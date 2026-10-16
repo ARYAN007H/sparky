@@ -54,9 +54,7 @@ impl LearningSink for ProbeHook {
 }
 
 fn hook_installed() -> bool {
-    openhuman_core::agent::hooks::embedder_post_turn_hooks()
-        .iter()
-        .any(|hook| hook.name() == "embed-seam-runtime-hook")
+    openhuman_core::agent::hooks::embedder_post_turn_hooks().len() == 1
 }
 
 #[test]

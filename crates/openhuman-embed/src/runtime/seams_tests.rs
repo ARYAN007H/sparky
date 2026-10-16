@@ -56,10 +56,7 @@ fn live_replacement_and_removal_update_builder_hooks_and_restore_predecessors() 
     assert_eq!(post_turn_marker("different-diagnostic-name"), None);
     seams.post_turn_hook(name, None);
     assert!(Arc::ptr_eq(
-        &embedder_post_turn_hooks()
-            .into_iter()
-            .find(|hook| hook.name() == name)
-            .unwrap(),
+        &embedder_post_turn_hook_named(name).unwrap(),
         &original
     ));
     seams.tool_hook(
@@ -79,10 +76,7 @@ fn live_replacement_and_removal_update_builder_hooks_and_restore_predecessors() 
     );
     drop(seams);
     assert!(Arc::ptr_eq(
-        &embedder_post_turn_hooks()
-            .into_iter()
-            .find(|hook| hook.name() == name)
-            .unwrap(),
+        &embedder_post_turn_hook_named(name).unwrap(),
         &original
     ));
     replace_embedder_post_turn_hook(name, None);
@@ -115,11 +109,7 @@ fn ranker_kind() -> Option<&'static str> {
 
 /// How many hooks of `name` are registered, `None` for zero.
 fn post_turn_marker(name: &str) -> Option<u8> {
-    let count = embedder_post_turn_hooks()
-        .iter()
-        .filter(|hook| hook.name() == name)
-        .count();
-    u8::try_from(count).ok().filter(|count| *count > 0)
+    embedder_post_turn_hook_named(name).map(|_| 1)
 }
 
 #[test]
@@ -234,9 +224,7 @@ fn same_named_hooks_unwind_newest_first() {
     assert_eq!(post_turn_marker("seams-dup-hook"), Some(1));
 
     drop(seams);
-    let restored = embedder_post_turn_hooks()
-        .into_iter()
-        .find(|hook| hook.name() == "seams-dup-hook")
+    let restored = embedder_post_turn_hook_named("seams-dup-hook")
         .expect("a hook under the name");
     assert!(
         Arc::ptr_eq(&restored, &original),

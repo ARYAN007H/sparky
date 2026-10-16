@@ -160,10 +160,6 @@ pub(super) async fn finalize_committed_turn(
     );
     let usage = super::holistic_last_turn_usage(&sidecar);
     let interrupted = sidecar.hit_cap || receipt.outcome.interrupted;
-    let turn_duration_ms = sidecar
-        .duration
-        .map(|duration| duration.as_millis().min(u128::from(u64::MAX)) as u64)
-        .unwrap_or_default();
     // State the caller reads as soon as `run_turn` returns.
     let prelude = {
         let mut state = state
