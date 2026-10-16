@@ -421,3 +421,25 @@ fn hosted_slugs_error_by_name_when_nothing_is_registered() {
         assert!(err.contains(slug), "{err}");
     }
 }
+
+/// With no hosted speech provider registered, the default routing strings are
+/// an expected "unavailable" state (filtered from Sentry), not a bad slug.
+#[test]
+fn default_speech_slugs_without_a_registered_provider_are_backend_unavailable() {
+    use crate::core::observability::is_backend_unavailable_message;
+    for slug in ["cloud", "openhuman", "backend"] {
+        let stt = create_stt_provider(slug, "", &cfg())
+            .err()
+            .unwrap_or_else(|| panic!("`{slug}` has no provider registered"));
+        assert!(is_backend_unavailable_message(&stt.to_string()), "{stt}");
+    }
+    for slug in ["cloud", "openhuman"] {
+        let tts = create_tts_provider(slug, "", &cfg())
+            .err()
+            .unwrap_or_else(|| panic!("`{slug}` has no provider registered"));
+        assert!(is_backend_unavailable_message(&tts.to_string()), "{tts}");
+    }
+    // A genuinely unknown slug keeps the misconfiguration wording.
+    let unknown = create_stt_provider("nonesuch", "", &cfg()).err().unwrap();
+    assert!(!is_backend_unavailable_message(&unknown.to_string()));
+}
