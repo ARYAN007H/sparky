@@ -31,6 +31,17 @@ pub enum WalletBackendCall {
     BridgeTransaction(Value),
 }
 
+impl From<tinywallet_bus::wire::WalletBackendRequest> for WalletBackendCall {
+    fn from(request: tinywallet_bus::wire::WalletBackendRequest) -> Self {
+        use tinywallet_bus::wire::WalletBackendRequest as Request;
+        match request {
+            Request::Routes => Self::Routes,
+            Request::SwapTransaction { body } => Self::SwapTransaction(body),
+            Request::BridgeTransaction { body } => Self::BridgeTransaction(body),
+        }
+    }
+}
+
 /// The pending answer of a [`WalletBackendHandler`].
 pub type WalletBackendFuture = Pin<Box<dyn Future<Output = Result<Value, String>> + Send>>;
 

@@ -641,16 +641,7 @@ impl WalletHost {
             .load_config()
             .await
             .map_err(callback_error)?;
-        let call = match request {
-            WalletBackendRequest::Routes => super::wallet_backend::WalletBackendCall::Routes,
-            WalletBackendRequest::SwapTransaction { body } => {
-                super::wallet_backend::WalletBackendCall::SwapTransaction(body)
-            }
-            WalletBackendRequest::BridgeTransaction { body } => {
-                super::wallet_backend::WalletBackendCall::BridgeTransaction(body)
-            }
-        };
-        let data = super::wallet_backend::call_wallet_backend(config, call)
+        let data = super::wallet_backend::call_wallet_backend(config, request.into())
             .await
             .map_err(callback_error)?;
         Ok(HostResponse::WalletBackend(WalletBackendResponse { data }))
