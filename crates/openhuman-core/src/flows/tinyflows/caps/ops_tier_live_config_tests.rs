@@ -443,7 +443,7 @@ async fn http_adapter_passes_its_live_upgrade_to_the_http_gate_without_egress() 
         other => panic!("expected capability error, got {other:?}"),
     };
     assert_eq!(
-        message, "Invalid URL",
+        message, "Only http:// and https:// URLs are allowed",
         "the refreshed policy must pass the inner NetGate and reach URL validation"
     );
 }
