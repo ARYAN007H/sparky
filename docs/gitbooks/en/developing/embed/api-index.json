@@ -340,7 +340,7 @@
     },
     {
       "name": "post_turn_hook",
-      "signature": "pub fn post_turn_hook(mut self, hook: Arc<dyn PostTurnHook>) -> Self",
+      "signature": "pub fn post_turn_hook(mut self, hook: Arc<dyn LearningSink>) -> Self",
       "source": "crates/openhuman-embed/src/runtime/seams.rs",
       "line": 430
     },
@@ -418,7 +418,7 @@
     },
     {
       "name": "tool_hook",
-      "signature": "pub fn tool_hook(mut self, hook: Arc<dyn ToolHook>) -> Self",
+      "signature": "pub fn tool_hook(mut self, hook: Arc<dyn ToolHook<OpenHumanRunContext>>) -> Self",
       "source": "crates/openhuman-embed/src/runtime/seams.rs",
       "line": 437
     },

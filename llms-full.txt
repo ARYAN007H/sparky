@@ -664,13 +664,13 @@ description: "Host seams replace infrastructure ports; hooks observe or control 
 
 Runtime builders accept host-owned ports for storage, sessions, memory, tools and controller extensions. These are composition seams: the host supplies an implementation of the owning library's contract, while OpenHuman retains access policy, approvals and lifecycle.
 
-Post-turn and tool hooks can be registered runtime-wide or on one agent. Agent hooks compose with parent runtime hooks and do not leak into sibling contexts. Use stable hook names to replace or remove runtime registrations through the live API; changes apply to subsequent turns.
+Learning sinks and tool hooks can be registered runtime-wide or on one agent. Agent hooks compose with parent runtime hooks and do not leak into sibling contexts. Use the live API's registration key to replace or remove runtime registrations; changes apply to subsequent turns. Learning sinks receive the upstream `TurnSummary`, while tool hooks receive the turn's `OpenHumanRunContext` and tool event.
 
 ## Runtime and agent scope
 
 | Runtime responsibility | Agent or call responsibility |
 | --- | --- |
-| Shared port implementations and named global hook registrations | Scoped hooks and host overrides inherited by recursive child contexts |
+| Shared port implementations and keyed global hook registrations | Scoped hooks and host overrides inherited by recursive child contexts |
 
 ## Verified example
 
@@ -2532,7 +2532,7 @@ The agent and turn hooks are never installed in the global registry, so
 concurrent workers and later turns do not pick up one another's callbacks.
 Post-turn callbacks run asynchronously with an owned session snapshot.
 Independently spawned tasks that build sessions must explicitly inherit
-`openhuman_core::agent::hooks::HookScope` to carry scoped hooks.
+`tinyagents_hooks::scope::HookScope` to carry scoped hooks.
 
 Gateway attribution headers can be attached to `Route::header(name, value)`
 and used with `Turn::route`, or with `Provider::routed(route)` on an agent.
@@ -2849,7 +2849,7 @@ Public consuming methods that return `Self`, extracted from the RuntimeBuilder i
 - [`memory_engine`](https://github.com/tinyhumansai/openhuman/blob/main/crates/openhuman-embed/src/runtime/builder.rs#L246): `pub fn memory_engine(mut self, engine: Arc<dyn tinymemory_api::MemoryEngine>) -> Self`
 - [`model_defaults`](https://github.com/tinyhumansai/openhuman/blob/main/crates/openhuman-embed/src/runtime/builder.rs#L167): `pub fn model_defaults(mut self, model: super::ModelDefaults) -> Self`
 - [`modules`](https://github.com/tinyhumansai/openhuman/blob/main/crates/openhuman-embed/src/runtime/selection.rs#L155): `pub fn modules(mut self, modules: impl IntoIterator<Item = RuntimeModule>) -> Self`
-- [`post_turn_hook`](https://github.com/tinyhumansai/openhuman/blob/main/crates/openhuman-embed/src/runtime/seams.rs#L430): `pub fn post_turn_hook(mut self, hook: Arc<dyn PostTurnHook>) -> Self`
+- [`post_turn_hook`](https://github.com/tinyhumansai/openhuman/blob/main/crates/openhuman-embed/src/runtime/seams.rs#L430): `pub fn post_turn_hook(mut self, hook: Arc<dyn LearningSink>) -> Self`
 - [`privacy`](https://github.com/tinyhumansai/openhuman/blob/main/crates/openhuman-embed/src/runtime/builder.rs#L203): `pub fn privacy(mut self, value: openhuman_core::config::schema::PrivacyConfig) -> Self`
 - [`provider`](https://github.com/tinyhumansai/openhuman/blob/main/crates/openhuman-embed/src/runtime/builder.rs#L361): `pub fn provider(mut self, provider: Provider) -> Self`
 - [`sandbox`](https://github.com/tinyhumansai/openhuman/blob/main/crates/openhuman-embed/src/runtime/builder.rs#L172): `pub fn sandbox(mut self, mode: crate::SandboxModeSpec) -> Self`
@@ -2862,7 +2862,7 @@ Public consuming methods that return `Self`, extracted from the RuntimeBuilder i
 - [`storage`](https://github.com/tinyhumansai/openhuman/blob/main/crates/openhuman-embed/src/runtime/seams.rs#L457): `pub fn storage(mut self, source: impl Into<StorageSource>) -> Self`
 - [`token`](https://github.com/tinyhumansai/openhuman/blob/main/crates/openhuman-embed/src/runtime/builder.rs#L442): `pub fn token(mut self, token: TokenSource) -> Self`
 - [`tool_groups`](https://github.com/tinyhumansai/openhuman/blob/main/crates/openhuman-embed/src/runtime/builder.rs#L424): `pub fn tool_groups(mut self, tool_groups: ToolGroups) -> Self`
-- [`tool_hook`](https://github.com/tinyhumansai/openhuman/blob/main/crates/openhuman-embed/src/runtime/seams.rs#L437): `pub fn tool_hook(mut self, hook: Arc<dyn ToolHook>) -> Self`
+- [`tool_hook`](https://github.com/tinyhumansai/openhuman/blob/main/crates/openhuman-embed/src/runtime/seams.rs#L437): `pub fn tool_hook(mut self, hook: Arc<dyn ToolHook<OpenHumanRunContext>>) -> Self`
 - [`tool_ranker`](https://github.com/tinyhumansai/openhuman/blob/main/crates/openhuman-embed/src/runtime/seams.rs#L422): `pub fn tool_ranker(mut self, ranker: Arc<dyn ToolRanker>) -> Self`
 - [`tool_rules`](https://github.com/tinyhumansai/openhuman/blob/main/crates/openhuman-embed/src/runtime/builder.rs#L198): `pub fn tool_rules(mut self, value: tinytools::ToolRules) -> Self`
 - [`workspace`](https://github.com/tinyhumansai/openhuman/blob/main/crates/openhuman-embed/src/runtime/builder.rs#L298): `pub fn workspace(mut self, workspace: Workspace) -> Self`
