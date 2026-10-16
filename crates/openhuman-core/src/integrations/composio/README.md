@@ -137,7 +137,7 @@ From `tools.rs` (`all_composio_agent_tools`, registered only when `agent::subage
 
 The subscribers live in `bus/`. All three are registered by one call, `register_composio_trigger_subscriber()`, from [`crates/openhuman-core/src/core/runtime/subscribers.rs`](../../core/runtime/subscribers.rs) after trigger history initialization:
 
-- **`ComposioTriggerSubscriber`**, reacts to `DomainEvent::ComposioTriggerReceived` (published by `platform::socket::event_handlers` when the backend emits `composio:trigger`); archives the event to `trigger_history` and routes it through `agent::triage::run_triage` unless `OPENHUMAN_TRIGGER_TRIAGE_DISABLED`, `composio.triage_disabled`, or `composio.triage_disabled_toolkits` opts out.
+- **`ComposioTriggerSubscriber`**, reacts to `DomainEvent::ComposioTriggerReceived` (published by `platform::socket::event_handlers` when the backend emits `composio:trigger`); archives the event to `trigger_history` and routes it through `triage::run_triage` unless `OPENHUMAN_TRIGGER_TRIAGE_DISABLED`, `composio.triage_disabled`, or `composio.triage_disabled_toolkits` opts out.
 - **`ComposioConnectionCreatedSubscriber`**, reacts to `DomainEvent::ComposioConnectionCreated` (published by `composio_authorize`); waits for the connection to go active, invalidates and eagerly warms the integrations cache, then (after onboarding, for toolkits with a native identity provider) fetches the profile.
 - **`ComposioConfigChangedSubscriber`**, reacts to `DomainEvent::ComposioConfigChanged` (mode/api-key changes).
 

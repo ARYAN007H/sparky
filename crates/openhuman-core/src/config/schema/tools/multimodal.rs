@@ -120,7 +120,7 @@ impl MultimodalFileConfig {
     /// `[tools.multimodal_files]` block in `config.toml`.
     ///
     /// Mirrors the triage-arm hardening in
-    /// `openhuman::agent::triage::evaluator`. Apply at the per-turn
+    /// `openhuman::triage::evaluator`. Apply at the per-turn
     /// application site (the channel-runtime dispatcher) — the
     /// operator-supplied `config.multimodal_files` stays the source of
     /// truth for the desktop / web-chat path where the user owns the

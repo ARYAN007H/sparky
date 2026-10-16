@@ -18,7 +18,7 @@ use crate::inference::provider::{self, INFERENCE_BACKEND_ID};
 /// short chat-shaped call, so it follows the user's `chat` route.
 const TRIAGE_ROLE: &str = "chat";
 
-/// The concrete provider + metadata that [`crate::agent::triage::evaluator::run_triage`]
+/// The concrete provider + metadata that [`crate::triage::evaluator::run_triage`]
 /// should use for this particular triage turn.
 pub struct ResolvedProvider {
     /// Model source for this arm. Production sources are crate-native.

@@ -19,7 +19,7 @@
 //! ## Usage
 //!
 //! ```ignore
-//! use crate::agent::triage::{run_triage, apply_decision, TriggerEnvelope};
+//! use crate::triage::{run_triage, apply_decision, TriggerEnvelope};
 //!
 //! // 1. Hydrate the envelope
 //! let envelope = TriggerEnvelope::from_composio(toolkit, trigger, id, uuid, payload);

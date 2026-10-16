@@ -13,7 +13,7 @@ use chrono::Utc;
 use serde_json::{json, Map, Value};
 use uuid::Uuid;
 
-use crate::agent::triage::{
+use crate::triage::{
     apply_decision, local_trigger_origin, run_triage, TriageOutcome, TriggerEnvelope, TriggerSource,
 };
 use crate::agent::turn_origin::with_origin;
@@ -478,8 +478,8 @@ pub async fn handle_stats(ctx: &DispatchCtx, _params: Map<String, Value>) -> Res
 
 /// Map the triage decision to a 0.0–1.0 importance score so the frontend
 /// can sort/filter without understanding triage action semantics.
-fn triage_action_to_score(action: crate::agent::triage::TriageAction) -> f32 {
-    use crate::agent::triage::TriageAction;
+fn triage_action_to_score(action: crate::triage::TriageAction) -> f32 {
+    use crate::triage::TriageAction;
     match action {
         TriageAction::Drop => 0.1,
         TriageAction::Acknowledge => 0.35,

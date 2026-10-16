@@ -1,5 +1,5 @@
 use super::*;
-use crate::agent::triage::TriggerEnvelope;
+use crate::triage::TriggerEnvelope;
 use crate::core::events::DomainEvent;
 use serde_json::json;
 use std::sync::Arc;

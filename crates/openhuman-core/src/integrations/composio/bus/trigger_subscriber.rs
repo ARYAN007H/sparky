@@ -4,7 +4,7 @@ use crate::core::runtime::DispatchCtx;
 use async_trait::async_trait;
 use tinybus::EventHandler;
 
-use crate::agent::triage::{
+use crate::triage::{
     apply_decision, remote_trigger_origin, run_triage, TriageOutcome, TriggerEnvelope,
 };
 use crate::agent::turn_origin::with_origin;
@@ -18,7 +18,7 @@ use crate::integrations::composio::trigger_history;
 pub(super) const TRIAGE_DISABLED_ENV: &str = "OPENHUMAN_TRIGGER_TRIAGE_DISABLED";
 
 /// Logs and (when enabled) routes `ComposioTriggerReceived` events
-/// through the reusable `agent::triage` pipeline.
+/// through the reusable `triage` pipeline.
 pub struct ComposioTriggerSubscriber;
 
 impl ComposioTriggerSubscriber {
@@ -181,7 +181,7 @@ impl EventHandler<DomainEvent> for ComposioTriggerSubscriber {
         tracing::debug!(
             label = %envelope.display_label,
             external_id = %envelope.external_id,
-            "[composio][triage] dispatching to agent::triage::run_triage"
+            "[composio][triage] dispatching to triage::run_triage"
         );
 
         // Spawn so the bus dispatch loop stays non-blocking — the

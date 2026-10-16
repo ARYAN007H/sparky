@@ -923,12 +923,12 @@ pub enum DomainEvent {
 
     // ── Triage ──────────────────────────────────────────────────────────
     //
-    // Published by `crate::agent::triage` when an external
+    // Published by `crate::triage` when an external
     // trigger (Composio webhook today, cron / webhook / other sources
     // later) has been classified by the trigger-triage agent. The
     // `source` field is a short slug like `"composio"` / `"cron"` so the
     // events stay source-agnostic — any module that calls
-    // `agent::triage::run_triage` will publish these.
+    // `triage::run_triage` will publish these.
     /// A trigger event was evaluated by the triage agent and assigned
     /// one of the four actions (drop / acknowledge / react / escalate).
     TriggerEvaluated {

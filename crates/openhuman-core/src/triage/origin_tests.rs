@@ -4,7 +4,7 @@
 //! handing a trust root to remote content.
 
 use super::*;
-use crate::agent::triage::envelope::TriggerEnvelope;
+use crate::triage::envelope::TriggerEnvelope;
 
 fn composio_envelope() -> TriggerEnvelope {
     TriggerEnvelope::from_composio(
@@ -124,7 +124,7 @@ fn every_dispatch_site_scopes_an_origin() {
             // The triage module defines and tests `apply_decision`; it is the
             // callee, not a call site. Test files model callers rather than
             // being them.
-            if rel.starts_with("crates/openhuman-core/src/agent/triage/")
+            if rel.starts_with("crates/openhuman-core/src/triage/")
                 || rel.ends_with("_tests.rs")
             {
                 continue;

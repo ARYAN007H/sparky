@@ -375,7 +375,7 @@ fn handle_triage_evaluate(ctx: DispatchCtx, params: Map<String, Value>) -> Contr
                 let toolkit = p.toolkit.as_deref().unwrap_or("unknown");
                 let trigger = p.trigger.as_deref().unwrap_or("unknown");
                 let eid = p.external_id.as_deref().unwrap_or("rpc");
-                crate::agent::triage::TriggerEnvelope::from_composio(
+                crate::triage::TriggerEnvelope::from_composio(
                     toolkit, trigger, "rpc", eid, p.payload,
                 )
             }
@@ -384,7 +384,7 @@ fn handle_triage_evaluate(ctx: DispatchCtx, params: Map<String, Value>) -> Contr
                 let tunnel_id = p.external_id.as_deref().unwrap_or("unknown");
                 let method = p.toolkit.as_deref().unwrap_or("POST");
                 let path = p.trigger.as_deref().unwrap_or("/");
-                crate::agent::triage::TriggerEnvelope::from_webhook(
+                crate::triage::TriggerEnvelope::from_webhook(
                     tunnel_id, method, path, p.payload,
                 )
             }
@@ -399,13 +399,13 @@ fn handle_triage_evaluate(ctx: DispatchCtx, params: Map<String, Value>) -> Contr
                     .get("output")
                     .and_then(Value::as_str)
                     .unwrap_or(job_name);
-                crate::agent::triage::TriggerEnvelope::from_cron(job_id, job_name, output)
+                crate::triage::TriggerEnvelope::from_cron(job_id, job_name, output)
             }
             "external" => {
                 tracing::trace!("[rpc][agent] building external trigger envelope");
                 let caller_id = p.external_id.as_deref().unwrap_or("unknown");
                 let reason = p.display_label.as_str();
-                crate::agent::triage::TriggerEnvelope::from_external(caller_id, reason, p.payload)
+                crate::triage::TriggerEnvelope::from_external(caller_id, reason, p.payload)
             }
             other => {
                 tracing::warn!(source = %other, "[rpc][agent] unsupported trigger source");
@@ -421,22 +421,22 @@ fn handle_triage_evaluate(ctx: DispatchCtx, params: Map<String, Value>) -> Contr
             "[rpc][agent] running triage pipeline"
         );
 
-        let outcome = crate::agent::triage::run_triage(&ctx, &envelope)
+        let outcome = crate::triage::run_triage(&ctx, &envelope)
             .await
             .map_err(|e| format!("triage evaluation failed: {e}"))?;
 
         let dry_run = p.dry_run.unwrap_or(false);
         match outcome {
-            crate::agent::triage::TriageOutcome::Decision(run) => {
+            crate::triage::TriageOutcome::Decision(run) => {
                 if !dry_run {
                     // Locally initiated: this is the desktop's own RPC surface,
                     // so the dispatch keeps the authority its caller already
                     // had. The envelope it builds may name a remote *source*,
                     // but the request itself is local (#5634).
-                    let origin = crate::agent::triage::local_trigger_origin();
+                    let origin = crate::triage::local_trigger_origin();
                     crate::agent::turn_origin::with_origin(
                         origin,
-                        crate::agent::triage::apply_decision(&ctx, run.clone(), &envelope),
+                        crate::triage::apply_decision(&ctx, run.clone(), &envelope),
                     )
                     .await
                     .map_err(|e| format!("apply_decision failed: {e}"))?;
@@ -453,7 +453,7 @@ fn handle_triage_evaluate(ctx: DispatchCtx, params: Map<String, Value>) -> Contr
                     "dry_run": dry_run,
                 }))
             }
-            crate::agent::triage::TriageOutcome::Deferred {
+            crate::triage::TriageOutcome::Deferred {
                 defer_until_ms,
                 reason,
             } => {
@@ -469,7 +469,7 @@ fn handle_triage_evaluate(ctx: DispatchCtx, params: Map<String, Value>) -> Contr
                     "dry_run": dry_run,
                 }))
             }
-            crate::agent::triage::TriageOutcome::Terminal { reason } => Ok(serde_json::json!({
+            crate::triage::TriageOutcome::Terminal { reason } => Ok(serde_json::json!({
                 "decision": "terminal",
                 "resolution_path": "terminal",
                 "reason": reason,

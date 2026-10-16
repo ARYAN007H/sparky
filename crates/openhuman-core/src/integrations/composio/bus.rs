@@ -7,7 +7,7 @@
 //!   [`DomainEvent::ComposioTriggerReceived`] (the backend HMAC-verifies a
 //!   Composio webhook and emits `composio:trigger` over Socket.IO). Archives
 //!   the trigger and, unless `OPENHUMAN_TRIGGER_TRIAGE_DISABLED` or the config
-//!   opts out, routes it through `agent::triage`.
+//!   opts out, routes it through `triage`.
 //! - [`ComposioConnectionCreatedSubscriber`] — handles
 //!   [`DomainEvent::ComposioConnectionCreated`]: waits for the connection to
 //!   become active, refreshes the integrations cache, fetches the account
