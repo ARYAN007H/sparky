@@ -12,8 +12,8 @@
 
 use crate::agent::harness::host_definition::AgentDefinitionRegistry;
 use crate::agent::prompts::{
-    render_datetime, render_identity, render_tools, render_workspace, ConnectedIntegration,
-    PromptContext,
+    ConnectedIntegration, PromptContext, render_datetime, render_identity, render_tools,
+    render_workspace,
 };
 use crate::tools::orchestrator_tools::sanitise_slug;
 use crate::tools::toolpacks;

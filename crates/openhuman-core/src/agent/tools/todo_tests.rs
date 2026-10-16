@@ -1,5 +1,5 @@
 use super::*;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use tinyagents_graph::todos::{TodoItem, TodoStatus};
 
 /// Serialize tests that share the process-global scratch store. Same lock
@@ -14,7 +14,9 @@ async fn scratch_lock_async() -> tokio::sync::MutexGuard<'static, ()> {
     SCRATCH_TEST_LOCK.lock().await
 }
 
-fn todo_store(workspace_dir: &std::path::Path) -> std::sync::Arc<dyn tinyagents_harness::store::Store> {
+fn todo_store(
+    workspace_dir: &std::path::Path,
+) -> std::sync::Arc<dyn tinyagents_harness::store::Store> {
     crate::agent::session_store::stores_or_ephemeral(workspace_dir).kv
 }
 
@@ -226,9 +228,13 @@ async fn a_legacy_session_keyed_list_is_migrated_forward_once() {
         id: parent.session_id.clone(),
     };
     let item = TodoItem::with_status("carried over", TodoStatus::InProgress);
-    tinyagents_graph::todos::store::replace(&todo_store(&workspace_dir), legacy_scope.key(), vec![item])
-        .await
-        .unwrap();
+    tinyagents_graph::todos::store::replace(
+        &todo_store(&workspace_dir),
+        legacy_scope.key(),
+        vec![item],
+    )
+    .await
+    .unwrap();
 
     let tool = TodoTool::new(workspace_dir.clone());
     let read = tool
@@ -248,9 +254,10 @@ async fn a_legacy_session_keyed_list_is_migrated_forward_once() {
     let thread_scope = TodoScope::Session {
         id: "thread-legacy".into(),
     };
-    let migrated = tinyagents_graph::todos::store::list(&todo_store(&workspace_dir), thread_scope.key())
-        .await
-        .unwrap();
+    let migrated =
+        tinyagents_graph::todos::store::list(&todo_store(&workspace_dir), thread_scope.key())
+            .await
+            .unwrap();
     assert_eq!(migrated.items.len(), 1);
 }
 
@@ -284,9 +291,11 @@ async fn sessions_do_not_see_each_other_and_a_list_survives_across_turns() {
         "a later turn of the same session reads it back"
     );
     assert_eq!(a_again.thread_id, "sess-a");
-    assert!(tinyagents_graph::todos::store::list(&todo_store(&workspace_dir), b.key())
-        .await
-        .unwrap()
-        .items
-        .is_empty());
+    assert!(
+        tinyagents_graph::todos::store::list(&todo_store(&workspace_dir), b.key())
+            .await
+            .unwrap()
+            .items
+            .is_empty()
+    );
 }

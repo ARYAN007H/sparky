@@ -21,11 +21,11 @@
 //! `crate::agent::tinyagents`); there is no in-house interrupt fence.
 
 pub mod artifact_offload;
-#[cfg(test)]
-pub(crate) mod test_support;
 pub mod fork_context;
 pub(crate) mod graph;
 pub mod host_definition;
+#[cfg(test)]
+pub(crate) mod test_support;
 pub(crate) mod tool_result_artifacts;
 
 // NOTE: deliberately no flat re-export here. `artifact_offload::ArtifactKind`

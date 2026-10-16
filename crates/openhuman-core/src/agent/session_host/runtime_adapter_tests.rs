@@ -298,7 +298,8 @@ fn wildcard_delegate_visibility_admits_new_connections_and_removes_revoked_ones(
 #[tokio::test]
 async fn committed_goal_accounting_uses_direct_and_completed_child_usage() {
     let workspace = tempfile::tempdir().unwrap();
-    tinyagents_graph::goals::store::set(&crate::agent::session_store::stores_or_ephemeral(workspace.path()).kv,
+    tinyagents_graph::goals::store::set(
+        &crate::agent::session_store::stores_or_ephemeral(workspace.path()).kv,
         "receipt-goal",
         "finish migration",
         Some(20),
@@ -325,10 +326,13 @@ async fn committed_goal_accounting_uses_direct_and_completed_child_usage() {
 
     account_committed_turn_against_goal(workspace.path(), Some("receipt-goal"), &sidecar).await;
 
-    let goal = tinyagents_graph::goals::store::get(&crate::agent::session_store::stores_or_ephemeral(workspace.path()).kv, "receipt-goal")
-        .await
-        .unwrap()
-        .unwrap();
+    let goal = tinyagents_graph::goals::store::get(
+        &crate::agent::session_store::stores_or_ephemeral(workspace.path()).kv,
+        "receipt-goal",
+    )
+    .await
+    .unwrap()
+    .unwrap();
     assert_eq!(
         goal.tokens_used, 21,
         "receipt accounts direct + child usage"

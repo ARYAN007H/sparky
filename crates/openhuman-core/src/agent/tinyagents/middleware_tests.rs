@@ -1,9 +1,8 @@
 use super::approval::approval_tool_name;
 use super::repeated_failure::{is_body_level_failure, user_actionable_escalation};
 use super::tool_output::{
-    is_compaction_exempt, is_truncation_exempt, COMPACTION_EXEMPT_TOOLS, SAMPLING_TOOLS,
+    COMPACTION_EXEMPT_TOOLS, SAMPLING_TOOLS, is_compaction_exempt, is_truncation_exempt,
 };
-use tinyagents_harness::config::ToolRuntimeConfig;
 use crate::agent::tinyagents::middleware::embedder_hooks::EmbedderToolHooksMiddleware;
 use crate::agent::tinyagents::middleware::repeated_failure::RepeatedToolFailureMiddleware;
 use crate::agent::tinyagents::middleware::tool_outcome_capture::ToolOutcomeCaptureMiddleware;
@@ -11,6 +10,7 @@ use crate::agent::tinyagents::middleware::tool_output::ToolOutputMiddleware;
 use serde_json::json;
 use std::collections::HashMap;
 use std::sync::Arc;
+use tinyagents_harness::config::ToolRuntimeConfig;
 
 use async_trait::async_trait;
 
@@ -20,9 +20,9 @@ use tinyinference_llm::message::Message as TaMessage;
 use tinyinference_llm::tool::ToolCall as TaToolCall;
 use tinytools::{ToolPolicy as TaToolPolicy, ToolResult as TaToolResult};
 
-use tinyagents_harness::middleware::library::DEFAULT_CLEARED_PLACEHOLDER;
 use crate::agent::tinyagents::payload_summarizer::DynPayloadSummarizer;
 use tinyagents_harness::context::{RunConfig, RunContext};
+use tinyagents_harness::middleware::library::DEFAULT_CLEARED_PLACEHOLDER;
 use tinyinference_llm::model::ModelRequest;
 use tinyjuice_bus::types::AgentTokenjuiceCompression;
 use tinytools::Tool;

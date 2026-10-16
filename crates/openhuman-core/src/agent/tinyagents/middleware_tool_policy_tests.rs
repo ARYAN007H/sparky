@@ -148,15 +148,21 @@ fn desktop_approval_bypass_skips_only_require_approval_channel_verdict() {
     }
     let approval_middleware = middleware(ToolPolicyAction::RequireApproval);
     let request = call("desktop_goal", json!({"app":"TextEdit","goal":"type"}));
-    assert!(approval_middleware
-        .channel_permission_block(&request, false)
-        .is_some());
-    assert!(approval_middleware
-        .channel_permission_block(&request, true)
-        .is_none());
-    assert!(middleware(ToolPolicyAction::Deny)
-        .channel_permission_block(&request, true)
-        .is_some());
+    assert!(
+        approval_middleware
+            .channel_permission_block(&request, false)
+            .is_some()
+    );
+    assert!(
+        approval_middleware
+            .channel_permission_block(&request, true)
+            .is_none()
+    );
+    assert!(
+        middleware(ToolPolicyAction::Deny)
+            .channel_permission_block(&request, true)
+            .is_some()
+    );
 }
 
 fn call(name: &str, args: serde_json::Value) -> TaToolCall {

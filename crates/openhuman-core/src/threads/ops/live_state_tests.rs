@@ -63,9 +63,14 @@ async fn goal_get_reads_back_a_stored_goal() {
         .await
         .unwrap()
         .workspace_dir;
-    tinyagents_graph::goals::store::set(&crate::agent::session_store::stores_or_ephemeral(&dir).kv, "thread-goal-live", "ship it", Some(1000))
-        .await
-        .unwrap();
+    tinyagents_graph::goals::store::set(
+        &crate::agent::session_store::stores_or_ephemeral(&dir).kv,
+        "thread-goal-live",
+        "ship it",
+        Some(1000),
+    )
+    .await
+    .unwrap();
 
     let filled = goal_get(ThreadLiveStateRequest {
         thread_id: "thread-goal-live".to_string(),

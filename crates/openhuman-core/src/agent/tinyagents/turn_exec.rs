@@ -11,8 +11,8 @@ use std::collections::{BTreeSet, HashSet};
 use std::sync::{Arc, LazyLock};
 
 use anyhow::Result;
-use tinyagents_harness::runtime::{AgentInvocation, AgentTurnRequest, InvocationRuntime};
 use tinyagents_harness::runtime::AgentHarness;
+use tinyagents_harness::runtime::{AgentInvocation, AgentTurnRequest, InvocationRuntime};
 use tinyagents_harness::store::{InMemoryStore as ToolResultArtifactIndexStore, StoreRegistry};
 use tinyagents_harness::turn_policy::effective_max_iterations;
 use tinyagents_runtime::turn_driver::{
@@ -26,12 +26,12 @@ use crate::agent::tinyagents::middleware::turn_context::TurnContextMiddleware;
 use crate::agent::tinyagents::observability::{OpenhumanEventBridge, SubagentScope};
 use crate::agent::tinyagents::tool_registration::capability_diagnostics;
 use crate::agent::tinyagents::turn_middleware::{
-    install_turn_middleware, TurnMiddlewareInputs, TurnWiring,
+    TurnMiddlewareInputs, TurnWiring, install_turn_middleware,
 };
 use crate::agent::tinyagents::turn_models::TurnModels;
 use crate::agent::tinyagents::turn_outcome::TinyagentsTurnOutcome;
 use crate::agent::tinyagents::turn_plan::{
-    enforce_registry_diagnostics, turn_models_for_plan, turn_run_policy, OpenHumanTurnPlanner,
+    OpenHumanTurnPlanner, enforce_registry_diagnostics, turn_models_for_plan, turn_run_policy,
 };
 use crate::agent::tinyagents::turn_run_error::map_turn_run_error;
 use crate::agent::tinyagents::turn_run_finalize::finalize_turn_outcome;

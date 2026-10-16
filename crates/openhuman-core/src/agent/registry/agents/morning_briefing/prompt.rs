@@ -6,7 +6,7 @@
 //! post-processing in the runner.
 
 use crate::agent::prompts::{
-    render_ambient_environment, render_tools, render_workspace, PromptContext,
+    PromptContext, render_ambient_environment, render_tools, render_workspace,
 };
 use anyhow::Result;
 

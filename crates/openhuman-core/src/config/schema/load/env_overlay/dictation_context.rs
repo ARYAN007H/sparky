@@ -1,7 +1,7 @@
 //! Env overrides for dictation and the context-management budget.
 
-use crate::config::schema::load::env::EnvLookup;
 use crate::config::schema::Config;
+use crate::config::schema::load::env::EnvLookup;
 
 impl Config {
     pub(super) fn apply_dictation_env<E: EnvLookup + ?Sized>(&mut self, env: &E) {
@@ -132,7 +132,8 @@ impl Config {
                 self.context.summarizer_model = Some(model.to_string());
             }
         }
-        let context_default = tinyagents_harness::config::ToolRuntimeConfig::default().tool_result_budget_bytes;
+        let context_default =
+            tinyagents_harness::config::ToolRuntimeConfig::default().tool_result_budget_bytes;
         let context_env_set = env.contains("OPENHUMAN_CONTEXT_TOOL_RESULT_BUDGET_BYTES");
         if !context_env_set
             && self.context.tool_result_budget_bytes == context_default

@@ -32,7 +32,10 @@ use tinyagents_hooks::stop::{StopDecision, StopHook, TurnState};
 pub async fn load_for_thread(workspace_dir: &Path, thread_id: Option<&str>) -> Option<ThreadGoal> {
     let thread_id = normalized_thread(thread_id)?;
     let store = crate::agent::session_store::stores_or_ephemeral(workspace_dir).kv;
-    match tinyagents_graph::goals::store::get(&store, &thread_id).await.map_err(|e| e.to_string()) {
+    match tinyagents_graph::goals::store::get(&store, &thread_id)
+        .await
+        .map_err(|e| e.to_string())
+    {
         Ok(goal) => goal,
         Err(e) => {
             tracing::debug!(thread_id = %thread_id, error = %e, "[thread_goals] load_for_thread failed");
@@ -49,7 +52,10 @@ pub async fn resume_for_thread(
 ) -> Option<Option<ThreadGoal>> {
     let thread_id = normalized_thread(thread_id)?;
     let store = crate::agent::session_store::stores_or_ephemeral(workspace_dir).kv;
-    match tinyagents_graph::goals::store::resume(&store, &thread_id).await.map_err(|e| e.to_string()) {
+    match tinyagents_graph::goals::store::resume(&store, &thread_id)
+        .await
+        .map_err(|e| e.to_string())
+    {
         Ok(goal) => {
             if goal.status.is_active() {
                 BUS.publish(DomainEvent::ThreadGoalUpdated {
@@ -82,7 +88,10 @@ pub async fn complete_for_thread(workspace_dir: &Path, thread_id: Option<&str>) 
         return;
     };
     let store = crate::agent::session_store::stores_or_ephemeral(workspace_dir).kv;
-    match tinyagents_graph::goals::store::complete(&store, &thread_id).await.map_err(|e| e.to_string()) {
+    match tinyagents_graph::goals::store::complete(&store, &thread_id)
+        .await
+        .map_err(|e| e.to_string())
+    {
         Ok(goal) => {
             if matches!(goal.status, ThreadGoalStatus::Complete) {
                 BUS.publish(DomainEvent::ThreadGoalUpdated {
@@ -111,7 +120,10 @@ pub async fn clear_for_thread(workspace_dir: &Path, thread_id: Option<&str>) {
         return;
     };
     let store = crate::agent::session_store::stores_or_ephemeral(workspace_dir).kv;
-    match tinyagents_graph::goals::store::clear(&store, &thread_id).await.map_err(|e| e.to_string()) {
+    match tinyagents_graph::goals::store::clear(&store, &thread_id)
+        .await
+        .map_err(|e| e.to_string())
+    {
         Ok(existed) => {
             if existed {
                 BUS.publish(DomainEvent::ThreadGoalCleared {
@@ -153,7 +165,10 @@ pub async fn account_turn_against_goal(
         return;
     };
     let store = crate::agent::session_store::stores_or_ephemeral(workspace_dir).kv;
-    let prev = match tinyagents_graph::goals::store::get(&store, &thread_id).await.map_err(|e| e.to_string()) {
+    let prev = match tinyagents_graph::goals::store::get(&store, &thread_id)
+        .await
+        .map_err(|e| e.to_string())
+    {
         Ok(Some(goal)) => goal,
         Ok(None) => return,
         Err(e) => {

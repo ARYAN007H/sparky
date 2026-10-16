@@ -15,11 +15,10 @@ use super::super::repeated_failure::recovery_policy;
 use super::*;
 use crate::agent::tinyagents::middleware::repeated_failure::RepeatedToolFailureMiddleware;
 #[cfg(feature = "modules")]
-use tinyagents_harness::middleware::{call_effect, tool_sets_lookup, CallEffect};
+use tinyagents_harness::middleware::{CallEffect, call_effect, tool_sets_lookup};
 
 /// The shape of a production refusal: the gate's marker, then its reason.
-const SHELL_BLOCK: &str =
-    "[policy-blocked] Unbounded system scan of '/' is not allowed; scope the command to the \
+const SHELL_BLOCK: &str = "[policy-blocked] Unbounded system scan of '/' is not allowed; scope the command to the \
      project directory or a narrower path.";
 const FETCH_BLOCK: &str = "[policy-blocked] Command not allowed by security policy: web_fetch";
 const FILE_BLOCK: &str = "[policy-blocked] Security policy: forbidden path /etc/shadow";

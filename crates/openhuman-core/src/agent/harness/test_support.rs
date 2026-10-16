@@ -139,4 +139,3 @@ pub(crate) fn test_inherit_parallel_worker_def() -> AgentDefinition {
         role: None,
     }
 }
-
