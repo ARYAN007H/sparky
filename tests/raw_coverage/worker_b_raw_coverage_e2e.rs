@@ -21,7 +21,6 @@ use reqwest::StatusCode;
 use serde_json::{json, Value};
 use tempfile::{tempdir, TempDir};
 
-use openhuman_core::agent::turn_origin::{self, AgentTurnOrigin};
 use openhuman_core::config::Config;
 use openhuman_core::core::auth::{init_rpc_token, CORE_TOKEN_ENV_VAR};
 use openhuman_core::security::approval::gate::{
@@ -31,6 +30,7 @@ use openhuman_core::security::approval::types::{ExecutionOutcome, GateOutcome};
 use openhuman_core::security::credentials::{
     AuthService, APP_SESSION_PROVIDER, DEFAULT_AUTH_PROFILE_NAME,
 };
+use openhuman_core::security::turn_origin::{self, AgentTurnOrigin};
 use openhuman_rpc::server::build_core_http_router;
 
 const TEST_RPC_TOKEN: &str = "worker-b-raw-coverage-e2e-token";
