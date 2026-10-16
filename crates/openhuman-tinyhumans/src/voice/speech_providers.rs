@@ -48,10 +48,6 @@ impl SttProvider for CloudSttProvider {
         "cloud"
     }
 
-    fn configured_model(&self) -> Option<&str> {
-        Some(&self.model)
-    }
-
     async fn transcribe(
         &self,
         config: &Config,
