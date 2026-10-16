@@ -258,7 +258,18 @@ impl OpenHumanTurnPrelude {
         };
         let prefix = if cold {
             let tiered = self.build_system_prompt_tiered()?;
-            Some(super::prefix_snapshot::tiered_prefix_snapshot(&tiered))
+            let messages = tiered.system_messages();
+            tracing::debug!(
+                segments = messages.len(),
+                bytes = ?messages.iter().map(String::len).collect::<Vec<_>>(),
+                "[session] frozen system prompt as tiered segments"
+            );
+            Some(tinyagents_runtime::PrefixSnapshot::new(
+                messages
+                    .into_iter()
+                    .map(tinyinference_llm::message::Message::system)
+                    .collect(),
+            ))
         } else {
             None
         };
