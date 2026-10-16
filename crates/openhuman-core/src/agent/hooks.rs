@@ -10,8 +10,11 @@ use tinyagents_hooks::tool::{HookIdentity, ToolHook};
 
 use crate::agent::tinyagents::host::OpenHumanRunContext;
 
+type NamedLearningSink = (Option<String>, Arc<dyn LearningSink>);
+type NamedToolHook = (Option<String>, Arc<dyn ToolHook<OpenHumanRunContext>>);
+
 static EMBEDDER_POST_TURN_HOOKS: std::sync::LazyLock<
-    std::sync::Mutex<Vec<(Option<String>, Arc<dyn LearningSink>)>>,
+    std::sync::Mutex<Vec<NamedLearningSink>>,
 > = std::sync::LazyLock::new(|| std::sync::Mutex::new(Vec::new()));
 static EMBEDDER_TOOL_HOOKS: std::sync::LazyLock<
     std::sync::Mutex<Vec<(Option<String>, Arc<dyn ToolHook<OpenHumanRunContext>>)>>,
