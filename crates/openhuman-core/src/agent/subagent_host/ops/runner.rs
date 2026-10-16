@@ -478,8 +478,7 @@ async fn offload_outcome_artifacts(
 
     // Offload at the tighter of the global default and this agent's own result
     // cap, so a definition capped below the default (flow_memory_agent at 4 000
-    // chars) gets its full body on disk instead of truncated by
-    // `apply_max_result_chars` immediately after.
+    // chars) gets its full body on disk instead of truncated immediately after.
     let threshold =
         effective_offload_threshold(DEFAULT_OFFLOAD_THRESHOLD_BYTES, definition.max_result_chars);
 
@@ -1049,6 +1048,3 @@ async fn run_typed_mode(
     })
 }
 
-#[cfg(test)]
-#[path = "runner_result_cap_tests.rs"]
-mod result_cap_tests;
