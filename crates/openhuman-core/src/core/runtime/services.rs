@@ -127,6 +127,7 @@ pub(crate) async fn start_selected_services(
         tasks.track(
             "blob_sweep",
             crate::storage::blob_sweep::spawn(
+                &crate::core::runtime::DispatchCtx::new(std::sync::Arc::clone(ctx)),
                 crate::storage::blob_sweep::FIRST_SWEEP_DELAY,
                 crate::storage::blob_sweep::SWEEP_INTERVAL,
             ),
