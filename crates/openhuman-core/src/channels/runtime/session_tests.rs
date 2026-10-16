@@ -103,7 +103,7 @@ async fn channel_sign_in_resumes_listener_service_after_logout() {
     let observed_cleanups = Arc::clone(&cleanups);
     let (started_tx, mut started_rx) = tokio::sync::mpsc::unbounded_channel();
     let (cleaned_tx, mut cleaned_rx) = tokio::sync::mpsc::unbounded_channel();
-    let service = spawn_channel_service_with(controller.clone(), move |session| {
+    let service = spawn_channel_service_with(&DispatchCtx::unbound(), controller.clone(), move |session| {
         let starts = Arc::clone(&observed_starts);
         let cleanups = Arc::clone(&observed_cleanups);
         let started_tx = started_tx.clone();
@@ -168,7 +168,7 @@ async fn channel_service_created_during_logout_waits_for_sign_in() {
     let starts = Arc::new(AtomicUsize::new(0));
     let observed_starts = Arc::clone(&starts);
     let (started_tx, mut started_rx) = tokio::sync::mpsc::unbounded_channel();
-    let service = spawn_channel_service_with(controller.clone(), move |session| {
+    let service = spawn_channel_service_with(&DispatchCtx::unbound(), controller.clone(), move |session| {
         let starts = Arc::clone(&observed_starts);
         let started_tx = started_tx.clone();
         async move {
