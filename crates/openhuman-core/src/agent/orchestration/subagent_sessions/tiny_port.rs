@@ -1,0 +1,217 @@
+//! Adapter from TinyAgents' durable subagent-session port to OpenHuman storage.
+
+use std::{path::PathBuf, sync::Arc};
+
+use async_trait::async_trait;
+use tinyagents_orchestration::subagent::{
+    DurableSubagentSession as TinySession, DurableSubagentStatus as TinyStatus,
+    ReuseDecision as TinyReuseDecision, SubagentError, SubagentSessionSelector as TinySelector,
+    SubagentSessionStore as TinySessionStore, SubagentSessionUpsert as TinyUpsert,
+};
+
+use super::{
+    self, DurableSubagentSession, DurableSubagentStatus, SubagentSessionSelector,
+    SubagentSessionStore, SubagentSessionUpsert,
+};
+
+/// Routes generic Jobs/Message session operations through OpenHuman's existing
+/// workspace-scoped session store. Legacy rows acquire a lifecycle key only
+/// from their validated pause checkpoint; the public task id is never enough.
+#[derive(Clone)]
+pub(crate) struct OpenHumanTinySubagentSessionStore {
+    store: SubagentSessionStore,
+    checkpoint_dir: PathBuf,
+}
+
+impl OpenHumanTinySubagentSessionStore {
+    pub(crate) fn new(workspace_dir: PathBuf) -> Self {
+        Self {
+            checkpoint_dir: workspace_dir.join(".openhuman/subagent_checkpoints"),
+            store: SubagentSessionStore::new(workspace_dir),
+        }
+    }
+
+    fn convert(&self, row: DurableSubagentSession) -> Result<TinySession, SubagentError> {
+        let lifecycle_key = match row.lifecycle_key.clone() {
+            Some(key) => key,
+            None => {
+                let task_id = row.current_task_id.as_deref().ok_or_else(|| {
+                    SubagentError::Persistence(
+                        "legacy subagent session has no lifecycle task".into(),
+                    )
+                })?;
+                super::resolve_lifecycle_key(
+                    &self.store,
+                    &row.subagent_session_id,
+                    &row.parent_session,
+                    row.parent_thread_id.as_deref(),
+                    &self.checkpoint_dir,
+                )
+                .map_err(SubagentError::Persistence)
+                .and_then(|key| {
+                    if key.task_id == task_id {
+                        Ok(key)
+                    } else {
+                        Err(SubagentError::Persistence(
+                            "legacy session checkpoint task does not match".into(),
+                        ))
+                    }
+                })?
+            }
+        };
+        Ok(TinySession {
+            subagent_session_id: row.subagent_session_id,
+            parent_session: row.parent_session,
+            parent_thread_id: row.parent_thread_id,
+            worker_thread_id: row.worker_thread_id,
+            agent_id: row.agent_id,
+            display_name: row.display_name,
+            model: row.model,
+            sandbox_mode: row.sandbox_mode,
+            action_root: row.action_root,
+            task_key: row.task_key,
+            lifecycle_key,
+            task_title: row.task_title,
+            current_task_id: row.current_task_id,
+            status: match row.status {
+                DurableSubagentStatus::Running => TinyStatus::Running,
+                DurableSubagentStatus::Idle => TinyStatus::Idle,
+                DurableSubagentStatus::AwaitingUser => TinyStatus::AwaitingUser,
+                DurableSubagentStatus::Failed => TinyStatus::Failed,
+                DurableSubagentStatus::Closed => TinyStatus::Closed,
+            },
+            reusable: row.reusable,
+            latest_history: row.latest_history.map(|history| {
+                history
+                    .iter()
+                    .filter_map(tinyagents_runtime::transcript::transcript_to_message)
+                    .collect()
+            }),
+            latest_error: row.latest_error,
+            created_at: row.created_at,
+            updated_at: row.updated_at,
+            last_used_at: row.last_used_at,
+        })
+    }
+
+    fn selector(selector: TinySelector) -> SubagentSessionSelector {
+        SubagentSessionSelector {
+            parent_session: selector.parent_session,
+            parent_thread_id: selector.parent_thread_id,
+            agent_id: selector.agent_id,
+            model: selector.model,
+            sandbox_mode: selector.sandbox_mode,
+            action_root: selector.action_root,
+            task_key: selector.task_key,
+        }
+    }
+}
+
+#[async_trait]
+impl TinySessionStore for OpenHumanTinySubagentSessionStore {
+    async fn list_for_parent(
+        &self,
+        parent_session: &str,
+        parent_thread_id: Option<&str>,
+    ) -> Result<Vec<TinySession>, SubagentError> {
+        super::list_for_parent(&self.store, parent_session, parent_thread_id)
+            .map_err(SubagentError::Persistence)?
+            .into_iter()
+            .map(|row| self.convert(row))
+            .collect()
+    }
+
+    async fn get(&self, id: &str) -> Result<Option<TinySession>, SubagentError> {
+        let row = self
+            .store
+            .load()
+            .map_err(SubagentError::Persistence)?
+            .into_iter()
+            .find(|row| row.subagent_session_id == id);
+        row.map(|row| self.convert(row)).transpose()
+    }
+
+    async fn upsert_running(
+        &self,
+        upsert: TinyUpsert,
+    ) -> Result<(TinySession, TinyReuseDecision), SubagentError> {
+        let selector = Self::selector(upsert.selector);
+        let reuse = if upsert.force_fresh {
+            None
+        } else {
+            super::find_reusable(&self.store, &selector)
+                .map_err(SubagentError::Persistence)?
+        };
+        let decision = if upsert.force_fresh {
+            TinyReuseDecision::ForcedFresh
+        } else if let Some(session) = reuse.as_ref() {
+            if session.status == DurableSubagentStatus::Running {
+                TinyReuseDecision::ReusedRunning
+            } else {
+                TinyReuseDecision::ReusedIdle
+            }
+        } else {
+            TinyReuseDecision::SpawnedNew
+        };
+        let row = super::upsert_running(
+            &self.store,
+            SubagentSessionUpsert {
+                selector,
+                display_name: upsert.display_name,
+                task_title: upsert.task_title,
+                worker_thread_id: upsert.worker_thread_id,
+                task_id: upsert.task_id,
+                lifecycle_key: Some(upsert.lifecycle_key),
+            },
+            reuse.as_ref(),
+        )
+        .map_err(SubagentError::Persistence)?;
+        Ok((self.convert(row)?, decision))
+    }
+
+    async fn close(&self, id: &str) -> Result<bool, SubagentError> {
+        super::close(&self.store, id).map_err(SubagentError::Persistence)
+    }
+
+    async fn mark_finished(
+        &self,
+        id: &str,
+        task_id: &str,
+        status: TinyStatus,
+        history: Vec<tinyinference_llm::message::Message>,
+    ) -> Result<bool, SubagentError> {
+        let status = match status {
+            TinyStatus::Running => crate::agent::subagent_host::SubagentRunStatus::Incomplete {
+                reason: "still running".into(),
+            },
+            TinyStatus::Idle => crate::agent::subagent_host::SubagentRunStatus::Completed,
+            TinyStatus::AwaitingUser => {
+                crate::agent::subagent_host::SubagentRunStatus::AwaitingUser {
+                    question: history.last().map(tinyinference_llm::message::Message::text).unwrap_or_default(),
+                    options: None,
+                    checkpoint: Some(self.checkpoint_dir.clone()),
+                }
+            }
+            TinyStatus::Failed => crate::agent::subagent_host::SubagentRunStatus::Cancelled,
+            TinyStatus::Closed => return self.close(id).await,
+        };
+        let history = history
+            .iter()
+            .filter_map(tinyagents_runtime::transcript::message_to_native_transcript)
+            .collect();
+        super::mark_finished(&self.store, id, task_id, &status, history)
+            .map_err(SubagentError::Persistence)?;
+        Ok(true)
+    }
+
+    async fn mark_failed(
+        &self,
+        id: &str,
+        task_id: &str,
+        error: String,
+    ) -> Result<bool, SubagentError> {
+        super::mark_failed(&self.store, id, task_id, error)
+            .map_err(SubagentError::Persistence)?;
+        Ok(true)
+    }
+}
