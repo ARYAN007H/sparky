@@ -40,9 +40,9 @@
 //! with `tinyflows-import`; see [`tinyflows`].
 
 pub mod live;
+mod schemas;
 pub mod sessions;
 mod snapshot;
-mod schemas;
 pub mod tinyflows;
 
 pub use schemas::{
@@ -52,14 +52,14 @@ pub use schemas::{
 use std::path::Path;
 use std::sync::Arc;
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 use serde_json::json;
 use sha2::Digest;
 use tinystoragedrivers::{CollectionSpec, ErrorKind, Precondition};
 
 use super::documents::Repo;
 use super::rusqlite;
-use super::{block_on, Scope, StorageBackend};
+use super::{Scope, StorageBackend, block_on};
 use crate::config::Config;
 use rusqlite::Connection;
 use serde_json::Value;

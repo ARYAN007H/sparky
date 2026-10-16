@@ -3,13 +3,13 @@
 //! are honoured and a system job's handler result is what gets recorded.
 
 use super::*;
-use crate::cron::system_job_handlers::{register, SystemJobContext};
+use crate::cron::system_job_handlers::{SystemJobContext, register};
 use crate::cron::system_jobs::ensure_system_job;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 use tempfile::TempDir;
-use tinyflows_schedule::types::Schedule;
 use tinyflows_schedule::JobPolicy;
+use tinyflows_schedule::types::Schedule;
 
 /// Stores `policy` on the job.
 fn set_policy(config: &Config, job_id: &str, policy: JobPolicy) -> anyhow::Result<()> {
@@ -182,10 +182,12 @@ async fn dispatch_claims_the_slot_so_a_running_job_is_not_due_again() {
     dispatcher.dispatch(vec![job.clone()]).await.unwrap();
     let stored = cron::get_job(&config, &job.id).unwrap();
     assert!(stored.next_run > Utc::now(), "the running slot is claimed");
-    assert!(cron::due_jobs(&config, Utc::now())
-        .unwrap()
-        .iter()
-        .all(|due| due.id != job.id));
+    assert!(
+        cron::due_jobs(&config, Utc::now())
+            .unwrap()
+            .iter()
+            .all(|due| due.id != job.id)
+    );
     release.notify_one();
     dispatcher.drain().await;
 }
@@ -342,10 +344,12 @@ async fn a_system_job_handler_error_is_recorded_as_the_run_result() {
     dispatcher.drain().await;
     let stored = cron::get_job(&config, &job.id).unwrap();
     assert_eq!(stored.last_status.as_deref(), Some("error"));
-    assert!(stored
-        .last_output
-        .unwrap_or_default()
-        .contains("handler failed"));
+    assert!(
+        stored
+            .last_output
+            .unwrap_or_default()
+            .contains("handler failed")
+    );
 }
 
 #[tokio::test]
@@ -463,10 +467,12 @@ async fn a_flow_schedule_job_fires_through_the_trigger_sink() {
 
     let stored = cron::get_job(&config, &job.id).unwrap();
     assert_eq!(stored.last_status.as_deref(), Some("ok"));
-    assert!(stored
-        .last_output
-        .unwrap_or_default()
-        .contains("flow schedule tick emitted for flow flow-missing-for-sink"));
+    assert!(
+        stored
+            .last_output
+            .unwrap_or_default()
+            .contains("flow schedule tick emitted for flow flow-missing-for-sink")
+    );
     assert!(stored.next_run > Utc::now(), "the recurrence moved on");
 }
 

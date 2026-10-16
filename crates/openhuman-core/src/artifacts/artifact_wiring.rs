@@ -15,8 +15,8 @@ use std::path::Path;
 use std::sync::Arc;
 
 use crate::agent::harness::tool_result_artifacts::{HostArtifactStore, new_tool_result_store};
-use crate::storage::sessions::artifact_blobs_for;
 use crate::security::policy::tool_result_artifacts_dir;
+use crate::storage::sessions::artifact_blobs_for;
 use tinystoragedrivers::{MemoryStorage, Scope, StorageBackend};
 
 /// How long a tool-result artifact survives: the blob lifetime handed to

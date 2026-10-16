@@ -6,7 +6,7 @@
 //! truncation tests do.
 
 use super::*;
-use crate::threads::store::{self as conversations, run_reply_message_id, ConversationMessage};
+use crate::threads::store::{self as conversations, ConversationMessage, run_reply_message_id};
 use serde_json::json;
 use std::sync::Arc;
 use tempfile::TempDir;

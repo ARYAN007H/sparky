@@ -39,19 +39,19 @@
 //!   turn.
 
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use tinyagents_session::transcript::{
     SessionRef, SessionTranscript, TranscriptLocator, TranscriptMessage, TranscriptMeta,
     TruncateCut,
 };
 
-use crate::core::runtime::DispatchCtx;
 use crate::core::Outcome;
-use crate::threads::store::{self as conversations, reply_run_id, run_reply_message_id};
+use crate::core::runtime::DispatchCtx;
 use crate::threads::ThreadsError;
+use crate::threads::store::{self as conversations, reply_run_id, run_reply_message_id};
 
-use super::support::{transcript_store, workspace_dir, TranscriptStore};
+use super::support::{TranscriptStore, transcript_store, workspace_dir};
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]

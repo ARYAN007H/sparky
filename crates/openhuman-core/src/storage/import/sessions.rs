@@ -32,17 +32,17 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use anyhow::{Context, Result};
-use tinyagents_session::legacy::{
-    import_transcripts, import_turn_states, QuiescentSource, SourceOwner,
-};
-use tinyagents_session::transcript::{session_stem, SessionRef};
 use tinyagents_session::DriverSessionStores;
+use tinyagents_session::legacy::{
+    QuiescentSource, SourceOwner, import_transcripts, import_turn_states,
+};
+use tinyagents_session::transcript::{SessionRef, session_stem};
 
 use super::tinyflows::{finish, marked};
 use super::{Outcome, Report, Snapshot};
-use crate::storage::sessions::DEFAULT_AGENT;
 use crate::config::Config;
 use crate::storage::StorageBackend;
+use crate::storage::sessions::DEFAULT_AGENT;
 
 /// The marker name of the session import.
 pub const SESSIONS_DOMAIN: &str = "sessions";

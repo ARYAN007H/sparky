@@ -3,7 +3,7 @@ use crate::desktop::notifications::store as live;
 use crate::desktop::notifications::types::{
     CoreNotificationCategory, CoreNotificationEvent, IntegrationNotification, NotificationStatus,
 };
-use crate::storage::import::{run_with, Outcome};
+use crate::storage::import::{Outcome, run_with};
 use chrono::{Duration, Utc};
 use tempfile::TempDir;
 

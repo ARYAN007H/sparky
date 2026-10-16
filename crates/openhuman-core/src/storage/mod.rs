@@ -60,8 +60,8 @@ pub use tinystoragedrivers::{
     ScopedStorage, StorageBackend, StorageConfig as StorageUrl, StorageError,
 };
 
-use crate::config::schema::storage::redact_url;
 use crate::config::Config;
+use crate::config::schema::storage::redact_url;
 
 /// The environment variable that overrides `[storage] url`.
 pub const STORAGE_URL_VAR: &str = "OPENHUMAN_STORAGE_URL";

@@ -23,13 +23,13 @@
 
 use std::sync::Arc;
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 use chrono::{DateTime, Utc};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use crate::config::Config;
 use crate::storage::local;
-use crate::storage::{block_on, DocumentStore, DocumentStoreExt, ScopedStorage, StorageError};
+use crate::storage::{DocumentStore, DocumentStoreExt, ScopedStorage, StorageError, block_on};
 use tinystoragedrivers::{
     CollectionSpec, ErrorKind, Filter, IndexSpec, Precondition, Query, Sort, Versioned,
 };

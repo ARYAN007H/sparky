@@ -117,8 +117,7 @@ fn a_saas_subagent_without_a_context_or_tree_store_is_kept_in_memory() {
 #[test]
 fn subagent_transcript_keeps_cumulative_spend_separate_from_unknown_last_call() {
     let workspace = tempfile::tempdir().unwrap();
-    let locator =
-        crate::storage::sessions::transcripts_or_files("orchestrator", workspace.path());
+    let locator = crate::storage::sessions::transcripts_or_files("orchestrator", workspace.path());
     let usage = AggregatedUsage {
         input_tokens: 120,
         output_tokens: 30,
@@ -253,8 +252,7 @@ fn parallel_worker_without_thread_keeps_parent_transcript_affinity() {
 #[tokio::test]
 async fn explicit_worker_thread_replaces_parent_for_model_run_and_transcript() {
     let workspace = tempfile::tempdir().expect("workspace");
-    let locator =
-        crate::storage::sessions::transcripts_or_files("orchestrator", workspace.path());
+    let locator = crate::storage::sessions::transcripts_or_files("orchestrator", workspace.path());
     let mut parent = crate::agent::tinyagents::host::OpenHumanRunContext::new();
     parent.thread_id = Some("parent-thread".to_owned());
     parent.transcripts = Some(locator.clone());

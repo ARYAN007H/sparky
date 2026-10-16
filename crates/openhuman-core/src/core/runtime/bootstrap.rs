@@ -21,7 +21,7 @@ pub(crate) async fn bootstrap_core_runtime(
     domains: crate::core::runtime::DomainSet,
     ctx: &DispatchCtx,
 ) {
-    use crate::platform::socket::{set_global_socket_manager, SocketManager};
+    use crate::platform::socket::{SocketManager, set_global_socket_manager};
     use std::sync::Arc;
     // `embedded_core` derived from host_kind so the rest of the function (which
     // already keys behavior off the boolean) stays unchanged.
@@ -129,10 +129,9 @@ pub(crate) async fn bootstrap_core_runtime(
     // rendering as perpetual "running" timeline entries on thread reopen.
     if agent_enabled {
         if !crate::storage::installed_is_shared() {
-            match crate::storage::sessions::with_ledger(
-                &cfg.workspace_dir,
-                |ledger| async move { ledger.interrupt_orphaned_agent_runs().await },
-            ) {
+            match crate::storage::sessions::with_ledger(&cfg.workspace_dir, |ledger| async move {
+                ledger.interrupt_orphaned_agent_runs().await
+            }) {
                 Ok(0) => {}
                 Ok(count) => {
                     log::info!("[runtime] settled {count} orphaned agent run(s) on startup")
