@@ -22,8 +22,10 @@ async fn plan_exit_does_not_flip_while_a_review_is_parked() {
         tinyagents_harness::middleware::RunMode::Plan,
     );
     let gate = crate::plan_review::gate::global();
+    let tenant = crate::core::runtime::DispatchCtx::ambient().tenant().unwrap();
     let parked = tokio::spawn(async move {
         gate.request_review(
+            tenant,
             Some(thread_id.to_string()),
             None,
             "Plan".into(),
@@ -59,7 +61,11 @@ async fn plan_exit_does_not_flip_while_a_review_is_parked() {
     // bookkeeping don't leak past this test.
     assert!(
         crate::plan_review::gate::global()
-            .decide_by_thread(thread_id, PlanReviewResolution::Approve)
+            .decide_by_thread(
+                &crate::core::runtime::DispatchCtx::ambient().tenant().unwrap(),
+                thread_id,
+                PlanReviewResolution::Approve,
+            )
     );
     let resolution = parked.await.unwrap();
     assert_eq!(resolution, PlanReviewResolution::Approve);
