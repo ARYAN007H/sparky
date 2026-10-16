@@ -20,6 +20,17 @@ import {
 } from './element-helpers';
 import { supportsExecuteScript } from './platform';
 
+function safeRpcErrorSummary(result: { error?: string } | null) {
+  if (typeof result?.error !== 'string') return null;
+  return result.error
+    .replace(/https?:\/\/[^\s)]+/gi, '<url>')
+    .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, '<email>')
+    .replace(/\beyJ[A-Z0-9._-]+/gi, '<token>')
+    .replace(/\b[A-Z0-9_-]{32,}\b/gi, '<redacted>')
+    .replace(/\/(?:[^\s,;]+\/)*[^\s,;]+/g, '<path>')
+    .slice(0, 160);
+}
+
 function safeRpcFailureKind(result: { ok?: boolean; error?: string } | null) {
   if (!result || result.ok) return null;
   const message = (result.error ?? '').toLowerCase();
@@ -991,8 +1002,10 @@ export async function performFullLogin(
       hasStoredToken: Boolean(tokenValue?.token),
       stateHttpStatus: sessionState?.httpStatus ?? null,
       stateErrorKind: safeRpcFailureKind(sessionState),
+      stateErrorSummary: safeRpcErrorSummary(sessionState),
       tokenHttpStatus: sessionToken?.httpStatus ?? null,
       tokenErrorKind: safeRpcFailureKind(sessionToken),
+      tokenErrorSummary: safeRpcErrorSummary(sessionToken),
     };
     console.error(
       `${logPrefix} auth bootstrap failed; mock auth endpoints=${JSON.stringify(authRequests)}; core state=${JSON.stringify(coreState)}; session RPC=${JSON.stringify(sessionRpc)}`
