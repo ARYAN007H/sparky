@@ -18,6 +18,7 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use tinyagents_graph::goals::ThreadGoalStatus;
+use tinyagents_harness::multimodal::markers::extract_image_placeholders_in_text;
 use tinyagents_runtime::{
     CommitReceipt, ResumePreparation, SessionBuilder, SessionTerminal, ToolSnapshot,
     TranscriptTarget, TurnPreparation,
@@ -479,11 +480,8 @@ impl OpenHumanTurnPrelude {
         run_context.response_shape = turn.response_shape.clone();
         run_context.attach_parent(self.parent_context(run_context.parent.as_ref()));
         self.apply_pending_announcements(&mut enriched);
-        run_context.attachment_placeholders = Arc::new(
-            tinyagents_harness::multimodal::markers::extract_image_placeholders_in_text(
-                original_user_message,
-            ),
-        );
+        run_context.attachment_placeholders =
+            Arc::new(extract_image_placeholders_in_text(original_user_message));
         run_context.dispatch = Some(Arc::new(
             crate::agent::tinyagents::host::TurnDispatchState::new(
                 crate::agent::tinyagents::agent_turn_wall_clock_ms_for(
