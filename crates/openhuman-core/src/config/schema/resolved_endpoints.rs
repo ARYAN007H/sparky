@@ -27,6 +27,19 @@ pub struct ResolvedEndpoints {
     pub socket_url: Option<String>,
     /// Where tracing/observability events are pushed.
     pub tracing_ingest_url: Option<String>,
+    /// Where OTLP trace exports are pushed (the OTLP/HTTP traces endpoint of
+    /// the same tracing backend), when the host exposes one.
+    pub tracing_otlp_url: Option<String>,
+    /// The deployment bucket the host places its control plane in
+    /// (`"production"`, `"staging"`, `"development"` or `"external"`). The core
+    /// classifies loopback hosts itself and treats anything unrecognised as
+    /// `"external"`, which does not push traces.
+    pub deployment_environment: Option<String>,
+    /// Host patterns the installed host treats as its own managed backend:
+    /// an exact host (`api.example.com`) or a `.suffix` that matches any
+    /// subdomain (`.example.com`). Empty with no host registered, so nothing
+    /// is recognised as a managed endpoint.
+    pub managed_hosts: Vec<String>,
     /// Headers stamped on every request to the control plane, `(name, value)`.
     pub attribution_headers: Vec<(String, String)>,
     /// The product identity the host reports (the `x-sdk-name` value).
@@ -63,6 +76,13 @@ impl ResolvedEndpoints {
         })
     }
 
+    /// Whether `url` (or a bare host) names one of the resolved managed hosts.
+    /// Matching is on the host component only, case-insensitively, so a path
+    /// or query that happens to contain a managed host name never matches.
+    pub fn is_managed_host(&self, url: &str) -> bool {
+        host_matches_any(url, &self.managed_hosts)
+    }
+
     /// The attribution headers as a `reqwest` header map; invalid pairs are
     /// skipped.
     pub fn attribution_header_map(&self) -> reqwest::header::HeaderMap {
@@ -78,3 +98,38 @@ impl ResolvedEndpoints {
         map
     }
 }
+
+/// Lower-cased host of `url` (scheme, userinfo, port and path stripped).
+fn host_of(url: &str) -> String {
+    let lower = url.trim().to_ascii_lowercase();
+    let without_scheme = lower.split("://").nth(1).unwrap_or(&lower);
+    let authority = without_scheme.split('/').next().unwrap_or("");
+    let host = authority.split('@').next_back().unwrap_or(authority);
+    host.split(':').next().unwrap_or(host).to_string()
+}
+
+/// Whether the host of `url` equals a pattern or falls under a `.suffix`
+/// pattern. Empty patterns never match.
+pub fn host_matches_any(url: &str, patterns: &[String]) -> bool {
+    if patterns.is_empty() {
+        return false;
+    }
+    let host = host_of(url);
+    if host.is_empty() {
+        return false;
+    }
+    patterns.iter().any(|pattern| {
+        let pattern = pattern.trim().to_ascii_lowercase();
+        if pattern.is_empty() {
+            false
+        } else if pattern.starts_with('.') {
+            host.ends_with(&pattern)
+        } else {
+            host == pattern
+        }
+    })
+}
+
+#[cfg(test)]
+#[path = "resolved_endpoints_tests.rs"]
+mod tests;
