@@ -41,7 +41,7 @@ pub mod core {
             is_session_expired_message, is_suppressed_usage_probe_backoff,
             is_transient_http_status_code, is_transient_message_failure, report_error_or_expected,
             report_warning_message, ExpectedErrorKind, API_KEY_REJECTED_PREFIX,
-            BACKEND_UNAVAILABLE_PREFIX, REPORT_ERROR_TRACING_TARGET,
+            BACKEND_UNAVAILABLE_PREFIX, REPORT_ERROR_TRACING_TARGET, USAGE_PROBE_BACKOFF_PREFIX,
         };
     }
 
@@ -94,6 +94,11 @@ pub mod core {
     }
     pub mod shutdown {
         pub use openhuman_core::core::shutdown::{register, signal};
+    }
+    /// The generic extension slots every `register_*` below is built on;
+    /// `CoreBuilder::extensions` takes an [`Extensions`](slots::Extensions).
+    pub mod slots {
+        pub use openhuman_core::core::slots::{Extensions, HookSlot, Registry};
     }
     pub mod types {
         pub use openhuman_core::core::types::AppState;
@@ -260,6 +265,93 @@ pub mod util {
             host_is_local, join_url, normalize_api_base_url, normalize_backend_api_base_url,
         };
     }
+}
+
+// ---------------------------------------------------------------------------
+// Extension points (tinyhumans). Generic, id-keyed registries the hosted layer
+// fills at install time; the core knows nothing about what it is handed. Each
+// `register_*` has an `_in` variant that binds to a `CoreBuilder::extensions`
+// set instead of the process.
+// ---------------------------------------------------------------------------
+
+/// Tool sources: tools an outside crate appends to the agent catalogue.
+pub mod tool_sources {
+    pub use openhuman_core::tools::sources::{
+        register_tool_source, register_tool_source_in, unregister_tool_source, ToolSourceCtx,
+        ToolSourceFactory,
+    };
+}
+
+/// Egress disclosure, for hosted calls that leave the machine.
+pub mod egress {
+    pub use openhuman_core::security::egress::{
+        emit_external_transfer, emit_external_transfer_in, enforce_egress, DataKind,
+        EgressDescriptor, EgressLedger, EgressReason, IdentificationRisk,
+    };
+}
+
+/// Config enrichers and the resolved fields they fill.
+pub mod config_enrichers {
+    pub use openhuman_core::config::schema::resolved_endpoints::ResolvedEndpoints;
+    pub use openhuman_core::config::{
+        register_enricher, register_enricher_in, run_enrichers, unregister_enricher,
+        ConfigEnricher,
+    };
+}
+
+/// Composio route builders (`composio.mode` -> route).
+pub mod composio {
+    pub use openhuman_core::integrations::composio::client::{
+        register_composio_route_builder, unregister_composio_route_builder, ComposioRoute,
+        ComposioRouteBuilder,
+    };
+}
+
+/// Model-provider registries: chat models, embeddings, catalogs.
+pub mod inference_registry {
+    pub use openhuman_core::inference::provider::factory::PROVIDER_OPENHUMAN;
+    pub use openhuman_core::inference::registry::{
+        register_catalog, register_catalog_in, register_chat_model, register_chat_model_in,
+        register_embedding, register_embedding_in, unregister_catalog, unregister_chat_model,
+        unregister_embedding, BoxFuture, CatalogEntry, CatalogLimits, CatalogListing,
+        ChatModelEntry, ChatModelFactory, ChatModelRequest, EmbeddingFactory, EmbeddingRequest,
+        ReadinessProbe,
+    };
+}
+
+/// Memory engines by id, and the free-background-work predicate.
+pub mod memory_engines {
+    pub use openhuman_core::memory::engine::{Binding, BoundEngine};
+    pub use openhuman_core::memory::engine_registry::{
+        bound_engine, register_memory_engine, register_memory_engine_in, unregister_memory_engine,
+        EngineBuilder, EngineEntry, EngineFuture, EngineRequest, FreeBackground,
+    };
+}
+
+/// The channel callback slot.
+#[cfg(feature = "channels")]
+pub mod channel_callback {
+    pub use openhuman_core::channels::callback_slot::{
+        register_channel_callback, register_channel_callback_in, unregister_channel_callback,
+        CallbackFuture, ChannelCallback, ChannelCallbackCtx,
+    };
+}
+
+/// Voice provider registries: STT, TTS and live sessions by slug.
+#[cfg(feature = "voice")]
+pub mod voice_registry {
+    pub use openhuman_core::voice::factory::registry::{
+        register_stt_provider, register_stt_provider_in, register_tts_provider,
+        register_tts_provider_in, unregister_stt_provider, unregister_tts_provider,
+        SttProviderFactory, TtsProviderFactory,
+    };
+    pub use openhuman_core::voice::factory::{SttProvider, SttResult, TtsProvider};
+    pub use openhuman_core::voice::live::registry::{
+        register_live_provider, register_live_provider_in, unregister_live_provider, ConfigureFn,
+        ConfiguredFn, LiveFuture, LiveProviderEntry, PrepareFn,
+    };
+    pub use openhuman_core::voice::live::types::{LiveProviderInfo, LiveProviderKind};
+    pub use openhuman_core::voice::live::{LiveVoiceError, PreparedProvider};
 }
 
 // The rest is the rpc server alone.
