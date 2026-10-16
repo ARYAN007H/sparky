@@ -50,6 +50,23 @@ pub fn run_enrichers(config: &mut Config) {
     }
 }
 
+/// The managed-host patterns for `config`: the ones already resolved onto it,
+/// else the ones a registered enricher resolves.
+///
+/// Load-time migrations run before enrichment, so a freshly parsed config has
+/// nothing resolved yet. Hosts are static (they do not depend on user
+/// settings), so the registered enrichers are probed against a default config
+/// instead. With no enricher registered the list is empty and nothing is
+/// recognised as a managed endpoint.
+pub(crate) fn managed_hosts_for(config: &Config) -> Vec<String> {
+    if !config.resolved_endpoints.managed_hosts.is_empty() {
+        return config.resolved_endpoints.managed_hosts.clone();
+    }
+    let mut probe = Config::default();
+    run_enrichers(&mut probe);
+    probe.resolved_endpoints.managed_hosts
+}
+
 /// Consumes `config`, enriched.
 pub(crate) fn enriched(mut config: Config) -> Config {
     run_enrichers(&mut config);

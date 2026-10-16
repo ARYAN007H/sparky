@@ -146,7 +146,7 @@ impl CoreContext {
         token: &TokenSource,
         domains: crate::core::runtime::DomainSet,
     ) -> anyhow::Result<(Arc<CoreContext>, bool, Option<crate::config::Config>)> {
-        Self::init_with_config(host_kind, token, domains, Default::default(), None, None).await
+        Self::init_with_config(host_kind, token, domains, Default::default(), None).await
     }
 
     /// [`init`](Self::init) with an optional caller-supplied configuration.
