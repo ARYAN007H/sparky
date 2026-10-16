@@ -8,21 +8,14 @@
 //!    and channels all build their opening system prompts through this
 //!    module; there is no parallel implementation elsewhere in the crate.
 //!
-//! 2. **Mechanical history bookkeeping** — [`stats::ContextStatsState`] records
-//!    provider usage. Live reduction runs in the TinyAgents middleware stack.
+//! 2. **Middleware configuration** — `ContextConfig` configures the TinyAgents
+//! turn middleware stack.
 //!
-//! Agents hold a single [`ContextManager`] per session. The manager owns
-//! per-conversation state (budget, utilisation) while prompt assembly remains
-//! centralized here.
-//!
-//! Submodules are added incrementally as the `agent/` → `context/`
-//! migration lands (see plan `misty-bubbling-bunny.md`).
+//! Session hosts hold their prompt builder and context settings directly;
+//! TinyAgents owns live transcript reduction and middleware execution.
 
 pub mod channels_prompt;
-pub mod manager;
-pub mod stats;
 
-pub use manager::{ContextManager, ContextStats};
 /// Default number of most-recent tool-result envelopes the TinyAgents
 /// microcompact middleware leaves intact.
 pub const DEFAULT_KEEP_RECENT_TOOL_RESULTS: usize = 5;

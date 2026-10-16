@@ -1,23 +1,13 @@
-//! Test fixtures: read a thread's head transcript out of a transcript store and
-//! write an edited copy back through the store port.
-//!
-//! Tests that need a transcript in a state the real writer never produces (an
-//! orphaned tool head, a replayed `[Tool results]` round) used to splice raw
-//! JSONL rows into the file the session host wrote. The host writes through a
-//! store port now, so the splice goes through the same port.
+//! Test helpers for editing transcript-store fixtures through the locator API.
 
 use std::sync::Arc;
 
-use tinyagents_session::port::{DriverSessionStores, SessionStoreProvider};
 use tinyagents_session::transcript::{TranscriptLocator, TranscriptMessage, TranscriptMeta};
 
 /// A fresh transcript store over the driver ports on memory (the production
 /// store, minus the disk), shared by cloning the `Arc`.
 pub(crate) fn memory_locator() -> Arc<dyn TranscriptLocator> {
-    DriverSessionStores::new(Arc::new(crate::storage::MemoryStorage::new()))
-        .expect("driver session stores over memory")
-        .for_agent("fixture")
-        .transcripts
+    tinyagents_session::testkit::in_memory_transcript()
 }
 
 /// A thread's head transcript as the model reads it.
