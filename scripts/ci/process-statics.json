@@ -238,5 +238,85 @@
     "category": "A",
     "reason": "This cfg(test)-only recorder captures trigger events emitted by unit-test fixtures so assertions can inspect helper output; it is absent from production builds and is not an application event store.",
     "verification": "triage/escalation_tests.rs: apply_decision_escalate_failure_publishes_failed_event"
+  },
+  {
+    "file": "crates/openhuman-core/src/agent/hooks.rs",
+    "scope": "",
+    "name": "EMBEDDER_POST_TURN_HOOKS",
+    "type": "std::sync::LazyLock<std::sync::Mutex<Vec<(Option<String>,Arc<dyn LearningSink>)>>, >",
+    "count": 1,
+    "category": "A",
+    "reason": "Embedder post-turn hooks are intentionally registered process-wide as host defaults; per-agent and per-turn hooks live in CoreContext host overrides, and this registry does not store tenant identifiers or per-agent callback entries.",
+    "verification": "openhuman-embed/tests/scoped_hooks.rs: hooks_are_additive_and_isolated_across_agents_turns_and_reused_ids"
+  },
+  {
+    "file": "crates/openhuman-core/src/agent/hooks.rs",
+    "scope": "",
+    "name": "EMBEDDER_TOOL_HOOKS",
+    "type": "std::sync::LazyLock<std::sync::Mutex<Vec<(Option<String>,Arc<dyn ToolHook<OpenHumanRunContext>>)>>, >",
+    "count": 1,
+    "category": "A",
+    "reason": "Embedder tool hooks are intentionally process-wide host defaults; per-agent and per-turn hooks live in CoreContext host overrides, and each invocation receives its own OpenHumanRunContext rather than registry-held tenant state.",
+    "verification": "openhuman-embed/tests/scoped_hooks.rs: hooks_are_additive_and_isolated_across_agents_turns_and_reused_ids"
+  },
+  {
+    "file": "crates/openhuman-core/src/backend/telemetry/langfuse/environment.rs",
+    "scope": "",
+    "name": "SKIP_LOGGED",
+    "type": "std::sync::Once",
+    "count": 1,
+    "category": "A",
+    "reason": "This process-wide latch suppresses duplicate informational messages when Langfuse pushes are disabled for an environment; it stores no request, credential, or tenant data.",
+    "verification": "backend/telemetry/langfuse/environment.rs: skip_push calls Once::call_once"
+  },
+  {
+    "file": "crates/openhuman-core/src/hooks/host.rs",
+    "scope": "",
+    "name": "ENGINE",
+    "type": "LazyLock<Arc<HookEngine>>",
+    "count": 1,
+    "category": "A",
+    "reason": "The command-hook engine is process-wide configuration and infrastructure shared by runtimes; per-call execution receives a DispatchCtx, while no tenant data is retained in the engine handle.",
+    "verification": "hooks/README.md: configured command HookEngine is installed for the process"
+  },
+  {
+    "file": "crates/openhuman-core/src/prompts/section_renderers.rs",
+    "scope": "",
+    "name": "EMPTY_TOOLS",
+    "type": "&[PromptTool<'static>]",
+    "count": 1,
+    "category": "A",
+    "reason": "This immutable empty slice is a construction sentinel for a static safety-section PromptContext; it carries no prompt or tenant data.",
+    "verification": "agent/prompts/mod_tests_tools_sections_tests.rs: empty tool sections render without a catalogue"
+  },
+  {
+    "file": "crates/openhuman-core/src/prompts/section_renderers.rs",
+    "scope": "",
+    "name": "EMPTY_WORKFLOWS",
+    "type": "&[tinyskills::Skill]",
+    "count": 1,
+    "category": "A",
+    "reason": "This immutable empty slice is a construction sentinel for a static safety-section PromptContext; it carries no workflow or tenant data.",
+    "verification": "agent/prompts/mod_tests_builder_sections_tests.rs: static section rendering needs no workflow context"
+  },
+  {
+    "file": "crates/openhuman-core/src/prompts/section_renderers.rs",
+    "scope": "",
+    "name": "EMPTY_INTEGRATIONS",
+    "type": "&[ConnectedIntegration]",
+    "count": 1,
+    "category": "A",
+    "reason": "This immutable empty slice is a construction sentinel for a static safety-section PromptContext; it carries no integration or tenant data.",
+    "verification": "agent/prompts/mod_tests_builder_sections_tests.rs: static section rendering needs no integration context"
+  },
+  {
+    "file": "crates/openhuman-core/src/prompts/section_renderers.rs",
+    "scope": "",
+    "name": "EMPTY_VISIBLE",
+    "type": "OnceLock<std::collections::HashSet<String>>",
+    "count": 1,
+    "category": "A",
+    "reason": "This once-initialized empty set is the immutable visibility sentinel used by the static safety-section PromptContext; no agent or tenant-specific tool names are inserted.",
+    "verification": "agent/prompts/mod_tests_tools_sections_tests.rs: static prompt sections use an empty tool visibility set"
   }
 ]
