@@ -79,7 +79,9 @@ pub fn start_periodic_poll() {
         tracing::debug!("[task_sources:periodic] scheduler already running, skipping start");
         return;
     }
-    crate::core::runtime::DispatchCtx::ambient().spawn(async move {
+    // The loop acts for the host: every tick visits `host_default()` and then
+    // each live agent scope itself, so the spawned task needs no ambient scope.
+    DispatchCtx::host_default().spawn(async move {
         tracing::info!(
             tick_seconds = TICK_SECONDS,
             "[task_sources:periodic] scheduler starting"
