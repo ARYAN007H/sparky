@@ -50,7 +50,11 @@ test("Linux container workflows stage TinyBus fixtures below sticky /tmp", () =>
     "../../.github/workflows/e2e-playwright.yml",
   ]) {
     const source = readFileSync(new URL(workflow, import.meta.url), "utf8");
-    assert.match(source, /\/tmp\/openhuman-test-modules/, workflow);
+    assert.match(
+      source,
+      /\/tmp\/openhuman-test-modules-\$\{GITHUB_RUN_ID\}-\$\{GITHUB_RUN_ATTEMPT\}/,
+      workflow,
+    );
     assert.doesNotMatch(source, /\/opt\/openhuman-test-modules/, workflow);
   }
 
@@ -58,7 +62,10 @@ test("Linux container workflows stage TinyBus fixtures below sticky /tmp", () =>
     new URL("../ci/self-hosted/lanes-plan.mjs", import.meta.url),
     "utf8",
   );
-  assert.match(lanes, /\/tmp\/openhuman-test-modules/);
+  assert.match(
+    lanes,
+    /\/tmp\/openhuman-test-modules-\$\{GITHUB_RUN_ID\}-\$\{GITHUB_RUN_ATTEMPT\}/,
+  );
   assert.doesNotMatch(lanes, /\/opt\/openhuman-test-modules/);
 });
 

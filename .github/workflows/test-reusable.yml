@@ -174,7 +174,7 @@ jobs:
       - name: Install checksum-pinned native test modules
         run: |
           # Module-loaded unit regressions execute in isolated test processes.
-          module_root="/tmp/openhuman-test-modules/${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          module_root="/tmp/openhuman-test-modules-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           bash scripts/ci/self-hosted/install-test-modules.sh \
             "$module_root" "$module_root/modules.env"
           cat "$module_root/modules.env" >> "$GITHUB_ENV"
