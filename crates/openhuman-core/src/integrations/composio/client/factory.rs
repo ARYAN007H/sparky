@@ -16,6 +16,7 @@
 use std::sync::Arc;
 
 use super::DirectCredential;
+use crate::core::slots::HookSlot;
 use crate::config::schema::{COMPOSIO_MODE_BACKEND, COMPOSIO_MODE_DIRECT};
 
 // Re-declare the mode strings as local consts so they can be used as
@@ -48,6 +49,28 @@ impl ComposioRoute {
             ComposioRoute::Direct(_) => COMPOSIO_MODE_DIRECT,
         }
     }
+}
+
+/// A registered route builder: resolves the [`ComposioRoute`] for one
+/// `composio.mode` value (the empty mode counts as `"backend"`).
+pub type ComposioRouteBuilder =
+    Arc<dyn Fn(&crate::config::Config) -> anyhow::Result<ComposioRoute> + Send + Sync>;
+
+static ROUTE_BUILDERS: HookSlot<ComposioRouteBuilder> =
+    HookSlot::new("integrations::composio::route_builders");
+
+/// Registers `builder` as the route for `mode`, replacing the built-in
+/// resolution for that mode. Nothing registered => the built-in routes apply.
+pub fn register_composio_route_builder<F>(mode: impl Into<String>, builder: F)
+where
+    F: Fn(&crate::config::Config) -> anyhow::Result<ComposioRoute> + Send + Sync + 'static,
+{
+    ROUTE_BUILDERS.register(mode, Arc::new(builder));
+}
+
+/// Removes the process-wide route builder for `mode`.
+pub fn unregister_composio_route_builder(mode: &str) -> bool {
+    ROUTE_BUILDERS.unregister(mode)
 }
 
 pub(crate) fn create_direct_client_for_api_key(
@@ -116,6 +139,12 @@ pub fn resolve_composio_route(config: &crate::config::Config) -> anyhow::Result<
 
     let mode = config.composio.mode.trim();
     tracing::debug!(mode = %mode, "[composio-factory] resolving route");
+
+    let builder_key = if mode.is_empty() { MODE_BACKEND_PAT } else { mode };
+    if let Some(builder) = ROUTE_BUILDERS.get(builder_key) {
+        tracing::debug!(mode = %builder_key, "[composio-factory] using the registered route builder");
+        return builder(config);
+    }
 
     match mode {
         // Empty string is treated as the default for forward compatibility
