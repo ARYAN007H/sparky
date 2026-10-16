@@ -181,10 +181,22 @@ cleanup() {
         "${E2E_ARTIFACTS_DIR:-$APP_DIR/test/e2e/artifacts}/${LOG_SUFFIX}-app-env-check.log" \
         2>/dev/null || true
     fi
+    if [ -f "${OPENHUMAN_WORKSPACE:-}/webkit-driver-env-check.log" ]; then
+      mkdir -p "${E2E_ARTIFACTS_DIR:-$APP_DIR/test/e2e/artifacts}"
+      cp "${OPENHUMAN_WORKSPACE}/webkit-driver-env-check.log" \
+        "${E2E_ARTIFACTS_DIR:-$APP_DIR/test/e2e/artifacts}/${LOG_SUFFIX}-webkit-driver-env-check.log" \
+        2>/dev/null || true
+    fi
     if [ -f "${TAURI_DRIVER_LOG:-}" ]; then
       mkdir -p "${E2E_ARTIFACTS_DIR:-$APP_DIR/test/e2e/artifacts}"
       cp "$TAURI_DRIVER_LOG" \
         "${E2E_ARTIFACTS_DIR:-$APP_DIR/test/e2e/artifacts}/${LOG_SUFFIX}-tauri-driver.log" \
+        2>/dev/null || true
+    fi
+    if [ -f "${WEBKIT_DRIVER_LOG:-}" ]; then
+      mkdir -p "${E2E_ARTIFACTS_DIR:-$APP_DIR/test/e2e/artifacts}"
+      cp "$WEBKIT_DRIVER_LOG" \
+        "${E2E_ARTIFACTS_DIR:-$APP_DIR/test/e2e/artifacts}/${LOG_SUFFIX}-webkit-driver.log" \
         2>/dev/null || true
     fi
   fi
@@ -377,11 +389,21 @@ if [ "$OS" = "Linux" ] && [ "${E2E_USE_TAURI_DRIVER:-0}" = "1" ]; then
 
   TAURI_DRIVER_PORT="${TAURI_DRIVER_PORT:-4444}"
   TAURI_DRIVER_LOG="${RUNNER_TEMP:-${TMPDIR:-/tmp}}/tauri-driver-${LOG_SUFFIX}.log"
+  WEBKIT_DRIVER_LOG="${RUNNER_TEMP:-${TMPDIR:-/tmp}}/webkit-driver-${LOG_SUFFIX}.log"
+  WEBKIT_DRIVER_WRAPPER="$OPENHUMAN_WORKSPACE/openhuman-e2e-webkit-driver"
+  WEBKIT_DRIVER_BIN="${WEBKIT_WEBDRIVER:-/usr/bin/WebKitWebDriver}"
+  {
+    printf '#!/usr/bin/env bash\nset -euo pipefail\n'
+    printf 'printf "webkit_driver_started=1 display_present=%%s\\n" "${DISPLAY:+yes}" > %q\n' \
+      "$OPENHUMAN_WORKSPACE/webkit-driver-env-check.log"
+    printf 'exec %q "$@" >> %q 2>&1\n' "$WEBKIT_DRIVER_BIN" "$WEBKIT_DRIVER_LOG"
+  } > "$WEBKIT_DRIVER_WRAPPER"
+  chmod 700 "$WEBKIT_DRIVER_WRAPPER"
   echo "[runner] Starting tauri-driver on port $TAURI_DRIVER_PORT"
   # Keep the native GUI process under Xvfb in a headless Linux environment.
   # WDIO itself must not be wrapped: its local runner uses an IPC descriptor
   # that xvfb-run does not retain (see autoXvfb: false in wdio.conf.ts).
-  DRIVER_COMMAND=(tauri-driver --port "$TAURI_DRIVER_PORT" --native-driver "${WEBKIT_WEBDRIVER:-/usr/bin/WebKitWebDriver}")
+  DRIVER_COMMAND=(tauri-driver --port "$TAURI_DRIVER_PORT" --native-driver "$WEBKIT_DRIVER_WRAPPER")
   if [ -z "${DISPLAY:-}" ] && [ -z "${WAYLAND_DISPLAY:-}" ]; then
     DRIVER_COMMAND=(xvfb-run --auto-servernum --server-args="-screen 0 1280x800x24" -- "${DRIVER_COMMAND[@]}")
   fi
