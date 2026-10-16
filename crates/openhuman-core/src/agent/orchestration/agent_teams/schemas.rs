@@ -10,8 +10,8 @@
 use crate::core::runtime::DispatchCtx;
 use serde_json::{Map, Value};
 
-use crate::core::all::{ControllerFuture, RegisteredController};
 use crate::core::Outcome;
+use crate::core::all::{ControllerFuture, RegisteredController};
 use crate::core::{ControllerSchema, FieldSchema, TypeSchema};
 use tinyagents_session::run_ledger::AgentTeamListRequest;
 
@@ -181,8 +181,7 @@ fn schema_for(function: &str) -> ControllerSchema {
         "agent_team_complete_task" => ControllerSchema {
             namespace: "agent_team",
             function: "complete_task",
-            description:
-                "Complete a claimed task, gating its transition to done behind quality checks.",
+            description: "Complete a claimed task, gating its transition to done behind quality checks.",
             inputs: vec![
                 required_str("teamId", "Team id."),
                 required_str("taskId", "Task id to complete."),

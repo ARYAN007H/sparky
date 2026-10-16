@@ -133,7 +133,9 @@ async fn ignores_unrelated_events_and_missing_runs() {
         iterations: 1,
     })
     .await;
-    assert!(get_agent_run(&config.workspace_dir, "ghost")
-        .unwrap()
-        .is_none());
+    assert!(
+        get_agent_run(&config.workspace_dir, "ghost")
+            .unwrap()
+            .is_none()
+    );
 }

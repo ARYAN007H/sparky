@@ -1,7 +1,7 @@
 //! Read-only rosters over the sub-agent registry: the durable+live merge used to render the
 //! `[active_subagents]` context block.
 
-use tinyagents_orchestration::subagent::{snapshot_for_owner, SubagentSnapshot};
+use tinyagents_orchestration::subagent::{SubagentSnapshot, snapshot_for_owner};
 
 use super::registry::{admit_workspace, owner_key, registry};
 use crate::agent::orchestration::fleet_tools::FleetToolSet;
@@ -114,8 +114,8 @@ pub(crate) fn active_subagents_context_block(
             .collect(),
         Err(err) => {
             log::warn!(
-                    "[running_subagents] durable roster load failed parent_session={parent_session} error={err}"
-                );
+                "[running_subagents] durable roster load failed parent_session={parent_session} error={err}"
+            );
             Vec::new()
         }
     };

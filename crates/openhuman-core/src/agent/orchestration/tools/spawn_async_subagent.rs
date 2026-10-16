@@ -15,7 +15,7 @@ use crate::agent::orchestration::subagent_sessions::{
 use crate::agent::orchestration::tools::dispatch::incomplete_stop;
 use crate::agent::progress::AgentProgress;
 use crate::agent::subagent_host::{
-    run_subagent_with_parent, SubagentRunOptions, SubagentRunStatus,
+    SubagentRunOptions, SubagentRunStatus, run_subagent_with_parent,
 };
 use crate::core::runtime::DispatchCtx;
 use crate::threads::store::{self as conversations, ConversationMessage};

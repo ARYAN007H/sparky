@@ -1,6 +1,6 @@
 use super::*;
 use tinyagents_orchestration::workflow::{
-    validate_agents, validate_structure, DefinitionError, WorkflowDefinition, WorkflowPhase,
+    DefinitionError, WorkflowDefinition, WorkflowPhase, validate_agents, validate_structure,
 };
 
 fn good_def() -> WorkflowDefinition {

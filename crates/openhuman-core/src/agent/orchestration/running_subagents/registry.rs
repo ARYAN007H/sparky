@@ -28,14 +28,14 @@ use tokio::sync::watch;
 use tokio::task::AbortHandle;
 
 use crate::agent::tinyagents::host::steering::shared_steering_registry;
+use tinyagents_harness::CancellationToken;
 use tinyagents_harness::ids::TaskId;
 use tinyagents_harness::run_queue::RunQueue;
-use tinyagents_harness::CancellationToken;
 use tinyagents_tasks::DetachedTaskRegistry;
 
 use super::task_ledger::{record_spawned, task_store_for_workspace};
 use tinyagents_orchestration::subagent::{
-    spawn_status_watcher, DetachedSubagentStatus, SubagentIdentity, WaitError,
+    DetachedSubagentStatus, SubagentIdentity, WaitError, spawn_status_watcher,
 };
 
 #[derive(Clone)]
@@ -138,8 +138,8 @@ const REGISTRY_SOFT_CAP: usize = 256;
 static REGISTRY: OnceLock<DetachedTaskRegistry<RunningSubagentMetadata, DetachedSubagentStatus>> =
     OnceLock::new();
 
-pub(crate) fn registry(
-) -> &'static DetachedTaskRegistry<RunningSubagentMetadata, DetachedSubagentStatus> {
+pub(crate) fn registry()
+-> &'static DetachedTaskRegistry<RunningSubagentMetadata, DetachedSubagentStatus> {
     REGISTRY.get_or_init(|| {
         DetachedTaskRegistry::new(
             shared_steering_registry().clone(),

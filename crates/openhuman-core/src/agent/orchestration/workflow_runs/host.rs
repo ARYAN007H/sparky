@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use async_trait::async_trait;
 use serde_json::json;
 use tinyagents_harness::CancellationToken;
@@ -11,8 +11,8 @@ use tinyagents_orchestration::workflow::{
     WorkflowDefinition, WorkflowExecutor,
 };
 
-use crate::agent::harness::host_definition::AgentDefinitionRegistry;
 use crate::agent::harness::ParentExecutionContext;
+use crate::agent::harness::host_definition::AgentDefinitionRegistry;
 use tinyagents_definition::{SandboxMode, ToolScope};
 use {
     crate::agent::orchestration::AgentOrchestrationSession,
