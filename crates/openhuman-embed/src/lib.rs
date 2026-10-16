@@ -63,9 +63,9 @@
 #![warn(missing_docs)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
-pub use openhuman_core::security::turn_origin::{AgentTurnOrigin, TrustedAutomationSource};
 /// Complete definition accepted by [`AgentDefinitionSpec::from_base`].
 pub use openhuman_core::agent_registry::host_definition::AgentDefinition;
+pub use openhuman_core::security::turn_origin::{AgentTurnOrigin, TrustedAutomationSource};
 
 /// The origin of the executing turn, with its original chat or channel route.
 ///

@@ -42,10 +42,10 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use super::error::CoreError;
-use openhuman_core::progress::AgentProgress;
-use openhuman_core::security::turn_origin::AgentTurnOrigin;
 use openhuman_core::core::runtime::CoreRuntime;
 use openhuman_core::inference::INFERENCE_AGENT_CHAT as AGENT_CHAT;
+use openhuman_core::progress::AgentProgress;
+use openhuman_core::security::turn_origin::AgentTurnOrigin;
 
 #[path = "turn_types.rs"]
 mod types;

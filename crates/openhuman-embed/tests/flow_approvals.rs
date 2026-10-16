@@ -4,11 +4,11 @@ mod common;
 
 use std::time::Duration;
 
-use openhuman_core::security::turn_origin::{self, TrustedAutomationSource};
 use openhuman_core::core::events::DomainEvent;
 use openhuman_core::core::runtime::{AgentContextRegistry, CoreContext};
 use openhuman_core::security::approval::{ApprovalGate, ApprovalSourceContext, GateOutcome};
 use openhuman_core::security::approval::{ApprovalTurnContext, FlowRunContext};
+use openhuman_core::security::turn_origin::{self, TrustedAutomationSource};
 use openhuman_embed::{
     Access, AgentDefinitionSpec, AgentSpec, AgentTurnOrigin, ApprovalDecision, Runtime,
     ToolScopeSpec, TrustedAccess, Workspace,
@@ -192,10 +192,11 @@ fn flow_surfaces_correlate_decisions_and_closed_instances_never_publish() {
             assert!(matches!(&rows[0].source_context,
                 Some(ApprovalSourceContext::Flow { flow_id, run_id, node_id })
                     if flow_id == "flow-live" && run_id == "run-direct" && node_id.is_none()));
-            assert!(gate
-                .decide(&request_id, ApprovalDecision::Deny)
-                .unwrap()
-                .is_some());
+            assert!(
+                gate.decide(&request_id, ApprovalDecision::Deny)
+                    .unwrap()
+                    .is_some()
+            );
             let (outcome, audited_request) = park.await.unwrap();
             assert!(matches!(outcome, GateOutcome::Deny { .. }));
             // Only an allowed call returns an execution-audit id; a refusal
@@ -224,10 +225,11 @@ fn flow_surfaces_correlate_decisions_and_closed_instances_never_publish() {
             })
             .await
             .unwrap();
-            assert!(gate
-                .decide(&request_id, ApprovalDecision::ApproveOnce)
-                .unwrap()
-                .is_none());
+            assert!(
+                gate.decide(&request_id, ApprovalDecision::ApproveOnce)
+                    .unwrap()
+                    .is_none()
+            );
 
             // Exercise the actual tool dispatcher too: a refused flow approval
             // must produce a denied tool result and never create the marker.
@@ -253,8 +255,10 @@ fn flow_surfaces_correlate_decisions_and_closed_instances_never_publish() {
             let requests = common::chat_requests(&provider).await;
             // Human approval refusals deliberately omit the policy-failure
             // marker so the model can explain that the action was not done.
-            assert!(requests.iter().any(|request| common::tool_results(request)
-                .contains("This action was refused and must not be performed this turn")));
+            assert!(requests.iter().any(|request| {
+                common::tool_results(request)
+                    .contains("This action was refused and must not be performed this turn")
+            }));
 
             // A retained context belongs to its old instance after removal.
             // Its late flow registration must create neither rows nor surfaces.
@@ -292,13 +296,14 @@ fn flow_surfaces_correlate_decisions_and_closed_instances_never_publish() {
                 matches!(outcome, GateOutcome::Deny { reason } if reason.contains("agent_removed"))
             );
             assert!(request.is_none());
-            assert!(gate
-                .list_pending_for_agent(
+            assert!(
+                gate.list_pending_for_agent(
                     &openhuman_core::core::runtime::DispatchCtx::ambient(),
                     Some("flow-removed")
                 )
                 .unwrap()
-                .is_empty());
+                .is_empty()
+            );
             assert!(
                 tokio::time::timeout(Duration::from_millis(100), async {
                     loop {
@@ -306,12 +311,12 @@ fn flow_surfaces_correlate_decisions_and_closed_instances_never_publish() {
                             DomainEvent::ApprovalRequested { agent_id, .. }
                                 if agent_id.as_deref() == Some("flow-removed") =>
                             {
-                                break
+                                break;
                             }
                             DomainEvent::FlowApprovalRequested { flow_id, .. }
                                 if flow_id == "flow-closed" =>
                             {
-                                break
+                                break;
                             }
                             _ => {}
                         }
