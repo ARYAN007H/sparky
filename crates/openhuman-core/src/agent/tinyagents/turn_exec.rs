@@ -49,8 +49,6 @@ use super::ToolPolicyEnforcement;
 /// are attached through an [`InvocationRuntime`] and [`AgentInvocation`] for
 /// each root.  That prevents concurrent sessions from replacing one another's
 /// security or workspace state on a shared harness.
-#[path = "turn_exec_hosted.rs"]
-mod turn_exec_hosted;
 static ROOT_HOSTED_HARNESS: LazyLock<AgentHarness<(), OpenHumanRunContext>> =
     LazyLock::new(AgentHarness::new);
 
