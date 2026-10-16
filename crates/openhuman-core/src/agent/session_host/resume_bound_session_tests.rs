@@ -1,18 +1,9 @@
-//! The host's session surface: start one, read it back, list its generations.
-//!
-//! OpenHuman does not own session mechanics. Identity, resume, transcript
-//! binding, compaction generations and persistence all live in
-//! `tinyagents-session` / `tinyagents-runtime`. What remains here is the small
-//! product-facing surface over them — starting a session (binding a thread's
-//! identity, [`super::runtime::accessors`]), reading one back, and listing the
-//! generations a long conversation has accumulated.
+use super::*;
 
 use anyhow::Result;
 use tinyagents_runtime::{ResumeMode, TurnOptions};
 
 use crate::agent::tinyagents::host::OpenHumanRunContext;
-
-use super::OpenHumanSessionHost;
 
 impl OpenHumanSessionHost {
     /// Load this session's durable history now, before any turn runs.

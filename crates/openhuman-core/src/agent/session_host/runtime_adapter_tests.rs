@@ -2,9 +2,9 @@ use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
 use tinyagents_runtime::{
-    DriverFailure, DriverOutcome, DriverRequest, PrefixSnapshot, ResumeMode, SessionDriver,
-    SessionTerminal, SessionTurnRequest, ToolSnapshot, TranscriptCodec, TranscriptTurnOptions,
-    TurnOptions,
+    DriverFailure, DriverOutcome, DriverRequest, PrefixSnapshot, ResumeMode, SessionBuilder,
+    SessionDriver, SessionTerminal, SessionTurnRequest, ToolSnapshot, TranscriptCodec,
+    TranscriptTurnOptions, TurnOptions,
 };
 use tinyagents_session::port::{InMemorySessionStores, SessionStoreProvider};
 use tinyagents_session::transcript::TranscriptMeta;
@@ -15,7 +15,7 @@ use super::announcement_notes::{
 };
 use super::runtime_session::tool_surface::reconcile_synthesized_visibility;
 use super::runtime_session::{account_committed_turn_against_goal, holistic_last_turn_usage};
-use super::{OpenHumanSessionFactory, OpenHumanSessionHooks, OpenHumanTranscriptCodec};
+use super::{OpenHumanSessionHooks, OpenHumanTranscriptCodec};
 use crate::agent::tinyagents::host::OpenHumanRunContext;
 
 struct RecordingDriver(Arc<Mutex<Vec<OpenHumanRunContext>>>);
@@ -69,12 +69,10 @@ fn codec_marks_failed_tool_rows_from_the_explicit_turn_sidecar() {
             },
         )
         .unwrap();
-    assert!(
-        rows[0]
-            .tool_failure
-            .as_ref()
-            .is_some_and(|failure| failure.failed)
-    );
+    assert!(rows[0]
+        .tool_failure
+        .as_ref()
+        .is_some_and(|failure| failure.failed));
 }
 
 /// The durable record is the parent's OWN spend.
@@ -384,16 +382,14 @@ async fn runtime_adapter_passes_host_context_commits_before_finalize_and_emits_o
         .transcripts;
     let context = OpenHumanRunContext::new();
     let cancellation = context.cancellation.clone();
-    let mut session = OpenHumanSessionFactory::build(
-        Arc::new(RecordingDriver(Arc::clone(&seen_context))),
-        hooks,
-        PrefixSnapshot::default(),
-        ToolSnapshot::default(),
-        Arc::clone(&locator),
-        "adapter-test",
-        meta(),
-    )
-    .unwrap();
+    let mut session = SessionBuilder::new(Arc::new(RecordingDriver(Arc::clone(&seen_context))))
+        .codec(Arc::new(OpenHumanTranscriptCodec))
+        .hooks(hooks)
+        .prefix(PrefixSnapshot::default())
+        .tool_snapshot(ToolSnapshot::default())
+        .transcript(Arc::clone(&locator), "adapter-test", meta())
+        .build()
+        .unwrap();
 
     session
         .turn(

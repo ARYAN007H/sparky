@@ -1,12 +1,12 @@
 //! `OpenHumanSessionHost::from_config` factory methods and internal `build_session_agent_inner` constructor.
 
 use super::should_synthesize_delegation_tools;
-use crate::agent_registry::host_definition::{
-    AgentDefinitionExt, AgentDefinitionRegistry, NO_TOOLS_SENTINEL,
-};
 use crate::agent::host_runtime;
 use crate::agent::prompts::SystemPromptBuilder;
 use crate::agent::session_host::types::OpenHumanSessionHost;
+use crate::agent_registry::host_definition::{
+    AgentDefinitionExt, AgentDefinitionRegistry, NO_TOOLS_SENTINEL,
+};
 use crate::config::Config;
 use crate::core::runtime::DispatchCtx;
 use crate::security::SecurityPolicy;
@@ -889,9 +889,9 @@ pub(super) fn resolve_target_definition(
              real tool belt instead of persona-only / erroring",
             agent_id
         );
-        return Ok(Some(
-            crate::agent_registry::definition_from_registry_entry(&entry),
-        ));
+        return Ok(Some(crate::agent_registry::definition_from_registry_entry(
+            &entry,
+        )));
     }
 
     if agent_id == "orchestrator" {

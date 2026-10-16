@@ -1,7 +1,7 @@
 use super::*;
 
-fn sidecar()
--> std::sync::Arc<std::sync::Mutex<crate::agent::tinyagents::host::run_context::SessionTurnSidecar>>
+fn sidecar(
+) -> std::sync::Arc<std::sync::Mutex<crate::agent::tinyagents::host::run_context::SessionTurnSidecar>>
 {
     crate::agent::tinyagents::host::OpenHumanRunContext::new()
         .session_sidecar
@@ -32,13 +32,11 @@ fn graph_failure_persists_only_accepted_snapshot_history() {
     assert_eq!(partial.history.len(), 2);
     assert_eq!(partial.history[0].text(), "stable prefix");
     assert_eq!(partial.history[1].text(), "request");
-    assert!(
-        partial
-            .partial
-            .expect("display partial")
-            .content
-            .contains("provider rejected follow-up")
-    );
+    assert!(partial
+        .partial
+        .expect("display partial")
+        .content
+        .contains("provider rejected follow-up"));
 }
 
 #[test]

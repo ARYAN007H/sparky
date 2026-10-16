@@ -8,8 +8,8 @@
 use std::sync::Arc;
 
 use crate::agent::session_host::types::OpenHumanSessionHost;
-use crate::agent::tinyagents::ToolPolicyEnforcement;
 use crate::agent::tinyagents::live_harness::LiveToolSurface;
+use crate::agent::tinyagents::ToolPolicyEnforcement;
 
 impl OpenHumanSessionHost {
     /// The durable tools, the visible names and the tool policy of this

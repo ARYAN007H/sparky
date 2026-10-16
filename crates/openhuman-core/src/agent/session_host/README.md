@@ -15,15 +15,11 @@ run after each turn commits.
 | --- | --- |
 | [`types.rs`](./types.rs) | `OpenHumanSessionHost` and `SessionHostBuilder` struct definitions, no logic |
 | `builder/` | `SessionHostBuilder` fluent API and the `from_config` factory |
-| [`factory.rs`](./factory.rs) | `OpenHumanSessionFactory` |
 | [`runtime_session.rs`](./runtime_session.rs) | Runtime session composition and the public `turn()` |
 | `runtime/` | Public accessors, `run_single` |
-| [`session_api.rs`](./session_api.rs) | Start, read back, and list the generations of a durable session |
 | [`driver.rs`](./driver.rs) | The OpenHuman `SessionDriver` that runs the model and tools |
 | [`hooks.rs`](./hooks.rs) | Product prepare, commit, and terminal hooks |
 | [`codec.rs`](./codec.rs) | `OpenHumanTranscriptCodec`, the product transcript dialect |
-| [`policy.rs`](./policy.rs) | Prompt and turn policy applied before dispatch |
-| [`prefix_snapshot.rs`](./prefix_snapshot.rs) | Cache-prefix bookkeeping across resumes |
 | [`recorded_tools.rs`](./recorded_tools.rs) | Rebuilds recorded Composio actions as deferred executors on resume |
 | [`prelude_integrations.rs`](./prelude_integrations.rs) | Fetches connected integrations on the first turn of a session instance |
 | [`announcement_notes.rs`](./announcement_notes.rs) | Smaller product wiring pulled out of the builder |
