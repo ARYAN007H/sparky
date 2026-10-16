@@ -248,9 +248,10 @@ describe('Chat conversation history', () => {
     let messageCount = 0;
     const deadline = Date.now() + 15_000;
     while (Date.now() < deadline) {
-      const read = await callOpenhumanRpc<{
-        data?: { messages?: Array<{ content?: string }> };
-      }>('openhuman.threads_messages_list', { thread_id: threadId });
+      const read = await callOpenhumanRpc<{ data?: { messages?: Array<{ content?: string }> } }>(
+        'openhuman.threads_messages_list',
+        { thread_id: threadId }
+      );
       if (read.ok) {
         const messages = read.result?.data?.messages ?? [];
         messageCount = messages.length;
@@ -259,7 +260,8 @@ describe('Chat conversation history', () => {
           content.includes(FIRST_PROMPT) &&
           content.includes(SECOND_PROMPT) &&
           content.includes(CANARY_SECOND)
-        ) break;
+        )
+          break;
       }
       await browser.pause(400);
     }
