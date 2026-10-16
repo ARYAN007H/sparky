@@ -1,0 +1,17 @@
+//! Product-facing RPC surfaces for agent runs, teams, workflows, replay, and tools.
+
+pub(crate) mod agent_teams;
+pub(crate) mod command_center;
+pub(crate) mod context_breakdown;
+pub(crate) mod replay;
+mod schemas;
+pub(crate) mod subagent_control;
+pub(crate) mod workflow_runs;
+pub(crate) mod worktree_schemas;
+
+pub(crate) use agent_teams::{all_agent_team_controller_schemas, all_agent_team_registered_controllers};
+pub(crate) use command_center::{all_command_center_controller_schemas, all_command_center_registered_controllers};
+pub(crate) use schemas::{all_controller_schemas as all_agent_controller_schemas, all_registered_controllers as all_agent_registered_controllers};
+pub(crate) use subagent_control::{all_controller_schemas as all_subagent_control_controller_schemas, all_registered_controllers as all_subagent_control_registered_controllers};
+pub(crate) use workflow_runs::{all_workflow_run_controller_schemas, all_workflow_run_registered_controllers};
+pub(crate) use worktree_schemas::{all_controller_schemas as all_worktree_controller_schemas, all_registered_controllers as all_worktree_registered_controllers};

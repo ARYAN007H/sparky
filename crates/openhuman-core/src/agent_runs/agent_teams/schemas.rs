@@ -15,7 +15,7 @@ use crate::core::all::{ControllerFuture, RegisteredController};
 use crate::core::{ControllerSchema, FieldSchema, TypeSchema};
 use tinyagents_session::run_ledger::AgentTeamListRequest;
 
-use super::runtime;
+use crate::agent::orchestration::agent_teams::runtime;
 use tinyagents_orchestration::teams::{NewMember, SessionTeamLedger, TeamService};
 
 /// Controller schemas exposed by the agent-teams module.
