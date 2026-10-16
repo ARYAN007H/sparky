@@ -93,7 +93,7 @@ async fn a_registered_stt_slug_is_built_with_the_effective_model() {
 }
 
 #[test]
-fn a_registered_slug_replaces_the_hard_coded_cloud_route() {
+fn a_registered_slug_answers_under_the_hosted_slug() {
     register_stt_provider("cloud", |_, _| {
         Ok(Box::new(FakeStt {
             model: String::new(),
@@ -102,9 +102,8 @@ fn a_registered_slug_replaces_the_hard_coded_cloud_route() {
     let provider = create_stt_provider("cloud", "", &Config::default()).unwrap();
     unregister_stt_provider("cloud");
     assert_eq!(provider.name(), "fake-stt");
-    // With the registration gone the built-in cloud provider answers again.
-    let builtin = create_stt_provider("cloud", "", &Config::default()).unwrap();
-    assert_ne!(builtin.name(), "fake-stt");
+    // With the registration gone the core has no `cloud` provider of its own.
+    assert!(create_stt_provider("cloud", "", &Config::default()).is_err());
 }
 
 #[tokio::test]
