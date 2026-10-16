@@ -408,7 +408,7 @@ export const classifyAuthStoreFailure = (failure: unknown): string => {
   if (/\b401\b|unauthorized/.test(m)) return 'auth_me_unauthorized';
   if (/\b50[234]\b|bad gateway|service unavailable|gateway timeout/.test(m))
     return 'auth_me_gateway';
-  if (/network|fetch failed|connection|dns|unreachable/.test(m)) return 'network';
+  if (/network|fetch failed|connection|connect|refused|dns|unreachable/.test(m)) return 'network';
   if (/auth\/me|session validation failed/.test(m)) return 'auth_me_other';
   // The owner's remaining prefixes (Rust `SessionError::{Core, Backend,
   // Invalid}`), checked after the content buckets above so a `CORE:`-wrapped
