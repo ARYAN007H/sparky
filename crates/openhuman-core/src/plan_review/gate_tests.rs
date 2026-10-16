@@ -155,6 +155,10 @@ async fn parked_reviews_are_isolated_by_tenant() {
     let gate = std::sync::Arc::new(PlanReviewGate::new(Duration::from_secs(5)));
     let alice = crate::core::runtime::Tenant {
         profile: Some("review-alice".into()),
+        agent: Some("trigger_reactor".into()),
+    };
+    let alice_ui = crate::core::runtime::Tenant {
+        profile: Some("review-alice".into()),
         agent: None,
     };
     let bob = crate::core::runtime::Tenant {
@@ -173,8 +177,8 @@ async fn parked_reviews_are_isolated_by_tenant() {
     assert!(futures::poll!(parked.as_mut()).is_pending());
 
     let alice_review = gate
-        .parked_review_for_thread(&alice, "same-thread")
-        .expect("Alice's review is available in Alice's scope");
+        .parked_review_for_thread(&alice_ui, "same-thread")
+        .expect("Alice's profile UI can replay its agent's review");
     assert!(gate.parked_review_for_thread(&bob, "same-thread").is_none());
     assert!(!gate.decide(
         &bob,
@@ -182,7 +186,7 @@ async fn parked_reviews_are_isolated_by_tenant() {
         PlanReviewResolution::Approve
     ));
     assert!(gate.decide(
-        &alice,
+        &alice_ui,
         &alice_review.request_id,
         PlanReviewResolution::Approve
     ));
