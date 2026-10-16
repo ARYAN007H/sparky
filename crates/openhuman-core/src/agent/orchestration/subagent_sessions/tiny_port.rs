@@ -31,7 +31,13 @@ impl OpenHumanTinySubagentSessionStore {
 
     fn convert(&self, row: DurableSubagentSession) -> Result<TinySession, SubagentError> {
         let lifecycle_key = match (row.lifecycle_key.clone(), row.current_task_id.as_deref()) {
-            (Some(key), _) => Some(key),
+            (Some(key), Some(task_id))
+                if key.task_id == task_id
+                    && key.thread_id.as_deref() == row.parent_thread_id.as_deref() =>
+            {
+                Some(key)
+            }
+            (Some(_), _) => None,
             (None, Some(task_id)) => super::resolve_lifecycle_key(
                 &self.store,
                 &row.subagent_session_id,
