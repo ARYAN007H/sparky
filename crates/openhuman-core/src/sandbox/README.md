@@ -104,8 +104,14 @@ is allow-default for reads, so `jail_request` sends the credential stores that
 `~/.azure`, `~/.kube`, `~/Library/Keychains`, `~/.netrc`, `~/.git-credentials`,
 `~/.pgpass`, `~/.npmrc`, `~/.docker/config.json`, `~/.cargo/credentials.toml`)
 as `NativeJailConfig.deny_read` (TinyBox contract 1.20), built from the same
-lists by `security::policy::home_credential_stores`. Only stores that exist are
-sent. A store that holds the workspace root or a read-write grant is left out
+lists by `security::policy::home_credential_stores`. OpenHuman's own credential
+files are denied too (`security::credentials::credential_files`, at the paths
+their stores write): the keyring's `secrets.enc`, `auth-profiles.json`,
+`http-credentials.json` and the account `config.toml`. The rest of the
+OpenHuman state folder stays readable for now, because TinyBox keeps the jail's
+scratch directory (its `TMPDIR`) under `<state_dir>/artifacts/sandbox-scratch`,
+and a denial is the profile's last rule, overriding that write grant. Only
+stores that exist are sent. A store that holds the workspace root or a read-write grant is left out
 with a warning, because TinyBox refuses a denial that would take the command's
 workspace away; a store inside a grant is still denied. Other files the user
 can read stay readable. `isolated` (Landlock) sends none: it already denies

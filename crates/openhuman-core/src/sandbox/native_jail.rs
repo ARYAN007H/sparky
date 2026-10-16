@@ -187,7 +187,7 @@ async fn execute_owned(
     run.meter = meter;
     // TinyBox adds its own per-call scratch directory to the writable grants and
     // points TMPDIR, TMP and TEMP at it unless the caller overrides them.
-    run.jail = Some(jail_request(policy, isolation)?);
+    run.jail = Some(jail_request(config, policy, isolation)?);
     super::shell_exec::run(ctx, config, run).await
 }
 
@@ -212,6 +212,7 @@ fn approved_environment(
 
 #[cfg(feature = "modules")]
 fn jail_request(
+    config: &Config,
     policy: &SandboxPolicy,
     isolation: SandboxIsolation,
 ) -> anyhow::Result<contract::NativeJailConfig> {
@@ -238,42 +239,40 @@ fn jail_request(
         },
         require_process_isolation: isolated,
         // Landlock denies every path it is not granted; Seatbelt reads
-        // allow-default, so folder confinement names the credential stores.
+        // allow-default, so folder confinement names the credential stores:
+        // the user's, and OpenHuman's own credential files.
         deny_read: if isolated {
             Vec::new()
         } else {
             let home =
                 super::local_grants::grant_home(crate::core::runtime::is_saas(), dirs::home_dir);
-            credential_denials(
-                home.as_deref(),
-                &policy.workspace_root,
-                &policy.read_write_mounts,
-            )
+            let stores = home
+                .as_deref()
+                .map(crate::security::policy::home_credential_stores)
+                .unwrap_or_default()
+                .into_iter()
+                .chain(crate::security::credentials::credential_files(config))
+                .collect();
+            credential_denials(stores, &policy.workspace_root, &policy.read_write_mounts)
         },
     })
 }
 
-/// The credential stores under `home` that a folder-confined jail must not
-/// read: the stores [`SecurityPolicy::is_always_forbidden`] protects, as
-/// existing absolute paths (TinyBox drops absent ones anyway). A store that
-/// holds the jail root or a writable grant is left out, because TinyBox refuses
-/// a denial that would take the command's workspace away.
-///
-/// [`SecurityPolicy::is_always_forbidden`]: crate::security::SecurityPolicy
+/// The credential `stores` a folder-confined jail must not read, as existing
+/// canonical paths (TinyBox drops absent ones anyway). A store that holds the
+/// jail root or a writable grant is left out, because TinyBox refuses a denial
+/// that would take the command's workspace away.
 #[cfg(any(feature = "modules", test))]
 fn credential_denials(
-    home: Option<&Path>,
+    stores: Vec<std::path::PathBuf>,
     root: &Path,
     read_write: &[std::path::PathBuf],
 ) -> Vec<String> {
-    let Some(home) = home else {
-        return Vec::new();
-    };
     let granted: Vec<std::path::PathBuf> = std::iter::once(root)
         .chain(read_write.iter().map(std::path::PathBuf::as_path))
         .filter_map(|path| path.canonicalize().ok())
         .collect();
-    crate::security::policy::home_credential_stores(home)
+    stores
         .into_iter()
         .filter_map(|store| {
             let real = store.canonicalize().ok()?;

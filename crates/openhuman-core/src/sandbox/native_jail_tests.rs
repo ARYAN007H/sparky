@@ -71,7 +71,14 @@ fn native_jail_request_preserves_grants_and_requires_enforcement() -> anyhow::Re
         env_passthrough: Vec::new(),
         docker_overrides: None,
     };
-    let request = jail_request(&policy, SandboxIsolation::Isolated)?;
+    let account = tempfile::tempdir()?;
+    let mut config = Config::default();
+    config.config_path = account.path().join("config.toml");
+    std::fs::write(&config.config_path, "")?;
+    let _keyring = crate::security::secret_storage::store::test_scope::ScopedWorkspace::new(
+        account.path().join("workspace"),
+    );
+    let request = jail_request(&config, &policy, SandboxIsolation::Isolated)?;
 
     assert_eq!(request.read_only, [readonly.path().to_str().unwrap()]);
     // TinyBox appends its own per-call scratch directory to the writable grants.
@@ -84,7 +91,7 @@ fn native_jail_request_preserves_grants_and_requires_enforcement() -> anyhow::Re
     // Folder confinement keeps the grants and the network decision, and asks
     // TinyBox for what Seatbelt can give: declared constraints, no process
     // isolation.
-    let confined = jail_request(&policy, SandboxIsolation::FolderConfined)?;
+    let confined = jail_request(&config, &policy, SandboxIsolation::FolderConfined)?;
     assert_eq!(confined.read_only, request.read_only);
     assert_eq!(confined.read_write, request.read_write);
     assert!(!confined.allow_net);
@@ -93,12 +100,19 @@ fn native_jail_request_preserves_grants_and_requires_enforcement() -> anyhow::Re
 
     // Landlock is deny-default, so the isolated jail needs no read denials;
     // Seatbelt reads allow-default, so folder confinement names the
-    // credential stores this host has.
+    // credential stores this host has and OpenHuman's own credential files.
     assert!(request.deny_read.is_empty());
+    let account_config = config.config_path.canonicalize()?;
+    assert!(confined
+        .deny_read
+        .contains(&account_config.to_str().unwrap().to_owned()));
     for denied in &confined.deny_read {
+        let denied = std::path::Path::new(denied);
         assert!(
-            crate::security::SecurityPolicy::is_always_forbidden(std::path::Path::new(denied)),
-            "{denied} is not a protected credential store"
+            crate::security::SecurityPolicy::is_always_forbidden(denied)
+                || denied == account_config,
+            "{} is not a protected credential store",
+            denied.display()
         );
     }
     Ok(())
@@ -141,7 +155,11 @@ fn folder_confinement_denies_the_credential_stores_that_exist() {
     ]);
     let root = tempfile::tempdir().unwrap();
 
-    let denied = credential_denials(Some(home.path()), root.path(), &[]);
+    let denied = credential_denials(
+        crate::security::policy::home_credential_stores(home.path()),
+        root.path(),
+        &[],
+    );
 
     // Absent stores (`.gnupg`, `.kube`, `.npmrc`, ...) are not sent.
     assert_eq!(
@@ -169,7 +187,7 @@ fn a_store_holding_the_root_or_a_writable_grant_is_not_denied() {
     // stores are dropped. A store inside a writable grant is still denied:
     // Seatbelt carves it out of the grant.
     let denied = credential_denials(
-        Some(home.path()),
+        crate::security::policy::home_credential_stores(home.path()),
         &home.path().join(".aws/project"),
         &[home.path().join(".kube"), home.path().join(".cargo")],
     );
@@ -181,9 +199,65 @@ fn a_store_holding_the_root_or_a_writable_grant_is_not_denied() {
 }
 
 #[test]
-fn no_home_means_no_credential_denials() {
+fn nothing_to_deny_means_no_credential_denials() {
     let root = tempfile::tempdir().unwrap();
-    assert!(credential_denials(None, root.path(), &[]).is_empty());
+    assert!(credential_denials(Vec::new(), root.path(), &[]).is_empty());
+}
+
+#[test]
+fn openhumans_own_credential_files_are_denied_when_present() {
+    // The account folder: config.toml and the credential stores beside it, the
+    // core workspace below it with the keyring file and TinyBox's scratch.
+    let account = tempfile::tempdir().unwrap();
+    let workspace = account.path().join("workspace");
+    let scratch = workspace.join("artifacts/sandbox-scratch/shell-1");
+    std::fs::create_dir_all(&scratch).unwrap();
+    let mut config = Config::default();
+    config.config_path = account.path().join("config.toml");
+    let _keyring =
+        crate::security::secret_storage::store::test_scope::ScopedWorkspace::new(&workspace);
+    let files = [
+        config.config_path.clone(),
+        account.path().join("auth-profiles.json"),
+        account.path().join("http-credentials.json"),
+        workspace.join("secrets.enc"),
+    ];
+    for file in &files {
+        std::fs::write(file, "secret").unwrap();
+    }
+    let root = tempfile::tempdir().unwrap();
+
+    let denied = credential_denials(
+        crate::security::credentials::credential_files(&config),
+        root.path(),
+        &[scratch.clone()],
+    );
+
+    let mut expected: Vec<String> = files
+        .iter()
+        .map(|file| file.canonicalize().unwrap().to_str().unwrap().to_owned())
+        .collect();
+    let mut sorted = denied.clone();
+    sorted.sort();
+    expected.sort();
+    assert_eq!(sorted, expected);
+    // Files only: none of them is, or contains, the jail's scratch directory.
+    let scratch = scratch.canonicalize().unwrap();
+    for file in &denied {
+        assert!(!scratch.starts_with(file), "{file} covers the scratch dir");
+    }
+
+    // A credential file that does not exist is not sent.
+    std::fs::remove_file(account.path().join("http-credentials.json")).unwrap();
+    let denied = credential_denials(
+        crate::security::credentials::credential_files(&config),
+        root.path(),
+        &[],
+    );
+    assert_eq!(denied.len(), 3);
+    assert!(!denied
+        .iter()
+        .any(|file| file.ends_with("http-credentials.json")));
 }
 
 #[test]
