@@ -40,7 +40,9 @@ fn hosted_credential(
     config: &openhuman_embed::__host::config::Config,
 ) -> Option<BackendCredential> {
     match get_session_token(config) {
-        Ok(Some(token)) if !is_local_session_token(&token) => Some(BackendCredential::Session(token)),
+        Ok(Some(token)) if !is_local_session_token(&token) => {
+            Some(BackendCredential::Session(token))
+        }
         _ => None,
     }
 }
@@ -95,7 +97,12 @@ async fn send(
             text,
         } => {
             client
-                .send_channel_edit(&channel, &message_id, credential.clone(), json!({"text": text}))
+                .send_channel_edit(
+                    &channel,
+                    &message_id,
+                    credential.clone(),
+                    json!({"text": text}),
+                )
                 .await
         }
         ProgressiveTransportRequest::Delete {

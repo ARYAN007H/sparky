@@ -75,7 +75,10 @@ pub(super) async fn send_reaction(
         .send_channel_reaction(channel, credential, reaction)
         .await
         .map_err(|e| {
-            anyhow::anyhow!("failed to send channel reaction: {}", flatten_authed_error(e))
+            anyhow::anyhow!(
+                "failed to send channel reaction: {}",
+                flatten_authed_error(e)
+            )
         })?;
     Ok(parse_or_raw(value))
 }
@@ -91,7 +94,10 @@ pub(super) async fn create_thread(
         .create_channel_thread(channel, credential, title)
         .await
         .map_err(|e| {
-            anyhow::anyhow!("failed to create channel thread: {}", flatten_authed_error(e))
+            anyhow::anyhow!(
+                "failed to create channel thread: {}",
+                flatten_authed_error(e)
+            )
         })?;
     Ok(parse_or_raw(value))
 }
@@ -110,7 +116,10 @@ pub(super) async fn update_thread(
         .update_channel_thread(channel, credential, thread_id, action)
         .await
         .map_err(|e| {
-            anyhow::anyhow!("failed to update channel thread: {}", flatten_authed_error(e))
+            anyhow::anyhow!(
+                "failed to update channel thread: {}",
+                flatten_authed_error(e)
+            )
         })?;
     Ok(parse_or_raw(value))
 }
@@ -126,7 +135,10 @@ pub(super) async fn list_threads(
         .list_channel_threads(channel, credential, active)
         .await
         .map_err(|e| {
-            anyhow::anyhow!("failed to list channel threads: {}", flatten_authed_error(e))
+            anyhow::anyhow!(
+                "failed to list channel threads: {}",
+                flatten_authed_error(e)
+            )
         })?;
     Ok(parse_or_raw(value))
 }

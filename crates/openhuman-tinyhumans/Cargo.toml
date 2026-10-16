@@ -110,6 +110,7 @@ axum = { version = "0.8", default-features = false, features = ["http1", "json",
 tempfile = "3"
 tokio = { version = "1", features = ["full", "test-util"] }
 wiremock = "0.6"
+tokio-util = { version = "0.7", features = ["rt", "io"] }
 # Feature unification with openhuman-cli's dev-dependencies. Cargo builds the
 # core once per distinct feature set of its dependencies, and the tests of
 # openhuman-embed, openhuman-tinyhumans and openhuman-cli each pull in the core
