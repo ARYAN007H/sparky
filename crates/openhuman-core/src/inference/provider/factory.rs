@@ -90,10 +90,7 @@ use local_runtime::{
     OptionalChatModelResult,
 };
 pub(crate) use managed_backend::make_openhuman_backend_model_for_thread;
-use managed_backend::{
-    registered_managed_chat_model, resolve_managed_backend,
-    resolve_managed_backend_with_model_override,
-};
+use managed_backend::{managed_chat_model, resolve_managed_model};
 use primary_cloud::{legacy_inference_slug, resolve_primary_cloud_provider_string};
 use subprocess_providers::{
     prepare_claude_agent_sdk_chat_model, try_create_claude_agent_sdk_chat_model,
@@ -125,7 +122,6 @@ mod factory_tests;
 use crate::config::schema::cloud_providers::AuthStyle;
 use crate::config::Config;
 use crate::inference::provider::openai_codex::resolve_openai_codex_routing;
-use crate::inference::provider::openhuman_backend_model::OpenHumanBackendModel;
 use crate::inference::provider::ProviderRuntimeOptions;
 use crate::security::credentials::AuthService;
 use crate::security::egress::EgressLedger;
