@@ -27,7 +27,7 @@ use tinyinference_llm::providers::MockModel;
 use tinyinference_llm::tool::ToolCall;
 use tinytools::{PermissionLevel, Tool, ToolResult};
 
-use tinyagents_hooks::tool::{ToolHook, ToolHookContext, ToolHookDecision, ToolHooksMiddleware};
+use tinyagents_hooks::tool::{ToolHook, ToolHookContext, ToolHooksMiddleware};
 use crate::agent::tinyagents::host::{OpenHumanRunContext, OpenHumanSecurityGate};
 use crate::security::policy::{AutonomyLevel, SecurityPolicy};
 
@@ -166,7 +166,7 @@ async fn run_with_hooks(target: &'static str) -> (Option<Outcome>, usize, usize)
         target,
         outcome: outcome.clone(),
     }));
-    harness.push_middleware(Arc::new(EmbedderToolHooksMiddleware::new(vec![Arc::new(
+    harness.push_middleware(Arc::new(ToolHooksMiddleware::<OpenHumanRunContext>::new(vec![Arc::new(
         DenyNamed("secret"),
     )])));
     harness
