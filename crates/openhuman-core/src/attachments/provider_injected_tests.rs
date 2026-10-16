@@ -1,5 +1,6 @@
 use super::tests::Probe;
 use super::*;
+#[cfg(feature = "documents")]
 use std::sync::Mutex;
 
 #[tokio::test]
