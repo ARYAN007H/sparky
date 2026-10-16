@@ -242,20 +242,18 @@ pub fn inject_workspace_file_capped(
 }
 
 pub fn default_workspace_file_content(filename: &str) -> &'static str {
-    // The bundled identity files live at `crates/openhuman-core/src/agent/prompts/`
-    // (owned by the `agent/` tree because they describe agent identity).
-    // This module is under `agent/prompts/render_helpers/`, so the relative path
-    // walks up one level back into `agent/prompts/`.
+    // The bundled identity files remain next to the agent prompt builder; only
+    // the reusable workspace-file handling moved into this domain.
     match filename {
-        "SOUL.md" => include_str!("../SOUL.md"),
-        "IDENTITY.md" => include_str!("../IDENTITY.md"),
+        "SOUL.md" => include_str!("../agent/prompts/SOUL.md"),
+        "IDENTITY.md" => include_str!("../agent/prompts/IDENTITY.md"),
         // The user-facing agent's role brief and writing style, moved out of
         // the compiled `orchestrator/prompt.md` so both are tunable on disk
         // without a rebuild (#5701). Same sync-and-inject contract as
         // SOUL.md / IDENTITY.md: the bundled copy seeds the workspace, and a
         // user edit wins from the next session on.
-        "ROLE.md" => include_str!("../ROLE.md"),
-        "STYLE.md" => include_str!("../STYLE.md"),
+        "ROLE.md" => include_str!("../agent/prompts/ROLE.md"),
+        "STYLE.md" => include_str!("../agent/prompts/STYLE.md"),
 
         _ => "",
     }

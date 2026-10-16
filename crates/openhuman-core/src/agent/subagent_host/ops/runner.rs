@@ -22,7 +22,7 @@ use crate::agent::subagent_host::types::{
 use crate::agent::tinyagents::budget::MAX_SPAWN_DEPTH;
 use crate::agent_registry::host_definition::{AgentDefinition, AgentDefinitionRegistry};
 use crate::inference::provider::AGENT_TURN_MAX_OUTPUT_TOKENS;
-use crate::prompts::render_subagent_system_prompt_with_format;
+use crate::agent::prompts::render_subagent_system_prompt_with_format;
 use tinyagents_definition::{
     AgentTier, IterationPolicy, PromptSource, SandboxMode as AgentSandboxMode,
     validate_tier_transition,

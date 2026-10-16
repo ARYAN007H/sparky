@@ -5,9 +5,9 @@
 //! for callers that only hold indices into the parent's tool vec.
 
 use super::builder::GLOBAL_STYLE_SUFFIX;
-use super::sections::GROUNDING_BODY;
+use crate::prompts::sections::GROUNDING_BODY;
 use super::types::*;
-use super::workspace_files::{inject_workspace_file, write_agents_md_blocks};
+use crate::prompts::{inject_workspace_file, write_agents_md_blocks};
 use std::fmt::Write;
 use std::path::Path;
 use tinytools_agent::dialect::ToolCallFormat;

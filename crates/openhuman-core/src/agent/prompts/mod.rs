@@ -11,6 +11,8 @@ pub use agents_md::{AGENTS_MD_FILENAME, AgentsMdContent, load_agents_md, load_ag
 pub mod builder;
 pub use builder::{GLOBAL_STYLE_SUFFIX, SystemPromptBuilder, TieredPrompt};
 
+#[path = "render_helpers/subagent.rs"]
+mod subagent;
 pub(crate) use subagent::harness_json_tool_prompt;
 pub use subagent::{render_subagent_system_prompt, render_subagent_system_prompt_with_format};
 
