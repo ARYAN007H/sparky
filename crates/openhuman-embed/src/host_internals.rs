@@ -128,7 +128,7 @@ pub mod config {
         };
     }
     pub mod ops {
-        pub use openhuman_core::config::ops::load_config_with_timeout;
+        pub use openhuman_core::config::ops::{load_config_in, load_config_with_timeout};
     }
     pub mod rpc {
         pub use openhuman_core::config::rpc::load_config_with_timeout;
