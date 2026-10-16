@@ -25,7 +25,6 @@
 //! turn's latency, observing does not) are documented with it in
 //! `tinyagents_runtime::command_hooks`.
 
-pub mod bridge;
 pub mod host;
 pub mod ops;
 pub mod prompt_eval;

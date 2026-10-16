@@ -10,7 +10,7 @@ use crate::core::runtime::DispatchCtx;
 use std::sync::{Arc, LazyLock};
 
 use async_trait::async_trait;
-use tinyagents_runtime::command_hooks::{
+use tinyagents_hooks::command::{
     config, HookConfig, HookEngine, HookEnvironment, PromptEvaluator,
 };
 
