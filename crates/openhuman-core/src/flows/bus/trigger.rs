@@ -94,6 +94,8 @@ struct DispatchKey {
 
 struct FlowRunQueue {
     sender: mpsc::Sender<QueuedRun>,
+    receiver: Mutex<Option<mpsc::Receiver<QueuedRun>>>,
+    worker_started: std::sync::atomic::AtomicBool,
     admission: Arc<AsyncMutex<()>>,
     outstanding: AtomicUsize,
 }
@@ -102,6 +104,30 @@ struct QueuedRun {
     ctx: crate::core::runtime::DispatchCtx,
     config: Arc<Config>,
     request: TriggerRunRequest,
+}
+
+struct QueueOutstanding {
+    queue: Arc<FlowRunQueue>,
+    armed: bool,
+}
+
+impl QueueOutstanding {
+    fn new(queue: Arc<FlowRunQueue>) -> Self {
+        queue.outstanding.fetch_add(1, Ordering::AcqRel);
+        Self { queue, armed: true }
+    }
+
+    fn transfer_to_worker(mut self) {
+        self.armed = false;
+    }
+}
+
+impl Drop for QueueOutstanding {
+    fn drop(&mut self) {
+        if self.armed {
+            self.queue.outstanding.fetch_sub(1, Ordering::AcqRel);
+        }
+    }
 }
 
 pub(crate) struct TriggerRunRequest {
@@ -246,12 +272,38 @@ impl FlowTriggerSubscriber {
         let (sender, receiver) = mpsc::channel(self.queue_capacity);
         let queue = Arc::new(FlowRunQueue {
             sender,
+            receiver: Mutex::new(Some(receiver)),
+            worker_started: std::sync::atomic::AtomicBool::new(false),
             admission: Arc::new(AsyncMutex::new(())),
             outstanding: AtomicUsize::new(0),
         });
         queues.insert(key.clone(), Arc::clone(&queue));
+        queue
+    }
+
+    fn start_worker_if_needed(
+        &self,
+        key: &DispatchKey,
+        queue: &Arc<FlowRunQueue>,
+        ctx: &crate::core::runtime::DispatchCtx,
+    ) {
+        if queue
+            .worker_started
+            .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
+            .is_err()
+        {
+            return;
+        }
+        let Some(receiver) = queue
+            .receiver
+            .lock()
+            .unwrap_or_else(|error| error.into_inner())
+            .take()
+        else {
+            return;
+        };
         let worker_key = key.clone();
-        let worker_queue = Arc::clone(&queue);
+        let worker_queue = Arc::clone(queue);
         let worker_queues = Arc::clone(&self.queues);
         let runner = Arc::clone(&self.runner);
         #[cfg(test)]
@@ -268,7 +320,6 @@ impl FlowTriggerSubscriber {
             )
             .await;
         });
-        queue
     }
 
     async fn enqueue_app_event(
@@ -286,12 +337,17 @@ impl FlowTriggerSubscriber {
                 continue;
             }
 
-            queue.outstanding.fetch_add(1, Ordering::AcqRel);
+            let outstanding = QueueOutstanding::new(Arc::clone(&queue));
             match queue.sender.send(queued).await {
-                Ok(()) => return,
+                Ok(()) => {
+                    outstanding.transfer_to_worker();
+                    drop(admission);
+                    self.start_worker_if_needed(&key, &queue, ctx);
+                    return;
+                }
                 Err(error) => {
                     queued = error.0;
-                    queue.outstanding.fetch_sub(1, Ordering::AcqRel);
+                    drop(outstanding);
                     drop(admission);
                     self.remove_queue_if_current(&key, &queue);
                 }
@@ -342,7 +398,11 @@ impl FlowTriggerSubscriber {
 
             queue.outstanding.fetch_add(1, Ordering::AcqRel);
             match queue.sender.try_send(queued) {
-                Ok(()) => return,
+                Ok(()) => {
+                    drop(admission);
+                    self.start_worker_if_needed(&key, &queue, ctx);
+                    return;
+                }
                 Err(mpsc::error::TrySendError::Full(_)) => {
                     queue.outstanding.fetch_sub(1, Ordering::AcqRel);
                     tracing::debug!(target: "flows", flow_id = %key.flow_id, "[flows] schedule tick coalesced while a trigger run is queued");
@@ -497,9 +557,11 @@ async fn run_queue_worker(
     while let Some(mut queued) = next {
         loop {
             let run_ctx = queued.ctx.clone();
-            run_ctx
-                .enter((runner)(queued.ctx, queued.config, queued.request))
-                .await;
+            let flow_id = queued.request.flow_id.clone();
+            let run = run_ctx.spawn((runner)(queued.ctx, queued.config, queued.request));
+            if let Err(error) = run.await {
+                tracing::warn!(target: "flows", %flow_id, error = %error, "[flows] trigger run task exited unexpectedly");
+            }
             queue.outstanding.fetch_sub(1, Ordering::AcqRel);
 
             if let Ok(queued) = receiver.try_recv() {
@@ -513,7 +575,7 @@ async fn run_queue_worker(
             // slot before retirement gets SendError and retries with the new
             // slot.
             #[cfg(test)]
-            retiring.notify_waiters();
+            retiring.notify_one();
             let admission = Arc::clone(&queue.admission).lock_owned().await;
             match receiver.try_recv() {
                 Ok(queued) => {
@@ -522,6 +584,7 @@ async fn run_queue_worker(
                     break;
                 }
                 Err(mpsc::error::TryRecvError::Empty | mpsc::error::TryRecvError::Disconnected) => {
+                    receiver.close();
                     let mut current = queues.lock().unwrap_or_else(|error| error.into_inner());
                     if current
                         .get(&key)

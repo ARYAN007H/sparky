@@ -175,6 +175,7 @@ async fn handle_schedule_tick_ignores_disabled_flow() {
 
 #[tokio::test]
 async fn schedule_tick_is_coalesced_while_a_trigger_run_is_active() {
+    use std::sync::Mutex;
     use tokio::sync::{mpsc, oneshot};
 
     let tmp = tempfile::TempDir::new().unwrap();
@@ -271,14 +272,8 @@ async fn app_event_runs_queue_fifo_per_tenant_while_other_tenants_progress() {
         .dispatch_test_app_event(&tenant_b, "shared-flow", json!({"event": "b1"}))
         .await;
 
-    let receive = async |rx: &mut mpsc::UnboundedReceiver<_>| {
-        tokio::time::timeout(std::time::Duration::from_secs(2), rx.recv())
-            .await
-            .expect("queued trigger did not finish within the hang guard")
-            .unwrap()
-    };
     assert_eq!(
-        receive(&mut completed_rx).await,
+        receive_trigger_run(&mut completed_rx).await,
         (
             "tenant-b".to_string(),
             "shared-flow".to_string(),
@@ -288,7 +283,7 @@ async fn app_event_runs_queue_fifo_per_tenant_while_other_tenants_progress() {
     );
     release_first_tx.send(()).unwrap();
     assert_eq!(
-        receive(&mut completed_rx).await,
+        receive_trigger_run(&mut completed_rx).await,
         (
             "tenant-a".to_string(),
             "shared-flow".to_string(),
@@ -296,13 +291,157 @@ async fn app_event_runs_queue_fifo_per_tenant_while_other_tenants_progress() {
         )
     );
     assert_eq!(
-        receive(&mut completed_rx).await,
+        receive_trigger_run(&mut completed_rx).await,
         (
             "tenant-a".to_string(),
             "shared-flow".to_string(),
             "a2".to_string()
         ),
         "app_event payloads for one tenant and flow must execute FIFO"
+    );
+}
+
+async fn receive_trigger_run(
+    receiver: &mut tokio::sync::mpsc::UnboundedReceiver<(String, String, String)>,
+) -> (String, String, String) {
+    tokio::time::timeout(std::time::Duration::from_secs(2), receiver.recv())
+        .await
+        .expect("queued trigger did not finish within the hang guard")
+        .unwrap()
+}
+
+#[tokio::test]
+async fn full_app_event_queue_backpressures_until_a_slot_opens() {
+    use std::sync::Mutex;
+    use tokio::sync::{mpsc, oneshot};
+
+    let tmp = tempfile::TempDir::new().unwrap();
+    let (started_tx, started_rx) = oneshot::channel();
+    let started_tx = Arc::new(Mutex::new(Some(started_tx)));
+    let (release_tx, release_rx) = oneshot::channel();
+    let release_rx = Arc::new(tokio::sync::Mutex::new(Some(release_rx)));
+    let (runs_tx, mut runs_rx) = mpsc::unbounded_channel();
+    let runner = move |_ctx: crate::core::runtime::DispatchCtx,
+                       _config: Arc<Config>,
+                       request: crate::flows::bus::trigger::TriggerRunRequest| {
+        let started_tx = Arc::clone(&started_tx);
+        let release_rx = Arc::clone(&release_rx);
+        let runs_tx = runs_tx.clone();
+        async move {
+            let event = request.input["event"].as_str().unwrap().to_owned();
+            if event == "a1" {
+                if let Some(started_tx) = started_tx.lock().unwrap().take() {
+                    let _ = started_tx.send(());
+                }
+                if let Some(release) = release_rx.lock().await.take() {
+                    let _ = release.await;
+                }
+            }
+            runs_tx.send(event).unwrap();
+        }
+    };
+    let subscriber = FlowTriggerSubscriber::with_runner(test_config(&tmp), 1, runner);
+    let ctx = crate::core::runtime::DispatchCtx::host_default();
+
+    subscriber
+        .dispatch_test_app_event(&ctx, "f1", json!({"event": "a1"}))
+        .await;
+    started_rx.await.unwrap();
+    subscriber
+        .dispatch_test_app_event(&ctx, "f1", json!({"event": "a2"}))
+        .await;
+    let third = subscriber.dispatch_test_app_event(&ctx, "f1", json!({"event": "a3"}));
+    tokio::pin!(third);
+    assert!(
+        futures::poll!(third.as_mut()).is_pending(),
+        "a full bounded queue must wait for capacity instead of dropping the event"
+    );
+
+    release_tx.send(()).unwrap();
+    third.await;
+    for expected in ["a1", "a2", "a3"] {
+        assert_eq!(
+            tokio::time::timeout(std::time::Duration::from_secs(2), runs_rx.recv())
+                .await
+                .expect("backpressured trigger did not finish")
+                .unwrap(),
+            expected
+        );
+    }
+}
+
+#[tokio::test]
+async fn arrival_racing_worker_retirement_is_retried_on_a_fresh_queue() {
+    use std::sync::Mutex;
+    use tokio::sync::{mpsc, oneshot};
+
+    let tmp = tempfile::TempDir::new().unwrap();
+    let (started_tx, started_rx) = oneshot::channel();
+    let started_tx = Arc::new(Mutex::new(Some(started_tx)));
+    let (release_tx, release_rx) = oneshot::channel();
+    let release_rx = Arc::new(tokio::sync::Mutex::new(Some(release_rx)));
+    let (runs_tx, mut runs_rx) = mpsc::unbounded_channel();
+    let runner = move |_ctx: crate::core::runtime::DispatchCtx,
+                       _config: Arc<Config>,
+                       request: crate::flows::bus::trigger::TriggerRunRequest| {
+        let started_tx = Arc::clone(&started_tx);
+        let release_rx = Arc::clone(&release_rx);
+        let runs_tx = runs_tx.clone();
+        async move {
+            let event = request.input["event"].as_str().unwrap().to_owned();
+            if event == "first" {
+                if let Some(started_tx) = started_tx.lock().unwrap().take() {
+                    let _ = started_tx.send(());
+                }
+                if let Some(release) = release_rx.lock().await.take() {
+                    let _ = release.await;
+                }
+            }
+            runs_tx.send(event).unwrap();
+        }
+    };
+    let subscriber = Arc::new(FlowTriggerSubscriber::with_runner(test_config(&tmp), 1, runner));
+    let ctx = crate::core::runtime::DispatchCtx::host_default();
+    let retiring = subscriber.retirement_notifier_test();
+    let retirement_started = retiring.notified();
+    tokio::pin!(retirement_started);
+
+    subscriber
+        .dispatch_test_app_event(&ctx, "f1", json!({"event": "first"}))
+        .await;
+    started_rx.await.unwrap();
+    let admission = subscriber.hold_queue_admission_test(&ctx, "f1").await;
+    release_tx.send(()).unwrap();
+    retirement_started.await;
+
+    // The worker notified just before it queued on the held admission gate.
+    // Tokio's mutex is FIFO, so its retirement request is ahead of this send.
+    let retry_subscriber = Arc::clone(&subscriber);
+    let retry_ctx = ctx.clone();
+    let arrival = tokio::spawn(async move {
+        retry_subscriber
+            .dispatch_test_app_event(&retry_ctx, "f1", json!({"event": "after-retirement"}))
+            .await;
+    });
+    tokio::task::yield_now().await;
+    drop(admission);
+    tokio::time::timeout(std::time::Duration::from_secs(2), arrival)
+        .await
+        .expect("the arrival stayed attached to a retired queue")
+        .unwrap();
+    assert_eq!(
+        tokio::time::timeout(std::time::Duration::from_secs(2), runs_rx.recv())
+            .await
+            .expect("arrival after worker retirement was lost")
+            .unwrap(),
+        "first"
+    );
+    assert_eq!(
+        tokio::time::timeout(std::time::Duration::from_secs(2), runs_rx.recv())
+            .await
+            .expect("retry on the fresh worker was lost")
+            .unwrap(),
+        "after-retirement"
     );
 }
 
