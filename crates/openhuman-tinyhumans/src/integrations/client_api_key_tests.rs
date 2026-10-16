@@ -24,7 +24,8 @@ fn record(seen: &Seen, headers: &HeaderMap) {
             .and_then(|value| value.to_str().ok())
             .map(str::to_owned)
     };
-    seen.lock().unwrap()
+    seen.lock()
+        .unwrap()
         .push((header("x-api-key"), header("authorization")));
 }
 

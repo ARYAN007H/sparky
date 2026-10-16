@@ -203,7 +203,6 @@ async fn local_only_rejects_user_data_verb_before_transport() {
     );
 }
 
-
 #[tokio::test]
 async fn standard_mode_lets_a_user_data_verb_reach_the_transport() {
     let _serial = POLICY_LOCK.lock().await;

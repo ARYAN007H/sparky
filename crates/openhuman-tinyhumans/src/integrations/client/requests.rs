@@ -13,7 +13,9 @@ pub(super) fn managed_budget_applies_to_path(path: &str) -> bool {
 /// Build the egress descriptor for a managed-backend round-trip. The query
 /// string is stripped so only the endpoint (the "to where") is described, never
 /// any data carried in the query.
-pub(super) fn backend_egress_descriptor(path: &str) -> openhuman_embed::__host::egress::EgressDescriptor {
+pub(super) fn backend_egress_descriptor(
+    path: &str,
+) -> openhuman_embed::__host::egress::EgressDescriptor {
     let endpoint = path.split('?').next().unwrap_or(path);
     openhuman_embed::__host::egress::EgressDescriptor::integration(endpoint)
 }

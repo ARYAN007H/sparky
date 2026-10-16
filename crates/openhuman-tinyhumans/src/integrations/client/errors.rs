@@ -36,7 +36,9 @@ pub(crate) fn extract_error_detail(body: &str, max_bytes: usize) -> String {
         if let Some(msg) = v.get("error").and_then(|e| e.as_str()) {
             let trimmed = msg.trim();
             if !trimmed.is_empty() {
-                return openhuman_embed::__host::util::truncate_at_byte_boundary(trimmed, max_bytes);
+                return openhuman_embed::__host::util::truncate_at_byte_boundary(
+                    trimmed, max_bytes,
+                );
             }
         }
     }
@@ -138,10 +140,12 @@ fn handle_session_jwt_unauthorized(method: &str, path: &str, url: &str, detail: 
     // is already free of secrets (it names the path + sanitized backend
     // `error` detail), but re-scrub for defense-in-depth before it reaches the
     // subscriber's logs.
-    openhuman_embed::__host::core::bus::BUS.publish(openhuman_embed::__host::core::events::DomainEvent::SessionExpired {
-        source: format!("integrations.{method}:{path}"),
-        reason: tinyinference_core::sanitize::sanitize_api_error(&message),
-    });
+    openhuman_embed::__host::core::bus::BUS.publish(
+        openhuman_embed::__host::core::events::DomainEvent::SessionExpired {
+            source: format!("integrations.{method}:{path}"),
+            reason: tinyinference_core::sanitize::sanitize_api_error(&message),
+        },
+    );
 
     message
 }

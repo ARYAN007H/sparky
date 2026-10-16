@@ -196,7 +196,10 @@ impl Tool for StorageUploadFileTool {
         context: Option<&dyn ToolRunContext>,
     ) -> anyhow::Result<ToolResult> {
         let action_dir = action_dir_for_context(&self.action_dir, context, self.name());
-        let approval = openhuman_embed::__host::agent::tinyagents::host::run_context::approval_for_tool(context);
+        let approval =
+            openhuman_embed::__host::agent::tinyagents::host::run_context::approval_for_tool(
+                context,
+            );
         self.run(args, &action_dir, &approval).await
     }
 }

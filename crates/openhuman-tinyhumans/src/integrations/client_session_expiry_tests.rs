@@ -122,7 +122,9 @@ async fn get_401_session_jwt_classifies_as_session_expired() {
 /// widened to swallow other statuses, this catches it.
 #[tokio::test]
 async fn non_401_4xx_does_not_classify_as_session_expired() {
-    use openhuman_embed::__host::core::observability::{expected_error_kind, is_session_expired_message};
+    use openhuman_embed::__host::core::observability::{
+        expected_error_kind, is_session_expired_message,
+    };
 
     // 403 — e.g. an authz/scope rejection on a backend-mediated provider
     // resource. This is NOT a dead session; it must stay a generic backend

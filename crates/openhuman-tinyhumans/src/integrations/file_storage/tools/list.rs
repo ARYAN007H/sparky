@@ -50,7 +50,10 @@ impl Tool for StorageListFilesTool {
         _options: tinytools::ToolCallOptions,
         context: Option<&dyn tinytools::ToolRunContext>,
     ) -> anyhow::Result<ToolResult> {
-        let approval = openhuman_embed::__host::agent::tinyagents::host::run_context::approval_for_tool(context);
+        let approval =
+            openhuman_embed::__host::agent::tinyagents::host::run_context::approval_for_tool(
+                context,
+            );
         self.run(_args, &approval).await
     }
 }

@@ -16,7 +16,8 @@ impl IntegrationClient {
             .get_or_init(|| async {
                 match self
                     .get::<IntegrationPricing>(
-                        &openhuman_embed::__host::security::approval::ApprovalTurnContext::default(),
+                        &openhuman_embed::__host::security::approval::ApprovalTurnContext::default(
+                        ),
                         "/agent-integrations/pricing",
                     )
                     .await
@@ -94,7 +95,9 @@ pub async fn pricing_for_config(
 /// stock_prices) gate tool registration at their own level.
 ///
 /// [`resolve_backend_credential`]: openhuman_embed::__host::security::credentials::session_support::resolve_backend_credential
-pub fn build_client(config: &openhuman_embed::__host::config::Config) -> Option<Arc<IntegrationClient>> {
+pub fn build_client(
+    config: &openhuman_embed::__host::config::Config,
+) -> Option<Arc<IntegrationClient>> {
     // Use the integrations-specific resolver: when `config.api_url` is set
     // to a local-AI endpoint (Ollama, vLLM, …), it would still be perfect
     // for `/v1/chat/completions`, but reusing it as the base for backend
@@ -122,7 +125,9 @@ pub fn build_client(config: &openhuman_embed::__host::config::Config) -> Option<
 fn build_client_with_credential(
     config: &openhuman_embed::__host::config::Config,
     backend_url: String,
-    credential: Option<openhuman_embed::__host::security::credentials::session_support::BackendCredential>,
+    credential: Option<
+        openhuman_embed::__host::security::credentials::session_support::BackendCredential,
+    >,
 ) -> Option<Arc<IntegrationClient>> {
     use openhuman_embed::__host::security::credentials::session_support::BackendCredential;
 

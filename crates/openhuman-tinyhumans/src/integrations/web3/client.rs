@@ -11,8 +11,8 @@ use std::sync::Arc;
 
 use serde_json::Value;
 
-use openhuman_embed::__host::config::Config;
 use crate::integrations::IntegrationClient;
+use openhuman_embed::__host::config::Config;
 
 const LOG_PREFIX: &str = "[web3]";
 

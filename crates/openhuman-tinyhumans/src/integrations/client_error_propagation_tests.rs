@@ -90,7 +90,10 @@ fn managed_budget_gate_applies_to_agent_integration_paths() {
 #[test]
 fn backend_egress_descriptor_strips_query_and_targets_backend() {
     let desc = backend_egress_descriptor("/agent-integrations/composio/execute?foo=bar");
-    assert_eq!(desc.reason, openhuman_embed::__host::egress::EgressReason::Integration);
+    assert_eq!(
+        desc.reason,
+        openhuman_embed::__host::egress::EgressReason::Integration
+    );
     assert_eq!(desc.provider_slug, "openhuman_backend");
     // Query stripped — only the endpoint is disclosed, never carried data.
     assert_eq!(desc.service, "/agent-integrations/composio/execute");
@@ -161,14 +164,15 @@ async fn verb_methods_never_expose_admin_or_webhook_routes() {
     );
 }
 
-
 #[tokio::test]
 async fn integration_requests_carry_the_host_attribution() {
     // The SDK transport stamps the host's product identity; which identity it
     // is belongs to the host.
     let seen = product_identity_seen_by_backend().await;
     assert!(
-        seen.sdk.as_deref().is_some_and(|identity| !identity.is_empty()),
+        seen.sdk
+            .as_deref()
+            .is_some_and(|identity| !identity.is_empty()),
         "agent-integration traffic must be attributed like every other backend call"
     );
     assert_eq!(

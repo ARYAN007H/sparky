@@ -164,7 +164,6 @@ async fn all_tools_executes_stock_family_against_fake_backend() {
     assert_eq!(requests[2].body["requireGreeks"], serde_json::json!(true));
 }
 
-
 #[tokio::test]
 async fn all_tools_executes_google_places_family_against_fake_backend() {
     let backend = spawn_fake_integration_backend().await;

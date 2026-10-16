@@ -65,8 +65,7 @@ async fn pricing_for_config_short_circuits_in_direct_mode() {
     // Build a client pointed at an unreachable backend — if the
     // short-circuit fires, we never actually attempt the network call
     // and the empty default struct comes back immediately.
-    let client =
-        IntegrationClient::new("http://127.0.0.1:0".into(), "test".into());
+    let client = IntegrationClient::new("http://127.0.0.1:0".into(), "test".into());
     let mut config = openhuman_embed::__host::config::Config::default();
     config.composio.mode = "direct".into();
 

@@ -32,8 +32,13 @@ macro_rules! disclosed_routing {
 /// two guards built for different chats do not share a destination.
 #[tokio::test]
 async fn a_guard_discloses_to_the_chat_it_was_built_for() {
-    openhuman_embed::__host::core::bus::init().await.expect("bus init");
-    let mut rx = openhuman_embed::__host::core::bus::BUS.get().unwrap().receiver();
+    openhuman_embed::__host::core::bus::init()
+        .await
+        .expect("bus init");
+    let mut rx = openhuman_embed::__host::core::bus::BUS
+        .get()
+        .unwrap()
+        .receiver();
 
     let chat_a = ApprovalChatContext {
         thread_id: "thread-media-a".into(),

@@ -16,7 +16,8 @@ pub struct IntegrationClient {
     /// `Authorization: Bearer`, a TinyHumans API key rides `x-api-key` (see
     /// [`crate::client::credential_headers`]). The 401 handling in `errors.rs`
     /// branches on which one it is.
-    pub(super) credential: openhuman_embed::__host::security::credentials::session_support::BackendCredential,
+    pub(super) credential:
+        openhuman_embed::__host::security::credentials::session_support::BackendCredential,
     pub(super) budget_config: Option<Arc<openhuman_embed::__host::config::Config>>,
     // The binary download path never rode the SDK: file storage also consumes
     // Content-Type and Content-Disposition, and the presigned-redirect hop

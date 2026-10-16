@@ -23,6 +23,6 @@ pub mod tools;
 pub use artifact_tool::MediaArtifactTool;
 pub use provider::{GeneratorRouter, MediaGenerators};
 pub use tools::{
-    media_tools_for_config, media_tools_from, MediaReferenceAllowlist, MediaListModelsTool, IMAGE_TOOL_NAME,
-    LIST_MODELS_TOOL_NAME, VIDEO_TOOL_NAME,
+    media_tools_for_config, media_tools_from, MediaListModelsTool, MediaReferenceAllowlist,
+    IMAGE_TOOL_NAME, LIST_MODELS_TOOL_NAME, VIDEO_TOOL_NAME,
 };

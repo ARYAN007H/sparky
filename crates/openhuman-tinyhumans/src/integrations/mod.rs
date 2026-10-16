@@ -48,7 +48,9 @@ pub(crate) fn register(_options: &InstallOptions) {
     #[cfg(feature = "web3")]
     web3::register();
     composio::register();
-    log::debug!("[tinyhumans] integrations: tool sources, wallet backend and composio route registered");
+    log::debug!(
+        "[tinyhumans] integrations: tool sources, wallet backend and composio route registered"
+    );
 }
 
 /// The id the file-storage tool source registers under.
