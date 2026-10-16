@@ -29,7 +29,7 @@ impl HookScope {
     }
 
     /// Append a completed-turn callback, preserving registration order.
-    pub fn push_post_turn(&mut self, hook: Arc<dyn PostTurnHook>) {
+    pub fn push_learning(&mut self, hook: Arc<dyn PostTurnHook>) {
         self.post_turn.push(hook);
     }
 

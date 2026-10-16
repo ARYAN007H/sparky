@@ -247,7 +247,7 @@ impl OpenHumanSessionHost {
     /// completed-turn callbacks join the learning sink's set and the tool belt
     /// authority is read when the runtime session is first created.
     pub fn set_host_env(&mut self, env: crate::agent::turn_env::HostTurnEnv) {
-        for hook in env.hooks.post_turn_hooks() {
+        for hook in env.hooks.learning_hooks() {
             if !self
                 .post_turn_hooks
                 .iter()

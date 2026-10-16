@@ -211,7 +211,7 @@ impl Turn {
     /// Add a completed-turn callback for this turn only. The callback runs
     /// asynchronously with an owned snapshot after the turn completes.
     pub fn post_turn_hook(mut self, hook: Arc<dyn crate::seams::PostTurnHook>) -> Self {
-        self.hooks.push_post_turn(hook);
+        self.hooks.push_learning(hook);
         self
     }
 
