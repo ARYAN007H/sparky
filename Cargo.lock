@@ -5459,11 +5459,12 @@ dependencies = [
  "tinyconnectors-bus",
  "tinydocs-bus",
  "tinyflows",
+ "tinyflows-bus",
  "tinyflows-catalog",
  "tinyflows-copilot",
  "tinyflows-drivers",
  "tinyflows-import",
- "tinyflows-schedule",
+ "tinyflows-module",
  "tinyhosts-bus",
  "tinyinference-core 0.4.1",
  "tinyinference-decisions 0.4.1",
@@ -5600,7 +5601,8 @@ dependencies = [
  "tinyagents-harness",
  "tinyagents-session",
  "tinybus",
- "tinyflows-schedule",
+ "tinyflows-bus",
+ "tinyflows-module",
  "tinyinference-embeddings",
  "tinyinference-llm 0.4.1",
  "tinymcp-bus",
@@ -5629,6 +5631,7 @@ dependencies = [
  "tinycomputer",
  "tinyconnectors",
  "tinydocs-module",
+ "tinyflows-module",
  "tinyhosts",
  "tinyjuice-module",
  "tinymcp",
@@ -8204,7 +8207,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32497e9a4c7b38532efcdebeef879707aa9f794296a4f0244f6f69e9bc8574bd"
 dependencies = [
  "fastrand",
- "getrandom 0.4.3",
+ "getrandom 0.3.4",
  "once_cell",
  "rustix 1.1.5",
  "windows-sys 0.60.2",
@@ -9044,7 +9047,7 @@ dependencies = [
 
 [[package]]
 name = "tinyflows"
-version = "0.8.21"
+version = "0.8.23"
 dependencies = [
  "async-trait",
  "futures-timer",
@@ -9060,6 +9063,15 @@ dependencies = [
  "thiserror 2.0.20",
  "tokio",
  "tracing",
+]
+
+[[package]]
+name = "tinyflows-bus"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -9124,12 +9136,33 @@ dependencies = [
  "sha2 0.11.0",
  "tempfile",
  "tinyflows",
+ "tinyflows-bus",
  "tinyflows-catalog",
  "tinyflows-drivers",
- "tinyflows-schedule",
  "tinystoragedrivers-core",
  "tinystoragedrivers-sqlite",
  "tracing",
+]
+
+[[package]]
+name = "tinyflows-module"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "chrono",
+ "serde",
+ "serde_json",
+ "tinybus",
+ "tinybus-module",
+ "tinyflows",
+ "tinyflows-bus",
+ "tinyflows-drivers",
+ "tinyflows-schedule",
+ "tinystoragedrivers-core",
+ "tokio",
+ "tracing",
+ "uuid",
 ]
 
 [[package]]
@@ -9142,6 +9175,7 @@ dependencies = [
  "chrono-tz",
  "cron",
  "serde",
+ "tinyflows-bus",
  "tokio",
  "tracing",
  "uuid",
@@ -11276,7 +11310,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.60.2",
+ "windows-sys 0.48.0",
 ]
 
 [[package]]
