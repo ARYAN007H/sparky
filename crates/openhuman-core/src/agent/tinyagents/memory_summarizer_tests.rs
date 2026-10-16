@@ -125,6 +125,28 @@ async fn without_recall_the_summarizer_is_unchanged_and_its_failure_is_its_own()
     assert!(failing.summarize(&dropped()).await.is_err());
 }
 
+#[tokio::test]
+async fn with_recall_off_a_compaction_still_moves_the_memory_window() {
+    let tmp = tempfile::tempdir().unwrap();
+    let turn = bound_turn(&tmp).await;
+    let mut quiet = (*turn).clone();
+    quiet.identity.recall = false;
+    let quiet = Arc::new(quiet);
+    let summarizer = MemoryRecallSummarizer::wrap(Box::new(ConcatSummarizer), Some(quiet.clone()));
+    let text = summarizer
+        .summarize(&dropped())
+        .await
+        .unwrap()
+        .summary
+        .text();
+    assert!(!text.contains(RECALLED_HEADING), "no recall when it is off");
+    assert_eq!(
+        quiet.in_prompt().from_turn,
+        2,
+        "the agent's memory tool still reads by the window"
+    );
+}
+
 #[test]
 fn an_earlier_recall_section_is_dropped_before_the_new_one() {
     let mut summary = Message::user(format!(
