@@ -109,7 +109,7 @@ fn handle_run_ledger_list(ctx: DispatchCtx, params: Map<String, Value>) -> Contr
                 s
             })?
         };
-        let response = crate::agent::session_store::with_ledger_async(
+        let response = crate::storage::sessions::with_ledger_async(
             &config.workspace_dir,
             |ledger| async move { ledger.list_agent_runs(&request).await },
         )
@@ -134,7 +134,7 @@ fn handle_run_ledger_get(ctx: DispatchCtx, params: Map<String, Value>) -> Contro
             .get("id")
             .and_then(|v| v.as_str())
             .ok_or_else(|| "missing required param: id".to_string())?;
-        let run = crate::agent::session_store::with_ledger_async(&config.workspace_dir, |ledger| async move {
+        let run = crate::storage::sessions::with_ledger_async(&config.workspace_dir, |ledger| async move {
             ledger.get_agent_run(id).await
         })
         .await
@@ -160,7 +160,7 @@ fn handle_run_ledger_events(ctx: DispatchCtx, params: Map<String, Value>) -> Con
                 log::warn!(target: "run_ledger_rpc", "[run_ledger_rpc][{cid}] events.bad_params err={s}");
                 s
             })?;
-        let response = crate::agent::session_store::with_ledger_async(
+        let response = crate::storage::sessions::with_ledger_async(
             &config.workspace_dir,
             |ledger| async move { ledger.list_recent_run_events(&request).await },
         )

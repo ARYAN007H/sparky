@@ -105,11 +105,11 @@ fn an_unusable_workspace_degrades_to_an_in_memory_store() {
 
     assert!(
         artifact_blobs_for(&unusable).is_none()
-            || crate::agent::session_store::installed().is_some()
+            || crate::storage::sessions::installed().is_some()
     );
     assert!(
         current_documents_for(&unusable).is_none()
-            || crate::agent::session_store::installed().is_some()
+            || crate::storage::sessions::installed().is_some()
     );
 }
 
