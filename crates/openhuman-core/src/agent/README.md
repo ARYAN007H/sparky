@@ -284,7 +284,7 @@ Turn execution:
 | [`queued_turn.rs`](./queued_turn.rs) | `QueuedTurn`, the payload for a message sent while a turn is running |
 | [`cost.rs`](./cost.rs) | Per-turn token and cost accounting (`TurnCost`) |
 | [`message_convert.rs`](./message_convert.rs), [`messages.rs`](./messages.rs) | Conversions between `TranscriptMessage` rows and TinyAgents `Message`s; the `history_wire` adapter for host-owned files |
-| `attachments/`, [`multimodal.rs`](./multimodal.rs) | Durable user uploads and provider-side attachment resolution; legacy marker compatibility ([README](attachments/README.md)) |
+| [`attachments/`](../attachments/), [`multimodal.rs`](./multimodal.rs) | Durable user uploads and provider-side attachment resolution; legacy marker compatibility ([README](../attachments/README.md)) |
 | [`host_runtime.rs`](./host_runtime.rs) | Native and Docker shell `RuntimeAdapter`s; the shell flavor is the contract's `tinybox_bus::ShellFlavor` and execution is TinyBox's |
 | `session_store/` | Process-wide `SessionStoreProvider` slot for hosts with their own database |
 

@@ -451,6 +451,8 @@ mod source;
 #[cfg(test)]
 #[path = "provider_tests.rs"]
 mod tests;
+#[path = "provider_injected_tests.rs"]
+mod injected_tests;
 
 #[cfg(test)]
 #[path = "provider_context_tests.rs"]
