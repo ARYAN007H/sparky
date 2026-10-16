@@ -201,7 +201,7 @@ fn default_microcompact_keep_recent() -> usize {
 }
 
 fn default_tool_result_budget_bytes() -> usize {
-    crate::agent::context::DEFAULT_TOOL_RESULT_BUDGET_BYTES
+    tinyagents_harness::config::ToolRuntimeConfig::default().tool_result_budget_bytes
 }
 
 fn default_summarizer_payload_threshold_tokens() -> usize {
