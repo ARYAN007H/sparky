@@ -28,6 +28,7 @@ pub(crate) mod delivery_drain;
 pub use delegation::open_delegation_checkpointer;
 pub(crate) mod fleet_tools;
 mod ops;
+#[path = "parent_context/builder.rs"]
 pub(crate) mod parent_context;
 pub(crate) mod run_ledger_finalize;
 pub(crate) mod running_subagents;
