@@ -8,9 +8,11 @@ import chatRuntimeReducer, {
   openArtifact,
   upsertArtifactReadyForThread,
 } from '../../../store/chatRuntimeSlice';
+import { openUrl } from '../../../utils/openUrl';
 import { ArtifactPreviewPanel, fileExtension } from './ArtifactPreviewPanel';
 
 vi.mock('../../../services/coreRpcClient', () => ({ callCoreRpc: vi.fn() }));
+vi.mock('../../../utils/openUrl', () => ({ openUrl: vi.fn().mockResolvedValue(undefined) }));
 
 vi.mock('../../../lib/i18n/I18nContext', () => ({
   useT: () => ({ t: (k: string) => k, locale: 'en' }),
@@ -84,6 +86,25 @@ describe('ArtifactPreviewPanel — preview rendering by kind (#1535)', () => {
     fireEvent.mouseDown(screen.getByRole('tab', { name: /chat.artifact.view.code/ }));
     // The artifact is the file, not this text: it cannot be edited here.
     expect((screen.getByRole('textbox') as HTMLTextAreaElement).readOnly).toBe(true);
+  });
+
+  it('opens an external link in the browser, never in the app window', async () => {
+    renderPanel(
+      'markdown',
+      '[site](https://example.com/page) and [bad](javascript:alert(1)) and [rel](/settings)\n'
+    );
+    const site = await screen.findByText('site');
+    const click = (el: HTMLElement) =>
+      fireEvent.click(el, { bubbles: true, cancelable: true }) === false;
+
+    // The default navigation is always cancelled.
+    expect(click(site)).toBe(true);
+    expect(openUrl).toHaveBeenCalledWith('https://example.com/page');
+
+    vi.mocked(openUrl).mockClear();
+    expect(click(screen.getByText('rel'))).toBe(true);
+    expect(click(screen.getByText('bad'))).toBe(true);
+    expect(openUrl).not.toHaveBeenCalled();
   });
 
   it('renders GFM constructs (tables) via remark-gfm', async () => {

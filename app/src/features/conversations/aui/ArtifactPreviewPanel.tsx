@@ -1,7 +1,7 @@
 'use client';
 
 import { Check, Clipboard, Code2, Download, Eye, FileBox, FileText, Share2, X } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
@@ -21,6 +21,8 @@ import {
   closeArtifactTab,
 } from '../../../store/chatRuntimeSlice';
 import { useAppDispatch, useAppSelector } from '../../../store/hooks';
+import { openUrl } from '../../../utils/openUrl';
+import { isAllowedExternalHref } from '../utils/format';
 
 // ─── Types ──────────────────────────────────────────────────────
 
@@ -45,6 +47,32 @@ const MAX_WIDTH = 1200;
 const DEFAULT_WIDTH = 520;
 /** Width change per arrow key on the resize handle. */
 const RESIZE_STEP = 24;
+
+// ─── Markdown links ─────────────────────────────────────────────
+
+/**
+ * A link in a Markdown preview: a click never navigates the app's window. An
+ * external link (`http(s)`, `mailto`) opens in the system browser, as chat
+ * links do; anything else does nothing.
+ */
+function PreviewLink({ href, children }: { href?: string; children?: ReactNode }) {
+  return (
+    <a
+      href={href}
+      onClick={e => {
+        e.preventDefault();
+        if (!href || !isAllowedExternalHref(href)) return;
+        void openUrl(href).catch(err => {
+          console.warn('[ArtifactPreviewPanel] could not open link:', err);
+        });
+      }}
+      className="cursor-pointer underline wrap-break-word">
+      {children}
+    </a>
+  );
+}
+
+const PREVIEW_MARKDOWN_COMPONENTS = { a: PreviewLink };
 
 // ─── Main panel ─────────────────────────────────────────────────
 
@@ -884,7 +912,9 @@ function EditableTextViewer({
           // raw source dump.
           <div className="flex-1 overflow-auto">
             <div className="p-4 prose prose-sm dark:prose-invert max-w-none">
-              <Markdown remarkPlugins={[remarkGfm]}>{editedBody}</Markdown>
+              <Markdown remarkPlugins={[remarkGfm]} components={PREVIEW_MARKDOWN_COMPONENTS}>
+                {editedBody}
+              </Markdown>
             </div>
           </div>
         ) : (
