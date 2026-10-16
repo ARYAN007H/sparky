@@ -46,7 +46,7 @@ fn threaded_turn_keeps_goal_tools_as_exposure_candidates() {
 #[tokio::test]
 async fn registered_memory_dispatch_enforces_one_budget_across_distinct_calls() {
     use crate::memory::test_fixtures::{bind_reference, config_in};
-    use tinyagents_harness::{context::RunConfig, CallId};
+    use tinyagents_harness::{CallId, context::RunConfig};
     use tinytools::ToolCallOptions;
     let workspace = tempfile::tempdir().unwrap();
     let config = config_in(&workspace);
