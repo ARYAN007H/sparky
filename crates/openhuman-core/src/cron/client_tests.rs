@@ -161,28 +161,3 @@ async fn a_switched_off_component_answers_component_disabled() {
         "{error}"
     );
 }
-
-#[test]
-fn an_untouched_agent_id_is_not_sent_but_an_explicit_clear_is() {
-    let untouched = StoreOperation::Update {
-        job_id: "j".into(),
-        patch: CronJobPatch {
-            enabled: Some(false),
-            ..CronJobPatch::default()
-        },
-    };
-    assert!(wire_operation(&untouched).unwrap()["patch"]
-        .get("agent_id")
-        .is_none());
-    let cleared = StoreOperation::Update {
-        job_id: "j".into(),
-        patch: CronJobPatch {
-            agent_id: Some(None),
-            ..CronJobPatch::default()
-        },
-    };
-    assert_eq!(
-        wire_operation(&cleared).unwrap()["patch"]["agent_id"],
-        Value::Null
-    );
-}

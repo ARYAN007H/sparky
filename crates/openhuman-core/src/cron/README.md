@@ -437,9 +437,9 @@ Cron publishes, through [`core/bus.rs`](../core/bus.rs), these `DomainEvent` var
   table, then collection) are folded into the job by the importer and by
   the module's store when it opens.
 - A `CronJobPatch` crosses the bus as JSON and `agent_id` is a double option
-  whose `null` means "clear". `client::wire_operation` drops an untouched
-  `agent_id` until the contract skips it when unset (tinyflows branch
-  `agent-id-patch-fix`); without it every patch cleared the agent definition.
+  whose `null` means "clear"; the contract (tinyflows v0.8.23) omits it when
+  unset, so an unrelated patch leaves the agent definition alone
+  (`a_patch_over_the_bus_keeps_the_agent_definition_it_does_not_mention`).
 - The hosted-profile sweep runs an agent-only scheduler (`JobDispatcher::agent_only`):
   a due shell or flow row of a profile is refused by the callback (and recorded
   as a failed run), never executed. The sweep ticks on the module's clock; its

@@ -58,27 +58,6 @@ async fn store_config(config: &Config, scope: &DocScope) -> Result<StoreConfig> 
     })
 }
 
-/// `operation` as the module's JSON.
-///
-/// `CronJobPatch.agent_id` is `Option<Option<_>>` whose deserializer reads a
-/// present `null` as "clear the agent definition", but through tinyflows
-/// v0.8.22 the serializer writes `null` for an untouched field, so every patch
-/// sent over the bus would clear it. Until the contract skips the field when
-/// unset (fix on tinyflows branch `agent-id-patch-fix`), an untouched
-/// `agent_id` is dropped from the wire here; only an explicit clear
-/// (`Some(None)`) keeps its `null`.
-fn wire_operation(operation: &StoreOperation) -> Result<Value> {
-    let mut wire = serde_json::to_value(operation)?;
-    if let StoreOperation::Update { patch, .. } = operation {
-        if patch.agent_id.is_none() {
-            if let Some(patch) = wire.get_mut("patch").and_then(Value::as_object_mut) {
-                patch.remove("agent_id");
-            }
-        }
-    }
-    Ok(wire)
-}
-
 /// Run one store operation in `scope` and decode its reply.
 pub(crate) async fn store_in<R: DeserializeOwned>(
     config: &Config,
@@ -87,7 +66,7 @@ pub(crate) async fn store_in<R: DeserializeOwned>(
 ) -> Result<R> {
     let request = StoreRequest {
         storage: store_config(config, scope).await?,
-        operation: wire_operation(&operation)?,
+        operation: serde_json::to_value(&operation)?,
     };
     let value: Value = call(config, members::SCHEDULE_STORE, (request,)).await?;
     serde_json::from_value(value).map_err(|error| {
