@@ -127,24 +127,25 @@ mod imp {
     }
 
     /// Stop serving `path`. Fire and forget: a call already admitted finishes.
+    /// Without a runtime to run on (a sync drop at exit) the object is left;
+    /// the process is ending anyway.
     pub(crate) fn unserve(path: String) {
-        let Some(Ok(runtime)) = runtime::is_started().then(|| Ok::<_, ()>(())).map(|_| {
-            // `is_started` guarantees `runtime()` resolves without a build.
-            Ok::<_, ()>(())
-        }) else {
+        if !runtime::is_started() {
+            return;
+        }
+        let Ok(handle) = tokio::runtime::Handle::try_current() else {
             return;
         };
-        let _ = runtime;
-        tokio::spawn(async move {
+        handle.spawn(async move {
             let Ok(runtime) = runtime::runtime().await else {
                 return;
             };
             let connection = runtime.connection().clone();
             let _ = runtime
                 .spawn(async move {
-                    if let Ok(path) = ObjectPath::new(&path) {
-                        let removed = connection.unserve(&path).await;
-                        tracing::trace!(%path, removed, "[cron:bus] host object unserved");
+                    if let Ok(object) = ObjectPath::new(&path) {
+                        let removed = connection.unserve(&object).await;
+                        tracing::trace!(path = %path, removed, "[cron:bus] host object unserved");
                     }
                 })
                 .await;
@@ -192,11 +193,6 @@ mod imp {
         } else {
             disabled_message()
         }
-    }
-
-    pub(crate) struct Unavailable;
-    impl Unavailable {
-        pub(crate) fn call(&self) {}
     }
 
     pub(crate) async fn proxy(config: &Config) -> Result<tinybus::Proxy, String> {
