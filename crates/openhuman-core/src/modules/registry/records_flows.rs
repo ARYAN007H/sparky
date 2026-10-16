@@ -3,14 +3,6 @@
 //! authoring. Published digests are added only from its release manifest.
 use crate::modules::types::{LoadPolicy, ModuleRecord, PlatformAsset, SourceSpec};
 
-// TODO(repin v0.8.22): the pins below are the v0.8.22 `checksum.toml` (schedule
-// contract v2). The host speaks contract v3 (`tinyflows-bus` at the vendored
-// gitlink), so release tinyflows v0.8.22 and run
-// `node scripts/modules/release-and-repin.mjs tinyflows` (or paste the new
-// `checksum.toml` verbatim) before this ships. Until then a `release` source
-// answers the v3-only members (`NextRun`, `ValidateSchedule`, ...) with
-// unknown-method errors; `OPENHUMAN_MODULE_SOURCE=source` / `linked` serve the
-// gitlink build.
 pub(crate) const TINYFLOWS: ModuleRecord = ModuleRecord {
     id: "tinyflows",
     description:
