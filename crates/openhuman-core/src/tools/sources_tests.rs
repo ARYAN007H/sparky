@@ -172,6 +172,7 @@ fn anchored_sources_sit_where_the_catalogue_always_listed_them() {
     assert!(pos("anchor_fake_search_b") < pos("image_info"));
     // End sources, and sources with an unknown anchor, trail every built-in
     // and keep registration order.
+    assert!(pos("image_info") < pos("anchor_fake_delegate"));
     assert!(pos("anchor_fake_delegate") < pos("anchor_fake_end"));
     assert!(pos("anchor_fake_end") < pos("anchor_fake_unknown"));
     assert_eq!(pos("anchor_fake_unknown"), names.len() - 1);
