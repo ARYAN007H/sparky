@@ -20,7 +20,10 @@ fn corrupt_job_queue_file_is_set_aside() {
     let store = FileQueueStore { file: file.clone() };
 
     assert_eq!(store.load(), QueueState::default());
-    assert!(!file.exists(), "corrupt queue must not be silently replaced");
+    assert!(
+        !file.exists(),
+        "corrupt queue must not be silently replaced"
+    );
     assert_eq!(
         std::fs::read(file.with_extension("json.corrupt")).unwrap(),
         b"{\"pending\":["

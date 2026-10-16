@@ -20,7 +20,10 @@ fn corrupt_channel_thread_file_is_set_aside() {
     std::fs::write(&file, b"{\"telegram\":[").unwrap();
 
     assert!(threads_of(tmp.path(), "telegram").is_empty());
-    assert!(!file.exists(), "corrupt state must not be silently replaced");
+    assert!(
+        !file.exists(),
+        "corrupt state must not be silently replaced"
+    );
     assert_eq!(
         std::fs::read(file.with_extension("json.corrupt")).unwrap(),
         b"{\"telegram\":["
