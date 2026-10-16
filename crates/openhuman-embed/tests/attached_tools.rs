@@ -125,10 +125,10 @@ fn attached_tools_survive_clones_and_session_resume() {
                 .send()
                 .await
                 .unwrap();
-            let transcripts =
-                openhuman_core::storage::sessions::provider_for_workspace(agent.workspace_dir())
-                    .for_agent("attached")
-                    .transcripts;
+            let transcripts = openhuman_core::storage::sessions::workspace_transcripts(
+                "attached",
+                agent.workspace_dir(),
+            );
             let continuing = transcripts
                 .thread_transcripts("continuing", None)
                 .expect("the continuing session transcript is durable");
