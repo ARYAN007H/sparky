@@ -62,17 +62,34 @@ pub async fn flows_cancel_run(config: &Config, run_id: &str) -> Result<Outcome<V
     // write FIRST and treat it as the authority: it only matches a still-live
     // row, so `false` means the run settled underneath us. Only once it has
     // won do we record the flow summary and drop the checkpoint.
-    let observed = current_persisted_steps(config, run_id);
-    let settled_by_us = finish_flow_run_row(
-        config,
-        run_id,
-        &run.flow_id,
-        "cancelled",
-        &observed,
-        &[],
-        Some("run cancelled"),
-        None,
-    );
+    let settled_by_us = if run.status == "pending_approval" {
+        // Use the status observed at entry to choose the atomic predicate.
+        // A resume may claim this parked row after the initial read and after
+        // `cancel` found no registry entry; the parked-only CAS then loses
+        // cleanly instead of tearing down the starting resume.
+        settle_parked_run(config, run_id, &run.flow_id, "cancelled", "run cancelled").await
+    } else {
+        // A stale `running` row cannot be newly claimed by ResumeRun, so the
+        // general live-row settle remains available for explicit cleanup.
+        let observed = current_persisted_steps(config, run_id);
+        let settled = finish_flow_run_row(
+            config,
+            run_id,
+            &run.flow_id,
+            "cancelled",
+            &observed,
+            &[],
+            Some("run cancelled"),
+            None,
+        );
+        if settled {
+            if let Err(e) = store::record_run(config, &run.flow_id, "cancelled") {
+                tracing::warn!(target: "flows", run_id, flow_id = %run.flow_id, error = %e, "[flows] flows_cancel_run: failed to record cancelled status on flow summary");
+            }
+            drop_checkpoint(config, run_id).await;
+        }
+        settled
+    };
     if !settled_by_us {
         tracing::info!(
             target: "flows",
@@ -83,15 +100,47 @@ pub async fn flows_cancel_run(config: &Config, run_id: &str) -> Result<Outcome<V
         );
         return Err(rm::settled_concurrently_error(run_id));
     }
-    if let Err(e) = store::record_run(config, &run.flow_id, "cancelled") {
-        tracing::warn!(target: "flows", run_id, flow_id = %run.flow_id, error = %e, "[flows] flows_cancel_run: failed to record cancelled status on flow summary");
-    }
-    drop_checkpoint(config, run_id).await;
-
     Ok(Outcome::single_log(
         json!({ "run_id": run_id, "cancelled": true, "was_in_flight": false }),
         format!("flow run {run_id} cancelled"),
     ))
+}
+
+/// Atomically settles a run that was observed parked for approval, then
+/// updates the flow summary and removes its checkpoint only if that write
+/// wins. The status check in the driver CAS protects a resume that claims the
+/// row after the caller's initial read.
+pub(super) async fn settle_parked_run(
+    config: &Config,
+    run_id: &str,
+    flow_id: &str,
+    status: &str,
+    error: &str,
+) -> bool {
+    let observed = current_persisted_steps(config, run_id);
+    if !finish_parked_flow_run_row(
+        config,
+        run_id,
+        flow_id,
+        status,
+        &observed,
+        &[],
+        Some(error),
+        None,
+    ) {
+        return false;
+    }
+    if let Err(e) = store::record_run(config, flow_id, status) {
+        tracing::warn!(
+            target: "flows",
+            run_id,
+            flow_id,
+            error = %e,
+            "[flows] failed to record settled parked run status on flow summary"
+        );
+    }
+    drop_checkpoint(config, run_id).await;
+    true
 }
 
 /// Best-effort drop of a run's durable tinyagents checkpoint thread, so a

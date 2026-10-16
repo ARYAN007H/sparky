@@ -125,32 +125,21 @@ pub async fn flows_resume(
                 //
                 // A is refused either way: its own view of the graph is stale,
                 // so it must never proceed regardless of who owns the row.
-                let observed = current_persisted_steps(config, thread_id);
-                let settled_by_us = finish_flow_run_row(
+                let settled_by_us = super::run_management::settle_parked_run(
                     config,
                     thread_id,
                     flow_id,
                     "cancelled",
-                    &observed,
-                    &[],
-                    Some(GRAPH_CHANGED_SINCE_PARK_ERROR),
-                    None,
-                );
+                    GRAPH_CHANGED_SINCE_PARK_ERROR,
+                )
+                .await;
                 if settled_by_us {
-                    if let Err(e) = store::record_run(config, flow_id, "cancelled") {
-                        tracing::warn!(
-                            target: "flows",
-                            flow_id = %flow_id,
-                            %thread_id,
-                            error = %e,
-                            "[flows] flows_resume: failed to record run summary (stale-approval refusal)"
-                        );
-                    }
-                    // The checkpoint is for a graph that no longer exists as
-                    // approved; drop it rather than leave it resumable against
-                    // a future graph edit that happens to hash back to the
-                    // same value.
-                    drop_checkpoint(config, thread_id).await;
+                    tracing::debug!(
+                        target: "flows",
+                        flow_id = %flow_id,
+                        %thread_id,
+                        "[flows] flows_resume: stale-approval refusal settled the parked run"
+                    );
                 } else {
                     tracing::info!(
                         target: "flows",
@@ -178,26 +167,22 @@ pub async fn flows_resume(
     // A pending checkpoint may have been created before this compatibility
     // gate shipped, so resume is an independent authoritative boundary.
     if let Err(error) = ensure_config_aware_engine_compatible(config, &flow.graph) {
-        if let Err(rec_err) = store::record_run(config, flow_id, "failed") {
-            tracing::warn!(
-                target: "flows",
-                flow_id = %flow_id,
-                %thread_id,
-                error = %rec_err,
-                "[flows] flows_resume: failed to record compatibility rejection"
-            );
-        }
-        let observed = current_persisted_steps(config, thread_id);
-        finish_flow_run_row(
+        let settled_by_us = super::run_management::settle_parked_run(
             config,
             thread_id,
             flow_id,
             "failed",
-            &observed,
-            &[],
-            Some(&error),
-            None,
-        );
+            &error,
+        )
+        .await;
+        if !settled_by_us {
+            tracing::info!(
+                target: "flows",
+                flow_id = %flow_id,
+                %thread_id,
+                "[flows] flows_resume: compatibility refusal lost the parked row to another lifecycle operation"
+            );
+        }
         tracing::warn!(
             target: "flows",
             flow_id = %flow_id,

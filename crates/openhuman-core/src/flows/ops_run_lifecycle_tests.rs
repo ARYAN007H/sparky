@@ -34,7 +34,7 @@ async fn stale_graph_refusal_leaves_a_resume_claimed_run_and_summary_untouched()
     // A winning resume claims the row between the stale graph check's read
     // and its attempted refusal write.
     assert!(store::mark_run_resuming(&config, run_id).unwrap());
-    assert!(!settle_parked_run(
+    assert!(!run_management::settle_parked_run(
         &config,
         run_id,
         &flow.id,
@@ -67,7 +67,14 @@ async fn cancel_observed_parked_does_not_tear_down_a_resume_starting() {
     // Cancel already read `pending_approval` and found no registry entry;
     // resume then registers and claims the row before cancel's CAS.
     assert!(store::mark_run_resuming(&config, run_id).unwrap());
-    assert!(!settle_parked_run(&config, run_id, &flow.id, "cancelled", "run cancelled").await);
+    assert!(!run_management::settle_parked_run(
+        &config,
+        run_id,
+        &flow.id,
+        "cancelled",
+        "run cancelled"
+    )
+    .await);
 
     let row = store::get_flow_run(&config, run_id).unwrap().unwrap();
     assert_eq!(row.status, "running");
