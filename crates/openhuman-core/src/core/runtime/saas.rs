@@ -529,7 +529,10 @@ pub async fn build_with_profile_capabilities(
     );
     crate::profiles::host::install(Arc::clone(&host));
     crate::profiles::lease::heartbeat(Arc::clone(&host), runtime.context().clone());
-    crate::profiles::background::spawn(host);
+    crate::profiles::background::spawn(
+        &crate::core::runtime::DispatchCtx::new(runtime.context().clone()),
+        host,
+    );
     Ok(runtime)
 }
 

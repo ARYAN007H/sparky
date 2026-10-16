@@ -163,7 +163,7 @@ pub(crate) async fn run_chat_task(
     let (progress_tx, progress_rx) = tokio::sync::mpsc::channel(256);
     // Under the web-turn guard, fold every event into the turn's activity
     // record (the idle guard's input) on its way to the bridge.
-    let progress_rx = super::turn_activity::tap(activity, progress_rx, 256);
+    let progress_rx = super::turn_activity::tap(ctx, activity, progress_rx, 256);
     // The channel is fresh here. Record the user input even if the turn fails
     // before a committed reply can emit its final TurnContent event.
     let _ = progress_tx.try_send(AgentProgress::TurnContent {

@@ -264,7 +264,8 @@ async fn search(
 async fn load_index(session: &Session, request: LoadIndexRequest) -> HostResult<Option<String>> {
     let config = session.config.clone();
     let kind: IndexKind = request.kind;
-    match crate::core::runtime::DispatchCtx::ambient()
+    match session
+        .dispatch_ctx()
         .spawn_blocking(move || docs::load(&config, kind))
         .await
     {
@@ -282,7 +283,8 @@ async fn load_index(session: &Session, request: LoadIndexRequest) -> HostResult<
 
 async fn save_index(session: &Session, request: SaveIndexRequest) -> HostResult<()> {
     let config = session.config.clone();
-    match crate::core::runtime::DispatchCtx::ambient()
+    match session
+        .dispatch_ctx()
         .spawn_blocking(move || docs::save(&config, request.kind, request.json))
         .await
     {
