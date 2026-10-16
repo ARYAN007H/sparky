@@ -394,8 +394,9 @@ pub enum DomainEvent {
     },
 
     /// A proactive message (morning briefing, welcome, cron output, etc.)
-    /// needs to be delivered to the user. The channels module routes it to
-    /// the user's active channel.
+    /// needs to be delivered to the user. The web subscriber publishes it to
+    /// the profile-scoped web stream; when configured, the optional channels
+    /// subscriber also routes it to the user's active external channel.
     ProactiveMessageRequested {
         /// Identifies the source (e.g. `"cron:morning_briefing"`, `"cron:welcome"`).
         source: String,

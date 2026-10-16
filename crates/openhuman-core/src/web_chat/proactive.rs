@@ -5,7 +5,8 @@
 //! the `channels` feature is disabled.
 
 use crate::core::events::DomainEvent;
-use crate::web_chat::{publish_web_channel_event, WebChannelEvent};
+use crate::core::runtime::DispatchCtx;
+use crate::web_chat::{publish_web_channel_event_in, WebChannelEvent};
 use async_trait::async_trait;
 use std::sync::Arc;
 use tinybus::EventHandler;
@@ -46,14 +47,19 @@ impl EventHandler<DomainEvent> for WebProactiveSubscriber {
             source,
             message,
             job_name,
-            ..
+            tenant,
         } = event
         else {
             return;
         };
 
+        let Some(ctx) = DispatchCtx::for_event(tenant.as_ref()) else {
+            tracing::warn!(source = %source, "[proactive] skipping web delivery without a live tenant context");
+            return;
+        };
+
         let thread_id = format!("proactive:{}", job_name.as_deref().unwrap_or("system"));
-        publish_web_channel_event(WebChannelEvent {
+        publish_web_channel_event_in(&ctx, WebChannelEvent {
             event: "proactive_message".to_string(),
             client_id: "system".to_string(),
             thread_id,
