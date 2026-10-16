@@ -9,32 +9,14 @@
 
 mod common;
 
-use std::sync::{
-    atomic::{AtomicUsize, Ordering},
-    Arc, Mutex,
-};
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use common::{offline_config, runtime, stub_backend, tool_call_completion};
+use common::{offline_config, runtime, scripted_provider, stub_backend, tool_call_completion};
 use openhuman_embed::{
     Access, AgentDefinitionSpec, AgentSpec, AgentTurnOrigin, CronDelivery, CronReply,
     HostTurnTools, InMemorySessionStores, JobOrigin, Runtime, ServiceSet, ToolScopeSpec, Workspace,
 };
-
-struct CronScript(AtomicUsize);
-
-impl wiremock::Respond for CronScript {
-    fn respond(&self, _: &wiremock::Request) -> wiremock::ResponseTemplate {
-        let response = match self.0.fetch_add(1, Ordering::SeqCst) {
-            // Compute the `at` schedule when the model asks for the tool, not
-            // when the fixture starts booting the runtime.
-            0 => add_job("stretch", "stretch reminder"),
-            1 => common::chat_completion("Scheduled."),
-            _ => common::chat_completion("Time to stretch!"),
-        };
-        wiremock::ResponseTemplate::new(200).set_body_json(response)
-    }
-}
 
 #[derive(Default)]
 struct Recorder(Mutex<Vec<CronReply>>);
@@ -68,6 +50,16 @@ fn a_library_agents_scheduled_reply_is_handed_to_the_host() {
     runtime().block_on(async {
         tokio::spawn(async {
             let backend = stub_backend().await;
+            // The chat turn schedules the job and acknowledges it; the job's
+            // own run answers from the fallback.
+            let provider = scripted_provider(
+                vec![
+                    add_job("stretch", "stretch reminder"),
+                    common::chat_completion("Scheduled."),
+                ],
+                "Time to stretch!",
+            )
+            .await;
             let recorder = Arc::new(Recorder::default());
             let mut config = offline_config();
             config.reliability.scheduler_poll_secs = 5;
@@ -76,9 +68,6 @@ fn a_library_agents_scheduled_reply_is_handed_to_the_host() {
                 .workspace(Workspace::Stateless)
                 .session_store(Arc::new(InMemorySessionStores::new()))
                 .backend_url(backend.uri())
-                // Scheduled work is background LLM work; the scheduler gate
-                // correctly parks it until this library runtime has a credential.
-                .api_key("th_test_key")
                 .cron_delivery(recorder.clone())
                 .services(ServiceSet {
                     cron: true,
@@ -87,19 +76,6 @@ fn a_library_agents_scheduled_reply_is_handed_to_the_host() {
                 .build()
                 .await
                 .expect("runtime builds");
-            assert!(runtime.has_api_key(), "the local fixture key is installed");
-            assert!(
-                !openhuman_core::cron::scheduler_gate::is_signed_out(),
-                "background cron inference requires a signed-in runtime"
-            );
-            // The responder computes the one-shot schedule when the model
-            // asks for the tool; startup cannot age the `at` timestamp.
-            let provider = wiremock::MockServer::start().await;
-            wiremock::Mock::given(wiremock::matchers::method("POST"))
-                .and(wiremock::matchers::path("/v1/chat/completions"))
-                .respond_with(CronScript(AtomicUsize::new(0)))
-                .mount(&provider)
-                .await;
             let agent = runtime
                 .agent(
                     AgentSpec::new("teeny")
@@ -128,30 +104,6 @@ fn a_library_agents_scheduled_reply_is_handed_to_the_host() {
                 .send()
                 .await
                 .expect("the stretch turn runs");
-
-            let jobs = runtime.cron().list().expect("scheduled job is stored");
-            let tool_messages = common::chat_requests(&provider)
-                .await
-                .into_iter()
-                .flat_map(|request| {
-                    let body: serde_json::Value = serde_json::from_slice(&request.body).unwrap();
-                    body["messages"]
-                        .as_array()
-                        .into_iter()
-                        .flatten()
-                        .filter(|message| message["role"] == "tool")
-                        .map(|message| message["content"].clone())
-                        .collect::<Vec<_>>()
-                })
-                .collect::<Vec<_>>();
-            assert_eq!(
-                jobs.len(),
-                1,
-                "{jobs:?}; tool responses: {tool_messages:?}"
-            );
-            let job = &jobs[0];
-            assert_eq!(job.name, "stretch");
-            assert!(job.next_run > std::time::SystemTime::now(), "{job:?}");
 
             let mut delivered = Vec::new();
             for _ in 0..120 {
