@@ -29,9 +29,10 @@ impl CronDelivery for Recorder {
     }
 }
 
-/// A `cron add` call for a one-shot agent job a few seconds from now.
+/// A `cron add` call for a one-shot agent job far enough ahead to allow the
+/// runtime to boot and the scheduling turn to finish before its due time.
 fn add_job(name: &str, prompt: &str) -> serde_json::Value {
-    let at = chrono::Utc::now() + chrono::Duration::seconds(2);
+    let at = chrono::Utc::now() + chrono::Duration::seconds(30);
     let arguments = serde_json::json!({
         "action": "add", "job_type": "agent", "name": name, "prompt": prompt,
         "delivery": {"mode": "origin"},
@@ -118,8 +119,9 @@ fn a_library_agents_scheduled_reply_is_handed_to_the_host() {
             let job = &jobs[0];
             assert_eq!(job.name, "stretch");
             assert!(
-                job.next_run <= std::time::SystemTime::now() + Duration::from_secs(5),
-                "job is not due within the scheduler's first poll: {job:?}"
+                job.next_run > std::time::SystemTime::now()
+                    && job.next_run <= std::time::SystemTime::now() + Duration::from_secs(60),
+                "job is not due within the test's delivery window: {job:?}"
             );
 
             let mut delivered = Vec::new();
