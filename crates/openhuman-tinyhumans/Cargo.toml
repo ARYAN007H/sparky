@@ -114,6 +114,9 @@ reqwest = { version = "0.12", default-features = false, features = ["json", "mul
 axum = { version = "0.8", default-features = false, features = ["http1", "json", "tokio", "query", "ws", "macros"] }
 tempfile = "3"
 tinybus = { path = "../../vendor/tinybus/crates/tinybus", default-features = false }
+# The managed-model stream tests replay SSE through the real harness loop.
+tinyagents-harness = { path = "../../vendor/tinyagents/crates/tinyagents-harness", default-features = false }
+futures = "0.3"
 tokio = { version = "1", features = ["full", "test-util"] }
 wiremock = "0.6"
 tokio-util = { version = "0.7", features = ["rt", "io"] }
