@@ -370,8 +370,13 @@ pub mod voice_registry {
         register_live_provider, register_live_provider_in, unregister_live_provider, ConfigureFn,
         ConfiguredFn, LiveFuture, LiveProviderEntry, PrepareFn,
     };
+    pub use openhuman_core::config::schema::voice_live::{
+        LIVE_PROVIDER_ELEVENLABS_HOSTED, LIVE_PROVIDER_GEMINI_HOSTED,
+    };
     pub use openhuman_core::voice::live::types::{LiveProviderInfo, LiveProviderKind};
-    pub use openhuman_core::voice::live::{LiveVoiceError, PreparedProvider};
+    pub use openhuman_core::voice::live::{
+        LiveVoiceError, PreparedProvider, GEMINI_LANGUAGES, GEMINI_VOICES,
+    };
 }
 
 // The rest is the rpc server alone.
