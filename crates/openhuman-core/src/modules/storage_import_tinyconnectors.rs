@@ -91,10 +91,9 @@ async fn import_into(scoped: &ScopedStorage, state_dir: &Path) -> Result<Outcome
         return Ok(Outcome::NoSource);
     }
 
-    let legacy =
-        tokio::task::spawn_blocking(move || read_legacy(&prefs_dir, &triggers_dir))
-            .await
-            .context("the legacy reader panicked")??;
+    let legacy = tokio::task::spawn_blocking(move || read_legacy(&prefs_dir, &triggers_dir))
+        .await
+        .context("the legacy reader panicked")??;
 
     docs.ensure_collection(&CollectionSpec::new(PREFS_COLLECTION))
         .await

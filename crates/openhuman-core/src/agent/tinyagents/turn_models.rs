@@ -260,9 +260,11 @@ fn build_turn_models_crate(
             .host_overrides()
             .and_then(|local| local.role_models.get("summarization").cloned())
         {
-            Some(custom) => {
-                crate::agent::attachments::provider::wrap_injected(ctx, custom, Arc::new(config.clone()))
-            }
+            Some(custom) => crate::agent::attachments::provider::wrap_injected(
+                ctx,
+                custom,
+                Arc::new(config.clone()),
+            ),
             None => build_primary(model)?,
         };
 
@@ -511,7 +513,11 @@ impl TurnModelSource {
             );
             let (primary, summarizer) = match &self.attachment_config {
                 Some(config) => (
-                    crate::agent::attachments::provider::wrap_injected(&self.dispatch_ctx(), primary, config.clone()),
+                    crate::agent::attachments::provider::wrap_injected(
+                        &self.dispatch_ctx(),
+                        primary,
+                        config.clone(),
+                    ),
                     crate::agent::attachments::provider::wrap_injected(
                         &self.dispatch_ctx(),
                         direct.clone(),
@@ -592,9 +598,11 @@ impl TurnModelSource {
                     .with_request_temperature(temperature),
             );
             return Ok(match &self.attachment_config {
-                Some(config) => {
-                    crate::agent::attachments::provider::wrap_injected(&self.dispatch_ctx(), summarizer, config.clone())
-                }
+                Some(config) => crate::agent::attachments::provider::wrap_injected(
+                    &self.dispatch_ctx(),
+                    summarizer,
+                    config.clone(),
+                ),
                 None => summarizer,
             });
         }

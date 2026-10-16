@@ -122,12 +122,13 @@ pub(crate) async fn run(
         // cancellation is acknowledged only after the command is gone.
         let hold = tinytools_std::timeout::ProcessCleanup::hold();
         let (_caller, abandoned) = tokio::sync::oneshot::channel::<std::convert::Infallible>();
-        crate::core::runtime::DispatchCtx::ambient().spawn(async move {
-            let _hold = hold;
-            run_owned(&config, run, abandoned, meter).await
-        })
-        .await
-        .map_err(|_| anyhow::anyhow!("TinyBox shell worker did not finish"))?
+        crate::core::runtime::DispatchCtx::ambient()
+            .spawn(async move {
+                let _hold = hold;
+                run_owned(&config, run, abandoned, meter).await
+            })
+            .await
+            .map_err(|_| anyhow::anyhow!("TinyBox shell worker did not finish"))?
     }
     #[cfg(not(feature = "modules"))]
     {

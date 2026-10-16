@@ -73,7 +73,10 @@ async fn a_task_spawned_from_a_context_keeps_it_across_awaits_and_nested_spawns(
         .spawn(async {
             tokio::task::yield_now().await;
             // A nested spawn from inside re-hands the ambient context.
-            DispatchCtx::ambient().spawn(async { seen() }).await.unwrap()
+            DispatchCtx::ambient()
+                .spawn(async { seen() })
+                .await
+                .unwrap()
         })
         .await
         .unwrap();

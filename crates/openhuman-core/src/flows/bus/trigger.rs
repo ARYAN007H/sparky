@@ -112,10 +112,7 @@ impl FlowTriggerSubscriber {
     }
 
     /// The configuration to handle an event under (`super::owner::config_for_scope`).
-    pub(super) fn config_for_scope(
-        &self,
-        ctx: &crate::core::runtime::DispatchCtx,
-    ) -> Arc<Config> {
+    pub(super) fn config_for_scope(&self, ctx: &crate::core::runtime::DispatchCtx) -> Arc<Config> {
         super::owner::config_for_scope(ctx, &self.config)
     }
 

@@ -76,9 +76,14 @@ async fn composio_authorize_errors_without_session() {
     let _serialised = module_guard().await;
     let tmp = tempfile::tempdir().unwrap();
     let config = test_config(&tmp);
-    let err = composio_authorize(&crate::core::runtime::DispatchCtx::host_default(), &config, "gmail", None)
-        .await
-        .unwrap_err();
+    let err = composio_authorize(
+        &crate::core::runtime::DispatchCtx::host_default(),
+        &config,
+        "gmail",
+        None,
+    )
+    .await
+    .unwrap_err();
     // Backend mode (default) without a session — the mode-aware factory
     // surfaces "no backend session token" once `composio_authorize`
     // routes through `resolve_composio_route`. Accept either the
@@ -348,9 +353,14 @@ async fn composio_authorize_clears_pending_meta_connection_before_handoff() {
     let base = start_mock_backend(app).await;
     let tmp = tempfile::tempdir().unwrap();
     let config = config_with_backend(&tmp, base);
-    let outcome = composio_authorize(&crate::core::runtime::DispatchCtx::host_default(), &config, "instagram", None)
-        .await
-        .unwrap();
+    let outcome = composio_authorize(
+        &crate::core::runtime::DispatchCtx::host_default(),
+        &config,
+        "instagram",
+        None,
+    )
+    .await
+    .unwrap();
     assert_eq!(outcome.value.connection_id, "c-new");
     assert_eq!(deletes.load(Ordering::SeqCst), 1);
 }
@@ -370,7 +380,14 @@ async fn composio_authorize_via_mock_publishes_event_and_returns_url() {
     let base = start_mock_backend(app).await;
     let tmp = tempfile::tempdir().unwrap();
     let config = config_with_backend(&tmp, base);
-    let outcome = composio_authorize(&crate::core::runtime::DispatchCtx::host_default(), &config, "gmail", None).await.unwrap();
+    let outcome = composio_authorize(
+        &crate::core::runtime::DispatchCtx::host_default(),
+        &config,
+        "gmail",
+        None,
+    )
+    .await
+    .unwrap();
     assert_eq!(outcome.value.connect_url, "https://x");
     assert_eq!(outcome.value.connection_id, "c1");
 }

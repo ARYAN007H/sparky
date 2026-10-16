@@ -325,12 +325,13 @@ async fn launch(
     let driver = importer(config, bound.engine, consent, paused);
     let begin = {
         let driver = driver.clone();
-        crate::core::runtime::DispatchCtx::ambient().spawn_blocking(move || match mode {
-            Mode::Import => driver.begin(),
-            Mode::Retry => driver.begin_retry(),
-            Mode::ResumeRetry => Ok(driver.begin_retry_resume()),
-        })
-        .await
+        crate::core::runtime::DispatchCtx::ambient()
+            .spawn_blocking(move || match mode {
+                Mode::Import => driver.begin(),
+                Mode::Retry => driver.begin_retry(),
+                Mode::ResumeRetry => Ok(driver.begin_retry_resume()),
+            })
+            .await
     };
     let begun: Begun = match begin {
         Ok(Ok(begun)) => begun,

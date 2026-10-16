@@ -212,12 +212,9 @@ impl ConversationStore for ConversationHistoryStore {
         limit: usize,
     ) -> anyhow::Result<Vec<ConversationMessage>> {
         let ctx = DispatchCtx::host_default();
-        let messages = crate::threads::store::get_messages(
-            &ctx,
-            self.workspace_dir.clone(),
-            session_key,
-        )
-        .map_err(|e| anyhow::anyhow!(e))?;
+        let messages =
+            crate::threads::store::get_messages(&ctx, self.workspace_dir.clone(), session_key)
+                .map_err(|e| anyhow::anyhow!(e))?;
         let start = messages.len().saturating_sub(limit);
         Ok(messages[start..]
             .iter()

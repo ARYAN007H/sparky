@@ -92,10 +92,9 @@ async fn import_into(
     }
 
     let dir = root.to_owned();
-    let (originals, mut skipped) =
-        tokio::task::spawn_blocking(move || read_originals(&dir, now))
-            .await
-            .context("the legacy reader panicked")??;
+    let (originals, mut skipped) = tokio::task::spawn_blocking(move || read_originals(&dir, now))
+        .await
+        .context("the legacy reader panicked")??;
 
     let (mut imported, mut expired) = (0usize, 0usize);
     for original in originals {

@@ -376,13 +376,15 @@ async fn queued_work_keeps_the_callers_core_context() {
         enqueue(
             cache.clone(),
             key.clone(),
-            Box::pin(crate::core::runtime::DispatchCtx::ambient().enter(async move {
-                assert!(Arc::ptr_eq(
-                    &crate::core::runtime::CoreContext::scoped().unwrap(),
-                    &expected
-                ));
-                Some(pack("scoped"))
-            })),
+            Box::pin(
+                crate::core::runtime::DispatchCtx::ambient().enter(async move {
+                    assert!(Arc::ptr_eq(
+                        &crate::core::runtime::CoreContext::scoped().unwrap(),
+                        &expected
+                    ));
+                    Some(pack("scoped"))
+                }),
+            ),
         );
         drain(&cache, &key).await;
         assert_eq!(completed(&cache, &key).unwrap().markdown, "scoped");

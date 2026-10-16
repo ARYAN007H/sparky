@@ -434,19 +434,20 @@ pub(crate) async fn fence_and_clear(config: &Config) -> MemoryResult<WriteFence>
     };
     fence.guard = Some(state.barrier.clone().write_owned().await);
     let snapshot_config = config.clone();
-    crate::core::runtime::DispatchCtx::ambient().spawn_blocking(move || {
-        let _guard = LOCK
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
-        for file in partitions(&snapshot_config)? {
-            queue(&file)
-                .clear_stale(state.gate.process(), fencing_generation)
-                .map_err(map_pending)?;
-        }
-        Ok::<_, MemoryError>(())
-    })
-    .await
-    .map_err(|_| unavailable())??;
+    crate::core::runtime::DispatchCtx::ambient()
+        .spawn_blocking(move || {
+            let _guard = LOCK
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            for file in partitions(&snapshot_config)? {
+                queue(&file)
+                    .clear_stale(state.gate.process(), fencing_generation)
+                    .map_err(map_pending)?;
+            }
+            Ok::<_, MemoryError>(())
+        })
+        .await
+        .map_err(|_| unavailable())??;
     tracing::debug!("[memory:tool_writes] erase fence in force; prior pending writes cleared");
     Ok(fence)
 }
@@ -466,19 +467,19 @@ pub(super) fn schedule_all(config: Arc<Config>) {
     }
     crate::core::runtime::DispatchCtx::ambient().spawn(async move {
         let scan_config = config.clone();
-        let files =
-            match crate::core::runtime::DispatchCtx::ambient().spawn_blocking(move || partitions(&scan_config))
-                .await
-            {
-                Ok(Ok(files)) => files,
-                _ => {
-                    tracing::debug!(
-                        code = "QUEUE_UNAVAILABLE",
-                        "[memory:tool_writes] retry discovery deferred"
-                    );
-                    return;
-                }
-            };
+        let files = match crate::core::runtime::DispatchCtx::ambient()
+            .spawn_blocking(move || partitions(&scan_config))
+            .await
+        {
+            Ok(Ok(files)) => files,
+            _ => {
+                tracing::debug!(
+                    code = "QUEUE_UNAVAILABLE",
+                    "[memory:tool_writes] retry discovery deferred"
+                );
+                return;
+            }
+        };
         for file in files {
             schedule_partition(config.clone(), file);
         }

@@ -43,8 +43,7 @@ async fn canceled_waiter_closes_handle_returned_by_in_flight_typing_start() {
         stopped: std::sync::Mutex::new(Some(sender)),
     });
     let cancellation = tokio_util::sync::CancellationToken::new();
-    let waiter =
-        spawn_typing_task(channel.clone(), "recipient".into(), cancellation.clone());
+    let waiter = spawn_typing_task(channel.clone(), "recipient".into(), cancellation.clone());
     channel.started.notified().await;
     waiter.abort();
     cancellation.cancel();
