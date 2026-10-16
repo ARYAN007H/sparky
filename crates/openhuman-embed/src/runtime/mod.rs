@@ -446,8 +446,11 @@ impl Runtime {
         kind: crate::cron::JobKind,
         handler: std::sync::Arc<dyn crate::cron::JobKindHandler>,
     ) {
+        log::debug!(
+            "[embed][runtime] job kind handler registered kind={}",
+            kind.as_str()
+        );
         let registration = openhuman_core::cron::handlers::register_kind(kind, handler);
-        log::debug!("[embed][runtime] job kind handler registered kind={kind:?}");
         self.guard
             .kind_handlers
             .lock()

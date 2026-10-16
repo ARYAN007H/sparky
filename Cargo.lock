@@ -5458,11 +5458,12 @@ dependencies = [
  "tinyconnectors-bus",
  "tinydocs-bus",
  "tinyflows",
+ "tinyflows-bus",
  "tinyflows-catalog",
  "tinyflows-copilot",
  "tinyflows-drivers",
  "tinyflows-import",
- "tinyflows-schedule",
+ "tinyflows-module",
  "tinyhosts-bus",
  "tinyinference-core 0.4.1",
  "tinyinference-decisions 0.4.1",
@@ -5599,7 +5600,7 @@ dependencies = [
  "tinyagents-harness",
  "tinyagents-session",
  "tinybus",
- "tinyflows-schedule",
+ "tinyflows-bus",
  "tinyinference-embeddings",
  "tinyinference-llm 0.4.1",
  "tinymcp-bus",
@@ -5628,6 +5629,7 @@ dependencies = [
  "tinycomputer",
  "tinyconnectors",
  "tinydocs-module",
+ "tinyflows-module",
  "tinyhosts",
  "tinyjuice-module",
  "tinymcp",
@@ -9117,12 +9119,33 @@ dependencies = [
  "sha2 0.11.0",
  "tempfile",
  "tinyflows",
+ "tinyflows-bus",
  "tinyflows-catalog",
  "tinyflows-drivers",
- "tinyflows-schedule",
  "tinystoragedrivers-core",
  "tinystoragedrivers-sqlite",
  "tracing",
+]
+
+[[package]]
+name = "tinyflows-module"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "chrono",
+ "serde",
+ "serde_json",
+ "tinybus",
+ "tinybus-module",
+ "tinyflows",
+ "tinyflows-bus",
+ "tinyflows-drivers",
+ "tinyflows-schedule",
+ "tinystoragedrivers-core",
+ "tokio",
+ "tracing",
+ "uuid",
 ]
 
 [[package]]
