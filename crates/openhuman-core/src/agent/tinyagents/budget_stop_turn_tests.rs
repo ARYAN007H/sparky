@@ -319,6 +319,7 @@ fn a_turn_before_its_wind_down_point_runs_to_its_final_answer() {
                         max_iterations: 50,
                         context_window: None,
                         run_queue: None,
+                        message_run_queue: None,
                         early_exit_tools: &[],
                         pause_at_cap: true,
                         max_output_tokens: None,

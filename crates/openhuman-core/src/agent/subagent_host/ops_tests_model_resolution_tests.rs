@@ -1,6 +1,6 @@
 use super::*;
 use crate::agent::subagent_host::run_subagent;
-use crate::agent::subagent_host::run_async_spawn_via_driver_tool;
+use crate::agent::subagent_host::{run_async_spawn_via_driver_tool, SubagentRunStatus};
 use tinyagents_harness::context::{current_run_depth, with_run_depth, RunDepth};
 
 #[tokio::test]

@@ -260,6 +260,7 @@ async fn run_root_with(
         max_iterations: 2,
         context_window: None,
         run_queue: None,
+        message_run_queue: None,
         early_exit_tools: &[],
         pause_at_cap: false,
         max_output_tokens: None,

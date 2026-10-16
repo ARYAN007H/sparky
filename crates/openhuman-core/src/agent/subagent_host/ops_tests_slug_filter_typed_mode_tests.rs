@@ -179,6 +179,7 @@ async fn typed_mode_returns_text_through_runner() {
                     checkpoint_dir: None,
                     worktree_action_dir: None,
                     run_queue: None,
+                    message_run_queue: None,
                 },
             ),
         )
@@ -409,6 +410,7 @@ async fn typed_mode_filters_tools_by_skill_filter() {
                     checkpoint_dir: None,
                     worktree_action_dir: None,
                     run_queue: None,
+                    message_run_queue: None,
                 },
             ),
         )
