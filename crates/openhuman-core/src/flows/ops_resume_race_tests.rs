@@ -65,8 +65,9 @@ async fn duplicate_resume_preserves_the_registered_run_and_parked_checkpoint() {
     assert_eq!(row.status, "pending_approval");
     assert_eq!(row.pending_approvals, pending);
     let checkpointer = crate::flows::tinyflows::open_flow_checkpointer(&config).unwrap();
+    let checkpoint_thread = run_id.clone();
     let checkpoints = crate::storage::block_on_anyhow(async move {
-        Ok(checkpointer.get_thread(&run_id).await?.len())
+        Ok(checkpointer.get_thread(&checkpoint_thread).await?.len())
     })
     .unwrap();
     assert!(
