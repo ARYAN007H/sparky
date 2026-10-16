@@ -209,6 +209,12 @@ fn subagent_control_dispatches(
             .with_description(adapter.description())
             .with_parameters(adapter.parameters_schema())
             .with_fixed_action(action)
+            .with_metadata(
+                adapter.permission_level(),
+                adapter.scope(),
+                adapter.category(),
+                tinytools::ToolTimeout::Inherit,
+            )
             .with_owner_scope(owner_scope.clone())
             .with_sessions(store.clone(), move |_| parent_session.clone());
         Some(Arc::new(dispatch))
@@ -230,6 +236,12 @@ fn subagent_control_dispatches(
                     .with_identifier_fields("task_id", "subagent_session_id")
                     .with_await_timeout_field("timeout_secs", 120, 3600)
                     .with_required_identifier()
+                    .with_metadata(
+                        adapter.permission_level(),
+                        adapter.scope(),
+                        adapter.category(),
+                        tinytools::ToolTimeout::Inherit,
+                    )
                     .with_owner_scope(owner_scope.clone())
                     .with_sessions(store.clone(), move |_| parent_session.clone()),
             ),
@@ -247,6 +259,12 @@ fn subagent_control_dispatches(
                     .with_fixed_action(SubAgentJobAction::Close)
                     .with_identifier_field("subagent_session_id")
                     .with_required_identifier()
+                    .with_metadata(
+                        adapter.permission_level(),
+                        adapter.scope(),
+                        adapter.category(),
+                        adapter.timeout_policy(&serde_json::Value::Null),
+                    )
                     .with_owner_scope(owner_scope.clone())
                     .with_sessions(store.clone(), move |_| parent_session.clone()),
             ),
@@ -268,6 +286,12 @@ fn subagent_control_dispatches(
                         "__request_id",
                     )
                     .with_lane_field("mode")
+                    .with_metadata(
+                        adapter.permission_level(),
+                        adapter.scope(),
+                        adapter.category(),
+                        adapter.timeout_policy(&serde_json::Value::Null),
+                    )
                     .with_owner_scope(owner_scope)
                     .with_sessions(store, move |_| parent_session.clone()),
             ),
