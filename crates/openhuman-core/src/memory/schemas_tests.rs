@@ -420,6 +420,85 @@ async fn engine_set_persists_the_selection_and_rejects_unknown_engines() {
 }
 
 #[tokio::test]
+async fn rpc_learn_invalidates_a_cached_prefetch_pack() {
+    use std::sync::Arc;
+    use tinymemory_api::{LearningKind, MemoryEngine, MemoryMeta};
+
+    let tmp = tempfile::tempdir().unwrap();
+    let config = config_in(&tmp);
+    let engine = bind_reference(&config);
+    engine
+        .store(tinymemory_api::StoreItem::learning(
+            "The user prefers dark roast coffee",
+            LearningKind::Preference,
+            0.9,
+            MemoryMeta::default(),
+        ))
+        .await
+        .unwrap();
+
+    let ctx = CoreContext::for_test_with_config(DomainSet::full(), config.clone());
+    let dispatch = DispatchCtx::new(ctx.clone());
+    let identity = crate::memory::scope::MemoryIdentity::root().resolve(&config);
+    let thread = "rpc-learn-invalidates-prefetch";
+    let input = || crate::memory::lifecycle::hooks::PreTurnInput {
+        thread_id: thread.into(),
+        turn_index: 0,
+        user_text: "What coffee do I like?".into(),
+        in_prompt_from: 0,
+        at: chrono::Utc::now(),
+        resumed_after_compaction: false,
+        observed_actor: None,
+    };
+
+    CoreContext::scope(ctx.clone(), async {
+        let config = Arc::new(config.clone());
+        assert!(crate::memory::lifecycle::prefetch::pre_turn(
+            &dispatch,
+            config.clone(),
+            identity.clone(),
+            input(),
+            None,
+        )
+        .is_none());
+        crate::memory::lifecycle::prefetch::settle_for_test(
+            &dispatch,
+            &config,
+            &identity,
+            thread,
+            false,
+        )
+        .await;
+        assert!(crate::memory::lifecycle::prefetch::pre_turn(
+            &dispatch,
+            config.clone(),
+            identity.clone(),
+            input(),
+            None,
+        )
+        .is_some(), "the initial turn should consume its completed pack");
+
+        call(
+            &config,
+            "learn",
+            json!({"text": "The user enjoys espresso"}),
+        )
+        .await
+        .unwrap();
+
+        assert!(crate::memory::lifecycle::prefetch::pre_turn(
+            &dispatch,
+            config,
+            identity,
+            input(),
+            None,
+        )
+        .is_none(), "a later turn must not consume a pack cached before RPC learn");
+    })
+    .await;
+}
+
+#[tokio::test]
 async fn source_handlers_add_remove_and_sync() {
     let tmp = tempfile::tempdir().unwrap();
     let config = config_in(&tmp);
