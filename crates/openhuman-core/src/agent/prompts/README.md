@@ -89,10 +89,9 @@ Other domains contribute prompt content without living in this directory:
 
 Built-in archetype system prompts (orchestrator, planner, image_agent,
 and so on) generally live in `agent_registry/agents/<name>/prompt.rs`; the
-trigger triage and reactor prompt builders live with `triage`. The remaining
-builders and
-`flows/agents/{flow_discovery,workflow_builder}/prompt.rs`, not here. Each is a
-`PromptSource::Dynamic` function that hand-assembles its body via the
+trigger triage and reactor prompt builders live with `triage`. Flow agent
+builders live in `flows/agents/{flow_discovery,workflow_builder}/prompt.rs`.
+These are `PromptSource::Dynamic` functions that hand-assemble their body via the
 `render_*` helpers; [`agent/session_host/builder/factory.rs`](../session_host/builder/factory.rs) wraps it with
 `SystemPromptBuilder::from_dynamic`.
 
