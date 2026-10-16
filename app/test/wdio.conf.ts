@@ -97,6 +97,8 @@ export const config: Options.Testrunner & Record<string, unknown> = {
   maxInstances: 1,
   capabilities: [
     {
+      // tauri-driver selects its native Wry/WebKit adapter by this browser name.
+      browserName: 'wry',
       'tauri:options': { application: linuxAppPath() },
       // WebKitGTK shipped by Ubuntu 22.04 does not support WebDriver BiDi.
       // WDIO 9 negotiates it by default; tauri-driver forwards that capability
