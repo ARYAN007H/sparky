@@ -96,6 +96,7 @@ async fn failed_subagent_run_keeps_its_unanswered_round_out_of_history() {
         10,
         None,
         None,
+        None,
         "researcher",
         "task-failed",
         false,

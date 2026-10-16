@@ -131,6 +131,7 @@ async fn run_with_spawn_tool_in_parent_surface(allowed: HashSet<String>) -> (boo
         10,
         None,
         None,
+        None,
         "researcher",
         "task-6157",
         false,
