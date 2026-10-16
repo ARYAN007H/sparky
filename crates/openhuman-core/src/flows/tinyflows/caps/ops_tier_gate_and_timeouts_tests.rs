@@ -153,13 +153,15 @@ async fn malformed_live_config_is_denied_without_echoing_its_contents() {
 }
 
 #[tokio::test]
-async fn captured_agent_tier_and_host_ceiling_are_not_replaced_by_parent_file() {
+async fn captured_agent_and_config_fn_tiers_are_not_replaced_by_parent_file() {
     use crate::security::AutonomyLevel;
 
     let dir = tempfile::tempdir().unwrap();
     let mut parent_file = persisted_tier_config(dir.path(), true, AutonomyLevel::Full);
     save_tier_config(&parent_file).await;
     let mut captured = parent_file.clone();
+    // This is the effective autonomy after AgentSpec's config_fn escape hatch;
+    // embed construction marks that final in-memory config as Captured.
     captured.autonomy.level = AutonomyLevel::ReadOnly;
     let parent = crate::core::runtime::CoreContext::for_test(
         crate::core::runtime::DomainSet::full(),
