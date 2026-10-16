@@ -578,7 +578,8 @@ async fn composio_list_connections_routes_through_direct_mode() {
     // remote will reject the test request, so we assert on the error
     // shape: it must reference `composio` AND must NOT reference the
     // backend-session path (proving the factory routed us to direct).
-    let result = composio_list_connections(&crate::core::runtime::DispatchCtx::ambient(), &config).await;
+    let result =
+        composio_list_connections(&crate::core::runtime::DispatchCtx::ambient(), &config).await;
     match result {
         Ok(outcome) => {
             // Some sandboxes resolve OK with an empty list — accept

@@ -155,7 +155,8 @@ async fn a_preference_still_in_the_legacy_file_gates_execution() {
     let mut config = Config::default();
     config.workspace_dir = tmp.path().join("workspace");
     config.config_path = tmp.path().join("config.toml");
-    crate::integrations::composio::file_store::save(&crate::core::runtime::DispatchCtx::ambient(), 
+    crate::integrations::composio::file_store::save(
+        &crate::core::runtime::DispatchCtx::ambient(),
         &config,
         crate::integrations::composio::file_store::USER_SCOPES_FILE,
         &serde_json::json!({"gmail": {"read": true, "write": false, "admin": false}}),

@@ -11,7 +11,13 @@ fn config_in(dir: &tempfile::TempDir) -> Config {
 #[tokio::test]
 async fn missing_value_loads_the_default() {
     let dir = tempfile::tempdir().unwrap();
-    let loaded: BTreeMap<String, u32> = load(&config_in(&dir), IDENTITIES_FILE).await.unwrap();
+    let loaded: BTreeMap<String, u32> = load(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config_in(&dir),
+        IDENTITIES_FILE,
+    )
+    .await
+    .unwrap();
     assert!(loaded.is_empty());
 }
 
@@ -21,11 +27,30 @@ async fn save_then_load_round_trips_in_the_workspace_default_backend() {
     let config = config_in(&dir);
     let mut value = BTreeMap::new();
     value.insert("gmail".to_string(), 3u32);
-    save(&config, USER_SCOPES_FILE, &value).await.unwrap();
-    let loaded: BTreeMap<String, u32> = load(&config, USER_SCOPES_FILE).await.unwrap();
+    save(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        USER_SCOPES_FILE,
+        &value,
+    )
+    .await
+    .unwrap();
+    let loaded: BTreeMap<String, u32> = load(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        USER_SCOPES_FILE,
+    )
+    .await
+    .unwrap();
     assert_eq!(loaded, value);
     // The other value is untouched, and nothing was written as a JSON file.
-    let other: BTreeMap<String, u32> = load(&config, IDENTITIES_FILE).await.unwrap();
+    let other: BTreeMap<String, u32> = load(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        IDENTITIES_FILE,
+    )
+    .await
+    .unwrap();
     assert!(other.is_empty());
     assert!(!dir.path().join("integrations").exists());
     assert!(dir.path().join("storage").exists());
@@ -39,9 +64,29 @@ async fn update_applies_and_persists_a_change() {
         *v.entry("n".into()).or_default() += 1;
         ((), true)
     };
-    update(&config, IDENTITIES_FILE, bump).await.unwrap();
-    update(&config, IDENTITIES_FILE, bump).await.unwrap();
-    let loaded: BTreeMap<String, u32> = load(&config, IDENTITIES_FILE).await.unwrap();
+    update(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        IDENTITIES_FILE,
+        bump,
+    )
+    .await
+    .unwrap();
+    update(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        IDENTITIES_FILE,
+        bump,
+    )
+    .await
+    .unwrap();
+    let loaded: BTreeMap<String, u32> = load(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        IDENTITIES_FILE,
+    )
+    .await
+    .unwrap();
     assert_eq!(loaded["n"], 2);
 }
 
@@ -53,7 +98,13 @@ async fn a_legacy_state_file_is_imported_once_and_left_byte_identical() {
     std::fs::create_dir_all(&legacy_dir).unwrap();
     std::fs::write(legacy_dir.join(USER_SCOPES_FILE), r#"{"gmail":7}"#).unwrap();
 
-    let loaded: BTreeMap<String, u32> = load(&config, USER_SCOPES_FILE).await.unwrap();
+    let loaded: BTreeMap<String, u32> = load(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        USER_SCOPES_FILE,
+    )
+    .await
+    .unwrap();
     assert_eq!(loaded["gmail"], 7);
     // The legacy file is read only: same name, same bytes, no `.migrated`.
     assert_eq!(
@@ -66,6 +117,7 @@ async fn a_legacy_state_file_is_imported_once_and_left_byte_identical() {
 
     // A later edit is not clobbered by a re-import.
     update(
+        &crate::core::runtime::DispatchCtx::ambient(),
         &config,
         USER_SCOPES_FILE,
         |v: &mut BTreeMap<String, u32>| {
@@ -75,7 +127,13 @@ async fn a_legacy_state_file_is_imported_once_and_left_byte_identical() {
     )
     .await
     .unwrap();
-    let again: BTreeMap<String, u32> = load(&config, USER_SCOPES_FILE).await.unwrap();
+    let again: BTreeMap<String, u32> = load(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        USER_SCOPES_FILE,
+    )
+    .await
+    .unwrap();
     assert_eq!(again["gmail"], 9);
     assert_eq!(
         std::fs::read(legacy_dir.join(USER_SCOPES_FILE)).unwrap(),
