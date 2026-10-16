@@ -33,7 +33,7 @@
 //! [`SubagentEntry::Skills`]: tinyagents_definition::SubagentEntry::Skills
 
 use crate::agent_registry::host_definition::{AgentDefinition, AgentDefinitionRegistry};
-use crate::agent::prompts::ConnectedIntegration;
+use crate::integrations::ConnectedIntegration;
 use crate::integrations::composio::ComposioActionTool;
 use tinyagents_definition::SubagentEntry;
 
@@ -197,7 +197,7 @@ pub fn collect_deferred_integration_actions(
     let mut seen: std::collections::HashSet<&str> = std::collections::HashSet::new();
     let mut tools: Vec<Box<dyn Tool>> = Vec::new();
     for integration in integrations {
-        let mut actions: Vec<&crate::agent::prompts::ConnectedIntegrationTool> =
+        let mut actions: Vec<&crate::integrations::ConnectedIntegrationTool> =
             integration.tools.iter().collect();
         actions.sort_by(|a, b| a.name.cmp(&b.name));
         for action in actions {

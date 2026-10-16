@@ -115,7 +115,7 @@ pub struct ParentExecutionContext {
     pub channel: String,
 
     /// Active Composio integrations the parent has fetched.
-    pub connected_integrations: Vec<crate::agent::prompts::ConnectedIntegration>,
+    pub connected_integrations: Vec<crate::integrations::ConnectedIntegration>,
 
     /// The parent's active tool-call format (Native / PFormat / Json).
     /// Sub-agents render their system prompts with this format so the

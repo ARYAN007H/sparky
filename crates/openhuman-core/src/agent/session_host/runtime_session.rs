@@ -160,7 +160,7 @@ struct OpenHumanTurnPreludeMutable {
     announced_skills: std::collections::HashSet<String>,
     pending_skill_announcement: Vec<String>,
     pending_skill_retraction: Vec<String>,
-    connected_integrations: Vec<crate::agent::prompts::ConnectedIntegration>,
+    connected_integrations: Vec<crate::integrations::ConnectedIntegration>,
     connected_integrations_initialized: bool,
     connected_integrations_authoritative: bool,
     /// A cold hydration seeded the announced sets; later ones diff instead.

@@ -506,7 +506,7 @@ impl OpenHumanRunContext {
 
     /// The connected-identities prompt section, read under this run's context.
     pub(crate) fn connected_identities_md(&self) -> String {
-        crate::agent::prompts::render_connected_identities(&self.dispatch_ctx())
+        crate::integrations::render_connected_identities(&self.dispatch_ctx())
     }
 
     /// Sets the direct TinyTools workspace descriptor for this run.

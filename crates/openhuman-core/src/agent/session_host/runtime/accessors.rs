@@ -169,7 +169,7 @@ impl OpenHumanSessionHost {
     }
 
     /// Active Composio integrations fetched at session start.
-    pub fn connected_integrations(&self) -> &[crate::agent::prompts::ConnectedIntegration] {
+    pub fn connected_integrations(&self) -> &[crate::integrations::ConnectedIntegration] {
         &self.connected_integrations
     }
 
@@ -192,7 +192,7 @@ impl OpenHumanSessionHost {
     /// fetch result when the agent was built outside the normal turn loop).
     pub fn set_connected_integrations(
         &mut self,
-        integrations: Vec<crate::agent::prompts::ConnectedIntegration>,
+        integrations: Vec<crate::integrations::ConnectedIntegration>,
     ) {
         self.connected_integrations = integrations;
         self.connected_integrations_initialized = true;

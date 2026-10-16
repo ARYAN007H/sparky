@@ -1,8 +1,8 @@
 use super::*;
 use std::collections::HashSet;
 
-fn item(toolkit: &str, connected: bool) -> crate::agent::prompts::ConnectedIntegration {
-    crate::agent::prompts::ConnectedIntegration {
+fn item(toolkit: &str, connected: bool) -> crate::integrations::ConnectedIntegration {
+    crate::integrations::ConnectedIntegration {
         toolkit: toolkit.into(),
         description: String::new(),
         tools: Vec::new(),

@@ -33,7 +33,7 @@ pub use trigger_subscriber::ComposioTriggerSubscriber;
 
 /// Publishes the active toolkit set after the integrations cache was
 /// re-warmed, so live sessions rebuild their delegation schema.
-fn publish_integrations_changed(entries: &[crate::agent::prompts::types::ConnectedIntegration]) {
+fn publish_integrations_changed(entries: &[crate::integrations::ConnectedIntegration]) {
     let mut toolkits: Vec<String> = entries
         .iter()
         .filter(|entry| entry.connected)

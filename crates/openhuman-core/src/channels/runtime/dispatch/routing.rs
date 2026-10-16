@@ -7,7 +7,7 @@
 //! * [`build_visible_tool_set`] — union of named tools + extra (delegation) tools.
 
 use crate::agent_registry::host_definition::{AgentDefinition, AgentDefinitionRegistry};
-use crate::agent::prompts::ConnectedIntegration;
+use crate::integrations::ConnectedIntegration;
 use crate::config::Config;
 use crate::integrations::composio::{
     cached_active_integrations, fetch_connected_integrations_status,

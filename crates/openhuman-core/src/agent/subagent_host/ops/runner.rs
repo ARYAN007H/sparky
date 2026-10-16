@@ -593,7 +593,7 @@ async fn run_typed_mode(
     // once the OAuth handshake reaches ACTIVE/CONNECTED, so this call
     // returns the fresh list almost for free on the warm path. Fall back
     // to the parent's frozen list when the live fetch returns empty.
-    let live_integrations: Vec<crate::agent::prompts::ConnectedIntegration> = {
+    let live_integrations: Vec<crate::integrations::ConnectedIntegration> = {
         let signed_in = config
             .as_ref()
             .ok()
@@ -723,7 +723,7 @@ async fn run_typed_mode(
         definition.extensions.omit_safety_preamble,
     );
 
-    let connected_integrations_for_prompt: Vec<crate::agent::prompts::ConnectedIntegration> =
+    let connected_integrations_for_prompt: Vec<crate::integrations::ConnectedIntegration> =
         live_integrations
             .iter()
             .filter(|ci| ci.connected)

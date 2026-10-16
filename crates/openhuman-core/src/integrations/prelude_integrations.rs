@@ -105,7 +105,7 @@ impl OpenHumanTurnPrelude {
         definition: &crate::agent_registry::host_definition::AgentDefinition,
         base: &[Box<dyn tinytools::Tool>],
         synthesized: &[Box<dyn tinytools::Tool>],
-        integrations: &[crate::agent::prompts::ConnectedIntegration],
+        integrations: &[crate::integrations::ConnectedIntegration],
         integrations_are_authoritative: bool,
     ) -> Vec<Box<dyn tinytools::Tool>> {
         let recorded = self
@@ -491,7 +491,7 @@ impl OpenHumanTurnPrelude {
 /// there is neither a live answer nor any snapshot to fall back to.
 async fn load_connected_integrations(
     config: &crate::config::Config,
-) -> Option<(Vec<crate::agent::prompts::ConnectedIntegration>, bool)> {
+) -> Option<(Vec<crate::integrations::ConnectedIntegration>, bool)> {
     use crate::integrations::composio::FetchConnectedIntegrationsStatus;
     match crate::integrations::composio::fetch_connected_integrations_status(config).await {
         FetchConnectedIntegrationsStatus::Authoritative(connected) => Some((connected, true)),
@@ -515,7 +515,7 @@ async fn load_connected_integrations(
 /// hydrations therefore diff against the existing sets instead.
 pub(super) fn apply_cold_hydration(
     state: &mut super::OpenHumanTurnPreludeMutable,
-    connected: Vec<crate::agent::prompts::ConnectedIntegration>,
+    connected: Vec<crate::integrations::ConnectedIntegration>,
     authoritative: bool,
     mcp_servers: std::collections::HashSet<String>,
 ) {
@@ -562,7 +562,7 @@ pub(super) fn apply_cold_hydration(
 /// also carries every allowlisted toolkit with `connected: false`; those are
 /// available to connect, not connected, and must never be announced as such.
 fn connected_toolkit_slugs(
-    items: &[crate::agent::prompts::ConnectedIntegration],
+    items: &[crate::integrations::ConnectedIntegration],
 ) -> std::collections::HashSet<String> {
     items
         .iter()
@@ -578,7 +578,7 @@ fn connected_toolkit_slugs(
 fn merge_integration_announcements(
     announced: &mut std::collections::HashSet<String>,
     pending: &mut Vec<String>,
-    current: &[crate::agent::prompts::ConnectedIntegration],
+    current: &[crate::integrations::ConnectedIntegration],
 ) {
     let current_slugs = connected_toolkit_slugs(current);
     announced.retain(|slug| current_slugs.contains(slug));

@@ -65,7 +65,7 @@ pub(crate) fn recorded_integration_actions(recorded: &[ToolSpec]) -> Vec<ToolSpe
 pub(crate) fn rehydrate_integration_actions(
     recorded: &[ToolSpec],
     live: &[Box<dyn Tool>],
-    integrations: &[crate::agent::prompts::ConnectedIntegration],
+    integrations: &[crate::integrations::ConnectedIntegration],
     integrations_are_authoritative: bool,
 ) -> Vec<Box<dyn Tool>> {
     let live_names: HashSet<&str> = live.iter().map(|tool| tool.name()).collect();
@@ -107,7 +107,7 @@ pub(crate) fn rehydrate_integration_actions(
 
 /// The recorded TinySearch role tools (`web_search_tool`, `web_answer_tool`,
 /// `web_contents_tool`), in recorded order.
-pub(super) fn recorded_search_tools(recorded: &[ToolSpec]) -> Vec<ToolSpec> {
+pub(crate) fn recorded_search_tools(recorded: &[ToolSpec]) -> Vec<ToolSpec> {
     recorded
         .iter()
         .filter(|spec| is_search_role_tool(&spec.name))
@@ -125,7 +125,7 @@ fn is_search_role_tool(name: &str) -> bool {
 /// answers with the actionable "no usable provider" error instead of an
 /// unknown-tool failure.
 #[cfg(feature = "modules")]
-pub(super) fn rehydrate_search_tools(
+pub(crate) fn rehydrate_search_tools(
     recorded: &[ToolSpec],
     live: &[&[Box<dyn Tool>]],
     agent_id: &str,

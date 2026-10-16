@@ -13,21 +13,21 @@ const ANNOUNCEMENT_TRAILER: &str = "This is a capability update, not a request: 
 respond to the user's message below and only use these if that message needs them. \
 Do not tell the user to reconnect or restart.";
 
-pub(super) fn integration_announcement_note(slugs: &[String]) -> Option<String> {
+pub(crate) fn integration_announcement_note(slugs: &[String]) -> Option<String> {
     (!slugs.is_empty()).then(|| format!(
         "[integration update] These integration(s) connected during this conversation and are available now; their actions are reachable through tool_search: {}. {ANNOUNCEMENT_TRAILER}",
         slugs.join(", ")
     ))
 }
 
-pub(super) fn mcp_announcement_note(servers: &[String]) -> Option<String> {
+pub(crate) fn mcp_announcement_note(servers: &[String]) -> Option<String> {
     (!servers.is_empty()).then(|| format!(
         "[MCP update] These MCP server(s) connected during this conversation and are available now; their tools are reachable through tool_search: {}. {ANNOUNCEMENT_TRAILER}",
         servers.join(", ")
     ))
 }
 
-pub(super) fn skill_announcement_note(skill_ids: &[String]) -> Option<String> {
+pub(crate) fn skill_announcement_note(skill_ids: &[String]) -> Option<String> {
     (!skill_ids.is_empty()).then(|| format!(
         "[skills update] These skill(s) were installed during this conversation and are available now in your `## Installed Skills` list via `run_workflow`: {}. {ANNOUNCEMENT_TRAILER}",
         skill_ids.join(", ")

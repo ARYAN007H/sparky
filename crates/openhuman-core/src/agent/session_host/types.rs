@@ -392,7 +392,7 @@ pub struct OpenHumanSessionHost {
     /// agent build time and threaded into each agent's `prompt.rs` so
     /// the delegator / skill-executor voices can render their own
     /// integration blocks.
-    pub(super) connected_integrations: Vec<crate::agent::prompts::ConnectedIntegration>,
+    pub(super) connected_integrations: Vec<crate::integrations::ConnectedIntegration>,
     /// Whether `connected_integrations` is an authoritative session-start
     /// snapshot (prewarmed from the shared Composio cache or fetched
     /// explicitly) versus the default empty placeholder installed by

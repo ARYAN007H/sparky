@@ -60,7 +60,7 @@ pub mod tools;
 pub(crate) mod trigger_history;
 pub mod types;
 
-pub use crate::agent::prompts::types::ConnectedIntegration;
+pub use crate::integrations::types::ConnectedIntegration;
 pub use crate::integrations::composio::contract::ProviderUserProfile;
 pub use action_tool::ComposioActionTool;
 pub(crate) use auth_probe::user_is_signed_in_to_composio;

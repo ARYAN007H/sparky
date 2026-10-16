@@ -20,7 +20,8 @@ pub(crate) use connected_identities::render_connected_identities;
 
 pub use client::{build_client, pricing_for_config, IntegrationClient};
 pub use types::{
-    BackendResponse, IntegrationPricing, IntegrationPricingEntry, PricingIntegrations,
+    BackendResponse, ConnectedIntegration, ConnectedIntegrationTool, GatedIntegrationTool,
+    IntegrationConnection, IntegrationPricing, IntegrationPricingEntry, PricingIntegrations,
 };
 
 #[cfg(test)]

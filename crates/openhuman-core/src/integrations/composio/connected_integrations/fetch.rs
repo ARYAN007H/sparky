@@ -4,7 +4,7 @@
 
 use std::sync::atomic::Ordering;
 
-use crate::agent::prompts::ConnectedIntegration;
+use crate::integrations::ConnectedIntegration;
 use crate::config::Config;
 
 use super::cache::{

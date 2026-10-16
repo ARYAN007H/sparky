@@ -15,8 +15,8 @@ fn integration(
     toolkit: &str,
     connected: bool,
     gated_tools: Vec<crate::agent::prompts::GatedIntegrationTool>,
-) -> crate::agent::prompts::ConnectedIntegration {
-    crate::agent::prompts::ConnectedIntegration {
+) -> crate::integrations::ConnectedIntegration {
+    crate::integrations::ConnectedIntegration {
         toolkit: toolkit.into(),
         description: String::new(),
         tools: Vec::new(),

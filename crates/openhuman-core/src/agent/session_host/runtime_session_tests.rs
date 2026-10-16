@@ -488,7 +488,7 @@ async fn a_resumed_orchestrator_keeps_the_integration_actions_it_was_sent() {
     prelude.adopt_recorded_tools(Some(&recorded));
     {
         let mut mutable = prelude.mutable.lock().expect("prelude state");
-        mutable.connected_integrations = vec![crate::agent::prompts::ConnectedIntegration {
+        mutable.connected_integrations = vec![crate::integrations::ConnectedIntegration {
             toolkit: "gmail".into(),
             description: String::new(),
             tools: Vec::new(),
@@ -700,7 +700,7 @@ async fn newly_connected_action_cannot_shadow_a_permanent_source() {
     ));
     {
         let mut mutable = prelude.mutable.lock().unwrap();
-        mutable.connected_integrations = vec![crate::agent::prompts::ConnectedIntegration {
+        mutable.connected_integrations = vec![crate::integrations::ConnectedIntegration {
             toolkit: "gmail".into(),
             description: String::new(),
             tools: Vec::new(),
