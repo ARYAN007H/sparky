@@ -173,7 +173,7 @@ async fn inference_gate_reports_signed_out_for_dynamic_agent_ref_only_graph() {
         ..Default::default()
     };
 
-    let errors = validate_inference_readiness(&config, &g).await;
+    let errors = validate_inference_readiness(&crate::core::runtime::DispatchCtx::ambient(), &config, &g).await;
     assert!(
         !errors.is_empty(),
         "a signed-out session must still be reported even though the only agent node's \
@@ -367,7 +367,7 @@ async fn local_agent_flow_is_ready_without_openhuman_session() {
         ],
         "edges": [{ "from_node": "t", "to_node": "a" }]
     }));
-    let errors = validate_inference_readiness(&config, &g).await;
+    let errors = validate_inference_readiness(&crate::core::runtime::DispatchCtx::ambient(), &config, &g).await;
     assert!(
         errors.is_empty(),
         "local flow must not need a session: {errors:?}"
@@ -400,7 +400,7 @@ async fn claude_agent_flow_readiness_does_not_require_an_openhuman_session() {
         let tmp = TempDir::new().unwrap();
         let mut config = test_config(&tmp);
         config.memory_provider = Some(provider.into());
-        let errors = validate_inference_readiness(&config, &g).await;
+        let errors = validate_inference_readiness(&crate::core::runtime::DispatchCtx::ambient(), &config, &g).await;
         if provider == "openhuman" {
             assert!(
                 errors.iter().any(|e| e.contains("signed out")),
@@ -465,7 +465,7 @@ async fn harness_readiness_checks_session_for_execution_provider() {
         config.default_model = Some("hint:reasoning".into());
         config.reasoning_provider = Some(runtime.into());
         config.memory_provider = Some(summary.into());
-        let errors = validate_inference_readiness(&config, &g).await;
+        let errors = validate_inference_readiness(&crate::core::runtime::DispatchCtx::ambient(), &config, &g).await;
         assert_eq!(
             errors.iter().any(|e| e.contains("signed out")),
             should_reject,
