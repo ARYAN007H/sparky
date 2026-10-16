@@ -80,6 +80,7 @@ impl TriggerHistory {
 
     async fn acquire(
         &self,
+        ctx: &DispatchCtx,
         config: &Config,
     ) -> Result<tokio::sync::OwnedMutexGuard<Option<Lease>>, String> {
         let lease = Arc::clone(&self.lease);
@@ -87,7 +88,7 @@ impl TriggerHistory {
         let client = self.client(&config);
         // Keep ownership installation running if the caller is cancelled while
         // OpenArchive completes. A later close can still release the handle.
-        crate::core::runtime::DispatchCtx::ambient().spawn(async move {
+        ctx.spawn(async move {
             let mut guard = lease.lock_owned().await;
             Self::ensure_lease(&config, &mut guard, client).await?;
             Ok(guard)
@@ -115,10 +116,11 @@ impl TriggerHistory {
     /// Archive one delivered event, serialized with reads and scope changes.
     pub async fn record(
         &self,
+        ctx: &DispatchCtx,
         config: &Config,
         event: ComposioTriggerEvent,
     ) -> Result<ComposioTriggerHistoryEntry, String> {
-        let lease = self.acquire(config).await?;
+        let lease = self.acquire(ctx, config).await?;
         let handle = lease.as_ref().expect("lease installed").handle.clone();
         lease
             .as_ref()
@@ -136,10 +138,11 @@ impl TriggerHistory {
     /// Read persisted history without changing the user's connector route.
     pub async fn read(
         &self,
+        ctx: &DispatchCtx,
         config: &Config,
         limit: Option<usize>,
     ) -> Result<ComposioTriggerHistoryResult, String> {
-        let lease = self.acquire(config).await?;
+        let lease = self.acquire(ctx, config).await?;
         let handle = lease.as_ref().expect("lease installed").handle.clone();
         lease
             .as_ref()
