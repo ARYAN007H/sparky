@@ -2,9 +2,10 @@
 
 Family root for media agent tools. Today it has one member,
 [`generation`](generation/README.md), which gives the agent image and video
-generation through OpenRouter, proxied by the TinyHumans backend. The family
+generation over generators a host supplies (the TinyHumans one is in
+`openhuman-tinyhumans`). The family
 is tools-only: there is no RPC controller, no store, and no bus subscriber.
-The tool registry in `tools/ops.rs` is the only caller.
+A host's tool source is the only caller of the tool builder.
 
 ## How it works
 

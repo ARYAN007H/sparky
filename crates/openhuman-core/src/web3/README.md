@@ -41,8 +41,10 @@ response values, without deriving chains, rebuilding transactions, or signing
 on the host. Execution requires `confirmed: true`; the module validates quote
 ownership and gives the host the exact intent for approval at the signer seam.
 
-The backend deBridge proxy remains a generic authenticated host transport at
-`/agent-integrations/crypto/*`. Provider response parsing, chain-family
+The backend deBridge proxy is reached through the wallet-backend hook
+(`modules::wallet_backend`); `openhuman-tinyhumans` answers it over
+`/agent-integrations/crypto/*`, and a core with none registered answers
+`BACKEND_UNAVAILABLE:`. Provider response parsing, chain-family
 selection, quote construction, transaction encoding, and quote storage are
 module-owned. Provider-specific URLs and defaults stay in the module; the host
 passes only approved endpoint overrides through opaque endpoint references.
