@@ -94,6 +94,8 @@ fn attribution_headers_and_identity_come_from_this_crate() {
 
 #[test]
 fn enrich_replaces_resolved_endpoints_and_is_visible_to_the_core_loader_hook() {
+    let _registry = crate::registry_test_lock();
+
     let _identity = crate::backend::product::product_identity_test_lock();
     let _env = crate::backend::url::backend_env_test_lock();
     let mut config = config_with(Some("http://127.0.0.1:1"));

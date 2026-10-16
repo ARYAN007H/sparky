@@ -178,6 +178,8 @@ async fn host_bearer_rejects_a_local_session_token() {
 
 #[test]
 fn registering_twice_leaves_one_engine() {
+    let _registry = crate::registry_test_lock();
+
     register(&InstallOptions::default());
     register(&InstallOptions::default());
     assert!(openhuman_embed::__host::memory_engines::unregister_memory_engine(TINYHUMANS_ENGINE));

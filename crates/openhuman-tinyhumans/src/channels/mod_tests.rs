@@ -69,6 +69,8 @@ fn backend_errors_map_to_distinct_progressive_recoveries() {
 
 #[test]
 fn registering_twice_leaves_one_callback() {
+    let _registry = crate::registry_test_lock();
+
     register(&InstallOptions::default());
     register(&InstallOptions::default());
     assert!(openhuman_embed::__host::channel_callback::unregister_channel_callback(CALLBACK_ID));

@@ -201,6 +201,8 @@ async fn sdk_route_policy_refuses_unexposed_routes_before_sending() {
 
 #[tokio::test]
 async fn install_shares_one_transport_with_the_hosted_client() {
+    let _registry = crate::registry_test_lock_async().await;
+
     let _guard = global_lock().lock().await;
     let installed = crate::install(crate::InstallOptions::default()).unwrap();
     assert!(crate::is_installed());
@@ -211,6 +213,8 @@ async fn install_shares_one_transport_with_the_hosted_client() {
 
 #[tokio::test]
 async fn backend_client_round_trips_through_the_installed_transport() {
+    let _registry = crate::registry_test_lock_async().await;
+
     let server = MockServer::start().await;
     Mock::given(method("GET"))
         .and(path("/announcements/latest"))
@@ -237,6 +241,8 @@ async fn backend_client_round_trips_through_the_installed_transport() {
 /// the backend through the SDK transport.
 #[tokio::test]
 async fn install_registers_hosted_controllers_that_dispatch_through_the_transport() {
+    let _registry = crate::registry_test_lock_async().await;
+
     use openhuman_embed::__host::core::all::{
         namespace_description, rpc_method_from_parts, schema_for_rpc_method,
     };
@@ -319,6 +325,8 @@ fn product_identity_and_attribution_come_from_this_crate() {
 
 #[tokio::test]
 async fn core_channel_routes_recover_from_the_transports_typed_404s() {
+    let _registry = crate::registry_test_lock_async().await;
+
     use crate::client::HostedApiError as BackendApiError;
     // POST + DELETE only, mirroring the deployed router: PATCH falls through
     // to Express's HTML 404 (#5230); DELETE answers a handler-level 404.

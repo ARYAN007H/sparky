@@ -5,6 +5,8 @@ use openhuman_embed::__host::voice_registry::{
 
 #[test]
 fn registration_covers_every_historical_cloud_slug() {
+    let _registry = crate::registry_test_lock();
+
     register();
     let config = Config::default();
     for slug in STT_SLUGS {

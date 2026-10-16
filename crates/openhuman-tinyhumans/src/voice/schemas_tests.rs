@@ -31,6 +31,8 @@ fn agent_signed_url_takes_no_params() {
 
 #[test]
 fn registration_is_idempotent() {
+    let _registry = crate::registry_test_lock();
+
     register();
     register();
 }

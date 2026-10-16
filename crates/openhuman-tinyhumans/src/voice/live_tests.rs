@@ -54,6 +54,8 @@ fn elevenlabs_hosted_config_owns_its_prompt_and_ignores_blank_voices() {
 
 #[test]
 fn registration_installs_both_hosted_providers() {
+    let _registry = crate::registry_test_lock();
+
     register();
     assert!(unregister_live_provider(LIVE_PROVIDER_GEMINI_HOSTED));
     assert!(unregister_live_provider(LIVE_PROVIDER_ELEVENLABS_HOSTED));
@@ -61,6 +63,8 @@ fn registration_installs_both_hosted_providers() {
 
 #[test]
 fn hosted_providers_are_listed_ahead_of_the_built_in_ones() {
+    let _registry = crate::registry_test_lock();
+
     // The catalogue has always listed the hosted providers first:
     // gemini-hosted, elevenlabs-hosted, gemini, sarvam.
     register();

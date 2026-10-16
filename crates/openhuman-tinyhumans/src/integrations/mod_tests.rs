@@ -53,6 +53,8 @@ fn build_client_returns_none_when_no_auth_token() {
 
 #[test]
 fn register_plugs_every_hosted_integration_into_the_core_registries() {
+    let _registry = crate::registry_test_lock();
+
     use openhuman_embed::__host::composio::unregister_composio_route_builder;
     use openhuman_embed::__host::config::schema::COMPOSIO_MODE_BACKEND;
     use openhuman_embed::__host::tool_sources::unregister_tool_source;
@@ -89,6 +91,8 @@ fn register_plugs_every_hosted_integration_into_the_core_registries() {
 /// Composio); the sources must register at those same anchors and in that order.
 #[test]
 fn tool_sources_register_at_the_pre_refactor_catalogue_positions() {
+    let _registry = crate::registry_test_lock();
+
     use openhuman_embed::__host::tool_sources::{
         registered_tool_source_placements, unregister_tool_source, ToolSourcePlacement,
         ANCHOR_AFTER_DELEGATE, ANCHOR_AFTER_SEARCH,
