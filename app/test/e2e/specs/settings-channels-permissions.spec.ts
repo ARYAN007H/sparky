@@ -15,6 +15,7 @@ import { callOpenhumanRpc } from '../helpers/core-rpc';
 import {
   clickSelector,
   getSwitchCheckedByLabel,
+  textExists,
   toggleSwitchByLabel,
   visibleTextExists,
   waitForText,
