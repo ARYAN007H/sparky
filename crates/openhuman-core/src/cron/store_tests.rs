@@ -167,3 +167,55 @@ fn a_legacy_jobs_db_is_imported_by_the_storage_importer_and_left_untouched() {
     }
     assert_eq!(list_jobs(&config).unwrap().len(), 2);
 }
+
+#[test]
+fn successive_patches_each_land_on_the_stored_job() {
+    use tinyflows_bus::schedule::types::{CronJobPatch, SessionTarget};
+    let tmp = TempDir::new().unwrap();
+    let config = test_config(&tmp);
+    let job = add_agent_job_with_definition(
+        &config,
+        Some("patched".into()),
+        Schedule::Every {
+            every_ms: 3_600_000,
+        },
+        "say hi",
+        SessionTarget::Isolated,
+        None,
+        None,
+        false,
+        Some("teeny".into()),
+        true,
+    )
+    .unwrap();
+
+    let renamed = update_job(
+        &config,
+        &job.id,
+        CronJobPatch {
+            prompt: Some("check in".into()),
+            ..CronJobPatch::default()
+        },
+    )
+    .unwrap();
+    assert_eq!(renamed.prompt.as_deref(), Some("check in"));
+
+    let policy = update_job(
+        &config,
+        &job.id,
+        CronJobPatch {
+            policy: Some(Default::default()),
+            ..CronJobPatch::default()
+        },
+    )
+    .unwrap();
+    assert_eq!(
+        policy.prompt.as_deref(),
+        Some("check in"),
+        "a policy-only patch must not undo the earlier prompt patch"
+    );
+    assert_eq!(
+        get_job(&config, &job.id).unwrap().prompt.as_deref(),
+        Some("check in")
+    );
+}
