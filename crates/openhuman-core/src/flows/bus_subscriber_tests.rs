@@ -173,27 +173,41 @@ async fn handle_schedule_tick_ignores_disabled_flow() {
 
 // ── in-flight dedupe (CodeRabbit finding B) ─────────────────────
 
-#[test]
-fn try_acquire_dispatch_skips_a_flow_already_in_flight() {
+#[tokio::test]
+async fn schedule_tick_is_coalesced_while_a_trigger_run_is_active() {
+    use tokio::sync::{mpsc, oneshot};
+
     let tmp = tempfile::TempDir::new().unwrap();
-    let sub = FlowTriggerSubscriber::new(test_config(&tmp));
+    let (started_tx, started_rx) = oneshot::channel();
+    let started_tx = Arc::new(Mutex::new(Some(started_tx)));
+    let (release_tx, release_rx) = oneshot::channel();
+    let release_rx = Arc::new(tokio::sync::Mutex::new(Some(release_rx)));
+    let (runs_tx, mut runs_rx) = mpsc::unbounded_channel();
+    let runner = move |_ctx: crate::core::runtime::DispatchCtx,
+                       _config: Arc<Config>,
+                       request: crate::flows::bus::trigger::TriggerRunRequest| {
+        let started_tx = Arc::clone(&started_tx);
+        let release_rx = Arc::clone(&release_rx);
+        let runs_tx = runs_tx.clone();
+        async move {
+            if let Some(started_tx) = started_tx.lock().unwrap().take() {
+                let _ = started_tx.send(());
+            }
+            if let Some(release) = release_rx.lock().await.take() {
+                let _ = release.await;
+            }
+            runs_tx.send(request.trigger.as_str()).unwrap();
+        }
+    };
+    let sub = FlowTriggerSubscriber::with_runner(test_config(&tmp), 1, runner);
+    let ctx = crate::core::runtime::DispatchCtx::host_default();
 
-    let guard = sub
-        .try_acquire_dispatch("f1")
-        .expect("first claim for f1 should succeed");
-    assert!(
-        sub.try_acquire_dispatch("f1").is_none(),
-        "a second claim for the same flow while the first is held must be skipped"
-    );
-
-    // A different flow is unaffected.
-    assert!(sub.try_acquire_dispatch("f2").is_some());
-
-    drop(guard);
-    assert!(
-        sub.try_acquire_dispatch("f1").is_some(),
-        "dropping the guard must release the claim so f1 can run again"
-    );
+    sub.dispatch_test_schedule(&ctx, "f1").await;
+    started_rx.await.unwrap();
+    sub.dispatch_test_schedule(&ctx, "f1").await;
+    release_tx.send(()).unwrap();
+    assert_eq!(runs_rx.recv().await, Some("schedule"));
+    assert!(runs_rx.try_recv().is_err(), "a busy schedule tick must be dropped");
 }
 
 #[tokio::test]
