@@ -20,6 +20,18 @@ import {
 } from './element-helpers';
 import { supportsExecuteScript } from './platform';
 
+function safeRpcFailureKind(result: { ok?: boolean; error?: string } | null) {
+  if (!result || result.ok) return null;
+  const message = (result.error ?? '').toLowerCase();
+  if (/timed out|timeout|deadline/.test(message)) return 'timeout';
+  if (/connection refused|tcp connect|connection|connect|socket|network/.test(message))
+    return 'transport';
+  if (/\b401\b|unauthorized/.test(message)) return 'unauthorized';
+  if (/method not found|unknown method/.test(message)) return 'method_not_found';
+  if (/invalid.*params|bad request/.test(message)) return 'invalid_request';
+  return result.error ? 'rpc_error' : 'empty_error';
+}
+
 // ---------------------------------------------------------------------------
 // Accounts page helpers
 // ---------------------------------------------------------------------------
@@ -978,7 +990,9 @@ export async function performFullLogin(
       tokenOk: sessionToken?.ok ?? false,
       hasStoredToken: Boolean(tokenValue?.token),
       stateHttpStatus: sessionState?.httpStatus ?? null,
+      stateErrorKind: safeRpcFailureKind(sessionState),
       tokenHttpStatus: sessionToken?.httpStatus ?? null,
+      tokenErrorKind: safeRpcFailureKind(sessionToken),
     };
     console.error(
       `${logPrefix} auth bootstrap failed; mock auth endpoints=${JSON.stringify(authRequests)}; core state=${JSON.stringify(coreState)}; session RPC=${JSON.stringify(sessionRpc)}`
