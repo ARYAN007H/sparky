@@ -605,11 +605,15 @@ impl ToolInvoker for OpenHumanTools {
 /// flow-scoped memory: `OpenHumanMemory` tags memory items with
 /// `flows::flow_tag`, derived independently from the run's trusted origin.
 ///
+/// `ctx` is the context the run acts under: the agent, code and HTTP adapters
+/// act for it instead of reading the calling task's own scope.
+///
 /// `flow_run` is the run the capabilities serve: every acting dispatch hands it
 /// to the approval gate (with the tool call), so a parked approval is stamped
 /// with the exact flow and run. `None` for a run with no flow identity (a dry
 /// run, a preview).
 pub fn build_capabilities(
+    ctx: &crate::core::runtime::DispatchCtx,
     config: Arc<Config>,
     state_namespace: impl Into<String>,
     flow_run: Option<crate::security::approval::FlowRunContext>,
@@ -636,12 +640,14 @@ pub fn build_capabilities(
             approval: approval.clone(),
         }),
         http: Arc::new(OpenHumanHttp {
+            ctx: ctx.clone(),
             security: security.clone(),
             http_config,
             http_creds,
             approval: approval.clone(),
         }),
         code: Arc::new(OpenHumanCode {
+            ctx: ctx.clone(),
             config: config.clone(),
             security: security.clone(),
             approval: approval.clone(),
@@ -649,6 +655,7 @@ pub fn build_capabilities(
         state: crate::flows::tinyflows::state::FlowState::open(&config, state_namespace)
             .into_state_store(),
         agent: Some(Arc::new(OpenHumanAgentRunner {
+            ctx: ctx.clone(),
             config: config.clone(),
             approval: approval.clone(),
         })),

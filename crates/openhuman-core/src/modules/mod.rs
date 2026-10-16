@@ -322,12 +322,14 @@ pub async fn import_legacy_tinybox(workspace_dir: &std::path::Path) {
 /// whose scope cannot be resolved here is skipped. Without the `modules`
 /// feature no module writes blobs, so there is nothing to sweep.
 #[cfg(feature = "modules")]
-pub(crate) fn expiring_blob_module_scopes() -> Vec<crate::storage::Scope> {
+pub(crate) fn expiring_blob_module_scopes(
+    ctx: &crate::core::runtime::DispatchCtx,
+) -> Vec<crate::storage::Scope> {
     #[cfg(feature = "modules")]
     {
         [storage_grant_tinyjuice::MODULE_ID]
             .into_iter()
-            .filter_map(|id| storage_host::current_module_scope(&crate::core::runtime::DispatchCtx::ambient(), id).ok())
+            .filter_map(|id| storage_host::current_module_scope(ctx, id).ok())
             .collect()
     }
     // Without the loader no module holds blobs.
@@ -361,7 +363,9 @@ pub(crate) fn expiring_blob_module_scopes_for(
 
 /// See the `modules` build: with the feature off no module writes blobs.
 #[cfg(not(feature = "modules"))]
-pub(crate) fn expiring_blob_module_scopes() -> Vec<crate::storage::Scope> {
+pub(crate) fn expiring_blob_module_scopes(
+    _ctx: &crate::core::runtime::DispatchCtx,
+) -> Vec<crate::storage::Scope> {
     Vec::new()
 }
 

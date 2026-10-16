@@ -234,7 +234,7 @@ impl OpenHumanTurnPrelude {
             )
             .await;
         };
-        crate::core::runtime::spawn_scoped(deferred_memory_work(profile_context, work));
+        self.dispatch_ctx().spawn(deferred_memory_work(profile_context, work));
     }
 }
 
