@@ -71,4 +71,35 @@ async fn an_unsettled_outcome_and_a_cancelled_import_are_retried() {
     assert_eq!(runs.load(std::sync::atomic::Ordering::SeqCst), 3);
 }
 
+#[tokio::test]
+async fn the_import_is_keyed_by_the_explicit_contexts_scope_not_the_tasks() {
+    use crate::core::runtime::{ContextOverlay, CoreContext, DispatchCtx, DomainSet};
+    let profile = |name: &str| {
+        DispatchCtx::new(
+            CoreContext::for_test(DomainSet::full(), None).derive_with(
+                ContextOverlay::new(
+                    crate::config::Config::default(),
+                    DomainSet::kernel(),
+                    Default::default(),
+                )
+                .profile(name),
+            ),
+        )
+    };
+    let dir = std::path::PathBuf::from("/import-once/tenants");
+    let runs = std::sync::atomic::AtomicUsize::new(0);
+    for ctx in [profile("once-alice"), profile("once-bob"), profile("once-alice")] {
+        import_once(&ctx, "test-tenants", MODULE_FOR_TEST, &dir, async {
+            runs.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            Ok(Done(true))
+        })
+        .await;
+    }
+    assert_eq!(
+        runs.load(std::sync::atomic::Ordering::SeqCst),
+        2,
+        "each tenant imports once; a repeat for the same tenant is skipped"
+    );
+}
+
 const MODULE_FOR_TEST: &str = "tinyjuice";
