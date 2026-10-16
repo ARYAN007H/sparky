@@ -4,8 +4,6 @@
 //! Transport refusals are typed facts mapped by [`map_backend_error`];
 //! recovery and retry budgets belong to the channel module.
 
-#![cfg(feature = "channels")]
-
 use openhuman_embed::__host::channel_callback::ChannelCallbackCtx;
 use openhuman_embed::__host::security::credentials::session_support::{
     get_session_token, is_local_session_token, BackendCredential,

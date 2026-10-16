@@ -4,15 +4,13 @@
 //! in `raw` (and is parsed into the typed fields when its shape matches), so
 //! the RPC response shapes are unchanged.
 
-#![cfg(feature = "channels")]
-
 use openhuman_embed::__host::config::Config;
 use openhuman_embed::__host::security::credentials::session_support::{
     resolve_backend_credential, BackendCredential,
 };
 use serde_json::Value;
 use tinychannels_bus::controllers::{
-    ChannelReactionResult, ChannelSendMessageResult, ChannelThreadListResult, ChannelThreadResult,
+    ChannelReactionResult, ChannelThreadListResult, ChannelThreadResult,
 };
 
 use crate::client::{flatten_authed_error, BackendClient};
@@ -44,7 +42,6 @@ macro_rules! raw_fallback {
     };
 }
 
-raw_fallback!(ChannelSendMessageResult,);
 raw_fallback!(ChannelReactionResult, success: true,);
 raw_fallback!(ChannelThreadResult,);
 raw_fallback!(ChannelThreadListResult,);

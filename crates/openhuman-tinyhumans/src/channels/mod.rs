@@ -12,7 +12,9 @@
 //! The core keeps only the generic slot dispatch; with this callback
 //! unregistered, those calls answer the `BACKEND_UNAVAILABLE:` sentinel.
 
+#[cfg(feature = "channels")]
 mod delivery;
+#[cfg(feature = "channels")]
 mod messaging;
 
 #[cfg(feature = "channels")]

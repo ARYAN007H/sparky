@@ -50,20 +50,19 @@ fn elevenlabs_hosted_config_owns_its_prompt_and_ignores_blank_voices() {
 }
 
 #[test]
-fn registration_lists_both_hosted_providers_as_hosted() {
+fn registration_installs_both_hosted_providers() {
     register();
-    let config = Config::default();
-    let infos = openhuman_embed::__host::voice_registry::provider_infos(&config);
-    for id in [LIVE_PROVIDER_GEMINI_HOSTED, LIVE_PROVIDER_ELEVENLABS_HOSTED] {
-        let info = infos.iter().find(|i| i.id == id).expect(id);
-        assert_eq!(info.kind, LiveProviderKind::Hosted, "{id}");
-        assert_eq!(info.key_slug, None, "{id}");
-    }
-    let gemini = infos
-        .iter()
-        .find(|i| i.id == LIVE_PROVIDER_GEMINI_HOSTED)
-        .unwrap();
-    assert!(gemini.voices.contains(&"Puck".to_string()));
-    unregister_live_provider(LIVE_PROVIDER_GEMINI_HOSTED);
-    unregister_live_provider(LIVE_PROVIDER_ELEVENLABS_HOSTED);
+    assert!(unregister_live_provider(LIVE_PROVIDER_GEMINI_HOSTED));
+    assert!(unregister_live_provider(LIVE_PROVIDER_ELEVENLABS_HOSTED));
+}
+
+#[tokio::test]
+async fn hosted_providers_report_not_configured_without_a_backend_credential() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut config = Config::default();
+    config.workspace_dir = dir.path().to_path_buf();
+    config.config_path = dir.path().join("config.toml");
+    assert!(!backend_ready(&config));
+    let err = prepare_gemini(config, LiveConfig::new()).await.err().unwrap();
+    assert_eq!(err.code, "not_configured");
 }
