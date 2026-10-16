@@ -21,8 +21,6 @@
 
 use crate::channels::{Channel, ChannelSendExt, SendMessage};
 use crate::core::events::DomainEvent;
-use crate::web_chat::publish_web_channel_event;
-use crate::web_chat::WebChannelEvent;
 use async_trait::async_trait;
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
@@ -36,33 +34,6 @@ fn proactive_approval_gate() -> Option<Arc<crate::security::approval::ApprovalGa
 #[cfg(test)]
 fn proactive_approval_gate() -> Option<Arc<crate::security::approval::ApprovalGate>> {
     None
-}
-
-/// Register a web-only proactive message subscriber on the global event bus.
-/// Guarded by `std::sync::Once` so repeated core boot registration is safe.
-/// Calls before bus initialization are deferred and can be retried later.
-pub fn register_web_only_proactive_subscriber() {
-    if crate::core::bus::BUS.get().is_none() {
-        tracing::warn!(
-            "[proactive] deferred web-only subscriber registration — bus not initialized"
-        );
-        return;
-    }
-
-    use std::sync::Once;
-    static REGISTERED: Once = Once::new();
-    REGISTERED.call_once(|| {
-        if let Some(handle) =
-            crate::core::bus::BUS.subscribe(Arc::new(ProactiveMessageSubscriber::web_only()))
-        {
-            std::mem::forget(handle);
-            tracing::debug!("[proactive] web-only subscriber registered");
-        } else {
-            tracing::warn!(
-                "[proactive] failed to register web-only subscriber — bus not initialized"
-            );
-        }
-    });
 }
 
 /// Routes proactive messages to the user's preferred channel.
@@ -89,13 +60,6 @@ impl ProactiveMessageSubscriber {
         }
     }
 
-    /// Construct a web-only subscriber (no external channels). Used in
-    /// the desktop/JSON-RPC runtime where no external channel instances
-    /// are registered.
-    pub fn web_only() -> Self {
-        Self::new(Arc::new(HashMap::new()), None)
-    }
-
     /// Update the active channel at runtime (e.g. from an RPC call).
     pub fn set_active_channel(&self, channel: Option<String>) {
         if let Ok(mut guard) = self.active_channel.write() {
@@ -115,8 +79,7 @@ impl ProactiveMessageSubscriber {
 /// Telegram↔Discord"). The `channels_set_default` RPC mutates this exact handle
 /// via [`set_runtime_active_channel`] so a default-channel switch from the UI
 /// takes effect without a restart. Only the full channel runtime registers
-/// (the web-only subscriber can't deliver externally), and nothing registers in
-/// unit tests — so [`set_runtime_active_channel`] is a no-op there and never
+/// and nothing registers in unit tests — so [`set_runtime_active_channel`] is a no-op there and never
 /// leaks across the parallel test suite. The choice is also persisted to
 /// `config.channels_config.active_channel`, which seeds the handle on next start.
 type ActiveChannelHandle = Arc<RwLock<Option<String>>>;
@@ -194,48 +157,8 @@ impl EventHandler<DomainEvent> for ProactiveMessageSubscriber {
             "[proactive] handling proactive message"
         );
 
-        // 1. Always deliver to the web channel via Socket.IO.
-        publish_web_channel_event(WebChannelEvent {
-            event: "proactive_message".to_string(),
-            client_id: "system".to_string(),
-            thread_id: thread_id.clone(),
-            request_id: request_id.clone(),
-            full_response: Some(message.clone()),
-            message: None,
-            error_type: None,
-            error_source: None,
-            error_retryable: None,
-            error_retry_after_ms: None,
-            error_provider: None,
-            error_fallback_available: None,
-            copy_key: None,
-            copy_params: None,
-            tool_name: None,
-            skill_id: None,
-            args: None,
-            output: None,
-            success: Some(true),
-            round: None,
-            segment_index: None,
-            segment_total: None,
-            delta: None,
-            delta_kind: None,
-            tool_call_id: None,
-            failure: None,
-            citations: None,
-            subagent: None,
-            tool_display_label: None,
-            tool_display_detail: None,
-            elapsed_ms: None,
-            structured: None,
-            usage: None,
-            // Proactive delivery is emitted outside the seq-stamping progress
-            // bridge; leave `seq` unset (older clients ignore it).
-            seq: None,
-            ..Default::default()
-        });
-
-        // 2. If an active external channel is configured, deliver there too.
+        // Deliver to the active external channel when configured. The web
+        // destination is handled independently by `web_chat::proactive`.
         //    The `channels_set_default` RPC mutates this handle in place (issue
         //    #3712), so reading it here picks up a live default-channel switch.
         let active = self
@@ -245,7 +168,7 @@ impl EventHandler<DomainEvent> for ProactiveMessageSubscriber {
             .and_then(|guard| guard.clone());
 
         if let Some(ref channel_name) = active {
-            // "web" is already handled above — skip to avoid noise.
+            // "web" is handled by `web_chat::proactive` — skip to avoid noise.
             if channel_name.eq_ignore_ascii_case("web") {
                 return;
             }
