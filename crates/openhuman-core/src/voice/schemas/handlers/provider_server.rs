@@ -493,9 +493,10 @@ pub(crate) fn handle_voice_server_start(
         let server = global_server(server_config);
         let config_clone = config.clone();
         let server_for_err = server.clone();
+        let run_ctx = ctx.clone();
 
         tokio::spawn(async move {
-            if let Err(e) = server.run(&config_clone).await {
+            if let Err(e) = server.run(&run_ctx, &config_clone).await {
                 log::warn!("[voice_server] server exited with error: {e}");
                 server_for_err.set_last_error(&e).await;
             }
