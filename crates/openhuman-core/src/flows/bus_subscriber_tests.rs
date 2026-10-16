@@ -400,7 +400,11 @@ async fn arrival_racing_worker_retirement_is_retried_on_a_fresh_queue() {
             runs_tx.send(event).unwrap();
         }
     };
-    let subscriber = Arc::new(FlowTriggerSubscriber::with_runner(test_config(&tmp), 1, runner));
+    let subscriber = Arc::new(FlowTriggerSubscriber::with_runner(
+        test_config(&tmp),
+        1,
+        runner,
+    ));
     let ctx = crate::core::runtime::DispatchCtx::host_default();
     let retiring = subscriber.retirement_notifier_test();
     let retirement_started = retiring.notified();
