@@ -17,8 +17,8 @@ use std::sync::Mutex;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 
-use crate::agent::debug::DumpPromptOptions;
-use crate::agent::debug::prompt_size::{PromptSizeReport, SectionSize, ToolSize};
+use crate::core::agent_cli::debug::DumpPromptOptions;
+use crate::core::agent_cli::debug::prompt_size::{PromptSizeReport, SectionSize, ToolSize};
 use crate::config::Config;
 use crate::core::Outcome;
 use crate::core::runtime::DispatchCtx;
@@ -65,7 +65,7 @@ pub struct ContextBreakdownResponse {
 }
 
 fn est_tokens(bytes: usize) -> usize {
-    bytes / crate::agent::debug::prompt_size::EST_BYTES_PER_TOKEN.max(1)
+    bytes / crate::core::agent_cli::debug::prompt_size::EST_BYTES_PER_TOKEN.max(1)
 }
 
 /// Coarse "did anything in config change" fingerprint. Correctness only
@@ -158,7 +158,7 @@ async fn history_section(
     // the module's own byte-per-token estimate so `bytes` stays a consistent
     // (if approximate) unit across every section in the response.
     let est = history_tokens(usage.last_turn_context_tokens as usize, fixed_prompt_tokens);
-    let bytes = est.saturating_mul(crate::agent::debug::prompt_size::EST_BYTES_PER_TOKEN);
+    let bytes = est.saturating_mul(crate::core::agent_cli::debug::prompt_size::EST_BYTES_PER_TOKEN);
     Some(ContextSection {
         label: "history".to_string(),
         bytes,

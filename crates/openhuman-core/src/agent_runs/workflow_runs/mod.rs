@@ -7,13 +7,10 @@ mod cancel;
 #[path = "../../agent/orchestration/workflow_runs/engine/lifecycle.rs"]
 mod lifecycle;
 const LOG_TARGET: &str = "workflow_run_engine";
-mod engine {
-    pub(super) use super::lifecycle::{resume_workflow_run, start_workflow_run, stop_workflow_run};
-}
 mod ops;
 mod schemas;
 
-pub(crate) use engine::{resume_workflow_run, start_workflow_run, stop_workflow_run};
+pub(crate) use lifecycle::{resume_workflow_run, start_workflow_run, stop_workflow_run};
 pub(crate) use ops::{
     PARALLEL_RESEARCH_ID, builtin_definitions, definition_by_id, get_run, list_definitions,
     list_runs,

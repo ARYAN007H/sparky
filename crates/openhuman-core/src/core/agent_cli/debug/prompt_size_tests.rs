@@ -94,7 +94,7 @@ fn session_report_measures_the_visible_belt_not_the_registry() {
     )
     .expect("critic session build");
 
-    let dumped = crate::agent::debug::session_dump(&agent, "critic", String::new());
+    let dumped = crate::core::agent_cli::debug::session_dump(&agent, "critic", String::new());
     let report = PromptSizeReport::from_dump(&dumped);
 
     let mut visible: Vec<String> = agent

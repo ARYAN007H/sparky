@@ -150,7 +150,7 @@ user message via `current_datetime_line`).
   the tool-policy boundary.
 - `agent/session_host/builder/factory.rs`: picks the entry point per
   `PromptSource`.
-- [`agent/debug/`](../debug/): `dump_agent_prompt` / `dump_all_agent_prompts` ([`mod.rs`](./mod.rs))
+- [`core/agent_cli/debug/`](../debug/): `dump_agent_prompt` / `dump_all_agent_prompts` ([`mod.rs`](./mod.rs))
   build the same `PromptContext` to render each agent's prompt,
   `dump_writer.rs` writes it to disk, `prompt_size.rs` measures it.
 

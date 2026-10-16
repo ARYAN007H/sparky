@@ -22,7 +22,6 @@ pub use crate::attachments::HostAttachment;
 pub mod bus;
 pub mod context;
 pub(crate) mod cost;
-pub mod debug;
 pub mod goals;
 pub mod harness;
 pub mod hooks;
