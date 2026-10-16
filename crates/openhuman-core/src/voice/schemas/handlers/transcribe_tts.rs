@@ -9,8 +9,8 @@ use crate::voice::schemas::helpers::{
     deserialize_params, effective_stt_provider, effective_tts_provider, to_json,
 };
 use crate::voice::schemas::params::{
-    ReplySynthesizeParams, SttDispatchParams, TranscribeBytesParams,
-    TranscribeParams, TtsDispatchParams, TtsParams,
+    ReplySynthesizeParams, SttDispatchParams, TranscribeBytesParams, TranscribeParams,
+    TtsDispatchParams, TtsParams,
 };
 
 pub(crate) fn handle_voice_status(
