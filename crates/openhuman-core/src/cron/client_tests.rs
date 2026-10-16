@@ -3,14 +3,10 @@ use std::time::Instant;
 
 #[tokio::test]
 async fn timing_probe() {
-    let config = Config::default();
     let t = Instant::now();
-    crate::modules::tinyflows::proxy(&config).await.unwrap();
+    let _ = crate::modules::runtime::runtime().await.unwrap();
+    eprintln!("runtime: {:?}", t.elapsed());
+    let t = Instant::now();
+    crate::modules::tinyflows::fixture_attach_for_probe().await.unwrap();
     eprintln!("attach: {:?}", t.elapsed());
-    let t = Instant::now();
-    let normalized = normalize_expression(&config, "0 9 * * 1-5").await.unwrap();
-    eprintln!("first call: {:?} -> {normalized}", t.elapsed());
-    let t = Instant::now();
-    normalize_expression(&config, "0 9 * * 1-5").await.unwrap();
-    eprintln!("second call: {:?}", t.elapsed());
 }
