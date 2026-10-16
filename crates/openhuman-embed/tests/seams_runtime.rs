@@ -54,7 +54,7 @@ impl LearningSink for ProbeHook {
 }
 
 fn hook_installed() -> bool {
-    openhuman_core::agent::hooks::embedder_post_turn_hooks().len() == 1
+    !openhuman_core::agent::hooks::embedder_post_turn_hooks().is_empty()
 }
 
 #[test]

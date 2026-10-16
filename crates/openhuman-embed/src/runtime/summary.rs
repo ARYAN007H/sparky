@@ -96,7 +96,8 @@ impl RuntimeBuilder {
                 .seams
                 .post_turn_hooks
                 .iter()
-                .map(|hook| hook.name().to_string())
+                .enumerate()
+                .map(|(index, _)| format!("learning_sink_{index}"))
                 .collect(),
             tool_hooks: self
                 .seams
