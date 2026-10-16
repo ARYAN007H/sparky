@@ -2,7 +2,7 @@
 //! workspace, injecting on-disk or inline content into a prompt under a
 //! `###` heading with a character cap, and the shared AGENTS.md block writer.
 
-use super::super::types::*;
+use super::types::*;
 use std::fmt::Write;
 use std::hash::{Hash, Hasher};
 use std::path::Path;
