@@ -528,7 +528,7 @@ async fn cancel_flow_run_refuses_a_run_the_caller_does_not_own() {
     .unwrap()
     .value;
 
-    let run = ops::flows_run(
+    let run = ops::flows_run(&crate::core::runtime::DispatchCtx::ambient(), 
         &config,
         &owner_flow.id,
         json!({}),

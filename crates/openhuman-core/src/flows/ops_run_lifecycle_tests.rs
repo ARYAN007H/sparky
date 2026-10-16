@@ -110,7 +110,7 @@ async fn flows_run_completes_trigger_only_graph() {
         .await
         .unwrap();
 
-    let outcome = flows_run(
+    let outcome = flows_run(&crate::core::runtime::DispatchCtx::ambient(), 
         &config,
         &created.value.id,
         json!({ "hello": "world" }),
@@ -146,7 +146,7 @@ async fn flows_run_on_trigger_only_graph_surfaces_no_actionable_nodes_note() {
         .await
         .unwrap();
 
-    let outcome = flows_run(
+    let outcome = flows_run(&crate::core::runtime::DispatchCtx::ambient(), 
         &config,
         &created.value.id,
         json!({}),
@@ -199,7 +199,7 @@ async fn flows_run_on_graph_with_actionable_nodes_has_no_empty_flow_note() {
         .await
         .unwrap();
 
-    let outcome = flows_run(
+    let outcome = flows_run(&crate::core::runtime::DispatchCtx::ambient(), 
         &config,
         &created.value.id,
         json!({}),
@@ -243,7 +243,7 @@ async fn flows_run_on_graph_with_disconnected_component_still_surfaces_empty_flo
         .await
         .unwrap();
 
-    let outcome = flows_run(
+    let outcome = flows_run(&crate::core::runtime::DispatchCtx::ambient(), 
         &config,
         &created.value.id,
         json!({}),
@@ -284,7 +284,7 @@ async fn flows_run_reports_pending_approval_and_blocks_downstream() {
         .await
         .unwrap();
 
-    let outcome = flows_run(
+    let outcome = flows_run(&crate::core::runtime::DispatchCtx::ambient(), 
         &config,
         &created.value.id,
         json!({ "x": 1 }),
@@ -317,7 +317,7 @@ async fn flows_get_missing_flow_errors() {
 async fn flows_run_missing_flow_errors() {
     let tmp = TempDir::new().unwrap();
     let config = test_config(&tmp);
-    let err = flows_run(
+    let err = flows_run(&crate::core::runtime::DispatchCtx::ambient(), 
         &config,
         "missing",
         json!({}),
@@ -343,7 +343,7 @@ async fn flows_run_threads_declared_inputs_into_the_run() {
     .await
     .unwrap();
 
-    let run = flows_run(
+    let run = flows_run(&crate::core::runtime::DispatchCtx::ambient(), 
         &config,
         &created.value.id,
         json!({}),
@@ -389,7 +389,7 @@ async fn flows_run_detached_threads_and_validates_declared_inputs_too() {
     .await
     .unwrap();
 
-    let err = flows_run_detached(
+    let err = flows_run_detached(&crate::core::runtime::DispatchCtx::ambient(), 
         &config,
         &created.value.id,
         json!({}),
@@ -400,7 +400,7 @@ async fn flows_run_detached_threads_and_validates_declared_inputs_too() {
     .expect_err("a missing required input must be refused before a run id is handed out");
     assert!(err.contains("repo"), "got: {err}");
 
-    let started = flows_run_detached(
+    let started = flows_run_detached(&crate::core::runtime::DispatchCtx::ambient(), 
         &config,
         &created.value.id,
         json!({}),
@@ -428,7 +428,7 @@ async fn flows_run_rejects_a_missing_required_input_without_creating_a_run_row()
     .await
     .unwrap();
 
-    let err = flows_run(
+    let err = flows_run(&crate::core::runtime::DispatchCtx::ambient(), 
         &config,
         &created.value.id,
         json!({}),
@@ -471,7 +471,7 @@ async fn flows_run_rejects_a_wrongly_typed_or_undeclared_input() {
     .await
     .unwrap();
 
-    let type_err = flows_run(
+    let type_err = flows_run(&crate::core::runtime::DispatchCtx::ambient(), 
         &config,
         &created.value.id,
         json!({}),
@@ -482,7 +482,7 @@ async fn flows_run_rejects_a_wrongly_typed_or_undeclared_input() {
     .expect_err("a string for a number input must be rejected");
     assert!(type_err.contains("depth"), "got: {type_err}");
 
-    let unknown_err = flows_run(
+    let unknown_err = flows_run(&crate::core::runtime::DispatchCtx::ambient(), 
         &config,
         &created.value.id,
         json!({}),
@@ -514,7 +514,7 @@ async fn flows_run_leaves_a_flow_declaring_no_inputs_unchanged() {
         .await
         .unwrap();
 
-    let run = flows_run(
+    let run = flows_run(&crate::core::runtime::DispatchCtx::ambient(), 
         &config,
         &created.value.id,
         json!({ "hi": 1 }),
@@ -550,7 +550,7 @@ async fn flows_run_records_failed_status_when_a_node_errors() {
         .await
         .unwrap();
 
-    let err = flows_run(
+    let err = flows_run(&crate::core::runtime::DispatchCtx::ambient(), 
         &config,
         &created.value.id,
         json!({}),
@@ -599,7 +599,7 @@ async fn flows_run_populates_error_when_a_continue_policy_node_errors() {
         .await
         .unwrap();
 
-    let run = flows_run(
+    let run = flows_run(&crate::core::runtime::DispatchCtx::ambient(), 
         &config,
         &created.value.id,
         json!({}),

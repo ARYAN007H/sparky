@@ -76,7 +76,7 @@ async fn flows_run_rejects_legacy_nested_conditional_fan_in_before_execution() {
     let graph = structurally_valid_graph(nested_conditional_fan_in_graph());
     let flow = store::create_flow(&config, "legacy".to_string(), graph, false, true).unwrap();
 
-    let err = flows_run(
+    let err = flows_run(&crate::core::runtime::DispatchCtx::ambient(), 
         &config,
         &flow.id,
         json!({ "outer": true, "inner": true }),
@@ -116,7 +116,7 @@ async fn flows_run_rejects_an_incompatible_saved_child_before_execution() {
     )
     .unwrap();
 
-    let error = flows_run(
+    let error = flows_run(&crate::core::runtime::DispatchCtx::ambient(), 
         &config,
         &parent.id,
         json!({}),
