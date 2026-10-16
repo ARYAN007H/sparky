@@ -181,6 +181,12 @@ cleanup() {
         "${E2E_ARTIFACTS_DIR:-$APP_DIR/test/e2e/artifacts}/${LOG_SUFFIX}-app-env-check.log" \
         2>/dev/null || true
     fi
+    if [ -f "${TAURI_DRIVER_LOG:-}" ]; then
+      mkdir -p "${E2E_ARTIFACTS_DIR:-$APP_DIR/test/e2e/artifacts}"
+      cp "$TAURI_DRIVER_LOG" \
+        "${E2E_ARTIFACTS_DIR:-$APP_DIR/test/e2e/artifacts}/${LOG_SUFFIX}-tauri-driver.log" \
+        2>/dev/null || true
+    fi
   fi
   if [ -n "$CREATED_TEMP_WORKSPACE" ]; then
     for attempt in 1 2 3; do
