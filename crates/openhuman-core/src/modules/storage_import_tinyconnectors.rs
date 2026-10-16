@@ -27,8 +27,8 @@ use serde_json::{json, Value};
 use tinystoragedrivers::{CollectionSpec, ScopedStorage};
 
 use super::storage_grant_tinyconnectors::{MODULE_ID, PREFS_COLLECTION, TRIGGER_STREAM_PREFIX};
-use crate::core::runtime::DispatchCtx;
 use super::storage_import_support as support;
+use crate::core::runtime::DispatchCtx;
 
 const LOG_PREFIX: &str = "[connectors-import]";
 const PREFS_DIR: &str = "composio-user-scopes";

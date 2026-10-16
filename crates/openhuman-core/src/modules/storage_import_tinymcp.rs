@@ -75,7 +75,7 @@ pub(crate) async fn import_legacy(ctx: &DispatchCtx, data_dir: &Path) -> Result<
         return Ok(Outcome::NoBackend);
     };
     let scope = super::storage_host::current_module_scope(ctx, MODULE_ID)
-    .map_err(|error| anyhow!("resolve the module scope: {:?}", error.kind()))?;
+        .map_err(|error| anyhow!("resolve the module scope: {:?}", error.kind()))?;
     let scoped = backend
         .for_scope(&scope)
         .map_err(|error| anyhow!("open the module scope: {:?}", error.kind()))?;

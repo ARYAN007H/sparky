@@ -88,7 +88,11 @@ async fn the_import_is_keyed_by_the_explicit_contexts_scope_not_the_tasks() {
     };
     let dir = std::path::PathBuf::from("/import-once/tenants");
     let runs = std::sync::atomic::AtomicUsize::new(0);
-    for ctx in [profile("once-alice"), profile("once-bob"), profile("once-alice")] {
+    for ctx in [
+        profile("once-alice"),
+        profile("once-bob"),
+        profile("once-alice"),
+    ] {
         import_once(&ctx, "test-tenants", MODULE_FOR_TEST, &dir, async {
             runs.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
             Ok(Done(true))
