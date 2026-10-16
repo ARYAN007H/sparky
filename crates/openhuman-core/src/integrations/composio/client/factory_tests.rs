@@ -46,7 +46,7 @@ fn without_a_route_builder_the_built_in_resolution_applies() {
 #[test]
 fn a_host_pinned_credential_wins_over_a_registered_builder() {
     let mut config = config_with_mode("backend");
-    config.composio.host_credential = Some(crate::config::ComposioHostCredential::new("key"));
+    config.composio.host_credential = Some(crate::config::ComposioHostCredential::direct("key"));
     register_composio_route_builder("backend", |_| anyhow::bail!("must not run"));
     let route = resolve_composio_route(&config);
     unregister_composio_route_builder("backend");
