@@ -129,7 +129,10 @@ async fn load_config(ctx: &DispatchCtx) -> Result<Config, String> {
 
 /// Mint a realtime voice-agent signed WebSocket URL (#5399). Takes no params -
 /// the agent is server-configured; the desktop only asks for a fresh signed URL.
-fn handle_voice_agent_signed_url(ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
+fn handle_voice_agent_signed_url(
+    ctx: DispatchCtx,
+    _params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         log::debug!("{LOG_PREFIX} voice.agent_signed_url");
         let config = load_config(&ctx).await?;

@@ -36,9 +36,7 @@ pub async fn transcribe_cloud(
                 .to_string(),
         );
     }
-    let http = client
-        .raw_client()
-        .map_err(flatten_authed_error)?;
+    let http = client.raw_client().map_err(flatten_authed_error)?;
     let result = tinyinference_voice::cloud::transcribe(
         &http,
         url,

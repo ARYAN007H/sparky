@@ -16,9 +16,7 @@ fn backend_401_is_tagged_as_session_expiry() {
         false,
     );
     assert!(tagged.starts_with("SESSION_EXPIRED: "));
-    assert!(is_session_expired_message(
-        &tagged
-    ));
+    assert!(is_session_expired_message(&tagged));
 }
 
 #[test]
@@ -34,9 +32,7 @@ fn backend_401_with_api_key_does_not_expire_session() {
         true,
     );
     assert!(tagged.starts_with("API_KEY_REJECTED: "));
-    assert!(!is_session_expired_message(
-        &tagged
-    ));
+    assert!(!is_session_expired_message(&tagged));
 }
 
 #[tokio::test]

@@ -52,7 +52,11 @@ pub(crate) fn configure_gemini(config: &Config, system_instruction: &str, live: 
 }
 
 /// Shapes the session configuration for `elevenlabs-hosted`.
-pub(crate) fn configure_elevenlabs(config: &Config, _system_instruction: &str, live: &mut LiveConfig) {
+pub(crate) fn configure_elevenlabs(
+    config: &Config,
+    _system_instruction: &str,
+    live: &mut LiveConfig,
+) {
     // The hosted agent owns its prompt and its brain (OpenHuman over the
     // Custom-LLM relay); only the voice may be overridden.
     live.voice = non_empty(config.voice_live.elevenlabs.voice_id.clone());

@@ -42,7 +42,10 @@ fn elevenlabs_hosted_config_owns_its_prompt_and_ignores_blank_voices() {
     config.voice_live.elevenlabs.voice_id = Some("  ".into());
     let mut live = LiveConfig::new();
     configure_elevenlabs(&config, "prompt", &mut live);
-    assert_eq!(live.system_instruction, None, "the hosted agent owns its prompt");
+    assert_eq!(
+        live.system_instruction, None,
+        "the hosted agent owns its prompt"
+    );
     assert_eq!(live.voice, None, "blank voice ids are ignored");
     config.voice_live.elevenlabs.voice_id = Some("v1".into());
     configure_elevenlabs(&config, "prompt", &mut live);
@@ -63,6 +66,9 @@ async fn hosted_providers_report_not_configured_without_a_backend_credential() {
     config.workspace_dir = dir.path().to_path_buf();
     config.config_path = dir.path().join("config.toml");
     assert!(!backend_ready(&config));
-    let err = prepare_gemini(config, LiveConfig::new()).await.err().unwrap();
+    let err = prepare_gemini(config, LiveConfig::new())
+        .await
+        .err()
+        .unwrap();
     assert_eq!(err.code, "not_configured");
 }

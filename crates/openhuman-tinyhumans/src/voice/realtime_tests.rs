@@ -103,7 +103,11 @@ async fn mint_signed_url_authenticates_with_the_api_key() {
     config.workspace_dir = dir.path().join("workspace");
     config.config_path = dir.path().join("config.toml");
     config.api_url = Some(format!("http://{addr}"));
-    openhuman_embed::__host::security::credentials::api_key::store_api_key(&config, "tiny_test_voice").unwrap();
+    openhuman_embed::__host::security::credentials::api_key::store_api_key(
+        &config,
+        "tiny_test_voice",
+    )
+    .unwrap();
 
     let out = mint_voice_agent_signed_url(&config)
         .await
