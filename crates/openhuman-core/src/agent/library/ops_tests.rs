@@ -1,5 +1,5 @@
 use super::*;
-use tinyagents_definition::{PromptSource, SkillsWildcard};
+use tinyagents_definition::{DefinitionSource, PromptSource, SkillsWildcard};
 
 fn definition() -> AgentDefinition {
     AgentDefinition {

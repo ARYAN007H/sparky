@@ -47,7 +47,9 @@ async fn account_turn_skips_non_active_goal() {
     )
     .await
     .unwrap();
-    store::pause(&dir, "t-paused").await.unwrap();
+    tinyagents_graph::goals::store::pause(&dir, "t-paused")
+        .await
+        .unwrap();
     account_turn_against_goal(&dir, Some("t-paused"), 500, 500, 1).await;
     let g = tinyagents_graph::goals::store::get(
         &crate::agent::session_store::stores_or_ephemeral(&dir).kv,
@@ -127,15 +129,13 @@ async fn complete_and_clear_are_safe_without_a_goal_or_thread() {
     let dir = tmp.path().to_path_buf();
     complete_for_thread(&dir, Some("t-empty")).await;
     clear_for_thread(&dir, Some("t-empty")).await;
-    assert!(
-        tinyagents_graph::goals::store::get(
-            &crate::agent::session_store::stores_or_ephemeral(&dir).kv,
-            "t-empty"
-        )
-        .await
-        .unwrap()
-        .is_none()
-    );
+    assert!(tinyagents_graph::goals::store::get(
+        &crate::agent::session_store::stores_or_ephemeral(&dir).kv,
+        "t-empty"
+    )
+    .await
+    .unwrap()
+    .is_none());
     // No ambient thread scope at all.
     complete_for_thread(&dir, None).await;
     clear_for_thread(&dir, None).await;
@@ -190,7 +190,7 @@ async fn budget_stop_hook_fires_on_crossing() {
     .await
     .unwrap();
     // 600 already used in a prior turn.
-    store::account_usage(&dir, "t-hook", &goal.goal_id, 600, 0)
+    tinyagents_graph::goals::store::account_usage(&dir, "t-hook", &goal.goal_id, 600, 0)
         .await
         .unwrap();
     let goal = tinyagents_graph::goals::store::get(
@@ -244,7 +244,9 @@ async fn no_hook_without_budget_or_when_inactive() {
     )
     .await
     .unwrap();
-    store::pause(&dir, "b").await.unwrap();
+    tinyagents_graph::goals::store::pause(&dir, "b")
+        .await
+        .unwrap();
     let paused = tinyagents_graph::goals::store::get(
         &crate::agent::session_store::stores_or_ephemeral(&dir).kv,
         "b",

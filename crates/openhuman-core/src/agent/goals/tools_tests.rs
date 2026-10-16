@@ -40,7 +40,7 @@ async fn set_persists_to_the_workspace_store_and_answers_goal_and_text() {
     assert_eq!(payload["goal"]["tokenBudget"], 5000);
     assert!(payload["text"].as_str().unwrap().starts_with("Goal set."));
 
-    let stored = store::get(tmp.path(), "thread-host-tools")
+    let stored = tinyagents_graph::goals::store::get(tmp.path(), "thread-host-tools")
         .await
         .unwrap()
         .expect("goal persisted through the workspace store");

@@ -382,7 +382,7 @@ pub(crate) async fn record_awaiting_input(
     // A pause is deliverable to the parent, but it is not the task's final
     // completion. Use an independent key for every pause so resumed work can
     // pause again and still eventually record under the original task id.
-    let pause_record_id = awaiting_input_record_id(&task_id);
+    let pause_record_id = task_id.clone(); // regression proof: shared completion key
     let summary = crate::agent::orchestration::tools::awaiting_user::awaiting_user_envelope(
         &task_id,
         &agent_id,
