@@ -19,7 +19,7 @@ use anyhow::{Context, Result, anyhow};
 pub mod dump_writer;
 pub mod prompt_size;
 pub mod wire;
-pub use dump_writer::{DumpWriteSummary, write_prompt_dumps};
+pub use dump_writer::write_prompt_dumps;
 pub use wire::render as render_wire_dump;
 
 use crate::agent::session_host::OpenHumanSessionHost;

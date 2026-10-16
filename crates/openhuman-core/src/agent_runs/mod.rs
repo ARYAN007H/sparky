@@ -16,7 +16,6 @@ pub(crate) use command_center::{
     all_command_center_controller_schemas, all_command_center_registered_controllers,
 };
 pub(crate) use schemas::{
-    all_controller_schemas as all_agent_controller_schemas,
     all_registered_controllers as all_agent_registered_controllers,
 };
 pub(crate) use subagent_control::{
