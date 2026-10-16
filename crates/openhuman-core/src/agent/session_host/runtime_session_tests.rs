@@ -80,7 +80,7 @@ async fn committed_progress_carries_the_sidecar_stop_on_turn_completed() {
     let mut context = crate::agent::tinyagents::host::OpenHumanRunContext::new();
     context.progress = Some(tx);
     context.session_sidecar.lock().unwrap().stop =
-        Some(crate::agent::turn_projection::breaker_stop(
+        Some(crate::agent::session_host::stop_summary::breaker_stop(
             "Stopping after 2 attempt(s): failure class `uncertain_side_effect` still blocks \
          operation `web_answer_tool` on `x`. Resolve this blocker before retrying.",
         ));

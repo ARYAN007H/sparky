@@ -19,12 +19,37 @@
 use std::fmt::Write as _;
 
 use super::turn_checkpoint::CheckpointToolResult;
+use tinyagents_harness::turn_stop::TurnStop;
 
 /// Longest error line shown for one tool, in characters.
 const ERROR_LINE_CHARS: usize = 120;
 
 /// Most result lines listed; the rest are counted.
 const MAX_LISTED: usize = 8;
+
+/// Maps an unclassified breaker stop to the product's stable stop category.
+fn stop_fallback_class(note: &str) -> &'static str {
+    StopReasonKind::from_stop_note(note).key()
+}
+
+/// A breaker stop with the product-specific fallback category.
+pub(crate) fn breaker_stop(note: &str) -> TurnStop {
+    TurnStop::breaker(note, stop_fallback_class)
+}
+
+/// Classifies the terminal reason for a completed turn.
+pub(crate) fn classify_stop(
+    breaker_halt: Option<&str>,
+    wind_down: bool,
+    hit_cap: bool,
+) -> Option<TurnStop> {
+    TurnStop::classify(breaker_halt, wind_down, hit_cap, stop_fallback_class)
+}
+
+/// Projects an incomplete result reason through the product's stop categories.
+pub(crate) fn stop_from_incomplete(reason: &str) -> TurnStop {
+    TurnStop::from_incomplete_reason(reason, stop_fallback_class)
+}
 
 /// Why the breaker stopped the turn, in terms a user can act on.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

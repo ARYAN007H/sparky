@@ -164,7 +164,7 @@ pub(super) async fn finalize_turn_outcome(
     // clean completion. No deadline wind-down on this path: only the session
     // turn carries one, and it records the stop through its sidecar.
     let stop =
-        crate::agent::turn_projection::classify_stop(breaker_halt.as_deref(), false, hit_cap);
+        crate::agent::session_host::stop_summary::classify_stop(breaker_halt.as_deref(), false, hit_cap);
     if let Some(stop) = stop.as_ref().filter(|_| turn_completed_sink.is_some()) {
         tracing::debug!(
             model,
