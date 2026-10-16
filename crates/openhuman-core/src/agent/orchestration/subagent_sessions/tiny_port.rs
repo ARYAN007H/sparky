@@ -119,10 +119,14 @@ impl TinySessionStore for OpenHumanTinySubagentSessionStore {
         parent_session: &str,
         parent_thread_id: Option<&str>,
     ) -> Result<Vec<TinySession>, SubagentError> {
-        let thread_id = self.parent_thread_id.as_deref().or(parent_thread_id);
         if parent_session != self.parent_session {
             return Ok(Vec::new());
         }
+        let thread_id = match (self.parent_thread_id.as_deref(), parent_thread_id) {
+            (Some(bound), Some(requested)) if bound != requested => return Ok(Vec::new()),
+            (Some(bound), _) => Some(bound),
+            (None, requested) => requested,
+        };
         super::list_for_parent(&self.store, parent_session, thread_id)
             .map_err(SubagentError::Persistence)?
             .into_iter()
