@@ -23,10 +23,7 @@ const NO_SESSION: &str =
 /// The proxy target for `config`: the backend origin and the credential secret.
 #[cfg(feature = "modules")]
 fn proxy_target(config: &Config) -> Result<ProxyTarget, String> {
-    let client = build_client(config).ok_or_else(|| {
-        "composio backend mode is unavailable: no backend session token. Sign in or set a TinyHumans API key."
-            .to_string()
-    })?;
+    let client = build_client(config).ok_or_else(|| NO_SESSION.to_string())?;
     Ok(ProxyTarget {
         base_url: client.backend_url.clone(),
         auth_token: client.auth_token.clone(),
