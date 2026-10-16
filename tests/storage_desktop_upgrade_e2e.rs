@@ -412,12 +412,13 @@ async fn host_documents(backend: &dyn StorageBackend) -> usize {
 
 async fn import_modules(workspace: &Path) {
     use openhuman_core::modules;
-    modules::import_legacy_mcp(workspace).await;
-    modules::import_legacy_connectors(workspace).await;
+    let ctx = openhuman_core::core::runtime::DispatchCtx::process_default();
+    modules::import_legacy_mcp(&ctx, workspace).await;
+    modules::import_legacy_connectors(&ctx, workspace).await;
     #[cfg(feature = "web3")]
-    assert!(modules::import_legacy_x402(workspace).await);
-    modules::import_legacy_tinybox(workspace).await;
-    modules::import_legacy_tinyjuice(&workspace.join("ccr"), Some(Duration::from_secs(3600))).await;
+    assert!(modules::import_legacy_x402(&ctx, workspace).await);
+    modules::import_legacy_tinybox(&ctx, workspace).await;
+    modules::import_legacy_tinyjuice(&ctx, &workspace.join("ccr"), Some(Duration::from_secs(3600))).await;
 }
 
 async fn a_desktop_upgrade_is_lossless_and_leaves_the_legacy_files_untouched(case: Case) {
