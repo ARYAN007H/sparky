@@ -79,7 +79,7 @@ fn http_adapter(allowed_domains: Vec<String>) -> OpenHumanHttp {
         &config.action_dir,
     ));
     OpenHumanHttp {
-        ctx: crate::core::runtime::DispatchCtx::ambient(),
+        ctx: crate::core::runtime::DispatchCtx::unbound(),
         config: Arc::new(config.clone()),
         security,
         http_config: crate::config::HttpRequestConfig {
@@ -108,7 +108,7 @@ fn tools_adapter(config: Arc<Config>) -> OpenHumanTools {
         &config.action_dir,
     ));
     OpenHumanTools {
-        ctx: crate::core::runtime::DispatchCtx::ambient(),
+        ctx: crate::core::runtime::DispatchCtx::unbound(),
         config,
         security,
         approval: Default::default(),

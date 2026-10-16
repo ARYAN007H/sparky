@@ -167,7 +167,7 @@ async fn composio_tool_call_blocks_under_readonly_tier() {
     use crate::security::AutonomyLevel;
 
     let tools = OpenHumanTools {
-        ctx: crate::core::runtime::DispatchCtx::ambient(),
+        ctx: crate::core::runtime::DispatchCtx::unbound(),
         config: Arc::new(Config::default()),
         security: Arc::new(policy(AutonomyLevel::ReadOnly)),
         approval: Default::default(),
@@ -214,7 +214,7 @@ async fn composio_read_action_allowed_under_readonly_tier() {
     // it may still fail downstream (no Composio session configured in
     // this test), but never with the policy-blocked marker.
     let tools = OpenHumanTools {
-        ctx: crate::core::runtime::DispatchCtx::ambient(),
+        ctx: crate::core::runtime::DispatchCtx::unbound(),
         config: Arc::new(Config::default()),
         security: Arc::new(policy(AutonomyLevel::ReadOnly)),
         approval: Default::default(),
@@ -252,7 +252,7 @@ async fn composio_read_action_does_not_prompt_under_supervised_tier() {
     );
 
     let tools = OpenHumanTools {
-        ctx: crate::core::runtime::DispatchCtx::ambient(),
+        ctx: crate::core::runtime::DispatchCtx::unbound(),
         config: Arc::new(Config::default()),
         security: Arc::new(policy(AutonomyLevel::Supervised)),
         approval: Default::default(),
@@ -478,7 +478,7 @@ fn agent_node_runtime_resolves_to_the_definitions_effective_iteration_cap() {
     assert_eq!(expected, 50);
 
     let agent = crate::agent::OpenHumanSessionHost::from_config_for_agent(
-        &crate::core::runtime::DispatchCtx::ambient(),
+        &crate::core::runtime::DispatchCtx::unbound(),
         &config,
         "planner",
     )
