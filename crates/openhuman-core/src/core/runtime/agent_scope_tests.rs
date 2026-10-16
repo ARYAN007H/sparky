@@ -43,6 +43,13 @@ fn every_agent_context_owns_its_slots() {
 #[test]
 fn autonomy_tier_source_and_ceiling_survive_derived_contexts() {
     let parent = root("/tmp/autonomy-source-parent");
+    let live_child = parent.derive_with(overlay("/tmp/autonomy-source-live-child"));
+    assert_eq!(
+        live_child.autonomy_tier_source(),
+        crate::core::runtime::AutonomyTierSource::LiveConfig,
+        "an overlay without a source override inherits the live parent binding"
+    );
+
     let fixed = parent.derive_with(
         overlay("/tmp/autonomy-source-fixed")
             .captured_autonomy_tier()
