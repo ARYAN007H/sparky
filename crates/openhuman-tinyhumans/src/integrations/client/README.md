@@ -44,5 +44,5 @@ becomes the `anyhow::Error` every verb method returns.
 
 ## Further reading
 
-- [Third-party integrations](../../../../../../docs/gitbooks/en/features/integrations/README.md)
-- [Connections](../../../../../../docs/gitbooks/en/features/connections.md)
+- [Third-party integrations](../../../../../docs/gitbooks/en/features/integrations/README.md)
+- [Connections](../../../../../docs/gitbooks/en/features/connections.md)
