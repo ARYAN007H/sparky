@@ -30,7 +30,7 @@
 //! phrases, budget exhaustion) keep matching them.
 
 use crate::backend::url::effective_backend_api_url;
-use openhuman_embed::__host::backend::transport::{
+use crate::transport::{
     resolve_backend_transport, BackendTransport, BackendTransportError, TransportProfile,
 };
 use openhuman_embed::__host::config::Config;
