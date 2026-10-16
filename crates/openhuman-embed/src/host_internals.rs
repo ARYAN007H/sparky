@@ -328,7 +328,7 @@ pub mod voice {
             #[cfg(all(feature = "voice", feature = "http-server"))]
             pub use openhuman_core::voice::live::ws::handle_live_voice_ws;
             #[cfg(not(all(feature = "voice", feature = "http-server")))]
-            pub async fn handle_live_voice_ws<S, C>(_socket: S, _config: C) {}
+            pub async fn handle_live_voice_ws<S, X, C>(_socket: S, _ctx: X, _config: C) {}
         }
     }
     pub mod streaming {

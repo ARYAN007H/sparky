@@ -184,7 +184,7 @@ mod socket {
             "/ws",
             axum::routing::get(move |ws: axum::extract::WebSocketUpgrade| {
                 let config = config.clone();
-                async move { ws.on_upgrade(move |socket| handle_live_voice_ws(socket, config)) }
+                async move { ws.on_upgrade(move |socket| handle_live_voice_ws(socket, crate::core::runtime::DispatchCtx::unbound(), config)) }
             }),
         );
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
