@@ -28,6 +28,7 @@ function runCoreStep(mode) {
       "scripts/ci",
       "tests/raw_coverage",
       "tests/in_process",
+      "modules",
     ])
       mkdirSync(join(root, directory), { recursive: true });
     writeFileSync(join(root, "tests/json_rpc_e2e.rs"), "fixture");
@@ -54,6 +55,22 @@ if [[ "$*" == *"test -p openhuman --lib"* ]]; then
     echo "core tests need separate private XDG cache and data directories" >&2
     exit 13
   }
+  if [[ "$*" == *"inference::tokenjuice::"* || "$*" == *"tinyjuice_detects_and_converts_html"* ]]; then
+    [[ "\${OPENHUMAN_MODULE_PATH:-}" == "$MODULE_FIXTURE_PATH" ]] || {
+      echo "module-backed core tests need the staged module path" >&2
+      exit 15
+    }
+    echo "ISOLATED-MODULE-TEST:$*"
+    echo "test result: ok. 1 passed; 0 failed; 0 ignored"
+  elif [[ "$*" == *"--test-threads=1"* ]]; then
+    [[ "\${OPENHUMAN_MODULE_PATH:-}" == "$MODULE_FIXTURE_PATH" ]] || exit 15
+  else
+    [[ -z "\${OPENHUMAN_MODULE_PATH:-}" ]] || {
+      echo "parallel core unit tests must not load process-global modules" >&2
+      exit 14
+    }
+    echo CORE-TESTS-WITHOUT-MODULE-PATH
+  fi
   echo PRIVATE-XDG-CACHE
 fi
 `,
@@ -66,6 +83,8 @@ fi
         ...process.env,
         PATH: `${join(root, "bin")}:${process.env.PATH}`,
         FIXTURE_MODE: mode,
+        MODULE_FIXTURE_PATH: join(root, "modules"),
+        OPENHUMAN_MODULE_PATH: join(root, "modules"),
       },
     });
   } finally {
@@ -76,6 +95,9 @@ fi
 test("hosted JSON-RPC tests are listed and executed with product features", () => {
   const result = runCoreStep("normal");
   assert.equal(result.status, 0, result.stdout + result.stderr);
+  assert.match(result.stdout, /CORE-TESTS-WITHOUT-MODULE-PATH/);
+  assert.match(result.stdout, /ISOLATED-MODULE-TEST/);
+  assert.equal((result.stdout.match(/ISOLATED-MODULE-TEST:/g) ?? []).length, 4, result.stdout);
   assert.match(result.stdout, /PRIVATE-XDG-CACHE/);
   assert.match(result.stdout, /EXECUTED-JSON-RPC/);
 });
