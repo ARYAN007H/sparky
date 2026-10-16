@@ -130,7 +130,7 @@ async fn round25_direct_mode_ops_use_loopback_factory_for_tools_connections_and_
         .value;
     assert!(toolkits.toolkits.is_empty());
 
-    let connections = composio_list_connections(&harness.config)
+    let connections = composio_list_connections(&openhuman_core::core::runtime::DispatchCtx::ambient(), &harness.config)
         .await
         .expect("direct list connections")
         .value;
