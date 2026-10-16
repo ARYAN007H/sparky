@@ -88,8 +88,6 @@ static INSTALLED: AtomicBool = AtomicBool::new(false);
 /// [`RuntimeBuilder`](crate::RuntimeBuilder) hands it to the embed builder's
 /// seam options (`controller_extension`, `tool_ranker`).
 pub(crate) struct Wiring {
-    /// The process-wide SDK transport ([`crate::client::shared_transport`]).
-    pub(crate) transport: Arc<SdkBackendTransport>,
     /// The hosted RPC proxies, unless [`InstallOptions::hosted_controllers`]
     /// is off.
     pub(crate) controllers: Option<ControllerExtension>,
@@ -163,9 +161,8 @@ fn connect_transport() -> Result<Arc<SdkBackendTransport>, InstallError> {
 /// the registry and ranker applied in between, in its historical order.
 pub(crate) fn wiring(options: &InstallOptions) -> Result<Wiring, InstallError> {
     let (controllers, ranker) = prepare(options);
-    let transport = connect_transport()?;
+    connect_transport()?;
     Ok(Wiring {
-        transport,
         controllers,
         ranker,
     })
