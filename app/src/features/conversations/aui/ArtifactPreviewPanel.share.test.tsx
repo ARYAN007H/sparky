@@ -103,11 +103,11 @@ describe('ShareStatus copy button', () => {
     render(<Harness />);
     await act(async () => fireEvent.click(screen.getByText('share')));
     // The share copied the link already; the button still offers to copy.
-    expect(screen.getByTestId('artifact-share-copy').textContent).toBe('Copy');
+    expect(screen.getByTestId('artifact-share-copy').textContent).toBe('chat.artifact.share.copy');
     writeText.mockClear();
 
     await act(async () => fireEvent.click(screen.getByTestId('artifact-share-copy')));
     expect(writeText).toHaveBeenCalledWith(url);
-    expect(screen.getByTestId('artifact-share-copy').textContent).toContain('Copied');
+    expect(screen.getByTestId('artifact-share-copy').textContent).toContain('chat.artifact.copied');
   });
 });

@@ -5,10 +5,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
+import ChipTabs from '../../../components/layout/ChipTabs';
 import {
   hasWindowDragBar,
   WINDOW_DRAG_BAR_HEIGHT,
 } from '../../../components/layout/shell/WindowDragBar';
+import { Button } from '../../../components/ui';
 import { useT } from '../../../lib/i18n/I18nContext';
 import { saveArtifactViaDialog } from '../../../services/artifactDownloadService';
 import { callCoreRpc } from '../../../services/coreRpcClient';
@@ -41,6 +43,8 @@ interface ArtifactBodyResponse {
 const MIN_WIDTH = 360;
 const MAX_WIDTH = 1200;
 const DEFAULT_WIDTH = 520;
+/** Width change per arrow key on the resize handle. */
+const RESIZE_STEP = 24;
 
 // ─── Main panel ─────────────────────────────────────────────────
 
@@ -105,6 +109,14 @@ export function ArtifactPreviewPanel(_props: ArtifactPreviewPanelProps) {
     };
   }, []);
 
+  // The panel is on the right, so moving the handle left widens it.
+  const handleResizeKey = useCallback((e: React.KeyboardEvent) => {
+    const delta = e.key === 'ArrowLeft' ? RESIZE_STEP : e.key === 'ArrowRight' ? -RESIZE_STEP : 0;
+    if (!delta) return;
+    e.preventDefault();
+    setPanelWidth(width => Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, width + delta)));
+  }, []);
+
   // Tabs = the artifacts currently open in the panel, in open order.
   const visibleTabs = useMemo(
     () =>
@@ -133,43 +145,64 @@ export function ArtifactPreviewPanel(_props: ArtifactPreviewPanelProps) {
         // band, which would otherwise swallow clicks on the tabs and the X.
         paddingTop: hasWindowDragBar() ? WINDOW_DRAG_BAR_HEIGHT : undefined,
       }}>
-      {/* Drag handle */}
+      {/* Resize handle: drag it, or focus it and use the arrow keys. */}
       <div
-        className="absolute left-0 top-0 bottom-0 w-1.5 cursor-ew-resize hover:bg-primary/20 active:bg-primary/30 z-20"
+        role="separator"
+        aria-orientation="vertical"
+        aria-label={t('chat.artifact.panel.resize')}
+        aria-valuemin={MIN_WIDTH}
+        aria-valuemax={MAX_WIDTH}
+        aria-valuenow={panelWidth}
+        tabIndex={0}
         onMouseDown={handleMouseDown}
+        onKeyDown={handleResizeKey}
+        className="absolute left-0 top-0 bottom-0 w-1.5 cursor-ew-resize outline-none hover:bg-primary/20 focus-visible:bg-primary/30 active:bg-primary/30 z-20"
       />
 
       {/* Header */}
       <div className="flex items-center justify-between border-b shrink-0">
         <div className="flex items-center gap-1 min-w-0 flex-1 overflow-x-auto">
           {showTabs ? (
-            visibleTabs.map(a => (
-              <div
-                key={a.artifactId}
-                className={`group flex items-center gap-1 border-b-2 px-2 py-2.5 transition-colors shrink-0 min-w-0 ${
-                  a.artifactId === activeId ? 'border-primary' : 'border-transparent'
-                }`}>
-                <button
-                  onClick={() => dispatch(activateArtifactTab(a.artifactId))}
-                  className={`flex min-w-0 items-center gap-1.5 text-xs font-medium transition-colors ${
-                    a.artifactId === activeId
-                      ? 'text-foreground'
-                      : 'text-muted-foreground hover:text-foreground'
-                  }`}>
-                  <FileText className="h-3.5 w-3.5 shrink-0" />
-                  <span className="truncate max-w-[110px]">{a.title}</span>
-                </button>
-                <button
-                  onClick={e => {
-                    e.stopPropagation();
-                    handleCloseTab(a.artifactId);
-                  }}
-                  className="ml-0.5 rounded p-0.5 text-muted-foreground/50 hover:bg-accent hover:text-foreground shrink-0"
-                  title="Close artifact">
-                  <X className="h-3 w-3" />
-                </button>
-              </div>
-            ))
+            <div
+              role="tablist"
+              aria-label={t('chat.artifact.tabs.aria')}
+              className="flex items-center gap-1 min-w-0">
+              {visibleTabs.map(a => {
+                const active = a.artifactId === activeId;
+                return (
+                  <div
+                    key={a.artifactId}
+                    className={`group flex items-center gap-1 border-b-2 px-2 py-2.5 transition-colors shrink-0 min-w-0 ${
+                      active ? 'border-primary' : 'border-transparent'
+                    }`}>
+                    <Button
+                      role="tab"
+                      aria-selected={active}
+                      variant="tertiary"
+                      size="xs"
+                      onClick={() => dispatch(activateArtifactTab(a.artifactId))}
+                      leadingIcon={<FileText className="h-3.5 w-3.5 shrink-0" />}
+                      className={`h-auto min-w-0 px-0 hover:bg-transparent ${
+                        active ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'
+                      }`}>
+                      <span className="truncate max-w-[110px]">{a.title}</span>
+                    </Button>
+                    <Button
+                      iconOnly
+                      variant="tertiary"
+                      size="xs"
+                      aria-label={t('chat.artifact.tab.close').replace('{title}', a.title)}
+                      onClick={e => {
+                        e.stopPropagation();
+                        handleCloseTab(a.artifactId);
+                      }}
+                      className="ml-0.5 text-muted-foreground/50 hover:text-foreground shrink-0">
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
+                );
+              })}
+            </div>
           ) : (
             <div className="flex items-center gap-2 px-4 py-2.5 min-w-0">
               <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
@@ -179,12 +212,15 @@ export function ArtifactPreviewPanel(_props: ArtifactPreviewPanelProps) {
             </div>
           )}
         </div>
-        <button
+        <Button
+          iconOnly
+          variant="tertiary"
+          size="sm"
+          aria-label={t('chat.artifact.panel.close')}
           onClick={() => dispatch(closeArtifactPanel())}
-          title="Close panel"
-          className="mr-2 shrink-0 inline-flex items-center justify-center rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground">
+          className="mr-2 shrink-0 text-muted-foreground hover:text-foreground">
           <X className="h-4 w-4" />
-        </button>
+        </Button>
       </div>
 
       {/* Content */}
@@ -329,8 +365,8 @@ function FileViewer({
       <div className="flex items-center justify-between border-b px-3 py-1.5 shrink-0 bg-muted/10">
         <div className="flex items-center gap-2">
           <FileBox className="h-4 w-4 text-muted-foreground" />
-          <span className="text-xs font-medium text-muted-foreground capitalize">
-            {artifact.kind}
+          <span className="text-xs font-medium text-muted-foreground">
+            {t(`chat.artifact.kind.${artifact.kind}`, artifact.kind)}
           </span>
           <span className="text-[11px] text-muted-foreground/60 border-l pl-2">v{version}</span>
         </div>
@@ -344,19 +380,17 @@ function FileViewer({
           <div>
             <p className="text-sm font-medium break-all">{fileName}</p>
             <p className="text-xs text-muted-foreground mt-1 break-all">{filePath}</p>
-            <p className="text-xs text-muted-foreground mt-2">
-              Binary {artifact.kind} — preview not available
-            </p>
+            <p className="text-xs text-muted-foreground mt-2">{t('chat.artifact.noPreview')}</p>
             {error && <p className="text-xs text-destructive mt-2">{error}</p>}
             {downloadError && <p className="text-xs text-destructive mt-2">{downloadError}</p>}
           </div>
           {filePath && (
-            <button
-              onClick={() => void saveArtifactAs(artifact, t).then(setDownloadError)}
-              className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-xs font-medium text-primary-foreground hover:bg-primary/90">
-              <Download className="h-3.5 w-3.5" />
-              Download
-            </button>
+            <Button
+              size="sm"
+              leadingIcon={<Download className="h-3.5 w-3.5" />}
+              onClick={() => void saveArtifactAs(artifact, t).then(setDownloadError)}>
+              {t('chat.artifact.download')}
+            </Button>
           )}
         </div>
       </div>
@@ -480,12 +514,8 @@ export function useArtifactAutosave(
 }
 
 function AutosaveStatus({ status }: { status: AutosaveState }) {
-  const label = {
-    saved: 'Saved',
-    pending: 'Unsaved changes',
-    saving: 'Saving…',
-    error: 'Not saved',
-  }[status];
+  const { t } = useT();
+  const label = t(`chat.artifact.autosave.${status}`);
   return (
     <span
       className={`text-[11px] border-l pl-2 ${
@@ -568,18 +598,23 @@ export function useArtifactShare(artifactId: string, beforeShare?: () => Promise
 }
 
 export function ShareButton({ state, onShare }: { state: ShareState; onShare: () => void }) {
+  const { t } = useT();
   return (
-    <button
+    <Button
+      iconOnly
+      variant="tertiary"
+      size="xs"
       onClick={onShare}
       disabled={state.status === 'sharing'}
-      title="Share: upload and copy a link"
-      className="inline-flex items-center justify-center rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-50">
+      aria-label={t('chat.artifact.share')}
+      title={t('chat.artifact.share')}
+      className="text-muted-foreground hover:text-foreground">
       {state.status === 'sharing' ? (
         <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
       ) : (
         <Share2 className="h-3.5 w-3.5" />
       )}
-    </button>
+    </Button>
   );
 }
 
@@ -593,6 +628,7 @@ export function ShareStatus({
   state: ShareState;
   onCopy: () => Promise<boolean>;
 }) {
+  const { t } = useT();
   // The button's own feedback: only for a click on it, not for the copy the
   // share already made (the status text reports that one).
   const [justCopied, setJustCopied] = useState(false);
@@ -616,37 +652,45 @@ export function ShareStatus({
       <div
         data-testid="artifact-share-status"
         className="border-b bg-destructive/10 px-3 py-1.5 text-[11px] text-destructive">
-        Not shared: {state.message}
+        {t('chat.artifact.share.failed').replace('{reason}', state.message)}
       </div>
     );
   }
   if (state.status !== 'shared') return null;
   const expires = state.expiresAt
-    ? ` · expires ${new Date(state.expiresAt).toLocaleDateString()}`
+    ? ` · ${t('chat.artifact.share.expires').replace(
+        '{date}',
+        new Date(state.expiresAt).toLocaleDateString()
+      )}`
     : '';
   return (
     <div
       data-testid="artifact-share-status"
       className="flex items-center gap-2 border-b bg-muted/20 px-3 py-1.5 text-[11px] text-muted-foreground">
       <span className="shrink-0">
-        {state.copied ? 'Link copied' : 'Link ready'} · v{state.version}
+        {state.copied ? t('chat.artifact.share.copied') : t('chat.artifact.share.ready')} · v
+        {state.version}
         {expires}
       </span>
       <span className="min-w-0 flex-1 truncate text-foreground/70" title={state.url}>
         {state.url}
       </span>
-      <button
+      <Button
+        variant="secondary"
+        size="xs"
         onClick={() => void handleCopy()}
-        title="Copy the full link"
+        title={t('chat.artifact.share.copyLink')}
         data-testid="artifact-share-copy"
-        className="inline-flex shrink-0 items-center gap-1 rounded border px-1.5 py-0.5 text-[11px] text-foreground hover:bg-accent">
-        {justCopied ? (
-          <Check className="h-3 w-3 text-green-500" />
-        ) : (
-          <Clipboard className="h-3 w-3" />
-        )}
-        {justCopied ? 'Copied' : 'Copy'}
-      </button>
+        leadingIcon={
+          justCopied ? (
+            <Check className="h-3 w-3 text-green-500" />
+          ) : (
+            <Clipboard className="h-3 w-3" />
+          )
+        }
+        className="shrink-0 text-[11px]">
+        {justCopied ? t('chat.artifact.copied') : t('chat.artifact.share.copy')}
+      </Button>
     </div>
   );
 }
@@ -722,53 +766,68 @@ function EditableTextViewer({
       {/* Toolbar */}
       <div className="flex items-center justify-between border-b px-3 py-1.5 shrink-0 bg-muted/10">
         <div className="flex items-center gap-2">
-          <span className="text-xs font-medium text-muted-foreground capitalize">{kind}</span>
+          <span className="text-xs font-medium text-muted-foreground">
+            {t(`chat.artifact.kind.${kind}`, kind)}
+          </span>
           <span className="text-[11px] text-muted-foreground/60 border-l pl-2">
             v{autosave.version}
           </span>
           {editable && <AutosaveStatus status={autosave.status} />}
         </div>
         <div className="flex items-center gap-0.5">
-          <div className="flex items-center rounded border mr-2">
-            <button
-              onClick={() => setTab('preview')}
-              className={`flex items-center gap-1 px-2 py-0.5 text-xs ${
-                tab === 'preview'
-                  ? 'bg-primary/10 text-primary'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}>
-              <Eye className="h-3 w-3" />
-              Preview
-            </button>
-            <button
-              onClick={() => setTab('code')}
-              className={`flex items-center gap-1 px-2 py-0.5 text-xs ${
-                tab === 'code'
-                  ? 'bg-primary/10 text-primary'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}>
-              <Code2 className="h-3 w-3" />
-              Code
-            </button>
-          </div>
+          <ChipTabs
+            compact
+            ariaLabel={t('chat.artifact.view.aria')}
+            className="mr-2 flex gap-1"
+            value={tab}
+            onChange={setTab}
+            items={[
+              {
+                id: 'preview',
+                label: (
+                  <span className="inline-flex items-center gap-1">
+                    <Eye className="h-3 w-3" />
+                    {t('chat.artifact.view.preview')}
+                  </span>
+                ),
+              },
+              {
+                id: 'code',
+                label: (
+                  <span className="inline-flex items-center gap-1">
+                    <Code2 className="h-3 w-3" />
+                    {t('chat.artifact.view.code')}
+                  </span>
+                ),
+              },
+            ]}
+          />
 
-          <button
+          <Button
+            iconOnly
+            variant="tertiary"
+            size="xs"
             onClick={handleCopy}
-            title="Copy to clipboard"
-            className="inline-flex items-center justify-center rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground">
+            aria-label={copied ? t('chat.artifact.copied') : t('chat.artifact.copy')}
+            title={t('chat.artifact.copy')}
+            className="text-muted-foreground hover:text-foreground">
             {copied ? (
               <Check className="h-3.5 w-3.5 text-green-500" />
             ) : (
               <Clipboard className="h-3.5 w-3.5" />
             )}
-          </button>
+          </Button>
           {/* <ShareButton state={sharing.state} onShare={() => void sharing.share()} /> */}
-          <button
+          <Button
+            iconOnly
+            variant="tertiary"
+            size="xs"
             onClick={() => void handleDownload()}
-            title="Download"
-            className="inline-flex items-center justify-center rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground">
+            aria-label={t('chat.artifact.download')}
+            title={t('chat.artifact.download')}
+            className="text-muted-foreground hover:text-foreground">
             <Download className="h-3.5 w-3.5" />
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -795,7 +854,7 @@ function EditableTextViewer({
             // Scripts run, but in an opaque origin: the agent's HTML cannot
             // reach the app window, its storage or the Tauri bridge.
             sandbox="allow-scripts"
-            title="HTML preview"
+            title={t('chat.artifact.htmlPreview')}
           />
         ) : isMarkdown ? (
           // Markdown renders as formatted content (headings, lists, tables,
@@ -818,6 +877,7 @@ function EditableTextViewer({
           value={editedBody}
           onChange={e => onEdit(e.target.value)}
           readOnly={!editable}
+          aria-label={t('chat.artifact.editor')}
           className="flex-1 w-full resize-none border-0 bg-background p-4 text-sm font-mono leading-relaxed outline-none focus:ring-0"
           spellCheck={false}
         />

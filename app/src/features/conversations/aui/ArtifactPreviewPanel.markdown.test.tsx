@@ -81,7 +81,7 @@ describe('ArtifactPreviewPanel — preview rendering by kind (#1535)', () => {
 
     const h1 = await screen.findByRole('heading', { level: 1 });
     expect(h1.textContent).toBe('Quarterly report');
-    fireEvent.click(screen.getByRole('button', { name: /Code/ }));
+    fireEvent.mouseDown(screen.getByRole('tab', { name: /chat.artifact.view.code/ }));
     // The artifact is the file, not this text: it cannot be edited here.
     expect((screen.getByRole('textbox') as HTMLTextAreaElement).readOnly).toBe(true);
   });
@@ -97,7 +97,7 @@ describe('ArtifactPreviewPanel — preview rendering by kind (#1535)', () => {
   it('keeps rendering HTML kind in the sandboxed iframe (unchanged)', async () => {
     renderPanel('html', '<h1>Hi</h1><p>body</p>');
 
-    const frame = await screen.findByTitle('HTML preview');
+    const frame = await screen.findByTitle('chat.artifact.htmlPreview');
     expect(frame.tagName).toBe('IFRAME');
     expect(frame.getAttribute('sandbox')).toBe('allow-scripts');
     expect(frame.getAttribute('srcdoc')).toContain('<h1>Hi</h1>');
@@ -107,7 +107,7 @@ describe('ArtifactPreviewPanel — preview rendering by kind (#1535)', () => {
     renderPanel('markdown', '', 'artifact unreadable');
 
     expect(await screen.findByText('artifact unreadable')).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: /Code/ }));
+    fireEvent.mouseDown(screen.getByRole('tab', { name: /chat.artifact.view.code/ }));
     // Typing here would save the empty text over the artifact.
     expect((screen.getByRole('textbox') as HTMLTextAreaElement).readOnly).toBe(true);
   });

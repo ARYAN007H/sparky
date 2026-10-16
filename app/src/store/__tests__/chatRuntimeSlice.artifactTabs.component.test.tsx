@@ -45,8 +45,8 @@ describe('ArtifactPreviewPanel — tab switching & close (#1535)', () => {
     );
 
     // Two tabs rendered (showTabs = length > 1)
-    const tab1 = screen.getByRole('button', { name: 'Doc One' });
-    const tab2 = screen.getByRole('button', { name: 'Doc Two' });
+    const tab1 = screen.getByRole('tab', { name: 'Doc One' });
+    const tab2 = screen.getByRole('tab', { name: 'Doc Two' });
     expect(tab1).toBeTruthy();
     expect(tab2).toBeTruthy();
 
@@ -73,7 +73,7 @@ describe('ArtifactPreviewPanel — tab switching & close (#1535)', () => {
     );
 
     // Two tabs, each with a close (X) button.
-    const closeBtns = screen.getAllByTitle('Close artifact');
+    const closeBtns = screen.getAllByRole('button', { name: 'chat.artifact.tab.close' });
     expect(closeBtns).toHaveLength(2);
 
     // Close the non-active tab (a-1): it is removed and a-2 stays active.
@@ -90,7 +90,7 @@ describe('ArtifactPreviewPanel — tab switching & close (#1535)', () => {
       </Provider>
     );
 
-    fireEvent.click(screen.getByTitle('Close panel'));
+    fireEvent.click(screen.getByRole('button', { name: 'chat.artifact.panel.close' }));
     expect(store.getState().chatRuntime.openArtifactIds).toEqual([]);
     expect(store.getState().chatRuntime.activeArtifactId).toBeNull();
   });

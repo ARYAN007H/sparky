@@ -68,7 +68,7 @@ describe('ArtifactPreviewPanel — versions saved elsewhere', () => {
     rpc.mockResolvedValueOnce(body('# first', 1));
     const store = setup();
     await screen.findByRole('heading', { level: 1 });
-    fireEvent.click(screen.getByRole('button', { name: /Code/ }));
+    fireEvent.mouseDown(screen.getByRole('tab', { name: /chat.artifact.view.code/ }));
     fireEvent.change(screen.getByRole('textbox'), { target: { value: '# my edit' } });
 
     rpc.mockResolvedValueOnce(body('# revised by the agent', 2));
@@ -89,7 +89,27 @@ describe('ArtifactPreviewPanel — download', () => {
     setup();
     await screen.findByRole('heading', { level: 1 });
     // Not the desktop app: the service refuses before any dialog.
-    fireEvent.click(screen.getByTitle(/Download/i));
+    fireEvent.click(screen.getByRole('button', { name: 'chat.artifact.download' }));
     expect(await screen.findByText('chat.files.error.not_desktop')).toBeTruthy();
+  });
+});
+
+describe('ArtifactPreviewPanel — resize handle', () => {
+  beforeEach(() => rpc.mockReset());
+
+  it('resizes with the arrow keys, within the bounds', async () => {
+    rpc.mockResolvedValue(body('# first', 1));
+    setup();
+    const handle = screen.getByRole('separator', { name: 'chat.artifact.panel.resize' });
+    const width = () => Number(handle.getAttribute('aria-valuenow'));
+    const start = width();
+
+    fireEvent.keyDown(handle, { key: 'ArrowLeft' });
+    expect(width()).toBe(start + 24);
+    fireEvent.keyDown(handle, { key: 'ArrowRight' });
+    fireEvent.keyDown(handle, { key: 'ArrowRight' });
+    expect(width()).toBe(start - 24);
+    for (let i = 0; i < 100; i++) fireEvent.keyDown(handle, { key: 'ArrowLeft' });
+    expect(width()).toBe(Number(handle.getAttribute('aria-valuemax')));
   });
 });
