@@ -59,10 +59,10 @@ fn custom_models_local_hooks_session_stores_and_events_stay_scoped() {
                     top_p: Some(0.8),
                     ..Default::default()
                 })
-                .post_turn_hook(Arc::new(Hook { seen: global_tx }))
                 .build()
                 .await
                 .unwrap();
+            runtime.post_turn_hook("global", Some(Arc::new(Hook { seen: global_tx })));
             let mut events = runtime.events();
             let store_a = Arc::new(InMemorySessionStores::new());
             let store_b = Arc::new(InMemorySessionStores::new());
@@ -75,10 +75,10 @@ fn custom_models_local_hooks_session_stores_and_events_stay_scoped() {
                 .agent(
                     AgentSpec::new("a")
                         .definition(definition())
-                        .session_store(store_a.clone())
-                        .post_turn_hook(Arc::new(Hook { seen: hook_tx })),
+                        .session_store(store_a.clone()),
                 )
                 .unwrap();
+            a.post_turn_hook("local", Some(Arc::new(Hook { seen: hook_tx })));
             let b = runtime
                 .agent(
                     AgentSpec::new("b")
