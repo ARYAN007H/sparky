@@ -118,6 +118,9 @@ impl tinyinference_local::models::LocalModelConfig for crate::config::Config {
     }
 }
 
+#[cfg(test)]
+pub(crate) mod registry_test_support;
+
 // Test helpers (re-exported for sibling test files that use inference_test_guard)
 #[cfg(test)]
 pub(crate) fn inference_test_guard() -> tokio::sync::MutexGuard<'static, ()> {

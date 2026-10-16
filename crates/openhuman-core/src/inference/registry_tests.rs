@@ -40,6 +40,7 @@ fn fake_entry(seen: Arc<Mutex<Vec<(String, Option<String>, Option<String>)>>>) -
 
 #[test]
 fn nothing_registered_resolves_no_provider() {
+    let _guard = crate::inference::inference_test_guard();
     assert!(chat_model(PROVIDER_OPENHUMAN).is_none());
     assert!(embedding(PROVIDER_OPENHUMAN).is_none());
     assert!(catalog(PROVIDER_OPENHUMAN).is_none());
@@ -77,7 +78,7 @@ async fn a_registered_chat_model_serves_the_managed_provider_for_a_thread() {
         seen[0],
         (
             "chat".to_string(),
-            Some("hint:reasoning".to_string()),
+            Some(crate::config::MODEL_MANAGED_DEFAULT.to_string()),
             Some("thread-1".to_string())
         )
     );
@@ -90,6 +91,7 @@ async fn a_registered_chat_model_serves_the_managed_provider_for_a_thread() {
 
 #[test]
 fn a_registered_embedding_factory_builds_the_managed_embedding_model() {
+    let _guard = crate::inference::inference_test_guard();
     let calls = Arc::new(AtomicUsize::new(0));
     let counter = Arc::clone(&calls);
     register_embedding(PROVIDER_OPENHUMAN, move |request| {
@@ -160,4 +162,31 @@ fn a_registered_catalog_supplies_the_managed_limits_request() {
         model_limits_request("chat", PROVIDER_OPENHUMAN, "some-model", &Config::default());
     unregister_catalog(PROVIDER_OPENHUMAN);
     assert!(request.is_some());
+}
+
+/// With nothing registered under the managed provider id, selecting it yields
+/// the `BACKEND_UNAVAILABLE:` sentinel instead of a panic or a hosted model.
+#[test]
+fn selecting_the_managed_provider_with_nothing_registered_is_backend_unavailable() {
+    let _guard = crate::inference::inference_test_guard();
+    let _exclusive = crate::inference::provider::factory::test_provider_override::exclusive();
+    let error = make_openhuman_backend_model_for_thread(
+        "chat",
+        &Config::default(),
+        "any-model",
+        true,
+        None,
+        &EgressLedger::none(),
+    )
+    .err()
+    .expect("no managed provider is registered");
+    assert!(
+        error
+            .to_string()
+            .starts_with(crate::core::observability::BACKEND_UNAVAILABLE_PREFIX),
+        "unexpected error: {error}"
+    );
+    let one_shot =
+        create_chat_model_from_string("chat", PROVIDER_OPENHUMAN, &Config::default(), 0.5);
+    assert!(one_shot.is_err());
 }

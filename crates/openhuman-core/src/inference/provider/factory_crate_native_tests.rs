@@ -262,6 +262,7 @@ fn resolves_to_managed_backend_for_default_config_but_not_for_local() {
 #[test]
 fn create_chat_model_routes_managed_backend_to_crate_native() {
     let _guard = crate::inference::inference_test_guard();
+    let _managed = crate::inference::registry_test_support::FakeManaged::register();
     // No test-provider override installed → the managed short-circuit engages.
     let config = Config::default();
     let (model, _model_id) = create_chat_model_with_model_id_in(
@@ -475,6 +476,7 @@ fn anthropic_auth_cloud_slug_in_text_mode_keeps_the_compat_client() {
 #[test]
 fn configured_openhuman_jwt_slug_routes_to_managed_chat_model() {
     let _guard = crate::inference::inference_test_guard();
+    let _managed = crate::inference::registry_test_support::FakeManaged::register();
     let mut config = Config::default();
     config.cloud_providers.push(oh_entry("p_oh"));
     // A retired tier slug after the managed slug is a role alias: it runs on
@@ -510,6 +512,7 @@ async fn openhuman_jwt_slug_discloses_pinned_model() {
     use std::time::Duration;
 
     let _guard = crate::inference::inference_test_guard_async().await;
+    let _managed = crate::inference::registry_test_support::FakeManaged::register();
     crate::core::bus::init().await.expect("bus init");
     let mut rx = crate::core::bus::BUS.get().unwrap().receiver();
 
@@ -649,6 +652,7 @@ async fn native_claude_turn_routes_disclose_pinned_models() {
 #[test]
 fn openhuman_jwt_slug_preserves_forced_text_mode() {
     let _guard = crate::inference::inference_test_guard();
+    let _managed = crate::inference::registry_test_support::FakeManaged::register();
     let mut config = Config::default();
     config.cloud_providers.push(oh_entry("p_oh"));
 
@@ -673,6 +677,7 @@ fn openhuman_jwt_slug_preserves_forced_text_mode() {
 #[test]
 fn openhuman_jwt_slug_without_model_preserves_managed_role_tier() {
     let _guard = crate::inference::inference_test_guard();
+    let _managed = crate::inference::registry_test_support::FakeManaged::register();
     let mut config = Config::default();
     config.cloud_providers.push(oh_entry("p_oh"));
 
