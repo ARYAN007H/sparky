@@ -42,6 +42,26 @@ const rustE2eRunner = fileURLToPath(
   new URL("../test-rust-e2e.sh", import.meta.url),
 );
 
+test("Linux container workflows stage TinyBus fixtures below sticky /tmp", () => {
+  for (const workflow of [
+    "../../.github/workflows/test-reusable.yml",
+    "../../.github/workflows/ci-full.yml",
+    "../../.github/workflows/e2e-reusable.yml",
+    "../../.github/workflows/e2e-playwright.yml",
+  ]) {
+    const source = readFileSync(new URL(workflow, import.meta.url), "utf8");
+    assert.match(source, /\/tmp\/openhuman-test-modules/, workflow);
+    assert.doesNotMatch(source, /\/opt\/openhuman-test-modules/, workflow);
+  }
+
+  const lanes = readFileSync(
+    new URL("../ci/self-hosted/lanes-plan.mjs", import.meta.url),
+    "utf8",
+  );
+  assert.match(lanes, /\/tmp\/openhuman-test-modules/);
+  assert.doesNotMatch(lanes, /\/opt\/openhuman-test-modules/);
+});
+
 test("locally built native Rust test modules come from build.mjs, not ad hoc cargo builds", () => {
   const source = readFileSync(localRustRunner, "utf8");
   assert.match(source, /modules\/stage-local-modules\.sh/);
@@ -64,17 +84,36 @@ test("local MCP registry E2E tests load the pinned TinyMCP module", () => {
 
 test("linked TinyDocs E2E enables its required local feature", () => {
   const localSource = readFileSync(localRustRunner, "utf8");
-  const localBranch = localSource.indexOf('if [ "$target" = "tinydocs_linked_e2e" ]');
-  assert.ok(localBranch >= 0, "the Rust gate gives linked TinyDocs an explicit branch");
+  const localBranch = localSource.indexOf(
+    'if [ "$target" = "tinydocs_linked_e2e" ]',
+  );
+  assert.ok(
+    localBranch >= 0,
+    "the Rust gate gives linked TinyDocs an explicit branch",
+  );
   const localEnd = localSource.indexOf("\n    elif ", localBranch);
-  assert.ok(localEnd > localBranch, "the linked target branch has a bounded body");
-  assert.match(localSource.slice(localBranch, localEnd), /--features linked-modules/);
+  assert.ok(
+    localEnd > localBranch,
+    "the linked target branch has a bounded body",
+  );
+  assert.match(
+    localSource.slice(localBranch, localEnd),
+    /--features linked-modules/,
+  );
 
   const e2eSource = readFileSync(rustE2eRunner, "utf8");
-  const e2eBranch = e2eSource.indexOf('if [ "$suite" = "tinydocs_linked_e2e" ]');
-  assert.ok(e2eBranch >= 0, "the Rust E2E runner gives linked TinyDocs an explicit branch");
+  const e2eBranch = e2eSource.indexOf(
+    'if [ "$suite" = "tinydocs_linked_e2e" ]',
+  );
+  assert.ok(
+    e2eBranch >= 0,
+    "the Rust E2E runner gives linked TinyDocs an explicit branch",
+  );
   const e2eEnd = e2eSource.indexOf("\n  fi\n", e2eBranch);
-  assert.ok(e2eEnd > e2eBranch, "the E2E linked target branch has a bounded body");
+  assert.ok(
+    e2eEnd > e2eBranch,
+    "the E2E linked target branch has a bounded body",
+  );
   assert.match(
     e2eSource.slice(e2eBranch, e2eEnd),
     /--features "\$PRODUCT_FEATURES,linked-modules"/,
@@ -105,9 +144,15 @@ test("multi-server MCP tests run serially through the module-backed host", () =>
   const fullSuiteStart = source.indexOf(
     'elif [ "$target" = "mcp_registry_multi_server" ]',
   );
-  assert.ok(fullSuiteStart >= 0, "full Rust gate gives the suite an isolated process");
+  assert.ok(
+    fullSuiteStart >= 0,
+    "full Rust gate gives the suite an isolated process",
+  );
   const fullSuiteEnd = source.indexOf("\n    else\n", fullSuiteStart);
-  assert.ok(fullSuiteEnd > fullSuiteStart, "full-suite branch has a bounded body");
+  assert.ok(
+    fullSuiteEnd > fullSuiteStart,
+    "full-suite branch has a bounded body",
+  );
   assert.match(
     source.slice(fullSuiteStart, fullSuiteEnd),
     /--test-threads=1/,
@@ -122,7 +167,10 @@ test("multi-server MCP tests run serially through the module-backed host", () =>
   const directStart = source.indexOf(
     'elif [ "$#" -ge 2 ] && [ "$1" = "--test" ] && [ "$2" = "mcp_registry_multi_server" ]',
   );
-  assert.ok(directStart >= 0, "the focused runner gives the suite the same isolation");
+  assert.ok(
+    directStart >= 0,
+    "the focused runner gives the suite the same isolation",
+  );
   const directEnd = source.indexOf("\nelse\n", directStart);
   assert.ok(directEnd > directStart, "focused branch has a bounded body");
   assert.match(
@@ -367,7 +415,7 @@ for (const runner of ["test-rust-with-mock.sh", "test-rust-e2e.sh"]) {
             "unset OPENHUMAN_MODULE_PATH",
             setup,
             'connectors_module_path="/connectors:${OPENHUMAN_MODULE_PATH:-}"',
-            'hosts_dir=/hosts',
+            "hosts_dir=/hosts",
             cargoStub,
             invocation,
           ].join("\n"),
@@ -416,7 +464,10 @@ test("the CI installer builds nothing: every module, tinyconnectors included, is
     "ubuntu-22.04-x86_64",
   );
   const connectors = assets.find((asset) => asset.id === "tinyconnectors");
-  assert.ok(connectors, "the installer resolves tinyconnectors from the registry");
+  assert.ok(
+    connectors,
+    "the installer resolves tinyconnectors from the registry",
+  );
   assert.match(connectors.sha256, /^[a-f0-9]{64}$/);
   assert.match(connectors.url, /\/releases\/download\/v\d+\.\d+\.\d+\//);
 });

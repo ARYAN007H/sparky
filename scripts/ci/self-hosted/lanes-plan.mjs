@@ -160,7 +160,7 @@ export function buildPlan({ profile, areas, env = {}, isPullRequest = true }) {
   };
   const modulesDir = ex63
     ? `${scratch}/test-modules`
-    : "/opt/openhuman-test-modules/${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}";
+    : "/tmp/openhuman-test-modules/${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}";
   const modulesEnvFile = "ci-out/test-modules.env";
   const withModules = (cmd) =>
     `set -a && . ${modulesEnvFile} && set +a && ${cmd}`;
