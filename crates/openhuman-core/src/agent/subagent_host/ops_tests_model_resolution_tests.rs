@@ -60,7 +60,7 @@ async fn prepared_async_spawn_runs_through_driver_jobs_dispatcher() {
             .with_thread("driver-spawn-thread"),
     );
 
-    let outcome = run_async_spawn_via_driver_tool(
+    let (outcome, job_id) = run_async_spawn_via_driver_tool(
         &parent,
         make_def_named_tools(&[]),
         "return the requested result".into(),
@@ -72,6 +72,12 @@ async fn prepared_async_spawn_runs_through_driver_jobs_dispatcher() {
     assert!(matches!(outcome.status, SubagentRunStatus::Completed));
     assert_eq!(outcome.output, "driver result");
     assert_eq!(outcome.task_id, "driver-backed-async-spawn");
+    let jobs = crate::core::runtime::slot_for::<
+        tinyagents_orchestration::subagent::SubAgentJobRegistry,
+    >(&parent.data.dispatch_ctx());
+    let job = jobs.get(&job_id).expect("driver tool registered the job");
+    assert_eq!(job.agent, "test");
+    assert_eq!(job.status, tinyagents_orchestration::subagent::SubAgentJobStatus::Completed);
 }
 
 #[tokio::test]

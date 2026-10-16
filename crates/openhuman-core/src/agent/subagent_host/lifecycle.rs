@@ -102,7 +102,7 @@ pub(crate) async fn run_async_spawn_via_driver_tool(
     definition: crate::agent_registry::host_definition::AgentDefinition,
     input: String,
     options: SubagentRunOptions,
-) -> Result<SubagentRunOutcome, SubagentRunError> {
+) -> Result<(SubagentRunOutcome, String), SubagentRunError> {
     use tinyagents_harness::tool::ToolDispatch;
     use tinyagents_orchestration::subagent::{DriverSubAgentTool, SubAgentJobRegistry};
     use tinytools::{PermissionLevel, ToolCategory, ToolCallOptions, ToolScope, ToolTimeout};
@@ -152,6 +152,7 @@ pub(crate) async fn run_async_spawn_via_driver_tool(
                 input,
                 None,
             )
+            .map(|request| request.with_target(request_host.definition.id.clone()))
         },
         |_request| None,
     );
@@ -179,7 +180,7 @@ pub(crate) async fn run_async_spawn_via_driver_tool(
             ToolTimeout::Unbounded,
         );
     let args = serde_json::json!({ "input": input, "mode": "inline" });
-    let _tool_result = dispatcher
+    let tool_result = dispatcher
         .execute(
             &(),
             tinyagents_harness::CallId::new(format!("spawn-{task_id}")),
@@ -189,6 +190,20 @@ pub(crate) async fn run_async_spawn_via_driver_tool(
         )
         .await
         .map_err(|error| SubagentRunError::Provider(anyhow::anyhow!(error.to_string())))?;
+    let reply: serde_json::Value = serde_json::from_str(&tool_result.output()).map_err(|error| {
+        SubagentRunError::Provider(anyhow::anyhow!(format!(
+            "driver-backed async spawn returned an invalid job reference: {error}"
+        )))
+    })?;
+    let public_job_id = reply
+        .get("task_id")
+        .and_then(serde_json::Value::as_str)
+        .ok_or_else(|| {
+            SubagentRunError::Provider(anyhow::anyhow!(
+                "driver-backed async spawn omitted its registered job id"
+            ))
+        })?
+        .to_owned();
 
     if let Some(outcome) = bundle
         .host_outcome
@@ -196,7 +211,7 @@ pub(crate) async fn run_async_spawn_via_driver_tool(
         .unwrap_or_else(|poisoned| poisoned.into_inner())
         .remove(&task_key)
     {
-        return Ok(outcome);
+        return Ok((outcome, public_job_id));
     }
     if let Some(error) = bundle
         .failures

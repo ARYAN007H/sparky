@@ -498,6 +498,7 @@ async fn an_in_stream_provider_failure_is_re_surfaced_past_the_hosted_sanitizer(
         max_iterations: 2,
         context_window: None,
         run_queue: None,
+        message_run_queue: None,
         early_exit_tools: &[],
         pause_at_cap: false,
         max_output_tokens: None,

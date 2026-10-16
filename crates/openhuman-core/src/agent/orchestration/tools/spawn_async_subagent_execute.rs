@@ -424,7 +424,8 @@ impl SpawnAsyncSubagentTool {
                     background_prompt,
                     options,
                 )
-                .await;
+                .await
+                .map(|(outcome, _job_id)| outcome);
                 match result {
                     Ok(outcome) => {
                         let emit_lifecycle_effects = outcome.should_emit_lifecycle_effects();
