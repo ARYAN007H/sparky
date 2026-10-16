@@ -30,7 +30,11 @@ impl ChatModel<()> for FakeManagedModel {
         _state: &(),
         _request: ModelRequest,
     ) -> tinyinference_llm::Result<ModelResponse> {
-        Ok(ModelResponse::assistant("from the fake managed model"))
+        // Like the real provider with no stored session: construction works,
+        // a call fails.
+        Err(tinyinference_llm::Error::Model(
+            "No backend session: store a JWT via auth (app-session)".to_string(),
+        ))
     }
 }
 
