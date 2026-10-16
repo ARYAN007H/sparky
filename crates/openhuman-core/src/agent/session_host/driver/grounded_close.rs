@@ -15,7 +15,6 @@ use tinytools_agent::dialect::ToolDialect;
 use tinyagents_harness::middleware::wrap_harness_instruction;
 
 use crate::agent::{
-    message_convert::dialect_response_from_provider,
     session_host::turn_checkpoint::{
         self, CloseVerdict, CloseViolation, build_deterministic_checkpoint,
         build_deterministic_final_summary, close_repair_instruction, close_verification_prompt,
@@ -24,6 +23,7 @@ use crate::agent::{
     },
     tinyagents::{TinyagentsTurnOutcome, TurnModelSource},
 };
+use crate::inference::provider::model::dialect_response_from_provider;
 use crate::inference::provider::{AGENT_TURN_MAX_OUTPUT_TOKENS, BilledUsage, ChatResponse};
 
 /// Accounting from model calls performed after the harness loop has ended.

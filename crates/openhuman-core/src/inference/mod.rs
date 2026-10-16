@@ -33,7 +33,7 @@ pub mod model_context;
 pub(crate) mod reasoning;
 pub mod ops;
 pub mod provider;
-pub(crate) mod turn_models;
+pub mod turn_models;
 mod schemas;
 pub mod tokenjuice;
 

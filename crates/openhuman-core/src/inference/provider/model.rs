@@ -6,12 +6,21 @@ use tinyinference_llm::message::{AssistantMessage, ContentBlock};
 use tinyinference_llm::model::{ChatModel, ModelRequest, ModelResponse};
 use tinyinference_llm::tool::ToolCall as TaToolCall;
 use tinyinference_llm::usage::{ProviderUsageReport, recover_usage};
+use tinytools_agent::dialect::DialectResponse;
 
 use crate::inference::provider::{BilledUsage, ChatResponse};
 
 pub(crate) type TurnChatModel = Arc<dyn ChatModel<()>>;
 pub(crate) type TierRoutes = Vec<(String, TurnChatModel)>;
 pub(crate) type BuiltTurnModels = (TurnChatModel, TierRoutes, TurnChatModel);
+
+/// Convert a host response into the canonical dialect response at the inference boundary.
+pub(crate) fn dialect_response_from_provider(response: &ChatResponse) -> DialectResponse {
+    DialectResponse {
+        text: response.text.clone(),
+        tool_calls: response.tool_calls.clone(),
+    }
+}
 
 /// Build a [`PFormatRegistry`](tinytools_agent::PFormatRegistry)
 /// from the tool schemas advertised on a [`ModelRequest`] (issue #4465).
