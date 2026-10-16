@@ -30,7 +30,7 @@ fn test_job(command: &str) -> CronJob {
     CronJob {
         claim_generation: 0,
         policy: Default::default(),
-        id: "test-job".into(),
+        id: format!("test-job-{}", uuid::Uuid::new_v4()),
         expression: "* * * * *".into(),
         schedule: tinyflows_bus::schedule::types::Schedule::Cron {
             expr: "* * * * *".into(),
