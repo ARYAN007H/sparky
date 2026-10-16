@@ -287,7 +287,7 @@
     "count": 1,
     "category": "A",
     "reason": "This immutable empty slice is a construction sentinel for a static safety-section PromptContext; it carries no prompt or tenant data.",
-    "verification": "agent/prompts/mod_tests_tools_sections_tests.rs: empty tool sections render without a catalogue"
+    "verification": "agent/prompts/mod_tests_tools_sections_tests.rs: tools_section_empty_for_native"
   },
   {
     "file": "crates/openhuman-core/src/prompts/section_renderers.rs",
@@ -297,7 +297,7 @@
     "count": 1,
     "category": "A",
     "reason": "This immutable empty slice is a construction sentinel for a static safety-section PromptContext; it carries no workflow or tenant data.",
-    "verification": "agent/prompts/mod_tests_builder_sections_tests.rs: static section rendering needs no workflow context"
+    "verification": "agent/prompts/mod_tests_builder_sections_tests.rs: prompt_builder_assembles_sections"
   },
   {
     "file": "crates/openhuman-core/src/prompts/section_renderers.rs",
@@ -307,7 +307,7 @@
     "count": 1,
     "category": "A",
     "reason": "This immutable empty slice is a construction sentinel for a static safety-section PromptContext; it carries no integration or tenant data.",
-    "verification": "agent/prompts/mod_tests_builder_sections_tests.rs: static section rendering needs no integration context"
+    "verification": "agent/prompts/mod_tests_builder_sections_tests.rs: prompt_builder_assembles_sections"
   },
   {
     "file": "crates/openhuman-core/src/prompts/section_renderers.rs",
@@ -317,6 +317,6 @@
     "count": 1,
     "category": "A",
     "reason": "This once-initialized empty set is the immutable visibility sentinel used by the static safety-section PromptContext; no agent or tenant-specific tool names are inserted.",
-    "verification": "agent/prompts/mod_tests_tools_sections_tests.rs: static prompt sections use an empty tool visibility set"
+    "verification": "agent/prompts/mod_tests_tools_sections_tests.rs: tools_section_empty_for_native"
   }
 ]
