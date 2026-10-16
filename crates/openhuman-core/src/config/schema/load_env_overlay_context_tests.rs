@@ -7,7 +7,7 @@ fn env_overlay_context_tool_result_budget_env_suppresses_legacy_migration() {
     // the default. This protects users who explicitly set the env to
     // the default.
     let default_budget =
-        tinyagents_harness::config::ToolRuntimeConfig::default().tool_result_budget_bytes;
+        tinyagents_harness::config::TurnConfig::default().tool_result_budget_bytes;
     let mut cfg = Config::default();
     cfg.context.tool_result_budget_bytes = default_budget;
     cfg.agent.tool_result_budget_bytes = 999_999;
@@ -58,7 +58,7 @@ fn env_overlay_compaction_default_on_and_switch() {
 fn env_overlay_context_tool_result_budget_legacy_migration_when_env_absent() {
     // Env absent, context at default, agent customised → agent value copies forward.
     let default_budget =
-        tinyagents_harness::config::ToolRuntimeConfig::default().tool_result_budget_bytes;
+        tinyagents_harness::config::TurnConfig::default().tool_result_budget_bytes;
     let mut cfg = Config::default();
     cfg.context.tool_result_budget_bytes = default_budget;
     cfg.agent.tool_result_budget_bytes = 777_777;

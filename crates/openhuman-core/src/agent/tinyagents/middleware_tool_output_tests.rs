@@ -169,7 +169,7 @@ fn defaults_enable_the_byte_cap_only() {
     let mw = TurnContextMiddleware::defaults();
     assert_eq!(
         mw.tool_result_budget_bytes,
-        tinyagents_harness::config::ToolRuntimeConfig::default().tool_result_budget_bytes
+        tinyagents_harness::config::TurnConfig::default().tool_result_budget_bytes
     );
     assert!(mw.payload_summarizer.is_none());
     assert_eq!(mw.microcompact_keep_recent, 0);
@@ -513,7 +513,7 @@ async fn tool_output_honors_a_tools_own_cap() {
 #[test]
 fn shared_tool_result_byte_budget_stays_16_kib() {
     assert_eq!(
-        tinyagents_harness::config::ToolRuntimeConfig::default().tool_result_budget_bytes,
+        tinyagents_harness::config::TurnConfig::default().tool_result_budget_bytes,
         16 * 1024
     );
 }

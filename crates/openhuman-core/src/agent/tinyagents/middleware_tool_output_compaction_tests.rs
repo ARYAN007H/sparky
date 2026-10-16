@@ -119,7 +119,7 @@ async fn tool_output_leaves_an_oversized_propose_workflow_byte_for_byte_intact()
     let payload = oversized_workflow_proposal_json(30);
     assert!(
         payload.len()
-            > tinyagents_harness::config::ToolRuntimeConfig::default().tool_result_budget_bytes,
+            > tinyagents_harness::config::TurnConfig::default().tool_result_budget_bytes,
         "test payload must exceed the shared byte budget to exercise step 4: {} bytes",
         payload.len()
     );

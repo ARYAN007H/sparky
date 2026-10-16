@@ -201,7 +201,7 @@ fn default_microcompact_keep_recent() -> usize {
 }
 
 fn default_tool_result_budget_bytes() -> usize {
-    tinyagents_harness::config::ToolRuntimeConfig::default().tool_result_budget_bytes
+    tinyagents_harness::config::TurnConfig::default().tool_result_budget_bytes
 }
 
 fn default_summarizer_payload_threshold_tokens() -> usize {
