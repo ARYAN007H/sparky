@@ -209,7 +209,7 @@ pub async fn set_credential(
         identity::clear_current_user();
         sentry_scope::clear();
         if !was_authenticated {
-            start_credential_gated_services(config).await;
+            start_credential_gated_services(ctx, config).await;
         } else {
             spawn_integrations_cache_warm(config);
         }
@@ -338,7 +338,7 @@ pub async fn set_credential(
             return Err(error);
         }
         logs.push("process globals rebound after credential install".to_string());
-        start_credential_gated_services(&effective_config).await;
+        start_credential_gated_services(ctx, &effective_config).await;
         logs.push("credential-gated services started".to_string());
     }
 
@@ -483,7 +483,7 @@ pub async fn clear_credential(
     // deliberately stops the gated services and closes the scheduler gate, so
     // restore the surviving key's runtime after that teardown has completed.
     if removed_session && api_key::has_api_key(config) {
-        start_credential_gated_services(config).await;
+        start_credential_gated_services(ctx, config).await;
         crate::cron::scheduler_gate::set_signed_out(false);
         sentry_scope::clear();
         identity::clear_current_user();
@@ -552,7 +552,7 @@ async fn clear_session_credential(
     }
 
     deactivate_user_scope()?;
-    stop_credential_gated_services(config).await;
+    stop_credential_gated_services(ctx, config).await;
 
     // Every process-global store must follow the now-active pre-login
     // workspace, or a signed-out caller keeps reading the previous account's
