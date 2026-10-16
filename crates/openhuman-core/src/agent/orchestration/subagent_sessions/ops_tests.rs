@@ -106,6 +106,23 @@ fn upsert_persists_the_full_lifecycle_key_without_collapsing_to_task_id() {
         .unwrap();
     assert_eq!(loaded.current_task_id.as_deref(), Some("sub-1"));
     assert_eq!(loaded.lifecycle_key, Some(key));
+    let resolved = resolve_lifecycle_key(
+        &store,
+        &session.subagent_session_id,
+        "parent-a",
+        Some("thread-a"),
+        dir.path(),
+    )
+    .unwrap();
+    assert_eq!(resolved, key);
+    assert!(resolve_lifecycle_key(
+        &store,
+        &session.subagent_session_id,
+        "another-parent",
+        Some("thread-a"),
+        dir.path(),
+    )
+    .is_err());
 }
 
 #[test]

@@ -5,7 +5,8 @@ mod types;
 
 pub use ops::{
     action_root_key, close, find_reusable, list_for_parent, mark_failed, mark_finished,
-    normalize_task_key, reuse_decision, task_title_from_prompt, upsert_running,
+    normalize_task_key, resolve_lifecycle_key, reuse_decision, task_title_from_prompt,
+    upsert_running,
 };
 pub use types::{
     DurableSubagentSessionSummary, DurableSubagentStatus, SubagentSessionSelector,

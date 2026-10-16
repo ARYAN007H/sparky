@@ -13,6 +13,44 @@ use super::types::{
     SubagentSessionStore, SubagentSessionUpsert,
 };
 
+/// Resolve a saved product session to its exact TinyAgents lifecycle key.
+///
+/// The product session lookup is scoped by the authenticated parent session,
+/// optional parent thread, and the workspace-specific store. Rows written
+/// before `lifecycle_key` was added recover it only from the matching host
+/// checkpoint; a public task id alone is never treated as a lifecycle key.
+pub fn resolve_lifecycle_key(
+    store: &SubagentSessionStore,
+    session_or_task_id: &str,
+    parent_session: &str,
+    parent_thread_id: Option<&str>,
+    checkpoint_dir: &Path,
+) -> Result<tinyagents_orchestration::subagent::SubagentTaskKey, String> {
+    let session = list_for_parent(store, parent_session, parent_thread_id)?
+        .into_iter()
+        .find(|session| {
+            session.subagent_session_id == session_or_task_id
+                || session.current_task_id.as_deref() == Some(session_or_task_id)
+        })
+        .ok_or_else(|| "durable subagent session not found".to_string())?;
+    let task_id = session
+        .current_task_id
+        .as_deref()
+        .ok_or_else(|| "durable subagent session has no current task".to_string())?;
+    let key = if let Some(key) = session.lifecycle_key {
+        key
+    } else {
+        crate::agent::subagent_host::load_subagent_checkpoint(checkpoint_dir, task_id)
+            .map_err(|error| format!("legacy subagent checkpoint unavailable: {error}"))?
+            .task_key
+            .ok_or_else(|| "legacy subagent checkpoint has no lifecycle key".to_string())?
+    };
+    if key.task_id != task_id || key.thread_id.as_deref() != session.parent_thread_id.as_deref() {
+        return Err("durable subagent lifecycle key does not match its owned session".into());
+    }
+    Ok(key)
+}
+
 pub fn normalize_task_key(input: &str) -> String {
     let mut out = String::new();
     let mut last_dash = false;
