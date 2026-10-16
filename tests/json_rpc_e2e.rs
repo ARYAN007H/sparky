@@ -11985,7 +11985,10 @@ async fn json_rpc_channel_web_chat_with_speak_reply_invokes_reply_speech_inner()
     let _vite_backend_guard = EnvVarGuard::unset("VITE_BACKEND_URL");
     // Activate the reply_speech test seam so synthesize_reply records and
     // short-circuits instead of calling the hosted backend.
-    let _seam_guard = EnvVarGuard::set(openhuman_tinyhumans::voice::reply_speech::TEST_SEAM_ENV, "1");
+    let _seam_guard = EnvVarGuard::set(
+        openhuman_tinyhumans::voice::reply_speech::TEST_SEAM_ENV,
+        "1",
+    );
 
     openhuman_tinyhumans::voice::reply_speech::test_seam::clear();
 
