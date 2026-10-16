@@ -216,9 +216,10 @@ pub use runtime::{
 /// so the trait unifies — re-exporting it here would break the
 /// agent-runtime ownership boundary.
 pub mod seams {
-    pub use openhuman_core::agent::hooks::{PostTurnHook, ToolHook};
-    pub use openhuman_core::agent::hooks::{ToolHookContext, ToolHookDecision, TurnContext};
-    pub use openhuman_core::agent::stop_hooks::BudgetStopHook;
+    pub use openhuman_core::agent::tinyagents::host::OpenHumanRunContext;
+    pub use tinyagents_harness::host::{LearningSink, TurnSummary};
+    pub use tinyagents_hooks::tool::{HookIdentity, ToolHook, ToolHookContext, ToolHookDecision, ToolHookEvent};
+    pub use tinyagents_hooks::stop::BudgetStopHook;
     pub use tinyagents_harness::cost::TurnCost;
     pub use tinyagents_harness::middleware::{PolicyDecision, ToolCallPolicy};
     pub use tinyagents_hooks::stop::{StopDecision, StopHook};
