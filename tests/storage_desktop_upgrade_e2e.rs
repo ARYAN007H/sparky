@@ -418,7 +418,12 @@ async fn import_modules(workspace: &Path) {
     #[cfg(feature = "web3")]
     assert!(modules::import_legacy_x402(&ctx, workspace).await);
     modules::import_legacy_tinybox(&ctx, workspace).await;
-    modules::import_legacy_tinyjuice(&ctx, &workspace.join("ccr"), Some(Duration::from_secs(3600))).await;
+    modules::import_legacy_tinyjuice(
+        &ctx,
+        &workspace.join("ccr"),
+        Some(Duration::from_secs(3600)),
+    )
+    .await;
 }
 
 async fn a_desktop_upgrade_is_lossless_and_leaves_the_legacy_files_untouched(case: Case) {
