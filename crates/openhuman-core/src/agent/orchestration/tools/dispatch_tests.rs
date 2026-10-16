@@ -7,7 +7,7 @@ use super::super::collapsed_delegation::{
     CollapsedDelegationTool, DelegateTarget, dispatch_targets_from_schema,
 };
 use super::super::delegate_graph::DelegateGraphDispatch;
-use crate::agent::tools::DelegateToolDispatch;
+use crate::tools::delegate::DelegateToolDispatch;
 use tinyagents_harness::context::RunConfig;
 use tinyagents_harness::tool::ToolDispatch;
 use tinyagents_harness::tools::AskClarificationTool;

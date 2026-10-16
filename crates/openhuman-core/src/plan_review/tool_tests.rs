@@ -1,5 +1,5 @@
 use super::*;
-use crate::agent::turn_origin::with_origin;
+use crate::security::turn_origin::with_origin;
 use crate::security::approval::ApprovalChatContext;
 
 /// The execution context the harness hands a tool dispatched inside a turn

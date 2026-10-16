@@ -7,7 +7,7 @@
 use std::sync::Arc;
 use tinyagents_harness::run_queue::RunQueue;
 
-use crate::agent::progress::AgentProgress;
+use crate::progress::AgentProgress;
 
 use super::ops::BudgetCorrelation;
 use super::progress_bridge::spawn_progress_bridge;
@@ -35,7 +35,7 @@ pub(crate) async fn run_chat_task(
     locale: Option<String>,
     run_queue: Arc<RunQueue<crate::agent::queued_turn::QueuedTurn>>,
     metadata: ChatRequestMetadata,
-    origin: crate::agent::turn_origin::AgentTurnOrigin,
+    origin: crate::security::turn_origin::AgentTurnOrigin,
     // When true, run as an isolated fork: build a fresh agent seeded from the
     // thread's history-at-start and never touch the shared `THREAD_SESSIONS`
     // cache, so a concurrent same-thread (parallel) turn cannot clobber — or be

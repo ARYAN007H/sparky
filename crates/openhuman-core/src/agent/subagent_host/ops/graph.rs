@@ -52,7 +52,7 @@ pub(super) use dispatch::run_subagent_via_graph;
 // of the original flat imports now live with the code that uses them, in
 // `dispatch.rs` / `transcript.rs` / `threads::worker_mirror`).
 #[cfg(test)]
-use crate::agent::progress::AgentProgress;
+use crate::progress::AgentProgress;
 #[cfg(test)]
 use crate::threads::worker_mirror::{mirror_worker_thread, mirror_worker_thread_from_history};
 #[cfg(test)]

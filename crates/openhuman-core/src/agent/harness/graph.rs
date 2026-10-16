@@ -32,7 +32,7 @@ use std::sync::Arc;
 use anyhow::Result;
 use tokio::sync::mpsc::Sender;
 
-use crate::agent::progress::AgentProgress;
+use crate::progress::AgentProgress;
 use crate::agent::tinyagents::TurnModelSource;
 use crate::agent::tinyagents::TurnSpec;
 use crate::config::{MultimodalConfig, MultimodalFileConfig};
@@ -56,7 +56,7 @@ pub(crate) async fn run_channel_turn_via_graph(
     multimodal: MultimodalConfig,
     multimodal_files: MultimodalFileConfig,
     on_progress: Option<Sender<AgentProgress>>,
-    origin: Option<crate::agent::turn_origin::AgentTurnOrigin>,
+    origin: Option<crate::security::turn_origin::AgentTurnOrigin>,
     sandbox_mode: tinyagents_definition::SandboxMode,
     approval: crate::security::approval::ApprovalTurnContext,
     memory_identity: crate::memory::scope::MemoryIdentity,
@@ -119,7 +119,7 @@ pub(crate) async fn run_channel_turn_via_graph(
             let scope = crate::attachments::AttachmentAccessScope {
                 external_channel: matches!(
                     origin.as_ref(),
-                    Some(crate::agent::turn_origin::AgentTurnOrigin::ExternalChannel { .. })
+                    Some(crate::security::turn_origin::AgentTurnOrigin::ExternalChannel { .. })
                 ),
                 workspace: workspace.clone(),
             };

@@ -1,8 +1,8 @@
 #[cfg(feature = "mcp")]
 use super::implementations::network::{McpListServersTool, McpListToolsTool};
 use super::*;
-use crate::agent::host_runtime::{NativeRuntime, RuntimeAdapter};
-use crate::agent::tools::DelegateTool;
+use crate::modules::tinybox::host_runtime::{NativeRuntime, RuntimeAdapter};
+use crate::tools::delegate::DelegateTool;
 use crate::config::{Config, DelegateAgentConfig};
 use crate::security::{AuditLogger, SecurityPolicy};
 use std::collections::HashMap;

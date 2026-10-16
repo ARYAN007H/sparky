@@ -22,7 +22,7 @@ use tinyagents_harness::events::AgentEvent;
 use tinyinference_llm::usage::Usage;
 
 #[cfg(test)]
-use crate::agent::progress::AgentProgress;
+use crate::progress::AgentProgress;
 
 pub(crate) use bridge_types::{ProviderUsageCarry, SubagentScope, ToolFailureMap, ToolNameMap};
 pub(crate) use event_bridge::OpenhumanEventBridge;

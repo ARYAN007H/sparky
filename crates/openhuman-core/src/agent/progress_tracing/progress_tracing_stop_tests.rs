@@ -28,7 +28,7 @@ fn exported_level(spans: &[TraceSpan], name: &str) -> Option<String> {
     let payloads = otlp_requests(
         spans,
         "production",
-        &crate::agent::progress_tracing::export_brand(),
+        &crate::core::observability::progress_tracing::export_brand(),
     );
     payloads
         .iter()

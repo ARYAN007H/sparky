@@ -1,5 +1,5 @@
 //! Functional `render_*` wrappers over the section structs in
-//! [`crate::agent::prompts::sections`], plus the per-turn datetime stamp and the
+//! [`crate::prompts::sections`], plus the per-turn datetime stamp and the
 //! ambient-environment composer that `agents/<id>/prompt.rs` builders call.
 
 use super::sections::*;

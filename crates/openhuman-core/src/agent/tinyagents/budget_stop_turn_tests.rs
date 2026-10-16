@@ -110,10 +110,10 @@ fn hosted_base() -> Arc<crate::agent::tinyagents::host::OpenHumanHostBase> {
 fn root_context(
     thread_id: &str,
     workspace: &str,
-    progress: tokio::sync::mpsc::Sender<crate::agent::progress::AgentProgress>,
+    progress: tokio::sync::mpsc::Sender<crate::progress::AgentProgress>,
 ) -> crate::agent::tinyagents::host::OpenHumanRunContext {
     let mut context = crate::agent::tinyagents::host::OpenHumanRunContext::new();
-    context.origin = Some(crate::agent::turn_origin::AgentTurnOrigin::WebChat {
+    context.origin = Some(crate::security::turn_origin::AgentTurnOrigin::WebChat {
         thread_id: thread_id.to_string(),
         client_id: format!("client-{thread_id}"),
         request_id: Some(format!("request-{thread_id}")),

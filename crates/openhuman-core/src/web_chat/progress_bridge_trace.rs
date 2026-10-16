@@ -5,7 +5,7 @@
 //! thread id for headless/autonomous runs). Disabled (both the remote and the
 //! local exporter off), it costs nothing.
 
-use crate::agent::progress_tracing::SpanCollector;
+use crate::core::observability::progress_tracing::SpanCollector;
 use tinyagents_harness::observability::trace_export as te;
 
 use super::super::types::ChatRequestMetadata;

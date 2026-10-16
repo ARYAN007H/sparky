@@ -5,7 +5,7 @@
 use serde_json::json;
 use tokio::sync::mpsc::Sender;
 
-use crate::agent::progress::AgentProgress;
+use crate::progress::AgentProgress;
 use tinyagents_orchestration::parallel::{BranchReport, Collected};
 use tinytools_std::file_state;
 

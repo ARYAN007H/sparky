@@ -2,7 +2,7 @@ use super::shell_description::{command_param_description, shell_description};
 #[cfg(feature = "modules")]
 use super::shell_support::container_environment;
 use super::shell_support::{command_failure, exec_result, python_utf8_env, tool_timeout_message};
-use crate::agent::host_runtime::RuntimeAdapter;
+use crate::modules::tinybox::host_runtime::RuntimeAdapter;
 use crate::agent::tinyagents::host::run_context::dispatch_ctx_for_tool;
 use crate::config::Config;
 use crate::core::runtime::DispatchCtx;

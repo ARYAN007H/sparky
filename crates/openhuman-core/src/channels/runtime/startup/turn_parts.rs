@@ -8,7 +8,7 @@
 
 use super::chat_workload::{resolve_chat_workload, ChatWorkloadResolution};
 use super::prompt::format_access_context;
-use crate::agent::host_runtime;
+use crate::modules::tinybox::host_runtime;
 use crate::channels::context::ChannelRuntimeContext;
 use crate::channels::system_prompt::{ChannelPromptInputs, ChannelSystemPrompt};
 use crate::config::Config;

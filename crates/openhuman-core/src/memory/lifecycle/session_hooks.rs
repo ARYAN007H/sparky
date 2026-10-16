@@ -111,7 +111,7 @@ impl OpenHumanTurnPrelude {
         history: &[Message],
         committed_turns: usize,
         current: Option<&Message>,
-        origin: Option<crate::agent::turn_origin::AgentTurnOrigin>,
+        origin: Option<crate::security::turn_origin::AgentTurnOrigin>,
     ) -> Option<Arc<MemoryTurn>> {
         let user_text = self
             .mutable

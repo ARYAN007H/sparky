@@ -7,7 +7,7 @@
 //! crate gaining field access.
 
 use crate::agent::hooks::PostTurnHook;
-use crate::agent::progress::AgentProgress;
+use crate::progress::AgentProgress;
 use crate::agent::prompts::SystemPromptBuilder;
 use crate::agent::tinyagents::TurnModelSource;
 use std::sync::Arc;

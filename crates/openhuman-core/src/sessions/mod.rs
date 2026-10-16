@@ -19,7 +19,7 @@
 //! in `src/` ever writes (permanently empty in production, no frontend
 //! consumer). The run ledger below is written from
 //! [`crate::web_chat::progress_bridge`] and
-//! [`crate::agent::progress_tracing`], so it stays fully functional.
+//! [`crate::core::observability::progress_tracing`], so it stays fully functional.
 
 mod schemas;
 

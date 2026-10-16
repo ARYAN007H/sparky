@@ -51,7 +51,7 @@
 //! tool. Naming this one `delegate` would therefore have removed the
 //! orchestrator's entire delegation surface for exactly those users, silently.
 //!
-//! [`DelegateTool`]: crate::agent::tools::DelegateTool
+//! [`DelegateTool`]: crate::tools::delegate::DelegateTool
 //! [`ArchetypeDelegationTool`]: super::ArchetypeDelegationTool
 //! [`ToolExposure::Hidden`]: tinytools::ToolExposure::Hidden
 

@@ -7,7 +7,7 @@ use tinybus::EventHandler;
 use crate::triage::{
     apply_decision, remote_trigger_origin, run_triage, TriageOutcome, TriggerEnvelope,
 };
-use crate::agent::turn_origin::with_origin;
+use crate::security::turn_origin::with_origin;
 use crate::core::events::DomainEvent;
 use crate::integrations::composio::trigger_history;
 

@@ -26,7 +26,7 @@ use super::types::{
     AgentSnapshot, SpawnAgentRequest, SpawnAgentResponse, WaitAgentOptions, WaitAgentResponse,
 };
 use crate::agent::harness::fork_context::ParentExecutionContext;
-use crate::agent::progress::AgentProgress;
+use crate::progress::AgentProgress;
 use crate::agent::subagent_host::{
     SubagentRunError, SubagentRunOptions, SubagentRunOutcome, SubagentRunStatus, run_subagent,
 };
@@ -413,7 +413,7 @@ impl AgentOrchestrationSession {
         // carried across the same boundary the parent execution context
         // already is. Without the origin the spawned agent's external-effect
         // tools reach the approval gate unlabelled and are refused.
-        let handle = tokio::spawn(crate::agent::turn_origin::propagate(async move {
+        let handle = tokio::spawn(crate::security::turn_origin::propagate(async move {
             mark_running(&task_status_tx);
             // The parent rides `options.run_context.parent`, built above.
             let result = run_subagent(&definition, &prompt, options).await;

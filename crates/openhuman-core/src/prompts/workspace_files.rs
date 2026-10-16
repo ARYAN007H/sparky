@@ -144,7 +144,7 @@ pub fn inject_inline_content(prompt: &mut String, label: &str, content: &str, ma
 
 /// Shared `## Project instructions (AGENTS.md)` block writer.
 ///
-/// Used by both [`crate::agent::prompts::sections::AgentsInstructionsSection`] (the default /
+/// Used by both [`crate::prompts::sections::AgentsInstructionsSection`] (the default /
 /// sub-agent builder chains) and the narrow sub-agent renderer
 /// ([`super::subagent::render_subagent_system_prompt_with_format`]) so the two paths never
 /// drift. The heading is emitted only when at least one layer carries content;

@@ -40,7 +40,7 @@ impl SpanCollector {
     /// ([`generation::normalize_usage`]) and an unpriced model's placeholder
     /// cost is dropped ([`generation::effective_cost`]).
     #[allow(clippy::too_many_arguments)]
-    pub(in crate::agent::progress_tracing) fn record_model_call(
+    pub(in crate::core::observability::progress_tracing) fn record_model_call(
         &mut self,
         model: &str,
         provider_id: &str,

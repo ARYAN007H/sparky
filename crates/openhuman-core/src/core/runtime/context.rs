@@ -107,7 +107,7 @@ pub struct CoreContext {
     /// [`CoreContext::derive_with`].
     backend_transport: Option<Arc<dyn crate::backend::transport::BackendTransport>>,
     /// Explicit authority on this derived turn context.
-    turn_origin: Option<crate::agent::turn_origin::AgentTurnOrigin>,
+    turn_origin: Option<crate::security::turn_origin::AgentTurnOrigin>,
     /// Durable relay conversation carried by the immutable turn context.
     channel_thread: Option<String>,
     /// The agent whose stores a host-installed session store

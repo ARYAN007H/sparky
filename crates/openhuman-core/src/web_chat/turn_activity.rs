@@ -37,7 +37,7 @@ use std::time::Duration;
 use tokio::sync::mpsc;
 use tokio::time::Instant;
 
-use crate::agent::progress::AgentProgress;
+use crate::progress::AgentProgress;
 
 /// Default idle window for a web-chat turn, in seconds.
 pub(crate) const DEFAULT_TURN_IDLE_SECS: u64 = 900;

@@ -11,7 +11,7 @@
 
 use tinytools::{PermissionLevel, Tool};
 
-use crate::agent::turn_origin::AgentTurnOrigin;
+use crate::security::turn_origin::AgentTurnOrigin;
 use crate::agent::HostTools;
 use crate::config::Config;
 

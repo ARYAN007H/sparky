@@ -201,7 +201,7 @@ pub struct PromptContext<'a> {
     /// Empty for non-master agents.
     pub personality_roster: Vec<PersonalityRosterEntry>,
     /// Pre-loaded global `AGENTS.md` content (`<workspace_dir>/AGENTS.md`),
-    /// injected by [`crate::agent::prompts::sections::AgentsInstructionsSection`].
+    /// injected by [`crate::prompts::sections::AgentsInstructionsSection`].
     /// `None` when the file is absent/empty or the `agents_md_enabled` config
     /// gate is off. Loaded once at system-prompt build time (never re-read per
     /// turn) so the frozen system-prompt prefix / KV-cache contract holds.

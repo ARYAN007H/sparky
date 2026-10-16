@@ -27,7 +27,7 @@
 use tokio::sync::mpsc::Sender;
 use tokio::sync::mpsc::error::TrySendError;
 
-use crate::agent::progress::AgentProgress;
+use crate::progress::AgentProgress;
 
 /// Error text carried by the synthesised `SubagentFailed`.
 pub(crate) const ABORTED_ERROR: &str = "sub-agent was cancelled";

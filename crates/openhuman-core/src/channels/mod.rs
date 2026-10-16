@@ -111,7 +111,7 @@ pub use runtime::test_support;
 
 #[cfg(feature = "channels")]
 // Channel system-prompt assembly lives in
-// `crate::agent::context::channels_prompt` alongside the rest of
+// `crate::channels::prompt` alongside the rest of
 // the prompt-building code. Re-exported here for callers that used the
 // old `channels::build_system_prompt` path.
 #[cfg(feature = "channels")]

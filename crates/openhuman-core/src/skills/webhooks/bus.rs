@@ -318,7 +318,7 @@ async fn run_agent_trigger(
             // attacker-influenceable, so the dispatch parks rather than running
             // on a trust root (#5634).
             let origin = crate::triage::remote_trigger_origin(envelope);
-            crate::agent::turn_origin::with_origin(
+            crate::security::turn_origin::with_origin(
                 origin,
                 crate::triage::apply_decision(ctx, run.clone(), envelope),
             )

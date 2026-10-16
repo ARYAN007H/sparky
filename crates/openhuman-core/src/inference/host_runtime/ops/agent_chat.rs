@@ -37,7 +37,7 @@ use super::turn_guards::{
 /// # Progress
 ///
 /// An in-process embedder hands a
-/// [`AgentProgress`](crate::agent::progress::AgentProgress) channel through
+/// [`AgentProgress`](crate::progress::AgentProgress) channel through
 /// [`AgentChatEnv`] (see [`agent_chat_for`]); it is attached to the agent built
 /// here, so the embedder observes the turn's tool calls and deltas live instead
 /// of only its final string.
@@ -81,7 +81,7 @@ pub async fn agent_chat(
 pub struct AgentChatEnv {
     /// Live progress for the turn; `None` attaches a drain-only sink so the
     /// model calls still stream.
-    pub progress: Option<tokio::sync::mpsc::Sender<crate::agent::progress::AgentProgress>>,
+    pub progress: Option<tokio::sync::mpsc::Sender<crate::progress::AgentProgress>>,
     /// The host environment installed on the session
     /// ([`OpenHumanSessionHost::set_host_env`]).
     pub host: crate::agent::turn_env::HostTurnEnv,
@@ -573,7 +573,7 @@ pub async fn agent_chat_reply_for(
         // turn fell back to unary `invoke`, so time-to-first-token equalled the
         // full completion latency. Attach a drain-only sink so the call streams;
         // the task ends when the agent drops its sender.
-        let (tx, mut rx) = tokio::sync::mpsc::channel::<crate::agent::progress::AgentProgress>(256);
+        let (tx, mut rx) = tokio::sync::mpsc::channel::<crate::progress::AgentProgress>(256);
         tokio::spawn(async move { while rx.recv().await.is_some() {} });
         agent.set_on_progress(Some(tx));
         log::debug!(
@@ -588,7 +588,7 @@ pub async fn agent_chat_reply_for(
     // Overwriting that with `Cli` would silently discard the caller's own
     // trust statement and hand every such turn the blanket CLI allowance
     // instead of the narrower one it asked for.
-    let run = crate::agent::turn_origin::with_origin(
+    let run = crate::security::turn_origin::with_origin(
         effective_agent_chat_origin(&turn_ctx),
         agent.run_single_with_approval(message, None, approval),
     );

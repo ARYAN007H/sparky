@@ -41,7 +41,7 @@ pub async fn flows_discover(
     config: &Config,
     stream: Option<FlowStreamTarget>,
 ) -> Result<Outcome<Vec<FlowSuggestion>>, String> {
-    use crate::agent::turn_origin::{with_origin, AgentTurnOrigin};
+    use crate::security::turn_origin::{with_origin, AgentTurnOrigin};
     use crate::agent::OpenHumanSessionHost;
 
     tracing::info!(

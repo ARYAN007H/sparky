@@ -68,12 +68,12 @@ pub async fn start_workflow_run(
     // origin here and re-scope it around the engine loop — the phases spawn
     // sub-agents whose tool calls the approval gate judges by that label.
     // Inherit-only: `None` leaves the loop unlabelled and failing closed.
-    let inherited_origin = crate::agent::turn_origin::capture();
+    let inherited_origin = crate::security::turn_origin::capture();
     let task_ctx = ctx.clone();
     ctx.spawn(async move {
         match crate::config::ops::load_current_or_init(&task_ctx).await {
             Ok(task_config) => {
-                crate::agent::turn_origin::with_inherited_origin(
+                crate::security::turn_origin::with_inherited_origin(
                     inherited_origin,
                     run_engine_loop(
                         &task_ctx,
@@ -219,12 +219,12 @@ pub async fn resume_workflow_run(
     let task_run_id = id.to_string();
     // Same inherit-only origin propagation as `start_workflow_run`: the resumed
     // loop runs on a fresh task, which would otherwise drop the caller's label.
-    let inherited_origin = crate::agent::turn_origin::capture();
+    let inherited_origin = crate::security::turn_origin::capture();
     let task_ctx = ctx.clone();
     ctx.spawn(async move {
         match crate::config::ops::load_current_or_init(&task_ctx).await {
             Ok(task_config) => {
-                crate::agent::turn_origin::with_inherited_origin(
+                crate::security::turn_origin::with_inherited_origin(
                     inherited_origin,
                     run_engine_loop(
                         &task_ctx,

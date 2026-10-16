@@ -28,7 +28,7 @@ use std::sync::Arc;
 use anyhow::Result;
 use tokio::sync::mpsc::Sender;
 
-use crate::agent::progress::AgentProgress;
+use crate::progress::AgentProgress;
 use crate::agent::tinyagents::middleware::turn_context::TurnContextMiddleware;
 use crate::agent::tinyagents::{TinyagentsTurnOutcome, TurnSpec};
 use crate::inference::provider::AGENT_TURN_MAX_OUTPUT_TOKENS;

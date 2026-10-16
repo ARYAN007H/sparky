@@ -35,7 +35,7 @@ use crate::agent::turn_env::HostTurnEnv;
 /// like a wedged one. Override via `OPENHUMAN_WEB_TURN_TIMEOUT_SECS`; set it to
 /// `0` to disable the backstop and the derived deadlines with it.
 fn web_turn_deadline() -> Option<Duration> {
-    crate::agent::session_host::turn_backstop::configured_backstop()
+    crate::web_chat::turn_guards::backstop::configured_backstop()
 }
 
 /// The backstop for a turn that has to be allowed to run long: one on a local /
@@ -228,7 +228,7 @@ fn turn_host_env(
 pub(crate) async fn run_turn_under_cancel_and_deadline<B, F>(
     ctx: &crate::core::runtime::DispatchCtx,
     cancel_token: CancellationToken,
-    origin: crate::agent::turn_origin::AgentTurnOrigin,
+    origin: crate::security::turn_origin::AgentTurnOrigin,
     approval_ctx: crate::security::approval::ApprovalChatContext,
     build_turn: B,
 ) -> Option<Result<WebChatTaskResult, String>>
@@ -251,7 +251,7 @@ where
             turn_activity::configured_idle_window(),
             ids,
             |activity| {
-                crate::agent::turn_origin::with_origin(
+                crate::security::turn_origin::with_origin(
                     origin,
                     build_turn(
                         env,

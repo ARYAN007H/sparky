@@ -6,7 +6,7 @@ use crate::agent::subagent_host::ops::checkpoint;
 use std::collections::HashSet;
 use std::sync::Arc;
 
-use crate::agent::progress::AgentProgress;
+use crate::progress::AgentProgress;
 use crate::agent::subagent_host::types::SubagentRunError;
 use crate::agent::tinyagents::{SubagentScope, TurnSpec};
 use tinyagents_harness::run_queue::RunQueue;
@@ -267,7 +267,7 @@ pub(in super::super) async fn run_subagent_via_graph(
             let task_id = task_id.to_string();
             let dispatch = dispatch.clone();
             tokio::spawn(async move {
-                crate::agent::progress_tracing::export_subagent_journal_trace(
+                crate::core::observability::progress_tracing::export_subagent_journal_trace(
                     &dispatch,
                     &config,
                     &journal_run_id,

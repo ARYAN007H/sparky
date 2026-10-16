@@ -1,7 +1,7 @@
 use std::sync::Arc;
 use std::time::Instant;
 
-use crate::agent::host_runtime::{NativeRuntime, RuntimeAdapter};
+use crate::modules::tinybox::host_runtime::{NativeRuntime, RuntimeAdapter};
 use crate::config::Config;
 use crate::core::bus::BUS;
 use crate::core::events::DomainEvent;

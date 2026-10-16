@@ -221,7 +221,7 @@ fn session_profile_user_attribution(config: &crate::config::Config) -> Option<St
 /// with the correct client/thread/request IDs. The task runs until the
 /// sender is dropped (i.e. when the agent turn finishes).
 pub(crate) fn spawn_progress_bridge(
-    mut rx: tokio::sync::mpsc::Receiver<crate::agent::progress::AgentProgress>,
+    mut rx: tokio::sync::mpsc::Receiver<crate::progress::AgentProgress>,
     client_id: String,
     thread_id: String,
     request_id: String,
@@ -230,7 +230,7 @@ pub(crate) fn spawn_progress_bridge(
     config: crate::config::Config,
     dispatch_ctx: crate::core::runtime::DispatchCtx,
 ) -> ProgressBridgeHandle {
-    use crate::agent::progress::AgentProgress;
+    use crate::progress::AgentProgress;
     use std::collections::HashMap;
     use tinyagents_session::run_ledger::{
         AgentRunKind, AgentRunStatus, AgentRunUpsert, RunEventAppend, RunTelemetryUpsert,
@@ -1084,7 +1084,7 @@ pub(crate) fn spawn_progress_bridge(
             };
             if let Some((trace_ctx, observations)) = journal_export {
                 let run_telemetry = ledger_get_telemetry(&config, &request_id);
-                crate::agent::progress_tracing::export_run_trace_from_journal(
+                crate::core::observability::progress_tracing::export_run_trace_from_journal(
                     &config,
                     &trace_ctx,
                     &observations,
@@ -1093,7 +1093,7 @@ pub(crate) fn spawn_progress_bridge(
                 )
                 .await;
             } else {
-                crate::agent::progress_tracing::export_run_trace(&config, &live_spans).await;
+                crate::core::observability::progress_tracing::export_run_trace(&config, &live_spans).await;
             }
         }
 
