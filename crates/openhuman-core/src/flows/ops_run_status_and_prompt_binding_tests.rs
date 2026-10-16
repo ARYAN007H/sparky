@@ -199,7 +199,7 @@ async fn flows_build_hides_the_live_run_tool_from_the_builder_belt() {
         "duplicate_flow",
     ] {
         assert!(
-            visible.contains(keep),
+            visible.iter().any(|spec| spec.name == keep),
             "authoring tool `{keep}` must remain visible after restriction; visible = {visible:?}"
         );
     }
@@ -289,7 +289,7 @@ async fn flows_build_copilot_toolset_unhides_the_live_run_tools() {
         "duplicate_flow",
     ] {
         assert!(
-            visible.contains(keep),
+            visible.iter().any(|spec| spec.name == keep),
             "authoring tool `{keep}` must remain visible on the copilot path; visible = \
              {visible:?}"
         );

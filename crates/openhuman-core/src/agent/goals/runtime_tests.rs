@@ -47,9 +47,12 @@ async fn account_turn_skips_non_active_goal() {
     )
     .await
     .unwrap();
-    tinyagents_graph::goals::store::pause(&dir, "t-paused")
-        .await
-        .unwrap();
+    tinyagents_graph::goals::store::pause(
+        &crate::agent::session_store::stores_or_ephemeral(&dir).kv,
+        "t-paused",
+    )
+    .await
+    .unwrap();
     account_turn_against_goal(&dir, Some("t-paused"), 500, 500, 1).await;
     let g = tinyagents_graph::goals::store::get(
         &crate::agent::session_store::stores_or_ephemeral(&dir).kv,
@@ -190,9 +193,15 @@ async fn budget_stop_hook_fires_on_crossing() {
     .await
     .unwrap();
     // 600 already used in a prior turn.
-    tinyagents_graph::goals::store::account_usage(&dir, "t-hook", &goal.goal_id, 600, 0)
-        .await
-        .unwrap();
+    tinyagents_graph::goals::store::account_usage(
+        &crate::agent::session_store::stores_or_ephemeral(&dir).kv,
+        "t-hook",
+        &goal.goal_id,
+        600,
+        0,
+    )
+    .await
+    .unwrap();
     let goal = tinyagents_graph::goals::store::get(
         &crate::agent::session_store::stores_or_ephemeral(&dir).kv,
         "t-hook",
@@ -244,9 +253,12 @@ async fn no_hook_without_budget_or_when_inactive() {
     )
     .await
     .unwrap();
-    tinyagents_graph::goals::store::pause(&dir, "b")
-        .await
-        .unwrap();
+    tinyagents_graph::goals::store::pause(
+        &crate::agent::session_store::stores_or_ephemeral(&dir).kv,
+        "b",
+    )
+    .await
+    .unwrap();
     let paused = tinyagents_graph::goals::store::get(
         &crate::agent::session_store::stores_or_ephemeral(&dir).kv,
         "b",
