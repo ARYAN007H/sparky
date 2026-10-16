@@ -146,14 +146,16 @@ async fn legacy_durable_session_resolves_its_key_only_from_owned_checkpoint() {
     )
     .unwrap();
     assert_eq!(resolved, key);
-    assert!(crate::agent::orchestration::subagent_sessions::resolve_lifecycle_key(
-        &store,
-        &session.subagent_session_id,
-        "different-owner",
-        Some("thread"),
-        &checkpoint_dir,
-    )
-    .is_err());
+    assert!(
+        crate::agent::orchestration::subagent_sessions::resolve_lifecycle_key(
+            &store,
+            &session.subagent_session_id,
+            "different-owner",
+            Some("thread"),
+            &checkpoint_dir,
+        )
+        .is_err()
+    );
 }
 
 #[tokio::test]
