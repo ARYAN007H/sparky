@@ -170,14 +170,17 @@ pub use types::{LoadPolicy, ModuleRecord, ModuleSource, ModuleState, ModuleStatu
 /// Imports tinymcp's legacy SQLite files under `data_dir` into the module's
 /// storage, once per directory. Never fails the caller: an error is logged and
 /// the import is retried at the next open.
-pub async fn import_legacy_mcp(data_dir: &std::path::Path) {
+pub async fn import_legacy_mcp(
+    ctx: &crate::core::runtime::DispatchCtx,
+    data_dir: &std::path::Path,
+) {
     #[cfg(feature = "modules")]
-    match storage_import_tinymcp::import_legacy(data_dir).await {
+    match storage_import_tinymcp::import_legacy(ctx, data_dir).await {
         Ok(outcome) => log::debug!("[mcp] legacy storage import: {outcome:?}"),
         Err(error) => log::warn!("[mcp] legacy storage import failed, will retry: {error:#}"),
     }
     #[cfg(not(feature = "modules"))]
-    let _ = data_dir;
+    let _ = (ctx, data_dir);
 }
 
 /// What an importer's outcome says about whether it may be skipped next time.
@@ -228,6 +231,7 @@ fn imported_once() -> &'static ImportedSet {
 /// finishes, so a cancelled caller leaves nothing behind.
 #[cfg(feature = "modules")]
 async fn import_once<F, T>(
+    ctx: &crate::core::runtime::DispatchCtx,
     kind: &'static str,
     module_id: &str,
     dir: &std::path::Path,
@@ -237,7 +241,7 @@ where
     F: std::future::Future<Output = anyhow::Result<T>>,
     T: std::fmt::Debug + Settled,
 {
-    let scope = match storage_host::current_module_scope(&crate::core::runtime::DispatchCtx::ambient(), module_id) {
+    let scope = match storage_host::current_module_scope(ctx, module_id) {
         Ok(scope) => format!("{scope:?}"),
         Err(error) => {
             log::warn!("[{kind}] legacy storage import skipped: {:?}", error.kind());

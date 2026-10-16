@@ -27,6 +27,7 @@ use serde_json::json;
 use tinystoragedrivers::ScopedStorage;
 
 use super::storage_grant_tinywallet::{MODULE_ID, PAYMENTS_STREAM};
+use crate::core::runtime::DispatchCtx;
 use super::storage_import_support as support;
 
 const LOG_PREFIX: &str = "[x402-import]";

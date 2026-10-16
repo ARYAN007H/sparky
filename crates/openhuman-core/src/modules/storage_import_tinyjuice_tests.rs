@@ -49,7 +49,7 @@ async fn read(scoped: &ScopedStorage, token: &str) -> Option<String> {
 async fn originals_within_their_ttl_move_into_the_modules_blobs() {
     let legacy = legacy_root();
     let scoped = scoped();
-    let outcome = import_into(
+    let outcome = import_into(&DispatchCtx::host_default(), 
         &scoped,
         legacy.path(),
         Some(Duration::from_secs(3600)),
@@ -83,7 +83,7 @@ async fn originals_within_their_ttl_move_into_the_modules_blobs() {
 async fn without_a_ttl_every_readable_original_is_kept() {
     let legacy = legacy_root();
     let scoped = scoped();
-    let outcome = import_into(&scoped, legacy.path(), None, SystemTime::now())
+    let outcome = import_into(&DispatchCtx::host_default(), &scoped, legacy.path(), None, SystemTime::now())
         .await
         .unwrap();
     assert_eq!(
@@ -100,7 +100,7 @@ async fn without_a_ttl_every_readable_original_is_kept() {
 #[tokio::test]
 async fn the_legacy_files_are_left_in_place() {
     let legacy = legacy_root();
-    import_into(&scoped(), legacy.path(), None, SystemTime::now())
+    import_into(&DispatchCtx::host_default(), &scoped(), legacy.path(), None, SystemTime::now())
         .await
         .unwrap();
     assert_eq!(
@@ -123,7 +123,7 @@ async fn a_second_run_is_a_noop_and_a_blob_already_stored_is_kept() {
         )
         .await
         .unwrap();
-    let first = import_into(&scoped, legacy.path(), None, SystemTime::now())
+    let first = import_into(&DispatchCtx::host_default(), &scoped, legacy.path(), None, SystemTime::now())
         .await
         .unwrap();
     assert_eq!(
@@ -139,7 +139,7 @@ async fn a_second_run_is_a_noop_and_a_blob_already_stored_is_kept() {
         Some("written by the module")
     );
     assert_eq!(
-        import_into(&scoped, legacy.path(), None, SystemTime::now())
+        import_into(&DispatchCtx::host_default(), &scoped, legacy.path(), None, SystemTime::now())
             .await
             .unwrap(),
         Outcome::AlreadyDone
@@ -152,7 +152,7 @@ async fn a_missing_directory_writes_no_marker() {
     let missing = dir.path().join("ccr");
     let scoped = scoped();
     assert_eq!(
-        import_into(&scoped, &missing, None, SystemTime::now())
+        import_into(&DispatchCtx::host_default(), &scoped, &missing, None, SystemTime::now())
             .await
             .unwrap(),
         Outcome::NoSource
@@ -160,7 +160,7 @@ async fn a_missing_directory_writes_no_marker() {
     std::fs::create_dir(&missing).unwrap();
     std::fs::write(missing.join(FRESH), "late").unwrap();
     assert!(matches!(
-        import_into(&scoped, &missing, None, SystemTime::now())
+        import_into(&DispatchCtx::host_default(), &scoped, &missing, None, SystemTime::now())
             .await
             .unwrap(),
         Outcome::Imported { imported: 1, .. }
@@ -188,7 +188,7 @@ async fn a_symlinked_token_is_never_followed_into_storage() {
     let dir = tempfile::tempdir().unwrap();
     std::os::unix::fs::symlink(outside.path().join("secret"), dir.path().join(FRESH)).unwrap();
     let scoped = scoped();
-    let outcome = import_into(&scoped, dir.path(), None, SystemTime::now())
+    let outcome = import_into(&DispatchCtx::host_default(), &scoped, dir.path(), None, SystemTime::now())
         .await
         .unwrap();
     assert!(matches!(
