@@ -3,24 +3,11 @@
 //! (`post`/`get`/`patch`/`delete`/`upload_multipart`).
 
 use super::construct::IntegrationClient;
+use crate::client::reject_privileged_backend_path;
 use openhuman_embed::__host::security::approval::ApprovalTurnContext;
 
 pub(super) fn managed_budget_applies_to_path(path: &str) -> bool {
     path != "/agent-integrations/pricing" && path.starts_with("/agent-integrations/")
-}
-
-fn reject_privileged_backend_path(method: &str, path: &str) -> anyhow::Result<()> {
-    let route = path.split('?').next().unwrap_or(path);
-    if route.split('/').any(|segment| {
-        segment.eq_ignore_ascii_case("webhooks") || segment.eq_ignore_ascii_case("admin")
-    }) {
-        anyhow::bail!(
-            "route is intentionally not exposed by the SDK: {} {}",
-            method,
-            route
-        );
-    }
-    Ok(())
 }
 
 /// Build the egress descriptor for a managed-backend round-trip. The query
@@ -53,38 +40,20 @@ pub(super) fn enforce_backend_egress(path: &str) -> anyhow::Result<()> {
 }
 
 impl IntegrationClient {
-    /// The process backend transport, or the typed "backend unavailable"
-    /// error already classified for this call.
-    pub(super) fn transport(
+    /// Send one JSON round-trip over the shared transport, classifying a
+    /// transport failure (including "no transport") for this call.
+    pub(super) async fn send_json_request(
         &self,
-        method: &str,
-        path: &str,
-        url: &str,
-    ) -> anyhow::Result<std::sync::Arc<dyn crate::backend::transport::BackendTransport>> {
-        crate::backend::transport::resolve_backend_transport()
-            .map_err(|error| self.map_transport_error(error, method, path, url))
-    }
-
-    /// Describe one `/agent-integrations/*` round-trip for the transport: the
-    /// client's credential (session JWT as bearer, API key as `x-api-key`), no envelope unwrapping (this client parses
-    /// the `{success,data}` envelope itself so its error classification sees
-    /// the raw shape).
-    pub(super) fn backend_request<'a>(
-        &'a self,
         method: reqwest::Method,
-        path: &'a str,
-        body: Option<&'a serde_json::Value>,
-    ) -> crate::backend::transport::BackendRequest<'a> {
-        crate::backend::transport::BackendRequest {
-            profile: crate::backend::transport::TransportProfile::Integrations,
-            base_url: &self.backend_url,
-            method,
-            path,
-            query: &[],
-            body,
-            credential: Some(&self.credential),
-            unwrap_envelope: false,
-        }
+        path: &str,
+        body: Option<&serde_json::Value>,
+        method_name: &str,
+        url: &str,
+    ) -> anyhow::Result<serde_json::Value> {
+        self.http
+            .send_json(method, path, body)
+            .await
+            .map_err(|error| self.map_transport_error(error, method_name, path, url))
     }
 
     pub(super) async fn ensure_budget_available(&self, path: &str) -> anyhow::Result<()> {
@@ -138,10 +107,8 @@ impl IntegrationClient {
         let method_name = method.as_str().to_ascii_lowercase();
         tracing::debug!("[integrations] {} {}", method.as_str(), url);
         let value = self
-            .transport(&method_name, path, &url)?
-            .send_json(self.backend_request(method, path, body))
-            .await
-            .map_err(|error| self.map_transport_error(error, &method_name, path, &url))?;
+            .send_json_request(method, path, body, &method_name, &url)
+            .await?;
         Self::parse_envelope(&method_name, path, &url, value)
     }
 
@@ -189,11 +156,8 @@ impl IntegrationClient {
         tracing::debug!("[integrations] POST(multipart) {}", url);
 
         let value = self
-            .transport("post_multipart", path, &url)?
-            .send_multipart(
-                self.backend_request(reqwest::Method::POST, path, None),
-                form,
-            )
+            .http
+            .send_multipart(path, form)
             .await
             .map_err(|error| self.map_transport_error(error, "post_multipart", path, &url))?;
         // The transport unwraps successful `{success,data}` responses. Preserve

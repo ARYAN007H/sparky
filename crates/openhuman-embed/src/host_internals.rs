@@ -124,7 +124,7 @@ pub mod backend {
 pub mod config {
     pub use openhuman_core::config::{
         active_workspace_dir, active_workspace_dir_cached, active_workspace_snapshot,
-        load_config_with_timeout, workspace_handle, Config,
+        load_config_with_timeout, workspace_handle, Config, MODEL_MANAGED_DEFAULT,
     };
 
     pub mod app_env {
@@ -145,6 +145,13 @@ pub mod config {
                 endpoint_host, host_is_builtin_cloud_provider,
             };
         }
+    }
+}
+
+/// tinyhumans (managed inference): the signed-out gate.
+pub mod cron {
+    pub mod scheduler_gate {
+        pub use openhuman_core::cron::scheduler_gate::is_signed_out;
     }
 }
 
@@ -329,7 +336,10 @@ pub mod inference_registry {
 
 /// Memory engines by id, and the free-background-work predicate.
 pub mod memory_engines {
-    pub use openhuman_core::memory::engine::{Binding, BoundEngine};
+    pub use openhuman_core::memory::engine::{
+        build_cached, rooted, BearerSource, Binding, BoundEngine, EngineCredential, EngineSettings,
+        TINYHUMANS_ENGINE,
+    };
     pub use openhuman_core::memory::engine_registry::{
         bound_engine, register_memory_engine, register_memory_engine_in, unregister_memory_engine,
         EngineBuilder, EngineEntry, EngineFuture, EngineRequest, FreeBackground,
