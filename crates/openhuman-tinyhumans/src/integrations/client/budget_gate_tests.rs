@@ -1,4 +1,5 @@
 use super::*;
+use crate::backend::url::effective_backend_api_url;
 use serde_json::json;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -317,7 +318,7 @@ async fn probe_without_a_credential_fails_before_the_backoff_and_any_request() {
     );
     assert!(
         !USAGE_FAILURE_CACHE.is_fresh(
-            &crate::backend::base_url(&config.api_url).unwrap(),
+            &effective_backend_api_url(&config.api_url),
             Instant::now(),
             USAGE_FAILURE_BACKOFF
         ),

@@ -46,7 +46,7 @@ struct ProductIdentitySeen {
 }
 
 async fn product_identity_seen_by_backend() -> ProductIdentitySeen {
-    use crate::backend::transport::plain::TEST_PRODUCT_HEADER as PRODUCT_IDENTITY_HEADER;
+    use crate::backend::product::PRODUCT_IDENTITY_HEADER;
 
     fn sink_header(sink: &Arc<std::sync::Mutex<Option<String>>>, headers: &axum::http::HeaderMap) {
         *sink.lock().unwrap() = headers
