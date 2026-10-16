@@ -113,6 +113,15 @@ fn a_library_agents_scheduled_reply_is_handed_to_the_host() {
                 .await
                 .expect("the stretch turn runs");
 
+            let jobs = runtime.cron().list().expect("scheduled job is stored");
+            assert_eq!(jobs.len(), 1, "{jobs:?}");
+            let job = &jobs[0];
+            assert_eq!(job.name, "stretch");
+            assert!(
+                job.next_run <= std::time::SystemTime::now() + Duration::from_secs(5),
+                "job is not due within the scheduler's first poll: {job:?}"
+            );
+
             let mut delivered = Vec::new();
             for _ in 0..120 {
                 delivered = recorder.0.lock().unwrap().clone();
