@@ -6,15 +6,16 @@
 
 use std::path::Path;
 use std::path::PathBuf;
-use std::sync::Arc;
-#[cfg(test)]
-use tinyagents_tasks::CompletionStore;
 
 use super::background_completions::state;
 #[cfg(test)]
 use super::background_completions::{new_router, Entry};
 
 use super::background_completions::{record_awaiting_input, record_completion, record_failure};
+
+#[cfg(test)]
+#[path = "completion_target_tests.rs"]
+pub(crate) mod tests;
 
 /// Completion-router key prefix for one task's awaiting-input notices.
 pub(super) fn awaiting_input_record_prefix(task_id: &str) -> String {
