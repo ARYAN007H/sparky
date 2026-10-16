@@ -97,7 +97,11 @@ test("hosted JSON-RPC tests are listed and executed with product features", () =
   assert.equal(result.status, 0, result.stdout + result.stderr);
   assert.match(result.stdout, /CORE-TESTS-WITHOUT-MODULE-PATH/);
   assert.match(result.stdout, /ISOLATED-MODULE-TEST/);
-  assert.equal((result.stdout.match(/ISOLATED-MODULE-TEST:/g) ?? []).length, 4, result.stdout);
+  assert.equal(
+    (result.stdout.match(/ISOLATED-MODULE-TEST:/g) ?? []).length,
+    4,
+    result.stdout,
+  );
   assert.match(result.stdout, /PRIVATE-XDG-CACHE/);
   assert.match(result.stdout, /EXECUTED-JSON-RPC/);
 });
