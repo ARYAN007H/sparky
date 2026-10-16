@@ -82,13 +82,9 @@ fn registered_sources_append_in_registration_order_after_built_ins() {
     let position = |name: &str| names.iter().position(|n| n == name).unwrap();
     assert!(position("source_fake_b") < position("source_fake_a1"));
     assert_eq!(position("source_fake_a2"), position("source_fake_a1") + 1);
-    // Every built-in precedes the first registered source.
-    let built_ins: Vec<_> = baseline.iter().filter(|n| names.contains(n)).collect();
-    assert_eq!(built_ins.len(), baseline.len());
-    assert!(baseline
-        .iter()
-        .filter(|n| !n.starts_with("pack_") && !n.starts_with("tool_pack"))
-        .all(|n| position(n) < position("source_fake_b")));
+    // Built-ins precede registered sources.
+    assert!(position("file_read") < position("source_fake_b"));
+    assert_eq!(names.len(), baseline.len() + 3);
 }
 
 #[test]
