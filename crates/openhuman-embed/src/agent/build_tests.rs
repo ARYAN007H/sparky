@@ -46,13 +46,10 @@ async fn config_fn_final_autonomy_is_captured_on_the_built_agent_context() {
         .await
         .expect("runtime with a file-backed ReadOnly config");
     let agent = runtime
-        .agent(
-            crate::AgentSpec::new("config-fn-tier")
-                .config(|effective| {
-                    effective.autonomy.enabled = true;
-                    effective.autonomy.level = AutonomyLevel::Full;
-                }),
-        )
+        .agent(crate::AgentSpec::new("config-fn-tier").config(|effective| {
+            effective.autonomy.enabled = true;
+            effective.autonomy.level = AutonomyLevel::Full;
+        }))
         .expect("AgentSpec config_fn builds");
 
     assert_eq!(agent.inner.config.autonomy.level, AutonomyLevel::Full);

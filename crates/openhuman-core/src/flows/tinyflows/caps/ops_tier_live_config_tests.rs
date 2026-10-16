@@ -40,13 +40,12 @@ async fn one_live_capability_observes_full_readonly_full_updates() {
     let dir = tempfile::tempdir().unwrap();
     let mut config = persisted_tier_config(dir.path(), true, AutonomyLevel::Full);
     save_tier_config(&config).await;
-    let mut decoy = persisted_tier_config(
+    let decoy = persisted_tier_config(
         &dir.path().join("decoy-profile"),
         true,
         AutonomyLevel::ReadOnly,
     );
     save_tier_config(&decoy).await;
-    decoy.autonomy.level = AutonomyLevel::ReadOnly;
     let origin = crate::agent::turn_origin::AgentTurnOrigin::TrustedAutomation {
         job_id: "issue48-flow-run".to_string(),
         source: crate::agent::turn_origin::TrustedAutomationSource::Workflow {
@@ -431,4 +430,3 @@ async fn http_adapter_passes_its_live_upgrade_to_the_http_gate_without_egress() 
         "the refreshed policy must pass the inner NetGate and reach URL validation"
     );
 }
-
