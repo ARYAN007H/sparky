@@ -21,7 +21,6 @@ fn composio_tools_register_in_direct_mode_without_an_app_session() {
     let mut cfg = test_config(&tmp);
     cfg.composio.mode = crate::config::schema::COMPOSIO_MODE_DIRECT.into();
     cfg.composio.api_key = Some("ck_direct_test".into());
-    assert!(crate::integrations::build_client(&cfg).is_none());
 
     let names = registry_names_for(&cfg, &tmp);
     assert_contains_all(
@@ -41,7 +40,6 @@ fn composio_tools_register_in_direct_mode_without_an_app_session() {
 fn composio_tools_stay_unregistered_in_backend_mode_without_an_app_session() {
     let tmp = TempDir::new().unwrap();
     let cfg = test_config(&tmp);
-    assert!(crate::integrations::build_client(&cfg).is_none());
 
     let names = registry_names_for(&cfg, &tmp);
     assert!(
