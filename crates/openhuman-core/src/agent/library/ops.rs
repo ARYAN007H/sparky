@@ -1,8 +1,6 @@
 use crate::agent::harness::host_definition::{AgentDefinition, AgentDefinitionRegistry};
 use crate::core::runtime::DispatchCtx;
-use tinyagents_definition::{
-    AgentTier, DefinitionSource, ModelSpec, SandboxMode, SubagentEntry, ToolScope,
-};
+use tinyagents_definition::{AgentTier, ModelSpec, SandboxMode, SubagentEntry, ToolScope};
 
 use super::types::{AgentDefinitionDisplay, AgentDefinitionModel, AgentDefinitionSource};
 
@@ -57,12 +55,7 @@ pub fn metadata_from_definition(def: &AgentDefinition) -> AgentDefinitionDisplay
         includes_memory_context: !def.extensions.omit_memory_context,
         can_run_as_user_facing_worker,
         write_capable: is_write_capable(def),
-        source: match &def.source {
-            DefinitionSource::Builtin => AgentDefinitionSource::Builtin,
-            DefinitionSource::File(_) | DefinitionSource::CustomRegistry => {
-                AgentDefinitionSource::Custom
-            }
-        },
+        source: def.source.clone(),
     }
 }
 

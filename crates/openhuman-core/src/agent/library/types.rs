@@ -2,12 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use tinyagents_definition::ToolScope;
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum AgentDefinitionSource {
-    Builtin,
-    Custom,
-}
+pub use tinyagents_definition::DefinitionSource as AgentDefinitionSource;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AgentDefinitionModel {
