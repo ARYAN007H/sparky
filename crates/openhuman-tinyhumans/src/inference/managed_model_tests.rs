@@ -543,3 +543,9 @@ fn resolve_bearer_returns_token_for_exp_less_offline_session() {
     let tmp = tempfile::TempDir::new().unwrap();
     seed_app_session(tmp.path());
     let backend = backend_pointed_at("127.0.0.1:9", tmp.path());
+
+    let token = backend
+        .resolve_bearer()
+        .expect("an exp-less offline session must resolve (presence-only)");
+    assert_eq!(token, "test.session.jwt");
+}

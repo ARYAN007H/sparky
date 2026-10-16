@@ -81,8 +81,30 @@ impl Drop for DirectAuthFailureGuard {
     }
 }
 
+/// A host-registered backend route (the core ships none of its own).
+fn register_fake_backend_route() {
+    register_composio_route_builder(crate::config::schema::COMPOSIO_MODE_BACKEND, |_config| {
+        Ok(ComposioRoute::Backend)
+    });
+}
+
+#[test]
+fn resolve_composio_route_backend_is_unavailable_without_a_registered_route() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let config = config_with_session_token(&tmp);
+    let err = resolve_composio_route(&config)
+        .err()
+        .expect("a core with no backend route builder has no backend route");
+    assert!(
+        err.to_string()
+            .starts_with(crate::core::observability::BACKEND_UNAVAILABLE_PREFIX),
+        "got: {err}"
+    );
+}
+
 #[test]
 fn resolve_composio_route_backend_variant_when_mode_default() {
+    register_fake_backend_route();
     let tmp = tempfile::tempdir().expect("tempdir");
     let config = config_with_session_token(&tmp);
     let route = resolve_composio_route(&config).expect("backend mode should build");
@@ -94,6 +116,7 @@ fn resolve_composio_route_backend_variant_when_mode_default() {
 fn resolve_composio_route_backend_empty_mode_falls_back_to_backend() {
     // A literal empty string in TOML should be treated as the default
     // (`"backend"`) rather than an unknown mode error.
+    register_fake_backend_route();
     let tmp = tempfile::tempdir().expect("tempdir");
     let mut config = config_with_session_token(&tmp);
     config.composio.mode = String::new();
