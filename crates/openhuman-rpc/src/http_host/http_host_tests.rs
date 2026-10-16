@@ -13,6 +13,7 @@ use crate::http_host::ops::{
     stop_hosted_dir_server,
 };
 use crate::http_host::path_utils::resolve_request_path;
+use crate::core_host::core::runtime::DispatchCtx;
 use crate::http_host::types::StartHostedDirParams;
 
 // Serializes tests that share the process-global server registry; the guard is
