@@ -113,3 +113,56 @@ fn enrich_replaces_resolved_endpoints_and_is_visible_to_the_core_loader_hook() {
         Some("http://127.0.0.1:3")
     );
 }
+
+#[test]
+fn deployment_environment_buckets_the_canonical_hosts() {
+    assert_eq!(
+        deployment_environment("https://api.tinyhumans.ai"),
+        "production"
+    );
+    assert_eq!(
+        deployment_environment("https://staging-api.tinyhumans.ai"),
+        "staging"
+    );
+}
+
+/// A hostname that merely *contains* `staging` is not ours. The classifier
+/// gates whether a live session token leaves the process, so anything it
+/// cannot positively recognise has to land on `external`.
+#[test]
+fn a_lookalike_staging_host_is_external_not_staging() {
+    for base in [
+        "https://staging-attacker.invalid",
+        "https://staging.evil.example",
+        "http://staging-api.tinyhumans.ai.evil.example",
+        // Right domain, wrong label position.
+        "https://api-staging-mirror.tinyhumans.ai",
+        // A public IP literal is never a deployment of ours.
+        "https://93.184.216.34",
+        // Never classify plaintext as a hosted bucket.
+        "http://api.tinyhumans.ai",
+        "not a url",
+        "",
+    ] {
+        assert_eq!(deployment_environment(base), "external", "{base:?}");
+    }
+}
+
+#[test]
+fn the_enricher_fills_otlp_environment_and_managed_hosts() {
+    let resolved = resolve(&config_with(Some("http://127.0.0.1:18765")));
+    assert_eq!(
+        resolved.tracing_otlp_url.as_deref(),
+        Some("http://127.0.0.1:18765/telemetry/langfuse/otel/v1/traces")
+    );
+    assert_eq!(resolved.deployment_environment.as_deref(), Some("external"));
+    for url in [
+        "https://api.tinyhumans.ai/openai/v1",
+        "https://staging-api.tinyhumans.ai",
+        "https://api.openhuman.ai",
+        "http://openhuman:7788",
+    ] {
+        assert!(resolved.is_managed_host(url), "{url}");
+    }
+    assert!(!resolved.is_managed_host("https://openrouter.ai/api/v1"));
+}
