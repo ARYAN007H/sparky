@@ -76,7 +76,10 @@ impl ToolHook<OpenHumanRunContext> for Observer {
 
 #[async_trait::async_trait]
 impl LearningSink for Observer {
-    async fn on_turn_complete(&self, ctx: &TurnSummary) -> anyhow::Result<()> {
+    async fn on_turn_complete(
+        &self,
+        ctx: &TurnSummary,
+    ) -> tinyagents_harness::error::Result<()> {
         assert!(!ctx.agent_id.is_empty());
         self.record("turn", ctx.input.lines().last().unwrap());
         Ok(())
