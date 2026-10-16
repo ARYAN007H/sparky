@@ -59,6 +59,11 @@ const RELEASE_DRAIN: Duration = Duration::from_secs(3);
 /// Retries for a failed store write before a completion is reported lost.
 const RECORD_RETRIES: u32 = 3;
 
+/// Reserved prefix for independently deliverable pause notices. The encoded
+/// task id keeps these records out of the terminal task's dedupe slot; the UUID
+/// distinguishes repeated pauses of the same resumable task.
+const AWAITING_INPUT_RECORD_PREFIX: &str = "\u{1}host-awaiting-input:";
+
 /// Bound on the session -> thread cache; the oldest mapping is evicted first.
 const SESSION_THREADS_CAP: usize = 4096;
 
@@ -361,7 +366,8 @@ pub(crate) async fn record_failure(
 /// Queue an **awaiting-user** async sub-agent for chat delivery (#4896). A
 /// detached child that pauses to ask a question will not continue on its own, so
 /// the framed `[SUBAGENT_NEEDS_INPUT]` notice is delivered back into chat for the
-/// parent agent to relay to (or answer for) the user.
+/// parent agent to relay to (or answer for) the user. Each pause has a separate
+/// router key: the same task may pause repeatedly before its final completion.
 pub(crate) async fn record_awaiting_input(
     ctx: &DispatchCtx,
     workspace_dir: &Path,
@@ -375,9 +381,8 @@ pub(crate) async fn record_awaiting_input(
     let task_id = task_id.into();
     let agent_id = agent_id.into();
     // A pause is deliverable to the parent, but it is not the task's final
-    // completion. Give the pause its own router key so a later result from the
-    // same task is not mistaken for a duplicate (TinyAgents applies the same
-    // rule by omitting AwaitingUser from completion records).
+    // completion. Use an independent key for every pause so resumed work can
+    // pause again and still eventually record under the original task id.
     let pause_record_id = awaiting_input_record_id(&task_id);
     let summary = crate::agent::orchestration::tools::awaiting_user::awaiting_user_envelope(
         &task_id,
@@ -403,7 +408,15 @@ pub(crate) async fn record_awaiting_input(
 /// remains available in the notification body; this separate key leaves the
 /// task id's dedupe slot open for its eventual terminal result.
 fn awaiting_input_record_id(task_id: &str) -> String {
-    format!("{task_id}:awaiting-input")
+    let encoded_task_id: String = task_id
+        .as_bytes()
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect();
+    format!(
+        "{AWAITING_INPUT_RECORD_PREFIX}{encoded_task_id}:{}",
+        uuid::Uuid::new_v4().simple()
+    )
 }
 
 /// Drop every workspace's router and all process-local state about them. Called
@@ -469,15 +482,29 @@ pub(crate) fn pending_for(workspace_dir: &Path, thread_id: &str) -> Vec<Completi
 /// answer. The router withdraws an already-recorded completion and drops one
 /// that arrives later. Returns whether a pending completion was withdrawn.
 pub(crate) fn mark_collected(workspace_dir: &Path, task_id: &str) -> bool {
-    let router = router_for_workspace(workspace_dir);
+    let entry = entry_for(workspace_dir);
+    let router = &entry.router;
     let completion = router.tombstone(task_id);
-    let pause = router.tombstone(&awaiting_input_record_id(task_id));
+    // A parent that collected the final result inline has no use for any
+    // queued pause notices from that same task. Sweep them too, including
+    // pauses persisted before a restart.
+    let pause_prefix = awaiting_input_record_prefix(task_id);
+    let pauses: Vec<String> = entry
+        .store
+        .list(None)
+        .into_iter()
+        .filter(|record| record.task_id.starts_with(&pause_prefix))
+        .map(|record| record.task_id)
+        .collect();
+    let pauses_collected = pauses.into_iter().any(|pause_id| {
+        matches!(router.tombstone(&pause_id), Ok(TombstoneOutcome::Suppressed))
+    });
     log::debug!(
         "[background_completions] mark_collected task_id={task_id} completion={completion:?} \
-         pause={pause:?}"
+         pauses_collected={pauses_collected}"
     );
     matches!(completion, Ok(TombstoneOutcome::Suppressed))
-        || matches!(pause, Ok(TombstoneOutcome::Suppressed))
+        || pauses_collected
 }
 
 /// Drop every queued completion for `thread_id` and everything that finishes
