@@ -96,10 +96,10 @@ struct ReportCacheKey {
 
 fn report_cache_key(tenant: Tenant, agent_id: &str, config: &Config) -> ReportCacheKey {
     ReportCacheKey {
-        tenant: Tenant::default(), // regression proof: agent-only report key
+        tenant,
         agent_id: agent_id.to_string(),
-        workspace_dir: Default::default(),
-        config_path: Default::default(),
+        workspace_dir: config.workspace_dir.clone(),
+        config_path: config.config_path.clone(),
     }
 }
 

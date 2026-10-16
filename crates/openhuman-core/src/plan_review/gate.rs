@@ -99,7 +99,7 @@ impl PlanReviewGate {
         // Requests run under a derived agent context, while the profile's UI
         // decides and replays them from its profile-level context. Share the
         // profile's gate entries across its agents, but isolate other profiles.
-        let scope = Tenant::default() /* regression proof: shared plan-review scope */;
+        let scope = tenant.profile_only();
         let request_key = (scope.clone(), request_id.clone());
         self.waiters.lock().insert(request_key.clone(), tx);
         if let Some(tid) = thread_id.clone() {
@@ -190,7 +190,7 @@ impl PlanReviewGate {
         tenant: &Tenant,
         thread_id: &str,
     ) -> Option<ParkedReview> {
-        let scope = Tenant::default() /* regression proof: shared plan-review scope */;
+        let scope = tenant.profile_only();
         let key = (scope.clone(), thread_id.to_string());
         let request_id = self.thread_to_request.lock().get(&key)?.clone();
         self.parked.lock().get(&(scope, request_id)).cloned()
@@ -207,7 +207,7 @@ impl PlanReviewGate {
         let sender = self
             .waiters
             .lock()
-            .remove(&(Tenant::default() /* regression proof: shared plan-review scope */, request_id.to_string()));
+            .remove(&(tenant.profile_only(), request_id.to_string()));
         match sender {
             Some(tx) => tx.send(resolution).is_ok(),
             None => {
@@ -228,7 +228,7 @@ impl PlanReviewGate {
         thread_id: &str,
         resolution: PlanReviewResolution,
     ) -> bool {
-        let scope = Tenant::default() /* regression proof: shared plan-review scope */;
+        let scope = tenant.profile_only();
         let request_id = self
             .thread_to_request
             .lock()
