@@ -13,6 +13,16 @@ use crate::config::Config;
 use crate::security::credentials::jwt::bearer_authorization_value;
 use crate::security::credentials::session_support::direct_backend_credential;
 
+/// Service key the push is proxied under (`ProxyConfig::services`).
+pub(super) const OTLP_SERVICE_KEY: &str = "telemetry.otlp";
+
+/// The push's HTTP client: the runtime proxy and platform TLS roots apply, and
+/// the underlying client is cached per service key, so every push reuses one
+/// connection pool.
+pub(super) fn otlp_client() -> reqwest::Client {
+    crate::config::build_runtime_proxy_client_with_timeouts(OTLP_SERVICE_KEY, 10, 10)
+}
+
 pub(super) async fn push_spans(config: &Config, spans: &[TraceSpan]) -> Result<(), String> {
     if spans.is_empty() {
         return Ok(());
@@ -37,13 +47,11 @@ pub(super) async fn push_spans(config: &Config, spans: &[TraceSpan]) -> Result<(
     // Backend traffic: stamp the host's attribution headers (product
     // identity, versions) resolved onto the config.
     let attribution = config.resolved_endpoints.attribution_header_map();
-    let client = reqwest::Client::builder()
-        .default_headers(attribution)
-        .build()
-        .map_err(|err| format!("Langfuse OTLP client build failed: {err}"))?;
+    let client = otlp_client();
     for payload in otlp_requests(spans, environment, &super::export_brand()) {
         let response = client
             .post(&url)
+            .headers(attribution.clone())
             .header(
                 reqwest::header::AUTHORIZATION,
                 bearer_authorization_value(&token),
