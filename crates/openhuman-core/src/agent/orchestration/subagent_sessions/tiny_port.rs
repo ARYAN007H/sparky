@@ -82,7 +82,7 @@ impl OpenHumanTinySubagentSessionStore {
             latest_history: row.latest_history.map(|history| {
                 history
                     .iter()
-                    .filter_map(tinyagents_runtime::transcript::transcript_to_message)
+                    .map(tinyagents_runtime::transcript::transcript_to_message)
                     .collect()
             }),
             latest_error: row.latest_error,
