@@ -84,8 +84,19 @@ pub(crate) fn model_limits_request(
 }
 
 /// The managed backend's catalogue listing, authenticated with the backend
-/// credential when the URL is safe to carry it.
+/// credential when the URL is safe to carry it. A registered catalog
+/// (`inference::registry`) with a limits function answers instead.
 fn managed_limits_request(model: &str, config: &Config) -> Option<DiscoveryRequest> {
+    if let Some(limits) = crate::inference::registry::catalog(PROVIDER_OPENHUMAN)
+        .and_then(|entry| entry.limits)
+    {
+        log::debug!("[model_limits] managed limits served by a registered catalog");
+        return limits(model, config);
+    }
+    builtin_managed_limits_request(model, config)
+}
+
+fn builtin_managed_limits_request(model: &str, config: &Config) -> Option<DiscoveryRequest> {
     use crate::inference::provider::openhuman_backend_model::{
         is_managed_endpoint_for_api_key, is_safe_endpoint_for_managed_bearer,
     };

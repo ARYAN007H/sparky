@@ -189,7 +189,7 @@ pub(crate) fn make_openhuman_backend_model(
         config,
         None,
         None,
-        false,
+        true,
         None,
         &EgressLedger::none(),
     ) {
