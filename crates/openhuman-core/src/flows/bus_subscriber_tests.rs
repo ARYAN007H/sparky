@@ -171,40 +171,6 @@ async fn handle_schedule_tick_ignores_disabled_flow() {
     .await;
 }
 
-// ── in-flight dedupe (CodeRabbit finding B) ─────────────────────
-
-#[test]
-fn try_acquire_dispatch_skips_a_flow_already_in_flight() {
-    let tmp = tempfile::TempDir::new().unwrap();
-    let sub = FlowTriggerSubscriber::new(test_config(&tmp));
-
-    let guard = sub
-        .try_acquire_dispatch("f1")
-        .expect("first claim for f1 should succeed");
-    assert!(
-        sub.try_acquire_dispatch("f1").is_none(),
-        "a second claim for the same flow while the first is held must be skipped"
-    );
-
-    // A different flow is unaffected.
-    assert!(sub.try_acquire_dispatch("f2").is_some());
-
-    drop(guard);
-    assert!(
-        sub.try_acquire_dispatch("f1").is_some(),
-        "dropping the guard must release the claim so f1 can run again"
-    );
-}
-
-#[test]
-fn default_constructs_the_same_as_new() {
-    let tmp = tempfile::TempDir::new().unwrap();
-    let config = test_config(&tmp);
-    let a = FlowTriggerSubscriber::new(config.clone());
-    let b = FlowTriggerSubscriber::new(config);
-    assert_eq!(a.name(), b.name());
-}
-
 // ── FlowRunDigestSubscriber ─────────────────────────────────────
 
 #[test]

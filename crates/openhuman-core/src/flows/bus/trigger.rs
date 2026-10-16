@@ -8,11 +8,15 @@ use crate::core::events::DomainEvent;
 use crate::flows::store;
 use async_trait::async_trait;
 use serde_json::Value;
-use std::collections::HashSet;
+use std::collections::HashMap;
+use std::future::Future;
+use std::pin::Pin;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use tinybus::EventHandler;
 use tinyflows::model::TriggerKind;
 use tinyflows_catalog::Flow;
+use tokio::sync::{mpsc, Mutex as AsyncMutex};
 
 /// Reads `trigger_kind` from a flow's trigger node config, deserializing into
 /// `tinyflows::model::TriggerKind`. Returns `None` when the flow doesn't have
@@ -75,40 +79,358 @@ pub(super) fn matches_app_event(flow: &Flow, toolkit: &str, trigger_slug: &str) 
 /// enabled flows. See the module doc for the full contract.
 pub struct FlowTriggerSubscriber {
     config: Arc<Config>,
-    /// Process-local dedupe of trigger-driven dispatch, keyed by `flow_id`
-    /// (CodeRabbit finding B — overlapping runs for the same flow). A fast
-    /// cadence or trigger burst can otherwise fire `spawn_run` for the same
-    /// flow multiple times before the first run finishes, racing
-    /// `last_run_at`/`last_status` and doing duplicate work. This is
-    /// intentionally scoped to trigger-driven dispatch (this subscriber) —
-    /// the interactive `flows_run` RPC is NOT deduped, since a user
-    /// explicitly asking to run a flow again (e.g. while a scheduled run is
-    /// still in flight) is fine.
-    in_flight: Arc<Mutex<HashSet<String>>>,
+    queues: Arc<Mutex<HashMap<DispatchKey, Arc<FlowRunQueue>>>>,
+    runner: Arc<RunExecutor>,
+    queue_capacity: usize,
+    #[cfg(test)]
+    retiring: Arc<tokio::sync::Notify>,
 }
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+struct DispatchKey {
+    tenant: crate::core::runtime::Tenant,
+    flow_id: String,
+}
+
+struct FlowRunQueue {
+    sender: mpsc::Sender<QueuedRun>,
+    receiver: Mutex<Option<mpsc::Receiver<QueuedRun>>>,
+    worker_started: std::sync::atomic::AtomicBool,
+    admission: Arc<AsyncMutex<()>>,
+    outstanding: AtomicUsize,
+}
+
+struct QueuedRun {
+    ctx: crate::core::runtime::DispatchCtx,
+    config: Arc<Config>,
+    request: TriggerRunRequest,
+}
+
+struct QueueOutstanding {
+    queue: Arc<FlowRunQueue>,
+    armed: bool,
+}
+
+impl QueueOutstanding {
+    fn new(queue: Arc<FlowRunQueue>) -> Self {
+        queue.outstanding.fetch_add(1, Ordering::AcqRel);
+        Self { queue, armed: true }
+    }
+
+    fn transfer_to_worker(mut self) {
+        self.armed = false;
+    }
+}
+
+impl Drop for QueueOutstanding {
+    fn drop(&mut self) {
+        if self.armed {
+            self.queue.outstanding.fetch_sub(1, Ordering::AcqRel);
+        }
+    }
+}
+
+pub(crate) struct TriggerRunRequest {
+    pub(crate) flow_id: String,
+    pub(crate) input: Value,
+    pub(crate) inputs: serde_json::Map<String, Value>,
+    pub(crate) trigger: tinyflows_catalog::FlowRunTrigger,
+}
+
+type RunFuture = Pin<Box<dyn Future<Output = ()> + Send + 'static>>;
+type RunExecutor = dyn Fn(crate::core::runtime::DispatchCtx, Arc<Config>, TriggerRunRequest) -> RunFuture
+    + Send
+    + Sync;
+
+const APP_EVENT_QUEUE_CAPACITY: usize = 32;
 
 impl FlowTriggerSubscriber {
     pub fn new(config: Arc<Config>) -> Self {
+        Self::with_executor(
+            config,
+            APP_EVENT_QUEUE_CAPACITY,
+            |ctx, config, request| async move {
+                let flow_id = request.flow_id.clone();
+                tracing::info!(target: "flows", %flow_id, "[flows] trigger fired — starting run");
+                match crate::flows::ops::flows_run(
+                    &ctx,
+                    &config,
+                    &flow_id,
+                    request.input,
+                    request.inputs,
+                    request.trigger,
+                )
+                .await
+                {
+                    Ok(_) => {
+                        tracing::info!(target: "flows", %flow_id, "[flows] trigger-driven run finished")
+                    }
+                    Err(e) => {
+                        tracing::warn!(target: "flows", %flow_id, error = %e, "[flows] trigger-driven run failed")
+                    }
+                }
+            },
+        )
+    }
+
+    fn with_executor<F, Fut>(config: Arc<Config>, queue_capacity: usize, runner: F) -> Self
+    where
+        F: Fn(crate::core::runtime::DispatchCtx, Arc<Config>, TriggerRunRequest) -> Fut
+            + Send
+            + Sync
+            + 'static,
+        Fut: Future<Output = ()> + Send + 'static,
+    {
+        let runner: Arc<RunExecutor> =
+            Arc::new(move |ctx, config, request| Box::pin(runner(ctx, config, request)));
         Self {
             config,
-            in_flight: Arc::new(Mutex::new(HashSet::new())),
+            queues: Arc::new(Mutex::new(HashMap::new())),
+            runner,
+            queue_capacity: queue_capacity.max(1),
+            #[cfg(test)]
+            retiring: Arc::new(tokio::sync::Notify::new()),
         }
     }
 
-    /// Attempts to claim `flow_id` for a trigger-driven dispatch. Returns
-    /// `None` when a dispatch for the same flow is already in flight — the
-    /// caller should skip this tick. Returns `Some(guard)` on success; the
-    /// guard releases the claim on `Drop` (including on panic/early return),
-    /// so a run can never permanently wedge the flow out of future ticks.
-    pub(super) fn try_acquire_dispatch(&self, flow_id: &str) -> Option<InFlightGuard> {
-        let mut in_flight = self.in_flight.lock().unwrap_or_else(|e| e.into_inner());
-        if !in_flight.insert(flow_id.to_string()) {
-            return None;
+    #[cfg(test)]
+    pub(crate) fn with_runner<F, Fut>(config: Arc<Config>, queue_capacity: usize, runner: F) -> Self
+    where
+        F: Fn(crate::core::runtime::DispatchCtx, Arc<Config>, TriggerRunRequest) -> Fut
+            + Send
+            + Sync
+            + 'static,
+        Fut: Future<Output = ()> + Send + 'static,
+    {
+        Self::with_executor(config, queue_capacity, runner)
+    }
+
+    async fn dispatch_app_event(
+        &self,
+        ctx: &crate::core::runtime::DispatchCtx,
+        flow_id: String,
+        payload: Value,
+        inputs: serde_json::Map<String, Value>,
+    ) {
+        // Admission intentionally waits for bounded per-key queue capacity.
+        // EventHandler runs inline in TinyBus, so a saturated key can delay
+        // later scopes in this callback. This is in-memory backpressure, not
+        // durable delivery; the upstream event broadcast is itself bounded.
+        let Some(key) = self.dispatch_key(ctx, &flow_id) else {
+            return;
+        };
+        let queued = QueuedRun {
+            ctx: ctx.clone(),
+            config: self.config_for_scope(ctx),
+            request: TriggerRunRequest {
+                flow_id,
+                input: payload,
+                inputs,
+                trigger: tinyflows_catalog::FlowRunTrigger::AppEvent,
+            },
+        };
+        self.enqueue_app_event(key, ctx, queued).await;
+    }
+
+    #[cfg(test)]
+    pub(crate) async fn dispatch_test_app_event(
+        &self,
+        ctx: &crate::core::runtime::DispatchCtx,
+        flow_id: &str,
+        payload: Value,
+    ) {
+        self.dispatch_app_event(ctx, flow_id.to_string(), payload, serde_json::Map::new())
+            .await;
+    }
+
+    fn dispatch_key(
+        &self,
+        ctx: &crate::core::runtime::DispatchCtx,
+        flow_id: &str,
+    ) -> Option<DispatchKey> {
+        match ctx.tenant() {
+            Ok(tenant) => Some(DispatchKey {
+                tenant,
+                flow_id: flow_id.to_string(),
+            }),
+            Err(error) => {
+                tracing::warn!(target: "flows", %flow_id, error = %error, "[flows] trigger dispatch has no tenant scope; refusing to use the host config");
+                None
+            }
         }
-        Some(InFlightGuard {
-            set: self.in_flight.clone(),
-            flow_id: flow_id.to_string(),
-        })
+    }
+
+    fn queue_for(&self, key: &DispatchKey) -> Arc<FlowRunQueue> {
+        let mut queues = self
+            .queues
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
+        if let Some(queue) = queues.get(key).filter(|queue| !queue.sender.is_closed()) {
+            return Arc::clone(queue);
+        }
+
+        let (sender, receiver) = mpsc::channel(self.queue_capacity);
+        let queue = Arc::new(FlowRunQueue {
+            sender,
+            receiver: Mutex::new(Some(receiver)),
+            worker_started: std::sync::atomic::AtomicBool::new(false),
+            admission: Arc::new(AsyncMutex::new(())),
+            outstanding: AtomicUsize::new(0),
+        });
+        queues.insert(key.clone(), Arc::clone(&queue));
+        queue
+    }
+
+    fn start_worker_if_needed(
+        &self,
+        key: &DispatchKey,
+        queue: &Arc<FlowRunQueue>,
+        ctx: &crate::core::runtime::DispatchCtx,
+    ) {
+        if queue
+            .worker_started
+            .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
+            .is_err()
+        {
+            return;
+        }
+        let Some(receiver) = queue
+            .receiver
+            .lock()
+            .unwrap_or_else(|error| error.into_inner())
+            .take()
+        else {
+            return;
+        };
+        let worker_key = key.clone();
+        let worker_queue = Arc::clone(queue);
+        let worker_queues = Arc::clone(&self.queues);
+        let runner = Arc::clone(&self.runner);
+        #[cfg(test)]
+        let retiring = Arc::clone(&self.retiring);
+        ctx.spawn(async move {
+            run_queue_worker(
+                worker_key,
+                worker_queue,
+                receiver,
+                worker_queues,
+                runner,
+                #[cfg(test)]
+                retiring,
+            )
+            .await;
+        });
+    }
+
+    async fn enqueue_app_event(
+        &self,
+        key: DispatchKey,
+        ctx: &crate::core::runtime::DispatchCtx,
+        mut queued: QueuedRun,
+    ) {
+        loop {
+            let queue = self.queue_for(&key);
+            let admission = Arc::clone(&queue.admission).lock_owned().await;
+            if queue.sender.is_closed() {
+                drop(admission);
+                self.remove_queue_if_current(&key, &queue);
+                continue;
+            }
+
+            let outstanding = QueueOutstanding::new(Arc::clone(&queue));
+            match queue.sender.send(queued).await {
+                Ok(()) => {
+                    outstanding.transfer_to_worker();
+                    drop(admission);
+                    self.start_worker_if_needed(&key, &queue, ctx);
+                    return;
+                }
+                Err(error) => {
+                    queued = error.0;
+                    drop(outstanding);
+                    drop(admission);
+                    self.remove_queue_if_current(&key, &queue);
+                }
+            }
+        }
+    }
+
+    async fn enqueue_schedule(
+        &self,
+        ctx: &crate::core::runtime::DispatchCtx,
+        flow_id: String,
+        inputs: serde_json::Map<String, Value>,
+    ) {
+        let Some(key) = self.dispatch_key(ctx, &flow_id) else {
+            return;
+        };
+        let queued = QueuedRun {
+            ctx: ctx.clone(),
+            config: self.config_for_scope(ctx),
+            request: TriggerRunRequest {
+                flow_id: flow_id.clone(),
+                input: Value::Null,
+                inputs,
+                trigger: tinyflows_catalog::FlowRunTrigger::Schedule,
+            },
+        };
+        self.enqueue_schedule_request(key, ctx, queued).await;
+    }
+
+    async fn enqueue_schedule_request(
+        &self,
+        key: DispatchKey,
+        ctx: &crate::core::runtime::DispatchCtx,
+        mut queued: QueuedRun,
+    ) {
+        loop {
+            let queue = self.queue_for(&key);
+            let admission = Arc::clone(&queue.admission).lock_owned().await;
+            if queue.sender.is_closed() {
+                drop(admission);
+                self.remove_queue_if_current(&key, &queue);
+                continue;
+            }
+            if queue.outstanding.load(Ordering::Acquire) != 0 {
+                tracing::debug!(target: "flows", flow_id = %key.flow_id, "[flows] schedule tick coalesced while a trigger run is queued or active");
+                return;
+            }
+
+            queue.outstanding.fetch_add(1, Ordering::AcqRel);
+            match queue.sender.try_send(queued) {
+                Ok(()) => {
+                    drop(admission);
+                    self.start_worker_if_needed(&key, &queue, ctx);
+                    return;
+                }
+                Err(mpsc::error::TrySendError::Full(_)) => {
+                    queue.outstanding.fetch_sub(1, Ordering::AcqRel);
+                    tracing::debug!(target: "flows", flow_id = %key.flow_id, "[flows] schedule tick coalesced while a trigger run is queued");
+                    return;
+                }
+                Err(mpsc::error::TrySendError::Closed(returned)) => {
+                    queue.outstanding.fetch_sub(1, Ordering::AcqRel);
+                    drop(admission);
+                    self.remove_queue_if_current(&key, &queue);
+                    // Keep the value available if the retiring worker won
+                    // the race with this schedule tick.
+                    queued = returned;
+                }
+            }
+        }
+    }
+
+    fn remove_queue_if_current(&self, key: &DispatchKey, queue: &Arc<FlowRunQueue>) {
+        let mut queues = self
+            .queues
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
+        if queues
+            .get(key)
+            .is_some_and(|current| Arc::ptr_eq(current, queue))
+        {
+            queues.remove(key);
+        }
     }
 
     /// The configuration to handle an event under (`super::owner::config_for_scope`).
@@ -155,13 +477,8 @@ impl FlowTriggerSubscriber {
             return;
         }
         let inputs = pinned_trigger_inputs(&flow);
-        self.spawn_run(
-            &ctx,
-            flow_id.to_string(),
-            Value::Null,
-            inputs,
-            tinyflows_catalog::FlowRunTrigger::Schedule,
-        );
+        self.enqueue_schedule(&ctx, flow_id.to_string(), inputs)
+            .await;
     }
 
     /// `DomainEvent::ComposioTriggerReceived` — scans every enabled flow for
@@ -194,75 +511,98 @@ impl FlowTriggerSubscriber {
             if matches_app_event(&flow, toolkit, trigger_slug) {
                 matched += 1;
                 let inputs = pinned_trigger_inputs(&flow);
-                self.spawn_run(
-                    &ctx,
-                    flow.id.clone(),
-                    payload.clone(),
-                    inputs,
-                    tinyflows_catalog::FlowRunTrigger::AppEvent,
-                );
+                self.dispatch_app_event(&ctx, flow.id.clone(), payload.clone(), inputs)
+                    .await;
             }
         }
         tracing::debug!(target: "flows", %toolkit, %trigger_slug, matched, "[flows] app_event trigger matching complete");
     }
 
-    /// Spawns a background `flows::ops::flows_run` for `flow_id`. Fire-and-
-    /// forget from the bus's perspective — `flows_run` itself records the
-    /// outcome onto the flow's summary fields and a `flow_runs` history row,
-    /// and surfaces a `CoreNotification` when the run pauses for approval.
-    ///
-    /// Skips the dispatch (see [`try_acquire_dispatch`]) if a trigger-driven
-    /// run for this `flow_id` is already in flight, so a fast schedule or a
-    /// burst of matching `app_event`s cannot run the same flow concurrently.
-    fn spawn_run(
+    #[cfg(test)]
+    pub(crate) async fn dispatch_test_schedule(
         &self,
         ctx: &crate::core::runtime::DispatchCtx,
-        flow_id: String,
-        input: Value,
-        inputs: serde_json::Map<String, Value>,
-        trigger: tinyflows_catalog::FlowRunTrigger,
+        flow_id: &str,
     ) {
-        let Some(guard) = self.try_acquire_dispatch(&flow_id) else {
-            tracing::debug!(target: "flows", %flow_id, "[flows] trigger: flow already running — skipping this tick");
-            return;
-        };
+        self.enqueue_schedule(ctx, flow_id.to_string(), serde_json::Map::new())
+            .await;
+    }
 
-        let config = self.config_for_scope(ctx);
-        let run_ctx = ctx.clone();
-        // Scoped: the run keeps the owner's context the handler entered.
-        ctx.spawn(async move {
-            // Held for the lifetime of the run; released on drop (including
-            // on panic) by `InFlightGuard`.
-            let _guard = guard;
-            tracing::info!(target: "flows", %flow_id, "[flows] trigger fired — starting run");
-            match crate::flows::ops::flows_run(&run_ctx, &config, &flow_id, input, inputs, trigger).await {
-                Ok(_) => {
-                    tracing::info!(target: "flows", %flow_id, "[flows] trigger-driven run finished")
-                }
-                Err(e) => {
-                    tracing::warn!(target: "flows", %flow_id, error = %e, "[flows] trigger-driven run failed")
-                }
-            }
-        });
+    #[cfg(test)]
+    pub(crate) async fn hold_queue_admission_test(
+        &self,
+        ctx: &crate::core::runtime::DispatchCtx,
+        flow_id: &str,
+    ) -> tokio::sync::OwnedMutexGuard<()> {
+        let key = self.dispatch_key(ctx, flow_id).unwrap();
+        let queue = self.queue_for(&key);
+        Arc::clone(&queue.admission).lock_owned().await
+    }
+
+    #[cfg(test)]
+    pub(crate) fn retirement_notifier_test(&self) -> Arc<tokio::sync::Notify> {
+        Arc::clone(&self.retiring)
     }
 }
 
-/// Drop guard releasing a [`FlowTriggerSubscriber::try_acquire_dispatch`]
-/// claim. Removing the `flow_id` on `Drop` (rather than only on the happy
-/// path) means a panicking or erroring `flows_run` still frees the flow up
-/// for its next trigger tick.
-pub(super) struct InFlightGuard {
-    set: Arc<Mutex<HashSet<String>>>,
-    flow_id: String,
-}
+async fn run_queue_worker(
+    key: DispatchKey,
+    queue: Arc<FlowRunQueue>,
+    mut receiver: mpsc::Receiver<QueuedRun>,
+    queues: Arc<Mutex<HashMap<DispatchKey, Arc<FlowRunQueue>>>>,
+    runner: Arc<RunExecutor>,
+    #[cfg(test)] retiring: Arc<tokio::sync::Notify>,
+) {
+    let mut next = receiver.recv().await;
+    loop {
+        let Some(queued) = next.take() else {
+            break;
+        };
+        let run_ctx = queued.ctx.clone();
+        let flow_id = queued.request.flow_id.clone();
+        let run = run_ctx.spawn((runner)(queued.ctx, queued.config, queued.request));
+        if let Err(error) = run.await {
+            tracing::warn!(target: "flows", %flow_id, error = %error, "[flows] trigger run task exited unexpectedly");
+        }
+        queue.outstanding.fetch_sub(1, Ordering::AcqRel);
 
-impl Drop for InFlightGuard {
-    fn drop(&mut self) {
-        // Recover from a poisoned lock (mirrors `try_acquire_dispatch`) so the
-        // flow_id is always removed — otherwise a poison would wedge this flow
-        // out of every future trigger dispatch, defeating the guard's purpose.
-        let mut set = self.set.lock().unwrap_or_else(|e| e.into_inner());
-        set.remove(&self.flow_id);
+        if let Ok(queued) = receiver.try_recv() {
+            next = Some(queued);
+            continue;
+        }
+
+        // A producer takes the same gate before sending. Once this worker
+        // holds it and observes an empty receiver, no successful send can be
+        // stranded behind a closed receiver. A sender that cloned this slot
+        // before retirement gets SendError and retries with the new slot.
+        #[cfg(test)]
+        retiring.notify_one();
+        let admission = Arc::clone(&queue.admission).lock_owned().await;
+        match receiver.try_recv() {
+            Ok(queued) => {
+                drop(admission);
+                next = Some(queued);
+            }
+            Err(mpsc::error::TryRecvError::Empty | mpsc::error::TryRecvError::Disconnected) => {
+                receiver.close();
+                let mut current = queues.lock().unwrap_or_else(|error| error.into_inner());
+                if current
+                    .get(&key)
+                    .is_some_and(|entry| Arc::ptr_eq(entry, &queue))
+                {
+                    current.remove(&key);
+                }
+                return;
+            }
+        }
+    }
+
+    let mut current = queues.lock().unwrap_or_else(|error| error.into_inner());
+    if current
+        .get(&key)
+        .is_some_and(|entry| Arc::ptr_eq(entry, &queue))
+    {
+        current.remove(&key);
     }
 }
 
