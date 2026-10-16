@@ -83,7 +83,7 @@ pub async fn sweep(host: &ProfileHost, now: DateTime<Utc>) -> SweepReport {
                 continue;
             }
         };
-        eprintln!("DBGSWEEP due {}", due.len());
+        eprintln!("DBGSWEEP due {} all={:?} now={now}", due.len(), store_in::<Vec<CronJob>>(&config,&scope,StoreOperation::List).await.map(|j| j.iter().map(|j| (j.id.clone(), j.next_run, j.enabled, j.job_type.as_str())).collect::<Vec<_>>()));
         if due.is_empty() {
             continue;
         }
