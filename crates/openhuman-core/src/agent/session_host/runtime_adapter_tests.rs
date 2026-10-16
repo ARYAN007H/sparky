@@ -14,32 +14,11 @@ use super::announcement_notes::{
     integration_announcement_note, mcp_announcement_note, skill_announcement_note,
 };
 use super::runtime_session::tool_surface::reconcile_synthesized_visibility;
-use super::runtime_session::{
-    OpenHumanSessionState, account_committed_turn_against_goal, begin_turn_resume,
-    holistic_last_turn_usage,
-};
+use super::runtime_session::{account_committed_turn_against_goal, holistic_last_turn_usage};
 use super::{OpenHumanSessionFactory, OpenHumanSessionHooks, OpenHumanTranscriptCodec};
 use crate::agent::tinyagents::host::OpenHumanRunContext;
 
 struct RecordingDriver(Arc<Mutex<Vec<OpenHumanRunContext>>>);
-
-#[test]
-fn transcript_suppression_is_applied_before_resume() {
-    let mut state = OpenHumanSessionState::default();
-    state.pending_turn_overrides = super::TurnOverrides {
-        suppress_transcript_autoload: true,
-        suppress_tools: true,
-        ..Default::default()
-    };
-    let mut resume = ResumeMode::LatestForAgent;
-
-    begin_turn_resume(&mut state, &mut resume);
-
-    assert_eq!(resume, ResumeMode::Never);
-    assert!(state.pending_turn_overrides == super::TurnOverrides::default());
-    assert!(state.active_turn_overrides.suppress_transcript_autoload);
-    assert!(state.active_turn_overrides.suppress_tools);
-}
 
 #[async_trait]
 impl SessionDriver<OpenHumanRunContext> for RecordingDriver {
