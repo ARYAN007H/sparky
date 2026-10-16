@@ -135,7 +135,7 @@ pub(crate) struct AgentInner {
     /// The agent's own in-process tools, rebuilt per turn. See
     /// [`AgentSpec::tools`](super::AgentSpec::tools) for why it is a factory.
     pub(crate) host_tools: Option<openhuman_core::agent::HostTools>,
-    pub(crate) hooks: openhuman_core::agent::hooks::HookScope,
+    pub(crate) hooks: tinyagents_hooks::scope::HookScope<openhuman_core::agent::tinyagents::host::OpenHumanRunContext, tinyagents_harness::cost::TurnCost>,
     pub(crate) lifecycle: lifecycle::Lifecycle,
     /// Built from [`ToolScopeSpec::HostOnly`]: every turn's session is built
     /// from the host tools alone.

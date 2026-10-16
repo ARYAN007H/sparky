@@ -6,7 +6,7 @@ use std::time::Duration;
 
 fn full_env() -> (HostTurnEnv, CancellationToken) {
     let token = CancellationToken::new();
-    let mut hooks = HookScope::default();
+    let mut hooks = tinyagents_hooks::scope::HookScope::<crate::agent::tinyagents::host::OpenHumanRunContext, tinyagents_harness::cost::TurnCost>::default();
     hooks.push_stop(Arc::new(BudgetStopHook::new(2.0)));
     let env = HostTurnEnv {
         spawn_depth_limit: Some(1),

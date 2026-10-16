@@ -98,7 +98,7 @@ pub struct Turn {
     control_deadline: Option<tokio::time::Instant>,
     observer: Option<Arc<dyn crate::observe::TurnObserver>>,
     trace_content: crate::observe::TraceContent,
-    hooks: openhuman_core::agent::hooks::HookScope,
+    hooks: tinyagents_hooks::scope::HookScope<openhuman_core::agent::tinyagents::host::OpenHumanRunContext, tinyagents_harness::cost::TurnCost>,
     tools: Option<openhuman_core::agent::HostTools>,
     tool_env: Option<tinytools_std::timeout::CommandEnvironment>,
 }
@@ -143,7 +143,7 @@ impl Turn {
         self
     }
 
-    pub(crate) fn with_hooks(mut self, hooks: openhuman_core::agent::hooks::HookScope) -> Self {
+    pub(crate) fn with_hooks(mut self, hooks: tinyagents_hooks::scope::HookScope<openhuman_core::agent::tinyagents::host::OpenHumanRunContext, tinyagents_harness::cost::TurnCost>) -> Self {
         self.hooks = hooks;
         self
     }

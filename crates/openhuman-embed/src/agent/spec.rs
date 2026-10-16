@@ -58,7 +58,7 @@ pub struct AgentSpec {
     composio: Option<ComposioHostCredential>,
     config_fn: Option<ConfigEdit>,
     host_tools: Option<openhuman_core::agent::HostTools>,
-    hooks: openhuman_core::agent::hooks::HookScope,
+    hooks: tinyagents_hooks::scope::HookScope<openhuman_core::agent::tinyagents::host::OpenHumanRunContext, tinyagents_harness::cost::TurnCost>,
     memory: Option<MemoryBinding>,
     subagents: Vec<(String, AgentDefinitionSpec)>,
 }
@@ -500,7 +500,7 @@ pub(crate) struct AgentSpecParts {
     pub(crate) composio: Option<ComposioHostCredential>,
     pub(crate) config_fn: Option<ConfigEdit>,
     pub(crate) host_tools: Option<openhuman_core::agent::HostTools>,
-    pub(crate) hooks: openhuman_core::agent::hooks::HookScope,
+    pub(crate) hooks: tinyagents_hooks::scope::HookScope<openhuman_core::agent::tinyagents::host::OpenHumanRunContext, tinyagents_harness::cost::TurnCost>,
     pub(crate) memory: Option<MemoryBinding>,
     pub(crate) subagents: Vec<(String, AgentDefinitionSpec)>,
 }
