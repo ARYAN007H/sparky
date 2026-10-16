@@ -35,6 +35,16 @@ pub type PrepareFn = Arc<
         + Sync,
 >;
 
+/// Where a registered provider is listed relative to the built-in ones.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum LiveProviderPlacement {
+    /// After every built-in provider (the default).
+    #[default]
+    AfterBuiltIn,
+    /// Before every built-in provider.
+    BeforeBuiltIn,
+}
+
 /// One registered live provider.
 #[derive(Clone)]
 pub struct LiveProviderEntry {
@@ -54,6 +64,9 @@ pub struct LiveProviderEntry {
     pub configure: Option<ConfigureFn>,
     /// Connects the provider.
     pub prepare: PrepareFn,
+    /// Where the provider is listed relative to the built-in ones. Providers
+    /// sharing a placement keep registration order.
+    pub placement: LiveProviderPlacement,
 }
 
 static LIVE_PROVIDERS: HookSlot<LiveProviderEntry> = HookSlot::new("voice::live::providers");
@@ -77,9 +90,11 @@ pub fn unregister_live_provider(slug: &str) -> bool {
     LIVE_PROVIDERS.unregister(slug)
 }
 
-/// Lists registered providers after the built-in ones; a registered slug that
-/// is also built in replaces the built-in row in place.
+/// Lists registered providers before or after the built-in ones according to
+/// their [`LiveProviderPlacement`]; a registered slug that is also built in
+/// replaces the built-in row in place.
 pub(super) fn merge_provider_infos(infos: &mut Vec<LiveProviderInfo>, config: &Config) {
+    let mut leading = Vec::new();
     for (slug, entry) in LIVE_PROVIDERS.entries() {
         let info = LiveProviderInfo {
             id: slug.clone(),
@@ -92,8 +107,15 @@ pub(super) fn merge_provider_infos(infos: &mut Vec<LiveProviderInfo>, config: &C
         };
         match infos.iter_mut().find(|existing| existing.id == slug) {
             Some(existing) => *existing = info,
-            None => infos.push(info),
+            None => match entry.placement {
+                LiveProviderPlacement::AfterBuiltIn => infos.push(info),
+                LiveProviderPlacement::BeforeBuiltIn => leading.push(info),
+            },
         }
+    }
+    if !leading.is_empty() {
+        leading.append(infos);
+        *infos = leading;
     }
 }
 

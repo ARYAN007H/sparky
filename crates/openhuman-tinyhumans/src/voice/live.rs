@@ -9,7 +9,7 @@
 use openhuman_embed::__host::config::Config;
 use openhuman_embed::__host::security::credentials::session_support::resolve_backend_credential;
 use openhuman_embed::__host::voice_registry::{
-    register_live_provider, LiveProviderEntry, LiveProviderKind, LiveVoiceError, PreparedProvider,
+    register_live_provider, LiveProviderEntry, LiveProviderKind, LiveProviderPlacement, LiveVoiceError, PreparedProvider,
     GEMINI_LANGUAGES, GEMINI_VOICES, LIVE_PROVIDER_ELEVENLABS_HOSTED, LIVE_PROVIDER_GEMINI_HOSTED,
 };
 use reqwest::Method;
@@ -150,7 +150,8 @@ pub(crate) async fn prepare_elevenlabs(
     })
 }
 
-/// Registers both hosted live providers under their configured ids.
+/// Registers both hosted live providers under their configured ids, listed
+/// ahead of the built-in providers as the catalogue has always shown them.
 pub(super) fn register() {
     register_live_provider(
         LIVE_PROVIDER_GEMINI_HOSTED,
@@ -163,6 +164,7 @@ pub(super) fn register() {
             configured: Arc::new(backend_ready),
             configure: Some(Arc::new(configure_gemini)),
             prepare: Arc::new(|config, live| Box::pin(prepare_gemini(config, live))),
+            placement: LiveProviderPlacement::BeforeBuiltIn,
         },
     );
     register_live_provider(
@@ -176,6 +178,7 @@ pub(super) fn register() {
             configured: Arc::new(backend_ready),
             configure: Some(Arc::new(configure_elevenlabs)),
             prepare: Arc::new(|config, live| Box::pin(prepare_elevenlabs(config, live))),
+            placement: LiveProviderPlacement::BeforeBuiltIn,
         },
     );
     log::debug!("{LOG_PREFIX} registered hosted live providers");

@@ -21,7 +21,28 @@ fn entry(label: &str) -> LiveProviderEntry {
                 })
             })
         }),
+        placement: LiveProviderPlacement::AfterBuiltIn,
     }
+}
+
+#[test]
+fn before_built_in_providers_lead_the_listing_in_registration_order() {
+    let leading = |label: &str| LiveProviderEntry {
+        placement: LiveProviderPlacement::BeforeBuiltIn,
+        ..entry(label)
+    };
+    register_live_provider("test-first", leading("First"));
+    register_live_provider("test-second", leading("Second"));
+    register_live_provider("test-last", entry("Last"));
+    let infos = provider_infos(&Config::default());
+    for slug in ["test-first", "test-second", "test-last"] {
+        unregister_live_provider(slug);
+    }
+    let ids: Vec<_> = infos.iter().map(|i| i.id.as_str()).collect();
+    assert_eq!(
+        ids,
+        ["test-first", "test-second", "gemini", "sarvam", "test-last"]
+    );
 }
 
 #[test]

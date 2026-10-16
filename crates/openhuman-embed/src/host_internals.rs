@@ -395,7 +395,7 @@ pub mod voice_registry {
     };
     pub use openhuman_core::voice::live::registry::{
         register_live_provider, register_live_provider_in, unregister_live_provider, ConfigureFn,
-        ConfiguredFn, LiveFuture, LiveProviderEntry, PrepareFn,
+        ConfiguredFn, LiveFuture, LiveProviderEntry, LiveProviderPlacement, PrepareFn,
     };
     pub use openhuman_core::voice::live::types::{LiveProviderInfo, LiveProviderKind};
     pub use openhuman_core::voice::live::{
