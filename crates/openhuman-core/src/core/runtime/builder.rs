@@ -170,6 +170,7 @@ pub struct CoreBuilder {
     port: Option<u16>,
     config: Option<crate::config::Config>,
     backend_transport: Option<std::sync::Arc<dyn crate::backend::transport::BackendTransport>>,
+    extensions: crate::core::slots::Extensions,
 }
 
 impl CoreBuilder {
@@ -186,7 +187,18 @@ impl CoreBuilder {
             port: None,
             config: None,
             backend_transport: None,
+            extensions: crate::core::slots::Extensions::new(),
         }
+    }
+
+    /// Binds hook registrations (see [`crate::core::slots`]) to the context
+    /// this builder creates, ahead of any process-wide registration. Fill an
+    /// [`Extensions`](crate::core::slots::Extensions) with
+    /// [`HookSlot::register_in`](crate::core::slots::HookSlot::register_in)
+    /// and pass it here; derived per-agent contexts inherit it.
+    pub fn extensions(mut self, extensions: crate::core::slots::Extensions) -> Self {
+        self.extensions = extensions;
+        self
     }
 
     /// Bind the transport this core's handlers reach the hosted TinyHumans
@@ -352,6 +364,7 @@ impl CoreBuilder {
             self.backend_transport,
         )
         .await?;
+        ctx.extensions().merge_from(&self.extensions);
 
         let components = config
             .as_ref()
