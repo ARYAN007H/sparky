@@ -1,10 +1,10 @@
 mod common;
 use common::{chat_completion, chat_requests, offline_config, runtime, stub_backend};
+use openhuman_embed::session_store::SessionRef;
 use openhuman_embed::{
     AgentDefinitionSpec, AgentSpec, HostTools, HostTurnTools, InMemorySessionStores, Provider,
     Runtime, SessionStoreProvider, Tool, ToolScopeSpec, Workspace,
 };
-use openhuman_embed::session_store::SessionRef;
 use std::sync::Arc;
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, ResponseTemplate};

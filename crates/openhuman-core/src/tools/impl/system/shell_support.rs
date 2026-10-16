@@ -83,7 +83,11 @@ pub(super) fn container_environment(
 ) -> Option<std::collections::BTreeMap<String, String>> {
     let mut env = std::collections::BTreeMap::new();
     if let Some(explicit) = explicit {
-        env.extend(explicit.iter().map(|(name, value)| (name.clone(), value.clone())));
+        env.extend(
+            explicit
+                .iter()
+                .map(|(name, value)| (name.clone(), value.clone())),
+        );
     }
     let inherited = if explicit.is_none() {
         crate::sandbox::ops::SANDBOX_ENV_PASSTHROUGH
@@ -100,7 +104,8 @@ pub(super) fn container_environment(
         explicit
             .and_then(|overrides| overrides.get(name).map(std::ffi::OsString::from))
             .or_else(|| {
-                explicit.is_none()
+                explicit
+                    .is_none()
                     .then(|| tinytools_std::timeout::CommandEnvironment::var_os(name))
                     .flatten()
             })

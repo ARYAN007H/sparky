@@ -715,10 +715,8 @@ impl ShellTool {
             "[shell] routing to sandbox backend"
         );
 
-        let mut extra_env = std::collections::HashMap::<
-            std::ffi::OsString,
-            std::ffi::OsString,
-        >::new();
+        let mut extra_env =
+            std::collections::HashMap::<std::ffi::OsString, std::ffi::OsString>::new();
         if let Some(overrides) = command_environment {
             extra_env.extend(overrides.iter().map(|(name, value)| {
                 (

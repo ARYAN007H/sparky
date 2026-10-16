@@ -593,10 +593,7 @@ impl OpenHumanRunContext {
         }
         self.turn_deadline = env.turn_deadline.or(self.turn_deadline);
         self.tool_call_limit = env.tool_call_limit.or(self.tool_call_limit);
-        self.command_environment = env
-            .command_environment
-            .clone()
-            .or(self.command_environment);
+        self.command_environment = env.command_environment.clone().or(self.command_environment);
         self.memory_identity = env.memory_identity.clone().or(self.memory_identity);
         self.core = env.core.clone().or(self.core);
         self.stop_hooks
