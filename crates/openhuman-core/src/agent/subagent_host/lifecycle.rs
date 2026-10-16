@@ -335,9 +335,9 @@ impl OpenHumanSubagentHost {
         continuation: bool,
         checkpoint_dir: PathBuf,
     ) -> Result<SubagentRunOutcome, SubagentRunError> {
-        let failures = Arc::new(Mutex::new(None));
-        let host_outcome = Arc::new(Mutex::new(None));
-        let plan = Arc::new(Mutex::new(None));
+        let failures = Arc::new(Mutex::new(HashMap::new()));
+        let host_outcome = Arc::new(Mutex::new(HashMap::new()));
+        let plan = Arc::new(Mutex::new(HashMap::new()));
         let fallback_agent_id = self.definition.id.clone();
         let request = HostRequest {
             definition: self.definition,
@@ -387,13 +387,16 @@ impl OpenHumanSubagentHost {
                 host_outcome
                     .lock()
                     .unwrap_or_else(|p| p.into_inner())
-                    .take(),
+                    .remove(&task_key),
                 &persistence,
                 &task_key,
                 &fallback_agent_id,
             )),
             Err(error) => {
-                if let Some(host_error) = failures.lock().unwrap_or_else(|p| p.into_inner()).take()
+                if let Some(host_error) = failures
+                    .lock()
+                    .unwrap_or_else(|p| p.into_inner())
+                    .remove(&task_key)
                 {
                     Err(host_error)
                 } else {
@@ -416,7 +419,7 @@ struct PreparedHostPlan {
 }
 
 struct OpenHumanPlanner {
-    plan: Arc<Mutex<Option<PreparedHostPlan>>>,
+    plans: Arc<Mutex<HashMap<SubagentTaskKey, PreparedHostPlan>>>,
 }
 
 /// Appends the new continuation input to the exact durable history supplied by
@@ -439,6 +442,7 @@ impl SubagentPlanner<crate::agent::tinyagents::host::OpenHumanRunContext, HostRe
     ) -> Result<PreparedSubagent<crate::agent::tinyagents::host::OpenHumanRunContext>, SubagentError>
     {
         let request = request.into_parts();
+        let task_key = request.task_key.clone();
         let mut options = request.host_request.options;
         let input = request.input;
         // The generic persistence seam supplies the pause *before* host
@@ -459,10 +463,16 @@ impl SubagentPlanner<crate::agent::tinyagents::host::OpenHumanRunContext, HostRe
         };
         options.task_id = Some(request.task_key.task_id.clone());
         options.run_context = request.run_context.data.clone();
-        *self.plan.lock().unwrap_or_else(|p| p.into_inner()) = Some(PreparedHostPlan {
-            definition: request.host_request.definition.clone(),
-            options,
-        });
+        self.plans
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .insert(
+                task_key,
+                PreparedHostPlan {
+                    definition: request.host_request.definition.clone(),
+                    options,
+                },
+            );
         // The host leaf resolves the real tool snapshot and policy; an empty
         // declaration here advertises no unresolved authority.
         Ok(PreparedSubagent::new(
@@ -476,9 +486,9 @@ impl SubagentPlanner<crate::agent::tinyagents::host::OpenHumanRunContext, HostRe
 }
 
 struct OpenHumanExecutor {
-    plan: Arc<Mutex<Option<PreparedHostPlan>>>,
-    failures: Arc<Mutex<Option<SubagentRunError>>>,
-    host_outcome: Arc<Mutex<Option<SubagentRunOutcome>>>,
+    plans: Arc<Mutex<HashMap<SubagentTaskKey, PreparedHostPlan>>>,
+    failures: Arc<Mutex<HashMap<SubagentTaskKey, SubagentRunError>>>,
+    host_outcome: Arc<Mutex<HashMap<SubagentTaskKey, SubagentRunOutcome>>>,
 }
 
 #[async_trait]
@@ -487,14 +497,15 @@ impl SubagentExecutor<crate::agent::tinyagents::host::OpenHumanRunContext> for O
         &self,
         execution: SubagentExecution<crate::agent::tinyagents::host::OpenHumanRunContext>,
     ) -> Result<SubagentOutcome, SubagentError> {
+        let task_key = execution.task_key.clone();
         let PreparedHostPlan {
             definition,
             mut options,
         } = self
-            .plan
+            .plans
             .lock()
             .unwrap_or_else(|p| p.into_inner())
-            .take()
+            .remove(&task_key)
             .ok_or_else(|| {
                 SubagentError::Execution("OpenHuman subagent plan was consumed".into())
             })?;
@@ -516,12 +527,17 @@ impl SubagentExecutor<crate::agent::tinyagents::host::OpenHumanRunContext> for O
         .await
         {
             Ok(outcome) => {
-                *self.host_outcome.lock().unwrap_or_else(|p| p.into_inner()) =
-                    Some(outcome.clone());
+                self.host_outcome
+                    .lock()
+                    .unwrap_or_else(|p| p.into_inner())
+                    .insert(task_key, outcome.clone());
                 Ok(host_outcome_to_neutral(outcome, &definition, &options))
             }
             Err(error) => {
-                *self.failures.lock().unwrap_or_else(|p| p.into_inner()) = Some(error);
+                self.failures
+                    .lock()
+                    .unwrap_or_else(|p| p.into_inner())
+                    .insert(task_key, error);
                 Err(SubagentError::Execution(
                     "OpenHuman execution failed".into(),
                 ))
@@ -536,7 +552,7 @@ impl SubagentExecutor<crate::agent::tinyagents::host::OpenHumanRunContext> for O
 /// one another's lifecycle.
 pub(super) struct OpenHumanPersistence {
     checkpoint_dir: std::path::PathBuf,
-    host_outcome: Arc<Mutex<Option<SubagentRunOutcome>>>,
+    host_outcome: Arc<Mutex<HashMap<SubagentTaskKey, SubagentRunOutcome>>>,
 }
 
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -559,11 +575,14 @@ impl OpenHumanPersistence {
     pub(super) fn new(checkpoint_dir: std::path::PathBuf) -> Self {
         Self {
             checkpoint_dir,
-            host_outcome: Arc::new(Mutex::new(None)),
+            host_outcome: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 
-    fn with_host_outcome(mut self, host_outcome: Arc<Mutex<Option<SubagentRunOutcome>>>) -> Self {
+    fn with_host_outcome(
+        mut self,
+        host_outcome: Arc<Mutex<HashMap<SubagentTaskKey, SubagentRunOutcome>>>,
+    ) -> Self {
         self.host_outcome = host_outcome;
         self
     }
