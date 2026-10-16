@@ -52,6 +52,10 @@ mod tools_e2e_tests;
 mod wait_subagent;
 
 pub(crate) use dispatch::DelegationDispatch;
+pub(crate) use list_subagents::overlay_task_store_status;
+pub(crate) use wait_subagent::{
+    format_running_wait_message, requested_timeout_secs, wait_status_payload,
+};
 
 /// A minimal live TinyAgents carrier over `parent`, for tests that drive a
 /// concrete tool directly (outside an agent turn) under an explicit parent

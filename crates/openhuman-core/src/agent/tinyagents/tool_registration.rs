@@ -124,7 +124,7 @@ fn project_list_subagents(
         >(row) else {
             continue;
         };
-        crate::agent::orchestration::tools::list_subagents::overlay_task_store_status(
+        crate::agent::orchestration::tools::overlay_task_store_status(
             &mut summary,
             &parent_ctx.workspace_dir,
             &parent_ctx.session_id,
@@ -220,7 +220,7 @@ fn project_wait_subagent(
                 &parent_ctx.workspace_dir,
                 &task_id,
             );
-            let payload = crate::agent::orchestration::tools::wait_subagent::wait_status_payload(
+            let payload = crate::agent::orchestration::tools::wait_status_payload(
                 Some(&resume),
                 &task_id,
                 "completed",
@@ -236,7 +236,7 @@ fn project_wait_subagent(
         }
         "awaiting_input" | "awaiting_user" => {
             let question = output;
-            let payload = crate::agent::orchestration::tools::wait_subagent::wait_status_payload(
+            let payload = crate::agent::orchestration::tools::wait_status_payload(
                 Some(&resume),
                 &task_id,
                 "awaiting_user",
@@ -264,7 +264,7 @@ fn project_wait_subagent(
             ToolResult::success(message)
         }
         "failed" | "incomplete" | "cancelled" => {
-            let payload = crate::agent::orchestration::tools::wait_subagent::wait_status_payload(
+            let payload = crate::agent::orchestration::tools::wait_status_payload(
                 Some(&resume),
                 &task_id,
                 "failed",
@@ -278,12 +278,10 @@ fn project_wait_subagent(
             ))
         }
         _ => ToolResult::success(
-            crate::agent::orchestration::tools::wait_subagent::format_running_wait_message(
+            crate::agent::orchestration::tools::format_running_wait_message(
                 Some(&resume),
                 &task_id,
-                crate::agent::orchestration::tools::wait_subagent::requested_timeout_secs(
-                    arguments,
-                ),
+                crate::agent::orchestration::tools::requested_timeout_secs(arguments),
             ),
         ),
     }
