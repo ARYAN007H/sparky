@@ -98,14 +98,6 @@ pub struct CoreContext {
     /// [`CoreContext::derive_with`] can turn it off so an embedded agent sees
     /// only the skills its host installed for it, never the operator's.
     user_skill_roots: bool,
-    /// The backend transport this context's handlers reach the hosted
-    /// TinyHumans backend through, when the host supplied one via
-    /// [`CoreBuilder::backend_transport`](crate::core::runtime::CoreBuilder::backend_transport).
-    /// `None` means "fall back to the process-global transport" — see
-    /// [`crate::backend::transport::resolve_backend_transport`] for the order.
-    /// Inherited unchanged by every context derived through
-    /// [`CoreContext::derive_with`].
-    backend_transport: Option<Arc<dyn crate::backend::transport::BackendTransport>>,
     /// Hook registrations bound to this context (see [`crate::core::slots`]).
     /// Empty unless the host supplied some through
     /// [`CoreBuilder::extensions`](crate::core::runtime::CoreBuilder::extensions);
@@ -174,15 +166,10 @@ impl CoreContext {
         mut domains: crate::core::runtime::DomainSet,
         mut tool_groups: crate::tools::toolpacks::ToolGroups,
         preloaded_config: Option<crate::config::Config>,
-        backend_transport: Option<Arc<dyn crate::backend::transport::BackendTransport>>,
     ) -> anyhow::Result<(Arc<CoreContext>, bool, Option<crate::config::Config>)> {
         log::debug!(
             "[core-context] init: host_kind={host_kind:?} domains={domains:?} \
-             tool_groups={tool_groups:?} backend_transport={}",
-            backend_transport
-                .as_ref()
-                .map(|t| t.name())
-                .unwrap_or("<process-global>")
+             tool_groups={tool_groups:?}"
         );
         crate::core::runtime::mode::admit_core(host_kind, DEFAULT_CONTEXT.get().is_some())
             .map_err(|e| anyhow::anyhow!("[core-context] {e}"))?;
@@ -294,7 +281,6 @@ impl CoreContext {
             components,
             embedder_config,
             user_skill_roots: true,
-            backend_transport,
             extensions: Default::default(),
             turn_origin: None,
             channel_thread: None,
@@ -427,7 +413,6 @@ impl CoreContext {
             components: self.components,
             embedder_config: Some(overlay.config),
             user_skill_roots: overlay.user_skill_roots,
-            backend_transport: self.backend_transport.clone(),
             extensions: self.extensions.clone(),
             turn_origin: self.turn_origin.clone(),
             channel_thread: self.channel_thread.clone(),
@@ -463,13 +448,6 @@ impl CoreContext {
             Self::current()
         };
         ctx.map(|ctx| ctx.extensions.clone())
-    }
-
-    /// The backend transport bound to this context, if the host supplied one.
-    pub fn backend_transport(
-        &self,
-    ) -> Option<Arc<dyn crate::backend::transport::BackendTransport>> {
-        self.backend_transport.clone()
     }
 
     /// The resolved per-user workspace directory this context is bound to.

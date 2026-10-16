@@ -33,7 +33,6 @@ impl CoreContext {
             components: self.components,
             embedder_config: self.embedder_config.clone(),
             user_skill_roots: self.user_skill_roots,
-            backend_transport: self.backend_transport.clone(),
             extensions: self.extensions.clone(),
             turn_origin: self.turn_origin.clone(),
             channel_thread: self.channel_thread.clone(),

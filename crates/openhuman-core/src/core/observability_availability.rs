@@ -7,14 +7,13 @@
 //! signal, so [`super::expected_error_kind`] demotes all of them.
 
 /// Sentinel prefix on the error string a backend-touching call returns when
-/// the core has no [`BackendTransport`](crate::backend::transport::BackendTransport)
-/// installed. `backend::client::flatten_authed_error` and the integrations client
-/// build their message from this constant; [`is_backend_unavailable_message`]
+/// no backend connection is
+/// installed. The hosted layer builds its message from this constant; [`is_backend_unavailable_message`]
 /// classifies it as [`super::ExpectedErrorKind::BackendUnavailable`].
 pub const BACKEND_UNAVAILABLE_PREFIX: &str = "BACKEND_UNAVAILABLE:";
 
 /// Sentinel prefix on the error string a backend call returns when the backend
-/// rejects the stored TinyHumans API key (`backend::client::flatten_authed_error`).
+/// rejects the stored TinyHumans API key.
 /// [`super::expected_error_kind`] demotes it: the fix is a new key, not a code
 /// change.
 pub const API_KEY_REJECTED_PREFIX: &str = "API_KEY_REJECTED:";
