@@ -59,7 +59,7 @@ the gate. Tests use a `_for_test` variant that skips the permit.
 ## Not routed through triage
 
 `TriggerEnvelope::from_cron` still exists, but only the manual RPCs
-`agent.triage_evaluate` ([`agent/schemas.rs`](../schemas.rs)) and `webhooks.trigger_agent`
+`agent.triage_evaluate` ([`agent_runs/schemas.rs`](../../agent_runs/schemas.rs)) and `webhooks.trigger_agent`
 ([`skills/webhooks/ops.rs`](../../skills/webhooks/ops.rs)) build one. The cron scheduler does not call
 `run_triage`: `cron/scheduler/agent_run.rs::run_agent_job` runs the job's
 agent directly, and `scheduler/delivery.rs` hard-codes
@@ -97,7 +97,7 @@ Re-exported from [`mod.rs`](./mod.rs):
 - `crates/openhuman-core/src/desktop/notifications/rpc.rs`: background
   triage spawned after `notification_ingest`; score persisted via
   `store::update_triage`, origin `local_trigger_origin`.
-- `crates/openhuman-core/src/agent/schemas.rs`: `agent.triage_evaluate` RPC
+- `crates/openhuman-core/src/agent_runs/schemas.rs`: `agent.triage_evaluate` RPC
   (synthetic trigger from any source, optional dry-run without
   `apply_decision`).
 

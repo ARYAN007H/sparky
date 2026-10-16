@@ -35,7 +35,7 @@ const LEGACY_LIMIT_ENTRIES = [
   ["crates/openhuman-core/src/agent/session_host/builder/factory.rs", 964],
   ["crates/openhuman-core/src/agent/subagent_host/lifecycle.rs", 1235],
   ["crates/openhuman-core/src/agent/subagent_host/ops/runner.rs", 1042],
-  ["crates/openhuman-core/src/web_chat/progress_bridge.rs", 1171],
+  ["crates/openhuman-core/src/web_chat/progress_bridge.rs", 1117],
   // These established external test modules grew with upstream coverage. Pin
   // their current sizes while follow-up work separates their test concerns.
   // `core/` was pruned from the line limit by name until these pins; its

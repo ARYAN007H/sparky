@@ -33,7 +33,7 @@ detail.
 
 A conversation's durable identity is `tinyagents_session::transcript::SessionRef`,
 derived from the thread id and the agent id, with no timestamp in the stem,
-so one conversation always resolves to the same file. `session_api.rs` binds
+so one conversation always resolves to the same file. The runtime binds
 that identity with `set_thread_id` and resumes with `ResumeMode::Session`; it
 does not mint stems, seed history by hand, or pick a transcript by recency.
 
@@ -47,8 +47,8 @@ session instance rather than only on a brand-new thread.
 
 Compaction never erases history. It seals the current generation and opens
 the next one, recording the sealed generation as the new one's parent; the
-sealed file stays on disk, and `session_api.rs` is what lets a caller list a
-long conversation's generations without reading the whole chain.
+sealed file stays on disk. TinyAgents owns the generation chain and its
+transcript lookup.
 
 ## Where next
 
