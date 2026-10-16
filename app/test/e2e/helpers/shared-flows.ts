@@ -8,6 +8,7 @@
  */
 import { getRequestLog } from '../mock-server';
 import { waitForAppReady, waitForAuthBootstrap as waitForAuthenticatedCore } from './app-helpers';
+import { callOpenhumanRpc } from './core-rpc';
 import { triggerAuthDeepLink } from './deep-link-helpers';
 import {
   clickButton,
@@ -964,8 +965,23 @@ export async function performFullLogin(
         };
       })
       .catch(() => null);
+    const [sessionState, sessionToken] = await Promise.all([
+      callOpenhumanRpc('openhuman.auth_get_state').catch(() => null),
+      callOpenhumanRpc('openhuman.auth_get_session_token').catch(() => null),
+    ]);
+    const stateValue = sessionState?.result?.value ?? sessionState?.result;
+    const tokenValue = sessionToken?.result?.value ?? sessionToken?.result;
+    const sessionRpc = {
+      stateOk: sessionState?.ok ?? false,
+      authenticated: stateValue?.isAuthenticated ?? null,
+      credential: stateValue?.credential ?? null,
+      tokenOk: sessionToken?.ok ?? false,
+      hasStoredToken: Boolean(tokenValue?.token),
+      stateHttpStatus: sessionState?.httpStatus ?? null,
+      tokenHttpStatus: sessionToken?.httpStatus ?? null,
+    };
     console.error(
-      `${logPrefix} auth bootstrap failed; mock auth endpoints=${JSON.stringify(authRequests)}; core state=${JSON.stringify(coreState)}`
+      `${logPrefix} auth bootstrap failed; mock auth endpoints=${JSON.stringify(authRequests)}; core state=${JSON.stringify(coreState)}; session RPC=${JSON.stringify(sessionRpc)}`
     );
     throw error;
   }
