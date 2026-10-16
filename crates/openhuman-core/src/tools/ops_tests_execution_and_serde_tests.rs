@@ -206,16 +206,11 @@ fn all_tools_registers_no_hosted_integration_families_without_a_tool_source() {
             "`{hosted}` must come from a tool source, not the core; got: {names:?}"
         );
     }
-    // Composio registers on the session alone; the route is a host's concern.
-    assert_contains_all(
-        &names,
-        &[
-            "composio_list_toolkits",
-            "composio_list_connections",
-            "composio_authorize",
-            "composio_list_tools",
-            "composio_execute",
-        ],
+    // Composio's backend mode is a route a host registers; a bare core has
+    // none, so a session alone does not register the composio tools.
+    assert!(
+        !names.iter().any(|n| n.starts_with("composio_")),
+        "composio backend mode needs a registered route; got: {names:?}"
     );
     // The backend retired its Twilio route; the agent must not be offered a
     // tool that can only fail.

@@ -164,6 +164,7 @@ fn an_unknown_mode_fails_loudly_and_names_the_alternatives() {
 fn an_empty_mode_is_treated_as_the_backend_default() {
     // `serde(default)` already gives "backend" for a missing field, but a
     // literal empty string in TOML would otherwise be rejected.
+    crate::integrations::composio::test_backend_route::register();
     let mut config = bare_config();
     config.composio.mode = String::new();
 
