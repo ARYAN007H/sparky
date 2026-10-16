@@ -23,7 +23,6 @@ pub mod config;
 mod context_wiring;
 mod deadline_wind_down;
 pub mod discovery;
-mod embeddings;
 pub mod host;
 pub(crate) mod hosted_error;
 pub(crate) mod journal;
@@ -74,7 +73,6 @@ pub(crate) use crate::agent::message_convert::chat_message_to_message;
 pub(crate) use crate::agent::message_convert::ta_call_to_oh_call;
 
 #[allow(unused_imports)] // Wired into the recall/retrieval facade in workstream 09.2.
-pub(crate) use embeddings::ProviderEmbeddingModel;
 pub(crate) use observability::SubagentScope;
 pub(crate) use reasoning::{apply_requested_effort, parse_reasoning_effort};
 pub(crate) use turn_exec::TurnSpec;

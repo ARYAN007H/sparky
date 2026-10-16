@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use tinyagents_definition::DefinitionRegistry;
 use tinyagents_harness::host::{
-    BudgetGate, ContextComposer, LearningSink, ModelResolver, ProgressSink, SecurityGate,
+    BudgetGate, ContextComposer, FixedModelResolver, ModelResolver, ProgressSink, SecurityGate,
     ToolOutcomeClassifier,
 };
 
@@ -20,7 +20,9 @@ fn inputs() -> (OpenHumanHostBundleInputs, OpenHumanRunContext) {
             security_policy: Arc::new(SecurityPolicy::default()),
             tool_sets: Vec::new(),
             tool_policy: None,
-            post_turn_hooks: Vec::new(),
+            model_resolver: Arc::new(FixedModelResolver::new(Arc::new(
+                tinyagents_harness::testkit::ScriptedModel::new(Vec::new()),
+            ))),
             session_definition: None,
         },
         turn,
@@ -38,7 +40,6 @@ fn factory_records_every_concrete_adapter_in_one_bundle() {
     let models: Arc<dyn ModelResolver<()>> = host.models.clone();
     let budget: Arc<dyn BudgetGate> = host.budget.clone();
     let progress: Arc<dyn ProgressSink> = host.progress.clone();
-    let learning: Arc<dyn LearningSink> = host.learning.clone();
     let outcomes: Arc<dyn ToolOutcomeClassifier> = host.tool_outcomes.clone();
 
     assert!(Arc::ptr_eq(&context, &host.capabilities.context));
@@ -55,10 +56,7 @@ fn factory_records_every_concrete_adapter_in_one_bundle() {
         &progress,
         host.capabilities.progress.as_ref().expect("progress")
     ));
-    assert!(Arc::ptr_eq(
-        &learning,
-        host.capabilities.learning.as_ref().expect("learning")
-    ));
+    assert!(host.capabilities.learning.is_none());
     assert!(Arc::ptr_eq(
         &outcomes,
         host.capabilities

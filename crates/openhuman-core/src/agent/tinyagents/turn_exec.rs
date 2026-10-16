@@ -591,7 +591,8 @@ async fn drive_turn(
                     tool_policy: tool_policy
                         .as_ref()
                         .map(|policy| Arc::new(policy.session.clone())),
-                    model_resolver: hosted_model_resolver,
+                    model_resolver: hosted_model_resolver
+                        .expect("hosted root retained its selected model resolver"),
                 },
                 &run_context,
             );
