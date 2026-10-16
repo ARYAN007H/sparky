@@ -181,6 +181,12 @@ cleanup() {
         "${E2E_ARTIFACTS_DIR:-$APP_DIR/test/e2e/artifacts}/${LOG_SUFFIX}-app-env-check.log" \
         2>/dev/null || true
     fi
+    if [ -f "${OPENHUMAN_WORKSPACE:-}/e2e-app-process.log" ]; then
+      mkdir -p "${E2E_ARTIFACTS_DIR:-$APP_DIR/test/e2e/artifacts}"
+      cp "${OPENHUMAN_WORKSPACE}/e2e-app-process.log" \
+        "${E2E_ARTIFACTS_DIR:-$APP_DIR/test/e2e/artifacts}/${LOG_SUFFIX}-app-process.log" \
+        2>/dev/null || true
+    fi
     if [ -f "${OPENHUMAN_WORKSPACE:-}/webkit-driver-env-check.log" ]; then
       mkdir -p "${E2E_ARTIFACTS_DIR:-$APP_DIR/test/e2e/artifacts}"
       cp "${OPENHUMAN_WORKSPACE}/webkit-driver-env-check.log" \
@@ -382,6 +388,8 @@ if [ "$OS" = "Linux" ] && [ "${E2E_USE_TAURI_DRIVER:-0}" = "1" ]; then
       fi
     done
     printf 'printf "launcher_started=1 key_present=%%s workspace_present=%%s backend_url_present=%%s\\n" "${OPENHUMAN_KEYRING_MASTER_KEY:+yes}" "${OPENHUMAN_WORKSPACE:+yes}" "${BACKEND_URL:+yes}" > %q\n' "$OPENHUMAN_WORKSPACE/e2e-app-env-check.log"
+    printf 'exec %q "$@" >> %q 2>&1\n' \
+      "$APP_BIN" "$OPENHUMAN_WORKSPACE/e2e-app-process.log"
   } > "$E2E_APP_WRAPPER"
   chmod 700 "$E2E_APP_WRAPPER"
   export OPENHUMAN_E2E_APP_BINARY="$E2E_APP_WRAPPER"
