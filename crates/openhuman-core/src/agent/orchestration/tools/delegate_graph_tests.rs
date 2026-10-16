@@ -4,8 +4,9 @@ use super::*;
 async fn validation_errors_name_the_delegate_graph_tool() {
     let tool: Arc<dyn Tool> = Arc::new(DelegateGraphTool::new());
     let dispatch = DelegateGraphDispatch::new(tool);
-    let parent = crate::agent::tinyhumans::host::OpenHumanRunContext::new()
-        .into_tinyagents(tinyagents_harness::context::RunConfig::new("delegate-graph-test"));
+    let parent = crate::agent::tinyagents::host::OpenHumanRunContext::new().into_tinyagents(
+        tinyagents_harness::context::RunConfig::new("delegate-graph-test"),
+    );
 
     let result = dispatch
         .execute(

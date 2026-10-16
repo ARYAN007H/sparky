@@ -320,12 +320,32 @@ fn awaiting_input_does_not_dedupe_the_later_completion() {
         true,
         Some("thread-resume".into()),
     ));
-    record(w, "sess-resume", "sub-resume", "finished after answer", Some("thread-resume"));
+    record(
+        w,
+        "sess-resume",
+        "sub-resume",
+        "finished after answer",
+        Some("thread-resume"),
+    );
 
     let pending = pending_for(w, "thread-resume");
-    assert_eq!(pending.len(), 2, "pause notice and final result both survive");
-    assert!(pending.iter().any(|record| record.result.text.contains("which repo?")));
-    assert!(pending.iter().any(|record| record.result.text == "finished after answer"));
+    assert_eq!(
+        pending.len(),
+        2,
+        "pause notice and final result both survive"
+    );
+    let pause = pending
+        .iter()
+        .find(|record| record.result.text.contains("which repo?"))
+        .expect("pause notice remains queued");
+    let completion = pending
+        .iter()
+        .find(|record| record.result.text == "finished after answer")
+        .expect("final completion remains queued");
+    assert_ne!(
+        pause.task_id, completion.task_id,
+        "pause has a separate dedupe key"
+    );
 }
 
 #[test]
