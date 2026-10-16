@@ -223,7 +223,7 @@
     "file": "crates/openhuman-core/src/tools/sources.rs",
     "scope": "",
     "name": "TOOL_SOURCES",
-    "type": "HookSlot<ToolSourceFactory>",
+    "type": "HookSlot<ToolSourceEntry>",
     "count": 1,
     "category": "A",
     "reason": "Host wiring: an id-keyed table of factories the embedding host registers at startup (core::slots::HookSlot). It holds code, never tenant data; a per-context override table lives on the CoreContext, not here.",
