@@ -22,7 +22,7 @@ the `[memory]` config into either `Binding::On(BoundEngine)` or
 
 | Engine | Endpoint | Credential | Off when |
 | --- | --- | --- | --- |
-| `tinyhumans` | `[memory.engines.tinyhumans] endpoint`, else `backend::base_url` | the host's backend credential, resolved per request | signed out, or no backend transport installed |
+| `tinyhumans` | registered by `openhuman-tinyhumans` through `engine_registry` (`[memory.engines.tinyhumans] endpoint`, else its control-plane origin) | the host's backend credential, resolved per request | not registered, or signed out |
 | `cortexdb` | `[memory.engines.cortexdb] endpoint`, else CortexDB's managed API | the API key stored in the keyring as `memory-cortexdb` | no key stored |
 
 The core never keeps a TinyHumans credential of its own. The bearer is
