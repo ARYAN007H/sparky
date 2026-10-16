@@ -17,7 +17,7 @@ langfuse = ["openhuman-embed/langfuse"]
 # ranker (`tinytools-jev` over the TinyHumans System One proxy). On by
 # default and forwarded by every shipped host; without it the core ranks
 # `tool_search` with BM25 alone.
-default = ["openhuman-embed/default", "jev"]
+default = ["openhuman-embed/default", "jev", "media"]
 jev = ["dep:tinytools-jev", "dep:tinyjevclient"]
 http-server = ["openhuman-embed/http-server"]
 inference = ["openhuman-embed/inference"]
