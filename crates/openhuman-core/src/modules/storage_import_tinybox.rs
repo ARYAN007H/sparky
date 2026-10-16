@@ -51,8 +51,8 @@ pub(crate) enum Outcome {
 
 /// Imports the index under `<workspace_dir>/jails` into the module's scope of
 /// the installed backend.
-pub(crate) async fn import_legacy(workspace_dir: &Path) -> Result<Outcome> {
-    let Some(scoped) = support::module_scope(MODULE_ID)? else {
+pub(crate) async fn import_legacy(ctx: &DispatchCtx, workspace_dir: &Path) -> Result<Outcome> {
+    let Some(scoped) = support::module_scope(ctx, MODULE_ID)? else {
         return Ok(Outcome::NoBackend);
     };
     import_into(&scoped, &workspace_dir.join(BASE_DIR)).await

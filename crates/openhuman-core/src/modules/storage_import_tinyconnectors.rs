@@ -54,11 +54,11 @@ pub(crate) enum Outcome {
 
 /// Imports the legacy files under `state_dir` into the module's scope of the
 /// installed backend.
-pub(crate) async fn import_legacy(state_dir: &Path) -> Result<Outcome> {
-    let Some(scoped) = support::module_scope(MODULE_ID)? else {
+pub(crate) async fn import_legacy(ctx: &DispatchCtx, state_dir: &Path) -> Result<Outcome> {
+    let Some(scoped) = support::module_scope(ctx, MODULE_ID)? else {
         return Ok(Outcome::NoBackend);
     };
-    import_into(&scoped, state_dir).await
+    import_into(ctx, &scoped, state_dir).await
 }
 
 /// A preference file: the toolkit key and its bare JSON value.
@@ -79,7 +79,11 @@ struct Legacy {
     skipped: usize,
 }
 
-async fn import_into(scoped: &ScopedStorage, state_dir: &Path) -> Result<Outcome> {
+async fn import_into(
+    ctx: &DispatchCtx,
+    scoped: &ScopedStorage,
+    state_dir: &Path,
+) -> Result<Outcome> {
     let docs = scoped.documents();
     let marker = support::marker_id("connectors", state_dir);
     if support::already_imported(docs, MARKER_COLLECTION, &marker).await? {
@@ -92,7 +96,7 @@ async fn import_into(scoped: &ScopedStorage, state_dir: &Path) -> Result<Outcome
     }
 
     let legacy =
-        crate::core::runtime::DispatchCtx::ambient().spawn_blocking(move || read_legacy(&prefs_dir, &triggers_dir))
+        ctx.spawn_blocking(move || read_legacy(&prefs_dir, &triggers_dir))
             .await
             .context("the legacy reader panicked")??;
 
