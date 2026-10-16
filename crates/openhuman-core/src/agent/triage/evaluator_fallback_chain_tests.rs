@@ -271,10 +271,12 @@ async fn retryable_cloud_failure_attempts_cloud_then_retry_then_local() {
             if n < 2 {
                 // Cloud calls #1 and #2 both 429.
                 assert_eq!(req.provider_name, "stub-cloud", "first two calls hit cloud");
+                assert_eq!(req.model, "stub-cloud-model");
                 Err("HTTP 429 Too Many Requests; Retry-After: 0".to_string())
             } else {
                 // Third call should be the local arm.
                 assert_eq!(req.provider_name, "stub-local", "fall-through hits local");
+                assert_eq!(req.model, "stub-local-model");
                 Ok(AgentTurnResponse::new(VALID_JSON_REPLY))
             }
         }
@@ -287,8 +289,6 @@ async fn retryable_cloud_failure_attempts_cloud_then_retry_then_local() {
 
     let run = outcome.into_decision().expect("decision");
     assert_eq!(run.resolution_path, TriageResolutionPath::LocalFallback);
-    assert_eq!(run.provider_name, "stub-local");
-    assert_eq!(run.model, "stub-local-model");
     assert!(run.used_local);
     assert_eq!(counter.load(Ordering::SeqCst), 3);
 }
