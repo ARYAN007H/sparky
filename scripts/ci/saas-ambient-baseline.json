@@ -8,14 +8,14 @@
   },
   {
     "rule": "ambient-config",
-    "path": "crates/openhuman-core/src/agent/harness/host_definition.rs",
+    "path": "crates/openhuman-core/src/agent_registry/host_definition.rs",
     "line": 207,
     "text": "let config = crate::config::Config::load_or_init().await?;",
     "occurrence": 1
   },
   {
     "rule": "ambient-context",
-    "path": "crates/openhuman-core/src/agent/harness/host_definition.rs",
+    "path": "crates/openhuman-core/src/agent_registry/host_definition.rs",
     "line": 287,
     "text": "crate::core::runtime::CoreContext::current()",
     "occurrence": 1
