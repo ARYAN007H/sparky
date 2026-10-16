@@ -251,7 +251,7 @@ pub(crate) async fn run_subagent_direct(
         // forbids never reaches a user script, and before config load so a
         // denied spawn has no side effects at all.
         if let Err(reason) = crate::hooks::ops::subagent_starting(
-            tinyagents_runtime::command_hooks::context::TurnIdentity {
+            tinyagents_hooks::command::context::TurnIdentity {
                 conversation_id: Some(parent.session_id.clone()),
                 session_id: Some(parent.session_id.clone()),
                 agent_id: Some(parent.agent_definition_id.clone()),
