@@ -2,7 +2,6 @@
 //! code relies on, pinned against a mock backend.
 
 use super::*;
-use crate::transport::{clear_backend_transport, resolve_backend_transport};
 use serde_json::json;
 use wiremock::matchers::{header, header_exists, method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
@@ -201,22 +200,13 @@ async fn sdk_route_policy_refuses_unexposed_routes_before_sending() {
 }
 
 #[tokio::test]
-async fn install_makes_the_core_resolve_this_transport() {
+async fn install_shares_one_transport_with_the_hosted_client() {
     let _guard = global_lock().lock().await;
-    let _t = crate::install(crate::InstallOptions::default()).unwrap();
+    let installed = crate::install(crate::InstallOptions::default()).unwrap();
     assert!(crate::is_installed());
-    assert_eq!(
-        resolve_backend_transport().unwrap().name(),
-        "tinyhumans-sdk"
-    );
-    clear_backend_transport();
-    assert!(!crate::is_installed());
-    // Re-install after a clear restores the same transport.
-    let _t = crate::install(crate::InstallOptions::default()).unwrap();
-    assert_eq!(
-        resolve_backend_transport().unwrap().name(),
-        "tinyhumans-sdk"
-    );
+    assert_eq!(installed.name(), "tinyhumans-sdk");
+    let shared = crate::client::shared_transport().unwrap();
+    assert!(std::sync::Arc::ptr_eq(&installed, &shared));
 }
 
 #[tokio::test]

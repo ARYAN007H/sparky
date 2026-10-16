@@ -17,7 +17,7 @@ fn default_wiring_carries_hosted_controllers_and_the_jev_ranker() {
     assert!(wired.ranker.is_some());
     #[cfg(not(feature = "jev"))]
     assert!(wired.ranker.is_none());
-    assert!(installed_backend_transport().is_some());
+    assert!(is_installed());
     let shown = format!("{wired:?}");
     assert!(shown.contains("Hosted"), "{shown}");
 }

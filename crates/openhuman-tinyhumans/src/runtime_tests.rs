@@ -4,7 +4,7 @@
 
 use super::*;
 use openhuman_embed::seams::DomainGroup;
-use openhuman_embed::{BackendTransport, BuilderSummary};
+use openhuman_embed::BuilderSummary;
 
 fn connected(builder: RuntimeBuilder) -> BuilderSummary {
     builder.connect().expect("connect").summary()
@@ -13,7 +13,6 @@ fn connected(builder: RuntimeBuilder) -> BuilderSummary {
 #[test]
 fn connect_wires_transport_hosted_controllers_and_ranker() {
     let summary = connected(RuntimeBuilder::new());
-    assert!(summary.has_backend_transport);
     assert_eq!(summary.controller_extensions, vec![DomainGroup::Hosted]);
     #[cfg(feature = "jev")]
     assert_eq!(
@@ -22,14 +21,13 @@ fn connect_wires_transport_hosted_controllers_and_ranker() {
     );
     #[cfg(not(feature = "jev"))]
     assert!(summary.tool_ranker.is_none());
-    // The transport is also the process global, as `install` leaves it.
-    assert!(openhuman_embed::installed_backend_transport().is_some());
+    // The shared transport is built, as `install` leaves it.
+    assert!(crate::is_installed());
 }
 
 #[test]
 fn into_embed_stays_unconnected() {
     let summary = RuntimeBuilder::new().into_embed().summary();
-    assert!(!summary.has_backend_transport);
     assert!(summary.controller_extensions.is_empty());
     assert!(summary.tool_ranker.is_none());
 }
@@ -37,7 +35,6 @@ fn into_embed_stays_unconnected() {
 #[test]
 fn deferred_builder_connects_through_tinyhumans_wrapper() {
     let summary = connected(RuntimeBuilder::new().defer_services());
-    assert!(summary.has_backend_transport);
 }
 
 #[test]
@@ -47,7 +44,6 @@ fn hosted_controllers_and_jev_can_be_turned_off() {
             .hosted_controllers(false)
             .jev_ranker(false),
     );
-    assert!(summary.has_backend_transport);
     assert!(summary.controller_extensions.is_empty());
     assert!(summary.tool_ranker.is_none());
 }

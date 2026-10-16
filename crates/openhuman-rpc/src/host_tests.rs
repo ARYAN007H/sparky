@@ -99,7 +99,6 @@ fn desktop_connected_builder_binds_the_transport_and_hosted_controllers() {
         .connect()
         .expect("SDK transport builds offline")
         .summary();
-    assert!(summary.has_backend_transport);
     assert!(summary.controller_extensions.contains(&DomainGroup::Hosted));
     assert!(summary
         .controller_extensions
