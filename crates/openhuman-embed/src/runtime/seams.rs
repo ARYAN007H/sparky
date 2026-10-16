@@ -10,7 +10,7 @@
 //! |---|---|---|
 //! | [`controller_extension`](RuntimeBuilder::controller_extension) | before boot | kept: the registry has no removal; re-registering the same controllers is a no-op |
 //! | [`tool_ranker`](RuntimeBuilder::tool_ranker) | before boot | the previous ranker is restored, if ours still holds the slot |
-//! | [`post_turn_hook`](RuntimeBuilder::post_turn_hook) / [`tool_hook`](RuntimeBuilder::tool_hook) | before boot, replacing a same-named hook | newest first, while ours still holds the name: ours removed, a replaced same-named hook restored |
+//! | [`post_turn_hook`](RuntimeBuilder::post_turn_hook) / [`tool_hook`](RuntimeBuilder::tool_hook) | before boot; learning sinks get private runtime identities, tool hooks retain declared names | newest first, while ours still holds the identity: ours removed, a replaced hook restored |
 //! | [`server_launcher`](RuntimeBuilder::server_launcher) | before boot | kept: first install wins for the process |
 //! | [`live_policy`](RuntimeBuilder::live_policy) | after boot | kept: the next boot (or a config reload) installs its own |
 //! | [`storage`](RuntimeBuilder::storage) | before boot | the previous backend is restored (or cleared), if ours still holds the slot |
@@ -23,17 +23,17 @@
 use std::sync::Arc;
 
 use crate::seams::{LearningSink, OpenHumanRunContext, ToolHook};
+#[cfg(test)]
+use openhuman_core::agent::hooks::embedder_post_turn_hooks;
 use openhuman_core::agent::hooks::{
     embedder_post_turn_hook_named, embedder_tool_hooks, replace_embedder_post_turn_hook,
     replace_embedder_tool_hook,
 };
-#[cfg(test)]
-use openhuman_core::agent::hooks::embedder_post_turn_hooks;
 use openhuman_core::agent::tinyagents::discovery::{
     clear_tool_ranker, install_tool_ranker, installed_tool_ranker,
 };
-use openhuman_core::core::all::{ControllerExtension, register_controller_extension};
-use openhuman_core::core::server_launcher::{ServerLauncher, install_server_launcher};
+use openhuman_core::core::all::{register_controller_extension, ControllerExtension};
+use openhuman_core::core::server_launcher::{install_server_launcher, ServerLauncher};
 use openhuman_core::security::SecurityPolicy;
 use openhuman_core::storage::StorageBackend;
 use tinytools::ToolRanker;
@@ -426,9 +426,9 @@ impl RuntimeBuilder {
         self
     }
 
-    /// A hook every agent session runs after each turn. Replaces a
-    /// learning sink installed by this builder; removed (and a replaced sink
-    /// restored) when the runtime drops.
+    /// A hook every agent session runs after each turn. The runtime registers
+    /// it with a private identity before boot and removes it when the runtime
+    /// drops.
     pub fn post_turn_hook(mut self, hook: Arc<dyn LearningSink>) -> Self {
         self.seams.post_turn_hooks.push(hook);
         self

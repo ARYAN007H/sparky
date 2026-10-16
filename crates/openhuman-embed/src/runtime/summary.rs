@@ -11,8 +11,8 @@ use openhuman_core::core::all::DomainGroup;
 use openhuman_core::core::runtime::{DomainSet, ServiceSet, TokenSource};
 use openhuman_core::core::types::HostKind;
 
-use super::RuntimeBuilder;
 use super::builder::ConfigSource;
+use super::RuntimeBuilder;
 use crate::harness::Workspace;
 
 /// What a [`RuntimeBuilder`] is set to; see the module docs.
@@ -51,7 +51,8 @@ pub struct BuilderSummary {
     pub controller_extensions: Vec<DomainGroup>,
     /// The [`kind`](tinytools::ToolRanker::kind) of the tool ranker.
     pub tool_ranker: Option<String>,
-    /// Names of configured post-turn hooks.
+    /// Diagnostic labels for configured post-turn sinks, in builder order.
+    /// These labels are not runtime registration identities.
     pub post_turn_hooks: Vec<String>,
     /// Names of configured tool hooks.
     pub tool_hooks: Vec<String>,
