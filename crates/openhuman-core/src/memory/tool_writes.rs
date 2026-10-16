@@ -400,10 +400,7 @@ impl AutomaticMutation {
 pub(crate) fn automatic_mutation(config: &Config) -> AutomaticMutation {
     let state = owner_state(config);
     let generation = state.gate.generation();
-    AutomaticMutation {
-        state,
-        generation,
-    }
+    AutomaticMutation { state, generation }
 }
 
 /// Holds the owner's mutation barrier through explicit engine erasure.
