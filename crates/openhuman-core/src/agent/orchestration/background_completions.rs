@@ -416,7 +416,10 @@ fn encoded_task_id(task_id: &str) -> String {
 }
 
 fn awaiting_input_record_prefix(task_id: &str) -> String {
-    format!("{AWAITING_INPUT_RECORD_PREFIX}{}:", encoded_task_id(task_id))
+    format!(
+        "{AWAITING_INPUT_RECORD_PREFIX}{}:",
+        encoded_task_id(task_id)
+    )
 }
 
 fn awaiting_input_record_id(task_id: &str) -> String {
@@ -505,15 +508,17 @@ pub(crate) fn mark_collected(workspace_dir: &Path, task_id: &str) -> bool {
         .map(|record| record.task_id)
         .collect();
     let pauses_collected = pauses.into_iter().fold(false, |collected, pause_id| {
-        let suppressed = matches!(router.tombstone(&pause_id), Ok(TombstoneOutcome::Suppressed));
+        let suppressed = matches!(
+            router.tombstone(&pause_id),
+            Ok(TombstoneOutcome::Suppressed)
+        );
         collected | suppressed
     });
     log::debug!(
         "[background_completions] mark_collected task_id={task_id} completion={completion:?} \
          pauses_collected={pauses_collected}"
     );
-    matches!(completion, Ok(TombstoneOutcome::Suppressed))
-        || pauses_collected
+    matches!(completion, Ok(TombstoneOutcome::Suppressed)) || pauses_collected
 }
 
 /// Drop every queued completion for `thread_id` and everything that finishes

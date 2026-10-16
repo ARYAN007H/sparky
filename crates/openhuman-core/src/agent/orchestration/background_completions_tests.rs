@@ -1,6 +1,6 @@
 use super::*;
 use crate::core::runtime::DispatchCtx;
-use tinyagents_tasks::CompletionStatus;
+use tinyagents_tasks::{CompletionFormatter, CompletionStatus};
 use tokio::sync::MutexGuard;
 
 /// The context these tests dispatch under: the calling task's own.
@@ -345,6 +345,63 @@ fn awaiting_input_does_not_dedupe_the_later_completion() {
     assert_ne!(
         pause.task_id, completion.task_id,
         "pause has a separate dedupe key"
+    );
+
+    let claimed = router_for_workspace(w)
+        .claim_pending("thread-resume", usize::MAX)
+        .unwrap();
+    assert_eq!(
+        claimed.len(),
+        2,
+        "pause and completion are both deliverable"
+    );
+    let notice = BackgroundCompletionFormatter.format_batch(&claimed);
+    assert!(notice.contains("<background_agent_needs_input id=\"sub-resume\""));
+    assert!(notice.contains("<background_agent_result id=\"sub-resume\""));
+}
+
+#[test]
+fn repeated_pauses_are_distinct_and_inline_collection_sweeps_them() {
+    let _guard = test_guard();
+    let ws = workspace();
+    let w = ws.path();
+    for question in ["which repo?", "which branch?"] {
+        futures::executor::block_on(record_awaiting_input(
+            &cx(),
+            w,
+            "sess-repeat-pause",
+            "sub-repeat-pause",
+            "researcher",
+            question,
+            true,
+            Some("thread-repeat-pause".into()),
+        ));
+    }
+    record(
+        w,
+        "sess-repeat-pause",
+        "sub-repeat-pause",
+        "finished after answers",
+        Some("thread-repeat-pause"),
+    );
+
+    let pending = pending_for(w, "thread-repeat-pause");
+    assert_eq!(
+        pending.len(),
+        3,
+        "each pause and the final result are retained"
+    );
+    let pause_ids: HashSet<_> = pending
+        .iter()
+        .filter(|record| record.label.as_deref() == Some(AWAITING_INPUT_LABEL))
+        .map(|record| record.task_id.as_str())
+        .collect();
+    assert_eq!(pause_ids.len(), 2, "each pause gets a unique router key");
+
+    assert!(mark_collected(w, "sub-repeat-pause"));
+    assert!(
+        pending_for(w, "thread-repeat-pause").is_empty(),
+        "collecting the final result also withdraws its queued pause notices"
     );
 }
 
