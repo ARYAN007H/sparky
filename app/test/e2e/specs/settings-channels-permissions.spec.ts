@@ -54,6 +54,11 @@ describe('Settings - Channels & Permissions', () => {
   });
 
   it('allows switching default messaging channel (13.2.1)', async () => {
+    // resetApp must finish dismissing the post-onboarding Joyride before a
+    // settings flow starts; otherwise the spotlight overlay intercepts the
+    // hash navigation and leaves the app on Chat.
+    expect(await textExists('Skip tour')).toBe(false);
+
     // The messaging panel now offers "Set as default" only on *connected*
     // channels. In a fresh workspace the only always-connected channel is Web
     // (the built-in chat), so we make Telegram the default first — that turns

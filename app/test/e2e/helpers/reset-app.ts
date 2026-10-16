@@ -48,6 +48,36 @@ function stepLog(message: string): void {
   console.log(`[resetApp][${new Date().toISOString()}] ${message}`);
 }
 
+/** Dismiss the Joyride tour if it starts after the home route becomes ready. */
+async function dismissLateWalkthrough(): Promise<void> {
+  const appeared = await browser
+    .waitUntil(
+      async () =>
+        Boolean(
+          await browser
+            .execute(() => document.querySelector('[role="tooltip"]') !== null)
+            .catch(() => false)
+        ),
+      { timeout: 4_000, interval: 250, timeoutMsg: 'waiting for a walkthrough tooltip' }
+    )
+    .then(() => true)
+    .catch(() => false);
+  if (!appeared) return;
+
+  const dismissed = await dismissWalkthroughIfVisible(5_000);
+  const stillVisible = await browser
+    .execute(() => document.querySelector('[role="tooltip"]') !== null)
+    .catch(() => false);
+  if (stillVisible) {
+    throw new Error(
+      dismissed
+        ? 'walkthrough tooltip remained visible after Skip tour'
+        : 'walkthrough tooltip appeared without a dismissible Skip tour button'
+    );
+  }
+  stepLog('Dismissed walkthrough after home route became ready');
+}
+
 /**
  * Wipe sidecar + renderer state and (by default) re-auth + onboard.
  *
@@ -249,9 +279,11 @@ export async function resetApp(userId: string, options: ResetAppOptions = {}): P
       stepLog('Home page still not reached after retry — proceeding anyway');
     } else {
       stepLog(`Home page confirmed on retry: "${retryHome}"`);
+      await dismissLateWalkthrough();
     }
   } else {
     stepLog(`Home page confirmed: "${homeText}"`);
+    await dismissLateWalkthrough();
   }
 
   stepLog('Reset + onboarding complete');
