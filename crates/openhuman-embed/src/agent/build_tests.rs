@@ -45,6 +45,11 @@ async fn config_fn_final_autonomy_is_captured_on_the_built_agent_context() {
         .build()
         .await
         .expect("runtime with a file-backed ReadOnly config");
+    assert_eq!(
+        runtime.core_runtime().context().autonomy_tier_source(),
+        AutonomyTierSource::Captured,
+        "a CoreBuilder::config snapshot remains bound to its in-memory tier"
+    );
     let agent = runtime
         .agent(crate::AgentSpec::new("config-fn-tier").config(|effective| {
             effective.autonomy.enabled = true;
