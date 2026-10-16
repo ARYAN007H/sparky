@@ -9,12 +9,12 @@
 use std::path::{Component, Path, PathBuf};
 
 use async_trait::async_trait;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use tinytools::{PermissionLevel, Tool, ToolCallOptions, ToolExposure, ToolResult, ToolRunContext};
 
 use super::cache::{self, InlineEntry};
 use super::resolve::{MAX_RESOURCE_BYTES, MAX_STRUCTURED_BYTES};
-use super::types::{McpUiPresentation, UiCsp, UiFlavor, UiResource, MCP_APP_MIME, MCP_UI_KIND};
+use super::types::{MCP_APP_MIME, MCP_UI_KIND, McpUiPresentation, UiCsp, UiFlavor, UiResource};
 use tinymcp_bus::ui::extract_links;
 
 /// The tool's registered name.
@@ -116,8 +116,8 @@ pub async fn read_confined(
 ) -> Result<String, String> {
     ctx.spawn_blocking(move || {
         use std::io::Read;
-        let file = crate::security::secure_open::secure_open(&resolved, &root)
-            .map_err(|error| {
+        let file =
+            crate::security::secure_open::secure_open(&resolved, &root).map_err(|error| {
                 tracing::debug!(?error, "[mcp_ui] show_ui refused the file open");
                 "the file is not inside the workspace or a skill bundle".to_string()
             })?;
@@ -212,7 +212,7 @@ impl Tool for ShowUiTool {
             _ => {
                 return Ok(ToolResult::error(
                     "show_ui: pass exactly one of `html` or `path`",
-                ))
+                ));
             }
         };
         if html.trim().is_empty() {
