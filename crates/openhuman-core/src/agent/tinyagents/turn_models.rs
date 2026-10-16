@@ -260,11 +260,9 @@ fn build_turn_models_crate(
             .host_overrides()
             .and_then(|local| local.role_models.get("summarization").cloned())
         {
-            Some(custom) => crate::attachments::provider::wrap_injected(
-                ctx,
-                custom,
-                Arc::new(config.clone()),
-            ),
+            Some(custom) => {
+                crate::attachments::provider::wrap_injected(ctx, custom, Arc::new(config.clone()))
+            }
             None => build_primary(model)?,
         };
 

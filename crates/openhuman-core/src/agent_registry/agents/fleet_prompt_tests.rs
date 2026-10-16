@@ -6,8 +6,8 @@
 //! anyone writing a test for it.
 
 use super::load_builtins;
-use crate::agent_registry::host_definition::AgentDefinition;
 use crate::agent::prompts::PromptContext;
+use crate::agent_registry::host_definition::AgentDefinition;
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::sync::Arc;
 use tinyagents_definition::{PromptSource, SubagentEntry, ToolScope};

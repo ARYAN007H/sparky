@@ -124,9 +124,7 @@ fn every_dispatch_site_scopes_an_origin() {
             // The triage module defines and tests `apply_decision`; it is the
             // callee, not a call site. Test files model callers rather than
             // being them.
-            if rel.starts_with("crates/openhuman-core/src/triage/")
-                || rel.ends_with("_tests.rs")
-            {
+            if rel.starts_with("crates/openhuman-core/src/triage/") || rel.ends_with("_tests.rs") {
                 continue;
             }
             let Ok(text) = std::fs::read_to_string(&path) else {

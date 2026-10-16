@@ -1,6 +1,6 @@
 use super::*;
-use crate::triage::TriggerEnvelope;
 use crate::core::events::DomainEvent;
+use crate::triage::TriggerEnvelope;
 use serde_json::json;
 use std::sync::Arc;
 use tokio::sync::Mutex;

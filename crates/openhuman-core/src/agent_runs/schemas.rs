@@ -384,9 +384,7 @@ fn handle_triage_evaluate(ctx: DispatchCtx, params: Map<String, Value>) -> Contr
                 let tunnel_id = p.external_id.as_deref().unwrap_or("unknown");
                 let method = p.toolkit.as_deref().unwrap_or("POST");
                 let path = p.trigger.as_deref().unwrap_or("/");
-                crate::triage::TriggerEnvelope::from_webhook(
-                    tunnel_id, method, path, p.payload,
-                )
+                crate::triage::TriggerEnvelope::from_webhook(tunnel_id, method, path, p.payload)
             }
             "cron" => {
                 tracing::trace!("[rpc][agent] building cron trigger envelope");
