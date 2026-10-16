@@ -12,9 +12,9 @@ import {
 import { useT } from '../../../lib/i18n/I18nContext';
 import { saveArtifactViaDialog } from '../../../services/artifactDownloadService';
 import { callCoreRpc } from '../../../services/coreRpcClient';
-import type { ArtifactSnapshot } from '../../../store/chatRuntimeSlice';
 import {
   activateArtifactTab,
+  type ArtifactSnapshot,
   closeArtifactPanel,
   closeArtifactTab,
 } from '../../../store/chatRuntimeSlice';
@@ -204,13 +204,8 @@ export function ArtifactPreviewPanel(_props: ArtifactPreviewPanelProps) {
 // ─── Content panel (fetches and renders) ────────────────────────
 
 function ArtifactContentPanel({ artifact }: { artifact: ArtifactSnapshot }) {
+  // Mounted per artifact (keyed by id), so switching starts from a clean state.
   const [bodyResult, setBodyResult] = useState<ArtifactBodyResponse | null>(null);
-  useEffect(() => {
-    // Clear when switching artifacts
-    setBodyResult(null);
-    setLoading(true);
-    setError(null);
-  }, [artifact.artifactId]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -397,7 +392,7 @@ async function saveArtifactAs(
   return t(`chat.files.error.${(outcome.code ?? 'download_failed').toLowerCase()}`);
 }
 
-type AutosaveStatus = 'saved' | 'pending' | 'saving' | 'error';
+type AutosaveState = 'saved' | 'pending' | 'saving' | 'error';
 
 /**
  * Save edits as new operator versions, AUTOSAVE_DELAY_MS after the last
@@ -411,7 +406,7 @@ export function useArtifactAutosave(
   initialVersion: number,
   enabled: boolean
 ) {
-  const [status, setStatus] = useState<AutosaveStatus>('saved');
+  const [status, setStatus] = useState<AutosaveState>('saved');
   const [version, setVersion] = useState(initialVersion);
   const pending = useRef<string | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -484,7 +479,7 @@ export function useArtifactAutosave(
   );
 }
 
-function AutosaveStatus({ status }: { status: AutosaveStatus }) {
+function AutosaveStatus({ status }: { status: AutosaveState }) {
   const label = {
     saved: 'Saved',
     pending: 'Unsaved changes',

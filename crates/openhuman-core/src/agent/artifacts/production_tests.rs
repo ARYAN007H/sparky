@@ -25,8 +25,8 @@ fn files_in(dir: &PathBuf) -> Vec<String> {
 }
 
 async fn produce(
-    workspace: &PathBuf,
-    files: &PathBuf,
+    workspace: &std::path::Path,
+    files: &std::path::Path,
     bytes: &[u8],
     tool_call_id: Option<&str>,
     revise: Option<&str>,
