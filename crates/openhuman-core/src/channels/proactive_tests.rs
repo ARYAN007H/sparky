@@ -75,6 +75,7 @@ fn proactive_event() -> DomainEvent {
         source: "cron:test".into(),
         message: "Hello!".into(),
         job_name: Some("test".into()),
+        tenant: None,
     }
 }
 

@@ -403,6 +403,10 @@ pub enum DomainEvent {
         message: String,
         /// Optional job name for display/threading purposes.
         job_name: Option<String>,
+        /// Tenant whose work produced this delivery; bus subscribers run on a
+        /// separate task and cannot inherit the publisher's dispatch context.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        tenant: Option<crate::core::runtime::Tenant>,
     },
     /// A host-owned system cron job came due (a `flow`-type row whose command
     /// is `system:<job>`, see `cron::system_jobs`). The owning domain runs it.

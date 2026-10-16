@@ -224,17 +224,35 @@ fn proactive_message_reaches_web_on_channelless_core_boot() {
             .build()
             .expect("test runtime")
             .block_on(async {
+                crate::core::runtime::lock_mode(crate::core::runtime::Mode::Saas)
+                    .expect("lock isolated test process in SaaS mode");
                 crate::core::bus::init().await.expect("bus init");
                 let mut web_events = crate::web_chat::subscribe_web_channel_events();
                 let config = crate::config::Config::default();
                 assert!(config.channels_config.active_channel.is_none());
+
+                let root = tempfile::tempdir().expect("profile root");
+                let id = crate::profiles::ProfileId::parse("proactive-test").unwrap();
+                let profile_host = std::sync::Arc::new(crate::profiles::ProfileHost::new(
+                    crate::profiles::SaasConfig::new(root.path()),
+                    crate::core::runtime::CoreContext::for_test(
+                        crate::core::runtime::DomainSet::full(),
+                        None,
+                    ),
+                ));
+                profile_host.provision(&id).await.expect("provision profile");
+                let profile = profile_host.open(&id).await.expect("open profile");
+                crate::profiles::host::install(profile_host);
+                let ctx = crate::core::runtime::DispatchCtx::new(profile.context());
+                let tenant = ctx.event_tenant();
+                assert_eq!(tenant.as_ref().and_then(|tenant| tenant.profile.as_deref()), Some("proactive-test"));
 
                 super::register_domain_subscribers(
                     std::env::temp_dir(),
                     config,
                     true,
                     crate::core::runtime::DomainSet::none(),
-                    &crate::core::runtime::DispatchCtx::ambient(),
+                    &ctx,
                 );
 
                 crate::core::bus::BUS.publish(
@@ -242,6 +260,7 @@ fn proactive_message_reaches_web_on_channelless_core_boot() {
                         source: "cron:test".into(),
                         message: "Your morning briefing is ready.".into(),
                         job_name: Some("morning-briefing".into()),
+                        tenant,
                     },
                 );
 
@@ -266,6 +285,8 @@ fn proactive_message_reaches_web_on_channelless_core_boot() {
                     event.full_response.as_deref(),
                     Some("Your morning briefing is ready.")
                 );
+                assert!(event.belongs_to_profile("proactive-test"));
+                assert!(!event.belongs_to_profile("another-profile"));
             });
         return;
     }

@@ -209,6 +209,7 @@ pub(super) async fn deliver_run(
                     source,
                     message: output.to_string(),
                     job_name: job.name.clone(),
+                    tenant: ctx.event_tenant(),
                 });
                 status = DeliveryStatus::Delivered;
             }
