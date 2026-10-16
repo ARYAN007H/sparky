@@ -54,6 +54,8 @@ pub(super) use dispatch::run_subagent_via_graph;
 #[cfg(test)]
 use crate::agent::progress::AgentProgress;
 #[cfg(test)]
+use crate::threads::worker_mirror::{mirror_worker_thread, mirror_worker_thread_from_history};
+#[cfg(test)]
 use std::collections::HashSet;
 #[cfg(test)]
 use std::sync::Arc;

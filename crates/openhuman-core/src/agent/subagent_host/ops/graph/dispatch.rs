@@ -17,7 +17,7 @@ use tinytools::{Tool, ToolSpec};
 use tinytools_agent::dialect::TranscriptEntry;
 
 use super::transcript::persist_subagent_transcript;
-use super::worker_mirror::mirror_worker_thread;
+use crate::threads::worker_mirror::mirror_worker_thread;
 
 /// Cumulative usage stats gathered across a sub-agent graph run.
 #[derive(Debug, Clone, Default)]

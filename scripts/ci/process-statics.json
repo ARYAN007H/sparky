@@ -197,7 +197,7 @@
     "count": 1,
     "category": "D",
     "reason": "The installed provider is a routing handle to the session storage backend; callers select AgentStores with the authenticated tenant's session_key, and durable records remain in the backend.",
-    "verification": "storage/sessions/mod_tests.rs: a_profile_prefixed_key_round_trips_through_edit_and_regenerate"
+    "verification": "storage/sessions/mod_tests.rs: two_profiles_default_agents_keep_separate_session_keys_and_stores; threads/ops/edit_tests.rs: a_profile_prefixed_key_round_trips_through_edit_and_regenerate"
   },
   {
     "file": "crates/openhuman-core/src/storage/sessions/workspace.rs",
@@ -207,7 +207,7 @@
     "count": 1,
     "category": "D",
     "reason": "Each entry routes one workspace path to its storage backend and DriverSessionStores provider; returned stores still require the caller's tenant session key, while authoritative session data remains in the backend.",
-    "verification": "storage/sessions/mod_tests.rs: each_workspace_keeps_its_sessions_in_its_own_database; storage/sessions/mod_tests.rs: a_profile_prefixed_key_round_trips_through_edit_and_regenerate"
+    "verification": "storage/sessions/mod_tests.rs: each_workspace_keeps_its_sessions_in_its_own_database; storage/sessions/mod_tests.rs: two_profiles_default_agents_keep_separate_session_keys_and_stores; threads/ops/edit_tests.rs: a_profile_prefixed_key_round_trips_through_edit_and_regenerate"
   },
   {
     "file": "crates/openhuman-core/src/storage/sessions/workspace.rs",
@@ -217,7 +217,7 @@
     "count": 1,
     "category": "D",
     "reason": "The in-memory provider is a workspace-keyed fallback routing handle; its AgentStores are selected with the caller's tenant session key, and an unusable workspace cannot read another workspace's provider.",
-    "verification": "storage/sessions/workspace_tests.rs: an_unusable_workspace_degrades_to_an_in_memory_store; storage/sessions/mod_tests.rs: a_profile_prefixed_key_round_trips_through_edit_and_regenerate"
+    "verification": "storage/sessions/workspace_tests.rs: an_unusable_workspace_degrades_to_an_in_memory_store; storage/sessions/mod_tests.rs: two_profiles_default_agents_keep_separate_session_keys_and_stores; threads/ops/edit_tests.rs: a_profile_prefixed_key_round_trips_through_edit_and_regenerate"
   },
   {
     "file": "crates/openhuman-core/src/triage/evaluator/chain.rs",

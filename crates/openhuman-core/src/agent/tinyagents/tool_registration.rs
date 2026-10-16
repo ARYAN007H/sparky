@@ -20,8 +20,9 @@ use tinytools::ToolRunContext;
 use crate::agent::orchestration::tools::{
     CloseSubagentDispatch, ContinueSubagentDispatch, DelegateGraphDispatch, DelegationDispatch,
     ListSubagentsDispatch, SpawnAsyncSubagentDispatch, SpawnParallelAgentsDispatch,
-    SpawnSubagentDispatch, SpawnWorkerThreadDispatch, SteerSubagentDispatch, WaitSubagentDispatch,
+    SpawnSubagentDispatch, SteerSubagentDispatch, WaitSubagentDispatch,
 };
+use crate::tools::impl::threads::SpawnWorkerThreadDispatch;
 use crate::agent::tinyagents::host::OpenHumanRunContext;
 use crate::agent::tinyagents::host::run_context::HostOperationContext;
 use crate::agent::tinyagents::turn_policy::is_subagent_spawn_or_delegate_tool;

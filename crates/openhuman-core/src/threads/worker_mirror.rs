@@ -71,7 +71,7 @@ fn append_worker_message(
 /// Each message carries the restored legacy metadata (#4466): a per-round
 /// `iteration` counter, `final` on the trailing message, `tool_calls` on an
 /// assistant round, and `tool_call_id` / `tool_name` on each tool result.
-pub(super) fn mirror_worker_thread(
+pub(crate) fn mirror_worker_thread(
     ctx: &DispatchCtx,
     workspace_dir: &std::path::Path,
     thread_id: &str,
@@ -182,7 +182,7 @@ pub(super) fn mirror_worker_thread(
 /// `user` rows. Used when only the recovered snapshot (not the typed
 /// `conversation`) is available. `failure_final`, when set, is appended as a
 /// trailing `agent` failure marker.
-pub(super) fn mirror_worker_thread_from_history(
+pub(crate) fn mirror_worker_thread_from_history(
     ctx: &DispatchCtx,
     workspace_dir: &std::path::Path,
     thread_id: &str,
