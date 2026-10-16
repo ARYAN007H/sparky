@@ -170,7 +170,7 @@ one with the sealed one as parent, so nothing is erased.
 
 By default transcripts, journals, goals and todos are files under the
 workspace. A host that keeps them in its own database installs a
-`SessionStoreProvider` once through `session_store/` (re-exported from
+`SessionStoreProvider` once through [`storage/sessions/`](../storage/sessions/) (re-exported from
 `tinyagents_session::port`), and every agent then reads and writes through
 its `AgentStores`. See [session_host/README.md](session_host/README.md).
 
