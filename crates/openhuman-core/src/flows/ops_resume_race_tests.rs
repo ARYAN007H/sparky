@@ -31,7 +31,8 @@ async fn park_approval_flow(config: &Config, name: &str) -> (String, String, Vec
     .await
     .unwrap();
     let run_id = parked.value["thread_id"].as_str().unwrap().to_string();
-    let pending = serde_json::from_value(parked.value["pending_approvals"].clone()).unwrap();
+    let pending: Vec<String> =
+        serde_json::from_value(parked.value["pending_approvals"].clone()).unwrap();
     assert!(!pending.is_empty());
     (created.value.id, run_id, pending)
 }
