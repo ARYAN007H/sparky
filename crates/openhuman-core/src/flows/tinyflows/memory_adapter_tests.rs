@@ -29,6 +29,7 @@ fn adapter(autonomy: AutonomyLevel) -> (TempDir, OpenHumanMemory) {
     (
         tmp,
         OpenHumanMemory {
+            ctx: crate::core::runtime::DispatchCtx::unbound(),
             config,
             security: security(autonomy),
             approval: Default::default(),
