@@ -349,6 +349,12 @@ pub(crate) fn host_binding_with<T>(
 /// The configured engine with its scope root (`None` legacy).
 fn resolve_configured(config: &Config, root: Option<&str>) -> Binding {
     let engine_id = config.memory.engine.trim().to_string();
+    // A registered engine (`engine_registry`) wins over the built-in match, and
+    // is resolved per config, so SaaS admits it for every tenant.
+    if let Some(entry) = super::engine_registry::lookup(&engine_id) {
+        tracing::debug!(engine = %engine_id, "[memory:engine] binding a registered engine");
+        return (entry.build)(&super::engine_registry::EngineRequest { config, root });
+    }
     match engine_id.as_str() {
         TINYHUMANS_ENGINE => resolve_tinyhumans(config, root),
         CORTEXDB_ENGINE => resolve_cortexdb(config, root),

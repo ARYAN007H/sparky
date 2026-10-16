@@ -51,6 +51,12 @@ pub async fn free_period_active(config: &Config) -> bool {
         Binding::On(bound) => bound,
         Binding::Off { .. } => return false,
     };
+    if let Some(entry) = super::engine_registry::lookup(&bound.id) {
+        return match entry.free_background {
+            Some(free) => free(config.clone(), bound).await,
+            None => true,
+        };
+    }
     if bound.id != TINYHUMANS_ENGINE {
         return true;
     }
