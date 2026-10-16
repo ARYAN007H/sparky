@@ -3,7 +3,7 @@ use super::repeated_failure::{is_body_level_failure, user_actionable_escalation}
 use super::tool_output::{
     is_compaction_exempt, is_truncation_exempt, COMPACTION_EXEMPT_TOOLS, SAMPLING_TOOLS,
 };
-use super::turn_context::DEFAULT_TOOL_RESULT_BUDGET_BYTES;
+use tinyagents_harness::config::ToolRuntimeConfig;
 use crate::agent::tinyagents::middleware::embedder_hooks::EmbedderToolHooksMiddleware;
 use crate::agent::tinyagents::middleware::repeated_failure::RepeatedToolFailureMiddleware;
 use crate::agent::tinyagents::middleware::tool_outcome_capture::ToolOutcomeCaptureMiddleware;
@@ -264,7 +264,7 @@ fn oversized_workflow_proposal_json(node_count: usize) -> String {
 /// of being persisted — deterministic to assert on).
 fn truncation_probe_mw() -> ToolOutputMiddleware {
     ToolOutputMiddleware {
-        budget_bytes: DEFAULT_TOOL_RESULT_BUDGET_BYTES,
+        budget_bytes: ToolRuntimeConfig::default().tool_result_budget_bytes,
         payload_summarizer: None,
         artifact_store: None,
         tokenjuice_compaction_enabled: false,

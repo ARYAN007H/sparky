@@ -169,7 +169,7 @@ fn defaults_enable_the_byte_cap_only() {
     let mw = TurnContextMiddleware::defaults();
     assert_eq!(
         mw.tool_result_budget_bytes,
-        DEFAULT_TOOL_RESULT_BUDGET_BYTES
+        tinyagents_harness::config::ToolRuntimeConfig::default().tool_result_budget_bytes
     );
     assert!(mw.payload_summarizer.is_none());
     assert_eq!(mw.microcompact_keep_recent, 0);
@@ -512,7 +512,7 @@ async fn tool_output_honors_a_tools_own_cap() {
 /// moving the ladder into the harness must not change it.
 #[test]
 fn shared_tool_result_byte_budget_stays_16_kib() {
-    assert_eq!(DEFAULT_TOOL_RESULT_BUDGET_BYTES, 16 * 1024);
+    assert_eq!(tinyagents_harness::config::ToolRuntimeConfig::default().tool_result_budget_bytes, 16 * 1024);
 }
 
 #[path = "middleware_tool_output_compaction_tests.rs"]
