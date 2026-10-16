@@ -277,13 +277,29 @@ pub(super) fn install_turn_middleware(
         harness.push_middleware(mw.clone());
     }
 
-    stop_hooks::install(
-        harness,
-        handle.as_ref(),
-        model,
-        stop_hooks,
-        halt_summary.clone(),
-    );
+    if handle.is_some() && !stop_hooks.is_empty() {
+        let summary = halt_summary.clone();
+        harness.push_middleware(Arc::new(
+            tinyagents_hooks::stop::StopHookMiddleware::new(model, stop_hooks)
+                .with_metrics_seed(crate::agent::cost::turn_cost())
+                .with_stop_observer(move |report| {
+                    tracing::warn!(
+                        target: "stop_hooks",
+                        hook = %report.hook,
+                        iteration = report.iteration,
+                        model = %report.model,
+                        "[stop_hooks] hook voted to stop the turn — pausing run: {}",
+                        report.reason
+                    );
+                    *summary
+                        .lock()
+                        .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(format!(
+                        "Stopping after {} model call(s): {}",
+                        report.iteration, report.reason
+                    ));
+                }),
+        ));
+    }
     // SHADOW tool-exposure layer (issue #4249, 01.3 — dynamic exposure). Compose
     // the OpenHuman exposure policy as a crate-native selection layer
     // (ToolAllowlistMiddleware + a ContextualToolSelectionMiddleware built via

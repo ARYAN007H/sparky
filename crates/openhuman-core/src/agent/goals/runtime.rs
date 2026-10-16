@@ -1,5 +1,4 @@
-//! OpenHuman runtime adapters for tinyagents thread-goal accounting and the
-//! host-specific mid-turn budget stop hook.
+//! OpenHuman accounting adapters for tinyagents thread goals.
 //!
 //! These are the pieces that make a stored goal actually steer the agent
 //! (Codex parity):
@@ -17,16 +16,13 @@
 //!   an autonomous run to a small, deterministic overshoot past the ceiling
 //!   rather than a hard cut at the exact accounting point.
 
-use std::path::{Path, PathBuf};
-
-use async_trait::async_trait;
+use std::path::Path;
 
 use tinyagents_graph::goals::budget as crate_budget;
-use tinyagents_graph::goals::{BudgetVerdict, GoalBudgetGuard, ThreadGoal, ThreadGoalStatus};
+use tinyagents_graph::goals::{ThreadGoal, ThreadGoalStatus};
 
 use crate::core::bus::BUS;
 use crate::core::events::DomainEvent;
-use tinyagents_hooks::stop::{StopDecision, StopHook, TurnState};
 
 /// Load the goal for an explicitly supplied chat thread.
 pub async fn load_for_thread(workspace_dir: &Path, thread_id: Option<&str>) -> Option<ThreadGoal> {
@@ -226,63 +222,6 @@ fn normalized_thread(thread_id: Option<&str>) -> Option<String> {
         .map(str::trim)
         .filter(|thread_id| !thread_id.is_empty())
         .map(ToOwned::to_owned)
-}
-
-/// Mid-turn stop hook that halts an in-flight turn once an **active** goal's
-/// running usage (already-accounted tokens from prior turns + this turn's
-/// tokens so far) would meet or exceed its budget.
-///
-/// The decision is the crate's
-/// [`GoalBudgetGuard`](tinyagents_graph::goals::GoalBudgetGuard); this is the
-/// adapter that votes it into OpenHuman's [`StopHook`] chain. #4469 item 1: the
-/// stop is a graceful *pause*, not an instantaneous abort — the vote fires in
-/// the stop-hook middleware's `after_model`, and the harness drains the pause
-/// at the **top of the next iteration**, so the tool round for the model call
-/// that tripped the budget still runs and the turn's wrap-up summary may spend
-/// one more model call before the partial transcript is returned. It bounds an
-/// autonomous run to a small, deterministic overshoot past the ceiling rather
-/// than a hard cut at the exact accounting point.
-///
-/// The guard only arms for a goal that is `Active` with a configured budget,
-/// and stands down if that goal is completed, replaced, or paused mid-turn —
-/// once a goal is `budget_limited`/`paused`/`complete` the user can still chat
-/// freely (the injected context steers the model to summarise), so a
-/// user-present turn is never hard-stopped by a budget that is no longer live.
-#[derive(Debug, Clone)]
-pub struct GoalBudgetStopHook {
-    workspace_dir: PathBuf,
-    guard: GoalBudgetGuard,
-}
-
-impl GoalBudgetStopHook {
-    /// Build a hook for `goal` if it's active and has a budget; `None` otherwise.
-    pub fn for_goal(workspace_dir: &Path, goal: &ThreadGoal) -> Option<Self> {
-        Some(Self {
-            workspace_dir: workspace_dir.to_path_buf(),
-            guard: GoalBudgetGuard::for_goal(goal)?,
-        })
-    }
-}
-
-#[async_trait]
-impl StopHook<tinyagents_harness::cost::TurnCost> for GoalBudgetStopHook {
-    fn name(&self) -> &str {
-        "thread_goal_budget"
-    }
-
-    async fn check(&self, ctx: &TurnState<'_, tinyagents_harness::cost::TurnCost>) -> StopDecision {
-        let store = crate::storage::sessions::stores_or_ephemeral(&self.workspace_dir).kv;
-        let in_flight = turn_tokens(ctx.cost.input_tokens, ctx.cost.output_tokens);
-        match self.guard.check(&store, in_flight).await {
-            Ok(BudgetVerdict::Stop { reason }) => StopDecision::Stop { reason },
-            Ok(BudgetVerdict::Continue) => StopDecision::Continue,
-            Err(e) => {
-                // An unreadable goal is not grounds for killing a live turn.
-                tracing::debug!(error = %e, "[thread_goals] budget check failed; continuing");
-                StopDecision::Continue
-            }
-        }
-    }
 }
 
 #[cfg(test)]
