@@ -6,7 +6,7 @@
 //! ## Provider-string grammar
 //!
 //! ```text
-//! "openhuman"                    → OpenHumanBackendModel; model = config.default_model
+//! "openhuman"                    → the registered managed chat model; model = config.default_model
 //! "cloud" / missing              → primary_cloud; legacy custom inference_url wins when
 //!                                  primary still points at OpenHuman after migration
 //! "ollama:<model>[@<temp>]"      → local Ollama at config.local_ai.base_url
@@ -30,7 +30,7 @@
 //! - [`primary_cloud`] — `primary_cloud` / legacy `inference_url` resolution.
 //! - [`access_gates`] — privacy-mode, session, and egress chokepoints.
 //! - [`credentials`] — auth-profile key lookup for cloud slugs.
-//! - [`managed_backend`] — the managed OpenHuman backend model.
+//! - [`managed_backend`] — the managed provider resolution (tier pinning, privacy gate, egress) in front of the registered chat model.
 //! - [`local_runtime`] — Ollama / LM Studio / MLX / OMLX / local-openai.
 //! - [`cloud_slug`] — `<slug>:<model>` BYOK cloud providers.
 //! - [`cloud_spec`] — `CloudProviderCreds` → `ProviderSpec` → `ProviderRegistry`.
