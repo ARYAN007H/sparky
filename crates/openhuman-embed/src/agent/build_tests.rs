@@ -67,12 +67,10 @@ fn sub_agents_become_workers_in_a_catalogue_of_the_agents_own() {
         own.get("orchestrator").is_some(),
         "built-ins stay reachable"
     );
-    assert!(
-        definition
-            .subagents
-            .iter()
-            .any(|entry| matches!(entry, SubagentEntry::AgentId(id) if id == "lead-helper"))
-    );
+    assert!(definition
+        .subagents
+        .iter()
+        .any(|entry| matches!(entry, SubagentEntry::AgentId(id) if id == "lead-helper")));
     assert!(catalogue.get("lead-helper").is_none());
 }
 

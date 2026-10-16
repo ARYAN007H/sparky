@@ -37,9 +37,9 @@ use openhuman_core::agent_registry::host_definition::AgentDefinition;
 use openhuman_core::config::Config;
 use openhuman_core::core::runtime::{CoreContext, CoreRuntime};
 
-use crate::CoreError;
 use crate::harness::{Access, Provider};
 use crate::turn::{Turn, TurnOutcome, TurnTarget};
+use crate::CoreError;
 
 /// Error from instantiating or driving an [`Agent`].
 #[derive(Debug, thiserror::Error)]
@@ -353,9 +353,9 @@ impl Agent {
         &self.inner.layout.skills
     }
 
-    /// `<workspace>/agents/<id>/session_raw/` — where this agent's transcripts
-    /// are written. Conversations it wrote earlier into the workspace's shared
-    /// `session_raw/` stay readable and are copied here when resumed.
+    /// `<workspace>/agents/<id>/session_raw/`, the legacy JSONL import
+    /// directory associated with this agent. New transcripts use the runtime's
+    /// session-store provider and are not necessarily written to this path.
     pub fn transcripts_dir(&self) -> &Path {
         &self.inner.layout.transcripts
     }
