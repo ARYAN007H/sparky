@@ -1,7 +1,7 @@
 //! Tracked runtime hooks, composed with agent-local hooks.
 use super::Runtime;
 use crate::seams::{
-    LearningSink, OpenHumanRunContext, ToolHook, ToolHookContext, ToolHookDecision, TurnSummary,
+    OpenHumanRunContext, ToolHook, ToolHookContext, ToolHookDecision,
 };
 use std::sync::Arc;
 
