@@ -403,6 +403,21 @@ pub fn all_tools_with_runtime(
 
     tools.extend(crate::search::build_search_tools(root_config));
 
+    // Media generation roots. The `media_generate_*` tools themselves come from
+    // a host's registered tool source (the core ships no media generators);
+    // this records the files roots their reference policy reads, ahead of
+    // every source so one that reads them while it builds sees them. Gated by the
+    // `media` compile-time feature (#4804); absent from slim builds. Runtime
+    // `DomainSet::media` (#4796) still gates the tools when compiled.
+    #[cfg(feature = "media")]
+    {
+        *security
+            .media_files_roots
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) =
+            Some(crate::agent::artifacts::FileRoots::from_config(root_config));
+    }
+
     // What every registered tool source can see (`tools::sources`).
     let source_ctx = crate::tools::sources::ToolSourceCtx {
         config: &config,
@@ -423,20 +438,6 @@ pub fn all_tools_with_runtime(
         &source_ctx,
         Some(crate::tools::sources::ANCHOR_AFTER_SEARCH),
     ));
-
-    // Media generation roots. The `media_generate_*` tools themselves come from
-    // a host's registered tool source (the core ships no media generators);
-    // this records the files roots their reference policy reads. Gated by the
-    // `media` compile-time feature (#4804); absent from slim builds. Runtime
-    // `DomainSet::media` (#4796) still gates the tools when compiled.
-    #[cfg(feature = "media")]
-    {
-        *security
-            .media_files_roots
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner) =
-            Some(crate::agent::artifacts::FileRoots::from_config(root_config));
-    }
 
     // Hosting tools — deploy a workspace directory through the compiled
     // TinyHosts module. Registered only once a credential
