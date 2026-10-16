@@ -33,13 +33,25 @@ where
     fn name(&self) -> &str {
         &self.name
     }
-    async fn before_tool(&self, _: &ToolHookContext) -> anyhow::Result<()> {
+    async fn before_tool(
+        &self,
+        _: &crate::seams::OpenHumanRunContext,
+        _: &ToolHookContext,
+    ) -> anyhow::Result<()> {
         Ok(())
     }
-    async fn after_tool(&self, _: &ToolHookContext) -> anyhow::Result<()> {
+    async fn after_tool(
+        &self,
+        _: &crate::seams::OpenHumanRunContext,
+        _: &ToolHookContext,
+    ) -> anyhow::Result<()> {
         Ok(())
     }
-    async fn before_tool_decision(&self, context: &ToolHookContext) -> ToolHookDecision {
+    async fn before_tool_decision(
+        &self,
+        _: &crate::seams::OpenHumanRunContext,
+        context: &ToolHookContext,
+    ) -> ToolHookDecision {
         (self.callback)(context).await
     }
 }
