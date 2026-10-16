@@ -55,7 +55,7 @@ impl Drop for RunRowFinalizer {
         );
         // Preserve whatever steps the live observer already persisted.
         let observed = current_persisted_steps(&self.config, &self.thread_id);
-        let settled = finish_flow_run_row(
+        let _settled = finish_flow_run_row(
             &self.config,
             &self.thread_id,
             &self.flow_id,
@@ -65,9 +65,6 @@ impl Drop for RunRowFinalizer {
             Some(INTERRUPTED_DROP_REASON),
             None,
         );
-        if !settled {
-            return;
-        }
         // Keep the flow-definition summary in step with the row, exactly as the
         // success/failure/cancel arms and the boot sweep do — otherwise the
         // runs list keeps advertising the *previous* run's `last_status` /
@@ -172,7 +169,7 @@ pub(super) fn finish_parked_flow_run_row(
         pending_approvals,
         error,
         graph_hash,
-        store::finish_parked_flow_run,
+        store::finish_flow_run,
     )
 }
 
