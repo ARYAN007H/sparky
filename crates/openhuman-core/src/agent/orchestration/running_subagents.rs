@@ -65,16 +65,16 @@ mod tests;
 #[cfg(test)]
 pub(crate) use cancel::prune;
 #[cfg(test)]
-pub(crate) use cancel::{CallerWorkspace, caller_workspace_in};
+pub(crate) use cancel::{caller_workspace_in, CallerWorkspace};
 pub(crate) use cancel::{
-    CancelledSubagent, cancel_all, cancel_by_session_in_workspace, cancel_by_task,
-    cancel_for_thread, stop_for_thread,
+    cancel_all, cancel_by_session_in_workspace, cancel_by_task, cancel_for_thread, stop_for_thread,
+    CancelledSubagent,
 };
-pub(crate) use registry::{RegistrationError, admit_spawn, register, status_channel};
+pub(crate) use registry::{admit_spawn, register, status_channel, RegistrationError};
 pub(crate) use resolve::{resume_ref_for_task_in_workspace, task_id_for_session_in_workspace};
 pub(crate) use roster::active_subagents_context_block;
+pub use steering::steer;
 pub(crate) use steering::steer_control;
-pub use steering::{SteerError, steer};
 #[cfg(test)]
 pub(crate) use task_ledger::task_records;
 pub(crate) use task_ledger::{reconcile_orphaned_tasks_on_boot, task_record_for_task_in_workspace};

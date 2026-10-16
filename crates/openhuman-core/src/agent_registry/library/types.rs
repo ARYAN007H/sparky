@@ -1,8 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use tinyagents_definition::ToolScope;
-
-pub use tinyagents_definition::DefinitionSource as AgentDefinitionSource;
+use tinyagents_definition::{DefinitionSource, ToolScope};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AgentDefinitionModel {
@@ -26,5 +24,5 @@ pub struct AgentDefinitionDisplay {
     pub includes_memory_context: bool,
     pub can_run_as_user_facing_worker: bool,
     pub write_capable: bool,
-    pub source: AgentDefinitionSource,
+    pub source: DefinitionSource,
 }

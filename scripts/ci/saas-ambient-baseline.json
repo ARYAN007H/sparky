@@ -49,20 +49,6 @@
     "occurrence": 1
   },
   {
-    "rule": "bare-spawn",
-    "path": "crates/openhuman-core/src/agent/session_host/tool_progress.rs",
-    "line": 239,
-    "text": "let forwarder = tokio::spawn(async move {",
-    "occurrence": 1
-  },
-  {
-    "rule": "ambient-config",
-    "path": "crates/openhuman-core/src/integrations/prelude_integrations.rs",
-    "line": 30,
-    "text": "None => match crate::config::Config::load_or_init().await {",
-    "occurrence": 1
-  },
-  {
     "rule": "ambient-config",
     "path": "crates/openhuman-core/src/storage/import/schemas.rs",
     "line": 83,

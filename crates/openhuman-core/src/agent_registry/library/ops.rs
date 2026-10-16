@@ -2,7 +2,7 @@ use crate::agent_registry::host_definition::{AgentDefinition, AgentDefinitionReg
 use crate::core::runtime::DispatchCtx;
 use tinyagents_definition::{AgentTier, ModelSpec, SandboxMode, SubagentEntry, ToolScope};
 
-use super::types::{AgentDefinitionDisplay, AgentDefinitionModel, AgentDefinitionSource};
+use super::types::{AgentDefinitionDisplay, AgentDefinitionModel};
 
 pub async fn list_definition_metadata(
     ctx: &DispatchCtx,

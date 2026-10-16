@@ -8,13 +8,14 @@
 //! without waiting for it to finish or restarting it. Mirrors Codex `send_input`.
 
 use crate::agent::harness::fork_context::ParentExecutionContext;
-use crate::agent::orchestration::running_subagents::{self, SteerError};
+use crate::agent::orchestration::running_subagents;
 use crate::tools::schema_cache::static_schema;
 use async_trait::async_trait;
 use std::sync::Arc;
 use tinyagents_harness::context::RunContext;
 use tinyagents_harness::run_queue::QueueLane;
 use tinyagents_harness::tool::{ToolDispatch, ToolExecutionContext};
+use tinyagents_orchestration::subagent::SteerError;
 use tinytools::{PermissionLevel, Tool, ToolCallOptions, ToolResult};
 
 pub struct SteerSubagentTool;

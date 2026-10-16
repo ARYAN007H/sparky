@@ -2,12 +2,10 @@
 
 use tinyagents_harness::ids::TaskId;
 use tinyagents_harness::run_queue::QueueLane;
-use tinyagents_orchestration::subagent::{SteerAccess, steer_detached};
+use tinyagents_orchestration::subagent::{steer_detached, SteerAccess, SteerError};
 
 use super::cancel::now_ms;
 use super::registry::{control_admits, owner_key, registry};
-
-pub use tinyagents_orchestration::subagent::SteerError;
 
 /// Inject an instruction into a detached sub-agent owned by `parent_session`.
 pub async fn steer(
