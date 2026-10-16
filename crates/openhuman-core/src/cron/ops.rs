@@ -6,7 +6,8 @@ use serde_json::json;
 use {
     crate::cron, crate::cron::add_shell_job, crate::cron::update_job,
     tinyflows_bus::schedule::types::CronJob, tinyflows_bus::schedule::types::CronJobPatch,
-    tinyflows_bus::schedule::types::CronRun, tinyflows_bus::schedule::types::Schedule,
+    tinyflows_bus::schedule::types::CronRun, tinyflows_bus::schedule::types::DeliveryStatus,
+    tinyflows_bus::schedule::types::Schedule,
 };
 
 /// Claim `job_id` as running. `None` when a Run Now of it already holds it. The
@@ -275,8 +276,9 @@ async fn run_and_record(
 ) -> (bool, String) {
     let run_id = uuid::Uuid::new_v4().to_string();
     let started_at = chrono::Utc::now();
-    let (success, output) = cron::scheduler::execute_job_now(ctx, config, job, &run_id).await;
-    if !success && output.ends_with("is already running") {
+    let (execution_success, output) =
+        cron::scheduler::execute_job_now(ctx, config, job, &run_id).await;
+    if !execution_success && output.ends_with("is already running") {
         // A scheduled run holds the job (the module's claim): nothing ran, so
         // there is nothing to deliver or record, and the "queued" placeholder
         // goes with the refused run.
@@ -286,8 +288,6 @@ async fn run_and_record(
     }
     let finished_at = chrono::Utc::now();
     let duration_ms = (finished_at - started_at).num_milliseconds();
-    let status = if success { "ok" } else { "error" };
-    tracing::debug!(job_id = %job.id, status, duration_ms, "[cron_run] run finished");
     // Remove a "queued" placeholder before inserting the real result so no
     // orphaned rows are left in the run history.
     let _ = cron::delete_queued_runs(config, &job.id);
@@ -295,6 +295,13 @@ async fn run_and_record(
     // origin replies and alerts are sent on "Run Now" too, then record the run
     // with how the delivery went.
     let delivery_status = cron::scheduler::deliver_job(ctx, config, job, &run_id, &output).await;
+    let success = success_after_delivery(
+        execution_success,
+        &delivery_status,
+        job.delivery.best_effort,
+    );
+    let status = if success { "ok" } else { "error" };
+    tracing::debug!(job_id = %job.id, status, duration_ms, "[cron_run] run finished");
     let _ = cron::record_run_with_delivery(
         config,
         &job.id,
@@ -307,6 +314,16 @@ async fn run_and_record(
     );
     let _ = cron::record_last_run(config, &job.id, finished_at, success, &output);
     (success, output)
+}
+
+/// A required delivery failure makes the run fail; best-effort and unrequested
+/// deliveries leave the execution result unchanged.
+pub(crate) fn success_after_delivery(
+    execution_success: bool,
+    delivery_status: &DeliveryStatus,
+    best_effort: bool,
+) -> bool {
+    execution_success && (!matches!(delivery_status, DeliveryStatus::Failed) || best_effort)
 }
 
 pub async fn cron_runs(

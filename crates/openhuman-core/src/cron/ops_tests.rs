@@ -1,7 +1,7 @@
 use super::*;
 use crate::cron::get_job;
 use tempfile::TempDir;
-use tinyflows_bus::schedule::types::ActiveHours;
+use tinyflows_bus::schedule::types::{ActiveHours, DeliveryConfig};
 
 fn test_config(tmp: &TempDir) -> Config {
     let config = Config {
@@ -618,4 +618,73 @@ async fn run_job_now_reports_an_unknown_job() {
     )
     .await
     .is_err());
+}
+
+#[test]
+fn required_delivery_failure_only_fails_non_best_effort_runs() {
+    let cases = [
+        (true, DeliveryStatus::Failed, false, false),
+        (true, DeliveryStatus::Failed, true, true),
+        (true, DeliveryStatus::NotRequested, false, true),
+        (true, DeliveryStatus::Suppressed, false, true),
+        (false, DeliveryStatus::Delivered, true, false),
+    ];
+
+    for (execution_success, delivery_status, best_effort, expected) in cases {
+        assert_eq!(
+            success_after_delivery(execution_success, &delivery_status, best_effort),
+            expected,
+            "unexpected success for execution_success={execution_success}, delivery_status={delivery_status:?}, best_effort={best_effort}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn run_job_now_records_required_delivery_failure_as_error() {
+    let tmp = TempDir::new().unwrap();
+    let config = test_config(&tmp);
+    let _handler = crate::cron::system_job_handlers::register(
+        "ops-run-now-delivery-failure",
+        std::sync::Arc::new(|_ctx| Box::pin(async { Ok(()) })),
+    );
+    let job = single_flight_system_job(&config, "ops-run-now-delivery-failure");
+    cron::update_job(
+        &config,
+        &job.id,
+        CronJobPatch {
+            delivery: Some(DeliveryConfig {
+                mode: "announce".into(),
+                channel: None,
+                to: Some("target".into()),
+                best_effort: false,
+            }),
+            ..CronJobPatch::default()
+        },
+    )
+    .unwrap();
+
+    let (success, output) = run_job_now(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        &job.id,
+    )
+    .await
+    .unwrap();
+
+    assert!(!success, "required delivery failure must fail Run Now");
+    assert!(
+        output.contains("completed"),
+        "execution itself succeeded: {output}"
+    );
+    let runs = cron::list_runs(&config, &job.id, 10).unwrap();
+    assert_eq!(runs.len(), 1);
+    assert_eq!(runs[0].status, "error");
+    assert_eq!(runs[0].delivery_status, Some(DeliveryStatus::Failed));
+    assert_eq!(
+        cron::get_job(&config, &job.id)
+            .unwrap()
+            .last_status
+            .as_deref(),
+        Some("error")
+    );
 }
