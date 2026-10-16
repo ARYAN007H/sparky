@@ -81,6 +81,14 @@ fi
 export OPENHUMAN_KEYRING_BACKEND
 echo "[runner] Using OPENHUMAN_KEYRING_BACKEND: $OPENHUMAN_KEYRING_BACKEND"
 
+# The Linux/macOS CI host may not provide a usable Secret Service. Supply a
+# per-run encryption key so the core's encrypted storage backend can persist
+# the E2E session without depending on the host keyring. Never print the key.
+if [ -z "${OPENHUMAN_KEYRING_MASTER_KEY:-}" ] && [ -z "${OPENHUMAN_KEYRING_MASTER_KEY_FILE:-}" ]; then
+  OPENHUMAN_KEYRING_MASTER_KEY="$(openssl rand -hex 32)"
+  export OPENHUMAN_KEYRING_MASTER_KEY
+fi
+
 # Place the CEF cache directory OUTSIDE the workspace. By default the Tauri
 # shell roots it under `$OPENHUMAN_WORKSPACE/users/<id>/cef`, but our
 # `mega-flow` spec calls `openhuman.config_reset_local_data` between

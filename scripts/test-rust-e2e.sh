@@ -163,6 +163,14 @@ echo "[rust-e2e] Mock backend healthy."
 export BACKEND_URL="$MOCK_API_URL"
 export VITE_BACKEND_URL="$MOCK_API_URL"
 
+# The Linux/macOS CI host may not provide a usable Secret Service. Supply a
+# per-run encryption key so the core's encrypted storage backend can persist
+# the E2E session without depending on the host keyring. Never print the key.
+if [ -z "${OPENHUMAN_KEYRING_MASTER_KEY:-}" ] && [ -z "${OPENHUMAN_KEYRING_MASTER_KEY_FILE:-}" ]; then
+  OPENHUMAN_KEYRING_MASTER_KEY="$(openssl rand -hex 32)"
+  export OPENHUMAN_KEYRING_MASTER_KEY
+fi
+
 # The agent-harness E2E surface drives very large async futures in debug builds
 # (the typed sub-agent runner + the full agentic brain turn exercised by
 # json_rpc_meet_agent_session_lifecycle). The default Rust test-thread stack
