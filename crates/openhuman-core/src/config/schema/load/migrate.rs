@@ -88,6 +88,13 @@ pub(crate) fn migrate_cloud_provider_slugs(config: &mut Config) {
         crate::config::schema::resolved_endpoints::host_matches_any(url, &managed_hosts)
     };
 
+    let is_openhuman_provider_entry =
+        |entry: &super::super::cloud_providers::CloudProviderCreds| {
+            entry.slug == "openhuman"
+                || matches!(entry.auth_style, AuthStyle::OpenhumanJwt)
+                || looks_like_openhuman_provider_endpoint(&entry.endpoint)
+        };
+
     let legacy_custom_slug = config
         .inference_url
         .as_deref()
@@ -190,13 +197,6 @@ pub(crate) fn migrate_cloud_provider_slugs(config: &mut Config) {
     fn normalize_provider_endpoint(url: &str) -> String {
         url.trim().trim_end_matches('/').to_ascii_lowercase()
     }
-
-    let is_openhuman_provider_entry =
-        |entry: &super::super::cloud_providers::CloudProviderCreds| {
-            entry.slug == "openhuman"
-                || matches!(entry.auth_style, AuthStyle::OpenhumanJwt)
-                || looks_like_openhuman_provider_endpoint(&entry.endpoint)
-        };
 }
 
 /// Convert the single-engine `[search]` format into providers, routes and
