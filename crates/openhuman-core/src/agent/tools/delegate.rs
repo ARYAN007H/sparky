@@ -12,7 +12,7 @@ use std::time::Duration;
 use tinyagents_harness::context::RunContext;
 use tinyagents_harness::tool::{ToolDispatch, ToolExecutionContext};
 use tinyinference_llm::message::Message;
-use tinyinference_llm::model::{ChatModel, ModelRequest};
+use tinyinference_llm::model::ModelRequest;
 use tinytools::{Tool, ToolCallOptions, ToolResult, ToolRunContext};
 
 /// Tool that delegates a subtask to a named agent with a different
