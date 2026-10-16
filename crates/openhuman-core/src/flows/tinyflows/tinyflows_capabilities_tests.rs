@@ -1,4 +1,5 @@
 use super::*;
+use crate::flows::tinyflows::caps::OpenHumanCode;
 
 // ── build_capabilities smoke ────────────────────────────────────────────
 

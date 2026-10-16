@@ -234,7 +234,8 @@ impl OpenHumanTurnPrelude {
             )
             .await;
         };
-        self.dispatch_ctx().spawn(deferred_memory_work(profile_context, work));
+        self.dispatch_ctx()
+            .spawn(deferred_memory_work(profile_context, work));
     }
 }
 

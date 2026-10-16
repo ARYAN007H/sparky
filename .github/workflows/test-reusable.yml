@@ -186,6 +186,12 @@ jobs:
         run: |
           set -euo pipefail
 
+          # Container HOME may be a runner-owned bind mount with mode 0755.
+          # TinyBus correctly refuses user module search paths beneath it, so
+          # keep XDG modules in a private, per-job directory instead.
+          export XDG_DATA_HOME="$(mktemp -d /tmp/openhuman-core-xdg.XXXXXX)"
+          chmod 700 "$XDG_DATA_HOME"
+
           integration_test_targets() {
             find tests -maxdepth 1 -type f -name '*.rs' -print |
               sed -e 's#^tests/##' -e 's#\.rs$##' |
@@ -303,6 +309,10 @@ jobs:
       CARGO_BUILD_JOBS: "1"
       CARGO_PROFILE_DEV_DEBUG: line-tables-only
     steps:
+      # The TinyFlows fixture tree contains paths beyond MAX_PATH. Configure
+      # Git before checkout so recursive submodule checkout can create them.
+      - name: Enable long Git paths
+        run: git config --global core.longpaths true
       - name: Checkout code
         uses: actions/checkout@v7
         with:
