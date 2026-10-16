@@ -211,3 +211,32 @@ async fn tool_timeout_seeds_on_channelless_core_boot() {
         "channel-less core boot must seed the tool-execution timeout from [agent].agent_timeout_secs"
     );
 }
+
+#[tokio::test]
+async fn proactive_message_reaches_web_on_channelless_core_boot() {
+    crate::core::bus::init().await.expect("bus init");
+    let mut web_events = crate::web_chat::subscribe_web_channel_events();
+    let config = crate::config::Config::default();
+    assert!(config.channels_config.active_channel.is_none());
+
+    super::register_domain_subscribers(
+        std::env::temp_dir(),
+        config,
+        true,
+        crate::core::runtime::DomainSet::none(),
+        &crate::core::runtime::DispatchCtx::ambient(),
+    );
+
+    crate::core::bus::BUS.publish(crate::core::events::DomainEvent::ProactiveMessageRequested {
+        source: "cron:test".into(),
+        message: "Your morning briefing is ready.".into(),
+        job_name: Some("morning-briefing".into()),
+    });
+
+    let event = tokio::time::timeout(std::time::Duration::from_secs(2), web_events.recv())
+        .await
+        .expect("proactive message should reach the web event stream")
+        .expect("web event stream should remain open");
+    assert_eq!(event.event, "proactive_message");
+    assert_eq!(event.full_response.as_deref(), Some("Your morning briefing is ready."));
+}
