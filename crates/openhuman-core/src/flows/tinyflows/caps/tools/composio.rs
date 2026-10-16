@@ -101,6 +101,12 @@ impl ToolBackend for ComposioToolBackend {
                     tinytools::status::POLICY_BLOCKED_MARKER
                 ))
             })?;
+        if live_config.recovered_from_corruption {
+            return Err(EngineError::Capability(format!(
+                "{} flows autonomy and Composio settings could not be refreshed; refusing the node",
+                tinytools::status::POLICY_BLOCKED_MARKER
+            )));
+        }
         // Autonomy-tier gate (Phase 2, made effect-aware): the node's
         // [`CommandClass`] is derived from the action's curated
         // [`ToolScope`](crate::integrations::composio::contract::ToolScope)

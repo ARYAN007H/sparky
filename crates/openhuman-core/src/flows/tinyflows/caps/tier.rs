@@ -80,11 +80,15 @@ pub(crate) async fn current_tier_policy(
 ) -> Result<SecurityPolicy> {
     let live = match ctx.autonomy_tier_source() {
         crate::core::runtime::AutonomyTierSource::Captured => None,
-        crate::core::runtime::AutonomyTierSource::LiveConfig => Some(
-            crate::config::ops::reload_config_snapshot_with_timeout(captured_config)
+        crate::core::runtime::AutonomyTierSource::LiveConfig => {
+            let live = crate::config::ops::reload_config_snapshot_with_timeout(captured_config)
                 .await
-                .map_err(|error| tier_config_error(&error))?,
-        ),
+                .map_err(|error| tier_config_error(&error))?;
+            if live.recovered_from_corruption {
+                return Err(tier_config_error("live config was recovered from corruption"));
+            }
+            Some(live)
+        }
     };
     tier_policy_from_config(ctx, captured_config, live.as_ref(), baseline)
 }
