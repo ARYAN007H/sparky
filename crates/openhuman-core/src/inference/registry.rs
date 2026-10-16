@@ -105,9 +105,8 @@ pub(crate) fn chat_model(provider_id: &str) -> Option<ChatModelEntry> {
     // built-in managed backend was; a test that wants the bare core asks for it
     // with `without_managed_provider`.
     #[cfg(test)]
-    let registered = registered.or_else(|| {
-        super::registry_test_support::default_managed_entry(provider_id)
-    });
+    let registered =
+        registered.or_else(|| super::registry_test_support::default_managed_entry(provider_id));
     registered
 }
 

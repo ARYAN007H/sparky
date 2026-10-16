@@ -20,7 +20,11 @@ fn state_dir_of(config: &Config) -> std::path::PathBuf {
 
 /// Builds the embedder the way the core's managed factory does: through the
 /// registered embedding provider, with the config's credential scope.
-fn build_through_registry(config: &Config, model: &str, dimensions: usize) -> ManagedEmbeddingModel {
+fn build_through_registry(
+    config: &Config,
+    model: &str,
+    dimensions: usize,
+) -> ManagedEmbeddingModel {
     ManagedEmbeddingModel::from_request(&EmbeddingRequest {
         config: Some(config),
         model,
@@ -30,7 +34,6 @@ fn build_through_registry(config: &Config, model: &str, dimensions: usize) -> Ma
         secrets_encrypt: config.secrets.encrypt,
     })
 }
-
 
 /// A stored TinyHumans API key authenticates cloud embeddings on its own (no
 /// session), sent as `Authorization: Bearer <key>` like managed inference.
@@ -62,8 +65,12 @@ async fn api_key_alone_authenticates_cloud_embeddings() {
     tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
 
     let state = tempfile::tempdir().unwrap();
-    openhuman_embed::__host::security::credentials::api_key::store_api_key_in(state.path(), false, "tiny_test_emb")
-        .unwrap();
+    openhuman_embed::__host::security::credentials::api_key::store_api_key_in(
+        state.path(),
+        false,
+        "tiny_test_emb",
+    )
+    .unwrap();
     let provider = ManagedEmbeddingModel::new(
         Some(format!("http://{addr}")),
         state.path().to_path_buf(),
@@ -88,8 +95,12 @@ async fn api_key_alone_authenticates_cloud_embeddings() {
 #[tokio::test]
 async fn api_key_is_refused_over_plaintext_non_loopback() {
     let state = tempfile::tempdir().unwrap();
-    openhuman_embed::__host::security::credentials::api_key::store_api_key_in(state.path(), false, "tiny_test_emb")
-        .unwrap();
+    openhuman_embed::__host::security::credentials::api_key::store_api_key_in(
+        state.path(),
+        false,
+        "tiny_test_emb",
+    )
+    .unwrap();
     let provider = ManagedEmbeddingModel::new(
         Some("http://embeddings.example.test".into()),
         state.path().to_path_buf(),
@@ -143,8 +154,13 @@ fn unreachable_embedder(model: &str) -> ManagedEmbeddingModel {
 /// this call, awaited on a plain test task, still routes.
 #[tokio::test]
 async fn a_cloud_embedding_call_in_a_chat_turn_discloses_to_that_chat() {
-    openhuman_embed::__host::core::bus::init().await.expect("bus init");
-    let mut rx = openhuman_embed::__host::core::bus::BUS.get().unwrap().receiver();
+    openhuman_embed::__host::core::bus::init()
+        .await
+        .expect("bus init");
+    let mut rx = openhuman_embed::__host::core::bus::BUS
+        .get()
+        .unwrap()
+        .receiver();
     let marker = "embed-routed-to-the-turns-chat";
     let chat = ApprovalChatContext {
         thread_id: "thread-embed".into(),
@@ -169,8 +185,13 @@ async fn a_cloud_embedding_call_in_a_chat_turn_discloses_to_that_chat() {
 /// nothing leaves.
 #[tokio::test]
 async fn an_unrouted_embedder_discloses_without_a_chat() {
-    openhuman_embed::__host::core::bus::init().await.expect("bus init");
-    let mut rx = openhuman_embed::__host::core::bus::BUS.get().unwrap().receiver();
+    openhuman_embed::__host::core::bus::init()
+        .await
+        .expect("bus init");
+    let mut rx = openhuman_embed::__host::core::bus::BUS
+        .get()
+        .unwrap()
+        .receiver();
     let marker = "embed-without-a-chat";
     let embedder = unreachable_embedder(marker);
 
@@ -197,8 +218,13 @@ async fn an_unrouted_embedder_discloses_without_a_chat() {
 /// original: each turn's disclosure reaches its own chat.
 #[tokio::test]
 async fn routing_is_per_embedder_not_shared() {
-    openhuman_embed::__host::core::bus::init().await.expect("bus init");
-    let mut rx = openhuman_embed::__host::core::bus::BUS.get().unwrap().receiver();
+    openhuman_embed::__host::core::bus::init()
+        .await
+        .expect("bus init");
+    let mut rx = openhuman_embed::__host::core::bus::BUS
+        .get()
+        .unwrap()
+        .receiver();
     let marker = "embed-routed-per-turn";
     let base = unreachable_embedder(marker);
     let chat = |thread: &str| ApprovalChatContext {
@@ -393,7 +419,6 @@ async fn default_provider_with_config_authenticates_with_config_scoped_token() {
         "the memory client's default embedder must authenticate with the config-scoped token"
     );
 }
-
 
 /// With no stored `app-session` token and no API key, the bearer resolver
 /// short-circuits to the backend-session error before any network call.

@@ -4,9 +4,7 @@
 
 use std::sync::Arc;
 
-use openhuman_embed::__host::egress::{
-    emit_external_transfer, enforce_egress, EgressDescriptor,
-};
+use openhuman_embed::__host::egress::{emit_external_transfer, enforce_egress, EgressDescriptor};
 use openhuman_embed::__host::inference_registry::EmbeddingRequest;
 use openhuman_embed::__host::security::approval::ApprovalChatContext;
 use openhuman_embed::__host::security::credentials::{AuthService, APP_SESSION_PROVIDER};
@@ -59,11 +57,12 @@ impl ManagedEmbeddingModel {
         let bearer: BearerResolver = Arc::new(move || {
             // A stored TinyHumans API key is the bearer outright, with the
             // plaintext guard: never put the key on a non-HTTPS, non-loopback wire.
-            if let Some(key) = openhuman_embed::__host::security::credentials::api_key::get_api_key_in(
-                &state_dir,
-                secrets_encrypt,
-            )
-            .map_err(|error| tinyinference_embeddings::Error::Embedding(error.to_string()))?
+            if let Some(key) =
+                openhuman_embed::__host::security::credentials::api_key::get_api_key_in(
+                    &state_dir,
+                    secrets_encrypt,
+                )
+                .map_err(|error| tinyinference_embeddings::Error::Embedding(error.to_string()))?
             {
                 if !is_managed_endpoint_for_api_key(&key_endpoint) {
                     return Err(tinyinference_embeddings::Error::Validation(format!(

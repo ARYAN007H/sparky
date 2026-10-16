@@ -70,22 +70,25 @@ pub(crate) fn build_chat_model(
         request.native_tool_calling,
         request.thread_id.is_some()
     );
-    let model = OpenHumanBackendModel::new(request.config.api_url.as_deref(), &options, default_model)
-        .with_native_tool_calling(request.native_tool_calling)
-        .with_thread_id(request.thread_id);
+    let model =
+        OpenHumanBackendModel::new(request.config.api_url.as_deref(), &options, default_model)
+            .with_native_tool_calling(request.native_tool_calling)
+            .with_thread_id(request.thread_id);
     Ok((Arc::new(model), pinned))
 }
 
 fn readiness_probe() -> ReadinessProbe {
-    Arc::new(|role: String, model: String, config: Config| -> BoxFuture<Result<(), String>> {
-        Box::pin(async move {
-            log::debug!("[tinyhumans][inference] readiness probe role={role} model={model}");
-            let options = managed_options(&config);
-            OpenHumanBackendModel::new(config.api_url.as_deref(), &options, model)
-                .probe_readiness()
-                .await
-        })
-    })
+    Arc::new(
+        |role: String, model: String, config: Config| -> BoxFuture<Result<(), String>> {
+            Box::pin(async move {
+                log::debug!("[tinyhumans][inference] readiness probe role={role} model={model}");
+                let options = managed_options(&config);
+                OpenHumanBackendModel::new(config.api_url.as_deref(), &options, model)
+                    .probe_readiness()
+                    .await
+            })
+        },
+    )
 }
 
 /// Registers this area's hooks with the core. Idempotent.
@@ -102,5 +105,7 @@ pub(crate) fn register(_options: &InstallOptions) {
         Ok(Box::new(ManagedEmbeddingModel::from_request(request)))
     });
     register_catalog(PROVIDER_OPENHUMAN, managed_catalog::entry());
-    log::debug!("[tinyhumans] inference: registered the managed chat model, embeddings and catalog");
+    log::debug!(
+        "[tinyhumans] inference: registered the managed chat model, embeddings and catalog"
+    );
 }

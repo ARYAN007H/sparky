@@ -10,7 +10,9 @@ use tinyinference_llm::Error as TiError;
 
 use super::managed_model::OpenHumanBackendModel;
 use super::managed_reasoning::{apply_reasoning_hint, with_thread_id};
-use super::managed_session::{maybe_publish_provider_session_expired, maybe_publish_session_expired};
+use super::managed_session::{
+    maybe_publish_provider_session_expired, maybe_publish_session_expired,
+};
 use super::managed_usage::project_managed_usage;
 
 /// Log the raw upstream failure at the managed inference dispatch boundary
@@ -55,7 +57,6 @@ pub(super) fn observe_in_band_failure(item: &ModelStreamItem) {
         maybe_publish_provider_session_expired(pe, "stream");
     }
 }
-
 
 #[async_trait]
 impl ChatModel<()> for OpenHumanBackendModel {

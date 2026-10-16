@@ -59,10 +59,13 @@ fn maybe_publish_local_session_expiry() {
         "[providers][openhuman-backend] managed session token expired locally — \
          publishing SessionExpired before any inference request"
     );
-    openhuman_embed::__host::core::bus::BUS.publish(openhuman_embed::__host::core::events::DomainEvent::SessionExpired {
-        source: "openhuman_backend_model.resolve_bearer".to_string(),
-        reason: "backend session token expired locally — re-authentication required".to_string(),
-    });
+    openhuman_embed::__host::core::bus::BUS.publish(
+        openhuman_embed::__host::core::events::DomainEvent::SessionExpired {
+            source: "openhuman_backend_model.resolve_bearer".to_string(),
+            reason: "backend session token expired locally — re-authentication required"
+                .to_string(),
+        },
+    );
 }
 
 /// Publish a `SessionExpired` event when the backend rejects a crate-native
@@ -78,14 +81,16 @@ pub(super) fn maybe_publish_session_expired(err: &TiError, operation: &str) {
 pub(super) fn maybe_publish_provider_session_expired(pe: &ProviderError, operation: &str) {
     if pe.provider.as_str() == "OpenHuman" && matches!(pe.status, Some(401 | 403)) {
         let reason = tinyinference_core::sanitize::sanitize_api_error(&pe.message);
-        openhuman_embed::__host::core::bus::BUS.publish(openhuman_embed::__host::core::events::DomainEvent::SessionExpired {
-            source: format!(
-                "openhuman_backend_model.{}({})",
-                operation,
-                pe.status.unwrap_or(0)
-            ),
-            reason,
-        });
+        openhuman_embed::__host::core::bus::BUS.publish(
+            openhuman_embed::__host::core::events::DomainEvent::SessionExpired {
+                source: format!(
+                    "openhuman_backend_model.{}({})",
+                    operation,
+                    pe.status.unwrap_or(0)
+                ),
+                reason,
+            },
+        );
     }
 }
 

@@ -1,5 +1,5 @@
-use super::*;
 use super::super::managed_reasoning::{apply_reasoning_hint, with_thread_id};
+use super::*;
 use openhuman_embed::__host::inference_registry::REASONING_OFF_METADATA_KEY;
 use serde_json::Value;
 use tinyinference_llm::model::ChatModel;
@@ -99,8 +99,14 @@ fn managed_model_supports_only_serializable_native_media_inputs() {
 
 #[test]
 fn resolve_model_normalizes_blank_and_trims_non_empty_values() {
-    assert_eq!(resolve_model(""), openhuman_embed::__host::config::MODEL_MANAGED_DEFAULT);
-    assert_eq!(resolve_model(" \t\n"), openhuman_embed::__host::config::MODEL_MANAGED_DEFAULT);
+    assert_eq!(
+        resolve_model(""),
+        openhuman_embed::__host::config::MODEL_MANAGED_DEFAULT
+    );
+    assert_eq!(
+        resolve_model(" \t\n"),
+        openhuman_embed::__host::config::MODEL_MANAGED_DEFAULT
+    );
     assert_eq!(resolve_model("  reasoning-v1  "), "reasoning-v1");
     assert_eq!(resolve_model("hint:reasoning"), "hint:reasoning");
 }
@@ -474,8 +480,12 @@ fn resolve_bearer_returns_token_when_expiry_in_future() {
 }
 
 fn backend_with_api_key(api_url: &str, dir: &std::path::Path) -> OpenHumanBackendModel {
-    openhuman_embed::__host::security::credentials::api_key::store_api_key_in(dir, false, "th_test_key")
-        .expect("seed api key");
+    openhuman_embed::__host::security::credentials::api_key::store_api_key_in(
+        dir,
+        false,
+        "th_test_key",
+    )
+    .expect("seed api key");
     OpenHumanBackendModel::new(
         Some(api_url),
         &ManagedOptions {

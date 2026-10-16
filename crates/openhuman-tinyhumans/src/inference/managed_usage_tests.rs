@@ -91,5 +91,8 @@ fn project_managed_usage_is_noop_without_envelope() {
         .is_none());
     let recovered = recover_usage(&projected).expect("usage present");
     assert_eq!(recovered.charged_amount_usd, None);
-    assert_eq!(recovered.usage.cache_read_tokens, 3, "crate cached preserved");
+    assert_eq!(
+        recovered.usage.cache_read_tokens, 3,
+        "crate cached preserved"
+    );
 }

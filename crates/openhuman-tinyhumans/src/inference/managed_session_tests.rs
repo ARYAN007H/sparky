@@ -28,9 +28,11 @@ fn the_refusal_does_not_read_as_an_expired_session() {
 
     // The whole point of the fix: this must not reach the sign-out path that
     // the backend's 401 envelope used to trigger.
-    assert!(!openhuman_embed::__host::core::observability::is_session_expired_message(
-        &error.to_string()
-    ));
+    assert!(
+        !openhuman_embed::__host::core::observability::is_session_expired_message(
+            &error.to_string()
+        )
+    );
 }
 
 #[test]
@@ -53,18 +55,22 @@ use tinyinference_llm::model::{ModelStreamItem, ProviderError};
 async fn an_in_band_401_publishes_session_expired() {
     use openhuman_embed::__host::core::events::DomainEvent;
 
-    openhuman_embed::__host::core::bus::init().await.expect("bus init");
+    openhuman_embed::__host::core::bus::init()
+        .await
+        .expect("bus init");
     let mut rx = openhuman_embed::__host::core::bus::BUS
         .get()
         .expect("event bus initialized")
         .receiver();
 
-    super::super::managed_calls::observe_in_band_failure(&ModelStreamItem::ProviderFailed(ProviderError {
-        provider: super::super::managed_model::PROVIDER_LABEL.to_string(),
-        status: Some(401),
-        message: "TEST_MARKER_IN_BAND token expired".to_string(),
-        ..ProviderError::default()
-    }));
+    super::super::managed_calls::observe_in_band_failure(&ModelStreamItem::ProviderFailed(
+        ProviderError {
+            provider: super::super::managed_model::PROVIDER_LABEL.to_string(),
+            status: Some(401),
+            message: "TEST_MARKER_IN_BAND token expired".to_string(),
+            ..ProviderError::default()
+        },
+    ));
 
     let mut source_seen = None;
     loop {

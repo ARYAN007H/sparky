@@ -15,7 +15,10 @@ fn a_401_without_an_attached_session_still_surfaces() {
 #[test]
 fn other_statuses_still_surface_the_error() {
     for status in [400, 403, 404, 429, 500, 503] {
-        assert!(!managed_401_means_signed_out(status, true), "managed {status}");
+        assert!(
+            !managed_401_means_signed_out(status, true),
+            "managed {status}"
+        );
     }
 }
 
@@ -26,7 +29,10 @@ fn the_catalog_url_targets_the_openrouter_catalog_on_the_control_plane() {
         ..Config::default()
     };
     let url = catalog_url(&config);
-    assert!(url.ends_with("/openai/v1/models?catalog=openrouter"), "{url}");
+    assert!(
+        url.ends_with("/openai/v1/models?catalog=openrouter"),
+        "{url}"
+    );
 }
 
 #[test]

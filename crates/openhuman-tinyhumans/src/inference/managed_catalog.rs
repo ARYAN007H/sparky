@@ -9,7 +9,9 @@
 
 use openhuman_embed::__host::config::Config;
 use openhuman_embed::__host::core::Outcome;
-use openhuman_embed::__host::inference_registry::{BoxFuture, CatalogEntry, CatalogLimits, CatalogListing};
+use openhuman_embed::__host::inference_registry::{
+    BoxFuture, CatalogEntry, CatalogLimits, CatalogListing,
+};
 use openhuman_embed::__host::security::credentials::session_support::{
     classify_session_token, load_app_session_profile, publish_local_session_expiry,
     resolve_backend_credential, BackendCredential, SessionTokenCheck,
@@ -21,16 +23,21 @@ use tinyinference_llm::model::discover::DiscoveryRequest;
 
 use crate::backend::headers::attribution_headers;
 use crate::backend::url::{effective_api_url, effective_backend_api_url};
-use crate::client::endpoint::{is_managed_endpoint_for_api_key, is_safe_endpoint_for_managed_bearer};
+use crate::client::endpoint::{
+    is_managed_endpoint_for_api_key, is_safe_endpoint_for_managed_bearer,
+};
 
 const MODELS_PATH: &str = "/openai/v1/models";
 
 /// The registry entry for the managed catalog.
 pub(super) fn entry() -> CatalogEntry {
-    let list: CatalogListing = Arc::new(|config: Config| -> BoxFuture<Result<Outcome<serde_json::Value>, String>> {
-        Box::pin(async move { list_models(&config).await })
-    });
-    let limits: CatalogLimits = Arc::new(|model: &str, config: &Config| limits_request(model, config));
+    let list: CatalogListing = Arc::new(
+        |config: Config| -> BoxFuture<Result<Outcome<serde_json::Value>, String>> {
+            Box::pin(async move { list_models(&config).await })
+        },
+    );
+    let limits: CatalogLimits =
+        Arc::new(|model: &str, config: &Config| limits_request(model, config));
     CatalogEntry {
         list,
         limits: Some(limits),
@@ -90,8 +97,11 @@ pub(super) async fn list_models(config: &Config) -> Result<Outcome<serde_json::V
 
     let url = catalog_url(config);
     log::debug!("[tinyhumans][inference] managed catalog url={url}");
-    let client =
-        openhuman_embed::__host::config::build_runtime_proxy_client_with_timeouts("providers.list_models", 30, 10);
+    let client = openhuman_embed::__host::config::build_runtime_proxy_client_with_timeouts(
+        "providers.list_models",
+        30,
+        10,
+    );
 
     let attach = is_safe_endpoint_for_managed_bearer(&url);
     let mut request = client.get(&url);
@@ -132,14 +142,22 @@ pub(super) async fn list_models(config: &Config) -> Result<Outcome<serde_json::V
         .await
         .map_err(|e| format!("[providers][list_models] failed to read response body: {e}"))?;
     let body: serde_json::Value = serde_json::from_str(&raw_body).map_err(|e| {
-        let snippet = truncate(&tinyinference_core::sanitize::sanitize_api_error(&raw_body), 300);
+        let snippet = truncate(
+            &tinyinference_core::sanitize::sanitize_api_error(&raw_body),
+            300,
+        );
         format!("[providers][list_models] failed to parse JSON: {e} (body: {snippet})")
     })?;
     if let Some(err_field) = body.get("error") {
         let msg = err_field
             .as_str()
             .map(str::to_string)
-            .or_else(|| err_field.get("message").and_then(|m| m.as_str()).map(str::to_string))
+            .or_else(|| {
+                err_field
+                    .get("message")
+                    .and_then(|m| m.as_str())
+                    .map(str::to_string)
+            })
             .unwrap_or_else(|| err_field.to_string());
         return Err(format!(
             "provider returned error payload: {}",
@@ -176,7 +194,9 @@ pub(super) fn limits_request(model: &str, config: &Config) -> Option<DiscoveryRe
         Ok(BackendCredential::ApiKey(key)) if is_managed_endpoint_for_api_key(&listing_url) => {
             request = request.with_header("Authorization", format!("Bearer {key}"));
         }
-        Ok(BackendCredential::Session(token)) if is_safe_endpoint_for_managed_bearer(&listing_url) => {
+        Ok(BackendCredential::Session(token))
+            if is_safe_endpoint_for_managed_bearer(&listing_url) =>
+        {
             request = request.with_header("Authorization", format!("Bearer {token}"));
         }
         Ok(_) => {
@@ -185,7 +205,9 @@ pub(super) fn limits_request(model: &str, config: &Config) -> Option<DiscoveryRe
             );
         }
         Err(_) => {
-            log::debug!("[tinyhumans][inference] no backend credential; managed listing probed anonymously");
+            log::debug!(
+                "[tinyhumans][inference] no backend credential; managed listing probed anonymously"
+            );
         }
     }
     if let Ok(headers) = attribution_headers() {

@@ -6,7 +6,6 @@ use tinyinference_llm::model::ModelRequest;
 
 use openhuman_embed::__host::inference_registry::REASONING_OFF_METADATA_KEY;
 
-
 /// Translate the request's reasoning choice into the managed backend's wire
 /// field: the OpenRouter-style `reasoning` object, which the backend forwards
 /// upstream.
