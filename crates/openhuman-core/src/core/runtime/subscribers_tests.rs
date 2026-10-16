@@ -212,52 +212,74 @@ async fn tool_timeout_seeds_on_channelless_core_boot() {
     );
 }
 
-#[tokio::test]
 #[cfg(feature = "channels")]
-async fn proactive_message_reaches_web_on_channelless_core_boot() {
-    // Serialize with the neighboring timeout boot test: both exercise
-    // register_domain_subscribers, whose process-wide registrations and
-    // timeout state must not race in this test binary.
-    let _env = EnvVarGuard::locked_unset_many_async(&["OPENHUMAN_TOOL_TIMEOUT_SECS"]).await;
-    crate::core::bus::init().await.expect("bus init");
-    let mut web_events = crate::web_chat::subscribe_web_channel_events();
-    let config = crate::config::Config::default();
-    assert!(config.channels_config.active_channel.is_none());
+#[test]
+fn proactive_message_reaches_web_on_channelless_core_boot() {
+    const CHILD: &str = "OPENHUMAN_PROACTIVE_SUBSCRIBER_TEST_CHILD";
+    const TEST_NAME: &str =
+        "core::runtime::subscribers::tests::proactive_message_reaches_web_on_channelless_core_boot";
 
-    super::register_domain_subscribers(
-        std::env::temp_dir(),
-        config,
-        true,
-        crate::core::runtime::DomainSet::none(),
-        &crate::core::runtime::DispatchCtx::ambient(),
-    );
+    if std::env::var(CHILD).as_deref() == Ok("1") {
+        tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .expect("test runtime")
+            .block_on(async {
+                crate::core::bus::init().await.expect("bus init");
+                let mut web_events = crate::web_chat::subscribe_web_channel_events();
+                let config = crate::config::Config::default();
+                assert!(config.channels_config.active_channel.is_none());
 
-    crate::core::bus::BUS.publish(
-        crate::core::events::DomainEvent::ProactiveMessageRequested {
-            source: "cron:test".into(),
-            message: "Your morning briefing is ready.".into(),
-            job_name: Some("morning-briefing".into()),
-        },
-    );
+                super::register_domain_subscribers(
+                    std::env::temp_dir(),
+                    config,
+                    true,
+                    crate::core::runtime::DomainSet::none(),
+                    &crate::core::runtime::DispatchCtx::ambient(),
+                );
 
-    let event = tokio::time::timeout(std::time::Duration::from_secs(2), async {
-        loop {
-            let event = web_events
-                .recv()
+                crate::core::bus::BUS.publish(
+                    crate::core::events::DomainEvent::ProactiveMessageRequested {
+                        source: "cron:test".into(),
+                        message: "Your morning briefing is ready.".into(),
+                        job_name: Some("morning-briefing".into()),
+                    },
+                );
+
+                let event = tokio::time::timeout(std::time::Duration::from_secs(2), async {
+                    loop {
+                        let event = web_events
+                            .recv()
+                            .await
+                            .expect("web event stream should remain open");
+                        if event.event == "proactive_message"
+                            && event.full_response.as_deref()
+                                == Some("Your morning briefing is ready.")
+                        {
+                            break event;
+                        }
+                    }
+                })
                 .await
-                .expect("web event stream should remain open");
-            if event.event == "proactive_message"
-                && event.full_response.as_deref() == Some("Your morning briefing is ready.")
-            {
-                break event;
-            }
-        }
-    })
-    .await
-    .expect("proactive message should reach the web event stream");
-    assert_eq!(event.event, "proactive_message");
-    assert_eq!(
-        event.full_response.as_deref(),
-        Some("Your morning briefing is ready.")
+                .expect("proactive message should reach the web event stream");
+                assert_eq!(event.event, "proactive_message");
+                assert_eq!(
+                    event.full_response.as_deref(),
+                    Some("Your morning briefing is ready.")
+                );
+            });
+        return;
+    }
+
+    let output = std::process::Command::new(std::env::current_exe().expect("test executable"))
+        .args(["--exact", TEST_NAME, "--nocapture", "--test-threads=1"])
+        .env(CHILD, "1")
+        .output()
+        .expect("run isolated proactive subscriber boot test");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        output.status.success() && stdout.contains("1 passed"),
+        "isolated proactive subscriber boot test failed:\n{stdout}\n{stderr}"
     );
 }
