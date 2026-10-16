@@ -22,7 +22,9 @@ function runCoreStep(mode) {
       /- name: Test core crate \(openhuman\)[\s\S]*?        run: \|\n([\s\S]*?)(?=\n  rust-core-tests-windows:)/,
     );
     assert.ok(block, "hosted core step exists");
-    const command = block[1].replace(/^          /gm, "");
+    const command = block[1]
+      .replace(/^          /gm, "")
+      .replaceAll("/root/", `${root}/`);
     for (const directory of [
       "bin",
       "scripts/ci",
