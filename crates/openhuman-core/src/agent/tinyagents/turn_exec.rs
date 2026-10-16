@@ -100,6 +100,7 @@ pub(crate) struct TurnSpec<'a> {
     pub subagent_scope: Option<SubagentScope>,
     pub context_window: Option<u64>,
     pub run_queue: Option<Arc<RunQueue<crate::agent::queued_turn::QueuedTurn>>>,
+    pub message_run_queue: Option<tinyagents_harness::run_queue::RunQueueHandle>,
     pub early_exit_tools: &'a [&'a str],
     pub pause_at_cap: bool,
     pub max_output_tokens: Option<u32>,
@@ -151,6 +152,7 @@ async fn drive_turn(
         subagent_scope,
         context_window,
         run_queue,
+        message_run_queue,
         early_exit_tools,
         pause_at_cap,
         max_output_tokens,
@@ -453,7 +455,9 @@ async fn drive_turn(
         // Forwards mid-flight steers from the session's run queue, drains
         // residual (delivered-but-unapplied) steers back into it when the turn
         // ends — also on cancellation (issue #4456).
-        steering: run_queue.map(steering_forwarder::queue_feed),
+        steering: message_run_queue
+            .map(steering_forwarder::message_queue_feed)
+            .or_else(|| run_queue.map(steering_forwarder::queue_feed)),
         registrar: is_subagent
             .then(|| Arc::new(steering_forwarder::SharedSteeringRegistrar) as Arc<_>),
         thread_label: Some(steer_thread_label),

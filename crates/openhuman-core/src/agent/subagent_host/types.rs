@@ -87,6 +87,11 @@ pub struct SubagentRunOptions {
             tinyagents_harness::run_queue::RunQueue<crate::agent::queued_turn::QueuedTurn>,
         >,
     >,
+
+    /// Native TinyAgents message queue for a driver-backed delegated run.
+    /// Generic Jobs/Message controls inject full user messages here; this is
+    /// converted to the runtime feed by the host's graph adapter.
+    pub message_run_queue: Option<tinyagents_harness::run_queue::RunQueueHandle>,
 }
 
 /// Terminal status of a sub-agent run.
