@@ -19,10 +19,9 @@
 use tinyinference_llm::message::{ContentBlock, ImageRef, MediaRef, Message, UserMessage};
 use tinyinference_llm::tool::ToolCall as TaToolCall;
 use tinytools_agent::dialect::{
-    DialectMessage, DialectResponse, DialectRole, ToolDialect, ToolResultEntry, TranscriptEntry,
+    DialectMessage, DialectRole, ToolDialect, ToolResultEntry, TranscriptEntry,
 };
 
-use crate::inference::provider::ChatResponse;
 use tinyagents_runtime::transcript::reasoning_from_content;
 #[cfg(test)]
 use tinyagents_runtime::transcript::{
@@ -33,13 +32,6 @@ use tinyagents_session::transcript::TranscriptMessage;
 
 /// Convert the host provider response at its boundary into the canonical
 /// dialect input. The dialect crate owns all parsing after this field-wise map.
-pub(crate) fn dialect_response_from_provider(response: &ChatResponse) -> DialectResponse {
-    DialectResponse {
-        text: response.text.clone(),
-        tool_calls: response.tool_calls.clone(),
-    }
-}
-
 /// Replay typed conversation entries through a canonical dialect and return
 /// the provider's typed rows (a native tool round keeps its calls and call ids
 /// in fields, never packed into `content`).
@@ -99,17 +91,17 @@ pub(crate) fn chat_message_to_message(msg: &TranscriptMessage) -> Message {
 /// [`user_text_with_markers`] gives back exactly the text that came in. Text
 /// without a ready marker is a plain text message, byte for byte.
 pub(crate) fn user_message_from_text(text: &str) -> Message {
-    if !crate::agent::attachments::parse(text).1.is_empty() {
+    if !crate::attachments::parse(text).1.is_empty() {
         let mut content = Vec::new();
-        for segment in crate::agent::attachments::segments(text) {
+        for segment in crate::attachments::segments(text) {
             let attachment = match segment {
-                crate::agent::attachments::Segment::Text(text) => {
+                crate::attachments::Segment::Text(text) => {
                     if let Message::User(user) = user_message_from_text(&text) {
                         content.extend(user.content);
                     }
                     continue;
                 }
-                crate::agent::attachments::Segment::Attachment(file) => file,
+                crate::attachments::Segment::Attachment(file) => file,
             };
             content.push(ContentBlock::Text(attachment.description()));
             let media = MediaRef::Path {
@@ -207,7 +199,7 @@ pub(crate) fn user_text_with_markers(msg: &Message) -> String {
 /// is empty or malformed is kept verbatim as text. Local references are
 /// resolved by the host model decorator before provider serialization.
 fn user_content_blocks(text: String) -> Vec<ContentBlock> {
-    if !crate::agent::attachments::parse(&text).1.is_empty() {
+    if !crate::attachments::parse(&text).1.is_empty() {
         if let Message::User(user) = user_message_from_text(&text) {
             return user.content;
         }

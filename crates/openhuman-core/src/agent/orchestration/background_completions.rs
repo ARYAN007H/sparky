@@ -41,12 +41,13 @@ use tinyagents_tasks::{
 
 use super::completion_notice::BackgroundCompletionFormatter;
 pub(crate) use super::completion_notice::{BackgroundAgentOutcome, AWAITING_INPUT_LABEL};
-pub(crate) use super::completion_target::CompletionTarget;
-pub(crate) use super::completion_target::{claim_recovery, forget_recovery};
 #[cfg(test)]
-pub(crate) use super::completion_target::{
+pub(crate) use super::completion_target::tests::{
     forget_workspace_for_test, install_store_for_test, TestWorkspace,
 };
+pub(crate) use super::completion_target::CompletionTarget;
+use super::completion_target::{awaiting_input_record_id, awaiting_input_record_prefix};
+pub(crate) use super::completion_target::{claim_recovery, forget_recovery};
 
 /// How long a settled record (delivered / gave up / tombstoned) is kept before
 /// compaction drops it. Dropping a settled record also drops its dedupe and its
@@ -59,6 +60,9 @@ const RELEASE_DRAIN: Duration = Duration::from_secs(3);
 /// Retries for a failed store write before a completion is reported lost.
 const RECORD_RETRIES: u32 = 3;
 
+/// Reserved prefix for independently deliverable pause notices. The encoded
+/// task id keeps these records out of the terminal task's dedupe slot; the UUID
+/// distinguishes repeated pauses of the same resumable task.
 /// Bound on the session -> thread cache; the oldest mapping is evicted first.
 const SESSION_THREADS_CAP: usize = 4096;
 
@@ -361,7 +365,8 @@ pub(crate) async fn record_failure(
 /// Queue an **awaiting-user** async sub-agent for chat delivery (#4896). A
 /// detached child that pauses to ask a question will not continue on its own, so
 /// the framed `[SUBAGENT_NEEDS_INPUT]` notice is delivered back into chat for the
-/// parent agent to relay to (or answer for) the user.
+/// parent agent to relay to (or answer for) the user. Each pause has a separate
+/// router key: the same task may pause repeatedly before its final completion.
 pub(crate) async fn record_awaiting_input(
     ctx: &DispatchCtx,
     workspace_dir: &Path,
@@ -374,6 +379,10 @@ pub(crate) async fn record_awaiting_input(
 ) {
     let task_id = task_id.into();
     let agent_id = agent_id.into();
+    // A pause is deliverable to the parent, but it is not the task's final
+    // completion. Use an independent key for every pause so resumed work can
+    // pause again and still eventually record under the original task id.
+    let pause_record_id = awaiting_input_record_id(&task_id);
     let summary = crate::agent::orchestration::tools::awaiting_user::awaiting_user_envelope(
         &task_id,
         &agent_id,
@@ -385,7 +394,7 @@ pub(crate) async fn record_awaiting_input(
         ctx,
         workspace_dir,
         parent_session,
-        task_id,
+        pause_record_id,
         agent_id,
         summary,
         parent_thread_id,
@@ -457,9 +466,32 @@ pub(crate) fn pending_for(workspace_dir: &Path, thread_id: &str) -> Vec<Completi
 /// answer. The router withdraws an already-recorded completion and drops one
 /// that arrives later. Returns whether a pending completion was withdrawn.
 pub(crate) fn mark_collected(workspace_dir: &Path, task_id: &str) -> bool {
-    let outcome = router_for_workspace(workspace_dir).tombstone(task_id);
-    log::debug!("[background_completions] mark_collected task_id={task_id} outcome={outcome:?}");
-    matches!(outcome, Ok(TombstoneOutcome::Suppressed))
+    let entry = entry_for(workspace_dir);
+    let router = &entry.router;
+    let completion = router.tombstone(task_id);
+    // A parent that collected the final result inline has no use for any
+    // queued pause notices from that same task. Sweep them too, including
+    // pauses persisted before a restart.
+    let pause_prefix = awaiting_input_record_prefix(task_id);
+    let pauses: Vec<String> = entry
+        .store
+        .list(None)
+        .into_iter()
+        .filter(|record| record.task_id.starts_with(&pause_prefix))
+        .map(|record| record.task_id)
+        .collect();
+    let pauses_collected = pauses.into_iter().fold(false, |collected, pause_id| {
+        let suppressed = matches!(
+            router.tombstone(&pause_id),
+            Ok(TombstoneOutcome::Suppressed)
+        );
+        collected | suppressed
+    });
+    log::debug!(
+        "[background_completions] mark_collected task_id={task_id} completion={completion:?} \
+         pauses_collected={pauses_collected}"
+    );
+    matches!(completion, Ok(TombstoneOutcome::Suppressed)) || pauses_collected
 }
 
 /// Drop every queued completion for `thread_id` and everything that finishes
@@ -706,6 +738,10 @@ pub(crate) fn recover_pending_threads(ctx: &DispatchCtx, workspace_dir: &Path) -
 #[cfg(test)]
 #[path = "background_completions_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "background_completions_pause_tests.rs"]
+mod pause_tests;
 
 #[cfg(test)]
 #[path = "background_completions_release_tests.rs"]

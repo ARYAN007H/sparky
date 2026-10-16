@@ -1,5 +1,4 @@
 use super::*;
-use crate::agent::session_store::ledger_sync::upsert_workflow_run;
 use serde_json::json;
 
 #[tokio::test]
@@ -9,9 +8,8 @@ async fn stop_fences_the_driver_and_makes_a_running_phase_resumable() {
         workspace_dir: workspace.path().to_path_buf(),
         ..Config::default()
     };
-    let run = upsert_workflow_run(
-        &config.workspace_dir,
-        WorkflowRunUpsert {
+    let run = crate::storage::sessions::with_ledger(&config.workspace_dir, |ledger| {
+        let ledger_arg_0 = WorkflowRunUpsert {
             id: "stop-resume-lifecycle".into(),
             definition_id: "parallel_research_cross_check".into(),
             parent_thread_id: None,
@@ -25,8 +23,9 @@ async fn stop_fences_the_driver_and_makes_a_running_phase_resumable() {
             summary: None,
             started_at: None,
             completed_at: None,
-        },
-    )
+        };
+        async move { ledger.upsert_workflow_run(ledger_arg_0).await }
+    })
     .expect("seed run");
 
     let stopped = stop_workflow_run(&config, &run.id)

@@ -6,12 +6,11 @@
 //! `impl OpenHumanSessionHost`/`impl SessionHostBuilder` can see them without the whole
 //! crate gaining field access.
 
-use crate::agent::context::ContextManager;
-use crate::agent::hooks::PostTurnHook;
-use crate::agent::progress::AgentProgress;
 use crate::agent::prompts::SystemPromptBuilder;
 use crate::agent::tinyagents::TurnModelSource;
+use crate::progress::AgentProgress;
 use std::sync::Arc;
+use tinyagents_harness::host::LearningSink;
 use tinytools::ToolPolicySession;
 use tinytools::{Tool, ToolSpec};
 use tinytools_agent::dialect::ToolDialect;
@@ -73,7 +72,7 @@ impl TurnInputs {
     /// What leads this turn's user message: the date line in the user's time
     /// zone, then the reply-language instruction.
     pub(crate) fn preamble(&self) -> String {
-        crate::agent::prompts::turn_preamble(
+        crate::prompts::turn_preamble(
             self.reply_language_directive.as_deref(),
             self.time_zone.as_deref(),
         )
@@ -281,7 +280,7 @@ pub struct OpenHumanSessionHost {
     /// distinguish "the agent paused mid-work" from "the agent asked a
     /// question" or "the agent finished" — `run_single` only returns the
     /// checkpoint/final text, with no other signal for which case occurred.
-    pub(super) post_turn_hooks: Vec<Arc<dyn PostTurnHook>>,
+    pub(super) post_turn_hooks: Vec<Arc<dyn LearningSink>>,
     pub(super) event_session_id: String,
     pub(super) event_channel: String,
     /// Recency window handed to every turn's run context so integration
@@ -318,7 +317,7 @@ pub struct OpenHumanSessionHost {
     /// `subagents` list post-fetch) stay correct even after the web
     /// channel's per-thread rename.
     ///
-    /// [`AgentDefinitionRegistry`]: crate::agent::harness::host_definition::AgentDefinitionRegistry
+    /// [`AgentDefinitionRegistry`]: crate::agent_registry::host_definition::AgentDefinitionRegistry
     pub(super) agent_definition_id: String,
     /// Injected transcript locator, or `None` to resolve the session store for
     /// this agent key.
@@ -376,17 +375,10 @@ pub struct OpenHumanSessionHost {
     /// timestamped `session_key` remains correct for sub-agents, where each
     /// spawn genuinely is a new transcript.
     pub(super) session: Option<tinyagents_session::transcript::SessionRef>,
-    /// Per-session [`ContextManager`] — owns the system-prompt
-    /// builder, the layered reduction pipeline (tool-result budget →
-    /// microcompact → autocompact signal → session-memory extraction
-    /// trigger), the guard's compaction circuit breaker, and the LLM
-    /// summarizer that runs when the pipeline asks for autocompaction.
-    /// Constructed once at session start so its budget counters and
-    /// session-memory deltas persist across turns. See
-    /// [`crate::agent::context`] for the full surface.
-    /// Host-only context/prompt and session-memory bookkeeping shared by the
-    /// runtime hooks; it is never a duplicate conversation history.
-    pub(super) context: Arc<std::sync::Mutex<ContextManager>>,
+    /// Prompt assembly configured for this session.
+    pub(super) prompt_builder: Arc<SystemPromptBuilder>,
+    /// Context middleware settings configured for this session.
+    pub(super) context_config: crate::config::ContextConfig,
     /// Optional progress event sender for real-time turn progress.
     /// When set, the turn loop emits [`AgentProgress`] events through
     /// this channel so callers (e.g. web channel) can surface live
@@ -400,7 +392,7 @@ pub struct OpenHumanSessionHost {
     /// agent build time and threaded into each agent's `prompt.rs` so
     /// the delegator / skill-executor voices can render their own
     /// integration blocks.
-    pub(super) connected_integrations: Vec<crate::agent::prompts::ConnectedIntegration>,
+    pub(super) connected_integrations: Vec<crate::integrations::ConnectedIntegration>,
     /// Whether `connected_integrations` is an authoritative session-start
     /// snapshot (prewarmed from the shared Composio cache or fetched
     /// explicitly) versus the default empty placeholder installed by
@@ -423,7 +415,7 @@ pub struct OpenHumanSessionHost {
     /// built from an explicit definition (a library host's per-agent spec)
     /// keeps those settings instead of having them silently replaced by
     /// whatever the process-global registry holds under the same id.
-    pub(super) definition: Option<Arc<crate::agent::harness::host_definition::AgentDefinition>>,
+    pub(super) definition: Option<Arc<crate::agent_registry::host_definition::AgentDefinition>>,
     /// Built by `from_config_host_only`: the belt is the host's tools alone.
     pub(super) host_only: bool,
     /// The next messages are untrusted data, so `run_single` skips the
@@ -590,7 +582,7 @@ pub struct SessionHostBuilder {
     pub(super) workflows: Option<Vec<tinyskills::Skill>>,
     /// OpenHumanSessionHost workflows to surface in the prompt. Populated from `load_workflows`
     /// at session start; defaults to empty when not explicitly set.
-    pub(super) post_turn_hooks: Vec<Arc<dyn PostTurnHook>>,
+    pub(super) post_turn_hooks: Vec<Arc<dyn LearningSink>>,
     pub(super) event_session_id: Option<String>,
     pub(super) event_channel: Option<String>,
     pub(super) agent_definition_name: Option<String>,
@@ -611,9 +603,9 @@ pub struct SessionHostBuilder {
     ///
     /// `None` (the default) leaves every existing caller as it was.
     ///
-    /// [`AgentDefinitionRegistry`]: crate::agent::harness::host_definition::AgentDefinitionRegistry
+    /// [`AgentDefinitionRegistry`]: crate::agent_registry::host_definition::AgentDefinitionRegistry
     pub(super) session_definition:
-        Option<Arc<crate::agent::harness::host_definition::AgentDefinition>>,
+        Option<Arc<crate::agent_registry::host_definition::AgentDefinition>>,
     /// Directory chain of parent session keys for a sub-agent. `None`
     /// (default) means this is a root session — its transcript lands
     /// flat in `session_raw/DDMMYYYY/{session_key}.jsonl`. Populated

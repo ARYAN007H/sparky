@@ -51,7 +51,7 @@
 //! tool. Naming this one `delegate` would therefore have removed the
 //! orchestrator's entire delegation surface for exactly those users, silently.
 //!
-//! [`DelegateTool`]: crate::agent::tools::DelegateTool
+//! [`DelegateTool`]: crate::tools::delegate::DelegateTool
 //! [`ArchetypeDelegationTool`]: super::ArchetypeDelegationTool
 //! [`ToolExposure::Hidden`]: tinytools::ToolExposure::Hidden
 
@@ -366,7 +366,7 @@ pub(crate) async fn execute_collapsed_delegation_with_live_parent(
         )));
     }
     let prompt = render_structured_handoff(&raw_prompt, &args);
-    let prompt = match crate::agent::attachments::delegation_prompt(
+    let prompt = match crate::attachments::delegation_prompt(
         &run_context.dispatch_ctx(),
         &prompt,
         &args,

@@ -29,9 +29,9 @@ use tinyagents_harness::summarization::payload_summarizer::{
 };
 use tracing::debug;
 
-use crate::agent::harness::host_definition::AgentDefinition;
 use crate::agent::subagent_host;
 use crate::agent::tinyagents::host::OpenHumanRunContext;
+use crate::agent_registry::host_definition::AgentDefinition;
 use {
     crate::inference::tokenjuice::generate::PreparedGenerate, tinyjuice_bus::wire::GenerateRequest,
 };

@@ -145,13 +145,13 @@ export const ALLOW = new Map(
       "one process-global savings counter snapshot, cheap to lose; not per-user data a scope would mean anything for",
     ],
     [
-      "agent/artifacts/files.rs",
+      "artifacts/files.rs",
       "json-write",
       "match tokio::fs::OpenOptions::new()",
       "reserves the artifact's content file in the user-visible files folder; the bytes stay a file on every backend (the port has no blob store), only the records moved",
     ],
     [
-      "agent/artifacts/tiny_store.rs",
+      "artifacts/tiny_store.rs",
       "json-write",
       "tokio::fs::write(&dest, latest.body.as_bytes()).await?;",
       "writes a text artifact's newest version into its file in the user-visible files folder; the deliverable is a user file on every backend, the versioned record itself goes through the artifact store",

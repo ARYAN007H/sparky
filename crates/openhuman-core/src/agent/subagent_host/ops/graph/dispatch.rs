@@ -6,9 +6,9 @@ use crate::agent::subagent_host::ops::checkpoint;
 use std::collections::HashSet;
 use std::sync::Arc;
 
-use crate::agent::progress::AgentProgress;
 use crate::agent::subagent_host::types::SubagentRunError;
 use crate::agent::tinyagents::{SubagentScope, TurnSpec};
+use crate::progress::AgentProgress;
 use tinyagents_harness::run_queue::RunQueue;
 use tinyagents_session::transcript::TranscriptMessage;
 use tinyjuice_bus::types::AgentTokenjuiceCompression;
@@ -17,7 +17,7 @@ use tinytools::{Tool, ToolSpec};
 use tinytools_agent::dialect::TranscriptEntry;
 
 use super::transcript::persist_subagent_transcript;
-use super::worker_mirror::mirror_worker_thread;
+use crate::threads::worker_mirror::mirror_worker_thread;
 
 /// Cumulative usage stats gathered across a sub-agent graph run.
 #[derive(Debug, Clone, Default)]
@@ -267,7 +267,7 @@ pub(in super::super) async fn run_subagent_via_graph(
             let task_id = task_id.to_string();
             let dispatch = dispatch.clone();
             tokio::spawn(async move {
-                crate::agent::progress_tracing::export_subagent_journal_trace(
+                crate::core::observability::progress_tracing::export_subagent_journal_trace(
                     &dispatch,
                     &config,
                     &journal_run_id,
@@ -550,7 +550,7 @@ fn build_subagent_context_mw(
             let ctx = &config.context;
             // TokenJuice content-aware compaction gates on the same master
             // `[context].compaction_enabled` the chat path reads
-            // (`ContextManager::compaction_enabled`).
+            // (`ContextConfig::compaction_enabled`).
             mw.tokenjuice_compaction_enabled =
                 ctx.compaction_enabled && crate::inference::tokenjuice::enabled(config);
             mw.tool_result_budget_bytes = ctx.tool_result_budget_bytes;
@@ -561,7 +561,7 @@ fn build_subagent_context_mw(
                 0
             };
             // Summarization step honors the `[context].enabled` + autocompact
-            // opt-outs, same as `ContextManager::autocompact_enabled`.
+            // opt-outs, same as `ContextConfig::enabled && autocompact_enabled`.
             mw.autocompact_enabled = ctx.enabled && ctx.autocompact_enabled;
             mw.compaction = ctx.compaction_settings();
             tracing::debug!(

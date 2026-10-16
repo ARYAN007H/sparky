@@ -107,21 +107,6 @@ impl OpenHumanSessionHost {
         Arc::clone(&self.durable_tool_specs)
     }
 
-    #[cfg(test)]
-    pub(crate) fn visible_tool_names_for_test(&self) -> &std::collections::HashSet<String> {
-        &self.visible_tool_names
-    }
-
-    #[cfg(test)]
-    pub(crate) fn deferred_tool_names_for_test(&self) -> &std::collections::HashSet<String> {
-        &self.deferred_tool_names
-    }
-
-    #[cfg(test)]
-    pub(crate) fn tool_policy_session_for_test(&self) -> &tinytools::ToolPolicySession {
-        &self.tool_policy_session
-    }
-
     /// The full host [`Config`](crate::config::Config) this session
     /// was built with, through the factory or an explicitly configured model.
     ///
@@ -144,9 +129,9 @@ impl OpenHumanSessionHost {
     /// them replaced by a same-id registry entry.
     pub(crate) fn resolved_definition(
         &self,
-    ) -> Option<Arc<crate::agent::harness::host_definition::AgentDefinition>> {
+    ) -> Option<Arc<crate::agent_registry::host_definition::AgentDefinition>> {
         self.definition.clone().or_else(|| {
-            crate::agent::harness::host_definition::AgentDefinitionRegistry::current()
+            crate::agent_registry::host_definition::AgentDefinitionRegistry::current()
                 .and_then(|registry| registry.get(&self.agent_definition_id).cloned())
                 .map(Arc::new)
         })
@@ -184,7 +169,7 @@ impl OpenHumanSessionHost {
     }
 
     /// Active Composio integrations fetched at session start.
-    pub fn connected_integrations(&self) -> &[crate::agent::prompts::ConnectedIntegration] {
+    pub fn connected_integrations(&self) -> &[crate::integrations::ConnectedIntegration] {
         &self.connected_integrations
     }
 
@@ -207,7 +192,7 @@ impl OpenHumanSessionHost {
     /// fetch result when the agent was built outside the normal turn loop).
     pub fn set_connected_integrations(
         &mut self,
-        integrations: Vec<crate::agent::prompts::ConnectedIntegration>,
+        integrations: Vec<crate::integrations::ConnectedIntegration>,
     ) {
         self.connected_integrations = integrations;
         self.connected_integrations_initialized = true;
@@ -262,7 +247,7 @@ impl OpenHumanSessionHost {
     /// completed-turn callbacks join the learning sink's set and the tool belt
     /// authority is read when the runtime session is first created.
     pub fn set_host_env(&mut self, env: crate::agent::turn_env::HostTurnEnv) {
-        for hook in env.hooks.post_turn_hooks() {
+        for hook in env.hooks.learning_hooks() {
             if !self
                 .post_turn_hooks
                 .iter()
@@ -406,7 +391,7 @@ impl OpenHumanSessionHost {
     /// iteration updates to the UI. Pass `None` to disable.
     pub fn set_on_progress(
         &mut self,
-        tx: Option<tokio::sync::mpsc::Sender<crate::agent::progress::AgentProgress>>,
+        tx: Option<tokio::sync::mpsc::Sender<crate::progress::AgentProgress>>,
     ) {
         // A warm runtime retains the last turn's prelude. Release its sender
         // along with the host sender so the finished turn's bridge can drain

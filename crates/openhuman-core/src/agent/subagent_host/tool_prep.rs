@@ -5,8 +5,8 @@
 //! actually see?).
 
 use super::types::SubagentRunError;
-use crate::agent::harness::host_definition::AgentDefinition;
 use crate::agent::prompts::PromptContext;
+use crate::agent_registry::host_definition::AgentDefinition;
 use tinyagents_definition::{PromptSource, ToolScope};
 use tinytools::Tool;
 
@@ -38,9 +38,7 @@ pub(crate) fn subagent_prompt_protocol(
         // The native request carries its own structured catalogue; retain
         // only the dialect guidance in the text prompt.
         ToolCallFormat::Native => NativeDialect.prompt_instructions(&[]),
-        ToolCallFormat::Json => {
-            crate::agent::prompts::render_helpers::harness_json_tool_prompt(tools)
-        }
+        ToolCallFormat::Json => crate::agent::prompts::harness_json_tool_prompt(tools),
         ToolCallFormat::Python => CodeDialect::instructions(CodeStyle::Python),
         ToolCallFormat::TypeScript => CodeDialect::instructions(CodeStyle::TypeScript),
     };
@@ -77,7 +75,7 @@ pub(super) fn is_subagent_spawn_tool(name: &str) -> bool {
     // surface. Resolve the override names via the registry so the strip
     // stays in lockstep with `collect_orchestrator_tools`'s naming.
     if let Some(registry) =
-        crate::agent::harness::host_definition::AgentDefinitionRegistry::current()
+        crate::agent_registry::host_definition::AgentDefinitionRegistry::current()
     {
         return registry
             .list()

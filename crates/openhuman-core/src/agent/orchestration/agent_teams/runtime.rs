@@ -188,9 +188,9 @@ pub async fn start_member_run(
     // don't cross `tokio::spawn` — capture the caller's turn origin here so the
     // worker keeps the label the approval gate needs. Inherit-only: no origin
     // in scope means the worker stays unlabelled and fails closed as before.
-    let inherited_origin = crate::agent::turn_origin::capture();
+    let inherited_origin = crate::security::turn_origin::capture();
     ctx.spawn(async move {
-        crate::agent::turn_origin::with_inherited_origin(
+        crate::security::turn_origin::with_inherited_origin(
             inherited_origin,
             run_member_loop(
                 &task_ctx,
@@ -295,7 +295,7 @@ async fn drive_member(
     parent: ParentExecutionContext,
 ) -> Result<()> {
     let ledger = SessionTeamLedger::new(
-        crate::agent::session_store::require_ledger(&config.workspace_dir)
+        crate::storage::sessions::require_ledger(&config.workspace_dir)
             .map_err(|e| anyhow!("{e}"))?,
     )?;
     let delivered = deliver_pending_messages(&ledger, team_id, member_id)?;
@@ -508,7 +508,7 @@ mod run_ledger {
     fn ledger(
         workspace_dir: &Path,
     ) -> Result<std::sync::Arc<dyn tinyagents_session::run_ledger::RunLedgerStore>> {
-        crate::agent::session_store::require_ledger(workspace_dir).map_err(|e| anyhow!("{e}"))
+        crate::storage::sessions::require_ledger(workspace_dir).map_err(|e| anyhow!("{e}"))
     }
 
     pub(super) async fn get_agent_team_member(

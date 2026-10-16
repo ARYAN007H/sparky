@@ -11,10 +11,8 @@ use std::time::Instant;
 
 use crate::agent::harness::artifact_offload::offload_run_result;
 use crate::agent::harness::fork_context::ParentExecutionContext;
-use crate::agent::harness::host_definition::{AgentDefinition, AgentDefinitionRegistry};
-use crate::agent::prompts::{
-    render_subagent_system_prompt_with_format, PromptContext, SubagentRenderOptions,
-};
+use crate::agent::prompts::render_subagent_system_prompt_with_format;
+use crate::agent::prompts::{PromptContext, SubagentRenderOptions};
 use crate::agent::subagent_host::definition_iter_cap;
 use crate::agent::subagent_host::tool_prep::{
     filter_tool_indices, is_subagent_spawn_tool, load_prompt_source, subagent_prompt_protocol,
@@ -23,6 +21,7 @@ use crate::agent::subagent_host::types::{
     SubagentMode, SubagentRunError, SubagentRunOptions, SubagentRunOutcome,
 };
 use crate::agent::tinyagents::budget::MAX_SPAWN_DEPTH;
+use crate::agent_registry::host_definition::{AgentDefinition, AgentDefinitionRegistry};
 use crate::inference::provider::AGENT_TURN_MAX_OUTPUT_TOKENS;
 use tinyagents_definition::{
     validate_tier_transition, AgentTier, IterationPolicy, PromptSource,
@@ -39,7 +38,7 @@ use tinytools_std::file_state::with_file_state_agent_id;
 use super::prompt::{
     append_artifact_offload_contract, append_subagent_role_contract, dedup_tool_specs_by_name,
 };
-use super::provider::{resolve_subagent_source, user_is_signed_in_to_composio};
+use super::provider::resolve_subagent_source;
 
 /// Runtime spawn-hierarchy gate decision for one delegation hop.
 ///
@@ -91,10 +90,6 @@ pub(super) fn tier_gate_decision(
     }
     Ok(())
 }
-
-#[path = "runner_result_cap.rs"]
-mod result_cap;
-use result_cap::apply_max_result_chars;
 
 /// Run a sub-agent based on its definition and a task prompt.
 ///
@@ -256,7 +251,7 @@ pub(crate) async fn run_subagent_direct(
         // forbids never reaches a user script, and before config load so a
         // denied spawn has no side effects at all.
         if let Err(reason) = crate::hooks::ops::subagent_starting(
-            tinyagents_runtime::command_hooks::context::TurnIdentity {
+            tinyagents_hooks::command::context::TurnIdentity {
                 conversation_id: Some(parent.session_id.clone()),
                 session_id: Some(parent.session_id.clone()),
                 agent_id: Some(parent.agent_definition_id.clone()),
@@ -376,9 +371,15 @@ pub(crate) async fn run_subagent_direct(
         // continues on to the cap and the summarizer detour exactly as before.
         Box::pin(offload_outcome_artifacts(&mut outcome, definition, &options, &task_id)).await;
 
-        // Truncate result to the definition's cap if set (shared with the
-        // deterministic memory fast path via `apply_max_result_chars`).
-        apply_max_result_chars(&mut outcome.output, definition.max_result_chars, &definition.id);
+        // Use TinyAgents' shared character-safe result cap so subagent output
+        // follows the same truncation contract as other orchestration paths.
+        if let Some(cap) = definition.max_result_chars {
+            outcome.output = tinyagents_orchestration::subagent::truncate_head_tail(
+                &outcome.output,
+                cap,
+            )
+            .0;
+        }
 
         tracing::info!(
             agent_id = %definition.id,
@@ -469,8 +470,7 @@ async fn offload_outcome_artifacts(
 
     // Offload at the tighter of the global default and this agent's own result
     // cap, so a definition capped below the default (flow_memory_agent at 4 000
-    // chars) gets its full body on disk instead of truncated by
-    // `apply_max_result_chars` immediately after.
+    // chars) gets its full body on disk instead of truncated immediately after.
     let threshold =
         effective_offload_threshold(DEFAULT_OFFLOAD_THRESHOLD_BYTES, definition.max_result_chars);
 
@@ -591,11 +591,11 @@ async fn run_typed_mode(
     // once the OAuth handshake reaches ACTIVE/CONNECTED, so this call
     // returns the fresh list almost for free on the warm path. Fall back
     // to the parent's frozen list when the live fetch returns empty.
-    let live_integrations: Vec<crate::agent::prompts::ConnectedIntegration> = {
+    let live_integrations: Vec<crate::integrations::ConnectedIntegration> = {
         let signed_in = config
             .as_ref()
             .ok()
-            .map(|cfg| user_is_signed_in_to_composio(cfg))
+            .map(|cfg| crate::integrations::composio::user_is_signed_in_to_composio(cfg))
             .unwrap_or(false);
         if !signed_in {
             parent.connected_integrations.clone()
@@ -721,7 +721,7 @@ async fn run_typed_mode(
         definition.extensions.omit_safety_preamble,
     );
 
-    let connected_integrations_for_prompt: Vec<crate::agent::prompts::ConnectedIntegration> =
+    let connected_integrations_for_prompt: Vec<crate::integrations::ConnectedIntegration> =
         live_integrations
             .iter()
             .filter(|ci| ci.connected)
@@ -813,7 +813,7 @@ async fn run_typed_mode(
     // Shared one-line stamp (#3602), in the user's zone like the main agent's.
     // On the user message: sub-agent system prompts are byte-stable for caching.
     let zone = config.as_ref().ok().map(|c| c.time_zone());
-    let now_str = crate::agent::prompts::current_datetime_line(zone.as_deref());
+    let now_str = crate::prompts::current_datetime_line(zone.as_deref());
 
     let mut context_parts: Vec<&str> = Vec::new();
     if !definition.extensions.omit_memory_context {
@@ -1039,7 +1039,3 @@ async fn run_typed_mode(
             tinyagents_orchestration::subagent::SubagentPersistenceDisposition::TerminalExisting,
     })
 }
-
-#[cfg(test)]
-#[path = "runner_result_cap_tests.rs"]
-mod result_cap_tests;

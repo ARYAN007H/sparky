@@ -16,14 +16,13 @@
 //! | `runner.rs`         | `run_subagent`, `run_typed_mode`                               |
 //! | `graph.rs`          | `run_subagent_via_graph` — the sub-agent turn graph + tools    |
 //! | `checkpoint.rs`     | `SubagentCheckpoint` — cap-hit summary                         |
-//! | `pause_checkpoint.rs` | `write` — the on-disk pause snapshot for `continue_subagent`  |
+//! | `pause_checkpoint.rs` | `is_safe_task_id` — validates model-provided checkpoint names |
 
 mod checkpoint;
 mod graph;
 mod pause_checkpoint;
-// The checkpoint filename validator, shared with `continue_subagent`: the
-// model-authored `task_id` must be rejected at the tool boundary as well as at
-// the write, so the read path cannot traverse either.
+// The checkpoint filename validator rejects model-authored task ids before the
+// continue path resolves a checkpoint.
 pub(crate) use pause_checkpoint::is_safe_task_id;
 mod prompt;
 mod provider;
@@ -32,14 +31,6 @@ mod runner;
 // The lifecycle adapter owns the public entry point.  This is its host-only
 // execution leaf after a neutral driver has prepared and admitted a request.
 pub(crate) use runner::run_subagent_direct;
-
-// `user_is_signed_in_to_composio` is the mode-aware "can the user call
-// composio at all?" probe added in Wave 2 (#1710). Re-exported here so
-// non-composio probe sites (registration gates, telemetry)
-// can call it as
-// `crate::agent::subagent_host::user_is_signed_in_to_composio`
-// without reaching into a private sibling module.
-pub(crate) use provider::user_is_signed_in_to_composio;
 
 pub(crate) use prompt::append_subagent_role_contract;
 pub(crate) use provider::resolve_subagent_source;
@@ -62,9 +53,9 @@ pub(super) use super::types::{SubagentMode, SubagentRunError, SubagentRunOptions
 #[cfg(test)]
 pub(super) use crate::agent::harness::fork_context::ParentExecutionContext;
 #[cfg(test)]
-pub(super) use crate::agent::harness::host_definition::AgentDefinition;
-#[cfg(test)]
 pub(super) use crate::agent::tinyagents::budget::MAX_SPAWN_DEPTH;
+#[cfg(test)]
+pub(super) use crate::agent_registry::host_definition::AgentDefinition;
 #[cfg(test)]
 use tinyagents_definition::PromptSource;
 #[cfg(test)]

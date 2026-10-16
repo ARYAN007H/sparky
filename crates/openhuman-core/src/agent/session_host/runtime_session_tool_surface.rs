@@ -25,7 +25,7 @@ impl OpenHumanTurnPrelude {
     /// removed from the executable source, schema, and policy together before
     /// this request is prepared.
     pub(super) fn refresh_delegation_tool_surface(&self) -> anyhow::Result<()> {
-        use crate::agent::harness::host_definition::AgentDefinitionRegistry;
+        use crate::agent_registry::host_definition::AgentDefinitionRegistry;
         use crate::tools::orchestrator_tools::collect_orchestrator_tools;
         use tinytools::ToolPolicyEngine;
 

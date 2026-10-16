@@ -35,14 +35,6 @@ use super::{
     SubagentRunError, SubagentRunOptions, SubagentRunOutcome, SubagentRunStatus, SubagentUsage,
 };
 
-fn root_context_from_options(
-    options: &SubagentRunOptions,
-) -> crate::agent::tinyagents::host::OpenHumanRunContext {
-    // The parent lineage is exactly what the caller put on the explicit
-    // carrier (`run_context.parent`); nothing is re-bound from an ambient turn.
-    options.run_context.clone()
-}
-
 /// Runs one host subagent through a neutral driver using a real direct child.
 ///
 /// Callers that are already inside a TinyAgents turn must use this entrypoint:
@@ -50,7 +42,7 @@ fn root_context_from_options(
 /// therefore preserves root, parent, thread, and cancellation lineage.
 pub async fn run_subagent_with_parent(
     parent: &RunContext<crate::agent::tinyagents::host::OpenHumanRunContext>,
-    definition: crate::agent::harness::host_definition::AgentDefinition,
+    definition: crate::agent_registry::host_definition::AgentDefinition,
     input: impl Into<String>,
     options: SubagentRunOptions,
 ) -> Result<SubagentRunOutcome, SubagentRunError> {
@@ -62,11 +54,11 @@ pub async fn run_subagent_with_parent(
 /// context. It creates the one explicit root context, then drives the same
 /// neutral lifecycle as nested callers.
 pub async fn run_subagent(
-    definition: &crate::agent::harness::host_definition::AgentDefinition,
+    definition: &crate::agent_registry::host_definition::AgentDefinition,
     input: &str,
     options: SubagentRunOptions,
 ) -> Result<SubagentRunOutcome, SubagentRunError> {
-    let mut root_data = root_context_from_options(&options);
+    let mut root_data = options.run_context.clone();
     let root_config = root_data.root_run_config("subagent-host");
     let root = root_data.into_tinyagents(root_config);
     run_subagent_with_parent(&root, definition.clone(), input, options).await
@@ -78,7 +70,7 @@ pub async fn run_subagent(
 pub async fn continue_subagent_with_parent(
     parent: &RunContext<crate::agent::tinyagents::host::OpenHumanRunContext>,
     original_key: SubagentTaskKey,
-    definition: crate::agent::harness::host_definition::AgentDefinition,
+    definition: crate::agent_registry::host_definition::AgentDefinition,
     input: impl Into<String>,
     options: SubagentRunOptions,
 ) -> Result<SubagentRunOutcome, SubagentRunError> {
@@ -91,11 +83,11 @@ pub async fn continue_subagent_with_parent(
 /// OpenHuman carrier. The original durable key is mandatory.
 pub async fn continue_subagent(
     original_key: SubagentTaskKey,
-    definition: &crate::agent::harness::host_definition::AgentDefinition,
+    definition: &crate::agent_registry::host_definition::AgentDefinition,
     input: &str,
     options: SubagentRunOptions,
 ) -> Result<SubagentRunOutcome, SubagentRunError> {
-    let mut root_data = root_context_from_options(&options);
+    let mut root_data = options.run_context.clone();
     let root_config = root_data.root_run_config("subagent-host");
     let root = root_data.into_tinyagents(root_config);
     continue_subagent_with_parent(&root, original_key, definition.clone(), input, options).await
@@ -118,7 +110,7 @@ pub(crate) fn load_subagent_checkpoint(
 /// for one caller-owned lifecycle; process-wide persistence remains the source
 /// of truth for cross-process continuation and duplicate terminal effects.
 pub struct OpenHumanSubagentHost {
-    definition: crate::agent::harness::host_definition::AgentDefinition,
+    definition: crate::agent_registry::host_definition::AgentDefinition,
     options: SubagentRunOptions,
 }
 
@@ -214,7 +206,7 @@ pub(super) fn host_in_flight(ctx: &crate::core::runtime::DispatchCtx) -> Arc<Hos
 
 impl OpenHumanSubagentHost {
     pub fn new(
-        definition: crate::agent::harness::host_definition::AgentDefinition,
+        definition: crate::agent_registry::host_definition::AgentDefinition,
         options: SubagentRunOptions,
     ) -> Self {
         Self {
@@ -372,7 +364,8 @@ impl OpenHumanSubagentHost {
         })
         .map_err(map_lifecycle_error)?;
         let request = if continuation {
-            SubagentRequest::continue_with_key(task_key.clone(), child, request, input, None)
+            SubagentRequest::continue_with_key(task_key.clone(), child, request, input, None, None)
+                .await
         } else {
             // `direct_subagent_child` derives the same key for the host's
             // durable lookup; this constructor independently proves that the
@@ -413,12 +406,12 @@ impl OpenHumanSubagentHost {
 
 #[derive(Clone)]
 struct HostRequest {
-    definition: crate::agent::harness::host_definition::AgentDefinition,
+    definition: crate::agent_registry::host_definition::AgentDefinition,
     options: SubagentRunOptions,
 }
 
 struct PreparedHostPlan {
-    definition: crate::agent::harness::host_definition::AgentDefinition,
+    definition: crate::agent_registry::host_definition::AgentDefinition,
     options: SubagentRunOptions,
 }
 

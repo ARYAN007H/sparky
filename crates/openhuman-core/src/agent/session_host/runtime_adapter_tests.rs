@@ -2,44 +2,23 @@ use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
 use tinyagents_runtime::{
-    DriverFailure, DriverOutcome, DriverRequest, PrefixSnapshot, ResumeMode, SessionDriver,
-    SessionTerminal, SessionTurnRequest, ToolSnapshot, TranscriptCodec, TranscriptTurnOptions,
-    TurnOptions,
+    DriverFailure, DriverOutcome, DriverRequest, PrefixSnapshot, ResumeMode, SessionBuilder,
+    SessionDriver, SessionTerminal, SessionTurnRequest, ToolSnapshot, TranscriptCodec,
+    TranscriptTurnOptions, TurnOptions,
 };
 use tinyagents_session::port::{InMemorySessionStores, SessionStoreProvider};
 use tinyagents_session::transcript::TranscriptMeta;
 use tinyinference_llm::message::Message;
 
-use super::announcement_notes::{
+use super::runtime_session::tool_surface::reconcile_synthesized_visibility;
+use super::runtime_session::{account_committed_turn_against_goal, holistic_last_turn_usage};
+use super::{OpenHumanSessionHooks, OpenHumanTranscriptCodec};
+use crate::agent::tinyagents::host::OpenHumanRunContext;
+use crate::integrations::announcement_notes::{
     integration_announcement_note, mcp_announcement_note, skill_announcement_note,
 };
-use super::runtime_session::tool_surface::reconcile_synthesized_visibility;
-use super::runtime_session::{
-    account_committed_turn_against_goal, begin_turn_resume, holistic_last_turn_usage,
-    OpenHumanSessionState,
-};
-use super::{OpenHumanSessionFactory, OpenHumanSessionHooks, OpenHumanTranscriptCodec};
-use crate::agent::tinyagents::host::OpenHumanRunContext;
 
 struct RecordingDriver(Arc<Mutex<Vec<OpenHumanRunContext>>>);
-
-#[test]
-fn transcript_suppression_is_applied_before_resume() {
-    let mut state = OpenHumanSessionState::default();
-    state.pending_turn_overrides = super::TurnOverrides {
-        suppress_transcript_autoload: true,
-        suppress_tools: true,
-        ..Default::default()
-    };
-    let mut resume = ResumeMode::LatestForAgent;
-
-    begin_turn_resume(&mut state, &mut resume);
-
-    assert_eq!(resume, ResumeMode::Never);
-    assert!(state.pending_turn_overrides == super::TurnOverrides::default());
-    assert!(state.active_turn_overrides.suppress_transcript_autoload);
-    assert!(state.active_turn_overrides.suppress_tools);
-}
 
 #[async_trait]
 impl SessionDriver<OpenHumanRunContext> for RecordingDriver {
@@ -296,8 +275,8 @@ fn wildcard_delegate_visibility_admits_new_connections_and_removes_revoked_ones(
 #[tokio::test]
 async fn committed_goal_accounting_uses_direct_and_completed_child_usage() {
     let workspace = tempfile::tempdir().unwrap();
-    crate::agent::goals::store::set(
-        workspace.path(),
+    tinyagents_graph::goals::store::set(
+        &crate::storage::sessions::stores_or_ephemeral(workspace.path()).kv,
         "receipt-goal",
         "finish migration",
         Some(20),
@@ -324,10 +303,13 @@ async fn committed_goal_accounting_uses_direct_and_completed_child_usage() {
 
     account_committed_turn_against_goal(workspace.path(), Some("receipt-goal"), &sidecar).await;
 
-    let goal = crate::agent::goals::store::get(workspace.path(), "receipt-goal")
-        .await
-        .unwrap()
-        .unwrap();
+    let goal = tinyagents_graph::goals::store::get(
+        &crate::storage::sessions::stores_or_ephemeral(workspace.path()).kv,
+        "receipt-goal",
+    )
+    .await
+    .unwrap()
+    .unwrap();
     assert_eq!(
         goal.tokens_used, 21,
         "receipt accounts direct + child usage"
@@ -400,16 +382,14 @@ async fn runtime_adapter_passes_host_context_commits_before_finalize_and_emits_o
         .transcripts;
     let context = OpenHumanRunContext::new();
     let cancellation = context.cancellation.clone();
-    let mut session = OpenHumanSessionFactory::build(
-        Arc::new(RecordingDriver(Arc::clone(&seen_context))),
-        hooks,
-        PrefixSnapshot::default(),
-        ToolSnapshot::default(),
-        Arc::clone(&locator),
-        "adapter-test",
-        meta(),
-    )
-    .unwrap();
+    let mut session = SessionBuilder::new(Arc::new(RecordingDriver(Arc::clone(&seen_context))))
+        .codec(Arc::new(OpenHumanTranscriptCodec))
+        .hooks(hooks)
+        .prefix(PrefixSnapshot::default())
+        .tool_snapshot(ToolSnapshot::default())
+        .transcript(Arc::clone(&locator), "adapter-test", meta())
+        .build()
+        .unwrap();
 
     session
         .turn(

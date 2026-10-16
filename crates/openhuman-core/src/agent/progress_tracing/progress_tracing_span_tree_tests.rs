@@ -1,6 +1,6 @@
 use super::*;
 
-use crate::agent::progress_tracing::export::export_spans;
+use crate::core::observability::progress_tracing::export::export_spans;
 use tinyagents_harness::observability::trace_export::serialize::SpanEnvelope;
 use tinyagents_harness::observability::trace_export::SpanKind;
 // ── config ────────────────────────────────────────────────────────────────
@@ -611,7 +611,7 @@ fn turn_span_stamps_user_and_thread_grouping_attributes() {
 
 #[test]
 fn envelope_for_maps_configured_backend() {
-    use crate::agent::progress_tracing::export::envelope_for;
+    use crate::core::observability::progress_tracing::export::envelope_for;
     assert_eq!(envelope_for(AgentTracingBackend::Otel), SpanEnvelope::Otel);
     assert_eq!(
         envelope_for(AgentTracingBackend::Langfuse),

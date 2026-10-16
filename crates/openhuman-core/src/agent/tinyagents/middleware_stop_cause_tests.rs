@@ -9,7 +9,8 @@ use crate::agent::session_host::turn_checkpoint::CheckpointToolResult;
 use crate::agent::tinyagents::middleware::repeated_failure::RepeatedToolFailureMiddleware;
 use tinyagents_harness::middleware::is_repeat_call_exempt;
 use tinyagents_harness::middleware::library::{
-    RepeatProgressMiddleware, REPEAT_GUARD_BLOCKED, REPEAT_GUARD_HALTED, REPEAT_GUARD_METADATA_KEY,
+    RepeatProgressMiddleware, DEFAULT_CLEARED_PLACEHOLDER, REPEAT_GUARD_BLOCKED,
+    REPEAT_GUARD_HALTED, REPEAT_GUARD_METADATA_KEY,
 };
 use tinyinference_llm::message::{AssistantMessage, ContentBlock};
 use tinyinference_llm::model::ModelResponse;
@@ -130,7 +131,7 @@ async fn re_read_until_stopped(batch: &[(&str, &str)], rounds: usize) -> (StopRe
         Arc::new(is_repeat_call_exempt),
     )
     .with_read_only(Arc::new(|name: &str| matches!(name, "file_read" | "grep")))
-    .with_cleared_placeholder(CLEARED_PLACEHOLDER);
+    .with_cleared_placeholder(DEFAULT_CLEARED_PLACEHOLDER);
     let breaker = RepeatedToolFailureMiddleware::new(handle.clone(), 3, slot.clone());
     let mut ctx = ctx();
     let mut records = Vec::new();

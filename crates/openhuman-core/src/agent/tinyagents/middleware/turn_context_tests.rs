@@ -6,7 +6,7 @@ async fn attachment_scope_is_request_local_and_contains_only_typed_authority() {
     let root = std::path::PathBuf::from("/workspace/project");
     let mut data = crate::agent::tinyagents::host::OpenHumanRunContext::new();
     data.origin = Some(
-        crate::agent::turn_origin::AgentTurnOrigin::ExternalChannel {
+        crate::security::turn_origin::AgentTurnOrigin::ExternalChannel {
             sender_name: None,
             channel: "test".into(),
             sender: None,
@@ -26,7 +26,7 @@ async fn attachment_scope_is_request_local_and_contains_only_typed_authority() {
         .expect("scope carrier is installed");
 
     let mut provider_metadata = request.metadata.clone();
-    let scope = crate::agent::attachments::take_request_scope(&mut provider_metadata);
+    let scope = crate::attachments::take_request_scope(&mut provider_metadata);
     assert!(scope.external_channel);
     assert_eq!(scope.workspace.as_deref(), Some(root.as_path()));
     assert_eq!(provider_metadata, serde_json::json!({"preserved": true}));

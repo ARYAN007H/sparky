@@ -9,7 +9,7 @@ use wiremock::matchers::{body_string_contains, method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
 use super::*;
-use crate::agent::artifacts::tiny_store::versioned_store;
+use crate::artifacts::tiny_store::versioned_store;
 use crate::security::AutonomyLevel;
 
 fn publisher(server_uri: String, autonomy: AutonomyLevel) -> StorageArtifactPublisher {

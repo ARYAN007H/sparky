@@ -17,14 +17,13 @@
 
 use std::sync::Arc;
 
-use crate::agent::harness::host_definition::AgentDefinition;
-use crate::agent::progress::AgentProgress;
 use crate::agent::subagent_host::{
     run_subagent_with_parent, SubagentRunOptions, SubagentRunStatus,
 };
-use crate::agent::tinyagents::host::delegation::run_or_resume_with_tracing;
 use crate::agent::tinyagents::host::OpenHumanRunContext;
+use crate::agent_registry::host_definition::AgentDefinition;
 use crate::config::Config;
+use crate::progress::AgentProgress;
 use tinyagents_graph::checkpoint::Checkpointer;
 use tinyagents_graph::delegation::{
     DelegationConfig, DelegationStage, DelegationStageOutput, DelegationState,
@@ -194,7 +193,7 @@ pub(crate) async fn run_subagent_delegation_with_parent_context(
             }
         };
 
-        let delegation_config = DelegationConfig {
+        let mut delegation_config = DelegationConfig {
             max_revisions,
             checkpointer: Some(checkpointer),
             thread_id: Some(thread_id),
@@ -205,10 +204,13 @@ pub(crate) async fn run_subagent_delegation_with_parent_context(
             // stays off here until a human-review delegation surface wires it.
             ..DelegationConfig::default()
         };
+        delegation_config.event_sink = Some(Arc::new(tinyagents_graph::GraphTracingSink::new(
+            "delegation:graph",
+        )));
         // Resume-aware entry (#3884): with today's fresh-per-run `thread_id` this
         // is always a fresh run; reusing a stable `thread_id` resumes from the
         // last checkpoint boundary instead of restarting.
-        run_or_resume_with_tracing(delegation_config, run_stage)
+        tinyagents_graph::delegation::run_or_resume_delegation(delegation_config, run_stage)
             .await
             .map(|outcome| outcome.state)
     };

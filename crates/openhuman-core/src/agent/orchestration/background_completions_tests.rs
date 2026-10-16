@@ -282,30 +282,6 @@ fn record_failure_queues_a_framed_failure_for_delivery() {
 }
 
 #[test]
-fn record_awaiting_input_queues_a_framed_needs_input_for_delivery() {
-    let _guard = test_guard();
-    let ws = workspace();
-    let w = ws.path();
-    futures::executor::block_on(record_awaiting_input(
-        &cx(),
-        w,
-        "sess-ask",
-        "sub-ask",
-        "researcher",
-        "which repo?",
-        true,
-        Some("thread-ask".into()),
-    ));
-    let pending = pending_for(w, "thread-ask");
-    assert_eq!(pending.len(), 1);
-    assert_eq!(
-        BackgroundAgentOutcome::of(&pending[0]),
-        BackgroundAgentOutcome::AwaitingInput
-    );
-    assert!(pending[0].result.text.contains("which repo?"));
-}
-
-#[test]
 fn the_outcome_survives_a_claim() {
     let _guard = test_guard();
     let ws = workspace();

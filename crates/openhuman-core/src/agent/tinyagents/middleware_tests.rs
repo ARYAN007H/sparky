@@ -3,14 +3,13 @@ use super::repeated_failure::{is_body_level_failure, user_actionable_escalation}
 use super::tool_output::{
     is_compaction_exempt, is_truncation_exempt, COMPACTION_EXEMPT_TOOLS, SAMPLING_TOOLS,
 };
-use super::turn_context::DEFAULT_TOOL_RESULT_BUDGET_BYTES;
-use crate::agent::tinyagents::middleware::embedder_hooks::EmbedderToolHooksMiddleware;
 use crate::agent::tinyagents::middleware::repeated_failure::RepeatedToolFailureMiddleware;
 use crate::agent::tinyagents::middleware::tool_outcome_capture::ToolOutcomeCaptureMiddleware;
 use crate::agent::tinyagents::middleware::tool_output::ToolOutputMiddleware;
 use serde_json::json;
 use std::collections::HashMap;
 use std::sync::Arc;
+use tinyagents_harness::config::TurnConfig;
 
 use async_trait::async_trait;
 
@@ -20,7 +19,6 @@ use tinyinference_llm::message::Message as TaMessage;
 use tinyinference_llm::tool::ToolCall as TaToolCall;
 use tinytools::{ToolPolicy as TaToolPolicy, ToolResult as TaToolResult};
 
-use crate::agent::context::CLEARED_PLACEHOLDER;
 use crate::agent::tinyagents::payload_summarizer::DynPayloadSummarizer;
 use tinyagents_harness::context::{RunConfig, RunContext};
 use tinyinference_llm::model::ModelRequest;
@@ -264,7 +262,7 @@ fn oversized_workflow_proposal_json(node_count: usize) -> String {
 /// of being persisted — deterministic to assert on).
 fn truncation_probe_mw() -> ToolOutputMiddleware {
     ToolOutputMiddleware {
-        budget_bytes: DEFAULT_TOOL_RESULT_BUDGET_BYTES,
+        budget_bytes: TurnConfig::default().tool_result_budget_bytes,
         payload_summarizer: None,
         artifact_store: None,
         tokenjuice_compaction_enabled: false,
@@ -338,65 +336,6 @@ fn body_failure_result(name: &str, extra: serde_json::Value) -> TaToolResult {
     tool_result(name, &serde_json::to_string_pretty(&body).unwrap())
 }
 
-// ── EmbedderToolHooksMiddleware ──────────────────────────────────────────
-
-/// One recorded post-tool notification: tool name, args, success flag, duration.
-type PostToolRecord = (String, serde_json::Value, Option<bool>, Option<u64>);
-
-/// Records lifecycle notifications for a test hook, optionally vetoing every
-/// pre-tool call so the veto path can be exercised.
-struct RecordingToolHook {
-    name: &'static str,
-    pre: std::sync::Arc<std::sync::Mutex<Vec<(String, serde_json::Value)>>>,
-    post: std::sync::Arc<std::sync::Mutex<Vec<PostToolRecord>>>,
-    veto: bool,
-}
-
-#[async_trait]
-impl crate::agent::hooks::ToolHook for RecordingToolHook {
-    fn name(&self) -> &str {
-        self.name
-    }
-    async fn before_tool(
-        &self,
-        context: &crate::agent::hooks::ToolHookContext,
-    ) -> anyhow::Result<()> {
-        self.pre
-            .lock()
-            .unwrap()
-            .push((context.tool_name.clone(), context.arguments.clone()));
-        if self.veto {
-            anyhow::bail!("vetoed by test hook");
-        }
-        Ok(())
-    }
-    async fn after_tool(
-        &self,
-        context: &crate::agent::hooks::ToolHookContext,
-    ) -> anyhow::Result<()> {
-        self.post.lock().unwrap().push((
-            context.tool_name.clone(),
-            context.arguments.clone(),
-            context.success,
-            context.duration_ms,
-        ));
-        Ok(())
-    }
-}
-
-fn embedder_hook_mw(
-    pre: std::sync::Arc<std::sync::Mutex<Vec<(String, serde_json::Value)>>>,
-    post: std::sync::Arc<std::sync::Mutex<Vec<PostToolRecord>>>,
-    veto: bool,
-) -> EmbedderToolHooksMiddleware {
-    EmbedderToolHooksMiddleware::new(vec![std::sync::Arc::new(RecordingToolHook {
-        name: "recording",
-        pre,
-        post,
-        veto,
-    })])
-}
-
 #[path = "middleware_approval_guard_tests.rs"]
 mod approval_guard_tests;
 #[path = "middleware_classified_failure_fetch_tests.rs"]
@@ -416,8 +355,6 @@ mod memory_budget_tests;
 #[path = "middleware_stop_cause_tests.rs"]
 mod stop_cause_tests;
 
-#[path = "middleware_memory_and_hooks_tests.rs"]
-mod memory_and_hooks_tests;
 #[path = "middleware_tool_output_artifact_tests.rs"]
 mod tool_output_artifact_tests;
 #[path = "middleware_tool_output_tests.rs"]

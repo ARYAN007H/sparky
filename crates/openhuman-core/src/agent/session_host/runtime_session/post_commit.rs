@@ -128,7 +128,7 @@ pub(super) struct TurnIdentity {
 /// finalize steps, with goal accounting deferred to a fenced background task.
 pub(super) async fn finalize_committed_turn(
     state: &std::sync::Mutex<super::OpenHumanSessionState>,
-    post_turn_hooks: &[std::sync::Arc<dyn crate::agent::hooks::PostTurnHook>],
+    post_turn_hooks: &[std::sync::Arc<dyn tinyagents_harness::host::LearningSink>],
     identity: TurnIdentity,
     receipt: tinyagents_runtime::CommitReceipt<crate::agent::tinyagents::host::OpenHumanRunContext>,
 ) {
@@ -160,32 +160,13 @@ pub(super) async fn finalize_committed_turn(
     );
     let usage = super::holistic_last_turn_usage(&sidecar);
     let interrupted = sidecar.hit_cap || receipt.outcome.interrupted;
-    let tool_calls = sidecar
-        .tool_outcomes
-        .iter()
-        .map(|outcome| crate::agent::hooks::ToolCallRecord {
-            name: outcome.name.clone(),
-            arguments: outcome.arguments.clone(),
-            success: outcome.success,
-            output_summary: crate::agent::hooks::sanitize_tool_output(
-                &outcome.content,
-                &outcome.name,
-                outcome.success,
-            ),
-            duration_ms: outcome.duration_ms,
-        })
-        .collect::<Vec<_>>();
-    let turn_duration_ms = sidecar
-        .duration
-        .map(|duration| duration.as_millis().min(u128::from(u64::MAX)) as u64)
-        .unwrap_or_default();
     // State the caller reads as soon as `run_turn` returns.
     let prelude = {
         let mut state = state
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
         state.last_turn_hit_cap = interrupted;
-        state.last_turn_usage = Some(usage);
+        state.last_turn_usage = Some(usage.clone());
         state.prelude.clone()
     };
     // Completion first: `TurnCompleted` is the progress
@@ -237,20 +218,49 @@ pub(super) async fn finalize_committed_turn(
             .unwrap_or_else(|poisoned| poisoned.into_inner());
         state.pending_post_commit = Some(pending);
     }
-    crate::agent::hooks::fire_hooks(
-        post_turn_hooks,
-        &dispatch,
-        crate::agent::hooks::TurnContext {
-            user_message: input,
-            assistant_response: output,
-            tool_calls,
-            turn_duration_ms,
-            session_id: Some(identity.session_id.clone()),
-            agent_id: Some(identity.agent_id),
-            entrypoint: Some(identity.channel),
-            iteration_count: iterations as usize,
-        },
-    );
+    let mut summary = tinyagents_harness::host::TurnSummary::new(
+        tinyagents_harness::ids::ThreadId::new(identity.session_id.clone()),
+        identity.agent_id,
+    )
+    .with_text(input, output)
+    .with_usage(tinyinference_llm::usage::Usage {
+        input_tokens: usage.input_tokens,
+        output_tokens: usage.output_tokens,
+        total_tokens: usage.input_tokens.saturating_add(usage.output_tokens),
+        cache_read_tokens: usage.cached_input_tokens,
+        ..Default::default()
+    });
+    for outcome in &sidecar.tool_outcomes {
+        use sha2::Digest;
+        let args = serde_json::to_vec(&outcome.arguments).unwrap_or_default();
+        summary.record_tool_outcome(tinyagents_harness::host::ToolOutcomeRecord {
+            name: outcome.name.clone(),
+            args_digest: format!("{:x}", sha2::Sha256::digest(args)),
+            success: outcome.success,
+            failure_class: (!outcome.success).then(|| {
+                tinyagents_harness::host::classify_tool_failure(&outcome.content).to_owned()
+            }),
+            duration_ms: outcome.duration_ms,
+        });
+    }
+    // `DispatchCtx::spawn` re-enters the exact CoreContext captured by this
+    // turn. Detached learning work must not fall back to another tenant.
+    for (index, hook) in post_turn_hooks.iter().enumerate() {
+        let hook = std::sync::Arc::clone(hook);
+        let summary = summary.clone();
+        let started = std::time::Instant::now();
+        dispatch.spawn(async move {
+            if let Err(error) = hook.on_turn_complete(&summary).await {
+                tracing::warn!(index, %error, "post-turn learning sink failed");
+            } else {
+                tracing::debug!(
+                    index,
+                    elapsed_ms = started.elapsed().as_millis(),
+                    "post-turn learning sink finished"
+                );
+            }
+        });
+    }
     tracing::debug!(
         session_id = %identity.session_id,
         elapsed_ms = elapsed_ms(commit_started),

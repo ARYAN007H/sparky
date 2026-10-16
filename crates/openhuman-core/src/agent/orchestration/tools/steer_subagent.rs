@@ -8,13 +8,14 @@
 //! without waiting for it to finish or restarting it. Mirrors Codex `send_input`.
 
 use crate::agent::harness::fork_context::ParentExecutionContext;
-use crate::agent::orchestration::running_subagents::{self, SteerError};
+use crate::agent::orchestration::running_subagents;
 use crate::tools::schema_cache::static_schema;
 use async_trait::async_trait;
 use std::sync::Arc;
 use tinyagents_harness::context::RunContext;
 use tinyagents_harness::run_queue::QueueLane;
 use tinyagents_harness::tool::{ToolDispatch, ToolExecutionContext};
+use tinyagents_orchestration::subagent::SteerError;
 use tinytools::{PermissionLevel, Tool, ToolCallOptions, ToolResult};
 
 pub struct SteerSubagentTool;
@@ -72,7 +73,7 @@ impl Tool for SteerSubagentTool {
     }
 
     fn parameters_schema(&self) -> serde_json::Value {
-        static_schema!(include_str!("parameters/steer_subagent.json"))
+        static_schema!(include_str!("steer_subagent.json"))
     }
 
     fn permission_level(&self) -> PermissionLevel {
@@ -176,7 +177,9 @@ impl SteerSubagentTool {
             message.chars().count()
         );
 
-        match running_subagents::steer(&dispatch, &resolved_task_id, &parent_session, message, lane).await {
+        match running_subagents::steer(&dispatch, &resolved_task_id, &parent_session, message, lane)
+            .await
+        {
             Ok(()) => Ok(ToolResult::success(format!(
                 "Steered sub-agent `{resolved_task_id}` ({mode}). It will pick this up at its next step. \
                  Use wait_subagent with its subagent_session_id or task_id to collect its result."
@@ -194,6 +197,9 @@ impl SteerSubagentTool {
             Err(SteerError::UnsupportedLane) => Ok(ToolResult::error(
                 "steer_subagent: only steer and collect messages can be delivered to a running sub-agent",
             )),
+            Err(_) => Ok(ToolResult::error(format!(
+                "steer_subagent: unable to deliver a message to sub-agent `{resolved_task_id}`"
+            ))),
         }
     }
 }

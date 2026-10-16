@@ -200,18 +200,18 @@ async fn message_append_with_config(
     ctx: &DispatchCtx,
     mut request: AppendConversationMessageRequest,
     config: &crate::config::Config,
-    origin: Option<&crate::agent::turn_origin::AgentTurnOrigin>,
+    origin: Option<&crate::security::turn_origin::AgentTurnOrigin>,
     persistence_dir: &std::path::Path,
 ) -> Result<Outcome<ApiEnvelope<ConversationMessageRecord>>, ThreadsError> {
     if request.message.sender == "user" {
         let raw_upload = request.message.content.contains("[IMAGE:")
             || request.message.content.contains("[FILE:");
-        let durable_files = crate::agent::attachments::parse(&request.message.content).1;
+        let durable_files = crate::attachments::parse(&request.message.content).1;
         let durable_upload = !durable_files.is_empty();
         // Raw and durable uploads both live under the thread's working folder,
         // where the turn reads them (#7714).
         let workspace = if raw_upload || durable_upload {
-            crate::agent::attachments::thread_action_dir(
+            crate::attachments::thread_action_dir(
                 ctx,
                 config,
                 persistence_dir,
@@ -241,7 +241,7 @@ async fn message_append_with_config(
                 || (image_count > 0 && config.multimodal.max_images == 0)
                 || matches!(
                     origin,
-                    Some(crate::agent::turn_origin::AgentTurnOrigin::ExternalChannel { .. })
+                    Some(crate::security::turn_origin::AgentTurnOrigin::ExternalChannel { .. })
                 )
             {
                 return Err(ThreadsError::Message(
@@ -249,14 +249,14 @@ async fn message_append_with_config(
                 ));
             }
             for file in &durable_files {
-                let scope = crate::agent::attachments::AttachmentAccessScope {
+                let scope = crate::attachments::AttachmentAccessScope {
                     external_channel: matches!(
                         origin,
-                        Some(crate::agent::turn_origin::AgentTurnOrigin::ExternalChannel { .. })
+                        Some(crate::security::turn_origin::AgentTurnOrigin::ExternalChannel { .. })
                     ),
                     workspace: Some(workspace.clone()),
                 };
-                let path = crate::agent::attachments::resolve_path(config, &file.path, &scope)
+                let path = crate::attachments::resolve_path(config, &file.path, &scope)
                     .await
                     .map_err(|error| {
                         ThreadsError::Message(format!("validate user attachment: {error}"))
@@ -298,7 +298,7 @@ async fn message_append_with_config(
                 "user upload bytes require attachment markers before persistence".into(),
             ));
         }
-        request.message.content = crate::agent::attachments::stage_turn(
+        request.message.content = crate::attachments::stage_turn(
             &request.message.content,
             Some(config),
             Some(&tinytools::WorkspaceDescriptor::new(workspace)),
@@ -510,7 +510,7 @@ async fn thread_delete_inner(
     // mirrors conversation-derived state) remains on disk; the
     // thread row itself is already gone at this point so the caller
     // sees a partial failure they can act on instead of silent drift.
-    crate::agent::session_store::turn_states_for(&dir)
+    crate::storage::sessions::turn_states_for(&dir)
         .delete(&request.thread_id)
         .map_err(|err| {
             format!(

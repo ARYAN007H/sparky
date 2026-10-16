@@ -1,5 +1,5 @@
 use super::*;
-use crate::agent::plan_review::PlanReviewResolution;
+use crate::plan_review::PlanReviewResolution;
 
 struct ThreadContext(&'static str);
 impl ToolRunContext for ThreadContext {
@@ -16,14 +16,18 @@ impl ToolRunContext for ThreadContext {
 #[tokio::test]
 async fn plan_exit_does_not_flip_while_a_review_is_parked() {
     let thread_id = "plan-exit-parked-thread";
-    crate::agent::tinyagents::run_mode::set_mode(
+    crate::threads::run_mode::set_mode(
         &crate::core::runtime::DispatchCtx::ambient(),
         thread_id,
         tinyagents_harness::middleware::RunMode::Plan,
     );
-    let gate = crate::agent::plan_review::gate::global();
+    let gate = crate::plan_review::gate::global();
+    let tenant = crate::core::runtime::DispatchCtx::ambient()
+        .tenant()
+        .unwrap();
     let parked = tokio::spawn(async move {
         gate.request_review(
+            tenant,
             Some(thread_id.to_string()),
             None,
             "Plan".into(),
@@ -47,7 +51,7 @@ async fn plan_exit_does_not_flip_while_a_review_is_parked() {
         .unwrap();
     assert!(!result.is_error);
     assert_eq!(
-        crate::agent::tinyagents::run_mode::get_mode(
+        crate::threads::run_mode::get_mode(
             &crate::core::runtime::DispatchCtx::ambient(),
             thread_id
         ),
@@ -57,8 +61,13 @@ async fn plan_exit_does_not_flip_while_a_review_is_parked() {
 
     // Resolve the parked review so the spawned task and the gate's
     // bookkeeping don't leak past this test.
-    assert!(crate::agent::plan_review::gate::global()
-        .decide_by_thread(thread_id, PlanReviewResolution::Approve));
+    assert!(crate::plan_review::gate::global().decide_by_thread(
+        &crate::core::runtime::DispatchCtx::ambient()
+            .tenant()
+            .unwrap(),
+        thread_id,
+        PlanReviewResolution::Approve,
+    ));
     let resolution = parked.await.unwrap();
     assert_eq!(resolution, PlanReviewResolution::Approve);
 
@@ -73,7 +82,7 @@ async fn plan_exit_does_not_flip_while_a_review_is_parked() {
         .unwrap();
     assert!(!result.is_error);
     assert_eq!(
-        crate::agent::tinyagents::run_mode::get_mode(
+        crate::threads::run_mode::get_mode(
             &crate::core::runtime::DispatchCtx::ambient(),
             thread_id
         ),

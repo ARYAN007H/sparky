@@ -181,7 +181,7 @@ pub async fn offload_run_result(
         .as_ref()
         .map(|p| p.workspace_dir.clone())
         .unwrap_or(action_dir);
-    let Some(blobs) = crate::agent::session_store::artifact_blobs_for(&workspace_dir) else {
+    let Some(blobs) = crate::storage::sessions::artifact_blobs_for(&workspace_dir) else {
         tracing::debug!(
             task_id = %task_id,
             agent_id = %agent_id,

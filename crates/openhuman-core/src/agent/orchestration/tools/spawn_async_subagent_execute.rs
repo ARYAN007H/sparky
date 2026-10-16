@@ -245,7 +245,7 @@ impl SpawnAsyncSubagentTool {
             .and_then(|session| session.worker_thread_id.clone())
             .or_else(|| {
                 parent_thread_id.as_ref().and_then(|parent_thread_id| {
-                    super::worker_thread::create_worker_thread(
+                    crate::threads::worker_thread::create_worker_thread(
                         &dispatch,
                         parent.workspace_dir.clone(),
                         parent_thread_id,
@@ -260,7 +260,7 @@ impl SpawnAsyncSubagentTool {
             (reusable.as_ref(), worker_thread_id.as_ref())
         {
             if session.worker_thread_id.as_deref() == Some(worker_thread_id.as_str()) {
-                super::worker_thread::append_reuse_follow_up(
+                crate::threads::worker_thread::append_reuse_follow_up(
                     &dispatch,
                     parent.workspace_dir.clone(),
                     worker_thread_id,
@@ -393,7 +393,7 @@ impl SpawnAsyncSubagentTool {
         // the off-task delivery subscriber resolves.
         let detached_run_context = detached_parent.data.child();
         let mut abort_report = AbortReport::arm(progress_sink.clone(), &definition.id, &task_id);
-        let join = dispatch.spawn(crate::agent::turn_origin::propagate(
+        let join = dispatch.spawn(crate::security::turn_origin::propagate(
             async move {
                 let options = SubagentRunOptions {
                     skill_filter_override: None,

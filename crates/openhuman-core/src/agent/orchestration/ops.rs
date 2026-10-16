@@ -26,14 +26,14 @@ use super::types::{
     AgentSnapshot, SpawnAgentRequest, SpawnAgentResponse, WaitAgentOptions, WaitAgentResponse,
 };
 use crate::agent::harness::fork_context::ParentExecutionContext;
-use crate::agent::harness::host_definition::{AgentDefinition, AgentDefinitionRegistry};
-use crate::agent::progress::AgentProgress;
 use crate::agent::subagent_host::{
     run_subagent, SubagentRunError, SubagentRunOptions, SubagentRunOutcome, SubagentRunStatus,
 };
 use crate::agent::tinyagents::host::steering::shared_steering_registry;
+use crate::agent_registry::host_definition::{AgentDefinition, AgentDefinitionRegistry};
 use crate::core::bus::BUS;
 use crate::core::events::DomainEvent;
+use crate::progress::AgentProgress;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 use thiserror::Error;
@@ -413,7 +413,7 @@ impl AgentOrchestrationSession {
         // carried across the same boundary the parent execution context
         // already is. Without the origin the spawned agent's external-effect
         // tools reach the approval gate unlabelled and are refused.
-        let handle = tokio::spawn(crate::agent::turn_origin::propagate(async move {
+        let handle = tokio::spawn(crate::security::turn_origin::propagate(async move {
             mark_running(&task_status_tx);
             // The parent rides `options.run_context.parent`, built above.
             let result = run_subagent(&definition, &prompt, options).await;

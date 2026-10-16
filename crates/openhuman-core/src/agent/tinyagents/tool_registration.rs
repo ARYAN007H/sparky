@@ -20,14 +20,16 @@ use tinytools::ToolRunContext;
 use crate::agent::orchestration::tools::{
     CloseSubagentDispatch, ContinueSubagentDispatch, DelegateGraphDispatch, DelegationDispatch,
     ListSubagentsDispatch, SpawnAsyncSubagentDispatch, SpawnParallelAgentsDispatch,
-    SpawnSubagentDispatch, SpawnWorkerThreadDispatch, SteerSubagentDispatch, WaitSubagentDispatch,
+    SpawnSubagentDispatch, SteerSubagentDispatch, WaitSubagentDispatch,
 };
 use crate::agent::tinyagents::host::run_context::HostOperationContext;
 use crate::agent::tinyagents::host::OpenHumanRunContext;
 use crate::agent::tinyagents::turn_policy::is_subagent_spawn_or_delegate_tool;
 use crate::agent::tinyagents::use_skill_dispatch::UseSkillDispatch;
-use crate::agent::tools::{DelegateToolDispatch, TodoToolDispatch};
+use crate::agent::tools::TodoToolDispatch;
 use crate::core::runtime::CoreContext;
+use crate::tools::delegate::DelegateToolDispatch;
+use crate::tools::implementations::threads::SpawnWorkerThreadDispatch;
 
 type RegisteredToolDispatch = Arc<dyn ToolDispatch<(), OpenHumanRunContext>>;
 type ToolDispatchSelectorFn =
@@ -68,7 +70,7 @@ pub(crate) fn typed_dispatch_for(
         _ => {
             return DelegationDispatch::for_tool(adapter).map(|dispatch| {
                 Arc::new(dispatch) as Arc<dyn ToolDispatch<(), OpenHumanRunContext>>
-            })
+            });
         }
     };
     Some(dispatch)
@@ -98,7 +100,7 @@ pub(crate) fn is_thread_goal_tool(name: &str) -> bool {
 /// `CoreContext` is re-scoped with it so a tool that asks "who is acting"
 /// answers for this turn and not for whichever turn last set a global.
 ///
-/// [`AgentTurnOrigin`]: crate::agent::turn_origin::AgentTurnOrigin
+/// [`AgentTurnOrigin`]: crate::security::turn_origin::AgentTurnOrigin
 pub(crate) struct TurnOriginScope;
 
 impl ToolExecScope for TurnOriginScope {
@@ -246,11 +248,11 @@ pub(crate) fn capability_diagnostics(
     // (built-ins plus workspace/config overrides, already merged by id) first,
     // then the `agent_registry` built-in loader, deduped by id.
     let runtime_ids: Vec<String> =
-        crate::agent::harness::host_definition::AgentDefinitionRegistry::current()
+        crate::agent_registry::host_definition::AgentDefinitionRegistry::current()
             .map(|runtime| runtime.list().iter().map(|def| def.id.clone()).collect())
             .unwrap_or_default();
     let runtime_agent_count = project_descriptors(&mut registry, ComponentKind::Agent, runtime_ids);
-    let builtin_supplement_count = match crate::agent::registry::agents::load_builtins() {
+    let builtin_supplement_count = match crate::agent_registry::agents::load_builtins() {
         Ok(builtins) => project_descriptors(
             &mut registry,
             ComponentKind::Agent,

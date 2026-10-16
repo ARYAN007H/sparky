@@ -172,65 +172,11 @@ mod wire_caps;
 use wire_caps::MAX_WIRE_SUBAGENT_OUTPUT;
 use wire_caps::{cap_wire_args, cap_wire_output};
 
-use crate::agent::session_store::ledger_sync;
-
-pub(super) fn ledger_upsert_agent_run(
-    config: &crate::config::Config,
-    upsert: tinyagents_session::run_ledger::AgentRunUpsert,
-) {
-    if let Err(err) = ledger_sync::upsert_agent_run(&config.workspace_dir, upsert) {
-        log::warn!("[run_ledger][web_channel] failed to upsert run: {err}");
-    }
-}
-
-pub(super) fn ledger_append_event(
-    config: &crate::config::Config,
-    event: tinyagents_session::run_ledger::RunEventAppend,
-) {
-    if let Err(err) = ledger_sync::append_run_event(&config.workspace_dir, event) {
-        log::warn!("[run_ledger][web_channel] failed to append event: {err}");
-    }
-}
-
-pub(super) fn ledger_upsert_telemetry(
-    config: &crate::config::Config,
-    telemetry: tinyagents_session::run_ledger::RunTelemetryUpsert,
-) {
-    if let Err(err) = ledger_sync::upsert_run_telemetry(&config.workspace_dir, telemetry) {
-        log::warn!("[run_ledger][web_channel] failed to upsert telemetry: {err}");
-    }
-}
-
-pub(super) fn ledger_get_telemetry(
-    config: &crate::config::Config,
-    run_id: &str,
-) -> Option<tinyagents_session::run_ledger::RunTelemetry> {
-    match ledger_sync::get_agent_run(&config.workspace_dir, run_id) {
-        Ok(Some(run)) => {
-            let telemetry = run.telemetry;
-            log::debug!(
-                "[run_ledger][web_channel] read telemetry run_id={} present={}",
-                run_id,
-                telemetry.is_some()
-            );
-            telemetry
-        }
-        Ok(None) => {
-            log::debug!(
-                "[run_ledger][web_channel] telemetry unavailable; run missing run_id={}",
-                run_id
-            );
-            None
-        }
-        Err(err) => {
-            log::warn!(
-                "[run_ledger][web_channel] failed to read telemetry run_id={} err={err}",
-                run_id
-            );
-            None
-        }
-    }
-}
+#[path = "progress_bridge_ledger.rs"]
+mod ledger;
+pub(super) use ledger::{
+    ledger_append_event, ledger_get_telemetry, ledger_upsert_agent_run, ledger_upsert_telemetry,
+};
 
 /// Build the worktree-isolation slice of a `subagent_completed`
 /// [`SubagentProgressDetail`] (#3376). An empty `changed_files` collapses to
@@ -275,7 +221,7 @@ fn session_profile_user_attribution(config: &crate::config::Config) -> Option<St
 /// with the correct client/thread/request IDs. The task runs until the
 /// sender is dropped (i.e. when the agent turn finishes).
 pub(crate) fn spawn_progress_bridge(
-    mut rx: tokio::sync::mpsc::Receiver<crate::agent::progress::AgentProgress>,
+    mut rx: tokio::sync::mpsc::Receiver<crate::progress::AgentProgress>,
     client_id: String,
     thread_id: String,
     request_id: String,
@@ -284,7 +230,7 @@ pub(crate) fn spawn_progress_bridge(
     config: crate::config::Config,
     dispatch_ctx: crate::core::runtime::DispatchCtx,
 ) -> ProgressBridgeHandle {
-    use crate::agent::progress::AgentProgress;
+    use crate::progress::AgentProgress;
     use std::collections::HashMap;
     use tinyagents_session::run_ledger::{
         AgentRunKind, AgentRunStatus, AgentRunUpsert, RunEventAppend, RunTelemetryUpsert,
@@ -1138,7 +1084,7 @@ pub(crate) fn spawn_progress_bridge(
             };
             if let Some((trace_ctx, observations)) = journal_export {
                 let run_telemetry = ledger_get_telemetry(&config, &request_id);
-                crate::agent::progress_tracing::export_run_trace_from_journal(
+                crate::core::observability::progress_tracing::export_run_trace_from_journal(
                     &config,
                     &trace_ctx,
                     &observations,
@@ -1147,7 +1093,7 @@ pub(crate) fn spawn_progress_bridge(
                 )
                 .await;
             } else {
-                crate::agent::progress_tracing::export_run_trace(&config, &live_spans).await;
+                crate::core::observability::progress_tracing::export_run_trace(&config, &live_spans).await;
             }
         }
 

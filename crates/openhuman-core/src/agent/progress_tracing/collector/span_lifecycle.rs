@@ -13,7 +13,7 @@ use super::state::SpanCollector;
 impl SpanCollector {
     /// Lazily open the root turn span so a stream that begins mid-flight
     /// (or never sends `TurnStarted`) still produces a correlated tree.
-    pub(in crate::agent::progress_tracing) fn ensure_turn_span(
+    pub(in crate::core::observability::progress_tracing) fn ensure_turn_span(
         &mut self,
         start_unix_ms: u64,
     ) -> String {
@@ -83,7 +83,7 @@ impl SpanCollector {
 
     /// The parent any iteration / tool / subagent span should hang off:
     /// the current iteration if one is open, else the turn root.
-    pub(in crate::agent::progress_tracing) fn active_parent_id(
+    pub(in crate::core::observability::progress_tracing) fn active_parent_id(
         &mut self,
         now_unix_ms: u64,
     ) -> String {
@@ -97,7 +97,7 @@ impl SpanCollector {
     /// [`MAX_TOOL_CONTENT_CHARS`]. A no-op unless content capture is on
     /// (`observability.agent_tracing.capture_content`) — when off, tool I/O
     /// never even reaches the in-memory span. `Null` arguments are skipped.
-    pub(in crate::agent::progress_tracing) fn capture_tool_arguments(
+    pub(in crate::core::observability::progress_tracing) fn capture_tool_arguments(
         &mut self,
         index: usize,
         arguments: &serde_json::Value,
@@ -122,7 +122,7 @@ impl SpanCollector {
     /// Record a tool call's result as the span's `output`, truncated to
     /// [`MAX_TOOL_CONTENT_CHARS`]. Same capture gate as
     /// [`Self::capture_tool_arguments`]. Empty output is skipped.
-    pub(in crate::agent::progress_tracing) fn capture_tool_output(
+    pub(in crate::core::observability::progress_tracing) fn capture_tool_output(
         &mut self,
         index: usize,
         output: &str,
@@ -141,7 +141,10 @@ impl SpanCollector {
         }
     }
 
-    pub(in crate::agent::progress_tracing) fn close_current_iteration(&mut self, end_unix_ms: u64) {
+    pub(in crate::core::observability::progress_tracing) fn close_current_iteration(
+        &mut self,
+        end_unix_ms: u64,
+    ) {
         if let Some(index) = self.current_iteration_index.take() {
             self.close_span(
                 index,

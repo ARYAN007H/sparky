@@ -71,7 +71,7 @@ impl EventHandler<DomainEvent> for RunLedgerFinalizeSubscriber {
             _ => return,
         };
 
-        let result = crate::agent::session_store::with_ledger_async(
+        let result = crate::storage::sessions::with_ledger_async(
             &self.config.workspace_dir,
             |ledger| async move {
                 ledger

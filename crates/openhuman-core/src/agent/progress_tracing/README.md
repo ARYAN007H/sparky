@@ -4,14 +4,14 @@ Turns the agent's real-time [`AgentProgress`](../progress.rs) event stream into
 OpenTelemetry/Langfuse-style trace spans (`agent.turn` -> `agent.iteration` ->
 `tool.*`/`subagent.*`), correlated by session id, for offline inspection and
 debugging long multi-agent runs (issue #3886). The module doc on
-[`agent/progress_tracing.rs`](../progress_tracing.rs) has the full span-tree shape and the
+[`core/observability/progress_tracing.rs`](../progress_tracing.rs) has the full span-tree shape and the
 content-capture privacy gate (`observability.agent_tracing.capture_content`,
 default on; enforced once, in `SpanCollector`, so no exporter can leak
 content).
 
 ## Key files
 
-- `agent/progress_tracing.rs` (parent module file) declares the submodules
+- `core/observability/progress_tracing.rs` (parent module file) declares the submodules
   below it. `collector/` holds `SpanCollector` (a pure state machine: feed it
   progress events plus a timestamp, it accumulates finished `TraceSpan`s).
   The data model (`TraceContext`, `RunType`, `SpanKind`/`SpanStatus`), content
@@ -33,7 +33,7 @@ content).
   `/telemetry/langfuse/otel/v1/traces` proxy; the backend supplies project
   keys and authoritative user attribution. Export is on by default through
   `observability.share_usage_data`; local NDJSON export remains optional.
-- [`langfuse.rs`](./langfuse.rs) + `langfuse/` hold the proxy URL and environment
+- [`langfuse/environment.rs`](./langfuse/environment.rs) hold the proxy URL and environment
   resolution `otlp.rs` and the flow exporter share, plus the legacy batch
   projection kept for compatibility tests. No trace is sent on the legacy
   batch path; Langfuse v4 ingests traces only over OTLP.

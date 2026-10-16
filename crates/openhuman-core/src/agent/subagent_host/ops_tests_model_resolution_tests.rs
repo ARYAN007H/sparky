@@ -84,7 +84,7 @@ async fn typed_mode_model_override_pins_exact_model_for_spawn() {
 /// `subagent_tool_result` socket events the parent thread renders.
 #[tokio::test]
 async fn typed_mode_emits_child_progress_events_when_sink_attached() {
-    use crate::agent::progress::AgentProgress;
+    use crate::progress::AgentProgress;
 
     let provider = ScriptedProvider::new(vec![
         tool_response("file_read", "{\"path\":\"x\"}"),
@@ -167,7 +167,7 @@ async fn typed_mode_emits_child_progress_events_when_sink_attached() {
 /// `subagent_thinking_delta` socket events the parent thread renders live.
 #[tokio::test]
 async fn typed_mode_forwards_child_text_and_thinking_deltas() {
-    use crate::agent::progress::AgentProgress;
+    use crate::progress::AgentProgress;
 
     let provider = ScriptedProvider::new(vec![text_response_with_reasoning(
         "the final answer",
@@ -504,7 +504,7 @@ fn resolve_subagent_source_hint_falls_back_on_factory_error() {
 
 #[test]
 fn direct_mode_user_with_stored_key_passes_signed_in_check() {
-    use super::super::user_is_signed_in_to_composio;
+    use crate::integrations::composio::user_is_signed_in_to_composio;
     let tmp = tempfile::tempdir().expect("tempdir");
     let mut config = crate::config::Config::default();
     config.config_path = tmp.path().join("config.toml");
@@ -521,7 +521,7 @@ fn direct_mode_user_with_stored_key_passes_signed_in_check() {
 
 #[test]
 fn unsigned_in_user_fails_probe() {
-    use super::super::user_is_signed_in_to_composio;
+    use crate::integrations::composio::user_is_signed_in_to_composio;
     let tmp = tempfile::tempdir().expect("tempdir");
     let mut config = crate::config::Config::default();
     config.config_path = tmp.path().join("config.toml");

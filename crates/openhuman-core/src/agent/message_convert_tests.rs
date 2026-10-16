@@ -11,7 +11,7 @@ fn durable_upload_parts_survive_message_row_replay_without_inline_payloads() {
         ("video.mp4", "video/mp4"),
         ("archive.zip", "application/zip"),
     ] {
-        let attachment = crate::agent::attachments::Attachment {
+        let attachment = crate::attachments::Attachment {
             path: format!("uploads/thread/id/{name}"),
             name: name.into(),
             mime: mime.into(),

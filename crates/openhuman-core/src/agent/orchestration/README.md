@@ -126,11 +126,11 @@ Five controller pairs are registered in `crate::core::all`:
 
 | Namespace | Source | Methods |
 | --- | --- | --- |
-| `agent_team` | `agent_teams::{all_agent_team_controller_schemas, all_agent_team_registered_controllers}` | `create`, `list`, `get`, `assign_task`, `claim_task`, `message_member`, `list_messages`, `complete_task`, `shutdown_member`, `close`, `start_member` |
-| `agent_work` | `command_center::{all_command_center_controller_schemas, all_command_center_registered_controllers}` | `list`, `control` |
-| `workflow_run` | `workflow_runs::{all_workflow_run_controller_schemas, all_workflow_run_registered_controllers}` | `list_definitions`, `list`, `get`, `start`, `stop`, `resume` |
-| `worktree` | `worktree_schemas::{all_controller_schemas, all_registered_controllers}` | `list`, `status`, `diff`, `remove` |
-| `subagent` | `subagent_control::{all_controller_schemas, all_registered_controllers}` | `cancel`, `steer` |
+| `agent_team` | `agent_runs::agent_teams::{all_agent_team_controller_schemas, all_agent_team_registered_controllers}` | `create`, `list`, `get`, `assign_task`, `claim_task`, `message_member`, `list_messages`, `complete_task`, `shutdown_member`, `close`, `start_member` |
+| `agent_work` | `agent_runs::command_center::{all_command_center_controller_schemas, all_command_center_registered_controllers}` | `list`, `control` |
+| `workflow_run` | `agent_runs::workflow_runs::{all_workflow_run_controller_schemas, all_workflow_run_registered_controllers}` | `list_definitions`, `list`, `get`, `start`, `stop`, `resume` |
+| `worktree` | `agent_runs::worktree_schemas::{all_controller_schemas, all_registered_controllers}` | `list`, `status`, `diff`, `remove` |
+| `subagent` | `agent_runs::subagent_control::{all_controller_schemas, all_registered_controllers}` | `cancel`, `steer` |
 
 ## Agent tools
 
@@ -152,7 +152,7 @@ name:
 
 `dispatch.rs` (the shared spawn path every tool above
 calls), `awaiting_user.rs` (the awaiting-user envelope), and
-`worker_thread.rs` (worker thread creation) are `pub(crate)` helpers, not
+`threads/worker_thread.rs` (worker thread creation) are `pub(crate)` helpers, not
 tools. Live harness registrations use typed `ToolDispatch<(),
 OpenHumanRunContext>` wrappers and fork the parent carrier for every child,
 so cancellation, origin, progress, dispatch state, thread, and workspace stay
@@ -169,7 +169,7 @@ races it against the inherited cancellation token. Execution itself routes throu
 - `tinyagents_session::run_ledger`: the `agent_runs`,
   `agent_teams`/`agent_team_members`/`agent_team_tasks`, and `workflow_runs`
   tables plus the shared `run_events` log, backed by
-  `{workspace}/session_db/sessions.db` (see [`agent/session_db/mod.rs`](../session_db/mod.rs)). Every
+  `{workspace}/session_db/sessions.db` (see [`sessions/mod.rs`](../../sessions/mod.rs)). Every
   spawn path (`spawn_subagent`, `spawn_async_subagent`,
   `spawn_parallel_agents`, `continue_subagent`, `dispatch`) writes a `running`
   `agent_runs` row; `run_ledger_finalize.rs` settles it from the global event

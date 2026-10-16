@@ -2,6 +2,7 @@ use super::*;
 use crate::core::runtime::DispatchCtx;
 use crate::core::runtime::{ContextOverlay, CoreContext, DomainSet, Mode};
 use crate::tools::toolpacks::ToolGroups;
+use tinyagents_orchestration::subagent::SteerError;
 
 const CHILD: &str = "OPENHUMAN_DETACHED_TENANT_TEST_CHILD";
 const PARENT: &str = "same-parent-session";
@@ -120,7 +121,7 @@ impl Pair {
 }
 
 async fn control(function: &str, task: &str) -> serde_json::Value {
-    let controller = crate::agent::orchestration::subagent_control::all_registered_controllers()
+    let controller = crate::agent_runs::subagent_control::all_registered_controllers()
         .into_iter()
         .find(|c| c.schema.function == function)
         .expect("public controller");
@@ -206,12 +207,11 @@ async fn saas_dispatch_exposes_only_the_callers_detached_worker_controls() {
         );
         assert!(crate::core::all::schema_for_rpc_method("openhuman.config_get_config").is_none());
         let unreviewed =
-            crate::agent::orchestration::command_center::all_command_center_registered_controllers(
-            )
-            .into_iter()
-            .find(|controller| controller.schema.function == "list")
-            .expect("existing Agent controller")
-            .schema;
+            crate::agent_runs::command_center::all_command_center_registered_controllers()
+                .into_iter()
+                .find(|controller| controller.schema.function == "list")
+                .expect("existing Agent controller")
+                .schema;
         let method = crate::core::all::rpc_method_name(&unreviewed);
         assert!(crate::core::all::schema_for_rpc_method(&method).is_none());
         assert!(
@@ -248,7 +248,7 @@ async fn unscoped_async_spawn_refuses_before_persisting_a_running_session() {
     use crate::agent::orchestration::subagent_sessions::SubagentSessionStore;
     use crate::agent::orchestration::tools::{SpawnAsyncSubagentDispatch, SpawnAsyncSubagentTool};
     use tinyagents_harness::tool::ToolDispatch;
-    let _ = crate::agent::harness::host_definition::AgentDefinitionRegistry::init_global_builtins();
+    let _ = crate::agent_registry::host_definition::AgentDefinitionRegistry::init_global_builtins();
     let workspace = tempfile::tempdir().unwrap();
     assert!(
         crate::storage::installed().is_none(),

@@ -8,14 +8,20 @@
 
 pub mod client;
 pub mod composio;
+mod connected_identities;
 pub mod file_storage;
 pub mod task_sources;
 pub mod tools;
 pub mod types;
 
+pub(crate) mod announcement_notes;
+pub(crate) mod recorded_tools;
+pub use connected_identities::render_connected_identities;
+
 pub use client::{build_client, pricing_for_config, IntegrationClient};
 pub use types::{
-    BackendResponse, IntegrationPricing, IntegrationPricingEntry, PricingIntegrations,
+    BackendResponse, ConnectedIntegration, ConnectedIntegrationTool, GatedIntegrationTool,
+    IntegrationConnection, IntegrationPricing, IntegrationPricingEntry, PricingIntegrations,
 };
 
 #[cfg(test)]

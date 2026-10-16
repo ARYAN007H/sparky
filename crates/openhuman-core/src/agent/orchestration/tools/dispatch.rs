@@ -1,10 +1,10 @@
 //! Subagent dispatch logic shared by all agent delegation tools.
 
-use crate::agent::harness::host_definition::AgentDefinitionRegistry;
-use crate::agent::progress::AgentProgress;
 use crate::agent::subagent_host::{
     run_subagent_with_parent, SubagentRunOptions, SubagentRunStatus,
 };
+use crate::agent_registry::host_definition::AgentDefinitionRegistry;
+use crate::progress::AgentProgress;
 use async_trait::async_trait;
 use std::sync::Arc;
 use tinyagents_harness::context::{RunConfig, RunContext};
@@ -232,7 +232,7 @@ pub(crate) async fn dispatch_subagent_with_live_parent(
                 definition.model.resolve(parent_model)
             }
         };
-        if crate::agent::attachments::should_forward_parent_images(prompt)
+        if crate::attachments::should_forward_parent_images(prompt)
             && !images.is_empty()
             && (agent_id == "vision_agent"
                 || crate::inference::provider::factory::oh_tier_supports_vision(&subagent_model))
@@ -250,7 +250,7 @@ pub(crate) async fn dispatch_subagent_with_live_parent(
     };
 
     if agent_id == "vision_agent" {
-        match crate::agent::attachments::has_resolvable_image(
+        match crate::attachments::has_resolvable_image(
             &run_context.dispatch_ctx(),
             prompt,
             parent_workspace_descriptor.as_ref(),

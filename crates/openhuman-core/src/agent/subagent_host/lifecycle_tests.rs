@@ -21,6 +21,9 @@ fn key() -> SubagentTaskKey {
 fn paused_outcome(question: &str, resume: SubagentResume) -> SubagentOutcome {
     SubagentOutcome {
         task_id: "task".into(),
+        worker_thread_id: None,
+        tier: None,
+        model_override: None,
         output: "partial result".into(),
         history: resume.history.clone(),
         status: SubagentOutcomeKind::AwaitingInput(SubagentPause {
@@ -28,6 +31,9 @@ fn paused_outcome(question: &str, resume: SubagentResume) -> SubagentOutcome {
             resume,
         }),
         usage: Default::default(),
+        cost_usd: None,
+        cost_source: None,
+        extensions: Default::default(),
         artifacts: Vec::new(),
         schema_error: None,
         artifact_error: None,

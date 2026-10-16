@@ -12,7 +12,7 @@ domains use to compose their own prompts.
   `SubagentRenderOptions`. Pure data, no rendering logic. Also holds the
   `pub(crate)` cap `BOOTSTRAP_MAX_CHARS` (20K, for
   [`SOUL.md`](./SOUL.md)/[`IDENTITY.md`](./IDENTITY.md)/[`ROLE.md`](./ROLE.md) and each `AGENTS.md` layer).
-- `render_connected_identities` ([`connected_identities.rs`](./connected_identities.rs)): best-effort,
+- `render_connected_identities` ([`connected_identities.rs`](../../integrations/connected_identities.rs)): best-effort,
   sync render of the `## Connected Identities` block. It reads through the
   bound memory driver via `block_in_place` and returns empty when there is no
   multi-thread runtime or the config/driver read fails.
@@ -27,9 +27,9 @@ domains use to compose their own prompts.
   `DateTimeSection`, `RuntimeSection`, `AgentsInstructionsSection`,
   `PersonalityRosterSection`, `ArchetypePromptSection`,
   `DynamicPromptSection`, `GroundingSection`).
-- Named re-exports from `render_helpers` ([`render_helpers.rs`](./render_helpers.rs) plus the
-  `render_helpers/` submodules `section_renderers.rs`, `subagent.rs`,
-  `workspace_files.rs`): free `render_*` functions (thin wrappers over the
+- Named exports from the `render_helpers/` implementation files
+  `section_renderers.rs`, `subagent.rs`, and `workspace_files.rs`: free
+  `render_*` functions (thin wrappers over the
   section structs), the workspace-file helpers
   (`inject_workspace_file[_capped]`, `inject_inline_content`,
   `sync_workspace_file`, `default_workspace_file_content`),
@@ -88,9 +88,10 @@ Other domains contribute prompt content without living in this directory:
   session-scoped bytes land at the tail of the prompt.
 
 Built-in archetype system prompts (orchestrator, planner, image_agent,
-and so on) live in `agent/registry/agents/<name>/prompt.rs` and
-`flows/agents/{flow_discovery,workflow_builder}/prompt.rs`, not here. Each is a
-`PromptSource::Dynamic` function that hand-assembles its body via the
+and so on) generally live in `agent_registry/agents/<name>/prompt.rs`; the
+trigger triage and reactor prompt builders live with `triage`. Flow agent
+builders live in `flows/agents/{flow_discovery,workflow_builder}/prompt.rs`.
+These are `PromptSource::Dynamic` functions that hand-assemble their body via the
 `render_*` helpers; [`agent/session_host/builder/factory.rs`](../session_host/builder/factory.rs) wraps it with
 `SystemPromptBuilder::from_dynamic`.
 
@@ -149,7 +150,7 @@ user message via `current_datetime_line`).
   the tool-policy boundary.
 - `agent/session_host/builder/factory.rs`: picks the entry point per
   `PromptSource`.
-- [`agent/debug/`](../debug/): `dump_agent_prompt` / `dump_all_agent_prompts` ([`mod.rs`](./mod.rs))
+- [`core/agent_cli/debug/`](../../core/agent_cli/debug/): `dump_agent_prompt` / `dump_all_agent_prompts` ([`mod.rs`](../../core/agent_cli/debug/mod.rs))
   build the same `PromptContext` to render each agent's prompt,
   `dump_writer.rs` writes it to disk, `prompt_size.rs` measures it.
 

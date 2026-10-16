@@ -12,10 +12,10 @@ use tinyagents_harness::middleware::AgentRun;
 use tinyagents_harness::middleware::{ContextCompressionMiddleware, PromptCacheGuardMiddleware};
 use tokio::sync::mpsc::Sender;
 
-use crate::agent::progress::AgentProgress;
 use crate::agent::tinyagents::journal::TurnJournal;
 use crate::agent::tinyagents::observability::{self, OpenhumanEventBridge, SubagentScope};
 use crate::agent::tinyagents::turn_outcome::TinyagentsTurnOutcome;
+use crate::progress::AgentProgress;
 use tinyagents_harness::turn_outcome::{HaltSummarySlot, ToolOutcomeSink};
 use tinyagents_harness::turn_run_finalize::{
     classify_turn_end, log_compaction_provenance, select_turn_text, system_segment_bytes, TurnEnd,
@@ -163,8 +163,11 @@ pub(super) async fn finalize_turn_outcome(
     // A run the harness stopped (breaker / cap) is traced as stopped, not as a
     // clean completion. No deadline wind-down on this path: only the session
     // turn carries one, and it records the stop through its sidecar.
-    let stop =
-        crate::agent::turn_projection::classify_stop(breaker_halt.as_deref(), false, hit_cap);
+    let stop = crate::agent::session_host::stop_summary::classify_stop(
+        breaker_halt.as_deref(),
+        false,
+        hit_cap,
+    );
     if let Some(stop) = stop.as_ref().filter(|_| turn_completed_sink.is_some()) {
         tracing::debug!(
             model,

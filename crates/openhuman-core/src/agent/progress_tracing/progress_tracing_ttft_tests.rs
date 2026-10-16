@@ -134,7 +134,7 @@ fn otlp_exports_completion_start_time_for_langfuse_ttft() {
     let payloads = otlp_requests(
         &spans,
         "production",
-        &crate::agent::progress_tracing::export_brand(),
+        &crate::core::observability::progress_tracing::export_brand(),
     );
     let exported = payloads[0]["resourceSpans"][0]["scopeSpans"][0]["spans"]
         .as_array()

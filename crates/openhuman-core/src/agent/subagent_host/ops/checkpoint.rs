@@ -54,7 +54,7 @@ impl SubagentCheckpoint {
         let request = ModelRequest::new(summary_input).with_max_tokens(self.max_output_tokens);
         match self.chat_model.invoke(&(), request).await {
             Ok(resp) => {
-                let usage = crate::agent::tinyagents::model::usage_info_from_response(&resp);
+                let usage = crate::inference::provider::model::usage_info_from_response(&resp);
                 let raw = resp.text();
                 let (prose, _) = tinytools_agent::parse_tool_calls(&raw);
                 let text = if prose.trim().is_empty() {

@@ -10,8 +10,8 @@
 //! Use it for non-trivial sub-tasks that benefit from a self-review/revision
 //! loop; use `spawn_subagent` for a single focused hand-off.
 
-use crate::agent::harness::host_definition::AgentDefinitionRegistry;
 use crate::agent::orchestration::delegation::run_subagent_delegation_with_parent_context;
+use crate::agent_registry::host_definition::AgentDefinitionRegistry;
 use async_trait::async_trait;
 use serde_json::json;
 use std::sync::Arc;
@@ -89,6 +89,10 @@ impl DelegateGraphTool {
         Self
     }
 }
+
+#[cfg(test)]
+#[path = "delegate_graph_tests.rs"]
+mod tests;
 
 #[async_trait]
 impl Tool for DelegateGraphTool {
@@ -202,11 +206,11 @@ impl DelegateGraphTool {
         };
         let agent_id = match args.get("agent_id").and_then(|v| v.as_str()) {
             Some(s) if !s.trim().is_empty() => s.trim().to_string(),
-            _ => return Ok(ToolResult::error("delegate: `agent_id` is required.")),
+            _ => return Ok(ToolResult::error("delegate_graph: `agent_id` is required.")),
         };
         let task = match args.get("task").and_then(|v| v.as_str()) {
             Some(s) if !s.trim().is_empty() => s.to_string(),
-            _ => return Ok(ToolResult::error("delegate: `task` is required.")),
+            _ => return Ok(ToolResult::error("delegate_graph: `task` is required.")),
         };
         let max_revisions = args
             .get("max_revisions")
@@ -218,7 +222,7 @@ impl DelegateGraphTool {
             Some(reg) => reg,
             None => {
                 return Ok(ToolResult::error(
-                    "delegate: agent definition registry not initialized.",
+                    "delegate_graph: agent definition registry not initialized.",
                 ));
             }
         };
@@ -226,7 +230,7 @@ impl DelegateGraphTool {
             Some(def) => def.clone(),
             None => {
                 return Ok(ToolResult::error(format!(
-                    "delegate: agent definition '{agent_id}' not found in registry."
+                    "delegate_graph: agent definition '{agent_id}' not found in registry."
                 )));
             }
         };
@@ -236,7 +240,7 @@ impl DelegateGraphTool {
                 Ok(cfg) => Arc::new(cfg),
                 Err(e) => {
                     return Ok(ToolResult::error(format!(
-                        "delegate: failed to load config: {e}"
+                        "delegate_graph: failed to load config: {e}"
                     )));
                 }
             };
@@ -256,7 +260,7 @@ impl DelegateGraphTool {
             Ok(state) => {
                 if state.cancelled {
                     return Ok(ToolResult::error(format!(
-                        "delegate cancelled for '{agent_id}'."
+                        "delegate_graph cancelled for '{agent_id}'."
                     )));
                 }
                 let final_output = state
@@ -273,7 +277,7 @@ impl DelegateGraphTool {
                 )))
             }
             Err(e) => Ok(ToolResult::error(format!(
-                "delegate failed for '{agent_id}': {e}"
+                "delegate_graph failed for '{agent_id}': {e}"
             ))),
         }
     }

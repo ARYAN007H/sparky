@@ -4,8 +4,8 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 
-use super::model::TurnChatModel;
-use super::turn_models::TurnModels;
+use crate::inference::provider::model::TurnChatModel;
+use crate::inference::turn_models::TurnModels;
 use tinyagents_harness::host::{ModelResolveRequest, ModelResolver};
 use tinyinference_llm::model::ErrorSlotModel;
 

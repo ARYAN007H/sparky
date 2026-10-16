@@ -153,7 +153,7 @@ pub mod agent {
         }
         // rpc: Socket.IO run-mode toggles.
         pub mod run_mode {
-            pub use openhuman_core::agent::tinyagents::run_mode::{parse_mode_label, set_mode};
+            pub use openhuman_core::threads::{parse_mode_label, set_mode};
         }
     }
     // rpc: shutdown, plan review over Socket.IO, and the session store install.
@@ -162,11 +162,11 @@ pub mod agent {
     }
     pub mod plan_review {
         pub mod gate {
-            pub use openhuman_core::agent::plan_review::gate::global;
+            pub use openhuman_core::plan_review::gate::global;
         }
     }
     pub mod session_store {
-        pub use openhuman_core::agent::session_store::{
+        pub use openhuman_core::storage::sessions::{
             context_workspace_dir, install, installed, restore, ReboundSessionStores,
             WorkspaceSessionStores,
         };

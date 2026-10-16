@@ -14,9 +14,9 @@
 //! that failure and is the fastest way to see these tests fail red.
 
 use super::*;
-use crate::agent::harness::host_definition::AgentDefinitionRegistry;
 use crate::agent::harness::ParentExecutionContext;
 use crate::agent::tinyagents::tool_registration::shared_tool_adapter;
+use crate::agent_registry::host_definition::AgentDefinitionRegistry;
 use async_trait::async_trait;
 use serde_json::json;
 use std::path::Path;
@@ -31,7 +31,7 @@ use tinytools_agent::dialect::ToolCallFormat;
 
 /// A stub archetype-delegate tool: only its name has to match `image_agent`'s
 /// `delegate_name` ("create_image", set in
-/// `agent/registry/agents/image_agent/agent.toml`) for
+/// `agent_registry/agents/image_agent/agent.toml`) for
 /// `DelegationDispatch::for_tool` to select the archetype path. The typed
 /// archetype test dispatches straight to
 /// `execute_archetype_delegation_with_live_parent`; the separate packed-target

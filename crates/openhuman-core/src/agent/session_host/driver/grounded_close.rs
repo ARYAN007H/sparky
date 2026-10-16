@@ -15,7 +15,6 @@ use tinytools_agent::dialect::ToolDialect;
 use tinyagents_harness::middleware::wrap_harness_instruction;
 
 use crate::agent::{
-    message_convert::dialect_response_from_provider,
     session_host::turn_checkpoint::{
         self, build_deterministic_checkpoint, build_deterministic_final_summary,
         close_repair_instruction, close_verification_prompt, final_answer_instruction,
@@ -24,6 +23,7 @@ use crate::agent::{
     },
     tinyagents::{TinyagentsTurnOutcome, TurnModelSource},
 };
+use crate::inference::provider::model::dialect_response_from_provider;
 use crate::inference::provider::{BilledUsage, ChatResponse, AGENT_TURN_MAX_OUTPUT_TOKENS};
 
 /// Accounting from model calls performed after the harness loop has ended.
@@ -105,7 +105,7 @@ pub(super) async fn repair_required_output(
     history: &[tinyinference_llm::message::Message],
     reply: &str,
     reply_already_streamed: bool,
-    progress: Option<&tokio::sync::mpsc::Sender<crate::agent::progress::AgentProgress>>,
+    progress: Option<&tokio::sync::mpsc::Sender<crate::progress::AgentProgress>>,
     iteration: u32,
     usage: &mut RepairUsage,
 ) -> Option<String> {
@@ -152,7 +152,7 @@ pub(super) async fn repair_required_output(
     let continuation = format!("\n\n{correction}");
     if let Some(progress) = progress {
         if let Err(error) = progress
-            .send(crate::agent::progress::AgentProgress::TextDelta {
+            .send(crate::progress::AgentProgress::TextDelta {
                 delta: continuation.clone(),
                 iteration,
             })
@@ -391,7 +391,7 @@ async fn completion(
                 };
                 return (
                     selected,
-                    crate::agent::tinyagents::model::usage_info_from_response(&response),
+                    crate::inference::provider::model::usage_info_from_response(&response),
                 );
             }
             ModelStreamItem::Failed(_) | ModelStreamItem::ProviderFailed(_) => {

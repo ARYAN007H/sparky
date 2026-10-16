@@ -8,7 +8,7 @@
 //! lists, and drive the comparison for one request.
 //!
 //! What the comparison means is documented on
-//! [`journal_projection`](crate::agent::progress_tracing::journal_projection):
+//! [`journal_projection`](crate::core::observability::progress_tracing::journal_projection):
 //! both sides fold through the same `SpanCollector`, so span-shape parity holds
 //! by construction and a divergence is a real gap rather than an artefact of
 //! comparing two different abstractions. The largest such gap today is that the
@@ -142,11 +142,12 @@ pub(super) async fn shadow_compare_journal_projection(
         return None;
     }
 
-    let projected = crate::agent::progress_tracing::journal_projection::spans_from_observations(
-        trace_ctx,
-        max_iterations,
-        &observations,
-    );
+    let projected =
+        crate::core::observability::progress_tracing::journal_projection::spans_from_observations(
+            trace_ctx,
+            max_iterations,
+            &observations,
+        );
     let live_sig = span_projection_signature(live_spans);
     let projected_sig = span_projection_signature(&projected);
     if live_sig == projected_sig {

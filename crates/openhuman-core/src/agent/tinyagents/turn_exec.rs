@@ -8,9 +8,10 @@
 //! finalize the run into a [`TinyagentsTurnOutcome`].
 
 use std::collections::{BTreeSet, HashSet};
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
 
 use anyhow::Result;
+use tinyagents_harness::runtime::AgentHarness;
 use tinyagents_harness::runtime::{AgentInvocation, AgentTurnRequest, InvocationRuntime};
 use tinyagents_harness::store::{InMemoryStore as ToolResultArtifactIndexStore, StoreRegistry};
 use tinyagents_harness::turn_policy::effective_max_iterations;
@@ -27,7 +28,6 @@ use crate::agent::tinyagents::tool_registration::capability_diagnostics;
 use crate::agent::tinyagents::turn_middleware::{
     install_turn_middleware, TurnMiddlewareInputs, TurnWiring,
 };
-use crate::agent::tinyagents::turn_models::TurnModels;
 use crate::agent::tinyagents::turn_outcome::TinyagentsTurnOutcome;
 use crate::agent::tinyagents::turn_plan::{
     enforce_registry_diagnostics, turn_models_for_plan, turn_run_policy, OpenHumanTurnPlanner,
@@ -35,6 +35,7 @@ use crate::agent::tinyagents::turn_plan::{
 use crate::agent::tinyagents::turn_run_error::map_turn_run_error;
 use crate::agent::tinyagents::turn_run_finalize::finalize_turn_outcome;
 use crate::agent::tinyagents::{journal, routes, steering_forwarder};
+use crate::inference::turn_models::TurnModels;
 use tinyagents_harness::events::EventSink;
 use tinyagents_harness::observability::turn_observer;
 use tinyagents_harness::run_queue::RunQueue;
@@ -48,9 +49,12 @@ use super::ToolPolicyEnforcement;
 /// are attached through an [`InvocationRuntime`] and [`AgentInvocation`] for
 /// each root.  That prevents concurrent sessions from replacing one another's
 /// security or workspace state on a shared harness.
-#[path = "turn_exec_hosted.rs"]
-mod turn_exec_hosted;
-use turn_exec_hosted::{root_hosted_harness, PrecomposedRootContext};
+static ROOT_HOSTED_HARNESS: LazyLock<AgentHarness<(), OpenHumanRunContext>> =
+    LazyLock::new(AgentHarness::new);
+
+fn root_hosted_harness() -> &'static AgentHarness<(), OpenHumanRunContext> {
+    &ROOT_HOSTED_HARNESS
+}
 
 #[cfg(test)]
 #[path = "turn_exec_tests.rs"]
@@ -168,11 +172,8 @@ async fn drive_turn(
     // Wrap concrete routes before the invocation-local hosted resolver captures them.
     let turn_models = turn_models.with_budget(run_context.model_budget.as_ref());
     let hosted_model_resolver = hosted_root.as_ref().map(|_| {
-        Arc::new(
-            crate::agent::tinyagents::turn_models::TurnModelResolver::from_turn_models(
-                &turn_models,
-            ),
-        ) as Arc<dyn tinyagents_harness::host::ModelResolver<()>>
+        Arc::new(crate::inference::turn_models::TurnModelResolver::from_turn_models(&turn_models))
+            as Arc<dyn tinyagents_harness::host::ModelResolver<()>>
     });
     // The host security adapter must see the exact same `Arc`-shared instances
     // the registration resolves against, so retain only the cheap Arc clone for
@@ -194,7 +195,7 @@ async fn drive_turn(
         deterministic_cacheable,
         is_local,
         run_context.tool_dialect,
-        crate::agent::tinyagents::reasoning::turn_reasoning_for(
+        crate::inference::reasoning::turn_reasoning_for(
             &run_context,
             hosted_root.as_ref().map(|(base, _)| base.config.as_ref()),
             max_output_tokens,
@@ -314,15 +315,15 @@ async fn drive_turn(
     // `session_kv_store` self-gates on the dual-write flag (config default ON +
     // env kill switch), returning `None` when disabled or unresolvable.
     if let Some(session_kv) =
-        crate::agent::session_import::live::session_kv_store(&run_context.dispatch_ctx()).await
+        crate::storage::import::live::session_kv_store(&run_context.dispatch_ctx()).await
     {
         stores.get_or_insert_with(StoreRegistry::new).register(
-            crate::agent::session_import::live::TINYAGENTS_SESSION_KV_STORE,
+            crate::storage::import::live::TINYAGENTS_SESSION_KV_STORE,
             session_kv,
         );
         tracing::debug!(
             "[session-store] registered session kv store on RunContext.stores under '{}'",
-            crate::agent::session_import::live::TINYAGENTS_SESSION_KV_STORE
+            crate::storage::import::live::TINYAGENTS_SESSION_KV_STORE
         );
     }
     if let Some(stores) = stores {
@@ -412,7 +413,7 @@ async fn drive_turn(
     )
     .await;
     if !is_subagent {
-        if let Some(crate::agent::turn_origin::AgentTurnOrigin::WebChat {
+        if let Some(crate::security::turn_origin::AgentTurnOrigin::WebChat {
             request_id: Some(request_id),
             ..
         }) = run_context.origin.as_ref()
@@ -523,10 +524,7 @@ async fn drive_turn(
             hosted_security_gate,
             pause_at_cap,
             run_mode: run_context.thread_id.as_deref().map(|thread_id| {
-                crate::agent::tinyagents::run_mode::handle_for_thread(
-                    &run_context.dispatch_ctx(),
-                    thread_id,
-                )
+                crate::threads::run_mode::handle_for_thread(&run_context.dispatch_ctx(), thread_id)
             }),
             memory_turn: run_context.memory_turn.clone(),
             summarizer_model,
@@ -538,7 +536,9 @@ async fn drive_turn(
                 .parent
                 .as_ref()
                 .filter(|_| todo_registered)
-                .map(|parent| crate::agent::todos::ops::store(&parent.workspace_dir)),
+                .map(|parent| {
+                    crate::storage::sessions::stores_or_ephemeral(&parent.workspace_dir).kv
+                }),
         },
     );
     if let Some(scope) = run_context.response_shape.clone() {
@@ -591,16 +591,11 @@ async fn drive_turn(
                     tool_policy: tool_policy
                         .as_ref()
                         .map(|policy| Arc::new(policy.session.clone())),
-                    model_resolver: hosted_model_resolver,
+                    model_resolver: hosted_model_resolver
+                        .expect("hosted root retained its selected model resolver"),
                 },
                 &run_context,
             );
-        // The root session has already assembled its exact system prompt,
-        // learned context and history before this graph runs.  Keep those bytes
-        // as the hosted request rather than composing/recalling a second copy;
-        // the host still owns definition resolution, security, model routing,
-        // budgets, progress and outcome classification for this invocation.
-        host_bundle.capabilities.context = Arc::new(PrecomposedRootContext);
         host_bundle.capabilities.memory = None;
         host_bundle.capabilities.experience = None;
         // Session finalization owns the full-fidelity hook payload (including

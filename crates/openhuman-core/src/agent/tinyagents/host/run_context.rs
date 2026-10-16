@@ -17,16 +17,16 @@ use std::time::Instant;
 use tokio::sync::mpsc::Sender;
 
 use crate::agent::harness::fork_context::{AgentContextPreparedSource, ParentExecutionContext};
-use crate::agent::progress::AgentProgress;
 use crate::agent::subagent_host::SubagentUsage;
 use crate::agent::tinyagents::{
     middleware::turn_context::TurnContextMiddleware, turn_policy::ToolPolicyEnforcement,
 };
-use crate::agent::turn_origin::AgentTurnOrigin;
+use crate::progress::AgentProgress;
+use crate::security::turn_origin::AgentTurnOrigin;
 use tinyagents_definition::SandboxMode;
-use tinyagents_harness::middleware::StopHook;
 use tinyagents_harness::store::InMemoryStore as ToolResultArtifactIndexStore;
 use tinyagents_harness::turn_outcome::{ToolCallOutcome, ToolOutcomeSink};
+use tinyagents_hooks::stop::StopHook;
 use tinyinference_llm::model::ResolvedModelRoute;
 
 /// Allocate a durable-unique root [`RunConfig`](tinyagents_harness::context::RunConfig).
@@ -291,7 +291,7 @@ pub struct OpenHumanRunContext {
     /// Stop policies evaluated after each model call.
     pub stop_hooks: Vec<Arc<dyn StopHook<tinyagents_harness::cost::TurnCost>>>,
     /// Agent/turn tool callbacks, registered after the runtime's global ones.
-    pub tool_hooks: Vec<Arc<dyn crate::agent::hooks::ToolHook>>,
+    pub tool_hooks: Vec<Arc<dyn tinyagents_hooks::tool::ToolHook<OpenHumanRunContext>>>,
     /// Host cap on real tool invocations for this turn tree; `None` leaves the
     /// product default. Inherited by children.
     pub tool_call_limit: Option<usize>,
@@ -410,7 +410,7 @@ pub(crate) struct HarnessHostPolicy {
     /// Stop policies evaluated after each model call.
     pub(crate) stop_hooks: Vec<Arc<dyn StopHook<tinyagents_harness::cost::TurnCost>>>,
     /// Agent/turn tool callbacks, registered after the runtime's global ones.
-    pub(crate) tool_hooks: Vec<Arc<dyn crate::agent::hooks::ToolHook>>,
+    pub(crate) tool_hooks: Vec<Arc<dyn tinyagents_hooks::tool::ToolHook<OpenHumanRunContext>>>,
     /// The host's cap on real tool invocations.
     pub(crate) tool_call_cap: Option<usize>,
 }
@@ -506,7 +506,7 @@ impl OpenHumanRunContext {
 
     /// The connected-identities prompt section, read under this run's context.
     pub(crate) fn connected_identities_md(&self) -> String {
-        crate::agent::prompts::render_connected_identities(&self.dispatch_ctx())
+        crate::integrations::render_connected_identities(&self.dispatch_ctx())
     }
 
     /// Sets the direct TinyTools workspace descriptor for this run.
@@ -575,7 +575,7 @@ impl OpenHumanRunContext {
     /// The real tool invocation budget for a turn of `max_iterations`: the
     /// product default, narrowed by the host's explicit cap.
     pub(crate) fn tool_call_limit_for(&self, max_iterations: usize) -> usize {
-        crate::agent::stop_hooks::tool_call_limit(max_iterations, self.tool_call_limit)
+        crate::agent::tinyagents::turn_policy::tool_call_limit(max_iterations, self.tool_call_limit)
     }
 
     /// Applies the host environment an entry point handed to the session:

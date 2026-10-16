@@ -1,8 +1,9 @@
-use super::{ArchetypeDelegationTool, DelegationTarget, SpawnSubagentTool, SpawnWorkerThreadTool};
-use crate::agent::harness::host_definition::AgentDefinitionRegistry;
+use super::{ArchetypeDelegationTool, DelegationTarget, SpawnSubagentTool};
 use crate::agent::harness::ParentExecutionContext;
-use crate::agent::prompts::ConnectedIntegration;
+use crate::agent_registry::host_definition::AgentDefinitionRegistry;
+use crate::integrations::ConnectedIntegration;
 use crate::threads::store as conversations;
+use crate::tools::implementations::threads::SpawnWorkerThreadTool;
 use async_trait::async_trait;
 use parking_lot::Mutex;
 use serde_json::json;
@@ -98,7 +99,7 @@ async fn spawn_subagent_reports_a_stopped_child_as_a_failed_tool_result() {
 
     let mut stop = None;
     while let Ok(event) = progress_rx.try_recv() {
-        if let crate::agent::progress::AgentProgress::SubagentCompleted { stop: s, .. } = event {
+        if let crate::progress::AgentProgress::SubagentCompleted { stop: s, .. } = event {
             stop = Some(s);
         }
     }

@@ -256,7 +256,7 @@ impl SpawnSubagentTool {
         let worker_thread_id = run_context.parent.as_ref().and_then(|p| {
             let parent_thread_id = parent_thread_id.as_ref()?;
             let title: String = prompt.chars().take(60).collect();
-            super::worker_thread::create_worker_thread(
+            crate::threads::worker_thread::create_worker_thread(
                 &dispatch,
                 p.workspace_dir.clone(),
                 parent_thread_id,

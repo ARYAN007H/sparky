@@ -7,7 +7,7 @@ use super::super::collapsed_delegation::{
     dispatch_targets_from_schema, CollapsedDelegationTool, DelegateTarget,
 };
 use super::super::delegate_graph::DelegateGraphDispatch;
-use crate::agent::tools::DelegateToolDispatch;
+use crate::tools::delegate::DelegateToolDispatch;
 use tinyagents_harness::context::RunConfig;
 use tinyagents_harness::tool::ToolDispatch;
 use tinyagents_harness::tools::AskClarificationTool;
@@ -60,7 +60,7 @@ impl Tool for DelegationRegistrationTool {
 
 #[test]
 fn typed_dispatch_registration_recognises_every_synthesised_delegate_surface() {
-    let _ = crate::agent::harness::host_definition::AgentDefinitionRegistry::init_global_builtins();
+    let _ = crate::agent_registry::host_definition::AgentDefinitionRegistry::init_global_builtins();
     let collapsed: Arc<dyn Tool> = Arc::new(
         CollapsedDelegationTool::for_targets(vec![DelegateTarget {
             tool_name: "research".to_string(),

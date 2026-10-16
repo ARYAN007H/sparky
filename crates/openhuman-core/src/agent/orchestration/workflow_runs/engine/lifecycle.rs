@@ -12,12 +12,12 @@ use crate::agent::orchestration::parent_context::with_root_parent;
 use crate::config::Config;
 use tinyagents_session::run_ledger::{WorkflowRun, WorkflowRunStatus, WorkflowRunUpsert};
 
-use super::super::ops::{
-    compare_and_swap_workflow_run_lifecycle, definition_by_id, get_workflow_run, workflow_store,
-};
 use super::cancel::{
     cancel_signal_if_current, clear_cancel_signal, is_current_cancel_signal, lookup_cancel_signal,
     register_cancel_signal, replace_cancel_signal, WorkflowCancelSignal,
+};
+use super::ops::{
+    compare_and_swap_workflow_run_lifecycle, definition_by_id, get_workflow_run, workflow_store,
 };
 use super::LOG_TARGET;
 use tinyagents_orchestration::workflow::WorkflowDefinition;
@@ -42,12 +42,12 @@ pub async fn start_workflow_run(
     );
     let definition = definition_by_id(definition_id)
         .ok_or_else(|| anyhow!("unknown workflow definition: {definition_id}"))?;
-    let safety_tier = super::super::host::admit_workflow(&definition)?;
+    let safety_tier = super::host::admit_workflow(&definition)?;
 
     let run_id = format!("wfrun-{}", uuid::Uuid::new_v4());
     let initial_engine = WorkflowEngine::new(
         workflow_store(config)?,
-        Arc::new(super::super::host::OpenHumanWorkflowExecutor::new(
+        Arc::new(super::host::OpenHumanWorkflowExecutor::new(
             &run_id,
             None,
             safety_tier,
@@ -68,12 +68,12 @@ pub async fn start_workflow_run(
     // origin here and re-scope it around the engine loop — the phases spawn
     // sub-agents whose tool calls the approval gate judges by that label.
     // Inherit-only: `None` leaves the loop unlabelled and failing closed.
-    let inherited_origin = crate::agent::turn_origin::capture();
+    let inherited_origin = crate::security::turn_origin::capture();
     let task_ctx = ctx.clone();
     ctx.spawn(async move {
         match crate::config::ops::load_current_or_init(&task_ctx).await {
             Ok(task_config) => {
-                crate::agent::turn_origin::with_inherited_origin(
+                crate::security::turn_origin::with_inherited_origin(
                     inherited_origin,
                     run_engine_loop(
                         &task_ctx,
@@ -189,7 +189,7 @@ pub async fn resume_workflow_run(
 
     let definition = definition_by_id(&run.definition_id)
         .ok_or_else(|| anyhow!("definition {} no longer exists", run.definition_id))?;
-    let _safety_tier = super::super::host::admit_workflow(&definition)?;
+    let _safety_tier = super::host::admit_workflow(&definition)?;
 
     let resumed = compare_and_swap_workflow_run_lifecycle(
         config,
@@ -219,12 +219,12 @@ pub async fn resume_workflow_run(
     let task_run_id = id.to_string();
     // Same inherit-only origin propagation as `start_workflow_run`: the resumed
     // loop runs on a fresh task, which would otherwise drop the caller's label.
-    let inherited_origin = crate::agent::turn_origin::capture();
+    let inherited_origin = crate::security::turn_origin::capture();
     let task_ctx = ctx.clone();
     ctx.spawn(async move {
         match crate::config::ops::load_current_or_init(&task_ctx).await {
             Ok(task_config) => {
-                crate::agent::turn_origin::with_inherited_origin(
+                crate::security::turn_origin::with_inherited_origin(
                     inherited_origin,
                     run_engine_loop(
                         &task_ctx,
@@ -274,7 +274,7 @@ pub(crate) async fn run_engine_loop(
                 .map(str::to_owned)
         })
         .filter(|model| !model.trim().is_empty());
-    let safety_tier = match super::super::host::admit_workflow(&definition) {
+    let safety_tier = match super::host::admit_workflow(&definition) {
         Ok(tier) => tier,
         Err(error) => {
             log::error!(target: LOG_TARGET, "[workflow_run_engine] loop.safety_admission_failed run={run_id} err={error}");
@@ -319,7 +319,7 @@ pub(crate) async fn run_engine_loop(
         |parent| async move {
             let engine = WorkflowEngine::new(
                 store,
-                Arc::new(super::super::host::OpenHumanWorkflowExecutor::new(
+                Arc::new(super::host::OpenHumanWorkflowExecutor::new(
                     run_id,
                     model_override,
                     safety_tier,

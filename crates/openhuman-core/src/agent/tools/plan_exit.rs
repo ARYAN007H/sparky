@@ -3,7 +3,7 @@
 //! Coding-harness baseline tool (issue #1205). When a plan-mode agent
 //! is ready to hand off to an execution-mode agent, it calls
 //! `plan_exit { plan }`. The tool returns a structured marker AND flips the
-//! calling thread's `RunMode` (`agent::tinyagents::run_mode::set_mode`) back
+//! calling thread's `RunMode` (`threads::run_mode::set_mode`) back
 //! to `Build`, so the very next tool exposure/execution check on that thread
 //! sees every tool again — the actual gating lives in
 //! `PlanModeMiddleware` (wired per-turn in `turn_middleware.rs`), not here;
@@ -93,6 +93,9 @@ impl PlanExitTool {
             return Ok(ToolResult::error("`plan` must not be empty"));
         }
         if let Some(thread_id) = context.and_then(ToolRunContext::thread_id) {
+            let dispatch_ctx =
+                crate::agent::tinyagents::host::run_context::dispatch_ctx_for_tool(context);
+            let tenant = dispatch_ctx.tenant().ok();
             // Only flip to Build when there is no plan review still parked on
             // this thread. A review resolves (approve/reject/revise) before
             // `request_plan_review` returns control to the agent, so by the
@@ -102,20 +105,26 @@ impl PlanExitTool {
             // concurrent `plan_exit` call that races a still-pending review:
             // flipping the mode early would unlock every tool for the thread
             // before the user has actually approved anything.
-            if crate::agent::plan_review::gate::global()
-                .parked_review_for_thread(thread_id)
-                .is_some()
-            {
+            if tenant.as_ref().is_some_and(|tenant| {
+                crate::plan_review::gate::global()
+                    .parked_review_for_thread(tenant, thread_id)
+                    .is_some()
+            }) {
                 tracing::warn!(
                     thread_id = %thread_id,
                     "[tool][plan_exit] a plan review is still parked on this thread — not flipping to build"
+                );
+            } else if tenant.is_none() {
+                tracing::warn!(
+                    thread_id = %thread_id,
+                    "[tool][plan_exit] tenant context is unavailable — not flipping to build"
                 );
             } else {
                 tracing::info!(
                     thread_id = %thread_id,
                     "[tool][plan_exit] flipping thread run mode to build"
                 );
-                crate::agent::tinyagents::run_mode::set_mode(
+                crate::threads::run_mode::set_mode(
                     &crate::agent::tinyagents::host::run_context::dispatch_ctx_for_tool(context),
                     thread_id,
                     tinyagents_harness::middleware::RunMode::Build,

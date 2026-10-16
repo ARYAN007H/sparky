@@ -23,11 +23,6 @@ use tinyjuice_bus::types::AgentTokenjuiceCompression;
 
 use super::tool_output::ToolOutputMiddleware;
 
-/// Default per-tool-result byte cap for the channel / sub-agent paths, which do
-/// not carry a session `ContextManager` to source the configured budget from.
-/// Mirrors the `ContextConfig::tool_result_budget_bytes` default (16 KiB).
-pub(crate) const DEFAULT_TOOL_RESULT_BUDGET_BYTES: usize = 16 * 1024;
-
 /// Config bundle for the openhuman context middlewares installed on a turn.
 ///
 /// Cheap to clone (the summarizer is an `Arc`). An all-default value installs
@@ -303,15 +298,16 @@ impl Middleware<(), crate::agent::tinyagents::host::OpenHumanRunContext>
                 guard.output_tokens += usage.output_tokens;
                 guard.cached_input_tokens += usage.cache_read_tokens;
                 let host_usage =
-                    crate::agent::tinyagents::model::usage_info_from_response(response).unwrap_or(
-                        crate::inference::provider::BilledUsage::from_counts(
-                            usage.input_tokens,
-                            usage.output_tokens,
-                        )
-                        .with_cached_input_tokens(usage.cache_read_tokens)
-                        .with_cache_creation_tokens(usage.cache_creation_tokens)
-                        .with_reasoning_tokens(usage.reasoning_tokens),
-                    );
+                    crate::inference::provider::model::usage_info_from_response(response)
+                        .unwrap_or(
+                            crate::inference::provider::BilledUsage::from_counts(
+                                usage.input_tokens,
+                                usage.output_tokens,
+                            )
+                            .with_cached_input_tokens(usage.cache_read_tokens)
+                            .with_cache_creation_tokens(usage.cache_creation_tokens)
+                            .with_reasoning_tokens(usage.reasoning_tokens),
+                        );
                 // Use the host's per-call pricing helper whenever the provider
                 // omitted an authoritative amount. `route` is preferred over a
                 // construction-time model because it preserves fallback pricing.
@@ -343,12 +339,13 @@ impl Middleware<(), crate::agent::tinyagents::host::OpenHumanRunContext>
 }
 
 impl TurnContextMiddleware {
-    /// A sensible default for turn paths without a session `ContextManager`
+    /// A sensible default for turn paths without session-specific context settings
     /// (channel / sub-agent): the default tool-result byte cap, no summarizer or
     /// microcompact.
     pub(crate) fn defaults() -> Self {
         Self {
-            tool_result_budget_bytes: DEFAULT_TOOL_RESULT_BUDGET_BYTES,
+            tool_result_budget_bytes: tinyagents_harness::config::TurnConfig::default()
+                .tool_result_budget_bytes,
             payload_summarizer: None,
             // Deliberately `None` on the channel / sub-agent path (#6408).
             //
@@ -459,7 +456,7 @@ impl Middleware<(), crate::agent::tinyagents::host::OpenHumanRunContext>
         _state: &(),
         request: &mut ModelRequest,
     ) -> TaResult<()> {
-        crate::agent::attachments::attach_request_scope(request, &context.data);
+        crate::attachments::attach_request_scope(request, &context.data);
         Ok(())
     }
 }

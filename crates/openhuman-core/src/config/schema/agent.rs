@@ -383,7 +383,7 @@ fn default_session_shadow_reads() -> bool {
 }
 
 fn default_tool_result_budget_bytes() -> usize {
-    crate::agent::context::DEFAULT_TOOL_RESULT_BUDGET_BYTES
+    tinyagents_harness::config::TurnConfig::default().tool_result_budget_bytes
 }
 
 fn default_agent_timeout_secs() -> u64 {

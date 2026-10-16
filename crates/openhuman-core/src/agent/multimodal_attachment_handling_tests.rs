@@ -303,7 +303,7 @@ async fn stash_image_attachments_caps_at_max_images() {
 fn extract_image_placeholders_pulls_att_tokens_in_order() {
     // Forwards a user's stashed image(s) into a delegated vision sub-agent.
     let text = "look at these [Image: image #att:aaa111] and [Image: image #att:bbb222] please";
-    let got = extract_image_placeholders_in_text(text);
+    let got = markers::extract_image_placeholders_in_text(text);
     assert_eq!(
         got,
         vec![
@@ -312,8 +312,10 @@ fn extract_image_placeholders_pulls_att_tokens_in_order() {
         ]
     );
     // A bare placeholder with no stash ref is ignored; plain text yields none.
-    assert!(extract_image_placeholders_in_text("[Image: (could not be processed)]").is_empty());
-    assert!(extract_image_placeholders_in_text("no images here").is_empty());
+    assert!(
+        markers::extract_image_placeholders_in_text("[Image: (could not be processed)]").is_empty()
+    );
+    assert!(markers::extract_image_placeholders_in_text("no images here").is_empty());
 }
 
 #[tokio::test]
