@@ -20,21 +20,12 @@
 //!
 //! `agent::registration` assembles the dialogue tools; `tools::ops` composes
 //! domain registrations and applies the runtime capability filters.
-mod delegate;
 mod plan_exit;
 // Pure `skill_runtime` client (spawn + await a workflow run) — compiled out
 // with the `skills` gate so the tool list OMITS these rather than degrading
 // them to a disabled-error.
-#[cfg(feature = "skills")]
-mod run_workflow;
 mod todo;
 
-pub use delegate::DelegateTool;
-pub(crate) use delegate::DelegateToolDispatch;
 pub use plan_exit::{PLAN_EXIT_MARKER, PlanExitTool};
-#[cfg(feature = "skills")]
-pub use run_workflow::{
-    AWAIT_WORKFLOW_TOOL_NAME, AwaitWorkflowTool, RUN_WORKFLOW_TOOL_NAME, RunWorkflowTool,
-};
 pub use todo::TodoTool;
 pub(crate) use todo::TodoToolDispatch;
