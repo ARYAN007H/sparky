@@ -1,4 +1,5 @@
 pub mod host_extensions;
+pub(crate) mod delegate;
 pub(crate) mod native_ops;
 mod native_ops_types;
 pub mod ops;

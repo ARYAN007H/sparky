@@ -20,6 +20,7 @@ pub mod pairing;
 pub mod policy;
 pub mod prompt_injection;
 pub mod scrub;
+pub mod turn_origin;
 pub mod secret_storage;
 pub(crate) mod secure_open;
 

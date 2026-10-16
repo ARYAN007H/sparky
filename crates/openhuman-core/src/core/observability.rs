@@ -3464,3 +3464,5 @@ pub fn is_stale_release_event(event: &sentry::protocol::Event<'_>) -> bool {
 #[cfg(test)]
 #[path = "observability_tests.rs"]
 mod tests;
+pub(crate) mod progress_tracing;
+

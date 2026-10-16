@@ -277,5 +277,5 @@ fn inject_workspace_file(
 }
 
 #[cfg(test)]
-#[path = "channels_prompt_tests.rs"]
+#[path = "prompt_tests.rs"]
 mod tests;

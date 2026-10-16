@@ -14,8 +14,6 @@
 //! Session hosts hold their prompt builder and context settings directly;
 //! TinyAgents owns live transcript reduction and middleware execution.
 
-pub mod channels_prompt;
-
 /// Default number of most-recent tool-result envelopes the TinyAgents
 /// microcompact middleware leaves intact.
 pub const DEFAULT_KEEP_RECENT_TOOL_RESULTS: usize = 5;

@@ -29,7 +29,6 @@ pub mod hooks;
 /// resolve by id, with their definition, host tools and context.
 pub mod host_agents;
 pub mod host_overrides;
-pub mod host_runtime;
 pub(crate) mod message_convert;
 pub mod messages;
 pub mod multimodal;
@@ -38,12 +37,10 @@ pub mod orchestration;
 /// and [`crate::sandbox::ops`] so all three shell-spawning sites
 /// agree on `cmd.exe` (Windows) vs `bash`/`sh` (Unix). Fixes #4705 where
 /// the sandbox paths hardcoded `sh` and failed at spawn on Windows.
-pub mod progress;
 /// Structured tracing export off the [`progress`] channel: turns the
 /// real-time [`progress::AgentProgress`] stream into OpenTelemetry/
 /// Langfuse-style spans (turn → iteration → tool / subagent) correlated by
 /// session id with user attribution (issue #3886).
-pub(crate) mod progress_tracing;
 /// Prompt plumbing — types, section builders, and
 /// [`SystemPromptBuilder`](prompts::SystemPromptBuilder).
 pub mod prompts;

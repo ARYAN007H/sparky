@@ -78,6 +78,8 @@ pub mod memory;
 pub mod modules;
 pub mod plan_review;
 pub mod platform;
+pub mod progress;
+pub mod prompts;
 pub mod profiles;
 pub mod sandbox;
 pub mod search;

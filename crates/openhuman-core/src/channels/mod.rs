@@ -28,6 +28,7 @@ pub mod host;
 pub mod proactive;
 #[cfg(feature = "channels")]
 pub mod providers;
+pub(crate) mod prompt;
 #[cfg(feature = "channels")]
 mod routes;
 #[cfg(feature = "channels")]
@@ -114,7 +115,7 @@ pub use runtime::test_support;
 // the prompt-building code. Re-exported here for callers that used the
 // old `channels::build_system_prompt` path.
 #[cfg(feature = "channels")]
-pub use crate::agent::context::channels_prompt::build_system_prompt;
+pub use prompt::build_system_prompt;
 #[cfg(feature = "channels")]
 pub use commands::doctor_channels;
 #[cfg(feature = "channels")]
