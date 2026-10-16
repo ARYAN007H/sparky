@@ -321,6 +321,7 @@ pub(crate) fn path_string(path: &std::path::Path, label: &str) -> anyhow::Result
 /// `preserve_pipeline_status` keeps a pipeline's default exit status for
 /// callers whose retry or settlement behavior depends on it (cron).
 pub(crate) async fn run_host(
+    ctx: &crate::core::runtime::DispatchCtx,
     config: &Config,
     command: &str,
     cwd: &std::path::Path,
@@ -334,7 +335,7 @@ pub(crate) async fn run_host(
     shell.meter = meter;
     shell.env = env;
     shell.preserve_pipeline_status = preserve_pipeline_status;
-    run(config, shell).await
+    run(ctx, config, shell).await
 }
 
 #[cfg(test)]

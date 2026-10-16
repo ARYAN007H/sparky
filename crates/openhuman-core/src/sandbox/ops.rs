@@ -370,6 +370,7 @@ pub(crate) async fn execute_in_sandbox_metered(
                 })?,
             };
             execute_unsandboxed(
+                ctx,
                 &config,
                 policy,
                 command,
@@ -475,6 +476,7 @@ pub(crate) async fn apply_requested_backend(
 /// [`SANDBOX_ENV_PASSTHROUGH`] names plus the Windows process-bootstrap
 /// variables), applies the caller's overrides and owns the scratch directory.
 async fn execute_unsandboxed(
+    ctx: &DispatchCtx,
     config: &crate::config::Config,
     policy: &SandboxPolicy,
     command: &str,
@@ -493,6 +495,7 @@ async fn execute_unsandboxed(
     std::fs::create_dir_all(&policy.state_dir)
         .map_err(|error| anyhow::anyhow!("Cannot prepare sandbox state directory: {error}"))?;
     super::shell_exec::run_host(
+        ctx,
         config,
         command,
         working_dir,
