@@ -13,20 +13,20 @@ pub fn normalize_api_base_url(url: &str) -> String {
 }
 
 /// Like [`normalize_api_base_url`] but also **strips any inference-style path**
-/// (e.g. `/openai/v1/chat/completions`) so the result is always a bare host
+/// (e.g. `/v1/chat/completions`) so the result is always a bare host
 /// root suitable as a backend base.
 ///
 /// # Why this exists
 ///
 /// Users (and CI configs) sometimes set `BACKEND_URL` or `config.api_url` to
 /// the full inference endpoint. Backend callers append domain-specific paths
-/// (`/auth/me`, `/agent-integrations/…`) which then land on
-/// `.../openai/v1/chat/completions/auth/me` — an obvious 404.
+/// (`/auth/me`, `/integrations/…`) which then land on
+/// `.../v1/chat/completions/auth/me` — an obvious 404.
 ///
 /// # Scheme-less fallback
 ///
 /// `option_env!`-baked values occasionally omit the scheme
-/// (e.g. `api.tinyhumans.ai/openai/v1/chat/completions`). We retry with an
+/// (e.g. `api.example.com/v1/chat/completions`). We retry with an
 /// `https://` prefix so the path can still be stripped before the value is
 /// used as a base. Without this, a scheme-less inference path survived into
 /// every backend call — Sentry `OPENHUMAN-TAURI-H6 / -HN`, issue #2075.

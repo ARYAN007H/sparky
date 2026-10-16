@@ -4,8 +4,8 @@
 //! this module the run's durable [`GraphObservation`] slice (captured by the
 //! per-run in-memory journal that `tinyflows`' journaled entry points fill)
 //! and it exports the run as one Langfuse trace via the backend's Langfuse
-//! OTLP proxy route, `/telemetry/langfuse/otel/v1/traces` (Langfuse v4; the
-//! legacy `/telemetry/langfuse/ingestion` batch path is not used for traces).
+//! OTLP proxy route (Langfuse v4; the legacy batch ingestion path is not used
+//! for traces).
 //!
 //! The trace is built by `tinyagents`' [`GraphLangfuseExporter`], which turns
 //! each superstep and node into a timed span and stamps the Langfuse **Agent
@@ -40,7 +40,7 @@ use tinyflows_catalog::FlowRunTrigger;
 const LOG_TARGET: &str = "flows::langfuse";
 /// Backend proxy route for legacy Langfuse ingestion (relative to the backend
 /// origin). Only the client's base: [`LangfuseClient::otlp_endpoint`] derives
-/// the OTLP route `/telemetry/langfuse/otel/v1/traces` beside it, which is
+/// the OTLP route beside it, which is
 /// where flow traces go. The backend authenticates the session JWT, injects
 /// the Langfuse project keys, and forwards to Langfuse's
 /// `/api/public/otel/v1/traces`.

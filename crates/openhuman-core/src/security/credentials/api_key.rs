@@ -5,7 +5,7 @@
 //! no `exp` to track. The host hands the core one API key at runtime build
 //! time and every managed-backend request authenticates with it:
 //!
-//! * managed inference (`{api_url}/openai/v1`) sends it as
+//! * managed inference (`{api_url}` + the inference path) sends it as
 //!   `Authorization: Bearer <key>` — the OpenAI-compatible endpoint takes a
 //!   bearer, and `OpenHumanBackendModel::resolve_bearer` prefers this profile
 //!   over the app session;

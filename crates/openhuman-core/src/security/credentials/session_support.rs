@@ -346,7 +346,7 @@ pub fn classify_session_token(
 ///   **once** (so the credentials subscriber clears state and the UI re-auths,
 ///   exactly as on a real network 401) and returns the `SESSION_EXPIRED`
 ///   sentinel. The doomed 401 is never sent — this is the #3297 RCA that stops
-///   the TAURI-RUST-8WY (`/teams/me/usage`) / 8WZ (`/payments/stripe/currentPlan`)
+///   the TAURI-RUST-8WY (team usage) / 8WZ (current plan)
 ///   flood at its source instead of demoting it after the fact.
 /// - token with no recorded expiry (local offline session / `exp`-less JWT) →
 ///   presence-only check; the `flatten_authed_error` 401 net still covers a

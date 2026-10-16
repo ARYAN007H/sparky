@@ -87,7 +87,7 @@ pub fn create_stt_provider(
 /// Piper branch. This function previously coerced an empty `voice` to that
 /// constant before the match, which handed `en_US-lessac-medium` to every
 /// provider: the cloud branch forwarded it as `voice_id` to the backend
-/// ElevenLabs proxy (`POST /openai/v1/audio/speech`), which rejects it with
+/// ElevenLabs speech proxy, which rejects it with
 /// **400 Bad Request** — breaking the Settings → Voice "Test" button and every
 /// cloud TTS reply (#5355). It also pre-empted each external provider's
 /// configured `default_tts_voice`, since the Piper id was never empty by the
