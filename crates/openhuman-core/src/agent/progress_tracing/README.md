@@ -4,14 +4,14 @@ Turns the agent's real-time [`AgentProgress`](../progress.rs) event stream into
 OpenTelemetry/Langfuse-style trace spans (`agent.turn` -> `agent.iteration` ->
 `tool.*`/`subagent.*`), correlated by session id, for offline inspection and
 debugging long multi-agent runs (issue #3886). The module doc on
-[`agent/progress_tracing.rs`](../progress_tracing.rs) has the full span-tree shape and the
+[`core/observability/progress_tracing.rs`](../progress_tracing.rs) has the full span-tree shape and the
 content-capture privacy gate (`observability.agent_tracing.capture_content`,
 default on; enforced once, in `SpanCollector`, so no exporter can leak
 content).
 
 ## Key files
 
-- `agent/progress_tracing.rs` (parent module file) declares the submodules
+- `core/observability/progress_tracing.rs` (parent module file) declares the submodules
   below it. `collector/` holds `SpanCollector` (a pure state machine: feed it
   progress events plus a timestamp, it accumulates finished `TraceSpan`s).
   The data model (`TraceContext`, `RunType`, `SpanKind`/`SpanStatus`), content

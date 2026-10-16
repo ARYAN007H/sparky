@@ -21,7 +21,7 @@
 //! `misty-bubbling-bunny` plan file for the roadmap toward a unified
 //! builder.
 
-use crate::agent::prompts::inject_inline_content;
+use crate::prompts::inject_inline_content;
 use std::path::Path;
 
 /// Maximum characters per injected workspace file (matches `OpenClaw` default).
