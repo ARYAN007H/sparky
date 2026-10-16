@@ -388,13 +388,16 @@ if [ "$OS" = "Linux" ] && [ "${E2E_USE_TAURI_DRIVER:-0}" = "1" ]; then
   echo "[runner] Created private E2E app launcher with the mock runtime environment"
 
   TAURI_DRIVER_PORT="${TAURI_DRIVER_PORT:-4444}"
+  WEBKIT_DRIVER_PORT="${TAURI_NATIVE_DRIVER_PORT:-4445}"
   TAURI_DRIVER_LOG="${RUNNER_TEMP:-${TMPDIR:-/tmp}}/tauri-driver-${LOG_SUFFIX}.log"
   WEBKIT_DRIVER_LOG="${RUNNER_TEMP:-${TMPDIR:-/tmp}}/webkit-driver-${LOG_SUFFIX}.log"
   WEBKIT_DRIVER_WRAPPER="$OPENHUMAN_WORKSPACE/openhuman-e2e-webkit-driver"
   WEBKIT_DRIVER_BIN="${WEBKIT_WEBDRIVER:-/usr/bin/WebKitWebDriver}"
   {
     printf '#!/usr/bin/env bash\nset -euo pipefail\n'
-    printf 'printf "webkit_driver_started=1 display_present=%%s\\n" "${DISPLAY:+yes}" > %q\n' \
+    printf 'printf "webkit_driver_started=1 display_present=%%s arg_count=%%s\\n" "${DISPLAY:+yes}" "$#" > %q\n' \
+      "$OPENHUMAN_WORKSPACE/webkit-driver-env-check.log"
+    printf 'printf "native_driver_args=%%s\\n" "$*" >> %q\n' \
       "$OPENHUMAN_WORKSPACE/webkit-driver-env-check.log"
     printf 'exec %q "$@" >> %q 2>&1\n' "$WEBKIT_DRIVER_BIN" "$WEBKIT_DRIVER_LOG"
   } > "$WEBKIT_DRIVER_WRAPPER"
@@ -403,7 +406,12 @@ if [ "$OS" = "Linux" ] && [ "${E2E_USE_TAURI_DRIVER:-0}" = "1" ]; then
   # Keep the native GUI process under Xvfb in a headless Linux environment.
   # WDIO itself must not be wrapped: its local runner uses an IPC descriptor
   # that xvfb-run does not retain (see autoXvfb: false in wdio.conf.ts).
-  DRIVER_COMMAND=(tauri-driver --port "$TAURI_DRIVER_PORT" --native-driver "$WEBKIT_DRIVER_WRAPPER")
+  DRIVER_COMMAND=(
+    tauri-driver
+    --port "$TAURI_DRIVER_PORT"
+    --native-port "$WEBKIT_DRIVER_PORT"
+    --native-driver "$WEBKIT_DRIVER_WRAPPER"
+  )
   if [ -z "${DISPLAY:-}" ] && [ -z "${WAYLAND_DISPLAY:-}" ]; then
     DRIVER_COMMAND=(xvfb-run --auto-servernum --server-args="-screen 0 1280x800x24" -- "${DRIVER_COMMAND[@]}")
   fi
@@ -411,8 +419,14 @@ if [ "$OS" = "Linux" ] && [ "${E2E_USE_TAURI_DRIVER:-0}" = "1" ]; then
     > "$TAURI_DRIVER_LOG" 2>&1 &
   APP_PID=$!
   export TAURI_DRIVER_PORT
+  DRIVER_READY=0
+  # tauri-driver can accept /status before its native WebKit server is
+  # reachable. Wait for both endpoints so WDIO cannot submit /session into a
+  # proxy whose downstream driver is still unavailable.
   for i in $(seq 1 30); do
-    if curl -sf "http://127.0.0.1:$TAURI_DRIVER_PORT/status" >/dev/null 2>&1; then
+    if curl -sf "http://127.0.0.1:$TAURI_DRIVER_PORT/status" >/dev/null 2>&1 \
+      && curl -sf "http://127.0.0.1:$WEBKIT_DRIVER_PORT/status" >/dev/null 2>&1; then
+      DRIVER_READY=1
       break
     fi
     if ! kill -0 "$APP_PID" 2>/dev/null; then
@@ -421,6 +435,12 @@ if [ "$OS" = "Linux" ] && [ "${E2E_USE_TAURI_DRIVER:-0}" = "1" ]; then
     fi
     sleep 1
   done
+  if [ "$DRIVER_READY" -ne 1 ]; then
+    echo "ERROR: tauri-driver and WebKitWebDriver did not both become ready." >&2
+    cat "$TAURI_DRIVER_LOG" >&2 || true
+    cat "$WEBKIT_DRIVER_LOG" >&2 || true
+    exit 1
+  fi
   if [ "${#SPEC_ARGS[@]}" -gt 0 ]; then
     WDIO_SPEC_ARGS=()
     for s in "${SPEC_ARGS[@]}"; do WDIO_SPEC_ARGS+=(--spec "$s"); done
