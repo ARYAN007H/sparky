@@ -267,6 +267,40 @@ pub fn finish_flow_run(
     })
 }
 
+/// The catalog's parked-only `finish_parked_flow_run` compare-and-swap.
+#[inline]
+pub fn finish_parked_flow_run(
+    config: &Config,
+    id: &str,
+    status: &str,
+    finished_at: &str,
+    steps: &[FlowRunStep],
+    pending_approvals: &[String],
+    error: Option<&str>,
+    graph_hash: Option<&str>,
+) -> Result<bool> {
+    let docs = documents(config)?;
+    let id = id.to_string();
+    let status = status.to_string();
+    let finished_at = finished_at.to_string();
+    let steps = steps.to_vec();
+    let pending_approvals = pending_approvals.to_vec();
+    let error = error.map(str::to_string);
+    let graph_hash = graph_hash.map(str::to_string);
+    run(async move {
+        docs.finish_parked_flow_run(
+            &id,
+            &status,
+            &finished_at,
+            &steps,
+            &pending_approvals,
+            error.as_deref(),
+            graph_hash.as_deref(),
+        )
+        .await
+    })
+}
+
 /// The catalog's `upsert_flow_run_step` for this call.
 #[inline]
 pub fn upsert_flow_run_step(config: &Config, run_id: &str, step: &FlowRunStep) -> Result<()> {

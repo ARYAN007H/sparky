@@ -105,11 +105,9 @@ pub async fn flows_resume(
                     "[flows] flows_resume: refusing — the flow's graph changed after this run \
                      parked (T-M1 stale-approval guard)"
                 );
-                // Settle the row FIRST and treat the guarded write as the
-                // authority, exactly as `flows_cancel_run` does (see its
-                // ORDER MATTERS note) — this refusal runs BEFORE this call
-                // claims the run, so a concurrent resume can legitimately own
-                // it by now:
+                // Settle the row through a parked-only compare-and-swap —
+                // this refusal runs before this call claims the run, so a
+                // concurrent resume can legitimately own it by now:
                 //
                 //   1. Resume B reads the flow and computes a matching hash.
                 //   2. `flows_update` rewrites the flow.
@@ -117,40 +115,29 @@ pub async fn flows_resume(
                 //   4. Resume B wins `mark_run_resuming`, flips the row to
                 //      `running`, and starts executing approved side effects.
                 //
-                // `finish_flow_run_row`'s guard admits `running` as well as
-                // `pending_approval`, so a blind write from A would relabel
-                // B's live row `cancelled`, overwrite `last_status`, and drop
-                // a checkpoint B is actively using. Acting only when the write
-                // actually matched keeps A's refusal from touching B's run.
+                // The ordinary finish guard admits `running` as well as
+                // `pending_approval`, so it would relabel B's live row
+                // `cancelled`, overwrite `last_status`, and drop a checkpoint
+                // B is actively using. The parked-only CAS makes the write
+                // fail once B has claimed the row.
                 //
                 // A is refused either way: its own view of the graph is stale,
                 // so it must never proceed regardless of who owns the row.
-                let observed = current_persisted_steps(config, thread_id);
-                let settled_by_us = finish_flow_run_row(
+                let settled_by_us = super::run_management::settle_parked_run(
                     config,
                     thread_id,
                     flow_id,
                     "cancelled",
-                    &observed,
-                    &[],
-                    Some(GRAPH_CHANGED_SINCE_PARK_ERROR),
-                    None,
-                );
+                    GRAPH_CHANGED_SINCE_PARK_ERROR,
+                )
+                .await;
                 if settled_by_us {
-                    if let Err(e) = store::record_run(config, flow_id, "cancelled") {
-                        tracing::warn!(
-                            target: "flows",
-                            flow_id = %flow_id,
-                            %thread_id,
-                            error = %e,
-                            "[flows] flows_resume: failed to record run summary (stale-approval refusal)"
-                        );
-                    }
-                    // The checkpoint is for a graph that no longer exists as
-                    // approved; drop it rather than leave it resumable against
-                    // a future graph edit that happens to hash back to the
-                    // same value.
-                    drop_checkpoint(config, thread_id).await;
+                    tracing::debug!(
+                        target: "flows",
+                        flow_id = %flow_id,
+                        %thread_id,
+                        "[flows] flows_resume: stale-approval refusal settled the parked run"
+                    );
                 } else {
                     tracing::info!(
                         target: "flows",
@@ -178,26 +165,17 @@ pub async fn flows_resume(
     // A pending checkpoint may have been created before this compatibility
     // gate shipped, so resume is an independent authoritative boundary.
     if let Err(error) = ensure_config_aware_engine_compatible(config, &flow.graph) {
-        if let Err(rec_err) = store::record_run(config, flow_id, "failed") {
-            tracing::warn!(
+        let settled_by_us =
+            super::run_management::settle_parked_run(config, thread_id, flow_id, "failed", &error)
+                .await;
+        if !settled_by_us {
+            tracing::info!(
                 target: "flows",
                 flow_id = %flow_id,
                 %thread_id,
-                error = %rec_err,
-                "[flows] flows_resume: failed to record compatibility rejection"
+                "[flows] flows_resume: compatibility refusal lost the parked row to another lifecycle operation"
             );
         }
-        let observed = current_persisted_steps(config, thread_id);
-        finish_flow_run_row(
-            config,
-            thread_id,
-            flow_id,
-            "failed",
-            &observed,
-            &[],
-            Some(&error),
-            None,
-        );
         tracing::warn!(
             target: "flows",
             flow_id = %flow_id,

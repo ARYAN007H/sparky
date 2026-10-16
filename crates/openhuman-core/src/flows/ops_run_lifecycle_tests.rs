@@ -1,5 +1,85 @@
 use super::*;
 
+fn insert_parked_run(config: &Config, flow_id: &str, run_id: &str) {
+    let now = Utc::now().to_rfc3339();
+    store::insert_flow_run(config, run_id, flow_id, run_id, &now).unwrap();
+    assert!(store::finish_flow_run(
+        config,
+        run_id,
+        "pending_approval",
+        &now,
+        &[],
+        &["gate".into()],
+        None,
+        Some("parked-graph"),
+    )
+    .unwrap());
+}
+
+#[tokio::test]
+async fn stale_graph_refusal_leaves_a_resume_claimed_run_and_summary_untouched() {
+    let tmp = TempDir::new().unwrap();
+    let config = test_config(&tmp);
+    let flow = store::create_flow(
+        &config,
+        "stale-graph-race".to_string(),
+        structurally_valid_graph(trigger_only_graph()),
+        false,
+        true,
+    )
+    .unwrap();
+    let run_id = "stale-graph-race-run";
+    insert_parked_run(&config, &flow.id, run_id);
+
+    // A winning resume claims the row between the stale graph check's read
+    // and its attempted refusal write.
+    assert!(store::mark_run_resuming(&config, run_id).unwrap());
+    assert!(
+        !run_management::settle_parked_run(
+            &config,
+            run_id,
+            &flow.id,
+            "cancelled",
+            GRAPH_CHANGED_SINCE_PARK_ERROR,
+        )
+        .await
+    );
+
+    let row = store::get_flow_run(&config, run_id).unwrap().unwrap();
+    assert_eq!(row.status, "running");
+    let flow = store::get_flow(&config, &flow.id).unwrap().unwrap();
+    assert!(flow.last_status.is_none());
+}
+
+#[tokio::test]
+async fn cancel_observed_parked_does_not_tear_down_a_resume_starting() {
+    let tmp = TempDir::new().unwrap();
+    let config = test_config(&tmp);
+    let flow = store::create_flow(
+        &config,
+        "cancel-start-race".to_string(),
+        structurally_valid_graph(trigger_only_graph()),
+        false,
+        true,
+    )
+    .unwrap();
+    let run_id = "cancel-start-race-run";
+    insert_parked_run(&config, &flow.id, run_id);
+
+    // Cancel already read `pending_approval` and found no registry entry;
+    // resume then registers and claims the row before cancel's CAS.
+    assert!(store::mark_run_resuming(&config, run_id).unwrap());
+    assert!(
+        !run_management::settle_parked_run(&config, run_id, &flow.id, "cancelled", "run cancelled")
+            .await
+    );
+
+    let row = store::get_flow_run(&config, run_id).unwrap().unwrap();
+    assert_eq!(row.status, "running");
+    let flow = store::get_flow(&config, &flow.id).unwrap().unwrap();
+    assert!(flow.last_status.is_none());
+}
+
 #[tokio::test]
 async fn flows_duplicate_missing_flow_errors() {
     let tmp = TempDir::new().unwrap();
