@@ -7,7 +7,7 @@ impl PostTurnHook for Hook {
     fn name(&self) -> &str {
         "local"
     }
-    async fn on_turn_complete(&self, _: &crate::agent::hooks::TurnContext) -> anyhow::Result<()> {
+    async fn on_turn_complete(&self, _: &tinyagents_harness::host::TurnSummary) -> anyhow::Result<()> {
         Ok(())
     }
 }

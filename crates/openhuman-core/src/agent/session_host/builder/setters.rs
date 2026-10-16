@@ -231,7 +231,7 @@ impl SessionHostBuilder {
     /// Sets the post-turn hooks to be executed after each turn.
     pub fn post_turn_hooks(
         mut self,
-        hooks: Vec<Arc<dyn crate::agent::hooks::PostTurnHook>>,
+        hooks: Vec<Arc<dyn tinyagents_harness::host::LearningSink>>,
     ) -> Self {
         self.post_turn_hooks = hooks;
         self

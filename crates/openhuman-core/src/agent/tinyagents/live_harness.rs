@@ -52,7 +52,7 @@ pub(crate) struct LiveToolSurface {
     pub(crate) has_thread: bool,
     /// The session's agent/turn tool callbacks, registered after the
     /// runtime's global ones.
-    pub(crate) tool_hooks: Vec<Arc<dyn crate::agent::hooks::ToolHook>>,
+    pub(crate) tool_hooks: Vec<Arc<dyn tinyagents_hooks::tool::ToolHook>>,
     /// The context the session acts under (its embedder hooks come from it).
     pub(crate) dispatch: crate::core::runtime::DispatchCtx,
 }

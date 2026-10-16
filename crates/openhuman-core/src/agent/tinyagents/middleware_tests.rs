@@ -353,13 +353,13 @@ struct RecordingToolHook {
 }
 
 #[async_trait]
-impl crate::agent::hooks::ToolHook for RecordingToolHook {
+impl tinyagents_hooks::tool::ToolHook for RecordingToolHook {
     fn name(&self) -> &str {
         self.name
     }
     async fn before_tool(
         &self,
-        context: &crate::agent::hooks::ToolHookContext,
+        context: &tinyagents_hooks::tool::ToolHookContext,
     ) -> anyhow::Result<()> {
         self.pre
             .lock()
@@ -372,7 +372,7 @@ impl crate::agent::hooks::ToolHook for RecordingToolHook {
     }
     async fn after_tool(
         &self,
-        context: &crate::agent::hooks::ToolHookContext,
+        context: &tinyagents_hooks::tool::ToolHookContext,
     ) -> anyhow::Result<()> {
         self.post.lock().unwrap().push((
             context.tool_name.clone(),

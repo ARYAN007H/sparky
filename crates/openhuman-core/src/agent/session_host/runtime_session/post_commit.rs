@@ -128,7 +128,7 @@ pub(super) struct TurnIdentity {
 /// finalize steps, with goal accounting deferred to a fenced background task.
 pub(super) async fn finalize_committed_turn(
     state: &std::sync::Mutex<super::OpenHumanSessionState>,
-    post_turn_hooks: &[std::sync::Arc<dyn crate::agent::hooks::PostTurnHook>],
+    post_turn_hooks: &[std::sync::Arc<dyn tinyagents_harness::host::LearningSink>],
     identity: TurnIdentity,
     receipt: tinyagents_runtime::CommitReceipt<crate::agent::tinyagents::host::OpenHumanRunContext>,
 ) {

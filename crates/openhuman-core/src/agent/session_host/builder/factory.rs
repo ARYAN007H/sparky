@@ -379,7 +379,7 @@ impl OpenHumanSessionHost {
             },
             None => SystemPromptBuilder::with_defaults(),
         };
-        let post_turn_hooks: Vec<Arc<dyn crate::agent::hooks::PostTurnHook>> =
+        let post_turn_hooks: Vec<Arc<dyn tinyagents_harness::host::LearningSink>> =
             crate::agent::hooks::embedder_post_turn_hooks_in(ctx);
 
         // Best-effort prewarm from the shared Composio cache. This avoids

@@ -6,7 +6,7 @@
 //! `impl OpenHumanSessionHost`/`impl SessionHostBuilder` can see them without the whole
 //! crate gaining field access.
 
-use crate::agent::hooks::PostTurnHook;
+use tinyagents_harness::host::LearningSink;
 use crate::agent::prompts::SystemPromptBuilder;
 use crate::agent::tinyagents::TurnModelSource;
 use crate::progress::AgentProgress;

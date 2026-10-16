@@ -107,29 +107,29 @@ fn nested_call(name: &str) -> TaToolCall {
 }
 
 /// A hook whose pre-tool decision is fixed, to exercise every arm.
-struct FixedDecisionHook(crate::agent::hooks::ToolHookDecision);
+struct FixedDecisionHook(tinyagents_hooks::tool::ToolHookDecision);
 
 #[async_trait]
-impl crate::agent::hooks::ToolHook for FixedDecisionHook {
+impl tinyagents_hooks::tool::ToolHook for FixedDecisionHook {
     fn name(&self) -> &str {
         "fixed"
     }
     async fn before_tool(
         &self,
-        _context: &crate::agent::hooks::ToolHookContext,
+        _context: &tinyagents_hooks::tool::ToolHookContext,
     ) -> anyhow::Result<()> {
         Ok(())
     }
     async fn after_tool(
         &self,
-        _context: &crate::agent::hooks::ToolHookContext,
+        _context: &tinyagents_hooks::tool::ToolHookContext,
     ) -> anyhow::Result<()> {
         Ok(())
     }
     async fn before_tool_decision(
         &self,
-        _context: &crate::agent::hooks::ToolHookContext,
-    ) -> crate::agent::hooks::ToolHookDecision {
+        _context: &tinyagents_hooks::tool::ToolHookContext,
+    ) -> tinyagents_hooks::tool::ToolHookDecision {
         self.0.clone()
     }
 }
@@ -167,7 +167,7 @@ async fn embedder_tool_hooks_nested_call_honours_a_veto() {
 
 #[tokio::test]
 async fn embedder_tool_hooks_nested_call_refuses_ask_and_rewrite() {
-    use crate::agent::hooks::ToolHookDecision;
+    use tinyagents_hooks::tool::ToolHookDecision;
     for decision in [
         ToolHookDecision::Ask("confirm".into()),
         ToolHookDecision::ProceedWith(json!({"path": "."})),
