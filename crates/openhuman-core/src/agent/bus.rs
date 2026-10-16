@@ -30,7 +30,7 @@ use crate::security::prompt_injection::{
 use tinyagents_session::transcript::TranscriptMessage;
 use tinytools::Tool;
 
-use super::harness::host_definition::AgentDefinitionRegistry;
+use crate::agent_registry::host_definition::AgentDefinitionRegistry;
 use super::harness::run_channel_turn_via_graph;
 use tinyagents_definition::SandboxMode;
 use tinytools_std::file_state::with_file_state_agent_id;

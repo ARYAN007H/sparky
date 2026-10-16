@@ -131,7 +131,7 @@ fn folder_ids_match_toml_ids() {
 fn coding_agent_prompts_reference_action_sandbox_not_stale_workspace() {
     // The coding playbook is the `coding` skill's guide now (the
     // `code_executor` specialist it replaced is gone).
-    let coding = include_str!("../../../tools/toolpacks/guides/coding.md");
+    let coding = include_str!("../../tools/toolpacks/guides/coding.md");
     assert!(
         !coding.contains("sandboxed environment"),
         "guides/coding.md says 'sandboxed environment' generically — anchor in \

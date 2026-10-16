@@ -123,7 +123,7 @@ pub const BUILTINS: &[BuiltinAgent] = &[
     #[cfg(feature = "skills")]
     BuiltinAgent {
         id: "skill_setup",
-        toml: include_str!("../../../skills/catalog/agent/skill_setup/agent.toml"),
+        toml: include_str!("../../skills/catalog/agent/skill_setup/agent.toml"),
         prompt_fn: crate::skills::catalog::agent::skill_setup::prompt::build,
     },
     // Workflow-authoring specialist (Phase 5a): builds tinyflows automation
@@ -134,7 +134,7 @@ pub const BUILTINS: &[BuiltinAgent] = &[
     #[cfg(feature = "flows")]
     BuiltinAgent {
         id: "workflow_builder",
-        toml: include_str!("../../../flows/agents/workflow_builder/agent.toml"),
+        toml: include_str!("../../flows/agents/workflow_builder/agent.toml"),
         prompt_fn: crate::flows::agents::workflow_builder::prompt::build,
     },
     // Workflow-discovery specialist (the "Flow Scout"): reads the user's
@@ -147,7 +147,7 @@ pub const BUILTINS: &[BuiltinAgent] = &[
     #[cfg(feature = "flows")]
     BuiltinAgent {
         id: "flow_discovery",
-        toml: include_str!("../../../flows/agents/flow_discovery/agent.toml"),
+        toml: include_str!("../../flows/agents/flow_discovery/agent.toml"),
         prompt_fn: crate::flows::agents::flow_discovery::prompt::build,
     },
 ];

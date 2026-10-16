@@ -1,6 +1,6 @@
 //! Test-only agent definitions used by harness and orchestration tests.
 
-use super::host_definition::AgentDefinition;
+use crate::agent_registry::host_definition::AgentDefinition;
 use tinyagents_definition::DefinitionSource;
 
 /// Test-only parent used by `AgentBuilder`'s default `agent_definition_name = "main"`.
