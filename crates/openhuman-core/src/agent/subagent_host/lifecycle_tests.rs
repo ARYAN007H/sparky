@@ -159,6 +159,58 @@ async fn legacy_durable_session_resolves_its_key_only_from_owned_checkpoint() {
 }
 
 #[tokio::test]
+async fn tiny_session_port_recovers_legacy_key_from_owned_pause_and_hides_foreign_rows() {
+    use tinyagents_orchestration::subagent::SubagentSessionStore as _;
+
+    let workspace = tempfile::tempdir().unwrap();
+    let checkpoint_dir = workspace.path().join(".openhuman/subagent_checkpoints");
+    let key = key();
+    let store = crate::agent::orchestration::subagent_sessions::SubagentSessionStore::new(
+        workspace.path().to_path_buf(),
+    );
+    crate::agent::orchestration::subagent_sessions::upsert_running(
+        &store,
+        crate::agent::orchestration::subagent_sessions::SubagentSessionUpsert {
+            selector: crate::agent::orchestration::subagent_sessions::SubagentSessionSelector {
+                parent_session: "owner-session".into(),
+                parent_thread_id: Some("thread".into()),
+                agent_id: "researcher".into(),
+                model: None,
+                sandbox_mode: "workspace".into(),
+                action_root: None,
+                task_key: "task".into(),
+            },
+            display_name: None,
+            task_title: "Task".into(),
+            worker_thread_id: None,
+            task_id: "task".into(),
+            lifecycle_key: None,
+        },
+        None,
+    )
+    .unwrap();
+    OpenHumanPersistence::new(checkpoint_dir)
+        .save_pause(persisted_pause(key.clone(), "question", None))
+        .await
+        .unwrap();
+
+    let port = crate::agent::orchestration::subagent_sessions::OpenHumanTinySubagentSessionStore::new(
+        workspace.path().to_path_buf(),
+    );
+    let owned = port
+        .list_for_parent("owner-session", Some("thread"))
+        .await
+        .unwrap();
+    assert_eq!(owned.len(), 1);
+    assert_eq!(owned[0].lifecycle_key, key);
+    assert!(port
+        .list_for_parent("foreign-session", Some("thread"))
+        .await
+        .unwrap()
+        .is_empty());
+}
+
+#[tokio::test]
 async fn persistence_commits_one_scoped_pause_and_recovers_its_original_key() {
     let directory = tempfile::tempdir().unwrap();
     let persistence = OpenHumanPersistence::new(directory.path().to_path_buf());
