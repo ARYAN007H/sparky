@@ -233,10 +233,21 @@ async fn proactive_message_reaches_web_on_channelless_core_boot() {
         job_name: Some("morning-briefing".into()),
     });
 
-    let event = tokio::time::timeout(std::time::Duration::from_secs(2), web_events.recv())
-        .await
-        .expect("proactive message should reach the web event stream")
-        .expect("web event stream should remain open");
+    let event = tokio::time::timeout(std::time::Duration::from_secs(2), async {
+        loop {
+            let event = web_events
+                .recv()
+                .await
+                .expect("web event stream should remain open");
+            if event.event == "proactive_message"
+                && event.full_response.as_deref() == Some("Your morning briefing is ready.")
+            {
+                break event;
+            }
+        }
+    })
+    .await
+    .expect("proactive message should reach the web event stream");
     assert_eq!(event.event, "proactive_message");
     assert_eq!(event.full_response.as_deref(), Some("Your morning briefing is ready."));
 }

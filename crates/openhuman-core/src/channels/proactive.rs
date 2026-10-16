@@ -43,6 +43,13 @@ fn proactive_approval_gate() -> Option<Arc<crate::security::approval::ApprovalGa
 /// `bootstrap_core_runtime` (desktop/JSON-RPC) and domain-level
 /// startup — only the first call takes effect.
 pub fn register_web_only_proactive_subscriber() {
+    if crate::core::bus::BUS.get().is_none() {
+        tracing::warn!(
+            "[proactive] deferred web-only subscriber registration — bus not initialized"
+        );
+        return;
+    }
+
     use std::sync::Once;
     static REGISTERED: Once = Once::new();
     REGISTERED.call_once(|| {

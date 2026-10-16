@@ -118,6 +118,14 @@ pub(super) fn register_domain_subscribers(
     let plan = DomainSubscriberPlan::for_domains(domains);
     log::debug!("[event_bus] register_domain_subscribers: domains={domains:?} plan={plan:?}");
 
+    // Proactive messages always have a web destination, including web-only
+    // cores where no external channel listeners are configured and
+    // `start_channels` never runs. Keep this independent of the Channels
+    // DomainGroup; channel startup still registers the external-channel leg
+    // when it has concrete channel instances.
+    #[cfg(feature = "channels")]
+    crate::channels::proactive::register_web_only_proactive_subscriber();
+
     // `subscribe_global` returns `None` only before the process-global bus is
     // initialized. Because that bus is a monotonic `OnceLock`, checking it here
     // guarantees the registrations in the guarded block cannot later lose bus
@@ -316,9 +324,6 @@ pub(super) fn register_domain_subscribers(
                     "[event_bus] failed to register channel subscriber — bus not initialized"
                 );
             }
-            // Web-only proactive message subscriber (no external channel
-            // instances are registered here in the desktop runtime).
-            crate::channels::proactive::register_web_only_proactive_subscriber();
         }
     } else {
         log::debug!(
