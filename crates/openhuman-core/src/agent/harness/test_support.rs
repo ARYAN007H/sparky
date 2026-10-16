@@ -1,44 +1,7 @@
-//! Built-in [`AgentDefinition`]s.
-//!
-//! The authoritative list of built-in agents lives in
-//! [`crate::agent::registry::agents`] — each agent is a subfolder
-//! containing `agent.toml` + `prompt.md`. This module is a thin
-//! wrapper that loads that set.
-//!
-//! Custom TOML definitions loaded later by
-//! [`super::definition_loader`] override any built-in with the same id.
+//! Test-only agent definitions used by harness and orchestration tests.
 
 use super::host_definition::AgentDefinition;
-#[cfg(test)]
 use tinyagents_definition::DefinitionSource;
-
-/// All built-in definitions, in stable order.
-///
-/// Panics if the baked-in built-in TOML fails to parse. `include_str!`
-/// guarantees at compile time that each file exists, but the actual
-/// TOML parse happens at runtime; the unit tests in
-/// [`crate::agent::registry::agents`] verify in CI that every entry in
-/// [`crate::agent::registry::agents::BUILTINS`] still parses cleanly.
-///
-/// In `#[cfg(test)]` builds the list additionally contains
-/// [`test_inherit_echo_def`] — a sub-agent with `ModelSpec::Inherit`
-/// that exists solely so the spawn-subagent end-to-end test can
-/// exercise the dispatch/threading plumbing with the *parent's*
-/// provider (every shipped builtin uses `Hint(...)`, which after
-/// #1710 builds a fresh factory provider and therefore can't share a
-/// test's `MockProvider`). It is never compiled into release builds.
-pub fn all() -> Vec<AgentDefinition> {
-    #[allow(unused_mut)]
-    let mut defs = crate::agent::registry::agents::load_builtins()
-        .expect("built-in agent TOML must always parse (see agents/*/agent.toml)");
-    #[cfg(test)]
-    {
-        defs.push(test_main_def());
-        defs.push(test_inherit_echo_def());
-        defs.push(test_inherit_parallel_worker_def());
-    }
-    defs
-}
 
 /// Test-only parent used by `AgentBuilder`'s default `agent_definition_name = "main"`.
 ///
@@ -177,6 +140,3 @@ pub(crate) fn test_inherit_parallel_worker_def() -> AgentDefinition {
     }
 }
 
-#[cfg(test)]
-#[path = "builtin_definitions_tests.rs"]
-mod tests;
