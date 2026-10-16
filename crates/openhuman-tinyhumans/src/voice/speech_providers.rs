@@ -25,8 +25,8 @@ const LOG_PREFIX: &str = "[voice-factory]";
 pub const STT_SLUGS: [&str; 3] = ["cloud", "openhuman", "backend"];
 /// TTS slugs the hosted provider answers to.
 pub const TTS_SLUGS: [&str; 2] = ["cloud", "openhuman"];
-/// Default STT model id for the hosted transcription proxy. The factory's
-/// caller-supplied model is ignored: the proxy picks from this one.
+/// Default STT model id for the hosted transcription proxy, used when the
+/// caller names no model.
 pub const DEFAULT_CLOUD_STT_MODEL: &str = "whisper-v1";
 
 /// Cloud STT. Stateless; cheap to construct.
@@ -121,11 +121,22 @@ impl TtsProvider for CloudTtsProvider {
     }
 }
 
+/// The model the hosted STT provider is built with: the caller's, else the
+/// proxy default.
+fn stt_model(requested: &str) -> &str {
+    let requested = requested.trim();
+    if requested.is_empty() {
+        DEFAULT_CLOUD_STT_MODEL
+    } else {
+        requested
+    }
+}
+
 /// Registers the hosted STT and TTS providers under their slugs.
 pub(super) fn register() {
     for slug in STT_SLUGS {
-        register_stt_provider(slug, |_model, _config| {
-            Ok(Box::new(CloudSttProvider::new(DEFAULT_CLOUD_STT_MODEL)))
+        register_stt_provider(slug, |model, _config| {
+            Ok(Box::new(CloudSttProvider::new(stt_model(model))))
         });
     }
     for slug in TTS_SLUGS {

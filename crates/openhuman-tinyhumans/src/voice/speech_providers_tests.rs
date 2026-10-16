@@ -31,3 +31,13 @@ fn cloud_tts_without_a_voice_carries_none_so_the_backend_default_applies() {
     let provider = CloudTtsProvider::new(Some("JBFqnCBsd6RMkjVDRZzb".into()));
     assert_eq!(provider.voice.as_deref(), Some("JBFqnCBsd6RMkjVDRZzb"));
 }
+
+/// The model the caller names reaches the provider; only an empty one falls
+/// back to the proxy default.
+#[test]
+fn the_callers_stt_model_is_passed_through() {
+    assert_eq!(stt_model("whisper-large"), "whisper-large");
+    assert_eq!(stt_model("  whisper-large "), "whisper-large");
+    assert_eq!(stt_model(""), DEFAULT_CLOUD_STT_MODEL);
+    assert_eq!(stt_model("   "), DEFAULT_CLOUD_STT_MODEL);
+}
