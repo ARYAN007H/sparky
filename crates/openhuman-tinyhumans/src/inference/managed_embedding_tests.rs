@@ -394,3 +394,17 @@ async fn default_provider_with_config_authenticates_with_config_scoped_token() {
     );
 }
 
+
+/// With no stored `app-session` token and no API key, the bearer resolver
+/// short-circuits to the backend-session error before any network call.
+#[tokio::test]
+async fn embedding_without_a_session_reports_no_backend_session() {
+    let tmp = tempfile::TempDir::new().unwrap();
+    let config = test_config(&tmp);
+    let provider = build_through_registry(&config, "voyage-3-large", 3);
+    let err = provider
+        .embed(&["hello".to_string()])
+        .await
+        .expect_err("no session must not embed");
+    assert!(err.to_string().contains("No backend session"), "{err}");
+}
