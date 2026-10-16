@@ -9629,7 +9629,6 @@ dependencies = [
 [[package]]
 name = "tinystoragedrivers"
 version = "0.11.0"
-source = "git+https://github.com/tinyhumansai/tinystoragedrivers?tag=v0.11.0#9eeef54aea403ac07461a612189bdf4982782823"
 dependencies = [
  "tinystoragedrivers-core",
  "tinystoragedrivers-file",
@@ -9642,7 +9641,6 @@ dependencies = [
 [[package]]
 name = "tinystoragedrivers-bus"
 version = "0.11.0"
-source = "git+https://github.com/tinyhumansai/tinystoragedrivers?tag=v0.11.0#9eeef54aea403ac07461a612189bdf4982782823"
 dependencies = [
  "serde",
  "serde_json",
@@ -9652,7 +9650,6 @@ dependencies = [
 [[package]]
 name = "tinystoragedrivers-busproxy"
 version = "0.11.0"
-source = "git+https://github.com/tinyhumansai/tinystoragedrivers?tag=v0.11.0#9eeef54aea403ac07461a612189bdf4982782823"
 dependencies = [
  "async-trait",
  "serde",
@@ -9667,7 +9664,6 @@ dependencies = [
 [[package]]
 name = "tinystoragedrivers-client"
 version = "0.11.0"
-source = "git+https://github.com/tinyhumansai/tinystoragedrivers?tag=v0.11.0#9eeef54aea403ac07461a612189bdf4982782823"
 dependencies = [
  "async-trait",
  "serde",
@@ -9681,7 +9677,6 @@ dependencies = [
 [[package]]
 name = "tinystoragedrivers-core"
 version = "0.11.0"
-source = "git+https://github.com/tinyhumansai/tinystoragedrivers?tag=v0.11.0#9eeef54aea403ac07461a612189bdf4982782823"
 dependencies = [
  "async-trait",
  "serde",
@@ -9693,7 +9688,6 @@ dependencies = [
 [[package]]
 name = "tinystoragedrivers-file"
 version = "0.11.0"
-source = "git+https://github.com/tinyhumansai/tinystoragedrivers?tag=v0.11.0#9eeef54aea403ac07461a612189bdf4982782823"
 dependencies = [
  "async-trait",
  "libc",
@@ -9706,7 +9700,6 @@ dependencies = [
 [[package]]
 name = "tinystoragedrivers-mongodb"
 version = "0.11.0"
-source = "git+https://github.com/tinyhumansai/tinystoragedrivers?tag=v0.11.0#9eeef54aea403ac07461a612189bdf4982782823"
 dependencies = [
  "async-trait",
  "futures-util",
@@ -9721,7 +9714,6 @@ dependencies = [
 [[package]]
 name = "tinystoragedrivers-s3"
 version = "0.11.0"
-source = "git+https://github.com/tinyhumansai/tinystoragedrivers?tag=v0.11.0#9eeef54aea403ac07461a612189bdf4982782823"
 dependencies = [
  "bytes",
  "futures-util",
@@ -9736,7 +9728,6 @@ dependencies = [
 [[package]]
 name = "tinystoragedrivers-secrets"
 version = "0.11.0"
-source = "git+https://github.com/tinyhumansai/tinystoragedrivers?tag=v0.11.0#9eeef54aea403ac07461a612189bdf4982782823"
 dependencies = [
  "async-trait",
  "atomicwrites",
@@ -9760,7 +9751,6 @@ dependencies = [
 [[package]]
 name = "tinystoragedrivers-sqlite"
 version = "0.11.0"
-source = "git+https://github.com/tinyhumansai/tinystoragedrivers?tag=v0.11.0#9eeef54aea403ac07461a612189bdf4982782823"
 dependencies = [
  "rusqlite",
  "serde_json",
