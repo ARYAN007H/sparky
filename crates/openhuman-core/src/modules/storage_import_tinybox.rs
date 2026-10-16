@@ -26,8 +26,8 @@ use serde_json::{json, Value};
 use tinystoragedrivers::{CollectionSpec, ScopedStorage};
 
 use super::storage_grant_tinybox::{JAIL_INDEX_COLLECTION, MODULE_ID};
-use crate::core::runtime::DispatchCtx;
 use super::storage_import_support as support;
+use crate::core::runtime::DispatchCtx;
 
 const LOG_PREFIX: &str = "[tinybox-import]";
 /// The registry the module opens over the workspace's jails directory.

@@ -271,7 +271,10 @@ where
 /// Imports the connector module's legacy preference and trigger-archive files
 /// under `state_dir` into its storage, once per directory. Never fails the
 /// caller: an error is logged and the import is retried at the next call.
-pub async fn import_legacy_connectors(ctx: &crate::core::runtime::DispatchCtx, state_dir: &std::path::Path) {
+pub async fn import_legacy_connectors(
+    ctx: &crate::core::runtime::DispatchCtx,
+    state_dir: &std::path::Path,
+) {
     #[cfg(feature = "modules")]
     import_once(
         ctx,
@@ -290,7 +293,10 @@ pub async fn import_legacy_connectors(ctx: &crate::core::runtime::DispatchCtx, s
 /// caller: an error is logged and the import is retried at the next call. Returns
 /// false when the import failed, so the caller can refuse to open a ledger that
 /// would ignore the legacy payments.
-pub async fn import_legacy_x402(ctx: &crate::core::runtime::DispatchCtx, workspace_dir: &std::path::Path) -> bool {
+pub async fn import_legacy_x402(
+    ctx: &crate::core::runtime::DispatchCtx,
+    workspace_dir: &std::path::Path,
+) -> bool {
     #[cfg(all(feature = "modules", feature = "web3"))]
     return import_once(
         ctx,
@@ -310,7 +316,10 @@ pub async fn import_legacy_x402(ctx: &crate::core::runtime::DispatchCtx, workspa
 /// Imports the legacy jail registry index under `<workspace_dir>/jails` into
 /// the tinybox module's storage, once. Never fails the caller: an error is
 /// logged and the import is retried at the next call.
-pub async fn import_legacy_tinybox(ctx: &crate::core::runtime::DispatchCtx, workspace_dir: &std::path::Path) {
+pub async fn import_legacy_tinybox(
+    ctx: &crate::core::runtime::DispatchCtx,
+    workspace_dir: &std::path::Path,
+) {
     #[cfg(feature = "modules")]
     import_once(
         ctx,
