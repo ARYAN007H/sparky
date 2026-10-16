@@ -38,9 +38,7 @@ pub(crate) fn subagent_prompt_protocol(
         // The native request carries its own structured catalogue; retain
         // only the dialect guidance in the text prompt.
         ToolCallFormat::Native => NativeDialect.prompt_instructions(&[]),
-        ToolCallFormat::Json => {
-            crate::agent::prompts::render_helpers::harness_json_tool_prompt(tools)
-        }
+        ToolCallFormat::Json => crate::agent::prompts::harness_json_tool_prompt(tools),
         ToolCallFormat::Python => CodeDialect::instructions(CodeStyle::Python),
         ToolCallFormat::TypeScript => CodeDialect::instructions(CodeStyle::TypeScript),
     };

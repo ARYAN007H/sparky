@@ -5,13 +5,13 @@
 //! [`super::render_helpers`] for workspace-file injection and
 //! sub-agent plumbing.
 
-use super::render_helpers::{inject_workspace_file, sync_workspace_file};
 use super::types::*;
+use super::{inject_workspace_file, sync_workspace_file};
 use anyhow::Result;
 use std::fmt::Write;
 use tinytools::ToolSpec;
-use tinytools_agent::dialect::render_pformat_catalogue;
 use tinytools_agent::dialect::ToolCallFormat;
+use tinytools_agent::dialect::render_pformat_catalogue;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Special sections (archetype, dynamic)
@@ -227,7 +227,7 @@ impl PromptSection for AgentsInstructionsSection {
 
     fn build(&self, ctx: &PromptContext<'_>) -> Result<String> {
         let mut out = String::new();
-        super::render_helpers::write_agents_md_blocks(
+        super::write_agents_md_blocks(
             &mut out,
             ctx.agents_md_global.as_deref(),
             ctx.agents_md_local.as_deref(),
@@ -458,7 +458,7 @@ impl PromptSection for DateTimeSection {
 
     fn build(&self, ctx: &PromptContext<'_>) -> Result<String> {
         // No concrete timestamp here. The live "now" is injected per turn
-        // on the user message via `render_helpers::current_datetime_line`
+        // on the user message via `current_datetime_line`
         // (the main session loop and the sub-agent runner both do this), so
         // it stays fresh across a long-lived session instead of freezing
         // into the cached system-prompt prefix and going stale (#3602).
