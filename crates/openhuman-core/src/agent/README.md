@@ -331,7 +331,7 @@ Persistence, setup and RPC:
 - `AgentTurnRequest` / `AgentTurnResponse` and `AGENT_RUN_TURN_METHOD`
   (`bus.rs`): the stateless turn over `BUS.native()`.
   `register_agent_handlers` installs it at startup.
-- `TurnModelSource` ([`tinyagents/turn_models.rs`](./tinyagents/turn_models.rs)): builds a turn's primary,
+- `TurnModelSource` ([`inference/turn_models.rs`](../inference/turn_models.rs)): builds a turn's primary,
   tier-routed and summarizer `ChatModel`s from `(role, config)`.
 - `TurnSpec::run` and `TurnSpec::run_hosted`
   ([`tinyagents/turn_exec.rs`](./tinyagents/turn_exec.rs)): the only places a harness is invoked.
