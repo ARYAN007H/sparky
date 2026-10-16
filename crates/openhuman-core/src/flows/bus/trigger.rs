@@ -256,11 +256,7 @@ impl FlowTriggerSubscriber {
         }
     }
 
-    fn queue_for(
-        &self,
-        key: &DispatchKey,
-        ctx: &crate::core::runtime::DispatchCtx,
-    ) -> Arc<FlowRunQueue> {
+    fn queue_for(&self, key: &DispatchKey) -> Arc<FlowRunQueue> {
         let mut queues = self
             .queues
             .lock()
@@ -329,7 +325,7 @@ impl FlowTriggerSubscriber {
         mut queued: QueuedRun,
     ) {
         loop {
-            let queue = self.queue_for(&key, ctx);
+            let queue = self.queue_for(&key);
             let admission = Arc::clone(&queue.admission).lock_owned().await;
             if queue.sender.is_closed() {
                 drop(admission);
@@ -384,7 +380,7 @@ impl FlowTriggerSubscriber {
         mut queued: QueuedRun,
     ) {
         loop {
-            let queue = self.queue_for(&key, ctx);
+            let queue = self.queue_for(&key);
             let admission = Arc::clone(&queue.admission).lock_owned().await;
             if queue.sender.is_closed() {
                 drop(admission);
@@ -535,7 +531,7 @@ impl FlowTriggerSubscriber {
         flow_id: &str,
     ) -> tokio::sync::OwnedMutexGuard<()> {
         let key = self.dispatch_key(ctx, flow_id).unwrap();
-        let queue = self.queue_for(&key, ctx);
+        let queue = self.queue_for(&key);
         Arc::clone(&queue.admission).lock_owned().await
     }
 
@@ -554,7 +550,7 @@ async fn run_queue_worker(
     #[cfg(test)] retiring: Arc<tokio::sync::Notify>,
 ) {
     let mut next = receiver.recv().await;
-    while let Some(mut queued) = next {
+    while let Some(queued) = next {
         loop {
             let run_ctx = queued.ctx.clone();
             let flow_id = queued.request.flow_id.clone();

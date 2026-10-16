@@ -371,6 +371,57 @@ async fn full_app_event_queue_backpressures_until_a_slot_opens() {
 }
 
 #[tokio::test]
+async fn a_panicking_run_does_not_discard_later_accepted_app_events() {
+    use std::sync::Mutex;
+    use tokio::sync::{mpsc, oneshot};
+
+    let tmp = tempfile::TempDir::new().unwrap();
+    let (started_tx, started_rx) = oneshot::channel();
+    let started_tx = Arc::new(Mutex::new(Some(started_tx)));
+    let (release_tx, release_rx) = oneshot::channel();
+    let release_rx = Arc::new(tokio::sync::Mutex::new(Some(release_rx)));
+    let (runs_tx, mut runs_rx) = mpsc::unbounded_channel();
+    let runner = move |_ctx: crate::core::runtime::DispatchCtx,
+                       _config: Arc<Config>,
+                       request: crate::flows::bus::trigger::TriggerRunRequest| {
+        let started_tx = Arc::clone(&started_tx);
+        let release_rx = Arc::clone(&release_rx);
+        let runs_tx = runs_tx.clone();
+        async move {
+            let event = request.input["event"].as_str().unwrap().to_owned();
+            if event == "panic" {
+                if let Some(started_tx) = started_tx.lock().unwrap().take() {
+                    let _ = started_tx.send(());
+                }
+                if let Some(release) = release_rx.lock().await.take() {
+                    let _ = release.await;
+                }
+                panic!("synthetic run failure");
+            }
+            runs_tx.send(event).unwrap();
+        }
+    };
+    let subscriber = FlowTriggerSubscriber::with_runner(test_config(&tmp), 1, runner);
+    let ctx = crate::core::runtime::DispatchCtx::host_default();
+
+    subscriber
+        .dispatch_test_app_event(&ctx, "f1", json!({"event": "panic"}))
+        .await;
+    started_rx.await.unwrap();
+    subscriber
+        .dispatch_test_app_event(&ctx, "f1", json!({"event": "survived"}))
+        .await;
+    release_tx.send(()).unwrap();
+    assert_eq!(
+        tokio::time::timeout(std::time::Duration::from_secs(2), runs_rx.recv())
+            .await
+            .expect("worker exited after a run panic")
+            .unwrap(),
+        "survived"
+    );
+}
+
+#[tokio::test]
 async fn arrival_racing_worker_retirement_is_retried_on_a_fresh_queue() {
     use std::sync::Mutex;
     use tokio::sync::{mpsc, oneshot};
@@ -420,19 +471,17 @@ async fn arrival_racing_worker_retirement_is_retried_on_a_fresh_queue() {
 
     // The worker notified just before it queued on the held admission gate.
     // Tokio's mutex is FIFO, so its retirement request is ahead of this send.
-    let retry_subscriber = Arc::clone(&subscriber);
-    let retry_ctx = ctx.clone();
-    let arrival = tokio::spawn(async move {
-        retry_subscriber
-            .dispatch_test_app_event(&retry_ctx, "f1", json!({"event": "after-retirement"}))
-            .await;
-    });
-    tokio::task::yield_now().await;
+    let arrival =
+        subscriber.dispatch_test_app_event(&ctx, "f1", json!({"event": "after-retirement"}));
+    tokio::pin!(arrival);
+    assert!(
+        futures::poll!(arrival.as_mut()).is_pending(),
+        "the arrival must have cloned the retiring queue and be waiting on its admission gate"
+    );
     drop(admission);
     tokio::time::timeout(std::time::Duration::from_secs(2), arrival)
         .await
-        .expect("the arrival stayed attached to a retired queue")
-        .unwrap();
+        .expect("the arrival stayed attached to a retired queue");
     assert_eq!(
         tokio::time::timeout(std::time::Duration::from_secs(2), runs_rx.recv())
             .await
