@@ -57,7 +57,7 @@
   },
   {
     "rule": "ambient-config",
-    "path": "crates/openhuman-core/src/agent/session_host/turn/tools.rs",
+    "path": "crates/openhuman-core/src/integrations/prelude_integrations.rs",
     "line": 30,
     "text": "None => match crate::config::Config::load_or_init().await {",
     "occurrence": 1

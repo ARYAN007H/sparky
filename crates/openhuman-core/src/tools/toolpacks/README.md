@@ -141,7 +141,7 @@ listing offers the hand-off beside the raw registry tools.
   exist; [`mod.rs`](./mod.rs) calls `scope_use_skill_spec` so the advertised `use_skill`
   spec lists only packs this session can call something in, and drops the
   spec entirely when that is none.
-- `agent/session_host/turn/tools.rs`: rebinds the synthesized registry
+- `integrations/prelude_integrations.rs`: rebinds the synthesized registry
   after every delegation refresh and re-strips packed names;
   `agent/session_host/runtime/accessors.rs` re-strips after
   materializing the visible set.
