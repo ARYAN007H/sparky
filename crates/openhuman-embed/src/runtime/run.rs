@@ -20,7 +20,6 @@
 
 use std::sync::Arc;
 
-use openhuman_core::backend::BackendTransport;
 use openhuman_core::core::server_launcher::HostBoot;
 use tinyagents_session::port::SessionStoreProvider;
 
@@ -124,7 +123,6 @@ impl RuntimeBuilder {
         seams.storage = storage.clone();
         self.seams.storage = storage;
         let globals = CliGlobals {
-            transport: self.backend_transport.clone(),
             memory_engine: self.memory_engine.clone(),
             session_store: self.session_store.clone(),
             seams,
@@ -147,10 +145,6 @@ impl CliGlobals {
     fn install(
         mut self,
     ) -> Result<Option<Arc<dyn openhuman_core::storage::StorageBackend>>, String> {
-        if let Some(transport) = self.transport {
-            openhuman_core::backend::install_backend_transport(transport);
-            log::debug!("[embed][cli] backend transport installed (process global)");
-        }
         if let Some(engine) = self.memory_engine {
             openhuman_core::memory::engine::install_host_engine(engine);
         }

@@ -106,20 +106,6 @@ pub mod core {
     }
 }
 
-/// tinyhumans (backend transport, hosted client, team ops) and rpc (`/health`).
-pub mod backend {
-    pub use openhuman_core::backend::{
-        base_url, flatten_authed_error, BackendApiError, BackendClient,
-    };
-
-    pub mod transport {
-        pub use openhuman_core::backend::transport::{
-            clear_backend_transport, resolve_backend_transport, BackendTransport,
-            BackendTransportError, TransportProfile,
-        };
-    }
-}
-
 /// tinyhumans (every hosted controller loads its config) and rpc (server).
 pub mod config {
     pub use openhuman_core::config::{
