@@ -11,6 +11,7 @@ use super::types::{
     ComposioTriggerEvent, ComposioTriggerHistoryEntry, ComposioTriggerHistoryResult,
 };
 use crate::config::Config;
+use crate::core::runtime::DispatchCtx;
 use tinybus::module::ModuleClient;
 use tinyconnectors_bus::names::methods;
 
