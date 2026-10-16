@@ -744,7 +744,7 @@ mod agent_parts;
 
 #[path = "context_overlay.rs"]
 mod overlay;
-pub use overlay::ContextOverlay;
+pub use overlay::{AutonomyTierSource, ContextOverlay};
 
 #[cfg(test)]
 #[path = "context_test_support.rs"]
