@@ -8,7 +8,7 @@ struct RecordingSource(Mutex<Vec<QueryRequest>>);
 
 #[async_trait]
 impl QuerySource for RecordingSource {
-    async fn query(&self, request: QueryRequest) -> Result<QueryResponse, String> {
+    async fn query(&self, _: &DispatchCtx, request: QueryRequest) -> Result<QueryResponse, String> {
         self.0.lock().unwrap().push(request);
         Ok(Ok(ReplOutput::Text {
             text: "needle in the middle".into(),
@@ -19,7 +19,7 @@ impl QuerySource for RecordingSource {
 struct FailingSource;
 #[async_trait]
 impl QuerySource for FailingSource {
-    async fn query(&self, _: QueryRequest) -> Result<QueryResponse, String> {
+    async fn query(&self, _: &DispatchCtx, _: QueryRequest) -> Result<QueryResponse, String> {
         Err("module unavailable".into())
     }
 }

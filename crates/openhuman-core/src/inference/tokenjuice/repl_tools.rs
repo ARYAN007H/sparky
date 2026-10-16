@@ -273,7 +273,8 @@ impl ModuleReplTool {
                 limits: self.limits,
                 context_token: None,
                 scope: None,
-            })
+                },
+            )
             .await;
         Ok(match response {
             Ok(Ok(output)) => ToolResult::json(serde_json::to_value(output)?),
@@ -293,7 +294,12 @@ impl ModuleReplTool {
     }
 
     /// The handle slot held a path: query the persisted artifact it names.
-    async fn execute_on_artifact(&self, path: String, args: Value) -> anyhow::Result<ToolResult> {
+    async fn execute_on_artifact(
+        &self,
+        ctx: &DispatchCtx,
+        path: String,
+        args: Value,
+    ) -> anyhow::Result<ToolResult> {
         let Some(dir) = self.artifacts_dir.clone() else {
             log::debug!(
                 "[tokenjuice][repl] {} artifact path with no workspace",
@@ -301,7 +307,7 @@ impl ModuleReplTool {
             );
             return Ok(ToolResult::error(not_a_handle_message()));
         };
-        let read = crate::core::runtime::DispatchCtx::ambient().spawn_blocking(move || {
+        let read = ctx.spawn_blocking(move || {
             read_tool_result_artifact(&dir, &path, MAX_ARTIFACT_BYTES)
         })
         .await
@@ -338,18 +344,30 @@ impl Tool for ModuleReplTool {
     }
 
     async fn execute(&self, args: Value) -> anyhow::Result<ToolResult> {
+        self.execute_with_context(args, ToolCallOptions::default(), None)
+            .await
+    }
+
+    async fn execute_with_context(
+        &self,
+        args: Value,
+        _options: ToolCallOptions,
+        tool_context: Option<&dyn ToolRunContext>,
+    ) -> anyhow::Result<ToolResult> {
+        let ctx =
+            crate::agent::tinyagents::host::run_context::dispatch_ctx_for_tool(tool_context);
         let Some(raw) = args.get("handle").and_then(Value::as_str) else {
             return Ok(ToolResult::error("missing required argument: handle"));
         };
         let handle = match handle::classify(raw) {
             handle::HandleArg::Handle(handle) => handle,
-            handle::HandleArg::Path(path) => return self.execute_on_artifact(path, args).await,
+            handle::HandleArg::Path(path) => return self.execute_on_artifact(&ctx, path, args).await,
             handle::HandleArg::Invalid => {
                 log::debug!("[tokenjuice][repl] {} rejected a non-handle", self.name);
                 return Ok(ToolResult::error(not_a_handle_message()));
             }
         };
-        self.run_query(QueryTarget::Handle { token: handle }, args)
+        self.run_query(&ctx, QueryTarget::Handle { token: handle }, args)
             .await
     }
 
