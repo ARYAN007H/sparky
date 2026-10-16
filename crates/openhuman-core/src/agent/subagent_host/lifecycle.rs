@@ -675,12 +675,14 @@ impl SubagentExecutor<crate::agent::tinyagents::host::OpenHumanRunContext> for O
             .ok_or_else(|| {
                 SubagentError::Execution("OpenHuman subagent plan was consumed".into())
             })?;
+        eprintln!("7950 bridge: plan removed, task={}", task_key.task_id);
         // Both carriers observe one token.  The generic driver installs this
         // token on the prepared RunContext; the host graph polls the copy in
         // its explicit OpenHuman carrier.
         options.run_context = execution.prepared.run_context.data.clone();
         options.run_context.cancellation = execution.cancellation.clone();
         options.message_run_queue = execution.prepared.run_context.run_queue.clone();
+        eprintln!("7950 bridge: before direct, input_size={}", execution.prepared.input.last().map(Message::text).unwrap_or_default().len());
         match Box::pin(super::ops::run_subagent_direct(
             &definition,
             &execution
@@ -694,6 +696,7 @@ impl SubagentExecutor<crate::agent::tinyagents::host::OpenHumanRunContext> for O
         .await
         {
             Ok(outcome) => {
+                eprintln!("7950 bridge: direct returned");
                 self.host_outcome
                     .lock()
                     .unwrap_or_else(|p| p.into_inner())
