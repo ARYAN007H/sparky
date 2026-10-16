@@ -52,7 +52,7 @@ test("Linux container workflows stage TinyBus fixtures under the root-owned cont
     const source = readFileSync(new URL(workflow, import.meta.url), "utf8");
     assert.match(
       source,
-      /\/root\/\.cache\/openhuman-test-modules-\$\{GITHUB_RUN_ID\}-\$\{GITHUB_RUN_ATTEMPT\}/,
+      /\/root\/openhuman-test-modules-\$\{GITHUB_RUN_ID\}-\$\{GITHUB_RUN_ATTEMPT\}/,
       workflow,
     );
     assert.doesNotMatch(source, /\/opt\/openhuman-test-modules/, workflow);
