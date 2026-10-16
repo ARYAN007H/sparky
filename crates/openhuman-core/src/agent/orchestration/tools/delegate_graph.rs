@@ -90,6 +90,10 @@ impl DelegateGraphTool {
     }
 }
 
+#[cfg(test)]
+#[path = "delegate_graph_tests.rs"]
+mod tests;
+
 #[async_trait]
 impl Tool for DelegateGraphTool {
     fn name(&self) -> &str {
