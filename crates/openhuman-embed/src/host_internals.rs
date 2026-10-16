@@ -225,13 +225,6 @@ pub mod inference {
     }
 }
 
-/// tinyhumans: the team ops budget gate.
-pub mod integrations {
-    pub mod client {
-        pub use openhuman_core::integrations::client::budget_gate;
-    }
-}
-
 /// tinyhumans (credentials for the hosted client) and rpc (server auth,
 /// Socket.IO approvals, bind policy).
 pub mod security {
@@ -338,6 +331,29 @@ pub mod composio {
     pub use openhuman_core::integrations::composio::client::{
         register_composio_route_builder, unregister_composio_route_builder, ComposioRoute,
         ComposioRouteBuilder,
+    };
+    // The proxy route's target (origin + bearer) for `composio.mode = backend`.
+    pub use openhuman_core::modules::connectors::{
+        register_proxy_target, unregister_proxy_target, ProxyTarget, ProxyTargetResolver,
+    };
+}
+
+/// Media-generation tool building over host-supplied generators (tinyhumans).
+#[cfg(feature = "media")]
+pub mod media {
+    pub mod generation {
+        pub use openhuman_core::media::generation::{
+            media_tools_for_config, GeneratorRouter, MediaGenerators, MediaReferenceAllowlist,
+        };
+    }
+}
+
+/// The wallet module's authenticated backend hook (tinyhumans web3).
+#[cfg(feature = "web3")]
+pub mod wallet_backend {
+    pub use openhuman_core::modules::wallet_backend::{
+        register_wallet_backend, register_wallet_backend_in, unregister_wallet_backend,
+        WalletBackendCall, WalletBackendFuture, WalletBackendHandler,
     };
 }
 
