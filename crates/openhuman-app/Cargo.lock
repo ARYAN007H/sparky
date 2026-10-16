@@ -3768,7 +3768,7 @@ dependencies = [
 
 [[package]]
 name = "openhuman"
-version = "0.64.16"
+version = "0.64.18"
 dependencies = [
  "aes-gcm",
  "aho-corasick",
@@ -3813,6 +3813,7 @@ dependencies = [
  "tar",
  "tempfile",
  "thiserror 2.0.20",
+ "tiny-artifacts",
  "tinyagents-definition",
  "tinyagents-graph",
  "tinyagents-harness",
@@ -3882,7 +3883,7 @@ dependencies = [
 
 [[package]]
 name = "openhuman-app"
-version = "0.64.16"
+version = "0.64.18"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3926,7 +3927,7 @@ dependencies = [
 
 [[package]]
 name = "openhuman-embed"
-version = "0.64.16"
+version = "0.64.18"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3960,7 +3961,7 @@ dependencies = [
 
 [[package]]
 name = "openhuman-rpc"
-version = "0.64.16"
+version = "0.64.18"
 dependencies = [
  "anyhow",
  "axum",
@@ -3993,7 +3994,7 @@ dependencies = [
 
 [[package]]
 name = "openhuman-tinyhumans"
-version = "0.64.16"
+version = "0.64.18"
 dependencies = [
  "aes-gcm",
  "anyhow",
@@ -4009,6 +4010,7 @@ dependencies = [
  "serde_json",
  "sha2 0.10.9",
  "thiserror 2.0.20",
+ "tiny-artifacts",
  "tinyagents-live",
  "tinychannels-bus",
  "tinyhumans-sdk",
@@ -6534,6 +6536,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "tiny-artifacts"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.20",
+ "tinytools",
+ "tokio",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
 name = "tiny-keccak"
 version = "2.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7189,7 +7206,7 @@ dependencies = [
  "log",
  "serde",
  "serde_json",
- "sha2 0.10.9",
+ "sha2 0.11.0",
  "thiserror 2.0.20",
  "tinymemory-api",
 ]

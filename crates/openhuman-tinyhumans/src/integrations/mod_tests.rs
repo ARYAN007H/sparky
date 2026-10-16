@@ -66,6 +66,11 @@ fn register_plugs_every_hosted_integration_into_the_core_registries() {
     #[cfg(feature = "web3")]
     assert!(openhuman_embed::__host::wallet_backend::unregister_wallet_backend(web3::HANDLER_ID));
     assert!(unregister_composio_route_builder(COMPOSIO_MODE_BACKEND));
+    assert!(
+        openhuman_embed::__host::artifact_publisher::unregister_artifact_publisher(
+            ARTIFACT_PUBLISHER_ID
+        )
+    );
     #[cfg(feature = "modules")]
     assert!(openhuman_embed::__host::composio::unregister_proxy_target(
         COMPOSIO_MODE_BACKEND

@@ -297,6 +297,17 @@ pub mod tool_sources {
     };
 }
 
+/// The artifact publisher slot: the service that shares an artifact version.
+pub mod artifact_publisher {
+    pub use openhuman_core::agent::artifacts::{
+        register_artifact_publisher, register_artifact_publisher_in, unregister_artifact_publisher,
+        ArtifactPublisherFactory,
+    };
+    // tinyhumans file-storage publisher: the protected-path guard it re-checks
+    // before upload, and the store its tests save artifacts into.
+    pub use openhuman_core::agent::artifacts::tiny_store::{refused_path, versioned_store};
+}
+
 /// Egress disclosure, for hosted calls that leave the machine.
 pub mod egress {
     pub use openhuman_core::security::egress::{
