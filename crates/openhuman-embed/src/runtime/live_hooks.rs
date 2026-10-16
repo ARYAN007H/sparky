@@ -5,13 +5,6 @@ use crate::seams::{
 };
 use std::sync::Arc;
 
-pub(super) struct NamedLearningSink(pub String, pub Arc<dyn LearningSink>);
-#[async_trait::async_trait]
-impl LearningSink for NamedLearningSink {
-    async fn on_turn_complete(&self, context: &TurnSummary) -> anyhow::Result<()> {
-        self.1.on_turn_complete(context).await
-    }
-}
 pub(super) struct NamedToolHook(pub String, pub Arc<dyn ToolHook<OpenHumanRunContext>>);
 #[async_trait::async_trait]
 impl ToolHook<OpenHumanRunContext> for NamedToolHook {
