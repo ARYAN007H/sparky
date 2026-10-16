@@ -2,7 +2,7 @@
 //!
 //! OpenHuman already had *hooks* in the sense of in-process Rust callbacks an
 //! embedding host installs ([`crate::agent::hooks`],
-//! [`crate::agent::stop_hooks`]). Those require compiling against
+//! upstream `tinyagents-hooks` contracts. Those require compiling against
 //! the core, which makes them the wrong tool for the thing people actually want
 //! hooks for: a small script, checked into a repository, that blocks `rm -rf`,
 //! runs the formatter after an edit, or writes an audit line per tool call.

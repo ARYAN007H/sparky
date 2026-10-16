@@ -278,9 +278,9 @@ Turn execution:
 | [`turn_env.rs`](./turn_env.rs) | `HostTurnEnv`: the explicit per-turn host values (budget, depth, cancellation, deadline, hooks, tool-belt authority) an entry point hands the session |
 | [`progress_tracing.rs`](./progress_tracing.rs), `progress_tracing/` | OpenTelemetry/Langfuse-style spans built from the progress stream ([README](progress_tracing/README.md)) |
 | `turn_origin.rs` | `AgentTurnOrigin` task-local, the trust and routing label the approval gate reads |
-| [`stop_hooks.rs`](./stop_hooks.rs) | `StopHook` mid-turn halts and the `tool_call_limit` budget |
+| [`tinyagents/turn_policy.rs`](./tinyagents/turn_policy.rs) | The OpenHuman `tool_call_limit` turn budget |
 | [`tool_policy.rs`](./tool_policy.rs) | `ToolPolicy`, the pre-execution allow/deny hook installed through the builder |
-| [`hooks.rs`](./hooks.rs) | `PostTurnHook` background hooks, including ones registered by embedders |
+| [`hooks.rs`](./hooks.rs) | Process-wide embedder hook registries and the `OpenHumanRunContext` identity implementation for upstream hook contracts |
 | [`queued_turn.rs`](./queued_turn.rs) | `QueuedTurn`, the payload for a message sent while a turn is running |
 | [`cost.rs`](./cost.rs) | Per-turn token and cost accounting (`TurnCost`) |
 | [`message_convert.rs`](./message_convert.rs), [`messages.rs`](./messages.rs) | Conversions between `TranscriptMessage` rows and TinyAgents `Message`s; the `history_wire` adapter for host-owned files |
