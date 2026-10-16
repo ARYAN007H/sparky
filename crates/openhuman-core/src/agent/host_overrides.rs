@@ -8,6 +8,7 @@ use std::collections::BTreeMap;
 use std::sync::{Arc, RwLock};
 
 use crate::agent::hooks::{PostTurnHook, ToolHook};
+use crate::agent::tinyagents::host::OpenHumanRunContext;
 use tinyinference_llm::model::ChatModel;
 
 /// Runtime or agent host adapters, shared by every context derived from it.
@@ -20,7 +21,7 @@ pub struct HostOverrides {
     /// Approval registration barrier owned by this agent instance.
     pub approval_scope: Option<Arc<crate::security::approval::ApprovalScope>>,
     post_turn_hooks: RwLock<BTreeMap<String, Arc<dyn PostTurnHook>>>,
-    tool_hooks: RwLock<BTreeMap<String, Arc<dyn ToolHook>>>,
+    tool_hooks: RwLock<BTreeMap<String, Arc<dyn ToolHook<OpenHumanRunContext>>>>,
     /// Native inference used by this agent instead of config-routed inference.
     pub model: Option<Arc<dyn ChatModel<()>>>,
     /// Role-specific native models; absent roles use `model` or config routing.
@@ -84,7 +85,7 @@ impl HostOverrides {
     }
 
     /// Add or replace an agent-local tool hook by name; `None` removes it.
-    pub fn tool_hook(&self, name: &str, hook: Option<Arc<dyn ToolHook>>) {
+    pub fn tool_hook(&self, name: &str, hook: Option<Arc<dyn ToolHook<OpenHumanRunContext>>>) {
         let mut hooks = self
             .tool_hooks
             .write()
@@ -113,7 +114,7 @@ impl HostOverrides {
     }
 
     /// Snapshot the agent-local tool hooks for a new turn.
-    pub fn tool_hooks(&self) -> Vec<Arc<dyn ToolHook>> {
+    pub fn tool_hooks(&self) -> Vec<Arc<dyn ToolHook<OpenHumanRunContext>>> {
         let mut hooks = self
             .parent
             .as_ref()
