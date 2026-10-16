@@ -140,7 +140,9 @@ pub(crate) async fn start_selected_services(
         spawn_flows_boot_reconcile();
     }
     if services.channels {
-        if let Some(handle) = spawn_channels_service() {
+        if let Some(handle) = spawn_channels_service(&crate::core::runtime::DispatchCtx::new(
+            std::sync::Arc::clone(ctx),
+        )) {
             tasks.track("channels", handle);
         }
     }
@@ -295,7 +297,9 @@ pub fn spawn_cron_service(
 /// messages are never polled. Skipped entirely when
 /// `OPENHUMAN_DISABLE_CHANNEL_LISTENERS` is set to `1`/`true`, and returns early
 /// when no channel integrations are configured.
-pub fn spawn_channels_service() -> Option<tokio::task::JoinHandle<()>> {
+pub fn spawn_channels_service(
+    dispatch: &crate::core::runtime::DispatchCtx,
+) -> Option<tokio::task::JoinHandle<()>> {
     // Compile-time `channels` gate: the body names `channels::start_channels`,
     // so the whole thing is `#[cfg]`-gated. With the feature off there are no
     // realtime listeners to spawn.
@@ -309,6 +313,7 @@ pub fn spawn_channels_service() -> Option<tokio::task::JoinHandle<()>> {
         // invalidate a listener that has not finished starting yet.
         return Some(
             crate::channels::session::spawn_current_channel_service_with(
+                dispatch,
                 |channel_session| async move {
                     let config = match crate::config::Config::load_or_init().await {
                         Ok(c) => c,
@@ -333,7 +338,12 @@ pub fn spawn_channels_service() -> Option<tokio::task::JoinHandle<()>> {
         log::info!("[channels] OPENHUMAN_DISABLE_CHANNEL_LISTENERS set — skipping start_channels");
     }
     #[cfg(not(feature = "channels"))]
-    log::debug!("[channels] channels feature disabled at compile time — not spawning listeners");
+    {
+        let _ = dispatch;
+        log::debug!(
+            "[channels] channels feature disabled at compile time — not spawning listeners"
+        );
+    }
     None
 }
 

@@ -442,7 +442,11 @@ async fn a_desktop_upgrade_is_lossless_and_leaves_the_legacy_files_untouched(cas
     };
 
     // First boot: every host importer runs and none is left without a source.
-    let reports = import::run(&config).await;
+    let reports = import::run(
+        &openhuman_core::core::runtime::DispatchCtx::process_default(),
+        &config,
+    )
+    .await;
     assert!(!reports.is_empty());
     for report in &reports {
         match report.outcome.as_ref().unwrap_or_else(|error| {
@@ -542,7 +546,11 @@ async fn a_desktop_upgrade_is_lossless_and_leaves_the_legacy_files_untouched(cas
     let _ = fixture.ccr_originals;
 
     // Second boot: nothing runs again, so nothing deleted comes back.
-    let again = import::run(&config).await;
+    let again = import::run(
+        &openhuman_core::core::runtime::DispatchCtx::process_default(),
+        &config,
+    )
+    .await;
     assert_eq!(again.len(), reports.len());
     for report in &again {
         assert_eq!(
