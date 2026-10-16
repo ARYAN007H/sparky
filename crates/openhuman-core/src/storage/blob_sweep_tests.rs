@@ -183,3 +183,26 @@ async fn a_hung_profile_listing_times_out_instead_of_stalling() {
     let ok = bounded_listing(Duration::from_secs(5), async { 7u8 }).await;
     assert_eq!(ok, Some(7));
 }
+
+#[cfg(feature = "modules")]
+#[test]
+fn module_blob_scopes_follow_the_handed_context_and_never_cross_tenants() {
+    use crate::core::runtime::{ContextOverlay, CoreContext, DispatchCtx, DomainSet};
+    let profile = |name: &str| {
+        DispatchCtx::new(
+            CoreContext::for_test(DomainSet::full(), None).derive_with(
+                ContextOverlay::new(
+                    crate::config::Config::default(),
+                    DomainSet::kernel(),
+                    Default::default(),
+                )
+                .profile(name),
+            ),
+        )
+    };
+    let alice = crate::modules::expiring_blob_module_scopes(&profile("blob-alice"));
+    let bob = crate::modules::expiring_blob_module_scopes(&profile("blob-bob"));
+    assert!(!alice.is_empty() && !bob.is_empty());
+    assert!(alice.iter().all(|s| s.as_str().contains("blob-alice")));
+    assert!(bob.iter().all(|s| s.as_str().contains("blob-bob")));
+}
