@@ -14,9 +14,9 @@
 use std::collections::HashMap;
 use std::sync::Mutex;
 
+use crate::core::runtime::Tenant;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
-use crate::core::runtime::Tenant;
 
 use crate::config::Config;
 use crate::core::Outcome;

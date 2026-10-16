@@ -174,7 +174,8 @@ impl RequestPlanReviewTool {
             "[tool][request_plan_review] parking interactive turn for plan review"
         );
 
-        let dispatch_ctx = crate::agent::tinyagents::host::run_context::dispatch_ctx_for_tool(context);
+        let dispatch_ctx =
+            crate::agent::tinyagents::host::run_context::dispatch_ctx_for_tool(context);
         let tenant = dispatch_ctx
             .tenant()
             .map_err(|error| anyhow::anyhow!(error.to_string()))?;

@@ -93,7 +93,8 @@ impl PlanExitTool {
             return Ok(ToolResult::error("`plan` must not be empty"));
         }
         if let Some(thread_id) = context.and_then(ToolRunContext::thread_id) {
-            let dispatch_ctx = crate::agent::tinyagents::host::run_context::dispatch_ctx_for_tool(context);
+            let dispatch_ctx =
+                crate::agent::tinyagents::host::run_context::dispatch_ctx_for_tool(context);
             let tenant = dispatch_ctx.tenant().ok();
             // Only flip to Build when there is no plan review still parked on
             // this thread. A review resolves (approve/reject/revise) before
@@ -108,8 +109,7 @@ impl PlanExitTool {
                 crate::plan_review::gate::global()
                     .parked_review_for_thread(tenant, thread_id)
                     .is_some()
-            })
-            {
+            }) {
                 tracing::warn!(
                     thread_id = %thread_id,
                     "[tool][plan_exit] a plan review is still parked on this thread — not flipping to build"
