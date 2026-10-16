@@ -107,6 +107,7 @@ fn tools_adapter(config: Arc<Config>) -> OpenHumanTools {
         &config.action_dir,
     ));
     OpenHumanTools {
+        ctx: crate::core::runtime::DispatchCtx::ambient(),
         config,
         security,
         approval: Default::default(),
