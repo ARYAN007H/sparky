@@ -28,17 +28,29 @@ mod loader;
 #[path = "fleet_prompt_tests.rs"]
 mod fleet_prompt_tests;
 
+#[path = "critic/prompt.rs"]
 pub mod critic;
+#[path = "image_agent/prompt.rs"]
 pub mod image_agent;
+#[path = "morning_briefing/prompt.rs"]
 pub mod morning_briefing;
+#[path = "orchestrator/prompt.rs"]
 pub mod orchestrator;
+#[path = "planner/prompt.rs"]
 pub mod planner;
+#[path = "presentation_agent/prompt.rs"]
 pub mod presentation_agent;
+#[path = "summarizer/prompt.rs"]
 pub mod summarizer;
+#[path = "task_manager_agent/prompt.rs"]
 pub mod task_manager_agent;
+#[path = "trigger_reactor/prompt.rs"]
 pub mod trigger_reactor;
+#[path = "trigger_triage/prompt.rs"]
 pub mod trigger_triage;
+#[path = "video_agent/prompt.rs"]
 pub mod video_agent;
+#[path = "vision_agent/prompt.rs"]
 pub mod vision_agent;
 
 pub use loader::{BUILTINS, BuiltinAgent, load_builtins};
