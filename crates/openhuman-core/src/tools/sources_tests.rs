@@ -123,7 +123,6 @@ fn anchored_sources_sit_where_the_catalogue_always_listed_them() {
     // its place / market-data tools right after the delegation tool, ahead of
     // the Composio tools; the order is a prompt-cache input.
     let tmp = TempDir::new().unwrap();
-    let baseline = assemble(&tmp);
     let anchor_tools = |names: &[&str]| -> Vec<Box<dyn Tool>> {
         names
             .iter()
@@ -180,6 +179,6 @@ fn anchored_sources_sit_where_the_catalogue_always_listed_them() {
     assert!(pos("image_info") < pos("anchor_fake_delegate"));
     assert!(pos("anchor_fake_delegate") < pos("anchor_fake_end"));
     assert!(pos("anchor_fake_end") < pos("anchor_fake_unknown"));
-    assert_eq!(pos("anchor_fake_unknown"), names.len() - 1);
-    assert_eq!(names.len(), baseline.len() + 5);
+    // Sibling tests register sources on the same process-wide slot, so only
+    // relative positions are asserted, never the total length.
 }
