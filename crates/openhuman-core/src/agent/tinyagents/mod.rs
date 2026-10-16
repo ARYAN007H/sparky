@@ -50,7 +50,6 @@ pub mod payload_summarizer;
 mod policy_denial;
 pub(crate) mod reaper;
 pub(crate) mod reasoning;
-pub(crate) mod replay;
 mod routes;
 mod steering_forwarder;
 pub(crate) mod stop_hooks;

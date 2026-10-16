@@ -54,6 +54,7 @@
 
 pub mod agent;
 pub mod agent_registry;
+pub mod agent_runs;
 pub mod artifacts;
 pub mod backend;
 pub mod channels;
