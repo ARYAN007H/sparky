@@ -141,6 +141,7 @@ pub(crate) struct RecordingEngine {
     /// `"erase"` / `"forget"`, in call order.
     pub(crate) calls: std::sync::Mutex<Vec<&'static str>>,
     erase_unsupported: bool,
+    fail_next_store: std::sync::atomic::AtomicBool,
 }
 
 impl RecordingEngine {
@@ -150,6 +151,7 @@ impl RecordingEngine {
             inner: ReferenceEngine::new(),
             calls: std::sync::Mutex::new(Vec::new()),
             erase_unsupported: false,
+            fail_next_store: std::sync::atomic::AtomicBool::new(false),
         }
     }
 
@@ -169,6 +171,12 @@ impl RecordingEngine {
     /// The recorded calls.
     pub(crate) fn calls(&self) -> Vec<&'static str> {
         self.calls.lock().unwrap().clone()
+    }
+
+    /// Makes the next store fail, then resumes normal behavior.
+    pub(crate) fn fail_next_store(&self) {
+        self.fail_next_store
+            .store(true, std::sync::atomic::Ordering::SeqCst);
     }
 }
 
@@ -200,6 +208,14 @@ impl MemoryEngine for RecordingEngine {
         &self,
         item: tinymemory_api::StoreItem,
     ) -> tinymemory_api::Result<tinymemory_api::StoreReceipt> {
+        if self
+            .fail_next_store
+            .swap(false, std::sync::atomic::Ordering::SeqCst)
+        {
+            return Err(tinymemory_api::Error::Engine(
+                "injected store failure".into(),
+            ));
+        }
         self.inner.store(item).await
     }
 

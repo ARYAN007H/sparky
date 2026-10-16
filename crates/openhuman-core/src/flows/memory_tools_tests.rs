@@ -1,5 +1,6 @@
 use super::*;
 use crate::memory::types::ItemsListParams;
+use crate::memory::test_fixtures::RecordingEngine;
 use tempfile::TempDir;
 use tinymemory_api::conformance::ReferenceEngine;
 
@@ -94,6 +95,29 @@ async fn remember_keyed_replaces_the_previous_value() {
         Some(false),
         "nothing derived from flow state"
     );
+}
+
+#[tokio::test]
+async fn failed_replacement_keeps_the_previous_value() {
+    let tmp = TempDir::new().unwrap();
+    let mut config = Config::default();
+    config.workspace_dir = tmp.path().to_path_buf();
+    let engine = Arc::new(RecordingEngine::new());
+    RecordingEngine::bind(&engine, &config);
+    let old_id = remember_keyed(&config, "f1", "k", "first", LearningKind::Fact)
+        .await
+        .unwrap();
+
+    engine.fail_next_store();
+    let error = remember_keyed(&config, "f1", "k", "second", LearningKind::Fact)
+        .await
+        .unwrap_err();
+
+    assert!(error.to_string().contains("injected store failure"));
+    let items = list(&config, flow_filter("f1")).await;
+    assert_eq!(items.len(), 1);
+    assert_eq!(items[0].id.0, old_id);
+    assert!(items[0].text.contains("first"));
 }
 
 #[tokio::test]
