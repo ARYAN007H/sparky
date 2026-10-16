@@ -49,6 +49,13 @@ if [[ "$*" == *"--test json_rpc_e2e"* ]]; then
   [[ "$*" == *"json_rpc_fixture"* ]] || exit 9
   echo EXECUTED-JSON-RPC
 fi
+if [[ "$*" == *"test -p openhuman --lib"* ]]; then
+  [[ -n "\${XDG_CACHE_HOME:-}" && "$XDG_CACHE_HOME" == "\${XDG_DATA_HOME:-}" && -d "$XDG_CACHE_HOME" ]] || {
+    echo "core tests need a private XDG cache alongside their private XDG data directory" >&2
+    exit 13
+  }
+  echo PRIVATE-XDG-CACHE
+fi
 `,
       { mode: 0o755 },
     );
@@ -69,6 +76,7 @@ fi
 test("hosted JSON-RPC tests are listed and executed with product features", () => {
   const result = runCoreStep("normal");
   assert.equal(result.status, 0, result.stdout + result.stderr);
+  assert.match(result.stdout, /PRIVATE-XDG-CACHE/);
   assert.match(result.stdout, /EXECUTED-JSON-RPC/);
 });
 

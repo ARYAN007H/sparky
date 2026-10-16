@@ -187,10 +187,11 @@ jobs:
           set -euo pipefail
 
           # Container HOME may be a runner-owned bind mount with mode 0755.
-          # TinyBus correctly refuses user module search paths beneath it, so
-          # keep XDG modules in a private, per-job directory instead.
+          # TinyBus refuses module paths beneath it, so point both its search
+          # path and dirs::cache_dir at one private, per-job directory.
           export XDG_DATA_HOME="$(mktemp -d /tmp/openhuman-core-xdg.XXXXXX)"
           chmod 700 "$XDG_DATA_HOME"
+          export XDG_CACHE_HOME="$XDG_DATA_HOME"
 
           integration_test_targets() {
             find tests -maxdepth 1 -type f -name '*.rs' -print |
