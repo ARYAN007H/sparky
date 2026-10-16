@@ -641,14 +641,18 @@ impl WalletHost {
             .load_config()
             .await
             .map_err(callback_error)?;
-        let client =
-            crate::web3::client::CryptoClient::from_config(&config).map_err(callback_error)?;
-        let data = match request {
-            WalletBackendRequest::Routes => client.routes().await,
-            WalletBackendRequest::SwapTransaction { body } => client.swap_tx(&body).await,
-            WalletBackendRequest::BridgeTransaction { body } => client.bridge_tx(&body).await,
-        }
-        .map_err(callback_error)?;
+        let call = match request {
+            WalletBackendRequest::Routes => super::wallet_backend::WalletBackendCall::Routes,
+            WalletBackendRequest::SwapTransaction { body } => {
+                super::wallet_backend::WalletBackendCall::SwapTransaction(body)
+            }
+            WalletBackendRequest::BridgeTransaction { body } => {
+                super::wallet_backend::WalletBackendCall::BridgeTransaction(body)
+            }
+        };
+        let data = super::wallet_backend::call_wallet_backend(config, call)
+            .await
+            .map_err(callback_error)?;
         Ok(HostResponse::WalletBackend(WalletBackendResponse { data }))
     }
 
