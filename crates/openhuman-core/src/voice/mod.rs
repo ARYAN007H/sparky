@@ -70,8 +70,9 @@ pub mod streaming;
 
 #[cfg(feature = "voice")]
 pub use factory::{
-    create_stt_provider, create_tts_provider, effective_stt_provider, effective_tts_provider, ExternalSttProvider, ExternalTtsProvider,
-    SttProvider, SttResult, TtsProvider, DEFAULT_PIPER_VOICE, DEFAULT_STT_MODEL,
+    create_stt_provider, create_tts_provider, effective_stt_provider, effective_tts_provider,
+    ExternalSttProvider, ExternalTtsProvider, SttProvider, SttResult, TtsProvider,
+    DEFAULT_PIPER_VOICE, DEFAULT_STT_MODEL,
 };
 #[cfg(feature = "voice")]
 pub use ops::*;
