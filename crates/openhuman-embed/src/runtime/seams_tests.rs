@@ -26,14 +26,12 @@ impl ToolRanker for NamedRanker {
     }
 }
 
-struct NamedPostTurn(&'static str);
+struct PostTurn(&'static str);
 
 #[async_trait::async_trait]
-impl LearningSink for NamedPostTurn {
-    async fn on_turn_complete(
-        &self,
-        _ctx: &TurnSummary,
-    ) -> Result<(), tinyagents_session::TinyAgentsError> {
+impl LearningSink for PostTurn {
+    async fn on_turn_complete(&self, _ctx: &TurnSummary) -> tinyagents_harness::error::Result<()> {
+        let _ = self.0;
         Ok(())
     }
 }
