@@ -335,10 +335,6 @@ impl OpenHumanSubagentHost {
         continuation: bool,
         checkpoint_dir: PathBuf,
     ) -> Result<SubagentRunOutcome, SubagentRunError> {
-        let failures = Arc::new(Mutex::new(HashMap::<SubagentTaskKey, SubagentRunError>::new()));
-        let host_outcome = Arc::new(Mutex::new(
-            HashMap::<SubagentTaskKey, SubagentRunOutcome>::new(),
-        ));
         let fallback_agent_id = self.definition.id.clone();
         let request = HostRequest {
             definition: self.definition,
@@ -397,10 +393,8 @@ impl OpenHumanSubagentHost {
 /// without routing through `OpenHumanSubagentHost::run` (which would create a
 /// second generic driver).
 pub(crate) struct OpenHumanDriverBundle {
-    pub(crate) driver: Arc<SubagentDriver<
-        crate::agent::tinyagents::host::OpenHumanRunContext,
-        HostRequest,
-    >>,
+    pub(crate) driver:
+        Arc<SubagentDriver<crate::agent::tinyagents::host::OpenHumanRunContext, HostRequest>>,
     pub(crate) failures: Arc<Mutex<HashMap<SubagentTaskKey, SubagentRunError>>>,
     pub(crate) host_outcome: Arc<Mutex<HashMap<SubagentTaskKey, SubagentRunOutcome>>>,
     pub(crate) persistence: Arc<OpenHumanPersistence>,
@@ -1171,7 +1165,7 @@ impl tinyagents_orchestration::subagent::SubagentPersistence for OpenHumanPersis
 
 #[path = "lifecycle_outcome.rs"]
 mod outcome;
-use outcome::{host_outcome_to_neutral, HostInFlightMap};
+use outcome::{HostInFlightMap, host_outcome_to_neutral};
 
 fn outcome_to_host(
     result: SubagentRunResult,
