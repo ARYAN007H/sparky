@@ -3491,7 +3491,7 @@ async fn json_rpc_thread_turn_state_lifecycle() {
     state.lifecycle = tinyagents_session::turn_state::TurnLifecycle::Streaming;
     state.iteration = 2;
     state.streaming_text = "partial".into();
-    openhuman_core::agent::session_store::turn_states_for(&workspace_dir)
+    openhuman_core::storage::sessions::turn_states_for(&workspace_dir)
         .put(&state)
         .expect("seed snapshot");
 
@@ -3550,7 +3550,7 @@ async fn json_rpc_thread_turn_state_lifecycle() {
     );
     state2.lifecycle = tinyagents_session::turn_state::TurnLifecycle::Completed;
     state2.updated_at = "2999-01-01T00:00:00Z".into();
-    openhuman_core::agent::session_store::turn_states_for(&workspace_dir)
+    openhuman_core::storage::sessions::turn_states_for(&workspace_dir)
         .put(&state2)
         .expect("seed snapshot 2");
 
@@ -3670,7 +3670,7 @@ async fn json_rpc_run_ledger_lifecycle() {
         .await
         .expect("load config");
 
-    openhuman_core::agent::session_store::with_ledger(&config.workspace_dir, |ledger| {
+    openhuman_core::storage::sessions::with_ledger(&config.workspace_dir, |ledger| {
         let ledger_arg_0 = tinyagents_session::run_ledger::AgentRunUpsert {
             id: "sub-run-1".to_string(),
             kind: tinyagents_session::run_ledger::AgentRunKind::WorkerThread,
@@ -3695,7 +3695,7 @@ async fn json_rpc_run_ledger_lifecycle() {
     })
     .expect("seed run");
 
-    openhuman_core::agent::session_store::with_ledger(&config.workspace_dir, |ledger| {
+    openhuman_core::storage::sessions::with_ledger(&config.workspace_dir, |ledger| {
         let ledger_arg_0 = tinyagents_session::run_ledger::RunEventAppend {
             run_id: "sub-run-1".to_string(),
             event_type: "subagent_awaiting_user".to_string(),
@@ -3806,22 +3806,22 @@ async fn json_rpc_agent_work_list_groups_runs_by_bucket() {
         completed_at: None,
     };
     // Two awaiting-user (needs_input), one running (working), one completed.
-    openhuman_core::agent::session_store::with_ledger(&config.workspace_dir, |ledger| {
+    openhuman_core::storage::sessions::with_ledger(&config.workspace_dir, |ledger| {
         let ledger_arg_0 = seed("work-a", AgentRunStatus::AwaitingUser);
         async move { ledger.upsert_agent_run(ledger_arg_0).await }
     })
     .expect("seed a");
-    openhuman_core::agent::session_store::with_ledger(&config.workspace_dir, |ledger| {
+    openhuman_core::storage::sessions::with_ledger(&config.workspace_dir, |ledger| {
         let ledger_arg_0 = seed("work-b", AgentRunStatus::AwaitingUser);
         async move { ledger.upsert_agent_run(ledger_arg_0).await }
     })
     .expect("seed b");
-    openhuman_core::agent::session_store::with_ledger(&config.workspace_dir, |ledger| {
+    openhuman_core::storage::sessions::with_ledger(&config.workspace_dir, |ledger| {
         let ledger_arg_0 = seed("work-c", AgentRunStatus::Running);
         async move { ledger.upsert_agent_run(ledger_arg_0).await }
     })
     .expect("seed c");
-    openhuman_core::agent::session_store::with_ledger(&config.workspace_dir, |ledger| {
+    openhuman_core::storage::sessions::with_ledger(&config.workspace_dir, |ledger| {
         let ledger_arg_0 = seed("work-d", AgentRunStatus::Completed);
         async move { ledger.upsert_agent_run(ledger_arg_0).await }
     })
@@ -3914,7 +3914,7 @@ async fn json_rpc_workflow_run_definitions_and_runs_roundtrip() {
     );
 
     // Seed a durable workflow run, then list + get it.
-    openhuman_core::agent::session_store::with_ledger(&config.workspace_dir, |ledger| {
+    openhuman_core::storage::sessions::with_ledger(&config.workspace_dir, |ledger| {
         let ledger_arg_0 = tinyagents_session::run_ledger::WorkflowRunUpsert {
             id: "wf-run-1".to_string(),
             definition_id: "parallel_research_cross_check".to_string(),
@@ -4113,13 +4113,13 @@ async fn json_rpc_agent_team_coordination_roundtrip() {
 
     // Mark A done directly via the run ledger, then B claims fine.
     let task_a =
-        openhuman_core::agent::session_store::with_ledger(&config.workspace_dir, |ledger| {
+        openhuman_core::storage::sessions::with_ledger(&config.workspace_dir, |ledger| {
             let ledger_arg_0 = (&task_a_id).to_string();
             async move { ledger.get_agent_team_task(&ledger_arg_0).await }
         })
         .expect("get task A")
         .expect("task A present");
-    openhuman_core::agent::session_store::with_ledger(&config.workspace_dir, |ledger| {
+    openhuman_core::storage::sessions::with_ledger(&config.workspace_dir, |ledger| {
         let ledger_arg_0 = tinyagents_session::run_ledger::AgentTeamTaskUpsert {
             id: task_a.id.clone(),
             team_id: task_a.team_id.clone(),
