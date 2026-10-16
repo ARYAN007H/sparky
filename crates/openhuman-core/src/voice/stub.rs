@@ -223,7 +223,12 @@ pub mod live {
         use crate::config::Config;
 
         /// Drop the upgraded socket immediately — live voice is compiled out.
-        pub async fn handle_live_voice_ws(_socket: WebSocket, _config: Arc<Config>) {}
+        pub async fn handle_live_voice_ws(
+            _socket: WebSocket,
+            _ctx: crate::core::runtime::DispatchCtx,
+            _config: Arc<Config>,
+        ) {
+        }
     }
 }
 
