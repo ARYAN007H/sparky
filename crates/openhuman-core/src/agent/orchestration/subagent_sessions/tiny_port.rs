@@ -202,3 +202,7 @@ impl TinySessionStore for OpenHumanTinySubagentSessionStore {
         Ok(true)
     }
 }
+
+#[cfg(test)]
+#[path = "tiny_port_tests.rs"]
+mod tests;
