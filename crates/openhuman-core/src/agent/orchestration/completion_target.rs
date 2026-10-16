@@ -8,8 +8,6 @@ use std::path::Path;
 use std::path::PathBuf;
 
 use super::background_completions::state;
-#[cfg(test)]
-use super::background_completions::{new_router, Entry};
 
 use super::background_completions::{record_awaiting_input, record_completion, record_failure};
 

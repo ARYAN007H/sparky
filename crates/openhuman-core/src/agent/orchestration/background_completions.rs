@@ -46,7 +46,7 @@ use super::completion_target::{awaiting_input_record_id, awaiting_input_record_p
 pub(crate) use super::completion_target::{claim_recovery, forget_recovery};
 #[cfg(test)]
 pub(crate) use super::completion_target::{
-    forget_workspace_for_test, install_store_for_test, tests::TestWorkspace,
+    tests::{forget_workspace_for_test, install_store_for_test, TestWorkspace},
 };
 
 /// How long a settled record (delivered / gave up / tombstoned) is kept before
