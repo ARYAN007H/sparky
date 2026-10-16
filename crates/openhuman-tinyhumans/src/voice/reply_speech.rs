@@ -56,13 +56,12 @@ fn test_seam_enabled() -> bool {
 /// gate. Always compiled (the visibility lets `tests/json_rpc_e2e.rs`
 /// inspect calls), but only written to when the env gate is on.
 pub mod test_seam {
-    use once_cell::sync::Lazy;
     use std::sync::Mutex;
 
     /// FIFO log of every `text` argument that flowed through the test-seam
     /// short-circuit in [`super::synthesize_reply`]. Cleared between tests
     /// with [`clear`].
-    pub static OBSERVED_CALLS: Lazy<Mutex<Vec<String>>> = Lazy::new(|| Mutex::new(Vec::new()));
+    pub static OBSERVED_CALLS: Mutex<Vec<String>> = Mutex::new(Vec::new());
 
     /// Clear the observation log.
     pub fn clear() {
