@@ -33,7 +33,6 @@ pub mod hooks;
 pub mod host_agents;
 pub mod host_overrides;
 pub mod host_runtime;
-pub mod library;
 pub(crate) mod message_convert;
 pub mod messages;
 pub mod multimodal;
@@ -55,7 +54,6 @@ pub mod prompts;
 /// Host-owned payload carried through TinyAgents run queues.
 pub mod queued_turn;
 pub(crate) mod registration;
-pub mod registry;
 mod schemas;
 pub mod session_db;
 /// OpenHuman's composition and policy layer around the neutral TinyAgents
