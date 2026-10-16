@@ -353,7 +353,7 @@ async fn digest_sanitizes_persisted_outputs() {
     assert!(entry.text.contains("n1"));
     assert!(entry.text.contains("\"sent\":3"));
     assert!(!entry.text.contains("synthetic-credential-value"));
-    assert!(entry.text.contains("[REDACTED]"));
+    assert!(entry.text.contains("[REDACTED_SECRET]"));
     assert!(!entry.text.contains(&token_output));
     assert!(entry.text.contains("n2"));
     assert!(entry.text.chars().count() <= DIGEST_MAX_CHARS);
