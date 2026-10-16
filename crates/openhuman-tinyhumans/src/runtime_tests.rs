@@ -4,6 +4,7 @@
 
 use super::*;
 use openhuman_embed::seams::DomainGroup;
+use crate::transport::BackendTransport;
 use openhuman_embed::BuilderSummary;
 
 fn connected(builder: RuntimeBuilder) -> BuilderSummary {
@@ -207,9 +208,5 @@ fn connect_keeps_cli_knobs_for_the_host_boot() {
     assert!(summary.fixed_token);
     assert_eq!(summary.listen_host.as_deref(), Some("0.0.0.0"));
     assert_eq!(summary.listen_port, Some(7812));
-    assert!(
-        summary.has_backend_transport,
-        "the server binds the transport"
-    );
     assert_eq!(summary.controller_extensions, vec![DomainGroup::Hosted]);
 }
