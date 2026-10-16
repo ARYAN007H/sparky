@@ -223,7 +223,7 @@ pub async fn flows_resume(
     // before inserting its row: never let a cancel observe a live-looking row
     // that no registered run owns.
     let (cancel_token, _run_guard) = run_registry::try_register(thread_id)
-        .ok_or_else(|| format!("flow run '{thread_id}' already has an in-flight resume"))?;
+        .ok_or_else(|| format!("flow run '{thread_id}' already has a resume in flight"))?;
     match store::mark_run_resuming(config, thread_id) {
         Ok(true) => {}
         Ok(false) => {
