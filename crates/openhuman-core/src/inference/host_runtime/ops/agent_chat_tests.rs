@@ -71,7 +71,7 @@ fn the_outcome_keeps_its_historical_shape() {
 
 #[test]
 fn explicit_turn_temperature_overrides_the_definition_without_mutating_it() {
-    let mut definition = crate::agent::harness::builtin_definitions::test_main_def();
+    let mut definition = crate::agent::harness::test_support::test_main_def();
     definition.temperature = 0.6;
     let effective = definition_for_turn(&definition, Some(0.9));
     assert_eq!(effective.temperature, 0.9);

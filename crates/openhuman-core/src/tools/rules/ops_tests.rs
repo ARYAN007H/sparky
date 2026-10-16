@@ -9,7 +9,7 @@ use tinytools::ToolRuleSet;
 use tinytools::{Surface, ToolSubject};
 
 fn definition(id: &str) -> AgentDefinition {
-    crate::agent::harness::builtin_definitions::all()
+    crate::agent::registry::agents::load_builtins().expect("built-ins load")
         .into_iter()
         .next()
         .map(|mut def| {
