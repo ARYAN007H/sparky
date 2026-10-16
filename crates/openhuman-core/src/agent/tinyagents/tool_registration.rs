@@ -170,6 +170,126 @@ fn dispatch_selector(tool_sets: Vec<SharedToolSet>) -> DispatchSelector {
     })
 }
 
+fn subagent_control_dispatches(
+    tool_sets: &[SharedToolSet],
+    run_context: &OpenHumanRunContext,
+) -> std::collections::HashMap<String, RegisteredToolDispatch> {
+    use tinyagents_orchestration::subagent::{
+        SubAgentJobAction, SubAgentJobRegistry, SubAgentJobsTool, SubAgentMessageTool,
+    };
+
+    let Some(parent) = run_context.parent.as_ref() else {
+        return std::collections::HashMap::new();
+    };
+    let registry = crate::core::runtime::slot_for::<SubAgentJobRegistry>(&run_context.dispatch_ctx());
+    let jobs = (*registry).clone();
+    let store: Arc<dyn tinyagents_orchestration::subagent::SubagentSessionStore> = Arc::new(
+        crate::agent::orchestration::subagent_sessions::OpenHumanTinySubagentSessionStore::new(
+            parent.workspace_dir.clone(),
+        ),
+    );
+    let owner = format!(
+        "{}:{}",
+        parent.session_id,
+        run_context.thread_id.as_deref().unwrap_or("no-thread")
+    );
+    let parent_session = parent.session_id.clone();
+    let parent_key = parent.session_id.clone();
+    let owner_scope: Arc<dyn Fn(u64) -> String + Send + Sync> =
+        Arc::new(move |_| owner.clone());
+    let parent_scope: Arc<dyn Fn(u64) -> String + Send + Sync> =
+        Arc::new(move |_| parent_key.clone());
+
+    let find_tool = |name: &str| -> Option<Arc<dyn tinytools::Tool>> {
+        shared_tool_adapter(tool_sets.to_vec(), name)
+            .map(|adapter| Arc::new(adapter) as Arc<dyn tinytools::Tool>)
+    };
+    let make_jobs_alias = |name: &str, action: SubAgentJobAction| -> Option<RegisteredToolDispatch> {
+        let adapter = find_tool(name)?;
+        let dispatch = SubAgentJobsTool::new(jobs.clone())
+            .with_tool_name(name)
+            .with_description(adapter.description())
+            .with_parameters(adapter.parameters_schema())
+            .with_fixed_action(action)
+            .with_owner_scope(owner_scope.clone())
+            .with_sessions(store.clone(), parent_scope.clone());
+        Some(Arc::new(dispatch))
+    };
+    let mut dispatches = std::collections::HashMap::new();
+    if let Some(dispatch) = make_jobs_alias("list_subagents", SubAgentJobAction::Query) {
+        dispatches.insert("list_subagents".into(), dispatch);
+    }
+    if let Some(adapter) = find_tool("wait_subagent") {
+        dispatches.insert(
+            "wait_subagent".into(),
+            Arc::new(
+                SubAgentJobsTool::new(jobs.clone())
+                    .with_tool_name("wait_subagent")
+                    .with_description(adapter.description())
+                    .with_parameters(adapter.parameters_schema())
+                    .with_fixed_action(SubAgentJobAction::Await)
+                    .with_identifier_fields("task_id", "subagent_session_id")
+                    .with_await_timeout_field("timeout_secs", 120, 3600)
+                    .with_required_identifier()
+                    .with_owner_scope(owner_scope.clone())
+                    .with_sessions(store.clone(), parent_scope.clone()),
+            ),
+        );
+    }
+    if let Some(adapter) = find_tool("close_subagent") {
+        dispatches.insert(
+            "close_subagent".into(),
+            Arc::new(
+                SubAgentJobsTool::new(jobs.clone())
+                    .with_tool_name("close_subagent")
+                    .with_description(adapter.description())
+                    .with_parameters(adapter.parameters_schema())
+                    .with_fixed_action(SubAgentJobAction::Close)
+                    .with_identifier_field("subagent_session_id")
+                    .with_required_identifier()
+                    .with_owner_scope(owner_scope.clone())
+                    .with_sessions(store.clone(), parent_scope.clone()),
+            ),
+        );
+    }
+    if let Some(adapter) = find_tool("steer_subagent") {
+        dispatches.insert(
+            "steer_subagent".into(),
+            Arc::new(
+                SubAgentMessageTool::new(jobs)
+                    .with_tool_name("steer_subagent")
+                    .with_description(adapter.description())
+                    .with_parameters(adapter.parameters_schema())
+                    .with_argument_fields(
+                        "task_id",
+                        "subagent_session_id",
+                        "message",
+                        "__request_id",
+                    )
+                    .with_lane_field("mode")
+                    .with_owner_scope(owner_scope)
+                    .with_sessions(store, parent_scope),
+            ),
+        );
+    }
+    let _ = parent_session;
+    dispatches
+}
+
+fn turn_dispatch_selector(
+    tool_sets: Vec<SharedToolSet>,
+    run_context: &OpenHumanRunContext,
+) -> DispatchSelector {
+    let aliases = subagent_control_dispatches(&tool_sets, run_context);
+    let fallback = dispatch_selector(tool_sets);
+    Arc::new(move |name, adapter| {
+        aliases
+            .get(name)
+            .cloned()
+            .or_else(|| fallback(name, adapter))
+    })
+}
+
 /// The admission rules for one turn.
 ///
 /// Allowlist semantics are **fail-closed** (issue #4452): `None` admits every
@@ -208,6 +328,21 @@ pub(crate) fn host_tool_set_builder(
         .admission(turn_admission(tool_sets, allowed, has_thread))
         .deferred(session_deferred.iter().cloned())
         .dispatch(dispatch_selector(tool_sets.to_vec()))
+        .exec_scope(Arc::new(TurnOriginScope))
+}
+
+pub(crate) fn host_tool_set_builder_for_turn(
+    tool_sets: &[SharedToolSet],
+    allowed: &Option<HashSet<String>>,
+    has_thread: bool,
+    session_deferred: &HashSet<String>,
+    run_context: &OpenHumanRunContext,
+) -> ToolSetBuilder<(), OpenHumanRunContext> {
+    ToolSetBuilder::new()
+        .sets(tool_sets.iter().cloned())
+        .admission(turn_admission(tool_sets, allowed, has_thread))
+        .deferred(session_deferred.iter().cloned())
+        .dispatch(turn_dispatch_selector(tool_sets.to_vec(), run_context))
         .exec_scope(Arc::new(TurnOriginScope))
 }
 
