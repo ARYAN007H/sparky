@@ -126,7 +126,12 @@ fn prepare(options: &InstallOptions) -> (Option<ControllerExtension>, Option<Arc
         *slot()
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner()) = None;
+        // The hosted client's own transport captured the old headers too.
+        crate::client::reset_shared_transport();
     }
+
+    // Plug every area into the core's generic registries (idempotent).
+    crate::register::register_all(options);
 
     let controllers = options.hosted_controllers.then(crate::hosted::extension);
 

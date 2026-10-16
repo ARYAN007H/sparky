@@ -39,6 +39,15 @@ pub fn shared_transport() -> Result<Arc<SdkBackendTransport>> {
     Ok(transport)
 }
 
+/// Drop the cached [`shared_transport`] so the next use rebuilds it. A
+/// transport captures its attribution headers once, so a product-identity
+/// change (see [`install`](crate::install)) must discard it.
+pub(crate) fn reset_shared_transport() {
+    *shared_slot()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner()) = None;
+}
+
 /// A client for authenticated hosted-backend routes.
 ///
 /// Owns the routes and the error classification; the HTTP round-trip rides a

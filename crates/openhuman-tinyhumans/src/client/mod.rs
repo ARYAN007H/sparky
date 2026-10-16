@@ -23,6 +23,7 @@ pub mod enricher;
 mod error;
 mod integrations_http;
 
+pub(crate) use backend_client::reset_shared_transport;
 pub use backend_client::{shared_transport, BackendClient};
 pub use endpoint::{
     is_managed_endpoint_for_api_key, is_safe_endpoint_for_managed_bearer,
