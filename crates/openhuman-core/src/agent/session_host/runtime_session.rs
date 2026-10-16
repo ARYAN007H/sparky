@@ -73,7 +73,8 @@ struct OpenHumanTurnPrelude {
     config: crate::config::AgentConfig,
     /// Host prompt/utilisation state, shared by the runtime hooks. It is not
     /// generic conversation state and the runtime never persists it.
-    context: Arc<std::sync::Mutex<crate::agent::context::ContextManager>>,
+    prompt_builder: Arc<crate::agent::prompts::SystemPromptBuilder>,
+    context_config: crate::config::ContextConfig,
     tool_policy: Arc<
         dyn tinyagents_harness::middleware::ToolCallPolicy<
             crate::agent::tinyagents::host::OpenHumanRunContext,
@@ -340,10 +341,7 @@ impl OpenHumanTurnPrelude {
             agents_md_global: agents_md.global,
             agents_md_local: agents_md.local,
         };
-        self.context
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .build_system_prompt_tiered(&context)
+        self.prompt_builder.build_tiered(&context)
     }
 
     fn drain_host_events(&self) -> bool {
@@ -593,25 +591,16 @@ impl OpenHumanSessionHost {
         if self.runtime_session.is_some() {
             return Ok(());
         }
-        let (
-            tool_result_budget_bytes,
-            tokenjuice_compaction_enabled,
-            microcompact_keep_recent,
-            autocompact_enabled,
-            compaction,
-        ) = {
-            let context = self
-                .context
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
-            (
-                context.tool_result_budget_bytes(),
-                context.compaction_enabled(),
-                context.microcompact_keep_recent(),
-                context.autocompact_enabled(),
-                context.compaction(),
-            )
+        let context_config = &self.context_config;
+        let tool_result_budget_bytes = context_config.tool_result_budget_bytes;
+        let tokenjuice_compaction_enabled = context_config.compaction_enabled;
+        let microcompact_keep_recent = if context_config.microcompact_enabled {
+            context_config.microcompact_keep_recent
+        } else {
+            0
         };
+        let autocompact_enabled = context_config.enabled && context_config.autocompact_enabled;
+        let compaction = context_config.compaction_settings();
         let artifact_store = super::artifact_wiring::build_artifact_store(
             &self.workspace_dir,
             &self.event_session_id,
@@ -684,7 +673,8 @@ impl OpenHumanSessionHost {
                 .map(crate::agent::tinyagents::config::required_output_from);
             state.prelude = Some(OpenHumanTurnPrelude {
                 config: self.config.clone(),
-                context: self.context.clone(),
+                prompt_builder: self.prompt_builder.clone(),
+                context_config: self.context_config.clone(),
                 tool_policy: self.tool_policy.clone(),
                 tool_dispatcher: self.tool_dispatcher.clone(),
                 workspace_dir: self.workspace_dir.clone(),
