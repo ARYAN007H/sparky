@@ -305,7 +305,30 @@ jobs:
               while IFS= read -r module; do
                 [ -n "${module}" ] || continue
                 echo "[test-reusable] in-process module: ${module}"
-                bash scripts/ci-cancel-aware.sh cargo test -p openhuman-cli --features "${CLI_FEATURES}" --test "${target}" -- "${module}::"
+                if [ "${module}" = "domain_modules_e2e" ]; then
+                  isolated_tests=(
+                    domain_modules_e2e::cron_update_applies_a_partial_patch_without_clobbering_unset_fields
+                    domain_modules_e2e::mcp_audit_list_dispatches_internally_and_stays_out_of_the_schema_dump
+                    domain_modules_e2e::mcp_clients_read_paths_validate_before_reaching_outward
+                    domain_modules_e2e::mcp_tool_description_scan_flags_injection_and_spares_ordinary_prose
+                  )
+                  skip_args=()
+                  for test_name in "${isolated_tests[@]}"; do
+                    skip_args+=(--skip "${test_name}")
+                  done
+                  bash scripts/ci-cancel-aware.sh cargo test -p openhuman-cli \
+                    --features "${CLI_FEATURES}" --test "${target}" -- \
+                    "${module}::" --test-threads=1 "${skip_args[@]}"
+                  for test_name in "${isolated_tests[@]}"; do
+                    echo "[test-reusable] isolated in-process test: ${test_name}"
+                    bash scripts/ci-cancel-aware.sh cargo test -p openhuman-cli \
+                      --features "${CLI_FEATURES}" --test "${target}" \
+                      "${test_name}" -- --exact --test-threads=1
+                  done
+                else
+                  bash scripts/ci-cancel-aware.sh cargo test -p openhuman-cli \
+                    --features "${CLI_FEATURES}" --test "${target}" -- "${module}::"
+                fi
               done < <(in_process_modules)
             elif [ "${target}" = "json_rpc_e2e" ]; then
               # JSON-RPC E2E cases change process-global provider routes and
