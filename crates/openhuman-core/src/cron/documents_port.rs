@@ -216,9 +216,7 @@ impl DocumentsPort {
                 }
                 encode(documents.atomic_batch(ops).await?)
             }
-            _ => Err(StorageError::invalid_input(
-                "unexpected document request",
-            )),
+            _ => Err(StorageError::invalid_input("unexpected document request")),
         }
     }
 }

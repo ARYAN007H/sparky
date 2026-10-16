@@ -21,8 +21,9 @@ use crate::config::Config;
 use anyhow::Result;
 use {
     crate::cron::add_agent_job_with_definition, crate::cron::dedup_named_jobs,
-    crate::cron::list_jobs, crate::cron::remove_job, tinyflows_bus::schedule::types::DeliveryConfig,
-    tinyflows_bus::schedule::types::Schedule, tinyflows_bus::schedule::types::SessionTarget,
+    crate::cron::list_jobs, crate::cron::remove_job,
+    tinyflows_bus::schedule::types::DeliveryConfig, tinyflows_bus::schedule::types::Schedule,
+    tinyflows_bus::schedule::types::SessionTarget,
 };
 
 /// Well-known job names used to detect whether seeding has already run.

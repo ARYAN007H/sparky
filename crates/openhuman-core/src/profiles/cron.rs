@@ -66,22 +66,17 @@ pub async fn sweep(host: &ProfileHost, now: DateTime<Utc>) -> SweepReport {
             continue;
         };
         let scope = DocScope::for_scope(&config, crate::storage::scope_for_profile(id.as_str()));
-        let due: Vec<CronJob> = match store_in::<Vec<CronJob>>(
-            &config,
-            &scope,
-            StoreOperation::Due { now },
-        )
-        .await
-        {
-            Ok(jobs) => jobs
-                .into_iter()
-                .filter(|job| matches!(job.job_type, JobType::Agent))
-                .collect(),
-            Err(error) => {
-                log::warn!("[profiles][cron] profile={id} due jobs unreadable: {error}");
-                continue;
-            }
-        };
+        let due: Vec<CronJob> =
+            match store_in::<Vec<CronJob>>(&config, &scope, StoreOperation::Due { now }).await {
+                Ok(jobs) => jobs
+                    .into_iter()
+                    .filter(|job| matches!(job.job_type, JobType::Agent))
+                    .collect(),
+                Err(error) => {
+                    log::warn!("[profiles][cron] profile={id} due jobs unreadable: {error}");
+                    continue;
+                }
+            };
         if due.is_empty() {
             continue;
         }

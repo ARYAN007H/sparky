@@ -43,7 +43,11 @@ fn contract_names() -> Vec<(&'static str, &'static str, &'static str)> {
         ),
         // The Authoring identity the module registers under; the scheduler is
         // a second object on it (pinned by `the_flows_record_serves_the_schedule_object`).
-        ("tinyflows", tinyflows_bus::BUS_NAME, tinyflows_bus::OBJECT_PATH),
+        (
+            "tinyflows",
+            tinyflows_bus::BUS_NAME,
+            tinyflows_bus::OBJECT_PATH,
+        ),
     ];
     #[cfg(feature = "modules")]
     names.push(("tinybox", tinybox_bus::INTERFACE, tinybox_bus::OBJECT_PATH));

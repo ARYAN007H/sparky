@@ -1,6 +1,6 @@
 use super::*;
-use crate::storage::MemoryStorage;
 use crate::cron::client::testing as cron_store;
+use crate::storage::MemoryStorage;
 
 fn copy_tree(from: &Path, to: &Path) {
     std::fs::create_dir_all(to).unwrap();

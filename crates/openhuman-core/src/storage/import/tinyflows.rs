@@ -233,13 +233,10 @@ pub fn import_cron(
                 let mut filed_as = std::collections::HashMap::new();
                 for job in legacy.jobs {
                     let source_id = job.id.clone();
-                    let imported: ImportedJob = store_in(
-                        &config,
-                        &doc_scope,
-                        StoreOperation::ImportJob { job },
-                    )
-                    .await
-                    .context("import a cron job")?;
+                    let imported: ImportedJob =
+                        store_in(&config, &doc_scope, StoreOperation::ImportJob { job })
+                            .await
+                            .context("import a cron job")?;
                     report.wrote("jobs", imported.written);
                     filed_as.insert(source_id, imported.id);
                 }

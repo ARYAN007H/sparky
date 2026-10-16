@@ -37,13 +37,10 @@ async fn the_port_serves_the_contracts_document_interface_and_reports_capabiliti
 async fn a_second_absent_write_comes_back_as_a_conflict_kind() {
     let (proxy, _) = port().await;
     let absent = serde_json::to_value(tinystoragedrivers::Precondition::Absent).unwrap();
-    let put = json!({"op":"put","collection":"cron_jobs","id":"dup","doc":{"a":1},"precondition":absent});
+    let put =
+        json!({"op":"put","collection":"cron_jobs","id":"dup","doc":{"a":1},"precondition":absent});
     // The collection must exist first; the module declares it, the port relays.
-    let ensured = ask(
-        &proxy,
-        json!({"op":"ensure","spec":{"name":"cron_jobs"}}),
-    )
-    .await;
+    let ensured = ask(&proxy, json!({"op":"ensure","spec":{"name":"cron_jobs"}})).await;
     assert!(ensured.get("error").is_none(), "{ensured}");
     let first = ask(&proxy, put.clone()).await;
     assert!(first.get("error").is_none(), "{first}");
@@ -65,14 +62,21 @@ async fn a_collection_outside_the_schedule_port_is_refused() {
         ]}),
     ] {
         let reply = ask(&proxy, request.clone()).await;
-        assert_eq!(reply["error"]["kind"], "invalid_input", "{request} -> {reply}");
+        assert_eq!(
+            reply["error"]["kind"], "invalid_input",
+            "{request} -> {reply}"
+        );
     }
 }
 
 #[tokio::test]
 async fn an_unknown_operation_is_refused_not_guessed() {
     let (proxy, _) = port().await;
-    let reply = ask(&proxy, json!({"op":"drop_collection","collection":"cron_jobs"})).await;
+    let reply = ask(
+        &proxy,
+        json!({"op":"drop_collection","collection":"cron_jobs"}),
+    )
+    .await;
     assert_eq!(reply["error"]["kind"], "invalid_input", "{reply}");
 }
 

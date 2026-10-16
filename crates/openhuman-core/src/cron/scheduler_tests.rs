@@ -9,7 +9,8 @@ use tinyagents_harness::agent_error::AgentError;
 use tinyflows_bus::schedule::types::JobType;
 use tinyflows_bus::schedule::types::SessionTarget;
 use {
-    crate::cron, tinyflows_bus::schedule::types::ActiveHours, tinyflows_bus::schedule::types::DeliveryConfig,
+    crate::cron, tinyflows_bus::schedule::types::ActiveHours,
+    tinyflows_bus::schedule::types::DeliveryConfig,
 };
 
 async fn test_config(tmp: &TempDir) -> Config {

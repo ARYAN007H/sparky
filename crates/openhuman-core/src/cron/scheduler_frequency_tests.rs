@@ -1,9 +1,9 @@
 use super::*;
 
-use tinyflows_bus::schedule::TooFrequent;
-use tinyflows_bus::schedule::MIN_AGENT_JOB_INTERVAL;
 use tinyflows_bus::schedule::types::JobType;
 use tinyflows_bus::schedule::types::Schedule;
+use tinyflows_bus::schedule::TooFrequent;
+use tinyflows_bus::schedule::MIN_AGENT_JOB_INTERVAL;
 #[tokio::test]
 async fn deliver_if_configured_empty_success_skips_chat_and_alert() {
     let tmp = TempDir::new().unwrap();

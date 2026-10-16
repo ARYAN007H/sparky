@@ -139,9 +139,8 @@ impl Binding {
     /// holds the per-flow in-flight dedupe across ticks.
     #[cfg(feature = "flows")]
     pub(crate) fn flows(&self) -> &crate::flows::bus::FlowTriggerSubscriber {
-        self.flows.get_or_init(|| {
-            crate::flows::bus::FlowTriggerSubscriber::new(Arc::new(self.config()))
-        })
+        self.flows
+            .get_or_init(|| crate::flows::bus::FlowTriggerSubscriber::new(Arc::new(self.config())))
     }
 }
 

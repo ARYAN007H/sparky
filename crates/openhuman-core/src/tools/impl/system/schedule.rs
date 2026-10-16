@@ -325,7 +325,8 @@ impl ScheduleTool {
                     active_hours: None,
                 }
             } else if let Some(delay_str) = delay {
-                let at = Utc::now() + crate::cron::client::parse_human_delay(&self.config, delay_str).await?;
+                let at = Utc::now()
+                    + crate::cron::client::parse_human_delay(&self.config, delay_str).await?;
                 Schedule::At { at }
             } else if let Some(at_str) = run_at {
                 let at: DateTime<Utc> = DateTime::parse_from_rfc3339(at_str)

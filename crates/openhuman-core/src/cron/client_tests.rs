@@ -35,7 +35,9 @@ async fn schedules_are_validated_and_the_agent_floor_applies() {
         .await
         .is_err());
     let past = Schedule::At { at: at(1) };
-    assert!(validate_schedule(&config, &past, at(8), false).await.is_err());
+    assert!(validate_schedule(&config, &past, at(8), false)
+        .await
+        .is_err());
 }
 
 #[tokio::test]
@@ -153,7 +155,9 @@ async fn a_switched_off_component_answers_component_disabled() {
     config.components.tinyflows = false;
     let error = parse_human_delay(&config, "1h").await.unwrap_err();
     assert!(
-        error.to_string().starts_with("COMPONENT_DISABLED:tinyflows"),
+        error
+            .to_string()
+            .starts_with("COMPONENT_DISABLED:tinyflows"),
         "{error}"
     );
 }

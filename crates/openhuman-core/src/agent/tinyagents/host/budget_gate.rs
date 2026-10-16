@@ -67,8 +67,8 @@ use tinyagents_harness::host::budget_gate::{
 use tinyinference_llm::usage::Usage;
 
 use crate::config::{Config, DEFAULT_MODEL};
-use crate::platform::llm_gate;
 use crate::platform::cost;
+use crate::platform::llm_gate;
 use tinyjuice_bus::types::AgentTokenjuiceCompression;
 
 /// OpenHuman's [`BudgetGate`]: scheduler-gate back-pressure, cost-tracker

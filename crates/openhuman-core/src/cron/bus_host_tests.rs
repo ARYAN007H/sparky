@@ -2,7 +2,9 @@
 //! the contract's `ScheduleHost` interface, against the real (linked) module.
 
 use super::*;
-use crate::cron::handlers::{kind_handler, register_kind, JobKindHandler, JobOutcome, JobRunContext};
+use crate::cron::handlers::{
+    kind_handler, register_kind, JobKindHandler, JobOutcome, JobRunContext,
+};
 use async_trait::async_trait;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use tempfile::TempDir;
@@ -37,7 +39,11 @@ async fn host(config: &Config, agent_only: bool) -> (HostRegistration, tinybus::
         .await
         .unwrap()
         .connection()
-        .proxy(&address.destination, &address.object_path, CALLBACK_INTERFACE)
+        .proxy(
+            &address.destination,
+            &address.object_path,
+            CALLBACK_INTERFACE,
+        )
         .expect("the contract's callback interface is the one served");
     (registration, proxy)
 }
@@ -151,7 +157,11 @@ async fn an_agent_only_scheduler_refuses_shell_jobs_before_running_anything() {
         .unwrap();
     assert!(!attempt.success);
     assert!(!attempt.retryable);
-    assert!(attempt.output.contains("only agent cron jobs"), "{}", attempt.output);
+    assert!(
+        attempt.output.contains("only agent cron jobs"),
+        "{}",
+        attempt.output
+    );
     assert_eq!(calls.load(Ordering::SeqCst), 0, "the handler never ran");
     let trigger: Attempt = proxy
         .call(callbacks::SCHEDULE_TRIGGER, ("some-flow", "run-d"))
@@ -192,7 +202,10 @@ async fn deliver_answers_with_the_delivery_status_string() {
         .call(callbacks::DELIVER, (&job, "run-f", &attempt))
         .await
         .unwrap();
-    assert_eq!(status, "not_requested", "delivery mode `none` sends nothing");
+    assert_eq!(
+        status, "not_requested",
+        "delivery mode `none` sends nothing"
+    );
     assert!(DeliveryStatus::parse(&status).is_some());
 }
 

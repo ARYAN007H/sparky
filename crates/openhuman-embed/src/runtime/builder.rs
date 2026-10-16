@@ -100,10 +100,7 @@ pub struct RuntimeBuilder {
     pub(super) memory_engine: Option<Arc<dyn tinymemory_api::MemoryEngine>>,
     pub(super) session_store: Option<Arc<dyn SessionStoreProvider>>,
     pub(super) cron_delivery: Option<Arc<dyn openhuman_core::cron::host_delivery::CronDelivery>>,
-    pub(super) cron_job_handlers: Vec<(
-        crate::cron::JobKind,
-        Arc<dyn crate::cron::JobKindHandler>,
-    )>,
+    pub(super) cron_job_handlers: Vec<(crate::cron::JobKind, Arc<dyn crate::cron::JobKindHandler>)>,
     pub(super) seams: HostSeams,
     pub(super) max_agents: usize,
     pub(super) agent_defaults: super::AgentDefaults,
@@ -297,7 +294,8 @@ impl RuntimeBuilder {
         kind: crate::cron::JobKind,
         handler: Arc<dyn crate::cron::JobKindHandler>,
     ) -> Self {
-        self.cron_job_handlers.retain(|(existing, _)| *existing != kind);
+        self.cron_job_handlers
+            .retain(|(existing, _)| *existing != kind);
         self.cron_job_handlers.push((kind, handler));
         self
     }

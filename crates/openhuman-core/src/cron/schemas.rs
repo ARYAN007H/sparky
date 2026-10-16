@@ -286,7 +286,8 @@ fn handle_add(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture 
         let config = ctx.load_config().await?;
         crate::core::runtime::components::require_config(&config, "tinyflows")?;
 
-        let schedule: tinyflows_bus::schedule::types::Schedule = read_required(&params, "schedule")?;
+        let schedule: tinyflows_bus::schedule::types::Schedule =
+            read_required(&params, "schedule")?;
         let name = params
             .get("name")
             .and_then(|v| v.as_str())

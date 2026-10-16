@@ -84,7 +84,11 @@ fn scheduled_job_capabilities_show_disabled_when_the_tinyflows_component_is_off(
             CapabilityStatus::Disabled,
             "{id}"
         );
-        assert_eq!(apply_components(cap, &off("flows")).status, cap.status, "{id}");
+        assert_eq!(
+            apply_components(cap, &off("flows")).status,
+            cap.status,
+            "{id}"
+        );
     }
 }
 

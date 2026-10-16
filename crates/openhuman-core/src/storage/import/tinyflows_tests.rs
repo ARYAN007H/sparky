@@ -1,4 +1,5 @@
 use super::*;
+use crate::cron::client::testing as cron_store;
 use crate::storage::{MemoryStorage, Scope};
 use serde_json::Value;
 use sha2::Digest;
@@ -6,7 +7,6 @@ use std::collections::BTreeMap;
 use tempfile::TempDir;
 use tinyflows::engine::Checkpointer;
 use tinyflows_drivers::catalog::FlowCatalogDocuments;
-use crate::cron::client::testing as cron_store;
 use tinyflows_drivers::DriverCheckpointer;
 
 fn fixtures() -> PathBuf {

@@ -32,8 +32,13 @@ struct ShellHandler;
 #[async_trait]
 impl JobKindHandler for ShellHandler {
     async fn run(&self, cx: &JobRunContext, job: &CronJob, _run_id: &str) -> JobOutcome {
-        let (success, output) =
-            run_job_command(&cx.dispatch_ctx(), &cx.config(), cx.security().as_ref(), job).await;
+        let (success, output) = run_job_command(
+            &cx.dispatch_ctx(),
+            &cx.config(),
+            cx.security().as_ref(),
+            job,
+        )
+        .await;
         JobOutcome {
             success,
             output,

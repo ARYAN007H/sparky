@@ -14,10 +14,10 @@ use super::failure_classification::{
     is_api_key_unset_failure, is_budget_exhausted_failure, is_insufficient_credits_failure,
     is_local_provider_unreachable_failure, is_session_expired_failure, permanent_halt_message,
 };
-use crate::cron::bus_host::{kind_refusal, Binding};
-use crate::cron::handlers::{kind_handler, JobRunContext};
 use crate::core::bus::BUS;
 use crate::core::events::DomainEvent;
+use crate::cron::bus_host::{kind_refusal, Binding};
+use crate::cron::handlers::{kind_handler, JobRunContext};
 use std::collections::HashMap;
 use std::sync::Mutex;
 use tinyflows_bus::schedule::types::{CronJob, JobType, SessionTarget};
@@ -341,7 +341,10 @@ pub(crate) async fn agent_job_too_frequent(
 /// `agent` rejects them), so a job that trips this predates the rule. It keeps
 /// running (silently skipping runs would turn its schedule into a lie) and
 /// this line is the operator's signal to edit it.
-pub(crate) async fn warn_if_high_frequency_agent_job(config: &crate::config::Config, job: &CronJob) {
+pub(crate) async fn warn_if_high_frequency_agent_job(
+    config: &crate::config::Config,
+    job: &CronJob,
+) {
     if let Some(too_frequent) = agent_job_too_frequent(config, job).await {
         tracing::warn!(
             "Cron agent job '{}' is scheduled more frequently than every 5 minutes: it \

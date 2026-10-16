@@ -58,9 +58,9 @@ use records_docs_wallet::TINYWALLET;
 #[cfg(feature = "modules")]
 use records_extra::TINYBOX;
 use records_extra::TINYCHANNELS;
-use records_flows::TINYFLOWS;
 #[cfg(feature = "hosting")]
 use records_extra::TINYHOSTS;
+use records_flows::TINYFLOWS;
 use records_mcp_connectors::{TINYCONNECTORS, TINYMCP};
 #[cfg(feature = "tinymemes")]
 use records_memes::TINYMEMES;

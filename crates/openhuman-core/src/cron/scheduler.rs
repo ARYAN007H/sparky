@@ -408,7 +408,10 @@ impl JobDispatcher {
         // The documents of the scope this dispatcher acts in: resolved under
         // its context, because the call below is made from a task that may
         // not carry it.
-        let scope = self.binding.within(async { DocScope::current(config) }).await?;
+        let scope = self
+            .binding
+            .within(async { DocScope::current(config) })
+            .await?;
         let storage = StoreConfig {
             backend: StoreBackend::Documents {
                 callback: crate::cron::documents_port::address(&scope).await?,

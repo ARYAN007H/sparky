@@ -54,8 +54,12 @@ async fn a_seeded_system_job_fires_through_the_module_and_records_its_handler() 
         .into_iter()
         .find(|job| system_jobs::system_job_name(job) == Some(BACKGROUND_JOB))
         .expect("the memory background job is seeded");
-    store::force_next_run_for_test(&config, &job.id, chrono::Utc::now() - chrono::Duration::seconds(1))
-        .unwrap();
+    store::force_next_run_for_test(
+        &config,
+        &job.id,
+        chrono::Utc::now() - chrono::Duration::seconds(1),
+    )
+    .unwrap();
 
     let mut dispatcher = dispatcher(&config);
     assert!(dispatcher.tick(&config).await.unwrap() >= 1);
@@ -64,7 +68,10 @@ async fn a_seeded_system_job_fires_through_the_module_and_records_its_handler() 
     assert_eq!(calls.load(Ordering::SeqCst), 1);
     let after = get_job(&config, &job.id).unwrap();
     assert_eq!(after.last_status.as_deref(), Some("ok"));
-    assert!(after.next_run > chrono::Utc::now(), "the recurrence moved on");
+    assert!(
+        after.next_run > chrono::Utc::now(),
+        "the recurrence moved on"
+    );
 }
 
 #[tokio::test]
@@ -104,8 +111,12 @@ async fn a_flow_schedule_row_is_answered_by_the_flow_handler_on_a_tick() {
         },
     )
     .unwrap();
-    store::force_next_run_for_test(&config, &row.id, chrono::Utc::now() - chrono::Duration::seconds(1))
-        .unwrap();
+    store::force_next_run_for_test(
+        &config,
+        &row.id,
+        chrono::Utc::now() - chrono::Duration::seconds(1),
+    )
+    .unwrap();
     let mut dispatcher = dispatcher(&config);
     assert_eq!(dispatcher.tick(&config).await.unwrap(), 1);
     dispatcher.drain().await;

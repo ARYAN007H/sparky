@@ -61,6 +61,4 @@ pub use tinyflows_bus::schedule::types::{
     ActiveHours, CronJob, CronJobPatch, CronRun, DeliveryConfig, DeliveryStatus, JobOrigin,
     JobType, Schedule, SessionTarget,
 };
-pub use tinyflows_bus::schedule::{
-    AgentJobSpec, JobPolicy, TooFrequent, MIN_AGENT_JOB_INTERVAL,
-};
+pub use tinyflows_bus::schedule::{AgentJobSpec, JobPolicy, TooFrequent, MIN_AGENT_JOB_INTERVAL};

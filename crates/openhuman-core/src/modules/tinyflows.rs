@@ -77,14 +77,21 @@ mod imp {
         }
     }
 
-    async fn schedule_proxy(config: &Config, timeout: std::time::Duration) -> Result<Proxy, String> {
+    async fn schedule_proxy(
+        config: &Config,
+        timeout: std::time::Duration,
+    ) -> Result<Proxy, String> {
         ensure(config).await?;
         let runtime = runtime::runtime()
             .await
             .map_err(|error| format!("the module bus is unavailable: {error}"))?;
         runtime
             .connection()
-            .proxy(schedule::BUS_NAME, schedule::OBJECT_PATH, schedule::INTERFACE)
+            .proxy(
+                schedule::BUS_NAME,
+                schedule::OBJECT_PATH,
+                schedule::INTERFACE,
+            )
             .map(|proxy| proxy.with_timeout(timeout))
             .map_err(|error| format!("the tinyflows schedule object is unreachable: {error}"))
     }

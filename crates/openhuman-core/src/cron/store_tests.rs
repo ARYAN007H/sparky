@@ -189,7 +189,11 @@ fn a_patch_over_the_bus_keeps_the_agent_definition_it_does_not_mention() {
     )
     .unwrap();
 
-    assert_eq!(job.agent_id.as_deref(), Some("teeny"), "the definition id is stored");
+    assert_eq!(
+        job.agent_id.as_deref(),
+        Some("teeny"),
+        "the definition id is stored"
+    );
     let renamed = update_job(
         &config,
         &job.id,

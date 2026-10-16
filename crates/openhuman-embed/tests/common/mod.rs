@@ -68,10 +68,10 @@ pub fn link_tinyflows(runtime: &tokio::runtime::Runtime) {
     openhuman_embed::modules::register_linked("tinyflows", tinyflows_module::linked_module);
     let mut config = Config::default();
     config.modules.allow_download = false;
-    config
-        .modules
-        .overrides
-        .push(ModuleOverride::with_source("tinyflows", ModuleSourceMode::Linked));
+    config.modules.overrides.push(ModuleOverride::with_source(
+        "tinyflows",
+        ModuleSourceMode::Linked,
+    ));
     runtime
         .block_on(openhuman_core::modules::ensure_loaded(&config, "tinyflows"))
         .expect("the linked tinyflows module is admitted");

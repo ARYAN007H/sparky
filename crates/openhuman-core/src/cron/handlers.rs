@@ -167,7 +167,10 @@ impl Drop for KindRegistration {
                     registry.kinds.remove(self.kind.as_str());
                 }
             }
-            tracing::debug!(kind = self.kind.as_str(), "[cron:handlers] kind handler restored");
+            tracing::debug!(
+                kind = self.kind.as_str(),
+                "[cron:handlers] kind handler restored"
+            );
         }
     }
 }
@@ -182,9 +185,7 @@ impl std::fmt::Debug for KindRegistration {
 
 /// Register `handler` for jobs of `kind`, replacing the current handler.
 pub fn register_kind(kind: JobType, handler: Arc<dyn JobKindHandler>) -> KindRegistration {
-    let previous = write()
-        .kinds
-        .insert(kind.as_str(), Arc::clone(&handler));
+    let previous = write().kinds.insert(kind.as_str(), Arc::clone(&handler));
     tracing::debug!(
         kind = kind.as_str(),
         replaced = previous.is_some(),
