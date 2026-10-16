@@ -30,7 +30,7 @@
 //! phrases, budget exhaustion) keep matching them.
 
 use crate::backend::url::effective_backend_api_url;
-use crate::transport::{BackendTransport, TransportProfile};
+use crate::transport::TransportProfile;
 use openhuman_embed::__host::config::Config;
 use openhuman_embed::__host::core::observability::{
     contains_transient_transport_phrase, is_transient_http_status_code, API_KEY_REJECTED_PREFIX,
@@ -40,7 +40,6 @@ use openhuman_embed::__host::security::credentials::session_support::{
     resolve_backend_credential, BackendCredential,
 };
 use serde_json::Value;
-use std::sync::Arc;
 use tinyhumans_sdk::{Error as SdkError, TinyHumansClient};
 
 const LOG_PREFIX: &str = "[hosted][client]";
