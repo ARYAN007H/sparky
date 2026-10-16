@@ -11,8 +11,6 @@ pub enum AutonomyTierSource {
     LiveConfig,
     /// Keep the effective tier supplied by an in-memory agent configuration.
     Captured,
-    /// Keep the host-only read-only restriction even if config changes.
-    ReadOnlyCeiling,
 }
 
 /// Per-agent overrides layered onto a booted context by
@@ -55,7 +53,9 @@ pub struct ContextOverlay {
     /// action budget. `None` keeps the parent's.
     pub agent_policy: Option<Arc<crate::security::SecurityPolicy>>,
     /// Source binding for autonomy-tier gates under this context.
-    pub autonomy_tier_source: AutonomyTierSource,
+    pub autonomy_tier_source: Option<AutonomyTierSource>,
+    /// A fixed maximum autonomy level inherited by derived contexts.
+    pub autonomy_tier_ceiling: Option<crate::security::AutonomyLevel>,
     /// Turn the interactive approval gate off for this agent.
     pub approvals_disabled: bool,
     /// The agent's own sub-agent catalogue. `None` keeps the parent's.
@@ -78,7 +78,8 @@ impl ContextOverlay {
             session_agent: None,
             profile: None,
             agent_policy: None,
-            autonomy_tier_source: AutonomyTierSource::LiveConfig,
+            autonomy_tier_source: None,
+            autonomy_tier_ceiling: None,
             approvals_disabled: false,
             definitions: None,
         }
@@ -120,13 +121,13 @@ impl ContextOverlay {
 
     /// Keep autonomy tier bound to this context's effective in-memory config.
     pub fn captured_autonomy_tier(mut self) -> Self {
-        self.autonomy_tier_source = AutonomyTierSource::Captured;
+        self.autonomy_tier_source = Some(AutonomyTierSource::Captured);
         self
     }
 
     /// Keep this context's effective autonomy tier at ReadOnly.
     pub fn read_only_autonomy_ceiling(mut self) -> Self {
-        self.autonomy_tier_source = AutonomyTierSource::ReadOnlyCeiling;
+        self.autonomy_tier_ceiling = Some(crate::security::AutonomyLevel::ReadOnly);
         self
     }
 

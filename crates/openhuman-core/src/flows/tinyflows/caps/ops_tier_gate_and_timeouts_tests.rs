@@ -64,6 +64,54 @@ fn code_node_tier_gate_blocks_readonly_allows_full() {
     );
 }
 
+/// A long-lived code capability must observe a tier downgrade at the same
+/// config path before it reaches code staging or sandbox execution.
+#[tokio::test]
+async fn code_adapter_observes_file_backed_tier_changes_between_calls() {
+    use crate::config::AutonomyConfig;
+    use crate::security::{AutonomyLevel, SecurityPolicy};
+
+    let dir = tempfile::tempdir().unwrap();
+    let mut config = Config::default();
+    config.config_path = dir.path().join("config.toml");
+    config.workspace_dir = dir.path().join("workspace");
+    std::fs::create_dir_all(&config.workspace_dir).unwrap();
+    config.action_dir = dir.path().join("action-is-a-file");
+    std::fs::write(&config.action_dir, "blocks code staging after the tier gate").unwrap();
+    config.autonomy = AutonomyConfig {
+        enabled: true,
+        level: AutonomyLevel::Full,
+        ..AutonomyConfig::default()
+    };
+    config.save().await.unwrap();
+
+    let code = OpenHumanCode {
+        ctx: crate::core::runtime::DispatchCtx::ambient(),
+        security: Arc::new(SecurityPolicy::from_config(
+            &config.autonomy,
+            &config.workspace_dir,
+            &config.action_dir,
+        )),
+        config: Arc::new(config.clone()),
+        approval: Default::default(),
+    };
+
+    // Simulate Settings changing the same persisted config after the run has
+    // already captured Full. No global policy hooks or timing are involved.
+    let mut changed = config;
+    changed.autonomy.level = AutonomyLevel::ReadOnly;
+    changed.save().await.unwrap();
+
+    let err = code
+        .run(tinyflows::caps::CodeLanguage::JavaScript, "return 1;", json!([]))
+        .await
+        .expect_err("the next call must observe the persisted ReadOnly tier");
+    assert!(
+        matches!(err, EngineError::Capability(ref message) if message.contains(POLICY_BLOCKED_MARKER)),
+        "tier downgrade must block before staging or execution; got {err:?}"
+    );
+}
+
 /// End-to-end at the adapter: an `http_request` node under a read-only tier
 /// is refused BEFORE any network egress (the tier gate fires ahead of the
 /// approval gate, credential resolution, and dispatch).

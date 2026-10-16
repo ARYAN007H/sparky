@@ -88,6 +88,8 @@ pub struct CoreContext {
     /// Whether autonomy-tier checks reload config or retain this context's
     /// effective in-memory tier.
     autonomy_tier_source: super::AutonomyTierSource,
+    /// A fixed maximum autonomy level inherited by derived contexts.
+    autonomy_tier_ceiling: Option<crate::security::AutonomyLevel>,
     /// Which tiny dependencies the config switched off (`[components]`). Only
     /// narrows: `domains` and `tool_groups` are already clamped by it, and this
     /// is kept so dispatch can answer `COMPONENT_DISABLED:<name>` for a method
@@ -290,6 +292,7 @@ impl CoreContext {
             domains,
             tool_groups,
             autonomy_tier_source: super::AutonomyTierSource::LiveConfig,
+            autonomy_tier_ceiling: None,
             components,
             embedder_config,
             user_skill_roots: true,
@@ -422,7 +425,13 @@ impl CoreContext {
             workspace_binding: RwLock::new(shared_binding),
             domains,
             tool_groups: overlay.tool_groups,
-            autonomy_tier_source: overlay.autonomy_tier_source,
+            autonomy_tier_source: overlay
+                .autonomy_tier_source
+                .unwrap_or(self.autonomy_tier_source),
+            autonomy_tier_ceiling: stricter_autonomy_ceiling(
+                self.autonomy_tier_ceiling,
+                overlay.autonomy_tier_ceiling,
+            ),
             components: self.components,
             embedder_config: Some(overlay.config),
             user_skill_roots: overlay.user_skill_roots,
@@ -445,6 +454,11 @@ impl CoreContext {
     /// Source binding for autonomy-tier decisions made by long-lived adapters.
     pub fn autonomy_tier_source(&self) -> super::AutonomyTierSource {
         self.autonomy_tier_source
+    }
+
+    /// The fixed autonomy ceiling inherited by this context, if any.
+    pub fn autonomy_tier_ceiling(&self) -> Option<crate::security::AutonomyLevel> {
+        self.autonomy_tier_ceiling
     }
 
     /// The backend transport bound to this context, if the host supplied one.
@@ -586,6 +600,20 @@ impl CoreContext {
     /// same rule as [`DispatchCtx::spawn`](crate::core::runtime::DispatchCtx::spawn).
     pub fn propagate<F: Future>(fut: F) -> impl Future<Output = F::Output> {
         super::spawn::carry(fut)
+    }
+}
+
+fn stricter_autonomy_ceiling(
+    left: Option<crate::security::AutonomyLevel>,
+    right: Option<crate::security::AutonomyLevel>,
+) -> Option<crate::security::AutonomyLevel> {
+    use crate::security::AutonomyLevel::{Full, ReadOnly, Supervised};
+
+    match (left, right) {
+        (None, ceiling) | (ceiling, None) => ceiling,
+        (Some(ReadOnly), _) | (_, Some(ReadOnly)) => Some(ReadOnly),
+        (Some(Supervised), _) | (_, Some(Supervised)) => Some(Supervised),
+        (Some(Full), Some(Full)) => Some(Full),
     }
 }
 
