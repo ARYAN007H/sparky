@@ -115,3 +115,39 @@ async fn parked_review_for_thread_is_none_when_nothing_is_parked() {
     let gate = PlanReviewGate::new(Duration::from_secs(5));
     assert!(gate.parked_review_for_thread("no-such-thread").is_none());
 }
+
+#[tokio::test]
+async fn parked_reviews_are_isolated_by_tenant() {
+    let gate = std::sync::Arc::new(PlanReviewGate::new(Duration::from_secs(5)));
+    let alice = crate::core::runtime::Tenant {
+        profile: Some("review-alice".into()),
+        agent: None,
+    };
+    let bob = crate::core::runtime::Tenant {
+        profile: Some("review-bob".into()),
+        agent: None,
+    };
+    let alice_gate = gate.clone();
+    let alice_tenant = alice.clone();
+    let parked = tokio::spawn(async move {
+        alice_gate
+            .request_review(
+                alice_tenant,
+                Some("same-thread".into()),
+                Some("alice-client".into()),
+                "Alice's plan".into(),
+                vec!["private step".into()],
+                None,
+            )
+            .await
+    });
+    tokio::time::sleep(Duration::from_millis(20)).await;
+
+    let alice_review = gate
+        .parked_review_for_thread(&alice, "same-thread")
+        .expect("Alice's review is available in Alice's scope");
+    assert!(gate.parked_review_for_thread(&bob, "same-thread").is_none());
+    assert!(!gate.decide(&bob, &alice_review.request_id, PlanReviewResolution::Approve));
+    assert!(gate.decide(&alice, &alice_review.request_id, PlanReviewResolution::Approve));
+    assert_eq!(parked.await.unwrap(), PlanReviewResolution::Approve);
+}
