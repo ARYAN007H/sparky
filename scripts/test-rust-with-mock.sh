@@ -285,6 +285,7 @@ run_json_rpc_e2e() {
     return 1
   fi
   test_names="$(printf '%s\n' "$listing" | sed -n 's/: test$//p')"
+  if [ -n "${JSON_RPC_E2E_FILTER:-}" ]; then test_names="$(printf "%s\n" "$test_names" | grep -- "$JSON_RPC_E2E_FILTER" || true)"; fi
   if [ -z "$test_names" ]; then
     echo "[test-rust-with-mock] ERROR: json_rpc_e2e enumeration returned no tests." >&2
     return 1
