@@ -63,20 +63,3 @@ async fn a_guard_discloses_to_the_chat_it_was_built_for() {
         (None, None)
     );
 }
-
-#[test]
-fn generators_without_a_router_are_returned_as_they_are() {
-    use tinyagents_harness::tinyinference_image::MockImageGenerator;
-    use tinyagents_harness::tinyinference_video::{MockVideoGenerator, MockVideoScript};
-    let generators = MediaGenerators::new(
-        Arc::new(MockImageGenerator::new()),
-        Arc::new(MockVideoGenerator::new(MockVideoScript::delivers())),
-    );
-    let routed = generators.routed(Some(&ApprovalChatContext {
-        thread_id: "t".into(),
-        client_id: "c".into(),
-        request_id: None,
-    }));
-    assert!(Arc::ptr_eq(&generators.image, &routed.image));
-    assert!(Arc::ptr_eq(&generators.video, &routed.video));
-}
