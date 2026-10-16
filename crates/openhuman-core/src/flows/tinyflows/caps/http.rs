@@ -45,6 +45,8 @@ use tinytools::Tool as _;
 pub struct OpenHumanHttp {
     /// The context the run acts under, handed over by whoever started it.
     pub ctx: crate::core::runtime::DispatchCtx,
+    /// The run's config snapshot, used to reload its anchored autonomy tier.
+    pub config: Arc<Config>,
     pub security: Arc<SecurityPolicy>,
     pub http_config: HttpRequestConfig,
     pub http_creds: Arc<HttpCredentialsStore>,
