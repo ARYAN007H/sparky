@@ -97,6 +97,26 @@ async fn routes_to_active_external_channel() {
 }
 
 #[tokio::test]
+async fn web_and_external_proactive_subscribers_deliver_each_destination_once() {
+    let send_count = Arc::new(AtomicUsize::new(0));
+    let ch: Arc<dyn Channel> = Arc::new(MockChannel::new("telegram", Arc::clone(&send_count)));
+    let map: HashMap<String, Arc<dyn Channel>> = [("telegram".into(), ch)].into();
+    let external = ProactiveMessageSubscriber::new(Arc::new(map), Some("telegram".into()));
+    let web = crate::web_chat::proactive::WebProactiveSubscriber;
+    let mut web_events = crate::web_chat::subscribe_web_channel_events();
+    let event = proactive_event();
+
+    web.handle(&event).await;
+    external.handle(&event).await;
+
+    let delivered = web_events.recv().await.expect("web event");
+    assert_eq!(delivered.event, "proactive_message");
+    assert_eq!(delivered.full_response.as_deref(), Some("Hello!"));
+    assert!(web_events.try_recv().is_err(), "web event must not be duplicated");
+    assert_eq!(send_count.load(Ordering::SeqCst), 1);
+}
+
+#[tokio::test]
 async fn skips_external_when_channel_has_no_proactive_target() {
     // The active channel is the configured default, but it has no resolvable
     // delivery target (e.g. Telegram with no stored chat). Proactive routing

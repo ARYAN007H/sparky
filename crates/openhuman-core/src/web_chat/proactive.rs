@@ -29,7 +29,7 @@ pub(crate) fn register_proactive_subscriber() {
     });
 }
 
-struct WebProactiveSubscriber;
+pub(crate) struct WebProactiveSubscriber;
 
 #[async_trait]
 impl EventHandler<DomainEvent> for WebProactiveSubscriber {
