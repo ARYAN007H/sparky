@@ -120,6 +120,7 @@ pub fn upsert_running(
             task_key: upsert.selector.task_key.clone(),
             task_title: upsert.task_title.clone(),
             current_task_id: None,
+            lifecycle_key: None,
             status: DurableSubagentStatus::Running,
             reusable: true,
             latest_history: None,
@@ -135,6 +136,7 @@ pub fn upsert_running(
     session.worker_thread_id = upsert.worker_thread_id.or(session.worker_thread_id);
     session.display_name = upsert.display_name.or(session.display_name);
     session.current_task_id = Some(upsert.task_id);
+    session.lifecycle_key = upsert.lifecycle_key.or(session.lifecycle_key);
     session.status = DurableSubagentStatus::Running;
     session.reusable = true;
     session.latest_error = None;
