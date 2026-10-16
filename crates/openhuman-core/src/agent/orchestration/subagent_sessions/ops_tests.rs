@@ -52,6 +52,7 @@ fn compatible_session_reuses_and_incompatible_shape_spawns_new() {
         task_title: "Same task".into(),
         worker_thread_id: Some("worker-1".into()),
         task_id: "sub-1".into(),
+        lifecycle_key: None,
     };
     let session = upsert_running(&store, upsert, None).unwrap();
     mark_finished(
@@ -85,6 +86,7 @@ fn closed_session_is_not_reusable() {
             task_title: "Task".into(),
             worker_thread_id: None,
             task_id: "sub-1".into(),
+            lifecycle_key: None,
         },
         None,
     )
@@ -106,6 +108,7 @@ fn list_for_parent_without_thread_id_does_not_filter_by_thread() {
             task_title: "First".into(),
             worker_thread_id: None,
             task_id: "sub-1".into(),
+            lifecycle_key: None,
         },
         None,
     )
@@ -121,6 +124,7 @@ fn list_for_parent_without_thread_id_does_not_filter_by_thread() {
             task_title: "Second".into(),
             worker_thread_id: None,
             task_id: "sub-2".into(),
+            lifecycle_key: None,
         },
         None,
     )

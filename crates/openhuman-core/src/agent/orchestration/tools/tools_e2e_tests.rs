@@ -307,6 +307,7 @@ async fn continue_subagent_resumes_idle_durable_session_e2e() {
             task_title: "Durable resume task".into(),
             worker_thread_id: None,
             task_id: "sub-earlier-task".into(),
+            lifecycle_key: None,
         },
         None,
     )

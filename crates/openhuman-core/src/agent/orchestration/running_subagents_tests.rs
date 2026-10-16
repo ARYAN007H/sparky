@@ -344,6 +344,7 @@ async fn snapshot_and_block_scope_to_parent_and_reflect_live_status() {
                 task_title: "Daily X trending email workflow".into(),
                 worker_thread_id: None,
                 task_id: "task-cold-1".into(),
+                lifecycle_key: None,
             },
             None,
         )

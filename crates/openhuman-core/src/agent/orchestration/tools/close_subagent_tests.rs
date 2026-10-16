@@ -82,6 +82,7 @@ fn seed_session(
             task_title: "Task".into(),
             worker_thread_id: Some("worker-1".into()),
             task_id: "sub-1".into(),
+            lifecycle_key: None,
         },
         None,
     )

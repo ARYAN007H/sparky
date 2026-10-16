@@ -279,6 +279,7 @@ impl SpawnAsyncSubagentTool {
                 task_title: task_title.clone(),
                 worker_thread_id: worker_thread_id.clone(),
                 task_id: task_id.clone(),
+                lifecycle_key: None,
             },
             reusable.as_ref(),
         ) {
