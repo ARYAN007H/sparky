@@ -23,7 +23,30 @@ async fn disabled_archive_operations_leave_the_host_filesystem_untouched() {
         .contains("module unavailable"));
     assert!(!workspace.path().join("state").exists());
     assert!(owner.lease.lock().await.is_none());
-    owner.close(&crate::core::runtime::DispatchCtx::default()).await.unwrap();
+    owner
+        .close(&crate::core::runtime::DispatchCtx::default())
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
+async fn close_releases_under_the_explicit_ctx_not_the_scoped_one() {
+    use crate::core::runtime::{CoreContext, DispatchCtx, DomainSet};
+    let owner = TriggerHistory {
+        initial_workspace: std::path::PathBuf::from("unused"),
+        lease: Arc::new(Mutex::new(None)),
+        #[cfg(feature = "modules")]
+        fixture: None,
+    };
+    let scoped = Arc::new(CoreContext::for_test(DomainSet::full(), None));
+    let explicit = DispatchCtx::new(Arc::new(CoreContext::for_test(DomainSet::full(), None)));
+    // A scope for another context is active; the release task is spawned by the
+    // explicit context and completes without consulting the scoped one.
+    CoreContext::scope(scoped, async {
+        owner.close(&explicit).await.unwrap();
+    })
+    .await;
+    assert!(owner.lease.lock().await.is_none());
 }
 
 #[cfg(feature = "modules")]
@@ -133,8 +156,14 @@ async fn changing_users_releases_the_old_archive_before_opening_the_next_scope()
         )
         .await
         .unwrap();
-    owner.close(&crate::core::runtime::DispatchCtx::default()).await.unwrap();
-    owner.close(&crate::core::runtime::DispatchCtx::default()).await.unwrap();
+    owner
+        .close(&crate::core::runtime::DispatchCtx::default())
+        .await
+        .unwrap();
+    owner
+        .close(&crate::core::runtime::DispatchCtx::default())
+        .await
+        .unwrap();
     assert_eq!(
         *calls.lock().await,
         vec![
@@ -176,7 +205,10 @@ async fn cancelling_a_pending_open_retains_a_handle_that_shutdown_can_release() 
     opening.abort();
     assert!(opening.await.unwrap_err().is_cancelled());
     observed.open_continue.notify_one();
-    owner.close(&crate::core::runtime::DispatchCtx::default()).await.unwrap();
+    owner
+        .close(&crate::core::runtime::DispatchCtx::default())
+        .await
+        .unwrap();
     assert_eq!(
         *observed.calls.lock().await,
         vec!["open:cancelled/state", "close:cancelled/state"]

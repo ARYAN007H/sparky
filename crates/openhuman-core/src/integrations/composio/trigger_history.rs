@@ -159,10 +159,7 @@ impl TriggerHistory {
     }
 
     /// Release the module resource while retaining all persisted documents.
-    pub async fn close(
-        &self,
-        ctx: &crate::core::runtime::DispatchCtx,
-    ) -> Result<(), String> {
+    pub async fn close(&self, ctx: &crate::core::runtime::DispatchCtx) -> Result<(), String> {
         let lease = Arc::clone(&self.lease);
         ctx.spawn(async move { Self::release(&mut *lease.lock_owned().await).await })
             .await
@@ -193,9 +190,7 @@ pub fn global() -> Option<Arc<TriggerHistory>> {
 }
 
 /// Close an existing lease on sign-out or runtime shutdown; never load at exit.
-pub(crate) async fn close_global(
-    ctx: &crate::core::runtime::DispatchCtx,
-) -> Result<(), String> {
+pub(crate) async fn close_global(ctx: &crate::core::runtime::DispatchCtx) -> Result<(), String> {
     match global() {
         Some(store) => store.close(ctx).await,
         None => Ok(()),
