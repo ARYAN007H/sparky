@@ -31,14 +31,31 @@ pub struct ManagedEmbeddingModel {
 impl ManagedEmbeddingModel {
     /// Builds the embedder for the credential scope `request` carries.
     pub fn from_request(request: &EmbeddingRequest<'_>) -> Self {
-        let api_url = request.config.and_then(|config| config.api_url.clone());
+        Self::new(
+            request.config.and_then(|config| config.api_url.clone()),
+            request.state_dir.clone(),
+            request.secrets_encrypt,
+            request.model,
+            request.dimensions,
+            request.chat.clone(),
+        )
+    }
+
+    /// Builds the embedder against `api_url` (or the default backend) with
+    /// credentials read from `state_dir`.
+    pub fn new(
+        api_url: Option<String>,
+        state_dir: std::path::PathBuf,
+        secrets_encrypt: bool,
+        model: &str,
+        dimensions: usize,
+        chat: Option<ApprovalChatContext>,
+    ) -> Self {
         let base_url = format!(
             "{}/openai/v1",
             effective_api_url(&api_url).trim_end_matches('/')
         );
         let key_endpoint = base_url.clone();
-        let state_dir = request.state_dir.clone();
-        let secrets_encrypt = request.secrets_encrypt;
         let bearer: BearerResolver = Arc::new(move || {
             // A stored TinyHumans API key is the bearer outright, with the
             // plaintext guard: never put the key on a non-HTTPS, non-loopback wire.
@@ -69,16 +86,28 @@ impl ManagedEmbeddingModel {
                     )
                 })
         });
-        let model = request.model.to_string();
+        let model = model.to_string();
         Self {
             inner: Arc::new(CloudEmbeddingModel::new(
                 base_url,
                 model.clone(),
-                request.dimensions,
+                dimensions,
                 bearer,
             )),
             model,
-            chat: request.chat.clone(),
+            chat,
+        }
+    }
+
+    /// This embedder with its egress disclosures routed to `chat` (the turn's
+    /// thread and client); `None` leaves them unrouted. Shares the transport,
+    /// so it is cheap to do per turn.
+    #[must_use]
+    pub fn routed_to(&self, chat: Option<ApprovalChatContext>) -> Self {
+        Self {
+            inner: Arc::clone(&self.inner),
+            model: self.model.clone(),
+            chat,
         }
     }
 
