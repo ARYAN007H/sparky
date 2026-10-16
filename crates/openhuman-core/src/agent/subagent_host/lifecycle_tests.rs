@@ -31,6 +31,7 @@ fn paused_outcome(question: &str, resume: SubagentResume) -> SubagentOutcome {
             resume,
         }),
         usage: Default::default(),
+        cost_usd: None,
         artifacts: Vec::new(),
         schema_error: None,
         artifact_error: None,
