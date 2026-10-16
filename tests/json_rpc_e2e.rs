@@ -2580,13 +2580,13 @@ async fn json_rpc_cron_add_run_list_round_trip_over_the_tinyflows_module_inner()
     .await;
     assert_no_jsonrpc_error(&store, "store_session");
 
-    // Nothing scheduled yet.
+    // The workspace may hold the host's own system jobs; ours is not there yet.
     let empty = post_json_rpc(&rpc_base, 2, "openhuman.cron_list", json!({})).await;
     assert!(
         !assert_no_jsonrpc_error(&empty, "cron_list")
             .to_string()
-            .contains("\"job_type\""),
-        "a fresh workspace has no cron jobs"
+            .contains("roundtrip"),
+        "the job is not there before it is added"
     );
 
     let add = post_json_rpc(
