@@ -10,7 +10,7 @@ use crate::agent::tinyagents::middleware::tool_output::ToolOutputMiddleware;
 use serde_json::json;
 use std::collections::HashMap;
 use std::sync::Arc;
-use tinyagents_harness::config::ToolRuntimeConfig;
+use tinyagents_harness::config::TurnConfig;
 
 use async_trait::async_trait;
 
@@ -264,7 +264,7 @@ fn oversized_workflow_proposal_json(node_count: usize) -> String {
 /// of being persisted — deterministic to assert on).
 fn truncation_probe_mw() -> ToolOutputMiddleware {
     ToolOutputMiddleware {
-        budget_bytes: ToolRuntimeConfig::default().tool_result_budget_bytes,
+        budget_bytes: TurnConfig::default().tool_result_budget_bytes,
         payload_summarizer: None,
         artifact_store: None,
         tokenjuice_compaction_enabled: false,

@@ -101,12 +101,10 @@ async fn todos_get_reads_back_what_the_todo_tool_wrote() {
     let empty_json = empty.into_cli_compatible_json().unwrap();
     assert!(empty_json["data"]["todos"].as_array().unwrap().is_empty());
 
-    let scope = crate::agent::todos::ops::TodoScope::Session {
-        id: "thread-todos-live".to_string(),
-    };
-    crate::agent::todos::ops::replace(
-        &dir,
-        &scope,
+    let store = crate::agent::session_store::stores_or_ephemeral(&dir).kv;
+    tinyagents_graph::todos::store::replace(
+        &store,
+        "thread-todos-live",
         vec![TodoItem::with_status("write tests", TodoStatus::InProgress)],
     )
     .await
