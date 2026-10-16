@@ -261,7 +261,7 @@ async fn security_policy_block_halts_without_spending_the_retry_budget() {
         attempt_count(&counter)
     );
     assert!(
-        elapsed < std::time::Duration::from_secs(1),
+        elapsed < std::time::Duration::from_millis(config.reliability.provider_backoff_ms),
         "the loop slept for {elapsed:?} on a deterministic policy refusal. A security block is \
          permanent across the backoff curve and must return on the first attempt; retrying it \
          only delays the user's error by the full retry budget (here about 4 s)."

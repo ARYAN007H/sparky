@@ -231,10 +231,13 @@ async fn an_upgraded_job_with_a_side_table_policy_keeps_firing_with_it() {
     }
 
     // The storage importer brings the legacy rows (and their side-table policy) over.
+    let t0 = std::time::Instant::now();
     let backend = crate::storage::local::backend_for(&config.workspace_dir).unwrap();
+    eprintln!("PROBE backend {:?}", t0.elapsed());
     for report in crate::storage::import::tinyflows::run_with(&backend, &config) {
         report.outcome.unwrap();
     }
+    eprintln!("PROBE imported {:?}", t0.elapsed());
     force_due(&config, shell_id);
     let job = cron::get_job(&config, shell_id).unwrap();
     assert_eq!(job.policy.retries, Some(0));
@@ -245,8 +248,11 @@ async fn an_upgraded_job_with_a_side_table_policy_keeps_firing_with_it() {
         &config,
         &security(&config),
     );
+    eprintln!("PROBE before tick {:?}", t0.elapsed());
     dispatcher.tick(&config).await.unwrap();
+    eprintln!("PROBE ticked {:?}", t0.elapsed());
     dispatcher.drain().await;
+    eprintln!("PROBE drained {:?}", t0.elapsed());
 
     let after = cron::get_job(&config, shell_id).unwrap();
     assert_eq!(
