@@ -111,6 +111,74 @@ impl SpawnAsyncSubagentTool {
     }
 }
 
+/// Route reusable-session input through the same generic Message operation
+/// installed for model calls. Durable session id lookup keeps the host from
+/// steering an unrelated live task by a raw task-id string.
+async fn steer_reusable_session(
+    parent: &RunContext<crate::agent::tinyagents::host::OpenHumanRunContext>,
+    session_id: &str,
+    message: String,
+) -> Result<(), String> {
+    use tinyagents_harness::tool::ToolDispatch;
+    use tinyagents_orchestration::subagent::{SubAgentJobRegistry, SubAgentMessageTool};
+    use tinytools::{ToolCallOptions, ToolTimeout};
+
+    let context = &parent.data;
+    let product_parent = context
+        .parent
+        .as_ref()
+        .ok_or_else(|| "reusable async subagent has no durable parent".to_owned())?;
+    let thread_id = parent.thread_id().map(|id| id.as_str().to_owned());
+    let owner = crate::agent::tinyagents::tool_registration::subagent_owner_key(
+        &product_parent.session_id,
+        thread_id.as_deref(),
+    );
+    let owner_scope: Arc<dyn Fn(u64) -> String + Send + Sync> = Arc::new(move |_| owner.clone());
+    let jobs = (*crate::core::runtime::slot_for::<SubAgentJobRegistry>(
+        &context.dispatch_ctx(),
+    ))
+    .clone();
+    let store: Arc<dyn tinyagents_orchestration::subagent::SubagentSessionStore> = Arc::new(
+        crate::agent::orchestration::subagent_sessions::OpenHumanTinySubagentSessionStore::new(
+            product_parent.workspace_dir.clone(),
+            product_parent.session_id.clone(),
+            thread_id.clone(),
+        ),
+    );
+    let parent_session = product_parent.session_id.clone();
+    let dispatch = SubAgentMessageTool::new(jobs)
+        .with_tool_name("steer_subagent")
+        .with_argument_fields("task_id", "subagent_session_id", "message", "__request_id")
+        .with_lane_field("mode")
+        .with_owner_scope(owner_scope)
+        .with_sessions(store, move |_| parent_session.clone())
+        .with_metadata(
+            PermissionLevel::Execute,
+            tinytools::ToolScope::All,
+            tinytools::ToolCategory::System,
+            ToolTimeout::Inherit,
+        );
+    let result = dispatch
+        .execute(
+            &(),
+            tinyagents_harness::CallId::new(format!("reuse-steer-{session_id}")),
+            json!({
+                "subagent_session_id": session_id,
+                "message": message,
+                "mode": "steer",
+            }),
+            ToolCallOptions::default(),
+            parent,
+        )
+        .await
+        .map_err(|error| error.to_string())?;
+    if result.is_error {
+        Err(result.output())
+    } else {
+        Ok(())
+    }
+}
+
 impl Default for SpawnAsyncSubagentTool {
     fn default() -> Self {
         Self::new()
