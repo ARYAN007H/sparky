@@ -224,7 +224,7 @@ fn proactive_message_reaches_web_on_channelless_core_boot() {
             .build()
             .expect("test runtime")
             .block_on(async {
-                crate::core::runtime::lock_mode(crate::core::runtime::Mode::Saas)
+                crate::core::runtime::mode::lock_mode(crate::core::runtime::Mode::Saas)
                     .expect("lock isolated test process in SaaS mode");
                 crate::core::bus::init().await.expect("bus init");
                 let mut web_events = crate::web_chat::subscribe_web_channel_events();
@@ -234,7 +234,7 @@ fn proactive_message_reaches_web_on_channelless_core_boot() {
                 let root = tempfile::tempdir().expect("profile root");
                 let id = crate::profiles::ProfileId::parse("proactive-test").unwrap();
                 let profile_host = std::sync::Arc::new(crate::profiles::ProfileHost::new(
-                    crate::profiles::SaasConfig::new(root.path()),
+                    crate::core::runtime::SaasConfig::new(root.path()),
                     crate::core::runtime::CoreContext::for_test(
                         crate::core::runtime::DomainSet::full(),
                         None,
@@ -243,7 +243,7 @@ fn proactive_message_reaches_web_on_channelless_core_boot() {
                 profile_host.provision(&id).await.expect("provision profile");
                 let profile = profile_host.open(&id).await.expect("open profile");
                 crate::profiles::host::install(profile_host);
-                let ctx = crate::core::runtime::DispatchCtx::new(profile.context());
+                let ctx = crate::core::runtime::DispatchCtx::new(std::sync::Arc::clone(profile.context()));
                 let tenant = ctx.event_tenant();
                 assert_eq!(tenant.as_ref().and_then(|tenant| tenant.profile.as_deref()), Some("proactive-test"));
 

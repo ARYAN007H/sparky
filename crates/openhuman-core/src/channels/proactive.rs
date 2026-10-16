@@ -137,7 +137,7 @@ impl EventHandler<DomainEvent> for ProactiveMessageSubscriber {
             source,
             message,
             job_name,
-            tenant: _,
+            ..
         } = event
         else {
             return;

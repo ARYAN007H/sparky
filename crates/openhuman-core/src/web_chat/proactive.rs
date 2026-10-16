@@ -46,7 +46,7 @@ impl EventHandler<DomainEvent> for WebProactiveSubscriber {
             source,
             message,
             job_name,
-            tenant: _,
+            ..
         } = event
         else {
             return;
