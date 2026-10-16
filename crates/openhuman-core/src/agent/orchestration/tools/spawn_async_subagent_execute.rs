@@ -279,7 +279,13 @@ impl SpawnAsyncSubagentTool {
                 task_title: task_title.clone(),
                 worker_thread_id: worker_thread_id.clone(),
                 task_id: task_id.clone(),
-                lifecycle_key: None,
+                lifecycle_key: Some(
+                    tinyagents_orchestration::subagent::SubagentTaskKey::from_context(
+                        &detached_parent,
+                        task_id.clone(),
+                        parent_thread_id.clone(),
+                    ),
+                ),
             },
             reusable.as_ref(),
         ) {
