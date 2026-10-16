@@ -3,8 +3,9 @@
 //! resolved host belongs to, and whether that environment may push at all.
 
 use crate::config::Config;
+use crate::security::credentials::session_support::direct_backend_credential;
 
-use super::LOG_TARGET;
+const LOG_TARGET: &str = "agent-tracing::langfuse";
 
 /// Backend proxy route for Langfuse ingestion (relative to the backend origin).
 /// The backend authenticates the caller's session JWT, injects the Langfuse
@@ -149,3 +150,22 @@ pub(crate) fn skip_push(environment: &str) -> bool {
     });
     true
 }
+
+/// Whether a journal push would actually send for `config`: the URL gate, the
+/// environment gate and a live session credential. Callers must read a journal
+/// and build observations first, so without a live session (unit tests, a
+/// signed-out or embedder host) or on a skipped environment that work is
+/// discarded anyway, and reading a whole child journal is not free.
+pub(crate) fn journal_push_ready(config: &Config) -> bool {
+    let url = ingestion_url(config);
+    !skip_push(environment_for_base(&url))
+        && url.starts_with("http")
+        && matches!(
+            direct_backend_credential(config, "langfuse journal push"),
+            Some(crate::security::credentials::session_support::BackendCredential::Session(_))
+        )
+}
+
+#[cfg(test)]
+#[path = "../langfuse_tests.rs"]
+mod tests;

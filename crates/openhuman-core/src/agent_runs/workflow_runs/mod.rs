@@ -20,12 +20,22 @@
 //! Namespace note: this is distinct from the existing `workflows` domain, which
 //! handles SKILL.md / WORKFLOW.md bundle discovery.
 
-mod engine;
+#[path = "../../agent/orchestration/workflow_runs/host.rs"]
 mod host;
+mod engine {
+    mod cancel {
+        include!("../../agent/orchestration/workflow_runs/engine/cancel.rs");
+    }
+    mod lifecycle {
+        include!("../../agent/orchestration/workflow_runs/engine/lifecycle.rs");
+    }
+    pub(super) const LOG_TARGET: &str = "workflow_run_engine";
+    pub use lifecycle::{resume_workflow_run, start_workflow_run, stop_workflow_run};
+}
 mod ops;
 mod schemas;
 
-pub use engine::{resume_workflow_run, start_workflow_run, stop_workflow_run};
+use engine::{resume_workflow_run, start_workflow_run, stop_workflow_run};
 pub use ops::{
     PARALLEL_RESEARCH_ID, builtin_definitions, definition_by_id, get_run, list_definitions,
     list_runs,

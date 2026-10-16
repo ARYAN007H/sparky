@@ -54,6 +54,7 @@
 /// Journal-backed projection from durable tinyagents observations.
 pub(crate) mod journal_projection;
 /// Langfuse ingestion exporter (remote push through the configured backend).
+#[path = "progress_tracing/langfuse/environment.rs"]
 pub(crate) mod langfuse;
 mod otlp;
 

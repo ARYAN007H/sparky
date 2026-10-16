@@ -33,7 +33,7 @@ content).
   `/telemetry/langfuse/otel/v1/traces` proxy; the backend supplies project
   keys and authoritative user attribution. Export is on by default through
   `observability.share_usage_data`; local NDJSON export remains optional.
-- [`langfuse.rs`](./langfuse.rs) + `langfuse/` hold the proxy URL and environment
+- [`langfuse/environment.rs`](./langfuse/environment.rs) hold the proxy URL and environment
   resolution `otlp.rs` and the flow exporter share, plus the legacy batch
   projection kept for compatibility tests. No trace is sent on the legacy
   batch path; Langfuse v4 ingests traces only over OTLP.

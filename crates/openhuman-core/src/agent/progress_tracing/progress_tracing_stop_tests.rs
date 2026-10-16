@@ -57,7 +57,9 @@ fn a_breaker_stopped_turn_closes_at_warning_with_stop_attributes() {
         (
             AgentProgress::TurnCompleted {
                 iterations: 4,
-                stop: Some(crate::agent::session_host::stop_summary::breaker_stop(BREAKER_NOTE)),
+                stop: Some(crate::agent::session_host::stop_summary::breaker_stop(
+                    BREAKER_NOTE,
+                )),
             },
             50,
         ),
@@ -169,7 +171,9 @@ fn a_stopped_subagent_span_closes_at_warning_with_stop_attributes() {
         (
             subagent_completed(
                 "t-stop",
-                Some(crate::agent::session_host::stop_summary::breaker_stop(BREAKER_NOTE)),
+                Some(crate::agent::session_host::stop_summary::breaker_stop(
+                    BREAKER_NOTE,
+                )),
             ),
             40,
         ),
