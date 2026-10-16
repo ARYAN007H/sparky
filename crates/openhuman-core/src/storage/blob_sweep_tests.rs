@@ -55,7 +55,7 @@ async fn sweep_all_visits_the_local_scope() {
 
 #[tokio::test(start_paused = true)]
 async fn spawned_sweeper_waits_for_its_first_delay_then_keeps_ticking() {
-    let handle = spawn(Duration::from_secs(10), Duration::from_secs(20));
+    let handle = spawn(&crate::core::runtime::DispatchCtx::ambient(), Duration::from_secs(10), Duration::from_secs(20));
     tokio::time::sleep(Duration::from_secs(65)).await;
     assert!(!handle.is_finished(), "the sweeper keeps running");
     handle.abort();
