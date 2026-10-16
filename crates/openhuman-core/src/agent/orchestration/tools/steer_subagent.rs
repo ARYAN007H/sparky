@@ -72,7 +72,7 @@ impl Tool for SteerSubagentTool {
     }
 
     fn parameters_schema(&self) -> serde_json::Value {
-        static_schema!(include_str!("parameters/steer_subagent.json"))
+        static_schema!(include_str!("steer_subagent.json"))
     }
 
     fn permission_level(&self) -> PermissionLevel {
