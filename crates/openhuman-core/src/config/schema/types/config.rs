@@ -234,7 +234,7 @@ pub struct Config {
     /// Global context management configuration — budget thresholds,
     /// summarization trigger, microcompact/autocompact toggles, and the
     /// session-memory extraction cadence. Consumed by
-    /// [`crate::agent::context::ContextManager`].
+    /// the agent context middleware configuration.
     #[serde(default)]
     pub context: ContextConfig,
 

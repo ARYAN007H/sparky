@@ -550,7 +550,7 @@ fn build_subagent_context_mw(
             let ctx = &config.context;
             // TokenJuice content-aware compaction gates on the same master
             // `[context].compaction_enabled` the chat path reads
-            // (`ContextManager::compaction_enabled`).
+            // (`ContextConfig::compaction_enabled`).
             mw.tokenjuice_compaction_enabled =
                 ctx.compaction_enabled && crate::inference::tokenjuice::enabled(config);
             mw.tool_result_budget_bytes = ctx.tool_result_budget_bytes;
@@ -561,7 +561,7 @@ fn build_subagent_context_mw(
                 0
             };
             // Summarization step honors the `[context].enabled` + autocompact
-            // opt-outs, same as `ContextManager::autocompact_enabled`.
+            // opt-outs, same as `ContextConfig::enabled && autocompact_enabled`.
             mw.autocompact_enabled = ctx.enabled && ctx.autocompact_enabled;
             mw.compaction = ctx.compaction_settings();
             tracing::debug!(
