@@ -302,6 +302,7 @@ impl ToolHook<OpenHumanRunContext> for ProfilePermission {
                 if rewritten && !decision.is_deny() && !decision.is_ask() {
                     decision.updated_input = Some(advertised.arguments);
                 }
+                decision
             }
             None => ToolHookDecision::deny("this profile has no host tool permission callback"),
         }

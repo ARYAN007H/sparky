@@ -57,7 +57,7 @@ pub async fn init(ctx: &DispatchCtx, config: &crate::config::schema::Config) {
     }
     crate::agent::hooks::replace_embedder_tool_hook(
         "configured_hooks",
-        Some(std::sync::Arc::new(super::host::engine().clone())),
+        Some(std::sync::Arc::new((*super::host::engine()).clone())),
     );
 }
 

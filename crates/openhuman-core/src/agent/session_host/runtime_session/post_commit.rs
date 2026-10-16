@@ -166,7 +166,7 @@ pub(super) async fn finalize_committed_turn(
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
         state.last_turn_hit_cap = interrupted;
-        state.last_turn_usage = Some(usage);
+        state.last_turn_usage = Some(usage.clone());
         state.prelude.clone()
     };
     // Completion first: `TurnCompleted` is the progress
