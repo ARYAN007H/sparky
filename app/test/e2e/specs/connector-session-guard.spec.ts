@@ -17,8 +17,8 @@ import {
   seedComposioToolkits,
 } from '../helpers/composio-helpers';
 import { callOpenhumanRpc } from '../helpers/core-rpc';
-import { triggerAuthLoopbackBypass } from '../helpers/loopback-auth-helpers';
 import { waitForWebView, waitForWindowVisible } from '../helpers/element-helpers';
+import { triggerAuthLoopbackBypass } from '../helpers/loopback-auth-helpers';
 import { completeOnboardingIfVisible, navigateToSkills } from '../helpers/shared-flows';
 import {
   clearRequestLog,

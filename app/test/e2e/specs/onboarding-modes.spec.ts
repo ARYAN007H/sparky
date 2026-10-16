@@ -6,8 +6,8 @@
  */
 import { waitForApp, waitForAppReady, waitForAuthBootstrap } from '../helpers/app-helpers';
 import { callOpenhumanRpc } from '../helpers/core-rpc';
-import { triggerAuthLoopbackBypass } from '../helpers/loopback-auth-helpers';
 import { waitForWebView, waitForWindowVisible } from '../helpers/element-helpers';
+import { triggerAuthLoopbackBypass } from '../helpers/loopback-auth-helpers';
 import { resetApp } from '../helpers/reset-app';
 import { dismissBootCheckGateIfVisible } from '../helpers/shared-flows';
 import {

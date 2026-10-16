@@ -29,13 +29,13 @@ import {
   seedComposioConnection,
   seedComposioToolkits,
 } from '../helpers/composio-helpers';
-import { triggerAuthLoopbackBypass } from '../helpers/loopback-auth-helpers';
 import {
   textExists,
   waitForText,
   waitForWebView,
   waitForWindowVisible,
 } from '../helpers/element-helpers';
+import { triggerAuthLoopbackBypass } from '../helpers/loopback-auth-helpers';
 import {
   completeOnboardingIfVisible,
   navigateToConnections,

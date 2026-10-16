@@ -26,7 +26,6 @@ import {
   seedComposioToolkits,
 } from './composio-helpers';
 import { callOpenhumanRpc } from './core-rpc';
-import { triggerAuthLoopbackBypass } from './loopback-auth-helpers';
 import {
   clickButton,
   textExists,
@@ -34,6 +33,7 @@ import {
   waitForWebView,
   waitForWindowVisible,
 } from './element-helpers';
+import { triggerAuthLoopbackBypass } from './loopback-auth-helpers';
 import { completeOnboardingIfVisible, navigateToSkills } from './shared-flows';
 
 /**

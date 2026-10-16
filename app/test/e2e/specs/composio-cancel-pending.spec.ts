@@ -19,13 +19,13 @@ import {
   seedComposioConnection,
   seedComposioToolkits,
 } from '../helpers/composio-helpers';
-import { triggerAuthLoopbackBypass } from '../helpers/loopback-auth-helpers';
 import {
   clickTestId,
   waitForTestId,
   waitForWebView,
   waitForWindowVisible,
 } from '../helpers/element-helpers';
+import { triggerAuthLoopbackBypass } from '../helpers/loopback-auth-helpers';
 import { completeOnboardingIfVisible, navigateToSkills } from '../helpers/shared-flows';
 import {
   clearRequestLog,

@@ -1,6 +1,5 @@
 import { waitForApp, waitForAppReady } from '../helpers/app-helpers';
 import { callOpenhumanRpc, expectRpcOk } from '../helpers/core-rpc';
-import { triggerAuthLoopbackBypass } from '../helpers/loopback-auth-helpers';
 import {
   clickText,
   textExists,
@@ -8,6 +7,7 @@ import {
   waitForWebView,
   waitForWindowVisible,
 } from '../helpers/element-helpers';
+import { triggerAuthLoopbackBypass } from '../helpers/loopback-auth-helpers';
 import { supportsExecuteScript } from '../helpers/platform';
 import { completeOnboardingIfVisible, navigateViaHash } from '../helpers/shared-flows';
 import { startMockServer, stopMockServer } from '../mock-server';
