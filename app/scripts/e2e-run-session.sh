@@ -152,13 +152,20 @@ cleanup() {
       done
     fi
   fi
-  if [ "$status" -ne 0 ] && [ -n "${OPENHUMAN_WORKSPACE:-}" ]; then
-    # The in-process core writes startup diagnostics beside its workspace.
-    # Preserve them on failed E2E runs before removing this temporary profile.
-    for core_log in "$OPENHUMAN_WORKSPACE"/logs/openhuman-*.log; do
-      [ -f "$core_log" ] || continue
-      mkdir -p "${E2E_ARTIFACTS_DIR:-$APP_DIR/test/e2e/artifacts}"
-      cp "$core_log" "${E2E_ARTIFACTS_DIR:-$APP_DIR/test/e2e/artifacts}/${LOG_SUFFIX}-core.log" 2>/dev/null || true
+  if [ "$status" -ne 0 ]; then
+    # The embedded core writes startup diagnostics beside its data directory.
+    # Preserve both the test workspace and default-home logs before removing
+    # the temporary profile; the latter also shows whether the child inherited
+    # OPENHUMAN_WORKSPACE as expected.
+    local core_log_dir core_log log_index=0
+    for core_log_dir in "${OPENHUMAN_WORKSPACE:-}/logs" "${HOME:-}/.openhuman/logs"; do
+      [ -d "$core_log_dir" ] || continue
+      for core_log in "$core_log_dir"/openhuman-*.log; do
+        [ -f "$core_log" ] || continue
+        mkdir -p "${E2E_ARTIFACTS_DIR:-$APP_DIR/test/e2e/artifacts}"
+        cp "$core_log" "${E2E_ARTIFACTS_DIR:-$APP_DIR/test/e2e/artifacts}/${LOG_SUFFIX}-core-${log_index}.log" 2>/dev/null || true
+        log_index=$((log_index + 1))
+      done
     done
   fi
   if [ -n "$CREATED_TEMP_WORKSPACE" ]; then
