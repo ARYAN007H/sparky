@@ -11,12 +11,14 @@
 //!   the `voice.agent_signed_url` controller.
 //! - [`speech_providers`]: the STT/TTS providers registered under the
 //!   `cloud` / `openhuman` / `backend` slugs.
+//! - [`schemas`]: the `voice.agent_signed_url` and `voice.cloud_transcribe` controllers.
 //! - [`live`]: the `gemini-hosted` and `elevenlabs-hosted` live providers.
 
 pub mod cloud_transcribe;
 pub mod live;
 pub mod realtime;
 pub mod reply_speech;
+pub mod schemas;
 pub mod speech_providers;
 
 use crate::install::InstallOptions;
@@ -26,5 +28,5 @@ pub(crate) fn register(_options: &InstallOptions) {
     log::debug!("[tinyhumans] voice: registering hosted STT/TTS and live providers");
     speech_providers::register();
     live::register();
-    realtime::register();
+    schemas::register();
 }

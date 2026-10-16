@@ -1,4 +1,4 @@
-use super::IntegrationClient;
+use super::client::IntegrationClient;
 
 mod google_places;
 mod stock_prices;

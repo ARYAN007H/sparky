@@ -18,7 +18,7 @@ pub(crate) use errors::extract_error_detail;
 // does — can see them, mirroring what direct declaration in this file used
 // to provide before the `include!` split was replaced with real submodules.
 #[cfg(test)]
-use construct::sanitize_backend_url;
+use crate::client::sanitize_backend_url;
 #[cfg(test)]
 use errors::is_composio_soft_auth_path;
 #[cfg(test)]
