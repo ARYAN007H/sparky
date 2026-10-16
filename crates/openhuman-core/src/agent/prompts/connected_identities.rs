@@ -36,7 +36,7 @@ async fn render_section(ctx: &crate::core::runtime::DispatchCtx) -> String {
         }
     };
     let identities =
-        match crate::integrations::composio::identity_store::load_connected_identities(&config)
+        match crate::integrations::composio::identity_store::load_connected_identities(ctx, &config)
             .await
         {
             Ok(identities) => identities,
