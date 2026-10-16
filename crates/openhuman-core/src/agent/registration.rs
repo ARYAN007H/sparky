@@ -8,7 +8,6 @@ use super::orchestration::tools::{
 #[cfg(feature = "skills")]
 use crate::skills::run_workflow::{AwaitWorkflowTool, RunWorkflowTool};
 use super::tools::{PlanExitTool, TodoTool};
-use crate::tools::delegate::DelegateTool;
 use crate::config::Config;
 use std::path::Path;
 use tinyagents_harness::tools as harness_tools;

@@ -72,7 +72,7 @@ impl TurnInputs {
     /// What leads this turn's user message: the date line in the user's time
     /// zone, then the reply-language instruction.
     pub(crate) fn preamble(&self) -> String {
-        crate::agent::prompts::turn_preamble(
+        crate::prompts::turn_preamble(
             self.reply_language_directive.as_deref(),
             self.time_zone.as_deref(),
         )
