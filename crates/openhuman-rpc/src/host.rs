@@ -81,8 +81,7 @@ fn embed_info(args: &[String]) -> anyhow::Result<Option<crate::embed::RuntimeInf
 /// the dispatched command failed.
 #[cfg(feature = "server")]
 pub fn cli(args: &[String]) -> anyhow::Result<()> {
-    // Before any config read (`provider_for_host` loads one), so load-time
-    // migrations can recognise managed endpoints.
+    // Config reads below (and in the dispatcher) need the enricher.
     openhuman_tinyhumans::register_hooks();
     // Introspection belongs above the core: never introduce a core -> embed dependency.
     if let Some(info) = embed_info(args)? {
@@ -114,7 +113,7 @@ pub fn cli(args: &[String]) -> anyhow::Result<()> {
         // resolved storage URL, opened on the core's storage runtime so the
         // backend outlives this call.
         let provider =
-            crate::core_host::storage::block_on_anyhow(crate::session_store::provider_for_host())?;
+            crate::core_host::storage::block_on_anyhow(session_store_for_boot())?;
         log::debug!("[rpc:host] cli: storage-backed session store installed");
         builder = builder.session_store(provider);
     }
@@ -319,7 +318,7 @@ pub async fn tui() -> anyhow::Result<openhuman_tinyhumans::embed::Runtime> {
     openhuman_tinyhumans::register_hooks();
     secret_storage::install();
     log::debug!("[rpc:host] tui: building connected runtime");
-    let session_store = crate::session_store::provider_for_host().await?;
+    let session_store = session_store_for_boot().await?;
     let runtime = tui_builder()
         .session_store(session_store)
         .build()
@@ -330,6 +329,18 @@ pub async fn tui() -> anyhow::Result<openhuman_tinyhumans::embed::Runtime> {
         })?;
     log::info!("[rpc:host] tui: core built (DomainSet::full, ServiceSet::none)");
     Ok(runtime)
+}
+
+/// The storage-backed session store a host opens *before* its runtime is
+/// connected. Opening it loads the config (to resolve `[storage] url`), so the
+/// TinyHumans config hooks go in first: without the enricher the load-time
+/// migrations cannot tell a managed endpoint from a custom one and would
+/// rewrite a legacy managed config.
+#[cfg(feature = "session-store")]
+async fn session_store_for_boot(
+) -> anyhow::Result<std::sync::Arc<dyn openhuman_tinyhumans::embed::SessionStoreProvider>> {
+    openhuman_tinyhumans::register_hooks();
+    crate::session_store::provider_for_host().await
 }
 
 #[cfg(test)]
