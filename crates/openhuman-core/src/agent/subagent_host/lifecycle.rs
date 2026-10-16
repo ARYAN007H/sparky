@@ -335,8 +335,10 @@ impl OpenHumanSubagentHost {
         continuation: bool,
         checkpoint_dir: PathBuf,
     ) -> Result<SubagentRunOutcome, SubagentRunError> {
-        let failures = Arc::new(Mutex::new(HashMap::new()));
-        let host_outcome = Arc::new(Mutex::new(HashMap::new()));
+        let failures = Arc::new(Mutex::new(HashMap::<SubagentTaskKey, SubagentRunError>::new()));
+        let host_outcome = Arc::new(Mutex::new(
+            HashMap::<SubagentTaskKey, SubagentRunOutcome>::new(),
+        ));
         let fallback_agent_id = self.definition.id.clone();
         let request = HostRequest {
             definition: self.definition,
