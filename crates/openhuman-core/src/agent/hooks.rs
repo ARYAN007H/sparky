@@ -79,7 +79,7 @@ pub fn embedder_post_turn_hooks_in(
 ) -> Vec<Arc<dyn PostTurnHook>> {
     let mut hooks = embedder_post_turn_hooks();
     if let Some(local) = ctx.host_overrides() {
-        hooks.extend(local.post_turn_hooks());
+        hooks.extend(local.learning_hooks().iter().cloned());
     }
     hooks
 }
