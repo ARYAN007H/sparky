@@ -227,7 +227,7 @@ async fn listener_fixture() -> (
 async fn cancelling_startup_still_closes_the_module_owned_listener_fixture() {
     let (client, fixture, _service) = listener_fixture().await;
     let startup = tokio::spawn(async move {
-        start_globe_with_client(client, Push, &CancellationToken::new()).await
+        start_globe_with_client(&crate::core::runtime::DispatchCtx::default(), client, Push, &CancellationToken::new()).await
     });
     fixture.entered.notified().await;
     startup.abort();
@@ -246,7 +246,7 @@ async fn cancelling_startup_still_closes_the_module_owned_listener_fixture() {
 async fn stopping_listener_joins_its_bus_cleanup_fixture() {
     let (client, fixture, _service) = listener_fixture().await;
     fixture.allow_start.notify_one();
-    let (handle, _rx) = start_globe_with_client(client, Push, &CancellationToken::new())
+    let (handle, _rx) = start_globe_with_client(&crate::core::runtime::DispatchCtx::default(), client, Push, &CancellationToken::new())
         .await
         .unwrap();
     handle.stop().await;
@@ -261,7 +261,7 @@ async fn lost_start_reply_recovers_the_lease_before_releasing_admission_fixture(
         .store(true, std::sync::atomic::Ordering::SeqCst);
     fixture.allow_start.notify_one();
     assert!(
-        start_globe_with_client(client, Push, &CancellationToken::new())
+        start_globe_with_client(&crate::core::runtime::DispatchCtx::default(), client, Push, &CancellationToken::new())
             .await
             .is_err()
     );
@@ -281,7 +281,7 @@ async fn failed_close_retains_ownership_until_the_module_confirms_cleanup_fixtur
         .fail_close
         .store(true, std::sync::atomic::Ordering::SeqCst);
     fixture.allow_start.notify_one();
-    let (handle, _rx) = start_globe_with_client(client, Push, &CancellationToken::new())
+    let (handle, _rx) = start_globe_with_client(&crate::core::runtime::DispatchCtx::default(), client, Push, &CancellationToken::new())
         .await
         .unwrap();
     handle.stop().await;
