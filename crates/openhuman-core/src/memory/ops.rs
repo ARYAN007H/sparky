@@ -363,16 +363,30 @@ pub async fn store_on_with(
 
 /// Stores `items` on `bound` in one bulk call (`MemoryEngine::store_many`):
 /// each is listed on return, ranked recall may lag behind for all but the
-/// last. For imports and backfills.
+/// last.
 pub async fn store_many_on(
     bound: &BoundEngine,
     items: Vec<StoreItem>,
 ) -> MemoryResult<Vec<StoreReceipt>> {
+    store_many_on_with(bound, items, WriteOptions::visible()).await
+}
+
+/// [`store_many_on`], returning as soon as `options` allows. A backfill or an
+/// import that reads nothing back until it ends passes
+/// [`WriteOptions::accepted`]: an engine that supports it (CortexDB) returns
+/// once the items are durably accepted, before they are indexed, and any
+/// other stores them as [`store_many_on`] does.
+pub async fn store_many_on_with(
+    bound: &BoundEngine,
+    items: Vec<StoreItem>,
+    options: WriteOptions,
+) -> MemoryResult<Vec<StoreReceipt>> {
     let count = items.len();
-    let receipts = bound.engine.store_many(items).await?;
+    let receipts = bound.engine.store_many_with(items, options).await?;
     tracing::debug!(
         engine = %bound.id,
         count,
+        wait = ?options.wait,
         replayed = receipts.iter().filter(|r| r.replayed).count(),
         "[memory:ops] batch stored"
     );

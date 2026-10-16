@@ -20,6 +20,10 @@
 //!   in `<workspace>/memory/conversations_backfill.json`, so an interrupted run
 //!   resumes and a later run sends only what is new. A re-sent item is a
 //!   replay (its id is a content digest), never a duplicate.
+//! - **Accepted, not indexed.** Batches go in with accepted writes: the
+//!   engine returns once it holds them durably, and indexes them after. A
+//!   run is `done` when every turn is stored; search catches up within
+//!   minutes. An engine without accepted writes stores them as before.
 //! - **Consent.** It uploads chat history to the selected engine, so
 //!   [`start`] refuses without `consent`.
 
@@ -34,7 +38,7 @@ use serde::{Deserialize, Serialize};
 use crate::config::Config;
 use crate::memory::engine::{self, BoundEngine};
 use crate::memory::error::{MemoryError, MemoryResult};
-use crate::memory::ops::store_many_on;
+use crate::memory::ops::store_many_on_with;
 use crate::memory::scope::{MemoryIdentity, ResolvedIdentity};
 use crate::memory::types::ImportPhase;
 use crate::threads::store::blocking as threads;
@@ -284,7 +288,14 @@ async fn run(
             );
             let count = items.len() as u64;
             if count > 0 {
-                if let Err(error) = store_many_on(bound, items).await {
+                // Accepted, not indexed: the run reads nothing back, and
+                // waiting on the engine to index every batch made a few
+                // thousand messages take hours on CortexDB. They are durably
+                // stored on return and searchable shortly after.
+                let stored =
+                    store_many_on_with(bound, items, tinymemory_api::WriteOptions::accepted())
+                        .await;
+                if let Err(error) = stored {
                     tracing::warn!(
                         code = error.code(),
                         "[memory:backfill] storing a batch failed; stopping"

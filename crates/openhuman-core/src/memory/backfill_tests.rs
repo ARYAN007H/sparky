@@ -175,3 +175,109 @@ async fn stores_past_chats_once_and_skips_what_live_logging_took() {
     assert_eq!(again.state.items_stored, 0);
     assert_eq!(stored(&engine, filter).await.len(), 6);
 }
+
+/// The reference engine, recording how long each bulk store asked to wait.
+struct WaitRecorder {
+    inner: tinymemory_api::conformance::ReferenceEngine,
+    waits: std::sync::Mutex<Vec<tinymemory_api::WaitFor>>,
+}
+
+#[async_trait::async_trait]
+impl tinymemory_api::MemoryEngine for WaitRecorder {
+    fn descriptor(&self) -> &tinymemory_api::EngineDescriptor {
+        self.inner.descriptor()
+    }
+    async fn health(&self) -> tinymemory_api::EngineHealth {
+        self.inner.health().await
+    }
+    async fn recall(
+        &self,
+        req: tinymemory_api::RecallRequest,
+    ) -> tinymemory_api::Result<tinymemory_api::RecallAnswer> {
+        self.inner.recall(req).await
+    }
+    async fn fetch(
+        &self,
+        req: tinymemory_api::FetchRequest,
+    ) -> tinymemory_api::Result<tinymemory_api::FetchPage> {
+        self.inner.fetch(req).await
+    }
+    async fn store(
+        &self,
+        item: tinymemory_api::StoreItem,
+    ) -> tinymemory_api::Result<tinymemory_api::StoreReceipt> {
+        self.inner.store(item).await
+    }
+    async fn store_many_with(
+        &self,
+        items: Vec<tinymemory_api::StoreItem>,
+        options: tinymemory_api::WriteOptions,
+    ) -> tinymemory_api::Result<Vec<tinymemory_api::StoreReceipt>> {
+        self.waits.lock().unwrap().push(options.wait);
+        self.inner.store_many_with(items, options).await
+    }
+    async fn forget(
+        &self,
+        target: tinymemory_api::ForgetTarget,
+    ) -> tinymemory_api::Result<tinymemory_api::ForgetReport> {
+        self.inner.forget(target).await
+    }
+    async fn list(
+        &self,
+        req: tinymemory_api::ListRequest,
+    ) -> tinymemory_api::Result<tinymemory_api::ListPage> {
+        self.inner.list(req).await
+    }
+}
+
+#[tokio::test]
+async fn batches_are_stored_accepted_without_waiting_on_indexing() {
+    let tmp = tempfile::tempdir().unwrap();
+    let config = config_in(&tmp);
+    let engine = std::sync::Arc::new(WaitRecorder {
+        inner: tinymemory_api::conformance::ReferenceEngine::new(),
+        waits: std::sync::Mutex::new(Vec::new()),
+    });
+    crate::memory::engine::install_test_engine(&config.workspace_dir, engine.clone());
+    seed_thread(
+        &config.workspace_dir,
+        "old-thread",
+        &[
+            ("user", "What is ownership?"),
+            ("agent", "Values have one owner."),
+            ("user", "And borrowing?"),
+            ("agent", "References without ownership."),
+        ],
+    )
+    .await;
+
+    start(
+        &DispatchCtx::ambient(),
+        &config,
+        BackfillStartParams { consent: true },
+    )
+    .await
+    .unwrap();
+    let done = wait_done(&config).await;
+    assert_eq!(done.state.phase, ImportPhase::Done, "{:?}", done.state);
+    assert_eq!(done.state.items_stored, 4);
+
+    let waits = engine.waits.lock().unwrap().clone();
+    assert!(!waits.is_empty(), "the backfill stores in bulk");
+    assert!(
+        waits
+            .iter()
+            .all(|wait| *wait == tinymemory_api::WaitFor::Accepted),
+        "every batch is stored accepted, not visible: {waits:?}"
+    );
+    let filter = MetaFilter {
+        kinds: vec![ItemKind::Conversation],
+        tags_any: vec![BACKFILL_TAG.to_string()],
+        ..MetaFilter::default()
+    };
+    assert_eq!(
+        stored(&engine.inner, filter).await.len(),
+        4,
+        "an engine without accepted writes still stores everything"
+    );
+}
