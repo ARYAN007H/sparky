@@ -278,10 +278,14 @@ async fn read_body_never_leaves_the_versioned_store() {
     });
     std::fs::write(workspace.path().join("x.json"), outside.to_string()).unwrap();
 
-    let err = read_body_in(workspace.path(), "../../x")
-        .await
-        .err()
-        .unwrap();
+    let err = read_body_in(
+        workspace.path(),
+        &FileRoots::new(workspace.path()),
+        "../../x",
+    )
+    .await
+    .err()
+    .unwrap();
     assert!(err.contains("invalid artifact id"), "{err}");
 }
 
@@ -289,13 +293,17 @@ async fn read_body_never_leaves_the_versioned_store() {
 async fn read_body_returns_a_text_version_and_a_small_text_file() {
     let workspace = tempfile::tempdir().unwrap();
     versioned_record(workspace.path(), "md-1", "markdown", "# hi");
-    let text = read_body_in(workspace.path(), "md-1").await.unwrap();
+    let text = read_body_in(workspace.path(), &FileRoots::new(workspace.path()), "md-1")
+        .await
+        .unwrap();
     assert_eq!((text.body.as_str(), text.is_text), ("# hi", true));
 
     let file = workspace.path().join("notes.txt");
     std::fs::write(&file, "plain notes").unwrap();
     versioned_record(workspace.path(), "f-1", "file", &file.display().to_string());
-    let read = read_body_in(workspace.path(), "f-1").await.unwrap();
+    let read = read_body_in(workspace.path(), &FileRoots::new(workspace.path()), "f-1")
+        .await
+        .unwrap();
     assert_eq!((read.body.as_str(), read.is_text), ("plain notes", true));
 }
 
@@ -308,7 +316,9 @@ async fn a_file_over_the_preview_limit_is_not_read() {
     let path = file.display().to_string();
     versioned_record(workspace.path(), "big-1", "file", &path);
 
-    let read = read_body_in(workspace.path(), "big-1").await.unwrap();
+    let read = read_body_in(workspace.path(), &FileRoots::new(workspace.path()), "big-1")
+        .await
+        .unwrap();
     // Shown as a file: the body stays its path.
     assert!(!read.is_text);
     assert_eq!(read.body, path);
@@ -339,4 +349,20 @@ fn docx_text_keeps_words_split_across_runs() {
         crate::docx::extract_text(&docx).unwrap(),
         "Hello world & more\nSecond"
     );
+}
+
+#[tokio::test]
+async fn a_file_outside_the_trusted_folders_is_not_read() {
+    let workspace = tempfile::tempdir().unwrap();
+    let elsewhere = tempfile::tempdir().unwrap();
+    let secret = elsewhere.path().join("secret.txt");
+    std::fs::write(&secret, "do not read").unwrap();
+    let path = secret.display().to_string();
+    versioned_record(workspace.path(), "out-1", "file", &path);
+
+    let read = read_body_in(workspace.path(), &FileRoots::new(workspace.path()), "out-1")
+        .await
+        .unwrap();
+    assert!(!read.is_text);
+    assert_eq!(read.body, path);
 }

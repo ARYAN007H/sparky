@@ -77,6 +77,19 @@ impl FileRoots {
         &self.current
     }
 
+    /// Whether `path` names an existing file inside one of the vouched-for
+    /// folders. Both sides are canonicalized, so `..` and symlinks cannot reach
+    /// outside; a path that does not exist is held by none.
+    pub fn holds(&self, path: &Path) -> bool {
+        let Ok(path) = path.canonicalize() else {
+            return false;
+        };
+        self.trusted
+            .iter()
+            .filter_map(|folder| folder.canonicalize().ok())
+            .any(|folder| path.starts_with(folder))
+    }
+
     /// Whether `root` is one of the vouched-for folders, compared canonically
     /// where the paths exist.
     fn trusts(&self, root: &Path) -> bool {

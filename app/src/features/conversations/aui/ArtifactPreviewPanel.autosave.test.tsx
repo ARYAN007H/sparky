@@ -59,6 +59,37 @@ describe('useArtifactAutosave', () => {
     expect(rpc).toHaveBeenCalledTimes(1);
   });
 
+  it('keeps an edit whose save failed and saves it on the retry', async () => {
+    rpc.mockRejectedValueOnce(new Error('core restarting'));
+    const { result } = renderHook(() => useArtifactAutosave('a-1', '# v1', 1, true));
+    act(() => result.current.schedule('# kept'));
+    await act(async () => vi.advanceTimersByTime(AUTOSAVE_DELAY_MS));
+    expect(rpc).toHaveBeenCalledTimes(1);
+    expect(result.current.status).toBe('error');
+
+    await act(async () => vi.advanceTimersByTime(AUTOSAVE_DELAY_MS));
+    expect(rpc).toHaveBeenCalledTimes(2);
+    expect(rpc).toHaveBeenLastCalledWith({
+      method: 'openhuman.ai_save_artifact_version',
+      params: { artifact_id: 'a-1', body: '# kept' },
+    });
+    expect(result.current.status).toBe('saved');
+  });
+
+  it('a newer edit replaces a failed one instead of both being saved', async () => {
+    rpc.mockRejectedValueOnce(new Error('core restarting'));
+    const { result } = renderHook(() => useArtifactAutosave('a-1', '# v1', 1, true));
+    act(() => result.current.schedule('# old'));
+    await act(async () => vi.advanceTimersByTime(AUTOSAVE_DELAY_MS));
+    act(() => result.current.schedule('# newer'));
+    await act(async () => vi.advanceTimersByTime(AUTOSAVE_DELAY_MS));
+    expect(rpc).toHaveBeenCalledTimes(2);
+    expect(rpc).toHaveBeenLastCalledWith({
+      method: 'openhuman.ai_save_artifact_version',
+      params: { artifact_id: 'a-1', body: '# newer' },
+    });
+  });
+
   it('never saves a read-only artifact', async () => {
     const { result } = renderHook(() => useArtifactAutosave('a-1', 'text', 1, false));
     act(() => result.current.schedule('changed'));

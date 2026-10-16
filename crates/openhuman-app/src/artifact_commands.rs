@@ -75,13 +75,18 @@ fn check_artifact_id(artifact_id: &str) -> Result<(), String> {
 
 #[tauri::command]
 pub async fn read_artifact_body(artifact_id: String) -> Result<ArtifactBodyResult, String> {
-    let config = openhuman_rpc::embed::config::load_config_with_timeout().await?;
-    read_body_in(&config.workspace_dir, &artifact_id).await
+    let config = openhuman_rpc::embed::config::load_host_config().await?;
+    // A file version may point into the agent's working folder or the files
+    // folders, the same places the artifact service accepts.
+    let roots = openhuman_rpc::embed::artifacts::FileRoots::from_config(&config)
+        .with_trusted([config.action_dir.clone()]);
+    read_body_in(&config.workspace_dir, &roots, &artifact_id).await
 }
 
-/// [`read_artifact_body`] for a given workspace.
+/// [`read_artifact_body`] for a given workspace and its trusted folders.
 async fn read_body_in(
     workspace_dir: &Path,
+    roots: &openhuman_rpc::embed::artifacts::FileRoots,
     artifact_id: &str,
 ) -> Result<ArtifactBodyResult, String> {
     check_artifact_id(artifact_id)?;
@@ -111,7 +116,9 @@ async fn read_body_in(
     // For file-kind artifacts the body is a path to a real file. Try to read
     // its text content so the panel can render it (md/txt/html/etc).
     // Truly binary files stay as paths — the panel shows metadata + download.
-    if kind == "file" && !body.is_empty() {
+    // A file outside the trusted folders (a hand-edited record) is never
+    // opened: it shows as a file, its path only.
+    if kind == "file" && !body.is_empty() && roots.holds(Path::new(&body)) {
         let file_path = PathBuf::from(&body);
         let small_enough = tokio::fs::metadata(&file_path)
             .await
@@ -166,7 +173,7 @@ pub async fn save_artifact_as(
     artifact_id: String,
     filename: String,
 ) -> Result<Option<String>, String> {
-    let config = openhuman_rpc::embed::config::load_config_with_timeout().await?;
+    let config = openhuman_rpc::embed::config::load_host_config().await?;
     let roots = openhuman_rpc::embed::artifacts::FileRoots::from_config(&config);
     let source = resolve_source(&config.workspace_dir, &roots, &artifact_id).await?;
     let sanitized = sanitize_filename(&filename)?;

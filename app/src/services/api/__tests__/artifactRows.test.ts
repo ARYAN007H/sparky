@@ -30,6 +30,22 @@ const row = (artifactId: string, requestId?: string): ThreadMessage => ({
 const ids = (message: ThreadMessage) => message.extraMetadata[ARTIFACT_IDS_METADATA_KEY];
 
 describe('attachArtifactRows', () => {
+  it('places a backfilled row without a turn on the first reply saved after its artifact', () => {
+    const at = (message: ThreadMessage, createdAt: string) => ({ ...message, createdAt });
+    // An older thread: replies carry no turn id, and the backfilled row was
+    // appended at the end of the log with its artifact's own (earlier) time.
+    const out = attachArtifactRows([
+      at(user('u1', 'x'), '2026-10-01T09:00:00Z'),
+      at(reply('r1'), '2026-10-01T09:01:00Z'),
+      at(user('u2', 'y'), '2026-10-01T10:00:00Z'),
+      at(reply('r2'), '2026-10-01T10:01:00Z'),
+      at(row('old'), '2026-10-01T09:00:40Z'),
+    ]);
+    expect(out.map(m => m.id)).toEqual(['u1', 'r1', 'u2', 'r2']);
+    expect(ids(out[1])).toEqual(['old']);
+    expect(ids(out[3])).toBeUndefined();
+  });
+
   it('takes rows out of the list and lists each artifact on its turn reply', () => {
     const out = attachArtifactRows([
       user('u1', 'req-1'),

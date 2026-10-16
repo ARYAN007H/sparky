@@ -382,6 +382,8 @@ export function useArtifactAutosave(
   const [version, setVersion] = useState(initialVersion);
   const pending = useRef<string | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // The retry after a failed save calls the current `save`.
+  const saveRef = useRef<() => Promise<void>>(async () => {});
 
   useEffect(() => {
     setVersion(initialVersion);
@@ -405,8 +407,18 @@ export function useArtifactAutosave(
     } catch (err) {
       console.error('[ArtifactPreviewPanel] autosave failed:', err);
       setStatus('error');
+      // Keep the edit and try again later, unless a newer edit replaced it
+      // meanwhile (that one is saved instead).
+      if (pending.current === null) {
+        pending.current = next;
+        if (timer.current) clearTimeout(timer.current);
+        timer.current = setTimeout(() => void saveRef.current(), AUTOSAVE_DELAY_MS);
+      }
     }
   }, [artifactId]);
+  useEffect(() => {
+    saveRef.current = save;
+  }, [save]);
 
   const schedule = useCallback(
     (next: string) => {

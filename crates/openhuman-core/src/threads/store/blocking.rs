@@ -274,6 +274,10 @@ pub async fn purge_threads(
 ///
 /// The heaviest operation in the family: a cold inverted index reads every
 /// thread's transcript before the search runs.
+///
+/// Artifact rows never come back: they only place cards in the UI, and these
+/// hits feed search results and the agent's cross-chat context. The search asks
+/// for extra hits so dropping rows still fills `limit`.
 pub async fn search_cross_thread_messages(
     ctx: DispatchCtx,
     workspace_dir: PathBuf,
@@ -281,14 +285,20 @@ pub async fn search_cross_thread_messages(
     limit: usize,
     exclude_thread_id: Option<String>,
 ) -> Result<Vec<CrossThreadHit>, String> {
-    run(ctx.clone(), "search_cross_thread_messages", move || {
+    let wanted = limit.saturating_mul(2).max(limit.saturating_add(8));
+    let hits = run(ctx.clone(), "search_cross_thread_messages", move || {
         ConversationStore::new(ctx, workspace_dir).search_cross_thread_messages(
             &query,
-            limit,
+            wanted,
             exclude_thread_id.as_deref(),
         )
     })
-    .await
+    .await?;
+    Ok(hits
+        .into_iter()
+        .filter(|hit| !crate::threads::artifact_rows::is_artifact_row_id(&hit.message_id))
+        .take(limit)
+        .collect())
 }
 
 #[cfg(test)]

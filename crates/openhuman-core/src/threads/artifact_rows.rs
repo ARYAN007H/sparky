@@ -43,7 +43,16 @@ const BACKFILL_PAGE: usize = 1_000;
 /// The row id for an artifact. One row per artifact: a new version, a retry or
 /// a re-delivered ready event finds the row already there.
 pub fn artifact_row_id(artifact_id: &str) -> String {
-    format!("artifact:{artifact_id}")
+    format!("{ARTIFACT_ROW_ID_PREFIX}{artifact_id}")
+}
+
+/// Prefix of every artifact row's id ([`artifact_row_id`]).
+const ARTIFACT_ROW_ID_PREFIX: &str = "artifact:";
+
+/// Whether `message_id` names an artifact row: for readers that see ids but not
+/// message types, such as search hits.
+pub fn is_artifact_row_id(message_id: &str) -> bool {
+    message_id.starts_with(ARTIFACT_ROW_ID_PREFIX)
 }
 
 /// Whether `message` is an artifact row.

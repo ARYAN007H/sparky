@@ -25,7 +25,10 @@ function stringField(metadata: Record<string, unknown> | undefined, key: string)
 
 /**
  * The reply an artifact row belongs to: the last agent message of the row's
- * turn, or, for a row without a turn, the first agent message after it.
+ * turn, or, for a row without a turn, the first agent message saved at or after
+ * the artifact. A backfilled row is appended at the end of the log but keeps
+ * its artifact's time, so a row without a turn is placed by time, and by
+ * position only when a time cannot be read.
  */
 function replyIndexFor(messages: readonly ThreadMessage[], rowIndex: number, requestId?: string) {
   // Rows are agent messages too; a row is never a reply.
@@ -38,6 +41,13 @@ function replyIndexFor(messages: readonly ThreadMessage[], rowIndex: number, req
         return i;
     }
     return -1;
+  }
+  const madeAt = Date.parse(messages[rowIndex].createdAt);
+  if (!Number.isNaN(madeAt)) {
+    return messages.findIndex(message => {
+      const savedAt = Date.parse(message.createdAt);
+      return isReply(message) && !Number.isNaN(savedAt) && savedAt >= madeAt;
+    });
   }
   return messages.findIndex((message, i) => i > rowIndex && isReply(message));
 }

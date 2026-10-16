@@ -184,3 +184,34 @@ async fn recording_an_artifact_twice_writes_one_row() {
     assert_eq!(row_request_id(&rows[0]), Some("req-1"));
     assert_eq!(rows[0].extra_metadata["artifactId"], "a");
 }
+
+#[tokio::test]
+async fn search_never_returns_artifact_rows() {
+    let ws = temp_ws();
+    seed_thread(&ws, "t-1");
+    // The row's content is the artifact's title, which the query matches.
+    record_artifact_row(
+        &DispatchCtx::unbound(),
+        ws.clone(),
+        "t-1",
+        "a",
+        "Quarterly roadmap",
+        Some("req-1"),
+    )
+    .await
+    .unwrap();
+
+    let hits = conversations::blocking::search_cross_thread_messages(
+        DispatchCtx::unbound(),
+        ws,
+        "roadmap".to_string(),
+        10,
+        None,
+    )
+    .await
+    .unwrap();
+    assert!(
+        hits.iter().all(|hit| !is_artifact_row_id(&hit.message_id)),
+        "{hits:?}"
+    );
+}
