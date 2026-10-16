@@ -140,3 +140,17 @@ impl ContextOverlay {
         self
     }
 }
+
+pub(super) fn stricter_autonomy_ceiling(
+    left: Option<crate::security::AutonomyLevel>,
+    right: Option<crate::security::AutonomyLevel>,
+) -> Option<crate::security::AutonomyLevel> {
+    use crate::security::AutonomyLevel::{Full, ReadOnly, Supervised};
+
+    match (left, right) {
+        (None, ceiling) | (ceiling, None) => ceiling,
+        (Some(ReadOnly), _) | (_, Some(ReadOnly)) => Some(ReadOnly),
+        (Some(Supervised), _) | (_, Some(Supervised)) => Some(Supervised),
+        (Some(Full), Some(Full)) => Some(Full),
+    }
+}
