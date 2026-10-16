@@ -19,14 +19,27 @@ use super::{SubagentSessionStore, SubagentSessionUpsert};
 pub(crate) struct OpenHumanTinySubagentSessionStore {
     store: SubagentSessionStore,
     checkpoint_dir: PathBuf,
+    parent_session: String,
+    parent_thread_id: Option<String>,
 }
 
 impl OpenHumanTinySubagentSessionStore {
-    pub(crate) fn new(workspace_dir: PathBuf) -> Self {
+    pub(crate) fn new(
+        workspace_dir: PathBuf,
+        parent_session: impl Into<String>,
+        parent_thread_id: Option<String>,
+    ) -> Self {
         Self {
             checkpoint_dir: workspace_dir.join(".openhuman/subagent_checkpoints"),
             store: SubagentSessionStore::new(workspace_dir),
+            parent_session: parent_session.into(),
+            parent_thread_id,
         }
+    }
+
+    fn is_owned(&self, row: &DurableSubagentSession) -> bool {
+        row.parent_session == self.parent_session
+            && row.parent_thread_id == self.parent_thread_id
     }
 
     fn convert(&self, row: DurableSubagentSession) -> Result<TinySession, SubagentError> {
@@ -107,7 +120,11 @@ impl TinySessionStore for OpenHumanTinySubagentSessionStore {
         parent_session: &str,
         parent_thread_id: Option<&str>,
     ) -> Result<Vec<TinySession>, SubagentError> {
-        super::list_for_parent(&self.store, parent_session, parent_thread_id)
+        let thread_id = self.parent_thread_id.as_deref().or(parent_thread_id);
+        if parent_session != self.parent_session {
+            return Ok(Vec::new());
+        }
+        super::list_for_parent(&self.store, parent_session, thread_id)
             .map_err(SubagentError::Persistence)?
             .into_iter()
             .map(|row| self.convert(row))
@@ -121,7 +138,9 @@ impl TinySessionStore for OpenHumanTinySubagentSessionStore {
             .map_err(SubagentError::Persistence)?
             .into_iter()
             .find(|row| row.subagent_session_id == id);
-        row.map(|row| self.convert(row)).transpose()
+        row.filter(|row| self.is_owned(row))
+            .map(|row| self.convert(row))
+            .transpose()
     }
 
     async fn upsert_running(
@@ -163,6 +182,9 @@ impl TinySessionStore for OpenHumanTinySubagentSessionStore {
     }
 
     async fn close(&self, id: &str) -> Result<bool, SubagentError> {
+        if self.get(id).await?.is_none() {
+            return Ok(false);
+        }
         super::close(&self.store, id).map_err(SubagentError::Persistence)
     }
 
@@ -173,6 +195,9 @@ impl TinySessionStore for OpenHumanTinySubagentSessionStore {
         status: TinyStatus,
         history: Vec<tinyinference_llm::message::Message>,
     ) -> Result<bool, SubagentError> {
+        if self.get(id).await?.is_none() {
+            return Ok(false);
+        }
         let status = match status {
             TinyStatus::Running => crate::agent::subagent_host::SubagentRunStatus::Incomplete {
                 reason: "still running".into(),
@@ -203,6 +228,9 @@ impl TinySessionStore for OpenHumanTinySubagentSessionStore {
         task_id: &str,
         error: String,
     ) -> Result<bool, SubagentError> {
+        if self.get(id).await?.is_none() {
+            return Ok(false);
+        }
         super::mark_failed(&self.store, id, task_id, error)
             .map_err(SubagentError::Persistence)?;
         Ok(true)
