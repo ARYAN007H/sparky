@@ -193,7 +193,7 @@ fn media_files_roots_are_recorded_before_any_source_builds() {
     let sink = Arc::clone(&seen);
     register_tool_source_at(
         "test::roots",
-        ANCHOR_AFTER_SEARCH,
+        ToolSourcePlacement::After(ANCHOR_AFTER_SEARCH),
         move |ctx| {
             *sink.lock().unwrap() = Some(ctx.security.media_files_roots.lock().unwrap().is_some());
             Vec::new()
