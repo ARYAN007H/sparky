@@ -114,14 +114,23 @@ impl ToolBackend for ComposioToolBackend {
         // curation check (unlike the pre-fix behavior) so a read-only tier
         // can never even probe which slugs are curated.
         let composio_class = super::super::classify_composio_action_for_tier(slug).await;
-        let tier_decision =
-            super::super::enforce_node_tier_gate(ctx.security, composio_class, "tool_call")?;
+        let tier_policy = super::super::tier_policy_from_config(
+            ctx.dispatch,
+            ctx.config,
+            Some(&live_config),
+            ctx.security,
+        )?;
+        let tier_decision = super::super::enforce_node_tier_gate(
+            &tier_policy,
+            composio_class,
+            "tool_call",
+        )?;
         tracing::debug!(
             target: "flows",
             %slug,
             ?composio_class,
             ?tier_decision,
-            tier = ?ctx.security.autonomy,
+            tier = ?tier_policy.autonomy,
             "[flows] tool_call: composio node tier gate evaluated"
         );
 

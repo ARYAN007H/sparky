@@ -56,7 +56,7 @@ use tinybox_bus::CommandClass;
 use tinymemory_api::wrap_untrusted_for_agent;
 use tinymemory_api::{Hit, LearningKind, MemoryMeta, MetaFilter, SourceKind};
 
-use super::caps::{enforce_node_tier_gate, gate_call_for_tier};
+use super::caps::{enforce_current_node_tier_gate, gate_call_for_tier};
 
 /// Stable `tracing` grep prefix for every log line this adapter emits. Never
 /// logs memory *content* or PII — only operation names, scopes, resolved
@@ -123,8 +123,15 @@ impl OpenHumanMemory {
     /// a guaranteed-`Allow` decision through `intercept_audited` anyway would
     /// only reintroduce the "reads wait for approval" bug that short-circuit
     /// was added to close.
-    fn tier_gate_read(&self, op: &str) -> Result<()> {
-        enforce_node_tier_gate(&self.security, CommandClass::Read, op)?;
+    async fn tier_gate_read(&self, op: &str) -> Result<()> {
+        enforce_current_node_tier_gate(
+            &self.ctx,
+            &self.config,
+            &self.security,
+            CommandClass::Read,
+            op,
+        )
+        .await?;
         Ok(())
     }
 
@@ -145,7 +152,14 @@ impl OpenHumanMemory {
     /// see that function's doc for why (E-m1).
     async fn tier_gate_write(&self, op: &str, action: &Value) -> Result<Option<String>> {
         let tool_name = format!("flows_memory_{op}");
-        let tier_decision = enforce_node_tier_gate(&self.security, CommandClass::Write, op)?;
+        let tier_decision = enforce_current_node_tier_gate(
+            &self.ctx,
+            &self.config,
+            &self.security,
+            CommandClass::Write,
+            op,
+        )
+        .await?;
         let summary = summarize_action(&tool_name, action);
         let redacted = redact_args(action);
         let (outcome, audit_id) = gate_call_for_tier(
@@ -257,7 +271,7 @@ impl MemoryProvider for OpenHumanMemory {
             "{LOG_PREFIX} recall: entry"
         );
 
-        self.tier_gate_read(operation)?;
+        self.tier_gate_read(operation).await?;
         let filter = self.scope_filter(scope)?;
 
         let (answer, results): (Option<String>, Vec<Value>) = if operation == "search" {
@@ -320,7 +334,7 @@ impl MemoryProvider for OpenHumanMemory {
     /// Memory v2 keeps no flavoured profiles, so every slug is unknown.
     async fn flavour(&self, slug: &str) -> Result<Value> {
         tracing::debug!(target: "flows", flavour = slug, "{LOG_PREFIX} flavour: unsupported");
-        self.tier_gate_read("flavour")?;
+        self.tier_gate_read("flavour").await?;
         Err(EngineError::Capability(format!(
             "memory node: unknown flavour \"{slug}\" (this host's memory keeps no flavour profiles)"
         )))
@@ -333,7 +347,7 @@ impl MemoryProvider for OpenHumanMemory {
             has_query = query.is_some_and(|q| !q.trim().is_empty()),
             "{LOG_PREFIX} people: unsupported, empty listing"
         );
-        self.tier_gate_read("people")?;
+        self.tier_gate_read("people").await?;
         Ok(json!({ "people": [], "supported": false }))
     }
 
