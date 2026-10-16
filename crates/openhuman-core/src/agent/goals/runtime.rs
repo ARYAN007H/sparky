@@ -6,15 +6,8 @@
 //! - [`account_turn_against_goal`] folds a completed turn's token + time usage
 //!   into the active goal, flipping it to `budget_limited` when the cap is
 //!   crossed.
-//! - [`GoalBudgetStopHook`] votes to stop an in-flight turn as soon as an
-//!   *active* goal's running usage would exceed its budget. #4469 item 1: the
-//!   stop is a graceful *pause*, not an instantaneous abort — the vote fires in
-//!   the stop-hook middleware's `after_model`, and the harness drains the pause
-//!   at the **top of the next iteration**, so the tool round for the model call
-//!   that tripped the budget still runs and the turn's wrap-up summary may spend
-//!   one more model call before the partial transcript is returned. It bounds
-//!   an autonomous run to a small, deterministic overshoot past the ceiling
-//!   rather than a hard cut at the exact accounting point.
+//! - Goal budget policy is supplied by `tinyagents-hooks`; this module keeps
+//!   persistence and completed-turn accounting.
 
 use std::path::Path;
 

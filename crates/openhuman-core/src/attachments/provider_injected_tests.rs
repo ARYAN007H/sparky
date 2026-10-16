@@ -1,5 +1,5 @@
-use super::tests::Probe;
 use super::*;
+use super::tests::Probe;
 
 #[tokio::test]
 async fn injected_turn_source_uses_bound_workspace_and_explicit_model_facts() {

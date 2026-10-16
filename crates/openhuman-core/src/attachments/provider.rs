@@ -446,6 +446,7 @@ impl ChatModel<()> for AttachmentModel {
 mod cache;
 #[path = "provider_fallback.rs"]
 mod fallback;
+#[cfg(test)]
 #[path = "provider_injected_tests.rs"]
 mod injected_tests;
 #[path = "provider_source.rs"]
