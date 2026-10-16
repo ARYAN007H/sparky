@@ -28,7 +28,7 @@ use crate::agent::tinyagents::turn_policy::is_subagent_spawn_or_delegate_tool;
 use crate::agent::tinyagents::use_skill_dispatch::UseSkillDispatch;
 use crate::agent::tools::{DelegateToolDispatch, TodoToolDispatch};
 use crate::core::runtime::CoreContext;
-use crate::tools::r#impl::threads::SpawnWorkerThreadDispatch;
+use crate::tools::implementations::threads::SpawnWorkerThreadDispatch;
 
 type RegisteredToolDispatch = Arc<dyn ToolDispatch<(), OpenHumanRunContext>>;
 type ToolDispatchSelectorFn =
