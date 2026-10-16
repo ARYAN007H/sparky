@@ -77,6 +77,22 @@ fn every_spec_method_is_registered_with_its_exact_name() {
 }
 
 #[test]
+fn every_function_resolves_through_its_handler_entry() {
+    for function in FUNCTIONS {
+        let (_, expected_handler) = HANDLERS
+            .iter()
+            .find(|(name, _)| *name == function)
+            .unwrap_or_else(|| panic!("missing handler entry for {function}"));
+        assert!(std::ptr::fn_addr_eq(
+            handler_for(function).expect("registered function has a handler"),
+            *expected_handler
+        ));
+    }
+
+    assert!(handler_for("no_such_function").is_none());
+}
+
+#[test]
 fn unknown_function_gets_the_placeholder_schema() {
     let unknown = schema("no_such_function");
     assert_eq!(unknown.function, "unknown");
