@@ -175,6 +175,12 @@ cleanup() {
         log_index=$((log_index + 1))
       done
     done
+    if [ -f "${OPENHUMAN_WORKSPACE:-}/e2e-app-env-check.log" ]; then
+      mkdir -p "${E2E_ARTIFACTS_DIR:-$APP_DIR/test/e2e/artifacts}"
+      cp "${OPENHUMAN_WORKSPACE}/e2e-app-env-check.log" \
+        "${E2E_ARTIFACTS_DIR:-$APP_DIR/test/e2e/artifacts}/${LOG_SUFFIX}-app-env-check.log" \
+        2>/dev/null || true
+    fi
   fi
   if [ -n "$CREATED_TEMP_WORKSPACE" ]; then
     for attempt in 1 2 3; do
@@ -357,7 +363,7 @@ if [ "$OS" = "Linux" ] && [ "${E2E_USE_TAURI_DRIVER:-0}" = "1" ]; then
         printf 'export %s=%q\n' "$env_name" "${!env_name}"
       fi
     done
-    printf 'exec %q "$@"\n' "$APP_BIN"
+    printf 'printf "launcher_started=1 key_present=%%s workspace_present=%%s backend_url_present=%%s\\n" "${OPENHUMAN_KEYRING_MASTER_KEY:+yes}" "${OPENHUMAN_WORKSPACE:+yes}" "${BACKEND_URL:+yes}" > %q\n' "$OPENHUMAN_WORKSPACE/e2e-app-env-check.log"
   } > "$E2E_APP_WRAPPER"
   chmod 700 "$E2E_APP_WRAPPER"
   export OPENHUMAN_E2E_APP_BINARY="$E2E_APP_WRAPPER"
