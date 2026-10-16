@@ -203,9 +203,21 @@ pub(crate) async fn truncate_cron_output(config: &Config, output: &str) -> Resul
     call(config, members::TRUNCATE_CRON_OUTPUT, (output,)).await
 }
 
-/// A synchronous caller's bridge to the async calls above. The acting scope
-/// and config are captured before the hop (the bridge thread carries no task
-/// context), so `f` receives owned copies.
+/// [`store`] for a synchronous caller (the cron store API is synchronous). The
+/// acting scope is resolved here, on the caller's task, because the bridge
+/// thread the call hops to carries no task context.
+pub(crate) fn store_blocking<R: DeserializeOwned + Send + 'static>(
+    config: &Config,
+    operation: StoreOperation,
+) -> Result<R> {
+    let scope = DocScope::current(config)?;
+    blocking(config, move |config| async move {
+        store_in(&config, &scope, operation).await
+    })
+}
+
+/// A synchronous caller's bridge to the async calls above. Anything that needs
+/// the acting scope must be captured before the hop.
 pub(crate) fn blocking<T, F, Fut>(config: &Config, f: F) -> Result<T>
 where
     T: Send + 'static,
