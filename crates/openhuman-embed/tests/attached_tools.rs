@@ -187,9 +187,8 @@ fn attached_tools_survive_clones_and_session_resume() {
                 .into_iter()
                 .next()
                 .expect("the later session has a root transcript");
-            let durable =
-                serde_json::to_string(&successor.transcript.read_session().unwrap().unwrap())
-                    .unwrap();
+            let successor = successor.transcript.read_session().unwrap().unwrap();
+            let durable = serde_json::to_string(&(successor.messages, successor.tools)).unwrap();
             assert!(
                 durable
                     .lines()
