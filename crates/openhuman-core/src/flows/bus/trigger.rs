@@ -125,19 +125,20 @@ const APP_EVENT_QUEUE_CAPACITY: usize = 32;
 impl FlowTriggerSubscriber {
     pub fn new(config: Arc<Config>) -> Self {
         Self::with_executor(config, APP_EVENT_QUEUE_CAPACITY, |ctx, config, request| async move {
-            tracing::info!(target: "flows", flow_id = %request.flow_id, "[flows] trigger fired — starting run");
+            let flow_id = request.flow_id.clone();
+            tracing::info!(target: "flows", %flow_id, "[flows] trigger fired — starting run");
             match crate::flows::ops::flows_run(
                 &ctx,
                 &config,
-                &request.flow_id,
+                &flow_id,
                 request.input,
                 request.inputs,
                 request.trigger,
             )
             .await
             {
-                Ok(_) => tracing::info!(target: "flows", flow_id = %request.flow_id, "[flows] trigger-driven run finished"),
-                Err(e) => tracing::warn!(target: "flows", flow_id = %request.flow_id, error = %e, "[flows] trigger-driven run failed"),
+                Ok(_) => tracing::info!(target: "flows", %flow_id, "[flows] trigger-driven run finished"),
+                Err(e) => tracing::warn!(target: "flows", %flow_id, error = %e, "[flows] trigger-driven run failed"),
             }
         })
     }
@@ -159,9 +160,11 @@ impl FlowTriggerSubscriber {
         });
         Self {
             config,
-            in_flight: Arc::new(Mutex::new(HashSet::new())),
+            queues: Arc::new(Mutex::new(HashMap::new())),
             runner,
             queue_capacity: queue_capacity.max(1),
+            #[cfg(test)]
+            retiring: Arc::new(tokio::sync::Notify::new()),
         }
     }
 
@@ -179,22 +182,6 @@ impl FlowTriggerSubscriber {
         Fut: Future<Output = ()> + Send + 'static,
     {
         Self::with_executor(config, queue_capacity, runner)
-    }
-
-    /// Attempts to claim `flow_id` for a trigger-driven dispatch. Returns
-    /// `None` when a dispatch for the same flow is already in flight — the
-    /// caller should skip this tick. Returns `Some(guard)` on success; the
-    /// guard releases the claim on `Drop` (including on panic/early return),
-    /// so a run can never permanently wedge the flow out of future ticks.
-    pub(super) fn try_acquire_dispatch(&self, flow_id: &str) -> Option<InFlightGuard> {
-        let mut in_flight = self.in_flight.lock().unwrap_or_else(|e| e.into_inner());
-        if !in_flight.insert(flow_id.to_string()) {
-            return None;
-        }
-        Some(InFlightGuard {
-            set: self.in_flight.clone(),
-            flow_id: flow_id.to_string(),
-        })
     }
 
     async fn dispatch_app_event(
