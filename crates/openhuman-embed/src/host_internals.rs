@@ -124,7 +124,8 @@ pub mod backend {
 pub mod config {
     pub use openhuman_core::config::{
         active_workspace_dir, active_workspace_dir_cached, active_workspace_snapshot,
-        load_config_with_timeout, workspace_handle, Config, MODEL_MANAGED_DEFAULT,
+        build_runtime_proxy_client_with_timeouts, load_config_with_timeout, workspace_handle,
+        Config, MODEL_MANAGED_DEFAULT,
     };
 
     pub mod app_env {
@@ -350,6 +351,7 @@ pub mod inference_registry {
         ChatModelEntry, ChatModelFactory, ChatModelRequest, EmbeddingFactory, EmbeddingRequest,
         ReadinessProbe,
     };
+    pub use openhuman_core::inference::provider::openhuman_backend_model::REASONING_OFF_METADATA_KEY;
 }
 
 /// Memory engines by id, and the free-background-work predicate.
