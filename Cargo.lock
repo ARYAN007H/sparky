@@ -5601,6 +5601,7 @@ dependencies = [
  "tinyagents-session",
  "tinybus",
  "tinyflows-bus",
+ "tinyflows-module",
  "tinyinference-embeddings",
  "tinyinference-llm 0.4.1",
  "tinymcp-bus",

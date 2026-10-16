@@ -54,7 +54,26 @@ pub fn offline_config() -> Config {
     config.agent.session_dual_write = false;
     config.agent.session_shadow_reads = false;
     config.default_temperature = 0.0;
+    link_tinyflows(&mut config);
     config
+}
+
+/// Serve the tinyflows module (scheduler runtime, job store, schedule maths)
+/// from the test binary instead of a downloaded release: the factory is
+/// registered with the core's `register_linked` seam and this config asks for
+/// it by a per-module override, so no other module changes source.
+pub fn link_tinyflows(config: &mut Config) {
+    use openhuman_core::config::schema::{ModuleOverride, ModuleSourceMode};
+    openhuman_embed::modules::register_linked("tinyflows", tinyflows_module::linked_module);
+    config.modules.allow_download = false;
+    config
+        .modules
+        .overrides
+        .retain(|existing| existing.id != "tinyflows");
+    config
+        .modules
+        .overrides
+        .push(ModuleOverride::with_source("tinyflows", ModuleSourceMode::Linked));
 }
 
 /// The tuned runtime the harness documents as the caller's responsibility.
