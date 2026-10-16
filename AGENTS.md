@@ -561,6 +561,7 @@ Direct rendered submodules under `vendor/`:
 | `tinyjuice` | Agent tool-output compression and recovery of omitted content. |
 | `tinymcp` | The TinyMCP module implementation and its bus contract. Put MCP module behavior and contract changes here; OpenHuman owns configuration, lifecycle, and host integration. |
 | `tinymemory` | Engine-neutral memory contracts, operations, and providers. Its nested TinyCortex submodule owns the TinyCortex memory engine. |
+| `tinystoragedrivers` | Storage ports, drivers (sqlite/file/mongodb/s3), secrets, storage bus contract; every module's tsd dependency is patched onto this checkout. |
 | `tinysearch` | Web-search module, provider dispatch, tool declarations, and execution behind its TinyBus contract. |
 | `tinyskills` | Host-independent skill/workflow bundle parsing, discovery, scope resolution, resource inventory, and safe reads. OpenHuman owns trust and execution policy. |
 | `tinyvoice` | Host-agnostic voice primitives such as audio framing, VAD, wake-word gating, routing, and STT hallucination detection. |

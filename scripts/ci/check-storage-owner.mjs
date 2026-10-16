@@ -9,6 +9,10 @@
 //      of FORBIDDEN_DEPS (any kind, optional or not), or
 //   2. a first-party package outside `tinystoragedrivers*` is named
 //      `*-sqlite`, `*-mongodb` or `*-file`.
+//   3. a `tinystoragedrivers*` package in the resolved graph is not built from
+//      a path under `vendor/tinystoragedrivers/` (a registry or git source
+//      means some manifest escaped the root `[patch]` onto the vendored copy,
+//      for example a module that bumped its tag past the vendored commit).
 // Third-party registry crates are ignored (they are the backends' own deps,
 // e.g. `rusqlite -> libsqlite3-sys`).
 //
@@ -53,6 +57,35 @@ const isOwner = name => name.startsWith('tinystoragedrivers');
 /** First-party = built from a path or a git source, not from a registry. */
 const isFirstParty = pkg => !pkg.source || pkg.source.startsWith('git+');
 
+export const VENDORED_TSD_DIR = 'vendor/tinystoragedrivers/';
+
+/** Rule 3: every tinystoragedrivers* package must be a path under VENDORED_TSD_DIR. */
+export function checkVendoredOwner(metadata) {
+  const out = [];
+  const packages = metadata.packages ?? [];
+  for (const pkg of packages) {
+    if (!isOwner(pkg.name)) continue;
+    const manifest = String(pkg.manifest_path ?? '').replaceAll('\\', '/');
+    if (!pkg.source && manifest.includes(`/${VENDORED_TSD_DIR}`)) continue;
+    const dependents = [
+      ...new Set(
+        packages
+          .filter(p => p.name !== pkg.name && (p.dependencies ?? []).some(d => d.name === pkg.name))
+          .map(p => p.name)
+      ),
+    ].sort();
+    out.push({
+      package: pkg.name,
+      kind: 'tsd-not-vendored',
+      detail:
+        `resolves to ${pkg.source ?? manifest} instead of ${VENDORED_TSD_DIR}` +
+        (dependents.length ? ` (required by ${dependents.join(', ')})` : '') +
+        '; bump vendor/tinystoragedrivers or the module\'s tinystoragedrivers tag so they agree',
+    });
+  }
+  return out;
+}
+
 /** Returns `[{ package, kind, detail }]` violations for one metadata document. */
 export function checkMetadata(metadata, allowlist = ALLOWLIST) {
   const out = [];
@@ -70,7 +103,7 @@ export function checkMetadata(metadata, allowlist = ALLOWLIST) {
       }
     }
   }
-  return out;
+  return [...out, ...checkVendoredOwner(metadata)];
 }
 
 export function formatReport(violations) {

@@ -9,9 +9,14 @@ import { fileURLToPath } from 'node:url';
 import { ALLOWLIST, checkMetadata, formatReport } from '../ci/check-storage-owner.mjs';
 
 const CHECKER = resolve(dirname(fileURLToPath(import.meta.url)), '../ci/check-storage-owner.mjs');
-const pkg = (name, deps = [], source = null) => ({
+const pkg = (name, deps = [], source = null, manifest_path) => ({
   name,
   source,
+  manifest_path:
+    manifest_path ??
+    (name.startsWith('tinystoragedrivers')
+      ? `/repo/vendor/tinystoragedrivers/crates/${name}/Cargo.toml`
+      : `/repo/vendor/${name}/Cargo.toml`),
   dependencies: deps.map(d => ({ name: d, kind: null, optional: false })),
 });
 const registry = 'registry+https://github.com/rust-lang/crates.io-index';
@@ -74,4 +79,33 @@ test('CLI exits 1 on a violation, 0 when clean, 2 on unreadable input', () => {
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test('tinystoragedrivers packages under vendor/tinystoragedrivers pass', () => {
+  assert.deepEqual(
+    checkMetadata({ packages: [pkg('tinyflows', ['tinystoragedrivers-core']), pkg('tinystoragedrivers-core')] }),
+    []
+  );
+});
+
+test('a git or registry tinystoragedrivers package fails and names its dependents', () => {
+  const git = 'git+https://github.com/tinyhumansai/tinystoragedrivers?tag=v0.12.0#abc';
+  const v = checkMetadata({
+    packages: [
+      pkg('tinyflows', ['tinystoragedrivers-core']),
+      pkg('tinystoragedrivers-core', [], git, '/home/u/.cargo/git/checkouts/tsd/abc/Cargo.toml'),
+    ],
+  });
+  assert.equal(v.length, 1);
+  assert.equal(v[0].kind, 'tsd-not-vendored');
+  assert.match(formatReport(v), /tinystoragedrivers-core: resolves to git\+.*required by tinyflows.*bump vendor\/tinystoragedrivers/);
+  const reg = checkMetadata({ packages: [pkg('tinystoragedrivers-core', [], registry)] });
+  assert.equal(reg[0].kind, 'tsd-not-vendored');
+});
+
+test('a path tinystoragedrivers package outside the vendored checkout fails', () => {
+  const v = checkMetadata({
+    packages: [pkg('tinystoragedrivers-core', [], null, '/repo/vendor/tinyagents/vendor/tinystoragedrivers/crates/x/Cargo.toml')],
+  });
+  assert.equal(v.length, 1);
 });
