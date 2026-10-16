@@ -322,7 +322,6 @@ impl FlowTriggerSubscriber {
             return;
         };
 
-        let config = self.config_for_scope(ctx);
         let run_ctx = ctx.clone();
         let config = self.config_for_scope(ctx);
         let request = TriggerRunRequest {

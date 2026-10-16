@@ -209,7 +209,11 @@ async fn app_event_runs_queue_fifo_per_tenant_while_other_tenants_progress() {
     let started_tx = Arc::new(Mutex::new(Some(started_tx)));
     let (release_first_tx, release_first_rx) = oneshot::channel();
     let release_first_rx = Arc::new(tokio::sync::Mutex::new(Some(release_first_rx)));
-    let runner = move |ctx, _config, request| {
+    let runner = move |
+        ctx: DispatchCtx,
+        _config: Arc<Config>,
+        request: crate::flows::bus::trigger::TriggerRunRequest,
+    | {
         let completed_tx = completed_tx.clone();
         let started_tx = Arc::clone(&started_tx);
         let release_first_rx = Arc::clone(&release_first_rx);
@@ -242,14 +246,14 @@ async fn app_event_runs_queue_fifo_per_tenant_while_other_tenants_progress() {
     let tenant_b = context("tenant-b");
 
     subscriber
-        .dispatch_app_event(&tenant_a, "shared-flow", json!({"event": "a1"}))
+        .dispatch_test_app_event(&tenant_a, "shared-flow", json!({"event": "a1"}))
         .await;
     started_rx.await.unwrap();
     subscriber
-        .dispatch_app_event(&tenant_a, "shared-flow", json!({"event": "a2"}))
+        .dispatch_test_app_event(&tenant_a, "shared-flow", json!({"event": "a2"}))
         .await;
     subscriber
-        .dispatch_app_event(&tenant_b, "shared-flow", json!({"event": "b1"}))
+        .dispatch_test_app_event(&tenant_b, "shared-flow", json!({"event": "b1"}))
         .await;
 
     let receive = async |rx: &mut mpsc::UnboundedReceiver<_>| {
