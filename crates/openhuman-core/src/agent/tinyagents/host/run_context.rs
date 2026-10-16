@@ -291,7 +291,7 @@ pub struct OpenHumanRunContext {
     /// Stop policies evaluated after each model call.
     pub stop_hooks: Vec<Arc<dyn StopHook<tinyagents_harness::cost::TurnCost>>>,
     /// Agent/turn tool callbacks, registered after the runtime's global ones.
-    pub tool_hooks: Vec<Arc<dyn crate::agent::hooks::ToolHook<OpenHumanRunContext>>>,
+    pub tool_hooks: Vec<Arc<dyn tinyagents_hooks::tool::ToolHook<OpenHumanRunContext>>>,
     /// Host cap on real tool invocations for this turn tree; `None` leaves the
     /// product default. Inherited by children.
     pub tool_call_limit: Option<usize>,
@@ -410,7 +410,7 @@ pub(crate) struct HarnessHostPolicy {
     /// Stop policies evaluated after each model call.
     pub(crate) stop_hooks: Vec<Arc<dyn StopHook<tinyagents_harness::cost::TurnCost>>>,
     /// Agent/turn tool callbacks, registered after the runtime's global ones.
-    pub(crate) tool_hooks: Vec<Arc<dyn crate::agent::hooks::ToolHook>>,
+    pub(crate) tool_hooks: Vec<Arc<dyn tinyagents_hooks::tool::ToolHook<OpenHumanRunContext>>>,
     /// The host's cap on real tool invocations.
     pub(crate) tool_call_cap: Option<usize>,
 }
