@@ -115,3 +115,65 @@ fn unregistering_a_source_removes_its_tools() {
     assert!(unregister_tool_source("test::gone"));
     assert!(!assemble(&tmp).contains(&"source_fake_gone".to_string()));
 }
+
+#[test]
+fn anchored_sources_sit_where_the_catalogue_always_listed_them() {
+    // The pre-refactor catalogue built a host's media / file-storage tools
+    // right after the search tools (before hosting, web3 and image_info) and
+    // its place / market-data tools right after the delegation tool, ahead of
+    // the Composio tools; the order is a prompt-cache input.
+    let tmp = TempDir::new().unwrap();
+    let baseline = assemble(&tmp);
+    let anchor_tools = |names: &[&str]| -> Vec<Box<dyn Tool>> {
+        names
+            .iter()
+            .map(|n| Box::new(FakeTool(Box::leak(n.to_string().into_boxed_str()))) as Box<dyn Tool>)
+            .collect()
+    };
+
+    register_tool_source_at(
+        "test::after_search_a",
+        ToolSourcePlacement::After(ANCHOR_AFTER_SEARCH),
+        move |_| anchor_tools(&["anchor_fake_search_a"]),
+    );
+    register_tool_source_at(
+        "test::after_search_b",
+        ToolSourcePlacement::After(ANCHOR_AFTER_SEARCH),
+        move |_| anchor_tools(&["anchor_fake_search_b"]),
+    );
+    register_tool_source_at(
+        "test::after_delegate",
+        ToolSourcePlacement::After(ANCHOR_AFTER_DELEGATE),
+        move |_| anchor_tools(&["anchor_fake_delegate"]),
+    );
+    register_tool_source("test::end", |_| vec![Box::new(FakeTool("anchor_fake_end"))]);
+    register_tool_source_at(
+        "test::unknown_anchor",
+        ToolSourcePlacement::After("nowhere"),
+        |_| vec![Box::new(FakeTool("anchor_fake_unknown"))],
+    );
+    let names = assemble(&tmp);
+    for id in [
+        "test::after_search_a",
+        "test::after_search_b",
+        "test::after_delegate",
+        "test::end",
+        "test::unknown_anchor",
+    ] {
+        unregister_tool_source(id);
+    }
+
+    let pos = |name: &str| names.iter().position(|n| n == name).unwrap_or_else(|| panic!("{name} missing"));
+    // Registration order within an anchor.
+    assert_eq!(pos("anchor_fake_search_b"), pos("anchor_fake_search_a") + 1);
+    // After-search sources precede the image-info built-in registered after
+    // hosting/web3, and follow the built-ins that precede the search tools.
+    assert!(pos("file_read") < pos("anchor_fake_search_a"));
+    assert!(pos("anchor_fake_search_b") < pos("image_info"));
+    // End sources, and sources with an unknown anchor, trail every built-in
+    // and keep registration order.
+    assert!(pos("anchor_fake_delegate") < pos("anchor_fake_end"));
+    assert!(pos("anchor_fake_end") < pos("anchor_fake_unknown"));
+    assert_eq!(pos("anchor_fake_unknown"), names.len() - 1);
+    assert_eq!(names.len(), baseline.len() + 5);
+}

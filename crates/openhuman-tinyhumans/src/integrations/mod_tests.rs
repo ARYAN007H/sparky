@@ -77,3 +77,44 @@ fn register_plugs_every_hosted_integration_into_the_core_registries() {
     assert!(unregister_tool_source(FILE_STORAGE_SOURCE_ID));
     register(&InstallOptions::default());
 }
+
+/// The catalogue order is a prompt-cache input. Before the move the core built
+/// the media and file-storage tools right after the search tools, and the
+/// Google Places / stock tools right after the delegation tool (ahead of
+/// Composio); the sources must register at those same anchors and in that order.
+#[test]
+fn tool_sources_register_at_the_pre_refactor_catalogue_positions() {
+    use openhuman_embed::__host::tool_sources::{
+        registered_tool_source_placements, unregister_tool_source, ToolSourcePlacement,
+        ANCHOR_AFTER_DELEGATE, ANCHOR_AFTER_SEARCH,
+    };
+
+    register(&InstallOptions::default());
+    let ours: Vec<_> = registered_tool_source_placements()
+        .into_iter()
+        .filter(|(id, _)| id.starts_with("tinyhumans-"))
+        .collect();
+    let placement = |id: &str| ours.iter().find(|(i, _)| i == id).map(|(_, p)| *p);
+    let position = |id: &str| ours.iter().position(|(i, _)| i == id);
+
+    assert_eq!(
+        placement(FILE_STORAGE_SOURCE_ID),
+        Some(ToolSourcePlacement::After(ANCHOR_AFTER_SEARCH))
+    );
+    assert_eq!(
+        placement(INTEGRATION_TOOLS_SOURCE_ID),
+        Some(ToolSourcePlacement::After(ANCHOR_AFTER_DELEGATE))
+    );
+    #[cfg(feature = "media")]
+    {
+        assert_eq!(
+            placement(media::TOOL_SOURCE_ID),
+            Some(ToolSourcePlacement::After(ANCHOR_AFTER_SEARCH))
+        );
+        // media before file storage, as the core built them.
+        assert!(position(media::TOOL_SOURCE_ID) < position(FILE_STORAGE_SOURCE_ID));
+        assert!(unregister_tool_source(media::TOOL_SOURCE_ID));
+    }
+    assert!(unregister_tool_source(FILE_STORAGE_SOURCE_ID));
+    assert!(unregister_tool_source(INTEGRATION_TOOLS_SOURCE_ID));
+}

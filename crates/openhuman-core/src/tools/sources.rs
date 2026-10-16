@@ -121,6 +121,15 @@ pub fn unregister_tool_source(id: &str) -> bool {
     TOOL_SOURCES.unregister(id)
 }
 
+/// The placement of every registered source, in registration order.
+pub fn registered_tool_source_placements() -> Vec<(String, ToolSourcePlacement)> {
+    TOOL_SOURCES
+        .entries()
+        .into_iter()
+        .map(|(id, entry)| (id, entry.placement))
+        .collect()
+}
+
 /// Builds the tools of every registered source placed at `anchor`
 /// (`Some(name)`) or at the end (`None`, which also collects sources whose
 /// anchor is unknown), in registration order.

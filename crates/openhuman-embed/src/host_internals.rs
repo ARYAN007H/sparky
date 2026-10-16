@@ -292,7 +292,7 @@ pub mod util {
 pub mod tool_sources {
     pub use openhuman_core::tools::sources::{
         register_tool_source, register_tool_source_at, register_tool_source_in,
-        unregister_tool_source, ToolSourceCtx, ToolSourceFactory, ToolSourcePlacement,
+        registered_tool_source_placements, unregister_tool_source, ToolSourceCtx, ToolSourceFactory, ToolSourcePlacement,
         ANCHOR_AFTER_DELEGATE, ANCHOR_AFTER_SEARCH,
     };
 }
