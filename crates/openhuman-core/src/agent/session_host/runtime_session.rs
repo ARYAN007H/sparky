@@ -346,15 +346,6 @@ impl OpenHumanTurnPrelude {
             .build_system_prompt_tiered(&context)
     }
 
-    #[cfg(test)]
-    fn synthesized_tool_names_for_test(&self) -> std::collections::HashSet<String> {
-        self.tool_surface
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .synthesized_tool_names
-            .clone()
-    }
-
     fn drain_host_events(&self) -> bool {
         let mut mutable = self
             .mutable
