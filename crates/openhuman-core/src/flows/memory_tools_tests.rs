@@ -1,6 +1,6 @@
 use super::*;
-use crate::memory::types::ItemsListParams;
 use crate::memory::test_fixtures::RecordingEngine;
+use crate::memory::types::ItemsListParams;
 use tempfile::TempDir;
 use tinymemory_api::conformance::ReferenceEngine;
 

@@ -208,10 +208,7 @@ pub async fn remember_keyed(
         Some(meta),
     )
     .await?;
-    let obsolete_ids: Vec<String> = old_ids
-        .into_iter()
-        .filter(|id| id != &view.id)
-        .collect();
+    let obsolete_ids: Vec<String> = old_ids.into_iter().filter(|id| id != &view.id).collect();
     let replaced = if obsolete_ids.is_empty() {
         0
     } else {
