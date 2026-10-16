@@ -2,7 +2,7 @@
 use super::implementations::network::{McpListServersTool, McpListToolsTool};
 use super::*;
 use crate::config::{Config, DelegateAgentConfig};
-use crate::modules::tinybox::host_runtime::{NativeRuntime, RuntimeAdapter};
+use crate::agent::host_runtime::{NativeRuntime, RuntimeAdapter};
 use crate::security::{AuditLogger, SecurityPolicy};
 use crate::tools::delegate::DelegateTool;
 use std::collections::HashMap;

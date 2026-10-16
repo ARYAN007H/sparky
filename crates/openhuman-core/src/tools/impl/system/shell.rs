@@ -5,7 +5,7 @@ use super::shell_support::{command_failure, exec_result, python_utf8_env, tool_t
 use crate::agent::tinyagents::host::run_context::dispatch_ctx_for_tool;
 use crate::config::Config;
 use crate::core::runtime::DispatchCtx;
-use crate::modules::tinybox::host_runtime::RuntimeAdapter;
+use crate::agent::host_runtime::RuntimeAdapter;
 use crate::security::{AuditLogger, CommandExecutionLog, SecurityPolicy};
 use async_trait::async_trait;
 use serde_json::json;
