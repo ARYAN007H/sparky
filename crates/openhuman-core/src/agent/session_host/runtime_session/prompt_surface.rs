@@ -3,7 +3,10 @@
 use super::*;
 
 impl OpenHumanSessionHost {
-    pub(super) fn create_turn_prelude(&self, force_integration_refresh: bool) -> OpenHumanTurnPrelude {
+    pub(super) fn create_turn_prelude(
+        &self,
+        force_integration_refresh: bool,
+    ) -> OpenHumanTurnPrelude {
         OpenHumanTurnPrelude {
             config: self.config.clone(),
             prompt_builder: self.prompt_builder.clone(),
@@ -114,5 +117,4 @@ impl OpenHumanSessionHost {
         self.tool_policy_session = surface.tool_policy_session.clone();
         self.sync_runtime_tool_surface();
     }
-
 }
