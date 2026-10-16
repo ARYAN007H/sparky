@@ -178,7 +178,8 @@ pub(super) async fn domain_events_handler(headers: axum::http::HeaderMap) -> Res
     }
 
     // Read dashboard config for event stream settings.
-    let es_cfg = crate::core_host::config::rpc::load_config_with_timeout()
+    let es_cfg = ctx
+        .load_config()
         .await
         .map(|c| c.dashboard.event_stream)
         .unwrap_or_default();
