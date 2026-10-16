@@ -301,6 +301,19 @@ describe('downloadArtifact', () => {
     });
   });
 
+  it('appends the extension to a title that only looks like it has one', async () => {
+    vi.mocked(callCoreRpc).mockResolvedValueOnce({
+      absolute_path: '/workspace/files/release-v1.2.md',
+      meta: { title: 'Release v1.2' },
+    });
+    hoisted.invoke.mockResolvedValueOnce('/dest/Release v1.2.md');
+    await downloadArtifact('art-1', 'Release v1.2', 'md');
+    expect(hoisted.invoke).toHaveBeenCalledWith('download_artifact_to_downloads', {
+      artifactId: 'art-1',
+      filename: 'Release v1.2.md',
+    });
+  });
+
   it('does NOT double-append when the title already has any trailing extension', async () => {
     // Title says .pdf but caller asked for pptx — defensive: keep the
     // user-visible title untouched rather than synthesising deck.pdf.pptx.

@@ -419,11 +419,17 @@ async function saveArtifactAs(
   artifact: ArtifactSnapshot,
   t: (key: string) => string
 ): Promise<string | null> {
-  const extension = artifact.path?.split('.').pop() ?? '';
+  const extension = fileExtension(artifact.path);
   const outcome = await saveArtifactViaDialog(artifact.artifactId, artifact.title, extension);
   if (outcome.ok || outcome.code === 'CANCELLED') return null;
   console.warn('[ArtifactPreviewPanel] download failed:', outcome.code, outcome.error);
   return t(`chat.files.error.${(outcome.code ?? 'download_failed').toLowerCase()}`);
+}
+
+/** The extension of the file a path names (`'md'` for `.../notes.md`), or `''`. */
+export function fileExtension(path: string | undefined): string {
+  const name = path?.split(/[\\/]/).pop() ?? '';
+  return /\.([^.]+)$/.exec(name)?.[1] ?? '';
 }
 
 type AutosaveState = 'saved' | 'pending' | 'saving' | 'error';

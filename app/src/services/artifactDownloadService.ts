@@ -217,10 +217,11 @@ async function resolveArtifactForExport(
   const title = resolved.meta?.title?.trim() || fallbackTitle.trim() || 'artifact';
   const ext = extension.trim().replace(/^\.+/, '');
   // Guard against double extensions: if `title` already ends in the
-  // requested extension (case-insensitive, with any other extension also
-  // tolerated), don't append again. Prevents `deck.pptx.pptx` when the
-  // persisted title is `deck.pptx` and the caller passes `'pptx'`.
-  const titleHasExtension = /\.[^./\\]+$/.test(title);
+  // requested extension (case-insensitive), or in another real one, don't
+  // append. Prevents `deck.pptx.pptx`, and keeps a title like `deck.pdf` as
+  // the user sees it. A real extension starts with a letter, so a title that
+  // only looks like it has one ("Release v1.2") still gets the extension.
+  const titleHasExtension = /\.[a-z][a-z0-9]{0,4}$/i.test(title);
   const titleHasSameExt = ext.length > 0 && title.toLowerCase().endsWith(`.${ext.toLowerCase()}`);
   const filename = ext && !titleHasExtension && !titleHasSameExt ? `${title}.${ext}` : title;
 

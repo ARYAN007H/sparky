@@ -8,7 +8,7 @@ import chatRuntimeReducer, {
   openArtifact,
   upsertArtifactReadyForThread,
 } from '../../../store/chatRuntimeSlice';
-import { ArtifactPreviewPanel } from './ArtifactPreviewPanel';
+import { ArtifactPreviewPanel, fileExtension } from './ArtifactPreviewPanel';
 
 vi.mock('../../../services/coreRpcClient', () => ({ callCoreRpc: vi.fn() }));
 
@@ -118,5 +118,14 @@ describe('ArtifactPreviewPanel — preview rendering by kind (#1535)', () => {
     const pre = await screen.findByText(/plain \*\*not\*\* markdown/);
     expect(pre.tagName).toBe('PRE');
     expect(screen.queryByRole('heading')).toBeNull();
+  });
+});
+
+describe('fileExtension', () => {
+  it('reads the extension from the file name only', () => {
+    expect(fileExtension('/files/release-v1.2.md')).toBe('md');
+    expect(fileExtension('/files.d/notes')).toBe('');
+    expect(fileExtension('C:\\Users\\me\\Files\\deck.pptx')).toBe('pptx');
+    expect(fileExtension(undefined)).toBe('');
   });
 });
