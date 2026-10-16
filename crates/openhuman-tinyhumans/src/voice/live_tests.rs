@@ -59,6 +59,31 @@ fn registration_installs_both_hosted_providers() {
     assert!(unregister_live_provider(LIVE_PROVIDER_ELEVENLABS_HOSTED));
 }
 
+#[test]
+fn hosted_providers_are_listed_ahead_of_the_built_in_ones() {
+    // The catalogue has always listed the hosted providers first:
+    // gemini-hosted, elevenlabs-hosted, gemini, sarvam.
+    register();
+    let listed = openhuman_embed::__host::voice_registry::live_providers(&Config::default());
+    unregister_live_provider(LIVE_PROVIDER_GEMINI_HOSTED);
+    unregister_live_provider(LIVE_PROVIDER_ELEVENLABS_HOSTED);
+    let ids: Vec<_> = listed
+        .value
+        .providers
+        .iter()
+        .map(|p| p.id.as_str())
+        .collect();
+    assert_eq!(
+        ids,
+        [
+            LIVE_PROVIDER_GEMINI_HOSTED,
+            LIVE_PROVIDER_ELEVENLABS_HOSTED,
+            "gemini",
+            "sarvam"
+        ]
+    );
+}
+
 #[tokio::test]
 async fn hosted_providers_report_not_configured_without_a_backend_credential() {
     let dir = tempfile::tempdir().unwrap();

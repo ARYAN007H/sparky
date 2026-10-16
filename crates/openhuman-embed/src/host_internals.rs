@@ -292,8 +292,8 @@ pub mod util {
 pub mod tool_sources {
     pub use openhuman_core::tools::sources::{
         register_tool_source, register_tool_source_at, register_tool_source_in,
-        registered_tool_source_placements, unregister_tool_source, ToolSourceCtx, ToolSourceFactory, ToolSourcePlacement,
-        ANCHOR_AFTER_DELEGATE, ANCHOR_AFTER_SEARCH,
+        registered_tool_source_placements, unregister_tool_source, ToolSourceCtx,
+        ToolSourceFactory, ToolSourcePlacement, ANCHOR_AFTER_DELEGATE, ANCHOR_AFTER_SEARCH,
     };
 }
 
@@ -393,6 +393,7 @@ pub mod voice_registry {
     pub use openhuman_core::voice::factory::{
         create_stt_provider, create_tts_provider, SttProvider, SttResult, TtsProvider,
     };
+    pub use openhuman_core::voice::live::ops::live_providers;
     pub use openhuman_core::voice::live::registry::{
         register_live_provider, register_live_provider_in, unregister_live_provider, ConfigureFn,
         ConfiguredFn, LiveFuture, LiveProviderEntry, LiveProviderPlacement, PrepareFn,
