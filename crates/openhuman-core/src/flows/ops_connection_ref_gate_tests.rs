@@ -3,10 +3,10 @@ use super::*;
 /// The negative-probe cache (design correction, item 3): a definitive
 /// `provider_not_configured` result must be served from cache within the TTL
 /// exactly like a `"ready"` result, so an edit -> validate -> propose -> run
-/// authoring/run burst hits the mock backend once, not once per call (the judge's
+/// authoring/run burst probes the provider once, not once per call (the judge's
 /// live run observed 4 network round trips in a single ~80s turn before this
-/// fix). Uses a real local axum server (no real network) that counts requests
-/// so a cache hit is provable, not just plausible.
+/// fix). Uses a registered provider whose probe counts calls so a cache hit is
+/// provable, not just plausible.
 #[tokio::test]
 async fn cached_probe_inference_readiness_caches_a_negative_result() {
     use std::sync::atomic::{AtomicUsize, Ordering};
@@ -16,6 +16,7 @@ async fn cached_probe_inference_readiness_caches_a_negative_result() {
     let _guard = crate::inference::inference_test_guard_async().await;
     let tmp = TempDir::new().unwrap();
     let config = test_config(&tmp);
+    seed_app_session_for_gate_test(&tmp);
 
     // A registered managed provider whose readiness probe is counted and
     // definitively rejects, standing in for the hosted backend's 400.
