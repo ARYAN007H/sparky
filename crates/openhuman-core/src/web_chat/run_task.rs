@@ -292,8 +292,6 @@ pub(crate) async fn run_chat_task(
         let speak_reply = matches!(metadata.speak_reply, Some(true));
         let trimmed_response = task_result.full_response.trim();
         if speak_reply && !trimmed_response.is_empty() {
-            #[cfg(feature = "voice")]
-            use crate::voice::TtsProvider as _;
             // Resolved through the voice registry by the hosted slug: the
             // provider is registered by the hosted-backend layer, so a core
             // with none registered logs the error and skips the spoken reply.

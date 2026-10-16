@@ -142,7 +142,6 @@ impl SpeechSynthesizer for VoiceSynthesizer {
         // under the `cloud` slug; with none registered this is an error.
         #[cfg(feature = "voice")]
         {
-            use crate::voice::TtsProvider as _;
             let voice = request.voice.as_deref().unwrap_or_default();
             let provider = crate::voice::create_tts_provider("cloud", voice, &self.config)?;
             let outcome = provider
