@@ -30,3 +30,25 @@ pub(crate) use worktree_schemas::{
     all_controller_schemas as all_worktree_controller_schemas,
     all_registered_controllers as all_worktree_registered_controllers,
 };
+
+/// Registers the orchestration RPC surfaces in their catalogue order.
+pub(crate) fn all_orchestration_registered_controllers() -> Vec<crate::core::RegisteredController> {
+    let mut controllers = Vec::new();
+    controllers.extend(all_command_center_registered_controllers());
+    controllers.extend(all_workflow_run_registered_controllers());
+    controllers.extend(all_agent_team_registered_controllers());
+    controllers.extend(all_worktree_registered_controllers());
+    controllers.extend(all_subagent_control_registered_controllers());
+    controllers
+}
+
+/// Returns orchestration schemas in the same order as their registered controllers.
+pub(crate) fn all_orchestration_controller_schemas() -> Vec<crate::core::ControllerSchema> {
+    let mut schemas = Vec::new();
+    schemas.extend(all_command_center_controller_schemas());
+    schemas.extend(all_workflow_run_controller_schemas());
+    schemas.extend(all_agent_team_controller_schemas());
+    schemas.extend(all_worktree_controller_schemas());
+    schemas.extend(all_subagent_control_controller_schemas());
+    schemas
+}
