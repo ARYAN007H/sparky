@@ -308,10 +308,9 @@ pub(super) fn register_domain_subscribers(
 
     // Channels: inbound dispatch.
     // The `plan.channels` runtime guard cannot stand in for the compile-time
-    // gate: the `channels::bus::ChannelInboundSubscriber` +
-    // `channels::proactive` type paths below must still resolve for this to
-    // compile, so the whole block is `#[cfg]`-gated too (mirrors the flows
-    // dual-gate below).
+    // gate: the `channels::bus::ChannelInboundSubscriber` type path below must
+    // still resolve for this to compile, so the whole block is `#[cfg]`-gated
+    // too (mirrors the flows dual-gate below).
     #[cfg(feature = "channels")]
     if plan.channels {
         if group_first_time(DomainGroup::Channels) {

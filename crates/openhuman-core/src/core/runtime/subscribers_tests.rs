@@ -213,6 +213,7 @@ async fn tool_timeout_seeds_on_channelless_core_boot() {
 }
 
 #[tokio::test]
+#[cfg(feature = "channels")]
 async fn proactive_message_reaches_web_on_channelless_core_boot() {
     crate::core::bus::init().await.expect("bus init");
     let mut web_events = crate::web_chat::subscribe_web_channel_events();
