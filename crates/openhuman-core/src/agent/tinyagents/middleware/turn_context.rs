@@ -24,7 +24,7 @@ use tinyjuice_bus::types::AgentTokenjuiceCompression;
 use super::tool_output::ToolOutputMiddleware;
 
 /// Default per-tool-result byte cap for the channel / sub-agent paths, which do
-/// not carry a session context settings to source the configured budget from.
+/// not carry session-specific context settings to source the configured budget from.
 /// Mirrors the `ContextConfig::tool_result_budget_bytes` default (16 KiB).
 pub(crate) const DEFAULT_TOOL_RESULT_BUDGET_BYTES: usize = 16 * 1024;
 
@@ -343,7 +343,7 @@ impl Middleware<(), crate::agent::tinyagents::host::OpenHumanRunContext>
 }
 
 impl TurnContextMiddleware {
-    /// A sensible default for turn paths without a session context settings
+    /// A sensible default for turn paths without session-specific context settings
     /// (channel / sub-agent): the default tool-result byte cap, no summarizer or
     /// microcompact.
     pub(crate) fn defaults() -> Self {
