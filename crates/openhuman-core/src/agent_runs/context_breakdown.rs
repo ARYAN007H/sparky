@@ -6,10 +6,10 @@
 //!
 //! [`PromptSizeReport::build`] is expensive: it rebuilds a real agent through
 //! `OpenHumanSessionHost::from_config_for_agent` and fetches live Composio
-//! connections. This module caches the last report per `agent_id`, keyed
-//! additionally on a coarse config-content fingerprint so an edited prompt,
-//! model route, or tool config invalidates the cache instead of serving a
-//! stale breakdown.
+//! connections. This module caches the last report per dispatch tenant and
+//! `agent_id`, with workspace and config paths in the cache key. A coarse
+//! config-content fingerprint invalidates the entry when an edited prompt,
+//! model route, or tool config changes inside that scope.
 
 use std::collections::HashMap;
 use std::sync::Mutex;
