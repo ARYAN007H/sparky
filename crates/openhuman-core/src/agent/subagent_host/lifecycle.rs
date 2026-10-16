@@ -540,6 +540,7 @@ impl SubagentExecutor<crate::agent::tinyagents::host::OpenHumanRunContext> for O
         // its explicit OpenHuman carrier.
         options.run_context = execution.prepared.run_context.data.clone();
         options.run_context.cancellation = execution.cancellation.clone();
+        options.message_run_queue = execution.prepared.run_context.run_queue.clone();
         match Box::pin(super::ops::run_subagent_direct(
             &definition,
             &execution
