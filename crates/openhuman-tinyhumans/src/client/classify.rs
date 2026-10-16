@@ -86,7 +86,7 @@ impl BackendClient {
                 let mut src: Option<&(dyn std::error::Error + 'static)> =
                     std::error::Error::source(&e);
                 while let Some(s) = src {
-                    error_message.push_str(" -> ");
+                    error_message.push_str(" → ");
                     error_message.push_str(&s.to_string());
                     src = s.source();
                 }

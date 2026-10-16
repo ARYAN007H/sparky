@@ -4,9 +4,7 @@
 use std::sync::{Arc, Mutex};
 
 use anyhow::{Context, Result};
-use openhuman_embed::__host::backend::transport::{
-    BackendTransport, BackendTransportError, TransportProfile,
-};
+use openhuman_embed::__host::backend::transport::{BackendTransport, TransportProfile};
 use openhuman_embed::__host::config::Config;
 use openhuman_embed::__host::security::credentials::session_support::BackendCredential;
 use openhuman_embed::BackendRequest;
@@ -167,12 +165,6 @@ impl BackendClient {
             .await;
         self.finish_authed_json(method, path, response, is_api_key)
     }
-}
-
-/// Map a transport `Unavailable` into the typed error; shared with
-/// [`IntegrationsHttp`](super::IntegrationsHttp).
-pub(super) fn is_unavailable(error: &BackendTransportError) -> bool {
-    matches!(error, BackendTransportError::Unavailable)
 }
 
 #[cfg(test)]
