@@ -69,7 +69,9 @@ tinybus-module = { path = "vendor/tinybus/crates/tinybus-module" }
 # vendor/tinystoragedrivers. This reverses #7754's removal of the patch on
 # purpose. The vendored commit must stay semver-compatible with the tag modules
 # declare; scripts/ci/check-storage-owner.mjs enforces that every tsd package
-# resolves to a path under vendor/tinystoragedrivers/.
+# resolves to a path under vendor/tinystoragedrivers/. tinystoragedrivers-tinybus
+# is left out: nothing here depends on it, and an unused patch warns. Add it with
+# the first dependent.
 tinystoragedrivers = { path = "vendor/tinystoragedrivers/crates/tinystoragedrivers" }
 tinystoragedrivers-bus = { path = "vendor/tinystoragedrivers/crates/tinystoragedrivers-bus" }
 tinystoragedrivers-busproxy = { path = "vendor/tinystoragedrivers/crates/tinystoragedrivers-busproxy" }
@@ -80,7 +82,6 @@ tinystoragedrivers-mongodb = { path = "vendor/tinystoragedrivers/crates/tinystor
 tinystoragedrivers-s3 = { path = "vendor/tinystoragedrivers/crates/tinystoragedrivers-s3" }
 tinystoragedrivers-secrets = { path = "vendor/tinystoragedrivers/crates/tinystoragedrivers-secrets" }
 tinystoragedrivers-sqlite = { path = "vendor/tinystoragedrivers/crates/tinystoragedrivers-sqlite" }
-tinystoragedrivers-tinybus = { path = "vendor/tinystoragedrivers/crates/tinystoragedrivers-tinybus" }
 
 [patch."https://github.com/tinyhumansai/tinyinference"]
 # tinymemes depends on the Jev client by git; resolve it to the vendored copy.
