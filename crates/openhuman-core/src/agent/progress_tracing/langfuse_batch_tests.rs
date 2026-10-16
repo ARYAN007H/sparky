@@ -37,25 +37,14 @@ fn every_environment_for_base_bucket_is_classified_deliberately() {
 }
 
 #[test]
-fn ingestion_url_uses_backend_origin_and_ingestion_path() {
+fn ingestion_url_is_the_host_resolved_tracing_endpoint() {
     let mut config = Config::default();
-    config.api_url = Some("https://staging-api.tinyhumans.ai/api/v1".to_string());
+    assert_eq!(ingestion_url(&config), "", "nothing resolved means no push");
+    config.resolved_endpoints.tracing_ingest_url =
+        Some("https://staging-api.tinyhumans.ai/telemetry/langfuse/ingestion".to_string());
     assert_eq!(
         ingestion_url(&config),
-        "https://staging-api.tinyhumans.ai/telemetry/langfuse/ingestion",
-        "endpoint is the backend's Langfuse proxy route on the base server \
-         host, replacing any inference path the base carried"
-    );
-
-    // A base carrying an inference path resolves to the proxy route on the
-    // SAME host — the ingestion host tracks the base server URL, not a fixed
-    // literal.
-    let mut with_inference_path = Config::default();
-    with_inference_path.api_url =
-        Some("https://api.tinyhumans.ai/openai/v1/chat/completions".to_string());
-    assert_eq!(
-        ingestion_url(&with_inference_path),
-        "https://api.tinyhumans.ai/telemetry/langfuse/ingestion"
+        "https://staging-api.tinyhumans.ai/telemetry/langfuse/ingestion"
     );
 }
 

@@ -19,6 +19,7 @@ fn bound_session_token_release_requires_issuing_backend() {
     let tmp = TempDir::new().unwrap();
     let mut config = test_config(&tmp);
     config.api_url = Some("https://issuer.example/".into());
+    config.resolved_endpoints.control_plane_url = Some("https://issuer.example".into());
     let mut metadata = std::collections::HashMap::new();
     metadata.insert(
         SESSION_ISSUING_BACKEND_META.into(),
@@ -47,6 +48,7 @@ fn bound_session_token_release_requires_issuing_backend() {
         Some("https://issuer.example")
     );
     config.api_url = Some("https://different.example".into());
+    config.resolved_endpoints.control_plane_url = Some("https://different.example".into());
     assert!(get_session_token(&config)
         .unwrap_err()
         .starts_with("SESSION_BACKEND_MISMATCH"));
