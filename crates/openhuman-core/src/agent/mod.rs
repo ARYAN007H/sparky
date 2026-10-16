@@ -22,7 +22,6 @@ pub(crate) mod attachments;
 pub use attachments::host::HostAttachment;
 pub mod bus;
 pub mod context;
-pub mod context_breakdown;
 pub(crate) mod cost;
 pub mod debug;
 pub mod goals;
@@ -54,7 +53,6 @@ pub mod prompts;
 /// Host-owned payload carried through TinyAgents run queues.
 pub mod queued_turn;
 pub(crate) mod registration;
-mod schemas;
 pub mod session_db;
 /// OpenHuman's composition and policy layer around the neutral TinyAgents
 /// session runtime. Generic history, transcript delta, prefix and tool
@@ -78,11 +76,6 @@ pub mod turn_env;
 /// origin-aware decisions rather than inferring trust from the absence of
 /// a chat approval context.
 pub mod turn_origin;
-pub use schemas::{
-    all_controller_schemas as all_agent_controller_schemas,
-    all_registered_controllers as all_agent_registered_controllers,
-};
-
 #[cfg(test)]
 #[path = "agent_tests.rs"]
 mod tests;
