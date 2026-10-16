@@ -111,7 +111,7 @@ In order:
    resumes the conversation if it is bound to a `SessionRef` with
    `ResumeMode::Session`. On resume it adopts the recorded tool list so
    Composio actions the thread used before are rebuilt as deferred executors
-   ([`session_host/recorded_tools.rs`](./session_host/recorded_tools.rs)).
+   ([`../integrations/recorded_tools.rs`](./../integrations/recorded_tools.rs)).
 4. TinyAgents' `Session::turn` runs the lifecycle. Its `before_turn` hook
    (`OpenHumanSessionHooks`) prepares the request: system prompt (frozen
    for a resumed thread), per-turn memory pack, integration, MCP and skill

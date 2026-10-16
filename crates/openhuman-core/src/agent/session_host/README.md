@@ -20,9 +20,9 @@ run after each turn commits.
 | [`driver.rs`](./driver.rs) | The OpenHuman `SessionDriver` that runs the model and tools |
 | [`hooks.rs`](./hooks.rs) | Product prepare, commit, and terminal hooks |
 | [`codec.rs`](./codec.rs) | `OpenHumanTranscriptCodec`, the product transcript dialect |
-| [`recorded_tools.rs`](./recorded_tools.rs) | Rebuilds recorded Composio actions as deferred executors on resume |
-| [`prelude_integrations.rs`](./prelude_integrations.rs) | Fetches connected integrations on the first turn of a session instance |
-| [`announcement_notes.rs`](./announcement_notes.rs) | Smaller product wiring pulled out of the builder |
+| [`integrations/recorded_tools.rs`](../../integrations/recorded_tools.rs) | Rebuilds recorded Composio actions as deferred executors on resume |
+| [`integrations/prelude_integrations.rs`](../../integrations/prelude_integrations.rs) | Fetches connected integrations on the first turn of a session instance |
+| [`announcement_notes.rs`](../../integrations/announcement_notes.rs) | Smaller product wiring pulled out of the builder |
 | `turn/`, [`turn_checkpoint.rs`](./turn_checkpoint.rs) | Per-turn state and checkpointing |
 
 Import `OpenHumanSessionHost` and `SessionHostBuilder` from `crate::agent`,
@@ -39,10 +39,10 @@ does not mint stems, seed history by hand, or pick a transcript by recency.
 
 A resumed session's prompt and tool list are frozen: both were recorded on
 the transcript, and restoring them verbatim is what keeps the provider's
-prefix cache warm across a restart. `recorded_tools.rs` exists because of
+prefix cache warm across a restart. `integrations/recorded_tools.rs` exists because of
 that freeze: it turns previously recorded Composio actions back into
 deferred executors instead of dropping them when a cache goes cold, and
-`prelude_integrations.rs` re-fetches integrations on the first turn of every
+`integrations/prelude_integrations.rs` re-fetches integrations on the first turn of every
 session instance rather than only on a brand-new thread.
 
 Compaction never erases history. It seals the current generation and opens

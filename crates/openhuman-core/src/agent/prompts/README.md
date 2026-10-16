@@ -12,7 +12,7 @@ domains use to compose their own prompts.
   `SubagentRenderOptions`. Pure data, no rendering logic. Also holds the
   `pub(crate)` cap `BOOTSTRAP_MAX_CHARS` (20K, for
   [`SOUL.md`](./SOUL.md)/[`IDENTITY.md`](./IDENTITY.md)/[`ROLE.md`](./ROLE.md) and each `AGENTS.md` layer).
-- `render_connected_identities` ([`connected_identities.rs`](./connected_identities.rs)): best-effort,
+- `render_connected_identities` ([`connected_identities.rs`](../../integrations/connected_identities.rs)): best-effort,
   sync render of the `## Connected Identities` block. It reads through the
   bound memory driver via `block_in_place` and returns empty when there is no
   multi-thread runtime or the config/driver read fails.
