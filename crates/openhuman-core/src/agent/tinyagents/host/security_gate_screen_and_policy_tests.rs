@@ -301,10 +301,12 @@ async fn a_nested_call_is_refused_even_for_a_read_only_tool() {
         .await
         .unwrap();
     assert!(!decision.is_allowed());
-    assert!(decision
-        .denial_reason()
-        .expect("denial reason")
-        .contains("may not call other tools"));
+    assert!(
+        decision
+            .denial_reason()
+            .expect("denial reason")
+            .contains("may not call other tools")
+    );
 }
 
 #[tokio::test]

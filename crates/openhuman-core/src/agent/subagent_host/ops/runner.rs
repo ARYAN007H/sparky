@@ -92,7 +92,6 @@ pub(super) fn tier_gate_decision(
     Ok(())
 }
 
-
 /// Run a sub-agent based on its definition and a task prompt.
 ///
 /// This is the primary entry point for agent delegation. It performs the following:
@@ -1047,4 +1046,3 @@ async fn run_typed_mode(
             tinyagents_orchestration::subagent::SubagentPersistenceDisposition::TerminalExisting,
     })
 }
-
