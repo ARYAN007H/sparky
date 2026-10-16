@@ -5,7 +5,7 @@ use serde_json::{Map, Value};
 use crate::core::all::{ControllerFuture, RegisteredController};
 use crate::core::Outcome;
 use crate::core::{ControllerSchema, FieldSchema, TypeSchema};
-use tinyflows_bus::schedule::types::CronJobPatch;
+use tinyflows_bus::schedule::types::{CronJobPatch, DeliveryConfig};
 
 fn job_id_input(comment: &'static str) -> FieldSchema {
     FieldSchema {
@@ -284,6 +284,7 @@ pub fn schemas(function: &str) -> ControllerSchema {
 fn handle_add(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let config = ctx.load_config().await?;
+        crate::core::runtime::components::require_config(&config, "tinyflows")?;
 
         let schedule: tinyflows_bus::schedule::types::Schedule = read_required(&params, "schedule")?;
         let name = params
@@ -368,22 +369,24 @@ fn handle_add(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture 
                 let p = prompt.ok_or("'prompt' is required for agent jobs")?;
                 // RPC-created jobs default to enabled and, without an origin,
                 // to no delivery (current behaviour).
-                let delivery = delivery.or_else(|| {
-                    origin
-                        .is_none()
-                        .then(tinyflows_bus::schedule::types::DeliveryConfig::default)
-                        .or_else(|| {
-                            Some(tinyflows_schedule::validation::default_delivery(
-                                origin.as_ref(),
-                            ))
-                        })
-                });
+                let delivery = match delivery {
+                    Some(delivery) => Some(delivery),
+                    None if origin.is_none() => Some(DeliveryConfig::default()),
+                    None => Some(
+                        crate::cron::client::default_delivery(&config, origin.as_ref())
+                            .await
+                            .map_err(|e| e.to_string())?,
+                    ),
+                };
                 let delivery_cfg = delivery.clone().unwrap_or_default();
-                tinyflows_schedule::validation::check_origin_requirements(
+                crate::cron::client::check_origin_requirements(
+                    &config,
                     &session_target,
                     &delivery_cfg,
                     origin.as_ref(),
-                )?;
+                )
+                .await
+                .map_err(|e| e.to_string())?;
                 let mut spec = tinyflows_bus::schedule::AgentJobSpec::new(schedule, p);
                 spec.name = name;
                 spec.session_target = session_target;
