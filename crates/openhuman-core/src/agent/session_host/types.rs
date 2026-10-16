@@ -6,7 +6,6 @@
 //! `impl OpenHumanSessionHost`/`impl SessionHostBuilder` can see them without the whole
 //! crate gaining field access.
 
-use crate::agent::context::ContextManager;
 use crate::agent::hooks::PostTurnHook;
 use crate::agent::progress::AgentProgress;
 use crate::agent::prompts::SystemPromptBuilder;
@@ -376,17 +375,10 @@ pub struct OpenHumanSessionHost {
     /// timestamped `session_key` remains correct for sub-agents, where each
     /// spawn genuinely is a new transcript.
     pub(super) session: Option<tinyagents_session::transcript::SessionRef>,
-    /// Per-session [`ContextManager`] — owns the system-prompt
-    /// builder, the layered reduction pipeline (tool-result budget →
-    /// microcompact → autocompact signal → session-memory extraction
-    /// trigger), the guard's compaction circuit breaker, and the LLM
-    /// summarizer that runs when the pipeline asks for autocompaction.
-    /// Constructed once at session start so its budget counters and
-    /// session-memory deltas persist across turns. See
-    /// [`crate::agent::context`] for the full surface.
-    /// Host-only context/prompt and session-memory bookkeeping shared by the
-    /// runtime hooks; it is never a duplicate conversation history.
-    pub(super) context: Arc<std::sync::Mutex<ContextManager>>,
+    /// Prompt assembly configured for this session.
+    pub(super) prompt_builder: Arc<SystemPromptBuilder>,
+    /// Context middleware settings configured for this session.
+    pub(super) context_config: crate::config::ContextConfig,
     /// Optional progress event sender for real-time turn progress.
     /// When set, the turn loop emits [`AgentProgress`] events through
     /// this channel so callers (e.g. web channel) can surface live
