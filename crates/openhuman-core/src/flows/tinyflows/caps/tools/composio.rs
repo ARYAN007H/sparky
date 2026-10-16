@@ -95,11 +95,18 @@ impl ToolBackend for ComposioToolBackend {
         // credentials, account resolution, and direct dispatch.
         let live_config = config_rpc::reload_config_snapshot_with_timeout(ctx.config)
             .await
-            .map_err(|e| {
+            .map_err(|_| {
                 EngineError::Capability(format!(
-                    "tool_call node: failed to load live Composio config: {e}"
+                    "{} flows autonomy and Composio settings could not be refreshed; refusing the node",
+                    tinytools::status::POLICY_BLOCKED_MARKER
                 ))
             })?;
+        if live_config.recovered_from_corruption {
+            return Err(EngineError::Capability(format!(
+                "{} flows autonomy and Composio settings could not be refreshed; refusing the node",
+                tinytools::status::POLICY_BLOCKED_MARKER
+            )));
+        }
         // Autonomy-tier gate (Phase 2, made effect-aware): the node's
         // [`CommandClass`] is derived from the action's curated
         // [`ToolScope`](crate::integrations::composio::contract::ToolScope)
@@ -114,14 +121,20 @@ impl ToolBackend for ComposioToolBackend {
         // curation check (unlike the pre-fix behavior) so a read-only tier
         // can never even probe which slugs are curated.
         let composio_class = super::super::classify_composio_action_for_tier(slug).await;
+        let tier_policy = super::super::tier_policy_from_config(
+            ctx.dispatch,
+            ctx.config,
+            Some(&live_config),
+            ctx.security,
+        )?;
         let tier_decision =
-            super::super::enforce_node_tier_gate(ctx.security, composio_class, "tool_call")?;
+            super::super::enforce_node_tier_gate(&tier_policy, composio_class, "tool_call")?;
         tracing::debug!(
             target: "flows",
             %slug,
             ?composio_class,
             ?tier_decision,
-            tier = ?ctx.security.autonomy,
+            tier = ?tier_policy.autonomy,
             "[flows] tool_call: composio node tier gate evaluated"
         );
 

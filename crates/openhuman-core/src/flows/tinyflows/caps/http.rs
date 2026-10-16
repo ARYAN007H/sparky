@@ -45,6 +45,8 @@ use tinytools::Tool as _;
 pub struct OpenHumanHttp {
     /// The context the run acts under, handed over by whoever started it.
     pub ctx: crate::core::runtime::DispatchCtx,
+    /// The run's config snapshot, used to reload its anchored autonomy tier.
+    pub config: Arc<Config>,
     pub security: Arc<SecurityPolicy>,
     pub http_config: HttpRequestConfig,
     pub http_creds: Arc<HttpCredentialsStore>,
@@ -177,8 +179,10 @@ impl HttpClient for OpenHumanHttp {
         // `gate_call_for_tier` is what actually performs the `Prompt` round-trip
         // — it escalates a Supervised `Prompt` decision into a forced approval
         // regardless of the flow's own `require_approval` toggle (Codex P1).
+        let security =
+            Arc::new(current_tier_policy(&self.ctx, &self.config, &self.security).await?);
         let tier_decision =
-            enforce_node_tier_gate(&self.security, CommandClass::Network, "http_request")?;
+            enforce_node_tier_gate(&security, CommandClass::Network, "http_request")?;
 
         // The approval gate summarizes/redacts the request BEFORE any credential
         // is injected, so a stored secret never lands in the approval UI or
@@ -207,7 +211,7 @@ impl HttpClient for OpenHumanHttp {
 
         let tool = http_request_tool(
             &self.ctx,
-            self.security.clone(),
+            security,
             self.http_config.allowed_domains.clone(),
             self.http_config.max_response_size,
             self.http_config.timeout_secs,

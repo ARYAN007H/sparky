@@ -64,6 +64,8 @@ fn code_node_tier_gate_blocks_readonly_allows_full() {
     );
 }
 
+/// A long-lived code capability must observe a tier downgrade at the same
+/// config path before it reaches code staging or sandbox execution.
 /// End-to-end at the adapter: an `http_request` node under a read-only tier
 /// is refused BEFORE any network egress (the tier gate fires ahead of the
 /// approval gate, credential resolution, and dispatch).
@@ -72,8 +74,12 @@ async fn http_adapter_blocks_under_readonly_tier() {
     use crate::security::AutonomyLevel;
 
     let (_dir, creds) = http_cred_store();
+    let mut config = Config::default();
+    config.autonomy.enabled = true;
+    config.autonomy.level = AutonomyLevel::ReadOnly;
     let http = OpenHumanHttp {
-        ctx: crate::core::runtime::DispatchCtx::ambient(),
+        ctx: crate::core::runtime::DispatchCtx::unbound(),
+        config: Arc::new(config),
         security: Arc::new(policy(AutonomyLevel::ReadOnly)),
         http_config: HttpRequestConfig::default(),
         http_creds: Arc::new(creds),
@@ -106,7 +112,7 @@ async fn composio_tool_call_blocks_under_readonly_tier() {
     use crate::security::AutonomyLevel;
 
     let tools = OpenHumanTools {
-        ctx: crate::core::runtime::DispatchCtx::ambient(),
+        ctx: crate::core::runtime::DispatchCtx::unbound(),
         config: Arc::new(Config::default()),
         security: Arc::new(policy(AutonomyLevel::ReadOnly)),
         approval: Default::default(),
@@ -153,7 +159,7 @@ async fn composio_read_action_allowed_under_readonly_tier() {
     // it may still fail downstream (no Composio session configured in
     // this test), but never with the policy-blocked marker.
     let tools = OpenHumanTools {
-        ctx: crate::core::runtime::DispatchCtx::ambient(),
+        ctx: crate::core::runtime::DispatchCtx::unbound(),
         config: Arc::new(Config::default()),
         security: Arc::new(policy(AutonomyLevel::ReadOnly)),
         approval: Default::default(),
@@ -191,7 +197,7 @@ async fn composio_read_action_does_not_prompt_under_supervised_tier() {
     );
 
     let tools = OpenHumanTools {
-        ctx: crate::core::runtime::DispatchCtx::ambient(),
+        ctx: crate::core::runtime::DispatchCtx::unbound(),
         config: Arc::new(Config::default()),
         security: Arc::new(policy(AutonomyLevel::Supervised)),
         approval: Default::default(),
@@ -417,7 +423,7 @@ fn agent_node_runtime_resolves_to_the_definitions_effective_iteration_cap() {
     assert_eq!(expected, 50);
 
     let agent = crate::agent::OpenHumanSessionHost::from_config_for_agent(
-        &crate::core::runtime::DispatchCtx::ambient(),
+        &crate::core::runtime::DispatchCtx::unbound(),
         &config,
         "planner",
     )
@@ -593,3 +599,6 @@ fn response_fields_from_schema_empty_for_none_or_non_object() {
     assert!(response_fields_from_schema(Some(&json!("not an object"))).is_empty());
     assert!(response_fields_from_schema(Some(&json!({}))).is_empty());
 }
+
+#[path = "ops_tier_live_config_tests.rs"]
+mod live_config_tests;

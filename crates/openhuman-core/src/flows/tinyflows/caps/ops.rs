@@ -652,6 +652,7 @@ pub fn build_capabilities(
         }),
         http: Arc::new(OpenHumanHttp {
             ctx: ctx.clone(),
+            config: config.clone(),
             security: security.clone(),
             http_config,
             http_creds,

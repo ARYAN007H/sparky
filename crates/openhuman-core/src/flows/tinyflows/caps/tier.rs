@@ -70,6 +70,113 @@ pub(crate) fn enforce_node_tier_gate(
     Ok(decision)
 }
 
+/// Loads the tier visible to one flow dispatch while keeping the policy's
+/// workspace roots, action budget tracker, and other fixed fields from the
+/// capability's original policy.
+pub(crate) async fn current_tier_policy(
+    ctx: &crate::core::runtime::DispatchCtx,
+    captured_config: &crate::config::Config,
+    baseline: &SecurityPolicy,
+) -> Result<SecurityPolicy> {
+    let live = match ctx.autonomy_tier_source() {
+        crate::core::runtime::AutonomyTierSource::Captured => None,
+        crate::core::runtime::AutonomyTierSource::LiveConfig => {
+            let live = crate::config::ops::reload_config_snapshot_with_timeout(captured_config)
+                .await
+                .map_err(|error| tier_config_error(&error))?;
+            if live.recovered_from_corruption {
+                return Err(tier_config_error(
+                    "live config was recovered from corruption",
+                ));
+            }
+            Some(live)
+        }
+    };
+    tier_policy_from_config(ctx, captured_config, live.as_ref(), baseline)
+}
+
+/// Uses an already reloaded live config when the caller needs that same
+/// snapshot for another part of its operation (Composio integrations).
+pub(crate) fn tier_policy_from_config(
+    ctx: &crate::core::runtime::DispatchCtx,
+    _captured_config: &crate::config::Config,
+    live_config: Option<&crate::config::Config>,
+    baseline: &SecurityPolicy,
+) -> Result<SecurityPolicy> {
+    let mut policy = baseline.clone();
+    policy.tracker = baseline.tracker.shared_clone();
+    let ceiling = ctx.autonomy_tier_ceiling();
+    if ctx.autonomy_tier_source() == crate::core::runtime::AutonomyTierSource::Captured {
+        if let Some(ceiling) = ceiling {
+            if policy.enabled {
+                policy.autonomy = stricter_tier(policy.autonomy, ceiling);
+            } else if ceiling != crate::security::AutonomyLevel::Full {
+                policy.enabled = true;
+                policy.autonomy = ceiling;
+            }
+        }
+        return Ok(policy);
+    }
+
+    let config =
+        live_config.ok_or_else(|| tier_config_error("live config snapshot was not provided"))?;
+    if config.autonomy.enabled {
+        policy.enabled = true;
+        policy.autonomy = config.autonomy.level;
+        if let Some(ceiling) = ceiling {
+            policy.autonomy = stricter_tier(policy.autonomy, ceiling);
+        }
+    } else if let Some(
+        ceiling @ (crate::security::AutonomyLevel::ReadOnly
+        | crate::security::AutonomyLevel::Supervised),
+    ) = ceiling
+    {
+        // A disabled config contributes no tier restriction; a restrictive
+        // host ceiling remains independently active.
+        policy.enabled = true;
+        policy.autonomy = ceiling;
+    } else {
+        // A Full ceiling adds no restriction, so it cannot enable a tier which
+        // the live config explicitly disabled.
+        policy.enabled = false;
+        policy.autonomy = crate::security::AutonomyLevel::Full;
+    }
+    Ok(policy)
+}
+
+/// Async counterpart used by the host adapters. Config failures are policy
+/// failures and carry the harness's permanent-block marker so the run cannot
+/// proceed using a stale permissive tier.
+pub(crate) async fn enforce_current_node_tier_gate(
+    ctx: &crate::core::runtime::DispatchCtx,
+    captured_config: &crate::config::Config,
+    baseline: &SecurityPolicy,
+    class: CommandClass,
+    node: &str,
+) -> Result<GateDecision> {
+    let policy = current_tier_policy(ctx, captured_config, baseline).await?;
+    enforce_node_tier_gate(&policy, class, node)
+}
+
+fn tier_config_error(_error: &str) -> EngineError {
+    EngineError::Capability(format!(
+        "{POLICY_BLOCKED_MARKER} flows autonomy tier could not be refreshed; refusing the node"
+    ))
+}
+
+fn stricter_tier(
+    tier: crate::security::AutonomyLevel,
+    ceiling: crate::security::AutonomyLevel,
+) -> crate::security::AutonomyLevel {
+    use crate::security::AutonomyLevel::{Full, ReadOnly, Supervised};
+
+    match (tier, ceiling) {
+        (ReadOnly, _) | (_, ReadOnly) => ReadOnly,
+        (Supervised, _) | (_, Supervised) => Supervised,
+        (Full, Full) => Full,
+    }
+}
+
 /// Dispatches to the process-global [`ApprovalGate`](crate::security::approval::ApprovalGate),
 /// escalating a `Prompt`-tier decision into a forced human-in-the-loop round
 /// trip regardless of the running flow's own `require_approval` toggle.

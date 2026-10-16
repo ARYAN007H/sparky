@@ -85,6 +85,11 @@ pub struct CoreContext {
     /// the model. Defaults to every group withheld, which is what the
     /// compiled-in pack table meant before the type existed.
     tool_groups: crate::tools::toolpacks::ToolGroups,
+    /// Whether autonomy-tier checks reload config or retain this context's
+    /// effective in-memory tier.
+    autonomy_tier_source: super::AutonomyTierSource,
+    /// A fixed maximum autonomy level inherited by derived contexts.
+    autonomy_tier_ceiling: Option<crate::security::AutonomyLevel>,
     /// Which tiny dependencies the config switched off (`[components]`). Only
     /// narrows: `domains` and `tool_groups` are already clamped by it, and this
     /// is kept so dispatch can answer `COMPONENT_DISABLED:<name>` for a method
@@ -286,6 +291,12 @@ impl CoreContext {
             }))),
             domains,
             tool_groups,
+            autonomy_tier_source: if embedder_config.is_some() {
+                super::AutonomyTierSource::Captured
+            } else {
+                super::AutonomyTierSource::LiveConfig
+            },
+            autonomy_tier_ceiling: None,
             components,
             embedder_config,
             user_skill_roots: true,
@@ -418,6 +429,13 @@ impl CoreContext {
             workspace_binding: RwLock::new(shared_binding),
             domains,
             tool_groups: overlay.tool_groups,
+            autonomy_tier_source: overlay
+                .autonomy_tier_source
+                .unwrap_or(self.autonomy_tier_source),
+            autonomy_tier_ceiling: overlay::stricter_autonomy_ceiling(
+                self.autonomy_tier_ceiling,
+                overlay.autonomy_tier_ceiling,
+            ),
             components: self.components,
             embedder_config: Some(overlay.config),
             user_skill_roots: overlay.user_skill_roots,
@@ -435,6 +453,16 @@ impl CoreContext {
     /// this context was derived for one.
     pub fn session_agent(&self) -> Option<&str> {
         self.session_agent.as_deref()
+    }
+
+    /// Source binding for autonomy-tier decisions made by long-lived adapters.
+    pub fn autonomy_tier_source(&self) -> super::AutonomyTierSource {
+        self.autonomy_tier_source
+    }
+
+    /// The fixed autonomy ceiling inherited by this context, if any.
+    pub fn autonomy_tier_ceiling(&self) -> Option<crate::security::AutonomyLevel> {
+        self.autonomy_tier_ceiling
     }
 
     /// The backend transport bound to this context, if the host supplied one.
@@ -706,7 +734,7 @@ mod agent_parts;
 
 #[path = "context_overlay.rs"]
 mod overlay;
-pub use overlay::ContextOverlay;
+pub use overlay::{AutonomyTierSource, ContextOverlay};
 
 #[cfg(test)]
 #[path = "context_test_support.rs"]
