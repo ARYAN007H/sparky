@@ -95,9 +95,7 @@ impl EventHandler<DomainEvent> for ComposioConnectionCreatedSubscriber {
         // The cache refresh runs for every toolkit; only the profile fetch is gated on a native provider.
         let toolkit = toolkit.clone();
         let connection_id = connection_id.clone();
-        tokio::spawn(async move {
-            on_connection_created(&ctx, toolkit, connection_id).await
-        });
+        tokio::spawn(async move { on_connection_created(&ctx, toolkit, connection_id).await });
     }
 }
 
