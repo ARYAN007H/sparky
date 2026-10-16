@@ -9,7 +9,6 @@ use std::time::Duration;
 use serde::{de::DeserializeOwned, Serialize};
 pub use tinybox_bus as contract;
 
-
 use crate::config::Config;
 
 use tinybus::module::{ModuleCallError, ModuleClient};
