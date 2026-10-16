@@ -102,9 +102,7 @@ async fn configured_storage_url() -> anyhow::Result<Option<String>> {
         &crate::core_host::core::runtime::DispatchCtx::host_default(),
     )
     .await
-        .map_err(|error| {
-            anyhow::anyhow!("loading the config to resolve the storage url: {error}")
-        })?;
+    .map_err(|error| anyhow::anyhow!("loading the config to resolve the storage url: {error}"))?;
     Ok(storage_url_from(env, &config))
 }
 

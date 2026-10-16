@@ -285,9 +285,7 @@ fn build_registry_entries(source: McpSource<'_>) -> Vec<ToolRegistryEntry> {
                                 McpSource::Config(config) => {
                                     connections::all_connected_tools_for_config(config).await
                                 }
-                                McpSource::Ctx(ctx) => {
-                                    connections::all_connected_tools(ctx).await
-                                }
+                                McpSource::Ctx(ctx) => connections::all_connected_tools(ctx).await,
                             }
                         })
                     })
