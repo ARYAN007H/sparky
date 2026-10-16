@@ -103,11 +103,17 @@ pub(crate) fn tier_policy_from_config(
             .ok_or_else(|| tier_config_error("live config snapshot was not provided"))?,
     };
     let mut policy = baseline.clone();
-    policy.enabled = config.autonomy.enabled;
-    policy.autonomy = config.autonomy.level;
-    if let Some(ceiling) = ctx.autonomy_tier_ceiling() {
-        policy.enabled = true;
-        policy.autonomy = stricter_tier(policy.autonomy, ceiling);
+    let ceiling = ctx.autonomy_tier_ceiling();
+    policy.enabled = config.autonomy.enabled || ceiling.is_some();
+    if config.autonomy.enabled {
+        policy.autonomy = config.autonomy.level;
+        if let Some(ceiling) = ceiling {
+            policy.autonomy = stricter_tier(policy.autonomy, ceiling);
+        }
+    } else if let Some(ceiling) = ceiling {
+        // A disabled config contributes no tier restriction; a host ceiling
+        // remains independently active.
+        policy.autonomy = ceiling;
     }
     Ok(policy)
 }
