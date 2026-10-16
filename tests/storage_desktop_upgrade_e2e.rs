@@ -29,7 +29,7 @@ use openhuman_core::storage::{rusqlite, DocumentStoreExt, Scope, ScopedStorage, 
 use sha2::Digest;
 use tinyagents_session::transcript::{session_stem, SessionRef, TranscriptMessage, TranscriptMeta};
 use tinyagents_session::turn_state::TurnState;
-use tinystoragedrivers_core::Query;
+use tinystoragedrivers_core::{Capability, Query};
 
 // The classic-transcript fixture writer, shared with the core's unit tests.
 #[path = "../crates/openhuman-core/src/util/classic_transcript_fixture.rs"]
@@ -427,6 +427,22 @@ async fn import_modules(workspace: &Path) {
 }
 
 async fn a_desktop_upgrade_is_lossless_and_leaves_the_legacy_files_untouched(case: Case) {
+    // TinyAgents' run ledger imports `sessions.db` (and appends to it) with
+    // checked batches, which a driver without `ValidatedBatch` refuses.
+    let local = case.backend().for_scope(&Scope::local()).unwrap();
+    if !local.documents().capabilities().contains(Capability::ValidatedBatch) {
+        // Written to the stderr handle, not with `eprintln!`, which the test
+        // harness captures for a passing test: the skip must show in the log.
+        use std::io::Write;
+        let _ = writeln!(
+            std::io::stderr(),
+            "skipped {}: the driver lacks the validated_batch capability the \
+             tinyagents run ledger needs to import sessions.db",
+            case.driver.name()
+        );
+        return;
+    }
+
     std::env::set_var("OPENHUMAN_KEYRING_BACKEND", "file");
     std::env::set_var("OPENHUMAN_KEYRING_MASTER_KEY", "33".repeat(32));
 
