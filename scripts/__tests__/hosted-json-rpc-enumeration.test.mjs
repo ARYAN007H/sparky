@@ -57,19 +57,25 @@ if [[ "$*" == *"test -p openhuman --lib"* ]]; then
     echo "core tests need separate private XDG cache and data directories" >&2
     exit 13
   }
-  if [[ "$*" == *"inference::tokenjuice::"* || "$*" == *"tinyjuice_detects_and_converts_html"* ]]; then
+  if [[ "$*" == *"--test-threads=1"* ]]; then
     [[ "\${OPENHUMAN_MODULE_PATH:-}" == "$MODULE_FIXTURE_PATH" ]] || {
       echo "module-backed core tests need the staged module path" >&2
       exit 15
     }
-    echo "ISOLATED-MODULE-TEST:$*"
+    if [[ "$*" == *"cron::bus_host::tests::"* || "$*" == *"cron::documents_port::tests::"* ]]; then
+      echo "ISOLATED-CRON-MODULE-TEST:$*"
+    else
+      echo "ISOLATED-MODULE-TEST:$*"
+    fi
     echo "test result: ok. 1 passed; 0 failed; 0 ignored"
-  elif [[ "$*" == *"--test-threads=1"* ]]; then
-    [[ "\${OPENHUMAN_MODULE_PATH:-}" == "$MODULE_FIXTURE_PATH" ]] || exit 15
   else
     [[ -z "\${OPENHUMAN_MODULE_PATH:-}" ]] || {
       echo "parallel core unit tests must not load process-global modules" >&2
       exit 14
+    }
+    [[ "$*" == *"--skip cron::bus_host::tests::"* && "$*" == *"--skip cron::documents_port::tests::"* ]] || {
+      echo "parallel core unit tests must skip module-backed cron tests" >&2
+      exit 16
     }
     echo CORE-TESTS-WITHOUT-MODULE-PATH
   fi
@@ -102,6 +108,11 @@ test("hosted JSON-RPC tests are listed and executed with product features", () =
   assert.equal(
     (result.stdout.match(/ISOLATED-MODULE-TEST:/g) ?? []).length,
     4,
+    result.stdout,
+  );
+  assert.equal(
+    (result.stdout.match(/ISOLATED-CRON-MODULE-TEST:/g) ?? []).length,
+    13,
     result.stdout,
   );
   assert.match(result.stdout, /PRIVATE-XDG-CACHE/);
