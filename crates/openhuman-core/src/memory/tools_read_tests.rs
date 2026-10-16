@@ -52,6 +52,7 @@ async fn recall_returns_evidence_and_leaves_the_calling_thread_out() {
         .unwrap();
 
     let recalled = run_action(
+        &DispatchCtx::ambient(),
         &config,
         &json!({"action": "recall", "question": "oolong tea"}),
         &facts,
@@ -70,7 +71,7 @@ async fn recall_returns_evidence_and_leaves_the_calling_thread_out() {
         out.get("answer").is_none(),
         "recall writes no answer of its own"
     );
-    let cites = take_turn_citations(&live);
+    let cites = take_turn_citations(&DispatchCtx::ambient(), &live);
     assert_eq!(cites.len(), 1, "{cites:?}");
 }
 
@@ -91,6 +92,7 @@ async fn fetch_leaves_the_calling_thread_out() {
         .unwrap();
 
     let fetched = run_action(
+        &DispatchCtx::ambient(),
         &config,
         &json!({"action": "fetch", "query": "oolong", "mode": "keyword", "limit": 5}),
         &facts,
@@ -111,6 +113,7 @@ async fn recall_with_nothing_relevant_says_so() {
     let config = config_in(&tmp);
     bind_reference(&config);
     let recalled = run_action(
+        &DispatchCtx::ambient(),
         &config,
         &json!({"action": "recall", "question": "anything at all"}),
         &facts(),
