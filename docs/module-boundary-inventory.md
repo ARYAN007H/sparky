@@ -545,3 +545,9 @@ cron scheduler keeps running agent, shell and system jobs, but `flow` schedule
 rows are answered as skipped (`COMPONENT_DISABLED:flows`, not retried) and no
 flow run starts. `cron.enabled = false` stops the whole scheduler, flow
 schedule rows included, regardless of `flows`.
+
+### TinyFlows schedule bus cutover (#7397)
+
+Supersedes the section above for who runs the scheduler. The `tinyflows` module (registry record `records_flows.rs`, contract `tinyflows_bus::schedule` v3) owns the scheduler runtime, claims, retry timing, completion, the cron job and run store (`CronDocuments`) and the schedule maths (`NextRun`, `ValidateSchedule`, `RunsCloserThan`, `NormalizeExpression`, `ParseHumanDelay`, `ValidateDelivery`, `DefaultDelivery`, `CheckOriginRequirements`, `CheckPatch`, `TruncateCronOutput`). Core links only `tinyflows-bus` (serde and chrono): `cargo tree -p openhuman -e normal -i tinyflows-schedule` is empty, and `tinyflows-drivers` is optional behind `flows` for the catalog alone.
+
+The host keeps four adapters in `crates/openhuman-core/src/cron/`: `client.rs` (typed calls and `ScheduleStore` requests), `documents_port.rs` (the scope's document store served to the module), `bus_host.rs` (the `ScheduleHost` callbacks `Execute`, `Failed`, `Deliver`, `ScheduleTrigger`, bound per scope) and `handlers.rs` (the job-kind registry that replaced the hard-coded shell/agent/flow split and absorbed the system-job handlers). Deleted: `claims.rs`, `scheduler/host.rs`, `scheduler/run_record.rs` and the `tinyflows_schedule` re-export facade. Temporary exception: `tinyflows-bus` carries `chrono` (record timestamps), recorded in `scripts/ci/module-boundaries.json`.
