@@ -174,7 +174,20 @@ fn an_empty_mode_is_treated_as_the_backend_default() {
 }
 
 #[test]
+fn the_backend_route_is_unavailable_without_a_registered_target() {
+    let mut config = bare_config();
+    config.composio.mode = COMPOSIO_MODE_BACKEND.to_string();
+
+    let error = module_config(&config).expect_err("no proxy target is registered");
+    assert!(
+        error.starts_with(crate::core::observability::BACKEND_UNAVAILABLE_PREFIX),
+        "{error}"
+    );
+}
+
+#[test]
 fn the_backend_route_needs_a_session() {
+    crate::integrations::composio::test_backend_route::register();
     let mut config = bare_config();
     config.composio.mode = COMPOSIO_MODE_BACKEND.to_string();
 
