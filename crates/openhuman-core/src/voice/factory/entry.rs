@@ -56,17 +56,13 @@ pub fn create_stt_provider(
         debug!("{LOG_PREFIX} create_stt_provider using registered provider slug={registered_slug}");
         return factory(effective_model, config);
     }
-    match provider.trim() {
-        other => {
-            let (slug, slug_model) = split_slug_model(other);
-            let effective_model = if slug_model.is_empty() {
-                model.trim()
-            } else {
-                slug_model
-            };
-            create_stt_provider_by_slug(slug, effective_model, config)
-        }
-    }
+    let (slug, slug_model) = split_slug_model(provider.trim());
+    let effective_model = if slug_model.is_empty() {
+        model.trim()
+    } else {
+        slug_model
+    };
+    create_stt_provider_by_slug(slug, effective_model, config)
 }
 
 /// Creates a text-to-speech provider based on the specified name and voice.
