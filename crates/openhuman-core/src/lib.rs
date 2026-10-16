@@ -9,7 +9,8 @@
 //! Business logic lives one directory per domain family under `src/`, listed
 //! below in the order they are declared (module declarations are kept
 //! alphabetical, with the `rpc` re-export sitting between `platform` and
-//! `runtime` — keep new modules sorted the same way): `agent`, `api`,
+//! `runtime` — keep new modules sorted the same way): `agent`, `artifacts`,
+//! `api`,
 //! `channels`, `config`, `core`, `cron`, `desktop`, `flows` (feature
 //! `flows`), `hooks`, `hosting` (feature `hosting`),
 //! `inference`, `integrations`,
