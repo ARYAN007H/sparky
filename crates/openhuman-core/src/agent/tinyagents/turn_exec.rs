@@ -542,7 +542,9 @@ async fn drive_turn(
                 .parent
                 .as_ref()
                 .filter(|_| todo_registered)
-                .map(|parent| crate::agent::todos::ops::store(&parent.workspace_dir)),
+                .map(|parent| {
+                    crate::agent::session_store::stores_or_ephemeral(&parent.workspace_dir).kv
+                }),
         },
     );
     if let Some(scope) = run_context.response_shape.clone() {

@@ -71,7 +71,6 @@ pub mod stop_hooks;
 /// definitions, prompts, tools, policy, checkpoints and progress remain here.
 pub mod subagent_host;
 pub mod tinyagents;
-pub mod todos;
 pub mod tools;
 pub mod triage;
 /// Explicit per-turn host environment handed to the session an entry point runs.

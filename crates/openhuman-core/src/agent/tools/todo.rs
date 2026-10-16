@@ -18,7 +18,6 @@
 //! dropped by the rekey.
 
 use crate::agent::harness::fork_context::ParentExecutionContext;
-use crate::agent::tools::todo::TodoScope;
 use async_trait::async_trait;
 use std::path::PathBuf;
 use std::sync::Arc;
