@@ -32,7 +32,7 @@ use super::types::OpenHumanSessionHost;
 use crate::agent::{
     message_convert::{user_message_from_text, user_text_with_markers},
     session_host::{
-        OpenHumanSessionHooks, OpenHumanTranscriptCodec, driver::OpenHumanSessionDriver,
+        driver::OpenHumanSessionDriver, OpenHumanSessionHooks, OpenHumanTranscriptCodec,
     },
     tinyagents::{host::OpenHumanRunContext, middleware::turn_context::TurnContextMiddleware},
 };
@@ -75,8 +75,8 @@ struct OpenHumanTurnPrelude {
     context_config: crate::config::ContextConfig,
     tool_policy: Arc<
         dyn tinyagents_harness::middleware::ToolCallPolicy<
-                crate::agent::tinyagents::host::OpenHumanRunContext,
-            >,
+            crate::agent::tinyagents::host::OpenHumanRunContext,
+        >,
     >,
     tool_dispatcher: Arc<dyn tinytools_agent::dialect::ToolDialect>,
     workspace_dir: std::path::PathBuf,
@@ -480,7 +480,9 @@ impl OpenHumanTurnPrelude {
         run_context.attach_parent(self.parent_context(run_context.parent.as_ref()));
         self.apply_pending_announcements(&mut enriched);
         run_context.attachment_placeholders = Arc::new(
-            crate::agent::multimodal::extract_image_placeholders_in_text(original_user_message),
+            tinyagents_harness::multimodal::markers::extract_image_placeholders_in_text(
+                original_user_message,
+            ),
         );
         run_context.dispatch = Some(Arc::new(
             crate::agent::tinyagents::host::TurnDispatchState::new(
