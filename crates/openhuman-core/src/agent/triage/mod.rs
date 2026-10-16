@@ -39,9 +39,9 @@ pub mod events;
 pub mod origin;
 pub mod routing;
 
-pub use decision::{parse_triage_decision, ParseError, TriageAction, TriageDecision};
+pub use decision::{ParseError, TriageAction, TriageDecision, parse_triage_decision};
 pub use envelope::{TriggerEnvelope, TriggerSource};
 pub use escalation::apply_decision;
-pub use evaluator::{run_triage, TriageOutcome, TriageResolutionPath, TriageRun};
+pub use evaluator::{TriageOutcome, TriageResolutionPath, TriageRun, run_triage};
 pub use origin::{local_trigger_origin, remote_trigger_origin};
-pub use routing::{build_local_provider_with_config, ResolvedProvider};
+pub use routing::{ResolvedProvider, build_local_provider_with_config};

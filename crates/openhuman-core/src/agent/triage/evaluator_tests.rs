@@ -1,10 +1,10 @@
 use super::*;
-use crate::agent::bus::{mock_agent_run_turn, AgentTurnResponse};
-use crate::agent_registry::host_definition::AgentDefinitionRegistry;
+use crate::agent::bus::{AgentTurnResponse, mock_agent_run_turn};
 use crate::agent_registry::agents::BUILTINS;
+use crate::agent_registry::host_definition::AgentDefinitionRegistry;
 use serde_json::json;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc as StdArc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 fn arm_error_label(err: &ArmError) -> &'static str {
     match err {

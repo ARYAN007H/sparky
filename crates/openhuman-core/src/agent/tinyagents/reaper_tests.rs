@@ -3,7 +3,7 @@ use super::*;
 use tinyagents_harness::events::HarnessRunStatus;
 use tinyagents_harness::ids::{ComponentId, ExecutionStatus, HarnessPhase};
 use tinyagents_harness::observability::{
-    mint_run_id, DriverStatusStore, HarnessStatusStore, ORPHAN_REAP_REASON,
+    DriverStatusStore, HarnessStatusStore, ORPHAN_REAP_REASON, mint_run_id,
 };
 
 /// Build a fresh status in a non-terminal state and persist it.

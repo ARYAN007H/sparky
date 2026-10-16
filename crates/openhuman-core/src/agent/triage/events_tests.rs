@@ -4,7 +4,7 @@ use crate::core::events::DomainEvent;
 use serde_json::json;
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use tokio::time::{sleep, Duration};
+use tokio::time::{Duration, sleep};
 
 #[tokio::test]
 async fn publish_helpers_emit_expected_trigger_events() {

@@ -7,8 +7,7 @@ use tinyinference_llm::message::Message;
 
 const NUDGE: &str =
     "The last call failed validation. Correct its schema or arguments once before trying again.";
-const FAILED_TOOL_RESULT_WITH_NUDGE: &str =
-    "{\"status_code\": 422}\n\n[harness note]\nThe last call failed validation. Correct its schema or arguments once before trying again.";
+const FAILED_TOOL_RESULT_WITH_NUDGE: &str = "{\"status_code\": 422}\n\n[harness note]\nThe last call failed validation. Correct its schema or arguments once before trying again.";
 
 /// A native-tool-calling model that replays scripted responses and records the
 /// messages of every request it receives.

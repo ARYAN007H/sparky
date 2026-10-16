@@ -56,7 +56,7 @@ fn mode_label_round_trips() {
 #[tokio::test]
 async fn plan_mode_stays_with_the_agent_that_set_it() {
     use crate::core::runtime::agent_scope::test_agent_context;
-    use crate::core::runtime::{context::CoreContext, DomainSet};
+    use crate::core::runtime::{DomainSet, context::CoreContext};
     let root = CoreContext::for_test(DomainSet::full(), None);
     let alpha = test_agent_context(&root, "alpha");
     let beta = test_agent_context(&root, "beta");

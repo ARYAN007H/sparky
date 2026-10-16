@@ -1,6 +1,5 @@
 //! Tool: `spawn_parallel_agents` — fan out independent sub-agent tasks.
 
-use crate::agent_registry::host_definition::AgentDefinitionRegistry;
 #[cfg(test)]
 use crate::agent::orchestration::spawn_parallel::ParallelAgentLineage;
 #[cfg(test)]
@@ -10,6 +9,7 @@ use crate::agent::orchestration::spawn_parallel::{
     SpawnParallelGraphOutcome, format_spawn_parallel_success,
     run_spawn_parallel_tasks_with_cancellation_and_workspace,
 };
+use crate::agent_registry::host_definition::AgentDefinitionRegistry;
 use async_trait::async_trait;
 use serde_json::json;
 use std::sync::Arc;

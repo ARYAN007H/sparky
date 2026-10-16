@@ -14,17 +14,16 @@ use async_trait::async_trait;
 use reqwest::Client;
 
 use crate::config::{
-    build_runtime_proxy_client_with_timeouts, MultimodalConfig, MultimodalFileConfig,
+    MultimodalConfig, MultimodalFileConfig, build_runtime_proxy_client_with_timeouts,
 };
 use tinyagents_session::transcript::{TranscriptMessage, TranscriptPart};
 
 use tinyagents_harness::multimodal::{
-    self as mm,
+    self as mm, BlobAttachmentStash,
     config::{FileLimits, ImageLimits},
     markers,
     payload::sha256_prefix,
-    resolve::{resolve_file, resolve_image, TextExtractor},
-    BlobAttachmentStash,
+    resolve::{TextExtractor, resolve_file, resolve_image},
 };
 
 use tinyagents_harness::multimodal::{FilePayload, MultimodalError};

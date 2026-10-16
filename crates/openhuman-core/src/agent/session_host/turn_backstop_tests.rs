@@ -1,5 +1,5 @@
 use super::*;
-use tinyagents_harness::turn_deadline::{parse_backstop, TurnDeadline};
+use tinyagents_harness::turn_deadline::{TurnDeadline, parse_backstop};
 
 #[test]
 fn parse_backstop_defaults_and_disables() {

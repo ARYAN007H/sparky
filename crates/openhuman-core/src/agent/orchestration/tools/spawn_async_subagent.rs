@@ -5,7 +5,6 @@
 //! events and, when possible, persisted in the child worker thread.
 
 use super::subagent_abort_report::AbortReport;
-use crate::agent_registry::host_definition::AgentDefinitionRegistry;
 use crate::agent::orchestration::fleet_tools::FleetToolSet;
 use crate::agent::orchestration::running_subagents;
 use crate::agent::orchestration::subagent_sessions::{
@@ -17,6 +16,7 @@ use crate::agent::progress::AgentProgress;
 use crate::agent::subagent_host::{
     SubagentRunOptions, SubagentRunStatus, run_subagent_with_parent,
 };
+use crate::agent_registry::host_definition::AgentDefinitionRegistry;
 use crate::core::runtime::DispatchCtx;
 use crate::threads::store::{self as conversations, ConversationMessage};
 use async_trait::async_trait;

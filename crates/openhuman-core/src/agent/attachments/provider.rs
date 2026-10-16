@@ -2,7 +2,7 @@
 use super::AttachmentAccessScope;
 use crate::config::Config;
 use async_trait::async_trait;
-use base64::{engine::general_purpose::STANDARD, Engine};
+use base64::{Engine, engine::general_purpose::STANDARD};
 use std::sync::Arc;
 use tinyinference_llm::{
     message::{ContentBlock, ImageRef, MediaRef, Message},

@@ -1,6 +1,6 @@
 use super::*;
 use crate::core::runtime::agent_scope::test_agent_context;
-use crate::core::runtime::{context::CoreContext, DomainSet};
+use crate::core::runtime::{DomainSet, context::CoreContext};
 
 #[tokio::test]
 async fn request_journal_runs_stay_with_the_agent_that_registered_them() {

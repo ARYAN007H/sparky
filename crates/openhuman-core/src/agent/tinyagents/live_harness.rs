@@ -28,11 +28,11 @@ use tinyagents_harness::middleware::{
 };
 use tinyagents_harness::runtime::AgentHarness;
 
+use super::ToolPolicyEnforcement;
 use super::host::OpenHumanRunContext;
 use super::middleware;
 use super::tool_registration::{capability_diagnostics, host_tool_set_builder};
 use super::turn_policy::run_policy_for;
-use super::ToolPolicyEnforcement;
 
 /// Generous tool-call budget for one live conversation; the harness's
 /// per-call admission still counts against it.

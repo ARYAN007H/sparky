@@ -5,8 +5,8 @@
 //! actually see?).
 
 use super::types::SubagentRunError;
-use crate::agent_registry::host_definition::AgentDefinition;
 use crate::agent::prompts::PromptContext;
+use crate::agent_registry::host_definition::AgentDefinition;
 use tinyagents_definition::{PromptSource, ToolScope};
 use tinytools::Tool;
 

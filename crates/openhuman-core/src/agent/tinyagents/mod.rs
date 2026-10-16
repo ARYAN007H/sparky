@@ -79,8 +79,8 @@ pub(crate) use turn_outcome::TinyagentsTurnOutcome;
 #[cfg(test)]
 pub(crate) use turn_policy::is_subagent_spawn_or_delegate_tool;
 pub(crate) use turn_policy::{
-    agent_turn_wall_clock_ms_for, chat_provider_is_local, local_web_turn_backstop_secs,
-    ToolPolicyEnforcement,
+    ToolPolicyEnforcement, agent_turn_wall_clock_ms_for, chat_provider_is_local,
+    local_web_turn_backstop_secs,
 };
 
 // Test-only glue so `tinyagents_tests.rs`'s `use super::*;` sees the

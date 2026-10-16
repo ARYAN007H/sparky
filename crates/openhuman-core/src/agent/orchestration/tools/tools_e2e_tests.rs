@@ -1,7 +1,7 @@
 use super::{ArchetypeDelegationTool, DelegationTarget, SpawnSubagentTool, SpawnWorkerThreadTool};
 use crate::agent::harness::ParentExecutionContext;
-use crate::agent_registry::host_definition::AgentDefinitionRegistry;
 use crate::agent::prompts::ConnectedIntegration;
+use crate::agent_registry::host_definition::AgentDefinitionRegistry;
 use crate::threads::store as conversations;
 use async_trait::async_trait;
 use parking_lot::Mutex;

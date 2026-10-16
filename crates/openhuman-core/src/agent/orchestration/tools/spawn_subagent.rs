@@ -12,12 +12,12 @@
 //! Sub-agents always run in "typed" mode: a narrow archetype-specific
 //! prompt with a filtered tool list, on a cheaper model where applicable.
 //!
-use crate::agent_registry::host_definition::AgentDefinitionRegistry;
 use crate::agent::orchestration::tools::dispatch::{incomplete_stop, stopped_subagent_result};
 use crate::agent::progress::AgentProgress;
 use crate::agent::subagent_host::{
     SubagentRunOptions, SubagentRunOutcome, SubagentRunStatus, run_subagent_with_parent,
 };
+use crate::agent_registry::host_definition::AgentDefinitionRegistry;
 use crate::core::runtime::DispatchCtx;
 use crate::threads::store::{self as conversations, ConversationMessage, CreateConversationThread};
 use async_trait::async_trait;

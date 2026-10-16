@@ -75,18 +75,21 @@ async fn references_convert_to_image_and_document_blocks() {
     let Message::User(user) = message else {
         panic!("not a user message");
     };
-    assert!(user
-        .content
-        .iter()
-        .any(|block| matches!(block, ContentBlock::Image(_))));
-    assert!(user
-        .content
-        .iter()
-        .any(|block| matches!(block, ContentBlock::Document(_))));
-    assert!(user
-        .content
-        .iter()
-        .any(|block| matches!(block, ContentBlock::Text(text) if text.contains("what is this?"))));
+    assert!(
+        user.content
+            .iter()
+            .any(|block| matches!(block, ContentBlock::Image(_)))
+    );
+    assert!(
+        user.content
+            .iter()
+            .any(|block| matches!(block, ContentBlock::Document(_)))
+    );
+    assert!(
+        user.content.iter().any(
+            |block| matches!(block, ContentBlock::Text(text) if text.contains("what is this?"))
+        )
+    );
 }
 
 #[tokio::test]

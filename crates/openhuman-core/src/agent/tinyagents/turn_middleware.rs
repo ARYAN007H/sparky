@@ -15,13 +15,13 @@ use std::sync::Arc;
 
 use tinyagents_harness::cache::InMemoryResponseCache;
 use tinyagents_harness::middleware::{
-    install_unmet_deliverable, is_repeat_call_exempt, tool_sets_lookup, ResearchBudgetMiddleware,
-    ShellTurnBudget, TurnClockMiddleware, DIRECT_WEB_READ_LIMIT,
+    ApprovalGateMiddleware, ArgRecoveryMiddleware, BudgetLimits, BudgetMiddleware,
+    ContextCompressionMiddleware, PromptCacheGuardMiddleware, RepeatProgressMiddleware,
+    RunModeHandle, ToolPolicyMiddleware as TaToolPolicyMiddleware, plan_mode_middleware,
 };
 use tinyagents_harness::middleware::{
-    plan_mode_middleware, ApprovalGateMiddleware, ArgRecoveryMiddleware, BudgetLimits,
-    BudgetMiddleware, ContextCompressionMiddleware, PromptCacheGuardMiddleware,
-    RepeatProgressMiddleware, RunModeHandle, ToolPolicyMiddleware as TaToolPolicyMiddleware,
+    DIRECT_WEB_READ_LIMIT, ResearchBudgetMiddleware, ShellTurnBudget, TurnClockMiddleware,
+    install_unmet_deliverable, is_repeat_call_exempt, tool_sets_lookup,
 };
 use tinyagents_harness::runtime::AgentHarness;
 use tinyagents_harness::steering::SteeringHandle;
@@ -244,7 +244,9 @@ pub(super) fn install_turn_middleware(
                 Arc::new(is_repeat_call_exempt),
             )
             .with_read_only(Arc::new(move |name: &str| read_only_tools.contains(name)))
-            .with_cleared_placeholder(tinyagents_harness::middleware::library::DEFAULT_CLEARED_PLACEHOLDER),
+            .with_cleared_placeholder(
+                tinyagents_harness::middleware::library::DEFAULT_CLEARED_PLACEHOLDER,
+            ),
         )
     });
     // Time awareness (#6953); before the repeat guard so its notes land last.

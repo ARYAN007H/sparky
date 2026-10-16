@@ -3,10 +3,10 @@
 //! stays readable: the ladder driver lives there, the classification here.
 
 use super::fetched_site::fetched_site_policy;
-use tinyagents_harness::middleware::{call_effect, CallEffect};
+use tinyagents_harness::middleware::{CallEffect, call_effect};
 use tinyagents_harness::no_progress::{
-    is_argument_rejection, is_command_exit_report, is_pre_execution_failure, json_error_recovery,
-    ARGUMENT_SCHEMA_RECOVERY,
+    ARGUMENT_SCHEMA_RECOVERY, is_argument_rejection, is_command_exit_report,
+    is_pre_execution_failure, json_error_recovery,
 };
 use tinyinference_llm::failure::is_recoverable_failure_text as is_recoverable_tool_failure;
 

@@ -14,16 +14,16 @@
 
 use std::path::PathBuf;
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 
 pub mod dump_writer;
 pub mod prompt_size;
 pub mod wire;
-pub use dump_writer::{write_prompt_dumps, DumpWriteSummary};
+pub use dump_writer::{DumpWriteSummary, write_prompt_dumps};
 pub use wire::render as render_wire_dump;
 
-use crate::agent_registry::host_definition::AgentDefinitionRegistry;
 use crate::agent::session_host::OpenHumanSessionHost;
+use crate::agent_registry::host_definition::AgentDefinitionRegistry;
 use crate::config::Config;
 use tinytools::ToolCategory;
 

@@ -2,8 +2,8 @@ use super::*;
 use serde_json::json;
 use std::collections::BTreeMap;
 use tinyagents_harness::events::AgentEvent;
-use tinyagents_harness::observability::trace_export::{SpanStatus, TraceSpan};
 use tinyagents_harness::observability::AgentObservation;
+use tinyagents_harness::observability::trace_export::{SpanStatus, TraceSpan};
 
 use tinyagents_harness::ids::{EventId, RunId};
 use tinyagents_harness::observability::trace_export::SpanKind;

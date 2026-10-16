@@ -5,7 +5,7 @@ use std::sync::Arc;
 use tinyinference_llm::message::{AssistantMessage, ContentBlock};
 use tinyinference_llm::model::{ChatModel, ModelRequest, ModelResponse};
 use tinyinference_llm::tool::ToolCall as TaToolCall;
-use tinyinference_llm::usage::{recover_usage, ProviderUsageReport};
+use tinyinference_llm::usage::{ProviderUsageReport, recover_usage};
 
 use crate::inference::provider::{BilledUsage, ChatResponse};
 

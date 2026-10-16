@@ -12,7 +12,7 @@ use tinyinference_llm::tool::ToolCall as TaToolCall;
 use tinytools::ToolResult as TaToolResult;
 
 use crate::security::approval::{
-    redact_args, summarize_action, ApprovalGate, ExecutionOutcome, GateOutcome,
+    ApprovalGate, ExecutionOutcome, GateOutcome, redact_args, summarize_action,
 };
 use tinytools::Tool;
 

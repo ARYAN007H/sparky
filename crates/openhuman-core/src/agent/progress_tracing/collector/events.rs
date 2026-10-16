@@ -4,11 +4,11 @@
 use std::collections::BTreeMap;
 
 use crate::agent::progress::AgentProgress;
-use tinyagents_harness::observability::trace_export::serialize::{
-    json_f64, json_str, json_u32, json_u64, json_usize, status_of, truncate_chars,
-    MAX_ERROR_MESSAGE_CHARS, MAX_MODEL_CONTENT_CHARS,
-};
 use tinyagents_harness::observability::trace_export::SpanKind;
+use tinyagents_harness::observability::trace_export::serialize::{
+    MAX_ERROR_MESSAGE_CHARS, MAX_MODEL_CONTENT_CHARS, json_f64, json_str, json_u32, json_u64,
+    json_usize, status_of, truncate_chars,
+};
 
 use super::state::{SpanCollector, SubagentState};
 use tinyagents_harness::observability::trace_export::SpanStatus;

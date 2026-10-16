@@ -2,8 +2,8 @@
 //! resolves a parked interactive turn (approve / reject / revise-with-feedback).
 
 use crate::core::runtime::DispatchCtx;
-use serde::de::DeserializeOwned;
 use serde::Deserialize;
+use serde::de::DeserializeOwned;
 use serde_json::{Map, Value};
 
 use crate::core::all::{ControllerFuture, RegisteredController};
@@ -54,8 +54,7 @@ pub fn schemas(function: &str) -> ControllerSchema {
             outputs: vec![FieldSchema {
                 name: "resolved",
                 ty: TypeSchema::Bool,
-                comment:
-                    "true if a parked turn was woken; false if the request was unknown/expired.",
+                comment: "true if a parked turn was woken; false if the request was unknown/expired.",
                 required: true,
             }],
         },
@@ -98,7 +97,7 @@ fn handle_decide(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFut
             other => {
                 return Err(format!(
                     "invalid decision '{other}' (expected approve|reject|revise)"
-                ))
+                ));
             }
         };
         tracing::debug!(

@@ -13,9 +13,9 @@ use crate::cron::scheduler_gate::LlmPermit;
 use super::super::envelope::TriggerEnvelope;
 use super::super::events;
 use super::super::routing::{
-    build_local_provider_with_config, resolve_provider_with_config, ResolvedProvider,
+    ResolvedProvider, build_local_provider_with_config, resolve_provider_with_config,
 };
-use super::arm::{try_arm, ArmError};
+use super::arm::{ArmError, try_arm};
 use super::outcome::{TriageOutcome, TriageResolutionPath};
 
 /// Cap on how long to wait for a server-supplied `Retry-After` before

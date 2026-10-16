@@ -30,8 +30,8 @@
 use crate::core::runtime::DispatchCtx;
 use std::sync::{Arc, LazyLock, PoisonError, RwLock};
 
-use crate::agent_registry::host_definition::AgentDefinition;
 use crate::agent::{HostTools, OpenHumanSessionHost};
+use crate::agent_registry::host_definition::AgentDefinition;
 use crate::config::Config;
 use crate::core::runtime::CoreContext;
 

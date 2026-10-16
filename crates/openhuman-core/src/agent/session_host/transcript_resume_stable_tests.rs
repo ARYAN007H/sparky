@@ -9,8 +9,8 @@ use serde_json::Value;
 use tinyinference_llm::model::ModelResponse;
 
 use super::transcript_compat_tests::{
-    build_host, model, place_fixture, run_async, store_locator, store_tree, thread_id, Layout,
-    SCENARIOS,
+    Layout, SCENARIOS, build_host, model, place_fixture, run_async, store_locator, store_tree,
+    thread_id,
 };
 
 fn tree(
@@ -83,9 +83,11 @@ fn a_legacy_workspace_is_adopted_once_and_the_next_process_resumes_in_place() {
             let stem = host.session_id().expect("bound session id");
             place_fixture(root.path(), scenario, &stem, "");
             imported = legacy_rows(root.path());
-            assert!(imported
-                .iter()
-                .all(|rows| !rows.as_array().unwrap().is_empty()));
+            assert!(
+                imported
+                    .iter()
+                    .all(|rows| !rows.as_array().unwrap().is_empty())
+            );
             assert!(host.resume_bound_session().await.expect("first resume"));
             after_first = tree(root.path(), &thread, &host);
         }

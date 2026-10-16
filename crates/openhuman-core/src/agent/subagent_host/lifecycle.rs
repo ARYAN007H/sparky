@@ -1126,7 +1126,7 @@ impl tinyagents_orchestration::subagent::SubagentPersistence for OpenHumanPersis
 
 #[path = "lifecycle_outcome.rs"]
 mod outcome;
-use outcome::{host_outcome_to_neutral, HostInFlightMap};
+use outcome::{HostInFlightMap, host_outcome_to_neutral};
 
 fn outcome_to_host(
     result: SubagentRunResult,

@@ -3,8 +3,8 @@
 use crate::core::runtime::DispatchCtx;
 use serde_json::{Map, Value};
 
-use crate::core::all::{ControllerFuture, RegisteredController};
 use crate::core::Outcome;
+use crate::core::all::{ControllerFuture, RegisteredController};
 use crate::core::{ControllerSchema, FieldSchema, TypeSchema};
 
 use tinyagents_session::run_ledger::{AgentRunListRequest, RunEventListRequest};
@@ -39,8 +39,7 @@ fn schema_for(function: &str) -> ControllerSchema {
         "run_ledger_list" => ControllerSchema {
             namespace: "run_ledger",
             function: "list",
-            description:
-                "List durable agent/workflow run ledger rows with optional filters and pagination.",
+            description: "List durable agent/workflow run ledger rows with optional filters and pagination.",
             inputs: vec![
                 optional_str("status", "Filter by run status."),
                 optional_str("kind", "Filter by run kind."),

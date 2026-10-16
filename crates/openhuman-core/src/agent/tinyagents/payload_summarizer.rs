@@ -22,16 +22,16 @@
 
 use std::sync::Arc;
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use tinyagents_harness::context::RunContext;
 use tinyagents_harness::summarization::payload_summarizer::{
-    run_unary_summary, summary_child_config, PayloadSummarizer as HarnessPayloadSummarizer,
+    PayloadSummarizer as HarnessPayloadSummarizer, run_unary_summary, summary_child_config,
 };
 use tracing::debug;
 
-use crate::agent_registry::host_definition::AgentDefinition;
 use crate::agent::subagent_host;
 use crate::agent::tinyagents::host::OpenHumanRunContext;
+use crate::agent_registry::host_definition::AgentDefinition;
 use {
     crate::inference::tokenjuice::generate::PreparedGenerate, tinyjuice_bus::wire::GenerateRequest,
 };
@@ -45,10 +45,10 @@ use {
 /// way supplies its own. The prompt is not part of this — TinyJuice writes it
 /// and sends it in the [`GenerateRequest`].
 pub type DynPayloadSummarizer = dyn HarnessPayloadSummarizer<
-    OpenHumanRunContext,
-    Prepared = PreparedGenerate,
-    Error = anyhow::Error,
->;
+        OpenHumanRunContext,
+        Prepared = PreparedGenerate,
+        Error = anyhow::Error,
+    >;
 
 /// Runs the `summarizer` agent definition's model as a unary child of the turn.
 pub struct SubagentPayloadSummarizer {

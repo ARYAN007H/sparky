@@ -31,10 +31,10 @@ mod todo;
 
 pub use delegate::DelegateTool;
 pub(crate) use delegate::DelegateToolDispatch;
-pub use plan_exit::{PlanExitTool, PLAN_EXIT_MARKER};
+pub use plan_exit::{PLAN_EXIT_MARKER, PlanExitTool};
 #[cfg(feature = "skills")]
 pub use run_workflow::{
-    AwaitWorkflowTool, RunWorkflowTool, AWAIT_WORKFLOW_TOOL_NAME, RUN_WORKFLOW_TOOL_NAME,
+    AWAIT_WORKFLOW_TOOL_NAME, AwaitWorkflowTool, RUN_WORKFLOW_TOOL_NAME, RunWorkflowTool,
 };
 pub use todo::TodoTool;
 pub(crate) use todo::TodoToolDispatch;

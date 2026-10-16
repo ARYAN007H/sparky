@@ -12,8 +12,8 @@ use std::{
 
 use serde_json::{Map, Value};
 
-use crate::core::runtime::DispatchCtx;
 use crate::core::ControllerSchema;
+use crate::core::runtime::DispatchCtx;
 
 /// A pinned, boxed future returned by a controller handler.
 pub type ControllerFuture = Pin<Box<dyn Future<Output = Result<Value, String>> + Send + 'static>>;
@@ -804,12 +804,14 @@ pub fn namespace_description(namespace: &str) -> Option<&'static str> {
         "agent" => Some("Per-thread agent run-mode control (Plan vs Build)."),
         "ai" => Some("Agent-generated artifact storage, retrieval, and lifecycle management."),
         "app_state" => Some("Expose core-owned app shell state for frontend polling."),
-        "profiles" => Some("SaaS operator plane: provision and inspect the profile serving each user."),
+        "profiles" => {
+            Some("SaaS operator plane: provision and inspect the profile serving each user.")
+        }
         "auth" => Some("Manage app session and provider credentials."),
         "agent_experience" => Some("Local procedural experience capture and retrieval for agents."),
         "channels" => Some("Channel definitions, connections, and lifecycle management."),
         "composio" => Some(
-            "Composio OAuth integrations proxied via the backend — toolkits, connections, tools, and actions."
+            "Composio OAuth integrations proxied via the backend — toolkits, connections, tools, and actions.",
         ),
         "config" => Some("Read and update persisted runtime configuration."),
         "connectivity" => Some(
@@ -817,9 +819,9 @@ pub fn namespace_description(namespace: &str) -> Option<&'static str> {
         ),
         "cron" => Some("Manage scheduled jobs and run history."),
         "flows" => Some("Create, store, and run automation workflows."),
-        "dashboard" => Some(
-            "Operator-facing dashboard aggregations: per-model health comparison rows.",
-        ),
+        "dashboard" => {
+            Some("Operator-facing dashboard aggregations: per-model health comparison rows.")
+        }
         "mcp_clients" => Some(
             "Browse the MCP registries, declare the user's servers in one mcp.json document, manage their connections and credentials, and expose their tools to the agent.",
         ),
@@ -831,16 +833,26 @@ pub fn namespace_description(namespace: &str) -> Option<&'static str> {
         ),
         "encrypt" => Some("Encrypt secure values managed by secret storage."),
         "health" => Some("Process and component health snapshots."),
-        "inference" => Some("Connect to configured text, vision, and embedding inference runtimes."),
-        "javascript" => Some("First-class JavaScript runtime bridge for listing and dispatching tools."),
+        "inference" => {
+            Some("Connect to configured text, vision, and embedding inference runtimes.")
+        }
+        "javascript" => {
+            Some("First-class JavaScript runtime bridge for listing and dispatching tools.")
+        }
         "security" => Some("Security policy and autonomy guardrail metadata."),
         "service" => Some("Desktop service lifecycle management."),
         "session_import" => {
             Some("One-time import of legacy session transcripts into TinyAgents stores.")
         }
-        "skill_registry" => Some("Browse, search, install, and uninstall skills from remote registries (OpenHuman, Hermes, OpenClaw)."),
-        "skill_runtime" => Some("Run installed skills, inspect run logs, and resolve Node/Python skill runtimes."),
-        "skills" => Some("Discovered SKILL.md skills (discovery, parse, install, run) and their resources."),
+        "skill_registry" => Some(
+            "Browse, search, install, and uninstall skills from remote registries (OpenHuman, Hermes, OpenClaw).",
+        ),
+        "skill_runtime" => {
+            Some("Run installed skills, inspect run logs, and resolve Node/Python skill runtimes.")
+        }
+        "skills" => {
+            Some("Discovered SKILL.md skills (discovery, parse, install, run) and their resources.")
+        }
         "socket" => Some("Backend Socket.IO bridge controls."),
         "memory" => Some(
             "Memory v2: engine selection, recall, fetch, learn, forget, conversations, document sources, context.md and v1 import.",
@@ -860,16 +872,18 @@ pub fn namespace_description(namespace: &str) -> Option<&'static str> {
         "tool_registry" => Some(
             "Read-only discovery for MCP stdio tools and controller-backed tools, including routes, schemas, version, allowed agents, and health.",
         ),
-        "test" => Some(
-            "E2E test support — wipe sidecar state in-place between specs.",
-        ),
-        "wallet" => Some("Local wallet onboarding status and derived multi-chain account metadata."),
+        "test" => Some("E2E test support — wipe sidecar state in-place between specs."),
+        "wallet" => {
+            Some("Local wallet onboarding status and derived multi-chain account metadata.")
+        }
         "web3_swap" => Some("Single-chain crypto swaps via deBridge, built on the local wallet."),
-        "web3_bridge" => Some("Cross-chain crypto bridges via deBridge DLN, built on the local wallet."),
+        "web3_bridge" => {
+            Some("Cross-chain crypto bridges via deBridge DLN, built on the local wallet.")
+        }
         "web3_dapp" => Some("Generic EVM dapp contract calls signed by the local wallet."),
-        "provider_surfaces" => Some(
-            "Local-first assistive surfaces for provider events, respond queues, and drafts.",
-        ),
+        "provider_surfaces" => {
+            Some("Local-first assistive surfaces for provider events, respond queues, and drafts.")
+        }
         "voice" => Some("Speech-to-text and text-to-speech using local models."),
         "webhooks" => {
             Some("Webhook tunnel registrations and captured request/response debug logs.")

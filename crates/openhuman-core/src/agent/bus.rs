@@ -25,7 +25,7 @@ use crate::agent::turn_origin::{self, AgentTurnOrigin};
 use crate::config::MultimodalConfig;
 use crate::core::bus::BUS;
 use crate::security::prompt_injection::{
-    enforce_prompt_input, PromptEnforcementAction, PromptEnforcementContext,
+    PromptEnforcementAction, PromptEnforcementContext, enforce_prompt_input,
 };
 use tinyagents_session::transcript::TranscriptMessage;
 use tinytools::Tool;

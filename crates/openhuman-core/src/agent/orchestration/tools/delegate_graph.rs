@@ -10,8 +10,8 @@
 //! Use it for non-trivial sub-tasks that benefit from a self-review/revision
 //! loop; use `spawn_subagent` for a single focused hand-off.
 
-use crate::agent_registry::host_definition::AgentDefinitionRegistry;
 use crate::agent::orchestration::delegation::run_subagent_delegation_with_parent_context;
+use crate::agent_registry::host_definition::AgentDefinitionRegistry;
 use async_trait::async_trait;
 use serde_json::json;
 use std::sync::Arc;

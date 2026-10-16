@@ -2,7 +2,7 @@ use super::*;
 use std::collections::{HashMap, HashSet};
 
 use async_trait::async_trait;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use tinyagents_harness::context::{RunConfig, RunContext};
 use tinyagents_harness::middleware::Middleware;
 use tinyinference_llm::tool::ToolCall as TaToolCall;

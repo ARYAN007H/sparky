@@ -12,9 +12,9 @@ use tinytools::WorkspaceDescriptor;
 use tokio::sync::mpsc::Sender;
 
 use crate::agent::harness::fork_context::ParentExecutionContext;
-use crate::agent_registry::host_definition::AgentDefinition;
 use crate::agent::orchestration::worktree;
 use crate::agent::progress::AgentProgress;
+use crate::agent_registry::host_definition::AgentDefinition;
 use tinyagents_definition::SandboxMode;
 
 use super::staging::{

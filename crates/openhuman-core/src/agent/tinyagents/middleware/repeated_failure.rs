@@ -9,12 +9,12 @@ use async_trait::async_trait;
 use tinyagents_harness::context::RunContext;
 use tinyagents_harness::error::Result as TaResult;
 use tinyagents_harness::middleware::{
-    call_effect, dispatch_target, is_repeat_call_exempt, repeat_guard_marker, CallEffect,
-    Middleware, ToolFactsLookup, ToolInvocationIdentity,
+    CallEffect, Middleware, ToolFactsLookup, ToolInvocationIdentity, call_effect, dispatch_target,
+    is_repeat_call_exempt, repeat_guard_marker,
 };
 use tinyagents_harness::no_progress::{
-    classified_step, clear_recovered, ClassifiedFailureTracker, ClassifiedStep, FailurePolicy,
-    NoProgress, NoProgressTracker, RecoverableFailureLadder, ToolAttempt,
+    ClassifiedFailureTracker, ClassifiedStep, FailurePolicy, NoProgress, NoProgressTracker,
+    RecoverableFailureLadder, ToolAttempt, classified_step, clear_recovered,
 };
 use tinyagents_harness::steering::SteeringHandle;
 use tinyagents_hooks::stop::StopLatch;

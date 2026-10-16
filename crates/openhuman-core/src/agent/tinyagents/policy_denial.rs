@@ -19,8 +19,8 @@
 //! It is a mitigation, not a guarantee — detecting fabrication needs the
 //! tool-call record carried out to the caller.
 
-use tinytools::status::POLICY_BLOCKED_MARKER;
 use tinytools::PermissionLevel;
+use tinytools::status::POLICY_BLOCKED_MARKER;
 
 /// Generic workaround for a raw security-policy / autonomy block. These denials
 /// originate deep in the tools / `SecurityPolicy` layer (autonomy tier, command

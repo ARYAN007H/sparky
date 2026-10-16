@@ -7,14 +7,14 @@
 use std::sync::Arc;
 
 use tinyagents_harness::middleware::{
-    compression_policy, legacy_max_input_tokens, microcompact_for_window, split_input_allowance,
     ArtifactIndexTocMiddleware, CapturedOutcomes, ContextCompressionMiddleware, ContextLadder,
     FinalCallWrapUpMiddleware, ImageAwareMessageTrimMiddleware, OutcomesUnavailable,
+    compression_policy, legacy_max_input_tokens, microcompact_for_window, split_input_allowance,
 };
 use tinyagents_harness::runtime::AgentHarness;
 use tinyagents_harness::summarization::{
-    FaultTolerantCachingSummarizer, ModelSummarizer, SummarizationPolicy, TaskStateSummarizer,
-    DEFAULT_TASK_STATE_CHUNK_TOKENS,
+    DEFAULT_TASK_STATE_CHUNK_TOKENS, FaultTolerantCachingSummarizer, ModelSummarizer,
+    SummarizationPolicy, TaskStateSummarizer,
 };
 
 use crate::agent::tinyagents::host::OpenHumanRunContext;
@@ -92,7 +92,9 @@ pub(super) fn install_context_ladder(
                 restore_allowance,
             )
             .with_deliverable_tools(["file_write", "apply_patch"])
-            .with_cleared_placeholder(tinyagents_harness::middleware::library::DEFAULT_CLEARED_PLACEHOLDER)
+            .with_cleared_placeholder(
+                tinyagents_harness::middleware::library::DEFAULT_CLEARED_PLACEHOLDER,
+            )
             .with_budget_notice(BUDGET_NOTICE_THRESHOLDS),
         )
     });

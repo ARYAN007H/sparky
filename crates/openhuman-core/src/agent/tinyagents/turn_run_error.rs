@@ -2,7 +2,7 @@
 //! caller expects, for [`TurnSpec::run`](TurnSpec::run).
 
 use crate::agent::tinyagents::journal::TurnJournal;
-use tinyagents_harness::turn_run_error::{classify_run_failure, RunFailureKind};
+use tinyagents_harness::turn_run_error::{RunFailureKind, classify_run_failure};
 use tinyinference_llm::model::ModelErrorSlot;
 
 /// Map the harness's run failure `e` onto the typed error the turn caller

@@ -259,8 +259,7 @@ async fn tool_completed_projects_output_arguments_and_elapsed() {
 }
 
 /// The answer the crate injects for an unknown tool (`unknown_tool_message`).
-const UNKNOWN_TOOL_ANSWER: &str =
-    "unknown tool `search_files` (arguments: {\"query\":\"config\"}): \
+const UNKNOWN_TOOL_ANSWER: &str = "unknown tool `search_files` (arguments: {\"query\":\"config\"}): \
      no tool with that name is available to you, and calling it again will fail the same way.";
 
 /// Emit what the crate emits for an unknown-tool call since TOOL-11: the typed

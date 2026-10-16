@@ -14,16 +14,16 @@
 //! that failure and is the fastest way to see these tests fail red.
 
 use super::*;
-use crate::agent_registry::host_definition::AgentDefinitionRegistry;
 use crate::agent::harness::ParentExecutionContext;
 use crate::agent::tinyagents::tool_registration::shared_tool_adapter;
+use crate::agent_registry::host_definition::AgentDefinitionRegistry;
 use async_trait::async_trait;
 use serde_json::json;
 use std::path::Path;
 use std::sync::Arc;
+use tinyagents_harness::CallId;
 use tinyagents_harness::context::RunConfig;
 use tinyagents_harness::tool::packs::{PackRegistryHandle, UseSkillTool};
-use tinyagents_harness::CallId;
 use tinyinference_llm::message::Message;
 use tinyinference_llm::model::{ChatModel, ModelProfile, ModelRequest, ModelResponse};
 use tinytools::{Tool, ToolCallOptions, ToolResult};

@@ -60,7 +60,7 @@ use tinyagents_harness::observability::AgentObservation;
 
 use super::SpanCollector;
 use crate::agent::progress::AgentProgress;
-use replay::{json_content_text, turn_outcome_for_failure, user_message_text, Replay};
+use replay::{Replay, json_content_text, turn_outcome_for_failure, user_message_text};
 
 #[path = "journal_replay.rs"]
 mod replay;

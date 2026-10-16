@@ -7,7 +7,7 @@ use std::time::Instant;
 
 use anyhow::anyhow;
 
-use crate::agent::bus::{AgentTurnRequest, AgentTurnResponse, AGENT_RUN_TURN_METHOD};
+use crate::agent::bus::{AGENT_RUN_TURN_METHOD, AgentTurnRequest, AgentTurnResponse};
 use crate::agent_registry::host_definition::AgentDefinitionRegistry;
 use crate::config::MultimodalConfig;
 use crate::core::bus::BUS;
@@ -16,7 +16,7 @@ use crate::inference::provider::error_classify::{
 };
 use tinyagents_session::transcript::TranscriptMessage;
 use tinybus::NativeRequestError;
-use tinyinference_providers::{is_budget_message, BudgetMatch};
+use tinyinference_providers::{BudgetMatch, is_budget_message};
 
 use super::super::decision::parse_triage_decision;
 use super::super::envelope::TriggerEnvelope;

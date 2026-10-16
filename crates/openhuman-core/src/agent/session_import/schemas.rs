@@ -3,10 +3,10 @@
 
 use crate::core::runtime::DispatchCtx;
 use serde::Deserialize;
-use serde_json::{json, Map, Value};
+use serde_json::{Map, Value, json};
 
-use crate::core::all::{ControllerFuture, RegisteredController};
 use crate::core::Outcome;
+use crate::core::all::{ControllerFuture, RegisteredController};
 use crate::core::{ControllerSchema, FieldSchema, TypeSchema};
 
 #[derive(Debug, Deserialize, Default)]
@@ -34,14 +34,16 @@ pub fn session_import_schemas(function: &str) -> ControllerSchema {
         "session_import_run" => ControllerSchema {
             namespace: "session_import",
             function: "run",
-            description:
-                "Import the workspace's legacy session files (session_db/sessions.db, \
+            description: "Import the workspace's legacy session files (session_db/sessions.db, \
                  session_raw transcripts, turn-state JSON) into the storage backend. Runs \
                  once per workspace (the boot-time import already did, so this is for \
                  retrying a failed one); sources are never modified and records already in \
                  the backend are never overwritten.",
             inputs: vec![
-                optional_bool("dry_run", "Report which legacy sources exist and write nothing."),
+                optional_bool(
+                    "dry_run",
+                    "Report which legacy sources exist and write nothing.",
+                ),
                 FieldSchema {
                     name: "workspace",
                     ty: TypeSchema::Option(Box::new(TypeSchema::String)),

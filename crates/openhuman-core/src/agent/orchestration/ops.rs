@@ -26,12 +26,12 @@ use super::types::{
     AgentSnapshot, SpawnAgentRequest, SpawnAgentResponse, WaitAgentOptions, WaitAgentResponse,
 };
 use crate::agent::harness::fork_context::ParentExecutionContext;
-use crate::agent_registry::host_definition::{AgentDefinition, AgentDefinitionRegistry};
 use crate::agent::progress::AgentProgress;
 use crate::agent::subagent_host::{
     SubagentRunError, SubagentRunOptions, SubagentRunOutcome, SubagentRunStatus, run_subagent,
 };
 use crate::agent::tinyagents::host::steering::shared_steering_registry;
+use crate::agent_registry::host_definition::{AgentDefinition, AgentDefinitionRegistry};
 use crate::core::bus::BUS;
 use crate::core::events::DomainEvent;
 use std::collections::BTreeMap;

@@ -135,12 +135,14 @@ fn unknown_requested_effort_is_rejected_and_keeps_the_prior_choice() {
         Some("off"),
     )
     .expect("valid effort");
-    assert!(apply_requested_effort(
-        &crate::core::runtime::DispatchCtx::ambient(),
-        thread,
-        Some("turbo")
-    )
-    .is_err());
+    assert!(
+        apply_requested_effort(
+            &crate::core::runtime::DispatchCtx::ambient(),
+            thread,
+            Some("turbo")
+        )
+        .is_err()
+    );
     assert_eq!(
         thread_effort(&crate::core::runtime::DispatchCtx::ambient(), thread),
         Some(ReasoningEffort::None)
@@ -285,7 +287,7 @@ fn a_cap_too_small_for_a_provider_minimum_budget_keeps_the_effort_only() {
 #[tokio::test]
 async fn reasoning_effort_stays_with_the_agent_that_chose_it() {
     use crate::core::runtime::agent_scope::test_agent_context;
-    use crate::core::runtime::{context::CoreContext, DomainSet};
+    use crate::core::runtime::{DomainSet, context::CoreContext};
     let root = CoreContext::for_test(DomainSet::full(), None);
     let alpha = test_agent_context(&root, "alpha");
     let beta = test_agent_context(&root, "beta");

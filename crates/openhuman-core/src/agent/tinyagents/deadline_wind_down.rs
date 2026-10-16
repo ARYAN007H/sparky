@@ -8,7 +8,7 @@
 
 use std::sync::Arc;
 
-use tinyagents_harness::middleware::library::{install_wind_down, WindDownMiddleware};
+use tinyagents_harness::middleware::library::{WindDownMiddleware, install_wind_down};
 use tinyagents_harness::runtime::AgentHarness;
 use tinyagents_harness::steering::SteeringHandle;
 

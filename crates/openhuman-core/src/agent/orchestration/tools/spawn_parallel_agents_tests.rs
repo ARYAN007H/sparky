@@ -1,12 +1,12 @@
 use super::*;
 use crate::agent::OpenHumanSessionHost;
 use crate::agent::harness::fork_context::ParentExecutionContext;
-use crate::agent_registry::host_definition::AgentDefinition;
-use crate::agent_registry::host_definition::AgentDefinitionRegistry;
 use crate::agent::orchestration::spawn_parallel::{
     ParallelTaskRejectionKind, SpawnParallelTaskPreflight, prepare_spawn_parallel_tasks_from_defs,
 };
 use crate::agent::tinyagents::host::OpenHumanRunContext;
+use crate::agent_registry::host_definition::AgentDefinition;
+use crate::agent_registry::host_definition::AgentDefinitionRegistry;
 use crate::config::AgentConfig;
 use async_trait::async_trait;
 use parking_lot::Mutex;

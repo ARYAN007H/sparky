@@ -65,6 +65,9 @@ pub mod stop_hooks;
 /// Generic lifecycle ordering and task-key coalescing live in TinyAgents;
 /// definitions, prompts, tools, policy, checkpoints and progress remain here.
 pub mod subagent_host;
+#[cfg(test)]
+#[path = "agent_tests.rs"]
+mod tests;
 pub mod tinyagents;
 pub mod tools;
 pub mod triage;
@@ -76,9 +79,6 @@ pub mod turn_env;
 /// origin-aware decisions rather than inferring trust from the absence of
 /// a chat approval context.
 pub mod turn_origin;
-#[cfg(test)]
-#[path = "agent_tests.rs"]
-mod tests;
 
 #[allow(unused_imports)]
 pub use session_host::{

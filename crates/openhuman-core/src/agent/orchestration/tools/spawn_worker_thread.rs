@@ -9,8 +9,8 @@
 //! Worker threads carry a hard cap on depth: a worker thread cannot spawn
 //! another worker thread.
 
-use crate::agent_registry::host_definition::AgentDefinitionRegistry;
 use crate::agent::subagent_host::{SubagentRunOptions, run_subagent_with_parent};
+use crate::agent_registry::host_definition::AgentDefinitionRegistry;
 use crate::threads::store as conversations;
 use async_trait::async_trait;
 use serde_json::json;

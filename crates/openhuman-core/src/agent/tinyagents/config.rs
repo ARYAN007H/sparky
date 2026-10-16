@@ -20,7 +20,7 @@ use tinyagents_harness::config::{
 };
 
 use crate::config::{
-    AgentConfig, Config, DelegateAgentConfig, RequiredOutputContract, DEFAULT_MODEL,
+    AgentConfig, Config, DEFAULT_MODEL, DelegateAgentConfig, RequiredOutputContract,
 };
 
 /// Translates OpenHuman's free-form `agent.tool_dispatcher` string into the

@@ -103,14 +103,16 @@ fn build_system_prompt_uses_workspace_skill_location_fallback() {
     );
 
     assert!(prompt.contains("<name>research-helper</name>"));
-    assert!(prompt.contains(
-        &tmp.path()
-            .join("skills")
-            .join("research-helper")
-            .join("SKILL.md")
-            .display()
-            .to_string()
-    ));
+    assert!(
+        prompt.contains(
+            &tmp.path()
+                .join("skills")
+                .join("research-helper")
+                .join("SKILL.md")
+                .display()
+                .to_string()
+        )
+    );
     assert!(prompt.contains("running as a Telegram bot"));
 }
 

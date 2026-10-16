@@ -21,9 +21,11 @@ async fn prepare_messages_rejects_too_many_images() {
     .await
     .expect_err("should reject image count overflow");
 
-    assert!(error
-        .to_string()
-        .contains("multimodal image limit exceeded"));
+    assert!(
+        error
+            .to_string()
+            .contains("multimodal image limit exceeded")
+    );
 }
 
 #[tokio::test]
@@ -80,7 +82,8 @@ async fn prepare_messages_rejects_oversized_file() {
     .await
     .expect_err("oversized file must be rejected");
 
-    assert!(err
-        .to_string()
-        .contains("multimodal file size limit exceeded"));
+    assert!(
+        err.to_string()
+            .contains("multimodal file size limit exceeded")
+    );
 }

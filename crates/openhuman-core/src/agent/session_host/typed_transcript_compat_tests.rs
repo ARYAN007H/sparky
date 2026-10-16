@@ -17,13 +17,13 @@
 //! committed corpus now.
 
 use crate::agent::session_store::splice_fixture_tests::head_of;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use tinyinference_llm::message::ContentBlock;
 use tinyinference_llm::model::ModelResponse;
 
 use super::transcript_compat_tests::{
-    build_host, call, classic_path, fixture, golden, import_placed, model, response, run_async,
-    snapshot_with, store_locator, thread_id, Scenario, SCENARIOS,
+    SCENARIOS, Scenario, build_host, call, classic_path, fixture, golden, import_placed, model,
+    response, run_async, snapshot_with, store_locator, thread_id,
 };
 
 /// Head fixtures that have a typed re-write (the chain and legacy layouts are
@@ -224,10 +224,12 @@ fn an_old_session_continued_by_this_binary_reloads_identically() {
             continued_history
         );
         let transcript = head_of(&locator, &thread);
-        assert!(transcript
-            .messages
-            .iter()
-            .any(|row| row.tool_calls.iter().any(|call| call.id == "call_new")));
+        assert!(
+            transcript
+                .messages
+                .iter()
+                .any(|row| row.tool_calls.iter().any(|call| call.id == "call_new"))
+        );
     });
 }
 
@@ -286,9 +288,11 @@ fn a_live_image_turn_persists_typed_image_parts_and_resumes_identically() {
         );
         assert!(!raw.contains("[IMAGE:"), "no text marker is persisted");
 
-        assert!(serde_json::to_string(&vision.0.requests())
-            .unwrap()
-            .contains(png));
+        assert!(
+            serde_json::to_string(&vision.0.requests())
+                .unwrap()
+                .contains(png)
+        );
 
         let mut second = build_live_image_host(root.path(), live_image_model("unused"), &thread);
         assert!(second.resume_bound_session().await.expect("resume"));

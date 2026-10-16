@@ -11,7 +11,6 @@ use std::time::Instant;
 
 use crate::agent::harness::artifact_offload::offload_run_result;
 use crate::agent::harness::fork_context::ParentExecutionContext;
-use crate::agent_registry::host_definition::{AgentDefinition, AgentDefinitionRegistry};
 use crate::agent::prompts::{
     PromptContext, SubagentRenderOptions, render_subagent_system_prompt_with_format,
 };
@@ -23,6 +22,7 @@ use crate::agent::subagent_host::types::{
     SubagentMode, SubagentRunError, SubagentRunOptions, SubagentRunOutcome,
 };
 use crate::agent::tinyagents::budget::MAX_SPAWN_DEPTH;
+use crate::agent_registry::host_definition::{AgentDefinition, AgentDefinitionRegistry};
 use crate::inference::provider::AGENT_TURN_MAX_OUTPUT_TOKENS;
 use tinyagents_definition::{
     AgentTier, IterationPolicy, PromptSource, SandboxMode as AgentSandboxMode,
