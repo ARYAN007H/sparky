@@ -13,6 +13,7 @@ use crate::config::Config;
 use crate::security::SecurityPolicy;
 
 pub(crate) mod host;
+pub use host::HostAttachment;
 pub(crate) mod legacy;
 pub(crate) mod provider;
 

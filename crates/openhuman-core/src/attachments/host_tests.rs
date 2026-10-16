@@ -1,5 +1,5 @@
 use super::*;
-use crate::agent::attachments::parse;
+use crate::attachments::parse;
 use tinyinference_llm::message::{ContentBlock, Message};
 
 const PNG: &[u8] = b"\x89PNG\r\n\x1a\n\0\0\0\rIHDRpixels";

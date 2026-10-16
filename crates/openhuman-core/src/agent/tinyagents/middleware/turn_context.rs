@@ -455,7 +455,7 @@ impl Middleware<(), crate::agent::tinyagents::host::OpenHumanRunContext>
         _state: &(),
         request: &mut ModelRequest,
     ) -> TaResult<()> {
-        crate::agent::attachments::attach_request_scope(request, &context.data);
+        crate::attachments::attach_request_scope(request, &context.data);
         Ok(())
     }
 }

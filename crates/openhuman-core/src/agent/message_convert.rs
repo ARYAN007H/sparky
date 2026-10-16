@@ -99,17 +99,17 @@ pub(crate) fn chat_message_to_message(msg: &TranscriptMessage) -> Message {
 /// [`user_text_with_markers`] gives back exactly the text that came in. Text
 /// without a ready marker is a plain text message, byte for byte.
 pub(crate) fn user_message_from_text(text: &str) -> Message {
-    if !crate::agent::attachments::parse(text).1.is_empty() {
+    if !crate::attachments::parse(text).1.is_empty() {
         let mut content = Vec::new();
-        for segment in crate::agent::attachments::segments(text) {
+        for segment in crate::attachments::segments(text) {
             let attachment = match segment {
-                crate::agent::attachments::Segment::Text(text) => {
+                crate::attachments::Segment::Text(text) => {
                     if let Message::User(user) = user_message_from_text(&text) {
                         content.extend(user.content);
                     }
                     continue;
                 }
-                crate::agent::attachments::Segment::Attachment(file) => file,
+                crate::attachments::Segment::Attachment(file) => file,
             };
             content.push(ContentBlock::Text(attachment.description()));
             let media = MediaRef::Path {
@@ -207,7 +207,7 @@ pub(crate) fn user_text_with_markers(msg: &Message) -> String {
 /// is empty or malformed is kept verbatim as text. Local references are
 /// resolved by the host model decorator before provider serialization.
 fn user_content_blocks(text: String) -> Vec<ContentBlock> {
-    if !crate::agent::attachments::parse(&text).1.is_empty() {
+    if !crate::attachments::parse(&text).1.is_empty() {
         if let Message::User(user) = user_message_from_text(&text) {
             return user.content;
         }

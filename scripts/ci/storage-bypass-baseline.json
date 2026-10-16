@@ -1,35 +1,35 @@
 [
   {
     "rule": "json-write",
-    "path": "crates/openhuman-core/src/agent/attachments/legacy.rs",
+    "path": "crates/openhuman-core/src/attachments/legacy.rs",
     "line": 143,
     "text": "let mut file = tokio::fs::OpenOptions::new()",
     "occurrence": 1
   },
   {
     "rule": "json-write",
-    "path": "crates/openhuman-core/src/agent/attachments/mod.rs",
+    "path": "crates/openhuman-core/src/attachments/mod.rs",
     "line": 288,
     "text": "let mut file = tokio::fs::OpenOptions::new()",
     "occurrence": 1
   },
   {
     "rule": "json-write",
-    "path": "crates/openhuman-core/src/agent/attachments/provider_cache.rs",
+    "path": "crates/openhuman-core/src/attachments/provider_cache.rs",
     "line": 163,
     "text": "let mut file = tokio::fs::OpenOptions::new()",
     "occurrence": 1
   },
   {
     "rule": "json-write",
-    "path": "crates/openhuman-core/src/agent/attachments/provider_open.rs",
+    "path": "crates/openhuman-core/src/security/secure_open.rs",
     "line": 20,
     "text": "let filesystem_root = std::fs::OpenOptions::new()",
     "occurrence": 1
   },
   {
     "rule": "json-write",
-    "path": "crates/openhuman-core/src/agent/attachments/provider_source.rs",
+    "path": "crates/openhuman-core/src/attachments/provider_source.rs",
     "line": 232,
     "text": "let mut file = tokio::fs::OpenOptions::new()",
     "occurrence": 1

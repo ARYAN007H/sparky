@@ -366,7 +366,7 @@ pub(crate) async fn execute_collapsed_delegation_with_live_parent(
         )));
     }
     let prompt = render_structured_handoff(&raw_prompt, &args);
-    let prompt = match crate::agent::attachments::delegation_prompt(
+    let prompt = match crate::attachments::delegation_prompt(
         &run_context.dispatch_ctx(),
         &prompt,
         &args,

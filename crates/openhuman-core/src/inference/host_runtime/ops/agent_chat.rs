@@ -489,11 +489,11 @@ pub async fn agent_chat_reply_for(
                 }
                 None => config.clone(),
             };
-            let scope = crate::agent::attachments::AttachmentAccessScope {
+            let scope = crate::attachments::AttachmentAccessScope {
                 external_channel: false,
                 workspace: turn_cwd.clone(),
             };
-            let references = crate::agent::attachments::host::stage_host(
+            let references = crate::attachments::host::stage_host(
                 attachments,
                 turn_session_id.unwrap_or("direct"),
                 &staging_config,

@@ -18,8 +18,7 @@
 //! - **[`subagent_host`]**: OpenHuman's planner, executor and persistence
 //!   adapters for sub-agents driven by the neutral TinyAgents lifecycle.
 //!   within a parent agent's tool loop, enabling hierarchical delegation.
-pub(crate) mod attachments;
-pub use attachments::host::HostAttachment;
+pub use crate::attachments::HostAttachment;
 pub mod bus;
 pub mod context;
 pub(crate) mod cost;

@@ -411,11 +411,9 @@ fn is_local_reference(source: &str) -> bool {
     windows_drive_path || url::Url::parse(source).is_err()
 }
 
-#[path = "provider_open.rs"]
-pub(crate) mod open;
 #[cfg(any(test, windows))]
-use open::normalize_windows_path_for_comparison;
-use open::secure_open;
+use crate::security::secure_open::normalize_windows_path_for_comparison;
+use crate::security::secure_open::secure_open;
 
 #[async_trait]
 impl ChatModel<()> for AttachmentModel {

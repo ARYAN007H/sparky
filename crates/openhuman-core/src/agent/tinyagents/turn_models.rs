@@ -140,7 +140,7 @@ fn build_turn_models_crate(
                 role, config, m, true, thread_id, &egress,
             )?;
             return Ok(Arc::new(RouteRecordingModel::new(
-                crate::agent::attachments::provider::wrap(
+                crate::attachments::provider::wrap(
                     ctx,
                     backend,
                     Arc::new(config.clone()),
@@ -172,7 +172,7 @@ fn build_turn_models_crate(
             ),
         }?;
         Ok(Arc::new(RouteRecordingModel::new(
-            crate::agent::attachments::provider::wrap(
+            crate::attachments::provider::wrap(
                 ctx,
                 model,
                 Arc::new(config.clone()),
@@ -204,7 +204,7 @@ fn build_turn_models_crate(
             }) {
                 routes.push((
                     tier.to_string(),
-                    crate::agent::attachments::provider::wrap_injected(
+                    crate::attachments::provider::wrap_injected(
                         ctx,
                         custom,
                         Arc::new(config.clone()),
@@ -232,7 +232,7 @@ fn build_turn_models_crate(
                 Ok((route_model, provider, resolved_model)) => routes.push((
                     tier.to_string(),
                     Arc::new(RouteRecordingModel::new(
-                        crate::agent::attachments::provider::wrap(
+                        crate::attachments::provider::wrap(
                             ctx,
                             route_model,
                             Arc::new(config.clone()),
@@ -260,7 +260,7 @@ fn build_turn_models_crate(
             .host_overrides()
             .and_then(|local| local.role_models.get("summarization").cloned())
         {
-            Some(custom) => crate::agent::attachments::provider::wrap_injected(
+            Some(custom) => crate::attachments::provider::wrap_injected(
                 ctx,
                 custom,
                 Arc::new(config.clone()),
@@ -473,7 +473,7 @@ impl TurnModelSource {
                         {
                             models.routes.push((
                                 tier.to_owned(),
-                                crate::agent::attachments::provider::wrap_injected(
+                                crate::attachments::provider::wrap_injected(
                                     &source_ctx,
                                     custom.clone(),
                                     source.config.clone(),
@@ -482,7 +482,7 @@ impl TurnModelSource {
                         }
                     }
                     if let Some(custom) = local.role_models.get("summarization") {
-                        models.summarizer = crate::agent::attachments::provider::wrap_injected(
+                        models.summarizer = crate::attachments::provider::wrap_injected(
                             &source_ctx,
                             custom.clone(),
                             source.config.clone(),
@@ -513,12 +513,12 @@ impl TurnModelSource {
             );
             let (primary, summarizer) = match &self.attachment_config {
                 Some(config) => (
-                    crate::agent::attachments::provider::wrap_injected(
+                    crate::attachments::provider::wrap_injected(
                         &self.dispatch_ctx(),
                         primary,
                         config.clone(),
                     ),
-                    crate::agent::attachments::provider::wrap_injected(
+                    crate::attachments::provider::wrap_injected(
                         &self.dispatch_ctx(),
                         direct.clone(),
                         config.clone(),
@@ -598,7 +598,7 @@ impl TurnModelSource {
                     .with_request_temperature(temperature),
             );
             return Ok(match &self.attachment_config {
-                Some(config) => crate::agent::attachments::provider::wrap_injected(
+                Some(config) => crate::attachments::provider::wrap_injected(
                     &self.dispatch_ctx(),
                     summarizer,
                     config.clone(),
@@ -612,7 +612,7 @@ impl TurnModelSource {
                     .model_for("summarization")
                     .or_else(|| local.model_for(&cn.role))
             }) {
-                return Ok(crate::agent::attachments::provider::wrap_injected(
+                return Ok(crate::attachments::provider::wrap_injected(
                     &cn.ctx(),
                     custom,
                     cn.config.clone(),
@@ -639,7 +639,7 @@ impl TurnModelSource {
                     thread_id,
                     &crate::security::egress::EgressLedger::none(),
                 )
-                .map(|(inner, _)| crate::agent::attachments::provider::wrap(&cn.ctx(), inner, cn.config.clone(), model, "openhuman"));
+                .map(|(inner, _)| crate::attachments::provider::wrap(&cn.ctx(), inner, cn.config.clone(), model, "openhuman"));
             }
             let built = match cn.primary_override.as_deref() {
                 Some(ps) => {
@@ -671,7 +671,7 @@ impl TurnModelSource {
                     .and_then(|p| p.model.as_deref())
                     .unwrap_or(model)
                     .to_owned();
-                crate::agent::attachments::provider::wrap(
+                crate::attachments::provider::wrap(
                     &cn.ctx(),
                     inner,
                     cn.config.clone(),

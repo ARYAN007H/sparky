@@ -73,7 +73,7 @@ async fn user_append_stages_original_strips_upload_bytes_and_reuses_returned_con
     .value
     .data
     .unwrap();
-    let (_, files) = crate::agent::attachments::parse(&first.content);
+    let (_, files) = crate::attachments::parse(&first.content);
     assert_eq!(files.len(), 1);
     assert_eq!(
         tokio::fs::read(config.action_dir.join(&files[0].path))
@@ -98,7 +98,7 @@ async fn user_append_stages_original_strips_upload_bytes_and_reuses_returned_con
         .data
         .unwrap();
     assert_eq!(second.content, first.content);
-    let staged = crate::agent::attachments::stage_turn(
+    let staged = crate::attachments::stage_turn(
         &second.content,
         Some(&config),
         None,
@@ -162,7 +162,7 @@ async fn rejected_upload_never_appends_a_message() {
 #[tokio::test]
 async fn external_origin_cannot_reuse_an_existing_attachment_marker() {
     let (_temp, config) = setup().await;
-    let staged = crate::agent::attachments::stage_turn(
+    let staged = crate::attachments::stage_turn(
         "[IMAGE:data:image/png;base64,iVBORw0KGgo=]",
         Some(&config),
         None,
@@ -320,7 +320,7 @@ async fn raw_append_stages_in_the_bound_thread_folder() {
         .value
         .data
         .unwrap();
-    let (_, files) = crate::agent::attachments::parse(&staged.content);
+    let (_, files) = crate::attachments::parse(&staged.content);
     assert_eq!(files.len(), 1);
     assert!(folder.join(&files[0].path).is_file());
     assert!(!config.action_dir.join("uploads").exists());

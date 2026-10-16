@@ -133,7 +133,7 @@ pub(crate) fn secure_open(
 }
 
 #[cfg(any(windows, test))]
-pub(super) fn normalize_windows_path_for_comparison(value: &str) -> String {
+pub(crate) fn normalize_windows_path_for_comparison(value: &str) -> String {
     value
         .strip_prefix("\\\\?\\UNC\\")
         .map(|unc| format!("\\\\{unc}"))

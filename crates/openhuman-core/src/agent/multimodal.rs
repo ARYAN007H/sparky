@@ -1,6 +1,6 @@
 //! Legacy attachment marker compatibility and configuration adapters.
 //!
-//! New uploads are handled by `agent::attachments`: originals live beneath
+//! New uploads are handled by `attachments`: originals live beneath
 //! the acting workspace and provider bytes are prepared only on request copies.
 //! The older stash remains readable so existing conversations can resume.
 
@@ -14,16 +14,17 @@ use async_trait::async_trait;
 use reqwest::Client;
 
 use crate::config::{
-    MultimodalConfig, MultimodalFileConfig, build_runtime_proxy_client_with_timeouts,
+    build_runtime_proxy_client_with_timeouts, MultimodalConfig, MultimodalFileConfig,
 };
 use tinyagents_session::transcript::{TranscriptMessage, TranscriptPart};
 
 use tinyagents_harness::multimodal::{
-    self as mm, BlobAttachmentStash,
+    self as mm,
     config::{FileLimits, ImageLimits},
     markers,
     payload::sha256_prefix,
-    resolve::{TextExtractor, resolve_file, resolve_image},
+    resolve::{resolve_file, resolve_image, TextExtractor},
+    BlobAttachmentStash,
 };
 
 use tinyagents_harness::multimodal::{FilePayload, MultimodalError};
@@ -161,11 +162,6 @@ impl TextExtractor for DocumentsTextExtractor<'_> {
 }
 
 // ── Marker helpers over `TranscriptMessage` ────────────────────────────────────
-
-/// The base64 payload Ollama's `images` array expects, or `None`.
-pub fn extract_ollama_image_payload(image_ref: &str) -> Option<String> {
-    markers::extract_ollama_image_payload(image_ref)
-}
 
 /// Count `[IMAGE:…]` markers in the **latest** user message only.
 ///
@@ -496,14 +492,6 @@ pub async fn stash_image_attachments(message: &str, image_config: &MultimodalCon
 }
 
 // ── Placeholders over `TranscriptMessage` ──────────────────────────────────────
-
-/// Extract the `[Image: … #att:<id>]` sidecar placeholder tokens from `text`,
-/// in order. Used to forward a user's attached images into a delegated vision
-/// sub-agent's prompt so its turn rehydrates them (the orchestrator itself, on
-/// a non-vision tier, keeps the placeholder as text and never sees the image).
-pub fn extract_image_placeholders_in_text(text: &str) -> Vec<String> {
-    markers::extract_image_placeholders_in_text(text)
-}
 
 /// True if any message carries an `[Image: … #att:<id>]` sidecar placeholder.
 pub fn has_image_placeholders(messages: &[TranscriptMessage]) -> bool {

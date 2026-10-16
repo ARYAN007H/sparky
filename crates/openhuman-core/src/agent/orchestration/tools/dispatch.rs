@@ -232,7 +232,7 @@ pub(crate) async fn dispatch_subagent_with_live_parent(
                 definition.model.resolve(parent_model)
             }
         };
-        if crate::agent::attachments::should_forward_parent_images(prompt)
+        if crate::attachments::should_forward_parent_images(prompt)
             && !images.is_empty()
             && (agent_id == "vision_agent"
                 || crate::inference::provider::factory::oh_tier_supports_vision(&subagent_model))
@@ -250,7 +250,7 @@ pub(crate) async fn dispatch_subagent_with_live_parent(
     };
 
     if agent_id == "vision_agent" {
-        match crate::agent::attachments::has_resolvable_image(
+        match crate::attachments::has_resolvable_image(
             &run_context.dispatch_ctx(),
             prompt,
             parent_workspace_descriptor.as_ref(),

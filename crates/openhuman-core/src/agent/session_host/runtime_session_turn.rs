@@ -34,7 +34,7 @@ impl OpenHumanSessionHost {
             self.host_env.core = crate::core::runtime::DispatchCtx::ambient().downgrade();
         }
         self.ensure_runtime_session()?;
-        let staged = crate::agent::attachments::stage_turn(
+        let staged = crate::attachments::stage_turn(
             user_message,
             self.runtime_config.as_deref(),
             self.workspace_descriptor.as_ref(),

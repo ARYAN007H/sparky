@@ -116,7 +116,7 @@ pub(crate) async fn run_channel_turn_via_graph(
                 .expect("config loaded for a marker-bearing history row");
             let workspace = Some(config.action_dir.clone());
             attachment_workspace = workspace.clone();
-            let scope = crate::agent::attachments::AttachmentAccessScope {
+            let scope = crate::attachments::AttachmentAccessScope {
                 external_channel: matches!(
                     origin.as_ref(),
                     Some(crate::agent::turn_origin::AgentTurnOrigin::ExternalChannel { .. })
@@ -124,7 +124,7 @@ pub(crate) async fn run_channel_turn_via_graph(
                 workspace: workspace.clone(),
             };
             row.content =
-                crate::agent::attachments::stage(&row.content, "channel", config, &scope).await?;
+                crate::attachments::stage(&row.content, "channel", config, &scope).await?;
             row.parts = None;
         }
     }
@@ -249,7 +249,7 @@ fn seed_channel_attachments(
         .map(crate::agent::message_convert::chat_message_to_message)
     {
         context.attachment_placeholders =
-            Arc::new(crate::agent::attachments::image_references(&input, &[]));
+            Arc::new(crate::attachments::image_references(&input, &[]));
     }
 }
 

@@ -41,7 +41,7 @@ async fn secure_open_rejects_parent_symlink_replaced_after_path_validation() {
         external_channel: false,
         workspace: Some(root.clone()),
     };
-    let validated = crate::agent::attachments::resolve_path(&config, "nested/file.png", &scope)
+    let validated = crate::attachments::resolve_path(&config, "nested/file.png", &scope)
         .await
         .unwrap();
     let canonical_root = tokio::fs::canonicalize(&root).await.unwrap();
