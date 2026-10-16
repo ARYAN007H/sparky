@@ -299,7 +299,7 @@ pub mod tool_sources {
 /// Egress disclosure, for hosted calls that leave the machine.
 pub mod egress {
     pub use openhuman_core::security::egress::{
-        emit_external_transfer, emit_external_transfer_in, enforce_egress, DataKind,
+        emit_external_transfer, emit_external_transfer_in, enforce_egress, local_only_blocks, DataKind,
         EgressDescriptor, EgressLedger, EgressReason, IdentificationRisk,
     };
 }

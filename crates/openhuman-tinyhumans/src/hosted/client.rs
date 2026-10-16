@@ -30,7 +30,7 @@
 //! phrases, budget exhaustion) keep matching them.
 
 use crate::backend::url::effective_backend_api_url;
-use crate::transport::TransportProfile;
+use crate::transport::{BackendTransport, TransportProfile};
 use openhuman_embed::__host::config::Config;
 use openhuman_embed::__host::core::observability::{
     contains_transient_transport_phrase, is_transient_http_status_code, API_KEY_REJECTED_PREFIX,
