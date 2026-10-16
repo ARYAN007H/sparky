@@ -696,7 +696,9 @@ fn the_turns_still_in_the_prompt_reach_the_runs_tools() {
             config: std::sync::Arc::new(config),
             thread_id: "thread-long".into(),
             pack: None,
-            in_prompt_from: 12,
+            in_prompt_from: std::sync::Arc::new(
+                crate::memory::lifecycle::window::InPromptFrom::new(12, 20),
+            ),
             core: None,
         },
     ));

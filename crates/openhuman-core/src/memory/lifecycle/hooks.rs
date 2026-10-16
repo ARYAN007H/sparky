@@ -151,10 +151,10 @@ pub struct MemoryTurn {
     pub thread_id: String,
     /// The pack the turn was given, if any.
     pub pack: Option<TurnPack>,
-    /// The first turn of the thread still verbatim in the turn's prompt:
-    /// the turns before it were compacted into a checkpoint. 0 when nothing
-    /// was compacted.
-    pub in_prompt_from: u32,
+    /// The first turn of the thread still verbatim in the turn's prompt: the
+    /// turns before it were compacted into a checkpoint (0 when nothing was).
+    /// Live: a compaction during the turn moves it forward.
+    pub in_prompt_from: std::sync::Arc<super::window::InPromptFrom>,
     /// The context the turn runs under, held weakly so a finished tenant's
     /// lease is not kept alive by a lingering turn handle.
     pub core: Option<std::sync::Weak<crate::core::runtime::CoreContext>>,
@@ -167,7 +167,7 @@ impl MemoryTurn {
     pub fn in_prompt(&self) -> tinymemory_api::ThreadWindow {
         tinymemory_api::ThreadWindow {
             thread_id: self.thread_id.clone(),
-            from_turn: self.in_prompt_from,
+            from_turn: self.in_prompt_from.get(),
         }
     }
 

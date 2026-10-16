@@ -682,7 +682,7 @@ impl OpenHumanRunContext {
                 .as_ref()
                 .map(|parent| parent.agent_definition_id.clone()),
             memory_identity: self.memory_identity.clone(),
-            memory_in_prompt: self.memory_turn.as_ref().map(|turn| turn.in_prompt()),
+            memory_turn: self.memory_turn.clone(),
             core: self.core.clone(),
         });
         let context = tinyagents_harness::context::RunContext::new(config, self)

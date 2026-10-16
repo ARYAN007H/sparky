@@ -16,7 +16,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use tinyagents_harness::error::Result;
-use tinyagents_harness::summarization::{Summarizer, SummaryRecord, SummaryRequest};
+use tinyagents_harness::summarization::{is_checkpoint, Summarizer, SummaryRecord, SummaryRequest};
 use tinyinference_llm::message::{ContentBlock, Message};
 use tinymemory_api::{Role, Turn};
 
@@ -57,6 +57,14 @@ impl MemoryRecallSummarizer {
             dropped_turns(messages),
         );
         let mut record = summary.await?;
+        // The folded user turns are out of the prompt now, so the turn's next
+        // memory read may return them.
+        self.turn.in_prompt_from.advance_past(
+            messages
+                .iter()
+                .filter(|message| matches!(message, Message::User(_)) && !is_checkpoint(message))
+                .map(Message::text),
+        );
         // A later compaction folds the previous checkpoint, recall included;
         // keep one recall section, the current one.
         strip_recalled(&mut record.summary);
