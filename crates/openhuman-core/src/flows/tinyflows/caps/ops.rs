@@ -641,6 +641,7 @@ pub fn build_capabilities(
 
     Capabilities {
         llm: Arc::new(OpenHumanLlm {
+            ctx: ctx.clone(),
             config: config.clone(),
         }),
         tools: Arc::new(OpenHumanTools {
