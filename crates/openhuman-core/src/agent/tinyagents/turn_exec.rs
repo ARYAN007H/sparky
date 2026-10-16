@@ -524,7 +524,7 @@ async fn drive_turn(
             hosted_security_gate,
             pause_at_cap,
             run_mode: run_context.thread_id.as_deref().map(|thread_id| {
-                crate::agent::tinyagents::run_mode::handle_for_thread(
+                crate::threads::run_mode::handle_for_thread(
                     &run_context.dispatch_ctx(),
                     thread_id,
                 )

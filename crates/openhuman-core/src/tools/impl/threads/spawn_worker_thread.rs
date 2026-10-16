@@ -291,7 +291,7 @@ impl SpawnWorkerThreadTool {
         // ── Create Worker Thread ───────────────────────────────────────
         // Shared with `spawn_subagent` so both delegation paths persist an
         // identical, reopenable sub-thread seeded with the prompt.
-        let worker_thread_id = super::worker_thread::create_worker_thread(
+        let worker_thread_id = crate::threads::worker_thread::create_worker_thread(
             &dispatch,
             parent.workspace_dir.clone(),
             &current_thread_id,

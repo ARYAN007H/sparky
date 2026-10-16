@@ -150,7 +150,7 @@ impl RequestPlanReviewTool {
         let mode = thread_id
             .as_deref()
             .map(|thread_id| {
-                crate::agent::tinyagents::run_mode::get_mode(
+                crate::threads::run_mode::get_mode(
                     &crate::agent::tinyagents::host::run_context::dispatch_ctx_for_tool(context),
                     thread_id,
                 )

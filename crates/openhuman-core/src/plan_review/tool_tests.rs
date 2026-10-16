@@ -30,7 +30,7 @@ async fn interactive_turn_parks_until_resolved() {
     // The tool is inert (no-ops rather than parks) outside Plan mode — see
     // `plan_mode_is_inert_outside_plan_mode` below — so this thread must be
     // in Plan mode for the park to actually happen.
-    crate::agent::tinyagents::run_mode::set_mode(
+    crate::threads::run_mode::set_mode(
         &crate::core::runtime::DispatchCtx::ambient(),
         "t-int",
         tinyagents_harness::middleware::RunMode::Plan,

@@ -16,7 +16,7 @@ impl ToolRunContext for ThreadContext {
 #[tokio::test]
 async fn plan_exit_does_not_flip_while_a_review_is_parked() {
     let thread_id = "plan-exit-parked-thread";
-    crate::agent::tinyagents::run_mode::set_mode(
+    crate::threads::run_mode::set_mode(
         &crate::core::runtime::DispatchCtx::ambient(),
         thread_id,
         tinyagents_harness::middleware::RunMode::Plan,
@@ -51,7 +51,7 @@ async fn plan_exit_does_not_flip_while_a_review_is_parked() {
         .unwrap();
     assert!(!result.is_error);
     assert_eq!(
-        crate::agent::tinyagents::run_mode::get_mode(
+        crate::threads::run_mode::get_mode(
             &crate::core::runtime::DispatchCtx::ambient(),
             thread_id
         ),
@@ -84,7 +84,7 @@ async fn plan_exit_does_not_flip_while_a_review_is_parked() {
         .unwrap();
     assert!(!result.is_error);
     assert_eq!(
-        crate::agent::tinyagents::run_mode::get_mode(
+        crate::threads::run_mode::get_mode(
             &crate::core::runtime::DispatchCtx::ambient(),
             thread_id
         ),

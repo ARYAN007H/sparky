@@ -450,7 +450,7 @@ fn build_registered_controllers() -> Vec<GroupedController> {
     push(
         &mut controllers,
         DomainGroup::Agent,
-        crate::agent::tinyagents::run_mode::all_registered_controllers(),
+        crate::threads::run_mode::all_registered_controllers(),
     );
     // Agent-generated artifact storage, retrieval, and lifecycle management
     push(
