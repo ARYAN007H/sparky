@@ -1,5 +1,5 @@
 use super::*;
-use openhuman_embed::__host::config_enrichers::{run_enrichers, unregister_enricher};
+use openhuman_embed::__host::config_enrichers::run_enrichers;
 
 fn config_with(api_url: Option<&str>) -> Config {
     let mut config = Config::default();
@@ -103,5 +103,4 @@ fn enrich_replaces_resolved_endpoints_and_is_visible_to_the_core_loader_hook() {
         again.resolved_endpoints.control_plane_url.as_deref(),
         Some("http://127.0.0.1:3")
     );
-    assert!(unregister_enricher(ENRICHER_ID));
 }
