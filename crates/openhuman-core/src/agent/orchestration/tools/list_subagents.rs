@@ -146,7 +146,7 @@ impl ListSubagentsTool {
     }
 }
 
-fn overlay_task_store_status(
+pub(crate) fn overlay_task_store_status(
     summary: &mut DurableSubagentSessionSummary,
     workspace_dir: &std::path::Path,
     parent_session: &str,

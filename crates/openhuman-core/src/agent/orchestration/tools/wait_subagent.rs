@@ -36,7 +36,7 @@ const MAX_TIMEOUT_SECS: u64 = 3600;
 /// designed success into an `error` result. The repeated-failure breaker then
 /// classifies "timed out" as transient, retries the identical call 8 times and
 /// halts the turn — which is how a working coding sub-agent lost its work.
-fn requested_timeout_secs(args: &serde_json::Value) -> u64 {
+pub(crate) fn requested_timeout_secs(args: &serde_json::Value) -> u64 {
     args.get("timeout_secs")
         .and_then(|v| v.as_u64())
         .unwrap_or(DEFAULT_TIMEOUT_SECS)
@@ -388,7 +388,7 @@ impl WaitSubagentTool {
 }
 
 /// Render a timeout/running wait response with a structured status payload.
-fn format_running_wait_message(
+pub(crate) fn format_running_wait_message(
     reference: Option<&SubagentResumeRef>,
     task_id: &str,
     timeout_secs: u64,
@@ -409,7 +409,7 @@ fn format_running_wait_message(
 }
 
 /// Build the machine-readable wait status block returned to the orchestrator.
-fn wait_status_payload(
+pub(crate) fn wait_status_payload(
     reference: Option<&SubagentResumeRef>,
     task_id: &str,
     status: &str,
