@@ -27,7 +27,7 @@ use tinyagents_graph::goals::{BudgetVerdict, GoalBudgetGuard, ThreadGoal, Thread
 use super::store::{self, goals_store};
 use crate::core::bus::BUS;
 use crate::core::events::DomainEvent;
-use tinyagents_harness::middleware::{StopDecision, StopHook, TurnState};
+use tinyagents_hooks::stop::{StopDecision, StopHook, TurnState};
 
 /// Load the goal for an explicitly supplied chat thread.
 pub async fn load_for_thread(workspace_dir: &Path, thread_id: Option<&str>) -> Option<ThreadGoal> {

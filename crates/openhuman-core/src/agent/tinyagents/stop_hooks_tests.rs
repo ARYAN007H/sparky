@@ -13,7 +13,7 @@ fn a_poisoned_halt_summary_does_not_abort_stop_reporting() {
     .is_err());
     record_halt_summary(
         &slot,
-        &tinyagents_harness::middleware::library::StopReport {
+        &tinyagents_hooks::stop::StopReport {
             hook: "budget".into(),
             reason: "limit reached".into(),
             iteration: 2,

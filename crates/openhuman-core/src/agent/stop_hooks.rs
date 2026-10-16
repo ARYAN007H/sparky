@@ -22,7 +22,7 @@
 use async_trait::async_trait;
 use tinyagents_harness::cost::TurnCost;
 
-use tinyagents_harness::middleware::{StopDecision, StopHook, TurnState};
+use tinyagents_hooks::stop::{StopDecision, StopHook, TurnState};
 
 /// Stop a turn when its cumulative cost reaches the configured USD cap.
 #[derive(Debug, Clone, Copy)]
