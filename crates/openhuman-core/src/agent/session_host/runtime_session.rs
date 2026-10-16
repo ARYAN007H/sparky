@@ -605,7 +605,7 @@ impl OpenHumanSessionHost {
         };
         let autocompact_enabled = context_config.enabled && context_config.autocompact_enabled;
         let compaction = context_config.compaction_settings();
-        let artifact_store = super::artifact_wiring::build_artifact_store(
+        let artifact_store = crate::artifacts::artifact_wiring::build_artifact_store(
             &self.workspace_dir,
             &self.event_session_id,
         );

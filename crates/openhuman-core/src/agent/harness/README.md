@@ -120,7 +120,7 @@ turn lifecycle are in `../session_host/`; `run_subagent`,
   onto TinyAgents primitives. That file is not checked into this repo, so the
   plan itself is not documented here, only the citations to it.
 - `artifact_offload` deliberately has no flat `ArtifactKind` re-export at the
-  `harness` level. It would shadow `agent::artifacts::ArtifactKind` for glob
+  `harness` level. It would shadow `artifacts::ArtifactKind` for glob
   importers, so use the `artifact_offload::` path instead.
 - The `Agent` struct, its turn lifecycle, and transcript persistence used to
   live under `harness/session/`. That code has moved to `../session_host/`;

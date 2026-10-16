@@ -53,6 +53,7 @@
 #![allow(dead_code)]
 
 pub mod agent;
+pub mod artifacts;
 pub mod backend;
 pub mod channels;
 pub mod commands;

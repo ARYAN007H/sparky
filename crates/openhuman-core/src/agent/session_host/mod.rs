@@ -68,7 +68,6 @@ pub use types::{OpenHumanSessionHost, SessionHostBuilder, TurnOverrides};
 pub(crate) use builder::dedup_visible_tool_specs;
 
 mod announcement_notes;
-mod artifact_wiring;
 
 #[cfg(test)]
 mod orphaned_head_resume_tests;

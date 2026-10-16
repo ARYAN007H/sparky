@@ -29,7 +29,7 @@ pub(crate) mod test_support;
 pub(crate) mod tool_result_artifacts;
 
 // NOTE: deliberately no flat re-export here. `artifact_offload::ArtifactKind`
-// would shadow the unrelated `openhuman::agent::artifacts::ArtifactKind` for anyone
+// would shadow the unrelated `openhuman::artifacts::ArtifactKind` for anyone
 // glob-importing this module; callers import the owning library directly.
 pub use fork_context::{AgentContextPreparedSource, ParentExecutionContext};
 

@@ -51,7 +51,7 @@ const ARTIFACT_RETENTION: std::time::Duration = std::time::Duration::from_secs(2
 /// The sweep is best-effort by design: a failed prune must never fail a turn,
 /// because the worst it costs is disk, while failing the turn costs the user
 /// their message.
-pub(super) fn build_artifact_store(workspace_dir: &Path, session_key: &str) -> HostArtifactStore {
+pub(crate) fn build_artifact_store(workspace_dir: &Path, session_key: &str) -> HostArtifactStore {
     let blobs = artifact_blobs_for(workspace_dir).unwrap_or_else(|| {
         tracing::warn!(
             "[agent][tool-result-artifacts] no blob store for the acting tenant — artifacts stay in memory for this process"

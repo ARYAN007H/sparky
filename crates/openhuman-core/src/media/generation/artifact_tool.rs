@@ -21,7 +21,7 @@
 //!
 //! A run with no context (`execute`/`execute_with_options`, e.g. CLI/tests)
 //! still creates artifacts — the production simply records no
-//! `tool_call_id` and the chat-context bridge in `agent/artifacts/store.rs`
+//! `tool_call_id` and the chat-context bridge in `artifacts/store.rs`
 //! degrades to `thread_id = None` as it already does for every other
 //! producer.
 

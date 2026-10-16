@@ -102,7 +102,7 @@ Inside `generation/`:
 - Argument parsing, writing files into the workspace, and result wording
   belong to TinyAgents (`tinyagents_harness::media`, in `vendor/tinyagents`).
 - Provider keys, billing, and the proxy route belong to the backend.
-- Artifact storage belongs to `agent::artifacts`.
+- Artifact storage belongs to `artifacts`.
 
 ## Gotchas
 
