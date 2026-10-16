@@ -121,6 +121,22 @@ async fn failed_replacement_keeps_the_previous_value() {
 }
 
 #[tokio::test]
+async fn remembering_identical_content_keeps_the_replayed_item() {
+    let (_tmp, config) = engine_config();
+    let first = remember_keyed(&config, "f1", "k", "same", LearningKind::Fact)
+        .await
+        .unwrap();
+    let replay = remember_keyed(&config, "f1", "k", "same", LearningKind::Fact)
+        .await
+        .unwrap();
+
+    assert_eq!(replay, first);
+    let items = list(&config, flow_filter("f1")).await;
+    assert_eq!(items.len(), 1);
+    assert_eq!(items[0].id.0, first);
+}
+
+#[tokio::test]
 async fn flow_filters_isolate_flows_and_cross_flow_sees_all() {
     let (_tmp, config) = engine_config();
     remember_keyed(&config, "f1", "k", "one", LearningKind::Fact)
