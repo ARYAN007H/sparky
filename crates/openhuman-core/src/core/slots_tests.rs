@@ -75,3 +75,38 @@ fn a_slot_name_reused_with_another_type_yields_a_detached_table() {
     assert_eq!(table.get("n"), Some(1));
     assert_eq!(table.get("s"), None);
 }
+
+/// A context registration must win `first()` over a process-wide one, as it
+/// does in `get`, even when the ids differ (a process entry is registered first
+/// in `entries()` order).
+#[test]
+fn a_context_entry_shadows_a_process_entry_in_first() {
+    use crate::core::runtime::{CoreContext, DomainSet};
+    let slot: HookSlot<u32> = HookSlot::new("slots_tests::shadow");
+    slot.register("process", 1);
+    let ctx = CoreContext::for_test(DomainSet::full(), None);
+    slot.register_in(ctx.extensions(), "context", 2);
+
+    assert_eq!(slot.first(), Some(1), "outside the context only the process entry exists");
+    let inside = CoreContext::sync_scope(Arc::clone(&ctx), || {
+        (slot.first(), slot.entries_context_first())
+    });
+    assert_eq!(inside.0, Some(2));
+    assert_eq!(
+        inside.1,
+        vec![("context".to_string(), 2), ("process".to_string(), 1)]
+    );
+    slot.clear();
+}
+
+#[test]
+fn a_context_entry_replacing_a_process_id_is_not_listed_twice() {
+    use crate::core::runtime::{CoreContext, DomainSet};
+    let slot: HookSlot<u32> = HookSlot::new("slots_tests::shadow_same_id");
+    slot.register("same", 1);
+    let ctx = CoreContext::for_test(DomainSet::full(), None);
+    slot.register_in(ctx.extensions(), "same", 2);
+    let entries = CoreContext::sync_scope(ctx, || slot.entries_context_first());
+    assert_eq!(entries, vec![("same".to_string(), 2)]);
+    slot.clear();
+}
