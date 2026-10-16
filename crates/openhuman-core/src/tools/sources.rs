@@ -84,11 +84,8 @@ where
 }
 
 /// Registers a tool source for the whole process at `placement`.
-pub fn register_tool_source_at<F>(
-    id: impl Into<String>,
-    placement: ToolSourcePlacement,
-    factory: F,
-) where
+pub fn register_tool_source_at<F>(id: impl Into<String>, placement: ToolSourcePlacement, factory: F)
+where
     F: for<'a> Fn(&ToolSourceCtx<'a>) -> Vec<Box<dyn Tool>> + Send + Sync + 'static,
 {
     TOOL_SOURCES.register(
