@@ -99,7 +99,7 @@ fn handle_update(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFutu
             .unwrap_or(false)
         {
             if let Some(graph_json) = graph.as_ref() {
-                ops::strict_gate(&config, graph_json).await?;
+                ops::strict_gate(&ctx, &config, graph_json).await?;
             }
         }
         to_json(
