@@ -29,7 +29,10 @@ fn fake_entry(seen: Arc<Mutex<Vec<(String, Option<String>, Option<String>)>>>) -
                 request.model_override.map(str::to_string),
                 request.thread_id.map(str::to_string),
             ));
-            Ok((Arc::new(FakeModel) as Arc<dyn ChatModel<()>>, "fake-model".to_string()))
+            Ok((
+                Arc::new(FakeModel) as Arc<dyn ChatModel<()>>,
+                "fake-model".to_string(),
+            ))
         }),
         probe: None,
     }
@@ -57,7 +60,8 @@ async fn a_registered_chat_model_serves_the_managed_provider_for_a_thread() {
         Some("thread-1"),
         &EgressLedger::none(),
     );
-    let one_shot = create_chat_model_from_string("chat", PROVIDER_OPENHUMAN, &Config::default(), 0.5);
+    let one_shot =
+        create_chat_model_from_string("chat", PROVIDER_OPENHUMAN, &Config::default(), 0.5);
     unregister_chat_model(PROVIDER_OPENHUMAN);
 
     let (model, resolved) = built.expect("registered model builds");
@@ -77,7 +81,11 @@ async fn a_registered_chat_model_serves_the_managed_provider_for_a_thread() {
             Some("thread-1".to_string())
         )
     );
-    assert_eq!(seen.len(), 2, "both construction paths consulted the registry");
+    assert_eq!(
+        seen.len(),
+        2,
+        "both construction paths consulted the registry"
+    );
 }
 
 #[test]
@@ -90,7 +98,11 @@ fn a_registered_embedding_factory_builds_the_managed_embedding_model() {
         Ok(Box::new(tinyinference_embeddings::NoopEmbeddingModel))
     });
     let built = crate::inference::embedding_host::create_embedding_provider_with_credentials(
-        "cloud", "any-model", 8, "", None,
+        "cloud",
+        "any-model",
+        8,
+        "",
+        None,
     );
     unregister_embedding(PROVIDER_OPENHUMAN);
     assert!(built.is_ok());
@@ -144,7 +156,8 @@ fn a_registered_catalog_supplies_the_managed_limits_request() {
             })),
         },
     );
-    let request = model_limits_request("chat", PROVIDER_OPENHUMAN, "some-model", &Config::default());
+    let request =
+        model_limits_request("chat", PROVIDER_OPENHUMAN, "some-model", &Config::default());
     unregister_catalog(PROVIDER_OPENHUMAN);
     assert!(request.is_some());
 }

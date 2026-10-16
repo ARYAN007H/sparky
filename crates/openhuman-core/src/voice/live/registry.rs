@@ -108,7 +108,10 @@ pub(super) fn configure(
         .get(provider)
         .and_then(|entry| entry.configure.clone())
     {
-        tracing::debug!(provider, "[voice-live] shaping config via registered provider");
+        tracing::debug!(
+            provider,
+            "[voice-live] shaping config via registered provider"
+        );
         configure(config, system_instruction, live);
     }
 }

@@ -68,7 +68,9 @@ fn registered_sources_append_in_registration_order_after_built_ins() {
     let tmp = TempDir::new().unwrap();
     let baseline = assemble(&tmp);
 
-    register_tool_source("test::second", |_| vec![Box::new(FakeTool("source_fake_b"))]);
+    register_tool_source("test::second", |_| {
+        vec![Box::new(FakeTool("source_fake_b"))]
+    });
     register_tool_source("test::first", |_| {
         vec![
             Box::new(FakeTool("source_fake_a1")),
@@ -106,7 +108,9 @@ fn a_source_receives_the_catalogue_context() {
 #[test]
 fn unregistering_a_source_removes_its_tools() {
     let tmp = TempDir::new().unwrap();
-    register_tool_source("test::gone", |_| vec![Box::new(FakeTool("source_fake_gone"))]);
+    register_tool_source("test::gone", |_| {
+        vec![Box::new(FakeTool("source_fake_gone"))]
+    });
     assert!(assemble(&tmp).contains(&"source_fake_gone".to_string()));
     assert!(unregister_tool_source("test::gone"));
     assert!(!assemble(&tmp).contains(&"source_fake_gone".to_string()));

@@ -196,7 +196,9 @@ impl ModuleProgressiveReply {
         session: tokio_util::sync::CancellationToken,
     ) -> anyhow::Result<Self> {
         if let Some(callback) = crate::channels::callback_slot::current() {
-            tracing::debug!("[channels][delivery] progressive delivery via the registered callback");
+            tracing::debug!(
+                "[channels][delivery] progressive delivery via the registered callback"
+            );
             anyhow::ensure!(!session.is_cancelled(), "Channel session closed");
             let transport = SlotTransport {
                 callback,

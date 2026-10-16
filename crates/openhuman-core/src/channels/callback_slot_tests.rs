@@ -1,6 +1,8 @@
 use super::*;
 use crate::channels::controllers::OpenHumanChannelBackend;
-use tinychannels_bus::module_progressive::{ProgressiveTransportRequest, ProgressiveTransportResult};
+use tinychannels_bus::module_progressive::{
+    ProgressiveTransportRequest, ProgressiveTransportResult,
+};
 
 fn typing(channel: &str) -> ChannelBackendRequest {
     ChannelBackendRequest::ProgressiveTransport(ProgressiveTransportRequest::Typing {
@@ -8,7 +10,9 @@ fn typing(channel: &str) -> ChannelBackendRequest {
     })
 }
 
-fn answering(value: serde_json::Value) -> impl Fn(
+fn answering(
+    value: serde_json::Value,
+) -> impl Fn(
     ChannelCallbackCtx,
     ChannelBackendRequest,
 ) -> CallbackFuture<anyhow::Result<ChannelBackendResult>> {
@@ -42,7 +46,10 @@ fn the_first_registered_callback_serves_requests() {
 async fn a_registered_callback_serves_the_progressive_transport_before_the_refusal() {
     let backend = OpenHumanChannelBackend::new(Config::default());
     let refused = backend.dispatch_callback(typing("web")).await;
-    assert!(refused.is_err(), "without a callback the request is refused");
+    assert!(
+        refused.is_err(),
+        "without a callback the request is refused"
+    );
 
     register_channel_callback("test", answering(serde_json::json!({"ok": true})));
     let served = backend.dispatch_callback(typing("web")).await;
@@ -72,7 +79,9 @@ async fn the_callback_is_told_the_config_it_serves() {
         api_url: Some("https://callback.example".to_string()),
         ..Config::default()
     };
-    let _ = OpenHumanChannelBackend::new(config).dispatch_callback(typing("web")).await;
+    let _ = OpenHumanChannelBackend::new(config)
+        .dispatch_callback(typing("web"))
+        .await;
     unregister_channel_callback("ctx");
     assert_eq!(
         seen.lock().unwrap().clone().flatten().as_deref(),

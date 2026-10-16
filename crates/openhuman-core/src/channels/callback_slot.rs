@@ -37,7 +37,10 @@ pub struct ChannelCallbackCtx {
 
 /// A registered channel callback.
 pub type ChannelCallback = Arc<
-    dyn Fn(ChannelCallbackCtx, ChannelBackendRequest) -> CallbackFuture<anyhow::Result<ChannelBackendResult>>
+    dyn Fn(
+            ChannelCallbackCtx,
+            ChannelBackendRequest,
+        ) -> CallbackFuture<anyhow::Result<ChannelBackendResult>>
         + Send
         + Sync,
 >;
@@ -48,7 +51,10 @@ static CALLBACKS: HookSlot<ChannelCallback> = HookSlot::new("channels::callback"
 /// registered callback (registration order) serves requests.
 pub fn register_channel_callback<F>(id: impl Into<String>, callback: F)
 where
-    F: Fn(ChannelCallbackCtx, ChannelBackendRequest) -> CallbackFuture<anyhow::Result<ChannelBackendResult>>
+    F: Fn(
+            ChannelCallbackCtx,
+            ChannelBackendRequest,
+        ) -> CallbackFuture<anyhow::Result<ChannelBackendResult>>
         + Send
         + Sync
         + 'static,
@@ -57,12 +63,12 @@ where
 }
 
 /// Registers the channel callback `id` for the context built from `extensions`.
-pub fn register_channel_callback_in<F>(
-    extensions: &Extensions,
-    id: impl Into<String>,
-    callback: F,
-) where
-    F: Fn(ChannelCallbackCtx, ChannelBackendRequest) -> CallbackFuture<anyhow::Result<ChannelBackendResult>>
+pub fn register_channel_callback_in<F>(extensions: &Extensions, id: impl Into<String>, callback: F)
+where
+    F: Fn(
+            ChannelCallbackCtx,
+            ChannelBackendRequest,
+        ) -> CallbackFuture<anyhow::Result<ChannelBackendResult>>
         + Send
         + Sync
         + 'static,

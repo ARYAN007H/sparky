@@ -294,8 +294,7 @@ pub mod egress {
 pub mod config_enrichers {
     pub use openhuman_core::config::schema::resolved_endpoints::ResolvedEndpoints;
     pub use openhuman_core::config::{
-        register_enricher, register_enricher_in, run_enrichers, unregister_enricher,
-        ConfigEnricher,
+        register_enricher, register_enricher_in, run_enrichers, unregister_enricher, ConfigEnricher,
     };
 }
 

@@ -62,7 +62,10 @@ fn a_registered_provider_shapes_the_session_config() {
     register_live_provider("test-live", entry("Test Live"));
     let live = live_config(&Config::default(), "test-live", "be brief", 16_000);
     unregister_live_provider("test-live");
-    assert_eq!(live.system_instruction.as_deref(), Some("registered:be brief"));
+    assert_eq!(
+        live.system_instruction.as_deref(),
+        Some("registered:be brief")
+    );
 }
 
 #[tokio::test]
@@ -77,6 +80,9 @@ async fn a_registered_provider_is_connected_before_the_built_ins() {
 #[tokio::test]
 async fn an_unregistered_unknown_provider_is_still_rejected() {
     let live = live_config(&Config::default(), "nope", "hi", 16_000);
-    let error = prepare(&Config::default(), "nope", live).await.err().unwrap();
+    let error = prepare(&Config::default(), "nope", live)
+        .await
+        .err()
+        .unwrap();
     assert_eq!(error.code, "invalid_request");
 }

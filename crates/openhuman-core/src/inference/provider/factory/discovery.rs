@@ -87,8 +87,8 @@ pub(crate) fn model_limits_request(
 /// credential when the URL is safe to carry it. A registered catalog
 /// (`inference::registry`) with a limits function answers instead.
 fn managed_limits_request(model: &str, config: &Config) -> Option<DiscoveryRequest> {
-    if let Some(limits) = crate::inference::registry::catalog(PROVIDER_OPENHUMAN)
-        .and_then(|entry| entry.limits)
+    if let Some(limits) =
+        crate::inference::registry::catalog(PROVIDER_OPENHUMAN).and_then(|entry| entry.limits)
     {
         log::debug!("[model_limits] managed limits served by a registered catalog");
         return limits(model, config);

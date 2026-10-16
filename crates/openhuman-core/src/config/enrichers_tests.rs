@@ -22,7 +22,10 @@ fn a_registered_enricher_fills_the_resolved_endpoints() {
         config.resolved_endpoints.control_plane_url.as_deref(),
         Some("https://control.example")
     );
-    assert_eq!(config.resolved_endpoints.product_identity.as_deref(), Some("demo"));
+    assert_eq!(
+        config.resolved_endpoints.product_identity.as_deref(),
+        Some("demo")
+    );
 }
 
 #[test]
@@ -31,13 +34,20 @@ fn enrichers_run_in_registration_order() {
         config.resolved_endpoints.socket_url = Some("first".into());
     });
     register_enricher("second", |config: &mut Config| {
-        let previous = config.resolved_endpoints.socket_url.take().unwrap_or_default();
+        let previous = config
+            .resolved_endpoints
+            .socket_url
+            .take()
+            .unwrap_or_default();
         config.resolved_endpoints.socket_url = Some(format!("{previous}>second"));
     });
     let config = enriched(Config::default());
     unregister_enricher("first");
     unregister_enricher("second");
-    assert_eq!(config.resolved_endpoints.socket_url.as_deref(), Some("first>second"));
+    assert_eq!(
+        config.resolved_endpoints.socket_url.as_deref(),
+        Some("first>second")
+    );
 }
 
 #[test]
@@ -65,7 +75,11 @@ async fn the_snapshot_loader_runs_registered_enrichers() {
             .await;
     unregister_enricher("test-load");
     assert_eq!(
-        loaded.unwrap().resolved_endpoints.control_plane_url.as_deref(),
+        loaded
+            .unwrap()
+            .resolved_endpoints
+            .control_plane_url
+            .as_deref(),
         Some("https://control.example")
     );
 }
@@ -76,5 +90,8 @@ async fn an_embedder_config_is_enriched_by_the_context_loader() {
     let mut config = Config::default();
     crate::config::ops::normalize_loaded_config(&mut config).await;
     unregister_enricher("test-embedder");
-    assert_eq!(config.resolved_endpoints.product_identity.as_deref(), Some("demo"));
+    assert_eq!(
+        config.resolved_endpoints.product_identity.as_deref(),
+        Some("demo")
+    );
 }

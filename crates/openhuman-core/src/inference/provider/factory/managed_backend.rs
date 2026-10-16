@@ -28,15 +28,17 @@ pub(super) fn registered_managed_chat_model(
     if let Err(error) = enforce_local_only_inference(role, PROVIDER_OPENHUMAN) {
         return Some(Err(error));
     }
-    Some((entry.build)(&crate::inference::registry::ChatModelRequest {
-        role,
-        config,
-        model_override,
-        default_model,
-        native_tool_calling,
-        thread_id,
-        egress,
-    }))
+    Some((entry.build)(
+        &crate::inference::registry::ChatModelRequest {
+            role,
+            config,
+            model_override,
+            default_model,
+            native_tool_calling,
+            thread_id,
+            egress,
+        },
+    ))
 }
 
 /// Resolve the managed OpenHuman backend for `role` — the model id (tier /
@@ -184,15 +186,9 @@ pub(crate) fn make_openhuman_backend_model(
     std::sync::Arc<dyn tinyinference_llm::model::ChatModel<()>>,
     String,
 )> {
-    if let Some(registered) = registered_managed_chat_model(
-        role,
-        config,
-        None,
-        None,
-        true,
-        None,
-        &EgressLedger::none(),
-    ) {
+    if let Some(registered) =
+        registered_managed_chat_model(role, config, None, None, true, None, &EgressLedger::none())
+    {
         return registered;
     }
     let (model_client, model) = resolve_managed_backend(role, config, &EgressLedger::none())?;

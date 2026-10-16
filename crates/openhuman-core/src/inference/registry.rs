@@ -61,7 +61,8 @@ pub type ChatModelFactory = Arc<
 >;
 
 /// Asks a provider whether it can serve `role` right now: `(role, config)`.
-pub type ReadinessProbe = Arc<dyn Fn(String, Config) -> BoxFuture<Result<(), String>> + Send + Sync>;
+pub type ReadinessProbe =
+    Arc<dyn Fn(String, Config) -> BoxFuture<Result<(), String>> + Send + Sync>;
 
 /// A registered chat-model provider.
 #[derive(Clone)]
@@ -118,7 +119,9 @@ pub struct EmbeddingRequest<'a> {
 
 /// Builds an embedding model.
 pub type EmbeddingFactory = Arc<
-    dyn for<'a> Fn(&EmbeddingRequest<'a>) -> tinyinference_embeddings::Result<Box<dyn EmbeddingModel>>
+    dyn for<'a> Fn(
+            &EmbeddingRequest<'a>,
+        ) -> tinyinference_embeddings::Result<Box<dyn EmbeddingModel>>
         + Send
         + Sync,
 >;
@@ -128,7 +131,9 @@ static EMBEDDINGS: HookSlot<EmbeddingFactory> = HookSlot::new("inference::embedd
 /// Registers the embedding provider `provider_id` for the whole process.
 pub fn register_embedding<F>(provider_id: impl Into<String>, factory: F)
 where
-    F: for<'a> Fn(&EmbeddingRequest<'a>) -> tinyinference_embeddings::Result<Box<dyn EmbeddingModel>>
+    F: for<'a> Fn(
+            &EmbeddingRequest<'a>,
+        ) -> tinyinference_embeddings::Result<Box<dyn EmbeddingModel>>
         + Send
         + Sync
         + 'static,
@@ -138,12 +143,11 @@ where
 
 /// Registers the embedding provider `provider_id` for the context built from
 /// `extensions`.
-pub fn register_embedding_in<F>(
-    extensions: &Extensions,
-    provider_id: impl Into<String>,
-    factory: F,
-) where
-    F: for<'a> Fn(&EmbeddingRequest<'a>) -> tinyinference_embeddings::Result<Box<dyn EmbeddingModel>>
+pub fn register_embedding_in<F>(extensions: &Extensions, provider_id: impl Into<String>, factory: F)
+where
+    F: for<'a> Fn(
+            &EmbeddingRequest<'a>,
+        ) -> tinyinference_embeddings::Result<Box<dyn EmbeddingModel>>
         + Send
         + Sync
         + 'static,

@@ -16,8 +16,8 @@
 use std::sync::Arc;
 
 use super::DirectCredential;
-use crate::core::slots::HookSlot;
 use crate::config::schema::{COMPOSIO_MODE_BACKEND, COMPOSIO_MODE_DIRECT};
+use crate::core::slots::HookSlot;
 
 // Re-declare the mode strings as local consts so they can be used as
 // pattern arms in the `match` below. `use` imports of `pub const &str`
@@ -140,7 +140,11 @@ pub fn resolve_composio_route(config: &crate::config::Config) -> anyhow::Result<
     let mode = config.composio.mode.trim();
     tracing::debug!(mode = %mode, "[composio-factory] resolving route");
 
-    let builder_key = if mode.is_empty() { MODE_BACKEND_PAT } else { mode };
+    let builder_key = if mode.is_empty() {
+        MODE_BACKEND_PAT
+    } else {
+        mode
+    };
     if let Some(builder) = ROUTE_BUILDERS.get(builder_key) {
         tracing::debug!(mode = %builder_key, "[composio-factory] using the registered route builder");
         return builder(config);

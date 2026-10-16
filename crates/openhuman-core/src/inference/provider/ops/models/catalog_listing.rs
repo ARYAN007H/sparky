@@ -57,7 +57,9 @@ pub async fn list_configured_models_from_config(
     // A registered catalog (`inference::registry`) answers before any entry
     // resolution; nothing registered => the built-in listing below.
     if let Some(catalog) = crate::inference::registry::catalog(&provider_id) {
-        log::debug!("[providers][list_models] provider_id={provider_id} served by a registered catalog");
+        log::debug!(
+            "[providers][list_models] provider_id={provider_id} served by a registered catalog"
+        );
         return (catalog.list)(config.clone()).await;
     }
 

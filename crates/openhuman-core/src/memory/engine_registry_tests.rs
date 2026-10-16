@@ -14,10 +14,7 @@ fn config_for(tmp: &tempfile::TempDir) -> Config {
     config
 }
 
-fn entry(
-    roots: Arc<Mutex<Vec<Option<String>>>>,
-    free: Option<FreeBackground>,
-) -> EngineEntry {
+fn entry(roots: Arc<Mutex<Vec<Option<String>>>>, free: Option<FreeBackground>) -> EngineEntry {
     EngineEntry {
         build: Arc::new(move |request| {
             roots.lock().unwrap().push(request.root.map(str::to_string));
