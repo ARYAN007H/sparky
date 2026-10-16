@@ -137,6 +137,7 @@ fn a_scheduled_job_runs_a_runtime_agent_with_its_host_tool_as_cron() {
             let changed = cron
                 .upsert(JobSpec::agent("teeny-hourly", "teeny", "check in", HOURLY))
                 .expect("job updated");
+            eprintln!("RUN OUTPUT: {} {:?}", run.success, run.output);
             assert_eq!(changed.id, first.id, "same job, updated in place");
             assert_eq!(
                 changed.target,
