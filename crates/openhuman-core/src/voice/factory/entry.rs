@@ -7,6 +7,7 @@ use log::debug;
 use super::helpers::{
     create_stt_provider_by_slug, create_tts_provider_by_slug, split_slug_model, LOG_PREFIX,
 };
+use super::registry::{stt_factory, tts_factory};
 use super::stt_providers::CloudSttProvider;
 use super::traits::{SttProvider, TtsProvider};
 use super::tts_providers::{CloudTtsProvider, PiperTtsProvider};
@@ -45,6 +46,17 @@ pub fn create_stt_provider(
     config: &Config,
 ) -> anyhow::Result<Box<dyn SttProvider>> {
     debug!("{LOG_PREFIX} create_stt_provider provider={provider} model={model}");
+    // A registered provider (see `registry`) wins over the hard-coded routes.
+    let (registered_slug, registered_model) = split_slug_model(provider.trim());
+    if let Some(factory) = stt_factory(registered_slug) {
+        let effective_model = if registered_model.is_empty() {
+            model.trim()
+        } else {
+            registered_model
+        };
+        debug!("{LOG_PREFIX} create_stt_provider using registered provider slug={registered_slug}");
+        return factory(effective_model, config);
+    }
     match provider.trim() {
         "cloud" | "openhuman" | "backend" => Ok(Box::new(CloudSttProvider::new(
             super::super::cloud_transcribe_default_model(),
@@ -101,6 +113,12 @@ pub fn create_tts_provider(
         "{LOG_PREFIX} create_tts_provider resolved provider={provider} voice={}",
         resolved.unwrap_or("<provider default>")
     );
+    // A registered provider (see `registry`) wins over the hard-coded routes.
+    let (registered_slug, _) = split_slug_model(provider);
+    if let Some(factory) = tts_factory(registered_slug) {
+        debug!("{LOG_PREFIX} create_tts_provider using registered provider slug={registered_slug}");
+        return factory(resolved, config);
+    }
     match provider {
         "cloud" | "openhuman" => Ok(Box::new(CloudTtsProvider::new(
             resolved.map(str::to_string),
