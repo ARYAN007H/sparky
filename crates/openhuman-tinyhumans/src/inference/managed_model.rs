@@ -100,11 +100,6 @@ impl OpenHumanBackendModel {
         self
     }
 
-    pub fn with_default_model(mut self, model: impl Into<String>) -> Self {
-        self.default_model = resolve_model(&model.into());
-        self
-    }
-
     /// Force prompt-guided tool calling for toolsets that exceed the managed
     /// backend's native grammar ceiling.
     pub fn with_native_tool_calling(mut self, enabled: bool) -> Self {

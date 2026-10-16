@@ -101,6 +101,7 @@ impl ManagedEmbeddingModel {
     /// This embedder with its egress disclosures routed to `chat` (the turn's
     /// thread and client); `None` leaves them unrouted. Shares the transport,
     /// so it is cheap to do per turn.
+    #[cfg(test)]
     #[must_use]
     pub fn routed_to(&self, chat: Option<ApprovalChatContext>) -> Self {
         Self {
