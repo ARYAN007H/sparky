@@ -384,3 +384,11 @@ impl wiremock::Respond for EchoCompletion {
         }
     }
 }
+
+/// Sleep until the wall clock passes `instant` (plus a beat for the store's
+/// millisecond ordering). Scheduled jobs now run on the tinyflows module's own
+/// clock, which a test cannot move, so a job due "later" is waited for.
+pub async fn wait_until(instant: chrono::DateTime<chrono::Utc>) {
+    let remaining = (instant - chrono::Utc::now()).to_std().unwrap_or_default();
+    tokio::time::sleep(remaining + std::time::Duration::from_millis(250)).await;
+}
