@@ -91,6 +91,14 @@ fn chat_origin(thread: &str) -> crate::agent::turn_origin::AgentTurnOrigin {
     }
 }
 
+fn chat_thread(origin: crate::agent::turn_origin::AgentTurnOrigin) -> String {
+    match origin {
+        crate::agent::turn_origin::AgentTurnOrigin::WebChat { thread_id, .. } => thread_id.into(),
+        crate::agent::turn_origin::AgentTurnOrigin::DirectChat => "direct".into(),
+        other => panic!("unexpected origin {other:?}"),
+    }
+}
+
 #[tokio::test]
 async fn agent_chat_origin_comes_from_the_turn_context_before_the_task_scope() {
     use crate::core::runtime::{CoreContext, DispatchCtx, DomainSet};
@@ -101,16 +109,13 @@ async fn agent_chat_origin_comes_from_the_turn_context_before_the_task_scope() {
     let scoped = std::sync::Arc::new(base.derive_channel_turn(None, Some(chat_origin("scoped"))));
     CoreContext::scope(scoped, async {
         // The turn's own context wins over whatever the task scope carries.
-        assert_eq!(effective_agent_chat_origin(&own), chat_origin("own"));
+        assert_eq!(chat_thread(effective_agent_chat_origin(&own)), "own");
         // A context with no origin of its own falls back to the task scope.
         let bare = DispatchCtx::new(CoreContext::for_test(DomainSet::full(), None));
-        assert_eq!(effective_agent_chat_origin(&bare), chat_origin("scoped"));
+        assert_eq!(chat_thread(effective_agent_chat_origin(&bare)), "scoped");
     })
     .await;
     // Neither: the trusted direct-chat label.
     let bare = DispatchCtx::new(CoreContext::for_test(DomainSet::full(), None));
-    assert_eq!(
-        effective_agent_chat_origin(&bare),
-        crate::agent::turn_origin::AgentTurnOrigin::DirectChat
-    );
+    assert_eq!(chat_thread(effective_agent_chat_origin(&bare)), "direct");
 }
