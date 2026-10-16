@@ -958,6 +958,9 @@ export async function performFullLogin(
           isBootstrapping: state?.isBootstrapping ?? null,
           hasSessionToken: Boolean(state?.snapshot?.sessionToken),
           hasAuthUser: Boolean(state?.snapshot?.auth?.userId),
+          authStoreFailureKind:
+            (window as unknown as { __OPENHUMAN_E2E_AUTH_STORE_FAILURE__?: string })
+              .__OPENHUMAN_E2E_AUTH_STORE_FAILURE__ ?? null,
         };
       })
       .catch(() => null);
