@@ -306,6 +306,29 @@ fn record_awaiting_input_queues_a_framed_needs_input_for_delivery() {
 }
 
 #[test]
+fn awaiting_input_does_not_dedupe_the_later_completion() {
+    let _guard = test_guard();
+    let ws = workspace();
+    let w = ws.path();
+    futures::executor::block_on(record_awaiting_input(
+        &cx(),
+        w,
+        "sess-resume",
+        "sub-resume",
+        "researcher",
+        "which repo?",
+        true,
+        Some("thread-resume".into()),
+    ));
+    record(w, "sess-resume", "sub-resume", "finished after answer", Some("thread-resume"));
+
+    let pending = pending_for(w, "thread-resume");
+    assert_eq!(pending.len(), 2, "pause notice and final result both survive");
+    assert!(pending.iter().any(|record| record.result.text.contains("which repo?")));
+    assert!(pending.iter().any(|record| record.result.text == "finished after answer"));
+}
+
+#[test]
 fn the_outcome_survives_a_claim() {
     let _guard = test_guard();
     let ws = workspace();
