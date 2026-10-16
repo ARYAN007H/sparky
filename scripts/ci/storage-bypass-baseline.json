@@ -9,14 +9,14 @@
   {
     "rule": "json-write",
     "path": "crates/openhuman-core/src/agent/attachments/mod.rs",
-    "line": 313,
+    "line": 288,
     "text": "let mut file = tokio::fs::OpenOptions::new()",
     "occurrence": 1
   },
   {
     "rule": "json-write",
     "path": "crates/openhuman-core/src/agent/attachments/provider_cache.rs",
-    "line": 164,
+    "line": 163,
     "text": "let mut file = tokio::fs::OpenOptions::new()",
     "occurrence": 1
   },
@@ -100,35 +100,35 @@
   {
     "rule": "json-write",
     "path": "crates/openhuman-core/src/agent/subagent_host/lifecycle.rs",
-    "line": 653,
+    "line": 668,
     "text": "let file = OpenOptions::new()",
     "occurrence": 1
   },
   {
     "rule": "json-write",
     "path": "crates/openhuman-core/src/agent/subagent_host/lifecycle.rs",
-    "line": 743,
+    "line": 758,
     "text": "std::fs::write(&temporary, bytes)",
     "occurrence": 1
   },
   {
     "rule": "json-write",
     "path": "crates/openhuman-core/src/agent/subagent_host/lifecycle.rs",
-    "line": 759,
+    "line": 774,
     "text": "std::fs::write(&temporary, bytes)",
     "occurrence": 2
   },
   {
     "rule": "json-write",
     "path": "crates/openhuman-core/src/config/migrations/phase_out_profile_md.rs",
-    "line": 175,
+    "line": 192,
     "text": "match fs::write(&md_path, cleaned.as_bytes()) {",
     "occurrence": 1
   },
   {
     "rule": "json-write",
     "path": "crates/openhuman-core/src/config/ops/ui.rs",
-    "line": 327,
+    "line": 321,
     "text": "std::fs::write(&flag_path, \"\")",
     "occurrence": 1
   },
@@ -191,14 +191,14 @@
   {
     "rule": "json-write",
     "path": "crates/openhuman-core/src/flows/tinyflows/caps/code.rs",
-    "line": 127,
+    "line": 112,
     "text": "tokio::fs::write(&script_path, script_body)",
     "occurrence": 1
   },
   {
     "rule": "json-write",
     "path": "crates/openhuman-core/src/flows/tinyflows/caps/code.rs",
-    "line": 130,
+    "line": 115,
     "text": "tokio::fs::write(&input_path, input_json)",
     "occurrence": 1
   },
@@ -212,7 +212,7 @@
   {
     "rule": "json-write",
     "path": "crates/openhuman-core/src/integrations/file_storage/tools/download.rs",
-    "line": 89,
+    "line": 84,
     "text": "if let Err(e) = tokio::fs::write(&path, &body).await {",
     "occurrence": 1
   },
@@ -331,21 +331,21 @@
   {
     "rule": "json-write",
     "path": "crates/openhuman-core/src/security/credentials/http_creds.rs",
-    "line": 424,
+    "line": 420,
     "text": "fs::write(&tmp_path, &json)",
     "occurrence": 1
   },
   {
     "rule": "json-write",
     "path": "crates/openhuman-core/src/security/credentials/profiles.rs",
-    "line": 288,
+    "line": 284,
     "text": "let mut file = OpenOptions::new()",
     "occurrence": 1
   },
   {
     "rule": "json-write",
     "path": "crates/openhuman-core/src/security/credentials/profiles.rs",
-    "line": 301,
+    "line": 297,
     "text": "fs::write(path, bytes)",
     "occurrence": 1
   },
@@ -422,28 +422,28 @@
   {
     "rule": "json-write",
     "path": "crates/openhuman-core/src/threads/welcome_migration.rs",
-    "line": 302,
+    "line": 298,
     "text": "fs::write(path, rewritten).map_err(|e| {",
     "occurrence": 1
   },
   {
     "rule": "json-write",
     "path": "crates/openhuman-core/src/threads/welcome_migration.rs",
-    "line": 393,
+    "line": 389,
     "text": "fs::write(marker, b\"done\\n\").map_err(|e| {",
     "occurrence": 1
   },
   {
     "rule": "json-write",
     "path": "crates/openhuman-core/src/tools/impl/document/mod.rs",
-    "line": 307,
+    "line": 264,
     "text": "if let Err(err) = tokio::fs::write(&output_path, &bytes).await {",
     "occurrence": 1
   },
   {
     "rule": "json-write",
     "path": "crates/openhuman-core/src/tools/impl/presentation/mod.rs",
-    "line": 419,
+    "line": 365,
     "text": "if let Err(err) = tokio::fs::write(&output_path, &bytes).await {",
     "occurrence": 1
   },
