@@ -196,7 +196,7 @@ async fn boot_session_store_keeps_a_legacy_managed_config_managed() {
         ("OPENHUMAN_STORAGE_URL", "".into()),
     ]);
     openhuman_tinyhumans::__host::config_enrichers::unregister_enricher(
-        openhuman_tinyhumans::client::ENRICHER_ID,
+        openhuman_tinyhumans::client::enricher::ENRICHER_ID,
     );
 
     let previous = crate::core_host::agent::session_store::installed();

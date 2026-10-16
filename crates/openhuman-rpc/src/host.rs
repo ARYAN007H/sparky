@@ -338,7 +338,7 @@ pub async fn tui() -> anyhow::Result<openhuman_tinyhumans::embed::Runtime> {
 /// rewrite a legacy managed config.
 #[cfg(feature = "session-store")]
 async fn session_store_for_boot(
-) -> anyhow::Result<std::sync::Arc<dyn openhuman_tinyhumans::embed::SessionStoreProvider>> {
+) -> anyhow::Result<std::sync::Arc<dyn tinyagents_session::port::SessionStoreProvider>> {
     openhuman_tinyhumans::register_hooks();
     crate::session_store::provider_for_host().await
 }
