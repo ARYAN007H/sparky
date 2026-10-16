@@ -173,6 +173,17 @@ pub(super) fn finish_parked_flow_run_row(
     )
 }
 
+type RunRowFinishWriter = fn(
+    &Config,
+    &str,
+    &str,
+    &str,
+    &[FlowRunStep],
+    &[String],
+    Option<&str>,
+    Option<&str>,
+) -> anyhow::Result<bool>;
+
 #[allow(clippy::too_many_arguments)]
 fn finish_flow_run_row_with_writer(
     config: &Config,
@@ -183,16 +194,7 @@ fn finish_flow_run_row_with_writer(
     pending_approvals: &[String],
     error: Option<&str>,
     graph_hash: Option<&str>,
-    writer: fn(
-        &Config,
-        &str,
-        &str,
-        &str,
-        &[FlowRunStep],
-        &[String],
-        Option<&str>,
-        Option<&str>,
-    ) -> anyhow::Result<bool>,
+    writer: RunRowFinishWriter,
 ) -> bool {
     let finished_at = Utc::now().to_rfc3339();
     match writer(
