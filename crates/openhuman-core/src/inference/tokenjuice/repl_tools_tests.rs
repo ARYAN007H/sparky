@@ -372,11 +372,7 @@ async fn queries_run_for_the_tool_runs_context_not_the_ambient_one() {
         for core in [&a, &b] {
             let context = context_for(core.clone());
             tools[0]
-                .execute_with_context(
-                    args.clone(),
-                    ToolCallOptions::default(),
-                    Some(&context),
-                )
+                .execute_with_context(args.clone(), ToolCallOptions::default(), Some(&context))
                 .await
                 .unwrap();
         }
