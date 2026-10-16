@@ -49,6 +49,11 @@ fn save_upserts_sessions_and_keeps_the_others() {
     assert_eq!(loaded.len(), 2);
     assert_eq!(loaded[0].subagent_session_id, "a");
     assert_eq!(loaded[1].status, DurableSubagentStatus::Idle);
+    // The source fixture intentionally predates lifecycle_key. Its owner and
+    // task reference remain available for the scoped legacy lookup path.
+    assert_eq!(loaded[0].parent_session, "parent");
+    assert_eq!(loaded[0].current_task_id, None);
+    assert_eq!(loaded[0].lifecycle_key, None);
     // A save from a stale snapshot never removes a session it does not know.
     docs.save(&[session("c")]).unwrap();
     let ids: Vec<_> = docs

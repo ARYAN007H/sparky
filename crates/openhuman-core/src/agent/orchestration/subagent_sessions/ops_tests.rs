@@ -75,6 +75,40 @@ fn compatible_session_reuses_and_incompatible_shape_spawns_new() {
 }
 
 #[test]
+fn upsert_persists_the_full_lifecycle_key_without_collapsing_to_task_id() {
+    let dir = tempfile::tempdir().unwrap();
+    let store = SubagentSessionStore::new(dir.path().to_path_buf());
+    let key = tinyagents_orchestration::subagent::SubagentTaskKey {
+        root_run_id: "root-run".into(),
+        parent_run_id: "turn-run".into(),
+        thread_id: Some("parent-thread".into()),
+        task_id: "sub-1".into(),
+    };
+    let session = upsert_running(
+        &store,
+        SubagentSessionUpsert {
+            selector: selector("durable-task"),
+            display_name: None,
+            task_title: "Task".into(),
+            worker_thread_id: None,
+            task_id: "sub-1".into(),
+            lifecycle_key: Some(key.clone()),
+        },
+        None,
+    )
+    .unwrap();
+
+    let loaded = store
+        .load()
+        .unwrap()
+        .into_iter()
+        .find(|row| row.subagent_session_id == session.subagent_session_id)
+        .unwrap();
+    assert_eq!(loaded.current_task_id.as_deref(), Some("sub-1"));
+    assert_eq!(loaded.lifecycle_key, Some(key));
+}
+
+#[test]
 fn closed_session_is_not_reusable() {
     let dir = tempfile::tempdir().unwrap();
     let store = SubagentSessionStore::new(dir.path().to_path_buf());
