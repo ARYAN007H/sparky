@@ -50,3 +50,29 @@ fn build_client_returns_none_when_no_auth_token() {
     };
     assert!(build_client(&config).is_none());
 }
+
+#[test]
+fn register_plugs_every_hosted_integration_into_the_core_registries() {
+    use openhuman_embed::__host::composio::{
+        unregister_composio_route_builder, unregister_proxy_target,
+    };
+    use openhuman_embed::__host::config::schema::COMPOSIO_MODE_BACKEND;
+    use openhuman_embed::__host::tool_sources::unregister_tool_source;
+
+    register(&InstallOptions::default());
+
+    assert!(unregister_tool_source(FILE_STORAGE_SOURCE_ID));
+    assert!(unregister_tool_source(INTEGRATION_TOOLS_SOURCE_ID));
+    #[cfg(feature = "media")]
+    assert!(unregister_tool_source(media::TOOL_SOURCE_ID));
+    #[cfg(feature = "web3")]
+    assert!(openhuman_embed::__host::wallet_backend::unregister_wallet_backend(web3::HANDLER_ID));
+    assert!(unregister_composio_route_builder(COMPOSIO_MODE_BACKEND));
+    assert!(unregister_proxy_target(COMPOSIO_MODE_BACKEND));
+
+    // Registration is idempotent and restores everything it removed above.
+    register(&InstallOptions::default());
+    register(&InstallOptions::default());
+    assert!(unregister_tool_source(FILE_STORAGE_SOURCE_ID));
+    register(&InstallOptions::default());
+}

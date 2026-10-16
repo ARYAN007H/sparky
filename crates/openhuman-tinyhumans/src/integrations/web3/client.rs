@@ -83,3 +83,7 @@ impl CryptoClient {
             .map_err(|e| format!("web3 bridge quote failed: {e}"))
     }
 }
+
+#[cfg(test)]
+#[path = "client_tests.rs"]
+mod tests;
