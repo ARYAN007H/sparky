@@ -3768,7 +3768,7 @@ dependencies = [
 
 [[package]]
 name = "openhuman"
-version = "0.64.17"
+version = "0.64.18"
 dependencies = [
  "aes-gcm",
  "aho-corasick",
@@ -3883,7 +3883,7 @@ dependencies = [
 
 [[package]]
 name = "openhuman-app"
-version = "0.64.17"
+version = "0.64.18"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3927,7 +3927,7 @@ dependencies = [
 
 [[package]]
 name = "openhuman-embed"
-version = "0.64.17"
+version = "0.64.18"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3961,7 +3961,7 @@ dependencies = [
 
 [[package]]
 name = "openhuman-rpc"
-version = "0.64.17"
+version = "0.64.18"
 dependencies = [
  "anyhow",
  "axum",
@@ -3994,7 +3994,7 @@ dependencies = [
 
 [[package]]
 name = "openhuman-tinyhumans"
-version = "0.64.17"
+version = "0.64.18"
 dependencies = [
  "aes-gcm",
  "anyhow",
@@ -7193,7 +7193,7 @@ dependencies = [
  "log",
  "serde",
  "serde_json",
- "sha2 0.10.9",
+ "sha2 0.11.0",
  "thiserror 2.0.20",
  "tinymemory-api",
 ]
