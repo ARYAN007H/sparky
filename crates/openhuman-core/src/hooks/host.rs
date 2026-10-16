@@ -10,9 +10,7 @@ use crate::core::runtime::DispatchCtx;
 use std::sync::{Arc, LazyLock};
 
 use async_trait::async_trait;
-use tinyagents_hooks::command::{
-    config, HookConfig, HookEngine, HookEnvironment, PromptEvaluator,
-};
+use tinyagents_hooks::command::{HookConfig, HookEngine, HookEnvironment, PromptEvaluator, config};
 
 /// Product name handed to the engine: `ProgramData\OpenHuman`,
 /// `/Library/Application Support/OpenHuman`, `/etc/openhuman`, `.openhuman`,
@@ -34,10 +32,11 @@ fn environment() -> HookEnvironment {
         .with_prompt_evaluator(Arc::new(HostPromptEvaluator))
 }
 
-static ENGINE: LazyLock<HookEngine> = LazyLock::new(|| HookEngine::new(environment()));
+static ENGINE: LazyLock<Arc<HookEngine>> =
+    LazyLock::new(|| Arc::new(HookEngine::new(environment())));
 
 /// The process-global engine.
-pub fn engine() -> &'static HookEngine {
+pub fn engine() -> &'static Arc<HookEngine> {
     &ENGINE
 }
 

@@ -12,7 +12,7 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use tinyagents_hooks::command::context::{
-    build_input, set_host_context, HostContext, TurnIdentity,
+    HostContext, TurnIdentity, build_input, set_host_context,
 };
 use tinyagents_hooks::command::types::{
     CompactPayload, HookEvent, HookPayload, PromptPayload, SessionPayload, SubagentPayload,
@@ -57,7 +57,7 @@ pub async fn init(ctx: &DispatchCtx, config: &crate::config::schema::Config) {
     }
     crate::agent::hooks::replace_embedder_tool_hook(
         "configured_hooks",
-        Some(std::sync::Arc::new((*super::host::engine()).clone())),
+        Some(std::sync::Arc::clone(super::host::engine())),
     );
 }
 

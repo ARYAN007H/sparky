@@ -270,7 +270,7 @@ impl ToolHook<OpenHumanRunContext> for ProfilePermission {
             || !self.capabilities.admits(&dispatch, &context.tool_name)
         {
             return ToolHookDecision::deny(
-                "tool is outside the hosted profile capability boundary".into(),
+                "tool is outside the hosted profile capability boundary",
             );
         }
         match &self.capabilities.permission {
@@ -283,9 +283,7 @@ impl ToolHook<OpenHumanRunContext> for ProfilePermission {
                 let mut rewritten = false;
                 if let Some(canonical) = canonical.filter(|name| *name != context.tool_name) {
                     if !self.capabilities.admits_capability(canonical) {
-                        return ToolHookDecision::deny(
-                            "canonical search capability is denied".into(),
-                        );
+                        return ToolHookDecision::deny("canonical search capability is denied");
                     }
                     let mut original = context.clone();
                     original.tool_name = canonical.to_owned();
