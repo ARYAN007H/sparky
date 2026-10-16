@@ -106,6 +106,11 @@ pub struct CoreContext {
     /// Inherited unchanged by every context derived through
     /// [`CoreContext::derive_with`].
     backend_transport: Option<Arc<dyn crate::backend::transport::BackendTransport>>,
+    /// Hook registrations bound to this context (see [`crate::core::slots`]).
+    /// Empty unless the host supplied some through
+    /// [`CoreBuilder::extensions`](crate::core::runtime::CoreBuilder::extensions);
+    /// inherited by every context derived through [`CoreContext::derive_with`].
+    extensions: crate::core::slots::Extensions,
     /// Explicit authority on this derived turn context.
     turn_origin: Option<crate::agent::turn_origin::AgentTurnOrigin>,
     /// Durable relay conversation carried by the immutable turn context.
@@ -435,6 +440,12 @@ impl CoreContext {
     /// this context was derived for one.
     pub fn session_agent(&self) -> Option<&str> {
         self.session_agent.as_deref()
+    }
+
+    /// The hook registrations bound to this context. Shared (not copied) by
+    /// derived contexts.
+    pub fn extensions(&self) -> &crate::core::slots::Extensions {
+        &self.extensions
     }
 
     /// The backend transport bound to this context, if the host supplied one.
