@@ -134,7 +134,7 @@ async fn create_chat_model_uses_native_test_override() {
     ])));
     let config = Config::default();
 
-    let model = create_chat_model("chat", &config, 0.3).expect("create_chat_model must build");
+    let model = create_chat_model_in(&crate::core::runtime::DispatchCtx::ambient(), "chat", &config, 0.3).expect("create_chat_model must build");
     let response = model
         .invoke(&(), ModelRequest::new(vec![Message::user("hi there")]))
         .await
@@ -175,7 +175,7 @@ async fn one_shot_chat_models_preserve_factory_temperature_as_request_default() 
     }));
 
     let config = Config::default();
-    let role_model = create_chat_model("chat", &config, 0.3).expect("role model");
+    let role_model = create_chat_model_in(&crate::core::runtime::DispatchCtx::ambient(), "chat", &config, 0.3).expect("role model");
     role_model
         .invoke(&(), ModelRequest::new(vec![Message::user("default")]))
         .await
@@ -252,7 +252,7 @@ fn create_chat_model_routes_managed_backend_to_crate_native() {
     let _guard = crate::inference::inference_test_guard();
     // No test-provider override installed → the managed short-circuit engages.
     let config = Config::default();
-    let (model, _model_id) = create_chat_model_with_model_id("chat", &config, 0.7)
+    let (model, _model_id) = create_chat_model_with_model_id_in(&crate::core::runtime::DispatchCtx::ambient(), "chat", &config, 0.7)
         .expect("managed create_chat_model must build");
     assert_eq!(
         model
@@ -268,7 +268,7 @@ fn create_chat_model_routes_local_runtime_to_crate_native() {
     let _guard = crate::inference::inference_test_guard();
     let mut config = Config::default();
     config.chat_provider = Some("ollama:qwen2.5".to_string());
-    let (model, model_id) = create_chat_model_with_model_id("chat", &config, 0.7)
+    let (model, model_id) = create_chat_model_with_model_id_in(&crate::core::runtime::DispatchCtx::ambient(), "chat", &config, 0.7)
         .expect("local create_chat_model must build");
     assert_eq!(model_id, "qwen2.5");
     // Motion B (#4727): a local runtime now builds a crate-native `OpenAiModel`
@@ -325,7 +325,7 @@ fn create_chat_model_routes_plain_bearer_cloud_slug_to_crate_native() {
     let mut config = Config::default();
     config.cloud_providers.push(deepseek_entry("p_ds"));
     config.chat_provider = Some("deepseek:deepseek-reasoner".to_string());
-    let (model, model_id) = create_chat_model_with_model_id("chat", &config, 0.7)
+    let (model, model_id) = create_chat_model_with_model_id_in(&crate::core::runtime::DispatchCtx::ambient(), "chat", &config, 0.7)
         .expect("bearer cloud create_chat_model must build");
     assert_eq!(model_id, "deepseek-reasoner");
     let profile = model
@@ -390,7 +390,7 @@ fn create_chat_model_routes_anthropic_auth_cloud_slug_to_crate_native() {
         .cloud_providers
         .push(anthropic_entry("p_anth", "anthropic"));
     config.chat_provider = Some("anthropic:claude-sonnet-4-6".to_string());
-    let (model, model_id) = create_chat_model_with_model_id("chat", &config, 0.7)
+    let (model, model_id) = create_chat_model_with_model_id_in(&crate::core::runtime::DispatchCtx::ambient(), "chat", &config, 0.7)
         .expect("anthropic cloud create_chat_model must build");
     assert_eq!(model_id, "claude-sonnet-4-6");
     assert_eq!(
