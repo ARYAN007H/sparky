@@ -1,21 +1,21 @@
 use super::*;
-use crate::config::schema::cloud_providers::{AuthStyle, CloudProviderCreds};
 use crate::config::Config;
+use crate::config::schema::cloud_providers::{AuthStyle, CloudProviderCreds};
 use crate::security::credentials::AuthService;
 use axum::{
+    Json, Router,
     extract::State,
     http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
     routing::get,
-    Json, Router,
 };
 use std::collections::HashMap;
 use std::sync::{
-    atomic::{AtomicUsize, Ordering as AtomicOrdering},
     Arc, Mutex,
+    atomic::{AtomicUsize, Ordering as AtomicOrdering},
 };
 use tempfile::TempDir;
-use tinyinference_core::sanitize::{sanitize_api_error, MAX_API_ERROR_CHARS};
+use tinyinference_core::sanitize::{MAX_API_ERROR_CHARS, sanitize_api_error};
 
 #[derive(Clone)]
 struct ModelProbeState {

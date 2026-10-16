@@ -28,7 +28,6 @@ use crate::agent::tinyagents::tool_registration::capability_diagnostics;
 use crate::agent::tinyagents::turn_middleware::{
     TurnMiddlewareInputs, TurnWiring, install_turn_middleware,
 };
-use crate::inference::turn_models::TurnModels;
 use crate::agent::tinyagents::turn_outcome::TinyagentsTurnOutcome;
 use crate::agent::tinyagents::turn_plan::{
     OpenHumanTurnPlanner, enforce_registry_diagnostics, turn_models_for_plan, turn_run_policy,
@@ -36,6 +35,7 @@ use crate::agent::tinyagents::turn_plan::{
 use crate::agent::tinyagents::turn_run_error::map_turn_run_error;
 use crate::agent::tinyagents::turn_run_finalize::finalize_turn_outcome;
 use crate::agent::tinyagents::{journal, routes, steering_forwarder};
+use crate::inference::turn_models::TurnModels;
 use tinyagents_harness::events::EventSink;
 use tinyagents_harness::observability::turn_observer;
 use tinyagents_harness::run_queue::RunQueue;
@@ -172,11 +172,8 @@ async fn drive_turn(
     // Wrap concrete routes before the invocation-local hosted resolver captures them.
     let turn_models = turn_models.with_budget(run_context.model_budget.as_ref());
     let hosted_model_resolver = hosted_root.as_ref().map(|_| {
-        Arc::new(
-            crate::inference::turn_models::TurnModelResolver::from_turn_models(
-                &turn_models,
-            ),
-        ) as Arc<dyn tinyagents_harness::host::ModelResolver<()>>
+        Arc::new(crate::inference::turn_models::TurnModelResolver::from_turn_models(&turn_models))
+            as Arc<dyn tinyagents_harness::host::ModelResolver<()>>
     });
     // The host security adapter must see the exact same `Arc`-shared instances
     // the registration resolves against, so retain only the cheap Arc clone for

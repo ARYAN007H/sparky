@@ -90,7 +90,7 @@ fn managed_limits_request(model: &str, config: &Config) -> Option<DiscoveryReque
         is_managed_endpoint_for_api_key, is_safe_endpoint_for_managed_bearer,
     };
     use crate::security::credentials::session_support::{
-        resolve_backend_credential, BackendCredential,
+        BackendCredential, resolve_backend_credential,
     };
 
     let model = model.trim();

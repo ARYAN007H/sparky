@@ -102,7 +102,7 @@ fn env_workspace_scope_is_the_config_dir_not_the_raw_workspace() {
 /// session), sent as `Authorization: Bearer <key>` like managed inference.
 #[tokio::test]
 async fn api_key_alone_authenticates_cloud_embeddings() {
-    use axum::{http::HeaderMap, routing::post, Json, Router};
+    use axum::{Json, Router, http::HeaderMap, routing::post};
     use std::sync::{Arc, Mutex};
 
     let seen: Arc<Mutex<Option<String>>> = Arc::default();

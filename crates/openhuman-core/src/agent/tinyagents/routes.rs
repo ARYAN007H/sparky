@@ -215,7 +215,8 @@ impl ModelMiddleware<(), crate::agent::tinyagents::host::OpenHumanRunContext>
     ) -> tinyagents_harness::Result<MiddlewareModelOutcome> {
         let outcome = next.run(ctx, state, request).await?;
         let response = outcome.into_response();
-        if let Some(usage) = crate::inference::provider::model::usage_info_from_response(&response) {
+        if let Some(usage) = crate::inference::provider::model::usage_info_from_response(&response)
+        {
             self.carry
                 .lock()
                 .unwrap_or_else(|p| p.into_inner())

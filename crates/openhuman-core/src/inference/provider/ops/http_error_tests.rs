@@ -68,10 +68,11 @@ async fn api_error_replaces_no_model_loaded_body_with_guidance() {
         ),
     )
     .await;
-    assert!(err
-        .to_string()
-        .to_ascii_lowercase()
-        .contains("load a model"));
+    assert!(
+        err.to_string()
+            .to_ascii_lowercase()
+            .contains("load a model")
+    );
 }
 
 #[tokio::test]

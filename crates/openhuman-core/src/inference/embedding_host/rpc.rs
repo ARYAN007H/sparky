@@ -18,7 +18,7 @@ use tinyinference_embeddings::probe::redact_secrets;
 #[cfg(test)]
 use settings::remember_active_custom_profile;
 #[cfg(test)]
-use tinyinference_embeddings::probe::{classify_embed_probe, EmbedProbe};
+use tinyinference_embeddings::probe::{EmbedProbe, classify_embed_probe};
 #[cfg(test)]
 use tinyinference_embeddings::served_models::{
     check_requested_model_served, fetch_served_model_ids, normalize_embed_model_id,

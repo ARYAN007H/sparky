@@ -49,9 +49,11 @@ async fn the_module_defers_a_summary_until_requested() {
     .await;
 
     assert_eq!(output.summarized_from_bytes, None);
-    assert!(!output
-        .text
-        .contains("the rate limit is 60 requests a minute"));
+    assert!(
+        !output
+            .text
+            .contains("the rate limit is 60 requests a minute")
+    );
     assert!(
         output.text.contains(tinyjuice_bus::tools::RETRIEVE),
         "the original stays retrievable: {}",

@@ -2,18 +2,18 @@
 //! update, including the save-time verification of a custom endpoint.
 
 use crate::config::Config;
-use crate::core::runtime::DispatchCtx;
 use crate::core::Outcome;
+use crate::core::runtime::DispatchCtx;
 use crate::security::credentials::AuthService;
 
-use super::{resolve_api_key, LOG_PREFIX};
+use super::{LOG_PREFIX, resolve_api_key};
 use tinyinference_embeddings::catalog;
 use tinyinference_embeddings::probe::{
-    classify_embed_probe, final_probe_dims, probe_custom_embeddings, EmbedProbe,
-    EmbeddingProbeRejection,
+    EmbedProbe, EmbeddingProbeRejection, classify_embed_probe, final_probe_dims,
+    probe_custom_embeddings,
 };
 use tinyinference_embeddings::served_models::{
-    check_requested_model_served, fetch_served_model_ids, ModelNotServed,
+    ModelNotServed, check_requested_model_served, fetch_served_model_ids,
 };
 
 fn probe_rejection_outcome(reject: EmbeddingProbeRejection) -> Outcome<serde_json::Value> {
@@ -289,10 +289,10 @@ pub async fn update_settings(
                 // auth vs wrong-model vs unreachable failures (issue #5017).
                 let reject_code = reject.error;
                 tracing::warn!(
-                        provider = effective_provider.as_str(),
-                        reject_code,
-                        "{LOG_PREFIX} update_settings rejected — embeddings endpoint failed verification"
-                    );
+                    provider = effective_provider.as_str(),
+                    reject_code,
+                    "{LOG_PREFIX} update_settings rejected — embeddings endpoint failed verification"
+                );
                 // Right-feedback (issue #3761): the probe failed. If the
                 // endpoint lists its served models and the requested id
                 // isn't among them, the cause is almost certainly a name
@@ -311,27 +311,27 @@ pub async fn update_settings(
                 if let Some(ep) = listed_endpoint {
                     let api_key = resolve_api_key(&config, "custom");
                     tracing::debug!(
-                            provider = effective_provider.as_str(),
-                            requested = new_model.as_str(),
-                            "{LOG_PREFIX} update_settings: probing endpoint /models for served-id guidance"
-                        );
+                        provider = effective_provider.as_str(),
+                        requested = new_model.as_str(),
+                        "{LOG_PREFIX} update_settings: probing endpoint /models for served-id guidance"
+                    );
                     match fetch_served_model_ids(ep, &api_key).await {
                         Ok(served) => match check_requested_model_served(&new_model, &served) {
                             Some(better) => {
                                 tracing::warn!(
-                                        provider = effective_provider.as_str(),
-                                        requested = new_model.as_str(),
-                                        served = served.len(),
-                                        "{LOG_PREFIX} update_settings: model not in served list — returning name-mismatch guidance"
-                                    );
+                                    provider = effective_provider.as_str(),
+                                    requested = new_model.as_str(),
+                                    served = served.len(),
+                                    "{LOG_PREFIX} update_settings: model not in served list — returning name-mismatch guidance"
+                                );
                                 return Ok(model_rejection_outcome(better));
                             }
                             None => {
                                 tracing::debug!(
-                                        provider = effective_provider.as_str(),
-                                        served = served.len(),
-                                        "{LOG_PREFIX} update_settings: requested model is served (or list empty) — keeping generic verification error"
-                                    );
+                                    provider = effective_provider.as_str(),
+                                    served = served.len(),
+                                    "{LOG_PREFIX} update_settings: requested model is served (or list empty) — keeping generic verification error"
+                                );
                             }
                         },
                         Err(e) => {
@@ -354,12 +354,12 @@ pub async fn update_settings(
             let detected_dims = final_probe_dims(&new_model, new_dims, probe_actual_dims);
             if detected_dims != new_dims {
                 tracing::info!(
-                        provider = effective_provider.as_str(),
-                        model = new_model.as_str(),
-                        requested = new_dims,
-                        detected = detected_dims,
-                        "{LOG_PREFIX} update_settings auto-detected custom embedding dimension from probe"
-                    );
+                    provider = effective_provider.as_str(),
+                    model = new_model.as_str(),
+                    requested = new_dims,
+                    detected = detected_dims,
+                    "{LOG_PREFIX} update_settings auto-detected custom embedding dimension from probe"
+                );
                 new_dims = detected_dims;
                 new_sig = format_embedding_signature(&new_provider, &new_model, new_dims);
                 sig_changed = new_sig != old_sig;

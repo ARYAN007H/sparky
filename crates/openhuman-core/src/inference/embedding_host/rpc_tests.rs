@@ -145,11 +145,13 @@ fn reject_model_not_served_without_match_lists_available() {
 #[test]
 fn check_requested_model_served_decisions() {
     // Served exactly → accept (None).
-    assert!(check_requested_model_served(
-        "text-embedding-bge-m3",
-        &["text-embedding-bge-m3".to_string()],
-    )
-    .is_none());
+    assert!(
+        check_requested_model_served(
+            "text-embedding-bge-m3",
+            &["text-embedding-bge-m3".to_string()],
+        )
+        .is_none()
+    );
     // Empty/unknown list → defer to probe (None), never block.
     assert!(check_requested_model_served("bge-m3", &[]).is_none());
     // Non-empty list without the model → reject with feedback.
@@ -159,7 +161,7 @@ fn check_requested_model_served_decisions() {
 
 #[tokio::test]
 async fn fetch_served_model_ids_parses_openai_models_list() {
-    use axum::{routing::get, Json, Router};
+    use axum::{Json, Router, routing::get};
     let app = Router::new().route(
         "/v1/models",
         get(|| async {
@@ -405,9 +407,9 @@ async fn conformant_custom_endpoint_verifies_and_sends_expected_request() {
     use std::sync::{Arc, Mutex};
 
     use axum::{
+        Json, Router,
         extract::State,
         routing::{get, post},
-        Json, Router,
     };
 
     #[derive(Clone, Default)]

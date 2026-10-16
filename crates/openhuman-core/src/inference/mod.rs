@@ -30,17 +30,17 @@ pub(crate) mod failure_copy;
 pub mod host_runtime;
 pub mod http;
 pub mod model_context;
-pub(crate) mod reasoning;
 pub mod ops;
 pub mod provider;
-pub mod turn_models;
+pub(crate) mod reasoning;
 mod schemas;
 pub mod tokenjuice;
+pub mod turn_models;
 
 pub use ops as rpc;
 pub use schemas::{
-    all_controller_schemas as all_inference_controller_schemas,
-    all_registered_controllers as all_inference_registered_controllers, INFERENCE_AGENT_CHAT,
+    INFERENCE_AGENT_CHAT, all_controller_schemas as all_inference_controller_schemas,
+    all_registered_controllers as all_inference_registered_controllers,
 };
 
 // Re-export the types that external callers (voice, agent, etc.) import from inference

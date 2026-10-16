@@ -20,10 +20,10 @@ use tinyagents_runtime::{DriverRequest, RuntimeError};
 use tinyinference_llm::model::ErrorSlotModel;
 
 use crate::agent::tinyagents::host::OpenHumanRunContext;
-use crate::inference::provider::model::TurnChatModel;
 use crate::agent::tinyagents::routes;
 use crate::agent::tinyagents::tool_registration::host_tool_set_builder;
 use crate::agent::tinyagents::turn_policy::run_policy_for_provider;
+use crate::inference::provider::model::TurnChatModel;
 
 /// The run policy for one turn, and whether it carries a cross-route fallback.
 ///

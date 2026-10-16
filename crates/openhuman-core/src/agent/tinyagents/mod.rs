@@ -67,11 +67,11 @@ pub(crate) use crate::agent::message_convert::chat_message_to_message;
 #[cfg(feature = "flows")]
 pub(crate) use crate::agent::message_convert::ta_call_to_oh_call;
 
-pub(crate) use observability::SubagentScope;
 pub(crate) use crate::inference::reasoning::{apply_requested_effort, parse_reasoning_effort};
-pub(crate) use turn_exec::TurnSpec;
 pub use crate::inference::turn_models::TurnModelSource;
 pub(crate) use crate::inference::turn_models::TurnModels;
+pub(crate) use observability::SubagentScope;
+pub(crate) use turn_exec::TurnSpec;
 pub(crate) use turn_outcome::TinyagentsTurnOutcome;
 #[cfg(test)]
 pub(crate) use turn_policy::is_subagent_spawn_or_delegate_tool;

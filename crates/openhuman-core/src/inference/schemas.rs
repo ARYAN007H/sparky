@@ -14,9 +14,9 @@ mod settings_handlers;
 use serde::de::DeserializeOwned;
 use serde_json::{Map, Value};
 
-use crate::core::all::RegisteredController;
 use crate::core::ControllerSchema;
 use crate::core::Outcome;
+use crate::core::all::RegisteredController;
 
 pub use catalog::schemas;
 use claude_code_handlers::*;

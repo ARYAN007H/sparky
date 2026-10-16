@@ -102,11 +102,7 @@ pub fn extract_backend_error_code_token(err: &str) -> Option<String> {
     let stripped = after_colon.strip_prefix('"')?;
     let end = stripped.find('"')?;
     let token = stripped[..end].trim().to_ascii_uppercase();
-    if token.is_empty() {
-        None
-    } else {
-        Some(token)
-    }
+    if token.is_empty() { None } else { Some(token) }
 }
 
 /// Whether the flattened error string is a **managed-backend** envelope (the

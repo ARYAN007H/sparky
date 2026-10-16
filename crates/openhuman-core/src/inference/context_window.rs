@@ -30,7 +30,7 @@ use std::sync::{Mutex, OnceLock};
 use tinyinference_llm::model::context_window::{ContextWindowInput, ContextWindowResolver};
 use tinyinference_llm::model::context_window::{ResolvedWindow, WindowSource};
 use tinyinference_llm::model::discover::{
-    model_limits_cache, DiscoveryRequest, ModelLimitsCache, ModelListingFetcher,
+    DiscoveryRequest, ModelLimitsCache, ModelListingFetcher, model_limits_cache,
 };
 
 use crate::config::Config;

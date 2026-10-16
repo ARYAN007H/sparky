@@ -6,8 +6,8 @@ fn list_configured_models_accepts_slug() {
     // passes a slug instead of the opaque random id. This lets the frontend
     // call the RPC before the provider config has been persisted (where only
     // the slug is stable).
-    use crate::config::schema::cloud_providers::{AuthStyle, CloudProviderCreds};
     use crate::config::Config;
+    use crate::config::schema::cloud_providers::{AuthStyle, CloudProviderCreds};
 
     let mut config = Config::default();
     config.cloud_providers.push(CloudProviderCreds {
@@ -207,8 +207,7 @@ mod provider_config_rejection_suppression {
     use super::super::*;
 
     // The exact #2079 Sentry body shape.
-    const TIER_LEAK_BODY: &str =
-        "The supported API model names are deepseek-v4-pro or deepseek-v4-flash, \
+    const TIER_LEAK_BODY: &str = "The supported API model names are deepseek-v4-pro or deepseek-v4-flash, \
          but you passed reasoning-v1.";
     // #2076 Moonshot Kimi K2 temperature constraint.
     const TEMP_BODY: &str = "invalid temperature: only 1 is allowed for this model";
@@ -350,7 +349,14 @@ mod provider_config_rejection_suppression {
         // Verbatim wire body from TAURI-RUST-4XK Sentry issue 5338.
         let body = r#"ollama API error (403 Forbidden): {"error":"this model requires a subscription, upgrade for access: https://ollama.com/upgrade (ref: bc48f3c8-fba1-40b6-93a9-786a167d16f9)"}"#;
         assert!(
-            config_rejection_demoted(&tinyinference_llm::failure::http::classify_http_failure("ollama", reqwest::StatusCode::FORBIDDEN.as_u16(), body), "ollama"),
+            config_rejection_demoted(
+                &tinyinference_llm::failure::http::classify_http_failure(
+                    "ollama",
+                    reqwest::StatusCode::FORBIDDEN.as_u16(),
+                    body
+                ),
+                "ollama"
+            ),
             "TAURI-RUST-4XK: ollama 403 subscription-gate must be classified as provider config-rejection"
         );
     }

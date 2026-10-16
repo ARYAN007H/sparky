@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 use std::time::Instant;
 
-use base64::{engine::general_purpose::STANDARD as BASE64, Engine};
+use base64::{Engine, engine::general_purpose::STANDARD as BASE64};
 use log::debug;
 
 use crate::config::Config;
@@ -63,8 +63,8 @@ pub async fn transcribe_with_prompt(
 
     let provider_name = effective_stt_provider(config);
     debug!(
-            "{LOG_PREFIX} configured STT dispatch provider={provider_name} path={audio_path} mime={mime}"
-        );
+        "{LOG_PREFIX} configured STT dispatch provider={provider_name} path={audio_path} mime={mime}"
+    );
     let bytes = tokio::fs::read(path)
         .await
         .map_err(|e| format!("failed to read audio file {audio_path}: {e}"))?;

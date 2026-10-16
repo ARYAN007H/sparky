@@ -16,8 +16,8 @@
 use super::super::openai_codex::resolve_openai_codex_routing;
 use tinyinference_core::sanitize::sanitize_api_error;
 use tinyinference_llm::providers::openai::codex::{
-    openai_codex_client_version, openai_codex_user_agent, OpenAiCodexRouting,
     OPENAI_CODEX_ACCOUNT_HEADER, OPENAI_CODEX_ORIGINATOR, OPENAI_CODEX_ORIGINATOR_HEADER,
+    OpenAiCodexRouting, openai_codex_client_version, openai_codex_user_agent,
 };
 
 mod catalog_listing;
@@ -25,8 +25,8 @@ mod local_runtime;
 mod managed_provider;
 mod openrouter;
 use tinyinference_llm::catalog::{
-    append_query_param, endpoint_hosts_models_listing, is_openrouter_provider,
-    merge_openai_codex_model_hints, parse_models_response, ModelInfo,
+    ModelInfo, append_query_param, endpoint_hosts_models_listing, is_openrouter_provider,
+    merge_openai_codex_model_hints, parse_models_response,
 };
 
 #[cfg(test)]

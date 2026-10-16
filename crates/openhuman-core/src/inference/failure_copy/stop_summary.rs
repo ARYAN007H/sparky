@@ -3,14 +3,18 @@
 /// The user-facing text for one `turn_stop.*` localization key.
 pub(crate) fn stop_summary_copy(key: &str) -> &'static str {
     match key {
-        "turn_stop.transient" => "a service I needed kept timing out or was temporarily unavailable",
+        "turn_stop.transient" => {
+            "a service I needed kept timing out or was temporarily unavailable"
+        }
         "turn_stop.uncertain_side_effect" => {
             "an action timed out and I could not confirm whether it went through, so I did not repeat it"
         }
         "turn_stop.authentication" => "a service rejected my credentials",
         "turn_stop.permission" => "I don't have permission for a step this needs",
         "turn_stop.policy" => "a step this needs is blocked by your security settings",
-        "turn_stop.missing_program" => "a program or feature this needs is not available on this device",
+        "turn_stop.missing_program" => {
+            "a program or feature this needs is not available on this device"
+        }
         "turn_stop.not_found" => "something this needs could not be found",
         "turn_stop.invalid_calls" => "a tool kept rejecting my requests as invalid",
         "turn_stop.unavailable" => "a tool this needs is not available right now",
