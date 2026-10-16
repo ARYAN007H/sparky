@@ -186,6 +186,8 @@ fn subagent_control_dispatches(
     let store: Arc<dyn tinyagents_orchestration::subagent::SubagentSessionStore> = Arc::new(
         crate::agent::orchestration::subagent_sessions::OpenHumanTinySubagentSessionStore::new(
             parent.workspace_dir.clone(),
+            parent.session_id.clone(),
+            run_context.thread_id.clone(),
         ),
     );
     let owner = format!(

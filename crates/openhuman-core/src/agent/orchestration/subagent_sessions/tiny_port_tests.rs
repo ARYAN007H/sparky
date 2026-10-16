@@ -29,7 +29,11 @@ async fn old_rows_without_checkpoint_identity_remain_readable_without_fabricated
     assert!(row.lifecycle_key.is_none());
     store.save(&[row]).unwrap();
 
-    let port = OpenHumanTinySubagentSessionStore::new(workspace.path().to_path_buf());
+    let port = OpenHumanTinySubagentSessionStore::new(
+        workspace.path().to_path_buf(),
+        "owner",
+        Some("thread".into()),
+    );
     let sessions = port.list_for_parent("owner", Some("thread")).await.unwrap();
     assert_eq!(sessions.len(), 1);
     assert_eq!(sessions[0].subagent_session_id, "legacy-session");
@@ -40,4 +44,12 @@ async fn old_rows_without_checkpoint_identity_remain_readable_without_fabricated
         .await
         .unwrap()
         .is_empty());
+    assert!(port.list_for_parent("owner", Some("other-thread")).await.unwrap().is_empty());
+    assert!(port.get("legacy-session").await.unwrap().is_some());
+    let other_thread = OpenHumanTinySubagentSessionStore::new(
+        workspace.path().to_path_buf(),
+        "owner",
+        Some("other-thread".into()),
+    );
+    assert!(other_thread.get("legacy-session").await.unwrap().is_none());
 }
