@@ -112,7 +112,10 @@ async fn web_and_external_proactive_subscribers_deliver_each_destination_once() 
     let delivered = web_events.recv().await.expect("web event");
     assert_eq!(delivered.event, "proactive_message");
     assert_eq!(delivered.full_response.as_deref(), Some("Hello!"));
-    assert!(web_events.try_recv().is_err(), "web event must not be duplicated");
+    assert!(
+        web_events.try_recv().is_err(),
+        "web event must not be duplicated"
+    );
     assert_eq!(send_count.load(Ordering::SeqCst), 1);
 }
 
