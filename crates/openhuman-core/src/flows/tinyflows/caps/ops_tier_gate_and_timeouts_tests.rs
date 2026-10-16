@@ -129,8 +129,12 @@ async fn http_adapter_blocks_under_readonly_tier() {
     use crate::security::AutonomyLevel;
 
     let (_dir, creds) = http_cred_store();
+    let mut config = Config::default();
+    config.autonomy.enabled = true;
+    config.autonomy.level = AutonomyLevel::ReadOnly;
     let http = OpenHumanHttp {
-        ctx: crate::core::runtime::DispatchCtx::ambient(),
+        ctx: crate::core::runtime::DispatchCtx::unbound(),
+        config: Arc::new(config),
         security: Arc::new(policy(AutonomyLevel::ReadOnly)),
         http_config: HttpRequestConfig::default(),
         http_creds: Arc::new(creds),

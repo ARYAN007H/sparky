@@ -80,6 +80,7 @@ fn http_adapter(allowed_domains: Vec<String>) -> OpenHumanHttp {
     ));
     OpenHumanHttp {
         ctx: crate::core::runtime::DispatchCtx::ambient(),
+        config: Arc::new(config.clone()),
         security,
         http_config: crate::config::HttpRequestConfig {
             allowed_domains,
