@@ -145,6 +145,7 @@ async fn round25_direct_mode_ops_use_loopback_factory_for_tools_connections_and_
         .any(|conn| conn.id == "acct-gmail" && conn.normalized_toolkit() == "gmail"));
 
     let listed = composio_list_tools(
+        &openhuman_core::core::runtime::DispatchCtx::ambient(),
         &harness.config,
         None,
         Some(vec![" readOnlyHint ".into(), " ".into()]),
