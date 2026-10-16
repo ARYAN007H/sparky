@@ -190,9 +190,7 @@ pub async fn run(ctx: &crate::core::runtime::DispatchCtx, config: &Config) -> Ve
         return Vec::new();
     }
     let config = config.clone();
-    let joined = ctx
-        .spawn_blocking(move || run_all(&backend, &config))
-        .await;
+    let joined = ctx.spawn_blocking(move || run_all(&backend, &config)).await;
     match joined {
         Ok(reports) => reports,
         Err(error) => {
