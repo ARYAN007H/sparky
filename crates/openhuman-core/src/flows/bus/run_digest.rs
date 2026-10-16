@@ -234,7 +234,11 @@ pub(super) fn render_run_digest(flow_name: &str, run: &FlowRun) -> String {
             break;
         }
         let status = step.status.as_deref().unwrap_or("?");
-        let output = truncate_chars(&step.output.to_string(), 120);
+        // Scrub the complete structured output before serialization and
+        // truncation, so sensitive fields are handled by the host policy
+        // even when their values fall beyond the digest's visible prefix.
+        let sanitized = crate::security::scrub::sanitize_json(&step.output);
+        let output = truncate_chars(&sanitized.value.to_string(), 120);
         let _ = writeln!(out, "- {} [{status}]: {output}", step.node_id);
     }
     truncate_chars(&out, DIGEST_MAX_CHARS)

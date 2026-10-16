@@ -277,7 +277,7 @@ async fn digest_ignores_cancelled_run() {
 }
 
 #[tokio::test]
-async fn digest_writes_run_digest_entry_for_completed_run() {
+async fn digest_sanitizes_persisted_outputs() {
     let tmp = tempfile::TempDir::new().unwrap();
     let config = test_config(&tmp);
     let _engine = digest_test_engine(&config);
@@ -294,10 +294,24 @@ async fn digest_writes_run_digest_entry_for_completed_run() {
     .unwrap();
     let step = tinyflows_catalog::FlowRunStep {
         node_id: "n1".to_string(),
-        output: json!({ "sent": 3 }),
+        output: json!({
+            "sent": 3,
+            "access_token": format!("synthetic-credential-value{}", "x".repeat(140)),
+        }),
         port: None,
         status: Some("success".to_string()),
         duration_ms: Some(12),
+        diagnostics: Vec::new(),
+    };
+    // Generated synthetic fixture data exercises text-token scrubbing; it is
+    // deterministic test input and never a real credential.
+    let token_output = format!("sk-ant-api03-{}", "0123456789abcdef".repeat(3));
+    let string_step = tinyflows_catalog::FlowRunStep {
+        node_id: "n2".to_string(),
+        output: json!(token_output.clone()),
+        port: None,
+        status: Some("success".to_string()),
+        duration_ms: Some(8),
         diagnostics: Vec::new(),
     };
     store::finish_flow_run(
@@ -305,7 +319,7 @@ async fn digest_writes_run_digest_entry_for_completed_run() {
         "run-ok",
         "completed",
         "2026-01-01T00:05:00Z",
-        &[step],
+        &[step, string_step],
         &[],
         None,
         None,
@@ -337,6 +351,11 @@ async fn digest_writes_run_digest_entry_for_completed_run() {
     assert!(entry.text.contains("f-ok"));
     assert!(entry.text.contains("completed"));
     assert!(entry.text.contains("n1"));
+    assert!(entry.text.contains("\"sent\":3"));
+    assert!(!entry.text.contains("synthetic-credential-value"));
+    assert!(entry.text.contains("[REDACTED_SECRET]"));
+    assert!(!entry.text.contains(&token_output));
+    assert!(entry.text.contains("n2"));
     assert!(entry.text.chars().count() <= DIGEST_MAX_CHARS);
 }
 
