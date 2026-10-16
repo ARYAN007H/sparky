@@ -110,33 +110,34 @@ pub fn confine_path_in(roots: &[PathBuf], path: &str) -> Result<(PathBuf, PathBu
 ///
 /// When the open is refused, the file is not regular, or it is too large.
 pub async fn read_confined(root: PathBuf, resolved: PathBuf) -> Result<String, String> {
-    tokio::task::spawn_blocking(move || {
-        use std::io::Read;
-        let file = crate::agent::attachments::provider::open::secure_open(&resolved, &root)
-            .map_err(|error| {
-                tracing::debug!(?error, "[mcp_ui] show_ui refused the file open");
-                "the file is not inside the workspace or a skill bundle".to_string()
-            })?;
-        let metadata = file
-            .metadata()
-            .map_err(|_| "could not read the file".to_string())?;
-        if !metadata.is_file() {
-            return Err("only regular files can be shown".to_string());
-        }
-        if metadata.len() > MAX_RESOURCE_BYTES as u64 {
-            return Err("the file is too large to show".to_string());
-        }
-        let mut html = String::new();
-        file.take(MAX_RESOURCE_BYTES as u64 + 1)
-            .read_to_string(&mut html)
-            .map_err(|_| "could not read the file".to_string())?;
-        if html.len() > MAX_RESOURCE_BYTES {
-            return Err("the file is too large to show".to_string());
-        }
-        Ok(html)
-    })
-    .await
-    .map_err(|_| "could not read the file".to_string())?
+    crate::core::runtime::DispatchCtx::ambient()
+        .spawn_blocking(move || {
+            use std::io::Read;
+            let file = crate::agent::attachments::provider::open::secure_open(&resolved, &root)
+                .map_err(|error| {
+                    tracing::debug!(?error, "[mcp_ui] show_ui refused the file open");
+                    "the file is not inside the workspace or a skill bundle".to_string()
+                })?;
+            let metadata = file
+                .metadata()
+                .map_err(|_| "could not read the file".to_string())?;
+            if !metadata.is_file() {
+                return Err("only regular files can be shown".to_string());
+            }
+            if metadata.len() > MAX_RESOURCE_BYTES as u64 {
+                return Err("the file is too large to show".to_string());
+            }
+            let mut html = String::new();
+            file.take(MAX_RESOURCE_BYTES as u64 + 1)
+                .read_to_string(&mut html)
+                .map_err(|_| "could not read the file".to_string())?;
+            if html.len() > MAX_RESOURCE_BYTES {
+                return Err("the file is too large to show".to_string());
+            }
+            Ok(html)
+        })
+        .await
+        .map_err(|_| "could not read the file".to_string())?
 }
 
 fn clean_title(raw: Option<&str>) -> Option<String> {

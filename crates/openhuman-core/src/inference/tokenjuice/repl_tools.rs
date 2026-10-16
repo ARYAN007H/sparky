@@ -287,11 +287,10 @@ impl ModuleReplTool {
             );
             return Ok(ToolResult::error(not_a_handle_message()));
         };
-        let read = tokio::task::spawn_blocking(move || {
-            read_tool_result_artifact(&dir, &path, MAX_ARTIFACT_BYTES)
-        })
-        .await
-        .map_err(|e| anyhow::anyhow!("juice: artifact read task failed: {e}"))?;
+        let read = crate::core::runtime::DispatchCtx::ambient()
+            .spawn_blocking(move || read_tool_result_artifact(&dir, &path, MAX_ARTIFACT_BYTES))
+            .await
+            .map_err(|e| anyhow::anyhow!("juice: artifact read task failed: {e}"))?;
         match read {
             Ok(content) => {
                 log::debug!(

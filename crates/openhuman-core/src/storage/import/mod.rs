@@ -190,7 +190,9 @@ pub async fn run(config: &Config) -> Vec<Report> {
         return Vec::new();
     }
     let config = config.clone();
-    let joined = tokio::task::spawn_blocking(move || run_all(&backend, &config)).await;
+    let joined = crate::core::runtime::DispatchCtx::ambient()
+        .spawn_blocking(move || run_all(&backend, &config))
+        .await;
     match joined {
         Ok(reports) => reports,
         Err(error) => {

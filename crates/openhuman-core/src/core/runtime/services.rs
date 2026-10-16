@@ -255,8 +255,9 @@ pub fn spawn_flows_boot_reconcile() {
 pub fn spawn_cron_service(
     ctx: std::sync::Arc<crate::core::runtime::CoreContext>,
 ) -> tokio::task::JoinHandle<()> {
-    tokio::spawn(crate::core::runtime::CoreContext::scope(ctx, async {
-        match crate::config::ops::load_config_with_timeout().await {
+    let dispatch = crate::core::runtime::DispatchCtx::new(ctx);
+    dispatch.clone().spawn(async move {
+        match dispatch.load_config().await {
             Ok(config) => {
                 if !config.cron.enabled {
                     log::info!("[cron] scheduler disabled via config; skipping");
@@ -276,7 +277,7 @@ pub fn spawn_cron_service(
                         "[flows] boot reconciliation of schedule-trigger cron jobs failed: {e}"
                     );
                 }
-                if let Err(e) = crate::cron::scheduler::run(config).await {
+                if let Err(e) = crate::cron::scheduler::run(&dispatch, config).await {
                     log::error!("[cron] scheduler loop ended with error: {e}");
                 }
             }
@@ -284,7 +285,7 @@ pub fn spawn_cron_service(
                 log::warn!("[core] config load failed, skipping cron scheduler: {err}");
             }
         }
-    }))
+    })
 }
 
 /// Realtime channel listeners (Telegram getUpdates, Discord gateway, etc.).

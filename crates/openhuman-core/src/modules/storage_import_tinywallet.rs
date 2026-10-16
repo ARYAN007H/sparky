@@ -66,13 +66,14 @@ async fn import_into(scoped: &ScopedStorage, workspace_dir: &Path) -> Result<Out
     if !ledger.is_file() {
         return Ok(Outcome::NoSource);
     }
-    let (records, skipped) = tokio::task::spawn_blocking(move || -> Result<_> {
-        let text = std::fs::read_to_string(&ledger)
-            .with_context(|| format!("read {}", ledger.display()))?;
-        Ok(support::parse_jsonl(&text))
-    })
-    .await
-    .context("the legacy reader panicked")??;
+    let (records, skipped) = crate::core::runtime::DispatchCtx::ambient()
+        .spawn_blocking(move || -> Result<_> {
+            let text = std::fs::read_to_string(&ledger)
+                .with_context(|| format!("read {}", ledger.display()))?;
+            Ok(support::parse_jsonl(&text))
+        })
+        .await
+        .context("the legacy reader panicked")??;
 
     let payments = support::append_if_empty(scoped, PAYMENTS_STREAM, records)
         .await

@@ -264,7 +264,10 @@ async fn search(
 async fn load_index(session: &Session, request: LoadIndexRequest) -> HostResult<Option<String>> {
     let config = session.config.clone();
     let kind: IndexKind = request.kind;
-    match tokio::task::spawn_blocking(move || docs::load(&config, kind)).await {
+    match crate::core::runtime::DispatchCtx::ambient()
+        .spawn_blocking(move || docs::load(&config, kind))
+        .await
+    {
         Ok(Ok(document)) => Ok(document),
         Ok(Err(error)) => {
             log::warn!("[tinymemes] cannot read index: {error}");
@@ -279,7 +282,9 @@ async fn load_index(session: &Session, request: LoadIndexRequest) -> HostResult<
 
 async fn save_index(session: &Session, request: SaveIndexRequest) -> HostResult<()> {
     let config = session.config.clone();
-    match tokio::task::spawn_blocking(move || docs::save(&config, request.kind, request.json)).await
+    match crate::core::runtime::DispatchCtx::ambient()
+        .spawn_blocking(move || docs::save(&config, request.kind, request.json))
+        .await
     {
         Ok(Ok(())) => Ok(()),
         Ok(Err(error)) => {

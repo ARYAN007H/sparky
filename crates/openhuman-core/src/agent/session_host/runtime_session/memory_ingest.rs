@@ -15,6 +15,7 @@
 //! The committed turn is also published as
 //! `DomainEvent::ConversationTurnCommitted` for observers.
 
+use crate::core::runtime::DispatchCtx;
 use std::sync::Arc;
 
 use chrono::Utc;
@@ -24,7 +25,6 @@ use tinyinference_llm::message::Message;
 
 use super::OpenHumanTurnPrelude;
 use crate::agent::tinyagents::host::OpenHumanRunContext;
-use crate::core::runtime::DispatchCtx;
 use crate::memory::lifecycle::hooks::{
     self, MemoryTurn, PostTurnInput, PreTurnInput, ToolCallSummary,
 };
@@ -234,7 +234,7 @@ impl OpenHumanTurnPrelude {
             )
             .await;
         };
-        crate::core::runtime::DispatchCtx::ambient()
+        self.dispatch_ctx()
             .spawn(deferred_memory_work(profile_context, work));
     }
 }
