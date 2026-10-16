@@ -2,7 +2,11 @@ import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { callCoreRpc } from '../../../services/coreRpcClient';
-import { AUTOSAVE_DELAY_MS, useArtifactAutosave } from './ArtifactPreviewPanel';
+import {
+  AUTOSAVE_DELAY_MS,
+  AUTOSAVE_MAX_RETRIES,
+  useArtifactAutosave,
+} from './ArtifactPreviewPanel';
 
 vi.mock('../../../services/coreRpcClient', () => ({
   callCoreRpc: vi.fn().mockResolvedValue({ artifact_id: 'a-1', version: 2, saved: true }),
@@ -88,6 +92,23 @@ describe('useArtifactAutosave', () => {
       method: 'openhuman.ai_save_artifact_version',
       params: { artifact_id: 'a-1', body: '# newer' },
     });
+  });
+
+  it('stops retrying a save that keeps failing, even after the panel closed', async () => {
+    rpc.mockRejectedValue(new Error('core down'));
+    const { result, unmount } = renderHook(() => useArtifactAutosave('a-1', '# v1', 1, true));
+    act(() => result.current.schedule('# edited'));
+    await act(async () => vi.advanceTimersByTime(AUTOSAVE_DELAY_MS));
+    await act(async () => unmount());
+    for (let i = 0; i < AUTOSAVE_MAX_RETRIES + 3; i++) {
+      await act(async () => vi.advanceTimersByTime(AUTOSAVE_DELAY_MS));
+    }
+    // The first save, the save on close, then the capped retries — no more.
+    const calls = rpc.mock.calls.length;
+    expect(calls).toBeLessThanOrEqual(2 + AUTOSAVE_MAX_RETRIES);
+    await act(async () => vi.advanceTimersByTime(AUTOSAVE_DELAY_MS * 10));
+    expect(rpc.mock.calls.length).toBe(calls);
+    rpc.mockResolvedValue({ artifact_id: 'a-1', version: 2, saved: true });
   });
 
   it('never saves a read-only artifact', async () => {

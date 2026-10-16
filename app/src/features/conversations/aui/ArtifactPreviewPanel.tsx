@@ -350,6 +350,9 @@ function FileViewer({
 /** Versioned kinds whose record holds the content, so an edit is a version. */
 const EDITABLE_KINDS = new Set(['text', 'markdown', 'html']);
 
+/** Times a failed autosave is retried on its own before waiting for the user. */
+export const AUTOSAVE_MAX_RETRIES = 3;
+
 /** Wait after the last keystroke before saving the edit as a new version. */
 export const AUTOSAVE_DELAY_MS = 5_000;
 
@@ -391,6 +394,9 @@ export function useArtifactAutosave(
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // The retry after a failed save calls the current `save`.
   const saveRef = useRef<() => Promise<void>>(async () => {});
+  // Retries since the last successful save or edit, so a save that keeps
+  // failing (also after the panel closed) stops instead of retrying forever.
+  const retries = useRef(0);
 
   useEffect(() => {
     setVersion(initialVersion);
@@ -409,6 +415,7 @@ export function useArtifactAutosave(
         method: 'openhuman.ai_save_artifact_version',
         params: { artifact_id: artifactId, body: next },
       });
+      retries.current = 0;
       if (typeof result?.version === 'number') setVersion(result.version);
       setStatus(pending.current === null ? 'saved' : 'pending');
     } catch (err) {
@@ -418,6 +425,10 @@ export function useArtifactAutosave(
       // meanwhile (that one is saved instead).
       if (pending.current === null) {
         pending.current = next;
+        // The edit stays pending; past the cap only a new edit or a flush
+        // (download, closing the panel) tries again.
+        if (retries.current >= AUTOSAVE_MAX_RETRIES) return;
+        retries.current += 1;
         if (timer.current) clearTimeout(timer.current);
         timer.current = setTimeout(() => void saveRef.current(), AUTOSAVE_DELAY_MS);
       }
@@ -430,6 +441,7 @@ export function useArtifactAutosave(
   const schedule = useCallback(
     (next: string) => {
       if (!enabled) return;
+      retries.current = 0;
       pending.current = next;
       setStatus('pending');
       if (timer.current) clearTimeout(timer.current);

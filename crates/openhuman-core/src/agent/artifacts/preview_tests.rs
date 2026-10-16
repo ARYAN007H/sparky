@@ -115,6 +115,7 @@ fn config_in(workspace: &Path) -> crate::config::Config {
     crate::config::Config {
         workspace_dir: workspace.to_path_buf(),
         action_dir: workspace.join("action"),
+        files_dir_override: Some(workspace.join("Files")),
         ..crate::config::Config::default()
     }
 }
@@ -135,4 +136,36 @@ async fn an_unknown_artifact_is_not_found() {
         .await
         .unwrap_err();
     assert!(err.contains("not found"), "{err}");
+}
+
+#[tokio::test]
+async fn an_artifact_made_before_versioning_opens_from_its_legacy_record() {
+    use crate::agent::artifacts::store::{create_artifact, finalize_artifact};
+    use crate::agent::artifacts::types::ArtifactKind as LegacyKind;
+
+    let workspace = tempfile::tempdir().unwrap();
+    let config = config_in(workspace.path());
+    let files = config.files_dir();
+    std::fs::create_dir_all(&files).unwrap();
+    // Only the legacy record: no versioned one.
+    let (meta, path) = create_artifact(
+        workspace.path(),
+        files.clone(),
+        LegacyKind::Document,
+        "Old notes",
+        "md",
+        None,
+    )
+    .await
+    .unwrap();
+    std::fs::write(&path, "# from before").unwrap();
+    finalize_artifact(workspace.path(), &meta.id, 13, None)
+        .await
+        .unwrap();
+
+    let body = read_body(&config, &meta.id).await.unwrap();
+    assert_eq!(body.title, "Old notes");
+    assert_eq!(body.kind, "file");
+    assert_eq!(body.body, "# from before");
+    assert!(body.is_text);
 }
