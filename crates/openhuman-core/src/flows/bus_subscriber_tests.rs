@@ -245,21 +245,31 @@ async fn app_event_runs_queue_fifo_per_tenant_while_other_tenants_progress() {
                 }
             }
             completed_tx
-                .send((tenant.agent.unwrap(), request.flow_id, event))
+                .send((
+                    format!(
+                        "{}/{}",
+                        tenant.profile.unwrap_or_default(),
+                        tenant.agent.unwrap_or_default()
+                    ),
+                    request.flow_id,
+                    event,
+                ))
                 .unwrap();
         }
     };
     let subscriber = FlowTriggerSubscriber::with_runner(config, 1, runner);
-    let context = |agent: &str| {
+    let context = |profile: &str, agent: &str| {
         DispatchCtx::new(
             CoreContext::for_test(DomainSet::full(), None).derive_with(
                 ContextOverlay::new(Config::default(), DomainSet::full(), Default::default())
+                    .profile(profile)
                     .session_agent(agent),
             ),
         )
     };
-    let tenant_a = context("tenant-a");
-    let tenant_b = context("tenant-b");
+    let tenant_a = context("profile-a", "agent-a");
+    let tenant_b = context("profile-b", "agent-a");
+    let tenant_c = context("profile-a", "agent-c");
 
     subscriber
         .dispatch_test_app_event(&tenant_a, "shared-flow", json!({"event": "a1"}))
@@ -271,21 +281,36 @@ async fn app_event_runs_queue_fifo_per_tenant_while_other_tenants_progress() {
     subscriber
         .dispatch_test_app_event(&tenant_b, "shared-flow", json!({"event": "b1"}))
         .await;
+    subscriber
+        .dispatch_test_app_event(&tenant_c, "shared-flow", json!({"event": "c1"}))
+        .await;
 
-    assert_eq!(
+    let mut other_tenant_runs = [
         receive_trigger_run(&mut completed_rx).await,
-        (
-            "tenant-b".to_string(),
-            "shared-flow".to_string(),
-            "b1".to_string()
-        ),
-        "a held run for one tenant must not block the same flow id for another tenant"
+        receive_trigger_run(&mut completed_rx).await,
+    ];
+    other_tenant_runs.sort();
+    assert_eq!(
+        other_tenant_runs,
+        [
+            (
+                "profile-a/agent-c".to_string(),
+                "shared-flow".to_string(),
+                "c1".to_string()
+            ),
+            (
+                "profile-b/agent-a".to_string(),
+                "shared-flow".to_string(),
+                "b1".to_string()
+            ),
+        ],
+        "a held run must not block the same flow ID for another profile or agent"
     );
     release_first_tx.send(()).unwrap();
     assert_eq!(
         receive_trigger_run(&mut completed_rx).await,
         (
-            "tenant-a".to_string(),
+            "profile-a/agent-a".to_string(),
             "shared-flow".to_string(),
             "a1".to_string()
         )
@@ -293,7 +318,7 @@ async fn app_event_runs_queue_fifo_per_tenant_while_other_tenants_progress() {
     assert_eq!(
         receive_trigger_run(&mut completed_rx).await,
         (
-            "tenant-a".to_string(),
+            "profile-a/agent-a".to_string(),
             "shared-flow".to_string(),
             "a2".to_string()
         ),

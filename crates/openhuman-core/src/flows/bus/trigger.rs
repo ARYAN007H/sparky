@@ -212,6 +212,10 @@ impl FlowTriggerSubscriber {
         payload: Value,
         inputs: serde_json::Map<String, Value>,
     ) {
+        // Admission intentionally waits for bounded per-key queue capacity.
+        // EventHandler runs inline in TinyBus, so a saturated key can delay
+        // later scopes in this callback. This is in-memory backpressure, not
+        // durable delivery; the upstream event broadcast is itself bounded.
         let Some(key) = self.dispatch_key(ctx, &flow_id) else {
             return;
         };
