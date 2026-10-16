@@ -182,14 +182,9 @@ async fn render_via_session(config: &Config, agent_id: &str) -> Result<DumpedPro
     )
     .with_context(|| format!("building session agent for `{agent_id}`"))?;
 
-    // Match turn-1 behaviour: fetch the user's active Composio
-    // connections so the rendered prompt mirrors what the LLM actually
-    // sees. Best-effort — failures degrade to an empty integration
-    // list, same as the live runtime.
-    agent.fetch_connected_integrations().await;
-    // Mirror turn-1: synthesise `delegate_*` tools for connected
-    // Composio toolkits now that we know what's actually authorised.
-    agent.refresh_delegation_tools();
+    // Use the live turn prelude's hydration and surface reconciliation so this
+    // snapshot matches what the runtime will send, without starting a model turn.
+    agent.refresh_prompt_surface().await;
 
     let text = agent
         .build_system_prompt()

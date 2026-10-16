@@ -1,5 +1,9 @@
 use super::*;
 
+fn tenant() -> crate::core::runtime::Tenant {
+    crate::core::runtime::Tenant::default()
+}
+
 #[tokio::test]
 async fn approve_resolves_parked_turn() {
     let gate = PlanReviewGate::new(Duration::from_secs(5));
@@ -7,6 +11,7 @@ async fn approve_resolves_parked_turn() {
     let g2 = gate.clone();
     let parked = tokio::spawn(async move {
         g2.request_review(
+            tenant(),
             Some("t1".into()),
             Some("c1".into()),
             "Ship it".into(),
@@ -17,7 +22,7 @@ async fn approve_resolves_parked_turn() {
     });
     // Let the park register the waiter.
     tokio::time::sleep(Duration::from_millis(20)).await;
-    assert!(gate.decide_by_thread("t1", PlanReviewResolution::Approve));
+    assert!(gate.decide_by_thread(&tenant(), "t1", PlanReviewResolution::Approve));
     assert_eq!(parked.await.unwrap(), PlanReviewResolution::Approve);
 }
 
@@ -26,12 +31,12 @@ async fn revise_carries_feedback_back() {
     let gate = std::sync::Arc::new(PlanReviewGate::new(Duration::from_secs(5)));
     let g2 = gate.clone();
     let parked = tokio::spawn(async move {
-        g2.request_review(Some("t2".into()), None, "Plan".into(), vec![], None)
+        g2.request_review(tenant(), Some("t2".into()), None, "Plan".into(), vec![], None)
             .await
     });
     tokio::time::sleep(Duration::from_millis(20)).await;
     assert!(gate.decide_by_thread(
-        "t2",
+        &tenant(), "t2",
         PlanReviewResolution::Revise {
             feedback: "add a test step".into(),
         },
@@ -48,17 +53,17 @@ async fn revise_carries_feedback_back() {
 async fn timeout_fails_closed_to_reject() {
     let gate = PlanReviewGate::new(Duration::from_millis(40));
     let resolution = gate
-        .request_review(Some("t3".into()), None, "Plan".into(), vec![], None)
+        .request_review(tenant(), Some("t3".into()), None, "Plan".into(), vec![], None)
         .await;
     assert_eq!(resolution, PlanReviewResolution::Reject);
     // The waiter is cleaned up after timeout.
-    assert!(!gate.decide_by_thread("t3", PlanReviewResolution::Approve));
+    assert!(!gate.decide_by_thread(&tenant(), "t3", PlanReviewResolution::Approve));
 }
 
 #[tokio::test]
 async fn decide_unknown_request_is_false() {
     let gate = PlanReviewGate::new(Duration::from_secs(5));
-    assert!(!gate.decide("nope", PlanReviewResolution::Approve));
+    assert!(!gate.decide(&tenant(), "nope", PlanReviewResolution::Approve));
 }
 
 #[tokio::test]
@@ -68,14 +73,14 @@ async fn cancelled_park_cleans_up_waiter() {
     let gate = std::sync::Arc::new(PlanReviewGate::new(Duration::from_secs(30)));
     let g2 = gate.clone();
     let handle = tokio::spawn(async move {
-        g2.request_review(Some("t-drop".into()), None, "Plan".into(), vec![], None)
+        g2.request_review(tenant(), Some("t-drop".into()), None, "Plan".into(), vec![], None)
             .await
     });
     tokio::time::sleep(Duration::from_millis(20)).await;
     handle.abort();
     let _ = handle.await;
     // The drop guard removed the entry, so there is nothing left to decide.
-    assert!(!gate.decide_by_thread("t-drop", PlanReviewResolution::Approve));
+    assert!(!gate.decide_by_thread(&tenant(), "t-drop", PlanReviewResolution::Approve));
 }
 
 #[tokio::test]
@@ -84,6 +89,7 @@ async fn parked_review_for_thread_carries_tool_call_id_and_expiry() {
     let g2 = gate.clone();
     let parked = tokio::spawn(async move {
         g2.request_review(
+            tenant(),
             Some("t-replay".into()),
             Some("c-replay".into()),
             "Ship it".into(),
@@ -95,7 +101,7 @@ async fn parked_review_for_thread_carries_tool_call_id_and_expiry() {
     tokio::time::sleep(Duration::from_millis(20)).await;
 
     let row = gate
-        .parked_review_for_thread("t-replay")
+        .parked_review_for_thread(&tenant(), "t-replay")
         .expect("review should be parked");
     assert_eq!(row.thread_id, Some("t-replay".to_string()));
     assert_eq!(row.client_id, Some("c-replay".to_string()));
@@ -103,17 +109,17 @@ async fn parked_review_for_thread_carries_tool_call_id_and_expiry() {
     assert!(row.expires_at.is_some());
     assert_eq!(row.steps, vec!["step one".to_string()]);
 
-    assert!(gate.decide_by_thread("t-replay", PlanReviewResolution::Approve));
+    assert!(gate.decide_by_thread(&tenant(), "t-replay", PlanReviewResolution::Approve));
     parked.await.unwrap();
 
     // Decided reviews are no longer parked.
-    assert!(gate.parked_review_for_thread("t-replay").is_none());
+    assert!(gate.parked_review_for_thread(&tenant(), "t-replay").is_none());
 }
 
 #[tokio::test]
 async fn parked_review_for_thread_is_none_when_nothing_is_parked() {
     let gate = PlanReviewGate::new(Duration::from_secs(5));
-    assert!(gate.parked_review_for_thread("no-such-thread").is_none());
+    assert!(gate.parked_review_for_thread(&tenant(), "no-such-thread").is_none());
 }
 
 #[tokio::test]
