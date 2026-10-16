@@ -5,7 +5,6 @@ use super::*;
 use serde_json::json;
 use tempfile::TempDir;
 
-use crate::agent::session_store::ledger_sync::{get_agent_run, upsert_agent_run};
 use tinyagents_session::run_ledger::{AgentRunKind, AgentRunStatus, AgentRunUpsert};
 use tinybus::EventHandler;
 
@@ -17,9 +16,8 @@ fn test_config(dir: &TempDir) -> Config {
 }
 
 fn seed_running(config: &Config, id: &str) {
-    upsert_agent_run(
-        &config.workspace_dir,
-        AgentRunUpsert {
+    crate::agent::session_store::with_ledger(&config.workspace_dir, |ledger| {
+        let ledger_arg_0 = AgentRunUpsert {
             id: id.into(),
             kind: AgentRunKind::Subagent,
             parent_run_id: Some("parent-turn".into()),
@@ -35,8 +33,9 @@ fn seed_running(config: &Config, id: &str) {
             metadata: json!({}),
             started_at: None,
             completed_at: None,
-        },
-    )
+        };
+        async move { ledger.upsert_agent_run(ledger_arg_0).await }
+    })
     .unwrap();
 }
 
@@ -59,9 +58,12 @@ async fn settles_running_run_on_subagent_completed() {
     })
     .await;
 
-    let run = get_agent_run(&config.workspace_dir, "sub-1")
-        .unwrap()
-        .expect("run present");
+    let run = crate::agent::session_store::with_ledger(&config.workspace_dir, |ledger| {
+        let ledger_arg_0 = ("sub-1").to_string();
+        async move { ledger.get_agent_run(&ledger_arg_0).await }
+    })
+    .unwrap()
+    .expect("run present");
     assert_eq!(run.status, AgentRunStatus::Completed);
     assert!(run.completed_at.is_some());
 }
@@ -83,9 +85,12 @@ async fn settles_running_run_on_subagent_failed_with_error() {
     })
     .await;
 
-    let run = get_agent_run(&config.workspace_dir, "sub-2")
-        .unwrap()
-        .expect("run present");
+    let run = crate::agent::session_store::with_ledger(&config.workspace_dir, |ledger| {
+        let ledger_arg_0 = ("sub-2").to_string();
+        async move { ledger.get_agent_run(&ledger_arg_0).await }
+    })
+    .unwrap()
+    .expect("run present");
     assert_eq!(run.status, AgentRunStatus::Failed);
     assert_eq!(run.error.as_deref(), Some("boom"));
 }
@@ -107,9 +112,12 @@ async fn settles_running_run_on_subagent_awaiting_user() {
     })
     .await;
 
-    let run = get_agent_run(&config.workspace_dir, "sub-3")
-        .unwrap()
-        .expect("run present");
+    let run = crate::agent::session_store::with_ledger(&config.workspace_dir, |ledger| {
+        let ledger_arg_0 = ("sub-3").to_string();
+        async move { ledger.get_agent_run(&ledger_arg_0).await }
+    })
+    .unwrap()
+    .expect("run present");
     assert_eq!(run.status, AgentRunStatus::AwaitingUser);
     assert!(run.error.is_none());
     assert!(run.completed_at.is_none());
@@ -134,8 +142,11 @@ async fn ignores_unrelated_events_and_missing_runs() {
     })
     .await;
     assert!(
-        get_agent_run(&config.workspace_dir, "ghost")
-            .unwrap()
-            .is_none()
+        crate::agent::session_store::with_ledger(&config.workspace_dir, |ledger| {
+            let ledger_arg_0 = ("ghost").to_string();
+            async move { ledger.get_agent_run(&ledger_arg_0).await }
+        })
+        .unwrap()
+        .is_none()
     );
 }
