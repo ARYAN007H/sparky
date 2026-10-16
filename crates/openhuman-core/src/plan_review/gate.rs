@@ -96,12 +96,16 @@ impl PlanReviewGate {
     ) -> PlanReviewResolution {
         let request_id = format!("plan-{}", Uuid::new_v4());
         let (tx, rx) = oneshot::channel();
-        let request_key = (tenant.clone(), request_id.clone());
+        // Requests run under a derived agent context, while the profile's UI
+        // decides and replays them from its profile-level context. Share the
+        // profile's gate entries across its agents, but isolate other profiles.
+        let scope = tenant.profile_only();
+        let request_key = (scope.clone(), request_id.clone());
         self.waiters.lock().insert(request_key.clone(), tx);
         if let Some(tid) = thread_id.clone() {
             self.thread_to_request
                 .lock()
-                .insert((tenant.clone(), tid), request_id.clone());
+                .insert((scope.clone(), tid), request_id.clone());
         }
         let expires_at = (chrono::Utc::now()
             + chrono::Duration::from_std(self.ttl).unwrap_or_default())
@@ -126,7 +130,7 @@ impl PlanReviewGate {
         // re-decided against a dead turn or replayed as still-pending.
         let _guard = ParkGuard {
             gate: self,
-            tenant: tenant.clone(),
+            tenant: scope,
             request_id: request_id.clone(),
             thread_id: thread_id.clone(),
         };
@@ -186,11 +190,12 @@ impl PlanReviewGate {
         tenant: &Tenant,
         thread_id: &str,
     ) -> Option<ParkedReview> {
-        let key = (tenant.clone(), thread_id.to_string());
+        let scope = tenant.profile_only();
+        let key = (scope.clone(), thread_id.to_string());
         let request_id = self.thread_to_request.lock().get(&key)?.clone();
         self.parked
             .lock()
-            .get(&(tenant.clone(), request_id))
+            .get(&(scope, request_id))
             .cloned()
     }
 
@@ -205,7 +210,7 @@ impl PlanReviewGate {
         let sender = self
             .waiters
             .lock()
-            .remove(&(tenant.clone(), request_id.to_string()));
+            .remove(&(tenant.profile_only(), request_id.to_string()));
         match sender {
             Some(tx) => tx.send(resolution).is_ok(),
             None => {
@@ -226,10 +231,11 @@ impl PlanReviewGate {
         thread_id: &str,
         resolution: PlanReviewResolution,
     ) -> bool {
+        let scope = tenant.profile_only();
         let request_id = self
             .thread_to_request
             .lock()
-            .get(&(tenant.clone(), thread_id.to_string()))
+            .get(&(scope, thread_id.to_string()))
             .cloned();
         match request_id {
             Some(id) => self.decide(tenant, &id, resolution),
