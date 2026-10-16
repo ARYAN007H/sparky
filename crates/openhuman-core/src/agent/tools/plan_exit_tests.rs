@@ -1,5 +1,5 @@
 use super::*;
-use crate::agent::plan_review::PlanReviewResolution;
+use crate::plan_review::PlanReviewResolution;
 
 struct ThreadContext(&'static str);
 impl ToolRunContext for ThreadContext {
@@ -21,7 +21,7 @@ async fn plan_exit_does_not_flip_while_a_review_is_parked() {
         thread_id,
         tinyagents_harness::middleware::RunMode::Plan,
     );
-    let gate = crate::agent::plan_review::gate::global();
+    let gate = crate::plan_review::gate::global();
     let parked = tokio::spawn(async move {
         gate.request_review(
             Some(thread_id.to_string()),
@@ -58,7 +58,7 @@ async fn plan_exit_does_not_flip_while_a_review_is_parked() {
     // Resolve the parked review so the spawned task and the gate's
     // bookkeeping don't leak past this test.
     assert!(
-        crate::agent::plan_review::gate::global()
+        crate::plan_review::gate::global()
             .decide_by_thread(thread_id, PlanReviewResolution::Approve)
     );
     let resolution = parked.await.unwrap();

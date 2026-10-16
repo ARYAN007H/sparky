@@ -35,7 +35,6 @@ pub(crate) mod message_convert;
 pub mod messages;
 pub mod multimodal;
 pub mod orchestration;
-pub mod plan_review;
 /// Cross-platform shell selection shared by [`host_runtime::NativeRuntime`]
 /// and [`crate::sandbox::ops`] so all three shell-spawning sites
 /// agree on `cmd.exe` (Windows) vs `bash`/`sh` (Unix). Fixes #4705 where

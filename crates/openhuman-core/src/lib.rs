@@ -77,6 +77,7 @@ pub mod media;
 pub mod memory;
 pub mod modules;
 pub mod platform;
+pub mod plan_review;
 pub mod profiles;
 pub mod sandbox;
 pub mod search;

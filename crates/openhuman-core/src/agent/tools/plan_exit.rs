@@ -102,7 +102,7 @@ impl PlanExitTool {
             // concurrent `plan_exit` call that races a still-pending review:
             // flipping the mode early would unlock every tool for the thread
             // before the user has actually approved anything.
-            if crate::agent::plan_review::gate::global()
+            if crate::plan_review::gate::global()
                 .parked_review_for_thread(thread_id)
                 .is_some()
             {

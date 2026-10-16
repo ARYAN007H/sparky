@@ -162,7 +162,7 @@ pub mod agent {
     }
     pub mod plan_review {
         pub mod gate {
-            pub use openhuman_core::agent::plan_review::gate::global;
+            pub use openhuman_core::plan_review::gate::global;
         }
     }
     pub mod session_store {

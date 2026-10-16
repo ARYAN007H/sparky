@@ -444,7 +444,7 @@ fn build_registered_controllers() -> Vec<GroupedController> {
     push(
         &mut controllers,
         DomainGroup::Agent,
-        crate::agent::plan_review::all_plan_review_registered_controllers(),
+        crate::plan_review::all_plan_review_registered_controllers(),
     );
     // Per-thread Plan/Build run mode (agent.set_run_mode / agent.get_run_mode)
     push(
