@@ -297,7 +297,7 @@ Delegation and coordination:
 | `triage/` | Classifies `TriggerEnvelope`s and escalates ([README](triage/README.md)) |
 | `goals/` | Host adapters around `tinyagents_graph::goals` and the `goal_*` tools ([README](goals/README.md)) |
 | `todos/` | Session-scoped todo list over the TinyAgents todo store ([README](todos/README.md)) |
-| `plan_review/` | `request_plan_review` gate that parks a web-chat turn until the user decides |
+| [`../plan_review/`](../plan_review/) | `request_plan_review` gate that parks a web-chat turn until the user decides |
 | [`tools.rs`](./tools.rs), `tools/` | Loop control tools: `delegate`, `plan_exit`, `todo`, `run_workflow`/`await_workflow` (with `skills`) ([README](tools/README.md)) |
 
 Definitions, prompts and context:
@@ -361,7 +361,7 @@ All controllers register under `DomainGroup::Agent` in [`core/all.rs`](../core/a
 | `agent` | [`tinyagents/replay/`](./tinyagents/replay/) | `runs_active`, `run_status`, `run_events` (read-only journal replay) |
 | `agent` | [`tinyagents/run_mode.rs`](./tinyagents/run_mode.rs) | `set_run_mode`, `get_run_mode` |
 | `agent_registry` | `registry/` | `list`, `available_tools`, `get`, `upsert_custom`, `create_custom`, `update`, `set_enabled`, `remove` |
-| `plan_review` | `plan_review/` | `decide` |
+| `plan_review` | `../plan_review/` | `decide` |
 | `ai` | `artifacts/` | `list_artifacts`, `get_artifact`, `delete_artifact`, `regenerate` |
 | `run_ledger` | `session_db/` | `list`, `get`, `events` |
 | `session_import` | `session_import/` | `run` |

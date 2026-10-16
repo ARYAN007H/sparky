@@ -578,7 +578,7 @@ New RPCs:
 - `agent.context_breakdown { agent_id?, thread_id? }`, a UI-friendly view over the agent's rendered prompt size (system/tools/history split) for the composer's context-usage indicator.
 - `commands.list`: merges built-in commands with `skills.list` and `flows.list` into one slash-command catalog.
 
-`plan_exit` (the tool that flips a thread from Plan back to Build) only flips the mode when there is no plan review still parked on that thread (`agent::plan_review::gate::PlanReviewGate::parked_review_for_thread`), a review resolves before `request_plan_review` returns control to the agent, so this only matters for a mis-timed/concurrent `plan_exit` call racing a still-pending review, which must not unlock every tool before the user has actually approved anything.
+`plan_exit` (the tool that flips a thread from Plan back to Build) only flips the mode when there is no plan review still parked on that thread (`plan_review::gate::PlanReviewGate::parked_review_for_thread`), a review resolves before `request_plan_review` returns control to the agent, so this only matters for a mis-timed/concurrent `plan_exit` call racing a still-pending review, which must not unlock every tool before the user has actually approved anything.
 
 ## Explicit run context and host capabilities
 
