@@ -1,9 +1,7 @@
 //! The live OpenHuman composition over `tinyagents_runtime::Session`.
 //!
-//! The mutex carries host preparation and finalization observations only.
-//! Generic model history, transcript rows,
-//! prefix reconciliation, tool snapshots, resume and persistence remain inside
-//! the runtime session.
+//! Host hooks carry product state; `tinyagents_runtime` owns history,
+//! transcripts, prefixes, snapshots, resume, and persistence.
 
 mod permanent;
 mod post_commit;
