@@ -26,7 +26,6 @@ use std::collections::HashMap;
 use std::sync::{Arc, LazyLock, PoisonError, RwLock};
 
 use async_trait::async_trait;
-use futures::future::BoxFuture;
 use tinyflows_bus::schedule::types::{CronJob, JobType};
 
 use super::bus_host::Binding;
@@ -122,12 +121,7 @@ pub trait JobKindHandler: Send + Sync {
     async fn run(&self, cx: &JobRunContext, job: &CronJob, run_id: &str) -> JobOutcome;
 }
 
-/// A host-owned `system:<name>` job handler. `Err` is the run's failure.
-pub type SystemHandler = Arc<
-    dyn Fn(super::system_job_handlers::SystemJobContext) -> BoxFuture<'static, Result<(), String>>
-        + Send
-        + Sync,
->;
+use super::system_job_handlers::SystemJobHandler as SystemHandler;
 
 #[derive(Default)]
 struct Registry {
