@@ -118,7 +118,9 @@ pub struct EmbeddingRequest<'a> {
 
 /// Builds an embedding model.
 pub type EmbeddingFactory = Arc<
-    dyn for<'a> Fn(&EmbeddingRequest<'a>) -> anyhow::Result<Box<dyn EmbeddingModel>> + Send + Sync,
+    dyn for<'a> Fn(&EmbeddingRequest<'a>) -> tinyinference_embeddings::Result<Box<dyn EmbeddingModel>>
+        + Send
+        + Sync,
 >;
 
 static EMBEDDINGS: HookSlot<EmbeddingFactory> = HookSlot::new("inference::embeddings");
@@ -126,7 +128,7 @@ static EMBEDDINGS: HookSlot<EmbeddingFactory> = HookSlot::new("inference::embedd
 /// Registers the embedding provider `provider_id` for the whole process.
 pub fn register_embedding<F>(provider_id: impl Into<String>, factory: F)
 where
-    F: for<'a> Fn(&EmbeddingRequest<'a>) -> anyhow::Result<Box<dyn EmbeddingModel>>
+    F: for<'a> Fn(&EmbeddingRequest<'a>) -> tinyinference_embeddings::Result<Box<dyn EmbeddingModel>>
         + Send
         + Sync
         + 'static,
@@ -141,7 +143,7 @@ pub fn register_embedding_in<F>(
     provider_id: impl Into<String>,
     factory: F,
 ) where
-    F: for<'a> Fn(&EmbeddingRequest<'a>) -> anyhow::Result<Box<dyn EmbeddingModel>>
+    F: for<'a> Fn(&EmbeddingRequest<'a>) -> tinyinference_embeddings::Result<Box<dyn EmbeddingModel>>
         + Send
         + Sync
         + 'static,
