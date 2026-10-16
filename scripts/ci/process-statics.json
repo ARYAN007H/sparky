@@ -40,6 +40,16 @@
     "verification": "tinymemes/service_tests.rs: foreground_remixes_share_a_lock_per_workspace_and_never_across_workspaces"
   },
   {
+    "file": "crates/openhuman-core/src/modules/wallet_backend.rs",
+    "scope": "",
+    "name": "HANDLERS",
+    "type": "HookSlot<WalletBackendHandler>",
+    "count": 1,
+    "category": "A",
+    "reason": "Host wiring: an id-keyed table of handlers the embedding host registers at startup (core::slots::HookSlot). It holds code, never tenant data; a per-context override table lives on the CoreContext, not here.",
+    "verification": "modules/wallet_backend_tests.rs: a_registered_handler_answers_the_call"
+  },
+  {
     "file": "crates/openhuman-core/src/modules/runtime.rs",
     "scope": "",
     "name": "RUNTIME",
@@ -188,6 +198,16 @@
     "category": "A",
     "reason": "Host wiring: an id-keyed table of factories the embedding host registers at startup (core::slots::HookSlot). It holds code, never tenant data; a per-context override table lives on the CoreContext, not here.",
     "verification": "integrations/composio/client/factory_tests.rs: a_registered_route_builder_resolves_the_backend_mode"
+  },
+  {
+    "file": "crates/openhuman-core/src/modules/connectors.rs",
+    "scope": "",
+    "name": "MODULE_PROXY_TARGETS",
+    "type": "HookSlot<ProxyTargetResolver>",
+    "count": 1,
+    "category": "A",
+    "reason": "Host wiring: an id-keyed table of handlers the embedding host registers at startup (core::slots::HookSlot). It holds code, never tenant data; a per-context override table lives on the CoreContext, not here.",
+    "verification": "modules/connectors_tests.rs: the_backend_route_is_unavailable_without_a_registered_target"
   },
   {
     "file": "crates/openhuman-core/src/memory/engine_registry.rs",
