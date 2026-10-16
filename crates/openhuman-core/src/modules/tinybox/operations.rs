@@ -59,7 +59,7 @@ const VALIDATE_DOCKER_POLICY: &str = contract::names::VALIDATE_DOCKER_POLICY;
 const DOCKER_CALL_GRACE: Duration = Duration::from_secs(5);
 
 #[cfg(test)]
-#[path = "tinybox_tests.rs"]
+#[path = "operations_tests.rs"]
 mod tests;
 
 /// Resolve TinyBox, require the bus contract supported by this host, and
