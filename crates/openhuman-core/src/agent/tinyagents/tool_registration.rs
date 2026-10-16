@@ -239,6 +239,11 @@ fn subagent_control_dispatches(
     }
     if let Some(adapter) = find_tool("wait_subagent") {
         let parent_session = parent_session.clone();
+        let task_parent_session = parent_session.clone();
+        let parent_thread_id = run_context.thread_id.clone();
+        let task_store = crate::agent::orchestration::running_subagents::task_ledger::task_store_for_workspace(
+            &parent.workspace_dir,
+        );
         let wait_dispatch: RegisteredToolDispatch = Arc::new(
             SubAgentJobsTool::new(jobs.clone())
                 .with_tool_name("wait_subagent")
@@ -255,7 +260,11 @@ fn subagent_control_dispatches(
                     tinytools::ToolTimeout::Inherit,
                 )
                 .with_owner_scope(owner_scope.clone())
-                .with_sessions(store.clone(), move |_| parent_session.clone()),
+                .with_sessions(store.clone(), move |_| parent_session.clone())
+                .with_task_store(task_store, move |_| {
+                    tinyagents_harness::ids::RunId::new(task_parent_session.clone())
+                })
+                .with_task_thread_scope(move |_| parent_thread_id.clone()),
         );
         dispatches.insert(
             "wait_subagent".into(),
