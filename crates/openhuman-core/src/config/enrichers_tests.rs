@@ -74,7 +74,7 @@ async fn the_snapshot_loader_runs_registered_enrichers() {
 async fn an_embedder_config_is_enriched_by_the_context_loader() {
     register_enricher("test-embedder", fill);
     let mut config = Config::default();
-    crate::config::ops::loader_normalize_for_tests(&mut config).await;
+    crate::config::ops::normalize_loaded_config(&mut config).await;
     unregister_enricher("test-embedder");
     assert_eq!(config.resolved_endpoints.product_identity.as_deref(), Some("demo"));
 }

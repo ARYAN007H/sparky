@@ -11,6 +11,8 @@ pub use load::{
     load_current_or_init, reload_config_from_paths,
     reload_config_snapshot_with_timeout,
 };
+#[cfg(test)]
+pub(crate) use load::normalize_loaded_config;
 pub(crate) use paths::fallback_workspace_dir;
 #[cfg(test)]
 pub(crate) use paths::{active_workspace_marker_path, config_openhuman_dir, default_openhuman_dir};

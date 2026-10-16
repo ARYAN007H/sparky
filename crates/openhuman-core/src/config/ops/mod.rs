@@ -41,6 +41,8 @@ pub(crate) use loader::{
     BROWSER_ALLOW_ALL_RPC_ENABLE_ENV,
 };
 #[cfg(test)]
+pub(crate) use loader::normalize_loaded_config;
+#[cfg(test)]
 pub(crate) use model::resolve_backend_api_url;
 #[cfg(test)]
 pub(crate) use std::path::PathBuf;
