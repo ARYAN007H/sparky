@@ -6,7 +6,7 @@
 //! the runtime session.
 
 #[path = "../../../memory/lifecycle/session_hooks.rs"]
-mod memory_ingest;
+mod session_hooks;
 mod permanent;
 mod post_commit;
 #[path = "runtime_session/prompt_surface.rs"]
@@ -185,8 +185,8 @@ struct OpenHumanTurnPreludeMutable {
     /// committed turn can be handed to memory.
     pending_user_text: Option<String>,
     /// The in-flight turn's memory identity and index, from pre-turn to
-    /// commit (`memory_ingest`).
-    pending_memory_turn: Option<memory_ingest::PendingMemoryTurn>,
+    /// commit (`memory::lifecycle::session_hooks`).
+    pending_memory_turn: Option<session_hooks::PendingMemoryTurn>,
 }
 
 impl OpenHumanTurnPrelude {
