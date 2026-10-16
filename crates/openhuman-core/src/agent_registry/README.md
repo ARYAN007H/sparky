@@ -136,13 +136,13 @@ ranking works.
   `DomainGroup::Agent`.
 - [`config/schema/`](../../config/schema/): `Config.agent_registry: AgentRegistryConfig` is the
   persisted store every `ops.rs` function reads and writes.
-- [`agent_registry/host_definition.rs`](../harness/host_definition.rs): seeds the
+- [`host_definition.rs`](./host_definition.rs): seeds the
   process-global `AgentDefinitionRegistry` from `registry::agents::load_builtins()`;
   TinyAgents validates the merged hierarchy when workspace overrides load.
-- [`agent/session_host/builder/factory.rs`](../session_host/builder/factory.rs):
+- [`agent/session_host/builder/factory.rs`](../agent/session_host/builder/factory.rs):
   `Agent::from_config_for_agent` falls back to `find_custom_in_config` +
   `definition_from_registry_entry` when an id is not in the harness registry.
-- [`agent/schemas.rs`](../schemas.rs): `agent.graph_topologies` and `agent.registry_snapshot`
+- [`agent/schemas.rs`](../agent/schemas.rs): `agent.graph_topologies` and `agent.registry_snapshot`
   enumerate `load_builtins()`.
 - `flows/` (`ops/inference_readiness.rs`, `ops/builder_gates.rs`,
   `builder_tools/kind_reads.rs`, `tinyflows/caps/agent.rs`): resolve a flow

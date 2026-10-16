@@ -218,20 +218,20 @@ coding workers, and background completion delivery. See
 
 ### Agent definitions, registry and prompts
 
-An `AgentDefinition` ([`harness/host_definition.rs`](./harness/host_definition.rs), vocabulary in `tinyagents-definition`) is an archetype: id, tier,
+An `AgentDefinition` ([`../agent_registry/host_definition.rs`](../agent_registry/host_definition.rs), vocabulary in `tinyagents-definition`) is an archetype: id, tier,
 prompt source, model spec, `ToolScope`, `SandboxMode`, iteration policy and
-allowed sub-agents. Built-ins live in `registry/agents/<id>/` as an
+allowed sub-agents. Built-ins live in `../agent_registry/agents/<id>/` as an
 `agent.toml` plus `prompt.md` (orchestrator, planner, critic, summarizer,
 trigger_triage, trigger_reactor, vision_agent and others). Custom
 definitions are TOML files under `<workspace>/agents/*.toml`, with
-`~/.openhuman/agents/*.toml` as a fallback (`tinyagents_definition::DefinitionSet::load_dirs`, driven from [`harness/host_definition.rs`](./harness/host_definition.rs)).
+`~/.openhuman/agents/*.toml` as a fallback (`tinyagents_definition::DefinitionSet::load_dirs`, driven from [`../agent_registry/host_definition.rs`](../agent_registry/host_definition.rs)).
 `AgentDefinitionRegistry` holds the merged set; `agent.reload_definitions`
 rebuilds it.
 
-`registry/` is the user-facing layer over those definitions: enable and
+`../agent_registry/` is the user-facing layer over those definitions: enable and
 disable, custom agents, model pins, tool allow and deny lists, and sub-agent
 policy, persisted at `Config.agent_registry` and exposed as the
-`agent_registry` RPC namespace. `library/` projects definitions into a
+`agent_registry` RPC namespace. `../agent_registry/library/` projects definitions into a
 display-safe `AgentDefinitionDisplay` for the UI.
 
 `prompts/` holds the bundled identity files (`SOUL.md`, `IDENTITY.md`,
@@ -304,12 +304,12 @@ Definitions, prompts and context:
 
 | Path | What it does |
 | --- | --- |
-| `registry/` | `agent_registry` RPC; built-in archetypes under [`registry/agents/`](./registry/agents/) ([README](registry/README.md)) |
+| [`../agent_registry/`](../agent_registry/) | `agent_registry` RPC; built-in archetypes under [`agents/`](../agent_registry/agents/) ([README](../agent_registry/README.md)) |
 | `prompts/` | Bundled identity files, `SystemPromptBuilder`, prompt sections ([README](prompts/README.md)) |
 | `context/` | `ContextManager` per session and the channel prompt builder ([README](context/README.md)) |
 | [`context_breakdown.rs`](./context_breakdown.rs) | `agent.context_breakdown`: system/tools/history split of prompt size for the UI |
 | `debug/` | Dumps the exact system prompt and prompt-size report for an agent |
-| `library/` | Display-safe projection of definitions (`AgentDefinitionDisplay`) |
+| [`../agent_registry/library/`](../agent_registry/library/) | Display-safe projection of definitions (`AgentDefinitionDisplay`) |
 
 Persistence, setup and RPC:
 
@@ -341,7 +341,7 @@ Persistence, setup and RPC:
 - `AgentProgress` (`progress.rs`): turn, iteration, tool, text and thinking
   deltas, cost updates and the `Subagent*` family.
 - `AgentDefinition`, `AgentDefinitionRegistry`, `ToolScope`, `SandboxMode`
-  (`harness/host_definition.rs` + `tinyagents-definition`): what an agent is.
+  (`../agent_registry/host_definition.rs` + `tinyagents-definition`): what an agent is.
 - `ParentExecutionContext` ([`harness/fork_context.rs`](./harness/fork_context.rs)): explicit parent
   state a sub-agent reads from the run context (`parent`); `orchestration::parent_context::build_root_parent`
   builds one for runs with no parent turn.

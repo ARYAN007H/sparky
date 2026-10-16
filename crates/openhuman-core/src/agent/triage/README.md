@@ -103,10 +103,10 @@ Re-exported from [`mod.rs`](./mod.rs):
 
 ## Related
 
-- [`crates/openhuman-core/src/agent_registry/agents/trigger_triage/`](../registry/agents/trigger_triage/): the
+- [`crates/openhuman-core/src/agent_registry/agents/trigger_triage/`](../../agent_registry/agents/trigger_triage/): the
   classifier agent definition; `prompt.md` describes the JSON contract
   `decision.rs` parses.
-- [`crates/openhuman-core/src/agent_registry/agents/trigger_reactor/`](../registry/agents/trigger_reactor/): the
+- [`crates/openhuman-core/src/agent_registry/agents/trigger_reactor/`](../../agent_registry/agents/trigger_reactor/): the
   single-step sub-agent `react` decisions dispatch to.
 - [`crates/openhuman-core/src/cron/scheduler_gate/README.md`](../../cron/scheduler_gate/README.md): the LLM-permit
   gate the local arm waits on.

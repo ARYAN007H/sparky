@@ -625,13 +625,13 @@ The harness shell lives under `crates/openhuman-core/src/agent/`, with the tinya
 | `harness/graph.rs`                       | The channel/CLI bus turn route into the tinyagents runner.                                                    |
 | `subagent_host/`                         | Direct OpenHuman planner/executor/persistence adapters for `tinyagents-orchestration::subagent`; product prompt/tool/model/security/artifact/progress behavior remains here. |
 | `orchestration/subagent_sessions/`       | Durable reusable sub-agent identity, compatibility matching, persisted status/history.                        |
-| `harness/host_definition.rs`             | Host extension and registry over `tinyagents_definition::AgentDefinition`.                                   |
+| `agent_registry/host_definition.rs`      | Host extension and registry over `tinyagents_definition::AgentDefinition`.                                   |
 | `subagent_host/ops/runner.rs`            | Integration-tool ranking and the host execution leaf; generic lifecycle stays in `tinyagents-orchestration`.  |
 | `tinyagents/payload_summarizer.rs`       | The model call behind TinyJuice's oversized-tool-result summary.                                              |
 | `session_host/tool_progress.rs`       | Surviving OpenHuman seam: `TurnProgress`.                                                                     |
 | `message_convert.rs`                     | Concrete durable/provider conversion around canonical tool-call dialect APIs.                                  |
 | `triage/`                                | External-trigger classification + escalation.                                                                 |
-| `registry/agents/`                       | Built-in archetypes: one subdirectory per agent.                                                             |
+| `agent_registry/agents/`                 | Built-in archetypes: one subdirectory per agent.                                                             |
 | `hooks.rs` / `stop_hooks.rs`             | Post-turn and mid-turn hook surfaces.                                                                         |
 | `cost.rs`                                | Per-turn USD/token accounting.                                                                                |
 | `progress.rs`                            | Real-time progress events to the UI.                                                                          |
