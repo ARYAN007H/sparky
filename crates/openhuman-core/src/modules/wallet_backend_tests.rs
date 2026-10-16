@@ -31,3 +31,24 @@ async fn a_registered_handler_answers_the_call() {
     assert_eq!(data, json!({ "echo": { "chainId": 1 } }));
     assert!(unregister_wallet_backend("test-wallet-backend"));
 }
+
+#[test]
+fn a_module_request_converts_to_the_matching_call() {
+    use tinywallet_bus::wire::WalletBackendRequest as Request;
+    assert_eq!(
+        WalletBackendCall::from(Request::Routes),
+        WalletBackendCall::Routes
+    );
+    assert_eq!(
+        WalletBackendCall::from(Request::SwapTransaction {
+            body: json!({ "a": 1 })
+        }),
+        WalletBackendCall::SwapTransaction(json!({ "a": 1 }))
+    );
+    assert_eq!(
+        WalletBackendCall::from(Request::BridgeTransaction {
+            body: json!({ "b": 2 })
+        }),
+        WalletBackendCall::BridgeTransaction(json!({ "b": 2 }))
+    );
+}
