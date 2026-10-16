@@ -97,7 +97,7 @@ fn every_dispatch_site_scopes_an_origin() {
             "crates/openhuman-core/src/desktop/notifications/rpc.rs",
             "local",
         ),
-        ("crates/openhuman-core/src/agent/schemas.rs", "local"),
+        ("crates/openhuman-core/src/agent_runs/schemas.rs", "local"),
     ];
 
     let root = std::path::Path::new(env!("OPENHUMAN_REPOSITORY_ROOT"));
