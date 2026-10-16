@@ -33,17 +33,22 @@ fn config_fn_final_autonomy_is_captured_on_the_built_agent_context() {
         .build()
         .unwrap();
     let test = tokio.spawn(async {
-        use openhuman_core::config::Config;
+        use openhuman_core::config::{AutonomyConfig, Config};
         use openhuman_core::core::runtime::AutonomyTierSource;
         use openhuman_core::security::AutonomyLevel;
 
         let dir = tempfile::tempdir().unwrap();
-        let mut config = Config::default();
-        config.config_path = dir.path().join("config.toml");
-        config.workspace_dir = dir.path().join("workspace");
-        config.action_dir = dir.path().join("action");
-        config.autonomy.enabled = true;
-        config.autonomy.level = AutonomyLevel::ReadOnly;
+        let config = Config {
+            config_path: dir.path().join("config.toml"),
+            workspace_dir: dir.path().join("workspace"),
+            action_dir: dir.path().join("action"),
+            autonomy: AutonomyConfig {
+                enabled: true,
+                level: AutonomyLevel::ReadOnly,
+                ..AutonomyConfig::default()
+            },
+            ..Config::default()
+        };
         config.save().await.unwrap();
 
         let runtime = crate::runtime::RuntimeBuilder::new()
