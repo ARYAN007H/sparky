@@ -212,7 +212,6 @@ async fn tool_timeout_seeds_on_channelless_core_boot() {
     );
 }
 
-#[cfg(feature = "channels")]
 #[test]
 fn proactive_message_reaches_web_on_channelless_core_boot() {
     const CHILD: &str = "OPENHUMAN_PROACTIVE_SUBSCRIBER_TEST_CHILD";
