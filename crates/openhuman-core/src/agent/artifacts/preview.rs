@@ -76,7 +76,12 @@ pub async fn read_body(config: &Config, id: &str) -> Result<ArtifactBody, String
         }
     };
     let converter = DocumentConverter::for_config(config);
-    Ok(body_of(&record, &tiny_artifacts::FileRoots::new(roots), &converter).await)
+    Ok(body_of(
+        &record,
+        &super::tiny_store::guarded_roots(roots),
+        &converter,
+    )
+    .await)
 }
 
 /// A one-version file record for an artifact that has only its legacy

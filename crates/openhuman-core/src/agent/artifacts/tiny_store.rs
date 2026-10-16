@@ -245,8 +245,14 @@ pub fn file_roots(
     action_dir: Option<&Path>,
 ) -> Vec<PathBuf> {
     // A relative path resolves against the first root: the agent's working
-    // folder when there is one, else the current files folder.
-    let mut roots: Vec<PathBuf> = action_dir.map(Path::to_path_buf).into_iter().collect();
+    // folder when there is one, else the current files folder. A working
+    // folder that contains OpenHuman's workspace (the home directory, say) is
+    // left out: it would make OpenHuman's own data referenceable.
+    let mut roots: Vec<PathBuf> = action_dir
+        .filter(|action| !contains(action, workspace_dir))
+        .map(Path::to_path_buf)
+        .into_iter()
+        .collect();
     for folder in files.trusted() {
         if !roots.contains(folder) {
             roots.push(folder.clone());
@@ -254,6 +260,26 @@ pub fn file_roots(
     }
     roots.push(version_files_dir(workspace_dir));
     roots
+}
+
+/// Whether `folder` is `inside` or one of its parents, compared canonically
+/// where the paths exist.
+fn contains(folder: &Path, inside: &Path) -> bool {
+    let canon = |p: &Path| p.canonicalize().unwrap_or_else(|_| p.to_path_buf());
+    canon(inside).starts_with(canon(folder))
+}
+
+/// Why a resolved path may not be an artifact's file, if it may not: it is in
+/// a location OpenHuman never lets the agent reach (credential stores, system
+/// roots), however broad the folders around it.
+pub fn refused_path(path: &Path) -> Option<String> {
+    crate::security::SecurityPolicy::is_always_forbidden(path)
+        .then(|| "the file is in a protected location".to_string())
+}
+
+/// [`file_roots`] as the crate's folders, with [`refused_path`] as their guard.
+pub fn guarded_roots(roots: Vec<PathBuf>) -> tiny_artifacts::FileRoots {
+    tiny_artifacts::FileRoots::new(roots).with_guard(refused_path)
 }
 
 /// The artifact service for one workspace: OpenHuman's store and UI bridge,
@@ -268,7 +294,7 @@ pub fn artifacts_service(
     let roots = file_roots(workspace_dir, &files, action_dir);
     Artifacts::new(Arc::new(versioned_store(workspace_dir)))
         .with_observer(Arc::new(LegacyUiBridge::new(workspace_dir, files, chat)))
-        .with_file_roots(tiny_artifacts::FileRoots::new(roots))
+        .with_file_roots(guarded_roots(roots))
         .with_version_files(version_files_dir(workspace_dir))
 }
 

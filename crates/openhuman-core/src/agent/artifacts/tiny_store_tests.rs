@@ -238,3 +238,38 @@ async fn a_file_in_an_earlier_files_folder_can_still_be_revised() {
         .unwrap();
     assert_eq!(saved.version, 2);
 }
+
+#[tokio::test]
+async fn a_protected_file_inside_the_working_folder_is_refused() {
+    let (workspace, files) = temp_dirs();
+    let action = workspace.parent().unwrap().join("home");
+    let ssh = action.join(".ssh");
+    std::fs::create_dir_all(&ssh).unwrap();
+    std::fs::write(ssh.join("id_ed25519"), b"PRIVATE").unwrap();
+    let artifacts = artifacts_service(&workspace, FileRoots::new(&files), Some(&action), None);
+
+    let err = artifacts
+        .create(
+            ArtifactKind::File,
+            "Key",
+            Content::File(".ssh/id_ed25519".into()),
+            &Author::agent("agent"),
+            None,
+        )
+        .await
+        .unwrap_err();
+    assert!(err.to_string().contains("protected location"), "{err}");
+}
+
+#[test]
+fn a_working_folder_that_contains_the_workspace_is_not_trusted() {
+    let (workspace, files) = temp_dirs();
+    let home = workspace.parent().unwrap().to_path_buf();
+    let roots = file_roots(&workspace, &FileRoots::new(&files), Some(&home));
+    assert!(!roots.contains(&home), "{roots:?}");
+    assert!(roots.contains(&files));
+    // A working folder beside the workspace stays the first root.
+    let beside = home.join("projects");
+    let roots = file_roots(&workspace, &FileRoots::new(&files), Some(&beside));
+    assert_eq!(roots.first(), Some(&beside));
+}

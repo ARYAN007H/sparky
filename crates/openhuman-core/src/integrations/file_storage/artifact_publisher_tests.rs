@@ -338,3 +338,33 @@ async fn a_server_failure_on_the_link_is_not_retried() {
         .unwrap_err();
     assert!(err.to_string().contains("link generation failed"), "{err}");
 }
+
+#[tokio::test]
+async fn a_file_in_a_protected_location_is_never_uploaded() {
+    let dir = tempfile::tempdir().unwrap();
+    let ssh = dir.path().join(".ssh");
+    std::fs::create_dir_all(&ssh).unwrap();
+    let key = ssh.join("id_ed25519");
+    std::fs::write(&key, b"PRIVATE").unwrap();
+    let mut version = ArtifactVersion::new(
+        1,
+        key.display().to_string(),
+        tiny_artifacts::ArtifactAuthor::Agent,
+        "agent",
+        1,
+    );
+    version.file = Some(FileRef {
+        path: key.display().to_string(),
+        size_bytes: 7,
+        media_type: None,
+    });
+    let mut record = ArtifactRecord::pending("k-1", "Key", ArtifactKind::File, 1);
+    record.versions.push(version.clone());
+
+    // An unreachable backend: an upload attempt would fail differently.
+    let err = publisher("http://127.0.0.1:9".into(), AutonomyLevel::Full)
+        .publish(&record, &version, &PublishOptions::default())
+        .await
+        .unwrap_err();
+    assert!(err.to_string().contains("protected location"), "{err}");
+}

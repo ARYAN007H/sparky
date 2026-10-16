@@ -76,7 +76,15 @@ async fn upload_body(
             .as_ref()
             .map_or(version.body.as_str(), |f| f.path.as_str());
         let path = Path::new(path);
-        let bytes = tokio::fs::read(path)
+        // The record was checked when written; check again on what the path
+        // resolves to now, so nothing protected leaves the machine.
+        let resolved = tokio::fs::canonicalize(path)
+            .await
+            .map_err(|e| anyhow::anyhow!("cannot read the artifact's file: {e}"))?;
+        if let Some(reason) = crate::agent::artifacts::tiny_store::refused_path(&resolved) {
+            anyhow::bail!("[policy-blocked] cannot share this artifact: {reason}");
+        }
+        let bytes = tokio::fs::read(&resolved)
             .await
             .map_err(|e| anyhow::anyhow!("cannot read the artifact's file: {e}"))?;
         // Named after the artifact: the file read may be a kept version copy
