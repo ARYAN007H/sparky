@@ -113,6 +113,7 @@ reqwest = { version = "0.12", default-features = false, features = ["json", "mul
 # tower and tracing features and force a separate core build (see below).
 axum = { version = "0.8", default-features = false, features = ["http1", "json", "tokio", "query", "ws", "macros"] }
 tempfile = "3"
+tinybus = { path = "../../vendor/tinybus/crates/tinybus", default-features = false }
 tokio = { version = "1", features = ["full", "test-util"] }
 wiremock = "0.6"
 tokio-util = { version = "0.7", features = ["rt", "io"] }

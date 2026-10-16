@@ -266,7 +266,7 @@ pub mod security {
             };
         }
         pub mod api_key {
-            pub use openhuman_core::security::credentials::api_key::get_api_key_in;
+            pub use openhuman_core::security::credentials::api_key::{get_api_key_in, store_api_key_in};
         }
     }
     pub mod approval {

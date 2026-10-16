@@ -78,7 +78,7 @@ async fn api_key_is_refused_over_plaintext_non_loopback() {
 /// Drains `rx` until the cloud-embedding disclosure for `marker` arrives.
 /// Tolerates unrelated events: the bus is process-wide.
 async fn find_embedding_disclosure(
-    rx: &mut tinybus_events_placeholder<openhuman_embed::__host::core::events::DomainEvent>,
+    rx: &mut tinybus::events::EventReceiver<openhuman_embed::__host::core::events::DomainEvent>,
     marker: &str,
 ) -> (Option<String>, Option<String>, Option<String>) {
     loop {
