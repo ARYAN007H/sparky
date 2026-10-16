@@ -43,6 +43,9 @@ use super::types::{
 /// Most citations kept per thread between two drains.
 const MAX_TURN_CITATIONS: usize = 20;
 
+/// How many matches one `fetch` returns; the model pages on with `cursor`.
+const FETCH_TOP: usize = 5;
+
 type TurnCitations = Mutex<HashMap<String, Vec<TurnCitation>>>;
 
 /// Citations `recall` produced during a thread's in-flight turn, drained by
@@ -138,6 +141,9 @@ pub struct CallFacts {
     pub agent_id: Option<String>,
     /// The provider-assigned tool-call id.
     pub tool_call_id: Option<String>,
+    /// The calling thread's turns still verbatim in the run's prompt, when
+    /// the run knows them (a turn with memory on). Reads leave these out.
+    pub in_prompt: Option<ThreadWindow>,
     /// The chat the call's turn is surfaced in, so the memory activity it
     /// raises reaches that chat. `None` outside a chat turn.
     pub chat: Option<crate::security::approval::ApprovalChatContext>,
@@ -173,6 +179,9 @@ impl CallFacts {
                 .map(str::to_string),
             tool_call_id: crate::tools::host_extensions::tool_call_id(context),
             chat: crate::agent::tinyagents::host::run_context::approval_for_tool(context).chat,
+            in_prompt: crate::agent::tinyagents::host::run_context::memory_in_prompt_for_tool(
+                context,
+            ),
             ..Self::of(config, &identity)
         }
     }
@@ -227,10 +236,23 @@ fn parse<T: serde::de::DeserializeOwned>(args: &Value) -> Result<T, String> {
     serde_json::from_value(args.clone()).map_err(|error| format!("invalid arguments: {error}"))
 }
 
-/// The turns a read inside a thread leaves out: the whole calling thread,
-/// whose turns the agent's prompt already holds.
+/// The turns a read inside a thread leaves out: those of the calling thread
+/// the agent's prompt still holds verbatim. Turns compaction folded into a
+/// checkpoint are readable again, so a long thread can recall what it said
+/// before; when the run does not know its window, the whole thread is left
+/// out.
 fn calling_thread(facts: &CallFacts) -> Option<ThreadWindow> {
-    facts.thread_id.as_deref().map(ThreadWindow::whole)
+    let thread_id = facts.thread_id.as_deref()?;
+    let window = facts
+        .in_prompt
+        .clone()
+        .filter(|window| window.thread_id == thread_id)
+        .unwrap_or_else(|| ThreadWindow::whole(thread_id));
+    tracing::debug!(
+        from_turn = window.from_turn,
+        "[memory:tool] reads leave out the thread's turns still in the prompt"
+    );
+    Some(window)
 }
 
 /// What `recall` shows the model: the evidence to answer from and how many
@@ -241,8 +263,85 @@ fn evidence_json(view: &RecallView) -> Value {
     if view.answer.trim().is_empty() {
         json!({ "evidence": "", "note": "Nothing relevant is stored in memory." })
     } else {
-        json!({ "evidence": view.answer, "items": view.citations.len() })
+        json!({ "evidence": capped_evidence(&view.answer), "items": view.citations.len() })
     }
+}
+
+/// About how many tokens of evidence `recall` hands the model (counted as
+/// four characters a token). The rest stays reachable through `fetch`.
+const EVIDENCE_TOKENS: usize = 2_500;
+
+/// The engine's closing note when a recall searched memory only in part.
+const PARTLY_SEARCHED: &str = "\n\n(Memory was only partly searched";
+
+/// `evidence` cut to about [`EVIDENCE_TOKENS`] tokens, only ever at the end
+/// of a line: whole `---`-separated entries in rank order, then as many whole
+/// lines of the next entry as fit (marked `[…]`), then a note on what was
+/// left out. A line is never split, so a single line longer than the budget
+/// is kept whole when it is the first. The engine's closing note (memory
+/// only partly searched) is always kept.
+fn capped_evidence(evidence: &str) -> String {
+    const SEPARATOR: &str = "\n\n---\n\n";
+    let budget = EVIDENCE_TOKENS * 4;
+    if evidence.len() <= budget {
+        return evidence.to_string();
+    }
+    let (body, closing) = match evidence.rfind(PARTLY_SEARCHED) {
+        Some(at) => (&evidence[..at], &evidence[at..]),
+        None => (evidence, ""),
+    };
+    let entries: Vec<&str> = body.split(SEPARATOR).collect();
+    let mut out = String::new();
+    let mut whole = 0;
+    let mut cut_short = false;
+    for entry in &entries {
+        let joint = if out.is_empty() { "" } else { SEPARATOR };
+        if out.len() + joint.len() + entry.len() <= budget {
+            out.push_str(joint);
+            out.push_str(entry);
+            whole += 1;
+            continue;
+        }
+        // The entry does not fit: keep the whole lines of it that do.
+        let mut lines = 0;
+        for line in entry.split('\n') {
+            let piece = if lines == 0 { joint.len() } else { 1 } + line.len();
+            if out.len() + piece > budget && !out.is_empty() {
+                break;
+            }
+            out.push_str(if lines == 0 { joint } else { "\n" });
+            out.push_str(line);
+            lines += 1;
+        }
+        if lines == entry.split('\n').count() {
+            whole += 1;
+        } else if lines > 0 {
+            out.push_str("\n[…]");
+            cut_short = true;
+        }
+        break;
+    }
+    let left = entries.len() - whole - usize::from(cut_short);
+    if left > 0 || cut_short {
+        let shortened = if cut_short {
+            ", the last one shortened,"
+        } else {
+            ""
+        };
+        out.push_str(&format!(
+            "\n\n({left} more memory entries left out{shortened} to keep this under about \
+             {EVIDENCE_TOKENS} tokens; search again with more specific words to see \
+             others.)"
+        ));
+    }
+    tracing::debug!(
+        entries = entries.len(),
+        whole,
+        cut_short,
+        "[memory:tool] recall evidence capped"
+    );
+    out.push_str(closing);
+    out
 }
 
 /// Runs one action. Errors become a model-visible tool error, never a hard
@@ -263,6 +362,8 @@ pub async fn run_action(
         "recall" => match parse::<RecallParams>(args) {
             Ok(mut params) => {
                 confine(&mut params.filter, facts);
+                // How much recall reads is the host's call, not the model's.
+                params.limit = None;
                 let question = params.question.clone();
                 ops::recall_with(config, params, RecallMode::Evidence, calling_thread(facts))
                     .await
@@ -285,9 +386,18 @@ pub async fn run_action(
         "fetch" => match parse::<FetchParams>(args) {
             Ok(mut params) => {
                 confine(&mut params.filter, facts);
+                // Five at a time, always; more come through `cursor`.
+                params.limit = Some(FETCH_TOP);
                 ops::fetch_with(config, params, calling_thread(facts))
                     .await
-                    .map(|view| json!(view))
+                    .map(|view| {
+                        let mut out =
+                            json!({ "matches": fetch_page(&view), "items": view.hits.len() });
+                        if let Some(cursor) = view.next_cursor {
+                            out["next_cursor"] = json!(cursor);
+                        }
+                        out
+                    })
                     .map_err(render_error)
             }
             Err(error) => Err(error),
@@ -339,6 +449,35 @@ pub async fn run_action(
     }
 }
 
+/// What `fetch` shows the model: its top matches as dated lines, best first,
+/// each with the id `forget` takes. The engine's `next_cursor`, when there
+/// is one, rides beside this text; the tool description says how to use it.
+fn fetch_page(view: &super::types::FetchView) -> String {
+    let mut out = match view.hits.len() {
+        0 => "Nothing in memory matches.".to_string(),
+        1 => "1 match.".to_string(),
+        n => format!("Top {n} matches, best first."),
+    };
+    for hit in &view.hits {
+        out.push_str("\n\n");
+        if let Some(at) = hit.meta.observed_at {
+            out.push_str(&format!("[{}] ", at.format("%Y-%m-%d %H:%M UTC")));
+        }
+        match hit.kind {
+            tinymemory_api::ItemKind::Learning => out.push_str("learning: "),
+            tinymemory_api::ItemKind::Document => out.push_str("document: "),
+            tinymemory_api::ItemKind::Conversation => {}
+        }
+        out.push_str(hit.text.trim());
+        out.push_str(&format!("\n(id {})", hit.id));
+    }
+    tracing::debug!(
+        hits = view.hits.len(),
+        "[memory:tool] fetch matches rendered"
+    );
+    out
+}
+
 /// Confines a model-supplied filter to the calling agent's reach.
 fn confine(filter: &mut Option<tinymemory_api::MetaFilter>, facts: &CallFacts) {
     filter.get_or_insert_with(Default::default).reach = Some(facts.reach.clone());
@@ -361,8 +500,13 @@ impl Tool for MemoryTool {
          Search matches meaning and wording: if a search misses something, search again \
          with different words before concluding it is not in memory, and search \
          separately for each part of a question that combines several things. `fetch` \
-         returns raw matching items (filter by metadata such as workspace, repo, \
-         file_path, kinds); \
+         returns matching items five at a time, best first, each with its id (filter by \
+         metadata such as workspace, repo, file_path, kinds). When it also returns \
+         `next_cursor`, more items match: for the next five of the same search, call fetch \
+         again with the same query and filter and `cursor` set to it. For a question that \
+         counts or lists things across conversations (how many, which ones, every time), \
+         follow `next_cursor` until fetch stops returning one before answering. A cursor \
+         only continues the search it came from; for different words, fetch without one. \
          `learn` queues a durable fact, preference, procedure or correction about the \
          user or their work, shared with every agent working alongside you; `forget` \
          queues removal of items by id. Write acknowledgements mean locally queued, \
