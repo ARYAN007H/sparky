@@ -122,14 +122,26 @@ MOCK_API_URL="http://127.0.0.1:${MOCK_API_PORT}"
 MOCK_LOG="${MOCK_LOG:-/tmp/openhuman-rust-e2e-mock.log}"
 MOCK_PID=""
 CREATED_XDG_DATA_HOME=""
+CREATED_XDG_CACHE_HOME=""
+XDG_ROOT="${OPENHUMAN_XDG_ROOT:-${TMPDIR:-/tmp}}"
 
 # TinyBus rejects module-search paths under a shared runner HOME mount. Keep
 # module state created by this test runner in an owner-only scratch directory.
 if [ -z "${XDG_DATA_HOME:-}" ]; then
-  XDG_DATA_HOME="$(mktemp -d "${TMPDIR:-/tmp}/openhuman-rust-e2e-xdg.XXXXXX")"
+  XDG_DATA_HOME="$(mktemp -d "${XDG_ROOT}/openhuman-rust-e2e-xdg.XXXXXX")"
   chmod 700 "$XDG_DATA_HOME"
   export XDG_DATA_HOME
   CREATED_XDG_DATA_HOME="$XDG_DATA_HOME"
+fi
+
+# dirs::cache_dir uses XDG_CACHE_HOME rather than XDG_DATA_HOME. Give it a
+# separate private root: the release cache must not also be scanned as a
+# TinyBus module search path.
+if [ -z "${XDG_CACHE_HOME:-}" ]; then
+  XDG_CACHE_HOME="$(mktemp -d "${XDG_ROOT}/openhuman-rust-e2e-cache.XXXXXX")"
+  chmod 700 "$XDG_CACHE_HOME"
+  CREATED_XDG_CACHE_HOME="$XDG_CACHE_HOME"
+  export XDG_CACHE_HOME
 fi
 
 cleanup() {
@@ -139,6 +151,9 @@ cleanup() {
   fi
   if [ -n "$CREATED_XDG_DATA_HOME" ]; then
     rm -rf "$CREATED_XDG_DATA_HOME" 2>/dev/null || true
+  fi
+  if [ -n "$CREATED_XDG_CACHE_HOME" ]; then
+    rm -rf "$CREATED_XDG_CACHE_HOME" 2>/dev/null || true
   fi
 }
 trap cleanup EXIT
@@ -207,7 +222,9 @@ source "$SCRIPT_DIR/modules/stage-local-modules.sh"
 # registry-pinned releases, as in CI.
 e2e_source_ids=()
 if local_module_source_is_source; then
-  e2e_source_ids+=(tinyconnectors tinyflows tinysearch tinybox tinymcp)
+  e2e_source_ids+=(tinyconnectors tinysearch tinybox tinymcp)
+elif [ "${OPENHUMAN_TEST_MODULES_STAGED:-}" = "1" ]; then
+  echo "[rust-e2e] Using pre-staged native modules from OPENHUMAN_MODULE_PATH."
 else
   # Shell command analysis and the storage URL E2E suites load TinyBox through
   # the native module path; the ignored MCP registry cases need TinyMCP. Both

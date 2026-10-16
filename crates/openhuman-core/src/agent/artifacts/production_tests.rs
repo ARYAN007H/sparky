@@ -223,6 +223,12 @@ async fn a_completion_that_records_nothing_fails_the_record_too() {
 async fn a_saved_version_the_card_cannot_show_succeeds_and_says_so() {
     use std::os::unix::fs::PermissionsExt;
 
+    // The CI container runs as root, which bypasses the file mode bits used
+    // below to make the visible copy unwritable. In that environment the
+    // copy succeeds and the card should remain ready; non-root runs exercise
+    // the saved-but-not-shown behavior.
+    let runs_as_root = unsafe { libc::geteuid() == 0 };
+
     let (workspace, files) = temp_dirs();
     let production = Production::start(
         &workspace,
@@ -256,6 +262,10 @@ async fn a_saved_version_the_card_cannot_show_succeeds_and_says_so() {
     assert_eq!(record.status, RecordStatus::Ready);
     assert_eq!(record.versions.len(), 1);
     let card = get_artifact(&workspace, production.id()).await.unwrap();
+    if runs_as_root {
+        assert_eq!(card.status, CardStatus::Ready);
+        return;
+    }
     assert_eq!(card.status, CardStatus::Failed);
     let error = card.error.unwrap_or_default();
     assert!(error.starts_with(SAVED_NOT_SHOWN), "{error}");

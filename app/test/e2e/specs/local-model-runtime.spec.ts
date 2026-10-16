@@ -2,7 +2,7 @@
 import { waitForApp, waitForAppReady } from '../helpers/app-helpers';
 import { triggerAuthDeepLink } from '../helpers/deep-link-helpers';
 import { textExists, waitForWebView, waitForWindowVisible } from '../helpers/element-helpers';
-import { walkOnboarding } from '../helpers/shared-flows';
+import { dismissWalkthroughIfVisible, walkOnboarding } from '../helpers/shared-flows';
 import { startMockServer, stopMockServer } from '../mock-server';
 
 /**
@@ -70,6 +70,7 @@ describe('Local model runtime route', () => {
     await waitForWebView(15_000);
     await waitForAppReady(15_000);
     await walkOnboarding('[LocalModel]');
+    await dismissWalkthroughIfVisible(10_000);
 
     await browser.execute(() => {
       window.location.hash = '#/settings/local-model-debug';

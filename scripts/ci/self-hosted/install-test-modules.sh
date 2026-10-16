@@ -75,5 +75,6 @@ fi
 {
   echo "OPENHUMAN_MODULE_PATH=${module_dirs}${OPENHUMAN_MODULE_PATH:+:$OPENHUMAN_MODULE_PATH}"
   echo "OPENHUMAN_TINYMCP_TEST_MODULE=${tinymcp_artifact}"
+  echo "OPENHUMAN_TEST_MODULES_STAGED=1"
 } > "${env_file}"
 log "wrote ${env_file}"

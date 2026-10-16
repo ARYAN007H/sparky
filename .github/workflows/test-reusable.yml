@@ -174,7 +174,7 @@ jobs:
       - name: Install checksum-pinned native test modules
         run: |
           # Module-loaded unit regressions execute in isolated test processes.
-          module_root="/opt/openhuman-test-modules/${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          module_root="/root/openhuman-test-modules-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           bash scripts/ci/self-hosted/install-test-modules.sh \
             "$module_root" "$module_root/modules.env"
           cat "$module_root/modules.env" >> "$GITHUB_ENV"
@@ -187,10 +187,12 @@ jobs:
           set -euo pipefail
 
           # Container HOME may be a runner-owned bind mount with mode 0755.
-          # TinyBus correctly refuses user module search paths beneath it, so
-          # keep XDG modules in a private, per-job directory instead.
-          export XDG_DATA_HOME="$(mktemp -d /tmp/openhuman-core-xdg.XXXXXX)"
+          # Keep TinyBus search paths and dirs::cache_dir private and separate:
+          # the cache itself must not also be scanned as a module search path.
+          export XDG_DATA_HOME="$(mktemp -d /root/openhuman-core-data.XXXXXX)"
           chmod 700 "$XDG_DATA_HOME"
+          export XDG_CACHE_HOME="$(mktemp -d /root/openhuman-core-cache.XXXXXX)"
+          chmod 700 "$XDG_CACHE_HOME"
 
           integration_test_targets() {
             find tests -maxdepth 1 -type f -name '*.rs' -print |
@@ -228,6 +230,14 @@ jobs:
           FEATURES="$(bash scripts/ci/product-features.sh)"
           CORE_FEATURES="$(bash scripts/ci/product-features.sh --core)"
           CLI_FEATURES="${FEATURES},bin-tools"
+          MODULE_TESTS=(
+            inference::tokenjuice::repl_module_tests::a_large_result_becomes_a_handle_the_repl_tools_can_query
+            inference::tokenjuice::tests::the_module_defers_a_summary_until_requested
+            inference::tokenjuice::tests::released_queries_keep_cached_originals_in_the_module_and_accept_artifact_content
+            tools::implementations::network::host::tests::tinyjuice_detects_and_converts_html
+          )
+          STAGED_MODULE_PATH="${OPENHUMAN_MODULE_PATH:-}"
+          STAGED_MODULE_SOURCE_DIR="${OPENHUMAN_MODULE_SOURCE_DIR:-}"
           echo "[test-reusable] feature set: ${FEATURES} (cli: ${CLI_FEATURES})"
 
           # `--features bin-tools` is load-bearing, not cosmetic: the
@@ -235,7 +245,31 @@ jobs:
           # `required-features = ["http-server", "bin-tools"]`, so without it
           # `--bins` silently skips it and this lane goes green having compiled
           # none of it. Its tests would vanish too, with no error.
+          # The regular libtest process runs tests in parallel. Keep the
+          # process-global, never-unloaded TinyBus modules out of that shared
+          # test process, then run each module-backed regression in its own
+          # process below. Boot and parallel resolver tests can otherwise race
+          # while attaching the same released library to the one module host.
+          unset OPENHUMAN_MODULE_PATH OPENHUMAN_MODULE_SOURCE_DIR
           bash scripts/ci-cancel-aware.sh cargo test -p openhuman --lib --features "${CORE_FEATURES}"
+          if [ -n "$STAGED_MODULE_PATH" ]; then
+            export OPENHUMAN_MODULE_PATH="$STAGED_MODULE_PATH"
+          fi
+          if [ -n "$STAGED_MODULE_SOURCE_DIR" ]; then
+            export OPENHUMAN_MODULE_SOURCE_DIR="$STAGED_MODULE_SOURCE_DIR"
+          fi
+          for module_test in "${MODULE_TESTS[@]}"; do
+            echo "[test-reusable] isolated module test: ${module_test}"
+            module_test_output="$(bash scripts/ci-cancel-aware.sh cargo test -p openhuman --lib --features "${CORE_FEATURES}" "${module_test}" -- --exact --test-threads=1)"
+            printf '%s\n' "$module_test_output"
+            case "$module_test_output" in
+              *"test result: ok. 1 passed; 0 failed;"*) ;;
+              *)
+                echo "::error::module test ${module_test} did not run exactly one passing test"
+                exit 1
+                ;;
+            esac
+          done
           # The core binary and developer bins live in the CLI crate.
           bash scripts/ci-cancel-aware.sh cargo test -p openhuman-cli --bins --features "${CLI_FEATURES}"
           bash scripts/ci-cancel-aware.sh cargo test -p openhuman --doc --features "${CORE_FEATURES}"

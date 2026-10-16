@@ -160,7 +160,7 @@ export function buildPlan({ profile, areas, env = {}, isPullRequest = true }) {
   };
   const modulesDir = ex63
     ? `${scratch}/test-modules`
-    : "/opt/openhuman-test-modules/${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}";
+    : "/tmp/openhuman-test-modules-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}";
   const modulesEnvFile = "ci-out/test-modules.env";
   const withModules = (cmd) =>
     `set -a && . ${modulesEnvFile} && set +a && ${cmd}`;
@@ -185,7 +185,11 @@ export function buildPlan({ profile, areas, env = {}, isPullRequest = true }) {
     {
       name: "static",
       checks: [
-        { name: "rust-fmt", when: rust, run: "cargo fmt --manifest-path Cargo.toml --package openhuman --package openhuman-cli --package openhuman-embed --package openhuman-modules-linked --package openhuman-rpc --package openhuman-tinyhumans --package openhuman-tui -- --check" },
+        {
+          name: "rust-fmt",
+          when: rust,
+          run: "cargo fmt --manifest-path Cargo.toml --package openhuman --package openhuman-cli --package openhuman-embed --package openhuman-modules-linked --package openhuman-rpc --package openhuman-tinyhumans --package openhuman-tui -- --check",
+        },
         {
           name: "rust-layout",
           when: core,
