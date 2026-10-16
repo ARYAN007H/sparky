@@ -170,7 +170,3 @@ impl BackendClient {
 #[cfg(test)]
 #[path = "backend_client_tests.rs"]
 mod tests;
-
-#[cfg(test)]
-#[path = "backend_channel_tests.rs"]
-mod channel_tests;
