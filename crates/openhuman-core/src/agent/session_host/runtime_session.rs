@@ -262,7 +262,7 @@ impl OpenHumanTurnPrelude {
                 tiered
                     .system_messages()
                     .into_iter()
-                    .map(tinyinference_llm::message::Message::system)
+                    .map(Message::system)
                     .collect(),
             ))
         } else {
