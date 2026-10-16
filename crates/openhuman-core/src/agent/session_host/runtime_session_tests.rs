@@ -5,7 +5,7 @@ use std::sync::Arc;
 use tinyagents_runtime::ToolSnapshot;
 use tinytools::ToolSpec;
 
-fn synthesized_tool_names(prelude: &super::SessionPrelude) -> std::collections::HashSet<String> {
+fn synthesized_tool_names(prelude: &super::OpenHumanTurnPrelude) -> std::collections::HashSet<String> {
     prelude
         .tool_surface
         .lock()

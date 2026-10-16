@@ -147,7 +147,7 @@ fn wildcard_belt_defers_but_keeps_reachable() {
 
     assert_eq!(
         agent.deferred_tool_names,
-        &std::collections::HashSet::from(["rare".to_string()])
+        std::collections::HashSet::from(["rare".to_string()])
     );
     assert!(agent.visible_tool_names.contains("plain"));
     assert!(!agent.visible_tool_names.contains("rare"));
@@ -178,11 +178,11 @@ fn named_belt_opts_into_discovery_by_naming_tool_search() {
 
     assert_eq!(
         agent.visible_tool_names,
-        &std::collections::HashSet::from(["plain".to_string()])
+        std::collections::HashSet::from(["plain".to_string()])
     );
     assert_eq!(
         agent.deferred_tool_names,
-        &std::collections::HashSet::from(["rare".to_string()])
+        std::collections::HashSet::from(["rare".to_string()])
     );
     assert!(agent.tool_policy_session.is_allowed("rare"));
 }

@@ -160,10 +160,10 @@ async fn flows_build_hides_the_live_run_tool_from_the_builder_belt() {
 
     // Precondition: the builder advertises all four run-advancing tools on its
     // belt before restriction — the exact set #4593/#4881 are about.
-    let visible_before = agent.visible_tool_names_for_test();
+    let visible_before = agent.visible_tool_specs_arc();
     for present in ["run_flow", "resume_flow_run", "cancel_flow_run"] {
         assert!(
-            visible_before.contains(present),
+            visible_before.iter().any(|spec| spec.name == present),
             "precondition: workflow_builder belt should advertise `{present}`; visible = \
              {visible_before:?}"
         );
@@ -173,7 +173,7 @@ async fn flows_build_hides_the_live_run_tool_from_the_builder_belt() {
 
     // After restriction none of the run-advancing tools are callable on the
     // flows_build path — the hide-list covers all of them (#4593 + #4881).
-    let visible = agent.visible_tool_names_for_test();
+    let visible = agent.visible_tool_specs_arc();
     for hidden in [
         "run_workflow",
         "run_flow",
@@ -181,7 +181,7 @@ async fn flows_build_hides_the_live_run_tool_from_the_builder_belt() {
         "cancel_flow_run",
     ] {
         assert!(
-            !visible.contains(hidden),
+            !visible.iter().any(|spec| spec.name == hidden),
             "run-advancing tool `{hidden}` must be hidden on the flows_build path; visible = \
              {visible:?}"
         );
@@ -263,17 +263,17 @@ async fn flows_build_copilot_toolset_unhides_the_live_run_tools() {
 
     restrict_builder_toolset_for_copilot(&mut agent);
 
-    let visible = agent.visible_tool_names_for_test();
+    let visible = agent.visible_tool_specs_arc();
     for still_reachable in ["run_flow", "resume_flow_run"] {
         assert!(
-            visible.contains(still_reachable),
+            visible.iter().any(|spec| spec.name == still_reachable),
             "`{still_reachable}` must stay reachable on the streaming copilot path — it \
              is gated behind the WebChat approval surface, not hidden; visible = {visible:?}"
         );
     }
     for hidden in ["run_workflow", "cancel_flow_run"] {
         assert!(
-            !visible.contains(hidden),
+            !visible.iter().any(|spec| spec.name == hidden),
             "`{hidden}` must stay hidden on the copilot path (unrelated legacy runner / \
              a cancel that is now safe to unhide but deliberately still gated behind a \
              product decision); visible = {visible:?}"
