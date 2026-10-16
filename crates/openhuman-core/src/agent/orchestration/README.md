@@ -126,11 +126,11 @@ Five controller pairs are registered in `crate::core::all`:
 
 | Namespace | Source | Methods |
 | --- | --- | --- |
-| `agent_team` | `agent_teams::{all_agent_team_controller_schemas, all_agent_team_registered_controllers}` | `create`, `list`, `get`, `assign_task`, `claim_task`, `message_member`, `list_messages`, `complete_task`, `shutdown_member`, `close`, `start_member` |
-| `agent_work` | `command_center::{all_command_center_controller_schemas, all_command_center_registered_controllers}` | `list`, `control` |
-| `workflow_run` | `workflow_runs::{all_workflow_run_controller_schemas, all_workflow_run_registered_controllers}` | `list_definitions`, `list`, `get`, `start`, `stop`, `resume` |
-| `worktree` | `worktree_schemas::{all_controller_schemas, all_registered_controllers}` | `list`, `status`, `diff`, `remove` |
-| `subagent` | `subagent_control::{all_controller_schemas, all_registered_controllers}` | `cancel`, `steer` |
+| `agent_team` | `agent_runs::agent_teams::{all_agent_team_controller_schemas, all_agent_team_registered_controllers}` | `create`, `list`, `get`, `assign_task`, `claim_task`, `message_member`, `list_messages`, `complete_task`, `shutdown_member`, `close`, `start_member` |
+| `agent_work` | `agent_runs::command_center::{all_command_center_controller_schemas, all_command_center_registered_controllers}` | `list`, `control` |
+| `workflow_run` | `agent_runs::workflow_runs::{all_workflow_run_controller_schemas, all_workflow_run_registered_controllers}` | `list_definitions`, `list`, `get`, `start`, `stop`, `resume` |
+| `worktree` | `agent_runs::worktree_schemas::{all_controller_schemas, all_registered_controllers}` | `list`, `status`, `diff`, `remove` |
+| `subagent` | `agent_runs::subagent_control::{all_controller_schemas, all_registered_controllers}` | `cancel`, `steer` |
 
 ## Agent tools
 
