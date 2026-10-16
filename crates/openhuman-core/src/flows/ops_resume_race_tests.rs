@@ -151,25 +151,26 @@ async fn stale_graph_refusal_does_not_settle_a_resume_claimed_after_its_snapshot
     .unwrap();
 
     let mut owner = None;
-    let mut claim_resume = || {
-        owner = Some(
-            run_registry::try_register(&run_id)
-                .expect("the competing resume must reserve the parked run"),
-        );
-        assert!(store::mark_run_resuming(&config, &run_id).unwrap());
+    let error = {
+        let mut claim_resume = || {
+            owner = Some(
+                run_registry::try_register(&run_id)
+                    .expect("the competing resume must reserve the parked run"),
+            );
+            assert!(store::mark_run_resuming(&config, &run_id).unwrap());
+        };
+        resume::flows_resume_with_refusal_hook(
+            &crate::core::runtime::DispatchCtx::ambient(),
+            &config,
+            &flow_id,
+            &run_id,
+            pending,
+            vec![],
+            &mut claim_resume,
+        )
+        .await
+        .unwrap_err()
     };
-    let error = resume::flows_resume_with_refusal_hook(
-        &crate::core::runtime::DispatchCtx::ambient(),
-        &config,
-        &flow_id,
-        &run_id,
-        pending,
-        vec![],
-        &mut claim_resume,
-    )
-    .await
-    .unwrap_err();
-    drop(claim_resume);
     assert!(error.contains(GRAPH_CHANGED_SINCE_PARK_ERROR), "{error}");
 
     let (token, guard) = owner.take().unwrap();
@@ -230,25 +231,26 @@ async fn compatibility_refusal_does_not_settle_a_resume_claimed_after_its_snapsh
     let summary_before = current_flow.last_status;
 
     let mut owner = None;
-    let mut claim_resume = || {
-        owner = Some(
-            run_registry::try_register(&run_id)
-                .expect("the competing resume must reserve the parked run"),
-        );
-        assert!(store::mark_run_resuming(&config, &run_id).unwrap());
+    let error = {
+        let mut claim_resume = || {
+            owner = Some(
+                run_registry::try_register(&run_id)
+                    .expect("the competing resume must reserve the parked run"),
+            );
+            assert!(store::mark_run_resuming(&config, &run_id).unwrap());
+        };
+        resume::flows_resume_with_refusal_hook(
+            &crate::core::runtime::DispatchCtx::ambient(),
+            &config,
+            &flow_id,
+            &run_id,
+            pending,
+            vec![],
+            &mut claim_resume,
+        )
+        .await
+        .unwrap_err()
     };
-    let error = resume::flows_resume_with_refusal_hook(
-        &crate::core::runtime::DispatchCtx::ambient(),
-        &config,
-        &flow_id,
-        &run_id,
-        pending,
-        vec![],
-        &mut claim_resume,
-    )
-    .await
-    .unwrap_err();
-    drop(claim_resume);
     assert!(
         error.contains(UNSUPPORTED_NESTED_CONDITIONAL_FAN_IN),
         "{error}"
@@ -290,22 +292,23 @@ async fn cancel_after_a_parked_snapshot_does_not_drop_a_resume_starting() {
         .last_status;
 
     let mut owner = None;
-    let mut claim_resume = || {
-        owner = Some(
-            run_registry::try_register(&run_id)
-                .expect("the starting resume must reserve the parked run"),
-        );
-        assert!(store::mark_run_resuming(&config, &run_id).unwrap());
+    let error = {
+        let mut claim_resume = || {
+            owner = Some(
+                run_registry::try_register(&run_id)
+                    .expect("the starting resume must reserve the parked run"),
+            );
+            assert!(store::mark_run_resuming(&config, &run_id).unwrap());
+        };
+        run_management::flows_cancel_run_with_snapshot(
+            &config,
+            &run_id,
+            observed,
+            &mut claim_resume,
+        )
+        .await
+        .unwrap_err()
     };
-    let error = run_management::flows_cancel_run_with_snapshot(
-        &config,
-        &run_id,
-        observed,
-        &mut claim_resume,
-    )
-    .await
-    .unwrap_err();
-    drop(claim_resume);
     assert!(
         error.contains("settled before it could be cancelled"),
         "{error}"
