@@ -337,32 +337,12 @@ impl OpenHumanSubagentHost {
     ) -> Result<SubagentRunOutcome, SubagentRunError> {
         let failures = Arc::new(Mutex::new(HashMap::new()));
         let host_outcome = Arc::new(Mutex::new(HashMap::new()));
-        let plans = Arc::new(Mutex::new(HashMap::new()));
         let fallback_agent_id = self.definition.id.clone();
         let request = HostRequest {
             definition: self.definition,
             options: self.options,
         };
-        let planner = Arc::new(OpenHumanPlanner {
-            plans: Arc::clone(&plans),
-        });
-        let executor = Arc::new(OpenHumanExecutor {
-            plans,
-            failures: Arc::clone(&failures),
-            host_outcome: Arc::clone(&host_outcome),
-        });
-        let persistence = Arc::new(
-            OpenHumanPersistence::new(checkpoint_dir).with_host_outcome(Arc::clone(&host_outcome)),
-        );
-        let lifecycle_persistence: Arc<
-            dyn tinyagents_orchestration::subagent::SubagentPersistence,
-        > = persistence.clone();
-        let driver = SubagentDriver::new(SubagentCapabilities {
-            planner: Some(planner),
-            executor: Some(executor),
-            persistence: Some(lifecycle_persistence),
-        })
-        .map_err(map_lifecycle_error)?;
+        let driver = OpenHumanDriverBundle::new(checkpoint_dir)?;
         let request = if continuation {
             SubagentRequest::continue_with_key(task_key.clone(), child, request, input, None, None)
                 .await
@@ -381,19 +361,21 @@ impl OpenHumanSubagentHost {
         }
         .map_err(map_lifecycle_error)?;
         let cancellation = parent.cancellation.clone();
-        match Box::pin(driver.run(request, cancellation)).await {
+        match Box::pin(driver.driver.run(request, cancellation)).await {
             Ok(result) => Ok(outcome_to_host(
                 result,
-                host_outcome
+                driver
+                    .host_outcome
                     .lock()
                     .unwrap_or_else(|p| p.into_inner())
                     .remove(&task_key),
-                &persistence,
+                &driver.persistence,
                 &task_key,
                 &fallback_agent_id,
             )),
             Err(error) => {
-                if let Some(host_error) = failures
+                if let Some(host_error) = driver
+                    .failures
                     .lock()
                     .unwrap_or_else(|p| p.into_inner())
                     .remove(&task_key)
@@ -407,10 +389,61 @@ impl OpenHumanSubagentHost {
     }
 }
 
+/// One configured OpenHuman lifecycle driver and its request-keyed host
+/// projections. Keeping this factory separate lets registered TinyAgents
+/// dispatchers reuse the same planner, executor and persistence adapters
+/// without routing through `OpenHumanSubagentHost::run` (which would create a
+/// second generic driver).
+pub(crate) struct OpenHumanDriverBundle {
+    pub(crate) driver: Arc<SubagentDriver<
+        crate::agent::tinyagents::host::OpenHumanRunContext,
+        HostRequest,
+    >>,
+    pub(crate) failures: Arc<Mutex<HashMap<SubagentTaskKey, SubagentRunError>>>,
+    pub(crate) host_outcome: Arc<Mutex<HashMap<SubagentTaskKey, SubagentRunOutcome>>>,
+    pub(crate) persistence: Arc<OpenHumanPersistence>,
+}
+
+impl OpenHumanDriverBundle {
+    pub(crate) fn new(checkpoint_dir: PathBuf) -> Result<Self, SubagentRunError> {
+        let failures = Arc::new(Mutex::new(HashMap::new()));
+        let host_outcome = Arc::new(Mutex::new(HashMap::new()));
+        let plans = Arc::new(Mutex::new(HashMap::new()));
+        let planner = Arc::new(OpenHumanPlanner {
+            plans: Arc::clone(&plans),
+        });
+        let executor = Arc::new(OpenHumanExecutor {
+            plans,
+            failures: Arc::clone(&failures),
+            host_outcome: Arc::clone(&host_outcome),
+        });
+        let persistence = Arc::new(
+            OpenHumanPersistence::new(checkpoint_dir).with_host_outcome(Arc::clone(&host_outcome)),
+        );
+        let lifecycle_persistence: Arc<
+            dyn tinyagents_orchestration::subagent::SubagentPersistence,
+        > = persistence.clone();
+        let driver = Arc::new(
+            SubagentDriver::new(SubagentCapabilities {
+                planner: Some(planner),
+                executor: Some(executor),
+                persistence: Some(lifecycle_persistence),
+            })
+            .map_err(map_lifecycle_error)?,
+        );
+        Ok(Self {
+            driver,
+            failures,
+            host_outcome,
+            persistence,
+        })
+    }
+}
+
 #[derive(Clone)]
-struct HostRequest {
-    definition: crate::agent_registry::host_definition::AgentDefinition,
-    options: SubagentRunOptions,
+pub(crate) struct HostRequest {
+    pub(crate) definition: crate::agent_registry::host_definition::AgentDefinition,
+    pub(crate) options: SubagentRunOptions,
 }
 
 struct PreparedHostPlan {
