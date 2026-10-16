@@ -6,6 +6,7 @@
  * All navigation uses browser.execute() with window.location.hash
  * because sidebar nav buttons are icon-only (aria-label, no text content).
  */
+import { getRequestLog } from '../mock-server';
 import { waitForAppReady, waitForAuthBootstrap as waitForAuthenticatedCore } from './app-helpers';
 import { triggerAuthDeepLink } from './deep-link-helpers';
 import {
@@ -939,7 +940,20 @@ export async function performFullLogin(
   // waits for that core before installing the session. Keep this E2E wait
   // within the product's cold-start budget instead of failing while the
   // BootCheckGate is still bringing the core up.
-  await waitForAuthenticatedCore(60_000);
+  try {
+    await waitForAuthenticatedCore(60_000);
+  } catch (error) {
+    // Report only endpoint names, never request bodies or credentials. This
+    // distinguishes a core-readiness timeout from a backend auth request that
+    // reached the mock but failed to complete.
+    const authRequests = getRequestLog()
+      .filter(entry => typeof entry.url === 'string' && entry.url.startsWith('/auth/'))
+      .map(entry => `${entry.method} ${entry.url.split('?')[0]}`);
+    console.error(
+      `${logPrefix} auth bootstrap failed; mock auth endpoints=${JSON.stringify(authRequests)}`
+    );
+    throw error;
+  }
 
   await walkOnboarding(logPrefix);
 
