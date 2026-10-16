@@ -32,8 +32,11 @@ const RELATIVE_ARTIFACT_PREFIX: &str = "artifacts/tool-results/";
 pub(crate) trait QuerySource: Send + Sync {
     /// `ctx` is the context the calling tool runs under; a source bound to a
     /// config of its own ignores it.
-    async fn query(&self, ctx: &DispatchCtx, request: QueryRequest)
-        -> Result<QueryResponse, String>;
+    async fn query(
+        &self,
+        ctx: &DispatchCtx,
+        request: QueryRequest,
+    ) -> Result<QueryResponse, String>;
 }
 
 struct ModuleSource {
@@ -268,11 +271,11 @@ impl ModuleReplTool {
             .query(
                 ctx,
                 QueryRequest {
-                target,
-                op,
-                limits: self.limits,
-                context_token: None,
-                scope: None,
+                    target,
+                    op,
+                    limits: self.limits,
+                    context_token: None,
+                    scope: None,
                 },
             )
             .await;
@@ -307,11 +310,10 @@ impl ModuleReplTool {
             );
             return Ok(ToolResult::error(not_a_handle_message()));
         };
-        let read = ctx.spawn_blocking(move || {
-            read_tool_result_artifact(&dir, &path, MAX_ARTIFACT_BYTES)
-        })
-        .await
-        .map_err(|e| anyhow::anyhow!("juice: artifact read task failed: {e}"))?;
+        let read = ctx
+            .spawn_blocking(move || read_tool_result_artifact(&dir, &path, MAX_ARTIFACT_BYTES))
+            .await
+            .map_err(|e| anyhow::anyhow!("juice: artifact read task failed: {e}"))?;
         match read {
             Ok(content) => {
                 log::debug!(
@@ -319,7 +321,8 @@ impl ModuleReplTool {
                     self.name,
                     content.len()
                 );
-                self.run_query(QueryTarget::Content { content }, args).await
+                self.run_query(ctx, QueryTarget::Content { content }, args)
+                    .await
             }
             Err(message) => {
                 log::debug!("[tokenjuice][repl] {} artifact refused", self.name);
@@ -354,14 +357,15 @@ impl Tool for ModuleReplTool {
         _options: ToolCallOptions,
         tool_context: Option<&dyn ToolRunContext>,
     ) -> anyhow::Result<ToolResult> {
-        let ctx =
-            crate::agent::tinyagents::host::run_context::dispatch_ctx_for_tool(tool_context);
+        let ctx = crate::agent::tinyagents::host::run_context::dispatch_ctx_for_tool(tool_context);
         let Some(raw) = args.get("handle").and_then(Value::as_str) else {
             return Ok(ToolResult::error("missing required argument: handle"));
         };
         let handle = match handle::classify(raw) {
             handle::HandleArg::Handle(handle) => handle,
-            handle::HandleArg::Path(path) => return self.execute_on_artifact(&ctx, path, args).await,
+            handle::HandleArg::Path(path) => {
+                return self.execute_on_artifact(&ctx, path, args).await
+            }
             handle::HandleArg::Invalid => {
                 log::debug!("[tokenjuice][repl] {} rejected a non-handle", self.name);
                 return Ok(ToolResult::error(not_a_handle_message()));

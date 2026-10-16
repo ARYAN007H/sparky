@@ -10,9 +10,7 @@ use std::path::{Component, Path, PathBuf};
 
 use async_trait::async_trait;
 use serde_json::{json, Value};
-use tinytools::{
-    PermissionLevel, Tool, ToolCallOptions, ToolExposure, ToolResult, ToolRunContext,
-};
+use tinytools::{PermissionLevel, Tool, ToolCallOptions, ToolExposure, ToolResult, ToolRunContext};
 
 use super::cache::{self, InlineEntry};
 use super::resolve::{MAX_RESOURCE_BYTES, MAX_STRUCTURED_BYTES};
