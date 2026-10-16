@@ -194,11 +194,8 @@ fn subagent_control_dispatches(
         run_context.thread_id.as_deref().unwrap_or("no-thread")
     );
     let parent_session = parent.session_id.clone();
-    let parent_key = parent.session_id.clone();
     let owner_scope: Arc<dyn Fn(u64) -> String + Send + Sync> =
         Arc::new(move |_| owner.clone());
-    let parent_scope: Arc<dyn Fn(u64) -> String + Send + Sync> =
-        Arc::new(move |_| parent_key.clone());
 
     let find_tool = |name: &str| -> Option<Arc<dyn tinytools::Tool>> {
         shared_tool_adapter(tool_sets.to_vec(), name)
@@ -206,13 +203,14 @@ fn subagent_control_dispatches(
     };
     let make_jobs_alias = |name: &str, action: SubAgentJobAction| -> Option<RegisteredToolDispatch> {
         let adapter = find_tool(name)?;
+        let parent_session = parent_session.clone();
         let dispatch = SubAgentJobsTool::new(jobs.clone())
             .with_tool_name(name)
             .with_description(adapter.description())
             .with_parameters(adapter.parameters_schema())
             .with_fixed_action(action)
             .with_owner_scope(owner_scope.clone())
-            .with_sessions(store.clone(), parent_scope.clone());
+            .with_sessions(store.clone(), move |_| parent_session.clone());
         Some(Arc::new(dispatch))
     };
     let mut dispatches = std::collections::HashMap::new();
@@ -220,6 +218,7 @@ fn subagent_control_dispatches(
         dispatches.insert("list_subagents".into(), dispatch);
     }
     if let Some(adapter) = find_tool("wait_subagent") {
+        let parent_session = parent_session.clone();
         dispatches.insert(
             "wait_subagent".into(),
             Arc::new(
@@ -232,11 +231,12 @@ fn subagent_control_dispatches(
                     .with_await_timeout_field("timeout_secs", 120, 3600)
                     .with_required_identifier()
                     .with_owner_scope(owner_scope.clone())
-                    .with_sessions(store.clone(), parent_scope.clone()),
+                    .with_sessions(store.clone(), move |_| parent_session.clone()),
             ),
         );
     }
     if let Some(adapter) = find_tool("close_subagent") {
+        let parent_session = parent_session.clone();
         dispatches.insert(
             "close_subagent".into(),
             Arc::new(
@@ -248,11 +248,12 @@ fn subagent_control_dispatches(
                     .with_identifier_field("subagent_session_id")
                     .with_required_identifier()
                     .with_owner_scope(owner_scope.clone())
-                    .with_sessions(store.clone(), parent_scope.clone()),
+                    .with_sessions(store.clone(), move |_| parent_session.clone()),
             ),
         );
     }
     if let Some(adapter) = find_tool("steer_subagent") {
+        let parent_session = parent_session.clone();
         dispatches.insert(
             "steer_subagent".into(),
             Arc::new(
@@ -268,11 +269,10 @@ fn subagent_control_dispatches(
                     )
                     .with_lane_field("mode")
                     .with_owner_scope(owner_scope)
-                    .with_sessions(store, parent_scope),
+                    .with_sessions(store, move |_| parent_session.clone()),
             ),
         );
     }
-    let _ = parent_session;
     dispatches
 }
 
