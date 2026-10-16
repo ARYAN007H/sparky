@@ -245,7 +245,7 @@ pub(crate) async fn build_builder_proposal(
     // shared, cached evaluator the run-time preflight (`validate_inference_readiness`
     // in `run_flow_body`) consumes, so a run right after this proposal reads
     // the cached result instead of re-probing the network.
-    let inference_readiness = evaluate_inference_readiness(config, graph).await;
+    let inference_readiness = evaluate_inference_readiness(ctx, config, graph).await;
     let graph_value = serde_json::to_value(graph).map_err(|e| e.to_string())?;
 
     tracing::info!(

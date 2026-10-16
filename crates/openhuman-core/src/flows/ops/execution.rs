@@ -173,7 +173,7 @@ async fn run_flow_body_inner(
     // Returns an empty `Vec` (no-op here) for a tool_call-only graph, and is
     // never consulted by `dry_run_workflow` (sandbox runs are exempt by
     // design — that tool doesn't route through `run_flow_body` at all).
-    let inference_errors = validate_inference_readiness(config, &flow.graph).await;
+    let inference_errors = validate_inference_readiness(&ctx, config, &flow.graph).await;
     if !inference_errors.is_empty() {
         let detail = inference_errors.join(" ");
         let msg = format!("This flow's AI step needs a working AI provider to run. {detail}");
