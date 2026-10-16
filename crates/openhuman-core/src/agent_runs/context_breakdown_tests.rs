@@ -95,8 +95,12 @@ fn report_cache_key_isolated_by_tenant_even_for_identical_config() {
         profile: Some("bob".into()),
         agent: None,
     };
+    let identical_config = config.clone();
 
-    assert_eq!(config_fingerprint(&config), config_fingerprint(&config));
+    assert_eq!(
+        config_fingerprint(&config),
+        config_fingerprint(&identical_config)
+    );
     assert_ne!(
         report_cache_key(alice.clone(), "orchestrator", &config),
         report_cache_key(bob, "orchestrator", &config),
