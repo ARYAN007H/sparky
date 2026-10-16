@@ -34,7 +34,7 @@ pub async fn init(ctx: &DispatchCtx, config: &crate::config::schema::Config) {
     if !settings.enabled {
         crate::agent::hooks::replace_embedder_tool_hook("configured_hooks", None);
         super::host::engine()
-            .install(tinyagents_hooks::command::tinyagents_hooks::command::HookConfig::default())
+            .install(tinyagents_hooks::command::HookConfig::default())
             .await;
         log::info!("[hooks] disabled by configuration");
         return;
