@@ -36,7 +36,6 @@ pub use builder::{HostOnlyToolPolicy, HostTools, HostTurnTools, TurnContext};
 mod builder;
 mod codec;
 mod driver;
-mod hooks;
 // Tool surface for live voice sessions (`voice::live`).
 #[cfg(feature = "voice")]
 mod live_tools;
@@ -56,7 +55,9 @@ pub(crate) mod turn_checkpoint;
 mod types;
 
 pub use codec::OpenHumanTranscriptCodec;
-pub use hooks::OpenHumanSessionHooks;
+pub type OpenHumanSessionHooks = tinyagents_runtime::FnSessionHooks<
+    crate::agent::tinyagents::host::OpenHumanRunContext,
+>;
 pub use types::{OpenHumanSessionHost, SessionHostBuilder, TurnOverrides};
 
 // Re-export the duplicate-tool-spec guard for sibling harness modules
