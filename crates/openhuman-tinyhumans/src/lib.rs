@@ -80,7 +80,7 @@ pub mod client;
 pub mod hosted;
 pub(crate) mod inference;
 mod install;
-pub(crate) mod integrations;
+pub mod integrations;
 #[cfg(feature = "jev")]
 pub mod jev;
 pub mod jwt;
