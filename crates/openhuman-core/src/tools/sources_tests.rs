@@ -182,3 +182,24 @@ fn anchored_sources_sit_where_the_catalogue_always_listed_them() {
     // Sibling tests register sources on the same process-wide slot, so only
     // relative positions are asserted, never the total length.
 }
+
+/// A media source that reads the security policy's files roots while it builds
+/// must find them already recorded.
+#[cfg(feature = "media")]
+#[test]
+fn media_files_roots_are_recorded_before_any_source_builds() {
+    let tmp = TempDir::new().unwrap();
+    let seen = Arc::new(std::sync::Mutex::new(None));
+    let sink = Arc::clone(&seen);
+    register_tool_source_at(
+        "test::roots",
+        ANCHOR_AFTER_SEARCH,
+        move |ctx| {
+            *sink.lock().unwrap() = Some(ctx.security.media_files_roots.lock().unwrap().is_some());
+            Vec::new()
+        },
+    );
+    let _ = assemble(&tmp);
+    unregister_tool_source("test::roots");
+    assert_eq!(*seen.lock().unwrap(), Some(true));
+}
