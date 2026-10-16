@@ -374,6 +374,11 @@ pub(crate) async fn record_awaiting_input(
 ) {
     let task_id = task_id.into();
     let agent_id = agent_id.into();
+    // A pause is deliverable to the parent, but it is not the task's final
+    // completion. Give the pause its own router key so a later result from the
+    // same task is not mistaken for a duplicate (TinyAgents applies the same
+    // rule by omitting AwaitingUser from completion records).
+    let pause_record_id = awaiting_input_record_id(&task_id);
     let summary = crate::agent::orchestration::tools::awaiting_user::awaiting_user_envelope(
         &task_id,
         &agent_id,
@@ -385,13 +390,20 @@ pub(crate) async fn record_awaiting_input(
         ctx,
         workspace_dir,
         parent_session,
-        task_id,
+        pause_record_id,
         agent_id,
         summary,
         parent_thread_id,
         BackgroundAgentOutcome::AwaitingInput,
     )
     .await;
+}
+
+/// Completion-router key for an awaiting-input notification. The real task id
+/// remains available in the notification body; this separate key leaves the
+/// task id's dedupe slot open for its eventual terminal result.
+fn awaiting_input_record_id(task_id: &str) -> String {
+    format!("{task_id}:awaiting-input")
 }
 
 /// Drop every workspace's router and all process-local state about them. Called
@@ -457,9 +469,15 @@ pub(crate) fn pending_for(workspace_dir: &Path, thread_id: &str) -> Vec<Completi
 /// answer. The router withdraws an already-recorded completion and drops one
 /// that arrives later. Returns whether a pending completion was withdrawn.
 pub(crate) fn mark_collected(workspace_dir: &Path, task_id: &str) -> bool {
-    let outcome = router_for_workspace(workspace_dir).tombstone(task_id);
-    log::debug!("[background_completions] mark_collected task_id={task_id} outcome={outcome:?}");
-    matches!(outcome, Ok(TombstoneOutcome::Suppressed))
+    let router = router_for_workspace(workspace_dir);
+    let completion = router.tombstone(task_id);
+    let pause = router.tombstone(&awaiting_input_record_id(task_id));
+    log::debug!(
+        "[background_completions] mark_collected task_id={task_id} completion={completion:?} \
+         pause={pause:?}"
+    );
+    matches!(completion, Ok(TombstoneOutcome::Suppressed))
+        || matches!(pause, Ok(TombstoneOutcome::Suppressed))
 }
 
 /// Drop every queued completion for `thread_id` and everything that finishes
