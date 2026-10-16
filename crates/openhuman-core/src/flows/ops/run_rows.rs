@@ -5,8 +5,7 @@ use super::*;
 /// tool abort, chat turn end, runtime shutdown, panic) before any terminal
 /// write landed. Surfaced verbatim in the run-details sidebar (bug B42c) so a
 /// cancelled/timed-out run reads as interrupted rather than a blank spinner.
-pub(super) const INTERRUPTED_DROP_REASON: &str =
-    "Run interrupted before completion — it was cancelled, timed out, or the app shut down mid-run.";
+pub(super) const INTERRUPTED_DROP_REASON: &str = "Run interrupted before completion — it was cancelled, timed out, or the app shut down mid-run.";
 
 /// Cancellation-safe finalizer for a live `flow_runs` row (bug B42).
 ///

@@ -445,17 +445,9 @@ fn run_row_finalizer_does_not_record_interrupted_for_an_already_terminal_row() {
     let tmp = TempDir::new().unwrap();
     let (config, flow_id, run_id) = seed_running_run(&tmp);
     let now = Utc::now().to_rfc3339();
-    assert!(store::finish_flow_run(
-        &config,
-        &run_id,
-        "completed",
-        &now,
-        &[],
-        &[],
-        None,
-        None,
-    )
-    .unwrap());
+    assert!(
+        store::finish_flow_run(&config, &run_id, "completed", &now, &[], &[], None, None,).unwrap()
+    );
     store::record_run(&config, &flow_id, "completed").unwrap();
 
     // A late drop must not rewrite the flow summary when its guarded row
