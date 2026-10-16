@@ -22,7 +22,6 @@ async fn account_turn_charges_active_goal_and_trips_budget() {
     assert_eq!(g.tokens_used, 120);
     assert_eq!(g.status, ThreadGoalStatus::BudgetLimited);
 }
-
 #[tokio::test]
 async fn account_turn_skips_non_active_goal() {
     let tmp = tempfile::tempdir().unwrap();
