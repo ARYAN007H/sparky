@@ -122,6 +122,7 @@ MOCK_API_URL="http://127.0.0.1:${MOCK_API_PORT}"
 MOCK_LOG="${MOCK_LOG:-/tmp/openhuman-rust-e2e-mock.log}"
 MOCK_PID=""
 CREATED_XDG_DATA_HOME=""
+CREATED_XDG_CACHE_HOME=""
 
 # TinyBus rejects module-search paths under a shared runner HOME mount. Keep
 # module state created by this test runner in an owner-only scratch directory.
@@ -132,6 +133,20 @@ if [ -z "${XDG_DATA_HOME:-}" ]; then
   CREATED_XDG_DATA_HOME="$XDG_DATA_HOME"
 fi
 
+# dirs::cache_dir uses XDG_CACHE_HOME rather than XDG_DATA_HOME. Keep the
+# release cache under the same private root when this runner created it, so
+# TinyBus never falls back to the runner-owned $HOME/.cache mount.
+if [ -z "${XDG_CACHE_HOME:-}" ]; then
+  if [ -n "$CREATED_XDG_DATA_HOME" ]; then
+    XDG_CACHE_HOME="$XDG_DATA_HOME"
+  else
+    XDG_CACHE_HOME="$(mktemp -d "${TMPDIR:-/tmp}/openhuman-rust-e2e-cache.XXXXXX")"
+    chmod 700 "$XDG_CACHE_HOME"
+    CREATED_XDG_CACHE_HOME="$XDG_CACHE_HOME"
+  fi
+  export XDG_CACHE_HOME
+fi
+
 cleanup() {
   if [ -n "$MOCK_PID" ]; then
     kill "$MOCK_PID" 2>/dev/null || true
@@ -139,6 +154,9 @@ cleanup() {
   fi
   if [ -n "$CREATED_XDG_DATA_HOME" ]; then
     rm -rf "$CREATED_XDG_DATA_HOME" 2>/dev/null || true
+  fi
+  if [ -n "$CREATED_XDG_CACHE_HOME" ]; then
+    rm -rf "$CREATED_XDG_CACHE_HOME" 2>/dev/null || true
   fi
 }
 trap cleanup EXIT
