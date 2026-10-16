@@ -300,7 +300,8 @@ async fn flows_run_fails_cleanly_without_invoking_engine_when_inference_not_read
         .await
         .expect("creating (authoring) an agent-node flow must succeed even when signed out");
 
-    let err = flows_run(&crate::core::runtime::DispatchCtx::ambient(), 
+    let err = flows_run(
+        &crate::core::runtime::DispatchCtx::ambient(),
         &config,
         &created.value.id,
         json!({}),

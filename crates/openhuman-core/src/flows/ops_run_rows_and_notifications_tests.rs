@@ -8,7 +8,8 @@ async fn flows_resume_with_no_recorded_run_for_thread_id_errors_clearly() {
         .await
         .unwrap();
 
-    let err = flows_resume(&crate::core::runtime::DispatchCtx::ambient(), 
+    let err = flows_resume(
+        &crate::core::runtime::DispatchCtx::ambient(),
         &config,
         &created.value.id,
         "thread-that-was-never-started",
@@ -30,7 +31,8 @@ async fn flows_run_persists_a_flow_run_row_queryable_via_list_and_get() {
         .await
         .unwrap();
 
-    let run = flows_run(&crate::core::runtime::DispatchCtx::ambient(), 
+    let run = flows_run(
+        &crate::core::runtime::DispatchCtx::ambient(),
         &config,
         &created.value.id,
         json!({ "hello": "world" }),
@@ -70,7 +72,8 @@ async fn flows_list_all_runs_aggregates_across_flows_newest_first() {
         .unwrap();
 
     // Run alpha first, then beta — beta's run is the newest.
-    flows_run(&crate::core::runtime::DispatchCtx::ambient(), 
+    flows_run(
+        &crate::core::runtime::DispatchCtx::ambient(),
         &config,
         &a.value.id,
         json!({}),
@@ -79,7 +82,8 @@ async fn flows_list_all_runs_aggregates_across_flows_newest_first() {
     )
     .await
     .unwrap();
-    let beta_run = flows_run(&crate::core::runtime::DispatchCtx::ambient(), 
+    let beta_run = flows_run(
+        &crate::core::runtime::DispatchCtx::ambient(),
         &config,
         &b.value.id,
         json!({}),
@@ -128,7 +132,8 @@ async fn flows_run_emits_pending_approval_notification() {
     .await
     .unwrap();
 
-    let run = flows_run(&crate::core::runtime::DispatchCtx::ambient(), 
+    let run = flows_run(
+        &crate::core::runtime::DispatchCtx::ambient(),
         &config,
         &created.value.id,
         json!({}),
@@ -187,7 +192,8 @@ async fn flows_run_does_not_notify_when_run_completes_without_pending_approvals(
         .unwrap();
     let created_id = created.value.id.clone();
 
-    flows_run(&crate::core::runtime::DispatchCtx::ambient(), 
+    flows_run(
+        &crate::core::runtime::DispatchCtx::ambient(),
         &config,
         &created.value.id,
         json!({}),
@@ -269,7 +275,8 @@ async fn flows_run_publishes_flow_run_started_with_flow_and_run_id() {
     .await
     .unwrap();
 
-    let run = flows_run(&crate::core::runtime::DispatchCtx::ambient(), 
+    let run = flows_run(
+        &crate::core::runtime::DispatchCtx::ambient(),
         &config,
         &created.value.id,
         json!({}),
@@ -362,7 +369,8 @@ async fn flows_run_finished_event_skips_pending_approval_and_fires_once_on_resum
     .await
     .unwrap();
 
-    let run = flows_run(&crate::core::runtime::DispatchCtx::ambient(), 
+    let run = flows_run(
+        &crate::core::runtime::DispatchCtx::ambient(),
         &config,
         &created.value.id,
         json!({ "x": 1 }),
@@ -387,9 +395,16 @@ async fn flows_run_finished_event_skips_pending_approval_and_fires_once_on_resum
         );
     }
 
-    let resumed = flows_resume(&crate::core::runtime::DispatchCtx::ambient(), &config, &created.value.id, &thread_id, pending, vec![])
-        .await
-        .unwrap();
+    let resumed = flows_resume(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        &created.value.id,
+        &thread_id,
+        pending,
+        vec![],
+    )
+    .await
+    .unwrap();
     assert_eq!(resumed.value["pending_approvals"], json!([]));
 
     // The bus is process-global and shared with concurrently-running tests,
@@ -505,7 +520,8 @@ async fn flows_run_persists_live_steps_with_status_and_timing() {
     .await
     .unwrap();
 
-    let run = flows_run(&crate::core::runtime::DispatchCtx::ambient(), 
+    let run = flows_run(
+        &crate::core::runtime::DispatchCtx::ambient(),
         &config,
         &created.value.id,
         json!({ "x": 1 }),
@@ -559,7 +575,8 @@ async fn flows_cancel_run_cancels_a_parked_pending_approval_run() {
 
     // Run pauses at the gate → a durable `pending_approval` row with no live
     // task (the run future already returned): the not-in-flight cancel path.
-    let run = flows_run(&crate::core::runtime::DispatchCtx::ambient(), 
+    let run = flows_run(
+        &crate::core::runtime::DispatchCtx::ambient(),
         &config,
         &created.value.id,
         json!({}),
@@ -596,7 +613,8 @@ async fn flows_cancel_run_cancels_a_parked_pending_approval_run() {
     assert_eq!(reloaded.value.last_status.as_deref(), Some("cancelled"));
 
     // A cancelled run can no longer be resumed — the status guard rejects it.
-    let err = flows_resume(&crate::core::runtime::DispatchCtx::ambient(), 
+    let err = flows_resume(
+        &crate::core::runtime::DispatchCtx::ambient(),
         &config,
         &created.value.id,
         &thread_id,
@@ -616,7 +634,8 @@ async fn flows_cancel_run_of_an_already_completed_run_errors() {
         .await
         .unwrap();
 
-    let run = flows_run(&crate::core::runtime::DispatchCtx::ambient(), 
+    let run = flows_run(
+        &crate::core::runtime::DispatchCtx::ambient(),
         &config,
         &created.value.id,
         json!({}),

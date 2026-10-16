@@ -222,7 +222,15 @@ fn handle_resume(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFutu
             .map_err(|e| format!("invalid 'rejections': {e}"))?
             .unwrap_or_default();
         to_json(
-            ops::flows_resume(&ctx, &config, id.trim(), thread_id.trim(), approvals, rejections).await?,
+            ops::flows_resume(
+                &ctx,
+                &config,
+                id.trim(),
+                thread_id.trim(),
+                approvals,
+                rejections,
+            )
+            .await?,
         )
     })
 }
