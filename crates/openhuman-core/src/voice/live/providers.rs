@@ -81,6 +81,12 @@ fn strings(items: &[&str]) -> Vec<String> {
 /// The provider catalogue with each provider's readiness.
 pub(crate) fn provider_infos(config: &Config) -> Vec<LiveProviderInfo> {
     let hosted = backend_ready(config);
+    let mut infos = built_in_provider_infos(config, hosted);
+    super::registry::merge_provider_infos(&mut infos, config);
+    infos
+}
+
+fn built_in_provider_infos(config: &Config, hosted: bool) -> Vec<LiveProviderInfo> {
     LIVE_PROVIDERS
         .iter()
         .map(|id| {
@@ -164,6 +170,7 @@ pub(crate) fn live_config(
         }
         _ => {}
     }
+    super::registry::configure(config, provider, system_instruction, &mut live);
     live
 }
 
@@ -172,9 +179,9 @@ fn non_empty(value: Option<String>) -> Option<String> {
 }
 
 /// A provider ready to connect, with the configuration it must connect with.
-pub(crate) struct PreparedProvider {
-    pub(crate) provider: Box<dyn LiveProvider>,
-    pub(crate) config: LiveConfig,
+pub struct PreparedProvider {
+    pub provider: Box<dyn LiveProvider>,
+    pub config: LiveConfig,
 }
 
 /// Resolves `provider` to something `tinyagents-live` can connect, minting a
@@ -184,6 +191,9 @@ pub(crate) async fn prepare(
     provider: &str,
     mut live: LiveConfig,
 ) -> Result<PreparedProvider, LiveVoiceError> {
+    if let Some(prepared) = super::registry::prepare(config, provider, live.clone()).await {
+        return prepared;
+    }
     match provider {
         LIVE_PROVIDER_GEMINI_HOSTED => {
             let ticket = mint_gemini_ticket(config, &live).await?;
