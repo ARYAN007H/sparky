@@ -1,15 +1,14 @@
 //! Tracked runtime hooks, composed with agent-local hooks.
 use super::Runtime;
-use crate::seams::{LearningSink, ToolHook, ToolHookContext, ToolHookDecision, TurnContext};
+use crate::seams::{
+    LearningSink, OpenHumanRunContext, ToolHook, ToolHookContext, ToolHookDecision, TurnSummary,
+};
 use std::sync::Arc;
 
-pub(super) struct NamedPostTurnHook(pub String, pub Arc<dyn LearningSink>);
+pub(super) struct NamedLearningSink(pub String, pub Arc<dyn LearningSink>);
 #[async_trait::async_trait]
-impl LearningSink for NamedPostTurnHook {
-    fn name(&self) -> &str {
-        &self.0
-    }
-    async fn on_turn_complete(&self, context: &TurnContext) -> anyhow::Result<()> {
+impl LearningSink for NamedLearningSink {
+    async fn on_turn_complete(&self, context: &TurnSummary) -> anyhow::Result<()> {
         self.1.on_turn_complete(context).await
     }
 }
@@ -19,24 +18,33 @@ impl ToolHook<OpenHumanRunContext> for NamedToolHook {
     fn name(&self) -> &str {
         &self.0
     }
-    async fn before_tool(&self, context: &ToolHookContext) -> anyhow::Result<()> {
-        self.1.before_tool(context).await
-    }
-    async fn after_tool(&self, context: &ToolHookContext) -> anyhow::Result<()> {
-        self.1.after_tool(context).await
-    }
-    async fn before_tool_decision(&self, context: &ToolHookContext) -> ToolHookDecision {
-        self.1.before_tool_decision(context).await
-    }
-    async fn before_tool_decision_in(
+    async fn before_tool(
         &self,
-        dispatch: &openhuman_core::core::runtime::DispatchCtx,
+        host: &OpenHumanRunContext,
+        context: &ToolHookContext,
+    ) -> anyhow::Result<()> {
+        self.1.before_tool(host, context).await
+    }
+    async fn after_tool(
+        &self,
+        host: &OpenHumanRunContext,
+        context: &ToolHookContext,
+    ) -> anyhow::Result<()> {
+        self.1.after_tool(host, context).await
+    }
+    async fn before_tool_decision(
+        &self,
+        host: &OpenHumanRunContext,
         context: &ToolHookContext,
     ) -> ToolHookDecision {
-        self.1.before_tool_decision_in(dispatch, context).await
+        self.1.before_tool_decision(host, context).await
     }
-    async fn after_tool_context(&self, context: &ToolHookContext) -> Option<String> {
-        self.1.after_tool_context(context).await
+    async fn after_tool_context(
+        &self,
+        host: &OpenHumanRunContext,
+        context: &ToolHookContext,
+    ) -> Option<String> {
+        self.1.after_tool_context(host, context).await
     }
 }
 impl Runtime {
