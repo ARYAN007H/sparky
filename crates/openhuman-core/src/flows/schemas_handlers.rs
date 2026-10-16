@@ -16,7 +16,7 @@ fn handle_create(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFutu
             .and_then(Value::as_bool)
             .unwrap_or(false)
         {
-            ops::strict_gate(&config, &graph).await?;
+            ops::strict_gate(&ctx, &config, &graph).await?;
         }
         to_json(ops::flows_create(&config, name, graph, require_approval).await?)
     })
@@ -99,7 +99,7 @@ fn handle_update(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFutu
             .unwrap_or(false)
         {
             if let Some(graph_json) = graph.as_ref() {
-                ops::strict_gate(&config, graph_json).await?;
+                ops::strict_gate(&ctx, &config, graph_json).await?;
             }
         }
         to_json(
