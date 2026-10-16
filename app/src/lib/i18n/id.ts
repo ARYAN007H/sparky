@@ -3409,6 +3409,7 @@ const messages: TranslationMap = {
   // Chat: agent-generated artifacts (#2779)
   'chat.artifact.ready': 'Siap',
   'chat.artifact.failed': 'Gagal dibuat',
+  'chat.artifact.savedNotShown': 'Tersimpan, tetapi tidak diperbarui di folder Files Anda',
   'chat.artifact.download': 'Unduh',
   'chat.artifact.downloading': 'Mengunduh…',
   'chat.artifact.download_failed': 'Unduhan gagal: {reason}',

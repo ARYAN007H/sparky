@@ -3384,6 +3384,7 @@ const messages: TranslationMap = {
   // Chat: agent-generated artifacts (#2779)
   'chat.artifact.ready': 'तैयार',
   'chat.artifact.failed': 'निर्माण विफल',
+  'chat.artifact.savedNotShown': 'सहेजा गया, लेकिन आपके Files फ़ोल्डर में अपडेट नहीं हुआ',
   'chat.artifact.download': 'डाउनलोड',
   'chat.artifact.downloading': 'डाउनलोड हो रहा है…',
   'chat.artifact.download_failed': 'डाउनलोड विफल: {reason}',

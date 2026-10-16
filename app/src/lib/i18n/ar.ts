@@ -3313,6 +3313,7 @@ const messages: TranslationMap = {
   // Chat: agent-generated artifacts (#2779)
   'chat.artifact.ready': 'جاهز',
   'chat.artifact.failed': 'فشل الإنشاء',
+  'chat.artifact.savedNotShown': 'تم الحفظ، لكن لم يُحدَّث في مجلد الملفات',
   'chat.artifact.download': 'تنزيل',
   'chat.artifact.downloading': 'جارٍ التنزيل…',
   'chat.artifact.download_failed': 'فشل التنزيل: {reason}',

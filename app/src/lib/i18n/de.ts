@@ -3482,6 +3482,7 @@ const messages: TranslationMap = {
   // Chat: agent-generated artifacts (#2779)
   'chat.artifact.ready': 'Bereit',
   'chat.artifact.failed': 'Erstellung fehlgeschlagen',
+  'chat.artifact.savedNotShown': 'Gespeichert, aber nicht in deinem Files-Ordner aktualisiert',
   'chat.artifact.download': 'Herunterladen',
   'chat.artifact.downloading': 'Wird heruntergeladen…',
   'chat.artifact.download_failed': 'Download fehlgeschlagen: {reason}',

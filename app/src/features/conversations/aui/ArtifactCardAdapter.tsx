@@ -40,6 +40,9 @@ export interface ArtifactCardAdapterProps {
   onOpenPreview?: (artifactId: string) => void;
 }
 
+/** The core's prefix for a version saved but not shown (`production::SAVED_NOT_SHOWN`). */
+export const SAVED_NOT_SHOWN = 'saved-not-shown:';
+
 export function ArtifactCardAdapter({
   artifact,
   onRetry,
@@ -48,12 +51,20 @@ export function ArtifactCardAdapter({
   const { t } = useT();
   const generating = artifact.status === 'in_progress';
   const isReady = artifact.status === 'ready';
+  // The version was saved, but its file in the files folder was not updated:
+  // the artifact opens (the preview reads the saved version) and there is
+  // nothing to retry.
+  const savedNotShown =
+    artifact.status === 'failed' && (artifact.error ?? '').startsWith(SAVED_NOT_SHOWN);
   const meta =
     isReady && artifact.sizeBytes != null
       ? `${t('chat.artifact.ready')} · ${formatFileSize(artifact.sizeBytes)}`
-      : artifact.status === 'failed'
-        ? t('chat.artifact.failed')
-        : '';
+      : savedNotShown
+        ? t('chat.artifact.savedNotShown')
+        : artifact.status === 'failed'
+          ? t('chat.artifact.failed')
+          : '';
+  const canOpen = isReady || savedNotShown;
 
   // The card's own button is the one control that opens the preview.
   return (
@@ -65,9 +76,9 @@ export function ArtifactCardAdapter({
         words={0}
         writingLabel={t('conversations.tools.working')}
         icon={KIND_ICONS[artifact.kind]}
-        onOpen={isReady && onOpenPreview ? () => onOpenPreview(artifact.artifactId) : undefined}
+        onOpen={canOpen && onOpenPreview ? () => onOpenPreview(artifact.artifactId) : undefined}
       />
-      {artifact.status === 'failed' && onRetry ? (
+      {artifact.status === 'failed' && !savedNotShown && onRetry ? (
         <Button
           variant="secondary"
           size="xs"

@@ -3188,6 +3188,7 @@ const messages: TranslationMap = {
   // Chat：agent-generated artifacts (#2779)
   'chat.artifact.ready': '已就绪',
   'chat.artifact.failed': '生成失败',
+  'chat.artifact.savedNotShown': '已保存，但未在你的“文件”文件夹中更新',
   'chat.artifact.download': '下载',
   'chat.artifact.downloading': '下载中…',
   'chat.artifact.download_failed': '下载失败：{reason}',

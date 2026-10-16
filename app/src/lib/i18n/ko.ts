@@ -3347,6 +3347,7 @@ const messages: TranslationMap = {
   // Chat: agent-generated artifacts (#2779)
   'chat.artifact.ready': '준비됨',
   'chat.artifact.failed': '생성 실패',
+  'chat.artifact.savedNotShown': '저장되었지만 Files 폴더에는 업데이트되지 않았습니다',
   'chat.artifact.download': '다운로드',
   'chat.artifact.downloading': '다운로드 중…',
   'chat.artifact.download_failed': '다운로드 실패: {reason}',

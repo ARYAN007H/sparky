@@ -3983,6 +3983,7 @@ const messages: TranslationMap = {
   // Chat: agent-generated artifacts (#2779)
   'chat.artifact.ready': '準備完了',
   'chat.artifact.failed': '生成に失敗しました',
+  'chat.artifact.savedNotShown': '保存しましたが、Files フォルダーでは更新されていません',
   'chat.artifact.download': 'ダウンロード',
   'chat.artifact.downloading': 'ダウンロード中…',
   'chat.artifact.download_failed': 'ダウンロードに失敗しました: {reason}',

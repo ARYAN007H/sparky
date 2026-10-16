@@ -26,6 +26,11 @@ use super::tiny_store::{artifacts_service, legacy_kind_for_extension};
 use super::types::ArtifactKind as LegacyArtifactKind;
 use crate::security::approval::ApprovalChatContext;
 
+/// Starts the card's failure reason when a version was recorded but the card
+/// could not show it (its file in the files folder was not updated). The UI
+/// keys on it to say so, instead of "generation failed".
+pub const SAVED_NOT_SHOWN: &str = "saved-not-shown:";
+
 /// A file being produced as an artifact.
 pub struct Production {
     artifacts: Artifacts,
@@ -153,20 +158,35 @@ impl Production {
             )
             .await;
         match saved {
-            Ok(saved) => {
-                let reason = match (
-                    saved.notice,
-                    saved.record.latest().and_then(|v| v.file.clone()),
-                ) {
-                    (None, Some(file)) => return Ok(file.size_bytes),
-                    (Some(notice), _) => notice,
-                    (None, None) => "the recorded version has no file".to_string(),
-                };
-                // The version is recorded; only the card could not follow.
-                let reason = format!("failed to finalize artifact: {reason}");
-                self.fail_card(&reason).await;
-                Err(reason)
-            }
+            Ok(saved) => match (
+                saved.notice,
+                saved.record.latest().and_then(|v| v.file.clone()),
+            ) {
+                (None, Some(file)) => Ok(file.size_bytes),
+                // The version is recorded, so the production succeeded; only
+                // the card (and the file in the files folder) could not follow.
+                // The card says exactly that.
+                (Some(notice), Some(file)) => {
+                    tracing::warn!(
+                        target: "tiny-artifacts",
+                        artifact_id = %self.id,
+                        version = saved.version,
+                        notice = %notice,
+                        "[artifacts] version saved but not shown"
+                    );
+                    self.fail_card(&format!(
+                        "{SAVED_NOT_SHOWN} version {} is saved, but {notice}",
+                        saved.version
+                    ))
+                    .await;
+                    Ok(file.size_bytes)
+                }
+                (_, None) => {
+                    let reason = "failed to finalize artifact: the recorded version has no file";
+                    self.fail_card(reason).await;
+                    Err(reason.to_string())
+                }
+            },
             // Nothing was recorded: end it as any failed production ends.
             Err(err) => {
                 let reason = format!("failed to finalize artifact: {err}");

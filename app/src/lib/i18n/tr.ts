@@ -3644,6 +3644,7 @@ const messages: TranslationMap = {
   'workflows.phase.toolScope.allow': 'İzin ver',
   'chat.artifact.ready': 'Hazır',
   'chat.artifact.failed': 'Oluşturma başarısız',
+  'chat.artifact.savedNotShown': 'Kaydedildi, ancak Files klasörünüzde güncellenmedi',
   'chat.artifact.download': 'İndir',
   'chat.artifact.downloading': 'İndiriliyor…',
   'chat.artifact.download_failed': 'İndirme başarısız: {reason}',

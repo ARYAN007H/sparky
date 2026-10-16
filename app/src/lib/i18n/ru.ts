@@ -3422,6 +3422,7 @@ const messages: TranslationMap = {
   // Chat: agent-generated artifacts (#2779)
   'chat.artifact.ready': 'Готово',
   'chat.artifact.failed': 'Сбой генерации',
+  'chat.artifact.savedNotShown': 'Сохранено, но не обновлено в папке Files',
   'chat.artifact.download': 'Скачать',
   'chat.artifact.downloading': 'Скачивание…',
   'chat.artifact.download_failed': 'Сбой скачивания: {reason}',

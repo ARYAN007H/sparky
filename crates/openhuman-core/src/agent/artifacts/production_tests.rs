@@ -217,3 +217,46 @@ async fn a_completion_that_records_nothing_fails_the_record_too() {
     let card = get_artifact(&workspace, production.id()).await.unwrap();
     assert_eq!(card.status, CardStatus::Failed);
 }
+
+#[cfg(unix)]
+#[tokio::test]
+async fn a_saved_version_the_card_cannot_show_succeeds_and_says_so() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let (workspace, files) = temp_dirs();
+    let production = Production::start(
+        &workspace,
+        FileRoots::new(&files),
+        ArtifactKind::File,
+        "Quarterly Deck",
+        "pptx",
+        None,
+        None,
+        None,
+    )
+    .await
+    .unwrap();
+    tokio::fs::write(production.path(), b"deck-v1")
+        .await
+        .unwrap();
+    // The card's file cannot be written: the version is recorded (from its
+    // kept copy), but the card cannot show it.
+    let visible = production.path().to_path_buf();
+    std::fs::set_permissions(&visible, std::fs::Permissions::from_mode(0o444)).unwrap();
+
+    let result = production.complete().await;
+    std::fs::set_permissions(&visible, std::fs::Permissions::from_mode(0o644)).unwrap();
+    assert_eq!(result.unwrap(), 7);
+
+    let record = versioned_store(&workspace)
+        .get(production.id())
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(record.status, RecordStatus::Ready);
+    assert_eq!(record.versions.len(), 1);
+    let card = get_artifact(&workspace, production.id()).await.unwrap();
+    assert_eq!(card.status, CardStatus::Failed);
+    let error = card.error.unwrap_or_default();
+    assert!(error.starts_with(SAVED_NOT_SHOWN), "{error}");
+}
