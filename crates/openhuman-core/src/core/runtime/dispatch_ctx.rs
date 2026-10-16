@@ -163,7 +163,7 @@ impl DispatchCtx {
     /// Source binding for live autonomy-tier decisions under this dispatch.
     pub fn autonomy_tier_source(&self) -> super::AutonomyTierSource {
         self.resolved()
-            .map_or(super::AutonomyTierSource::LiveConfig, |core| {
+            .map_or(super::AutonomyTierSource::Captured, |core| {
                 core.autonomy_tier_source()
             })
     }

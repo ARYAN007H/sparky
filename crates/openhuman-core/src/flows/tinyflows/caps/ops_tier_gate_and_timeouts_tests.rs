@@ -84,9 +84,18 @@ async fn code_adapter_observes_file_backed_tier_changes_between_calls() {
         ..AutonomyConfig::default()
     };
     config.save().await.unwrap();
+    let context = crate::core::runtime::CoreContext::for_test(
+        crate::core::runtime::DomainSet::full(),
+        Some(config.workspace_dir.clone()),
+    )
+    .derive_with(crate::core::runtime::ContextOverlay::new(
+        config.clone(),
+        crate::core::runtime::DomainSet::full(),
+        crate::tools::toolpacks::ToolGroups::default(),
+    ));
 
     let code = OpenHumanCode {
-        ctx: crate::core::runtime::DispatchCtx::ambient(),
+        ctx: crate::core::runtime::DispatchCtx::new(context),
         security: Arc::new(SecurityPolicy::from_config(
             &config.autonomy,
             &config.workspace_dir,
