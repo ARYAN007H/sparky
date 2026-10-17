@@ -386,10 +386,7 @@ impl OpenHumanPersistence {
         &self,
         key: &SubagentTaskKey,
     ) -> Result<Option<SubagentCheckpointData>, SubagentError> {
-        if self.file_store.terminal_outcome(key).map_err(map_lifecycle_error)?.is_some() {
-            return Ok(None);
-        }
-        if self.terminal_path(key).exists() {
+        if self.file_store.terminal_outcome(key)?.is_some() {
             return Ok(None);
         }
         if self.terminal_path(key).exists() {
