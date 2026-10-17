@@ -90,7 +90,11 @@ pub async fn done(scoped: &ScopedStorage, owner: &str, step: &str) -> Result<boo
 /// # Errors
 ///
 /// A storage error.
-pub async fn mark_done(scoped: &ScopedStorage, owner: &str, step: &str) -> Result<(), StorageError> {
+pub async fn mark_done(
+    scoped: &ScopedStorage,
+    owner: &str,
+    step: &str,
+) -> Result<(), StorageError> {
     declare(scoped.documents()).await?;
     Migrations::new(scoped).mark_done(owner, step).await
 }
@@ -297,7 +301,10 @@ fn lease_key(owner: &str, step: &str) -> String {
 /// A storage error; the markers not yet moved stay in place for the next boot.
 pub async fn migrate_legacy_markers(scoped: &ScopedStorage) -> Result<usize, StorageError> {
     let docs = scoped.documents();
-    if !docs.capabilities().contains(Capability::CollectionEnumeration) {
+    if !docs
+        .capabilities()
+        .contains(Capability::CollectionEnumeration)
+    {
         return Ok(0);
     }
     let present = docs.collections("").await?;

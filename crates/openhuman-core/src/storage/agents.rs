@@ -51,16 +51,16 @@ pub fn storage_schema() -> Schema {
         .step(Step::new("registry_v2", AGENTS, 1, 2, registry_v2).source(LEGACY_AGENTS))
 }
 
-fn registry_v2(
-    batch: Vec<SourceRecord>,
-) -> tinystoragedrivers::Result<Vec<TargetRecord>> {
+fn registry_v2(batch: Vec<SourceRecord>) -> tinystoragedrivers::Result<Vec<TargetRecord>> {
     batch
         .into_iter()
         .map(|record| {
-            Ok(
-                TargetRecord::new(AGENTS, key_of(&record.id)?, json!({ "agent_id": record.id }))
-                    .created_ms(record.meta.created_ms),
+            Ok(TargetRecord::new(
+                AGENTS,
+                key_of(&record.id)?,
+                json!({ "agent_id": record.id }),
             )
+            .created_ms(record.meta.created_ms))
         })
         .collect()
 }
@@ -154,7 +154,12 @@ fn recorded(backend: Arc<dyn StorageBackend>) -> Vec<String> {
         let stored = docs.query_all(AGENTS, &Query::all()).await?;
         Ok(stored
             .into_iter()
-            .filter_map(|doc| doc.doc.get("agent_id").and_then(Value::as_str).map(str::to_owned))
+            .filter_map(|doc| {
+                doc.doc
+                    .get("agent_id")
+                    .and_then(Value::as_str)
+                    .map(str::to_owned)
+            })
             .collect::<Vec<_>>())
     });
     result.unwrap_or_else(|error| {

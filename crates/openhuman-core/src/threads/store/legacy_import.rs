@@ -179,9 +179,10 @@ pub(super) fn import_once(
                 ))?);
             }
             let store = store.clone();
-            let (threads_n, messages_n) = crate::storage::block_on_anyhow(async move {
-                copy(&store, threads, messages).await
-            })?;
+            let (threads_n, messages_n) =
+                crate::storage::block_on_anyhow(
+                    async move { copy(&store, threads, messages).await },
+                )?;
             import_state::set_done(repo, OWNER, &step)?;
             log::info!("{LOG_PREFIX} imported threads={threads_n} messages={messages_n}");
             Ok(())

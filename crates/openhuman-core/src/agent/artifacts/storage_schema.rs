@@ -61,7 +61,10 @@ pub(super) fn meta_to_body(meta: &ArtifactMeta) -> anyhow::Result<Value> {
     let mut doc = serde_json::to_value(meta)?;
     if let Some(fields) = doc.as_object_mut() {
         fields.remove("created_at");
-        fields.insert("created_ms".into(), meta.created_at.timestamp_millis().into());
+        fields.insert(
+            "created_ms".into(),
+            meta.created_at.timestamp_millis().into(),
+        );
     }
     Ok(doc)
 }
@@ -95,9 +98,7 @@ pub(super) fn args_body(args: &Value) -> Value {
 /// The arguments a stored body holds.
 pub(super) fn args_of_body(body: &Value) -> Value {
     match body.as_object() {
-        Some(fields) if fields.len() == 1 && fields.contains_key("_args") => {
-            body["_args"].clone()
-        }
+        Some(fields) if fields.len() == 1 && fields.contains_key("_args") => body["_args"].clone(),
         _ => body.clone(),
     }
 }

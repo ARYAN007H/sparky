@@ -25,8 +25,14 @@ pub fn storage_schema() -> Schema {
     Schema::new(owner("threads"))
         .collection_with(SCHEMA, spec(), ScopeClass::Tenant)
         .step(
-            Step::new("transcript_keys_v2", TRANSCRIPT_KEYS, 1, SCHEMA, transcript_keys_v2)
-                .source(LEGACY_TRANSCRIPT_KEYS),
+            Step::new(
+                "transcript_keys_v2",
+                TRANSCRIPT_KEYS,
+                1,
+                SCHEMA,
+                transcript_keys_v2,
+            )
+            .source(LEGACY_TRANSCRIPT_KEYS),
         )
 }
 

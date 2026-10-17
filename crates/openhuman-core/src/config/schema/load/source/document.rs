@@ -11,8 +11,8 @@ use tinystoragedrivers::{CollectionSpec, DocumentStore, Precondition};
 use super::{apply_bootstrap, strip_bootstrap, ConfigRead, ConfigSource, FileConfigSource};
 use crate::storage::Scope;
 
-pub(crate) use super::storage_schema::CONFIG_COLLECTION;
 use super::storage_schema::document_id;
+pub(crate) use super::storage_schema::CONFIG_COLLECTION;
 
 /// The document field holding the encrypted TOML body (`enc2:` hex).
 const BODY_FIELD: &str = "toml_enc";

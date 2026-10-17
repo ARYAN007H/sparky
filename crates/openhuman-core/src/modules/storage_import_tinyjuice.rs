@@ -136,8 +136,7 @@ async fn import_into(
         imported += 1;
     }
 
-    support::mark_imported(scoped, MARKER_COLLECTION, &marker)
-    .await?;
+    support::mark_imported(scoped, MARKER_COLLECTION, &marker).await?;
     tracing::info!("{LOG_PREFIX} imported={imported} expired={expired} skipped={skipped}");
     Ok(Outcome::Imported {
         imported,

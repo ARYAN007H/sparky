@@ -42,11 +42,7 @@ pub(super) fn marker_id(prefix: &str, source: &Path) -> String {
 /// collection name (`tinybox_host_import`), so a marker row an older build
 /// wrote ([`crate::storage::import_state::migrate_legacy_markers`]) answers
 /// the same question.
-pub(super) async fn already_imported(
-    scoped: &ScopedStorage,
-    kind: &str,
-    id: &str,
-) -> Result<bool> {
+pub(super) async fn already_imported(scoped: &ScopedStorage, kind: &str, id: &str) -> Result<bool> {
     crate::storage::import_state::host_import_done(scoped, kind, id)
         .await
         .map_err(|error| anyhow!("read the import state: {:?}", error.kind()))

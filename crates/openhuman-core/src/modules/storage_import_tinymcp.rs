@@ -95,7 +95,8 @@ async fn import_into(
     let marker = marker_id(data_dir);
     if crate::storage::import_state::host_import_done(scoped, MARKER_COLLECTION, &marker)
         .await
-        .map_err(|error| anyhow!("read the import state: {:?}", error.kind()))? {
+        .map_err(|error| anyhow!("read the import state: {:?}", error.kind()))?
+    {
         return Ok(Outcome::AlreadyDone);
     }
     let clients = data_dir.join(CLIENTS_DB);

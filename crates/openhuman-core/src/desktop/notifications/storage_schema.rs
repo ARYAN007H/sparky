@@ -160,7 +160,10 @@ fn core_v2(batch: Vec<SourceRecord>) -> Result<Vec<TargetRecord>> {
                 .set("workspace", workspace)
                 .copy(old, "payload")
                 .copy(old, "timestamp_ms")
-                .set("read", old.get("read").and_then(Value::as_bool).unwrap_or(false))
+                .set(
+                    "read",
+                    old.get("read").and_then(Value::as_bool).unwrap_or(false),
+                )
                 .build();
             Some(TargetRecord::new(CORE, core_id(workspace, event), body).created_ms(created_ms))
         })

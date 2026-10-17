@@ -36,14 +36,10 @@ fn claim_runs_the_body_and_releases() {
 #[test]
 fn claim_is_released_when_the_body_fails() {
     let repo = repo();
-    let result: Result<Option<()>> =
-        with_claim(&repo, OWNER, "m", || Err(anyhow::anyhow!("boom")));
+    let result: Result<Option<()>> = with_claim(&repo, OWNER, "m", || Err(anyhow::anyhow!("boom")));
     assert!(result.is_err());
     assert!(!claim_held(&repo, "m"));
-    assert_eq!(
-        with_claim(&repo, OWNER, "m", || Ok(1)).unwrap(),
-        Some(1)
-    );
+    assert_eq!(with_claim(&repo, OWNER, "m", || Ok(1)).unwrap(), Some(1));
 }
 
 #[test]
@@ -181,7 +177,14 @@ fn a_legacy_marker_row_is_honoured_and_removed() {
         .await?;
         let moved = migrate_legacy_markers(&scoped).await?;
         assert_eq!(moved, 1);
-        assert!(done(&scoped, "storage", &step_id("storage_import", "approval@abcd")).await?);
+        assert!(
+            done(
+                &scoped,
+                "storage",
+                &step_id("storage_import", "approval@abcd")
+            )
+            .await?
+        );
         assert!(!done(&scoped, "storage", &step_id("storage_import", "other@x")).await?);
         assert!(
             docs.query_all("storage_import", &tinystoragedrivers::Query::all())
@@ -191,7 +194,14 @@ fn a_legacy_marker_row_is_honoured_and_removed() {
         );
         // A second sweep has nothing to do and keeps the entry.
         assert_eq!(migrate_legacy_markers(&scoped).await?, 0);
-        assert!(done(&scoped, "storage", &step_id("storage_import", "approval@abcd")).await?);
+        assert!(
+            done(
+                &scoped,
+                "storage",
+                &step_id("storage_import", "approval@abcd")
+            )
+            .await?
+        );
         Ok::<_, StorageError>(())
     })
     .unwrap();

@@ -36,7 +36,9 @@ pub fn storage_schema() -> Schema {
 /// # Errors
 ///
 /// When `scope` is empty.
-pub(crate) fn document_id(scope: &str) -> std::result::Result<String, tinystoragedrivers::StorageError> {
+pub(crate) fn document_id(
+    scope: &str,
+) -> std::result::Result<String, tinystoragedrivers::StorageError> {
     key_of(scope)
 }
 

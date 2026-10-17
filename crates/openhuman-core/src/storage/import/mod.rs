@@ -309,7 +309,8 @@ fn upgrade(owner: &str, records: Vec<Record>) -> Result<(Vec<Record>, Vec<Collec
     }
     for (collection, batch) in by_collection {
         let step = schema.steps.iter().find(|step| {
-            matches!(step.run, StepBody::Documents(_)) && step.source.unwrap_or(step.item) == collection
+            matches!(step.run, StepBody::Documents(_))
+                && step.source.unwrap_or(step.item) == collection
         });
         let Some(StepBody::Documents(run)) = step.map(|step| &step.run) else {
             upgraded.extend(batch.into_iter().map(|r| Record {
@@ -354,12 +355,7 @@ fn import_one(
     let domain = source.domain;
     // The v2 collections are declared by the write itself (`upgrade` names
     // them); the v1 specs only tell the snapshot which document tables to read.
-    let repo = Repo::on(
-        backend,
-        &super::scope::tenant_scope(None),
-        domain,
-        Vec::new,
-    )?;
+    let repo = Repo::on(backend, &super::scope::tenant_scope(None), domain, Vec::new)?;
     let markers = Repo::on(
         backend,
         &super::scope::tenant_scope(None),

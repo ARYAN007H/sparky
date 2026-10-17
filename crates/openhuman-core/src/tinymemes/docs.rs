@@ -72,8 +72,8 @@ pub(super) fn load(config: &Config, kind: IndexKind) -> Result<Option<String>> {
     let adopted = state_body(kind, &legacy);
     let written = repo.run(move |docs| async move {
         docs.put(COLLECTION, id, adopted, Precondition::Absent)
-        .await
-        .map(|_| ())
+            .await
+            .map(|_| ())
     });
     match written {
         Ok(()) => {

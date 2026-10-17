@@ -29,8 +29,7 @@ use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tinystoragedrivers::{
-    CollectionSpec, DocumentStore, DocumentStoreExt, Key, Kv, ScopedStorage,
-    StorageError,
+    CollectionSpec, DocumentStore, DocumentStoreExt, Key, Kv, ScopedStorage, StorageError,
 };
 
 use crate::storage::documents::Repo;
@@ -122,7 +121,10 @@ impl Docs {
     {
         let name = name.to_string();
         self.0.run(|docs| async move {
-            let repo = tinystoragedrivers::Repo::<KvEntry>::new(&docs, tinystoragedrivers::primitives::KV)?;
+            let repo = tinystoragedrivers::Repo::<KvEntry>::new(
+                &docs,
+                tinystoragedrivers::primitives::KV,
+            )?;
             let mut result = None;
             repo.update(&kv_id(&name)?, |current| {
                 let mut value: T = match &current {
@@ -195,9 +197,8 @@ impl Docs {
         let name = name.to_string();
         let value = serde_json::to_value(value)?;
         log::debug!("[composio:store] document save id={name}");
-        self.0.run(|docs| async move {
-            kv(&docs)?.put(&name, &value).await.map(|_| ())
-        })
+        self.0
+            .run(|docs| async move { kv(&docs)?.put(&name, &value).await.map(|_| ()) })
     }
 }
 
@@ -219,8 +220,14 @@ fn import_step(name: &str) -> String {
 pub(crate) async fn migrate_legacy_state(scoped: &ScopedStorage) -> Result<usize, StorageError> {
     use tinystoragedrivers::Capability;
     let docs = scoped.documents();
-    if !docs.capabilities().contains(Capability::CollectionEnumeration)
-        || !docs.collections("").await?.iter().any(|name| name == LEGACY_STATE)
+    if !docs
+        .capabilities()
+        .contains(Capability::CollectionEnumeration)
+        || !docs
+            .collections("")
+            .await?
+            .iter()
+            .any(|name| name == LEGACY_STATE)
     {
         return Ok(0);
     }

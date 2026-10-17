@@ -1,6 +1,6 @@
 use super::*;
 use serde_json::json;
-use tinystoragedrivers::{Meta, MemoryStorage, Precondition, Scope, StorageBackend};
+use tinystoragedrivers::{MemoryStorage, Meta, Precondition, Scope, StorageBackend};
 
 #[test]
 fn a_registry_row_loses_its_seconds_field_and_keeps_its_creation_time() {
@@ -12,7 +12,10 @@ fn a_registry_row_loses_its_seconds_field_and_keeps_its_creation_time() {
     .unwrap();
     assert_eq!(out[0].collection, REGISTRY_COLLECTION);
     assert_eq!(out[0].id, "alice");
-    assert_eq!(out[0].body, json!({ "profile_id": "alice", "layout_version": 2 }));
+    assert_eq!(
+        out[0].body,
+        json!({ "profile_id": "alice", "layout_version": 2 })
+    );
     assert_eq!(out[0].created_ms, Some(1_700_000_000_000));
 }
 
@@ -21,7 +24,9 @@ async fn migrate_cluster_moves_the_v1_registry_into_the_v2_collection() {
     let backend = MemoryStorage::new();
     let scoped = backend.for_scope(&Scope::cluster()).unwrap();
     let docs = scoped.documents();
-    docs.ensure_collection(&CollectionSpec::new("profiles")).await.unwrap();
+    docs.ensure_collection(&CollectionSpec::new("profiles"))
+        .await
+        .unwrap();
     docs.put(
         "profiles",
         "alice",
@@ -32,8 +37,15 @@ async fn migrate_cluster_moves_the_v1_registry_into_the_v2_collection() {
     .unwrap();
     migrate_cluster(&scoped).await.unwrap();
     migrate_cluster(&scoped).await.unwrap();
-    let moved = docs.get(REGISTRY_COLLECTION, "alice").await.unwrap().unwrap();
-    assert_eq!(moved.doc, json!({ "profile_id": "alice", "layout_version": 2 }));
+    let moved = docs
+        .get(REGISTRY_COLLECTION, "alice")
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        moved.doc,
+        json!({ "profile_id": "alice", "layout_version": 2 })
+    );
     assert_eq!(moved.meta.created_ms, 5000);
 }
 

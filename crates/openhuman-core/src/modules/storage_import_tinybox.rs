@@ -91,8 +91,7 @@ async fn import_into(scoped: &ScopedStorage, base: &Path) -> Result<Outcome> {
         _ => tracing::warn!("{LOG_PREFIX} skipped an index file that is not a JSON object"),
     }
 
-    support::mark_imported(scoped, MARKER_COLLECTION, &marker)
-    .await?;
+    support::mark_imported(scoped, MARKER_COLLECTION, &marker).await?;
     tracing::info!("{LOG_PREFIX} imported written={written}");
     Ok(Outcome::Imported { written })
 }

@@ -118,8 +118,7 @@ async fn import_into(
         triggers += support::append_if_empty(scoped, &day.stream, day.records).await?;
     }
 
-    support::mark_imported(scoped, MARKER_COLLECTION, &marker)
-    .await?;
+    support::mark_imported(scoped, MARKER_COLLECTION, &marker).await?;
     tracing::info!(
         "{LOG_PREFIX} imported prefs={prefs} triggers={triggers} skipped={}",
         legacy.skipped

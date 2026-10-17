@@ -83,8 +83,7 @@ async fn import_into(
     let payments = support::append_if_empty(scoped, PAYMENTS_STREAM, records)
         .await
         .map_err(|error| anyhow!("import the payments: {error:#}"))?;
-    support::mark_imported(scoped, MARKER_COLLECTION, &marker)
-    .await?;
+    support::mark_imported(scoped, MARKER_COLLECTION, &marker).await?;
     tracing::info!("{LOG_PREFIX} imported payments={payments} skipped={skipped}");
     Ok(Outcome::Imported { payments, skipped })
 }

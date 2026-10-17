@@ -120,7 +120,11 @@ async fn a_document_holds_no_plaintext_and_no_bootstrap_tables() {
         .unwrap();
 
     let docs = Arc::clone(scoped(&storage, "alice").documents());
-    let stored = docs.get("config.documents", "alice").await.unwrap().unwrap();
+    let stored = docs
+        .get("config.documents", "alice")
+        .await
+        .unwrap()
+        .unwrap();
     let raw = serde_json::to_string(&stored.doc).unwrap();
     assert!(raw.contains("enc2:"), "{raw}");
     for leaked in ["sk-very-secret", "mongodb", "default_model", "[storage]"] {
@@ -146,7 +150,12 @@ async fn a_document_does_not_decrypt_under_another_scope_or_master_key() {
     // Another scope's data key cannot open alice's ciphertext even when the
     // sealed value is copied across (per-scope key derivation).
     let docs = Arc::clone(scoped(&storage, "alice").documents());
-    let sealed = docs.get("config.documents", "alice").await.unwrap().unwrap().doc;
+    let sealed = docs
+        .get("config.documents", "alice")
+        .await
+        .unwrap()
+        .unwrap()
+        .doc;
     let bob_docs = Arc::clone(scoped(&storage, "bob").documents());
     bob_docs
         .put(
@@ -517,7 +526,10 @@ async fn a_document_save_refuses_process_key_secrets_it_cannot_open() {
         .await
         .unwrap();
     assert!(
-        docs.get("config.documents", "tenant-a").await.unwrap().is_none(),
+        docs.get("config.documents", "tenant-a")
+            .await
+            .unwrap()
+            .is_none(),
         "nothing was written over the shared document"
     );
 }

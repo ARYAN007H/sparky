@@ -80,8 +80,7 @@ fn sessions_v2(batch: Vec<SourceRecord>) -> Result<Vec<TargetRecord>> {
                 .get("subagentSessionId")
                 .and_then(Value::as_str)
                 .unwrap_or(&record.id);
-            Ok(TargetRecord::new(SESSIONS, key_of(id)?, Value::Object(body))
-                .created_ms(created))
+            Ok(TargetRecord::new(SESSIONS, key_of(id)?, Value::Object(body)).created_ms(created))
         })
         .collect()
 }

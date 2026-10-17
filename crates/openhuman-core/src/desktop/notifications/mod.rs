@@ -25,8 +25,8 @@
 pub mod bus;
 pub mod rpc;
 pub mod schemas;
-pub mod store;
 mod storage_schema;
+pub mod store;
 mod store_documents;
 mod store_import;
 pub(crate) use storage_schema::storage_schema;

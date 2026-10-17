@@ -32,10 +32,12 @@ use crate::config::Config;
 use crate::storage::documents::compare_and_swap;
 use crate::storage::local;
 use crate::storage::{block_on, DocumentStore, DocumentStoreExt, ScopedStorage, StorageError};
-use tinystoragedrivers::{CollectionSpec, ErrorKind, Filter, Key, Precondition, Query, Sort, Versioned};
+use tinystoragedrivers::{
+    CollectionSpec, ErrorKind, Filter, Key, Precondition, Query, Sort, Versioned,
+};
 
-pub(super) use super::storage_schema::{trust_id, APPROVALS, FLOW_TRUST};
 use super::storage_schema::{legacy_collections, specs};
+pub(super) use super::storage_schema::{trust_id, APPROVALS, FLOW_TRUST};
 
 use super::types::{
     ApprovalAuditEntry, ApprovalDecision, ApprovalSourceContext, ExecutionOutcome, PendingApproval,

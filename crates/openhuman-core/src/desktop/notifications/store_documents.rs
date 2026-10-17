@@ -33,9 +33,7 @@ use anyhow::{Context, Result};
 use chrono::{DateTime, Duration, Utc};
 use serde_json::{json, Map, Value};
 use sha2::{Digest, Sha256};
-use tinystoragedrivers::{
-    CollectionSpec, ErrorKind, Filter, Precondition, Query, Sort, Versioned,
-};
+use tinystoragedrivers::{CollectionSpec, ErrorKind, Filter, Precondition, Query, Sort, Versioned};
 
 use super::types::{
     CoreNotificationEvent, IntegrationNotification, NotificationSettings, NotificationStats,
