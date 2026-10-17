@@ -173,3 +173,44 @@ async fn module_run_flow_uses_the_host_detached_runner_and_requires_a_saved_flow
     assert!(started["run_id"].as_str().is_some_and(|id| !id.is_empty()));
     assert_eq!(started["flow_id"], flow.id);
 }
+
+#[tokio::test]
+async fn module_proposal_tool_uses_host_gates_without_persisting() {
+    let workspace = tempfile::tempdir().expect("temporary workspace");
+    let mut config = Config::default();
+    config.workspace_dir = workspace.path().join("workspace");
+    config.action_dir = config.workspace_dir.clone();
+    config.config_path = workspace.path().join("config.toml");
+    std::fs::create_dir_all(&config.workspace_dir).expect("workspace directory");
+    let catalog = CopilotToolCatalog::load(Arc::new(config.clone()))
+        .expect("module tool catalog loads");
+    let tool = catalog
+        .tool("propose_workflow")
+        .expect("propose_workflow is catalogued");
+
+    let invalid = tool
+        .execute(json!({ "name": "Invalid", "graph": { "nodes": [], "edges": [] } }))
+        .await
+        .expect("invalid candidate is a reported tool error");
+    assert!(invalid.is_error, "{}", invalid.output());
+
+    let valid = tool
+        .execute(json!({
+            "name": "Proposed only",
+            "graph": {
+                "nodes": [{"id":"trigger","kind":"trigger","name":"Trigger","config":{}}],
+                "edges": []
+            }
+        }))
+        .await
+        .expect("valid candidate uses the scoped BuildProposal callback");
+    assert!(!valid.is_error, "{}", valid.output());
+    let proposal: Value = serde_json::from_str(&valid.output()).expect("proposal JSON");
+    assert_eq!(proposal["type"], "workflow_proposal");
+    assert_eq!(proposal["persisted"], false);
+    assert!(crate::flows::ops::flows_list(&config)
+        .await
+        .expect("flow list")
+        .value
+        .is_empty());
+}
