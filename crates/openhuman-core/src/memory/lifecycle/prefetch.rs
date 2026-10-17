@@ -89,10 +89,7 @@ impl Key {
 /// full Config is large and unrelated settings must not invalidate turn packs.
 fn memory_config_fingerprint(config: &Config) -> u64 {
     let mut fingerprint = std::collections::hash_map::DefaultHasher::new();
-    // Keep only the digest, never serialized settings or credentials.
-    serde_json::to_vec(&config.memory)
-        .unwrap_or_default()
-        .hash(&mut fingerprint);
+    config.memory.hash(&mut fingerprint);
     config.config_path.hash(&mut fingerprint);
     fingerprint.finish()
 }
