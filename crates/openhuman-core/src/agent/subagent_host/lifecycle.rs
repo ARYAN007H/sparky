@@ -26,7 +26,7 @@ use tinyinference_llm::{
     message::Message,
     usage::{ChargedAmount, Usage, UsageTotals},
 };
-use tokio::sync::{Mutex as AsyncMutex, Notify};
+use tokio::sync::Mutex as AsyncMutex;
 
 #[path = "lifecycle_checkpoint.rs"]
 mod checkpoint;
@@ -35,7 +35,6 @@ mod outcome;
 use checkpoint::absolute_checkpoint_dir;
 pub(super) use driver_adapter::outcome_to_host;
 use driver_adapter::HostInvocation;
-use outcome::HostInFlightMap;
 
 #[path = "lifecycle/driver_result.rs"]
 mod driver_result;
@@ -571,94 +570,21 @@ pub struct OpenHumanSubagentHost {
     options: SubagentRunOptions,
 }
 
-/// Process-local coalescing extends TinyAgents' per-driver reservation across
-/// independently constructed host adapters. Durable persistence remains the
-/// cross-process authority; this prevents duplicate local child graphs.
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub(super) struct HostLifecycleKey {
-    checkpoint_dir: PathBuf,
-    task_key: SubagentTaskKey,
-}
+/// Shared TinyAgents reservations are partitioned by the canonical checkpoint
+/// root because product task IDs can repeat across workspaces.
+type ScopedSubagentFlights =
+    std::sync::Mutex<std::collections::HashMap<PathBuf, tinyagents_orchestration::subagent::SubagentInFlight>>;
 
-pub(super) struct HostInFlight {
-    /// `Some(Some(outcome))` is a committed leader result; `Some(None)` means
-    /// the leader failed before a durable result and followers must reserve a
-    /// new attempt rather than receiving a flattened host error.
-    result: AsyncMutex<Option<Option<SubagentRunOutcome>>>,
-    notify: Notify,
-}
-
-impl HostInFlight {
-    pub(super) fn new() -> Self {
-        Self {
-            result: AsyncMutex::new(None),
-            notify: Notify::new(),
-        }
-    }
-
-    pub(super) async fn wait(
-        &self,
-        cancellation: &tinyagents_harness::CancellationToken,
-        task_key: &SubagentTaskKey,
-        agent_id: &str,
-    ) -> Result<Option<SubagentRunOutcome>, SubagentRunError> {
-        loop {
-            let notified = self.notify.notified();
-            tokio::pin!(notified);
-            notified.as_mut().enable();
-            if let Some(result) = self.result.lock().await.clone() {
-                return Ok(result.map(host_observer_outcome));
-            }
-            tokio::select! {
-                biased;
-                _ = cancellation.cancelled() => {
-                    return Ok(Some(observer_cancelled_outcome(task_key, agent_id)));
-                }
-                _ = &mut notified => {}
-            }
-        }
-    }
-
-    pub(super) async fn complete(&self, result: Option<SubagentRunOutcome>) {
-        *self.result.lock().await = Some(result);
-        self.notify.notify_waiters();
-    }
-}
-
-fn observer_cancelled_outcome(task_key: &SubagentTaskKey, agent_id: &str) -> SubagentRunOutcome {
-    SubagentRunOutcome {
-        task_id: task_key.task_id.clone(),
-        agent_id: agent_id.to_owned(),
-        output: String::new(),
-        iterations: 0,
-        elapsed: std::time::Duration::default(),
-        mode: super::SubagentMode::Typed,
-        status: SubagentRunStatus::Cancelled,
-        final_history: Vec::new(),
-        usage: SubagentUsage::default(),
-        artifact_paths: Vec::new(),
-        persistence_disposition:
-            tinyagents_orchestration::subagent::SubagentPersistenceDisposition::ObserverCancelled,
-    }
-}
-
-fn host_observer_outcome(mut outcome: SubagentRunOutcome) -> SubagentRunOutcome {
-    use tinyagents_orchestration::subagent::SubagentPersistenceDisposition as Disposition;
-
-    outcome.persistence_disposition = match outcome.persistence_disposition {
-        Disposition::PauseCommitted | Disposition::PauseReplaced | Disposition::PauseExisting => {
-            Disposition::PauseExisting
-        }
-        Disposition::TerminalInserted | Disposition::TerminalExisting => {
-            Disposition::TerminalExisting
-        }
-        Disposition::ObserverCancelled => Disposition::ObserverCancelled,
-    };
-    outcome
-}
-
-pub(super) fn host_in_flight(ctx: &crate::core::runtime::DispatchCtx) -> Arc<HostInFlightMap> {
-    crate::core::runtime::slot_for(ctx)
+fn shared_subagent_flight(
+    ctx: &crate::core::runtime::DispatchCtx,
+    checkpoint_dir: &std::path::Path,
+) -> tinyagents_orchestration::subagent::SubagentInFlight {
+    let flights = crate::core::runtime::slot_for::<ScopedSubagentFlights>(ctx);
+    let mut flights = flights.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+    flights
+        .entry(checkpoint_dir.to_path_buf())
+        .or_default()
+        .clone()
 }
 
 impl OpenHumanSubagentHost {
