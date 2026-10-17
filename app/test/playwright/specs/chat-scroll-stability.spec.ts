@@ -49,7 +49,17 @@ test.describe('Chat scroll paint stability', () => {
     await dismissWalkthroughIfPresent(page);
     const row = page.getByTestId(`thread-row-${threadId}`);
     await expect(row).toBeVisible({ timeout: 20_000 });
+    const transcriptLoaded = page.waitForResponse(response => {
+      const body = response.request().postData();
+      return Boolean(
+        body?.includes('openhuman.threads_transcript_get') && body.includes(threadId)
+      );
+    });
     await row.click({ force: true });
+    // The message list can paint before the settled-turn projection request
+    // completes. Establish that initial hydration is finished before measuring
+    // whether scrolling itself triggers another transcript read.
+    await transcriptLoaded;
 
     const roots = page.locator(
       '[data-slot="aui_assistant-message-root"], [data-slot="aui_user-message-root"]'
