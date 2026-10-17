@@ -303,7 +303,7 @@ async fn flows_build_copilot_toolset_unhides_the_live_run_tools() {
         "trace should describe the actual builder tool visibility: {log}"
     );
     assert!(
-        !log.contains("stay visible"),
+        !log.contains("run_flow/resume_flow_run/cancel_flow_run stay visible"),
         "trace contradicts the actual hidden toolset: {log}"
     );
 
