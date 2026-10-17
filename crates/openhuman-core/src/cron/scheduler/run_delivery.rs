@@ -136,6 +136,11 @@ pub(crate) async fn trigger(binding: &Binding, flow_id: &str, run_id: &str) -> A
                     retryable: false,
                 };
             };
+            BUS.publish(DomainEvent::CronJobTriggered {
+                job_id: job.id.clone(),
+                job_name: job.name.clone().unwrap_or_default(),
+                job_type: format!("{:?}", job.job_type),
+            });
             let outcome = handler
                 .run(&JobRunContext::new(binding.clone()), &job, run_id)
                 .await;

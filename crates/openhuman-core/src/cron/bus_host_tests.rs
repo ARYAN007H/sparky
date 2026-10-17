@@ -312,8 +312,8 @@ async fn refreshing_binding_config_updates_existing_flow_subscriber() {
         )),
     );
     let (seen_tx, mut seen_rx) = mpsc::unbounded_channel();
-    let subscriber = crate::flows::bus::FlowTriggerSubscriber::with_runner(
-        Arc::new(initial),
+    let subscriber = crate::flows::bus::FlowTriggerSubscriber::with_runner_and_config_source(
+        Arc::clone(&binding.config),
         1,
         move |_ctx, config, _request| {
             let seen_tx = seen_tx.clone();

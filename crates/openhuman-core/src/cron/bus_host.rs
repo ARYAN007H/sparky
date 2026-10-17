@@ -140,7 +140,11 @@ impl Binding {
     #[cfg(feature = "flows")]
     pub(crate) fn flows(&self) -> &crate::flows::bus::FlowTriggerSubscriber {
         self.flows
-            .get_or_init(|| crate::flows::bus::FlowTriggerSubscriber::new(Arc::new(self.config())))
+            .get_or_init(|| {
+                crate::flows::bus::FlowTriggerSubscriber::with_config_source(
+                    Arc::clone(&self.config),
+                )
+            })
     }
 }
 
