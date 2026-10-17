@@ -1,5 +1,64 @@
 use super::*;
 
+#[cfg(feature = "modules")]
+struct RegistrationProbe {
+    dropped: std::sync::Arc<tokio::sync::Notify>,
+    context: std::sync::Arc<()>,
+}
+
+#[cfg(feature = "modules")]
+impl Drop for RegistrationProbe {
+    fn drop(&mut self) {
+        self.dropped.notify_one();
+    }
+}
+
+#[cfg(feature = "modules")]
+#[async_trait::async_trait]
+impl tinybus::service::Interface for RegistrationProbe {
+    fn name(&self) -> tinybus::InterfaceName {
+        tinybus::InterfaceName::new("ai.tinyhumans.openhuman.TestRegistration")
+            .expect("interface name")
+    }
+
+    fn members(&self) -> Vec<tinybus::MemberName> {
+        vec![tinybus::MemberName::new("Ping").expect("member name")]
+    }
+
+    async fn call(
+        &self,
+        _member: &tinybus::MemberName,
+        _args: serde_json::Value,
+    ) -> tinybus::Result<serde_json::Value> {
+        let _keep_callback_context_alive = &self.context;
+        Ok(serde_json::Value::Null)
+    }
+}
+
+#[cfg(feature = "modules")]
+struct SecondRegistrationProbe;
+
+#[cfg(feature = "modules")]
+#[async_trait::async_trait]
+impl tinybus::service::Interface for SecondRegistrationProbe {
+    fn name(&self) -> tinybus::InterfaceName {
+        tinybus::InterfaceName::new("ai.tinyhumans.openhuman.TestRegistrationSecond")
+            .expect("interface name")
+    }
+
+    fn members(&self) -> Vec<tinybus::MemberName> {
+        vec![tinybus::MemberName::new("Ping").expect("member name")]
+    }
+
+    async fn call(
+        &self,
+        _member: &tinybus::MemberName,
+        _args: serde_json::Value,
+    ) -> tinybus::Result<serde_json::Value> {
+        Ok(serde_json::Value::Null)
+    }
+}
+
 #[test]
 fn the_disabled_message_names_the_component_and_the_switch() {
     let message = disabled_message();
@@ -86,4 +145,59 @@ async fn the_copilot_object_answers_tool_catalog_over_its_bus_contract() {
     let run_flow = tools.iter().find(|tool| tool.name == "run_flow").unwrap();
     assert_eq!(run_flow.permission, "Write");
     assert!(run_flow.external_effect);
+}
+
+#[cfg(feature = "modules")]
+#[tokio::test]
+async fn cancelling_partial_callback_registration_unserves_and_releases_its_context() {
+    use std::sync::Arc;
+
+    let path = format!("/ai/tinyhumans/openhuman/TestRegistration/{}", uuid::Uuid::new_v4());
+    let dropped = Arc::new(tokio::sync::Notify::new());
+    let context = Arc::new(());
+    let weak_context = Arc::downgrade(&context);
+    let (registered_tx, registered_rx) = tokio::sync::oneshot::channel();
+    let (continue_tx, continue_rx) = tokio::sync::oneshot::channel();
+    let task_path = path.clone();
+    let task_dropped = Arc::clone(&dropped);
+    let task_context = Arc::clone(&context);
+    let registration = tokio::spawn(async move {
+        serve_pair_after_first(
+            task_path,
+            RegistrationProbe {
+                dropped: task_dropped,
+                context: task_context,
+            },
+            SecondRegistrationProbe,
+            async move {
+                let _ = registered_tx.send(());
+                let _ = continue_rx.await;
+            },
+        )
+        .await
+    });
+    registered_rx.await.expect("first interface is served");
+
+    let connected = super::super::runtime::runtime()
+        .await
+        .expect("module runtime exists");
+    let proxy = connected
+        .connection()
+        .proxy(
+            HOST_BUS_NAME,
+            &path,
+            "ai.tinyhumans.openhuman.TestRegistration",
+        )
+        .expect("probe proxy");
+    assert!(proxy.call::<_, (), serde_json::Value>("Ping", ()).await.is_ok());
+
+    registration.abort();
+    let cleanup = dropped.notified();
+    let _ = continue_tx.send(());
+    tokio::time::timeout(std::time::Duration::from_secs(5), cleanup)
+        .await
+        .expect("detached registration settles and unregisters its interface");
+    drop(context);
+    assert!(weak_context.upgrade().is_none(), "callback context is released");
+    assert!(proxy.call::<_, (), serde_json::Value>("Ping", ()).await.is_err());
 }

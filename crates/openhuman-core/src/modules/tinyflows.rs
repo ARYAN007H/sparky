@@ -200,7 +200,7 @@ mod imp {
         serve_pair_after_first(path, first, second, async {}).await
     }
 
-    async fn serve_pair_after_first<F>(
+    pub(super) async fn serve_pair_after_first<F>(
         path: String,
         first: impl tinybus::service::Interface + 'static,
         second: impl tinybus::service::Interface + 'static,
@@ -268,9 +268,10 @@ mod fixture;
 
 #[cfg(feature = "modules")]
 pub(crate) use imp::{
-    copilot_invoke_proxy, copilot_proxy, proxy, run_proxy, serve, serve_pair,
-    ServedObjectRegistration, unserve,
+    copilot_invoke_proxy, copilot_proxy, proxy, run_proxy, serve, serve_pair, unserve,
 };
+#[cfg(all(test, feature = "modules"))]
+pub(crate) use imp::serve_pair_after_first;
 
 #[cfg(not(feature = "modules"))]
 mod imp {
@@ -309,11 +310,19 @@ mod imp {
         Err("scheduled jobs are unavailable: this build has no module loader".to_string())
     }
 
+    pub(crate) async fn serve_pair(
+        _path: String,
+        _first: impl tinybus::service::Interface + 'static,
+        _second: impl tinybus::service::Interface + 'static,
+    ) -> Result<ServedObjectRegistration, String> {
+        Err("scheduled jobs are unavailable: this build has no module loader".to_string())
+    }
+
     pub(crate) fn unserve(_path: String) {}
 }
 
 #[cfg(not(feature = "modules"))]
-pub(crate) use imp::{copilot_invoke_proxy, copilot_proxy, proxy, run_proxy, serve, unserve};
+pub(crate) use imp::{copilot_invoke_proxy, copilot_proxy, proxy, run_proxy, serve, serve_pair, unserve};
 
 /// Whether the module can serve in this build and configuration (the switch
 /// is on and the loader exists). Does not load anything.
