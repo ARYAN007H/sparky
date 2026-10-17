@@ -139,7 +139,9 @@ impl ProfileHost {
     }
 
     /// A host over `backend` when given (the shared registry and cluster
-    /// leases), else as [`Self::new`].
+    /// leases), else as [`Self::new`]. Supplied backends are guarded by this
+    /// host's profile fences for cron policy writes; an already-fenced backend
+    /// remains safe, with an additional host guard around it.
     ///
     /// # Errors
     ///
@@ -153,8 +155,8 @@ impl ProfileHost {
     }
 
     /// Construct a host over the already-fenced backend installed by the
-    /// runtime. Kept crate-private so external callers use [`Self::with_backend`],
-    /// which adds this host's fence around a supplied raw backend.
+    /// runtime. Kept crate-private so the installed backend is not wrapped a
+    /// second time.
     pub(crate) fn with_fenced_backend(
         saas: SaasConfig,
         operator: Arc<CoreContext>,
@@ -402,7 +404,13 @@ impl ProfileHost {
         let anchor: Arc<dyn std::any::Any + Send + Sync> = context.clone();
         fence.anchor_to(Arc::downgrade(&anchor));
         self.fences.register(Arc::clone(&fence));
-        if let Err(error) = super::lifecycle::reconcile_cron_admission(&config, id).await {
+        if let Err(error) = super::lifecycle::reconcile_cron_admission(
+            &config,
+            id,
+            self.cron_backend.as_ref(),
+        )
+        .await
+        {
             self.fences.retire(id.as_str(), grant.epoch);
             profile_lease::release_all(self, vec![(id.clone(), grant)]).await;
             return Err(OpenError::Storage(error));

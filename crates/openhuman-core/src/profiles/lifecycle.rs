@@ -43,11 +43,17 @@ use crate::storage::lease::{LeaseError, LeaseGrant};
 pub(super) async fn reconcile_cron_admission(
     config: &Config,
     id: &ProfileId,
+    backend: Option<&Arc<dyn crate::storage::StorageBackend>>,
 ) -> Result<(), String> {
-    let scope = crate::cron::documents_port::DocScope::for_scope(
-        config,
-        crate::storage::scope_for_profile(id.as_str()),
-    );
+    let profile_scope = crate::storage::scope_for_profile(id.as_str());
+    let scope = match backend {
+        Some(backend) => crate::cron::documents_port::DocScope::on_backend(
+            config,
+            Arc::clone(backend),
+            profile_scope,
+        ),
+        None => crate::cron::documents_port::DocScope::for_scope(config, profile_scope),
+    };
     let limit = if config.cron.agent_jobs_only {
         Some(config.cron.max_active_jobs as usize)
     } else {
@@ -151,7 +157,7 @@ impl ProfileHost {
         let anchor: Arc<dyn std::any::Any + Send + Sync> = Arc::new(());
         fence.anchor_to(Arc::downgrade(&anchor));
         self.fences.register(Arc::clone(&fence));
-        let reconciled = reconcile_cron_admission(&config, id).await;
+        let reconciled = reconcile_cron_admission(&config, id, self.cron_backend.as_ref()).await;
         self.fences.retire(id.as_str(), grant.epoch);
         reconciled?;
         let meta = ProfileMeta {

@@ -523,7 +523,11 @@ pub async fn build_with_profile_capabilities(
         );
     }
     let host = Arc::new(
-        crate::profiles::ProfileHost::with_backend(config, runtime.context().clone(), backend)
+        crate::profiles::ProfileHost::with_fenced_backend(
+            config,
+            runtime.context().clone(),
+            backend,
+        )
             .map_err(|e| anyhow::anyhow!("[saas] {e}"))?
             .with_capabilities(capabilities),
     );
