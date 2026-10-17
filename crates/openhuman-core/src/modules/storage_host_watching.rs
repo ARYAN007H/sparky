@@ -112,6 +112,19 @@ impl DocumentStore for Documents {
         Ok(version)
     }
 
+    async fn put_with(
+        &self,
+        c: &str,
+        id: &str,
+        doc: Value,
+        p: Precondition,
+        options: tinystoragedrivers::WriteOptions,
+    ) -> Result<Version> {
+        let version = self.inner.put_with(c, id, doc, p, options).await?;
+        let _ = self.changed.send(());
+        Ok(version)
+    }
+
     async fn delete(&self, c: &str, id: &str, p: Precondition) -> Result<bool> {
         let deleted = self.inner.delete(c, id, p).await?;
         let _ = self.changed.send(());
