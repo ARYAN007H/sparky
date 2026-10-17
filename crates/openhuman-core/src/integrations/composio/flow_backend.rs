@@ -7,6 +7,25 @@ use serde_json::Value;
 use crate::{config::Config, core::runtime::DispatchCtx, security::{GateDecision, SecurityPolicy}};
 use crate::security::approval::ApprovalTurnContext;
 
+pub(crate) async fn execute_for_connection(
+    config: &Config,
+    slug: &str,
+    args: Option<Value>,
+    connection_id: Option<&str>,
+) -> Result<crate::integrations::composio::ComposioExecuteResponse, String> {
+    crate::integrations::composio::module_client::call::<_, crate::integrations::composio::ComposioExecuteResponse>(
+        config,
+        tinyconnectors_bus::names::methods::EXECUTE,
+        crate::integrations::composio::types::ComposioExecuteRequest {
+            tool: slug.to_string(),
+            arguments: args,
+            connection_id: connection_id.map(str::to_string),
+        },
+    )
+    .await
+    .map_err(|error| error.to_string())
+}
+
 #[async_trait]
 pub(crate) trait FlowCallPolicy: Send + Sync {
     async fn tier_decision(
@@ -64,15 +83,8 @@ pub(crate) async fn invoke(
     };
 
     let connection_id = crate::integrations::composio::flow_gate::composio_connection_id(conn);
-    let response = crate::integrations::composio::module_client::call::<_, crate::integrations::composio::ComposioExecuteResponse>(
-        &live,
-        tinyconnectors_bus::names::methods::EXECUTE,
-        crate::integrations::composio::types::ComposioExecuteRequest {
-            tool: slug.to_string(),
-            arguments: (!args.is_null()).then_some(args),
-            connection_id: connection_id.map(str::to_string),
-        },
-    ).await.map_err(|error| error.to_string())
+    let response = execute_for_connection(&live, slug, (!args.is_null()).then_some(args), connection_id)
+      .await
       .and_then(|result| crate::integrations::composio::flow_gate::reject_unsuccessful_composio_response(slug, result).map_err(|error| error.to_string()))
       .and_then(|result| serde_json::to_value(result).map_err(|error| error.to_string()));
     if let Some(audit_id) = audit_id { ctx.policy.record(&audit_id, &response); }
@@ -82,3 +94,7 @@ pub(crate) async fn invoke(
 fn policy_refresh_error() -> String {
     format!("{} flows autonomy and Composio settings could not be refreshed; refusing the node", tinytools::status::POLICY_BLOCKED_MARKER)
 }
+
+#[cfg(test)]
+#[path = "flow_backend_tests.rs"]
+mod tests;

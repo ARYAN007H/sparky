@@ -53,6 +53,3 @@ impl ToolBackend for ComposioToolBackend {
     }
 }
 
-#[cfg(test)]
-#[path = "composio_tests.rs"]
-mod tests;
