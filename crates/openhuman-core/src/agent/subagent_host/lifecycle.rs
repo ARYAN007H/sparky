@@ -286,11 +286,36 @@ async fn invoke_async_spawn_driver_tool(
     jobs_override: Option<tinyagents_orchestration::subagent::SubAgentJobRegistry>,
     continuation: Option<(SubagentTaskKey, SubagentResume)>,
 ) -> Result<(tinytools::ToolResult, OpenHumanDriverBundle), SubagentRunError> {
+    invoke_driver_tool_with_request(
+        parent,
+        HostRequest {
+            invocation: HostInvocation::Agent(definition),
+            options,
+        },
+        input,
+        mode,
+        completion,
+        jobs_override,
+        continuation,
+    )
+    .await
+}
+
+async fn invoke_driver_tool_with_request(
+    parent: &RunContext<crate::agent::tinyagents::host::OpenHumanRunContext>,
+    host_request: HostRequest,
+    input: String,
+    mode: &str,
+    completion: Option<HostCompletion>,
+    jobs_override: Option<tinyagents_orchestration::subagent::SubAgentJobRegistry>,
+    continuation: Option<(SubagentTaskKey, SubagentResume)>,
+) -> Result<(tinytools::ToolResult, OpenHumanDriverBundle), SubagentRunError> {
     use tinyagents_harness::tool::ToolDispatch;
     use tinyagents_orchestration::subagent::{DriverSubAgentTool, SubAgentJobRegistry};
     use tinytools::{PermissionLevel, ToolCallOptions, ToolCategory, ToolScope, ToolTimeout};
 
-    let task_id = options
+    let task_id = host_request
+        .options
         .task_id
         .clone()
         .unwrap_or_else(|| format!("sub-{}", uuid::Uuid::new_v4()));
@@ -308,10 +333,6 @@ async fn invoke_async_spawn_driver_tool(
                 .unwrap_or_else(|| PathBuf::from(".openhuman/subagent_checkpoints"))
         }));
     let bundle = OpenHumanDriverBundle::new(checkpoint_dir)?;
-    let host_request = HostRequest {
-        definition: definition.clone(),
-        options,
-    };
     let request_host = host_request.clone();
     let request_task_id = task_id.clone();
     let request_continuation = continuation;
@@ -350,7 +371,7 @@ async fn invoke_async_spawn_driver_tool(
                     None,
                 )
             };
-            request.map(|request| request.with_target(request_host.definition.id.clone()))
+            request.map(|request| request.with_target(request_host.agent_id().to_owned()))
         },
         |request| Some(request.task_id().to_owned()),
     );
@@ -384,7 +405,7 @@ async fn invoke_async_spawn_driver_tool(
         let host_outcome = Arc::clone(&bundle.host_outcome);
         let failures = Arc::clone(&bundle.failures);
         let persistence = Arc::clone(&bundle.persistence);
-        let fallback_agent_id = definition.id.clone();
+        let fallback_agent_id = host_request.agent_id().to_owned();
         dispatcher = dispatcher.with_async_completion_handler(move |target, result| {
             let completion = Arc::clone(&completion);
             let host_outcome = Arc::clone(&host_outcome);
