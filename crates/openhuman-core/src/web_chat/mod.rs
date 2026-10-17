@@ -27,7 +27,7 @@
 //! contract), `types.rs` (shared param/state types).
 
 mod channel_event;
-mod citations;
+pub(crate) mod citations;
 #[cfg(test)]
 mod citations_tests;
 mod egress_surface;
