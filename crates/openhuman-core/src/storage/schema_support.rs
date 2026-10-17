@@ -29,6 +29,15 @@ pub fn rfc3339_ms(text: &str) -> Option<i64> {
         .map(|at| at.timestamp_millis())
 }
 
+/// The RFC 3339 form of `ms` epoch milliseconds, for an RPC type that still
+/// presents a formatted time. An out-of-range value reads as the epoch.
+#[must_use]
+pub fn ms_rfc3339(ms: i64) -> String {
+    chrono::DateTime::from_timestamp_millis(ms)
+        .unwrap_or_default()
+        .to_rfc3339_opts(chrono::SecondsFormat::Millis, true)
+}
+
 /// The time held by `body[field]`, as epoch milliseconds: an RFC 3339 string.
 #[must_use]
 pub fn time_ms(body: &Value, field: &str) -> Option<i64> {
