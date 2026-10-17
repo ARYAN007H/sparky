@@ -230,6 +230,27 @@ fn driver_task_cancel_reports_legacy_failure_and_refuses_ambiguous_ids() {
 }
 
 #[test]
+fn driver_task_cancel_propagates_session_store_load_errors() {
+    let dir = tempfile::tempdir().unwrap();
+    let legacy_dir = dir.path().join(".openhuman");
+    std::fs::create_dir_all(&legacy_dir).unwrap();
+    std::fs::write(legacy_dir.join("subagent_sessions.json"), b"not valid json").unwrap();
+    let store = SubagentSessionStore::new(dir.path().to_path_buf());
+
+    let error = cancel_driver_job_by_task(
+        &store,
+        dir.path(),
+        &SubAgentJobRegistry::default(),
+        "missing-task",
+        None,
+    )
+    .expect_err("corrupt session data is not an unknown task");
+
+    assert!(error.contains("failed to load subagent sessions for cancellation"));
+    assert!(error.contains("failed to parse legacy subagent sessions"));
+}
+
+#[test]
 fn cancellation_reason_is_written_only_for_the_observed_full_lifecycle() {
     let dir = tempfile::tempdir().unwrap();
     let store = SubagentSessionStore::new(dir.path().to_path_buf());
