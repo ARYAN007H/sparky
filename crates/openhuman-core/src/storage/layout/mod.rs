@@ -54,7 +54,9 @@ pub use run::{auto_migrate, migrate, restore, Options};
 pub use state::{LayoutError, Step};
 pub use status::{status, Status};
 
-use crate::config::schema::profile_layout::{PROFILE_FILES_DIR, PROFILE_STORAGE_FILE, PROFILE_WORKSPACE_DIR};
+use crate::config::schema::profile_layout::{
+    PROFILE_FILES_DIR, PROFILE_STORAGE_FILE, PROFILE_WORKSPACE_DIR,
+};
 use crate::config::Config;
 
 /// Directory under the root that holds the archives.
@@ -88,7 +90,9 @@ impl Target {
     pub fn from_config(config: &Config) -> Option<Self> {
         let profile_dir = config.config_path.parent()?;
         let users = profile_dir.parent()?;
-        if users.file_name()? != std::ffi::OsStr::new(crate::config::schema::profile_layout::USERS_DIR) {
+        if users.file_name()?
+            != std::ffi::OsStr::new(crate::config::schema::profile_layout::USERS_DIR)
+        {
             return None;
         }
         let user_id = profile_dir.file_name()?.to_str()?.to_owned();

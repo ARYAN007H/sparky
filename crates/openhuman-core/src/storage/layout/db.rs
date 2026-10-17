@@ -45,7 +45,9 @@ fn counts_of(conn: &Connection) -> Result<Counts, LayoutError> {
         let mut stmt = conn
             .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name")
             .map_err(sql)?;
-        let rows = stmt.query_map([], |row| row.get::<_, String>(0)).map_err(sql)?;
+        let rows = stmt
+            .query_map([], |row| row.get::<_, String>(0))
+            .map_err(sql)?;
         for row in rows {
             tables.push(row.map_err(sql)?);
         }
@@ -54,7 +56,9 @@ fn counts_of(conn: &Connection) -> Result<Counts, LayoutError> {
     for table in tables {
         let quoted = format!("\"{}\"", table.replace('"', "\"\""));
         let n: i64 = conn
-            .query_row(&format!("SELECT COUNT(*) FROM {quoted}"), [], |row| row.get(0))
+            .query_row(&format!("SELECT COUNT(*) FROM {quoted}"), [], |row| {
+                row.get(0)
+            })
             .map_err(sql)?;
         counts.insert(table, u64::try_from(n).unwrap_or(0));
     }
@@ -92,26 +96,37 @@ fn mismatch(source: &Counts, copy: &Counts) -> Option<String> {
 /// [`LayoutError::Verify`] when the copy's counts differ from the source's, or
 /// an I/O or SQLite error. The source is untouched either way.
 pub fn copy(source: &Path, dest: &Path) -> Result<DbCopy, LayoutError> {
-    let conn = Connection::open_with_flags(source, OpenFlags::SQLITE_OPEN_READ_WRITE).map_err(sql)?;
+    let conn =
+        Connection::open_with_flags(source, OpenFlags::SQLITE_OPEN_READ_WRITE).map_err(sql)?;
     let source_counts = counts_of(&conn)?;
     if dest.is_file() {
         if let Ok(existing) = table_counts(dest) {
             if existing == source_counts {
                 tracing::debug!(target: "openhuman::storage", dest = %dest.display(), "[layout] storage.db already matches the source; kept");
-                return Ok(DbCopy { counts: existing, reused: true });
+                return Ok(DbCopy {
+                    counts: existing,
+                    reused: true,
+                });
             }
         }
     }
     let tmp = tmp_path(dest);
-    for stale in [tmp.clone(), tmp.with_extension("tmp-wal"), tmp.with_extension("tmp-shm")] {
+    for stale in [
+        tmp.clone(),
+        tmp.with_extension("tmp-wal"),
+        tmp.with_extension("tmp-shm"),
+    ] {
         let _ = std::fs::remove_file(stale);
     }
-    conn.execute("VACUUM INTO ?1", [tmp.to_string_lossy().as_ref()]).map_err(sql)?;
+    conn.execute("VACUUM INTO ?1", [tmp.to_string_lossy().as_ref()])
+        .map_err(sql)?;
     drop(conn);
     let copy_counts = table_counts(&tmp)?;
     if let Some(diff) = mismatch(&source_counts, &copy_counts) {
         let _ = std::fs::remove_file(&tmp);
-        return Err(LayoutError::Verify(format!("the database copy does not match its source ({diff})")));
+        return Err(LayoutError::Verify(format!(
+            "the database copy does not match its source ({diff})"
+        )));
     }
     std::fs::File::open(&tmp)?.sync_all()?;
     std::fs::rename(&tmp, dest)?;
@@ -121,7 +136,10 @@ pub fn copy(source: &Path, dest: &Path) -> Result<DbCopy, LayoutError> {
         rows = copy_counts.values().sum::<u64>(),
         "[layout] database copied and verified"
     );
-    Ok(DbCopy { counts: copy_counts, reused: false })
+    Ok(DbCopy {
+        counts: copy_counts,
+        reused: false,
+    })
 }
 
 /// Checkpoints and truncates the WAL of `path`, so the file set the archive
@@ -132,7 +150,8 @@ pub fn copy(source: &Path, dest: &Path) -> Result<DbCopy, LayoutError> {
 /// A SQLite error.
 pub fn checkpoint(path: &Path) -> Result<(), LayoutError> {
     let conn = Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_WRITE).map_err(sql)?;
-    conn.query_row("PRAGMA wal_checkpoint(TRUNCATE)", [], |_| Ok(())).map_err(sql)?;
+    conn.query_row("PRAGMA wal_checkpoint(TRUNCATE)", [], |_| Ok(()))
+        .map_err(sql)?;
     Ok(())
 }
 

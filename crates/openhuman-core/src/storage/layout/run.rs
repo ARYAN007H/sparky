@@ -57,15 +57,19 @@ pub async fn migrate(
         if !options.dry_run {
             // The schema migrations are all an explicit backend gets, and
             // opening it runs them.
-            crate::storage::open(&url)
-                .await
-                .map_err(|e| LayoutError::Other(anyhow::anyhow!("open the configured backend: {e}")))?;
+            crate::storage::open(&url).await.map_err(|e| {
+                LayoutError::Other(anyhow::anyhow!("open the configured backend: {e}"))
+            })?;
         }
-        return Ok(Outcome::Noop { reason: Noop::ExplicitUrl });
+        return Ok(Outcome::Noop {
+            reason: Noop::ExplicitUrl,
+        });
     }
     let resuming = LayoutState::load(&target.profile_dir)?.is_some();
     if !resuming && LayoutVersion::detect(&target.profile_dir) == LayoutVersion::V2 {
-        return Ok(Outcome::Noop { reason: Noop::AlreadyV2 });
+        return Ok(Outcome::Noop {
+            reason: Noop::AlreadyV2,
+        });
     }
     if options.dry_run {
         return dry_run(target, resuming).map(|d| Outcome::DryRun(Box::new(d)));
@@ -81,7 +85,9 @@ pub async fn migrate(
         Some(state) => state,
         None => {
             if LayoutVersion::detect(&target.profile_dir) == LayoutVersion::V2 {
-                return Ok(Outcome::Noop { reason: Noop::AlreadyV2 });
+                return Ok(Outcome::Noop {
+                    reason: Noop::AlreadyV2,
+                });
             }
             let state = LayoutState::new(&target.user_id, now_ms());
             state.save(&target.profile_dir)?;
@@ -168,10 +174,11 @@ fn live_conflict(target: &Target, installed_url: Option<String>) -> Option<Strin
 }
 
 fn plan_of(state: &LayoutState) -> Result<&Plan, LayoutError> {
-    state
-        .plan
-        .as_ref()
-        .ok_or_else(|| LayoutError::Other(anyhow::anyhow!("the layout state holds no plan; remove .layout.state to start over")))
+    state.plan.as_ref().ok_or_else(|| {
+        LayoutError::Other(anyhow::anyhow!(
+            "the layout state holds no plan; remove .layout.state to start over"
+        ))
+    })
 }
 
 fn names(plan: &Plan, action: Action) -> Vec<String> {
@@ -184,7 +191,9 @@ fn dry_run(target: &Target, resuming: bool) -> Result<DryRun, LayoutError> {
         Some(plan) => plan,
         None => plan::scan(&target.workspace())?,
     };
-    let database_bytes = std::fs::metadata(legacy::v1_db(target)).ok().map(|m| m.len());
+    let database_bytes = std::fs::metadata(legacy::v1_db(target))
+        .ok()
+        .map(|m| m.len());
     Ok(DryRun {
         archive: scanned.archive_totals(),
         move_entries: scanned.with(Action::Move).cloned().collect(),
@@ -247,7 +256,11 @@ fn move_entry(from: &Path, to: &Path) -> Result<(), LayoutError> {
 }
 
 /// Step 6. Archives, verifies and publishes the archive; returns its file count.
-async fn write_archive(target: &Target, state: &LayoutState, plan: &Plan) -> Result<u64, LayoutError> {
+async fn write_archive(
+    target: &Target,
+    state: &LayoutState,
+    plan: &Plan,
+) -> Result<u64, LayoutError> {
     let final_path = target.backups().join(&state.archive);
     if final_path.is_file() {
         let path = final_path.clone();
@@ -267,7 +280,11 @@ async fn write_archive(target: &Target, state: &LayoutState, plan: &Plan) -> Res
             plan::join(&workspace, &entry.path)
         };
         if std::fs::symlink_metadata(&at).is_ok() {
-            sources.push(Source { rel: entry.path.clone(), action: entry.action, at });
+            sources.push(Source {
+                rel: entry.path.clone(),
+                action: entry.action,
+                at,
+            });
         }
     }
     // The database about to be deleted must be whole in its `.db` file.
@@ -278,15 +295,19 @@ async fn write_archive(target: &Target, state: &LayoutState, plan: &Plan) -> Res
     let tmp = final_path.with_file_name(format!("{}.tmp", state.archive));
     let (user, created) = (target.user_id.clone(), state.started_ms);
     let written = tmp.clone();
-    let manifest = tokio::task::spawn_blocking(move || -> Result<archive::Manifest, LayoutError> {
-        archive::write(&written, &user, created, &sources)?;
-        archive::verify(&written)
-    })
-    .await
-    .map_err(|e| LayoutError::Other(e.into()))??;
+    let manifest =
+        tokio::task::spawn_blocking(move || -> Result<archive::Manifest, LayoutError> {
+            archive::write(&written, &user, created, &sources)?;
+            archive::verify(&written)
+        })
+        .await
+        .map_err(|e| LayoutError::Other(e.into()))??;
     std::fs::rename(&tmp, &final_path)?;
     // The sidecar was written beside the temp name; give it the final name.
-    let _ = std::fs::rename(archive::sidecar_path(&tmp), archive::sidecar_path(&final_path));
+    let _ = std::fs::rename(
+        archive::sidecar_path(&tmp),
+        archive::sidecar_path(&final_path),
+    );
     Ok(manifest.files.len() as u64)
 }
 
@@ -295,10 +316,14 @@ async fn write_archive(target: &Target, state: &LayoutState, plan: &Plan) -> Res
 fn finish(target: &Target, state: &LayoutState, plan: &Plan) -> Result<(), LayoutError> {
     let archive = target.backups().join(&state.archive);
     if !archive.is_file() || !state.has(Step::Archive) {
-        return Err(LayoutError::Verify("no verified archive; refusing to delete".to_owned()));
+        return Err(LayoutError::Verify(
+            "no verified archive; refusing to delete".to_owned(),
+        ));
     }
     if legacy::v1_db(target).is_file() && !target.storage_db().is_file() {
-        return Err(LayoutError::Verify("no verified storage.db; refusing to delete".to_owned()));
+        return Err(LayoutError::Verify(
+            "no verified storage.db; refusing to delete".to_owned(),
+        ));
     }
     std::fs::create_dir_all(target.files())?;
     LayoutVersion::mark_v2(&target.profile_dir)?;
@@ -322,7 +347,10 @@ fn finish(target: &Target, state: &LayoutState, plan: &Plan) -> Result<(), Layou
 /// Removes `path`, which must lie below `base`, without following symlinks.
 fn remove_within(base: &Path, path: &Path) -> Result<(), LayoutError> {
     if !path.starts_with(base) || path == base {
-        return Err(LayoutError::Verify(format!("refusing to delete {}", path.display())));
+        return Err(LayoutError::Verify(format!(
+            "refusing to delete {}",
+            path.display()
+        )));
     }
     match std::fs::symlink_metadata(path) {
         Ok(meta) if meta.is_dir() => std::fs::remove_dir_all(path)?,
@@ -362,7 +390,9 @@ pub async fn restore(target: &Target, archive_path: &Path) -> Result<RestoreRepo
     let mut set_aside = None;
     let db = target.storage_db();
     if db.is_file() {
-        let aside = target.profile_dir.join(format!("storage.v2-{}.db", now_ms()));
+        let aside = target
+            .profile_dir
+            .join(format!("storage.v2-{}.db", now_ms()));
         std::fs::rename(&db, &aside)?;
         for suffix in ["-wal", "-shm"] {
             let mut name = db.file_name().unwrap_or_default().to_os_string();
@@ -408,7 +438,10 @@ pub async fn auto_migrate(config: &Config) -> bool {
     let Some(target) = Target::from_config(config) else {
         return false;
     };
-    let options = Options { env_url: std::env::var(crate::storage::STORAGE_URL_VAR).ok(), ..Options::default() };
+    let options = Options {
+        env_url: std::env::var(crate::storage::STORAGE_URL_VAR).ok(),
+        ..Options::default()
+    };
     match migrate(&target, config, &options).await {
         Ok(Outcome::Migrated(report)) => {
             tracing::info!(

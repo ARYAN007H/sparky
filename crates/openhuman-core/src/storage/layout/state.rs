@@ -169,9 +169,9 @@ impl LayoutState {
     /// An unreadable or unparsable file: the migration must not guess.
     pub fn load(profile_dir: &Path) -> Result<Option<Self>, LayoutError> {
         match std::fs::read(profile_dir.join(STATE_FILE)) {
-            Ok(bytes) => serde_json::from_slice(&bytes)
-                .map(Some)
-                .map_err(|e| LayoutError::Other(anyhow::anyhow!("the layout state file is damaged: {e}"))),
+            Ok(bytes) => serde_json::from_slice(&bytes).map(Some).map_err(|e| {
+                LayoutError::Other(anyhow::anyhow!("the layout state file is damaged: {e}"))
+            }),
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
             Err(e) => Err(e.into()),
         }
@@ -222,7 +222,13 @@ impl LayoutState {
 fn sanitize(user: &str) -> String {
     let clean: String = user
         .chars()
-        .map(|c| if c.is_ascii_alphanumeric() || c == '-' || c == '_' { c } else { '_' })
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || c == '-' || c == '_' {
+                c
+            } else {
+                '_'
+            }
+        })
         .collect();
     if clean.is_empty() {
         "user".to_owned()

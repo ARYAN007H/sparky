@@ -16,7 +16,11 @@ fn state_round_trips_and_records_each_step_once() {
     let dir = TempDir::new().unwrap();
     assert!(LayoutState::load(dir.path()).unwrap().is_none());
     let mut state = LayoutState::new("u/1 weird", 1_700_000_000_000);
-    assert!(state.archive.starts_with("u_1_weird-2023"), "{}", state.archive);
+    assert!(
+        state.archive.starts_with("u_1_weird-2023"),
+        "{}",
+        state.archive
+    );
     assert!(state.archive.ends_with(".tar.zst"));
     state.finish(Step::Import, dir.path()).unwrap();
     state.finish(Step::Import, dir.path()).unwrap();

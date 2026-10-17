@@ -205,7 +205,13 @@ fn scan_memory(dir: &Path, entries: &mut Vec<Entry>) -> std::io::Result<()> {
         let item = item?;
         let name = item.file_name().to_string_lossy().into_owned();
         let (action, reason) = classify_memory_child(&name, item.file_type()?.is_dir());
-        push(entries, format!("memory/{name}"), &item.path(), action, reason);
+        push(
+            entries,
+            format!("memory/{name}"),
+            &item.path(),
+            action,
+            reason,
+        );
     }
     Ok(())
 }
@@ -223,7 +229,8 @@ fn push(entries: &mut Vec<Entry>, path: String, abs: &Path, action: Action, reas
 
 /// The path of a plan entry below `base` (`workspace/` or `files/`).
 pub fn join(base: &Path, rel: &str) -> PathBuf {
-    rel.split('/').fold(base.to_path_buf(), |p, part| p.join(part))
+    rel.split('/')
+        .fold(base.to_path_buf(), |p, part| p.join(part))
 }
 
 #[cfg(test)]

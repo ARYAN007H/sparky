@@ -42,7 +42,13 @@ pub struct ImportSummary {
 
 /// The v1 database URL of the profile (`sqlite:<workspace>/storage`).
 pub fn v1_url(target: &Target) -> String {
-    format!("sqlite:{}", target.workspace().join(storage::config::DEFAULT_DIR).display())
+    format!(
+        "sqlite:{}",
+        target
+            .workspace()
+            .join(storage::config::DEFAULT_DIR)
+            .display()
+    )
 }
 
 /// `<workspace>/storage/storage.db`, the file the URL opens.
@@ -71,7 +77,10 @@ pub async fn import(target: &Target, config: &Config) -> Result<ImportSummary, L
         return Ok(ImportSummary::default());
     }
     let backend = open_v1(target).await?;
-    let config = Config { workspace_dir: workspace.clone(), ..config.clone() };
+    let config = Config {
+        workspace_dir: workspace.clone(),
+        ..config.clone()
+    };
     let summary = tokio::task::spawn_blocking({
         let backend = Arc::clone(&backend);
         move || import_blocking(&backend, &config, &workspace)

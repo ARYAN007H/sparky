@@ -15,7 +15,11 @@ fn the_copy_has_the_sources_counts_and_leaves_the_source_alone() {
     assert_eq!(copied.counts, table_counts(&source).unwrap());
     assert_eq!(copied.counts, table_counts(&dest).unwrap());
     assert!(!dest.with_file_name("storage.db.tmp").exists());
-    assert_eq!(std::fs::read(&source).unwrap(), before, "the source is read-only to the copy");
+    assert_eq!(
+        std::fs::read(&source).unwrap(),
+        before,
+        "the source is read-only to the copy"
+    );
     assert_eq!(fixture_docs(&dest).len(), 3);
 }
 

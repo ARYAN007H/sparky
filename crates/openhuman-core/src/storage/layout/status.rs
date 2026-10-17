@@ -49,7 +49,11 @@ pub struct Status {
 ///
 /// An unreadable progress file. A database that cannot be read reports no
 /// versions rather than failing.
-pub async fn status(target: &Target, config: &Config, env_url: Option<String>) -> Result<Status, LayoutError> {
+pub async fn status(
+    target: &Target,
+    config: &Config,
+    env_url: Option<String>,
+) -> Result<Status, LayoutError> {
     let layout = LayoutVersion::detect(&target.profile_dir);
     let state = LayoutState::load(&target.profile_dir)?;
     let database = match layout {
@@ -78,7 +82,9 @@ pub async fn status(target: &Target, config: &Config, env_url: Option<String>) -
     })
 }
 
-async fn read_versions(db: &std::path::Path) -> Result<(Vec<OwnerVersion>, Option<i64>), LayoutError> {
+async fn read_versions(
+    db: &std::path::Path,
+) -> Result<(Vec<OwnerVersion>, Option<i64>), LayoutError> {
     use tinystoragedrivers::schema::Progress;
     use tinystoragedrivers::{DocumentStoreExt, Query, MIGRATIONS_COLLECTION};
     let url = crate::storage::StorageUrl::parse(&format!("sqlite:{}", db.display()))
@@ -107,7 +113,10 @@ async fn read_versions(db: &std::path::Path) -> Result<(Vec<OwnerVersion>, Optio
         }
     }
     Ok((
-        owners.into_iter().map(|(owner, version)| OwnerVersion { owner, version }).collect(),
+        owners
+            .into_iter()
+            .map(|(owner, version)| OwnerVersion { owner, version })
+            .collect(),
         last,
     ))
 }

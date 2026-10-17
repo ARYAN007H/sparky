@@ -275,7 +275,9 @@ fn import_legacy(kv: &StateKv, dir: &Path) -> anyhow::Result<()> {
             let value: serde_json::Value = match serde_json::from_slice(&bytes) {
                 Ok(value) => value,
                 Err(error) => {
-                    log::warn!("[subagent:lifecycle] legacy index {component} unparsable ({error})");
+                    log::warn!(
+                        "[subagent:lifecycle] legacy index {component} unparsable ({error})"
+                    );
                     continue;
                 }
             };

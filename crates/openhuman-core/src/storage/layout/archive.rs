@@ -137,13 +137,19 @@ fn write_inner(
         created_ms,
         entries: sources
             .iter()
-            .map(|s| EntryRecord { path: s.rel.clone(), action: s.action })
+            .map(|s| EntryRecord {
+                path: s.rel.clone(),
+                action: s.action,
+            })
             .collect(),
         files: Vec::new(),
     };
     for source in sources {
         let root = format!("{ROOT}/{}", source.rel);
-        for item in WalkDir::new(&source.at).follow_links(false).sort_by_file_name() {
+        for item in WalkDir::new(&source.at)
+            .follow_links(false)
+            .sort_by_file_name()
+        {
             let item = item.map_err(|e| io(e))?;
             let relative = item.path().strip_prefix(&source.at).map_err(|e| io(e))?;
             let name = if relative.as_os_str().is_empty() {
@@ -227,7 +233,9 @@ fn restrict(path: &Path, mode: u32) {
 #[cfg(not(unix))]
 fn restrict(_path: &Path, _mode: u32) {}
 
-fn open_archive(path: &Path) -> Result<tar::Archive<zstd::stream::read::Decoder<'static, BufReader<File>>>, LayoutError> {
+fn open_archive(
+    path: &Path,
+) -> Result<tar::Archive<zstd::stream::read::Decoder<'static, BufReader<File>>>, LayoutError> {
     let decoder = zstd::stream::read::Decoder::new(File::open(path)?)?;
     Ok(tar::Archive::new(decoder))
 }
@@ -247,32 +255,52 @@ pub fn verify(archive: &Path) -> Result<Manifest, LayoutError> {
     let mut manifest: Option<Manifest> = None;
     for entry in tar.entries().map_err(|e| bad(format!("unreadable: {e}")))? {
         let mut entry = entry.map_err(|e| bad(format!("unreadable entry: {e}")))?;
-        let path = entry.path().map_err(|e| bad(e.to_string()))?.to_string_lossy().into_owned();
+        let path = entry
+            .path()
+            .map_err(|e| bad(e.to_string()))?
+            .to_string_lossy()
+            .into_owned();
         let kind = entry.header().entry_type();
         if path == MANIFEST_ENTRY {
             let mut body = Vec::new();
-            entry.read_to_end(&mut body).map_err(|e| bad(format!("manifest unreadable: {e}")))?;
-            manifest = Some(serde_json::from_slice(&body).map_err(|e| bad(format!("manifest damaged: {e}")))?);
+            entry
+                .read_to_end(&mut body)
+                .map_err(|e| bad(format!("manifest unreadable: {e}")))?;
+            manifest = Some(
+                serde_json::from_slice(&body).map_err(|e| bad(format!("manifest damaged: {e}")))?,
+            );
         } else if kind.is_file() {
             let mut hasher = Sha256::new();
             let mut size = 0u64;
             let mut buf = vec![0u8; 64 * 1024];
             loop {
-                let n = entry.read(&mut buf).map_err(|e| bad(format!("{path}: {e}")))?;
+                let n = entry
+                    .read(&mut buf)
+                    .map_err(|e| bad(format!("{path}: {e}")))?;
                 if n == 0 {
                     break;
                 }
                 hasher.update(&buf[..n]);
                 size += n as u64;
             }
-            seen.insert(path, ("file".to_owned(), size, hex::encode(hasher.finalize())));
+            seen.insert(
+                path,
+                ("file".to_owned(), size, hex::encode(hasher.finalize())),
+            );
         } else if kind.is_symlink() {
             let target = entry
                 .link_name()
                 .map_err(|e| bad(e.to_string()))?
                 .map(|t| t.to_string_lossy().into_owned())
                 .unwrap_or_default();
-            seen.insert(path, ("symlink".to_owned(), 0, hex::encode(Sha256::digest(target.as_bytes()))));
+            seen.insert(
+                path,
+                (
+                    "symlink".to_owned(),
+                    0,
+                    hex::encode(Sha256::digest(target.as_bytes())),
+                ),
+            );
         }
     }
     let manifest = manifest.ok_or_else(|| bad("no manifest entry".to_owned()))?;
@@ -311,10 +339,16 @@ pub fn restore(archive: &Path, profile_dir: &Path) -> Result<Manifest, LayoutErr
             continue;
         }
         if !path.starts_with(ROOT) {
-            return Err(LayoutError::Verify(format!("{} is outside {ROOT}/", path.display())));
+            return Err(LayoutError::Verify(format!(
+                "{} is outside {ROOT}/",
+                path.display()
+            )));
         }
         if !entry.unpack_in(profile_dir)? {
-            return Err(LayoutError::Verify(format!("{} escapes the profile directory", path.display())));
+            return Err(LayoutError::Verify(format!(
+                "{} escapes the profile directory",
+                path.display()
+            )));
         }
     }
     Ok(manifest)

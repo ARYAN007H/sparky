@@ -82,7 +82,11 @@ fn migrate_dry_run_plans_a_v1_profile_and_writes_nothing() {
     let profile = v1_profile(home.path());
     let before = digest(&profile);
 
-    let plan = call(home.path(), "openhuman.storage_migrate", r#"{"dry_run":true}"#);
+    let plan = call(
+        home.path(),
+        "openhuman.storage_migrate",
+        r#"{"dry_run":true}"#,
+    );
     assert_eq!(plan["result"], "dry_run", "{plan}");
     let paths = |key: &str| -> Vec<String> {
         plan[key]
@@ -98,8 +102,17 @@ fn migrate_dry_run_plans_a_v1_profile_and_writes_nothing() {
     assert!(plan["archive"]["bytes"].as_u64().unwrap() > 0);
     assert_eq!(digest(&profile), before, "a dry run writes nothing");
     assert!(!home.path().join(".openhuman/backups").exists());
-    for created in [".layout", ".layout.lock", ".layout.state", "storage.db", "files"] {
-        assert!(!profile.join(created).exists(), "{created} must not exist after a dry run");
+    for created in [
+        ".layout",
+        ".layout.lock",
+        ".layout.state",
+        "storage.db",
+        "files",
+    ] {
+        assert!(
+            !profile.join(created).exists(),
+            "{created} must not exist after a dry run"
+        );
     }
 }
 

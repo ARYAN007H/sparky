@@ -27,9 +27,11 @@ async fn duplicates_merge_and_the_queue_survives_a_reload() {
 
     let queue = snapshot(&config).await;
     assert_eq!(queue.pending.len(), 3, "one per (root, job)");
-    assert!(crate::memory::state_store::load::<JobQueue>(&config.workspace_dir, "jobs")
-        .unwrap()
-        .is_some());
+    assert!(
+        crate::memory::state_store::load::<JobQueue>(&config.workspace_dir, "jobs")
+            .unwrap()
+            .is_some()
+    );
 }
 
 #[tokio::test]
@@ -103,7 +105,11 @@ async fn the_build_delay_comes_from_the_recall_config_and_the_file_store_is_the_
     let stored: JobQueue = crate::memory::state_store::load(&config.workspace_dir, "jobs")
         .unwrap()
         .unwrap();
-    assert_eq!(stored.pending.len(), 1, "persisted in the memory state store");
+    assert_eq!(
+        stored.pending.len(),
+        1,
+        "persisted in the memory state store"
+    );
     assert!(run(&config, Selection::Due).await.unwrap().is_empty());
 }
 

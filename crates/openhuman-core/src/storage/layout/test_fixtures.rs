@@ -82,14 +82,20 @@ pub fn v1_profile() -> Fixture {
         config_path: target.profile_dir.join("config.toml"),
         ..Config::default()
     };
-    Fixture { dir, target, config }
+    Fixture {
+        dir,
+        target,
+        config,
+    }
 }
 
 /// Every file under `root` with the digest of its bytes (and `<dir>` markers
 /// for directories), for before/after comparisons.
 pub fn tree(root: &Path) -> BTreeMap<String, String> {
     fn walk(dir: &Path, root: &Path, out: &mut BTreeMap<String, String>) {
-        let Ok(entries) = std::fs::read_dir(dir) else { return };
+        let Ok(entries) = std::fs::read_dir(dir) else {
+            return;
+        };
         for entry in entries {
             let path = entry.unwrap().path();
             let rel = path.strip_prefix(root).unwrap().display().to_string();
@@ -97,7 +103,10 @@ pub fn tree(root: &Path) -> BTreeMap<String, String> {
                 out.insert(rel, "<dir>".to_owned());
                 walk(&path, root, out);
             } else {
-                out.insert(rel, hex::encode(sha2::Sha256::digest(std::fs::read(&path).unwrap())));
+                out.insert(
+                    rel,
+                    hex::encode(sha2::Sha256::digest(std::fs::read(&path).unwrap())),
+                );
             }
         }
     }
