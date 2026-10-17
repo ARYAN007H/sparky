@@ -252,3 +252,7 @@ fn unsupported_arg_names(schema: Option<&Value>, args: &Value) -> Option<Vec<Str
     unsupported.sort();
     Some(unsupported)
 }
+
+#[cfg(test)]
+#[path = "validation_tests.rs"]
+mod tests;
