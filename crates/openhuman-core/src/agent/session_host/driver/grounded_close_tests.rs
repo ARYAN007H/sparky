@@ -135,7 +135,7 @@ async fn grounded_close_uses_the_selected_model_and_keeps_verifier_out_of_contex
     let expected_history: Vec<_> = history
         .iter()
         .filter_map(tinyagents_runtime::transcript::message_to_native_transcript)
-        .map(crate::agent::tinyagents::chat_message_to_message)
+        .map(|message| crate::agent::tinyagents::chat_message_to_message(&message))
         .collect();
     assert_eq!(
         &requests[0].messages[..expected_history.len()],
@@ -185,6 +185,7 @@ async fn required_output_repair_preserves_all_host_output_placements() {
             &source,
             "test-model",
             0.0,
+            None,
             Some(&progress),
             &tinytools_agent::dialect::NativeDialect,
             &contract,
