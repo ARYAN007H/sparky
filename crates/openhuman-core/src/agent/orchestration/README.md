@@ -137,10 +137,14 @@ removed rather than kept under new names:
   completion and token-scoped cleanup. The host returns the owner's receipt
   over a oneshot before continuing its real worker executor.
 - Workflow start/resume/stop use `WorkflowRunSupervisor` generation APIs.
-  OpenHuman retains durable revision-CAS transitions, policy admission,
-  root-parent construction, origin propagation and failure projection. Stop
-  captures the owner handle before CAS and cancels only that generation after
-  CAS succeeds.
+  OpenHuman commits durable start/resume transitions inside
+  `start_scoped_with_commit` / `resume_scoped_with_commit`, so the durable CAS
+  and generation handoff are serialized by the owner. Policy admission,
+  root-parent construction and origin propagation remain host responsibilities.
+  Stop captures the current handle before its revision CAS and cancels only
+  that generation after the CAS succeeds. Pre-drive setup failures may update
+  only their captured revision; once drive begins, the engine's lease-fenced
+  lifecycle writes own durable errors, and the host only logs drive failures.
 - Parallel dispatch uses `Plan::stage_with_preflight` and `parallel::run`.
   Preflight only resolves definitions and trims prompts; worktree creation and
   spawn events follow admission. Awaited host progress and results stay in the
