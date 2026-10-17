@@ -163,7 +163,6 @@ fn child_ledgers_are_isolated_and_parent_keeps_completed_child_totals() {
     let left = root.child();
     let right = root.child();
     left.append_subagent_usage(SubagentUsageEntry {
-        run_id: "run-left".into(),
         task_id: "left-task".into(),
         agent_id: "researcher".into(),
         usage: crate::agent::subagent_host::SubagentUsage {
@@ -177,7 +176,6 @@ fn child_ledgers_are_isolated_and_parent_keeps_completed_child_totals() {
     assert!(right.subagent_usage_entries().is_empty());
 
     left.record_completed_subagent_usage(SubagentUsageEntry {
-        run_id: "run-completed".into(),
         task_id: "completed-child".into(),
         agent_id: "researcher".into(),
         usage: crate::agent::subagent_host::SubagentUsage::default(),
@@ -191,7 +189,6 @@ fn failed_outer_run_promotes_completed_nested_usage_once() {
     let root = OpenHumanRunContext::new();
     let outer = root.child();
     outer.append_subagent_usage(SubagentUsageEntry {
-        run_id: "run-nested".into(),
         task_id: "nested".into(),
         agent_id: "researcher".into(),
         usage: crate::agent::subagent_host::SubagentUsage {
@@ -206,7 +203,6 @@ fn failed_outer_run_promotes_completed_nested_usage_once() {
     outer.promote_completed_descendant_usage();
     assert_eq!(root.subagent_usage_entries().len(), 1);
     assert_eq!(root.subagent_usage_entries()[0].task_id, "nested");
-    assert_eq!(root.subagent_usage_entries()[0].run_id, "run-nested");
 }
 
 #[test]
@@ -223,7 +219,6 @@ fn detached_children_reset_turn_accounting_and_cancellation() {
     root.cancellation.cancel();
     assert!(!detached.cancellation.is_cancelled());
     detached.record_completed_subagent_usage(SubagentUsageEntry {
-        run_id: "run-background".into(),
         task_id: "background".into(),
         agent_id: "archivist".into(),
         usage: Default::default(),

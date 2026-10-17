@@ -111,7 +111,6 @@ fn codec_attaches_only_this_agents_own_sidecar_usage_to_atomic_append() {
             });
     }
     context.append_subagent_usage(crate::agent::tinyagents::host::SubagentUsageEntry {
-        run_id: "run-child-usage".into(),
         task_id: "child-usage".into(),
         agent_id: "researcher".into(),
         usage: crate::agent::subagent_host::SubagentUsage {
@@ -196,7 +195,6 @@ fn last_turn_usage_reports_the_same_holistic_totals_as_transcript_billing() {
     sidecar
         .subagents
         .push(crate::agent::tinyagents::host::SubagentUsageEntry {
-            run_id: "run-child-ui".into(),
             task_id: "child-ui".into(),
             agent_id: "researcher".into(),
             usage: crate::agent::subagent_host::SubagentUsage {
@@ -227,7 +225,6 @@ fn child_usage_rollup_deduplicates_runs_without_merging_repeated_task_ids() {
         source: tinyagents_harness::cost::CostSource::Charged,
     };
     let inclusive_child = crate::agent::tinyagents::host::SubagentUsageEntry {
-        run_id: "run-inclusive-child".into(),
         task_id: "reused-task".into(),
         agent_id: "researcher".into(),
         usage: crate::agent::subagent_host::SubagentUsage {
@@ -252,7 +249,6 @@ fn child_usage_rollup_deduplicates_runs_without_merging_repeated_task_ids() {
         inclusive_child,
         crate::agent::tinyagents::host::SubagentUsageEntry {
             // Same task, distinct actual execution: its usage is retained.
-            run_id: "run-second-execution".into(),
             task_id: "reused-task".into(),
             agent_id: "researcher".into(),
             usage: crate::agent::subagent_host::SubagentUsage {
@@ -357,7 +353,6 @@ async fn committed_goal_accounting_uses_direct_and_completed_child_usage() {
     sidecar
         .subagents
         .push(crate::agent::tinyagents::host::SubagentUsageEntry {
-            run_id: "run-child-goal".into(),
             task_id: "child-goal".into(),
             agent_id: "researcher".into(),
             usage: crate::agent::subagent_host::SubagentUsage {

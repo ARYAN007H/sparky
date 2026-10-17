@@ -76,13 +76,16 @@ pub(crate) fn direct_subagent_child(
 /// usage breakdown.
 #[derive(Debug, Clone, PartialEq)]
 pub struct SubagentUsageEntry {
-    /// Identity for this actual execution, shared across cloned/promoted
-    /// completion records so usage rollup can ignore replayed entries without
-    /// conflating separate runs of the same task.
-    pub run_id: String,
     pub task_id: String,
     pub agent_id: String,
     pub usage: SubagentUsage,
+}
+
+/// Internal run identity paired with its host-facing usage projection.
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct SubagentUsageRecord {
+    pub(crate) run_id: String,
+    pub(crate) entry: SubagentUsageEntry,
 }
 
 /// Complete usage for a completed root turn, including synchronous children.
@@ -337,11 +340,11 @@ pub struct OpenHumanRunContext {
     /// Zero-based OpenHuman subagent depth (the root is zero).
     pub spawn_depth: usize,
     /// This run's subagent usage roll-up; intentionally isolated for children.
-    pub subagent_usage: Arc<Mutex<Vec<SubagentUsageEntry>>>,
+    subagent_usage: Arc<Mutex<Vec<SubagentUsageRecord>>>,
     /// The immediate parent's ledger. A child writes its own completed total to
     /// this explicit handle, while nested children first collect in this run's
     /// isolated ledger. It is never a task-local or a root-global collector.
-    parent_subagent_usage: Option<Arc<Mutex<Vec<SubagentUsageEntry>>>>,
+    parent_subagent_usage: Option<Arc<Mutex<Vec<SubagentUsageRecord>>>>,
     /// Provider/model/host-route observation for this run, written from the
     /// canonical response metadata by typed model middleware. Intentionally
     /// isolated for children.

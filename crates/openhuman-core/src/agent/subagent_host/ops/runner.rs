@@ -358,7 +358,6 @@ pub(crate) async fn run_subagent_direct(
         // offload. A cancellation while that filesystem work is pending must
         // not erase direct model usage or descendants that already finished.
         usage_finalizer.finish(crate::agent::tinyagents::host::SubagentUsageEntry {
-            run_id: usage_finalizer.run_id.clone(),
             task_id: task_id.clone(),
             agent_id: definition.id.clone(),
             usage: outcome.usage,
