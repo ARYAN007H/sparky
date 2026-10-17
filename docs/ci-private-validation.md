@@ -87,6 +87,22 @@ is context rather than a controlled speed-up claim.
 
 ## Measurement protocol
 
+The initial diagnostic at `0b93ecf6bc1012fa06886c87b30ee0eebbd7e5f0`
+finished with a failing aggregate result in 117m49s: lanes took 108m24s and cache
+saving took 8m36s. Its resource limit changed mid-run, so these timings are not
+a controlled cold measurement. All eight main Rust configurations passed their
+12,225 test executions; all 23 offline examples passed. The diagnostic exposed
+missing vendor tag history, the frontend lint heap limit, an unsupported
+`llvm-cov show-env --features` option, and conflicting auxiliary coverage flags.
+The seven auxiliary coverage configurations failed before running tests and
+must not be counted as covered merely because an LCOV report was produced.
+
+The private workflow budget is now 180 minutes, including a bounded 15-minute
+cache save. The earlier 120-minute budget had almost expired before those seven
+configurations could execute; the provisional five-minute save limit was below
+the observed 8m36s save time. Final measurements must use the corrected source
+and unchanged resources throughout each run.
+
 Run the complete selected lane plan twice at the same source revision and image,
 using fresh target outputs. Preserve package-manager caches, and identify whether
 the signed remote Rust cache already contains those compiler keys. Do not call a
