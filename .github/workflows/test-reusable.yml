@@ -130,7 +130,9 @@ jobs:
     if: inputs.run_rust_core
     name: Rust Core Tests + Quality
     runs-on: ubuntu-22.04
-    timeout-minutes: 60
+    # The full Rust test binary and serial host integration matrix exceed an
+    # hour on the hosted container under cold build/cache pressure.
+    timeout-minutes: 120
     container:
       image: ghcr.io/tinyhumansai/openhuman_ci:latest
     env:
