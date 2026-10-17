@@ -257,7 +257,10 @@ async fn stale_setup_failure_does_not_overwrite_another_process_lease() {
         }
     })
     .expect("claim workflow lease");
-    assert!(matches!(claim, WorkflowLeaseClaim::Acquired(_)));
+    let claimed = match claim {
+        WorkflowLeaseClaim::Acquired(run) => run,
+        other => panic!("expected lease acquisition, got {other:?}"),
+    };
 
     let supervisor = workflow_supervisor().clone();
     let handle = supervisor.start_scoped_with_handle(
@@ -282,5 +285,6 @@ async fn stale_setup_failure_does_not_overwrite_another_process_lease() {
         .expect("run remains present");
     assert_eq!(after.status, WorkflowRunStatus::Running);
     assert_eq!(after.lease_owner.as_deref(), Some("other-process"));
+    assert_eq!(after.revision, claimed.revision);
     assert_ne!(after.summary.as_deref(), Some("stale setup failure"));
 }
