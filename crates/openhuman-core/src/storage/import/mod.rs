@@ -28,8 +28,9 @@
 //!   untouched legacy file. A failed import leaves no marker and is retried
 //!   on the next boot.
 //!
-//! Records land under [`Scope::local`], the scope the operator's own stores
-//! read; the legacy files belong to one workspace and carry no tenancy. SaaS
+//! Records land under [`super::scope::tenant_scope`] of no profile
+//! (`local`), the one scope every unprofiled reader resolves to
+//! ([`super::current_scope`]) — never a scope only some readers use; the legacy files belong to one workspace and carry no tenancy. SaaS
 //! processes have no workspace-local legacy files and import nothing.
 //!
 //! # What is not here
@@ -53,7 +54,7 @@ use tinystoragedrivers::{CollectionSpec, ErrorKind, Precondition};
 
 use super::documents::Repo;
 use super::rusqlite;
-use super::{block_on, Scope, StorageBackend};
+use super::{block_on, StorageBackend};
 use crate::config::Config;
 use rusqlite::Connection;
 use serde_json::Value;
@@ -279,8 +280,18 @@ fn import_one(
 ) -> Result<Outcome> {
     let domain = source.domain;
     let marker = marker_id(domain, &config.workspace_dir);
-    let repo = Repo::on(backend, &Scope::local(), domain, source.collections)?;
-    let markers = Repo::on(backend, &Scope::local(), "storage::import", marker_spec)?;
+    let repo = Repo::on(
+        backend,
+        &super::scope::tenant_scope(None),
+        domain,
+        source.collections,
+    )?;
+    let markers = Repo::on(
+        backend,
+        &super::scope::tenant_scope(None),
+        "storage::import",
+        marker_spec,
+    )?;
 
     let marker_id = marker.clone();
     let done = markers
@@ -382,7 +393,7 @@ pub fn is_done(
 ) -> Result<bool> {
     let marker = marker_id(source.domain, &config.workspace_dir);
     let scoped = backend
-        .for_scope(&Scope::local())
+        .for_scope(&super::scope::tenant_scope(None))
         .map_err(|error| anyhow!("open the local scope: {error}"))?;
     let docs = Arc::clone(scoped.documents());
     let found = block_on(async move {

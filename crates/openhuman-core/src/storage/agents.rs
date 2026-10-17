@@ -35,7 +35,7 @@ use super::{block_on, installed, DocumentStoreExt, StorageBackend};
 use crate::core::runtime::{AgentContextRegistry, CoreContext, DispatchCtx};
 
 /// The `local`-scope collection recording which agents have their own scope.
-const AGENTS: &str = "storage_agents";
+pub(super) const AGENTS: &str = "storage_agents";
 
 /// `(backend, agent id)` pairs this process has already recorded, the
 /// backend identified by its address (see [`backend_key`]).

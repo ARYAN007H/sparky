@@ -264,6 +264,7 @@ pub async fn compare_and_swap(
                     id: id.to_string(),
                     version,
                     doc: next,
+                    meta: stored.meta,
                 }));
             }
             Err(error) if error.kind() == ErrorKind::Conflict => {}
