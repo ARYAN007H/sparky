@@ -58,7 +58,11 @@ async fn a_profile_open_on_one_node_is_refused_on_another_naming_the_holder() {
         node(tmp.path(), "node-b", Some(&backend)),
     );
     let alice = profile("alice");
-    assert!(a.provision(&alice).await.unwrap());
+    let provisioned = a.provision(&alice).await;
+    if let Err(error) = &provisioned {
+        eprintln!("lease test provision error: {error}");
+    }
+    assert!(provisioned.unwrap());
     assert!(
         !b.provision(&alice).await.unwrap(),
         "the registry is shared: node b sees alice provisioned"
