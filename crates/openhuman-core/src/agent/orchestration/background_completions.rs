@@ -38,7 +38,7 @@ use tinyagents_orchestration::subagent::{
 };
 use tinyagents_tasks::{
     CompletionRecord, CompletionResult, CompletionRouter, CompletionRouterPool,
-    CompletionRouterReplaceOutcome, CompletionState, CompletionStatus, CompletionStore,
+    CompletionState, CompletionStatus, CompletionStore, CompletionStoreReplaceOutcome,
     DriverCompletionStore, InMemoryCompletionStore, NotifyMode, TombstoneOutcome,
     DEFAULT_MAX_ATTEMPTS,
 };
@@ -237,38 +237,41 @@ fn degrade_to_memory(
     failed: &Arc<CompletionRouter>,
 ) -> Arc<Entry> {
     let scope = router_scope_for(ctx, workspace_dir);
-    let store = Arc::new(InMemoryCompletionStore::new());
-    for record in failed.store().list(None) {
-        if let Err(error) = store.put(&record) {
-            log::warn!("[background_completions] could not carry a record over: {error}");
-        }
-    }
-    let store: Arc<dyn CompletionStore> = store;
-    let replacement = Arc::new(new_router(store));
-    match router_pool().replace_if_current(&scope, failed, replacement) {
-        Ok(CompletionRouterReplaceOutcome::Replaced(router)) => {
-            let store = router.store();
+    let previous = failed.store();
+    let replacement: Arc<dyn CompletionStore> =
+        Arc::new(InMemoryCompletionStore::new());
+    match failed.replace_store_if_current(&previous, replacement) {
+        Ok(CompletionStoreReplaceOutcome::Replaced(store)) => {
             state().stores.insert(scope, store.clone());
             log::error!(
                 "[background_completions] degraded to an in-memory queue workspace_dir={}",
                 workspace_dir.display()
             );
-            Arc::new(Entry { router, store })
+            Arc::new(Entry {
+                router: Arc::clone(failed),
+                store,
+            })
         }
-        Ok(CompletionRouterReplaceOutcome::Current(router)) => {
-            let store = router.store();
+        Ok(CompletionStoreReplaceOutcome::Current(store)) => {
             state().stores.insert(scope, store.clone());
-            Arc::new(Entry { router, store })
-        }
-        Ok(CompletionRouterReplaceOutcome::Missing) => {
-            // A lifecycle release removed the key while records were copied.
-            // Reopen the current scope; never reinstall the stale replacement.
-            state().stores.remove(&scope);
-            entry_for_ctx(ctx, workspace_dir)
+            Arc::new(Entry {
+                router: Arc::clone(failed),
+                store,
+            })
         }
         Err(error) => {
-            log::error!("[background_completions] router fallback replace failed: {error}");
-            entry_for_ctx(ctx, workspace_dir)
+            // A failed enumeration/copy leaves the old router and lease state
+            // canonical. Keep it addressable and report the actual migration
+            // error instead of silently replacing it with an empty queue.
+            log::error!(
+                "[background_completions] could not migrate completion records to memory workspace_dir={} error={error:#}",
+                workspace_dir.display()
+            );
+            state().stores.insert(scope, previous.clone());
+            Arc::new(Entry {
+                router: Arc::clone(failed),
+                store: previous,
+            })
         }
     }
 }
