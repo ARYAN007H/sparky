@@ -1,4 +1,42 @@
 use super::*;
+use crate::flows::tinyflows::caps::{fetch_live_toolkit_catalog, ToolContract};
+
+pub(crate) const RUNTIME_GATE_WARNING: &str = "This action will be REJECTED on every real run — the runtime tool gate only allows curated actions for this toolkit. Pick a `featured: true` result from search_tool_catalog instead.";
+
+pub(crate) enum ContractLookupError {
+    InvalidSlug { slug: String },
+    CatalogUnavailable { toolkit: String },
+    ActionNotFound { slug: String, toolkit: String },
+}
+
+/// Resolves one live action and the runtime-curation warning used by both
+/// builder surfaces. The runtime allowlist remains authoritative; this only
+/// classifies an action so authoring can explain an inevitable rejection.
+pub(crate) async fn lookup_contract(
+    config: &Config,
+    slug: &str,
+) -> Result<(ToolContract, Option<&'static str>), ContractLookupError> {
+    let trimmed = slug.trim();
+    let Some(toolkit) = toolkit_for_contract_slug(trimmed) else {
+        return Err(ContractLookupError::InvalidSlug {
+            slug: slug.to_string(),
+        });
+    };
+    let Some(catalog) = fetch_live_toolkit_catalog(config, &toolkit).await else {
+        return Err(ContractLookupError::CatalogUnavailable { toolkit });
+    };
+    let Some(contract) = catalog.iter().find(|contract| {
+        crate::integrations::composio::contract::action_slug_matches(&contract.slug, trimmed)
+    }) else {
+        return Err(ContractLookupError::ActionNotFound {
+            slug: trimmed.to_string(),
+            toolkit,
+        });
+    };
+    let warning = (!contract.is_curated && toolkit_has_curated_catalog(&toolkit))
+        .then_some(RUNTIME_GATE_WARNING);
+    Ok((contract.clone(), warning))
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Catalog RPCs for the UI (Phase 5, item 16) — one implementation, two consumers
@@ -57,39 +95,26 @@ pub async fn flows_get_tool_contract(
     slug: &str,
 ) -> Result<Outcome<Value>, String> {
     let trimmed = slug.trim();
-    // Shape-check before `toolkit_from_slug`, and before any I/O: the shared
-    // helper is deliberately permissive, so an unshaped slug would otherwise
-    // fall through to a catalog round trip and fail with an unrelated message.
-    // The message quotes the caller's own slug, not `trimmed` — reporting the
-    // trimmed form named an empty string back at whoever sent whitespace.
-    let Some(toolkit) = toolkit_for_contract_slug(trimmed) else {
-        return Err(format!(
-            "Could not extract a toolkit from slug '{slug}' — it must look like \
+    let (contract, runtime_gate) =
+        lookup_contract(config, slug)
+            .await
+            .map_err(|error| match error {
+                ContractLookupError::InvalidSlug { slug } => format!(
+                    "Could not extract a toolkit from slug '{slug}' — it must look like \
              '<TOOLKIT>_<ACTION>' (e.g. 'GMAIL_SEND_EMAIL')."
-        ));
-    };
-    tracing::debug!(target: "flows", slug = %trimmed, %toolkit, "[flows] flows_get_tool_contract: fetching contract");
-    let Some(catalog) =
-        crate::flows::tinyflows::caps::fetch_live_toolkit_catalog(config, &toolkit).await
-    else {
-        return Err(format!(
-            "Could not fetch the live Composio catalog for toolkit '{toolkit}'."
-        ));
-    };
-    match catalog
-        .iter()
-        .find(|c| crate::integrations::composio::contract::action_slug_matches(&c.slug, trimmed))
-    {
-        Some(contract) => {
-            let contract = contract.clone();
-            let value = serde_json::to_value(&contract).map_err(|e| e.to_string())?;
-            Ok(Outcome::single_log(
-                json!({ "contract": value }),
-                "tool contract fetched",
-            ))
-        }
-        None => Err(format!(
-            "'{trimmed}' is not a real action in the '{toolkit}' toolkit's live catalog."
-        )),
+                ),
+                ContractLookupError::CatalogUnavailable { toolkit } => {
+                    format!("Could not fetch the live Composio catalog for toolkit '{toolkit}'.")
+                }
+                ContractLookupError::ActionNotFound { slug, toolkit } => format!(
+                    "'{slug}' is not a real action in the '{toolkit}' toolkit's live catalog."
+                ),
+            })?;
+    let value = serde_json::to_value(&contract).map_err(|e| e.to_string())?;
+    tracing::debug!(target: "flows", slug = %trimmed, toolkit = %contract.toolkit, "[flows] flows_get_tool_contract: fetching contract");
+    let mut response = json!({ "contract": value });
+    if let Some(warning) = runtime_gate {
+        response["runtime_gate"] = json!(warning);
     }
+    Ok(Outcome::single_log(response, "tool contract fetched"))
 }

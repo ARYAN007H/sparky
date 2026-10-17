@@ -39,9 +39,18 @@ async fn flows_get_tool_contract_rpc_warns_for_runtime_gated_uncurated_action() 
         .await
         .expect("seeded catalog lookup should succeed");
 
-    assert_eq!(outcome.value["contract"]["slug"], "SPOTIFY_OBSCURE_RPC_ACTION");
+    assert_eq!(
+        outcome.value["contract"]["slug"],
+        "SPOTIFY_OBSCURE_RPC_ACTION"
+    );
     assert_eq!(outcome.value["contract"]["is_curated"], false);
-    assert!(outcome.value["runtime_gate"].as_str().unwrap().contains("REJECTED on every real run"));
+    assert!(
+        outcome.value["runtime_gate"]
+            .as_str()
+            .is_some_and(|warning| warning.contains("REJECTED on every real run")),
+        "RPC should explain the runtime rejection: {}",
+        outcome.value
+    );
 }
 
 #[tokio::test]
@@ -58,7 +67,10 @@ async fn validate_tool_contracts_accepts_a_separated_action_slug_alias() {
 
     let errors = validate_tool_contracts(&Config::default(), &g).await;
 
-    assert!(errors.is_empty(), "valid action alias was rejected: {errors:?}");
+    assert!(
+        errors.is_empty(),
+        "valid action alias was rejected: {errors:?}"
+    );
 }
 
 #[tokio::test]
@@ -83,9 +95,21 @@ async fn graph_wiring_warnings_resolves_a_separated_action_slug_alias() {
 
     let warnings = graph_wiring_warnings(&Config::default(), &g).await;
 
-    assert_eq!(warnings.len(), 2, "alias should reach both wiring checks: {warnings:?}");
-    assert!(warnings.iter().any(|warning| warning.contains("json.data.files")), "{warnings:?}");
-    assert!(warnings.iter().any(|warning| warning.contains("wrong")), "{warnings:?}");
+    assert_eq!(
+        warnings.len(),
+        2,
+        "alias should reach both wiring checks: {warnings:?}"
+    );
+    assert!(
+        warnings
+            .iter()
+            .any(|warning| warning.contains("json.data.files")),
+        "{warnings:?}"
+    );
+    assert!(
+        warnings.iter().any(|warning| warning.contains("wrong")),
+        "{warnings:?}"
+    );
 }
 
 /// (Codex feedback on this PR) `notion` ships a static curated catalog

@@ -90,7 +90,10 @@ pub(crate) async fn validate_tool_contracts(config: &Config, graph: &WorkflowGra
             continue;
         };
 
-        let Some(contract) = catalog.iter().find(|c| c.slug.eq_ignore_ascii_case(slug)) else {
+        let Some(contract) = catalog
+            .iter()
+            .find(|c| crate::integrations::composio::contract::action_slug_matches(&c.slug, slug))
+        else {
             tracing::warn!(
                 target: "flows",
                 node = %node.id,
