@@ -50,6 +50,7 @@ pub(crate) fn tools(config: Arc<Config>, security: &Arc<SecurityPolicy>) -> Vec<
         "duplicate_flow",
         "list_flows",
         "get_flow",
+        "get_flow_run",
     ] {
         push_copilot_tool(&mut tools, copilot.as_ref(), name);
     }

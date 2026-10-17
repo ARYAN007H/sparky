@@ -114,7 +114,7 @@ impl BusCopilotTool {
         )
         .await
         .map_err(anyhow::Error::msg)?;
-        let proxy = crate::modules::tinyflows::copilot_proxy(&self.config)
+        let proxy = crate::modules::tinyflows::copilot_invoke_proxy(&self.config)
             .await
             .map_err(anyhow::Error::msg)?;
         let request = tinyflows_bus::copilot::InvokeToolRequest {
