@@ -39,7 +39,7 @@ use tinytools_agent::dialect::ToolCallFormat;
 /// and execution methods.
 struct StubCreateImage {
     result: &'static str,
-    target: crate::agent::orchestration::tools::DelegationTarget,
+    target: Option<crate::agent::orchestration::tools::DelegationTarget>,
 }
 
 #[async_trait]
@@ -54,7 +54,9 @@ impl Tool for StubCreateImage {
         json!({})
     }
     fn host_extension(&self) -> Option<&(dyn std::any::Any + Send + Sync)> {
-        Some(&self.target)
+        self.target
+            .as_ref()
+            .map(|target| target as &(dyn std::any::Any + Send + Sync))
     }
     async fn execute(&self, _args: serde_json::Value) -> anyhow::Result<ToolResult> {
         Ok(ToolResult::success(self.result))
@@ -132,11 +134,11 @@ fn parent_execution_context(workspace_dir: &Path) -> ParentExecutionContext {
 /// `PackRegistryHandle` bound to it, and the `CanonicalSharedToolAdapter`
 /// wrapping `use_skill` that the harness would have registered.
 fn build_use_skill_dispatch_with_handle() -> (UseSkillDispatch, PackRegistryHandle) {
-    build_use_skill_dispatch_with_target("image_agent")
+    build_use_skill_dispatch_with_target(None)
 }
 
 fn build_use_skill_dispatch_with_target(
-    target_id: &str,
+    target_id: Option<&str>,
 ) -> (UseSkillDispatch, PackRegistryHandle) {
     let handle = PackRegistryHandle::default();
     let use_skill_tool: Box<dyn Tool> = Box::new(UseSkillTool::new(
@@ -145,7 +147,7 @@ fn build_use_skill_dispatch_with_target(
     ));
     let create_image_tool: Box<dyn Tool> = Box::new(StubCreateImage {
         result: "original",
-        target: crate::agent::orchestration::tools::DelegationTarget(target_id.into()),
+        target: target_id.map(|id| crate::agent::orchestration::tools::DelegationTarget(id.into())),
     });
     let durable: Arc<Vec<Box<dyn Tool>>> = Arc::new(vec![use_skill_tool, create_image_tool]);
     handle.bind(Arc::downgrade(&durable));
@@ -188,7 +190,7 @@ async fn use_skill_dispatch_keeps_authorized_target_after_registry_rebind() {
         )),
         Box::new(StubCreateImage {
             result: "replacement",
-            target: crate::agent::orchestration::tools::DelegationTarget("image_agent".into()),
+            target: None,
         }),
     ]);
     handle.bind(Arc::downgrade(&replacement));
@@ -215,7 +217,7 @@ async fn use_skill_dispatch_keeps_authorized_target_after_registry_rebind() {
 #[tokio::test]
 async fn use_skill_dispatch_reaches_live_parent_for_packed_archetype_delegate() {
     let _ = AgentDefinitionRegistry::init_global_builtins();
-    let (dispatch, _) = build_use_skill_dispatch_with_target("scoped_only_packed_worker");
+    let (dispatch, _) = build_use_skill_dispatch_with_target(Some("image_agent"));
     let workspace = tempfile::TempDir::new().expect("workspace");
 
     let parent_data = crate::agent::tinyagents::host::OpenHumanRunContext::new()
@@ -252,7 +254,7 @@ async fn packed_delegate_uses_scoped_target_and_registers_shared_job() {
     use tinyagents_orchestration::subagent::{SubAgentJobRegistry, SubAgentJobStatus};
 
     let workspace = tempfile::TempDir::new().expect("workspace");
-    let dispatch = build_use_skill_dispatch();
+    let (dispatch, _) = build_use_skill_dispatch_with_target(Some("scoped_only_packed_worker"));
     let mut target = crate::agent::harness::test_support::test_inherit_echo_def();
     target.id = "scoped_only_packed_worker".into();
     target.delegate_name = Some("create_image".into());
@@ -261,6 +263,7 @@ async fn packed_delegate_uses_scoped_target_and_registers_shared_job() {
     );
     let mut config = crate::config::Config::default();
     config.workspace_dir = workspace.path().to_path_buf();
+    config.components.juice = false;
     let core = CoreContext::for_test_with_config(DomainSet::full(), config.clone()).derive_with(
         ContextOverlay::new(config, DomainSet::full(), ToolGroups::none())
             .definitions(definitions),
