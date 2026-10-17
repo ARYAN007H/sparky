@@ -1,6 +1,5 @@
-//! OpenHuman's product policy adapters for TinyAgents' subagent lifecycle.
-//! OpenHuman supplies planning, execution details, persistence, and DTO
-//! projection; TinyAgents owns lifecycle coordination.
+//! OpenHuman supplies plans, execution, persistence, and DTO projection;
+//! TinyAgents owns subagent lifecycle coordination.
 
 use std::{
     collections::HashMap,
@@ -116,7 +115,6 @@ pub async fn continue_subagent(
     continue_subagent_with_parent(&root, original_key, definition.clone(), input, options).await
 }
 
-/// Appends the continuation input after the durable conversation history.
 pub(super) fn merged_resume_history(mut history: Vec<Message>, input: String) -> Vec<Message> {
     if !input.is_empty() {
         history.push(Message::user(input));
