@@ -143,7 +143,7 @@ impl EventListener for RouteEventRecorder {
 
 #[tokio::test]
 async fn resolved_route_enrichment_uses_actual_provider_model_and_call_identity() {
-    let route = ResolvedModelRoute::new("anthropic", "gpt-4o-mini", "backup");
+    let route = ResolvedModelRoute::new("anthropic", "claude-opus-4-8", "backup");
     let mut harness: AgentHarness<(), crate::agent::tinyagents::host::OpenHumanRunContext> =
         AgentHarness::new();
     let model = Arc::new(RouteRecordingModel::new(scripted_success(), route));
@@ -152,7 +152,7 @@ async fn resolved_route_enrichment_uses_actual_provider_model_and_call_identity(
         .set_default_model("primary");
     harness.push_model_middleware(Arc::new(ResolvedRouteMiddleware::new(
         "configured-provider",
-        "claude-opus-4-6",
+        "gpt-4.1",
     )));
 
     let host = crate::agent::tinyagents::host::OpenHumanRunContext::new();
@@ -177,7 +177,11 @@ async fn resolved_route_enrichment_uses_actual_provider_model_and_call_identity(
         AgentEvent::GenerationEnriched { call_id: enriched, enrichment }
             if enriched == &call_id
                 && enrichment.provider_id.as_deref() == Some("anthropic")
-                && enrichment.pricing.is_some()
+                && enrichment.pricing.as_ref().is_some_and(|pricing| {
+                    pricing.input_per_mtok_usd == Some(5.0)
+                        && pricing.cached_input_per_mtok_usd == Some(0.5)
+                        && pricing.output_per_mtok_usd == Some(25.0)
+                })
     )), "pricing and provider metadata use the actual response route, not configured fallback values; events={events:#?}");
 }
 
