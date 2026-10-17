@@ -20,15 +20,15 @@ fn reconcile_surface_names(
         permanent: std::mem::take(permanent),
     };
     managed.refresh_synthesized(previous_synthesized, synthesized, auto_include_new);
-    if let Some(names) = &discovery_deferred {
-        managed.visible.retain(|name| !names.contains(name));
-        managed.deferred = names.clone();
-    }
     // New wildcard-synthesized names must participate in packed-tool
     // filtering so a withheld name can add its `use_skill` route. Restore
     // permanent names afterward, preserving their precedence over both
     // packed and deferred visibility filters.
     strip_packed(&mut managed.visible);
+    if let Some(names) = &discovery_deferred {
+        managed.visible.retain(|name| !names.contains(name));
+        managed.deferred = names.clone();
+    }
     managed.make_permanent(std::iter::empty::<String>());
     if let Some(names) = &discovery_deferred {
         managed.defer_visible(names);

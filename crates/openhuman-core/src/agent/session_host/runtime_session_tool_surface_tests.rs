@@ -51,29 +51,33 @@ fn permanent_tools_survive_packed_and_deferred_filters_but_revocation_wins() {
 #[test]
 fn packed_deferred_tool_keeps_its_use_skill_route_visible() {
     let packed_deferred = "packed_deferred_tool".to_string();
-    let mut visible = [packed_deferred.clone()].into_iter().collect();
-    let mut deferred = std::collections::HashSet::new();
-    let mut permanent = std::collections::HashSet::new();
-    let previous = [packed_deferred.clone()].into_iter().collect();
-    let next = [packed_deferred.clone()].into_iter().collect();
-    let discovery_deferred = [packed_deferred.clone()].into_iter().collect();
+    for previous_names in [
+        std::collections::HashSet::new(),
+        [packed_deferred.clone()].into_iter().collect(),
+    ] {
+        let mut visible = [packed_deferred.clone()].into_iter().collect();
+        let mut deferred = std::collections::HashSet::new();
+        let mut permanent = std::collections::HashSet::new();
+        let next = [packed_deferred.clone()].into_iter().collect();
+        let discovery_deferred = [packed_deferred.clone()].into_iter().collect();
 
-    reconcile_surface_names(
-        &mut visible,
-        &mut deferred,
-        &mut permanent,
-        &previous,
-        &next,
-        true,
-        Some(discovery_deferred),
-        |visible| {
-            if visible.remove(&packed_deferred) {
-                visible.insert("use_skill".to_string());
-            }
-        },
-    );
+        reconcile_surface_names(
+            &mut visible,
+            &mut deferred,
+            &mut permanent,
+            &previous_names,
+            &next,
+            true,
+            Some(discovery_deferred),
+            |visible| {
+                if visible.remove(&packed_deferred) {
+                    visible.insert("use_skill".to_string());
+                }
+            },
+        );
 
-    assert!(visible.contains("use_skill"));
-    assert!(!visible.contains(&packed_deferred));
-    assert!(deferred.contains(&packed_deferred));
+        assert!(visible.contains("use_skill"));
+        assert!(!visible.contains(&packed_deferred));
+        assert!(deferred.contains(&packed_deferred));
+    }
 }
