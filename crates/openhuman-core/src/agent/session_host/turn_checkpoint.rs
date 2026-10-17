@@ -341,7 +341,7 @@ const MIN_QUOTED_WORDS: usize = 10;
 /// the closed set of strings it injects, and neither is correct output on any
 /// path, so there is nothing to gain from narrowing the set to the path that
 /// ran.
-fn harness_instruction_needles(stop_reason: Option<&str>) -> Vec<String> {
+pub(crate) fn harness_instruction_needles(stop_reason: Option<&str>) -> Vec<String> {
     let mut sources = vec![
         FINAL_ANSWER_INSTRUCTION,
         TRUNCATED_ANSWER_INSTRUCTION,
