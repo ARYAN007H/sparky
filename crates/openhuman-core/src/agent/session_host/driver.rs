@@ -241,6 +241,17 @@ impl SessionDriver<OpenHumanRunContext> for OpenHumanSessionDriver {
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .deferred_terminal = outcome.deferred_terminal.take();
+        let supplemental_trace = sidecar
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .deferred_terminal
+            .as_ref()
+            .map(|terminal| {
+                grounded_close::SupplementalTrace::new(
+                    terminal.events.clone(),
+                    terminal.run_id.clone(),
+                )
+            });
 
         if outcome.text.trim().is_empty() && outcome.tool_outcomes.is_empty() {
             return Err(driver_error(
@@ -302,6 +313,7 @@ impl SessionDriver<OpenHumanRunContext> for OpenHumanSessionDriver {
                 &user_message,
                 &outcome,
                 close_by.map(|at| at.saturating_duration_since(Instant::now())),
+                supplemental_trace.as_ref(),
             ) => close,
         };
         let mut output = close
@@ -369,6 +381,7 @@ impl SessionDriver<OpenHumanRunContext> for OpenHumanSessionDriver {
                         request.run_context.data.progress.as_ref(),
                         outcome.model_calls.saturating_add(1) as u32,
                         &mut repair_usage,
+                        supplemental_trace.as_ref(),
                     );
                     tokio::pin!(repair);
                     tokio::select! {
