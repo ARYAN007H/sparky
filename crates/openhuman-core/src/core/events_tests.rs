@@ -776,6 +776,7 @@ fn events_outside_the_supervisor_have_no_event_log_detail() {
         job_id: "job-1".into(),
         success: true,
         output: "done".into(),
+        tenant: None,
     }
     .log_detail()
     .is_none());
@@ -930,6 +931,7 @@ fn events_without_a_workspace_report_none() {
             job_id: "job-1".into(),
             success: true,
             output: "done".into(),
+            tenant: None,
         }
         .workspace_dir(),
         None

@@ -59,11 +59,11 @@ pub(crate) fn publish_completion(
     success: bool,
     output: &str,
 ) {
-    crate::cron::completion_owner::note(ctx, &job.id);
     BUS.publish(DomainEvent::CronJobCompleted {
         job_id: job.id.clone(),
         success,
         output: crate::util::truncate_with_ellipsis(output, 512),
+        tenant: ctx.event_tenant(),
     });
     BUS.publish(DomainEvent::HealthChanged {
         component: "scheduler".to_string(),
@@ -106,12 +106,6 @@ fn stand_in(flow_id: &str) -> CronJob {
         last_output: None,
         origin: None,
     }
-}
-
-/// A stand-in `flow` row with `command`, for tests of handlers.
-#[cfg(test)]
-pub(crate) fn stand_in_for_test(command: &str) -> CronJob {
-    stand_in(command)
 }
 
 /// Fire the `flow` row bound to `flow_id` through the registered `flow`

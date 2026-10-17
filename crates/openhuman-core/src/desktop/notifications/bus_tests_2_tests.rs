@@ -86,6 +86,7 @@ fn cron_completed_produces_agents_notification() {
         job_id: "job-1".into(),
         success: true,
         output: "done".into(),
+        tenant: None,
     };
     let n = event_to_notification(&ev).expect("should produce notification");
     assert_eq!(n.category, CoreNotificationCategory::Agents);
@@ -116,6 +117,7 @@ fn cron_failed_uses_failure_title() {
         job_id: "job-1".into(),
         success: false,
         output: "error".into(),
+        tenant: None,
     };
     let n = event_to_notification(&ev).unwrap();
     assert_eq!(n.title, "Cron job failed");
@@ -458,6 +460,7 @@ fn an_event_that_names_no_workspace_uses_this_bridge_s_store() {
             job_id: "job-1".into(),
             success: true,
             output: "done".into(),
+            tenant: None,
         },
     );
     assert_eq!(target.workspace_dir, own);
@@ -580,6 +583,7 @@ async fn a_process_wide_event_is_announced_without_consulting_the_workspace() {
                 job_id: "job-1".into(),
                 success: true,
                 output: "done".into(),
+                tenant: None,
             })
             .await,
         super::Announce::Unbound
@@ -631,6 +635,7 @@ async fn a_noted_cron_completion_names_its_agent() {
         job_id: "notif-owner-job".into(),
         success: true,
         output: String::new(),
+        tenant: None,
     };
     let owner = event_owner(
         &crate::core::runtime::DispatchCtx::host_default(),
