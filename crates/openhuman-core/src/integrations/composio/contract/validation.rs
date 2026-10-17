@@ -1,6 +1,7 @@
 //! Composio contract validation that can be shared by flow authoring stages.
 
 use serde_json::Value;
+use tinyagents_harness::tool::{missing_required_args, unsupported_arg_names};
 
 /// A graph node reduced to the Composio fields needed by the connection gate.
 #[derive(Debug, Clone)]
@@ -168,11 +169,7 @@ pub(crate) async fn validate_tool_contract_nodes(
             ));
             continue;
         }
-        let missing: Vec<_> = action
-            .required_args
-            .iter()
-            .filter(|name| node.args.get(name.as_str()).is_none_or(Value::is_null))
-            .collect();
+        let missing = missing_required_args(&action.required_args, &node.args);
         if !missing.is_empty() {
             tracing::warn!(target: "flows", node = %node.id, %slug, ?missing, "[flows] tool-contract check: required arg(s) missing or null — rejecting");
             let list = missing
@@ -223,38 +220,6 @@ pub(crate) async fn validate_tool_contract_nodes(
         }
     }
     errors
-}
-
-fn unsupported_arg_names(schema: Option<&Value>, args: &Value) -> Option<Vec<String>> {
-    let schema = schema?.as_object()?;
-    if schema
-        .get("additionalProperties")
-        .is_some_and(|value| value.as_bool() == Some(true) || value.is_object())
-    {
-        return None;
-    }
-    let properties = schema.get("properties")?.as_object()?;
-    let patterns = match schema.get("patternProperties").and_then(Value::as_object) {
-        Some(patterns) => patterns
-            .keys()
-            .map(|pattern| regex::Regex::new(pattern))
-            .collect::<Result<Vec<_>, _>>()
-            .ok()?,
-        None => Vec::new(),
-    };
-    let Some(args) = args.as_object() else {
-        return Some(Vec::new());
-    };
-    let mut unsupported = args
-        .keys()
-        .filter(|key| {
-            !properties.contains_key(key.as_str())
-                && !patterns.iter().any(|pattern| pattern.is_match(key))
-        })
-        .cloned()
-        .collect::<Vec<_>>();
-    unsupported.sort();
-    Some(unsupported)
 }
 
 #[cfg(test)]
