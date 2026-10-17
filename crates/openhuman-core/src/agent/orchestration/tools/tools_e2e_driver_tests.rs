@@ -619,8 +619,3 @@ async fn detached_registration_failure_finishes_the_announced_product_card() {
         "failed request construction must not register a job"
     );
 }
-
-/// A child the harness stops early (failure breaker / iteration cap) is not a
-/// finished delegation: the parent's tool result must be a failure, so its own
-/// failure policy and its trace see it, and the `SubagentCompleted` progress
-/// event must say how the child was stopped.
