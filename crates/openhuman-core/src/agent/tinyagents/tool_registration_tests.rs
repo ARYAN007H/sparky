@@ -167,8 +167,8 @@ async fn static_live_harness_builder_resolves_control_aliases_from_the_execution
             serde_json::json!({}),
         )],
     )
-        .await
-        .expect("the live control resolves its execution parent");
+    .await
+    .expect("the live control resolves its execution parent");
     assert_eq!(result.results.len(), 1);
     assert!(result.results[0].text().contains("live-owned-session"));
 }
