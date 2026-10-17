@@ -179,7 +179,10 @@ pub(super) fn handle_runs(ctx: DispatchCtx, params: Map<String, Value>) -> Contr
     })
 }
 
-pub(super) fn read_required<T: DeserializeOwned>(params: &Map<String, Value>, key: &str) -> Result<T, String> {
+pub(super) fn read_required<T: DeserializeOwned>(
+    params: &Map<String, Value>,
+    key: &str,
+) -> Result<T, String> {
     let value = params
         .get(key)
         .cloned()
@@ -209,7 +212,7 @@ fn to_json<T: serde::Serialize>(outcome: Outcome<T>) -> Result<Value, String> {
     outcome.into_cli_compatible_json()
 }
 
-pub(super) pub(super) fn type_name(value: &Value) -> &'static str {
+pub(super) fn type_name(value: &Value) -> &'static str {
     match value {
         Value::Null => "null",
         Value::Bool(_) => "bool",
