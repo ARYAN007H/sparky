@@ -143,7 +143,7 @@ fn renaming_an_enabled_job_does_not_consume_another_slot() {
         &config,
         &job.id,
         CronJobPatch {
-            name: Some(Some("renamed".into())),
+            name: Some("renamed".into()),
             ..CronJobPatch::default()
         },
     )
