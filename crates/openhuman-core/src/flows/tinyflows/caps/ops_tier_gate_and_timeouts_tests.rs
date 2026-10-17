@@ -258,36 +258,6 @@ async fn composio_unknown_slug_prompts_under_supervised_tier() {
     assert!(enforce_node_tier_gate(&policy(AutonomyLevel::ReadOnly), class, "tool_call").is_err());
 }
 
-/// Unit coverage of the classifier itself, independent of the gate: a
-/// curated Read entry classifies as `Read`; curated Write/Admin entries,
-/// an uncurated toolkit, and an unparseable/empty slug all classify as
-/// `Network` (fail-safe default — never silently widen to Read).
-#[tokio::test]
-async fn classify_composio_action_for_tier_matches_curated_scope_fail_safe() {
-    assert_eq!(
-        classify_composio_action_for_tier("TWITTER_RECENT_SEARCH").await,
-        CommandClass::Read
-    );
-    assert_eq!(
-        classify_composio_action_for_tier("TWITTER_CREATION_OF_A_POST").await,
-        CommandClass::Network
-    );
-    assert_eq!(
-        classify_composio_action_for_tier("TWITTER_POST_DELETE_BY_POST_ID").await,
-        CommandClass::Network
-    );
-    // Uncurated toolkit (no catalog at all for "unknown").
-    assert_eq!(
-        classify_composio_action_for_tier("UNKNOWN_SERVICE_DO_THING").await,
-        CommandClass::Network
-    );
-    // Unparseable / empty slug.
-    assert_eq!(
-        classify_composio_action_for_tier("").await,
-        CommandClass::Network
-    );
-}
-
 /// A `Prompt` tier decision on a default (`require_approval: false`)
 /// workflow trust root escalates to `require_approval: true` — the forced
 /// human-in-the-loop round trip that closes the Codex P1 finding.

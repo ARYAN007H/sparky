@@ -283,3 +283,34 @@ async fn connected_uncatalogued_toolkit_rejects_a_hallucinated_slug() {
     );
 }
 
+
+/// Unit coverage of the classifier itself, independent of the gate: a
+/// curated Read entry classifies as `Read`; curated Write/Admin entries,
+/// an uncurated toolkit, and an unparseable/empty slug all classify as
+/// `Network` (fail-safe default — never silently widen to Read).
+#[test]
+fn classify_composio_action_for_tier_matches_curated_scope_fail_safe() {
+    assert_eq!(
+        classify_composio_action_for_tier("TWITTER_RECENT_SEARCH"),
+        CommandClass::Read
+    );
+    assert_eq!(
+        classify_composio_action_for_tier("TWITTER_CREATION_OF_A_POST"),
+        CommandClass::Network
+    );
+    assert_eq!(
+        classify_composio_action_for_tier("TWITTER_POST_DELETE_BY_POST_ID"),
+        CommandClass::Network
+    );
+    // Uncurated toolkit (no catalog at all for "unknown").
+    assert_eq!(
+        classify_composio_action_for_tier("UNKNOWN_SERVICE_DO_THING"),
+        CommandClass::Network
+    );
+    // Unparseable / empty slug.
+    assert_eq!(
+        classify_composio_action_for_tier(""),
+        CommandClass::Network
+    );
+}
+
