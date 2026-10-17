@@ -99,6 +99,20 @@ pub(crate) async fn flow_tool_allowed(
     allowed
 }
 
+/// Applies the connected-set lookup only for toolkits without a static catalog.
+pub(crate) async fn is_curated_flow_tool(
+    ctx: &crate::core::runtime::DispatchCtx,
+    config: &Config,
+    slug: &str,
+) -> bool {
+    let connected = if slug_needs_connected_set(slug) {
+        connected_toolkit_slugs(config).await
+    } else {
+        None
+    };
+    flow_tool_allowed(ctx, config, slug, connected.as_deref()).await
+}
+
 /// Classifies a curated action for the autonomy-tier gate.
 pub(crate) fn classify_composio_action_for_tier(slug: &str) -> tinybox_bus::CommandClass {
     use crate::integrations::composio::contract::{curated_scope_for, ToolScope};
