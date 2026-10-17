@@ -49,12 +49,13 @@ fn permanent_tools_survive_packed_and_deferred_filters_but_revocation_wins() {
 }
 
 #[test]
-fn newly_synthesized_packed_tool_keeps_its_use_skill_route_visible() {
+fn packed_deferred_tool_keeps_its_use_skill_route_visible() {
     let mut visible = std::collections::HashSet::new();
     let mut deferred = std::collections::HashSet::new();
     let mut permanent = std::collections::HashSet::new();
     let previous = std::collections::HashSet::new();
-    let next = ["packed_delegate".to_string()].into_iter().collect();
+    let next = ["packed_deferred_tool".to_string()].into_iter().collect();
+    let discovery_deferred = ["packed_deferred_tool".to_string()].into_iter().collect();
 
     reconcile_surface_names(
         &mut visible,
@@ -63,14 +64,15 @@ fn newly_synthesized_packed_tool_keeps_its_use_skill_route_visible() {
         &previous,
         &next,
         true,
-        None,
+        Some(discovery_deferred),
         |visible| {
-            if visible.remove("packed_delegate") {
+            if visible.remove("packed_deferred_tool") {
                 visible.insert("use_skill".to_string());
             }
         },
     );
 
     assert!(visible.contains("use_skill"));
-    assert!(!visible.contains("packed_delegate"));
+    assert!(!visible.contains("packed_deferred_tool"));
+    assert!(deferred.contains("packed_deferred_tool"));
 }

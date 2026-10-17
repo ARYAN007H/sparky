@@ -14,16 +14,16 @@ fn reconcile_surface_names(
     discovery_deferred: Option<std::collections::HashSet<String>>,
     strip_packed: impl FnOnce(&mut std::collections::HashSet<String>),
 ) {
-    if let Some(names) = &discovery_deferred {
-        visible.retain(|name| !names.contains(name));
-        *deferred = names.clone();
-    }
     let mut managed = tinyagents_runtime::ManagedToolNames {
         visible: std::mem::take(visible),
         deferred: std::mem::take(deferred),
         permanent: std::mem::take(permanent),
     };
     managed.refresh_synthesized(previous_synthesized, synthesized, auto_include_new);
+    if let Some(names) = &discovery_deferred {
+        managed.visible.retain(|name| !names.contains(name));
+        managed.deferred = names.clone();
+    }
     // New wildcard-synthesized names must participate in packed-tool
     // filtering so a withheld name can add its `use_skill` route. Restore
     // permanent names afterward, preserving their precedence over both
