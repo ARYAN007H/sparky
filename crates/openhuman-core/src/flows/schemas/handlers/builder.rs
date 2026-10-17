@@ -18,7 +18,10 @@ pub(super) fn handle_build(ctx: DispatchCtx, params: Map<String, Value>) -> Cont
     })
 }
 
-pub(super) fn handle_build_cancel(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_build_cancel(
+    _ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let thread_id = read_required::<String>(&params, "thread_id")?;
         let request_id = params
@@ -43,7 +46,9 @@ pub(super) fn handle_discover(ctx: DispatchCtx, params: Map<String, Value>) -> C
 /// `flows.build` and `flows.discover` into an [`ops::FlowStreamTarget`].
 /// Returns `None` (headless run) when no usable `thread_id` is present; a
 /// missing `request_id` is filled with a fresh uuid inside `from_params`.
-pub(super) fn read_flow_stream_target(params: &Map<String, Value>) -> Option<ops::FlowStreamTarget> {
+pub(super) fn read_flow_stream_target(
+    params: &Map<String, Value>,
+) -> Option<ops::FlowStreamTarget> {
     let thread_id = params
         .get("thread_id")
         .and_then(Value::as_str)
@@ -55,7 +60,10 @@ pub(super) fn read_flow_stream_target(params: &Map<String, Value>) -> Option<ops
     ops::FlowStreamTarget::from_params(thread_id, request_id)
 }
 
-pub(super) fn handle_list_suggestions(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_list_suggestions(
+    ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let config = ctx.load_config().await?;
         let status = params
@@ -68,7 +76,10 @@ pub(super) fn handle_list_suggestions(ctx: DispatchCtx, params: Map<String, Valu
     })
 }
 
-pub(super) fn handle_dismiss_suggestion(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_dismiss_suggestion(
+    ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let config = ctx.load_config().await?;
         let id = read_required::<String>(&params, "id")?;
@@ -76,7 +87,10 @@ pub(super) fn handle_dismiss_suggestion(ctx: DispatchCtx, params: Map<String, Va
     })
 }
 
-pub(super) fn handle_mark_suggestion_built(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_mark_suggestion_built(
+    ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let config = ctx.load_config().await?;
         let id = read_required::<String>(&params, "id")?;
@@ -84,7 +98,10 @@ pub(super) fn handle_mark_suggestion_built(ctx: DispatchCtx, params: Map<String,
     })
 }
 
-pub(super) fn handle_required_connections(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_required_connections(
+    ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let config = ctx.load_config().await?;
         let graph = read_required::<Value>(&params, "graph")?;
@@ -92,7 +109,10 @@ pub(super) fn handle_required_connections(ctx: DispatchCtx, params: Map<String, 
     })
 }
 
-pub(super) fn handle_approval_manifest(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_approval_manifest(
+    ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let config = ctx.load_config().await?;
         let id = params
@@ -105,7 +125,10 @@ pub(super) fn handle_approval_manifest(ctx: DispatchCtx, params: Map<String, Val
     })
 }
 
-pub(super) fn handle_search_tool_catalog(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_search_tool_catalog(
+    ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let config = ctx.load_config().await?;
         let query = read_required::<String>(&params, "query")?;
@@ -122,7 +145,10 @@ pub(super) fn handle_search_tool_catalog(ctx: DispatchCtx, params: Map<String, V
     })
 }
 
-pub(super) fn handle_get_tool_contract(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_get_tool_contract(
+    ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let config = ctx.load_config().await?;
         let slug = read_required::<String>(&params, "slug")?;

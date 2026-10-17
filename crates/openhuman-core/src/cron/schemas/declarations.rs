@@ -1,5 +1,5 @@
-use super::*;
 use super::handlers::*;
+use super::*;
 
 use crate::core::runtime::DispatchCtx;
 use serde::de::DeserializeOwned;
@@ -283,4 +283,3 @@ pub fn schemas(function: &str) -> ControllerSchema {
         },
     }
 }
-

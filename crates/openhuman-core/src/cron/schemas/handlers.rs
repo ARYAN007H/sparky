@@ -187,7 +187,10 @@ fn read_required<T: DeserializeOwned>(params: &Map<String, Value>, key: &str) ->
     serde_json::from_value(value).map_err(|e| format!("invalid '{key}': {e}"))
 }
 
-pub(super) fn read_optional_u64(params: &Map<String, Value>, key: &str) -> Result<Option<u64>, String> {
+pub(super) fn read_optional_u64(
+    params: &Map<String, Value>,
+    key: &str,
+) -> Result<Option<u64>, String> {
     match params.get(key) {
         None => Ok(None),
         Some(Value::Null) => Ok(None),

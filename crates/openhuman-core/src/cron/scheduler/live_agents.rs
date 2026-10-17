@@ -67,4 +67,3 @@ pub async fn run_live_agent_pass(max_concurrent: usize) {
     agents.tick().await;
     agents.drain().await;
 }
-

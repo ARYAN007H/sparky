@@ -53,7 +53,6 @@ pub(crate) fn harness_model_default_override(node_model: &str) -> String {
     format!("hint:{}", role_for_model_tier(node_model))
 }
 
-
 /// Decides how to run an `agent_ref` that has no harness definition, given
 /// the (already-performed) config-backed custom registry lookup: an
 /// [`AgentRoute::Harness`] for a known, *enabled* custom entry — the factory
@@ -72,4 +71,3 @@ pub(crate) fn route_custom_entry_lookup(
         _ => AgentRoute::RegistryFallback,
     }
 }
-

@@ -58,4 +58,3 @@ pub(crate) fn try_acquire_run(job_id: &str) -> Option<RunGuard> {
         .insert(job_id.to_string())
         .then(|| RunGuard(job_id.to_string()))
 }
-

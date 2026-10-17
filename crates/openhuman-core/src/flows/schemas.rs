@@ -350,9 +350,8 @@ pub fn all_registered_controllers() -> Vec<RegisteredController> {
     registered::all_registered_controllers()
 }
 
-
-mod registered;
 mod handlers;
+mod registered;
 use handlers::*;
 mod builder_schemas;
 mod definition_schemas;
@@ -393,8 +392,6 @@ pub fn schemas(function: &str) -> ControllerSchema {
         }],
     }
 }
-
-
 
 #[cfg(test)]
 #[path = "schemas_tests.rs"]

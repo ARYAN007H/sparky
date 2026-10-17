@@ -68,7 +68,10 @@ pub(super) fn handle_list(ctx: DispatchCtx, _params: Map<String, Value>) -> Cont
     })
 }
 
-pub(super) fn handle_list_connections(ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_list_connections(
+    ctx: DispatchCtx,
+    _params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let config = ctx.load_config().await?;
         to_json(ops::flows_list_connections(&ctx, &config).await?)

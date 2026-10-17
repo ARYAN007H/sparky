@@ -1,6 +1,9 @@
 use super::super::*;
 
-pub(super) fn handle_draft_create(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_draft_create(
+    ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let config = ctx.load_config().await?;
         let name = read_required::<String>(&params, "name")?;
@@ -29,7 +32,10 @@ pub(super) fn handle_draft_get(ctx: DispatchCtx, params: Map<String, Value>) -> 
     })
 }
 
-pub(super) fn handle_draft_update(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_draft_update(
+    ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let config = ctx.load_config().await?;
         let id = read_required::<String>(&params, "id")?;
@@ -59,7 +65,10 @@ pub(super) fn handle_draft_list(ctx: DispatchCtx, _params: Map<String, Value>) -
     })
 }
 
-pub(super) fn handle_draft_delete(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_draft_delete(
+    ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let config = ctx.load_config().await?;
         let id = read_required::<String>(&params, "id")?;
@@ -67,7 +76,10 @@ pub(super) fn handle_draft_delete(ctx: DispatchCtx, params: Map<String, Value>) 
     })
 }
 
-pub(super) fn handle_draft_promote(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_draft_promote(
+    ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let config = ctx.load_config().await?;
         let id = read_required::<String>(&params, "id")?;
@@ -119,5 +131,3 @@ pub(super) fn parse_draft_update_flow_id(
         )),
     }
 }
-
-#[cfg(test)]

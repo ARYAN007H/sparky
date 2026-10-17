@@ -20,7 +20,10 @@ pub(super) fn handle_run(ctx: DispatchCtx, params: Map<String, Value>) -> Contro
     })
 }
 
-pub(super) fn handle_run_detached(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_run_detached(
+    ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let config = ctx.load_config().await?;
         let id = read_required::<String>(&params, "id")?;
@@ -47,7 +50,9 @@ pub(super) fn handle_run_detached(ctx: DispatchCtx, params: Map<String, Value>) 
 /// inputs are all optional or defaulted. A present-but-non-object value is a
 /// caller error rejected here, before it reaches `ops`, so the message names the
 /// parameter rather than surfacing as a confusing per-input complaint.
-pub(super) fn read_declared_inputs(params: &Map<String, Value>) -> Result<Map<String, Value>, String> {
+pub(super) fn read_declared_inputs(
+    params: &Map<String, Value>,
+) -> Result<Map<String, Value>, String> {
     match params.get("inputs") {
         None | Some(Value::Null) => Ok(Map::new()),
         Some(Value::Object(map)) => Ok(map.clone()),
@@ -120,7 +125,10 @@ pub(super) fn handle_list_runs(ctx: DispatchCtx, params: Map<String, Value>) -> 
     })
 }
 
-pub(super) fn handle_list_all_runs(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+pub(super) fn handle_list_all_runs(
+    ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let config = ctx.load_config().await?;
         let limit = params

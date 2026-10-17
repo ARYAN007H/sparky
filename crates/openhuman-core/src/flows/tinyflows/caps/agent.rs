@@ -17,8 +17,10 @@ use tinyflows::caps::*;
 use tinyflows::error::{EngineError, Result};
 
 use super::*;
-use crate::flows::agent_route::{harness_model_default_override, route_custom_entry_lookup, route_for_agent_ref, AgentRoute};
 use crate::config::Config;
+use crate::flows::agent_route::{
+    harness_model_default_override, route_custom_entry_lookup, route_for_agent_ref, AgentRoute,
+};
 
 /// [`AgentRunner`] backing an `agent` node's `agent_ref`. It runs the selected
 /// agent kind by one of two paths, chosen by [`route_for_agent_ref`]:
@@ -117,7 +119,6 @@ fn max_parallel_harness_agents(raw: Option<&str>) -> usize {
         .filter(|n| *n > 0)
         .unwrap_or(DEFAULT_MAX_PARALLEL_HARNESS_AGENTS)
 }
-
 
 #[async_trait]
 impl AgentRunner for OpenHumanAgentRunner {
@@ -235,7 +236,6 @@ impl AgentRunner for OpenHumanAgentRunner {
         }
     }
 }
-
 
 impl OpenHumanAgentRunner {
     /// Full harness turn: build a real session agent for `agent_ref` and drive
