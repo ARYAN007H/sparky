@@ -75,4 +75,3 @@ pub(crate) fn append_artifact_offload_contract(
 
     prompt
 }
-

@@ -13,8 +13,8 @@ use crate::agent::harness::artifact_offload::offload_run_result;
 use crate::agent::harness::fork_context::ParentExecutionContext;
 use crate::agent::prompts::render_subagent_system_prompt_with_format;
 use crate::agent::prompts::{PromptContext, SubagentRenderOptions};
-use crate::agent::subagent_host::definition_iter_cap;
 use crate::agent::session_host::dedup_visible_tool_specs;
+use crate::agent::subagent_host::definition_iter_cap;
 use crate::agent::subagent_host::tool_prep::{
     filter_tool_indices, is_subagent_spawn_tool, load_prompt_source, subagent_prompt_protocol,
 };
