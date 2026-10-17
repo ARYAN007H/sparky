@@ -1,5 +1,6 @@
 use super::*;
 use tinymemory_tools::queue::QueueState;
+use tinymemory_tools::queue::MAX_ATTEMPTS;
 
 use tinymemory_api::{ConsolidateRequest, ItemKind, Reach};
 
