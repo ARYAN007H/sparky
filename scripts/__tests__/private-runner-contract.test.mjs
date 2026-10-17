@@ -4,6 +4,7 @@ import { mkdtempSync, writeFileSync, rmSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
+import { classifyElf } from "../ci/self-hosted/verify-linkage.mjs";
 
 const helper = new URL("../ci/self-hosted/verify-runner.sh", import.meta.url);
 const pin = readFileSync(new URL("../ci/self-hosted/guest-image.txt", import.meta.url), "utf8").trim();
@@ -55,4 +56,41 @@ test("private routing requires both trusted identities and retains outsider host
   assert.match(route, /needs.route.outputs.member == 'true'/);
   assert.match(hosted, /profile: hosted/);
   assert.doesNotMatch(route, /contents: write|secrets: inherit/);
+});
+
+test("mold proof distinguishes instrumented binaries from ordinary executables", () => {
+  assert.deepEqual(classifyElf(" [1] .interp PROGBITS\n [2] __llvm_prf_cnts PROGBITS", "mold 2.40.4"), {
+    executable: true, instrumented: true, mold: true,
+  });
+  assert.deepEqual(classifyElf(" [1] .interp PROGBITS", "GCC 15"), {
+    executable: true, instrumented: false, mold: false,
+  });
+  assert.equal(classifyElf(" [1] .text PROGBITS", "mold 2.40.4").executable, false);
+});
+
+test("membership gate routes mixed identities, outsiders and bots away from EX63", () => {
+  const route = readFileSync(new URL("../../.github/workflows/ci-fast.yml", import.meta.url), "utf8");
+  const body = route.split("        run: |\n")[1].split("\n  lanes:")[0]
+    .split("\n").map((line) => line.slice(10)).join("\n");
+  const dir = mkdtempSync(join(tmpdir(), "ci-membership-"));
+  try {
+    writeFileSync(join(dir, "curl"), '#!/usr/bin/env bash\nurl="${!#}"\ncase "$url" in */members/alice|*/members/bob) echo 204;; *) echo 404;; esac\n', { mode: 0o755 });
+    for (const [author, actor, association, token, expected] of [
+      ["alice", "bob", "MEMBER", "fixture", true],
+      ["alice", "outsider", "MEMBER", "fixture", false],
+      ["outsider", "alice", "NONE", "fixture", false],
+      ["dependabot[bot]", "dependabot[bot]", "NONE", "fixture", false],
+      ["alice", "alice", "MEMBER", "", true],
+      ["alice", "bob", "MEMBER", "", false],
+    ]) {
+      const output = join(dir, "output");
+      writeFileSync(output, "");
+      const result = spawnSync("bash", ["-c", body], { encoding: "utf8", env: {
+        ...process.env, PATH: `${dir}:${process.env.PATH}`, ORG: "fixture", AUTHOR: author,
+        ACTOR: actor, ASSOCIATION: association, MEMBERSHIP_TOKEN: token, GITHUB_OUTPUT: output,
+      } });
+      assert.equal(result.status, 0, result.stderr);
+      assert.equal(readFileSync(output, "utf8").trim(), `member=${expected}`, `${author}/${actor}`);
+    }
+  } finally { rmSync(dir, { recursive: true, force: true }); }
 });
