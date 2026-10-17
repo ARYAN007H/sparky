@@ -6,7 +6,6 @@ use super::*;
 use crate::cron::system_job_handlers::{register, SystemJobContext};
 use crate::cron::system_jobs::ensure_system_job;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::time::Duration;
 use tempfile::TempDir;
 use tinyflows_bus::schedule::types::Schedule;
 use tinyflows_bus::schedule::JobPolicy;
@@ -60,7 +59,7 @@ fn due_system_job(config: &Config, name: &str) -> CronJob {
 }
 
 fn force_due(config: &Config, job_id: &str) {
-    crate::cron::store::force_next_run_for_test(
+    crate::cron::store::tests::force_next_run_for_test(
         config,
         job_id,
         Utc::now() - ChronoDuration::seconds(1),
@@ -207,7 +206,9 @@ fn only_one_scheduler_loop_holds_the_slot() {
 async fn an_upgraded_job_with_a_side_table_policy_keeps_firing_with_it() {
     let tmp = TempDir::new().unwrap();
     let config = test_config(&tmp).await;
-    let legacy = crate::cron::store::legacy_db_path(&config);
+    let legacy = crate::storage::import::tinyflows::legacy_jobs_db(
+        &crate::core::runtime::agent_scope_dir(&config),
+    );
     std::fs::create_dir_all(legacy.parent().unwrap()).unwrap();
     std::fs::copy(
         std::path::Path::new(env!("CARGO_MANIFEST_DIR"))

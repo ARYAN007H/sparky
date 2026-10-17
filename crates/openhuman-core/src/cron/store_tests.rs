@@ -6,6 +6,32 @@ use super::*;
 use chrono::Duration as ChronoDuration;
 use tempfile::TempDir;
 
+/// Move one scheduled row into the past for scheduler tests. The document
+/// representation belongs to the module store; this helper is test-only.
+pub(crate) fn force_next_run_for_test(
+    config: &Config,
+    job_id: &str,
+    at: DateTime<Utc>,
+) -> Result<()> {
+    use tinystoragedrivers::Precondition;
+    let opened = crate::storage::local::open("cron::store", &config.workspace_dir)?;
+    let docs = std::sync::Arc::clone(opened.scoped()?.documents());
+    let job_id = job_id.to_string();
+    crate::storage::block_on_anyhow(async move {
+        let stored = docs
+            .get("cron_jobs", &job_id)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("no job {job_id}"))?;
+        let mut doc = stored.doc;
+        doc["next_run"] = serde_json::json!(at.to_rfc3339());
+        doc["next_run_ms"] = serde_json::json!(at.timestamp_millis());
+        doc["next_run_ns"] = serde_json::json!(at.timestamp_nanos_opt().unwrap_or(i64::MAX));
+        docs.put("cron_jobs", &job_id, doc, Precondition::None)
+            .await?;
+        Ok(())
+    })
+}
+
 fn test_config(tmp: &TempDir) -> Config {
     let config = Config {
         workspace_dir: tmp.path().join("workspace"),
@@ -72,18 +98,6 @@ fn jobs_live_in_the_workspace_default_database() {
     let config = test_config(&tmp);
     add_job(&config, "*/5 * * * *", "echo ok").unwrap();
     assert!(tmp.path().join("workspace/storage/storage.db").is_file());
-}
-
-#[test]
-fn due_jobs_batch_size_follows_scheduler_max_tasks() {
-    let tmp = TempDir::new().unwrap();
-    let mut config = test_config(&tmp);
-    config.scheduler.max_tasks = 2;
-    for i in 0..3 {
-        add_job(&config, "* * * * *", &format!("echo due-{i}")).unwrap();
-    }
-    let far_future = Utc::now() + ChronoDuration::days(365);
-    assert_eq!(due_jobs(&config, far_future).unwrap().len(), 2);
 }
 
 #[test]
@@ -261,7 +275,9 @@ fn legacy_fixture() -> std::path::PathBuf {
 fn a_legacy_jobs_db_is_imported_by_the_storage_importer_and_left_untouched() {
     let tmp = TempDir::new().unwrap();
     let config = test_config(&tmp);
-    let legacy = legacy_db_path(&config);
+    let legacy = crate::storage::import::tinyflows::legacy_jobs_db(
+        &crate::core::runtime::agent_scope_dir(&config),
+    );
     std::fs::create_dir_all(legacy.parent().unwrap()).unwrap();
     std::fs::copy(legacy_fixture(), &legacy).unwrap();
     let before = std::fs::read(&legacy).unwrap();

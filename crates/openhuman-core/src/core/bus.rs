@@ -96,7 +96,8 @@ pub const EVENTS_INTERFACE: &str = "ai.tinyhumans.openhuman.Events2";
 /// ambient one.
 /// `2.0.0` removes `CronDeliveryRequested`; announce delivery now sends
 /// synchronously through the cron channel bridge.
-pub const EVENTS_VERSION: Version = Version::new(2, 0, 0);
+/// `2.1.0` adds optional `CronJobCompleted` tenant ownership.
+pub const EVENTS_VERSION: Version = Version::new(2, 1, 0);
 
 /// The bus. Initialised once by [`init`]; safe to touch before that.
 pub static BUS: OnceBus<DomainEvent> = OnceBus::new();

@@ -26,13 +26,6 @@ use tinyflows_bus::schedule::{AgentJobSpec, StoreOperation};
 use super::client::store_blocking;
 use super::limits;
 
-/// The cron database tinyflows used to write, imported on first use.
-pub fn legacy_db_path(config: &Config) -> std::path::PathBuf {
-    crate::storage::import::tinyflows::legacy_jobs_db(&crate::core::runtime::agent_scope_dir(
-        config,
-    ))
-}
-
 pub fn add_job(config: &Config, expression: &str, command: &str) -> Result<CronJob> {
     let schedule = Schedule::Cron {
         expr: expression.to_string(),
@@ -66,33 +59,7 @@ pub fn add_shell_job(
     )
 }
 
-#[allow(clippy::too_many_arguments)]
-pub fn add_agent_job(
-    config: &Config,
-    name: Option<String>,
-    schedule: Schedule,
-    prompt: &str,
-    session_target: SessionTarget,
-    model: Option<String>,
-    delivery: Option<DeliveryConfig>,
-    delete_after_run: bool,
-) -> Result<CronJob> {
-    add_agent_job_with_definition(
-        config,
-        name,
-        schedule,
-        prompt,
-        session_target,
-        model,
-        delivery,
-        delete_after_run,
-        None,
-        true,
-    )
-}
-
-/// Like [`add_agent_job`] but accepts an optional built-in agent definition
-/// ID and the initial enabled state.
+/// Adds an agent job with an optional built-in definition and enabled state.
 #[allow(clippy::too_many_arguments)]
 pub fn add_agent_job_with_definition(
     config: &Config,
@@ -189,10 +156,6 @@ pub fn dedup_named_jobs(config: &Config) -> Result<usize> {
     store_blocking(config, StoreOperation::Dedup)
 }
 
-pub fn due_jobs(config: &Config, now: DateTime<Utc>) -> Result<Vec<CronJob>> {
-    store_blocking(config, StoreOperation::Due { now })
-}
-
 pub fn update_job(config: &Config, job_id: &str, patch: CronJobPatch) -> Result<CronJob> {
     update_job_with_origin(config, job_id, patch, None)
 }
@@ -271,23 +234,6 @@ pub fn record_last_run(
     .map(|_| ())
 }
 
-pub fn reschedule_after_run(
-    config: &Config,
-    job: &CronJob,
-    success: bool,
-    output: &str,
-) -> Result<()> {
-    store_blocking::<serde_json::Value>(
-        config,
-        StoreOperation::Reschedule {
-            job: job.clone(),
-            success,
-            output: output.to_string(),
-        },
-    )
-    .map(|_| ())
-}
-
 pub fn record_run(
     config: &Config,
     job_id: &str,
@@ -356,34 +302,6 @@ pub fn list_runs(config: &Config, job_id: &str, limit: usize) -> Result<Vec<Cron
     )
 }
 
-/// Moves a job's next run to `at`, which no production path can do directly
-/// (a patch reschedules from the schedule, not to a given instant). Writes the
-/// three forms the store keeps of the instant, so the due-job query sees it.
-#[cfg(test)]
-pub(crate) fn force_next_run_for_test(
-    config: &Config,
-    job_id: &str,
-    at: DateTime<Utc>,
-) -> Result<()> {
-    use tinystoragedrivers::Precondition;
-    let opened = crate::storage::local::open("cron::store", &config.workspace_dir)?;
-    let docs = std::sync::Arc::clone(opened.scoped()?.documents());
-    let job_id = job_id.to_string();
-    crate::storage::block_on_anyhow(async move {
-        let stored = docs
-            .get("cron_jobs", &job_id)
-            .await?
-            .ok_or_else(|| anyhow::anyhow!("no job {job_id}"))?;
-        let mut doc = stored.doc;
-        doc["next_run"] = serde_json::json!(at.to_rfc3339());
-        doc["next_run_ms"] = serde_json::json!(at.timestamp_millis());
-        doc["next_run_ns"] = serde_json::json!(at.timestamp_nanos_opt().unwrap_or(i64::MAX));
-        docs.put("cron_jobs", &job_id, doc, Precondition::None)
-            .await?;
-        Ok(())
-    })
-}
-
 #[cfg(test)]
 #[path = "store_tests.rs"]
-mod tests;
+pub(crate) mod tests;

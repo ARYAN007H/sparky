@@ -250,7 +250,7 @@ pub fn spawn_flows_boot_reconcile() {
     log::debug!("[flows] flows feature disabled at compile time — no boot run reconciliation");
 }
 
-/// Cron scheduler — polls `due_jobs()` every ~5s and executes them
+/// Cron scheduler — ticks the schedule module every ~5s and executes due jobs
 /// automatically. Gated by `config.cron.enabled`.
 ///
 /// Runs under `ctx`, the runtime's own context: the config is read through
