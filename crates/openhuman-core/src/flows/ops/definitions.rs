@@ -220,15 +220,12 @@ pub async fn flows_list(config: &Config) -> Result<Outcome<Vec<Flow>>, String> {
 
 /// Deletes a flow by id.
 ///
-/// Unbinds the flow's automatic-dispatch trigger (e.g. the schedule-trigger
-/// cron job) *before* removing the flow definition. `flow_runs` cascades on
-/// delete via a same-database `FOREIGN KEY ... ON DELETE CASCADE`, but a
-/// bound cron job lives in the entirely separate `cron.db` — it does NOT
-/// cascade — so skipping this would orphan the cron job, leaving it pointing
-/// at a now-nonexistent `flow_id` forever. Best-effort: a lookup failure
-/// (flow already gone, store error) is logged and does not block the delete
-/// itself — `store::remove_flow` below still errors clearly if `id` doesn't
-/// exist.
+/// Removes the flow definition before unbinding its automatic-dispatch trigger
+/// (e.g. the schedule-trigger cron job). `flow_runs` cascades on delete via a
+/// same-database `FOREIGN KEY ... ON DELETE CASCADE`, but a bound cron job lives
+/// in the entirely separate `cron.db`. Removing the flow first means a failed
+/// delete leaves its still-existing schedule intact. Best-effort: a lookup
+/// failure is logged and does not block the delete itself.
 pub async fn flows_delete(config: &Config, id: &str) -> Result<Outcome<Value>, String> {
     flows_delete_with_remove(config, id, |config, id| {
         store::remove_flow(config, id).map_err(|e| e.to_string())
@@ -243,15 +240,19 @@ pub(super) async fn flows_delete_with_remove(
     id: &str,
     remove: impl FnOnce(&Config, &str) -> Result<(), String>,
 ) -> Result<Outcome<Value>, String> {
-    match store::get_flow(config, id) {
-        Ok(Some(flow)) => unbind_trigger(config, &flow),
+    let flow = match store::get_flow(config, id) {
+        Ok(Some(flow)) => Some(flow),
         Ok(None) => {}
         Err(e) => {
             tracing::warn!(target: "flows", flow_id = %id, error = %e, "[flows] flows_delete: failed to load flow before unbind — proceeding with delete anyway");
+            None
         }
-    }
+    };
 
     remove(config, id)?;
+    if let Some(flow) = flow {
+        unbind_trigger(config, &flow);
+    }
     tracing::debug!(target: "flows", flow_id = %id, "[flows] flows_delete: removed");
 
     // Best-effort: purge the flow's pre-authorized tool trust with its row —
