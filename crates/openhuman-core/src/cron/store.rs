@@ -202,7 +202,7 @@ pub fn update_job(config: &Config, job_id: &str, patch: CronJobPatch) -> Result<
 pub(crate) fn update_job_with_origin(
     config: &Config,
     job_id: &str,
-    patch: CronJobPatch,
+    mut patch: CronJobPatch,
     trusted_origin: Option<tinyflows_bus::schedule::types::JobOrigin>,
 ) -> Result<CronJob> {
     limits::check_patch(config, &patch)?;
@@ -223,6 +223,12 @@ pub(crate) fn update_job_with_origin(
             trusted_origin.as_ref(),
         )
         .map_err(anyhow::Error::msg)?;
+
+        // Persist exactly the pair we validated. Sending only the changed
+        // field would let two concurrent partial route updates combine into
+        // a delivery/origin pair that neither caller validated.
+        patch.delivery = Some(delivery);
+        patch.origin = Some(effective_origin);
     }
     store_blocking(
         config,
