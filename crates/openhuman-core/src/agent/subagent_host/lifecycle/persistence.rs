@@ -231,8 +231,16 @@ impl OpenHumanPersistence {
             options: host
                 .get("options")
                 .and_then(|value| serde_json::from_value(value.clone()).ok()),
-            skill_filter_override: metadata.get("skill_filter_override").cloned(),
-            model_override: metadata.get("model_override").cloned(),
+            skill_filter_override: metadata.get("skill_filter_override").cloned().or_else(|| {
+                host.get("skill_filter_override")
+                    .and_then(serde_json::Value::as_str)
+                    .map(str::to_owned)
+            }),
+            model_override: metadata.get("model_override").cloned().or_else(|| {
+                host.get("model_override")
+                    .and_then(serde_json::Value::as_str)
+                    .map(str::to_owned)
+            }),
             created_at: host_string("created_at"),
             resume_checkpoint: paused.resume.checkpoint,
             resume_metadata: metadata,
@@ -351,6 +359,8 @@ impl OpenHumanPersistence {
             "worker_thread_id": checkpoint.worker_thread_id.clone(),
             "created_at": checkpoint.created_at.clone(),
             "options": checkpoint.options.clone(),
+            "skill_filter_override": checkpoint.skill_filter_override.clone(),
+            "model_override": checkpoint.model_override.clone(),
             "elapsed_ms": checkpoint.elapsed_ms,
             "cost_source": checkpoint.usage.cost_source,
         });
