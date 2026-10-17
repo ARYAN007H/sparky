@@ -36,7 +36,12 @@ use crate::config::Config;
 use crate::modules::tinyflows as module;
 
 /// The collections the schedule store owns.
-const COLLECTIONS: [&str; 7] = [
+///
+/// The v2 names (`cron.*`, `tsd.*`) are the current module's. The v1 names stay
+/// admitted so a tinyflows module release that predates the schema (the pinned
+/// artifact is re-pinned only after the epic is released) keeps working against
+/// a fresh database; its v1 collections are not migrated by the owner's steps.
+const COLLECTIONS: [&str; 11] = [
     "cron.jobs",
     "cron.runs",
     "cron.admission",
@@ -44,6 +49,10 @@ const COLLECTIONS: [&str; 7] = [
     "tsd.counters",
     "tsd.leases",
     "tsd.migrations",
+    "cron_jobs",
+    "cron_runs",
+    "cron_counters",
+    "cron_job_policies",
 ];
 
 /// Where one scope's cron documents live: the workspace whose default backend
