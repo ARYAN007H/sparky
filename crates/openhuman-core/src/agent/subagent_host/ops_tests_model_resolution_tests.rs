@@ -314,8 +314,7 @@ async fn closing_a_durable_driver_session_cancels_only_its_registered_child() {
     )
     .await
     .expect("shared Jobs wait observes cooperative cancellation settlement")
-    .expect("Tiny await dispatches successfully")
-    .expect("child stays owned until cancellation settles");
+    .expect("Tiny await dispatches successfully");
     assert!(!settled.is_error, "settled Jobs wait must remain a result");
     assert_eq!(
         jobs.get(job_id.as_str()).unwrap().status,
