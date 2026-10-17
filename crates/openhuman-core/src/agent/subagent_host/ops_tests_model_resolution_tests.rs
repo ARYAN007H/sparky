@@ -78,14 +78,20 @@ async fn prepared_async_spawn_runs_through_driver_jobs_dispatcher() {
 
     assert!(matches!(outcome.status, SubagentRunStatus::Completed));
     assert_eq!(outcome.output, "driver result");
-    assert!(!outcome.task_id.is_empty(), "host must retain generated task ID");
+    assert!(
+        !outcome.task_id.is_empty(),
+        "host must retain generated task ID"
+    );
     assert_eq!(provider.captured.lock().len(), 1, "child provider must run");
     let jobs = crate::core::runtime::slot_for::<
         tinyagents_orchestration::subagent::SubAgentJobRegistry,
     >(&parent.data.dispatch_ctx());
     let job = jobs.get(&job_id).expect("driver tool registered the job");
     assert_eq!(job.agent, "test");
-    assert_eq!(job.status, tinyagents_orchestration::subagent::SubAgentJobStatus::Completed);
+    assert_eq!(
+        job.status,
+        tinyagents_orchestration::subagent::SubAgentJobStatus::Completed
+    );
 }
 
 #[tokio::test]
@@ -103,6 +109,7 @@ async fn detached_driver_spawn_repairs_replayed_host_outcome_without_reexecution
     );
 
     let (first_tx, first_rx) = tokio::sync::oneshot::channel();
+    let first_tx = Arc::new(std::sync::Mutex::new(Some(first_tx)));
     let mut first_options = parent_options.clone();
     first_options.task_id = Some("driver-replay-task".into());
     first_options.checkpoint_dir = Some(scratch.path().join("checkpoints"));
@@ -113,8 +120,11 @@ async fn detached_driver_spawn_repairs_replayed_host_outcome_without_reexecution
         "return the persisted result".into(),
         first_options,
         move |_target, result, effects| {
+            let first_tx = first_tx.clone();
             Box::pin(async move {
-                let _ = first_tx.send((result, effects));
+                if let Some(first_tx) = first_tx.lock().unwrap().take() {
+                    let _ = first_tx.send((result, effects));
+                }
             })
         },
     )
@@ -127,6 +137,7 @@ async fn detached_driver_spawn_repairs_replayed_host_outcome_without_reexecution
     assert_eq!(provider.captured.lock().len(), 1, "child runs exactly once");
 
     let (replay_tx, replay_rx) = tokio::sync::oneshot::channel();
+    let replay_tx = Arc::new(std::sync::Mutex::new(Some(replay_tx)));
     let mut replay_options = parent_options;
     replay_options.task_id = Some("driver-replay-task".into());
     replay_options.checkpoint_dir = Some(scratch.path().join("checkpoints"));
@@ -137,8 +148,11 @@ async fn detached_driver_spawn_repairs_replayed_host_outcome_without_reexecution
         "return the persisted result".into(),
         replay_options,
         move |_target, result, effects| {
+            let replay_tx = replay_tx.clone();
             Box::pin(async move {
-                let _ = replay_tx.send((result, effects));
+                if let Some(replay_tx) = replay_tx.lock().unwrap().take() {
+                    let _ = replay_tx.send((result, effects));
+                }
             })
         },
     )
@@ -149,7 +163,11 @@ async fn detached_driver_spawn_repairs_replayed_host_outcome_without_reexecution
     assert!(!replay_effects, "terminal replay must not repeat effects");
     assert_eq!(replay_result.output, "durable driver result");
     assert_eq!(replay_result.agent_id, "test");
-    assert_eq!(provider.captured.lock().len(), 1, "replay must not execute child");
+    assert_eq!(
+        provider.captured.lock().len(),
+        1,
+        "replay must not execute child"
+    );
 }
 
 #[tokio::test]
