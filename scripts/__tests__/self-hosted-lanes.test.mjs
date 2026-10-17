@@ -44,55 +44,16 @@ const ALL = Object.fromEntries(Object.keys(AREA_ENV).map((k) => [k, true]));
 const NONE = Object.fromEntries(Object.keys(AREA_ENV).map((k) => [k, false]));
 const EX63_ENV = { CI_SCRATCH_DIR: "/scratch" };
 
-test("EX63 installs script dependencies only after changed areas are detected", () => {
-  const detect = ciLanes.indexOf("- name: Detect changed areas");
-  const install = ciLanes.indexOf(
-    "- name: Install jq for release-script tests",
-  );
-  const python = ciLanes.indexOf("- name: Setup Python for lanes");
-  const start = ciLanes.indexOf("- name: Start lanes");
-  assert.ok(
-    detect >= 0 && install > detect && python > detect && start > python,
-    "area detection and Python setup must precede lane startup",
-  );
-  const nextStep = ciLanes.indexOf("\n      - name:", install + 1);
-  const installBlock = ciLanes.slice(
-    install,
-    nextStep < 0 ? undefined : nextStep,
-  );
-  assert.doesNotMatch(
-    installBlock,
-    /\bsudo\b|apt-get/,
-    "the pinned jq download does not require package installation",
-  );
-  assert.match(installBlock, /JQ_SHA256/);
-  assert.match(installBlock, /sha256sum -c/);
-
-  const pythonBlock = ciLanes.slice(
-    python,
-    ciLanes.indexOf("\n      - name:", python + 1),
-  );
-  assert.match(pythonBlock, /python-version: "3\.12"/);
-  assert.match(pythonBlock, /update-environment: false/);
-  const startBlock = ciLanes.slice(
-    start,
-    ciLanes.indexOf("\n      - name:", start + 1),
-  );
-  assert.match(
-    startBlock,
-    /OPENHUMAN_CI_PYTHON: \$\{\{ steps\.python\.outputs\.python-path \}\}/,
-    "the pinned Python interpreter is passed to the lanes without exporting its PATH",
-  );
-});
-
-test("EX63 provides jq without root and before the lanes start", () => {
-  const install = ciLanes.indexOf("- name: Install jq for release-script tests");
-  const end = ciLanes.indexOf("\n      - name:", install + 1);
-  const step = ciLanes.slice(install, end);
-  assert.doesNotMatch(step, /\bsudo\b|apt-get/);
-  assert.match(step, /sha256sum -c/);
-  assert.match(step, /GITHUB_PATH/);
-  assert.ok(install < ciLanes.indexOf("- name: Start lanes"), "jq must be on PATH before the lanes spawn");
+test("EX63 verifies preinstalled tools before cache setup and validation", () => {
+  const privateJob = ciLanes.slice(ciLanes.indexOf("  ex63:"), ciLanes.indexOf("  hosted:"));
+  const verify = privateJob.indexOf("- name: Verify private runner contract");
+  const cache = privateJob.indexOf("- name: Setup Tinymold");
+  const detect = privateJob.indexOf("- name: Detect changed areas");
+  const start = privateJob.indexOf("- name: Start lanes");
+  assert.ok(verify >= 0 && cache > verify && detect > cache && start > detect);
+  assert.match(privateJob, /bash scripts\/ci\/self-hosted\/verify-runner\.sh/);
+  assert.doesNotMatch(privateJob, /setup-python|apt-get|JQ_SHA256|sccache/);
+  assert.match(privateJob, /Save Tinymold cache[\s\S]*continue-on-error: true/);
 });
 
 const plans = () => [
