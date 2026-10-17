@@ -158,7 +158,8 @@ pub(super) async fn finalize_committed_turn(
             .map(|at| commit_started.saturating_duration_since(at).as_millis() as u64),
         "[session-runtime] post-commit: durable commit done; finalizing turn"
     );
-    let usage = super::holistic_last_turn_usage(&sidecar);
+    let subagent_records = receipt.options.context.subagent_usage_records();
+    let usage = super::holistic_last_turn_usage(&sidecar, &subagent_records);
     let interrupted = sidecar.hit_cap || receipt.outcome.interrupted;
     // State the caller reads as soon as `run_turn` returns.
     let prelude = {
@@ -177,6 +178,7 @@ pub(super) async fn finalize_committed_turn(
         let prelude = prelude.clone();
         let thread_id = receipt.options.context.thread_id.clone();
         let sidecar = sidecar.clone();
+        let subagent_records = subagent_records.clone();
         async move {
             let Some(prelude) = prelude else {
                 return;
@@ -186,6 +188,7 @@ pub(super) async fn finalize_committed_turn(
                 &prelude.workspace_dir,
                 thread_id.as_deref(),
                 &sidecar,
+                &subagent_records,
             )
             .await;
             tracing::debug!(
