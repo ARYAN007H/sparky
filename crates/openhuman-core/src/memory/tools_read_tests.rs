@@ -119,7 +119,7 @@ async fn recall_returns_evidence_and_leaves_the_calling_thread_out() {
         out.get("answer").is_none(),
         "recall writes no answer of its own"
     );
-    let cites = take_turn_citations(&DispatchCtx::ambient(), &live);
+    let cites = crate::web_chat::citations::take_turn_citations(&DispatchCtx::ambient(), &live);
     assert_eq!(cites.len(), 1, "{cites:?}");
 }
 

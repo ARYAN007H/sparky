@@ -188,10 +188,10 @@ async fn recall_fetch_and_forget_round_trip_and_recall_records_citations() {
     )
     .await;
     assert!(!recalled.is_error, "{}", text(&recalled));
-    let cites = take_turn_citations(&ambient(), "thread-citations");
+    let cites = crate::web_chat::citations::take_turn_citations(&ambient(), "thread-citations");
     assert!(cites.iter().any(|c| c.id == id), "{cites:?}");
     assert!(
-        take_turn_citations(&ambient(), "thread-citations").is_empty(),
+        crate::web_chat::citations::take_turn_citations(&ambient(), "thread-citations").is_empty(),
         "draining empties the thread's citations"
     );
 
