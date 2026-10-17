@@ -106,6 +106,7 @@ fn task_store() -> Arc<dyn TaskStore> {
 
 /// Record a freshly-spawned sub-agent in the workspace's store (`Pending` →
 /// `Running`). Insert errors (e.g. a re-used task id across tests) are ignored.
+#[cfg(test)]
 pub(crate) fn record_spawned(
     task_id: &str,
     agent_id: &str,
@@ -115,43 +116,24 @@ pub(crate) fn record_spawned(
     workspace_dir: &Path,
     parent_thread_id: Option<&str>,
 ) {
-    record_spawned_in_store(
-        task_store_for_workspace(workspace_dir).as_ref(),
+    let workspace = workspace_dir.display().to_string();
+    let record = SpawnedSubagent {
         task_id,
         agent_id,
         parent_session,
         session_parent_prefix,
         subagent_session_id,
-        workspace_dir,
+        workspace_dir: &workspace,
         parent_thread_id,
-    );
+    };
+    record_spawned_in_store(task_store_for_workspace(workspace_dir).as_ref(), &record);
 }
 
-pub(crate) fn record_spawned_in_store(
-    store: &dyn TaskStore,
-    task_id: &str,
-    agent_id: &str,
-    parent_session: &str,
-    session_parent_prefix: Option<&str>,
-    subagent_session_id: Option<&str>,
-    workspace_dir: &Path,
-    parent_thread_id: Option<&str>,
-) {
-    let workspace = workspace_dir.display().to_string();
-    if let Err(err) = ledger_spawned(
-        store,
-        &SpawnedSubagent {
-            task_id,
-            agent_id,
-            parent_session,
-            session_parent_prefix,
-            subagent_session_id,
-            workspace_dir: &workspace,
-            parent_thread_id,
-        },
-    ) {
+pub(crate) fn record_spawned_in_store(store: &dyn TaskStore, spawned: &SpawnedSubagent<'_>) {
+    if let Err(err) = ledger_spawned(store, spawned) {
         log::debug!(
-            "[running_subagents] spawn ledger insert ignored task_id={task_id} error={err}"
+            "[running_subagents] spawn ledger insert ignored task_id={} error={err}",
+            spawned.task_id
         );
     }
 }

@@ -36,7 +36,7 @@ use tinyagents_tasks::DetachedTaskRegistry;
 use super::resolve::scoped_task_store;
 use super::task_ledger::record_spawned_in_store;
 use tinyagents_orchestration::subagent::{
-    spawn_status_watcher, DetachedSubagentStatus, SubagentIdentity, WaitError,
+    spawn_status_watcher, DetachedSubagentStatus, SpawnedSubagent, SubagentIdentity, WaitError,
 };
 
 #[derive(Clone)]
@@ -250,15 +250,18 @@ pub(crate) fn register(
             RegistrationError::Registry(error)
         })?;
     // Failed admission must not leave a Running lifecycle record or watcher.
+    let workspace = workspace_dir.display().to_string();
     record_spawned_in_store(
         task_store.as_ref(),
-        &task_id,
-        &agent_id,
-        &parent_session,
-        session_parent_prefix.as_deref(),
-        subagent_session_id.as_deref(),
-        &workspace_dir,
-        parent_thread_id.as_deref(),
+        &SpawnedSubagent {
+            task_id: &task_id,
+            agent_id: &agent_id,
+            parent_session: &parent_session,
+            session_parent_prefix: session_parent_prefix.as_deref(),
+            subagent_session_id: subagent_session_id.as_deref(),
+            workspace_dir: &workspace,
+            parent_thread_id: parent_thread_id.as_deref(),
+        },
     );
     spawn_status_watcher(task_store, task_id.clone(), status);
     log::debug!(
