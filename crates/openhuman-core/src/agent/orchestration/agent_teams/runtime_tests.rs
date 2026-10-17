@@ -267,6 +267,7 @@ async fn run_member_loop_drives_member_under_an_explicit_parent() {
         "task_manager_agent",
         task,
         "teamrun-y",
+        "teamworker-y",
         Some("test-model".into()),
         Some(mock_parent(provider)),
     )

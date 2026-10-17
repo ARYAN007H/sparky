@@ -244,6 +244,10 @@ impl TeamMemberExecutor for HostTeamMemberExecutor {
             .run_id
             .as_deref()
             .ok_or_else(|| anyhow!("admitted team member has no run id"))?;
+        let worker_thread_id = member
+            .worker_thread_id
+            .as_deref()
+            .ok_or_else(|| anyhow!("admitted team member has no worker thread id"))?;
         run_member_loop(
             &self.ctx,
             &self.config,
@@ -252,6 +256,7 @@ impl TeamMemberExecutor for HostTeamMemberExecutor {
             agent_id,
             task.clone(),
             run_id,
+            worker_thread_id,
             self.model_override.clone(),
             self.parent_override.clone(),
         )
@@ -267,6 +272,7 @@ async fn run_member_loop(
     agent_id: &str,
     task: AgentTeamTask,
     run_id: &str,
+    worker_thread_id: &str,
     model_override: Option<String>,
     parent_override: Option<ParentExecutionContext>,
 ) -> Result<Vec<String>> {
@@ -292,6 +298,7 @@ async fn run_member_loop(
                 agent_id,
                 &task,
                 run_id,
+                worker_thread_id,
                 model_override,
                 parent,
             )
@@ -314,6 +321,7 @@ async fn drive_member(
     agent_id: &str,
     task: &AgentTeamTask,
     run_id: &str,
+    worker_thread_id: &str,
     model_override: Option<String>,
     parent: ParentExecutionContext,
 ) -> Result<Vec<String>> {
@@ -338,6 +346,7 @@ async fn drive_member(
                     ("memberId".to_string(), member_id.to_string()),
                     ("taskId".to_string(), task.id.clone()),
                     ("teamRunId".to_string(), run_id.to_string()),
+                ("teamWorkerThreadId".to_string(), worker_thread_id.to_string()),
                 ]
                 .into_iter()
                 .collect(),

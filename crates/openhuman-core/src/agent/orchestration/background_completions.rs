@@ -134,7 +134,7 @@ pub(super) fn state() -> std::sync::MutexGuard<'static, HostState> {
 
 /// The durable completion queue of `workspace_dir` in the storage backend,
 /// under the calling tenant's scope.
-fn open_driver_store(workspace_dir: &Path) -> anyhow::Result<Arc<dyn CompletionStore>> {
+pub(super) fn open_driver_store(workspace_dir: &Path) -> anyhow::Result<Arc<dyn CompletionStore>> {
     let opened = crate::storage::local::open("background_completions", workspace_dir)?;
     let scoped = opened.scoped()?;
     let store = DriverCompletionStore::new(Arc::clone(scoped.documents()))
@@ -142,7 +142,7 @@ fn open_driver_store(workspace_dir: &Path) -> anyhow::Result<Arc<dyn CompletionS
     Ok(Arc::new(store))
 }
 
-fn router_pool() -> &'static CompletionRouterPool<RouterScope> {
+pub(super) fn router_pool() -> &'static CompletionRouterPool<RouterScope> {
     static POOL: OnceLock<CompletionRouterPool<RouterScope>> = OnceLock::new();
     POOL.get_or_init(|| {
         CompletionRouterPool::new(|scope| {
@@ -171,13 +171,13 @@ fn router_pool() -> &'static CompletionRouterPool<RouterScope> {
 }
 
 #[cfg(test)]
-fn test_store_overrides() -> &'static Mutex<HashMap<RouterScope, Arc<dyn CompletionStore>>> {
+pub(super) fn test_store_overrides() -> &'static Mutex<HashMap<RouterScope, Arc<dyn CompletionStore>>> {
     static STORES: OnceLock<Mutex<HashMap<RouterScope, Arc<dyn CompletionStore>>>> =
         OnceLock::new();
     STORES.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
-fn entry_for(workspace_dir: &Path) -> Arc<Entry> {
+pub(super) fn entry_for(workspace_dir: &Path) -> Arc<Entry> {
     let scope = router_scope(workspace_dir);
     let router = match router_pool().get_or_open(&scope) {
         Ok(router) => router,
