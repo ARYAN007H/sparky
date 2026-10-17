@@ -37,6 +37,22 @@ use super::{
     SubagentRunError, SubagentRunOptions, SubagentRunOutcome, SubagentRunStatus, SubagentUsage,
 };
 
+/// Creates the detached child carrier used by OpenHuman's async delegation
+/// adapters while preserving the authenticated parent lineage and detached
+/// cancellation token for TinyAgents' driver.
+pub(crate) fn detached_subagent_parent(
+    parent: &RunContext<crate::agent::tinyagents::host::OpenHumanRunContext>,
+    run_name: &str,
+) -> anyhow::Result<RunContext<crate::agent::tinyagents::host::OpenHumanRunContext>> {
+    let data = parent.data.detached_child();
+    let cancellation = data.cancellation.clone();
+    let config = RunConfig::new(format!("{run_name}-{}", uuid::Uuid::new_v4()));
+    parent
+        .child(config, data)
+        .map(|context| context.with_cancellation(cancellation))
+        .map_err(|error| anyhow::anyhow!(error.to_string()))
+}
+
 /// Runs one host subagent through a neutral driver using a real direct child.
 ///
 /// Callers that are already inside a TinyAgents turn must use this entrypoint:

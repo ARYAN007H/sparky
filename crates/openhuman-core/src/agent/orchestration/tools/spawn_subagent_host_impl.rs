@@ -220,18 +220,10 @@ impl SpawnSubagentTool {
                 agent_id = %definition.id,
                 "[spawn_subagent] routing to reusable async sub-agent by default"
             );
-            let detached_data = live_parent.data.detached_child();
-            let detached_cancellation = detached_data.cancellation.clone();
-            let detached_parent = live_parent
-                .child(
-                    tinyagents_harness::context::RunConfig::new(format!(
-                        "async-subagent-{}",
-                        uuid::Uuid::new_v4()
-                    )),
-                    detached_data,
-                )
-                .map_err(|error| anyhow::anyhow!(error.to_string()))?
-                .with_cancellation(detached_cancellation);
+            let detached_parent = crate::agent::subagent_host::detached_subagent_parent(
+                live_parent,
+                "async-subagent",
+            )?;
             return super::spawn_async_subagent::SpawnAsyncSubagentTool::new()
                 .execute_with_live_parent_context(
                     async_args,

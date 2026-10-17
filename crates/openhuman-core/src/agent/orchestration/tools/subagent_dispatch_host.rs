@@ -297,15 +297,11 @@ pub(crate) async fn dispatch_subagent_with_live_parent(
             // agent-turn futures) overflows the test-thread stack on deep
             // parallel-delegation flows.
             return Box::pin(async move {
-                let detached_data = live_parent.data.detached_child();
-                let detached_cancellation = detached_data.cancellation.clone();
-                let detached_parent = live_parent
-                    .child(
-                        RunConfig::new(format!("async-subagent-{}", uuid::Uuid::new_v4())),
-                        detached_data,
-                    )
-                    .map_err(|error| anyhow::anyhow!(error.to_string()))?
-                    .with_cancellation(detached_cancellation);
+                let detached_parent =
+                    crate::agent::subagent_host::detached_subagent_parent(
+                        live_parent,
+                        "async-subagent",
+                    )?;
                 super::spawn_async_subagent::SpawnAsyncSubagentTool::new()
                     .execute_with_live_parent_context(
                         async_args,

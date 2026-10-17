@@ -61,15 +61,10 @@ impl ToolDispatch<(), crate::agent::tinyagents::host::OpenHumanRunContext>
         parent: &RunContext<crate::agent::tinyagents::host::OpenHumanRunContext>,
     ) -> anyhow::Result<ToolResult> {
         let context = ToolExecutionContext::from_run_context(parent, _call_id.clone());
-        let detached_data = parent.data.detached_child();
-        let detached_cancellation = detached_data.cancellation.clone();
-        let detached_parent = parent
-            .child(
-                RunConfig::new(format!("async-subagent-{}", uuid::Uuid::new_v4())),
-                detached_data,
-            )
-            .map_err(|error| anyhow::anyhow!(error.to_string()))?
-            .with_cancellation(detached_cancellation);
+        let detached_parent = crate::agent::subagent_host::detached_subagent_parent(
+            parent,
+            "async-subagent",
+        )?;
         SpawnAsyncSubagentTool::new()
             .execute_with_live_parent_context(
                 arguments,
@@ -329,15 +324,10 @@ impl SpawnAsyncSubagentTool {
         parent: crate::agent::harness::ParentExecutionContext,
     ) -> anyhow::Result<ToolResult> {
         let live_parent = super::live_parent_run_context("direct-async-subagent", parent);
-        let detached_data = live_parent.data.detached_child();
-        let detached_cancellation = detached_data.cancellation.clone();
-        let detached_parent = live_parent
-            .child(
-                RunConfig::new(format!("async-subagent-{}", uuid::Uuid::new_v4())),
-                detached_data,
-            )
-            .map_err(|error| anyhow::anyhow!(error.to_string()))?
-            .with_cancellation(detached_cancellation);
+        let detached_parent = crate::agent::subagent_host::detached_subagent_parent(
+            &live_parent,
+            "async-subagent",
+        )?;
         self.execute_with_context_inner(
             args,
             options,
