@@ -140,12 +140,20 @@ pub(super) fn state() -> std::sync::MutexGuard<'static, HostState> {
 
 /// The durable completion queue of `workspace_dir` in the storage backend,
 /// under the calling tenant's scope.
-pub(super) fn open_driver_store(workspace_dir: &Path) -> anyhow::Result<Arc<dyn CompletionStore>> {
-    let opened = crate::storage::local::open("background_completions", workspace_dir)?;
-    let scoped = opened.scoped()?;
-    let store = DriverCompletionStore::new(Arc::clone(scoped.documents()))
-        .map_err(|error| anyhow::anyhow!("start the completion store bridge: {error}"))?;
-    Ok(Arc::new(store))
+pub(super) fn open_driver_store(
+    ctx: &DispatchCtx,
+    workspace_dir: &Path,
+) -> anyhow::Result<Arc<dyn CompletionStore>> {
+    let core_context = ctx
+        .resolved()
+        .ok_or_else(|| anyhow::anyhow!("completion store requires a resolved dispatch context"))?;
+    crate::core::runtime::CoreContext::sync_scope(core_context, || {
+        let opened = crate::storage::local::open("background_completions", workspace_dir)?;
+        let scoped = opened.scoped()?;
+        let store = DriverCompletionStore::new(Arc::clone(scoped.documents()))
+            .map_err(|error| anyhow::anyhow!("start the completion store bridge: {error}"))?;
+        Ok(Arc::new(store) as Arc<dyn CompletionStore>)
+    })
 }
 
 pub(super) fn router_pool() -> &'static CompletionRouterPool<RouterScope> {
@@ -160,7 +168,9 @@ pub(super) fn router_pool() -> &'static CompletionRouterPool<RouterScope> {
             {
                 return Arc::new(new_router(store));
             }
-            let store = match open_driver_store(&scope.workspace_dir) {
+            // `get_or_open` invokes its opener synchronously, so carry the
+            // caller's explicit profile context into storage::local::open.
+            let store = match open_driver_store(&DispatchCtx::ambient(), &scope.workspace_dir) {
                 Ok(store) => store,
                 Err(error) => {
                     log::error!(
@@ -186,10 +196,20 @@ pub(super) fn test_store_overrides(
 
 pub(super) fn entry_for_ctx(ctx: &DispatchCtx, workspace_dir: &Path) -> Arc<Entry> {
     let scope = router_scope_for(ctx, workspace_dir);
-    let router = match router_pool().get_or_open(&scope) {
-        Ok(router) => router,
-        Err(error) => {
+    let router = match ctx.resolved().map(|core_context| {
+        crate::core::runtime::CoreContext::sync_scope(core_context, || {
+            router_pool().get_or_open(&scope)
+        })
+    }) {
+        Some(Ok(router)) => router,
+        Some(Err(error)) => {
             log::error!("[background_completions] router pool lookup failed: {error}");
+            Arc::new(new_router(Arc::new(InMemoryCompletionStore::new())))
+        }
+        None => {
+            log::error!(
+                "[background_completions] router lookup requires a resolved dispatch context"
+            );
             Arc::new(new_router(Arc::new(InMemoryCompletionStore::new())))
         }
     };

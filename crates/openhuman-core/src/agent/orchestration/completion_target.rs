@@ -152,7 +152,7 @@ pub(crate) fn forget_recovery_ctx(ctx: &crate::core::runtime::DispatchCtx, works
     if Arc::strong_count(&router) != 2 {
         return;
     }
-    let Ok(store) = super::background_completions::open_driver_store(workspace_dir) else {
+    let Ok(store) = super::background_completions::open_driver_store(ctx, workspace_dir) else {
         return;
     };
     let replacement = Arc::new(super::background_completions::new_router(store));
