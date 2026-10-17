@@ -2,6 +2,7 @@
 //! TinyAgents owns subagent lifecycle coordination.
 
 use std::{
+    collections::HashMap,
     fs::OpenOptions,
     future::Future,
     path::PathBuf,
