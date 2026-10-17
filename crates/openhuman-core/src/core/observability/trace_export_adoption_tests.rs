@@ -1,4 +1,4 @@
-use super::{journal_projection::spans_from_observations, RunType, SpanCollector, TraceContext};
+use super::{journal_projection::spans_from_observations, RunType, TraceContext};
 use tinyagents_harness::events::AgentEvent;
 use tinyagents_harness::ids::{CallId, EventId, RunId};
 use tinyagents_harness::observability::trace_export::collector::SpanCollector as NativeSpanCollector;
@@ -220,6 +220,16 @@ fn per_run_trace_snapshots_keep_reused_call_ids_scoped_and_content_gated() {
     assert!(
         !spans_to_ndjson(SpanEnvelope::Otel, &child_native.spans()).contains("CONTENT_SENTINEL"),
         "content-off export must not contain child payloads"
+    );
+    let mut captured = NativeSpanCollector::new(parent_ctx.with_capture_content(true));
+    for observation in &parent_observations {
+        captured.record(observation);
+    }
+    captured.finish(1_110);
+    assert!(
+        spans_to_ndjson(SpanEnvelope::Otel, &captured.spans())
+            .contains("CONTENT_SENTINEL_PROMPT"),
+        "content-on export retains opted-in prompt content"
     );
     assert_eq!(
         parent_legacy.iter().find(|span| span.name == "llm.gpt-4").unwrap().attributes["gen_ai.usage.input_tokens"],
