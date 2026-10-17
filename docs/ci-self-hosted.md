@@ -109,19 +109,30 @@ for any commit without posting it.
 
 ## Profiles
 
-- **`ex63`**: every lane at once on one VM (10 vCPU, 28 GiB).
-  - Each Rust lane has its own target dir on the per-job scratch disk, so
-    lanes never wait on cargo's build lock.
-  - Every Rust build, the instrumented coverage builds included, goes
-    through sccache. Its cache is one store on the host shared by both VMs,
-    capped at 8 GB on a 10 GB disk. If the store is down, sccache falls back
-    to the VM's own cache disk.
-  - sccache keys include the target dir, so a lane reuses the same lane's
-    work from any earlier job, not other lanes' work.
-  - The cargo registry and pnpm store live on a 10 GB cache disk per slot.
-  - The step summary reports sccache's Rust hit rate.
-  - Target dirs are not kept between jobs.
-  - vitest runs with 8 workers.
+- **`ex63`**: one job selects both the `openhuman-ex63` runner group and label.
+  Lanes run sequentially, including after an independent check fails. Compatible
+  uninstrumented outputs share `target/ci-private-build`; coverage uses
+  `target/ci-private-coverage`. Neither is restored as an Actions artifact cache.
+  - `scripts/ci/self-hosted/guest-image.txt` pins the guest OCI digest. Before
+    validation, `verify-runner.sh` compares `/etc/ohci/build-info` with that pin,
+    checks preinstalled tools, and selects `rust-toolchain.toml` explicitly.
+    Missing metadata, tools, or the compiler fail; CI does not install replacements.
+  - The pinned shared checkout action fetches the PR merge ref with full root
+    history, recursive build dependencies, and the `wiki` exclusion.
+  - The pinned Tinymold setup/save actions use the image's binary and signed
+    remote cache. The supervisor supplies credentials through guest metadata;
+    the workflow masks them and needs no additional repository secrets. Cache
+    save runs after failures and cannot replace the validation result.
+  - Cargo's target linker points at `/usr/local/bin/rust-mold-linker`. It survives
+    coverage clearing `RUSTFLAGS`. `verify-linkage.mjs` checks `.comment` and LLVM
+    sections in actual ordinary and instrumented lane executables and archives proof.
+  - Coverage runs each selected package/feature set once through nextest, which
+    fails when the selected suite has no tests. Process-per-test isolation and
+    nextest resource groups retain external-resource serialization.
+  - Cargo registry, pnpm store, and content-based frontend caches remain on the
+    slot cache disk. Rust output caching uses Tinymold alone.
+  - VM sizing is a supervisor setting; it is not assumed by the lane scheduler.
+    Vitest currently uses 8 workers.
 - **`hosted`**: lanes grouped into jobs sized for 4-core, ~14 GB runners:
   `checks`, `rust-lint` (lint and gates-off in turn), `rust-cov`, `tauri`,
   `storage` (the `storage-drivers` lane) and `pester`. Groups whose areas are untouched don't start.
@@ -145,15 +156,30 @@ members may land on GitHub-hosted runners instead.
 
 ```bash
 node scripts/ci/self-hosted/compare-runs.mjs            # wall clock per commit
-node scripts/ci/self-hosted/compare-runs.mjs --lanes    # plus per-lane times, sccache hits
+node scripts/ci/self-hosted/compare-runs.mjs --lanes    # plus per-lane times
 ```
 
 Each run uploads `ci-out-*` artifacts with per-lane logs, `ci-timings.json`
-(per-check timings, target-dir sizes, sccache stats) and lcov.
+(per-check timings and target-dir sizes), linkage proof, and lcov. Tinymold
+setup/save logs contain cache hit/miss and save timings. See the suite inventory
+and measurement record in [ci-private-validation.md](ci-private-validation.md).
 
 ## Local use
 
 ```bash
-CI_AREA_RUST_CORE=true CI_SCRATCH_DIR=/tmp/x node scripts/ci/self-hosted/lanes.mjs --profile ex63 --dry-run
+CI_AREA_RUST_CORE=true CI_SCRATCH_DIR=/scratch node scripts/ci/self-hosted/lanes.mjs --profile ex63 --dry-run
 CI_AREA_DOCS=true node scripts/ci/self-hosted/lanes.mjs --profile hosted --lanes static,frontend
 ```
+
+## Image rollout
+
+Publish and smoke-test the image first. Roll the pinned rootfs into idle slots
+without interrupting active jobs, then change `guest-image.txt`. Check the metadata
+inside a new guest rather than trusting only the supervisor configuration. The
+current image contains Rust 1.96.1, mold 2.40.4, Tinymold 0.3.0 and nextest 0.9.148.
+
+Private workflow routing runs from the trusted base branch. A PR run can therefore
+exercise the previous workflow; green pre-merge CI alone does not prove a workflow
+change is active. Verify the new behavior after merge as well as in an isolated
+guest before enabling it. Hosted fallback, macOS/Windows, distinct E2E, security
+gates, and release workflows retain their existing ownership and behavior.
