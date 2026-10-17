@@ -17,8 +17,12 @@ async fn get_schema_response_bytes_match_the_pre_refactor_baseline() {
         .await
         .expect("read GET /schema response body");
     let digest = format!("{:x}", Sha256::digest(&body));
-    println!("GET /schema body: {} bytes, SHA-256 {digest}", body.len());
-    assert!(!body.is_empty());
+    assert_eq!(body.len(), 211_864, "GET /schema response byte count");
+    assert_eq!(
+        digest,
+        "47c63cfa2f0da8e671da19ea0048d48a2cd88897d4db3abefb206dc65bb46719",
+        "GET /schema response SHA-256"
+    );
 }
 
 #[test]
