@@ -108,13 +108,6 @@ fn stand_in(flow_id: &str) -> CronJob {
     }
 }
 
-#[cfg(test)]
-#[path = "run_delivery_tests.rs"]
-pub(crate) mod tests;
-
-#[cfg(test)]
-pub(crate) use tests::stand_in_for_test;
-
 /// Fire the `flow` row bound to `flow_id` through the registered `flow`
 /// handler.
 pub(crate) async fn trigger(binding: &Binding, flow_id: &str, run_id: &str) -> Attempt {
@@ -137,6 +130,13 @@ pub(crate) async fn trigger(binding: &Binding, flow_id: &str, run_id: &str) -> A
                 }
             };
             binding.publish_triggered_once(&job, run_id);
+            if let Err(error) = crate::cron::limits::check_run(&config, &job) {
+                return Attempt {
+                    success: false,
+                    output: error.to_string(),
+                    retryable: false,
+                };
+            }
             if let Some(refusal) = kind_refusal(binding, &job.job_type) {
                 return Attempt {
                     success: false,
@@ -162,3 +162,10 @@ pub(crate) async fn trigger(binding: &Binding, flow_id: &str, run_id: &str) -> A
         })
         .await
 }
+
+#[cfg(test)]
+#[path = "run_delivery_tests.rs"]
+pub(crate) mod tests;
+
+#[cfg(test)]
+pub(crate) use tests::stand_in_for_test;

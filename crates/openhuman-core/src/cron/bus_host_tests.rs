@@ -1,7 +1,7 @@
-//! The callback adapter, driven the way the module drives it: over the bus, on
-//! the contract's `ScheduleHost` interface, against the real (linked) module.
-
 use super::*;
+// The callback adapter, driven the way the module drives it: over the bus, on
+// the contract's `ScheduleHost` interface, against the real (linked) module.
+
 use crate::cron::handlers::{
     kind_handler, register_kind, JobKindHandler, JobOutcome, JobRunContext,
 };
@@ -271,6 +271,47 @@ async fn schedule_trigger_runs_a_system_job_and_records_the_handler_result() {
     assert!(attempt.success, "{}", attempt.output);
     assert!(attempt.output.contains("completed"), "{}", attempt.output);
     assert_eq!(calls.load(Ordering::SeqCst), 1);
+}
+
+#[tokio::test]
+async fn schedule_trigger_checks_agent_only_limits_before_running_a_flow_handler() {
+    let tmp = TempDir::new().unwrap();
+    let mut config = config(&tmp);
+    let job = crate::cron::add_flow_schedule_job(
+        &config,
+        "issue56-flow:",
+        Schedule::Every { every_ms: 60_000 },
+    )
+    .unwrap();
+    config.cron.agent_jobs_only = true;
+
+    let (_host, proxy) = host(&config, false).await;
+    let calls = Arc::new(AtomicUsize::new(0));
+    let _handler = register_kind(
+        JobType::Flow,
+        Arc::new(Marker {
+            prefix: "issue56-flow:",
+            inner: kind_handler(&JobType::Flow).unwrap(),
+            calls: Arc::clone(&calls),
+            permanent: false,
+        }),
+    );
+    let attempt: Attempt = proxy
+        .call(callbacks::SCHEDULE_TRIGGER, (&job.command, "run-issue56"))
+        .await
+        .unwrap();
+
+    assert_eq!(
+        calls.load(Ordering::SeqCst),
+        0,
+        "the flow handler never ran"
+    );
+    assert!(!attempt.success);
+    assert!(
+        attempt.output.contains("only agent cron jobs"),
+        "{}",
+        attempt.output
+    );
 }
 
 #[cfg(feature = "flows")]

@@ -113,6 +113,17 @@ impl DocScope {
         let scoped = backend.for_scope(&self.scope)?;
         Ok(Arc::clone(scoped.documents()))
     }
+
+    /// Whether this scope can atomically update the schedule store's admission
+    /// policy. An unenforced host can skip clearing an absent policy when the
+    /// backend lacks transactions; the module refuses writes if a policy
+    /// ledger already exists on that backend.
+    pub(crate) fn supports_transactions(&self) -> Result<bool, StorageError> {
+        Ok(self
+            .documents()?
+            .capabilities()
+            .contains(Capability::Transactions))
+    }
 }
 
 /// The object. Its interface name is the contract's `DOCUMENT_INTERFACE`

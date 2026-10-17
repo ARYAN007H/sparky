@@ -13,9 +13,7 @@ use anyhow::{bail, Result};
 use chrono::{Duration, Utc};
 
 use crate::config::Config;
-use crate::cron::{
-    delivery_mode, list_jobs, CronJob, CronJobPatch, DeliveryConfig, JobType, Schedule,
-};
+use crate::cron::{delivery_mode, CronJob, CronJobPatch, DeliveryConfig, JobType, Schedule};
 
 /// Whether `config` restricts cron to agent jobs.
 pub fn enforced(config: &Config) -> bool {
@@ -54,20 +52,34 @@ fn check_delivery(delivery: &DeliveryConfig) -> Result<()> {
     bail!("cron output can only return to the conversation that created the job")
 }
 
-/// Enabled jobs in the current scope, read from the store.
-fn active_jobs(config: &Config) -> Result<usize> {
-    Ok(list_jobs(config)?.iter().filter(|job| job.enabled).count())
-}
-
-fn check_capacity(config: &Config) -> Result<()> {
+fn install_capacity_limit(config: &Config) -> Result<()> {
     let max = config.cron.max_active_jobs as usize;
-    if active_jobs(config)? >= max {
-        bail!("this profile already has {max} active cron jobs; remove one first");
-    }
+    crate::cron::client::store_blocking::<()>(
+        config,
+        tinyflows_bus::schedule::StoreOperation::SetMaxActiveJobs { limit: Some(max) },
+    )?;
     Ok(())
 }
 
-/// Refuse a new job that breaks the limits. No-op unless [`enforced`].
+/// Clear a prior operator cap when enforcement is off. Backends without
+/// transactions cannot clear it, so skip the unsupported write; TinyFlows'
+/// admission ledger guard refuses mutations if an earlier policy is present.
+fn clear_capacity_limit_if_supported(config: &Config) -> Result<()> {
+    let scope = super::documents_port::DocScope::current(config)?;
+    if !scope.supports_transactions()? {
+        return Ok(());
+    }
+    crate::cron::client::blocking(config, move |config| async move {
+        crate::cron::client::store_in::<()>(
+            &config,
+            &scope,
+            tinyflows_bus::schedule::StoreOperation::SetMaxActiveJobs { limit: None },
+        )
+        .await
+    })
+}
+
+/// Enforce the limits for a new job, or clear a stored cap while they are off.
 pub(crate) fn check_new(
     config: &Config,
     job_type: &JobType,
@@ -75,6 +87,7 @@ pub(crate) fn check_new(
     delivery: Option<&DeliveryConfig>,
 ) -> Result<()> {
     if !enforced(config) {
+        clear_capacity_limit_if_supported(config)?;
         return Ok(());
     }
     check_type(job_type)?;
@@ -82,12 +95,13 @@ pub(crate) fn check_new(
     if let Some(delivery) = delivery {
         check_delivery(delivery)?;
     }
-    check_capacity(config)
+    install_capacity_limit(config)
 }
 
-/// Refuse an update that breaks the limits. No-op unless [`enforced`].
+/// Enforce update limits, or clear a stored cap while they are off.
 pub(crate) fn check_patch(config: &Config, patch: &CronJobPatch) -> Result<()> {
     if !enforced(config) {
+        clear_capacity_limit_if_supported(config)?;
         return Ok(());
     }
     if patch.command.is_some() {
@@ -103,7 +117,7 @@ pub(crate) fn check_patch(config: &Config, patch: &CronJobPatch) -> Result<()> {
         check_delivery(delivery)?;
     }
     if patch.enabled == Some(true) {
-        check_capacity(config)?;
+        install_capacity_limit(config)?;
     }
     Ok(())
 }
