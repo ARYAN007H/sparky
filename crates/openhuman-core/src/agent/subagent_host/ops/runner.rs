@@ -369,7 +369,11 @@ pub(crate) async fn run_subagent_direct(
         // this host's authorized artifact store. Project its opaque reference
         // into the product pointer before applying the independent character
         // cap, preserving the existing full-output-first behavior.
-        apply_subagent_result_policies(&mut outcome, definition, &options, &task_id).await;
+        if let Some(error) =
+            apply_subagent_result_policies(&mut outcome, definition, &options, &task_id).await
+        {
+            tracing::debug!(task_id = %task_id, error = %error, "[artifact] sub-agent result policy fell back to inline output");
+        }
 
         tracing::info!(
             agent_id = %definition.id,
@@ -398,8 +402,9 @@ async fn apply_subagent_result_policies(
     definition: &AgentDefinition,
     options: &SubagentRunOptions,
     task_id: &str,
-) {
+) -> Option<String> {
     let mut paths = extract_artifact_paths(&outcome.output);
+    let mut artifact_error = None;
 
     // A worktree-isolated worker offloads into its own checkout; everyone else
     // uses the live policy's action root, which is the same root a parent's
@@ -427,13 +432,15 @@ async fn apply_subagent_result_policies(
             DEFAULT_OFFLOAD_THRESHOLD_BYTES,
             definition.max_result_chars,
         );
-        if let Some(stored) =
-            offload_result_by_policy(task_id, &outcome.output, threshold, store).await
-        {
-            outcome.output = stored.pointer;
-            if !paths.contains(&stored.relative_path) {
-                paths.push(stored.relative_path);
+        match offload_result_by_policy(task_id, &outcome.output, threshold, store).await {
+            Ok(Some(stored)) => {
+                outcome.output = stored.pointer;
+                if !paths.contains(&stored.relative_path) {
+                    paths.push(stored.relative_path);
+                }
             }
+            Ok(None) => {}
+            Err(error) => artifact_error = Some(error),
         }
     } else if action_dir.is_none() {
         tracing::debug!(
@@ -470,6 +477,7 @@ async fn apply_subagent_result_policies(
         task_id,
         &outcome.artifact_paths,
     );
+    artifact_error
 }
 
 async fn offload_result_by_policy(
@@ -477,24 +485,27 @@ async fn offload_result_by_policy(
     output: &str,
     threshold_bytes: usize,
     store: &Arc<SubagentArtifactStore>,
-) -> Option<StoredSubagentArtifact> {
+) -> Result<Option<StoredSubagentArtifact>, String> {
     let applied = tinyagents_orchestration::subagent::ResultPolicy::new()
         .with_max_bytes(threshold_bytes)
         .with_overflow(tinyagents_orchestration::subagent::ResultOverflow::Artifact)
         .with_artifact_store(store.clone())
         .apply(task_id, output, None)
         .await;
+    if let Some(error) = applied.artifact_error {
+        return Err(error);
+    }
     let Some(reference) = applied.artifact else {
-        return None;
+        return Ok(None);
     };
     let stored = store.take(&reference.id);
-    if stored.is_none() {
+    stored.map(Some).ok_or_else(|| {
         tracing::warn!(
             task_id = %task_id,
             "[artifact] TinyAgents returned an unknown sub-agent artifact reference"
         );
-    }
-    stored
+        "TinyAgents returned an unknown OpenHuman artifact reference".to_owned()
+    })
 }
 
 struct SubagentArtifactStore {
