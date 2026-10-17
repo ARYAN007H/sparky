@@ -213,6 +213,7 @@ async fn start_member_with_executor<E: TeamMemberExecutor + 'static>(
                     TeamMemberStartError::AlreadyClaimed { .. } => {
                         StartMemberOutcome::AlreadyClaimed
                     }
+                    TeamMemberStartError::AlreadyActive { .. } => StartMemberOutcome::AlreadyActive,
                     TeamMemberStartError::Blocked { unmet, .. } => StartMemberOutcome::Blocked {
                         unmet: unmet.clone(),
                     },
