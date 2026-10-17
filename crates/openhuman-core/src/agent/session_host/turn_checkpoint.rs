@@ -248,8 +248,6 @@ pub(crate) fn render_tool_results(results: &[CheckpointToolResult], total_budget
     )
 }
 
- 
-
 /// Budget for the tool records a closing message is grounded in and checked
 /// against (issues #6278, #6279).
 ///
@@ -504,7 +502,7 @@ pub(crate) fn close_verification_prompt(user_request: &str, records: &str, reply
 }
 
 /// The check call's verdict on a closing message.
-pub(crate) use tinyagents_harness::close::{CloseVerdict, parse_close_verdict};
+pub(crate) use tinyagents_harness::close::{parse_close_verdict, CloseVerdict};
 
 /// Build a deterministic final answer from this turn's tool results.
 /// Used as the guaranteed non-empty fallback when a turn ran tools but the

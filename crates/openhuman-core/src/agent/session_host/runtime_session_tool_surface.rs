@@ -156,10 +156,7 @@ impl OpenHumanTurnPrelude {
             auto_include_new_synthesized_tools,
             discovery_deferred,
             |visible| {
-                crate::tools::toolpacks::strip_packed_from_visible(
-                    visible,
-                    &agent_definition_name,
-                )
+                crate::tools::toolpacks::strip_packed_from_visible(visible, &agent_definition_name)
             },
         );
         let mut specs = surface

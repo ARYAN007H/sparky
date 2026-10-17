@@ -392,15 +392,17 @@ async fn committed_goal_accounting_saturates_direct_plus_inclusive_child_tokens(
         output_tokens: u64::MAX - 2,
         ..Default::default()
     };
-    sidecar.subagents.push(crate::agent::tinyagents::host::SubagentUsageEntry {
-        task_id: "large-child".into(),
-        agent_id: "researcher".into(),
-        usage: crate::agent::subagent_host::SubagentUsage {
-            input_tokens: 10,
-            output_tokens: 10,
-            ..Default::default()
-        },
-    });
+    sidecar
+        .subagents
+        .push(crate::agent::tinyagents::host::SubagentUsageEntry {
+            task_id: "large-child".into(),
+            agent_id: "researcher".into(),
+            usage: crate::agent::subagent_host::SubagentUsage {
+                input_tokens: 10,
+                output_tokens: 10,
+                ..Default::default()
+            },
+        });
 
     account_committed_turn_against_goal(workspace.path(), Some("saturated-goal"), &sidecar).await;
 

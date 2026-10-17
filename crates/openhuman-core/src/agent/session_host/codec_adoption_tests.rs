@@ -99,7 +99,11 @@ fn durable_turn_usage_keeps_the_root_record_exclusive_with_child_entries() {
         .session_sidecar
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner);
-    assert_eq!(sidecar.subagents.len(), 1, "children remain available to UI billing");
+    assert_eq!(
+        sidecar.subagents.len(),
+        1,
+        "children remain available to UI billing"
+    );
 }
 
 #[test]
