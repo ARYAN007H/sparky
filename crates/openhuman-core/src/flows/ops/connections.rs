@@ -159,51 +159,20 @@ pub(super) fn build_flow_connections(
     identities: &[crate::integrations::composio::contract::ConnectedIdentity],
     keys: &std::collections::HashMap<String, String>,
 ) -> Vec<FlowConnection> {
-    // Normalised form of a raw key, from the module-computed `keys`. A key the
-    // module did not return is left as it came.
-    let normalize_connection_identifier =
-        |raw: &str| keys.get(raw).cloned().unwrap_or_else(|| raw.to_string());
-
-    let identity_lookup = crate::integrations::composio::ops::identity_lookup(
+    let entries = crate::integrations::composio::ops::flow_connection_entries(
+        &composio,
         identities,
         keys,
     );
-
     let mut out = Vec::with_capacity(composio.len() + http.len());
-    for conn in composio {
-        if !conn.is_active() {
-            tracing::debug!(
-                toolkit = %conn.toolkit,
-                connection_id = %conn.id,
-                status = %conn.status,
-                "[flows] flows_list_connections: skipping non-active composio connection"
-            );
-            continue;
-        }
-        let toolkit = conn.normalized_toolkit();
-        let lookup_key = (
-            normalize_connection_identifier(&toolkit),
-            normalize_connection_identifier(&conn.id),
-        );
-        let platform_user_id = identity_lookup
-            .get(&lookup_key)
-            .and_then(|identity| identity.user_id.clone());
-        tracing::debug!(
-            toolkit = %toolkit,
-            connection_id = %conn.id,
-            has_platform_user_id = platform_user_id.is_some(),
-            "[flows] flows_list_connections: resolved platform_user_id for composio connection"
-        );
-        out.push(FlowConnection {
-            // Exactly the shape `tinyflows::caps::composio_connection_id` parses.
-            connection_ref: format!("composio:{}:{}", toolkit, conn.id),
-            kind: "composio".to_string(),
-            display: composio_connection_display(&toolkit, &conn),
-            toolkit: Some(toolkit),
-            scheme: None,
-            platform_user_id,
-        });
-    }
+    out.extend(entries.into_iter().map(|entry| FlowConnection {
+        connection_ref: entry.connection_ref,
+        kind: "composio".to_string(),
+        display: entry.display,
+        toolkit: Some(entry.toolkit),
+        scheme: None,
+        platform_user_id: entry.platform_user_id,
+    }));
     for cred in http {
         out.push(FlowConnection {
             // Exactly the shape `tinyflows::caps::http_cred_name` parses.
@@ -218,55 +187,13 @@ pub(super) fn build_flow_connections(
     out
 }
 
-/// Human-readable picker label for a Composio connected account, e.g.
-/// `"Gmail · user@example.com"`. Prefers email, then workspace/team, then
-/// handle; falls back to the title-cased toolkit alone when no identity is
-/// cached. The identity fields are display metadata (already surfaced by
-/// `composio_list_connections`), never secret material.
-fn composio_connection_display(
-    toolkit: &str,
-    conn: &crate::integrations::composio::ComposioConnection,
-) -> String {
-    let title = title_case_toolkit(toolkit);
-    let identity = conn
-        .account_email
-        .as_deref()
-        .or(conn.workspace.as_deref())
-        .or(conn.username.as_deref())
-        .map(str::trim)
-        .filter(|s| !s.is_empty());
-    match identity {
-        Some(id) => format!("{title} · {id}"),
-        None => title,
-    }
-}
-
 /// Human-readable picker label for a named HTTP credential, e.g.
 /// `"stripe (bearer)"`. Only the (non-secret) name + scheme — never the value.
 fn http_credential_display(cred: &crate::security::credentials::HttpCredentialSummary) -> String {
     format!("{} ({})", cred.name, cred.scheme)
 }
 
-/// Title-case a toolkit slug for display: `"gmail"` → `"Gmail"`,
-/// `"google_calendar"` → `"Google Calendar"`. Best-effort cosmetic only.
-pub(super) fn title_case_toolkit(toolkit: &str) -> String {
-    let trimmed = toolkit.trim();
-    if trimmed.is_empty() {
-        return String::new();
-    }
-    trimmed
-        .split(['_', '-', ' '])
-        .filter(|w| !w.is_empty())
-        .map(|word| {
-            let mut chars = word.chars();
-            match chars.next() {
-                Some(first) => first.to_uppercase().collect::<String>() + chars.as_str(),
-                None => String::new(),
-            }
-        })
-        .collect::<Vec<_>>()
-        .join(" ")
-}
+pub(super) use crate::integrations::composio::ops::title_case_toolkit;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Connector onboarding (Phase 5, item 18) — which toolkits a graph needs
