@@ -199,6 +199,12 @@ async fn cancelling_a_paused_driver_through_rpc_settles_once_with_its_reason() {
         })
         .expect("the paused child is registered in shared Jobs");
     assert_eq!(paused_job.status, SubAgentJobStatus::AwaitingInput);
+    assert!(
+        crate::agent::orchestration::background_completions::mark_collected(
+            workspace.path(),
+            &task_id,
+        )
+    );
 
     let controller = crate::agent_runs::subagent_control::all_registered_controllers()
         .into_iter()
