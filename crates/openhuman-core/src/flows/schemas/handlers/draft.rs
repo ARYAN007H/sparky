@@ -88,7 +88,7 @@ pub(super) fn handle_draft_promote(
     })
 }
 
-fn read_required<T: DeserializeOwned>(params: &Map<String, Value>, key: &str) -> Result<T, String> {
+pub(super) fn read_required<T: DeserializeOwned>(params: &Map<String, Value>, key: &str) -> Result<T, String> {
     let value = params
         .get(key)
         .cloned()

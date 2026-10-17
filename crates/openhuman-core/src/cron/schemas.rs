@@ -8,6 +8,7 @@ use tinyflows_bus::schedule::types::{CronJobPatch, DeliveryConfig};
 
 mod declarations;
 mod handlers;
+use handlers::*;
 
 pub use declarations::{all_controller_schemas, all_registered_controllers, schemas};
 
