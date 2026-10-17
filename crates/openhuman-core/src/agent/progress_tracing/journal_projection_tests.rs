@@ -317,6 +317,48 @@ fn legacy_export_snapshot_for_root_and_child_with_reused_call_ids() {
         !snapshot.contains("CONTENT_SENTINEL"),
         "content-off export must not contain captured payloads"
     );
+    let spans_by_id: std::collections::HashMap<_, _> = spans
+        .iter()
+        .map(|span| (span.span_id.as_str(), span))
+        .collect();
+    let normalized: Vec<_> = spans
+        .iter()
+        .map(|span| {
+            serde_json::json!({
+                "name": span.name,
+                "kind": format!("{:?}", span.kind),
+                "parent": span.parent_span_id.as_deref().and_then(|id| spans_by_id.get(id)).map(|parent| parent.name.as_str()),
+                "start_unix_ms": span.start_unix_ms,
+                "end_unix_ms": span.end_unix_ms,
+                "status": format!("{:?}", span.status),
+                "attributes": span.attributes,
+            })
+        })
+        .collect();
+    println!("NORMALIZED:{}", serde_json::to_string_pretty(&normalized).unwrap());
+    let root = spans.iter().find(|span| span.parent_span_id.is_none()).unwrap();
+    assert_eq!(root.start_unix_ms, 1_000);
+    assert_eq!(root.end_unix_ms, Some(1_110));
+    let generation_names: Vec<_> = spans
+        .iter()
+        .filter(|span| span.kind == SpanKind::Generation)
+        .map(|span| span.name.as_str())
+        .collect();
+    assert_eq!(generation_names, ["llm.gpt-4", "llm.gpt-4-mini"]);
+    assert_eq!(
+        spans.iter().find(|span| span.name == "llm.gpt-4").unwrap().attributes["gen_ai.usage.input_tokens"],
+        serde_json::json!(100)
+    );
+    assert_eq!(
+        spans.iter().find(|span| span.name == "llm.gpt-4-mini").unwrap().attributes["gen_ai.usage.input_tokens"],
+        serde_json::json!(7),
+        "the repeated call id in a child run must retain its own usage"
+    );
+    let captured = spans_from_observations(ctx().with_capture_content(true), 10, &observations);
+    assert!(
+        spans_to_ndjson(SpanEnvelope::Otel, &captured).contains("CONTENT_SENTINEL_PROMPT"),
+        "content-on export retains opted-in prompt content"
+    );
     println!("{snapshot}");
 }
 
