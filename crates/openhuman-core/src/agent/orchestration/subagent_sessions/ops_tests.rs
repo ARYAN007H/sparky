@@ -118,6 +118,14 @@ fn stale_completion_cannot_overwrite_reused_or_closed_session() {
     assert_eq!(current.current_task_id.as_deref(), Some("second-task"));
     assert_eq!(current.status, DurableSubagentStatus::Running);
     assert!(current.latest_history.is_none());
+    assert!(mark_failed(
+        &store,
+        &second.subagent_session_id,
+        "first-task",
+        "stale failure".into(),
+    )
+    .is_err());
+    assert!(store.load().unwrap()[0].latest_error.is_none());
 
     close(&store, &second.subagent_session_id).unwrap();
     assert!(mark_finished(
@@ -126,6 +134,13 @@ fn stale_completion_cannot_overwrite_reused_or_closed_session() {
         "second-task",
         &SubagentRunStatus::Completed,
         vec![TranscriptMessage::user("late after close")],
+    )
+    .is_err());
+    assert!(mark_failed(
+        &store,
+        &second.subagent_session_id,
+        "second-task",
+        "late failure".into(),
     )
     .is_err());
     let closed = store.load().unwrap().remove(0);
