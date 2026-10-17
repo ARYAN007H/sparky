@@ -226,7 +226,6 @@ async fn closing_a_durable_driver_session_cancels_only_its_registered_child() {
         "test-session",
         Some("close-driver-thread"),
     );
-    let wait_owner = owner.clone();
     let owner_scope: std::sync::Arc<dyn Fn(u64) -> String + Send + Sync> =
         std::sync::Arc::new(move |_| owner.clone());
     let message_store: std::sync::Arc<dyn TinySessionStore> = std::sync::Arc::new(port.clone());
@@ -275,7 +274,7 @@ async fn closing_a_durable_driver_session_cancels_only_its_registered_child() {
         .with_fixed_action(SubAgentJobAction::Await)
         .with_identifier_fields("task_id", "subagent_session_id")
         .with_await_timeout_field("timeout_secs", 1, 3600)
-        .with_owner_scope(owner_scope)
+        .with_owner_scope(owner_scope.clone())
         .with_sessions(tiny_store, |_| "test-session".to_owned());
     let wait_result = tinyagents_harness::tool::ToolDispatch::execute(
         &wait,
@@ -293,14 +292,36 @@ async fn closing_a_durable_driver_session_cancels_only_its_registered_child() {
         wait_result.output()
     );
     release.notify_one();
+    let final_wait = SubAgentJobsTool::new(jobs.clone())
+        .with_tool_name("wait_subagent")
+        .with_fixed_action(SubAgentJobAction::Await)
+        .with_identifier_fields("task_id", "subagent_session_id")
+        .with_required_identifier()
+        .with_owner_scope(owner_scope.clone())
+        .with_sessions(
+            std::sync::Arc::new(port.clone()),
+            |_| "test-session".to_owned(),
+        );
     let settled = tokio::time::timeout(
         std::time::Duration::from_secs(5),
-        jobs.wait_owned(job_id.as_str(), wait_owner),
+        tinyagents_harness::tool::ToolDispatch::execute(
+            &final_wait,
+            &(),
+            tinyagents_harness::CallId::new("wait-cancelled-close-child-settled"),
+            serde_json::json!({"task_id":"close-driver-task"}),
+            tinytools::ToolCallOptions::default(),
+            &parent,
+        ),
     )
     .await
     .expect("shared Jobs wait observes cooperative cancellation settlement")
+    .expect("Tiny await dispatches successfully")
     .expect("child stays owned until cancellation settles");
-    assert_eq!(settled.status, SubAgentJobStatus::Cancelled);
+    assert!(!settled.is_error, "settled Jobs wait must remain a result");
+    assert_eq!(
+        jobs.get(job_id.as_str()).unwrap().status,
+        SubAgentJobStatus::Cancelled
+    );
 
     let cancelled = jobs
         .list()
