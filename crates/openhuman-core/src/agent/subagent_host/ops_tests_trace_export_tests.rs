@@ -65,7 +65,7 @@ async fn prepared_child_run_is_exported_from_its_native_journal_lineage() {
     let mut options = options;
     options.checkpoint_dir = Some(scratch.path().join("checkpoints"));
     options.thread_id = Some("native-trace-thread".into());
-    options.model_override = Some("gpt-4o".into());
+    options.model_override = Some("claude-opus-4-8".into());
     let (outcome, _job_id) = run_subagent_via_driver_tool(
         &parent,
         make_def_named_tools(&[]),
