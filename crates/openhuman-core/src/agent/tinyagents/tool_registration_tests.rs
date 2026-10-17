@@ -285,10 +285,12 @@ async fn live_close_alias_enforces_parent_thread_ownership() {
         )],
     )
     .await
-    .expect_err("closing another thread's session is denied by the live alias");
+    .expect("a foreign selector is returned as a recoverable model-facing tool error");
     assert!(
-        foreign.to_string().contains("tool dispatch failed"),
-        "the harness surfaces the fail-closed control error: {foreign}"
+        foreign.results.iter().any(|message| {
+            message.text().contains("session") || message.text().contains("subagent")
+        }),
+        "the registered alias must return a selector denial to the model"
     );
     assert!(sessions.load().unwrap().iter().any(|row| {
         row.subagent_session_id == "foreign-session" && row.status == DurableSubagentStatus::Idle
