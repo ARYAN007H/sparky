@@ -8,19 +8,19 @@ lower-level `agent::harness` remains the execution engine: prompt
 construction, policy-filtered tools, model selection, and the sub-agent run
 loop itself.
 
-The generic durable coordination model lives in
-`tinyagents-orchestration`: team/workflow types, validation, run-ledger
-services, graph composition, member prompt construction, message watermark
-delivery, and diagnostic workflow topology. OpenHuman imports those APIs
-directly. This module retains the product adapters: Config and root-parent
-construction, model/tool selection, `run_subagent`, progress and BUS events,
-RPC/tool formatting, and OpenHuman's worktree policy.
+The generic coordination model lives in `tinyagents-orchestration`: team and
+workflow types, validation, run-ledger services, workflow execution, member
+prompt construction, message watermark delivery, and parallel task
+staging/fanout. OpenHuman imports those APIs directly. This module retains the
+product adapters: Config and root-parent construction, model/tool selection,
+`run_subagent`, progress and BUS events, RPC/tool formatting, and OpenHuman's
+worktree policy.
 
 ## Responsibilities
 
 - Register, wait on, and cancel child agent runs ([`ops.rs`](./ops.rs),
   `AgentOrchestrationSession`) as thin wrappers over TinyAgents'
-  `DetachedTaskRegistry`.
+  `DetachedTaskRegistry`, including its ordered batch wait and shared deadline.
 - Host adapters for durable teams and workflows: RPC schemas, root-parent
   worker execution, model selection, cancellation policy, and BUS/progress
   integration. Their host-neutral types, storage services, scheduling graphs,
@@ -52,15 +52,16 @@ RPC/tool formatting, and OpenHuman's worktree policy.
 - `ops.rs` / [`types.rs`](./types.rs): `AgentOrchestrationSession`, `OrchestrationError`,
   `AgentSnapshot`, `OrchestrationTaskStatus`, `SpawnAgentRequest`/`Response`,
   `WaitAgentOptions`/`Response`.
-- `agent_teams/`: OpenHuman's live member-worker adapter for the generic
-  `tinyagents_orchestration::teams` service: it supplies Config, the root
-  parent context, model/tool execution, progress tracing, and BUS-facing
-  lifecycle behavior.
+- `agent_teams/`: OpenHuman's member-worker adapter for TinyAgents'
+  `TeamService::start_member_with_started`. The host supplies Config, the root
+  parent context, model/tool execution and product failure events; the owner
+  handles claim, active state, completion, and token-scoped cleanup.
 - `command_center/`: read-only grouped view of background agent runs
   (`ops.rs`) plus stop/retry/continue/follow-up transitions (`control.rs`).
-- `workflow_runs/`: OpenHuman's live workflow execution and RPC adapters;
-  workflow definitions, durable state, validation, graphs, and neutral engine
-  mechanics are imported directly from `tinyagents_orchestration::workflow`.
+- `workflow_runs/`: OpenHuman's workflow RPC and executor adapters. The
+  `WorkflowRunSupervisor` owns live generation/cancellation state; OpenHuman
+  retains durable revision-CAS lifecycle transitions, policy admission,
+  root-parent construction, origin propagation, and failure projection.
 - [`delegation.rs`](./delegation.rs): production worker for TinyAgents' durable
   plan→execute⇄review→finalize graph; every stage runs through `run_subagent`.
 - `spawn_parallel_agents` stages through
