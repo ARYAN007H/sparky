@@ -2,7 +2,7 @@ use super::*;
 
 #[tokio::test]
 async fn continue_subagent_resumes_paused_job_through_shared_driver() {
-    use super::{ContinueSubagentTool, SpawnSubagentTool};
+    use crate::agent::orchestration::tools::{ContinueSubagentTool, SpawnSubagentTool};
     use tinyagents_orchestration::subagent::{SubAgentJobRegistry, SubAgentJobStatus};
 
     let _ = AgentDefinitionRegistry::init_global_builtins();
@@ -24,7 +24,10 @@ async fn continue_subagent_resumes_paused_job_through_shared_driver() {
     parent
         .subagent_tool_ceiling_names
         .insert("ask_user_clarification".into());
-    let live = super::live_parent_run_context("continue-paused-e2e", parent);
+    let live = crate::agent::orchestration::tools::live_parent_run_context(
+        "continue-paused-e2e",
+        parent,
+    );
     let paused = SpawnSubagentTool::new()
         .execute_with_live_parent_context(
             json!({
@@ -105,7 +108,7 @@ async fn continue_subagent_resumes_paused_job_through_shared_driver() {
 
 #[tokio::test]
 async fn delegate_graph_runs_every_stage_through_shared_driver_jobs() {
-    use super::DelegateGraphTool;
+    use crate::agent::orchestration::tools::DelegateGraphTool;
     use crate::agent_registry::host_definition::AgentDefinitionRegistry;
     use crate::core::runtime::{ContextOverlay, CoreContext, DomainSet};
     use crate::tools::toolpacks::ToolGroups;
