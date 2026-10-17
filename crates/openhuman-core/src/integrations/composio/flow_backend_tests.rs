@@ -2,8 +2,6 @@ use super::*;
 use axum::{routing::post, Json, Router};
 use serde_json::{json, Value};
 
-use crate::config::Config;
-use crate::integrations::composio::flow_backend::execute_for_connection;
 use crate::integrations::composio::module_client::module_guard;
 
 /// Regression for #5751: the flow adapter used to parse and log the chosen

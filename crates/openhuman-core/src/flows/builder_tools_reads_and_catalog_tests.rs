@@ -1,7 +1,6 @@
 use super::*;
 
 use crate::flows::builder_tools_connection_reads::flow_connection_to_json;
-use crate::integrations::composio::builder_tools::catalog_search::search_catalog;
 // ── revise_workflow ──────────────────────────────────────────────────────────
 
 #[tokio::test]

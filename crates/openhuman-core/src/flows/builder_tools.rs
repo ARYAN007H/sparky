@@ -2,8 +2,7 @@
 
 #[cfg(test)]
 use crate::integrations::composio::builder_tools::{
-    GetToolContractTool, GetToolOutputSampleTool, ListConnectableToolkitsTool,
-    ListFlowConnectionsTool, SearchToolCatalogTool,
+    ListFlowConnectionsTool,
 };
 
 #[cfg(test)]
