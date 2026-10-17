@@ -504,6 +504,31 @@ async fn legacy_pause_migration_preserves_host_checkpoint_metadata_and_bytes() {
     assert_eq!(recovered.artifact_paths, checkpoint.artifact_paths);
     assert_eq!(recovered.elapsed_ms, checkpoint.elapsed_ms);
     assert_eq!(std::fs::read(&pause_path).unwrap(), pause_bytes);
+
+    let mut newer_checkpoint = checkpoint;
+    let mut newer_key = key();
+    newer_key.task_id = "task-with-new-resume-metadata".into();
+    newer_checkpoint.task_key = Some(newer_key.clone());
+    newer_checkpoint.task_id = newer_key.task_id.clone();
+    newer_checkpoint.resume_metadata.insert(
+        "skill_filter_override".into(),
+        "new-skill".into(),
+    );
+    newer_checkpoint
+        .resume_metadata
+        .insert("model_override".into(), "new-model".into());
+    let newer_path = migrated.legacy_pause_path(&newer_key);
+    std::fs::create_dir_all(newer_path.parent().unwrap()).unwrap();
+    std::fs::write(
+        &newer_path,
+        serde_json::to_vec_pretty(&newer_checkpoint).unwrap(),
+    )
+    .unwrap();
+    let newer_store = OpenHumanPersistence::new(directory.path().to_path_buf());
+    assert!(newer_store.load_pause(&newer_key).await.unwrap().is_some());
+    let newer = load_subagent_checkpoint(directory.path(), &newer_key.task_id).unwrap();
+    assert_eq!(newer.skill_filter_override.as_deref(), Some("new-skill"));
+    assert_eq!(newer.model_override.as_deref(), Some("new-model"));
 }
 
 #[tokio::test]
