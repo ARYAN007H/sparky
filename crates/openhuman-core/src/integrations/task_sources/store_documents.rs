@@ -35,7 +35,7 @@ use crate::storage::{DocumentStoreExt, StorageError};
 
 pub(super) use super::storage_schema::{ingested_id, INGESTED, SOURCES};
 use super::storage_schema::{legacy_collections, specs};
-use crate::storage::schema_support::{key_of, ms_rfc3339};
+use crate::storage::schema_support::key_of;
 const DOMAIN: &str = "task_sources::store";
 
 /// The legacy `sources.db`, as the storage importer reads it.
