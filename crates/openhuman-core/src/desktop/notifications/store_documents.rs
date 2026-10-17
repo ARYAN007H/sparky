@@ -279,13 +279,6 @@ async fn release_content(
     }
 }
 
-/// The core-notification document id: the workspace is part of the key, since
-/// each workspace's events are persisted separately in the SQL store (one
-/// database per workspace) and event ids repeat across them.
-pub(super) fn core_id(workspace: &str, event_id: &str) -> String {
-    format!("{}:{workspace}/{event_id}", workspace.len())
-}
-
 /// The notification store over one scoped document handle.
 #[derive(Clone)]
 pub(super) struct Docs(Repo, String);

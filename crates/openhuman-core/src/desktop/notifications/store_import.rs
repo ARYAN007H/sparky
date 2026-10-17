@@ -23,6 +23,7 @@ use serde_json::json;
 mod store_rows;
 use store_rows::rows_to_notifications;
 
+use super::store_documents::LOCAL_WORKSPACE;
 use super::storage_schema::{LEGACY_CORE, LEGACY_NOTIFICATIONS, LEGACY_SETTINGS};
 use super::types::IntegrationNotification;
 use crate::config::Config;

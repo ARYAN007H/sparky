@@ -26,6 +26,7 @@ pub mod store;
 mod storage_schema;
 mod store_documents;
 mod store_import;
+pub(crate) use storage_schema::storage_schema;
 pub(crate) use store_documents::import_source;
 pub mod tools;
 pub mod types;
