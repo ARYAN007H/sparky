@@ -110,8 +110,7 @@ async fn independent_host_bundles_share_and_project_the_persisted_winner() {
         })],
     );
     parent_context.workspace_dir = workspace;
-    let mut definition = make_def_named_tools(&["blocking_cross_bundle_fixture"]);
-    definition.id = "cross-bundle-child".into();
+    let definition = make_def_named_tools(&["blocking_cross_bundle_fixture"]);
     let mut options = with_parent(parent_context, SubagentRunOptions::default());
     options.task_id = Some("cross-bundle-task".into());
     options.thread_id = Some("cross-bundle-thread".into());
@@ -124,18 +123,21 @@ async fn independent_host_bundles_share_and_project_the_persisted_winner() {
         test_config,
     );
     options.run_context = options.run_context.with_core(Some(Arc::clone(&core)));
-    let parent = options.run_context.clone().into_tinyagents(
+    let leader_parent = options.run_context.clone().into_tinyagents(
         tinyagents_harness::context::RunConfig::new("cross-bundle-parent")
             .with_thread("cross-bundle-thread"),
     );
-    let task_key = SubagentTaskKey::from_context(&parent, "cross-bundle-task", None);
+    let follower_parent = options.run_context.clone().into_tinyagents(
+        tinyagents_harness::context::RunConfig::new("cross-bundle-parent")
+            .with_thread("cross-bundle-thread"),
+    );
+    let task_key = SubagentTaskKey::from_context(&leader_parent, "cross-bundle-task", None);
     let flights = crate::agent::subagent_host::lifecycle::shared_subagent_flight(
-        &parent.data.dispatch_ctx(),
+        &leader_parent.data.dispatch_ctx(),
         &checkpoint_dir,
     );
     let leader_definition = definition.clone();
     let leader_options = options.clone();
-    let leader_parent = parent.clone();
     let leader = tokio::spawn(async move {
         crate::agent::subagent_host::OpenHumanSubagentHost::new(
             leader_definition,
@@ -152,7 +154,6 @@ async fn independent_host_bundles_share_and_project_the_persisted_winner() {
         .get(&task_key)
         .expect("leader reserves the shared task key");
 
-    let follower_parent = parent.clone();
     let follower = tokio::spawn(async move {
         crate::agent::subagent_host::OpenHumanSubagentHost::new(definition, options)
             .run(&follower_parent, "produce a report".into())
