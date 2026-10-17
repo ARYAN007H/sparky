@@ -1,4 +1,5 @@
 use super::*;
+use tinyagents_tasks::InMemoryCompletionStore;
 
 /// A store whose writes always fail, like a full disk.
 struct FullDisk(InMemoryCompletionStore);

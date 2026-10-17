@@ -5,9 +5,9 @@ use super::*;
 /// One drain an event asks for: the thread, how soon, and the context of the
 /// profile that owns it (`None` on the desktop, where nothing is per profile).
 pub(in crate::agent::orchestration) struct Drain {
-    pub(super) owner: Option<Arc<CoreContext>>,
-    pub(super) thread_id: String,
-    pub(super) delay: Duration,
+    pub(in crate::agent::orchestration) owner: Option<Arc<CoreContext>>,
+    pub(in crate::agent::orchestration) thread_id: String,
+    pub(in crate::agent::orchestration) delay: Duration,
 }
 
 /// Which thread to drain, and after how long, for an event, outside any
