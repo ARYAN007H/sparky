@@ -82,8 +82,7 @@ turn lifecycle are in `../session_host/`; `run_subagent`,
   bundles loaded by `tinyagents_definition` (user TOML) and `builtin_definitions`.
 - `crate::security::SecurityPolicy`: workspace containment policy plumbed
   into `artifact_offload::new_artifact_offload`.
-- `tinymemory-api`: provenance classification and untrusted-context wrapping,
-  configured with connector prefixes from `memory::provenance`.
+- `tinymemory-api`: provenance classification and untrusted-context wrapping.
 - `crate::memory`: text
   sanitization (`artifact_offload::SanitizingRedactor` wraps `memory::safety::sanitize_text` for both artifact stores).
 - `crate::config::AgentConfig`, `crate::skills::Workflow`,
