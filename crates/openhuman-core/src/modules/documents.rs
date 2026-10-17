@@ -37,6 +37,12 @@ use crate::config::Config;
 /// Registry id of the module these calls go to.
 const MODULE_ID: &str = "tinydocs";
 
+/// Temporary host-side stop while the published TinyMemory spreadsheet parser
+/// is being repaired. Keep the wire format recognized so callers cannot fall
+/// through to a different parser.
+const SPREADSHEET_IMPORT_UNAVAILABLE: &str =
+    "spreadsheet imports are temporarily unavailable pending a safe TinyMemory release";
+
 /// How much of a held document to pull per `ReadOutput`.
 ///
 /// Below the module's own per-chunk cap with room for the base64 expansion and
@@ -371,11 +377,14 @@ fn classify(error: &tinybus::Error) -> DocumentCallError {
 mod tests;
 
 /// Extract structured document sections using the published intake contract.
+/// XLSX is recognized by the contract but temporarily refused before loading
+/// the module while the published TinyMemory parser is repaired.
 pub async fn extract_document(
     config: &Config,
     document: &[u8],
     spec: &tinydocs_bus::ExtractDocumentSpec,
 ) -> Result<tinydocs_bus::ExtractedDocument, DocumentCallError> {
+    reject_disabled_spreadsheet_import(spec.format)?;
     intake_available()?;
     let (runtime, record) = ready(config).await?;
     let (destination, path, interface) = address(record)?;
@@ -393,7 +402,9 @@ pub async fn extract_document(
         .map_err(|e| classify(&e))
 }
 
-/// Convert a streamed PDF or Office document to complete normalized Markdown.
+/// Convert a streamed PDF, Word document, or presentation to complete
+/// normalized Markdown. XLSX is temporarily refused before loading the module
+/// while the published TinyMemory parser is repaired.
 ///
 /// Unlike [`extract_document`], this operation preserves the full text needed
 /// for memory persistence and returns it through the module's bounded held
@@ -408,6 +419,7 @@ pub async fn convert_markdown(
     format: tinydocs_bus::DocumentFormat,
     document: &[u8],
 ) -> Result<String, DocumentCallError> {
+    reject_disabled_spreadsheet_import(format)?;
     let (runtime, record) = ready(config).await?;
     let proxy = proxy(runtime, record)?;
     let (destination, path, interface) = address(record)?;
@@ -517,4 +529,17 @@ fn intake_available() -> Result<(), DocumentCallError> {
         ));
     }
     Ok(())
+}
+
+/// Refuse spreadsheet parsing before module loading or bus access.
+fn reject_disabled_spreadsheet_import(
+    format: tinydocs_bus::DocumentFormat,
+) -> Result<(), DocumentCallError> {
+    if matches!(format, tinydocs_bus::DocumentFormat::Xlsx) {
+        Err(DocumentCallError::Unavailable(
+            SPREADSHEET_IMPORT_UNAVAILABLE.to_string(),
+        ))
+    } else {
+        Ok(())
+    }
 }
