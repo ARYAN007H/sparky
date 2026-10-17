@@ -156,10 +156,9 @@ fn handle_subagent_cancel(ctx: DispatchCtx, params: Map<String, Value>) -> Contr
             }
             Some(meta) => {
                 if meta.driver_managed {
-                    // The driver's awaited host-completion hook records the
-                    // terminal session state and delivers the failed event.
-                    // Publishing the legacy pseudo-completion here would
-                    // duplicate both effects.
+                    // Active driver jobs finish through the awaited host hook.
+                    // A paused job has already returned from that hook, so this
+                    // handler settles and reports that one terminal transition.
                     if let Some(paused) = meta.driver_pause.as_ref() {
                         let store = subagent_sessions::SubagentSessionStore::new(
                             meta.workspace_dir.clone(),
@@ -172,17 +171,6 @@ fn handle_subagent_cancel(ctx: DispatchCtx, params: Map<String, Value>) -> Contr
                                     )
                                 })?;
                         if transitioned {
-                            let summary = match reason
-                                .as_deref()
-                                .map(str::trim)
-                                .filter(|reason| !reason.is_empty())
-                            {
-                                Some(reason) => format!(
-                                    "You cancelled this background sub-agent before it finished. Reason: {reason}"
-                                ),
-                                None => "You cancelled this background sub-agent before it finished."
-                                    .to_string(),
-                            };
                             let error = match reason
                                 .as_deref()
                                 .map(str::trim)
