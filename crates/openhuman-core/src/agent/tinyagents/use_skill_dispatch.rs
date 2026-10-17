@@ -96,6 +96,11 @@ impl ToolDispatch<(), OpenHumanRunContext> for UseSkillDispatch {
             .get("args")
             .cloned()
             .unwrap_or_else(|| serde_json::json!({}));
+        let delegation_target = tools
+            .iter()
+            .find(|tool| tool.name() == name)
+            .and_then(|tool| crate::tools::host_extensions::delegation_target(tool.as_ref()))
+            .map(str::to_string);
         let Some(inner_adapter) = super::tool_registration::shared_tool_adapter(vec![tools], name)
             .map(|adapter| Arc::new(adapter) as Arc<dyn Tool>)
         else {
@@ -112,11 +117,6 @@ impl ToolDispatch<(), OpenHumanRunContext> for UseSkillDispatch {
                 answer: Some(result),
             })));
         };
-        let delegation_target = tools
-            .iter()
-            .find(|tool| tool.name() == name)
-            .and_then(|tool| crate::tools::host_extensions::delegation_target(tool.as_ref()))
-            .map(str::to_string);
         let typed = typed_dispatch_for(name, inner_adapter.clone(), delegation_target);
         Ok(Some(Arc::new(BoundUseSkillDispatch {
             outer: self.tool.clone(),
@@ -163,6 +163,11 @@ impl ToolDispatch<(), OpenHumanRunContext> for UseSkillDispatch {
             .get("args")
             .cloned()
             .unwrap_or_else(|| serde_json::json!({}));
+        let delegation_target = tools
+            .iter()
+            .find(|tool| tool.name() == name)
+            .and_then(|tool| crate::tools::host_extensions::delegation_target(tool.as_ref()))
+            .map(str::to_string);
 
         // Re-wrap the resolved tool in the same `CanonicalSharedToolAdapter`
         // seam the harness itself builds at registration: typed-dispatch
@@ -180,11 +185,6 @@ impl ToolDispatch<(), OpenHumanRunContext> for UseSkillDispatch {
                 .await;
         };
 
-        let delegation_target = tools
-            .iter()
-            .find(|tool| tool.name() == name)
-            .and_then(|tool| crate::tools::host_extensions::delegation_target(tool.as_ref()))
-            .map(str::to_string);
         if let Some(dispatch) = typed_dispatch_for(&name, inner_adapter.clone(), delegation_target) {
             return dispatch
                 .execute(&(), call_id, inner_args, options, parent)
