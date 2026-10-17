@@ -16,6 +16,8 @@ pub(crate) use crate::integrations::composio::flow_gate::composio_connection_id;
 use std::sync::Arc;
 
 use async_trait::async_trait;
+#[cfg(test)]
+use serde_json::json;
 use serde_json::Value;
 use tinyflows::caps::*;
 use tinyflows::error::{EngineError, Result};
