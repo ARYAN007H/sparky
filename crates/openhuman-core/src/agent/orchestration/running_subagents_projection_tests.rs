@@ -138,3 +138,60 @@ async fn explicit_profile_projects_spawn_completion_and_cancel_without_ambient_s
     let _ = alice_tx;
     let _ = bob_tx;
 }
+
+#[tokio::test]
+async fn cancellation_projection_uses_the_captured_profile_store() {
+    let name = "cancellation_projection_uses_the_captured_profile_store";
+    let module = module_path!().split_once("::").expect("crate module").1;
+    let exact = format!("{module}::{name}");
+    if std::env::var("OPENHUMAN_SUBAGENT_PROJECTION_CHILD").as_deref() != Ok(exact.as_str()) {
+        let output = std::process::Command::new(std::env::current_exe().expect("test binary"))
+            .args(["--exact", &exact, "--nocapture", "--test-threads=1"])
+            .env("OPENHUMAN_SUBAGENT_PROJECTION_CHILD", &exact)
+            .output()
+            .expect("run isolated SaaS cancellation test");
+        assert!(
+            output.status.success() && String::from_utf8_lossy(&output.stdout).contains("1 passed"),
+            "isolated test {exact} failed:\n{}\n{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+        return;
+    }
+
+    crate::core::runtime::mode::lock_mode(Mode::Saas).expect("lock isolated SaaS mode");
+    let _guard = test_guard_async().await;
+    let workspace = tempfile::tempdir().expect("workspace");
+    let alice_context = profile("cancel-alice", workspace.path());
+    let bob_context = profile("cancel-bob", workspace.path());
+    let alice = DispatchCtx::new(alice_context.clone());
+    let bob = DispatchCtx::new(bob_context.clone());
+    let task_id = uuid::Uuid::new_v4().to_string();
+    let (_status, receiver) = status_channel();
+    CoreContext::sync_scope(alice_context, || {
+        register(
+            &alice,
+            task_id.clone(),
+            "researcher".into(),
+            PARENT.into(),
+            None,
+            None,
+            workspace.path().to_path_buf(),
+            None,
+            run_queue(),
+            dummy_abort(),
+            receiver,
+        )
+    })
+    .expect("Alice registration");
+
+    assert!(CoreContext::sync_scope(bob_context, || cancel_by_task(&alice, &task_id)).is_some());
+    let alice_row = records(&alice, workspace.path())
+        .into_iter()
+        .find(|row| row.spec.task_id.as_str() == task_id)
+        .expect("Alice cancellation is persisted to Alice's profile store");
+    assert_eq!(alice_row.status, OrchestrationTaskStatus::Cancelled);
+    assert!(records(&bob, workspace.path())
+        .iter()
+        .all(|row| row.spec.task_id.as_str() != task_id));
+}
