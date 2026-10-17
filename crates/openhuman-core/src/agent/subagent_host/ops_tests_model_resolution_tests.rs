@@ -298,10 +298,9 @@ async fn closing_a_durable_driver_session_cancels_only_its_registered_child() {
         .with_identifier_fields("task_id", "subagent_session_id")
         .with_required_identifier()
         .with_owner_scope(owner_scope.clone())
-        .with_sessions(
-            std::sync::Arc::new(port.clone()),
-            |_| "test-session".to_owned(),
-        );
+        .with_sessions(std::sync::Arc::new(port.clone()), |_| {
+            "test-session".to_owned()
+        });
     let settled = tokio::time::timeout(
         std::time::Duration::from_secs(5),
         tinyagents_harness::tool::ToolDispatch::execute(
