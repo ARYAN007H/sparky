@@ -34,7 +34,7 @@ llvm_cov() {
       ;;
     *)
       if [ "${OH_COV_RUNNER:-cargo}" = "nextest" ]; then
-        bash scripts/ci-cancel-aware.sh cargo llvm-cov nextest --profile ci --no-tests=fail \
+        bash scripts/ci/nextest-coverage.sh "${COV_SUITE:-coverage}" cargo llvm-cov nextest --profile ci --no-tests=fail \
           --features "${CORE_PRODUCT_FEATURES}" "$@"
       else
         bash scripts/ci-cancel-aware.sh cargo llvm-cov \
@@ -46,7 +46,7 @@ llvm_cov() {
 
 llvm_cov_package() {
   if [ "${OH_COV_RUNNER:-cargo}" = "nextest" ]; then
-    bash scripts/ci-cancel-aware.sh cargo llvm-cov nextest --profile ci --no-tests=fail "$@"
+    bash scripts/ci/nextest-coverage.sh "${COV_SUITE:-coverage}" cargo llvm-cov nextest --profile ci --no-tests=fail "$@"
   else
     bash scripts/ci-cancel-aware.sh cargo llvm-cov "$@"
   fi
@@ -54,7 +54,7 @@ llvm_cov_package() {
 
 llvm_cov_product_facade() {
   if [ "${OH_COV_RUNNER:-cargo}" = "nextest" ]; then
-    bash scripts/ci-cancel-aware.sh cargo llvm-cov nextest --profile ci --no-tests=fail \
+    bash scripts/ci/nextest-coverage.sh "${COV_SUITE:-coverage}" cargo llvm-cov nextest --profile ci --no-tests=fail \
       --features "${CORE_PRODUCT_FEATURES}" "$@"
   else
     bash scripts/ci-cancel-aware.sh cargo llvm-cov \
@@ -125,7 +125,7 @@ FAILED_SUITES=()
 suite() {
   local name="$1" rc=0
   shift
-  "$@" || rc=$?
+  COV_SUITE="$(printf '%s' "$name" | tr -cs '[:alnum:]' '-')" "$@" || rc=$?
   case "${rc}" in
     0) ;;
     130 | 143)
@@ -256,6 +256,16 @@ if [ "${OH_COV_RUNNER:-cargo}" = "nextest" ]; then
   # other without the per-module and serial invocations below. Cargo skips a
   # target whose required-features are not in the product set; `kind(test)`
   # keeps the run to the integration targets, as the loop below runs them.
+  mkdir -p ci-out/nextest
+  expected_targets="${PWD}/ci-out/nextest/cli-expected-targets.txt"
+  : >"${expected_targets}"
+  while IFS= read -r target; do
+    [ -n "${target}" ] || continue
+    if target_features_satisfied "${target}"; then
+      printf '%s\n' "${target}" >>"${expected_targets}"
+    fi
+  done < <(integration_test_targets)
+  NEXTEST_EXPECTED_TARGETS="${expected_targets}" \
   suite "openhuman-cli integration tests (nextest)" llvm_cov \
     --no-report --no-fail-fast -p openhuman-cli --tests -E 'kind(test)'
 else

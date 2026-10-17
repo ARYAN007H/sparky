@@ -208,9 +208,11 @@ test("coverage finalizer retains interrupted reports and the cancellation status
 function runMockedCoverage(exitCode) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "rust-coverage-runner-"));
   try {
-    for (const folder of ["bin", "scripts/ci", "crates/openhuman-cli"])
+    for (const folder of ["bin", "scripts/ci", "crates/openhuman-cli", ".config", "tests"])
       fs.mkdirSync(path.join(dir, folder), { recursive: true });
     const write = (name, content) => fs.writeFileSync(path.join(dir, name), content, { mode: 0o755 });
+    for (const name of ["scripts/ci/nextest-coverage.sh", "scripts/ci/nextest-report.mjs", ".config/nextest.toml"])
+      fs.copyFileSync(path.join(repoRoot, name), path.join(dir, name));
     write("scripts/ci/product-features.sh", "#!/bin/bash\necho channels\n");
     write("scripts/ci-cancel-aware.sh", '#!/bin/bash\nexec "$@"\n');
     write("scripts/ci/assert-coverage-presence.sh", "#!/bin/bash\nexit 0\n");
@@ -218,7 +220,17 @@ function runMockedCoverage(exitCode) {
     write("bin/rustup", "#!/bin/bash\nexit 1\n");
     write("bin/cargo", `#!/bin/bash
 printf '%s\\n' "$*" >> "$MOCK_CALLS"
-case "$*" in *"-p openhuman --lib --bins"*) exit "${exitCode}" ;; esac
+case "$*" in *"-p openhuman --lib --bins"*) [ "${exitCode}" = 0 ] || exit "${exitCode}" ;; esac
+node - "$@" <<'JS'
+const fs = require('node:fs');
+const args = process.argv.slice(2);
+const pos = args.indexOf('--config-file');
+if (pos >= 0) {
+  const config = fs.readFileSync(args[pos + 1], 'utf8');
+  const report = JSON.parse(config.split('\\n').find(line => line.startsWith('path = ')).slice(7));
+  fs.writeFileSync(report, '<testsuites><testsuite name="mock" tests="1"></testsuite></testsuites>');
+}
+JS
 `);
     let status = 0;
     try {
