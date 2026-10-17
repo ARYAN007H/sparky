@@ -335,6 +335,11 @@ pub(in crate::agent::subagent_host) fn outcome_to_host(
 ) -> SubagentRunOutcome {
     let persistence_disposition = result.disposition;
     let outcome = result.outcome;
+    let elapsed_from_neutral = outcome
+        .extensions
+        .get("elapsed_ns")
+        .and_then(serde_json::Value::as_u64)
+        .map(std::time::Duration::from_nanos);
     // A driver that lost a pause/terminal CAS may have a perfectly valid local
     // execution result, but it is not the authoritative lifecycle outcome.
     // Reconstruct the durable winner instead of leaking the loser’s output,
@@ -407,6 +412,9 @@ pub(in crate::agent::subagent_host) fn outcome_to_host(
             .collect(),
         persistence_disposition,
     });
+    if let Some(elapsed) = elapsed_from_neutral {
+        host.elapsed = elapsed;
+    }
     let is_awaiting_input = matches!(outcome.status, SubagentOutcomeKind::AwaitingInput(_));
     let status = match outcome.status {
         SubagentOutcomeKind::Completed => SubagentRunStatus::Completed,

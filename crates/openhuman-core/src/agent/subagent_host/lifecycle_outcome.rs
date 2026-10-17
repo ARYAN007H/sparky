@@ -20,6 +20,10 @@ pub(super) fn host_outcome_to_neutral(
             serde_json::json!(outcome.elapsed.as_millis() as u64),
         ),
         (
+            "elapsed_ns".into(),
+            serde_json::json!(outcome.elapsed.as_nanos().min(u64::MAX as u128) as u64),
+        ),
+        (
             "artifact_paths".into(),
             serde_json::json!(outcome.artifact_paths),
         ),

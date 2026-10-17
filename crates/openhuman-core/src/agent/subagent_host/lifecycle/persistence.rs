@@ -362,6 +362,7 @@ impl OpenHumanPersistence {
             "skill_filter_override": checkpoint.skill_filter_override.clone(),
             "model_override": checkpoint.model_override.clone(),
             "elapsed_ms": checkpoint.elapsed_ms,
+            "elapsed_ns": checkpoint.elapsed_ms.saturating_mul(1_000_000),
             "cost_source": checkpoint.usage.cost_source,
         });
         let mut outcome =
@@ -578,6 +579,7 @@ impl tinyagents_orchestration::subagent::SubagentPersistence for OpenHumanPersis
             "created_at": chrono::Utc::now().to_rfc3339(),
             "options": pause.outcome.extensions.get("options"),
             "elapsed_ms": elapsed_ms,
+            "elapsed_ns": outcome.elapsed.as_nanos().min(u64::MAX as u128) as u64,
         });
         pause
             .outcome
