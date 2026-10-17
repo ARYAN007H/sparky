@@ -509,6 +509,26 @@ async fn opening_an_existing_profile_adopts_the_enforced_cron_cap() {
 
 #[tokio::test]
 async fn provisioning_with_a_new_root_replaces_a_dead_higher_epoch_fence() {
+    const CHILD: &str = "OPENHUMAN_PROFILE_DEAD_HIGHER_FENCE_CHILD";
+    if std::env::var_os(CHILD).is_none() {
+        let output = std::process::Command::new(std::env::current_exe().unwrap())
+            .args([
+                "--exact",
+                "profiles::host::tests::provisioning_with_a_new_root_replaces_a_dead_higher_epoch_fence",
+                "--nocapture",
+            ])
+            .env(CHILD, "1")
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "isolated profile fence child failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert!(String::from_utf8_lossy(&output.stdout).contains("test result: ok"));
+        return;
+    }
+
     let first_root = tempfile::tempdir().unwrap();
     let second_root = tempfile::tempdir().unwrap();
     let id = profile(&format!("cron-fence-{}", uuid::Uuid::new_v4().simple()));
@@ -548,6 +568,26 @@ async fn provisioning_with_a_new_root_replaces_a_dead_higher_epoch_fence() {
 
 #[tokio::test]
 async fn opening_replaces_a_dropped_hosts_fence_before_cron_reconciliation() {
+    const CHILD: &str = "OPENHUMAN_PROFILE_REOPEN_DROPPED_FENCE_CHILD";
+    if std::env::var_os(CHILD).is_none() {
+        let output = std::process::Command::new(std::env::current_exe().unwrap())
+            .args([
+                "--exact",
+                "profiles::host::tests::opening_replaces_a_dropped_hosts_fence_before_cron_reconciliation",
+                "--nocapture",
+            ])
+            .env(CHILD, "1")
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "isolated profile reopen child failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert!(String::from_utf8_lossy(&output.stdout).contains("test result: ok"));
+        return;
+    }
+
     let tmp = tempfile::tempdir().unwrap();
     let id = profile(&format!("cron-fence-{}", uuid::Uuid::new_v4().simple()));
     let registry = crate::storage::fence::registry();
