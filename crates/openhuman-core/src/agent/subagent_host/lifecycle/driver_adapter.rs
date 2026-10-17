@@ -169,6 +169,8 @@ impl SubagentExecutor<crate::agent::tinyagents::host::OpenHumanRunContext> for O
             .ok_or_else(|| {
                 SubagentError::Execution("OpenHuman subagent plan was consumed".into())
             })?;
+        let native_run_config = execution.prepared.run_context.config.clone();
+        let parent_events = execution.prepared.run_context.events.clone();
         // Both carriers observe one token.  The generic driver installs this
         // token on the prepared RunContext; the host graph polls the copy in
         // its explicit OpenHuman carrier.
@@ -185,10 +187,16 @@ impl SubagentExecutor<crate::agent::tinyagents::host::OpenHumanRunContext> for O
             .unwrap_or_default();
         match invocation {
             HostInvocation::Agent(definition) => {
-                let run = Box::pin(crate::agent::subagent_host::ops::run_subagent_direct(
+                let native = crate::agent::tinyagents::NativeSubagentRunContext {
+                    config: native_run_config,
+                    parent_events,
+                    name: definition.id.clone(),
+                };
+                let run = Box::pin(crate::agent::subagent_host::ops::run_subagent_direct_with_native_context(
                     &definition,
                     &input,
                     options.clone(),
+                    native,
                 ));
                 let result = match dispatch.into_core() {
                     Some(core) => {
