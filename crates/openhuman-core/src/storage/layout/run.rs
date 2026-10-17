@@ -71,10 +71,8 @@ pub async fn migrate(
         return dry_run(target, resuming).map(|d| Outcome::DryRun(Box::new(d)));
     }
     if !options.allow_live {
-        if let Some(url) = crate::storage::installed_url() {
-            if url == legacy::v1_url(target) {
-                return Err(LayoutError::Live(crate::config::schema::storage::redact_url(&url)));
-            }
+        if let Some(url) = live_conflict(target, crate::storage::installed_url()) {
+            return Err(LayoutError::Live(url));
         }
     }
     let _lock = Lock::acquire(&target.profile_dir)?;
@@ -159,6 +157,14 @@ pub async fn migrate(
         steps_run,
         restart_required: true,
     })))
+}
+
+/// The installed backend's URL when it is `target`'s v1 database: this
+/// process is writing to what the migration is about to snapshot.
+fn live_conflict(target: &Target, installed_url: Option<String>) -> Option<String> {
+    installed_url
+        .filter(|url| *url == legacy::v1_url(target))
+        .map(|url| crate::config::schema::storage::redact_url(&url))
 }
 
 fn plan_of(state: &LayoutState) -> Result<&Plan, LayoutError> {
