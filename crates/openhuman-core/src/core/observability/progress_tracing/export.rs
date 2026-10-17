@@ -4,7 +4,6 @@
 use crate::config::schema::AgentTracingConfig;
 use crate::config::Config;
 
-use super::langfuse;
 use super::otlp;
 use crate::config::schema::AgentTracingBackend;
 use tinyagents_harness::observability::trace_export::serialize::{spans_to_ndjson, SpanEnvelope};
@@ -152,17 +151,12 @@ pub(crate) async fn export_run_trace_from_journal(
     for observation in &observations {
         collector.record(observation);
     }
-    collector.finish(crate::agent::progress_tracing::unix_epoch_ms());
+    let finished_at_ms = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis()
+        .min(u128::from(u64::MAX)) as u64;
+    collector.finish(finished_at_ms);
     let spans = collector.spans().to_vec();
-    if spans.is_empty() {
-        return;
-    }
-    if observability.share_usage_data {
-        if let Err(err) = otlp::push_spans(config, &spans).await {
-            log::warn!("[agent-tracing] Langfuse OTLP push failed ({err})");
-        }
-    }
-    if observability.agent_tracing.enabled {
-        export_spans(&observability.agent_tracing, &spans);
-    }
+    export_run_trace(config, &spans).await;
 }
