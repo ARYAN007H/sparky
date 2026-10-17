@@ -9,9 +9,7 @@ async fn driver_job_controls_are_isolated_by_workspace_with_shared_runtime_state
     use crate::core::runtime::{ContextOverlay, CoreContext, DomainSet};
     use crate::tools::toolpacks::ToolGroups;
     use tinyagents_harness::agent_loop::phases::execute_tool_batch;
-    use tinyagents_orchestration::subagent::{
-        SubAgentJobRegistry, SubAgentJobStatus,
-    };
+    use tinyagents_orchestration::subagent::SubAgentJobRegistry;
     use tinyagents_runtime::turn_driver::SharedToolSet;
 
     struct PausedModel {
@@ -135,6 +133,7 @@ async fn driver_job_controls_are_isolated_by_workspace_with_shared_runtime_state
         "same-parent-session",
         Some("same-parent-thread"),
     );
+    assert_ne!(owner_a, owner_b, "workspace identity is part of the owner scope");
     let job_a = jobs_a
         .list()
         .into_iter()
