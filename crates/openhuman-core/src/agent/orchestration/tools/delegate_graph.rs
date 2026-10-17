@@ -219,7 +219,17 @@ impl DelegateGraphTool {
             .map(|n| (n as usize).min(MAX_MAX_REVISIONS))
             .unwrap_or(DEFAULT_MAX_REVISIONS);
 
-        let registry = match AgentDefinitionRegistry::current() {
+        // The live parent is the authority for this invocation. Looking only
+        // at `CoreContext::current()` can select another concurrent tenant's
+        // catalogue (or none at all) when callers execute the typed tool with
+        // an explicit parent carrier. Keep the process registry as the legacy
+        // fallback for contexts that do not carry an agent-local catalogue.
+        let registry = match run_context
+            .dispatch_ctx()
+            .into_core()
+            .and_then(|core| core.definitions())
+            .or_else(AgentDefinitionRegistry::global_arc)
+        {
             Some(reg) => reg,
             None => {
                 return Ok(ToolResult::error(
