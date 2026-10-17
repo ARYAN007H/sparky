@@ -21,15 +21,15 @@ pub fn cancel_driver_jobs_for_thread(
     workspace_dir: &Path,
     jobs: &tinyagents_orchestration::subagent::SubAgentJobRegistry,
     thread_id: &str,
-) -> usize {
+) -> Vec<String> {
     let sessions = match store.load() {
         Ok(sessions) => sessions,
         Err(error) => {
             log::warn!("[subagent_sessions] failed to load sessions for thread cancellation: {error}");
-            return 0;
+            return Vec::new();
         }
     };
-    let mut cancelled = 0;
+    let mut cancelled = Vec::new();
     for session in sessions.into_iter().filter(|session| {
         session.parent_thread_id.as_deref() == Some(thread_id)
             && matches!(
@@ -62,7 +62,7 @@ pub fn cancel_driver_jobs_for_thread(
             Some(thread_id),
         );
         if jobs.cancel_key_owned(&key, owner).is_ok() {
-            cancelled += 1;
+            cancelled.push(task_id.to_owned());
         }
     }
     cancelled

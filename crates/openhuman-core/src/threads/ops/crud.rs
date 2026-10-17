@@ -499,7 +499,8 @@ async fn thread_delete_inner(
         &dir,
         &jobs,
         &request.thread_id,
-    );
+    )
+    .len();
     let cancelled = cancelled_legacy + cancelled_driver;
     let discarded = crate::agent::orchestration::background_completions::discard_for_thread(
         &ctx,
