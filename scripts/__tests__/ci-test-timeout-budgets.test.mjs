@@ -41,3 +41,11 @@ test("Linux Rust integration E2E has time to finish the complete suite", () => {
     "the full Rust integration E2E lane needs at least an hour on hosted runners",
   );
 });
+
+test("Linux full desktop E2E shards have time for the chat journey suite", () => {
+  assert.ok(
+    timeoutMinutes(".github/workflows/e2e-reusable.yml", "e2e-linux-full") >=
+      60,
+    "the full Linux desktop chat, skills, and journeys shard needs at least an hour",
+  );
+});
