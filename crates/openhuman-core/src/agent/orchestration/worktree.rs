@@ -39,7 +39,9 @@
 
 use std::path::PathBuf;
 
-use tinyagents_harness::workspace::{GitWorktreeBaseRef, GitWorktreeIsolation, WorkspaceIsolation};
+use tinyagents_harness::workspace::{
+    GitWorktreeBaseRef, GitWorktreeIsolation, GitWorktreeLifecycleHook, WorkspaceIsolation,
+};
 use tinytools::{SandboxMode, WorkspaceDescriptor};
 
 use crate::core::bus::BUS;
@@ -62,7 +64,9 @@ impl OpenHumanWorktreeIsolation {
     /// Create an isolation provider rooted at the user's project repo.
     pub fn new(repo_root: impl Into<PathBuf>) -> Self {
         Self {
-            inner: GitWorktreeIsolation::new(repo_root),
+            inner: GitWorktreeIsolation::new(repo_root)
+                .with_policy_id_prefix("openhuman.worktree")
+                .with_lifecycle_hook(std::sync::Arc::new(OpenHumanWorktreeLifecycle)),
         }
     }
 
@@ -84,12 +88,30 @@ impl OpenHumanWorktreeIsolation {
         self
     }
 
-    /// OpenHuman's policy-id convention for an isolated run.
-    fn policy_id(run_id: &str, agent: Option<&str>) -> String {
-        match agent {
-            Some(agent) if !agent.is_empty() => format!("openhuman.worktree:{agent}:{run_id}"),
-            _ => format!("openhuman.worktree:{run_id}"),
-        }
+}
+
+struct OpenHumanWorktreeLifecycle;
+
+#[async_trait::async_trait]
+impl GitWorktreeLifecycleHook for OpenHumanWorktreeLifecycle {
+    async fn prepared(&self, descriptor: &WorkspaceDescriptor) -> tinyagents_harness::Result<()> {
+        let _ = BUS.publish(DomainEvent::WorkspacePrepared {
+            policy_id: descriptor.policy_id.clone(),
+            root: descriptor.root.display().to_string(),
+        });
+        Ok(())
+    }
+
+    async fn cleaned(
+        &self,
+        descriptor: &WorkspaceDescriptor,
+        error: Option<&str>,
+    ) -> tinyagents_harness::Result<()> {
+        let _ = BUS.publish(DomainEvent::WorkspaceCleanup {
+            policy_id: descriptor.policy_id.clone(),
+            error: error.map(str::to_owned),
+        });
+        Ok(())
     }
 }
 
@@ -106,11 +128,7 @@ impl WorkspaceIsolation for OpenHumanWorktreeIsolation {
             "[worktree] workspace_prepare_start"
         );
 
-        let descriptor = self
-            .inner
-            .prepare(run_id, agent)
-            .await?
-            .with_policy_id(Self::policy_id(run_id, agent));
+        let descriptor = self.inner.prepare(run_id, agent).await?;
 
         tracing::debug!(
             root = %descriptor.root.display(),
