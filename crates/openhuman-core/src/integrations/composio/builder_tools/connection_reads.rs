@@ -6,7 +6,6 @@ use async_trait::async_trait;
 use serde_json::{json, Value};
 
 use crate::config::Config;
-use crate::flows::ops;
 use tinytools::{PermissionLevel, Tool, ToolCallOptions, ToolResult, ToolRunContext};
 
 /// `list_connectable_toolkits`: read-only list of the Composio toolkits the
@@ -63,7 +62,11 @@ impl Tool for ListConnectableToolkitsTool {
         // read through the host's curated snapshot.
         use crate::integrations::composio::contract::agent_ready_toolkits;
         tracing::debug!(target: "flows", "[flows] list_connectable_toolkits: listing toolkits + connected state (read-only) via the memory contract");
-        let connected = ops::connected_toolkits(&ctx, &self.config).await;
+        let connected = crate::integrations::composio::flow_gate::connected_toolkit_slugs(&self.config)
+            .await
+            .unwrap_or_default()
+            .into_iter()
+            .collect::<std::collections::HashSet<_>>();
         let toolkits: Vec<Value> = agent_ready_toolkits()
             .into_iter()
             .map(|tk| {
@@ -139,7 +142,7 @@ impl Tool for ListFlowConnectionsTool {
     ) -> anyhow::Result<ToolResult> {
         let ctx = crate::agent::tinyagents::host::run_context::dispatch_ctx_for_tool(tool_context);
         tracing::debug!(target: "flows", "[flows] list_flow_connections: enumerating connection refs (read-only)");
-        match ops::flows_list_connections(&ctx, &self.config).await {
+        match crate::flows::ops::flows_list_connections(&ctx, &self.config).await {
             Ok(outcome) => {
                 let conns: Vec<Value> = outcome.value.iter().map(flow_connection_to_json).collect();
                 Ok(ToolResult::success(serde_json::to_string_pretty(
@@ -159,7 +162,7 @@ impl Tool for ListFlowConnectionsTool {
 /// `U123ABC`, or `null` when no identity has synced yet). Never secret
 /// material. A free function (rather than inline in `execute`) so the
 /// mapping is unit-testable without a live Composio backend.
-pub(super) fn flow_connection_to_json(c: &tinyflows_catalog::types::FlowConnection) -> Value {
+pub(crate) fn flow_connection_to_json(c: &tinyflows_catalog::types::FlowConnection) -> Value {
     json!({
         "connection_ref": c.connection_ref,
         "kind": c.kind,
