@@ -71,20 +71,22 @@ async fn explicit_profile_projects_spawn_completion_and_cancel_without_ambient_s
         alice_rx,
     )
     .expect("Alice registration");
-    register(
-        &bob,
-        bob_task.clone(),
-        "researcher".into(),
-        PARENT.into(),
-        None,
-        None,
-        workspace.path().to_path_buf(),
-        None,
-        run_queue(),
-        dummy_abort(),
-        bob_rx,
-    )
-    .expect("Bob registration");
+    CoreContext::sync_scope(alice.resolved().unwrap().clone(), || {
+        register(
+            &bob,
+            bob_task.clone(),
+            "researcher".into(),
+            PARENT.into(),
+            None,
+            None,
+            workspace.path().to_path_buf(),
+            None,
+            run_queue(),
+            dummy_abort(),
+            bob_rx,
+        )
+    })
+    .expect("Bob registration under foreign ambient profile");
 
     let alice_spawned = records(&alice, workspace.path());
     let bob_spawned = records(&bob, workspace.path());
@@ -114,10 +116,25 @@ async fn explicit_profile_projects_spawn_completion_and_cancel_without_ambient_s
     .expect("Alice terminal status projected");
 
     assert!(cancel_by_task(&alice, &bob_task).is_none());
-    assert!(cancel_by_task(&alice, &alice_task).is_some());
+    assert!(cancel_by_task(&bob, &bob_task).is_some());
     let alice_after_cancel = records(&alice, workspace.path());
     let bob_after_cancel = records(&bob, workspace.path());
-    assert!(alice_after_cancel.iter().any(|row| row.spec.task_id.as_str() == alice_task));
-    assert!(bob_after_cancel.iter().any(|row| row.spec.task_id.as_str() == bob_task));
+    assert_eq!(
+        alice_after_cancel
+            .iter()
+            .find(|row| row.spec.task_id.as_str() == alice_task)
+            .expect("Alice row remains in Alice store")
+            .status,
+        OrchestrationTaskStatus::Completed
+    );
+    assert_eq!(
+        bob_after_cancel
+            .iter()
+            .find(|row| row.spec.task_id.as_str() == bob_task)
+            .expect("Bob row remains in Bob store")
+            .status,
+        OrchestrationTaskStatus::Cancelled
+    );
+    let _ = alice_tx;
     let _ = bob_tx;
 }
