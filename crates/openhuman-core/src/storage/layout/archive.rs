@@ -150,8 +150,8 @@ fn write_inner(
             .follow_links(false)
             .sort_by_file_name()
         {
-            let item = item.map_err(|e| io(e))?;
-            let relative = item.path().strip_prefix(&source.at).map_err(|e| io(e))?;
+            let item = item.map_err(io)?;
+            let relative = item.path().strip_prefix(&source.at).map_err(io)?;
             let name = if relative.as_os_str().is_empty() {
                 root.clone()
             } else {
@@ -174,7 +174,7 @@ fn write_inner(
                     sha256: hex::encode(Sha256::digest(target.to_string_lossy().as_bytes())),
                 });
             } else if kind.is_file() {
-                let meta = item.metadata().map_err(|e| io(e))?;
+                let meta = item.metadata().map_err(io)?;
                 let mut header = tar::Header::new_gnu();
                 header.set_metadata(&meta);
                 let mut reader = HashingReader {
@@ -193,7 +193,7 @@ fn write_inner(
             }
         }
     }
-    let body = serde_json::to_vec(&manifest).map_err(|e| io(e))?;
+    let body = serde_json::to_vec(&manifest).map_err(io)?;
     let mut header = tar::Header::new_gnu();
     header.set_size(body.len() as u64);
     header.set_mode(0o600);
