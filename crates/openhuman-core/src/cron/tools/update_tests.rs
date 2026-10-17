@@ -4,9 +4,8 @@ use crate::agent::turn_origin::AgentTurnOrigin;
 use crate::config::Config;
 use tempfile::TempDir;
 use tinyagents_harness::{context::RunConfig, ids::CallId, tool::ToolExecutionContext};
-use tinyflows_bus::schedule::types::{
-    AgentJobSpec, DeliveryConfig, JobOrigin, Schedule, SessionTarget,
-};
+use tinyflows_bus::schedule::types::{DeliveryConfig, JobOrigin, Schedule, SessionTarget};
+use tinyflows_bus::schedule::AgentJobSpec;
 
 fn channel_origin(reply_target: &str) -> JobOrigin {
     JobOrigin::Channel {
