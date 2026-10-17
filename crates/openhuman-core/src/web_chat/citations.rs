@@ -129,3 +129,7 @@ pub(crate) fn take_turn_citations(ctx: &DispatchCtx, thread_id: &str) -> Vec<Tur
         .remove(thread_id)
         .unwrap_or_default()
 }
+
+#[cfg(test)]
+#[path = "citations_tests.rs"]
+mod tests;
