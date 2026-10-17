@@ -189,7 +189,7 @@ fn handle_subagent_cancel(ctx: DispatchCtx, params: Map<String, Value>) -> Contr
                             subagent_sessions::SubagentSessionStore::new(meta.workspace_dir);
                         if let Err(err) = subagent_sessions::mark_failed(
                             &store,
-                            &subagent_session_id,
+                            subagent_session_id,
                             &task_id,
                             "cancelled by user".to_string(),
                         ) {
