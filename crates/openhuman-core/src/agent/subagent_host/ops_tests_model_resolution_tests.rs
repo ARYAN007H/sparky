@@ -192,7 +192,7 @@ async fn closing_a_durable_driver_session_cancels_only_its_registered_child() {
         }])
         .expect("save the authenticated durable session");
 
-    spawn_async_via_driver_tool_with_jobs(
+    let _spawn_reference = spawn_async_via_driver_tool_with_jobs(
         &parent,
         definition,
         "must be cancelled before the child runs".into(),
@@ -202,6 +202,12 @@ async fn closing_a_durable_driver_session_cancels_only_its_registered_child() {
     )
     .await
     .expect("background driver registers the child");
+    let job_id = jobs
+        .list()
+        .into_iter()
+        .find(|job| job.agent == "cancelled-child")
+        .expect("driver child is visible in the shared registry")
+        .id;
     tokio::time::timeout(std::time::Duration::from_secs(5), started_rx.recv())
         .await
         .expect("child reaches its blocking tool")
@@ -237,7 +243,7 @@ async fn closing_a_durable_driver_session_cancels_only_its_registered_child() {
         &wait,
         &(),
         tinyagents_harness::CallId::new("wait-cancelled-close-child"),
-        serde_json::json!({"task_id":"close-driver-task","timeout_secs":1}),
+        serde_json::json!({"task_id":job_id,"timeout_secs":1}),
         tinytools::ToolCallOptions::default(),
         &parent,
     )
