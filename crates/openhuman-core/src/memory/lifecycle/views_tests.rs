@@ -8,6 +8,16 @@ use crate::memory::scope::MemoryIdentity;
 use crate::memory::test_fixtures::{bind_reference, config_in};
 
 #[test]
+fn policy_set_accepts_fields_reported_by_policy_get() {
+    let _params: PolicySetParams = serde_json::from_value(serde_json::json!({
+        "date_hint": true,
+        "compaction_timeout_ms": 12_000,
+        "build_delay_secs": 900,
+    }))
+    .unwrap();
+}
+
+#[test]
 fn the_policy_round_trips_and_refuses_out_of_range_values() {
     let mut config = Config::default();
     let view = policy_view(&config);
