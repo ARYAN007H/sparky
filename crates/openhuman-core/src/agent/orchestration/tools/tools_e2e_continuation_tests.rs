@@ -215,7 +215,7 @@ async fn cancelling_a_paused_driver_through_rpc_settles_once_with_its_reason() {
     assert_eq!(cancelled["data"]["cancelled"], true);
     assert_eq!(provider.calls.load(std::sync::atomic::Ordering::SeqCst), 1);
     assert!(matches!(
-        jobs.get(&paused_job.id)
+        jobs.get(paused_job.id.as_str())
             .expect("paused job remains inspectable")
             .status,
         SubAgentJobStatus::Cancelled
