@@ -127,7 +127,11 @@ impl TinySessionStore for OpenHumanTinySubagentSessionStore {
         }) {
             return Ok(Vec::new());
         }
-        super::list_for_parent(&self.store, parent_session, thread_id)
+        super::list_for_parent(
+            &self.store,
+            parent_session,
+            self.parent_thread_id.as_deref(),
+        )
             .map_err(SubagentError::Persistence)?
             .into_iter()
             .filter(|row| self.is_owned(row))
@@ -156,7 +160,7 @@ impl TinySessionStore for OpenHumanTinySubagentSessionStore {
             || upsert.lifecycle_key.thread_id != self.parent_thread_id
             || upsert.lifecycle_key.task_id != upsert.task_id
         {
-            return Err(SubagentError::Session(
+            return Err(SubagentError::InvalidRequest(
                 "subagent session upsert is outside its authenticated owner scope".into(),
             ));
         }

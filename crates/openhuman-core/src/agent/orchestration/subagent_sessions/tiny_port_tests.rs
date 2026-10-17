@@ -63,7 +63,7 @@ async fn old_rows_without_checkpoint_identity_remain_readable_without_fabricated
 async fn unthreaded_port_lists_only_unthreaded_rows() {
     let workspace = tempfile::tempdir().unwrap();
     let store = SubagentSessionStore::new(workspace.path().to_path_buf());
-    let mut unthreaded: DurableSubagentSession = serde_json::from_value(serde_json::json!({
+    let unthreaded: DurableSubagentSession = serde_json::from_value(serde_json::json!({
         "subagentSessionId": "unthreaded-session",
         "parentSession": "owner",
         "parentThreadId": null,
@@ -86,7 +86,6 @@ async fn unthreaded_port_lists_only_unthreaded_rows() {
     }))
     .unwrap();
     let mut threaded = unthreaded.clone();
-    unthreaded.subagent_session_id = "unthreaded-session".into();
     threaded.subagent_session_id = "threaded-session".into();
     threaded.parent_thread_id = Some("thread-a".into());
     store.save(&[unthreaded, threaded]).unwrap();
