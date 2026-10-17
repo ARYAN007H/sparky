@@ -269,18 +269,30 @@ async fn invoke_async_spawn_driver_tool(
         let callback_task_key = SubagentTaskKey::from_context(parent, task_id.clone(), None);
         let host_outcome = Arc::clone(&bundle.host_outcome);
         let failures = Arc::clone(&bundle.failures);
-        dispatcher = dispatcher.with_async_completion_handler(move |target, result, emit_effects| {
+        let persistence = Arc::clone(&bundle.persistence);
+        let fallback_agent_id = definition.id.clone();
+        dispatcher = dispatcher.with_async_completion_handler(move |target, result| {
             let completion = Arc::clone(&completion);
             let host_outcome = Arc::clone(&host_outcome);
             let failures = Arc::clone(&failures);
+            let persistence = Arc::clone(&persistence);
+            let fallback_agent_id = fallback_agent_id.clone();
             let key = callback_task_key.clone();
             Box::pin(async move {
                 let projected = match result {
-                    Ok(_) => host_outcome
-                        .lock()
-                        .unwrap_or_else(|poisoned| poisoned.into_inner())
-                        .remove(&key)
-                        .ok_or_else(|| "driver completed without a persisted host outcome".to_string()),
+                    Ok(result) => {
+                        let cached = host_outcome
+                            .lock()
+                            .unwrap_or_else(|poisoned| poisoned.into_inner())
+                            .remove(&key);
+                        Ok(outcome_to_host(
+                            result,
+                            cached,
+                            &persistence,
+                            &key,
+                            &fallback_agent_id,
+                        ))
+                    }
                     Err(error) => {
                         let host_error = failures
                             .lock()
@@ -290,6 +302,9 @@ async fn invoke_async_spawn_driver_tool(
                         Err(host_error.unwrap_or(error))
                     }
                 };
+                let emit_effects = projected.as_ref().is_ok_and(|outcome| {
+                    outcome.persistence_disposition.should_emit_host_effects()
+                });
                 completion(target, projected, emit_effects).await;
             })
         });
