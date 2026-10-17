@@ -38,11 +38,7 @@ impl From<&tinymemory_api::Hit> for TurnCitation {
                 .observed_at
                 .map(|at| at.to_rfc3339())
                 .unwrap_or_default(),
-            snippet: hit
-                .text
-                .chars()
-                .take(TURN_CITATION_SNIPPET_CHARS)
-                .collect(),
+            snippet: hit.text.chars().take(TURN_CITATION_SNIPPET_CHARS).collect(),
         }
     }
 }
@@ -80,7 +76,11 @@ fn turn_citations(ctx: &DispatchCtx) -> Arc<TurnCitations> {
     crate::core::runtime::slot_for::<TurnCitations>(ctx)
 }
 
-fn extend_thread(ctx: &DispatchCtx, thread_id: &str, citations: impl IntoIterator<Item = TurnCitation>) {
+fn extend_thread(
+    ctx: &DispatchCtx,
+    thread_id: &str,
+    citations: impl IntoIterator<Item = TurnCitation>,
+) {
     let citations_by_thread = turn_citations(ctx);
     let mut all = citations_by_thread
         .lock()

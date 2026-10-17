@@ -99,7 +99,13 @@ fn citations_drain_per_thread_and_merge_pack_and_recall_sources() {
     record_recall_citations(&ctx, "thread-a", &[recall]);
 
     let thread_a = take_turn_citations(&ctx, "thread-a");
-    assert_eq!(thread_a.iter().map(|item| item.id.as_str()).collect::<Vec<_>>(), ["pack", "shared"]);
+    assert_eq!(
+        thread_a
+            .iter()
+            .map(|item| item.id.as_str())
+            .collect::<Vec<_>>(),
+        ["pack", "shared"]
+    );
     assert_eq!(take_turn_citations(&ctx, "thread-a"), []);
     assert_eq!(take_turn_citations(&ctx, "thread-b")[0].id, "other-thread");
 }
