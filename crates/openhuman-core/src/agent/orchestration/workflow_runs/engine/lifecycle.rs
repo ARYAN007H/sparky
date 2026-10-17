@@ -192,11 +192,9 @@ fn schedule_workflow_drive(
     if resume {
         supervisor
             .resume_scoped_with_commit(run_id, commit, make_future, root_parent, origin, spawn)
-            .map_err(Into::into)
     } else {
         supervisor
             .start_scoped_with_commit(run_id, commit, make_future, root_parent, origin, spawn)
-            .map_err(Into::into)
     }
 }
 
