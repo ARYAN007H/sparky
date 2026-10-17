@@ -182,7 +182,7 @@ impl SpawnAsyncSubagentTool {
         if let Some(session) = reusable.as_ref() {
             if session.status == DurableSubagentStatus::Running {
                 if let Some(ref running_task_id) = session.current_task_id {
-                    match super::steer_reusable_session(
+                    match steer_reusable_session(
                         &detached_parent,
                         &session.subagent_session_id,
                         follow_up_prompt.clone(),
