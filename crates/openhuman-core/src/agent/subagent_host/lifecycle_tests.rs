@@ -402,6 +402,51 @@ async fn persistence_inserts_one_terminal_and_returns_the_durable_winner() {
 }
 
 #[tokio::test]
+async fn canonical_terminal_hides_legacy_pause_without_rewriting_legacy_files() {
+    let directory = tempfile::tempdir().unwrap();
+    let key = key();
+    let legacy = OpenHumanPersistence::new(directory.path().to_path_buf());
+    let checkpoint = SubagentCheckpointData {
+        task_key: Some(key.clone()),
+        task_id: key.task_id.clone(),
+        agent_id: "researcher".into(),
+        worker_thread_id: None,
+        history: Vec::new(),
+        question: "legacy question".into(),
+        options: Some(vec!["continue".into()]),
+        skill_filter_override: None,
+        model_override: None,
+        created_at: "2026-10-01T00:00:00Z".into(),
+        resume_checkpoint: None,
+        resume_metadata: Default::default(),
+        output: "legacy partial".into(),
+        iterations: 3,
+        usage: SubagentUsage::default(),
+        artifact_paths: Vec::new(),
+        elapsed_ms: 12,
+    };
+    let pause_path = legacy.legacy_pause_path(&key);
+    let index_path = legacy.index_path(&key.task_id);
+    std::fs::create_dir_all(pause_path.parent().unwrap()).unwrap();
+    let pause_bytes = serde_json::to_vec_pretty(&checkpoint).unwrap();
+    let index_bytes = serde_json::to_vec(&serde_json::json!({"keys": [key]})).unwrap();
+    std::fs::write(&pause_path, &pause_bytes).unwrap();
+    std::fs::write(&index_path, &index_bytes).unwrap();
+
+    let mut terminal = SubagentOutcome::cancelled("task");
+    terminal.status = SubagentOutcomeKind::Completed;
+    terminal.output = "canonical terminal winner".into();
+    OpenHumanPersistence::new(directory.path().to_path_buf())
+        .record_terminal(&key, &terminal, None)
+        .await
+        .unwrap();
+
+    assert!(load_subagent_checkpoint(directory.path(), &key.task_id).is_err());
+    assert_eq!(std::fs::read(&pause_path).unwrap(), pause_bytes);
+    assert_eq!(std::fs::read(&index_path).unwrap(), index_bytes);
+}
+
+#[tokio::test]
 async fn driver_inline_projection_returns_the_durable_winner_not_a_local_loser() {
     use tinyagents_orchestration::subagent::SubagentPersistenceDisposition as Disposition;
 
