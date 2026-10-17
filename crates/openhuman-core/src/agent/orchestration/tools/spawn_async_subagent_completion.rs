@@ -191,7 +191,29 @@ pub(super) fn make_completion(
                                 }
                             }
                             SubagentRunStatus::Cancelled => {
-                                let error = "async sub-agent was cancelled".to_string();
+                                let reason = match background_store.load() {
+                                    Ok(rows) => rows
+                                        .into_iter()
+                                        .find(|row| {
+                                            row.subagent_session_id
+                                                == background_subagent_session_id
+                                                && row.current_task_id.as_deref()
+                                                    == Some(outcome.task_id.as_str())
+                                        })
+                                        .and_then(|row| row.latest_error),
+                                    Err(error) => {
+                                        log::warn!(
+                                            "[subagent_reuse] cancellation reason lookup failed subagent_session_id={} task_id={} error={error}",
+                                            background_subagent_session_id,
+                                            outcome.task_id
+                                        );
+                                        None
+                                    }
+                                };
+                                let error = match reason.as_deref().map(str::trim).filter(|reason| !reason.is_empty()) {
+                                    Some(reason) => format!("async sub-agent was cancelled. Reason: {reason}"),
+                                    None => "async sub-agent was cancelled".to_string(),
+                                };
                                 if let Err(err) = subagent_sessions::mark_finished(
                                     &background_store,
                                     &background_subagent_session_id,
