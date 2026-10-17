@@ -97,7 +97,6 @@ pub(in super::super) async fn run_subagent_via_graph(
     // otherwise a child remains in its parent's conversation. Do this before
     // constructing *any* model so managed requests, transcript metadata, and
     // the child carrier cannot disagree.
-    let trace_session_group = run_context.thread_id.clone().or_else(|| thread_id.clone());
     let thread_id = inherited_thread_id(run_context.thread_id.clone(), thread_id);
     // Where this child's transcript is written: its turn tree's store.
     let transcripts = super::transcript::subagent_transcripts(&run_context, &workspace_dir);
@@ -262,31 +261,6 @@ pub(in super::super) async fn run_subagent_via_graph(
         Some(native) => turn_spec.run_with_native_subagent(native).await,
         None => turn_spec.run().await,
     };
-
-    if let Some(config) = config.filter(|config| config.observability.share_usage_data) {
-        let journal_run_id = child_journal_run_id
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .clone();
-        if let Some(journal_run_id) = journal_run_id {
-            let config = config.clone();
-            let thread_id = trace_session_group.clone();
-            let agent_id = agent_id.to_string();
-            let task_id = task_id.to_string();
-            let dispatch = dispatch.clone();
-            tokio::spawn(async move {
-                crate::core::observability::progress_tracing::export_subagent_journal_trace(
-                    &dispatch,
-                    &config,
-                    &journal_run_id,
-                    thread_id.as_deref(),
-                    &agent_id,
-                    &task_id,
-                )
-                .await;
-            });
-        }
-    }
 
     let mut outcome = match run_result {
         Ok(outcome) => outcome,
