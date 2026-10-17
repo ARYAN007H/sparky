@@ -106,6 +106,7 @@ async fn prepared_child_run_is_exported_from_its_native_journal_lineage() {
     let mut options = options;
     options.checkpoint_dir = Some(scratch.path().join("checkpoints"));
     options.thread_id = Some("native-trace-thread".into());
+    options.model_override = Some("gpt-4o".into());
     let (outcome, _job_id) = run_subagent_via_driver_tool(
         &parent,
         make_def_named_tools(&[]),
@@ -185,9 +186,11 @@ async fn prepared_child_run_is_exported_from_its_native_journal_lineage() {
         child_observations.iter().any(|observation| matches!(
             &observation.event,
             AgentEvent::GenerationEnriched { call_id, enrichment }
-                if call_id == &reported_call && enrichment.provider_id.is_some()
+                if call_id == &reported_call
+                    && enrichment.provider_id.is_some()
+                    && enrichment.pricing.is_some()
         )),
-        "host route/provider enrichment accompanies the actual generation"
+        "host provider and catalog pricing accompany the actual generation"
     );
 
     let trace_context = TraceContext::new("native-trace-root", None)
@@ -221,6 +224,7 @@ async fn prepared_child_run_is_exported_from_its_native_journal_lineage() {
         .expect("native projection preserves the provider-reported charge");
     assert_eq!(generation.attributes["gen_ai.usage.input_tokens"], 120);
     assert_eq!(generation.attributes["gen_ai.usage.output_tokens"], 8);
+    assert!(generation.attributes.contains_key("gen_ai.pricing.input_per_mtok_usd"));
     let exported = spans_to_ndjson(
         tinyagents_harness::observability::trace_export::serialize::SpanEnvelope::Otel,
         spans,
