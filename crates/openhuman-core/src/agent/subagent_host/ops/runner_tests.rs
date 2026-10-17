@@ -35,10 +35,8 @@ async fn byte_policy_projects_a_parent_readable_artifact_before_the_result_cap()
         worktree_action_dir: Some(worktree_action_dir.clone()),
         ..SubagentRunOptions::default()
     };
-    let mut definition = AgentDefinitionRegistry::builtins_only()
-        .get("code_executor")
-        .expect("code executor builtin")
-        .clone();
+    let mut definition = crate::agent::harness::test_support::test_main_def();
+    definition.id = "artifact-policy-worker".into();
     definition.max_result_chars = Some(16);
     let original = format!(
         "[artifact] kind=output path=authored.txt bytes=11\nworker-authored artifact\n{}",
