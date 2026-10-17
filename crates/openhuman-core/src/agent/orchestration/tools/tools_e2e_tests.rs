@@ -498,6 +498,20 @@ async fn continue_subagent_resumes_paused_job_through_shared_driver() {
         .expect("continue");
     assert!(!resumed.is_error, "{}", resumed.output());
     assert!(provider.saw("Inspect the README and continue."));
+    assert_eq!(provider.calls.load(std::sync::atomic::Ordering::SeqCst), 2);
+    let requests = provider.seen.lock();
+    assert_eq!(requests.len(), 2);
+    let resumed_request = &requests[1];
+    assert!(resumed_request.contains("Investigate the pause-resume fixture"));
+    assert!(resumed_request.contains("which file should I inspect?"));
+    assert_eq!(
+        resumed_request
+            .matches("Inspect the README and continue.")
+            .count(),
+        1,
+        "the answer is appended to the resumed history exactly once"
+    );
+    drop(requests);
 
     let completed_job = jobs
         .get(paused_job.id.as_str())
