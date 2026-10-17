@@ -369,7 +369,7 @@ impl ContinueSubagentTool {
         let registry = match run_context
             .dispatch_ctx()
             .into_core()
-            .and_then(|core| AgentDefinitionRegistry::for_core_context(&core))
+            .and_then(AgentDefinitionRegistry::for_core_context)
         {
             Some(reg) => reg,
             None => {

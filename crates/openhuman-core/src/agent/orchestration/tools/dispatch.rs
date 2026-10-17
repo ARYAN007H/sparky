@@ -110,7 +110,7 @@ impl ToolDispatch<(), crate::agent::tinyagents::host::OpenHumanRunContext> for D
                     .data
                     .dispatch_ctx()
                     .into_core()
-                    .and_then(|core| AgentDefinitionRegistry::for_core_context(&core))
+            .and_then(AgentDefinitionRegistry::for_core_context)
                     .and_then(|registry| {
                     registry.list().into_iter().find_map(|definition| {
                         let name = definition

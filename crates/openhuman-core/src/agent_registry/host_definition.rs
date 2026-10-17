@@ -286,8 +286,11 @@ impl AgentDefinitionRegistry {
     /// back to the process registry. Execution paths with a live parent must
     /// pass that parent's core so concurrent tenant/run contexts cannot read
     /// another invocation's ambient catalogue.
-    pub fn for_core_context(core: &crate::core::runtime::CoreContext) -> Option<Arc<Self>> {
-        core.definitions().or_else(Self::global_arc)
+    pub fn for_core_context(
+        core: Option<Arc<crate::core::runtime::CoreContext>>,
+    ) -> Option<Arc<Self>> {
+        core.and_then(|core| core.definitions())
+            .or_else(Self::global_arc)
     }
 
     /// The catalogue sub-agent lookups resolve through: the ambient agent

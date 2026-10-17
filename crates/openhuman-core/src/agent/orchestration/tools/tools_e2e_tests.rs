@@ -554,9 +554,12 @@ async fn delegate_graph_runs_every_stage_through_shared_driver_jobs() {
         ContextOverlay::new(config, DomainSet::full(), ToolGroups::none())
             .definitions(definitions),
     );
+    // `OpenHumanRunContext::with_core` retains a weak handle; keep this strong
+    // owner alive through the graph execution so the scoped definition
+    // catalogue is the one the live parent carries.
     let live = Arc::new(
         crate::agent::tinyagents::host::OpenHumanRunContext::new()
-            .with_core(Some(core))
+            .with_core(Some(Arc::clone(&core)))
             .with_parent(parent)
             .into_tinyagents(tinyagents_harness::context::RunConfig::new(
                 "delegate-graph-jobs-e2e",
