@@ -51,7 +51,7 @@ async fn cached_probe_serves_definitive_negative_results() {
     assert!(first
         .unwrap_err()
         .to_ascii_lowercase()
-        .contains("api key not configured"));
+        .contains("api key not configured for provider"));
     assert_eq!(hit_count.load(Ordering::SeqCst), 1);
     assert!(
         cached_probe(&DispatchCtx::ambient(), "summarization", &config)

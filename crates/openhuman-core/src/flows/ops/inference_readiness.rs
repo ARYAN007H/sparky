@@ -153,3 +153,7 @@ pub(crate) async fn validate_inference_readiness(
         vec![message]
     }
 }
+
+#[cfg(test)]
+#[path = "inference_readiness_tests.rs"]
+mod tests;
