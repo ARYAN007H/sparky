@@ -8,17 +8,17 @@ mod grounded_close;
 
 use std::{collections::HashSet, sync::Arc, time::Instant};
 
+use crate::agent::tinyagents::TurnSpec;
 use async_trait::async_trait;
 use tinyagents_runtime::{
     DriverFailure, DriverOutcome, DriverRequest, RuntimeError, SessionDriver, TranscriptPartial,
 };
-use crate::agent::tinyagents::TurnSpec;
 use tinyagents_session::transcript::TranscriptMessage;
 use tinyinference_llm::message::Message;
 use tinytools_agent::dialect::ToolDialect;
 
-use crate::agent::{
-    tinyagents::{host::OpenHumanHostBase, host::OpenHumanRunContext, TurnModelSource},
+use crate::agent::tinyagents::{
+    host::OpenHumanHostBase, host::OpenHumanRunContext, TurnModelSource,
 };
 
 /// Immutable host composition consumed by [`OpenHumanSessionDriver`].
