@@ -387,6 +387,16 @@ impl SpawnAsyncSubagentTool {
             let background_store = background_store.clone();
             let background_subagent_session_id = background_subagent_session_id.clone();
             let background_parent_thread_id = background_parent_thread_id.clone();
+            let background_workspace_dir = background_workspace_dir.clone();
+            let background_dispatch = background_dispatch.clone();
+            let background_agent_id = background_agent_id.clone();
+            let background_task_id = background_task_id.clone();
+            let background_parent_session = background_parent_session.clone();
+            let completion_target = completion_target.clone();
+            let background_worker_thread_id = background_worker_thread_id.clone();
+            let background_store = background_store.clone();
+            let background_subagent_session_id = background_subagent_session_id.clone();
+            let background_parent_thread_id = background_parent_thread_id.clone();
             Box::pin(async move {
                 let finish = async move {
                     let mut abort_report = AbortReport::arm(
