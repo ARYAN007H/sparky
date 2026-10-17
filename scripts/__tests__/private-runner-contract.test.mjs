@@ -157,3 +157,16 @@ test("membership gate routes mixed identities, outsiders and bots away from EX63
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("private cache save has a five-minute budget and cannot suppress artifact upload", () => {
+  const workflow = readFileSync(new URL("../../.github/workflows/ci-lanes.yml", import.meta.url), "utf8").split("  # ── hosted:")[0];
+  const saveStart = workflow.indexOf("      - name: Save Tinymold cache");
+  const saveEnd = workflow.indexOf("\n      - name:", saveStart + 1);
+  const save = workflow.slice(saveStart, saveEnd);
+  assert.match(save, /timeout-minutes: 5/);
+  assert.match(save, /continue-on-error: true/);
+  const upload = workflow.slice(workflow.indexOf("      - name: Upload lane logs, timings and coverage"));
+  assert.match(upload, /if: always\(\)/);
+  assert.ok(workflow.indexOf("      - name: Upload lane logs, timings and coverage") > saveEnd);
+  assert.doesNotMatch(upload, /tinymold\.outcome|success\(\)/);
+});
