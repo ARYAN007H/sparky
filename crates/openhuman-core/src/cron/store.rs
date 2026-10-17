@@ -226,7 +226,7 @@ pub(crate) fn update_job_with_origin(
 fn validate_and_complete_route_patch(
     config: &Config,
     existing: &CronJob,
-    patch: CronJobPatch,
+    mut patch: CronJobPatch,
     trusted_origin: Option<&tinyflows_bus::schedule::types::JobOrigin>,
 ) -> Result<CronJobPatch> {
     let delivery = patch
@@ -245,8 +245,10 @@ fn validate_and_complete_route_patch(
     )
     .map_err(anyhow::Error::msg)?;
 
-    // Route fields are materialized once the test proves the partial-patch
-    // interleaving described above.
+    // Persist exactly the pair that was validated. A stale write containing
+    // only one route field must not combine with a newer counterpart.
+    patch.delivery = Some(delivery);
+    patch.origin = Some(effective_origin);
     Ok(patch)
 }
 
