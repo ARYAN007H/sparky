@@ -21,10 +21,10 @@ fn seeded_alias_contract() -> ToolContract {
 #[tokio::test]
 async fn flows_get_tool_contract_rpc_warns_for_runtime_gated_uncurated_action() {
     seed_live_catalog_cache(
-        "spotify",
+        "airtable",
         vec![ToolContract {
-            slug: "SPOTIFY_OBSCURE_RPC_ACTION".to_string(),
-            toolkit: "spotify".to_string(),
+            slug: "AIRTABLE_OBSCURE_RPC_ACTION".to_string(),
+            toolkit: "airtable".to_string(),
             description: None,
             required_args: vec![],
             input_schema: None,
@@ -35,13 +35,13 @@ async fn flows_get_tool_contract_rpc_warns_for_runtime_gated_uncurated_action() 
         }],
     );
 
-    let outcome = flows_get_tool_contract(&Config::default(), "SPOTIFY_OBSCURE_RPC_ACTION")
+    let outcome = flows_get_tool_contract(&Config::default(), "AIRTABLE_OBSCURE_RPC_ACTION")
         .await
         .expect("seeded catalog lookup should succeed");
 
     assert_eq!(
         outcome.value["contract"]["slug"],
-        "SPOTIFY_OBSCURE_RPC_ACTION"
+        "AIRTABLE_OBSCURE_RPC_ACTION"
     );
     assert_eq!(outcome.value["contract"]["is_curated"], false);
     assert!(
