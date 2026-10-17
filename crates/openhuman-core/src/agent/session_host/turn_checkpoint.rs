@@ -248,52 +248,7 @@ pub(crate) fn render_tool_results(results: &[CheckpointToolResult], total_budget
     )
 }
 
-/*
-    // Render each block before choosing, so the budget is charged what
-    // the checkpoint will actually contain (CodeRabbit on #6068). Walking
-    // `r.content` alone undercounts by the per-result header and the `"  > "`
-    // on every line — a newline-heavy result costs well over its body, and
-    // several of them overran the limit while the walk believed it had room.
-    let blocks: Vec<String> = results
-        .iter()
-        .map(|r| {
-            let status = if r.success { "ok" } else { "failed" };
-            let mut block = format!("\n- `{}` — {}\n", r.name, status);
-            for line in r.content.lines() {
-                block.push_str("  > ");
-                block.push_str(line);
-                block.push('\n');
-            }
-            block
-        })
-        .collect();
-    // Choose how far back the budget reaches by walking from the newest
-    // result, then render in the original order — a checkpoint read
-    // backwards is harder to follow than one that simply starts later.
-    let mut budget = total_budget;
-    let mut first_shown = results.len();
-    for (idx, block) in blocks.iter().enumerate().rev() {
-        let cost = block.chars().count();
-        if cost > budget && idx + 1 < results.len() {
-            // The newest result is always shown, however long, so a single
-            // oversized payload cannot empty the checkpoint entirely; every
-            // earlier one has to fit what is left.
-            break;
-        }
-        budget = budget.saturating_sub(cost);
-        first_shown = idx;
-    }
-    let mut out = String::new();
-    if first_shown > 0 {
-        out.push_str(&format!(
-            "\n_({first_shown} earlier tool result(s) omitted for length — the most recent are shown.)_\n"
-        ));
-    }
-    for block in &blocks[first_shown..] {
-        out.push_str(block);
-    }
-    out
-}
+ 
 
 /// Budget for the tool records a closing message is grounded in and checked
 /// against (issues #6278, #6279).
