@@ -78,12 +78,6 @@ impl StorageBackend for Backend {
             Arc::clone(inner.blobs()),
         ))
     }
-    fn database(&self, name: &str) -> StoreResult<Arc<dyn StorageBackend>> {
-        Ok(Arc::new(Self {
-            inner: self.inner.database(name)?,
-            faults: Arc::clone(&self.faults),
-        }))
-    }
 }
 
 #[derive(Debug)]

@@ -79,7 +79,6 @@ async fn the_default_url_opens_in_directory_mode() {
         .await
         .unwrap();
     assert_eq!(backend.driver(), "sqlite");
-    // Directory mode: a named database is its own file in the directory.
-    backend.database("approvals").unwrap();
-    assert!(dir.path().join(DEFAULT_DIR).join("approvals.db").exists());
+    // Directory mode: the directory holds the database file.
+    assert!(dir.path().join(DEFAULT_DIR).exists());
 }

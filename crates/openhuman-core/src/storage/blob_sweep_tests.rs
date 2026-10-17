@@ -165,9 +165,6 @@ impl StorageBackend for HungSweep {
     ) -> tinystoragedrivers::Result<tinystoragedrivers::ScopedStorage> {
         self.0.for_scope(scope)
     }
-    fn database(&self, name: &str) -> tinystoragedrivers::Result<Arc<dyn StorageBackend>> {
-        self.0.database(name)
-    }
     async fn sweep_expired_blobs(&self, _scope: &Scope) -> tinystoragedrivers::Result<u64> {
         std::future::pending().await
     }
