@@ -32,17 +32,19 @@ impl ConnectableToolkitProvider for EmptyConnectableProvider {
 #[tokio::test]
 async fn connectable_toolkits_uses_the_injected_host_snapshot_and_fails_closed_empty() {
     let tmp = TempDir::new().unwrap();
-    let core = crate::core::runtime::CoreContext::for_test(
-        crate::core::runtime::DomainSet::full(),
-        None,
-    );
+    let core =
+        crate::core::runtime::CoreContext::for_test(crate::core::runtime::DomainSet::full(), None);
     let tool = ListConnectableToolkitsTool::new(
         test_config(&tmp),
-        Arc::new(EmptyConnectableProvider { expected_core: core.clone() }),
+        Arc::new(EmptyConnectableProvider {
+            expected_core: core.clone(),
+        }),
     );
     let run = crate::agent::tinyagents::host::run_context::OpenHumanRunContext::new()
         .with_core(Some(core.clone()))
-        .into_tinyagents(tinyagents_harness::context::RunConfig::new("composio-provider-test"));
+        .into_tinyagents(tinyagents_harness::context::RunConfig::new(
+            "composio-provider-test",
+        ));
     let context = tinyagents_harness::tool::ToolExecutionContext::from_run_context(
         &run,
         tinyagents_harness::ids::CallId::new("composio-provider-call"),
