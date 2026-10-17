@@ -48,7 +48,7 @@ fn allowed_users_for_channel<'a>(config: &'a Config, channel: &str) -> Option<&'
 /// Validate `delivery` at creation time: the module rules
 /// (the module's `ValidateDelivery`) plus the channel's
 /// configured `allowed_users`, which only the host knows.
-pub(crate) fn validate_delivery_for_config(
+fn validate_delivery_for_config(
     config: &Config,
     delivery: &DeliveryConfig,
     origin: Option<&JobOrigin>,
