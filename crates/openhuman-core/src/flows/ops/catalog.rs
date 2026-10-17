@@ -3,7 +3,7 @@ use super::*;
 pub(crate) use crate::integrations::composio::catalog::{
     lookup_contract, ContractLookupError,
 };
-pub(crate) use crate::integrations::composio::catalog::has_curated_catalog as toolkit_has_curated_catalog;
+pub(crate) use crate::integrations::composio::catalog::toolkit_for_contract_slug;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Catalog RPCs for the UI (Phase 5, item 16) — one implementation, two consumers

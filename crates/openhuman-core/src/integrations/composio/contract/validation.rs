@@ -1,5 +1,7 @@
 //! Composio contract validation that can be shared by flow authoring stages.
 
+use serde_json::Value;
+
 /// A graph node reduced to the Composio fields needed by the connection gate.
 #[derive(Debug, Clone)]
 pub(crate) struct ConnectionRefNode {
