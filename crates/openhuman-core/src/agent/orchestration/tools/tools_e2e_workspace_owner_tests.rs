@@ -100,6 +100,16 @@ async fn driver_job_controls_are_isolated_by_workspace_with_shared_runtime_state
         Arc::ptr_eq(&jobs_a, &jobs_b),
         "the two workspace overlays must exercise one shared registry"
     );
+    let key_a = tinyagents_orchestration::subagent::SubagentTaskKey::from_context(
+        &parent_a,
+        "same-raw-task-id",
+        Some("same-parent-thread".into()),
+    );
+    let key_b = tinyagents_orchestration::subagent::SubagentTaskKey::from_context(
+        &parent_b,
+        "same-raw-task-id",
+        Some("same-parent-thread".into()),
+    );
 
     let mut definition_a = AgentDefinitionRegistry::builtins_only()
         .get("task_manager_agent")
@@ -175,16 +185,6 @@ async fn driver_job_controls_are_isolated_by_workspace_with_shared_runtime_state
                 last_used_at: now.clone(),
             }])
     };
-    let key_a = tinyagents_orchestration::subagent::SubagentTaskKey::from_context(
-        &parent_a,
-        "same-raw-task-id",
-        Some("same-parent-thread".into()),
-    );
-    let key_b = tinyagents_orchestration::subagent::SubagentTaskKey::from_context(
-        &parent_b,
-        "same-raw-task-id",
-        Some("same-parent-thread".into()),
-    );
     save_running_session(&workspace_a, "workspace-a-session", key_a)
         .expect("persist A session for native close alias");
     save_running_session(&workspace_b, "workspace-b-session", key_b)
