@@ -5,9 +5,11 @@ use tinychannels_bus::{Channel, ChannelMessage, SendMessage};
 use tinyflows_bus::schedule::types::DeliveryStatus;
 use tokio::sync::mpsc;
 
+type RecordedSends = Arc<Mutex<Vec<(String, Option<String>)>>>;
+
 struct AnnounceMockChannel {
     name: String,
-    sends: Arc<Mutex<Vec<(String, Option<String>)>>>,
+    sends: RecordedSends,
     fail: bool,
 }
 
@@ -33,7 +35,7 @@ impl Channel for AnnounceMockChannel {
     }
 }
 
-fn install_mock_channel(name: String, fail: bool) -> Arc<Mutex<Vec<(String, Option<String>)>>> {
+fn install_mock_channel(name: String, fail: bool) -> RecordedSends {
     let sends = Arc::new(Mutex::new(Vec::new()));
     let channel: Arc<dyn Channel> = Arc::new(AnnounceMockChannel {
         name: name.clone(),
