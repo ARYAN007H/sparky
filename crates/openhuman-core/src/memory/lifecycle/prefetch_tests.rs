@@ -100,6 +100,10 @@ fn prefetch_key_tracks_memory_config_without_hashing_unrelated_config() {
     memory_changed.memory.recall.brain_limit += 1;
     assert!(key != Key::new(&memory_changed, &identity, "t", false));
 
+    let mut engine_changed = config.clone();
+    engine_changed.api_url = Some("https://memory.example.test".into());
+    assert!(key != Key::new(&engine_changed, &identity, "t", false));
+
     let mut unrelated_changed = config;
     unrelated_changed.context.enabled = false;
     assert!(key == Key::new(&unrelated_changed, &identity, "t", false));
