@@ -766,3 +766,7 @@ pub(super) fn unix_now() -> u64 {
 #[cfg(test)]
 #[path = "host_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "host_storage_tests.rs"]
+mod storage_tests;
