@@ -14,7 +14,10 @@ impl crate::integrations::composio::builder_tools::ConnectableToolkitProvider
         dispatch: &crate::core::runtime::DispatchCtx,
         config: &crate::config::Config,
     ) -> Vec<String> {
-        crate::flows::ops::connected_toolkits(dispatch, config).await
+        crate::flows::ops::connected_toolkits(dispatch, config)
+            .await
+            .into_iter()
+            .collect()
     }
 }
 

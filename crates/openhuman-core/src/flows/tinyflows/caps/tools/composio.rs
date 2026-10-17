@@ -59,7 +59,7 @@ impl FlowCallPolicy for FlowPolicy {
             let display_error = result
                 .as_ref()
                 .err()
-                .map(|message| EngineError::Capability(message.clone()).to_string());
+                .map(|message| capability_error_display(message));
             gate.record_execution(audit_id, outcome, display_error.as_deref());
         }
     }
@@ -71,6 +71,14 @@ fn capability_payload(error: EngineError) -> String {
         other => other.to_string(),
     }
 }
+
+fn capability_error_display(message: &str) -> String {
+    EngineError::Capability(message.to_string()).to_string()
+}
+
+#[cfg(test)]
+#[path = "composio_adapter_tests.rs"]
+mod tests;
 
 #[async_trait]
 impl ToolBackend for ComposioToolBackend {
