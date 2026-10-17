@@ -1,7 +1,9 @@
 use std::path::Path;
 use std::sync::Arc;
 
-use super::super::background_completions::{new_router, state, Entry};
+use super::super::background_completions::{
+    entry_for, router_pool, router_scope, state, test_store_overrides,
+};
 use tinyagents_tasks::CompletionStore;
 
 /// A temporary workspace that forgets its router when dropped, so the
@@ -27,19 +29,27 @@ impl Drop for TestWorkspace {
 /// Register `store` as `workspace_dir`'s completion store, so a test can inject
 /// one that fails.
 pub(crate) fn install_store_for_test(workspace_dir: &Path, store: Arc<dyn CompletionStore>) {
-    let entry = Arc::new(Entry {
-        router: Arc::new(new_router(store.clone())),
-        store,
-    });
-    state().routers.insert(workspace_dir.to_path_buf(), entry);
+    let scope = router_scope(workspace_dir);
+    test_store_overrides()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .insert(scope, store);
+    router_pool().clear().expect("clear completion router pool");
+    let _ = entry_for(workspace_dir);
 }
 
 /// Forget everything this process knows about `workspace_dir`, as a restart
 /// would: the router (and its open log handle) and every thread/session mapping
 /// that points at it. The on-disk log is untouched.
 pub(crate) fn forget_workspace_for_test(workspace_dir: &Path) {
+    let scope = router_scope(workspace_dir);
+    let _ = router_pool().clear();
+    test_store_overrides()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .remove(&scope);
     let mut st = state();
-    st.routers.remove(workspace_dir);
+    st.stores.remove(&scope);
     let gone: Vec<String> = st
         .thread_workspaces
         .iter()
@@ -51,7 +61,7 @@ pub(crate) fn forget_workspace_for_test(workspace_dir: &Path) {
         st.stopped_threads.remove(&thread);
         st.deleted_threads.remove(&thread);
     }
-    st.recovered_workspaces.remove(workspace_dir);
+    st.recovered_workspaces.remove(&scope);
     st.session_threads.clear();
     st.session_order.clear();
 }
