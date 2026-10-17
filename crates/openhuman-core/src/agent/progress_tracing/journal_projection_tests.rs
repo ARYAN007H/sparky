@@ -194,33 +194,6 @@ fn legacy_export_snapshot_for_root_and_child_with_reused_call_ids() {
         obs(
             3,
             1_030,
-            AgentEvent::ToolCompleted {
-                parent_call_id: None,
-                call_id: CallId::new("tool-1"),
-                tool_name: "lookup".to_string(),
-                started_at_ms: Some(1_020),
-                input: Some(serde_json::json!({"query":"CONTENT_SENTINEL_INPUT"})),
-                output: Some(serde_json::json!({"result":"CONTENT_SENTINEL_OUTPUT"})),
-                duration_ms: Some(10),
-                output_bytes: Some(33),
-                error: None,
-                metadata: None,
-            },
-        ),
-        obs(
-            4,
-            1_100,
-            AgentEvent::ModelCompleted {
-                call_id: CallId::new("same-call"),
-                started_at_ms: Some(1_010),
-                usage: Some(Usage::new(100, 20)),
-                input: Some(serde_json::json!(["CONTENT_SENTINEL_PROMPT"])),
-                output: Some(serde_json::json!(["CONTENT_SENTINEL_REPLY"])),
-            },
-        ),
-        obs(
-            5,
-            1_030,
             AgentEvent::SubAgentStarted {
                 name: "researcher".to_string(),
                 depth: 1,
@@ -260,7 +233,7 @@ fn legacy_export_snapshot_for_root_and_child_with_reused_call_ids() {
         ts_ms: 1_060,
         event: AgentEvent::ModelCompleted {
             call_id: CallId::new("same-call"),
-            started_at_ms: Some(1_070),
+            started_at_ms: Some(1_050),
             usage: Some(Usage::new(7, 3)),
             input: None,
             output: None,
@@ -278,6 +251,49 @@ fn legacy_export_snapshot_for_root_and_child_with_reused_call_ids() {
             outcome: None,
         },
     });
+    observations.push(obs(
+        4,
+        1_080,
+        AgentEvent::SubAgentCompleted {
+            name: "researcher".to_string(),
+            depth: 1,
+        },
+    ));
+    observations.push(obs(
+        5,
+        1_090,
+        AgentEvent::ToolCompleted {
+            parent_call_id: None,
+            call_id: CallId::new("tool-1"),
+            tool_name: "lookup".to_string(),
+            started_at_ms: Some(1_020),
+            input: Some(serde_json::json!({"query":"CONTENT_SENTINEL_INPUT"})),
+            output: Some(serde_json::json!({"result":"CONTENT_SENTINEL_OUTPUT"})),
+            duration_ms: Some(70),
+            output_bytes: Some(33),
+            error: None,
+            metadata: None,
+        },
+    ));
+    observations.push(obs(
+        6,
+        1_100,
+        AgentEvent::ModelCompleted {
+            call_id: CallId::new("same-call"),
+            started_at_ms: Some(1_010),
+            usage: Some(Usage::new(100, 20)),
+            input: Some(serde_json::json!(["CONTENT_SENTINEL_PROMPT"])),
+            output: Some(serde_json::json!(["CONTENT_SENTINEL_REPLY"])),
+        },
+    ));
+    observations.push(obs(
+        7,
+        1_110,
+        AgentEvent::RunCompleted {
+            run_id: RunId::new("run-1"),
+            outcome: None,
+        },
+    ));
     observations.push(obs(
         6,
         1_080,
