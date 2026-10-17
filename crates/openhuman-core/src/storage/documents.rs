@@ -247,7 +247,7 @@ pub async fn compare_and_swap(
     docs: &Arc<dyn DocumentStore>,
     collection: &str,
     id: &str,
-    change: impl Fn(&Value) -> Option<Value> + Send,
+    change: impl Fn(&Value) -> Option<Value> + Send + Sync,
 ) -> Result<Option<Versioned<Value>>, StorageError> {
     let repo = TsdRepo::<Value>::new(docs, collection)?.with_retry(RetryPolicy::default());
     let written = repo
