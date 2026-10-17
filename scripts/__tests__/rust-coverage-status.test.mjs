@@ -394,5 +394,6 @@ test("coverage inventory exceptions match the source gates and remain required a
   const windows = fs.readFileSync(path.join(repoRoot, "tests/windows_sandbox_env_e2e.rs"), "utf8");
   const functions = [...windows.matchAll(/#\[cfg\(windows\)\]\s*#\[(?:tokio::)?test(?:\([^\n]*\))?\]/g)];
   assert.ok(functions.length > 0, "Windows-only fixture must retain gated tests");
+  assert.equal(functions.length, [...windows.matchAll(/#\[(?:tokio::)?test(?:\([^\n]*\))?\]/g)].length, "every Windows fixture test must remain gated");
   assert.match(fs.readFileSync(runner, "utf8"), /target_features_satisfied "\$\{target\}" && target_expected_in_coverage "\$\{target\}"/);
 });

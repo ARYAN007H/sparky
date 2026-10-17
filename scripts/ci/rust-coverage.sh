@@ -116,6 +116,30 @@ target_features_satisfied() {
   done
 }
 
+# These target-level cfgs intentionally produce empty binaries in this build.
+# Keep exceptions named and narrow: every other expected target must report
+# tests, including newly added targets. The Composio stress case runs once in
+# the private uninstrumented lane; existing Windows checks remain separate.
+target_expected_in_coverage() {
+  local target="$1" platform="${2:-$(uname -s)}"
+  case "$target" in
+    composio_list_tools_stack_overflow_regression)
+      log "not expecting ${target} in coverage: #![cfg(not(coverage))]; tested uninstrumented"
+      return 1
+      ;;
+    windows_sandbox_env_e2e)
+      case "$platform" in
+        MINGW* | MSYS* | CYGWIN* | Windows_NT) ;;
+        *)
+          log "not expecting ${target} on ${platform}: all tests are #[cfg(windows)]"
+          return 1
+          ;;
+      esac
+      ;;
+  esac
+  return 0
+}
+
 # Every suite runs even when an earlier one fails, so one red crate never
 # hides the results of the crates and targets after it. Failures are
 # collected and reported together at the end, after the lcov report is still
@@ -261,7 +285,7 @@ if [ "${OH_COV_RUNNER:-cargo}" = "nextest" ]; then
   : >"${expected_targets}"
   while IFS= read -r target; do
     [ -n "${target}" ] || continue
-    if target_features_satisfied "${target}"; then
+    if target_features_satisfied "${target}" && target_expected_in_coverage "${target}"; then
       printf '%s\n' "${target}" >>"${expected_targets}"
     fi
   done < <(integration_test_targets)
