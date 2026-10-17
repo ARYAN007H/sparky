@@ -8,7 +8,6 @@ mod grounded_close;
 
 use std::{collections::HashSet, sync::Arc, time::Instant};
 
-use crate::agent::tinyagents::TurnSpec;
 use async_trait::async_trait;
 use tinyagents_runtime::{
     DriverFailure, DriverOutcome, DriverRequest, RuntimeError, SessionDriver, TranscriptPartial,
@@ -17,6 +16,7 @@ use tinyagents_session::transcript::TranscriptMessage;
 use tinyinference_llm::message::Message;
 use tinytools_agent::dialect::ToolDialect;
 
+use crate::agent::session_host::turn::chat_spec::build_chat_turn_spec;
 use crate::agent::tinyagents::{
     host::OpenHumanHostBase, host::OpenHumanRunContext, TurnModelSource,
 };
@@ -194,36 +194,23 @@ impl SessionDriver<OpenHumanRunContext> for OpenHumanSessionDriver {
                     "hosted root invocation is unavailable because the session has no hosted authority"
                 )
             })?;
-            let provider_id = turn_models.provider_id().to_string();
             let mut run_context = run_context;
             run_context.workspace = self.workspace.clone().or(run_context.workspace);
             run_context.sandbox_mode = Some(self.sandbox_mode);
-            TurnSpec {
+            build_chat_turn_spec(
                 run_context,
                 turn_models,
-                provider_id,
-                model: &self.model_name,
-                history: messages,
-                // Keep durable and synthesized registrations in the same order
-                // as the runtime snapshot, so each advertised name resolves to
-                // the executable instance that owns it.
-                tool_sets: vec![tools, synthesized_tools],
-                // `Some(empty)` is authoritative deny-all; `None` would expose
-                // the construction-time registry.
-                allowed: Some(visible_tool_names),
-                max_iterations: self.max_iterations,
-                subagent_scope: None,
+                &self.model_name,
+                messages,
+                tools,
+                synthesized_tools,
+                visible_tool_names,
+                self.max_iterations,
                 context_window,
-                run_queue: self.run_queue.clone(),
-                message_run_queue: None,
-                early_exit_tools: &["ask_user_clarification"],
-                pause_at_cap: true,
-                max_output_tokens: Some(crate::inference::provider::AGENT_TURN_MAX_OUTPUT_TOKENS),
+                self.run_queue.clone(),
                 context_mw,
-                tool_policy: Some(tool_policy),
-                deterministic_cacheable: false,
-                defer_turn_completed_to_caller: true,
-            }
+                tool_policy,
+            )
             .run_hosted(hosted_base, self.agent_id.clone())
             .await
         });

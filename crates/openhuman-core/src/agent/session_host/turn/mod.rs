@@ -3,4 +3,5 @@
 //! Generic turn lifecycle is intentionally absent: it is owned by
 //! `tinyagents_runtime::Session` in `runtime_session`.
 
+pub(super) mod chat_spec;
 mod context;
