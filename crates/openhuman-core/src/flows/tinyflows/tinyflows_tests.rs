@@ -138,7 +138,7 @@ fn seeded_required_args_contract(
 
 // ── OpenHumanAgentRunner: routing + request/model mapping (Phase A) ───────────
 
-use super::caps::{
+use crate::flows::agent_route::{
     harness_model_default_override, route_custom_entry_lookup, route_for_agent_ref, AgentRoute,
 };
 

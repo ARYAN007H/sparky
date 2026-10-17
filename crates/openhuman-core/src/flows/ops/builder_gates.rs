@@ -319,7 +319,7 @@ pub(crate) async fn build_builder_proposal(
 /// Rejects an `agent` node whose `config.agent_ref` would hit the runtime's
 /// `RegistryFallback` "unknown agent_ref" hard error mid-run
 /// (`run_via_registry_fallback` in `tinyflows/caps.rs`) — a real ref is one
-/// that resolves via [`crate::flows::tinyflows::caps::route_for_agent_ref`]
+/// that resolves via [`crate::flows::agent_route::route_for_agent_ref`]
 /// to a harness [`AgentDefinition`](crate::agent::harness::host_definition::AgentDefinition)
 /// (`AgentRoute::Harness`), OR — when it routes to `AgentRoute::RegistryFallback`
 /// — resolves to an *enabled*
@@ -362,7 +362,7 @@ pub(crate) async fn validate_agent_refs(
 ) -> Vec<String> {
     use crate::agent::harness::host_definition::AgentDefinitionRegistry;
     use crate::agent::registry::AgentRegistryEntry;
-    use crate::flows::tinyflows::caps::{route_for_agent_ref, AgentRoute};
+    use crate::flows::agent_route::{route_for_agent_ref, AgentRoute};
 
     let mut errors = Vec::new();
     let mut harness_registry_init_attempted = false;
