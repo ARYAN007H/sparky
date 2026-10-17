@@ -1,6 +1,6 @@
 use super::*;
 use crate::agent::subagent_host::run_subagent;
-use tinyagents_harness::context::{RunDepth, current_run_depth, with_run_depth};
+use tinyagents_harness::context::{current_run_depth, with_run_depth, RunDepth};
 
 #[test]
 fn filter_named_scope_keeps_only_named() {
@@ -146,16 +146,12 @@ async fn typed_mode_system_prompt_includes_subagent_role_contract() {
         .find(|m| m.role == "system")
         .expect("system message should be present");
     assert!(system_msg.content.contains("## Sub-agent Role Contract"));
-    assert!(
-        system_msg
-            .content
-            .contains("You are a sub-agent working for a parent OpenHuman agent")
-    );
-    assert!(
-        system_msg
-            .content
-            .contains("Keep your final response concise and synthesis-ready")
-    );
+    assert!(system_msg
+        .content
+        .contains("You are a sub-agent working for a parent OpenHuman agent"));
+    assert!(system_msg
+        .content
+        .contains("Keep your final response concise and synthesis-ready"));
 }
 
 #[tokio::test]

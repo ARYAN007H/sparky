@@ -34,7 +34,7 @@ use tinytools::{Tool, ToolCallOptions, ToolResult};
 use super::host::OpenHumanRunContext;
 use super::tool_registration::typed_dispatch_for;
 use crate::tools::toolpacks::registry::CATALOG;
-use tinyagents_harness::tool::packs::{PackRegistryHandle, named_tool};
+use tinyagents_harness::tool::packs::{named_tool, PackRegistryHandle};
 
 /// Live-parent dispatch for the `use_skill` proxy tool.
 ///

@@ -24,14 +24,14 @@ use crate::agent::tinyagents::budget::MAX_SPAWN_DEPTH;
 use crate::agent_registry::host_definition::{AgentDefinition, AgentDefinitionRegistry};
 use crate::inference::provider::AGENT_TURN_MAX_OUTPUT_TOKENS;
 use tinyagents_definition::{
-    AgentTier, IterationPolicy, PromptSource, SandboxMode as AgentSandboxMode,
-    validate_tier_transition,
+    validate_tier_transition, AgentTier, IterationPolicy, PromptSource,
+    SandboxMode as AgentSandboxMode,
 };
 use tinyagents_harness::artifacts::{
-    DEFAULT_OFFLOAD_THRESHOLD_BYTES, HANDOFF_STAGE_RECORDED, effective_offload_threshold,
-    extract_artifact_paths, note_artifact_handoff,
+    effective_offload_threshold, extract_artifact_paths, note_artifact_handoff,
+    DEFAULT_OFFLOAD_THRESHOLD_BYTES, HANDOFF_STAGE_RECORDED,
 };
-use tinyagents_harness::context::{RunConfig, RunDepth, current_run_depth, with_run_depth};
+use tinyagents_harness::context::{current_run_depth, with_run_depth, RunConfig, RunDepth};
 use tinytools::{SandboxMode as TinyagentsSandboxMode, ToolSpec, WorkspaceDescriptor};
 use tinytools_std::file_state::with_file_state_agent_id;
 

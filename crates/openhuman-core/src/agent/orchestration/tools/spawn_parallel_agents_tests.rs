@@ -1,10 +1,10 @@
 use super::*;
-use crate::agent::OpenHumanSessionHost;
 use crate::agent::harness::fork_context::ParentExecutionContext;
 use crate::agent::orchestration::spawn_parallel::{
-    ParallelTaskRejectionKind, SpawnParallelTaskPreflight, prepare_spawn_parallel_tasks_from_defs,
+    prepare_spawn_parallel_tasks_from_defs, ParallelTaskRejectionKind, SpawnParallelTaskPreflight,
 };
 use crate::agent::tinyagents::host::OpenHumanRunContext;
+use crate::agent::OpenHumanSessionHost;
 use crate::agent_registry::host_definition::AgentDefinition;
 use crate::agent_registry::host_definition::AgentDefinitionRegistry;
 use crate::config::AgentConfig;
@@ -13,8 +13,8 @@ use parking_lot::Mutex;
 use serde_json::json;
 use std::collections::HashMap;
 use std::sync::{
-    Arc,
     atomic::{AtomicUsize, Ordering},
+    Arc,
 };
 use tinyagents_definition::{
     AgentTier, DefinitionSource, ModelSpec, PromptSource, SandboxMode, ToolScope,
@@ -29,7 +29,7 @@ use tinytools::{PermissionLevel, Tool, ToolResult};
 use tinytools_agent::dialect::NativeDialect;
 use tinytools_agent::dialect::ToolCallFormat;
 use tinytools_agent::dialect::TranscriptEntry;
-use tokio::time::{Duration, sleep, timeout};
+use tokio::time::{sleep, timeout, Duration};
 
 const PARENT_PROMPT_CANARY: &str = "parallel-fanout-e2e-canary";
 const RESEARCH_PROMPT_CANARY: &str = "research-branch-canary";

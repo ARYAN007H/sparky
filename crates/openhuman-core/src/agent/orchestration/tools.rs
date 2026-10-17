@@ -45,10 +45,10 @@ mod tools_e2e_tests;
 pub(crate) use dispatch::DelegationDispatch;
 pub(crate) use subagent_control_surfaces::overlay_task_store_status;
 pub(crate) use subagent_control_surfaces::{
-    CloseSubagentTool, ListSubagentsTool, SteerSubagentTool, WaitSubagentTool,
+    format_running_wait_message, requested_timeout_secs, wait_status_payload,
 };
 pub(crate) use subagent_control_surfaces::{
-    format_running_wait_message, requested_timeout_secs, wait_status_payload,
+    CloseSubagentTool, ListSubagentsTool, SteerSubagentTool, WaitSubagentTool,
 };
 
 /// A minimal live TinyAgents carrier over `parent`, for tests that drive a
@@ -67,13 +67,13 @@ pub(crate) fn live_parent_run_context(
 }
 
 pub use archetype_delegation::{ArchetypeDelegationTool, DelegationTarget};
-pub use collapsed_delegation::{CollapsedDelegationTool, DELEGATE_TO_TOOL_NAME, DelegateTarget};
+pub use collapsed_delegation::{CollapsedDelegationTool, DelegateTarget, DELEGATE_TO_TOOL_NAME};
 pub(crate) use continue_subagent::ContinueSubagentDispatch;
 pub use continue_subagent::ContinueSubagentTool;
 pub(crate) use delegate_graph::DelegateGraphDispatch;
 pub use delegate_graph::DelegateGraphTool;
 pub(crate) use spawn_async_subagent::SpawnAsyncSubagentDispatch;
-pub use spawn_async_subagent::{SpawnAsyncSubagentTool, scope_spawn_async_subagent_spec};
+pub use spawn_async_subagent::{scope_spawn_async_subagent_spec, SpawnAsyncSubagentTool};
 pub(crate) use spawn_parallel_agents::SpawnParallelAgentsDispatch;
 pub use spawn_parallel_agents::SpawnParallelAgentsTool;
 pub(crate) use spawn_subagent::SpawnSubagentDispatch;

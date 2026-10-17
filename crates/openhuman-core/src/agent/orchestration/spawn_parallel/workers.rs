@@ -6,10 +6,10 @@
 use std::path::PathBuf;
 
 use tinyagents_harness::CancellationToken;
-use tinyagents_orchestration::parallel::{Worker, resolve_concurrency, run};
+use tinyagents_orchestration::parallel::{resolve_concurrency, run, Worker};
 
 use crate::agent::subagent_host::{
-    SubagentRunOptions, SubagentRunStatus, run_subagent_with_parent,
+    run_subagent_with_parent, SubagentRunOptions, SubagentRunStatus,
 };
 
 use super::types::{ParallelAgentResult, ParallelAgentStatus, SpawnParallelWorker};

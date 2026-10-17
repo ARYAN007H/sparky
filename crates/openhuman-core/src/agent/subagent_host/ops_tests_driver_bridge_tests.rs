@@ -199,21 +199,19 @@ async fn closing_a_durable_driver_session_cancels_only_its_registered_child() {
     assert_eq!(steered_payload["job_id"].as_str(), Some(job_id.as_str()));
     assert_eq!(steered_payload["status"], "message_queued");
 
-    assert!(
-        port.close("close-driver-session")
-            .await
-            .expect("Tiny close adapter cancels then closes the durable row")
-    );
+    assert!(port
+        .close("close-driver-session")
+        .await
+        .expect("Tiny close adapter cancels then closes the durable row"));
     assert_eq!(
         jobs.get(job_id.as_str()).unwrap().status,
         SubAgentJobStatus::Running,
         "the job remains visible while cooperative cancellation unwinds"
     );
-    assert!(
-        port.close("close-driver-session")
-            .await
-            .expect("repeated close is idempotent without re-cancelling")
-    );
+    assert!(port
+        .close("close-driver-session")
+        .await
+        .expect("repeated close is idempotent without re-cancelling"));
     assert!(!parent_cancellation.is_cancelled(), "parent stays live");
 
     let tiny_store: std::sync::Arc<dyn TinySessionStore> = std::sync::Arc::new(port.clone());

@@ -32,8 +32,8 @@ mod checkpoint;
 #[path = "lifecycle_outcome.rs"]
 mod outcome;
 use checkpoint::absolute_checkpoint_dir;
-use driver_adapter::HostInvocation;
 pub(super) use driver_adapter::outcome_to_host;
+use driver_adapter::HostInvocation;
 use outcome::HostInFlightMap;
 pub(super) use persistence::OpenHumanPersistence;
 
@@ -268,13 +268,13 @@ pub(crate) async fn spawn_async_via_driver_tool(
     input: String,
     options: SubagentRunOptions,
     completion: impl Fn(
-        String,
-        Result<SubagentRunOutcome, String>,
-        bool,
-    ) -> Pin<Box<dyn Future<Output = ()> + Send>>
-    + Send
-    + Sync
-    + 'static,
+            String,
+            Result<SubagentRunOutcome, String>,
+            bool,
+        ) -> Pin<Box<dyn Future<Output = ()> + Send>>
+        + Send
+        + Sync
+        + 'static,
 ) -> Result<String, SubagentRunError> {
     spawn_async_via_driver_tool_using_jobs(parent, definition, input, options, None, completion)
         .await
@@ -288,13 +288,13 @@ pub(crate) async fn spawn_async_via_driver_tool_with_jobs(
     options: SubagentRunOptions,
     jobs: tinyagents_orchestration::subagent::SubAgentJobRegistry,
     completion: impl Fn(
-        String,
-        Result<SubagentRunOutcome, String>,
-        bool,
-    ) -> Pin<Box<dyn Future<Output = ()> + Send>>
-    + Send
-    + Sync
-    + 'static,
+            String,
+            Result<SubagentRunOutcome, String>,
+            bool,
+        ) -> Pin<Box<dyn Future<Output = ()> + Send>>
+        + Send
+        + Sync
+        + 'static,
 ) -> Result<String, SubagentRunError> {
     spawn_async_via_driver_tool_using_jobs(
         parent,
@@ -314,13 +314,13 @@ async fn spawn_async_via_driver_tool_using_jobs(
     options: SubagentRunOptions,
     jobs: Option<tinyagents_orchestration::subagent::SubAgentJobRegistry>,
     completion: impl Fn(
-        String,
-        Result<SubagentRunOutcome, String>,
-        bool,
-    ) -> Pin<Box<dyn Future<Output = ()> + Send>>
-    + Send
-    + Sync
-    + 'static,
+            String,
+            Result<SubagentRunOutcome, String>,
+            bool,
+        ) -> Pin<Box<dyn Future<Output = ()> + Send>>
+        + Send
+        + Sync
+        + 'static,
 ) -> Result<String, SubagentRunError> {
     let task_id = options
         .task_id

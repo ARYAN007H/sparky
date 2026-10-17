@@ -26,7 +26,7 @@ use tinyagents_runtime::turn_driver::{
     MessageRunQueueFeed, RunQueueFeed, SteeringFeed, SteeringRegistrar,
 };
 
-use crate::agent::queued_turn::{QueuedTurn, text_preview};
+use crate::agent::queued_turn::{text_preview, QueuedTurn};
 use crate::core::bus::BUS;
 use crate::core::events::DomainEvent;
 

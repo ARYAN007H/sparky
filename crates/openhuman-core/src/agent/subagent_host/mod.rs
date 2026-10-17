@@ -63,11 +63,11 @@ pub(crate) use lifecycle::run_subagent_via_driver_tool;
 pub(crate) use lifecycle::spawn_async_via_driver_tool;
 #[cfg(test)]
 pub(crate) use lifecycle::spawn_async_via_driver_tool_with_jobs;
-pub use lifecycle::{
-    OpenHumanSubagentHost, continue_subagent, continue_subagent_with_parent, run_subagent,
-    run_subagent_with_parent,
-};
 pub(crate) use lifecycle::{checkpoint_resume, continue_subagent_via_driver_tool};
+pub use lifecycle::{
+    continue_subagent, continue_subagent_with_parent, run_subagent, run_subagent_with_parent,
+    OpenHumanSubagentHost,
+};
 pub(crate) use ops::is_safe_task_id;
 pub use types::{
     SubagentCheckpointData, SubagentMode, SubagentRunError, SubagentRunOptions, SubagentRunOutcome,
