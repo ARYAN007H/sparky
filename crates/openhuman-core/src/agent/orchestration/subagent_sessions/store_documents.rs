@@ -24,7 +24,6 @@
 //! remove sessions another process added meanwhile.
 
 use anyhow::Result;
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tinystoragedrivers::{CollectionSpec, Query, Sort};
@@ -32,7 +31,7 @@ use tinyagents_session::transcript::TranscriptMessage;
 
 use super::storage_schema::{spec, SESSIONS};
 use super::types::{DurableSubagentSession, DurableSubagentStatus};
-use crate::storage::documents::{compare_and_swap, Repo};
+use crate::storage::documents::Repo;
 use crate::storage::import_state;
 use crate::storage::schema_support::{key_of, ms_rfc3339, rfc3339_ms};
 use crate::storage::DocumentStoreExt;
@@ -256,7 +255,6 @@ async fn write_if_newer(
     doc: Value,
     updated_ms: i64,
 ) -> Result<(), crate::storage::StorageError> {
-    use crate::storage::Precondition;
     // A missing session is inserted; an existing one is replaced only while it
     // is older than ours. Both go through tsd's one retrying compare-and-swap.
     let repo = tinystoragedrivers::Repo::<Value>::new(docs, SESSIONS)?;
@@ -273,10 +271,6 @@ async fn write_if_newer(
     })
     .await
     .map(|_| ())
-    .map_err(|error| {
-        let _ = Precondition::None;
-        error
-    })
 }
 
 #[cfg(test)]
