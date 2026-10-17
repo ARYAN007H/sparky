@@ -320,7 +320,7 @@ async fn invoke_driver_tool_with_request(
         .clone()
         .unwrap_or_else(|| format!("sub-{}", uuid::Uuid::new_v4()));
     let checkpoint_dir =
-        absolute_checkpoint_dir(options.checkpoint_dir.clone().unwrap_or_else(|| {
+        absolute_checkpoint_dir(host_request.options.checkpoint_dir.clone().unwrap_or_else(|| {
             parent
                 .data
                 .parent
