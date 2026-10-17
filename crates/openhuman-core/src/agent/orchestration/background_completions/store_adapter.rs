@@ -193,4 +193,3 @@ pub(crate) fn router_for_workspace_ctx(
 pub(crate) fn router_for_workspace(workspace_dir: &Path) -> Arc<CompletionRouter> {
     router_for_workspace_ctx(&DispatchCtx::ambient(), workspace_dir)
 }
-
