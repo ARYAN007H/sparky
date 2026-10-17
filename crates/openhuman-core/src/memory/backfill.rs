@@ -299,7 +299,11 @@ async fn run(
                 } else {
                     tinymemory_api::WriteOptions::accepted()
                 };
-                let stored = bound.engine.store_many_with(items, options).await;
+                let stored = bound
+                    .engine
+                    .store_many_with(items, options)
+                    .await
+                    .map_err(MemoryError::from);
                 if let Err(error) = stored {
                     tracing::warn!(
                         code = error.code(),

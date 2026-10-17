@@ -8,7 +8,7 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use tinymemory_api::{
-    Citation, EngineDescriptor, FetchMode, Hit, ItemKind, LearningKind, MemoryMeta, MetaFilter,
+    Citation, EngineDescriptor, FetchMode, Hit, LearningKind, MemoryMeta, MetaFilter,
 };
 use tinymemory_integrations::import::ImportState;
 
