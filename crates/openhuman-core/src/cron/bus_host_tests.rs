@@ -1,7 +1,7 @@
-//! The callback adapter, driven the way the module drives it: over the bus, on
-//! the contract's `ScheduleHost` interface, against the real (linked) module.
-
 use super::*;
+// The callback adapter, driven the way the module drives it: over the bus, on
+// the contract's `ScheduleHost` interface, against the real (linked) module.
+
 use crate::cron::handlers::{
     kind_handler, register_kind, JobKindHandler, JobOutcome, JobRunContext,
 };
