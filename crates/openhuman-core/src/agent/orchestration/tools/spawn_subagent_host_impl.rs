@@ -187,7 +187,7 @@ impl SpawnSubagentTool {
         // asked to delegate, and running the sub-agent inline is the one mode
         // that both executes it and returns its output. Mirrors the
         // `has_delivery_thread` fallback the `delegate_*` tools already do in
-        // `dispatch.rs::dispatch_subagent`.
+        // `subagent_dispatch_host.rs::dispatch_subagent`.
         let parent_thread_id = tool_context
             .and_then(ToolRunContext::thread_id)
             .or(run_context.thread_id.as_deref())

@@ -1,7 +1,7 @@
 // `spawn_subagent`'s parameter schema.
 //
-// Textually included into `spawn_subagent.rs` beside
-// `spawn_subagent_tool_impl.rs`, so it shares that module's imports. Split out
+// Textually included into `spawn_subagent_surface.rs` beside
+// `spawn_subagent_host_impl.rs`, so it shares that module's imports. Split out
 // because the impl fragment had grown to 803 lines against the layout gate's
 // pin, and this is the one part of it that answers a question of its own —
 // "what arguments does this tool take?" — with no dependence on the execution

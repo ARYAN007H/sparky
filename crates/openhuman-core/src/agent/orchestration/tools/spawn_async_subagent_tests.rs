@@ -530,7 +530,7 @@ async fn errors_clearly_when_no_parent_thread_for_delivery() {
     // back here. Verified callable under the product feature profile:
     // `delegate_<agent_id>` tools are generated in
     // `tools/orchestrator_tools.rs:116`, and they accept `blocking`
-    // (`archetype_delegation.rs:115` declares it, `:245` reads it) — so the
+    // (`archetype_delegation_host.rs:115` declares it, `:245` reads it) — so the
     // guidance names a real tool family with a real argument, not a route the
     // model cannot take.
     assert!(out.contains("blocking: true"), "{out}");

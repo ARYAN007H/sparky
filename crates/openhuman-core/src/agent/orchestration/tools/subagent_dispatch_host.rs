@@ -346,7 +346,7 @@ pub(crate) async fn dispatch_subagent_with_live_parent(
     );
 
     // Also send to the per-request progress sink so the web channel bridge
-    // emits `subagent_spawned` to the frontend (same pattern as spawn_subagent.rs).
+    // emits `subagent_spawned` to the frontend (same pattern as spawn_subagent_surface.rs).
     if let Some(progress) = run_context.progress.clone() {
         let _ = progress
             .send(AgentProgress::SubagentSpawned {
@@ -470,7 +470,7 @@ pub(crate) async fn dispatch_subagent_with_live_parent(
                             outcome.iterations,
                         );
                         // Also send to the per-request progress sink (mirrors
-                        // `spawn_subagent.rs`) so the web channel bridge emits
+                        // `spawn_subagent_surface.rs`) so the web channel bridge emits
                         // `subagent_done` to the frontend. Without this the delegated
                         // subagent's timeline row (created on `SubagentSpawned` above)
                         // stays "running" forever — `publish_subagent_completed` only
