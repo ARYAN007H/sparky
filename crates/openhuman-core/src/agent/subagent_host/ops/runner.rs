@@ -6,7 +6,9 @@
 //! calls and tool execution until the model returns without further tool calls
 //! (or the iteration budget is exhausted).
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
+use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
 use crate::agent::harness::artifact_offload::offload_run_result;
@@ -363,22 +365,11 @@ pub(crate) async fn run_subagent_direct(
             usage: outcome.usage,
         });
 
-        // #3883: offload an oversized worker result to `action_dir/outputs/`
-        // BEFORE the cap below truncates it, so the parent receives a path plus
-        // an abstract and the full-fidelity body survives on disk instead of
-        // being cut. A refused or failed offload is soft: the inline payload
-        // continues on to the cap and the summarizer detour exactly as before.
-        Box::pin(offload_outcome_artifacts(&mut outcome, definition, &options, &task_id)).await;
-
-        // Use TinyAgents' shared character-safe result cap so subagent output
-        // follows the same truncation contract as other orchestration paths.
-        if let Some(cap) = definition.max_result_chars {
-            outcome.output = tinyagents_orchestration::subagent::ResultPolicy::new()
-                .with_max_chars(cap)
-                .apply(&task_id, &outcome.output, None)
-                .await
-                .text;
-        }
+        // The owner policy makes the generic byte-overflow decision and calls
+        // this host's authorized artifact store. Project its opaque reference
+        // into the product pointer before applying the independent character
+        // cap, preserving the existing full-output-first behavior.
+        apply_subagent_result_policies(&mut outcome, definition, &options, &task_id).await;
 
         tracing::info!(
             agent_id = %definition.id,
@@ -396,100 +387,86 @@ pub(crate) async fn run_subagent_direct(
     .await
 }
 
-/// Apply the filesystem-offload convention to a finished sub-agent run (#3883).
+/// Host-owned result adaptation around TinyAgents' generic result policy.
 ///
-/// Writes an oversized result to `action_dir/outputs/` and swaps `output` for a
-/// path + abstract, then records every `[artifact]` pointer the outgoing payload
-/// carries — the harness-written one and any the worker authored itself by
-/// following the prompt contract — onto `SubagentRunOutcome::artifact_paths`, so
-/// the parent receives the paths structurally, not only as prose.
-///
-/// Every failure is soft. With no resolvable action root (or a refused target)
-/// the outcome is left untouched and the summarizer detour plus
-/// `tool_result_budget_bytes` truncation stay in charge as the fallback.
-async fn offload_outcome_artifacts(
+/// TinyAgents decides whether the full result crosses the product byte
+/// threshold and applies the character cap. This adapter supplies authorized
+/// storage, resolves the opaque artifact reference into the product's existing
+/// pointer/abstract text, and records user-authored or stored paths.
+async fn apply_subagent_result_policies(
     outcome: &mut SubagentRunOutcome,
     definition: &AgentDefinition,
     options: &SubagentRunOptions,
     task_id: &str,
 ) {
-    // Pointers the WORKER authored itself (prompt contract) are read first: the
-    // harness may be about to replace `output` wholesale with its own pointer,
-    // which would otherwise drop them. They also have to survive the early
-    // returns below, so a run with no resolvable action root still reports the
-    // paths its child wrote by hand.
     let mut paths = extract_artifact_paths(&outcome.output);
 
     // A worktree-isolated worker offloads into its own checkout; everyone else
     // uses the live policy's action root, which is the same root a parent's
     // relative read resolves the returned path against.
     let policy = crate::security::live_policy::effective_in(&options.run_context.dispatch_ctx());
-    let Some(action_dir) = options
+    let action_dir = options
         .worktree_action_dir
         .clone()
-        .or_else(|| policy.as_ref().map(|p| p.action_dir.clone()))
-    else {
+        .or_else(|| policy.as_ref().map(|p| p.action_dir.clone()));
+
+    let can_store = !policy
+            .as_ref()
+            .is_some_and(|p| p.autonomy == crate::security::AutonomyLevel::ReadOnly);
+    let store = match (action_dir.as_ref(), can_store) {
+        (Some(action_dir), true) => Some(Arc::new(SubagentArtifactStore::new(
+            policy,
+            action_dir.clone(),
+            outcome.agent_id.clone(),
+        ))),
+        _ => None,
+    };
+
+    if let Some(store) = store.as_ref() {
+        let threshold =
+            effective_offload_threshold(DEFAULT_OFFLOAD_THRESHOLD_BYTES, definition.max_result_chars);
+        let applied = tinyagents_orchestration::subagent::ResultPolicy::new()
+            .with_max_bytes(threshold)
+            .with_overflow(tinyagents_orchestration::subagent::ResultOverflow::Artifact)
+            .with_artifact_store(store.clone())
+            .apply(task_id, &outcome.output, None)
+            .await;
+        if let Some(reference) = applied.artifact {
+            if let Some(stored) = store.take(&reference.id) {
+                outcome.output = stored.pointer;
+                if !paths.contains(&stored.relative_path) {
+                    paths.push(stored.relative_path);
+                }
+            } else {
+                tracing::warn!(
+                    task_id = %task_id,
+                    "[artifact] TinyAgents returned an unknown sub-agent artifact reference"
+                );
+            }
+        }
+    } else if action_dir.is_none() {
         tracing::debug!(
             task_id = %task_id,
             agent_id = %outcome.agent_id,
             worker_authored_paths = paths.len(),
             "[artifact] no resolvable action_dir — skipping offload (summarizer/truncation backstop applies)"
         );
-        outcome.artifact_paths = paths;
-        note_artifact_handoff(
-            HANDOFF_STAGE_RECORDED,
-            &outcome.agent_id,
-            task_id,
-            &outcome.artifact_paths,
-        );
-        return;
-    };
-
-    // A read-only tier means this run may not mutate the disk at all, so the
-    // harness does not persist on its behalf either. The result stays inline and
-    // the summarizer / truncation backstops handle it, exactly as before #3883.
-    if policy
-        .as_ref()
-        .is_some_and(|p| p.autonomy == crate::security::AutonomyLevel::ReadOnly)
-    {
+    } else {
         tracing::debug!(
             task_id = %task_id,
             agent_id = %outcome.agent_id,
             "[artifact] readonly autonomy tier — skipping offload (summarizer/truncation backstop applies)"
         );
-        outcome.artifact_paths = paths;
-        note_artifact_handoff(
-            HANDOFF_STAGE_RECORDED,
-            &outcome.agent_id,
-            task_id,
-            &outcome.artifact_paths,
-        );
-        return;
     }
 
-    // Offload at the tighter of the global default and this agent's own result
-    // cap, so a definition capped below the default (flow_memory_agent at 4 000
-    // chars) gets its full body on disk instead of truncated immediately after.
-    let threshold =
-        effective_offload_threshold(DEFAULT_OFFLOAD_THRESHOLD_BYTES, definition.max_result_chars);
+    if let Some(cap) = definition.max_result_chars {
+        outcome.output = tinyagents_orchestration::subagent::ResultPolicy::new()
+            .with_max_chars(cap)
+            .apply(task_id, &outcome.output, None)
+            .await
+            .text;
+    }
 
-    // The parent that receives the pointer resolves relative paths against ITS
-    // action root, so the stored artifact is materialised there (also for a
-    // worktree-isolated worker) and the handed-back `outputs/…` path opens.
-    let (output, _artifact) = offload_run_result(
-        std::mem::take(&mut outcome.output),
-        policy,
-        action_dir,
-        outcome.agent_id.clone(),
-        task_id,
-        threshold,
-    )
-    .await;
-    outcome.output = output;
-
-    // Merge: the harness pointer (if it fired) plus any worker-authored pointer
-    // read before the swap. `extract_artifact_paths` already de-duplicates
-    // within a payload; dedupe across the two sources here.
     for path in extract_artifact_paths(&outcome.output) {
         if !paths.contains(&path) {
             paths.push(path);
@@ -502,6 +479,76 @@ async fn offload_outcome_artifacts(
         task_id,
         &outcome.artifact_paths,
     );
+}
+
+struct SubagentArtifactStore {
+    policy: Option<Arc<crate::security::SecurityPolicy>>,
+    action_dir: PathBuf,
+    agent_id: String,
+    artifacts: Mutex<HashMap<String, StoredSubagentArtifact>>,
+}
+
+struct StoredSubagentArtifact {
+    pointer: String,
+    relative_path: String,
+}
+
+impl SubagentArtifactStore {
+    fn new(
+        policy: Option<Arc<crate::security::SecurityPolicy>>,
+        action_dir: PathBuf,
+        agent_id: String,
+    ) -> Self {
+        Self {
+            policy,
+            action_dir,
+            agent_id,
+            artifacts: Mutex::new(HashMap::new()),
+        }
+    }
+
+    fn take(&self, id: &str) -> Option<StoredSubagentArtifact> {
+        self.artifacts
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .remove(id)
+    }
+}
+
+#[async_trait::async_trait]
+impl tinyagents_orchestration::subagent::ArtifactStore for SubagentArtifactStore {
+    async fn store(
+        &self,
+        task_id: &str,
+        content: &str,
+    ) -> Result<tinyagents_orchestration::subagent::ArtifactReference, String> {
+        let (pointer, artifact) = offload_run_result(
+            content.to_owned(),
+            self.policy.clone(),
+            self.action_dir.clone(),
+            self.agent_id.clone(),
+            task_id,
+            0,
+        )
+        .await;
+        let artifact = artifact.ok_or_else(|| "OpenHuman did not persist the result".to_owned())?;
+        let id = uuid::Uuid::new_v4().to_string();
+        self.artifacts
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .insert(
+                id.clone(),
+                StoredSubagentArtifact {
+                    pointer,
+                    relative_path: artifact.relative_path,
+                },
+            );
+        Ok(tinyagents_orchestration::subagent::ArtifactReference {
+            id,
+            media_type: Some("text/plain".into()),
+            metadata: Default::default(),
+        })
+    }
 }
 
 fn workspace_descriptor_for_subagent(
