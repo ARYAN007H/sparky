@@ -152,7 +152,10 @@ async fn the_copilot_object_answers_tool_catalog_over_its_bus_contract() {
 async fn cancelling_partial_callback_registration_unserves_and_releases_its_context() {
     use std::sync::Arc;
 
-    let path = format!("/ai/tinyhumans/openhuman/TestRegistration/{}", uuid::Uuid::new_v4());
+    let path = format!(
+        "/ai/tinyhumans/openhuman/TestRegistration/{}",
+        uuid::Uuid::new_v4()
+    );
     let dropped = Arc::new(tokio::sync::Notify::new());
     let context = Arc::new(());
     let weak_context = Arc::downgrade(&context);
@@ -189,7 +192,10 @@ async fn cancelling_partial_callback_registration_unserves_and_releases_its_cont
             "ai.tinyhumans.openhuman.TestRegistration",
         )
         .expect("probe proxy");
-    assert!(proxy.call::<_, (), serde_json::Value>("Ping", ()).await.is_ok());
+    assert!(proxy
+        .call::<_, (), serde_json::Value>("Ping", ())
+        .await
+        .is_ok());
 
     registration.abort();
     let cleanup = dropped.notified();
@@ -198,6 +204,12 @@ async fn cancelling_partial_callback_registration_unserves_and_releases_its_cont
         .await
         .expect("detached registration settles and unregisters its interface");
     drop(context);
-    assert!(weak_context.upgrade().is_none(), "callback context is released");
-    assert!(proxy.call::<_, (), serde_json::Value>("Ping", ()).await.is_err());
+    assert!(
+        weak_context.upgrade().is_none(),
+        "callback context is released"
+    );
+    assert!(proxy
+        .call::<_, (), serde_json::Value>("Ping", ())
+        .await
+        .is_err());
 }

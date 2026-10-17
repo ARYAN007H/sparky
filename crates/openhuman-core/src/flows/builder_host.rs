@@ -342,12 +342,8 @@ pub(crate) async fn register(
         context,
         runtime: tokio::runtime::Handle::try_current().ok(),
     };
-    let registration = module::serve_pair(
-        path.clone(),
-        host.clone(),
-        CopilotCapsHost(host),
-    )
-    .await?;
+    let registration =
+        module::serve_pair(path.clone(), host.clone(), CopilotCapsHost(host)).await?;
     Ok(HostRegistration {
         _registration: registration,
         address: CopilotHost {
