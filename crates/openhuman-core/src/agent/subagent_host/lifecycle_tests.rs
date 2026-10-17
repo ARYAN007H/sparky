@@ -7,7 +7,9 @@ use super::lifecycle::{
     decode_driver_job_result, host_in_flight, load_subagent_checkpoint, merged_resume_history,
     HostInFlight, OpenHumanDriverBundle, OpenHumanPersistence,
 };
-use super::{SubagentMode, SubagentRunOutcome, SubagentRunStatus, SubagentUsage};
+use super::{
+    SubagentMode, SubagentRunError, SubagentRunOutcome, SubagentRunStatus, SubagentUsage,
+};
 
 fn key() -> SubagentTaskKey {
     SubagentTaskKey {
@@ -96,11 +98,9 @@ fn driver_error_does_not_hide_completed_mismatched_or_persistence_failures() {
         }));
 
     for result in [
-        lifecycle_error("completed", "subagent-job-42"),
         lifecycle_error("cancelled", "subagent-job-42"),
         lifecycle_error("unknown", "subagent-job-42"),
         tinytools::ToolResult::error("provider transport failed"),
-        lifecycle_error("awaiting_input", ""),
     ] {
         let error = decode_driver_job_result(result, &bundle, &task_key).unwrap_err();
         assert!(error.to_string().contains("driver-backed async spawn failed"));
@@ -117,6 +117,27 @@ fn driver_error_does_not_hide_completed_mismatched_or_persistence_failures() {
     )
     .unwrap_err();
     assert!(error.to_string().contains("checkpoint write failed"));
+
+    bundle.failures.lock().unwrap().remove(&task_key);
+    bundle.host_outcome.lock().unwrap().insert(
+        task_key.clone(),
+        cached_outcome(SubagentRunStatus::Completed),
+    );
+    let error = decode_driver_job_result(
+        lifecycle_error("completed", "subagent-job-42"),
+        &bundle,
+        &task_key,
+    )
+    .unwrap_err();
+    assert!(error.to_string().contains("driver-backed async spawn failed"));
+
+    let error = decode_driver_job_result(
+        lifecycle_error("awaiting_input", ""),
+        &bundle,
+        &task_key,
+    )
+    .unwrap_err();
+    assert!(error.to_string().contains("omitted its registered job id"));
 }
 
 fn paused_outcome(question: &str, resume: SubagentResume) -> SubagentOutcome {
