@@ -194,8 +194,7 @@ pub fn mark_finished(
     run_status: &SubagentRunStatus,
     history: Vec<TranscriptMessage>,
 ) -> Result<(), String> {
-    let updated = update_session(store, subagent_session_id, |session, now| {
-        session.current_task_id = Some(task_id.to_string());
+    let updated = update_session_for_task(store, subagent_session_id, task_id, |session, now| {
         session.status = DurableSubagentStatus::from_run_status(run_status);
         session.latest_history = Some(history);
         session.latest_error = None;
@@ -217,8 +216,7 @@ pub fn mark_failed(
     task_id: &str,
     error: String,
 ) -> Result<(), String> {
-    let updated = update_session(store, subagent_session_id, |session, now| {
-        session.current_task_id = Some(task_id.to_string());
+    let updated = update_session_for_task(store, subagent_session_id, task_id, |session, now| {
         session.status = DurableSubagentStatus::Failed;
         session.latest_error = Some(error);
         session.updated_at = now.clone();
@@ -289,6 +287,39 @@ where
         .iter_mut()
         .find(|session| session.subagent_session_id == subagent_session_id)
     {
+        update(session, now);
+        store.save(&sessions)?;
+        return Ok(true);
+    }
+    Ok(false)
+}
+
+/// Apply a terminal write only while it still belongs to the current task.
+/// The check and write share the store lock so a late completion cannot
+/// overwrite a reused session or revive one that has already been closed.
+fn update_session_for_task<F>(
+    store: &SubagentSessionStore,
+    subagent_session_id: &str,
+    task_id: &str,
+    update: F,
+) -> Result<bool, String>
+where
+    F: FnOnce(&mut DurableSubagentSession, String),
+{
+    let _guard = store_write_lock()
+        .lock()
+        .map_err(|_| "subagent session store lock poisoned".to_string())?;
+    let mut sessions = store.load()?;
+    let now = chrono::Utc::now().to_rfc3339();
+    if let Some(session) = sessions
+        .iter_mut()
+        .find(|session| session.subagent_session_id == subagent_session_id)
+    {
+        if session.status == DurableSubagentStatus::Closed
+            || session.current_task_id.as_deref() != Some(task_id)
+        {
+            return Ok(false);
+        }
         update(session, now);
         store.save(&sessions)?;
         return Ok(true);
