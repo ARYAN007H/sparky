@@ -150,36 +150,10 @@ fn stale_completion_cannot_overwrite_reused_or_closed_session() {
 }
 
 #[test]
-fn driver_task_cancel_reports_durable_finished_outcomes_and_refuses_ambiguous_ids() {
+fn driver_task_cancel_reports_legacy_failure_and_refuses_ambiguous_ids() {
     let dir = tempfile::tempdir().unwrap();
     let store = SubagentSessionStore::new(dir.path().to_path_buf());
     let jobs = SubAgentJobRegistry::default();
-    let completed = upsert_running(
-        &store,
-        SubagentSessionUpsert {
-            selector: selector("completed"),
-            display_name: None,
-            task_title: "Completed child".into(),
-            worker_thread_id: None,
-            task_id: "finished-completed".into(),
-            lifecycle_key: None,
-        },
-        None,
-    )
-    .unwrap();
-    mark_finished(
-        &store,
-        &completed.subagent_session_id,
-        "finished-completed",
-        &SubagentRunStatus::Completed,
-        Vec::new(),
-    )
-    .unwrap();
-    let selected = cancel_driver_job_by_task(&store, dir.path(), &jobs, "finished-completed", None)
-        .unwrap()
-        .expect("completed public task remains reportable");
-    assert_eq!(selected.already_finished, Some(FinishedOutcome::Completed));
-
     let failed = upsert_running(
         &store,
         SubagentSessionUpsert {

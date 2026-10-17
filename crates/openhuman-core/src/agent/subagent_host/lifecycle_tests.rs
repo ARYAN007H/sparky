@@ -474,6 +474,97 @@ async fn driver_inline_projection_returns_the_durable_winner_not_a_local_loser()
 }
 
 #[tokio::test]
+async fn driver_cancel_uses_the_typed_terminal_for_lossy_idle_sessions() {
+    use crate::agent::orchestration::subagent_sessions::{
+        cancel_driver_job_by_task, mark_finished, upsert_running, DurableSubagentStatus,
+        SubagentSessionSelector, SubagentSessionStore, SubagentSessionUpsert,
+    };
+
+    let directory = tempfile::tempdir().unwrap();
+    let workspace = directory.path();
+    let store = SubagentSessionStore::new(workspace.to_path_buf());
+    let jobs = tinyagents_orchestration::subagent::SubAgentJobRegistry::default();
+    let persistence = OpenHumanPersistence::new(
+        workspace.join(".openhuman/subagent_checkpoints"),
+    );
+
+    for (task_id, terminal, expected) in [
+        (
+            "typed-completed",
+            SubagentOutcomeKind::Completed,
+            Some(tinyagents_orchestration::subagent::FinishedOutcome::Completed),
+        ),
+        (
+            "typed-incomplete",
+            SubagentOutcomeKind::Incomplete(
+                tinyagents_orchestration::subagent::SubagentIncomplete::new("iteration cap"),
+            ),
+            Some(tinyagents_orchestration::subagent::FinishedOutcome::Failed),
+        ),
+    ] {
+        let key = SubagentTaskKey {
+            root_run_id: "root-typed-finished".into(),
+            parent_run_id: "parent-typed-finished".into(),
+            thread_id: Some("thread-typed-finished".into()),
+            task_id: task_id.into(),
+        };
+        let session = upsert_running(
+            &store,
+            SubagentSessionUpsert {
+                selector: SubagentSessionSelector {
+                    parent_session: "parent-typed-finished".into(),
+                    parent_thread_id: key.thread_id.clone(),
+                    agent_id: "researcher".into(),
+                    model: None,
+                    sandbox_mode: "read_only".into(),
+                    action_root: None,
+                    task_key: task_id.into(),
+                },
+                display_name: None,
+                task_title: task_id.into(),
+                worker_thread_id: None,
+                task_id: task_id.into(),
+                lifecycle_key: Some(key.clone()),
+            },
+            None,
+        )
+        .unwrap();
+        let mut outcome = SubagentOutcome::cancelled(task_id);
+        outcome.status = terminal;
+        persistence.record_terminal(&key, &outcome, None).await.unwrap();
+        mark_finished(
+            &store,
+            &session.subagent_session_id,
+            task_id,
+            &match task_id {
+                "typed-completed" => SubagentRunStatus::Completed,
+                _ => SubagentRunStatus::Incomplete {
+                    reason: "iteration cap".into(),
+                },
+            },
+            Vec::new(),
+        )
+        .unwrap();
+        assert_eq!(
+            store.load().unwrap()[0].status,
+            DurableSubagentStatus::Idle,
+            "both typed terminal outcomes share the legacy Idle session state"
+        );
+
+        let selected = cancel_driver_job_by_task(
+            &store,
+            workspace,
+            &jobs,
+            task_id,
+            None,
+        )
+        .unwrap()
+        .expect("typed terminal remains reportable");
+        assert_eq!(selected.already_finished, expected, "{task_id}");
+    }
+}
+
+#[tokio::test]
 async fn continuation_replaces_only_the_pause_it_loaded_and_stale_duplicate_gets_winner() {
     let directory = tempfile::tempdir().unwrap();
     let persistence = OpenHumanPersistence::new(directory.path().to_path_buf());
