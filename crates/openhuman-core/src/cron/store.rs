@@ -194,7 +194,23 @@ pub fn due_jobs(config: &Config, now: DateTime<Utc>) -> Result<Vec<CronJob>> {
 }
 
 pub fn update_job(config: &Config, job_id: &str, patch: CronJobPatch) -> Result<CronJob> {
+    update_job_with_origin(config, job_id, patch, None)
+}
+
+/// Update a job, using only a host-verified conversation origin for delivery
+/// validation. Raw origins stored on jobs or supplied by RPC are not trusted.
+pub(crate) fn update_job_with_origin(
+    config: &Config,
+    job_id: &str,
+    mut patch: CronJobPatch,
+    trusted_origin: Option<tinyflows_bus::schedule::types::JobOrigin>,
+) -> Result<CronJob> {
     limits::check_patch(config, &patch)?;
+    if patch.delivery.is_some() || patch.origin.is_some() {
+        let existing = get_job(config, job_id)?;
+        patch =
+            validate_and_complete_route_patch(config, &existing, patch, trusted_origin.as_ref())?;
+    }
     store_blocking(
         config,
         StoreOperation::Update {
@@ -202,6 +218,38 @@ pub fn update_job(config: &Config, job_id: &str, patch: CronJobPatch) -> Result<
             patch,
         },
     )
+}
+
+/// Validate routing changes against the row snapshot and return the patch to
+/// persist. Route completion is performed alongside validation so a delayed
+/// store write cannot combine the caller's route with a newer counterpart.
+fn validate_and_complete_route_patch(
+    config: &Config,
+    existing: &CronJob,
+    mut patch: CronJobPatch,
+    trusted_origin: Option<&tinyflows_bus::schedule::types::JobOrigin>,
+) -> Result<CronJobPatch> {
+    let delivery = patch
+        .delivery
+        .clone()
+        .unwrap_or_else(|| existing.delivery.clone());
+    let effective_origin = patch
+        .origin
+        .clone()
+        .unwrap_or_else(|| existing.origin.clone());
+    crate::cron::job_builder::validate_delivery_for_config_with_trusted_origin(
+        config,
+        &delivery,
+        effective_origin.as_ref(),
+        trusted_origin,
+    )
+    .map_err(anyhow::Error::msg)?;
+
+    // Persist exactly the pair that was validated. A stale write containing
+    // only one route field must not combine with a newer counterpart.
+    patch.delivery = Some(delivery);
+    patch.origin = Some(effective_origin);
+    Ok(patch)
 }
 
 pub fn record_last_run(

@@ -641,8 +641,19 @@ fn required_delivery_failure_only_fails_non_best_effort_runs() {
 
 #[tokio::test]
 async fn run_job_now_records_required_delivery_failure_as_error() {
+    let _bridge_lock = crate::cron::channel_bridge::TEST_BRIDGE_LOCK.lock().await;
     let tmp = TempDir::new().unwrap();
-    let config = test_config(&tmp);
+    let mut config = test_config(&tmp);
+    config.channels_config.telegram = Some(crate::config::TelegramConfig {
+        bot_token: "test-token".into(),
+        chat_id: None,
+        allowed_users: vec!["target".into()],
+        stream_mode: Default::default(),
+        draft_update_interval_ms: 1000,
+        silent_streaming: true,
+        mention_only: false,
+    });
+    delivery_tests::install_failing_telegram_bridge();
     let _handler = crate::cron::system_job_handlers::register(
         "ops-run-now-delivery-failure",
         std::sync::Arc::new(|_ctx| Box::pin(async { Ok(()) })),
@@ -654,7 +665,7 @@ async fn run_job_now_records_required_delivery_failure_as_error() {
         CronJobPatch {
             delivery: Some(DeliveryConfig {
                 mode: "announce".into(),
-                channel: Some(format!("missing-{}", uuid::Uuid::new_v4())),
+                channel: Some("telegram".into()),
                 to: Some("target".into()),
                 best_effort: false,
             }),

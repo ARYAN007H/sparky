@@ -284,6 +284,9 @@ pub fn schemas(function: &str) -> ControllerSchema {
 fn handle_add(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let config = ctx.load_config().await?;
+        if !config.cron.enabled {
+            return Err("cron is disabled by config (cron.enabled=false)".to_string());
+        }
         crate::core::runtime::components::require_config(&config, "tinyflows")?;
 
         let schedule: tinyflows_bus::schedule::types::Schedule =
@@ -380,6 +383,14 @@ fn handle_add(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture 
                     ),
                 };
                 let delivery_cfg = delivery.clone().unwrap_or_default();
+                // RPC `origin` is request data, not a verified turn context;
+                // it cannot exempt a target from the configured allowlist.
+                crate::cron::job_builder::validate_delivery_for_config_with_trusted_origin(
+                    &config,
+                    &delivery_cfg,
+                    origin.as_ref(),
+                    None,
+                )?;
                 crate::cron::client::check_origin_requirements(
                     &config,
                     &session_target,
