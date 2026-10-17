@@ -470,13 +470,9 @@ async fn opening_an_existing_profile_adopts_the_enforced_cron_cap() {
         crate::storage::scope_for_profile(id.as_str()),
     );
 
-    crate::cron::client::store_in::<crate::cron::CronJob>(
-        &config,
-        &scope,
-        raw_profile_agent_add(),
-    )
-    .await
-    .unwrap();
+    crate::cron::client::store_in::<crate::cron::CronJob>(&config, &scope, raw_profile_agent_add())
+        .await
+        .unwrap();
     let second = crate::cron::client::store_in::<crate::cron::CronJob>(
         &config,
         &scope,
@@ -501,13 +497,9 @@ async fn disabling_profile_cron_limits_clears_the_persisted_store_cap() {
         &config,
         crate::storage::scope_for_profile(id.as_str()),
     );
-    crate::cron::client::store_in::<crate::cron::CronJob>(
-        &config,
-        &scope,
-        raw_profile_agent_add(),
-    )
-    .await
-    .unwrap();
+    crate::cron::client::store_in::<crate::cron::CronJob>(&config, &scope, raw_profile_agent_add())
+        .await
+        .unwrap();
 
     let unenforced = ProfileHost::new(
         SaasConfig::new(tmp.path()),
@@ -521,11 +513,7 @@ async fn disabling_profile_cron_limits_clears_the_persisted_store_cap() {
         crate::storage::scope_for_profile(id.as_str()),
     );
 
-    crate::cron::client::store_in::<crate::cron::CronJob>(
-        &config,
-        &scope,
-        raw_profile_agent_add(),
-    )
-    .await
-    .expect("disabling operator policy should clear its persisted cap");
+    crate::cron::client::store_in::<crate::cron::CronJob>(&config, &scope, raw_profile_agent_add())
+        .await
+        .expect("disabling operator policy should clear its persisted cap");
 }
