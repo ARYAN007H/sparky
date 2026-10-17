@@ -34,7 +34,9 @@ mod checkpoint;
 mod outcome;
 use checkpoint::absolute_checkpoint_dir;
 use driver_adapter::HostInvocation;
+pub(super) use driver_adapter::outcome_to_host;
 use outcome::HostInFlightMap;
+pub(super) use persistence::OpenHumanPersistence;
 
 use super::{
     SubagentRunError, SubagentRunOptions, SubagentRunOutcome, SubagentRunStatus, SubagentUsage,
@@ -112,6 +114,14 @@ pub async fn continue_subagent(
     let root_config = root_data.root_run_config("subagent-host");
     let root = root_data.into_tinyagents(root_config);
     continue_subagent_with_parent(&root, original_key, definition.clone(), input, options).await
+}
+
+/// Appends the continuation input after the durable conversation history.
+pub(super) fn merged_resume_history(mut history: Vec<Message>, input: String) -> Vec<Message> {
+    if !input.is_empty() {
+        history.push(Message::user(input));
+    }
+    history
 }
 
 /// Runs a host-prepared subagent through TinyAgents' registered driver
@@ -923,6 +933,8 @@ impl OpenHumanSubagentHost {
     }
 }
 
+#[path = "lifecycle/driver_adapter.rs"]
+mod driver_adapter;
 /// One configured OpenHuman lifecycle driver and its request-keyed host
 /// projections. Keeping this factory separate lets registered TinyAgents
 /// dispatchers reuse the same planner, executor and persistence adapters
@@ -930,14 +942,8 @@ impl OpenHumanSubagentHost {
 /// second generic driver).
 #[path = "lifecycle/persistence.rs"]
 mod persistence;
-pub(super) use persistence::OpenHumanPersistence;
 
-#[path = "lifecycle/driver_adapter.rs"]
-mod driver_adapter;
-
-pub(super) use driver_adapter::{
-    HostRequest, OpenHumanDriverBundle, merged_resume_history, outcome_to_host,
-};
+pub(super) use driver_adapter::{HostRequest, OpenHumanDriverBundle};
 
 fn map_lifecycle_error(error: SubagentError) -> SubagentRunError {
     SubagentRunError::Provider(anyhow::anyhow!(error.to_string()))

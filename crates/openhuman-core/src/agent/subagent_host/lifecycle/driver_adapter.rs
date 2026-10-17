@@ -82,19 +82,6 @@ struct OpenHumanPlanner {
     plans: Arc<Mutex<HashMap<SubagentTaskKey, PreparedHostPlan>>>,
 }
 
-/// Appends the new continuation input to the exact durable history supplied by
-/// TinyAgents. Kept separate so the no-drop/no-duplicate resume contract has a
-/// focused regression test independent of provider execution.
-pub(in crate::agent::subagent_host) fn merged_resume_history(
-    mut history: Vec<Message>,
-    input: String,
-) -> Vec<Message> {
-    if !input.is_empty() {
-        history.push(Message::user(input));
-    }
-    history
-}
-
 #[async_trait]
 impl SubagentPlanner<crate::agent::tinyagents::host::OpenHumanRunContext, HostRequest>
     for OpenHumanPlanner
@@ -114,7 +101,7 @@ impl SubagentPlanner<crate::agent::tinyagents::host::OpenHumanRunContext, HostRe
         // after that durable history, exactly once; never overwrite a
         // caller-provided answer with the loaded checkpoint.
         let planned_input = if let Some(resume) = request.resume {
-            let history = merged_resume_history(resume.history, input);
+            let history = super::merged_resume_history(resume.history, input);
             options.initial_history = Some(
                 history
                     .iter()
