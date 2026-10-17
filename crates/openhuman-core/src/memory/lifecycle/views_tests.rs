@@ -3,7 +3,7 @@ use super::*;
 use chrono::Utc;
 use tinymemory_api::{LearningKind, MemoryEngine, MemoryMeta, StoreItem};
 
-use crate::memory::lifecycle::hooks::{self, PreTurnInput};
+use crate::memory::lifecycle::hooks::pre_turn_work;
 use crate::memory::scope::MemoryIdentity;
 use crate::memory::test_fixtures::{bind_reference, config_in};
 
@@ -122,19 +122,17 @@ async fn the_preview_reads_without_logging_and_agents_are_listed() {
         .await
         .unwrap();
     let writer = scope::MemoryIdentity::agent("writer").resolve(&config);
-    hooks::pre_turn(
+    pre_turn_work(
         &crate::core::runtime::DispatchCtx::ambient(),
         &config,
         &writer,
-        PreTurnInput {
-            thread_id: "t".into(),
-            turn_index: 0,
-            user_text: "draft the invoice email".into(),
-            in_prompt_from: 0,
-            at: Utc::now(),
-            resumed_after_compaction: false,
-            observed_actor: None,
-        },
+        "t".into(),
+        0,
+        "draft the invoice email".into(),
+        0,
+        Utc::now(),
+        false,
+        None,
     )
     .await;
 

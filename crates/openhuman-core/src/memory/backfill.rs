@@ -39,10 +39,9 @@ use serde::{Deserialize, Serialize};
 use crate::config::Config;
 use crate::memory::engine::{self, BoundEngine};
 use crate::memory::error::{MemoryError, MemoryResult};
-use crate::memory::ops::store_many_on_with;
 use crate::memory::scope::{MemoryIdentity, ResolvedIdentity};
-use crate::memory::types::ImportPhase;
 use crate::threads::store::blocking as threads;
+use tinymemory_integrations::import::ImportPhase;
 
 use tinymemory_tools::backfill::{first_live_turn, group_items, turn_groups, ThreadMessage};
 pub use tinymemory_tools::backfill::{pending_range, turns_of, PastTurn, BACKFILL_TAG, MAIN_AGENT};
@@ -300,7 +299,11 @@ async fn run(
                 } else {
                     tinymemory_api::WriteOptions::accepted()
                 };
-                let stored = store_many_on_with(bound, items, options).await;
+                let stored = bound
+                    .engine
+                    .store_many_with(items, options)
+                    .await
+                    .map_err(MemoryError::from);
                 if let Err(error) = stored {
                     tracing::warn!(
                         code = error.code(),
