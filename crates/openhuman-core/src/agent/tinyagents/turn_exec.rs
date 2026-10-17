@@ -110,11 +110,27 @@ pub(crate) struct TurnSpec<'a> {
     pub defer_turn_completed_to_caller: bool,
 }
 
+/// Native execution identity retained by OpenHuman's neutral sub-agent
+/// adapter. Child model/tool events use their own run-local sink; the parent
+/// sink carries only the typed child lifecycle link.
+pub(crate) struct NativeSubagentRunContext {
+    pub config: tinyagents_harness::context::RunConfig,
+    pub parent_events: EventSink,
+    pub name: String,
+}
+
 impl TurnSpec<'_> {
     /// Plan the turn with [`OpenHumanTurnPlanner`] and drive it on the runtime
     /// `TurnDriver` (channel/CLI and sub-agent routes).
     pub(crate) async fn run(self) -> Result<TinyagentsTurnOutcome> {
-        Box::pin(drive_turn(self, None)).await
+        Box::pin(drive_turn(self, None, None)).await
+    }
+
+    pub(crate) async fn run_with_native_subagent(
+        self,
+        native: NativeSubagentRunContext,
+    ) -> Result<TinyagentsTurnOutcome> {
+        Box::pin(drive_turn(self, None, Some(native))).await
     }
 
     /// Drive a hosted root turn: the same plan, executed through
@@ -129,7 +145,7 @@ impl TurnSpec<'_> {
     ) -> Result<TinyagentsTurnOutcome> {
         self.subagent_scope = None;
         self.deterministic_cacheable = false;
-        Box::pin(drive_turn(self, Some((hosted_base, agent_id)))).await
+        Box::pin(drive_turn(self, Some((hosted_base, agent_id)), None)).await
     }
 }
 
@@ -139,6 +155,7 @@ async fn drive_turn(
         Arc<crate::agent::tinyagents::host::OpenHumanHostBase>,
         String,
     )>,
+    native_subagent: Option<NativeSubagentRunContext>,
 ) -> Result<TinyagentsTurnOutcome> {
     let TurnSpec {
         mut run_context,
