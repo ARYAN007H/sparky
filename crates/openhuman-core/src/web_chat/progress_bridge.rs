@@ -174,9 +174,7 @@ use wire_caps::{cap_wire_args, cap_wire_output};
 
 #[path = "progress_bridge_ledger.rs"]
 mod ledger;
-pub(super) use ledger::{
-    ledger_append_event, ledger_upsert_agent_run, ledger_upsert_telemetry,
-};
+pub(super) use ledger::{ledger_append_event, ledger_upsert_agent_run, ledger_upsert_telemetry};
 
 /// Build the worktree-isolation slice of a `subagent_completed`
 /// [`SubagentProgressDetail`] (#3376). An empty `changed_files` collapses to

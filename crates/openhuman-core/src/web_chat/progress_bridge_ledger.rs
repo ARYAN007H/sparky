@@ -34,4 +34,3 @@ pub(in crate::web_chat) fn ledger_upsert_telemetry(
         log::warn!("[run_ledger][web_channel] failed to upsert telemetry: {err}");
     }
 }
-
