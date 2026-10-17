@@ -123,6 +123,17 @@ impl ProfileHost {
         let _profile = self.lifecycle.lock(id).await;
         if self.registry.get(id).await?.is_some() {
             let grant = self.acquire_for_lifecycle(id, "provision").await?;
+            match self.registry.get(id).await {
+                Ok(Some(_)) => {}
+                Ok(None) => {
+                    profile_lease::release_all(self, vec![(id.clone(), grant)]).await;
+                    return Ok(false);
+                }
+                Err(error) => {
+                    profile_lease::release_all(self, vec![(id.clone(), grant)]).await;
+                    return Err(error);
+                }
+            }
             let config = self.forced_config(&self.layout_of(id), id);
             let reconciled = reconcile_cron_admission(&config, id).await;
             profile_lease::release_all(self, vec![(id.clone(), grant)]).await;

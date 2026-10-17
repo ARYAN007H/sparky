@@ -79,7 +79,7 @@ fn clear_capacity_limit_if_supported(config: &Config) -> Result<()> {
     })
 }
 
-/// Refuse a new job that breaks the limits. No-op unless [`enforced`].
+/// Enforce the limits for a new job, or clear a stored cap while they are off.
 pub(crate) fn check_new(
     config: &Config,
     job_type: &JobType,
@@ -98,7 +98,7 @@ pub(crate) fn check_new(
     install_capacity_limit(config)
 }
 
-/// Refuse an update that breaks the limits. No-op unless [`enforced`].
+/// Enforce update limits, or clear a stored cap while they are off.
 pub(crate) fn check_patch(config: &Config, patch: &CronJobPatch) -> Result<()> {
     if !enforced(config) {
         clear_capacity_limit_if_supported(config)?;
