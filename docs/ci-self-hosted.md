@@ -6,10 +6,10 @@ job may run in parallel. It is the pull-request lane flow: the `ci-lite.yml` wor
 alongside was deleted on 2026-10-01. The one check to require is **CI Gate**
 (see [CI Gate](#ci-gate)).
 
-| Who opened the PR         | Workflow                              | Where it runs                                                             |
-| ------------------------- | ------------------------------------- | ------------------------------------------------------------------------- |
-| `tinyhumansai` org member | `ci-fast.yml` (`pull_request_target`) | one job on a throwaway Firecracker microVM on the Hetzner EX63            |
-| anyone else               | `ci-fast-hosted.yml` (`pull_request`) | the same lanes split over GitHub-hosted jobs, with GitHub's Actions cache |
+| Who opened the PR                               | Workflow                              | Where it runs                                                             |
+| ----------------------------------------------- | ------------------------------------- | ------------------------------------------------------------------------- |
+| author and actor admitted by membership routing | `ci-fast.yml` (`pull_request_target`) | one job on a throwaway Firecracker microVM on the Hetzner EX63            |
+| otherwise                                       | `ci-fast-hosted.yml` (`pull_request`) | the same lanes split over GitHub-hosted jobs, with GitHub's Actions cache |
 
 Both call `.github/workflows/ci-lanes.yml`, which runs
 `scripts/ci/self-hosted/lanes.mjs`. The plan itself is in
