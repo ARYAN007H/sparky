@@ -50,12 +50,14 @@ jobs:
     timeout-minutes: 120
     steps:
       - name: Checkout PR merge commit
-        uses: tinyhumansai/.github/actions/checkout@9d94105e7e81801ac3dc5f8d6535282165669cd9
+        uses: tinyhumansai/.github/actions/checkout@c705a5471b73941c0ff0b56a6fc6adf4958c84ab
         with:
           ref: refs/pull/${{ inputs.pr-number }}/merge
           fetch-depth: 0
           submodules: recursive
           exclude-submodules: wiki
+          # Trusted-base membership routing authorizes team fork merge refs.
+          allow-unsafe-pr-checkout: true
           persist-credentials: false
 
       - name: Verify private runner contract

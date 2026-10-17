@@ -48,6 +48,7 @@ test("private workflow pins checkout, image and signed Tinymold without artifact
   assert.match(privateJob, /submodules: recursive/);
   assert.match(privateJob, /exclude-submodules: wiki/);
   assert.match(privateJob, /fetch-depth: 0/);
+  assert.match(privateJob, /allow-unsafe-pr-checkout: true/);
   assert.match(privateJob, /tinyhumansai\/tinymold@[a-f0-9]{40}/);
   assert.match(privateJob, /install: none/);
   assert.match(privateJob, /backend: remote/);
