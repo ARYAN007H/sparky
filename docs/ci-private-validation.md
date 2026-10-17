@@ -97,6 +97,23 @@ missing vendor tag history, the frontend lint heap limit, an unsupported
 The seven auxiliary coverage configurations failed before running tests and
 must not be counted as covered merely because an LCOV report was produced.
 
+A second diagnostic at `e35e5c0240b61bc8cffaf857f8f826c4276ce8b6`
+failed after 107m03s when the 160 GiB scratch disk filled during the ordinary
+Tauri link. The subsequent coverage build and status writes reported `ENOSPC`;
+storage suites, Pester and cache saving were not reached. The 12,714 recorded
+executions across ten instrumented configurations and the plain Composio test
+passed, but this was a failed workflow and no warm run followed it.
+
+Its closed artifacts showed per-process auxiliary coverage profiles and large
+ordinary debug sections. The corrected private plan bounds every coverage
+process to eight merging profile slots, removes only the completed release
+example graph, and uses `line-tables-only` for ordinary dev/test builds. Coverage
+keeps its existing debug level zero. Actual Cargo 1.96.1 checks confirmed dev and
+test file-and-line backtraces and assertions, the coverage override, and unchanged
+release artifacts. Release output includes reflinks, so its allocated size does
+not establish how much physical space cleanup recovers. These fixes require a
+new complete cold/warm pair; neither diagnostic establishes final performance.
+
 The private workflow budget is now 180 minutes, including a bounded 15-minute
 cache save. The earlier 120-minute budget had almost expired before those seven
 configurations could execute; the provisional five-minute save limit was below
