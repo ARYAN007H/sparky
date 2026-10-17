@@ -195,5 +195,8 @@ pub enum Outcome {
 }
 
 #[cfg(test)]
+mod test_fixtures;
+
+#[cfg(test)]
 #[path = "mod_tests.rs"]
 mod tests;
