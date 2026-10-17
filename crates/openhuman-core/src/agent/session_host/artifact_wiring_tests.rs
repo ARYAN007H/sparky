@@ -54,7 +54,7 @@ async fn the_store_materialises_in_the_workspace_not_the_action_dir() {
         tool_result_artifacts_dir(&workspace)
     );
     let pointer = store.path_for_read_tool("shell", Some("c"));
-    assert_eq!(pointer, "tool-results/s/shell/c.txt");
+    assert_eq!(pointer, "harness/tool_results/s/shell/c.txt");
 }
 
 /// A large result is stored on the blob store, its pointer opens through the
