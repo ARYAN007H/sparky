@@ -471,6 +471,48 @@ async fn provisioning_installs_the_cron_cap_in_the_profile_scope() {
 }
 
 #[tokio::test]
+async fn a_backend_supplied_to_profile_host_owns_its_cron_cap() {
+    let tmp = tempfile::tempdir().unwrap();
+    let id = profile("cron-cap-shared-backend");
+    let mut saas = SaasConfig::new(tmp.path());
+    saas.cron.agent_jobs_only = true;
+    saas.cron.max_active_jobs = 1;
+    let backend: Arc<dyn crate::storage::StorageBackend> =
+        Arc::new(crate::storage::MemoryStorage::new());
+    let fences = Arc::new(crate::storage::fence::FenceRegistry::new(
+        crate::profiles::lease::now_ms,
+    ));
+    let host = ProfileHost::with_backend(
+        saas,
+        CoreContext::for_test(DomainSet::full(), None),
+        Some(Arc::clone(&backend)),
+    )
+    .unwrap()
+    .with_fences(fences);
+    host.provision(&id).await.unwrap();
+    let config = host.provisioned_config(&id).await.unwrap();
+    let scope = crate::cron::documents_port::DocScope::on_backend(
+        &config,
+        Arc::clone(&backend),
+        crate::storage::scope_for_profile(id.as_str()),
+    );
+
+    crate::cron::client::store_in::<crate::cron::CronJob>(&config, &scope, raw_profile_agent_add())
+        .await
+        .unwrap();
+    let second = crate::cron::client::store_in::<crate::cron::CronJob>(
+        &config,
+        &scope,
+        raw_profile_agent_add(),
+    )
+    .await;
+    let error = second.expect_err("the cap must be installed in the supplied backend");
+    assert!(error
+        .to_string()
+        .contains("Failed to insert cron agent job"));
+}
+
+#[tokio::test]
 async fn opening_an_existing_profile_adopts_the_enforced_cron_cap() {
     let tmp = tempfile::tempdir().unwrap();
     let id = profile("cron-cap-adopt-existing");
