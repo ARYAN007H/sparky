@@ -313,6 +313,7 @@ async fn run_and_record(
         Some(delivery_status),
     );
     let _ = cron::record_last_run(config, &job.id, finished_at, success, &output);
+    crate::cron::scheduler::run_delivery::publish_completion(ctx, job, success, &output);
     (success, output)
 }
 

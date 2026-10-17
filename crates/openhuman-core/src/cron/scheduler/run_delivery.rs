@@ -43,27 +43,39 @@ pub(crate) async fn deliver(
             // The job ran as its agent (when it had one); a one-shot job
             // is deleted once the run completes, so subscribers learn the
             // owner here, not from the store.
-            crate::cron::completion_owner::note(&ctx, &job.id);
-            BUS.publish(DomainEvent::CronJobCompleted {
-                job_id: job.id.clone(),
-                success,
-                output: crate::util::truncate_with_ellipsis(&attempt.output, 512),
-            });
             binding.finish_triggered_run(run_id);
-            BUS.publish(DomainEvent::HealthChanged {
-                component: "scheduler".to_string(),
-                healthy: success,
-                message: (!success).then(|| {
-                    if attempt.output.is_empty() {
-                        format!("job {} failed", job.id)
-                    } else {
-                        crate::util::truncate_with_ellipsis(&attempt.output, 256)
-                    }
-                }),
-            });
+            publish_completion(&ctx, job, success, &attempt.output);
             result
         })
         .await
+}
+
+/// Publish the final status shared by scheduled callbacks, Run Now, and the
+/// non-delivering `cron_run` tool. Callers decide delivery and persistence
+/// before projecting this event.
+pub(crate) fn publish_completion(
+    ctx: &crate::core::runtime::DispatchCtx,
+    job: &CronJob,
+    success: bool,
+    output: &str,
+) {
+    crate::cron::completion_owner::note(ctx, &job.id);
+    BUS.publish(DomainEvent::CronJobCompleted {
+        job_id: job.id.clone(),
+        success,
+        output: crate::util::truncate_with_ellipsis(output, 512),
+    });
+    BUS.publish(DomainEvent::HealthChanged {
+        component: "scheduler".to_string(),
+        healthy: success,
+        message: (!success).then(|| {
+            if output.is_empty() {
+                format!("job {} failed", job.id)
+            } else {
+                crate::util::truncate_with_ellipsis(output, 256)
+            }
+        }),
+    });
 }
 
 /// A `flow` row standing in for a trigger whose stored row cannot be read (it
