@@ -18,7 +18,7 @@ const STATE: &str = "layout_migration";
 /// begun there.
 #[must_use]
 pub fn exists(workspace_dir: &Path) -> bool {
-    crate::memory::state_store::load::<serde_json::Value>(workspace_dir, STATE)
+    crate::memory::state_store::load_strict::<serde_json::Value>(workspace_dir, STATE)
         .map(|state| state.is_some())
         .unwrap_or(false)
 }
@@ -63,7 +63,7 @@ fn detail(error: MemoryError) -> String {
 /// A state that cannot be read or parsed: the migration must not start
 /// over and copy everything again on a damaged value.
 pub fn load(workspace_dir: &Path) -> MemoryResult<MigrationState> {
-    crate::memory::state_store::load(workspace_dir, STATE)
+    crate::memory::state_store::load_strict(workspace_dir, STATE)
         .map(Option::unwrap_or_default)
         .map_err(|error| {
             MemoryError::Engine(format!("layout migration state unreadable: {error:#}"))

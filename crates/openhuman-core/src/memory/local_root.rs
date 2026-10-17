@@ -156,7 +156,7 @@ fn valid(record: &LocalRoot) -> std::io::Result<()> {
 }
 
 fn read(workspace_dir: &Path) -> anyhow::Result<Option<LocalRoot>> {
-    let record: Option<LocalRoot> = super::state_store::load(workspace_dir, STATE)?;
+    let record: Option<LocalRoot> = super::state_store::load_strict(workspace_dir, STATE)?;
     if let Some(record) = &record {
         valid(record)?;
     }

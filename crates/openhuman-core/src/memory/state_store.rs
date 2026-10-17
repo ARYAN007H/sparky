@@ -31,6 +31,26 @@ fn open(workspace_dir: &Path, name: &str) -> Result<StateKv> {
     Ok(kv)
 }
 
+/// [`open`] for a value a damaged legacy file must not reset.
+fn open_strict(workspace_dir: &Path, name: &str) -> Result<StateKv> {
+    let kv = StateKv::open(workspace_dir, OWNER, NS)?;
+    kv.import_file_strict(name, &legacy_path(workspace_dir, name))?;
+    Ok(kv)
+}
+
+/// [`load`], failing on a damaged legacy file instead of starting over.
+///
+/// # Errors
+///
+/// A storage error, an unparsable legacy file, or a stored value that is not
+/// a `T`.
+pub(crate) fn load_strict<T: DeserializeOwned + Send + 'static>(
+    workspace_dir: &Path,
+    name: &str,
+) -> Result<Option<T>> {
+    open_strict(workspace_dir, name)?.get(name)
+}
+
 /// State value `name`, or `None` when none was stored.
 ///
 /// # Errors
@@ -70,7 +90,7 @@ pub(crate) fn record_once<T>(workspace_dir: &Path, name: &str, value: &T) -> Res
 where
     T: Serialize + DeserializeOwned + Clone + Send + 'static,
 {
-    let kv = open(workspace_dir, name)?;
+    let kv = open_strict(workspace_dir, name)?;
     if kv.insert_if_absent(name, value)? {
         return Ok(value.clone());
     }

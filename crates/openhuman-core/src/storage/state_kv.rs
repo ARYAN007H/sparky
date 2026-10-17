@@ -225,6 +225,21 @@ impl StateKv {
     ///
     /// A storage error.
     pub fn import_file(&self, name: &str, legacy: &Path) -> Result<()> {
+        self.import_file_with(name, legacy, false)
+    }
+
+    /// [`Self::import_file`] for a value that must not start over from a
+    /// damaged file: an unparsable file is an error and is not recorded, so
+    /// every read fails closed until the file is repaired or removed.
+    ///
+    /// # Errors
+    ///
+    /// A storage error, or an unparsable legacy file.
+    pub fn import_file_strict(&self, name: &str, legacy: &Path) -> Result<()> {
+        self.import_file_with(name, legacy, true)
+    }
+
+    fn import_file_with(&self, name: &str, legacy: &Path, strict: bool) -> Result<()> {
         let step = import_state::step_id(IMPORT_KIND, &format!("{}/{}/{name}", self.owner, self.ns));
         let key = format!("{}/{}/{name}", self.owner, self.ns);
         self.repo.once_per_backend(&key, || {
@@ -245,6 +260,11 @@ impl StateKv {
                                 self.owner,
                                 self.ns
                             );
+                        }
+                        Err(error) if strict => {
+                            return Err(error).with_context(|| {
+                                format!("the legacy state file {} is not JSON", legacy.display())
+                            });
                         }
                         Err(error) => log::warn!(
                             "[storage::state_kv] legacy {}/{}/{name} is not JSON ({error}); skipped",
