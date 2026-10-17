@@ -212,12 +212,7 @@ pub fn cancel_driver_job_by_task(
     };
     if already_finished.is_none()
         && reason.is_some()
-        && !record_cancel_reason(
-            store,
-            &session.subagent_session_id,
-            task_id,
-            reason.expect("checked above").trim(),
-        )
+        && !record_cancel_reason(store, &session, reason.expect("checked above").trim())?
     {
         return Ok(None);
     }
@@ -232,7 +227,7 @@ pub fn cancel_driver_job_by_task(
         )
     {
         if reason.is_some() {
-            clear_cancel_reason(store, &session.subagent_session_id, task_id);
+            clear_cancel_reason(store, &session);
         }
         return Ok(None);
     }
@@ -252,27 +247,59 @@ pub fn cancel_driver_job_by_task(
 /// later reuse of the same durable session.
 fn record_cancel_reason(
     store: &SubagentSessionStore,
-    subagent_session_id: &str,
-    task_id: &str,
+    observed: &DurableSubagentSession,
     reason: &str,
-) -> bool {
+) -> Result<bool, String> {
     if reason.is_empty() {
-        return true;
+        return Ok(true);
     }
-    update_session_for_task(store, subagent_session_id, task_id, |session, now| {
-        if matches!(session.status, DurableSubagentStatus::Running | DurableSubagentStatus::AwaitingUser) {
+    mutate_observed_session(store, observed, |session, now| {
+        if matches!(
+            session.status,
+            DurableSubagentStatus::Running | DurableSubagentStatus::AwaitingUser
+        ) {
             session.latest_error = Some(reason.to_owned());
             session.updated_at = now;
         }
     })
-    .unwrap_or(false)
 }
 
-fn clear_cancel_reason(store: &SubagentSessionStore, subagent_session_id: &str, task_id: &str) {
-    let _ = update_session_for_task(store, subagent_session_id, task_id, |session, now| {
+fn clear_cancel_reason(store: &SubagentSessionStore, observed: &DurableSubagentSession) {
+    let _ = mutate_observed_session(store, observed, |session, now| {
         session.latest_error = None;
         session.updated_at = now;
     });
+}
+
+fn mutate_observed_session<F>(
+    store: &SubagentSessionStore,
+    observed: &DurableSubagentSession,
+    update: F,
+) -> Result<bool, String>
+where
+    F: FnOnce(&mut DurableSubagentSession, String),
+{
+    let _guard = store_write_lock()
+        .lock()
+        .map_err(|_| "subagent session store lock poisoned".to_string())?;
+    let mut sessions = store.load()?;
+    let Some(session) = sessions
+        .iter_mut()
+        .find(|session| session.subagent_session_id == observed.subagent_session_id)
+    else {
+        return Ok(false);
+    };
+    if session.parent_session != observed.parent_session
+        || session.parent_thread_id != observed.parent_thread_id
+        || session.current_task_id != observed.current_task_id
+        || session.lifecycle_key != observed.lifecycle_key
+        || session.status != observed.status
+    {
+        return Ok(false);
+    }
+    update(session, chrono::Utc::now().to_rfc3339());
+    store.save(&sessions)?;
+    Ok(true)
 }
 
 /// Resolve a saved product session to its exact TinyAgents lifecycle key.
