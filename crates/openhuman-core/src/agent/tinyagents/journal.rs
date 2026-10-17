@@ -338,7 +338,7 @@ fn cross_run_event_order(event: &tinyagents_harness::events::AgentEvent) -> u8 {
         AgentEvent::SubAgentRunStarted { .. } => 0,
         AgentEvent::RunCompleted { .. } => 4,
         AgentEvent::SubAgentRunCompleted { .. } => 3,
-        AgentEvent::RunFailed { .. } | AgentEvent::RunCancelled { .. } => 2,
+        AgentEvent::RunFailed { .. } => 2,
         _ => 1,
     }
 }

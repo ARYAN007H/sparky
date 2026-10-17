@@ -280,8 +280,8 @@ pub(crate) fn spawn_progress_bridge(
             TurnStateMirror::new(turn_state_store, thread_id.clone(), request_id.clone());
 
         // #3886: structured tracing export (`progress_bridge_trace.rs`).
-        let (mut span_collector, mut journal_trace_ctx) =
-            trace::span_collector(&config, &metadata, &client_id, &thread_id, &request_id).unzip();
+        let mut journal_trace_ctx =
+            trace::trace_context(&config, &metadata, &client_id, &thread_id, &request_id);
 
         // #4270: emit a periodic liveness beat for the whole in-flight turn so
         // the frontend silence timer never false-fires during a long prefill or
@@ -329,9 +329,6 @@ pub(crate) fn spawn_progress_bridge(
             };
             events_seen += 1;
             turn_state.observe(&event);
-            if let Some(collector) = span_collector.as_mut() {
-                collector.record(&event, unix_epoch_ms());
-            }
             match &event {
                 AgentProgress::TextDelta { delta, iteration } => {
                     log::trace!(
@@ -1066,35 +1063,16 @@ pub(crate) fn spawn_progress_bridge(
         // publishing an error. Trace export is best-effort I/O and must not
         // hold up terminal delivery after the progress stream closed.
         let _ = drained_tx.send(true);
-        if let Some(mut collector) = span_collector.take() {
-            collector.finish(unix_epoch_ms());
-            let live_spans = collector.spans().to_vec();
-            let journal_export = if let Some(trace_ctx) = journal_trace_ctx.take() {
-                super::journal_shadow::shadow_compare_journal_projection(
-                    &dispatch_ctx,
-                    &request_id,
-                    trace_ctx.clone(),
-                    parent_max_iterations,
-                    &live_spans,
-                )
-                .await
-                .map(|observations| (trace_ctx, observations))
-            } else {
-                None
-            };
-            if let Some((trace_ctx, observations)) = journal_export {
-                let run_telemetry = ledger_get_telemetry(&config, &request_id);
-                crate::core::observability::progress_tracing::export_run_trace_from_journal(
-                    &config,
-                    &trace_ctx,
-                    &observations,
-                    run_telemetry.as_ref(),
-                    &live_spans,
-                )
-                .await;
-            } else {
-                crate::core::observability::progress_tracing::export_run_trace(&config, &live_spans).await;
-            }
+        if let Some(trace_ctx) = journal_trace_ctx.take() {
+            let run_telemetry = ledger_get_telemetry(&config, &request_id);
+            crate::core::observability::progress_tracing::export_run_trace_from_journal(
+                &dispatch_ctx,
+                &config,
+                &request_id,
+                trace_ctx,
+                run_telemetry.as_ref(),
+            )
+            .await;
         }
 
         log::debug!(
