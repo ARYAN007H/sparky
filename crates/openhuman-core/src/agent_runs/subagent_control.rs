@@ -183,13 +183,21 @@ fn handle_subagent_cancel(ctx: DispatchCtx, params: Map<String, Value>) -> Contr
                                 None => "You cancelled this background sub-agent before it finished."
                                     .to_string(),
                             };
-                            background_completions::record_completion(
+                            let error = match reason
+                                .as_deref()
+                                .map(str::trim)
+                                .filter(|reason| !reason.is_empty())
+                            {
+                                Some(reason) => format!("cancelled by user. Reason: {reason}"),
+                                None => "cancelled by user".to_string(),
+                            };
+                            background_completions::record_failure(
                                 &ctx,
                                 &meta.workspace_dir,
                                 &meta.parent_session,
                                 &task_id,
-                                meta.agent_id.clone(),
-                                summary,
+                                meta.agent_id,
+                                &error,
                                 meta.parent_thread_id.clone(),
                             )
                             .await;
