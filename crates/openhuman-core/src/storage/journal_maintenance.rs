@@ -190,7 +190,7 @@ async fn configured_retention_days(ctx: &crate::core::runtime::DispatchCtx) -> u
         Ok(config) => config.storage.journal_retention_days,
         Err(error) => {
             tracing::debug!(%error, "{LOG} config unavailable; using the default retention");
-            crate::config::DEFAULT_JOURNAL_RETENTION_DAYS
+            crate::config::StorageConfig::default().journal_retention_days
         }
     }
 }
