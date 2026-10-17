@@ -433,6 +433,85 @@ async fn stopped_async_spawn_is_refused_before_progress_or_session_effects() {
     );
 }
 
+#[tokio::test]
+async fn detached_registration_failure_finishes_the_announced_product_card() {
+    use crate::agent::orchestration::subagent_sessions::{
+        DurableSubagentStatus, SubagentSessionStore,
+    };
+    use crate::agent::tinyagents::host::OpenHumanRunContext;
+    use crate::core::runtime::{ContextOverlay, CoreContext, DomainSet};
+    use crate::tools::toolpacks::ToolGroups;
+    use tinyagents_harness::context::RunContext;
+
+    let scratch = tempfile::tempdir().expect("isolated registration-failure fixture");
+    let workspace = scratch.path().join("workspace");
+    std::fs::create_dir_all(&workspace).expect("create workspace");
+    let provider = Arc::new(ScriptedModel::new(vec![]));
+    let (progress_tx, mut progress_rx) = tokio::sync::mpsc::channel(8);
+    let mut parent = parent_context(workspace.as_path(), provider.clone(), vec![]);
+    parent.workspace_dir = workspace.clone();
+    parent.session_id = "registration-failure-parent-session".into();
+    parent.on_progress = Some(progress_tx);
+
+    let definitions = Arc::new(AgentDefinitionRegistry::builtins_only());
+    let mut config = crate::config::Config::default();
+    config.workspace_dir = workspace.clone();
+    config.components.juice = false;
+    let core = CoreContext::for_test_with_config(DomainSet::full(), config.clone()).derive_with(
+        ContextOverlay::new(config, DomainSet::full(), ToolGroups::none())
+            .definitions(definitions),
+    );
+    let thread_id = "registration-failure-parent-thread";
+    let mut host_context = OpenHumanRunContext::new()
+        .with_core(Some(Arc::clone(&core)))
+        .with_parent(parent);
+    host_context.thread_id = Some(thread_id.into());
+    let live = RunContext::<OpenHumanRunContext>::new(
+        tinyagents_harness::context::RunConfig::new("registration-failure-parent")
+            .with_thread(thread_id)
+            .with_max_depth(1),
+        host_context,
+    );
+    let detached_data = live.data.detached_child();
+    let detached = live
+        .child(
+            tinyagents_harness::context::RunConfig::new("registration-failure-detached-child")
+                .with_max_depth(1),
+            detached_data.clone(),
+        )
+        .expect("the already-detached invocation is allowed")
+        .with_cancellation(detached_data.cancellation.clone());
+
+    let result = crate::agent::orchestration::tools::SpawnAsyncSubagentTool::new()
+        .execute_with_live_parent_context(
+            json!({
+                "agent_id": "task_manager_agent",
+                "prompt": "registration fails before provider dispatch",
+                "model": "test-model"
+            }),
+            None,
+            live.data.child(),
+            detached,
+        )
+        .await
+        .expect("tool execution");
+
+    assert!(result.is_error, "depth rejection is a failed registration");
+    let events = std::iter::from_fn(|| progress_rx.try_recv().ok()).collect::<Vec<_>>();
+    assert!(
+        matches!(events.as_slice(), [
+            crate::progress::AgentProgress::SubagentSpawned { .. },
+            crate::progress::AgentProgress::SubagentFailed { .. }
+        ]),
+        "the announced product card must end in failure: {events:?}"
+    );
+    let store = SubagentSessionStore::new(workspace.clone());
+    let rows = store.load().expect("session row is durable");
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0].status, DurableSubagentStatus::Failed);
+    assert!(provider.seen.lock().is_empty(), "registration error must not dispatch the model");
+}
+
 /// A child the harness stops early (failure breaker / iteration cap) is not a
 /// finished delegation: the parent's tool result must be a failure, so its own
 /// failure policy and its trace see it, and the `SubagentCompleted` progress
