@@ -4,8 +4,8 @@ use tinyagents_orchestration::subagent::{
 };
 
 use super::lifecycle::{
-    decode_driver_job_result, host_in_flight, load_subagent_checkpoint, merged_resume_history,
-    HostInFlight, OpenHumanDriverBundle, OpenHumanPersistence,
+    HostInFlight, OpenHumanDriverBundle, OpenHumanPersistence, decode_driver_job_result,
+    host_in_flight, load_subagent_checkpoint, merged_resume_history,
 };
 use super::{SubagentMode, SubagentRunError, SubagentRunOutcome, SubagentRunStatus, SubagentUsage};
 
@@ -97,9 +97,11 @@ fn driver_error_does_not_hide_completed_mismatched_or_persistence_failures() {
         tinytools::ToolResult::error("provider transport failed"),
     ] {
         let error = decode_driver_job_result(result, &bundle, &task_key).unwrap_err();
-        assert!(error
-            .to_string()
-            .contains("driver-backed async spawn failed"));
+        assert!(
+            error
+                .to_string()
+                .contains("driver-backed async spawn failed")
+        );
     }
 
     bundle.failures.lock().unwrap().insert(
@@ -125,9 +127,11 @@ fn driver_error_does_not_hide_completed_mismatched_or_persistence_failures() {
         &task_key,
     )
     .unwrap_err();
-    assert!(error
-        .to_string()
-        .contains("driver-backed async spawn failed"));
+    assert!(
+        error
+            .to_string()
+            .contains("driver-backed async spawn failed")
+    );
 
     bundle.host_outcome.lock().unwrap().insert(
         task_key.clone(),
@@ -330,11 +334,12 @@ async fn tiny_session_port_recovers_legacy_key_from_owned_pause_and_hides_foreig
         .unwrap();
     assert_eq!(owned.len(), 1);
     assert_eq!(owned[0].lifecycle_key, Some(key));
-    assert!(port
-        .list_for_parent("foreign-session", Some("thread"))
-        .await
-        .unwrap()
-        .is_empty());
+    assert!(
+        port.list_for_parent("foreign-session", Some("thread"))
+            .await
+            .unwrap()
+            .is_empty()
+    );
 }
 
 #[tokio::test]
@@ -564,7 +569,7 @@ async fn host_coalescer_keeps_the_leader_winner_and_cancels_only_the_observer() 
 #[tokio::test]
 async fn each_agent_dedupes_its_own_in_flight_sub_agents() {
     use crate::core::runtime::agent_scope::test_agent_context;
-    use crate::core::runtime::{context::CoreContext, DomainSet};
+    use crate::core::runtime::{DomainSet, context::CoreContext};
     use std::sync::Arc;
 
     let root = CoreContext::for_test(DomainSet::full(), None);
