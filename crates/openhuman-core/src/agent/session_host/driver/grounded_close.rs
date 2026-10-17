@@ -7,7 +7,6 @@
 //! its usage in a sidecar; it never owns transcript history or persistence.
 
 use tinyagents_runtime::transcript::message_to_native_transcript as message_to_native_chat_message;
-use tinyagents_session::transcript::TranscriptMessage;
 use tinyinference_llm::model::{ChatModel, ModelRequest, ModelResponse, ModelStream};
 use tinytools_agent::dialect::ToolDialect;
 

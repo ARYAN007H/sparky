@@ -127,18 +127,19 @@ async fn terminal_failed_close_requests_are_counted_without_usage() {
 async fn required_output_repair_preserves_all_host_output_placements() {
     use tinyagents_harness::testkit::ScriptedModel;
 
-    async fn repair(candidate: &str, reply: &str, streamed: bool) -> String {
+    async fn repair(candidate: &str, reply: &str, streamed: bool) -> (String, Vec<String>) {
         let source = TurnModelSource::from_model(Arc::new(ScriptedModel::replies(vec![candidate])));
         let contract = tinyagents_harness::config::RequiredOutput {
             block_key: "result".into(),
             required_keys: vec!["status".into()],
         };
         let mut usage = RepairUsage::for_model("test-model");
-        super::repair_required_output(
+        let (progress, mut receiver) = tokio::sync::mpsc::channel(2);
+        let output = super::repair_required_output(
             &source,
             "test-model",
             0.0,
-            None,
+            Some(&progress),
             &tinytools_agent::dialect::NativeDialect,
             &contract,
             &[],
@@ -149,7 +150,14 @@ async fn required_output_repair_preserves_all_host_output_placements() {
             &mut usage,
         )
         .await
-        .expect("reply lacks the required block")
+        .expect("reply lacks the required block");
+        let mut deltas = Vec::new();
+        while let Ok(event) = receiver.try_recv() {
+            if let crate::progress::AgentProgress::TextDelta { delta, .. } = event {
+                deltas.push(delta);
+            }
+        }
+        (output, deltas)
     }
 
     let valid = r#"{"result":"ok","status":"ok"}"#;
@@ -157,19 +165,18 @@ async fn required_output_repair_preserves_all_host_output_placements() {
     let reply = "Original reply.";
     let block = r#"{"result":"","status":""}"#;
 
-    assert_eq!(repair(valid, reply, false).await, valid);
-    assert_eq!(
-        repair(valid, reply, true).await,
-        format!("{reply}\n\n{valid}")
-    );
-    assert_eq!(
-        repair(invalid, reply, true).await,
-        format!("{reply}\n\n{block}")
-    );
-    assert_eq!(
-        repair(invalid, reply, false).await,
-        format!("{block}\n\n{reply}")
-    );
+    let (valid_unstreamed, valid_unstreamed_deltas) = repair(valid, reply, false).await;
+    assert_eq!(valid_unstreamed, valid);
+    assert!(valid_unstreamed_deltas.is_empty());
+    let (valid_streamed, valid_streamed_deltas) = repair(valid, reply, true).await;
+    assert_eq!(valid_streamed, format!("{reply}\n\n{valid}"));
+    assert_eq!(valid_streamed_deltas, vec![format!("\n\n{valid}")]);
+    let (invalid_streamed, invalid_streamed_deltas) = repair(invalid, reply, true).await;
+    assert_eq!(invalid_streamed, format!("{reply}\n\n{block}"));
+    assert_eq!(invalid_streamed_deltas, vec![format!("\n\n{block}")]);
+    let (invalid_unstreamed, invalid_unstreamed_deltas) = repair(invalid, reply, false).await;
+    assert_eq!(invalid_unstreamed, format!("{block}\n\n{reply}"));
+    assert!(invalid_unstreamed_deltas.is_empty());
 }
 
 fn blank_outcome(truncated: bool) -> TinyagentsTurnOutcome {
