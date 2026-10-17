@@ -152,10 +152,10 @@ async fn required_output_repair_preserves_all_host_output_placements() {
         .expect("reply lacks the required block")
     }
 
-    let valid = r#"{"result":{"status":"ok"}}"#;
+    let valid = r#"{"result":"ok","status":"ok"}"#;
     let invalid = "not structured output";
     let reply = "Original reply.";
-    let block = r#"{"result":{"status":""}}"#;
+    let block = r#"{"result":"","status":""}"#;
 
     assert_eq!(repair(valid, reply, false).await, valid);
     assert_eq!(
