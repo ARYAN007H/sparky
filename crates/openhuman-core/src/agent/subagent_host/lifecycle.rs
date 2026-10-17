@@ -103,6 +103,90 @@ pub(crate) async fn run_async_spawn_via_driver_tool(
     input: String,
     options: SubagentRunOptions,
 ) -> Result<(SubagentRunOutcome, String), SubagentRunError> {
+    let task_id = options
+        .task_id
+        .clone()
+        .unwrap_or_else(|| format!("sub-{}", uuid::Uuid::new_v4()));
+    let task_key = SubagentTaskKey::from_context(parent, task_id.clone(), None);
+    let (tool_result, bundle) = invoke_async_spawn_driver_tool(
+        parent,
+        definition,
+        input,
+        options,
+        "inline",
+        None,
+    )
+    .await?;
+    let public_job_id = decode_driver_job_result(tool_result, &bundle, &task_key)?;
+    if let Some(outcome) = bundle
+        .host_outcome
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .remove(&task_key)
+    {
+        return Ok((outcome, public_job_id));
+    }
+    if let Some(error) = bundle
+        .failures
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .remove(&task_key)
+    {
+        return Err(error);
+    }
+    Err(SubagentRunError::Provider(anyhow::anyhow!(
+        "driver-backed async spawn returned without a host outcome"
+    )))
+}
+
+/// Starts a detached host-prepared child through TinyAgents' registered
+/// dispatcher. The generic tool owns detachment, job registration and terminal
+/// status; the callback is reserved for OpenHuman's product-side delivery.
+pub(crate) async fn spawn_async_via_driver_tool(
+    parent: &RunContext<crate::agent::tinyagents::host::OpenHumanRunContext>,
+    definition: crate::agent_registry::host_definition::AgentDefinition,
+    input: String,
+    options: SubagentRunOptions,
+    completion: impl Fn(&str, Result<SubagentRunOutcome, String>) + Send + Sync + 'static,
+) -> Result<String, SubagentRunError> {
+    let task_id = options
+        .task_id
+        .clone()
+        .unwrap_or_else(|| format!("sub-{}", uuid::Uuid::new_v4()));
+    let task_key = SubagentTaskKey::from_context(parent, task_id, None);
+    let (tool_result, bundle) = invoke_async_spawn_driver_tool(
+        parent,
+        definition,
+        input,
+        options,
+        "background",
+        Some(Arc::new(move |target, result| {
+            let projected = match result {
+                Ok(_) => bundle_outcome_for_key(&bundle, &task_key),
+                Err(error) => bundle_failure_for_key(&bundle, &task_key)
+                    .map_or_else(|| Err(error), |failure| Err(failure.to_string())),
+            };
+            completion(target, projected);
+        })),
+    )
+    .await?;
+    decode_driver_job_result(tool_result, &bundle, &task_key)
+}
+
+type DriverCompletion = Arc<
+    dyn Fn(&str, Result<tinyagents_orchestration::subagent::SubagentOutcome, String>)
+        + Send
+        + Sync,
+>;
+
+async fn invoke_async_spawn_driver_tool(
+    parent: &RunContext<crate::agent::tinyagents::host::OpenHumanRunContext>,
+    definition: crate::agent_registry::host_definition::AgentDefinition,
+    input: String,
+    options: SubagentRunOptions,
+    mode: &str,
+    completion: Option<DriverCompletion>,
+) -> Result<(tinytools::ToolResult, OpenHumanDriverBundle), SubagentRunError> {
     use tinyagents_harness::tool::ToolDispatch;
     use tinyagents_orchestration::subagent::{DriverSubAgentTool, SubAgentJobRegistry};
     use tinytools::{PermissionLevel, ToolCategory, ToolCallOptions, ToolScope, ToolTimeout};
@@ -111,7 +195,6 @@ pub(crate) async fn run_async_spawn_via_driver_tool(
         .task_id
         .clone()
         .unwrap_or_else(|| format!("sub-{}", uuid::Uuid::new_v4()));
-    let task_key = SubagentTaskKey::from_context(parent, task_id.clone(), None);
     let checkpoint_dir = absolute_checkpoint_dir(options.checkpoint_dir.clone().unwrap_or_else(|| {
         parent
             .data
@@ -154,7 +237,7 @@ pub(crate) async fn run_async_spawn_via_driver_tool(
             )
             .map(|request| request.with_target(request_host.definition.id.clone()))
         },
-        |_request| None,
+        |request| Some(request.task_id().to_owned()),
     );
     let dispatch_ctx = parent.data.dispatch_ctx();
     let jobs = (*crate::core::runtime::slot_for::<SubAgentJobRegistry>(&dispatch_ctx)).clone();
@@ -170,7 +253,7 @@ pub(crate) async fn run_async_spawn_via_driver_tool(
         thread_id.as_deref(),
     );
     let owner_scope: Arc<dyn Fn(u64) -> String + Send + Sync> = Arc::new(move |_| owner.clone());
-    let dispatcher = dispatcher
+    let mut dispatcher = dispatcher
         .with_job_registry(jobs)
         .with_owner_scope(owner_scope)
         .with_metadata(
@@ -179,7 +262,12 @@ pub(crate) async fn run_async_spawn_via_driver_tool(
             ToolCategory::System,
             ToolTimeout::Unbounded,
         );
-    let args = serde_json::json!({ "input": input, "mode": "inline" });
+    if let Some(completion) = completion {
+        dispatcher = dispatcher.with_completion_handler(move |target, outcome| {
+            completion(target, outcome)
+        });
+    }
+    let args = serde_json::json!({ "input": input, "mode": mode });
     let tool_result = dispatcher
         .execute(
             &(),
@@ -190,13 +278,16 @@ pub(crate) async fn run_async_spawn_via_driver_tool(
         )
         .await
         .map_err(|error| SubagentRunError::Provider(anyhow::anyhow!(error.to_string())))?;
+    Ok((tool_result, bundle))
+}
+
+fn decode_driver_job_result(
+    tool_result: tinytools::ToolResult,
+    bundle: &OpenHumanDriverBundle,
+    task_key: &SubagentTaskKey,
+) -> Result<String, SubagentRunError> {
     if tool_result.is_error {
-        if let Some(error) = bundle
-            .failures
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .remove(&task_key)
-        {
+        if let Some(error) = bundle_failure_for_key(bundle, task_key) {
             return Err(error);
         }
         return Err(SubagentRunError::Provider(anyhow::anyhow!(format!(
@@ -213,35 +304,38 @@ pub(crate) async fn run_async_spawn_via_driver_tool(
             ))));
         }
     };
-    let public_job_id = reply
+    reply
         .get("task_id")
         .and_then(serde_json::Value::as_str)
+        .map(str::to_owned)
         .ok_or_else(|| {
             SubagentRunError::Provider(anyhow::anyhow!(
                 "driver-backed async spawn omitted its registered job id"
             ))
-        })?
-        .to_owned();
+        })
+}
 
-    if let Some(outcome) = bundle
+fn bundle_outcome_for_key(
+    bundle: &OpenHumanDriverBundle,
+    task_key: &SubagentTaskKey,
+) -> Result<SubagentRunOutcome, String> {
+    bundle
         .host_outcome
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner())
-        .remove(&task_key)
-    {
-        return Ok((outcome, public_job_id));
-    }
-    if let Some(error) = bundle
+        .remove(task_key)
+        .ok_or_else(|| "driver completed without a persisted host outcome".to_string())
+}
+
+fn bundle_failure_for_key(
+    bundle: &OpenHumanDriverBundle,
+    task_key: &SubagentTaskKey,
+) -> Option<SubagentRunError> {
+    bundle
         .failures
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner())
-        .remove(&task_key)
-    {
-        return Err(error);
-    }
-    Err(SubagentRunError::Provider(anyhow::anyhow!(
-        "driver-backed async spawn returned without a host outcome"
-    )))
+        .remove(task_key)
 }
 
 /// Recover the original durable key and complete host pause payload from the
