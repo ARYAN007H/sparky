@@ -929,11 +929,28 @@ impl OpenHumanSubagentHost {
 /// dispatchers reuse the same planner, executor and persistence adapters
 /// without routing through `OpenHumanSubagentHost::run` (which would create a
 /// second generic driver).
+#[path = "lifecycle/persistence.rs"]
+mod persistence;
+pub(super) use persistence::OpenHumanPersistence;
+
 #[path = "lifecycle/driver_adapter.rs"]
 mod driver_adapter;
 
-use driver_adapter::map_lifecycle_error;
 pub(super) use driver_adapter::{
     HostRequest, OpenHumanDriverBundle, OpenHumanPersistence, checkpoint_resume,
     decode_driver_job_result, load_subagent_checkpoint, merged_resume_history, outcome_to_host,
 };
+
+fn map_lifecycle_error(error: SubagentError) -> SubagentRunError {
+    SubagentRunError::Provider(anyhow::anyhow!(error.to_string()))
+}
+
+/// A child run's cost as it comes back across the orchestration boundary.
+/// That `Usage` can only say whether a charge is present, so a present one is
+/// read as charged and an absent one as unknown (it was sent as absent).
+fn cost_source_of(charged: Option<&ChargedAmount>) -> tinyagents_harness::cost::CostSource {
+    match charged {
+        Some(_) => tinyagents_harness::cost::CostSource::Charged,
+        None => tinyagents_harness::cost::CostSource::Unknown,
+    }
+}
