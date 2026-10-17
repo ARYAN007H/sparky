@@ -1,6 +1,92 @@
 use super::*;
 use crate::config::test_env::EnvVarGuard;
 
+#[tokio::test]
+async fn cron_completion_owner_is_event_data_and_survives_repeated_reads() {
+    use tinybus::EventHandler;
+
+    struct Completions(tokio::sync::mpsc::UnboundedSender<DomainEvent>);
+    #[async_trait::async_trait]
+    impl EventHandler<DomainEvent> for Completions {
+        fn name(&self) -> &str {
+            "test::notifications::cron_completion_owner_event_data"
+        }
+
+        async fn handle(&self, event: &DomainEvent) {
+            if matches!(event, DomainEvent::CronJobCompleted { job_id, .. } if job_id == "shared-completion-id") {
+                let _ = self.0.send(event.clone());
+            }
+        }
+    }
+
+    crate::core::bus::init().await.unwrap();
+    let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+    let _subscription = crate::core::bus::BUS
+        .subscribe(std::sync::Arc::new(Completions(tx)))
+        .unwrap();
+
+    let context_for = |agent: &str| {
+        crate::core::runtime::CoreContext::for_test(
+            crate::core::runtime::DomainSet::full(),
+            None,
+        )
+        .derive_with(
+            crate::core::runtime::ContextOverlay::new(
+                crate::config::Config::default(),
+                crate::core::runtime::DomainSet::full(),
+                Default::default(),
+            )
+            .session_agent(agent),
+        )
+    };
+    let mut job = crate::cron::scheduler::run_delivery::stand_in_for_test("unused");
+    job.id = "shared-completion-id".into();
+
+    crate::cron::scheduler::run_delivery::publish_completion(
+        &crate::core::runtime::DispatchCtx::new(context_for("completion-owner-a")),
+        &job,
+        true,
+        "done",
+    );
+    crate::cron::scheduler::run_delivery::publish_completion(
+        &crate::core::runtime::DispatchCtx::new(context_for("completion-owner-b")),
+        &job,
+        true,
+        "done",
+    );
+
+    let events = tokio::time::timeout(std::time::Duration::from_secs(2), async {
+        let mut events = Vec::new();
+        while events.len() < 2 {
+            events.push(rx.recv().await.expect("completion subscriber remains open"));
+        }
+        events
+    })
+    .await
+    .expect("both completion events arrive");
+    let owners = futures::future::join_all(events.iter().map(|event| {
+        event_owner(
+            &crate::core::runtime::DispatchCtx::host_default(),
+            &crate::config::Config::default(),
+            event,
+        )
+    }))
+    .await;
+
+    assert_eq!(owners[0], Ok(Some("completion-owner-a".into())));
+    assert_eq!(owners[1], Ok(Some("completion-owner-b".into())));
+    assert_eq!(
+        event_owner(
+            &crate::core::runtime::DispatchCtx::host_default(),
+            &crate::config::Config::default(),
+            &events[0],
+        )
+        .await,
+        Ok(Some("completion-owner-a".into())),
+        "reading an event repeatedly must not consume or change its owner"
+    );
+}
+
 #[test]
 fn cron_completed_produces_agents_notification() {
     let ev = DomainEvent::CronJobCompleted {
