@@ -59,8 +59,7 @@ async fn spawn_subagent_tool_runs_child_agent_e2e() {
         jobs.list().iter().any(|job| {
             job.agent == "task_manager_agent"
                 && job.output.as_deref() == Some("spawn-subagent-child-answer")
-                && job.status
-                    == tinyagents_orchestration::subagent::SubAgentJobStatus::Completed
+                && job.status == tinyagents_orchestration::subagent::SubAgentJobStatus::Completed
         }),
         "spawn_subagent must register its real target and terminal state in shared Jobs"
     );
@@ -180,8 +179,7 @@ async fn archetype_delegation_tool_runs_child_agent_e2e() {
         completed.iter().any(|job| {
             job.agent == "task_manager_agent"
                 && job.output.as_deref() == Some("archetype-delegation-child-answer")
-                && job.status
-                    == tinyagents_orchestration::subagent::SubAgentJobStatus::Completed
+                && job.status == tinyagents_orchestration::subagent::SubAgentJobStatus::Completed
         }),
         "blocking delegation must register its real target and terminal state in shared Jobs"
     );
@@ -425,6 +423,83 @@ async fn continue_subagent_resumes_idle_durable_session_e2e() {
 }
 
 #[tokio::test]
+async fn continue_subagent_resumes_paused_job_through_shared_driver() {
+    use super::{ContinueSubagentTool, SpawnSubagentTool};
+    use tinyagents_orchestration::subagent::{SubAgentJobRegistry, SubAgentJobStatus};
+
+    let _ = AgentDefinitionRegistry::init_global_builtins();
+    let workspace = tempfile::TempDir::new().expect("workspace");
+    let provider = Arc::new(PauseThenAnswerModel {
+        calls: std::sync::atomic::AtomicUsize::new(0),
+    });
+    let live = super::live_parent_run_context(
+        "continue-paused-e2e",
+        parent_context(workspace.path(), provider.clone(), vec![]),
+    );
+    let paused = SpawnSubagentTool::new()
+        .execute_with_live_parent_context(
+            json!({
+                "agent_id": "task_manager_agent",
+                "prompt": "Investigate the pause-resume fixture",
+                "model": "test-model",
+                "blocking": true
+            }),
+            None,
+            live.data.child(),
+            Some(&live),
+        )
+        .await
+        .expect("initial spawn");
+    assert!(!paused.is_error, "{}", paused.output());
+    let task_id = paused
+        .output()
+        .lines()
+        .find_map(|line| line.strip_prefix("task_id: "))
+        .expect("pause envelope carries task id")
+        .to_owned();
+    assert!(paused.output().contains("which file should I inspect?"));
+
+    let jobs = crate::core::runtime::slot_for::<SubAgentJobRegistry>(&live.data.dispatch_ctx());
+    let paused_job = jobs
+        .list()
+        .into_iter()
+        .find(|job| {
+            job.extensions
+                .get("task_id")
+                .and_then(serde_json::Value::as_str)
+                == Some(task_id.as_str())
+        })
+        .expect("initial pause is registered in shared Jobs");
+    assert_eq!(paused_job.status, SubAgentJobStatus::AwaitingInput);
+
+    let resumed = ContinueSubagentTool::new()
+        .execute_with_live_parent_context(
+            json!({
+                "task_id": task_id,
+                "agent_id": "task_manager_agent",
+                "message": "Inspect the README and continue."
+            }),
+            None,
+            live.data.child(),
+            Some(&live),
+        )
+        .await
+        .expect("continue");
+    assert!(!resumed.is_error, "{}", resumed.output());
+    assert!(provider.saw("Inspect the README and continue."));
+
+    let completed_job = jobs
+        .get(paused_job.id.as_str())
+        .expect("continuation reuses the same registered job");
+    assert_eq!(completed_job.agent, "task_manager_agent");
+    assert_eq!(completed_job.status, SubAgentJobStatus::Completed);
+    assert_eq!(
+        completed_job.output.as_deref(),
+        Some("paused-child-resumed-answer")
+    );
+}
+
+#[tokio::test]
 async fn continue_subagent_without_checkpoint_or_durable_session_names_the_roster() {
     use super::ContinueSubagentTool;
     let _ = AgentDefinitionRegistry::init_global_builtins();
@@ -553,6 +628,43 @@ fn parent_context(
 struct ScriptedModel {
     responses: Vec<(&'static str, &'static str)>,
     seen: Mutex<Vec<String>>,
+}
+
+struct PauseThenAnswerModel {
+    calls: std::sync::atomic::AtomicUsize,
+}
+
+#[async_trait]
+impl ChatModel<()> for PauseThenAnswerModel {
+    fn profile(&self) -> Option<&ModelProfile> {
+        static PROFILE: std::sync::OnceLock<ModelProfile> = std::sync::OnceLock::new();
+        Some(PROFILE.get_or_init(|| {
+            let mut profile = ModelProfile::default();
+            profile.tool_calling = true;
+            profile.parallel_tool_calls = true;
+            profile
+        }))
+    }
+
+    async fn invoke(
+        &self,
+        _state: &(),
+        _request: ModelRequest,
+    ) -> tinyinference_llm::Result<ModelResponse> {
+        use std::sync::atomic::Ordering;
+        if self.calls.fetch_add(1, Ordering::SeqCst) == 0 {
+            let mut response = ModelResponse::assistant("");
+            response.message.tool_calls = vec![tinyinference_llm::tool::ToolCall::new(
+                "pause-call",
+                "ask_user_clarification",
+                json!({"question": "which file should I inspect?"}),
+            )];
+            response.finish_reason = Some("tool_calls".into());
+            Ok(response)
+        } else {
+            Ok(ModelResponse::assistant("paused-child-resumed-answer"))
+        }
+    }
 }
 
 impl ScriptedModel {
