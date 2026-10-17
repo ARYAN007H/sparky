@@ -1136,14 +1136,17 @@ impl SubagentExecutor<crate::agent::tinyagents::host::OpenHumanRunContext> for O
                 let cancellation = execution.cancellation.clone();
                 let invoke = Box::pin(async move {
                     tokio::select! {
-                        _ = cancellation.cancelled() => Ok(tinytools::ToolResult::error(
-                            "delegate: cancelled before the configured agent completed"
-                        )),
+                        _ = cancellation.cancelled() => (
+                            Ok(tinytools::ToolResult::error(
+                                "delegate: cancelled before the configured agent completed"
+                            )),
+                            true,
+                        ),
                         result = tool.execute_with_context(
                             arguments,
                             tinytools::ToolCallOptions::default(),
                             Some(&tool_context),
-                        ) => result,
+                        ) => (result, false),
                     }
                 });
                 let result = match dispatch.into_core() {
@@ -1156,9 +1159,11 @@ impl SubagentExecutor<crate::agent::tinyagents::host::OpenHumanRunContext> for O
                     None => invoke.await,
                 };
                 match result {
-                    Ok(tool_result) => {
+                    Ok((tool_result, cancelled)) => {
                         let output = tool_result.output();
-                        let status = if tool_result.is_error {
+                        let status = if cancelled {
+                            SubagentRunStatus::Cancelled
+                        } else if tool_result.is_error {
                             SubagentRunStatus::Incomplete {
                                 reason: "configured delegate reported failure".into(),
                             }
@@ -1192,7 +1197,9 @@ impl SubagentExecutor<crate::agent::tinyagents::host::OpenHumanRunContext> for O
                         neutral
                             .extensions
                             .insert("iterations".into(), serde_json::Value::Number(1.into()));
-                        neutral.status = if tool_result.is_error {
+                        neutral.status = if cancelled {
+                            SubagentOutcomeKind::Cancelled
+                        } else if tool_result.is_error {
                             SubagentOutcomeKind::Incomplete(SubagentIncomplete::new(
                                 "configured delegate reported failure",
                             ))

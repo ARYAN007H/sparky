@@ -21,6 +21,8 @@ struct BlockingDelegationTool {
     started: tokio::sync::mpsc::Sender<()>,
 }
 
+struct FailingDelegationTool;
+
 #[async_trait]
 impl Tool for BlockingDelegationTool {
     fn name(&self) -> &str {
@@ -36,6 +38,24 @@ impl Tool for BlockingDelegationTool {
         let _ = self.started.send(()).await;
         std::future::pending::<()>().await;
         unreachable!("the parent cancellation must win")
+    }
+}
+
+#[async_trait]
+impl Tool for FailingDelegationTool {
+    fn name(&self) -> &str {
+        "delegate"
+    }
+    fn description(&self) -> &str {
+        "configured delegate that returns a product error"
+    }
+    fn parameters_schema(&self) -> serde_json::Value {
+        serde_json::json!({})
+    }
+    async fn execute(&self, _args: serde_json::Value) -> anyhow::Result<tinytools::ToolResult> {
+        Ok(tinytools::ToolResult::error(
+            "configured policy rejected the request",
+        ))
     }
 }
 
@@ -172,6 +192,37 @@ async fn config_delegate_dispatch_honours_the_parent_cancellation_token() {
             .any(|job| { job.agent == "configured" && job.status.is_terminal() }),
         "configured child cancellation settles the shared Jobs lifecycle"
     );
+}
+
+#[tokio::test]
+async fn config_delegate_dispatch_preserves_tool_failure_in_shared_jobs() {
+    let dispatch = DelegateToolDispatch::new(Arc::new(FailingDelegationTool));
+    let parent = crate::agent::tinyagents::host::OpenHumanRunContext::new()
+        .into_tinyagents(RunConfig::new("config-delegate-error-parent"));
+    let jobs = crate::core::runtime::slot_for::<
+        tinyagents_orchestration::subagent::SubAgentJobRegistry,
+    >(&parent.data.dispatch_ctx());
+
+    let result = dispatch
+        .execute(
+            &(),
+            tinyagents_harness::CallId::new("configured-error-call"),
+            serde_json::json!({"agent": "configured-error", "prompt": "work"}),
+            tinytools::ToolCallOptions::default(),
+            &parent,
+        )
+        .await
+        .expect("the host returns the configured tool result");
+
+    assert!(result.is_error);
+    assert!(result.output().contains("configured policy rejected the request"));
+    assert!(jobs.list().iter().any(|job| {
+        job.agent == "configured-error"
+            && job.status == tinyagents_orchestration::subagent::SubAgentJobStatus::Incomplete
+            && job.error.as_deref().is_some_and(|error| {
+                error.contains("configured policy rejected the request")
+            })
+    }), "the registered job retains the configured product failure");
 }
 
 #[test]
