@@ -268,10 +268,14 @@ impl ModelMiddleware<(), crate::agent::tinyagents::host::OpenHumanRunContext>
             .correlation
             .as_ref()
             .map(|correlation| correlation.call_id.clone())
-            .or_else(|| ctx.active_model_call.as_ref().map(|call_id| call_id.as_str().to_owned()));
+            .or_else(|| {
+                ctx.active_model_call
+                    .as_ref()
+                    .map(|call_id| call_id.as_str().to_owned())
+            });
         if let Some(call_id) = &call_id {
-            let provider_id = valid_trace_provider_id(&self.provider_id)
-                .then(|| self.provider_id.clone());
+            let provider_id =
+                valid_trace_provider_id(&self.provider_id).then(|| self.provider_id.clone());
             if let Some(provider_id) = provider_id {
                 ctx.events.emit(AgentEvent::GenerationEnriched {
                     call_id: call_id.clone().into(),
