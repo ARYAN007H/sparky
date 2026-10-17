@@ -183,7 +183,9 @@ async fn live_close_alias_enforces_parent_thread_ownership() {
     use crate::agent::orchestration::subagent_sessions::{
         DurableSubagentSession, DurableSubagentStatus, SubagentSessionStore,
     };
-    use tinyagents_harness::{context::RunConfig, tool::ToolDispatch};
+    use tinyagents_harness::{
+        ComponentId, agent_loop::phases::execute_tool_batch, context::RunConfig,
+    };
 
     let workspace = tempfile::tempdir().expect("live harness workspace");
     let config = crate::config::Config::default();
@@ -253,51 +255,65 @@ async fn live_close_alias_enforces_parent_thread_ownership() {
         crate::agent::orchestration::tools::CloseSubagentTool::new(),
     )]);
     let sets = vec![tools];
-    let adapter = shared_tool_adapter(sets.clone(), "close_subagent").expect("close tool adapter");
-    let dispatch = LiveSubagentControlDispatch {
-        name: "close_subagent".into(),
-        adapter: Arc::new(adapter),
-        tool_sets: sets,
-    };
+    let mut harness: AgentHarness<(), OpenHumanRunContext> = AgentHarness::new();
+    host_tool_set_builder(&sets, &None, true, &HashSet::new()).register(&mut harness, None);
     let mut live_context = OpenHumanRunContext::new()
         .with_core(Some(Arc::clone(&core)))
         .with_parent(parent);
     live_context.thread_id = Some("voice-thread".into());
     let mut run = live_context
         .into_tinyagents(RunConfig::new("live-close-parent").with_thread("voice-thread"));
-    let foreign = dispatch
-        .execute(
-            &(),
-            tinyagents_harness::CallId::new("close-foreign-call"),
+    let mut status = tinyagents_harness::events::HarnessRunStatus::new(
+        run.run_id().clone(),
+        ComponentId::new("live-close-test".to_owned()),
+    );
+    let mut agent_run = tinyagents_harness::middleware::AgentRun::new();
+    let mut messages = Vec::new();
+    let foreign = execute_tool_batch(
+        &harness,
+        &(),
+        &mut run,
+        &mut agent_run,
+        &mut status,
+        &mut messages,
+        vec![tinyinference_llm::tool::ToolCall::new(
+            "close-foreign-call",
+            "close_subagent",
             serde_json::json!({"subagent_session_id":"foreign-session"}),
-            tinytools::ToolCallOptions::default(),
-            &run,
-        )
-        .await
-        .expect("foreign close dispatch");
+        )],
+    )
+    .await
+    .expect("foreign close tool call");
     assert!(
-        foreign.text().contains("not found for this parent thread"),
+        foreign.results[0]
+            .text()
+            .contains("not found for this parent thread"),
         "foreign live close should fail closed: {}",
-        foreign.text()
+        foreign.results[0].text()
     );
     assert!(sessions.load().unwrap().iter().any(|row| {
         row.subagent_session_id == "foreign-session" && row.status == DurableSubagentStatus::Idle
     }));
 
-    let owned = dispatch
-        .execute(
-            &(),
-            tinyagents_harness::CallId::new("close-owned-call"),
+    let owned = execute_tool_batch(
+        &harness,
+        &(),
+        &mut run,
+        &mut agent_run,
+        &mut status,
+        &mut messages,
+        vec![tinyinference_llm::tool::ToolCall::new(
+            "close-owned-call",
+            "close_subagent",
             serde_json::json!({"subagent_session_id":"owned-session"}),
-            tinytools::ToolCallOptions::default(),
-            &run,
-        )
-        .await
-        .expect("owned close dispatch");
+        )],
+    )
+    .await
+    .expect("owned close tool call");
     assert!(
-        owned.text().contains("closed"),
+        owned.results[0].text().contains("closed"),
         "owned live close should report closure: {}",
-        owned.text()
+        owned.results[0].text()
     );
     assert!(sessions.load().unwrap().iter().any(|row| {
         row.subagent_session_id == "owned-session" && row.status == DurableSubagentStatus::Closed
