@@ -83,6 +83,7 @@ async fn force_fresh_cancels_the_registered_driver_before_reusing_its_session() 
         first_started: tokio::sync::mpsc::Sender<()>,
         release_first: Arc<tokio::sync::Notify>,
         second_started: tokio::sync::mpsc::Sender<()>,
+        release_second: Arc<tokio::sync::Notify>,
     }
 
     #[async_trait]
@@ -111,6 +112,7 @@ async fn force_fresh_cancels_the_registered_driver_before_reusing_its_session() 
                 }
                 1 => {
                     let _ = self.second_started.send(()).await;
+                    self.release_second.notified().await;
                     Ok(ModelResponse::assistant("fresh child completed"))
                 }
                 other => panic!("unexpected child model call {other}"),
@@ -124,11 +126,13 @@ async fn force_fresh_cancels_the_registered_driver_before_reusing_its_session() 
     let (first_started_tx, mut first_started_rx) = tokio::sync::mpsc::channel(1);
     let (second_started_tx, mut second_started_rx) = tokio::sync::mpsc::channel(1);
     let release_first = Arc::new(tokio::sync::Notify::new());
+    let release_second = Arc::new(tokio::sync::Notify::new());
     let provider = Arc::new(GatedModel {
         calls: std::sync::atomic::AtomicUsize::new(0),
         first_started: first_started_tx,
         release_first: release_first.clone(),
         second_started: second_started_tx,
+        release_second: release_second.clone(),
     });
     let mut parent = parent_context(workspace.as_path(), provider.clone(), vec![]);
     parent.workspace_dir = workspace.clone();
@@ -142,12 +146,14 @@ async fn force_fresh_cancels_the_registered_driver_before_reusing_its_session() 
         ContextOverlay::new(config, DomainSet::full(), ToolGroups::none())
             .definitions(definitions),
     );
+    let mut host_context = OpenHumanRunContext::new()
+        .with_core(Some(Arc::clone(&core)))
+        .with_parent(parent);
+    host_context.thread_id = Some("force-fresh-parent-thread".into());
     let live = RunContext::<OpenHumanRunContext>::new(
         tinyagents_harness::context::RunConfig::new("force-fresh-parent")
             .with_thread("force-fresh-parent-thread"),
-        OpenHumanRunContext::new()
-            .with_core(Some(Arc::clone(&core)))
-            .with_parent(parent),
+        host_context,
     );
     let spawn = |live: &RunContext<OpenHumanRunContext>, args| async move {
         let detached_data = live.data.detached_child();
@@ -179,6 +185,17 @@ async fn force_fresh_cancels_the_registered_driver_before_reusing_its_session() 
     )
     .await;
     assert!(!first.is_error, "{}", first.output());
+    let accepted_ref = first
+        .output()
+        .split("[async_subagent_ref]\n")
+        .nth(1)
+        .and_then(|value| value.split("\n[/async_subagent_ref]").next())
+        .and_then(|value| serde_json::from_str::<serde_json::Value>(value).ok())
+        .expect("first accepted envelope contains its task ID");
+    let old_task_id = accepted_ref["task_id"]
+        .as_str()
+        .expect("accepted task ID")
+        .to_owned();
     tokio::time::timeout(std::time::Duration::from_secs(5), first_started_rx.recv())
         .await
         .expect("old child reaches the deterministic provider gate")
@@ -194,11 +211,9 @@ async fn force_fresh_cancels_the_registered_driver_before_reusing_its_session() 
         .load()
         .expect("first child session persisted")
         .into_iter()
-        .find(|session| session.current_task_id.is_some())
+        .find(|session| session.current_task_id.as_deref() == Some(old_task_id.as_str()))
         .expect("durable row links to the live child");
     assert_eq!(before.status, DurableSubagentStatus::Running);
-    let old_task_id = before.current_task_id.clone().expect("old task ID");
-    assert_eq!(old_job.extensions["task_id"], old_task_id);
 
     let fresh = spawn(
         &live,
@@ -212,15 +227,21 @@ async fn force_fresh_cancels_the_registered_driver_before_reusing_its_session() 
     )
     .await;
     assert!(!fresh.is_error, "{}", fresh.output());
+    let fresh_ref = fresh
+        .output()
+        .split("[async_subagent_ref]\n")
+        .nth(1)
+        .and_then(|value| value.split("\n[/async_subagent_ref]").next())
+        .and_then(|value| serde_json::from_str::<serde_json::Value>(value).ok())
+        .expect("fresh accepted envelope contains its task ID");
+    let fresh_task_id = fresh_ref["task_id"]
+        .as_str()
+        .expect("fresh task ID")
+        .to_owned();
     tokio::time::timeout(std::time::Duration::from_secs(5), second_started_rx.recv())
         .await
         .expect("replacement child is actually dispatched")
         .expect("replacement child start notification");
-    assert_eq!(
-        jobs.get(&old_job.id.to_string()).expect("old job remains observable").status,
-        SubAgentJobStatus::Running,
-        "force-fresh requests cooperative cancellation before replacing the durable row"
-    );
     let rows = store.load().expect("replacement session persisted");
     let closed_old = rows
         .iter()
@@ -229,12 +250,17 @@ async fn force_fresh_cancels_the_registered_driver_before_reusing_its_session() 
     assert_eq!(closed_old.status, DurableSubagentStatus::Closed);
     let replacement = rows
         .iter()
-        .find(|session| session.current_task_id.as_deref() != Some(old_task_id.as_str()))
+        .find(|session| session.current_task_id.as_deref() == Some(fresh_task_id.as_str()))
         .expect("fresh launch writes a distinct durable session and task");
     assert_eq!(replacement.status, DurableSubagentStatus::Running);
     assert_ne!(replacement.subagent_session_id, before.subagent_session_id);
+    assert!(
+        !live.data.cancellation.is_cancelled(),
+        "fresh replacement must not cancel the parent turn"
+    );
 
     release_first.notify_one();
+    release_second.notify_one();
     let session_port = crate::agent::orchestration::subagent_sessions::
         OpenHumanTinySubagentSessionStore::new(
             workspace.clone(),
@@ -276,6 +302,31 @@ async fn force_fresh_cancels_the_registered_driver_before_reusing_its_session() 
         jobs.get(&old_job.id.to_string()).expect("old child remains registered").status,
         SubAgentJobStatus::Cancelled
     );
+    let new_job = jobs
+        .list()
+        .into_iter()
+        .find(|job| {
+            job.agent == "task_manager_agent"
+                && job.extensions.get("task_id").and_then(serde_json::Value::as_str)
+                    == Some(fresh_task_id.as_str())
+        })
+        .expect("fresh task has its own shared Job");
+    let new_settled = tokio::time::timeout(
+        std::time::Duration::from_secs(5),
+        ToolDispatch::execute(
+            &wait,
+            &(),
+            tinyagents_harness::CallId::new("wait-force-fresh-new-child"),
+            json!({"task_id": fresh_task_id}),
+            tinytools::ToolCallOptions::default(),
+            &live,
+        ),
+    )
+    .await
+    .expect("replacement child settles")
+    .expect("replacement shared Jobs await succeeds");
+    assert!(!new_settled.is_error, "{}", new_settled.output());
+    assert_eq!(new_job.status, SubAgentJobStatus::Completed);
     assert_eq!(provider.calls.load(std::sync::atomic::Ordering::SeqCst), 2);
     let after_rows = store
         .load()
@@ -291,6 +342,7 @@ async fn force_fresh_cancels_the_registered_driver_before_reusing_its_session() 
         .find(|session| session.subagent_session_id == replacement.subagent_session_id)
         .expect("replacement durable row remains present");
     assert_eq!(new_after.status, DurableSubagentStatus::Idle);
+    assert_eq!(new_after.current_task_id.as_deref(), Some(fresh_ref["task_id"].as_str().unwrap()));
 }
 
 /// A child the harness stops early (failure breaker / iteration cap) is not a
