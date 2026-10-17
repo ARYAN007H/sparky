@@ -401,10 +401,20 @@ async fn count(scoped: &ScopedStorage, collection: &str) -> usize {
 async fn host_documents(backend: &dyn StorageBackend) -> usize {
     let docs = backend.for_scope(&Scope::local()).unwrap();
     let mut total = 0;
-    for source in import::sources() {
-        for spec in (source.collections)() {
-            docs.documents().ensure_collection(&spec).await.unwrap();
-            total += count(&docs, &spec.name).await;
+    // The importers write the v2 collections of the owners behind each source.
+    let owners: Vec<&str> = import::sources()
+        .iter()
+        .map(|source| source.owner)
+        .collect();
+    for schema in openhuman_core::storage::schema::owner_schemas() {
+        if !owners.contains(&schema.owner.as_str()) {
+            continue;
+        }
+        for item in &schema.items {
+            if let tinystoragedrivers_core::schema::Item::Collection { spec, .. } = item {
+                docs.documents().ensure_collection(spec).await.unwrap();
+                total += count(&docs, &spec.name).await;
+            }
         }
     }
     total

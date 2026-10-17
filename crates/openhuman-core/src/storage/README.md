@@ -54,7 +54,7 @@ through TinyAgents' `legacy` importer, which owns those formats: the run ledger
 from a `VACUUM INTO` snapshot of `session_db/sessions.db`, each
 `session_raw` transcript into the scope of the agent its stem names (matched
 against the known definitions, else the default agent), and the turn-state
-JSON into the default agent. Each importer keeps a marker per workspace, so a
+JSON into the default agent. Each importer records a `tsd.migrations` entry per workspace, so a
 record deleted afterwards is not resurrected from the untouched legacy file.
 
 ## Entry points
@@ -92,8 +92,21 @@ record deleted afterwards is not resurrected from the untouched legacy file.
   one shared runtime thread.
 - `documents::Repo` and `documents::compare_and_swap`: the base the domain
   stores build on. A `Repo` holds one domain's scoped document handle,
-  declares its collections and runs each call; `compare_and_swap` is the
-  guarded-`UPDATE` loop.
+  declares its collections and runs each call on the blocking bridge;
+  `compare_and_swap` is tsd's `Repo::update` with its default `RetryPolicy`,
+  so the host keeps no retry loop of its own.
+- `import_state`: where a one-time importer records that it finished
+  (`tsd.migrations`, `Migrations::mark_done`) and the claim that serialises
+  two processes (`Leases` on `tsd.leases`). `migrate_legacy_markers` turns the
+  marker rows older builds wrote (`storage_import`, `threads_import`,
+  `subagent_sessions_import`, `composio_state_import`, `*_host_import`) into
+  the same entries at boot, so an installed profile is not imported again.
+- `schema_support`: owner, time and id helpers the host domains' v1 -> v2
+  steps share. Each host domain declares its own `storage_schema()` (owners
+  `approvals`, `devices`, `notifications`, `task_sources`, `artifacts`, `cost`,
+  `config`, `profiles`, `threads`, `subagents`, `agents`), composed in
+  `schema.rs`. `host_importers` moves the v1 data whose v2 home is another
+  owner's collection (`composio_state` into `tsd.kv`).
 
 ## Storage for loadable modules
 

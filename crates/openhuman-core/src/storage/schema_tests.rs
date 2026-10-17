@@ -4,7 +4,23 @@ use super::*;
 fn every_owner_composes_without_collision() {
     let registry = registry().expect("the owners compose");
     let owners: Vec<&str> = registry.owners().collect();
-    for expected in ["harness", "session", "graph", "tasks"] {
+    for expected in [
+        "harness",
+        "session",
+        "graph",
+        "tasks",
+        "approvals",
+        "devices",
+        "notifications",
+        "task_sources",
+        "artifacts",
+        "cost",
+        "config",
+        "profiles",
+        "threads",
+        "subagents",
+        "agents",
+    ] {
         assert!(owners.contains(&expected), "{expected} missing: {owners:?}");
     }
 }

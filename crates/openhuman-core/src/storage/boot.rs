@@ -164,6 +164,11 @@ async fn migrate_scope(
     if let Err(error) = tinyagents_session::import_legacy_ledger(&scoped).await {
         record(report, scope, "import_legacy_ledger", &error);
     }
+    // Marker rows older builds wrote become `tsd.migrations` entries, so an
+    // already imported profile is not imported again.
+    if let Err(error) = super::import_state::migrate_legacy_markers(&scoped).await {
+        record(report, scope, "migrate_legacy_markers", &error);
+    }
     match registry.migrate(&scoped, &MigrateOptions::new()).await {
         Ok(done) => {
             if !done.ran.is_empty() {
@@ -205,6 +210,9 @@ async fn post_migrate_importers(
     }
     if let Err(error) = tinyagents_graph::import_legacy_task_cache(scoped).await {
         record(report, scope, "import_legacy_task_cache", &error);
+    }
+    for (step, error) in super::host_importers::run(scoped).await {
+        record(report, scope, step, &error);
     }
     #[cfg(feature = "flows")]
     {

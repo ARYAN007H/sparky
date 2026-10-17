@@ -9,6 +9,42 @@ scope at boot. Names are `<owner>.<entity>`; the scope class says where a record
 (`tenant`: `local` or `u:<id>`, `agent`: `<tenant>/agent:<id>`, `module`:
 `<tenant>/module:<id>`, `cluster`: the shared registry scope).
 
+## agents
+
+| Kind | Name | Version | Scope | Indexed fields |
+| --- | --- | --- | --- | --- |
+| collection | `agents.registry` | 2 | tenant |  |
+
+Migration steps:
+
+- `registry_v2`: `agents.registry` v1 to v2 from `storage_agents`
+
+## approvals
+
+| Kind | Name | Version | Scope | Indexed fields |
+| --- | --- | --- | --- | --- |
+| collection | `approvals.flow_trust` | 2 | tenant | `flow_id`, `tool_name` |
+| collection | `approvals.requests` | 2 | tenant | `pending`, `created_ms`, `pending`, `decided_ms`, `session_id`, `pending` |
+
+Migration steps:
+
+- `requests_v2`: `approvals.requests` v1 to v2 from `approvals`
+- `flow_trust_v2`: `approvals.flow_trust` v1 to v2 from `approval_flow_trust`
+
+## artifacts
+
+| Kind | Name | Version | Scope | Indexed fields |
+| --- | --- | --- | --- | --- |
+| collection | `artifacts.args` | 2 | tenant |  |
+| collection | `artifacts.records` | 2 | tenant | `thread_id`, `created_ms` |
+| collection | `artifacts.versions` | 2 | tenant |  |
+
+Migration steps:
+
+- `records_v2`: `artifacts.records` v1 to v2 from `artifacts`
+- `args_v2`: `artifacts.args` v1 to v2 from `artifact_args`
+- `versions_v2`: `artifacts.versions` v1 to v2 from `artifact_versions`
+
 ## box
 
 | Kind | Name | Version | Scope | Indexed fields |
@@ -57,6 +93,16 @@ Migration steps:
 - `whatsapp-sync-key-v2`: `channels.whatsapp_sync_key` v1 to v2 from `whatsapp_sync_key`
 - `whatsapp-lid-mapping-v2`: `channels.whatsapp_lid_mapping` v1 to v2 from `whatsapp_lid_mapping`
 
+## config
+
+| Kind | Name | Version | Scope | Indexed fields |
+| --- | --- | --- | --- | --- |
+| collection | `config.documents` | 2 | tenant |  |
+
+Migration steps:
+
+- `documents_v2`: `config.documents` v1 to v2 from `config`
+
 ## connectors
 
 | Kind | Name | Version | Scope | Indexed fields |
@@ -83,6 +129,16 @@ Migration steps:
 - `appends_v2`: `conversations.appends` v1 to v2 from `conversation_appends_v1`
 - `messages_v2`: `conversations.messages` v1 to v2 from `conversation_messages_v1:`
 
+## cost
+
+| Kind | Name | Version | Scope | Indexed fields |
+| --- | --- | --- | --- | --- |
+| collection | `cost.records` | 2 | tenant | `ts_ms` |
+
+Migration steps:
+
+- `records_v2`: `cost.records` v1 to v2 from `cost_records`
+
 ## cron
 
 | Kind | Name | Version | Scope | Indexed fields |
@@ -96,6 +152,16 @@ Migration steps:
 - `jobs_v2`: `cron.jobs` v1 to v2 from `cron_jobs`
 - `runs_v2`: `cron.runs` v1 to v2 from `cron_runs`
 - `admission_v2`: `cron.admission` v1 to v2 from `cron_counters`
+
+## devices
+
+| Kind | Name | Version | Scope | Indexed fields |
+| --- | --- | --- | --- | --- |
+| collection | `devices.paired` | 2 | tenant | `revoked`, `created_ms` |
+
+Migration steps:
+
+- `paired_v2`: `devices.paired` v1 to v2 from `paired_devices`
 
 ## flows
 
@@ -267,6 +333,32 @@ Migration steps:
 
 - `state_v2`: `memes.state` v1 to v2 from `tinymemes_documents`
 
+## notifications
+
+| Kind | Name | Version | Scope | Indexed fields |
+| --- | --- | --- | --- | --- |
+| collection | `notifications.core` | 2 | tenant | `workspace`, `read`, `timestamp_ms` |
+| collection | `notifications.dedup` | 2 | tenant |  |
+| collection | `notifications.integration` | 2 | tenant | `provider`, `received_ms`, `status` |
+| collection | `notifications.settings` | 2 | tenant |  |
+
+Migration steps:
+
+- `integration_v2`: `notifications.integration` v1 to v2 from `integration_notifications`
+- `dedup_v2`: `notifications.dedup` v1 to v2 from `notification_dedup`
+- `settings_v2`: `notifications.settings` v1 to v2 from `notification_settings`
+- `core_v2`: `notifications.core` v1 to v2 from `core_notifications`
+
+## profiles
+
+| Kind | Name | Version | Scope | Indexed fields |
+| --- | --- | --- | --- | --- |
+| collection | `profiles.registry` | 2 | cluster |  |
+
+Migration steps:
+
+- `registry_v2`: `profiles.registry` v1 to v2 from `profiles`
+
 ## session
 
 | Kind | Name | Version | Scope | Indexed fields |
@@ -292,6 +384,28 @@ Migration steps:
 
 - `catalogs_v2`: `skills.catalogs` v1 to v2 from `tinyskills_catalogs`
 
+## subagents
+
+| Kind | Name | Version | Scope | Indexed fields |
+| --- | --- | --- | --- | --- |
+| collection | `subagents.sessions` | 2 | agent |  |
+
+Migration steps:
+
+- `sessions_v2`: `subagents.sessions` v1 to v2 from `subagent_sessions`
+
+## task_sources
+
+| Kind | Name | Version | Scope | Indexed fields |
+| --- | --- | --- | --- | --- |
+| collection | `task_sources.ingested` | 2 | tenant | `source_id`, `ingested_ms` |
+| collection | `task_sources.sources` | 2 | tenant | `created_ms` |
+
+Migration steps:
+
+- `sources_v2`: `task_sources.sources` v1 to v2 from `task_sources`
+- `ingested_v2`: `task_sources.ingested` v1 to v2 from `ingested_tasks`
+
 ## tasks
 
 | Kind | Name | Version | Scope | Indexed fields |
@@ -305,6 +419,16 @@ Migration steps:
 - `records_v2`: `tasks.records` v1 to v2 from `orchestration_tasks`
 - `history_v2`: `tasks.history` v1 to v2 from `orchestration_task_history`
 - `completions_v2`: `tasks.completions` v1 to v2 from `orchestration_completions`
+
+## threads
+
+| Kind | Name | Version | Scope | Indexed fields |
+| --- | --- | --- | --- | --- |
+| collection | `threads.transcript_keys` | 2 | tenant |  |
+
+Migration steps:
+
+- `transcript_keys_v2`: `threads.transcript_keys` v1 to v2 from `threads_transcript_keys`
 
 ## wallet
 

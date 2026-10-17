@@ -31,8 +31,9 @@ pub mod config;
 pub mod documents;
 pub mod fence;
 pub mod fenced_backend;
+mod host_importers;
 pub mod import;
-pub mod import_claim;
+pub mod import_state;
 pub mod journal_maintenance;
 pub mod lease;
 mod lease_documents;
@@ -40,6 +41,7 @@ mod lease_local;
 pub mod local;
 pub mod rebind;
 pub mod schema;
+pub mod schema_support;
 pub mod scope;
 pub mod scope_move;
 pub mod secrets;
@@ -346,3 +348,7 @@ pub fn source_key(source: &std::path::Path) -> String {
 #[cfg(test)]
 #[path = "mod_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "host_migration_tests.rs"]
+mod host_migration_tests;
