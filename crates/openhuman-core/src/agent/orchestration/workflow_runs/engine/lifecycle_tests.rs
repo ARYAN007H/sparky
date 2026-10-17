@@ -88,7 +88,13 @@ async fn stale_workflow_generation_cannot_fail_its_replacement() {
     assert!(!supervisor.is_current(&old));
     assert!(supervisor.is_current(&current));
 
-    record_failed_if_current(&config, &run_id, &old, "stale sentinel".into());
+    record_failed_if_current(
+        &config,
+        &run_id,
+        &old,
+        seeded.revision,
+        "stale sentinel".into(),
+    );
     let unchanged = crate::storage::sessions::with_ledger(&config.workspace_dir, |ledger| {
         let id = run_id.clone();
         async move { ledger.get_workflow_run(&id).await }

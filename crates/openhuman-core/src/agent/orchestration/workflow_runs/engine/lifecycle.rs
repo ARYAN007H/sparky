@@ -156,12 +156,19 @@ fn schedule_workflow_drive(
             ) else {
                 return;
             };
+            let Some(admission_revision) = revision_slot.get().copied() else {
+                log::error!(
+                    target: LOG_TARGET,
+                    "[workflow_run_engine] drive missing admission revision run={run_id}"
+                );
+                return;
+            };
             run_engine_loop(
                 &config,
                 &run_id,
                 definition,
                 handle,
-                revision_slot.get().copied().unwrap_or_default(),
+                admission_revision,
                 cancel_token,
                 Some(parent),
             )
