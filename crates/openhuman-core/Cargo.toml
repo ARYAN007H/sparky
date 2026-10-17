@@ -271,6 +271,18 @@ tinyskills = { path = "../../vendor/tinyskills/crates/tinyskills" }
 # over `DocumentStore`); ports only, the host picks the backend. Only the
 # `skills` feature compiles the registry that uses it.
 tinyskills-drivers = { path = "../../vendor/tinyskills/crates/tinyskills-drivers", optional = true }
+# Owner storage schemas. A host composes every owner's `storage_schema()` into
+# one registry (`storage::schema`) and generates each module's storage grant
+# from it. Only the schema declarations are used: the module bus adapters stay
+# off (`default-features = false`), so none of these links a TinyBus module or
+# exports module ABI symbols. They ride on `modules` (and `web3`/`tinymemes`).
+tinymcp = { path = "../../vendor/tinymcp/crates/tinymcp", default-features = false, optional = true }
+tinychannels = { path = "../../vendor/tinychannels", default-features = false, optional = true }
+tinyconnectors = { path = "../../vendor/tinyconnectors/crates/tinyconnectors", default-features = false, optional = true }
+tinybox-drivers = { path = "../../vendor/tinybox/crates/tinybox-drivers", optional = true }
+tinyjuice-drivers = { path = "../../vendor/tinyjuice/crates/tinyjuice-drivers", optional = true }
+tinywallet-x402 = { path = "../../vendor/tinywallet/crates/tinywallet-x402", default-features = false, features = ["ledger"], optional = true }
+tinymemes-module = { path = "../../vendor/tinymemes/crates/tinymemes-module", features = ["storage-schema", "static-link"], optional = true }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 serde_path_to_error = "0.1"
@@ -673,7 +685,7 @@ hosting = ["modules", "dep:tinyhosts-bus"]
 # is still off until `OPENHUMAN_TINYMEMES` (or a build-time
 # `OPENHUMAN_TINYMEMES_DEFAULT`) turns it on. Off in the minimal kernel
 # profiles, so they stay free of its dependencies.
-tinymemes = ["modules", "dep:tinymemes-bus", "dep:tinyinference-decisions"]
+tinymemes = ["modules", "dep:tinymemes-bus", "dep:tinyinference-decisions", "dep:tinymemes-module"]
 # The dynamic module host (`openhuman::modules`): the loader that admits a
 # compiled `cdylib` through tinybus's ABI descriptor, manifest, dependency and
 # SHA-256 gates, plus the `modules` RPC namespace and the registry of modules
@@ -704,6 +716,11 @@ modules = [
     "dep:tinystoragedrivers-client",
     "dep:tinystoragedrivers-busproxy",
     "dep:tinybus-module",
+    "dep:tinymcp",
+    "dep:tinychannels",
+    "dep:tinyconnectors",
+    "dep:tinybox-drivers",
+    "dep:tinyjuice-drivers",
 ]
 # Voice domain: STT/TTS providers, the standalone dictation
 # server, and always-on listening.
@@ -735,6 +752,7 @@ voice = [
 # feature carries only the lightweight bus contract and generic HTTP client.
 web3 = [
     "dep:tinywallet-bus",
+    "dep:tinywallet-x402",
     "modules",
 ]
 
@@ -761,7 +779,7 @@ media = ["tinyagents-harness/media"]
 # runtime `DomainSet::flows` flag (#4796): the feature narrows the compile-time
 # surface, `DomainSet` gates it at runtime.
 # NOTE: this gate does NOT drop `tinyagents` itself — 26+ domains consume it.
-flows = ["modules", "dep:tinyflows", "dep:tinyflows-catalog", "dep:tinyflows-copilot", "dep:tinyflows-drivers", "tinyflows-import/engine", "tinyflows-import/store", "tinyflows-import/catalog", "tinyflows-drivers/catalog"]
+flows = ["modules", "dep:tinyflows", "dep:tinyflows-catalog", "dep:tinyflows-copilot", "dep:tinyflows-drivers", "tinyflows-import/engine", "tinyflows-import/store", "tinyflows-import/catalog", "tinyflows-drivers/catalog", "tinyflows-drivers/schedule"]
 # Skills domains: `openhuman::skills` (metadata/discovery/install),
 # `openhuman::skill_runtime` (SKILL.md execution + the skill_executor agent),
 # and `openhuman::skill_registry` (remote catalogs + the skill_setup agent).
