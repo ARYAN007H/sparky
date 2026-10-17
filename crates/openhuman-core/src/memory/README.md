@@ -200,8 +200,8 @@ CronSystemJobDue
 The brain is the set of documents every agent under a root shares, filed at
 `source:<connector>` nodes with no agent id ([`brain.rs`](./brain.rs)). A file ingested
 from the UI (`memory_brain_ingest`) goes under `files`; synced sources are
-filed by what they read. Files are converted through [`convert.rs`](./convert.rs): PDF,
-DOCX, PPTX and XLSX are streamed to the configured TinyDocs module when the
+filed by what they read. The [TinyDocs memory converter](../modules/documents/memory_converter.rs)
+streams PDF, DOCX, PPTX and XLSX to the configured module when the
 `documents` feature is on, then `NativeConverter` handles text, markdown, HTML
 and code. The host carries only the bus contract and current config; it has no
 local office parser fallback. Every ingest queues a belief build of the
@@ -294,7 +294,6 @@ The agent `memory` tool applies the same confinement and overwrites any
 | [`confine.rs`](./confine.rs) | Confines the RPC surface to the acting identity's subtree. |
 | [`explore.rs`](./explore.rs) | The facet explorer behind `memory_explore` and `memory_items_get`. |
 | [`brain.rs`](./brain.rs) | Brain source mapping and the `memory_brain_*` ops. |
-| [`convert.rs`](./convert.rs) | The document converter chain used by brain ingest and file sources. |
 | [`sources/`](./sources/) | The `[[memory.sources]]` registry (`mod.rs`), sync state (`state.rs`) and the `SourceRegistry` adapter over `tinymemory_integrations::sources::sync` (`sync.rs`). |
 | [`channels.rs`](./channels.rs) | Channel to thread records, for forgetting a channel. |
 | [`deletion.rs`](./deletion.rs) | Hard deletes; the file store and executor for the pending-deletion queue (`tinymemory_tools::deletion`, with retry backoff on background ticks). |
