@@ -385,12 +385,12 @@ impl Docs {
         reason: &str,
     ) -> Result<bool> {
         let (score, action, reason) = (f64::from(score), action.to_string(), reason.to_string());
-        let scored_at = Utc::now().to_rfc3339();
+        let scored_ms = Utc::now().timestamp_millis();
         self.set(id, move |next| {
             next["importance_score"] = json!(score);
             next["triage_action"] = json!(action);
             next["triage_reason"] = json!(reason);
-            next["scored_at"] = json!(scored_at);
+            next["scored_ms"] = json!(scored_ms);
         })
     }
 
@@ -468,6 +468,7 @@ impl Docs {
 
     pub(super) fn get_settings(&self, provider: &str) -> Result<NotificationSettings> {
         let id = key_of(provider)?;
+        let provider = provider.to_string();
         self.0.run(|docs| async move {
             let defaults = NotificationSettings {
                 provider: provider.clone(),
@@ -490,7 +491,7 @@ impl Docs {
                     .get("route_to_orchestrator")
                     .and_then(Value::as_bool)
                     .unwrap_or(defaults.route_to_orchestrator),
-                provider: provider.to_string(),
+                provider,
             })
         })
     }
@@ -507,7 +508,6 @@ impl Docs {
                 .context("[notifications::store] serialize core notification failed")?,
             "timestamp_ms": event.timestamp_ms,
             "read": false,
-            "created_at": Utc::now().to_rfc3339(),
         });
         self.0.run(|docs| async move {
             match docs.put(CORE, &id, doc, Precondition::Absent).await {
