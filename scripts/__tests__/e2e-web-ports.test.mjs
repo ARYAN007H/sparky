@@ -74,14 +74,15 @@ fi
     path.join(bin, "curl"),
     `#!/usr/bin/env bash
 ${record("curl")}
-if [[ "$1" == *"/__admin/health" ]]; then
+url="$2"
+if [[ "$url" == *"/__admin/health" ]]; then
   for _ in {1..100}; do
     grep -q 'mock-api-server.mjs' "${log}" && exit 0
     sleep 0.01
   done
   exit 1
 fi
-if [[ "$1" == *"/health" ]]; then
+if [[ "$url" == *"/health" ]]; then
   for _ in {1..100}; do
     [[ -f "$OPENHUMAN_WORKSPACE/core.started" ]] && exit 0
     sleep 0.01
