@@ -202,7 +202,10 @@ fn stale_close_and_reuse_snapshots_cannot_change_a_newer_lifecycle() {
     assert_eq!(current.current_task_id.as_deref(), Some("same-public-task"));
     assert_eq!(current.lifecycle_key, Some(second_key));
     assert_eq!(current.status, DurableSubagentStatus::Running);
-    assert!(current.reusable, "stale close must preserve replacement reuse");
+    assert!(
+        current.reusable,
+        "stale close must preserve replacement reuse"
+    );
     assert!(
         upsert_running(
             &store,
