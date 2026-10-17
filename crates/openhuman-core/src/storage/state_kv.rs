@@ -239,9 +239,17 @@ impl StateKv {
         self.import_file_with(name, legacy, true)
     }
 
-    fn import_file_with(&self, name: &str, legacy: &Path, strict: bool) -> Result<()> {
-        let step = import_state::step_id(IMPORT_KIND, &format!("{}/{}/{name}", self.owner, self.ns));
+    /// Runs `body` once for this backend and scope under the import claim, and
+    /// records `name` as imported in `tsd.migrations` afterwards. `body` is
+    /// skipped when the entry already exists, so it must write with
+    /// insert-if-absent semantics; the entry is not recorded when it fails.
+    ///
+    /// # Errors
+    ///
+    /// A storage error, or whatever `body` returns.
+    pub fn import_once(&self, name: &str, body: impl FnOnce() -> Result<()>) -> Result<()> {
         let key = format!("{}/{}/{name}", self.owner, self.ns);
+        let step = import_state::step_id(IMPORT_KIND, &key);
         self.repo.once_per_backend(&key, || {
             if import_state::is_done(&self.repo, self.owner, &step)? {
                 return Ok(());
@@ -250,37 +258,44 @@ impl StateKv {
                 if import_state::is_done(&self.repo, self.owner, &step)? {
                     return Ok(());
                 }
-                match std::fs::read(legacy) {
-                    Ok(bytes) if bytes.iter().all(u8::is_ascii_whitespace) => {}
-                    Ok(bytes) => match serde_json::from_slice::<Value>(&bytes) {
-                        Ok(value) => {
-                            let wrote = self.insert_if_absent(name, &value)?;
-                            log::debug!(
-                                "[storage::state_kv] imported {}/{}/{name} (written={wrote})",
-                                self.owner,
-                                self.ns
-                            );
-                        }
-                        Err(error) if strict => {
-                            return Err(error).with_context(|| {
-                                format!("the legacy state file {} is not JSON", legacy.display())
-                            });
-                        }
-                        Err(error) => log::warn!(
-                            "[storage::state_kv] legacy {}/{}/{name} is not JSON ({error}); skipped",
-                            self.owner,
-                            self.ns
-                        ),
-                    },
-                    Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
-                    Err(error) => {
-                        return Err(error).with_context(|| {
-                            format!("read the legacy state file {}", legacy.display())
-                        });
-                    }
-                }
+                body()?;
                 import_state::set_done(&self.repo, self.owner, &step)
             })?;
+            Ok(())
+        })
+    }
+
+    fn import_file_with(&self, name: &str, legacy: &Path, strict: bool) -> Result<()> {
+        self.import_once(name, || {
+            match std::fs::read(legacy) {
+                Ok(bytes) if bytes.iter().all(u8::is_ascii_whitespace) => {}
+                Ok(bytes) => match serde_json::from_slice::<Value>(&bytes) {
+                    Ok(value) => {
+                        let wrote = self.insert_if_absent(name, &value)?;
+                        log::debug!(
+                            "[storage::state_kv] imported {}/{}/{name} (written={wrote})",
+                            self.owner,
+                            self.ns
+                        );
+                    }
+                    Err(error) if strict => {
+                        return Err(error).with_context(|| {
+                            format!("the legacy state file {} is not JSON", legacy.display())
+                        });
+                    }
+                    Err(error) => log::warn!(
+                        "[storage::state_kv] legacy {}/{}/{name} is not JSON ({error}); skipped",
+                        self.owner,
+                        self.ns
+                    ),
+                },
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+                Err(error) => {
+                    return Err(error).with_context(|| {
+                        format!("read the legacy state file {}", legacy.display())
+                    });
+                }
+            }
             Ok(())
         })
     }
