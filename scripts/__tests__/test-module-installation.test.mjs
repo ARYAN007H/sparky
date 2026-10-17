@@ -173,7 +173,10 @@ test("config/auth in-process integration tests run serially in both full runners
     const source = readFileSync(path, "utf8");
     const start = source.indexOf("run_in_process_modules() {");
     const end = source.indexOf("\n}", start);
-    assert.ok(start >= 0 && end > start, `${runner} has an in-process module runner`);
+    assert.ok(
+      start >= 0 && end > start,
+      `${runner} has an in-process module runner`,
+    );
     assert.match(
       source.slice(start, end),
       /config_auth_app_state_connectivity_e2e[\s\S]*?--test-threads=1/,
