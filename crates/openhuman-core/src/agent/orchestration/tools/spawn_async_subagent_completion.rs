@@ -210,8 +210,14 @@ pub(super) fn make_completion(
                                         None
                                     }
                                 };
-                                let error = match reason.as_deref().map(str::trim).filter(|reason| !reason.is_empty()) {
-                                    Some(reason) => format!("async sub-agent was cancelled. Reason: {reason}"),
+                                let error = match reason
+                                    .as_deref()
+                                    .map(str::trim)
+                                    .filter(|reason| !reason.is_empty())
+                                {
+                                    Some(reason) => {
+                                        format!("async sub-agent was cancelled. Reason: {reason}")
+                                    }
                                     None => "async sub-agent was cancelled".to_string(),
                                 };
                                 if let Err(err) = subagent_sessions::mark_finished(

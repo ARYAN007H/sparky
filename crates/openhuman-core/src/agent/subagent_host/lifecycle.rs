@@ -17,9 +17,9 @@ use tinyagents_harness::context::{RunConfig, RunContext};
 use tinyagents_orchestration::subagent::{
     ArtifactReference, PreparedSubagent, SubagentCapabilities, SubagentDriver, SubagentError,
     SubagentExecution, SubagentExecutor, SubagentIncomplete, SubagentOutcome, SubagentOutcomeKind,
-    SubagentPause, SubagentPausePersistenceDisposition, SubagentPlanner, SubagentRequest,
-    SubagentPersistence, SubagentPersistenceDisposition, SubagentResume, SubagentRunResult,
-    SubagentTaskKey, SubagentTerminalPersistenceDisposition,
+    SubagentPause, SubagentPausePersistenceDisposition, SubagentPersistence,
+    SubagentPersistenceDisposition, SubagentPlanner, SubagentRequest, SubagentResume,
+    SubagentRunResult, SubagentTaskKey, SubagentTerminalPersistenceDisposition,
 };
 use tinyagents_runtime::ToolSnapshot;
 use tinyinference_llm::{
@@ -583,10 +583,11 @@ pub(super) async fn resolve_inline_driver_outcome(
     {
         Some((
             outcome,
-            cached.as_ref().map_or(
-                SubagentPersistenceDisposition::TerminalExisting,
-                |host| host.persistence_disposition,
-            ),
+            cached
+                .as_ref()
+                .map_or(SubagentPersistenceDisposition::TerminalExisting, |host| {
+                    host.persistence_disposition
+                }),
         ))
     } else if let Some(outcome) = bundle
         .persistence
@@ -596,19 +597,21 @@ pub(super) async fn resolve_inline_driver_outcome(
     {
         Some((
             outcome,
-            cached.as_ref().map_or(
-                SubagentPersistenceDisposition::PauseExisting,
-                |host| host.persistence_disposition,
-            ),
+            cached
+                .as_ref()
+                .map_or(SubagentPersistenceDisposition::PauseExisting, |host| {
+                    host.persistence_disposition
+                }),
         ))
     } else {
         None
     };
 
     if let Some((outcome, disposition)) = persisted {
-        if declared_status.as_deref().is_some_and(|status| {
-            neutral_status_for_outcome(&outcome.status) != Some(status)
-        }) {
+        if declared_status
+            .as_deref()
+            .is_some_and(|status| neutral_status_for_outcome(&outcome.status) != Some(status))
+        {
             return Err(SubagentRunError::Provider(anyhow::anyhow!(
                 "driver-backed async spawn failed: lifecycle status did not match its durable outcome"
             )));

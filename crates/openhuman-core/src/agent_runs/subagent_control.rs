@@ -127,7 +127,9 @@ fn handle_subagent_cancel(ctx: DispatchCtx, params: Map<String, Value>) -> Contr
         {
             let config = crate::config::ops::load_config_in(&ctx)
                 .await
-                .map_err(|error| format!("subagent_cancel: failed to resolve active workspace: {error}"))?;
+                .map_err(|error| {
+                    format!("subagent_cancel: failed to resolve active workspace: {error}")
+                })?;
             cancelled_subagent = running_subagents::cancel_by_task_with_workspace_reason(
                 &ctx,
                 &task_id,

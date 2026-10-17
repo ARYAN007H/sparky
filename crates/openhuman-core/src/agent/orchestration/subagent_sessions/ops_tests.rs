@@ -175,15 +175,9 @@ fn driver_task_cancel_reports_durable_finished_outcomes_and_refuses_ambiguous_id
         Vec::new(),
     )
     .unwrap();
-    let selected = cancel_driver_job_by_task(
-        &store,
-        dir.path(),
-        &jobs,
-        "finished-completed",
-        None,
-    )
-    .unwrap()
-    .expect("completed public task remains reportable");
+    let selected = cancel_driver_job_by_task(&store, dir.path(), &jobs, "finished-completed", None)
+        .unwrap()
+        .expect("completed public task remains reportable");
     assert_eq!(selected.already_finished, Some(FinishedOutcome::Completed));
 
     let failed = upsert_running(
@@ -206,15 +200,9 @@ fn driver_task_cancel_reports_durable_finished_outcomes_and_refuses_ambiguous_id
         "provider failed".into(),
     )
     .unwrap();
-    let selected = cancel_driver_job_by_task(
-        &store,
-        dir.path(),
-        &jobs,
-        "finished-failed",
-        None,
-    )
-    .unwrap()
-    .expect("failed public task remains reportable");
+    let selected = cancel_driver_job_by_task(&store, dir.path(), &jobs, "finished-failed", None)
+        .unwrap()
+        .expect("failed public task remains reportable");
     assert_eq!(selected.already_finished, Some(FinishedOutcome::Failed));
 
     let ambiguous = upsert_running(
@@ -254,9 +242,11 @@ fn driver_task_cancel_reports_durable_finished_outcomes_and_refuses_ambiguous_id
     )
     .unwrap();
     assert_ne!(ambiguous.subagent_session_id, second.subagent_session_id);
-    assert!(cancel_driver_job_by_task(&store, dir.path(), &jobs, "same-public-id", None)
-        .unwrap()
-        .is_none());
+    assert!(
+        cancel_driver_job_by_task(&store, dir.path(), &jobs, "same-public-id", None)
+            .unwrap()
+            .is_none()
+    );
     assert!(store
         .load()
         .unwrap()
@@ -288,8 +278,11 @@ fn cancellation_reason_is_written_only_for_the_observed_full_lifecycle() {
         None,
     )
     .unwrap();
-    assert!(record_cancel_reason(&store, &session, "finish the current step" ).unwrap());
-    assert_eq!(store.load().unwrap()[0].latest_error.as_deref(), Some("finish the current step"));
+    assert!(record_cancel_reason(&store, &session, "finish the current step").unwrap());
+    assert_eq!(
+        store.load().unwrap()[0].latest_error.as_deref(),
+        Some("finish the current step")
+    );
 
     let mut stale = session;
     stale.lifecycle_key = Some(SubagentTaskKey {
@@ -297,7 +290,10 @@ fn cancellation_reason_is_written_only_for_the_observed_full_lifecycle() {
         ..key
     });
     assert!(!record_cancel_reason(&store, &stale, "stale reason").unwrap());
-    assert_eq!(store.load().unwrap()[0].latest_error.as_deref(), Some("finish the current step"));
+    assert_eq!(
+        store.load().unwrap()[0].latest_error.as_deref(),
+        Some("finish the current step")
+    );
 }
 
 #[test]
