@@ -131,7 +131,7 @@ pub(super) fn entry_for(workspace_dir: &Path) -> Arc<Entry> {
 /// The owner migrates the store under the same lock as claims and transitions,
 /// so concurrent callers keep the same router, leases and parent markers.
 /// `failed` is the router the caller just saw fail.
-fn degrade_to_memory(
+pub(super) fn degrade_to_memory(
     ctx: &DispatchCtx,
     workspace_dir: &Path,
     failed: &Arc<CompletionRouter>,
@@ -189,6 +189,7 @@ pub(crate) fn router_for_workspace_ctx(
     entry_for_ctx(ctx, workspace_dir).router.clone()
 }
 
+#[cfg(test)]
 #[cfg(test)]
 pub(crate) fn router_for_workspace(workspace_dir: &Path) -> Arc<CompletionRouter> {
     router_for_workspace_ctx(&DispatchCtx::ambient(), workspace_dir)
