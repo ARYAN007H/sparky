@@ -1,5 +1,6 @@
 use super::*;
 use crate::agent::orchestration::subagent_sessions::types::SubagentSessionUpsert;
+use tinyagents_orchestration::subagent::{FinishedOutcome, SubAgentJobRegistry, SubagentTaskKey};
 
 fn selector(task_key: &str) -> SubagentSessionSelector {
     SubagentSessionSelector {
@@ -146,6 +147,157 @@ fn stale_completion_cannot_overwrite_reused_or_closed_session() {
     let closed = store.load().unwrap().remove(0);
     assert_eq!(closed.status, DurableSubagentStatus::Closed);
     assert!(closed.latest_history.is_none());
+}
+
+#[test]
+fn driver_task_cancel_reports_durable_finished_outcomes_and_refuses_ambiguous_ids() {
+    let dir = tempfile::tempdir().unwrap();
+    let store = SubagentSessionStore::new(dir.path().to_path_buf());
+    let jobs = SubAgentJobRegistry::default();
+    let completed = upsert_running(
+        &store,
+        SubagentSessionUpsert {
+            selector: selector("completed"),
+            display_name: None,
+            task_title: "Completed child".into(),
+            worker_thread_id: None,
+            task_id: "finished-completed".into(),
+            lifecycle_key: None,
+        },
+        None,
+    )
+    .unwrap();
+    mark_finished(
+        &store,
+        &completed.subagent_session_id,
+        "finished-completed",
+        &SubagentRunStatus::Completed,
+        Vec::new(),
+    )
+    .unwrap();
+    let selected = cancel_driver_job_by_task(
+        &store,
+        dir.path(),
+        &jobs,
+        "finished-completed",
+        None,
+    )
+    .unwrap()
+    .expect("completed public task remains reportable");
+    assert_eq!(selected.already_finished, Some(FinishedOutcome::Completed));
+
+    let failed = upsert_running(
+        &store,
+        SubagentSessionUpsert {
+            selector: selector("failed"),
+            display_name: None,
+            task_title: "Failed child".into(),
+            worker_thread_id: None,
+            task_id: "finished-failed".into(),
+            lifecycle_key: None,
+        },
+        None,
+    )
+    .unwrap();
+    mark_failed(
+        &store,
+        &failed.subagent_session_id,
+        "finished-failed",
+        "provider failed".into(),
+    )
+    .unwrap();
+    let selected = cancel_driver_job_by_task(
+        &store,
+        dir.path(),
+        &jobs,
+        "finished-failed",
+        None,
+    )
+    .unwrap()
+    .expect("failed public task remains reportable");
+    assert_eq!(selected.already_finished, Some(FinishedOutcome::Failed));
+
+    let ambiguous = upsert_running(
+        &store,
+        SubagentSessionUpsert {
+            selector: selector("ambiguous"),
+            display_name: None,
+            task_title: "Ambiguous child".into(),
+            worker_thread_id: None,
+            task_id: "same-public-id".into(),
+            lifecycle_key: Some(SubagentTaskKey {
+                root_run_id: "root-a".into(),
+                parent_run_id: "parent-a".into(),
+                thread_id: Some("thread-a".into()),
+                task_id: "same-public-id".into(),
+            }),
+        },
+        None,
+    )
+    .unwrap();
+    let second = upsert_running(
+        &store,
+        SubagentSessionUpsert {
+            selector: selector("ambiguous-2"),
+            display_name: None,
+            task_title: "Ambiguous child 2".into(),
+            worker_thread_id: None,
+            task_id: "same-public-id".into(),
+            lifecycle_key: Some(SubagentTaskKey {
+                root_run_id: "root-b".into(),
+                parent_run_id: "parent-b".into(),
+                thread_id: Some("thread-a".into()),
+                task_id: "same-public-id".into(),
+            }),
+        },
+        None,
+    )
+    .unwrap();
+    assert_ne!(ambiguous.subagent_session_id, second.subagent_session_id);
+    assert!(cancel_driver_job_by_task(&store, dir.path(), &jobs, "same-public-id", None)
+        .unwrap()
+        .is_none());
+    assert!(store
+        .load()
+        .unwrap()
+        .iter()
+        .filter(|row| row.current_task_id.as_deref() == Some("same-public-id"))
+        .all(|row| row.status == DurableSubagentStatus::Running));
+}
+
+#[test]
+fn cancellation_reason_is_written_only_for_the_observed_full_lifecycle() {
+    let dir = tempfile::tempdir().unwrap();
+    let store = SubagentSessionStore::new(dir.path().to_path_buf());
+    let key = SubagentTaskKey {
+        root_run_id: "root-a".into(),
+        parent_run_id: "parent-a".into(),
+        thread_id: Some("thread-a".into()),
+        task_id: "cancel-reason-task".into(),
+    };
+    let session = upsert_running(
+        &store,
+        SubagentSessionUpsert {
+            selector: selector("reason"),
+            display_name: None,
+            task_title: "Reason".into(),
+            worker_thread_id: None,
+            task_id: key.task_id.clone(),
+            lifecycle_key: Some(key.clone()),
+        },
+        None,
+    )
+    .unwrap();
+    assert!(record_cancel_reason(&store, &session, "finish the current step" ).unwrap());
+    assert_eq!(store.load().unwrap()[0].latest_error.as_deref(), Some("finish the current step"));
+
+    let mut stale = session;
+    stale.lifecycle_key = Some(SubagentTaskKey {
+        root_run_id: "root-b".into(),
+        ..key
+    });
+    assert!(!record_cancel_reason(&store, &stale, "stale reason").unwrap());
+    assert_eq!(store.load().unwrap()[0].latest_error.as_deref(), Some("finish the current step"));
 }
 
 #[test]
