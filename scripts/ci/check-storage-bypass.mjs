@@ -67,6 +67,12 @@ const LEGACY_READER =
 export const ALLOW = new Map(
   [
     [
+      "config/schema/profile_layout.rs",
+      "json-write",
+      'std::fs::write(dir.join(PROFILE_LAYOUT_MARKER), "2\\n")',
+      "bootstrap marker that says which on-disk layout a profile directory is; it must be readable before any storage backend can be opened (it decides where the backend lives)",
+    ],
+    [
       "util/classic_transcript_fixture.rs",
       "json-write",
       'std::fs::write(path, classic_jsonl(messages, meta)).expect("write the classic transcript");',
