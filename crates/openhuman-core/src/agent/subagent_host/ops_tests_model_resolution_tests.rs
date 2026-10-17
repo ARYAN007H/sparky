@@ -27,7 +27,7 @@ impl tinytools::Tool for BlockingSubagentCloseTool {
     async fn execute(&self, _args: serde_json::Value) -> anyhow::Result<tinytools::ToolResult> {
         let _ = self.started.send(()).await;
         let _ = self.release.await;
-        Ok(tinytools::ToolResult::text("tool released after close"))
+        Ok(tinytools::ToolResult::success("tool released after close"))
     }
 }
 
@@ -259,7 +259,7 @@ async fn closing_a_durable_driver_session_cancels_only_its_registered_child() {
     .expect("TaskFirst host adapter resolves raw task ID via the owned session port");
     let steered_payload: serde_json::Value =
         serde_json::from_str(&steered.output()).expect("message dispatch returns JSON");
-    assert_eq!(steered_payload["job_id"], job_id);
+    assert_eq!(steered_payload["job_id"].as_str(), Some(job_id.as_str()));
     assert_eq!(steered_payload["status"], "message_queued");
 
     assert!(port
@@ -287,7 +287,7 @@ async fn closing_a_durable_driver_session_cancels_only_its_registered_child() {
     .await
     .expect("Tiny await observes close cancellation");
     assert!(
-        !wait_result.is_error(),
+        !wait_result.is_error,
         "raw product task ID resolves through the authenticated session port: {}",
         wait_result.output()
     );
@@ -305,7 +305,7 @@ async fn closing_a_durable_driver_session_cancels_only_its_registered_child() {
     .await
     .expect("Tiny await observes settled cancellation");
     assert!(
-        !wait_result.is_error(),
+        !wait_result.is_error,
         "shared Jobs await returns the settled cancellation: {}",
         wait_result.output()
     );

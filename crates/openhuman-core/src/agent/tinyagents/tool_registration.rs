@@ -177,6 +177,18 @@ impl ToolDispatch<(), OpenHumanRunContext> for TaskFirstSessionMessageDispatch {
         parent: &tinyagents_harness::context::RunContext<OpenHumanRunContext>,
     ) -> anyhow::Result<ToolResult> {
         if let Some(object) = arguments.as_object_mut() {
+            let Some(message) = object
+                .get("message")
+                .and_then(serde_json::Value::as_str)
+                .map(str::trim)
+                .filter(|message| !message.is_empty())
+            else {
+                return Ok(ToolResult::error("steer_subagent: `message` is required"));
+            };
+            object.insert(
+                "message".into(),
+                serde_json::Value::String(message.to_owned()),
+            );
             let selected = object
                 .get("task_id")
                 .and_then(serde_json::Value::as_str)
