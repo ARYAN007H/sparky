@@ -278,7 +278,9 @@ impl OpenHumanPersistence {
         &self,
         key: &SubagentTaskKey,
     ) -> Result<Option<SubagentOutcome>, SubagentError> {
-        let _key_lock = self.key_lock(key)?;
+        if let Some(outcome) = self.file_store.terminal_outcome(key)? {
+            return Ok(Some(outcome));
+        }
         Ok(self.read_terminal_record(key)?.map(|record| record.outcome))
     }
 
@@ -286,7 +288,6 @@ impl OpenHumanPersistence {
         &self,
         key: &SubagentTaskKey,
     ) -> Result<Option<(String, u64)>, SubagentError> {
-        let _key_lock = self.key_lock(key)?;
         if let Some(record) = self.read_terminal_record(key)? {
             return Ok(
                 (!record.agent_id.is_empty()).then_some((record.agent_id, record.elapsed_ms))
@@ -385,7 +386,12 @@ impl OpenHumanPersistence {
         &self,
         key: &SubagentTaskKey,
     ) -> Result<Option<SubagentCheckpointData>, SubagentError> {
-        let _key_lock = self.key_lock(key)?;
+        if self.file_store.terminal_outcome(key).map_err(map_lifecycle_error)?.is_some() {
+            return Ok(None);
+        }
+        if self.terminal_path(key).exists() {
+            return Ok(None);
+        }
         if self.terminal_path(key).exists() {
             return Ok(None);
         }
@@ -405,10 +411,7 @@ impl OpenHumanPersistence {
             .file_store
             .keys_for_task(task_id)
             .map_err(map_lifecycle_error)?;
-        let legacy_keys = {
-            let _index_lock = self.index_lock(task_id).map_err(map_lifecycle_error)?;
-            self.read_index_keys(task_id).map_err(map_lifecycle_error)?
-        };
+        let legacy_keys = self.read_index_keys(task_id).map_err(map_lifecycle_error)?;
         for key in legacy_keys {
             if !keys.contains(&key) {
                 keys.push(key);
