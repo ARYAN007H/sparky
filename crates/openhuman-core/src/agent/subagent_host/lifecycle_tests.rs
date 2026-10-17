@@ -2,6 +2,7 @@ use std::{
     collections::HashMap,
     sync::{Arc, Mutex},
 };
+use crate::agent::subagent_host::types::SubagentCheckpointData;
 use tinyagents_orchestration::subagent::{
     PersistedSubagentPause, SubagentOutcome, SubagentOutcomeKind, SubagentPause,
     SubagentPausePersistenceDisposition, SubagentPersistence, SubagentResume, SubagentTaskKey,

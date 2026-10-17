@@ -91,7 +91,10 @@ impl OpenHumanPersistence {
             .expect("valid subagent pause key has a persistence path")
     }
 
-    fn legacy_pause_path(&self, key: &SubagentTaskKey) -> std::path::PathBuf {
+    pub(in crate::agent::subagent_host) fn legacy_pause_path(
+        &self,
+        key: &SubagentTaskKey,
+    ) -> std::path::PathBuf {
         self.checkpoint_dir
             .join("lifecycle")
             .join(format!("{}.pause.json", Self::key_component(key)))
@@ -103,7 +106,7 @@ impl OpenHumanPersistence {
             .join(format!("{}.terminal.json", Self::key_component(key)))
     }
 
-    fn index_path(&self, task_id: &str) -> std::path::PathBuf {
+    pub(in crate::agent::subagent_host) fn index_path(&self, task_id: &str) -> std::path::PathBuf {
         self.checkpoint_dir
             .join("lifecycle")
             .join(format!("task-{}.index.json", Self::task_component(task_id)))
