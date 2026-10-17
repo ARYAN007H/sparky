@@ -116,6 +116,7 @@ async fn driver_job_controls_are_isolated_by_workspace_with_shared_runtime_state
         .expect("task manager definition")
         .clone();
     definition_a.id = "workspace-a-worker".into();
+    definition_a.model = tinyagents_definition::ModelSpec::Inherit;
     let mut definition_b = definition_a.clone();
     definition_b.id = "workspace-b-worker".into();
     let mut child_a = tokio::spawn(async move {
