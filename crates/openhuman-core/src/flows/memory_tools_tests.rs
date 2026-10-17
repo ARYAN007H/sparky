@@ -161,7 +161,7 @@ async fn remembering_identical_content_keeps_the_replayed_item() {
 async fn remember_keyed_cleans_up_legacy_values_across_pages() {
     let (_tmp, config) = engine_config();
     for index in 0..101 {
-        seed_keyed(&config, "k", &format!("legacy value {index}" )).await;
+        seed_keyed(&config, "k", &format!("legacy value {index}")).await;
     }
 
     let replacement = remember_keyed(&config, "f1", "k", "current", LearningKind::Fact)
