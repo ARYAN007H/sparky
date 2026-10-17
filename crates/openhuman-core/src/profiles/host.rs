@@ -35,7 +35,6 @@ use super::types::{ProfileId, ProfileMeta, ProfileSummary};
 use crate::config::Config;
 use crate::core::runtime::{ContextOverlay, CoreContext, DomainSet, SaasConfig};
 use crate::storage::fence::{FenceRegistry, LeaseFence};
-use crate::storage::fenced_backend::FencedBackend;
 use crate::storage::lease::{LeaseGrant, LeaseStore};
 use crate::storage::StorageBackend;
 use crate::tools::toolpacks::ToolGroups;
@@ -84,7 +83,7 @@ pub(super) struct Slot {
 /// The open profiles of one SaaS process.
 pub struct ProfileHost {
     pub(super) saas: SaasConfig,
-    capabilities: Option<Arc<super::capabilities::ProfileCapabilities>>,
+    pub(super) capabilities: Option<Arc<super::capabilities::ProfileCapabilities>>,
     pub(super) operator: Arc<CoreContext>,
     pub(super) node: String,
     pub(super) open: Mutex<HashMap<ProfileId, Slot>>,
@@ -98,7 +97,7 @@ pub struct ProfileHost {
     /// [`super::lifecycle`].
     pub(super) lifecycle: ProfileLocks,
     /// The backend shared by the profile registry and cluster leases.
-    backend: Option<Arc<dyn StorageBackend>>,
+    pub(super) backend: Option<Arc<dyn StorageBackend>>,
     /// The same physical backend, guarded by this host's profile fences, for
     /// cron admission policy writes. `None` uses the host-installed/default
     /// workspace backend.
@@ -138,97 +137,12 @@ impl ProfileHost {
         Self::with_backend(saas, operator, None).expect("file-backed profile host")
     }
 
-    /// A host over `backend` when given (the shared registry and cluster
-    /// leases), else as [`Self::new`]. Supplied backends are guarded by this
-    /// host's profile fences for cron policy writes; an already-fenced backend
-    /// remains safe, with an additional host guard around it.
-    ///
-    /// # Errors
-    ///
-    /// When the backend refuses the cluster scope.
-    pub fn with_backend(
-        saas: SaasConfig,
-        operator: Arc<CoreContext>,
-        backend: Option<Arc<dyn StorageBackend>>,
-    ) -> Result<Self, String> {
-        Self::with_backend_inner(saas, operator, backend, false)
-    }
-
-    /// Construct a host over the already-fenced backend installed by the
-    /// runtime. Kept crate-private so the installed backend is not wrapped a
-    /// second time.
-    pub(crate) fn with_fenced_backend(
-        saas: SaasConfig,
-        operator: Arc<CoreContext>,
-        backend: Option<Arc<dyn StorageBackend>>,
-    ) -> Result<Self, String> {
-        Self::with_backend_inner(saas, operator, backend, true)
-    }
-
-    fn with_backend_inner(
-        mut saas: SaasConfig,
-        operator: Arc<CoreContext>,
-        backend: Option<Arc<dyn StorageBackend>>,
-        already_fenced: bool,
-    ) -> Result<Self, String> {
-        super::provider_settings::ProfileProviderSettings::from_saas(&saas)
-            .map_err(|error| error.to_string())?;
-        let node = saas.resolve_node_id(None).to_owned();
-        let fences = crate::storage::fence::registry();
-        let leases = profile_lease::store_for(
-            &saas.root,
-            backend.as_ref(),
-            &node,
-            saas.advertise_url.clone(),
-            saas.lease_ttl(),
-        )?;
-        let registry = match &backend {
-            Some(backend) => ProfileRegistry::cluster(backend.as_ref())?,
-            None => ProfileRegistry::files(&saas.root),
-        };
-        let cron_backend = backend.as_ref().map(|backend| {
-            if already_fenced {
-                Arc::clone(backend)
-            } else {
-                Arc::new(FencedBackend::new(Arc::clone(backend), Arc::clone(&fences)))
-                    as Arc<dyn StorageBackend>
-            }
-        });
-        Ok(Self {
-            capabilities: None,
-            saas,
-            operator,
-            node,
-            open: Mutex::new(HashMap::new()),
-            gate: tokio::sync::Mutex::new(()),
-            lifecycle: ProfileLocks::default(),
-            backend,
-            cron_backend,
-            leases,
-            fences,
-            registry,
-        })
-    }
-
     /// Install immutable operator adapters before this host is shared.
     pub fn with_capabilities(
         mut self,
         capabilities: Option<Arc<super::capabilities::ProfileCapabilities>>,
     ) -> Self {
         self.capabilities = capabilities;
-        self
-    }
-
-    /// This host registering its fences in `fences` instead of the process
-    /// registry (tests, which must not share one).
-    pub fn with_fences(mut self, fences: Arc<FenceRegistry>) -> Self {
-        self.fences = fences;
-        if let Some(backend) = &self.backend {
-            self.cron_backend = Some(Arc::new(FencedBackend::new(
-                Arc::clone(backend),
-                Arc::clone(&self.fences),
-            )));
-        }
         self
     }
 
