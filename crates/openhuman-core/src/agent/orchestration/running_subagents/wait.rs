@@ -6,7 +6,8 @@ use std::path::Path;
 use std::time::Duration;
 
 use tinyagents_orchestration::subagent::{
-    wait_detached, wait_detached_or_durable, WaitError, WaitOutcome,
+    wait_detached, wait_detached_or_durable_with_owners, DetachedSubagentOwners, WaitError,
+    WaitOutcome,
 };
 
 use super::registry::{admit_workspace, owner_key, registry};
@@ -27,12 +28,13 @@ pub(crate) async fn wait(
     };
     admit_workspace(ctx, &workspace_dir)?;
     let store = super::resolve::scoped_task_store(ctx, &workspace_dir)?;
-    wait_detached_or_durable(
+    let owners = DetachedSubagentOwners::new(&owner, parent_session);
+    wait_detached_or_durable_with_owners(
         registry(),
         store.as_ref(),
         &super::super::background_completions::router_for_workspace_ctx(ctx, &workspace_dir),
         task_id,
-        &owner,
+        &owners,
         timeout,
     )
     .await
@@ -48,12 +50,13 @@ pub(crate) async fn wait_in_workspace(
     admit_workspace(ctx, workspace_dir)?;
     let owner = owner_key(ctx, parent_session)?;
     let store = super::resolve::scoped_task_store(ctx, workspace_dir)?;
-    wait_detached_or_durable(
+    let owners = DetachedSubagentOwners::new(&owner, parent_session);
+    wait_detached_or_durable_with_owners(
         registry(),
         store.as_ref(),
         &super::super::background_completions::router_for_workspace_ctx(ctx, workspace_dir),
         task_id,
-        &owner,
+        &owners,
         timeout,
     )
     .await

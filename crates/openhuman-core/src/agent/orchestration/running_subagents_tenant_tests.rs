@@ -676,4 +676,33 @@ async fn durable_fallback_store_uses_explicit_profile_context_at_shared_workspac
         resume_ref_for_task_in_workspace(&bob, &task_id, PARENT, workspace.path()),
         Err(WaitError::Unknown)
     ));
+    assert!(
+        matches!(
+            super::super::wait_in_workspace(
+                &alice,
+                &task_id,
+                PARENT,
+                workspace.path(),
+                std::time::Duration::ZERO,
+            )
+            .await,
+            Ok(tinyagents_orchestration::subagent::WaitOutcome::TimedOut(
+                tinyagents_orchestration::subagent::DetachedSubagentStatus::Running
+            )),
+        ),
+        "Alice's scoped durable wait must read her running row after registry miss"
+    );
+    assert_eq!(
+        super::super::wait_in_workspace(
+            &bob,
+            &task_id,
+            PARENT,
+            workspace.path(),
+            std::time::Duration::ZERO,
+        )
+        .await
+        .unwrap_err(),
+        WaitError::Unknown,
+        "Bob's profile store must not expose Alice's task"
+    );
 }
