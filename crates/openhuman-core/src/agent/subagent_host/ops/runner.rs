@@ -133,7 +133,8 @@ pub(crate) async fn run_subagent_direct(
         }
         impl UsageFinalizer {
             fn finish(&mut self, entry: crate::agent::tinyagents::host::SubagentUsageEntry) {
-                self.context.record_completed_subagent_usage(entry);
+                self.context
+                    .record_completed_subagent_usage_with_run_id(self.run_id.clone(), entry);
                 self.complete = true;
             }
         }
