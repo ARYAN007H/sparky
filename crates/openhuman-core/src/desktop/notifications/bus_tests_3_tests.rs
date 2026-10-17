@@ -1,6 +1,6 @@
 use super::*;
-use crate::core::runtime::{CoreContext, DomainSet};
-use crate::profiles::{ProfileHost, ProfileId, ProfileIdMode, SaasConfig};
+use crate::core::runtime::{CoreContext, DomainSet, SaasConfig};
+use crate::profiles::{ProfileHost, ProfileId, ProfileIdMode};
 
 #[tokio::test]
 async fn cron_completion_stays_in_each_profile_when_agent_ids_match() {
@@ -18,7 +18,7 @@ async fn cron_completion_stays_in_each_profile_when_agent_ids_match() {
     host.provision(&profile_b).await.unwrap();
     let state_a = host.open(&profile_a).await.unwrap();
     let state_b = host.open(&profile_b).await.unwrap();
-    ProfileHost::install(Arc::clone(&host));
+    crate::profiles::host::install(Arc::clone(&host));
 
     let subscriber = NotificationBridgeSubscriber::new(crate::config::Config::default());
     for (profile, job_id) in [(&profile_a, "profile-job-a"), (&profile_b, "profile-job-b")] {
