@@ -164,6 +164,59 @@ pub fn cancel_driver_job_for_observed_session(
     jobs.cancel_key_owned(&key, owner).is_ok()
 }
 
+/// A driver-backed child selected and cancelled by its public task id.
+///
+/// The selector is scoped to the caller's durable session store and refuses
+/// ambiguous task IDs. The actual cancellation remains keyed by the full
+/// authenticated TinyAgents lifecycle key.
+#[derive(Debug, Clone)]
+pub struct DriverTaskCancellation {
+    pub agent_id: String,
+    pub parent_session: String,
+    pub subagent_session_id: String,
+    pub workspace_dir: std::path::PathBuf,
+    pub parent_thread_id: Option<String>,
+}
+
+pub fn cancel_driver_job_by_task(
+    store: &SubagentSessionStore,
+    checkpoint_dir: &Path,
+    jobs: &tinyagents_orchestration::subagent::SubAgentJobRegistry,
+    task_id: &str,
+) -> Option<DriverTaskCancellation> {
+    let mut matches = store
+        .load()
+        .ok()?
+        .into_iter()
+        .filter(|session| {
+            session.current_task_id.as_deref() == Some(task_id)
+                && matches!(
+                    session.status,
+                    DurableSubagentStatus::Running | DurableSubagentStatus::AwaitingUser
+                )
+        });
+    let session = matches.next()?;
+    if matches.next().is_some()
+        || !cancel_driver_job_for_observed_session(
+            store,
+            checkpoint_dir,
+            jobs,
+            &session,
+            &session.parent_session,
+            session.parent_thread_id.as_deref(),
+        )
+    {
+        return None;
+    }
+    Some(DriverTaskCancellation {
+        agent_id: session.agent_id,
+        parent_session: session.parent_session,
+        subagent_session_id: session.subagent_session_id,
+        workspace_dir: store.workspace_dir.clone(),
+        parent_thread_id: session.parent_thread_id,
+    })
+}
+
 /// Resolve a saved product session to its exact TinyAgents lifecycle key.
 ///
 /// The product session lookup is scoped by the authenticated parent session,

@@ -133,6 +133,13 @@ fn handle_subagent_cancel(ctx: DispatchCtx, params: Map<String, Value>) -> Contr
                 (false, Some(finished.as_str()))
             }
             Some(meta) => {
+                if meta.driver_managed {
+                    // The driver's awaited host-completion hook records the
+                    // terminal session state and delivers the failed event.
+                    // Publishing the legacy pseudo-completion here would
+                    // duplicate both effects.
+                    (true, None)
+                } else {
                 let summary = match reason.as_deref().map(str::trim).filter(|r| !r.is_empty()) {
                     Some(r) => format!(
                         "You cancelled this background sub-agent before it finished. Reason: {r}"
@@ -169,6 +176,7 @@ fn handle_subagent_cancel(ctx: DispatchCtx, params: Map<String, Value>) -> Contr
                     }
                 }
                 (true, None)
+                }
             }
             None => (false, Some("unknown")),
         };

@@ -28,6 +28,9 @@ pub(crate) struct CancelledSubagent {
     /// "Cancel" still finds it; the caller must not rewrite that outcome as a
     /// user cancellation, and reports it instead.
     pub(crate) already_finished: Option<FinishedOutcome>,
+    /// TinyAgents' awaited completion handler owns terminal delivery for this
+    /// driver-backed child; the RPC handler must not publish a duplicate.
+    pub(crate) driver_managed: bool,
 }
 
 /// Abort and drop the sub-agent with `task_id`, returning its metadata so the
@@ -41,33 +44,59 @@ pub(crate) fn cancel_by_task(
     task_id: &str,
 ) -> Option<CancelledSubagent> {
     let id = TaskId::new(task_id);
-    let snapshot = registry().snapshot_trusted(&id).ok()?;
-    if !control_admits(ctx, &snapshot.metadata) {
-        return None;
+    if let Ok(snapshot) = registry().snapshot_trusted(&id) {
+        if !control_admits(ctx, &snapshot.metadata) {
+            return None;
+        }
+        let cancelled = registry().cancel(&id, &snapshot.owner_id).ok()?;
+        // `AwaitingUser` is paused, not finished: cancelling it is a real cancel.
+        let already_finished = cancelled.status.finished_outcome();
+        let metadata = cancelled.metadata;
+        if already_finished.is_none() {
+            record_cancelled(&metadata.workspace_dir, task_id);
+        }
+        log::debug!(
+            "[running_subagents] cancel_by_task task_id={} agent_id={} parent_thread_id={:?} live_entries={}",
+            task_id,
+            metadata.agent_id,
+            metadata.parent_thread_id,
+            registry()
+                .len()
+                .expect("detached task registry lock poisoned")
+        );
+        return Some(CancelledSubagent {
+            agent_id: metadata.agent_id,
+            parent_session: metadata.parent_session,
+            subagent_session_id: metadata.subagent_session_id,
+            workspace_dir: metadata.workspace_dir,
+            parent_thread_id: metadata.parent_thread_id,
+            already_finished,
+            driver_managed: false,
+        });
     }
-    let cancelled = registry().cancel(&id, &snapshot.owner_id).ok()?;
-    // `AwaitingUser` is paused, not finished: cancelling it is a real cancel.
-    let already_finished = cancelled.status.finished_outcome();
-    let metadata = cancelled.metadata;
-    if already_finished.is_none() {
-        record_cancelled(&metadata.workspace_dir, task_id);
-    }
-    log::debug!(
-        "[running_subagents] cancel_by_task task_id={} agent_id={} parent_thread_id={:?} live_entries={}",
-        task_id,
-        metadata.agent_id,
-        metadata.parent_thread_id,
-        registry()
-            .len()
-            .expect("detached task registry lock poisoned")
+
+    let context = ctx.resolved()?;
+    let workspace_dir = context.workspace_dir().ok()?;
+    let store = crate::agent::orchestration::subagent_sessions::SubagentSessionStore::new(
+        workspace_dir.clone(),
     );
+    let jobs = crate::core::runtime::slot_for::<
+        tinyagents_orchestration::subagent::SubAgentJobRegistry,
+    >(ctx);
+    let selected = crate::agent::orchestration::subagent_sessions::cancel_driver_job_by_task(
+        &store,
+        &workspace_dir.join(".openhuman/subagent_checkpoints"),
+        jobs,
+        task_id,
+    )?;
     Some(CancelledSubagent {
-        agent_id: metadata.agent_id,
-        parent_session: metadata.parent_session,
-        subagent_session_id: metadata.subagent_session_id,
-        workspace_dir: metadata.workspace_dir,
-        parent_thread_id: metadata.parent_thread_id,
-        already_finished,
+        agent_id: selected.agent_id,
+        parent_session: selected.parent_session,
+        subagent_session_id: Some(selected.subagent_session_id),
+        workspace_dir: selected.workspace_dir,
+        parent_thread_id: selected.parent_thread_id,
+        already_finished: None,
+        driver_managed: true,
     })
 }
 
