@@ -60,6 +60,8 @@ async fn prepared_child_run_is_exported_from_its_native_journal_lineage() {
     let mut config = crate::config::Config::default();
     config.workspace_dir = workspace.clone();
     config.components.juice = false;
+    config.observability.agent_tracing.capture_content = false;
+    let capture_content = config.observability.agent_tracing.capture_content;
     let core = crate::core::runtime::CoreContext::for_test_with_config(
         crate::core::runtime::DomainSet::full(),
         config,
@@ -184,7 +186,7 @@ async fn prepared_child_run_is_exported_from_its_native_journal_lineage() {
                 assert_eq!(usage.charged_amount.map(|amount| amount.micros), Some(4_200));
                 assert_eq!(usage.input_tokens, 120);
                 assert_eq!(usage.output_tokens, 8);
-                assert!(input.is_none() && output.is_none(), "model content capture stays off");
+                assert!(input.is_some() && output.is_some(), "the private native journal retains source observations");
                 Some(call_id.clone())
             }
             _ => None,
@@ -203,7 +205,7 @@ async fn prepared_child_run_is_exported_from_its_native_journal_lineage() {
 
     let trace_context = TraceContext::new("native-trace-root", None)
         .with_session_group("native-trace-thread")
-        .with_capture_content(false)
+        .with_capture_content(capture_content)
         .with_run_lineage(Some(root_run_id.as_str().into()), None, Some(root_run_id.as_str().into()));
     let mut collector = SpanCollector::new(trace_context);
     for observation in &observations {

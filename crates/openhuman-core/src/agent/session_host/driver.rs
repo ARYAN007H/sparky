@@ -482,7 +482,6 @@ impl SessionDriver<OpenHumanRunContext> for OpenHumanSessionDriver {
             }
             observed.resolved_route = outcome.resolved_route.clone();
             observed.deferred_terminal = outcome.deferred_terminal.take();
-            observed.stop.clone()
         };
         // The turn compacted its context: persist the compacted history, so the
         // next turn starts from the checkpoint. The runtime session seals the
