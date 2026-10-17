@@ -179,6 +179,7 @@ pub struct DriverTaskCancellation {
     pub subagent_session_id: String,
     pub workspace_dir: std::path::PathBuf,
     pub parent_thread_id: Option<String>,
+    pub already_finished: Option<tinyagents_orchestration::subagent::FinishedOutcome>,
 }
 
 pub fn cancel_driver_job_by_task(
@@ -187,16 +188,27 @@ pub fn cancel_driver_job_by_task(
     jobs: &tinyagents_orchestration::subagent::SubAgentJobRegistry,
     task_id: &str,
 ) -> Option<DriverTaskCancellation> {
-    let mut matches = store.load().ok()?.into_iter().filter(|session| {
-        session.current_task_id.as_deref() == Some(task_id)
-            && matches!(
-                session.status,
-                DurableSubagentStatus::Running | DurableSubagentStatus::AwaitingUser
-            )
-    });
+    let mut matches = store
+        .load()
+        .ok()?
+        .into_iter()
+        .filter(|session| session.current_task_id.as_deref() == Some(task_id));
     let session = matches.next()?;
-    if matches.next().is_some()
-        || !cancel_driver_job_for_observed_session(
+    if matches.next().is_some() {
+        return None;
+    }
+    let already_finished = match session.status {
+        DurableSubagentStatus::Idle => {
+            Some(tinyagents_orchestration::subagent::FinishedOutcome::Completed)
+        }
+        DurableSubagentStatus::Failed => {
+            Some(tinyagents_orchestration::subagent::FinishedOutcome::Failed)
+        }
+        DurableSubagentStatus::Running | DurableSubagentStatus::AwaitingUser => None,
+        DurableSubagentStatus::Closed => return None,
+    };
+    if already_finished.is_none()
+        && !cancel_driver_job_for_observed_session(
             store,
             checkpoint_dir,
             jobs,
@@ -213,6 +225,7 @@ pub fn cancel_driver_job_by_task(
         subagent_session_id: session.subagent_session_id,
         workspace_dir: store.workspace_dir.clone(),
         parent_thread_id: session.parent_thread_id,
+        already_finished,
     })
 }
 
