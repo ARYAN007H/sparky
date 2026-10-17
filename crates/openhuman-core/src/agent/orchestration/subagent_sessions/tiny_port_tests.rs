@@ -103,6 +103,68 @@ async fn unthreaded_port_lists_only_unthreaded_rows() {
 }
 
 #[tokio::test]
+async fn raw_task_id_lookup_filters_owner_before_matching_and_rejects_ambiguity() {
+    fn row(session: &str, owner: &str, thread: &str) -> DurableSubagentSession {
+        serde_json::from_value(serde_json::json!({
+            "subagentSessionId": session,
+            "parentSession": owner,
+            "parentThreadId": thread,
+            "workerThreadId": null,
+            "agentId": "researcher",
+            "displayName": null,
+            "model": null,
+            "sandboxMode": "workspace",
+            "actionRoot": null,
+            "taskKey": "analysis",
+            "taskTitle": "Analyze",
+            "currentTaskId": "shared-task-id",
+            "status": "idle",
+            "reusable": true,
+            "latestHistory": null,
+            "latestError": null,
+            "createdAt": "2026-01-01T00:00:00Z",
+            "updatedAt": "2026-01-01T00:00:00Z",
+            "lastUsedAt": "2026-01-01T00:00:00Z"
+        }))
+        .unwrap()
+    }
+
+    let workspace = tempfile::tempdir().unwrap();
+    let store = SubagentSessionStore::new(workspace.path().to_path_buf());
+    store
+        .save(&[
+            row("foreign-first", "foreign-owner", "same-thread"),
+            row("owned-second", "owner", "same-thread"),
+        ])
+        .unwrap();
+
+    let owned = OpenHumanTinySubagentSessionStore::new(
+        workspace.path().to_path_buf(),
+        "owner",
+        Some("same-thread".into()),
+    );
+    assert_eq!(
+        owned
+            .get("shared-task-id")
+            .await
+            .unwrap()
+            .unwrap()
+            .subagent_session_id,
+        "owned-second",
+        "a foreign row with the same raw task ID cannot shadow an owned child"
+    );
+
+    store
+        .save(&[
+            row("owned-second", "owner", "same-thread"),
+            row("owned-duplicate", "owner", "same-thread"),
+        ])
+        .unwrap();
+    let error = owned.get("shared-task-id").await.unwrap_err();
+    assert!(error.to_string().contains("ambiguous"));
+}
+
+#[tokio::test]
 async fn upsert_rejects_a_selector_or_lifecycle_key_outside_bound_scope() {
     let workspace = tempfile::tempdir().unwrap();
     let store = SubagentSessionStore::new(workspace.path().to_path_buf());
