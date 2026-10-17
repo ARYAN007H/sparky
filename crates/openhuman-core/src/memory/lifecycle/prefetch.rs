@@ -55,51 +55,24 @@ struct Key {
 }
 
 impl Key {
-    /// `config_fingerprint` is supplied by the host so the cache key can
-    /// later consume the host's config generation directly (e.g. TurnCache).
-    fn with_fingerprint(
-        config: &Config,
-        config_fingerprint: u64,
-        identity: &ResolvedIdentity,
-        thread: &str,
-        compaction: bool,
-    ) -> Self {
+    fn new(config: &Config, identity: &ResolvedIdentity, thread: &str, compaction: bool) -> Self {
+        let mut fingerprint = std::collections::hash_map::DefaultHasher::new();
+        // Keep only the digest, never serialized settings or credentials.
+        serde_json::to_value(config)
+            .ok()
+            .and_then(|value| serde_json::to_vec(&value).ok())
+            .unwrap_or_default()
+            .hash(&mut fingerprint);
+        config.config_path.hash(&mut fingerprint);
+        config.action_dir.hash(&mut fingerprint);
         Self {
             workspace: config.workspace_dir.clone(),
-            config: config_fingerprint,
+            config: fingerprint.finish(),
             identity: identity.clone(),
             thread: thread.to_owned(),
             compaction,
         }
     }
-
-    #[cfg(test)]
-    fn new(config: &Config, identity: &ResolvedIdentity, thread: &str, compaction: bool) -> Self {
-        Self::with_fingerprint(
-            config,
-            memory_config_fingerprint(config),
-            identity,
-            thread,
-            compaction,
-        )
-    }
-}
-
-/// Fingerprints only memory settings that affect recall and its sources. The
-/// full Config is large and unrelated settings must not invalidate turn packs.
-fn memory_config_fingerprint(config: &Config) -> u64 {
-    let mut fingerprint = std::collections::hash_map::DefaultHasher::new();
-    config.memory.hash(&mut fingerprint);
-    config.config_path.hash(&mut fingerprint);
-    config.action_dir.hash(&mut fingerprint);
-    config.api_url.hash(&mut fingerprint);
-    config.components.memory.hash(&mut fingerprint);
-    config.default_model.hash(&mut fingerprint);
-    config.chat_provider.hash(&mut fingerprint);
-    config.memory_provider.hash(&mut fingerprint);
-    config.model_routes.hash(&mut fingerprint);
-    config.time_zone().hash(&mut fingerprint);
-    fingerprint.finish()
 }
 
 struct Cache(Prefetcher<Key, TurnPack>);
@@ -181,13 +154,7 @@ pub(crate) fn pre_turn(
         return None;
     }
     let cache = cache(ctx);
-    let key = Key::with_fingerprint(
-        &config,
-        memory_config_fingerprint(&config),
-        &identity,
-        &input.thread_id,
-        false,
-    );
+    let key = Key::new(&config, &identity, &input.thread_id, false);
     let pack = identity.recall.then(|| completed(&cache, &key)).flatten();
     tracing::debug!(thread_id = %key.thread, agent_id = %key.identity.agent_id, cache_hit = pack.is_some(), "[memory:prefetch] pre_turn cache");
     if let Some(pack) = &pack {
@@ -243,12 +210,9 @@ pub(crate) fn compaction(
         return None;
     }
     let cache = cache(ctx);
-    let fingerprint = memory_config_fingerprint(&config);
-    let key = Key::with_fingerprint(&config, fingerprint, &identity, &thread, true);
+    let key = Key::new(&config, &identity, &thread, true);
     let pack = completed(&cache, &key)
-        .or_else(|| {
-            completed(&cache, &Key::with_fingerprint(&config, fingerprint, &identity, &thread, false))
-        });
+        .or_else(|| completed(&cache, &Key::new(&config, &identity, &thread, false)));
     enqueue(
         cache,
         key,
@@ -268,13 +232,7 @@ pub(crate) async fn settle_for_test(
     compaction: bool,
 ) {
     let cache = cache(ctx);
-    let key = Key::with_fingerprint(
-        config,
-        memory_config_fingerprint(config),
-        identity,
-        thread,
-        compaction,
-    );
+    let key = Key::new(config, identity, thread, compaction);
     tokio::time::timeout(Duration::from_secs(2), async {
         while !cache.0.is_idle(&key) {
             tokio::task::yield_now().await;
