@@ -383,7 +383,7 @@ pub(in super::super) async fn run_subagent_via_graph(
     // checkpoint (the delegating agent continues from partial progress) rather
     // than surfacing an empty/partial answer — the legacy `SubagentCheckpoint`.
     if outcome.hit_cap {
-        let digest = build_cap_digest(&outcome.conversation, &outcome.tool_outcomes);
+        let results = cap_tool_results(&outcome.conversation, &outcome.tool_outcomes);
         let strategy = checkpoint::SubagentCheckpoint {
             chat_model: summary_model.clone(),
             agent_id: agent_id.to_string(),
@@ -395,7 +395,7 @@ pub(in super::super) async fn run_subagent_via_graph(
             // cap-summary call too.
             max_output_tokens,
         };
-        match strategy.summarize_cap_hit(&digest, max_iterations).await {
+        match strategy.summarize_cap_hit(&results, max_iterations).await {
             Ok(co) => {
                 if let Some(u) = co.usage {
                     // Fold ALL four token fields (the legacy cap-summary folded
@@ -602,10 +602,10 @@ fn map_tinyagents_subagent_error(err: anyhow::Error) -> SubagentRunError {
 /// — e.g. a hallucinated/unknown tool the crate recovered without running
 /// `after_tool` — is marked `failed`, so the summary no longer tells the model
 /// every call succeeded.
-fn build_cap_digest(
-    conversation: &[TranscriptEntry],
+fn cap_tool_results<'a>(
+    conversation: &'a [TranscriptEntry],
     tool_outcomes: &[tinyagents_harness::turn_outcome::ToolCallOutcome],
-) -> String {
+) -> Vec<tinyagents_harness::summarization::CapToolResult<'a>> {
     use std::collections::HashMap;
     use tinyagents_harness::summarization::CapToolResult;
 
@@ -646,5 +646,5 @@ fn build_cap_digest(
                 .unwrap_or(false),
         })
         .collect();
-    tinyagents_harness::summarization::build_cap_digest(&results, 800)
+    results
 }
