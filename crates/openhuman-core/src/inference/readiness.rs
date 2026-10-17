@@ -20,6 +20,7 @@ type Cache = HashMap<CacheKey, CacheEntry>;
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ReadinessFailure {
     pub status: &'static str,
+    pub session_wide: bool,
     pub role: &'static str,
     pub message: String,
     pub node_ids: Vec<String>,
@@ -107,6 +108,7 @@ pub async fn evaluate(
             status: "signed_out",
             failures: vec![ReadinessFailure {
                 status: "signed_out",
+                session_wide: true,
                 role: nodes[0].1,
                 message: "Inference unavailable: you are signed out. Sign in to OpenHuman to run agent nodes.".into(),
                 node_ids: vec![first_node_id.clone()],
@@ -131,6 +133,7 @@ pub async fn evaluate(
             status: "signed_out",
             failures: vec![ReadinessFailure {
                 status: "signed_out",
+                session_wide: true,
                 role: nodes[0].1,
                 message: format!(
                     "Inference unavailable: {error} Sign in to OpenHuman to run agent nodes."
@@ -151,6 +154,7 @@ pub async fn evaluate(
             tracing::warn!(target: "inference", nodes = ?node_ids, role, "inference readiness probe rejected: {message}");
             failures.push(ReadinessFailure {
                 status: classify(&message),
+                session_wide: false,
                 role,
                 message,
                 node_ids,

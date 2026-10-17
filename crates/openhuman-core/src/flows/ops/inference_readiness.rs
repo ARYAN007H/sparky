@@ -1,5 +1,11 @@
 use super::*;
 
+pub(super) struct InferenceReadinessEvaluation {
+    pub(super) status: &'static str,
+    pub(super) message: Option<String>,
+    pub(super) node_id: Option<String>,
+}
+
 /// Resolve the effective inference workload for an agent node. This remains
 /// beside the graph adapter because it depends on TinyFlows node configuration.
 pub(super) fn agent_node_role(config: &Config, node: &tinyflows::model::Node) -> &'static str {
@@ -48,13 +54,16 @@ pub(super) fn agent_node_role(config: &Config, node: &tinyflows::model::Node) ->
 }
 
 fn format_evaluation(
-    evaluation: crate::inference::readiness::ReadinessEvaluation,
+    evaluation: &crate::inference::readiness::ReadinessEvaluation,
 ) -> Option<String> {
     if evaluation.status == "ready" {
         return None;
     }
     if let [failure] = evaluation.failures.as_slice() {
-        if let [node_id] = failure.node_ids.as_slice() {
+        if let [_node_id] = failure.node_ids.as_slice() {
+            if failure.session_wide {
+                return Some(failure.message.clone());
+            }
             return Some(if evaluation.status == "provider_not_configured" {
                 format!(
                     "This flow's agent step needs a working AI provider, but the provider \
@@ -80,12 +89,7 @@ fn format_evaluation(
                 .map(|id| format!("'{id}'"))
                 .collect::<Vec<_>>()
                 .join(", ");
-            if evaluation.status == "provider_not_configured"
-                && failure
-                    .message
-                    .to_ascii_lowercase()
-                    .contains("api key not configured")
-            {
+            if failure.status == "provider_not_configured" {
                 format!(
                     "Node(s) {nodes} (role `{}`): the provider returned: '{}'. Configure \
                      your provider API key in OpenHuman Settings > Providers, then try again.",
@@ -111,14 +115,24 @@ pub(super) async fn evaluate_inference_readiness(
     ctx: &crate::core::runtime::DispatchCtx,
     config: &Config,
     graph: &WorkflowGraph,
-) -> Option<crate::inference::readiness::ReadinessEvaluation> {
+) -> Option<InferenceReadinessEvaluation> {
     let roles: Vec<_> = graph
         .nodes
         .iter()
         .filter(|node| node.kind == NodeKind::Agent)
         .map(|node| (node.id.clone(), agent_node_role(config, node)))
         .collect();
-    crate::inference::readiness::evaluate(ctx, config, &roles).await
+    let evaluation = crate::inference::readiness::evaluate(ctx, config, &roles).await?;
+    let message = format_evaluation(&evaluation);
+    let node_id = match evaluation.failures.as_slice() {
+        [failure] if failure.node_ids.len() == 1 => Some(failure.node_ids[0].clone()),
+        _ => None,
+    };
+    Some(InferenceReadinessEvaluation {
+        status: evaluation.status,
+        message,
+        node_id,
+    })
 }
 
 /// Run-time hard gate, returned in the flows domain's established error shape.
@@ -130,14 +144,11 @@ pub(crate) async fn validate_inference_readiness(
     let Some(evaluation) = evaluate_inference_readiness(ctx, config, graph).await else {
         return Vec::new();
     };
-    let Some(message) = format_evaluation(evaluation.clone()) else {
+    let Some(message) = evaluation.message else {
         return Vec::new();
     };
-    if evaluation.failures.len() == 1 && evaluation.failures[0].node_ids.len() == 1 {
-        vec![format!(
-            "Node '{}': {message}",
-            evaluation.failures[0].node_ids[0]
-        )]
+    if let Some(node_id) = evaluation.node_id {
+        vec![format!("Node '{node_id}': {message}")]
     } else {
         vec![message]
     }
