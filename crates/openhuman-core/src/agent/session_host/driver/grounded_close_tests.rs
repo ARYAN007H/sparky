@@ -226,6 +226,53 @@ fn blank_outcome(truncated: bool) -> TinyagentsTurnOutcome {
     }
 }
 
+#[tokio::test]
+async fn supplemental_close_call_emits_native_start_and_actual_completion() {
+    use tinyagents_harness::events::{AgentEvent, EventListener, EventSink};
+    use tinyagents_harness::ids::RunId;
+    use tinyagents_session::transcript::TranscriptMessage;
+    use std::sync::{Arc, Mutex};
+
+    #[derive(Default)]
+    struct Recorder(Mutex<Vec<AgentEvent>>);
+    impl EventListener for Recorder {
+        fn on_event(&self, record: &tinyagents_harness::events::EventRecord) {
+            self.0.lock().unwrap().push(record.event.clone());
+        }
+    }
+
+    let run_id = RunId::new("host-supplemental-fixture");
+    let sink = EventSink::with_stream_id(run_id.as_str());
+    let recorder = Arc::new(Recorder::default());
+    sink.subscribe(recorder.clone());
+    let trace = SupplementalTrace::new(sink, run_id.clone());
+    let source = TurnModelSource::from_model(Arc::new(
+        tinyagents_harness::testkit::ScriptedModel::replies(vec!["supplemental answer"]),
+    ));
+
+    let (text, usage) = completion(
+        &source,
+        "gpt-4.1",
+        0.0,
+        None,
+        vec![TranscriptMessage::user("supplemental prompt")],
+        Some(trace.as_ref()),
+    )
+    .await;
+
+    assert_eq!(text, "supplemental answer");
+    assert!(usage.is_none());
+    let records = recorder.0.lock().unwrap();
+    assert!(matches!(records.as_slice(), [
+        AgentEvent::ModelStarted { call_id: started, model },
+        AgentEvent::ModelCompleted { call_id: completed, input: Some(input), output: Some(output), .. },
+    ] if started == completed
+        && started.as_str() == "host-supplemental-fixture-host-supplemental-1"
+        && model == "gpt-4.1"
+        && input.to_string().contains("supplemental prompt")
+        && output.to_string().contains("supplemental answer")));
+}
+
 /// #6951: a turn that ended because the model ran out of output tokens while
 /// reasoning is closed with that cause named, not with "you have finished
 /// using tools" — which told the model its unfinished work was done.
