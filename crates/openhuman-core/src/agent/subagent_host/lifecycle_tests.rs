@@ -405,11 +405,11 @@ async fn persistence_inserts_one_terminal_and_returns_the_durable_winner() {
 #[tokio::test]
 async fn canonical_terminal_hides_legacy_pause_without_rewriting_legacy_files() {
     let directory = tempfile::tempdir().unwrap();
-    let legacy_key = key();
+    let key = key();
     let legacy = OpenHumanPersistence::new(directory.path().to_path_buf());
     let checkpoint = SubagentCheckpointData {
-        task_key: Some(legacy_key.clone()),
-        task_id: legacy_key.task_id.clone(),
+        task_key: Some(key.clone()),
+        task_id: key.task_id.clone(),
         agent_id: "researcher".into(),
         worker_thread_id: None,
         history: Vec::new(),
@@ -426,7 +426,7 @@ async fn canonical_terminal_hides_legacy_pause_without_rewriting_legacy_files() 
         artifact_paths: Vec::new(),
         elapsed_ms: 12,
     };
-    let pause_path = legacy.legacy_pause_path(&legacy_key);
+    let pause_path = legacy.legacy_pause_path(&key);
     let index_path = legacy.index_path(&key.task_id);
     std::fs::create_dir_all(pause_path.parent().unwrap()).unwrap();
     let pause_bytes = serde_json::to_vec_pretty(&checkpoint).unwrap();
@@ -450,7 +450,7 @@ async fn canonical_terminal_hides_legacy_pause_without_rewriting_legacy_files() 
 #[tokio::test]
 async fn legacy_pause_migration_preserves_host_checkpoint_metadata_and_bytes() {
     let directory = tempfile::tempdir().unwrap();
-    let key = key();
+    let legacy_key = key();
     let legacy = OpenHumanPersistence::new(directory.path().to_path_buf());
     let checkpoint = SubagentCheckpointData {
         task_key: Some(key.clone()),
