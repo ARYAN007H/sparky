@@ -37,10 +37,9 @@ use tinyagents_orchestration::subagent::{
     record_detached_completion, DetachedCompletionTarget, DetachedSubagentStatus,
 };
 use tinyagents_tasks::{
-    CompletionRecord, CompletionResult, CompletionRouter, CompletionRouterPool,
-    CompletionState, CompletionStatus, CompletionStore, CompletionStoreReplaceOutcome,
-    DriverCompletionStore, InMemoryCompletionStore, NotifyMode, TombstoneOutcome,
-    DEFAULT_MAX_ATTEMPTS,
+    CompletionRecord, CompletionResult, CompletionRouter, CompletionRouterPool, CompletionState,
+    CompletionStatus, CompletionStore, CompletionStoreReplaceOutcome, DriverCompletionStore,
+    InMemoryCompletionStore, NotifyMode, TombstoneOutcome, DEFAULT_MAX_ATTEMPTS,
 };
 
 use super::completion_notice::BackgroundCompletionFormatter;
@@ -227,10 +226,9 @@ pub(super) fn entry_for(workspace_dir: &Path) -> Arc<Entry> {
 /// from the same records, so delivery keeps working in this process. The log on
 /// disk is left as it is and replays on the next boot.
 ///
-/// Serialized per process: when two records hit the failure together, the second
-/// finds the first's fallback already installed and uses it, rather than
-/// installing a second one the delivery loop would never see. `failed` is the
-/// router the caller just saw fail.
+/// The owner migrates the store under the same lock as claims and transitions,
+/// so concurrent callers keep the same router, leases and parent markers.
+/// `failed` is the router the caller just saw fail.
 fn degrade_to_memory(
     ctx: &DispatchCtx,
     workspace_dir: &Path,
@@ -238,8 +236,7 @@ fn degrade_to_memory(
 ) -> Arc<Entry> {
     let scope = router_scope_for(ctx, workspace_dir);
     let previous = failed.store();
-    let replacement: Arc<dyn CompletionStore> =
-        Arc::new(InMemoryCompletionStore::new());
+    let replacement: Arc<dyn CompletionStore> = Arc::new(InMemoryCompletionStore::new());
     match failed.replace_store_if_current(&previous, replacement) {
         Ok(CompletionStoreReplaceOutcome::Replaced(store)) => {
             state().stores.insert(scope, store.clone());
