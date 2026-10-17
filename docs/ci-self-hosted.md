@@ -130,6 +130,9 @@ for any commit without posting it.
   - Cargo's target linker points at `/usr/local/bin/rust-mold-linker`. It survives
     coverage clearing `RUSTFLAGS`. `verify-linkage.mjs` checks `.comment` and LLVM
     sections in actual ordinary and instrumented lane executables and archives proof.
+    Ordinary private dev/test builds use line-table debug information, retaining
+    file:line backtraces with smaller outputs. Coverage keeps its existing
+    `CARGO_PROFILE_DEV_DEBUG=0`; local/hosted and release profile settings are unchanged.
   - Coverage runs each selected package/feature set once through nextest, which
     fails when the selected suite has no tests. Process-per-test isolation and
     nextest resource groups retain external-resource serialization.
