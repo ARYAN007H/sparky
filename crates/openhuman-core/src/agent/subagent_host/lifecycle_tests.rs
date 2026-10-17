@@ -473,5 +473,47 @@ async fn driver_inline_projection_returns_the_durable_winner_not_a_local_loser()
     );
 }
 
+#[tokio::test]
+async fn observer_cancel_survives_a_leader_commit_before_host_projection() {
+    let directory = tempfile::tempdir().unwrap();
+    let key = key();
+    let bundle = OpenHumanDriverBundle::new(directory.path().join("checkpoints")).unwrap();
+
+    // Model the Tiny driver ordering: this invocation has already received
+    // ObserverCancelled, then the independent leader commits before the host
+    // adapter reads the durable lifecycle record.
+    let mut observer = cached_outcome(SubagentRunStatus::Cancelled);
+    observer.persistence_disposition =
+        tinyagents_orchestration::subagent::SubagentPersistenceDisposition::ObserverCancelled;
+    bundle
+        .host_outcome
+        .lock()
+        .unwrap()
+        .insert(key.clone(), observer);
+    let mut leader = SubagentOutcome::cancelled("task");
+    leader.status = SubagentOutcomeKind::Completed;
+    leader.output = "leader result".into();
+    bundle
+        .persistence
+        .record_terminal(&key, &leader, None)
+        .await
+        .unwrap();
+
+    let result = tinytools::ToolResult::error(
+        serde_json::json!({"task_id":"public-job-42", "status":"cancelled"}).to_string(),
+    );
+    let (projected, public_job_id) =
+        resolve_inline_driver_outcome(result, &bundle, &key, "fallback-agent")
+            .await
+            .expect("observer cancellation must survive the leader's later commit");
+
+    assert_eq!(public_job_id, "public-job-42");
+    assert!(matches!(projected.status, SubagentRunStatus::Cancelled));
+    assert_eq!(
+        projected.persistence_disposition,
+        tinyagents_orchestration::subagent::SubagentPersistenceDisposition::ObserverCancelled
+    );
+}
+
 #[path = "lifecycle_terminal_tests.rs"]
 mod terminal_tests;

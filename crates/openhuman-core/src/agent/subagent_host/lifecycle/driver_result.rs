@@ -39,18 +39,6 @@ pub(crate) async fn resolve_inline_driver_outcome(
         .unwrap_or_else(|poisoned| poisoned.into_inner())
         .remove(task_key);
 
-    // TinyAgents returns an observer's cancellation independently from the
-    // leader's durable lifecycle. The leader may commit after this observer
-    // receives its cancellation but before this adapter reads persistence.
-    // In that race, the explicit observer result remains authoritative for
-    // this invocation; consulting the leader's record would turn cancellation
-    // into a status mismatch and a provider error.
-    if let Some(outcome) = cached.as_ref().filter(|host| {
-        host.persistence_disposition == SubagentPersistenceDisposition::ObserverCancelled
-    }) {
-        return Ok((outcome.clone(), public_job_id));
-    }
-
     // The driver's persistence CAS result is authoritative. Another
     // invocation can win terminal/pause persistence while this executor's
     // host-side cache still contains its local loser. Read the same scoped
