@@ -369,7 +369,30 @@ fn triggered_run_guard_retains_long_lived_ids_past_1024_runs() {
             &config.action_dir,
         )),
     );
-    let job = shell_job(&config, "echo guard");
+    let now = chrono::Utc::now();
+    let job = CronJob {
+        claim_generation: 0,
+        policy: Default::default(),
+        id: "overflow-guard-job".into(),
+        expression: "* * * * *".into(),
+        schedule: Schedule::Every { every_ms: 60_000 },
+        command: "echo guard".into(),
+        prompt: None,
+        name: None,
+        job_type: JobType::Shell,
+        session_target: Default::default(),
+        model: None,
+        agent_id: None,
+        enabled: true,
+        delivery: Default::default(),
+        delete_after_run: false,
+        created_at: now,
+        next_run: now,
+        last_run: None,
+        last_status: None,
+        last_output: None,
+        origin: None,
+    };
     for index in 0..1025 {
         binding.publish_triggered_once(&job, &format!("long-lived-run-{index}"));
     }
