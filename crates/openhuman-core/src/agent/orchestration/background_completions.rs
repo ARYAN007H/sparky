@@ -81,6 +81,7 @@ pub(super) struct RouterScope {
 }
 
 impl RouterScope {
+    #[cfg(test)]
     pub(super) fn workspace_dir(&self) -> &Path {
         &self.workspace_dir
     }
