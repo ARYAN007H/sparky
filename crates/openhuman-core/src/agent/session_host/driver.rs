@@ -252,37 +252,27 @@ impl SessionDriver<OpenHumanRunContext> for OpenHumanSessionDriver {
                 },
             ));
         }
-        // A cap pause is advisory in the harness.  Treat an exhausted loop
-        // without a usable final response as capped even if that pause arrived
-        // after the loop's own limit check.
+        // A late cap pause still marks an empty exhausted loop as capped.
         outcome.hit_cap |= outcome.text.trim().is_empty()
             && (outcome.model_calls >= self.max_iterations
                 || outcome.tool_calls >= self.max_iterations
                 || outcome.tool_outcomes.len() >= self.max_iterations);
-        // Older hosted-harness paths materialize this fallback before exposing
-        // the outcome, which leaves the raw call counters unavailable here.
-        // It is only produced when the loop exhausted a tool round without a
-        // model conclusion, so normalize it to the same resumable cap state.
+        // Normalize the exhausted-loop fallback when older hosted paths hide raw counters.
         let exhausted_fallback = outcome
             .text
             .starts_with("I finished this turn without writing up a result.");
         outcome.hit_cap |= exhausted_fallback;
-        // The fallback is not a model-authored wrap-up, even when the shared
-        // middleware reports that it attempted one.  Let the grounded close
-        // replace it with the explicit resumable checkpoint.
+        // This fallback is not model-authored; replace it with the resumable checkpoint.
         if exhausted_fallback {
             outcome.wrap_up_injected = false;
         }
 
-        // When the close (and any required-output repair after it) must be
-        // done by, so the turn commits before the backstop drops it.
+        // Keep the close and any required-output repair inside the turn deadline.
         let close_by = request.run_context.data.turn_deadline.map(|deadline| {
             let now = Instant::now();
             now + deadline.close_budget(now)
         });
-        // A Stop during the close or the repair after it hands back the
-        // accepted rounds like a Stop during the loop, instead of letting the
-        // runtime's grace expire and drop the turn (#7776).
+        // A Stop during close or repair also returns accepted rounds (#7776).
         let accepted_history = request.history.clone();
         let stopped = || {
             driver_cancelled_with_snapshot(
