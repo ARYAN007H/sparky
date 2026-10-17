@@ -66,7 +66,7 @@ fn a_stale_routing_patch_cannot_combine_with_a_newer_unvalidated_route() {
         silent_streaming: true,
         mention_only: false,
     });
-    let channel_origin = |target: &str| JobOrigin::Channel {
+    let channel_origin = |target: &str| tinyflows_bus::schedule::types::JobOrigin::Channel {
         channel: "telegram".into(),
         reply_target: target.into(),
         history_key: format!("telegram-target-{target}"),
@@ -127,12 +127,7 @@ fn a_stale_routing_patch_cannot_combine_with_a_newer_unvalidated_route() {
 
     let saved = get_job(&config, &job.id).unwrap();
     assert_eq!(saved.delivery.mode, "none");
-    assert_eq!(saved.origin, Some(origin_999));
-    assert_ne!(
-        (saved.delivery.mode.as_str(), saved.origin.as_ref()),
-        ("origin", Some(&origin_999)),
-        "a delayed origin-only patch must not inherit A's delivery route"
-    );
+    assert_eq!(saved.origin.as_ref(), Some(&origin_999));
 }
 
 fn agent_context(
