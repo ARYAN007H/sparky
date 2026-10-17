@@ -127,7 +127,7 @@ impl SpawnSubagentTool {
             return Ok(ToolResult::error("spawn_subagent: `prompt` is required"));
         }
         let registry = match AgentDefinitionRegistry::for_core_context(
-            parent.data.dispatch_ctx().into_core(),
+            run_context.dispatch_ctx().into_core(),
         ) {
             Some(reg) => reg,
             None => {
