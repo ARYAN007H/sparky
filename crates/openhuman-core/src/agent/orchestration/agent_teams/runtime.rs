@@ -46,8 +46,6 @@ use tinyagents_orchestration::teams::{
     build_member_prompt, claimable_task, deliver_pending_messages, truncate_chars,
     SessionTeamLedger, TeamError, TeamMemberExecutor, TeamMemberStartError,
 };
-use tinyagents_graph::GraphTracingSink;
-
 const LOG_TARGET: &str = "agent_team_runtime";
 /// Fallback archetype when a member carries no explicit `agent_id`: the
 /// orchestrator, the one general-purpose agent with the full direct belt plus
@@ -152,6 +150,7 @@ pub async fn start_member_run(
         team_id: team_id.to_string(),
         member_id: member_id.to_string(),
         model_override,
+        parent_override: None,
     };
     let (started_tx, started_rx) = tokio::sync::oneshot::channel();
     let mut started_tx = Some(started_tx);
@@ -228,6 +227,7 @@ struct HostTeamMemberExecutor {
     team_id: String,
     member_id: String,
     model_override: Option<String>,
+    parent_override: Option<ParentExecutionContext>,
 }
 
 #[async_trait::async_trait]
@@ -250,7 +250,7 @@ impl TeamMemberExecutor for HostTeamMemberExecutor {
             task.clone(),
             run_id,
             self.model_override.clone(),
-            None,
+            self.parent_override.clone(),
         )
         .await
     }
@@ -399,15 +399,15 @@ async fn record_failure_event(
     .await;
 }
 
-/// The team ledger operations this runtime performs, on the calling tenant's
-/// run ledger in the storage backend. Each opens the ledger for
-/// `workspace_dir` and awaits one port call.
+/// Host-owned team-ledger reads and failure-event projection. Claiming,
+/// active-state transitions, completion and cleanup are owned by TinyAgents'
+/// `TeamService`.
 mod run_ledger {
     use std::path::Path;
 
     use anyhow::{anyhow, Result};
 
-    use super::{AgentTeamMember, AgentTeamTask, ClaimOutcome, CompletionOutcome, RunEventAppend};
+    use super::{AgentTeamMember, AgentTeamTask, RunEventAppend};
 
     fn ledger(
         workspace_dir: &Path,
@@ -431,69 +431,6 @@ mod run_ledger {
     ) -> Result<Vec<AgentTeamTask>> {
         ledger(workspace_dir)?
             .list_agent_team_tasks(team_id)
-            .await
-            .map_err(|e| anyhow!("{e}"))
-    }
-
-    pub(super) async fn claim_agent_team_task(
-        workspace_dir: &Path,
-        team_id: &str,
-        task_id: &str,
-        member_id: &str,
-        claim_token: &str,
-    ) -> Result<ClaimOutcome> {
-        ledger(workspace_dir)?
-            .claim_agent_team_task(team_id, task_id, member_id, claim_token)
-            .await
-            .map_err(|e| anyhow!("{e}"))
-    }
-
-    pub(super) async fn mark_agent_team_member_running(
-        workspace_dir: &Path,
-        team_id: &str,
-        member_id: &str,
-        task_id: &str,
-        worker_thread_id: &str,
-        run_id: &str,
-    ) -> Result<Option<AgentTeamMember>> {
-        ledger(workspace_dir)?
-            .mark_agent_team_member_running(team_id, member_id, task_id, worker_thread_id, run_id)
-            .await
-            .map_err(|e| anyhow!("{e}"))
-    }
-
-    pub(super) async fn mark_agent_team_member_idle(
-        workspace_dir: &Path,
-        team_id: &str,
-        member_id: &str,
-    ) -> Result<Option<AgentTeamMember>> {
-        ledger(workspace_dir)?
-            .mark_agent_team_member_idle(team_id, member_id)
-            .await
-            .map_err(|e| anyhow!("{e}"))
-    }
-
-    pub(super) async fn release_agent_team_task(
-        workspace_dir: &Path,
-        team_id: &str,
-        task_id: &str,
-    ) -> Result<bool> {
-        ledger(workspace_dir)?
-            .release_agent_team_task(team_id, task_id)
-            .await
-            .map_err(|e| anyhow!("{e}"))
-    }
-
-    pub(super) async fn complete_agent_team_task(
-        workspace_dir: &Path,
-        team_id: &str,
-        task_id: &str,
-        member_id: &str,
-        evidence: &[String],
-        require_evidence: bool,
-    ) -> Result<CompletionOutcome> {
-        ledger(workspace_dir)?
-            .complete_agent_team_task(team_id, task_id, member_id, evidence, require_evidence)
             .await
             .map_err(|e| anyhow!("{e}"))
     }
