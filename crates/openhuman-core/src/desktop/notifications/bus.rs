@@ -525,8 +525,8 @@ async fn persist_in_event_context(
     dispatch: &crate::core::runtime::DispatchCtx,
     config: &Config,
     event: &CoreNotificationEvent,
-) -> Option<Result<bool>> {
-    let persist = super::store::insert_core_notification(config, event);
+) -> Option<anyhow::Result<bool>> {
+    let persist = async { super::store::insert_core_notification(config, event) };
     match dispatch.core() {
         Some(core) => Some(
             crate::core::runtime::CoreContext::scope(std::sync::Arc::clone(core), persist).await,
