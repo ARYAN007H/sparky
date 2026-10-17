@@ -17,7 +17,7 @@ use tinyflows::caps::*;
 use tinyflows::error::{EngineError, Result};
 
 use super::*;
-use super::agent_route::{harness_model_default_override, route_custom_entry_lookup, route_for_agent_ref, AgentRoute};
+use crate::flows::agent_route::{harness_model_default_override, route_custom_entry_lookup, route_for_agent_ref, AgentRoute};
 use crate::config::Config;
 
 /// [`AgentRunner`] backing an `agent` node's `agent_ref`. It runs the selected
