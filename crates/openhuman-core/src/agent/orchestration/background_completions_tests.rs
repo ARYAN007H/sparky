@@ -679,7 +679,7 @@ async fn degrading_a_leased_completion_keeps_its_lease() {
             "leased-task",
             "leased-thread",
             "researcher",
-            CompletionStatus::Completed,
+            CompletionStatus::Success,
             CompletionResult::text("done"),
         ))
         .await
