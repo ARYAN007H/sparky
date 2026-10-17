@@ -81,6 +81,13 @@ if [[ "$1" == *"/__admin/health" ]]; then
   done
   exit 1
 fi
+if [[ "$1" == *"/health" ]]; then
+  for _ in {1..100}; do
+    [[ -f "$OPENHUMAN_WORKSPACE/core.started" ]] && exit 0
+    sleep 0.01
+  done
+  exit 1
+fi
 `,
   );
   writeExecutable(
@@ -122,6 +129,7 @@ function stubCore(tree, boundPort, startupDelayMs = 0) {
     bin,
     `#!/usr/bin/env bash
 sleep ${startupDelayMs / 1000}
+touch "$OPENHUMAN_WORKSPACE/core.started"
 ${boundPort == null ? "" : `echo "[core] OpenHuman core is ready \u2014 listening on http://127.0.0.1:${boundPort} (version test)"`}
 sleep 30
 `,
