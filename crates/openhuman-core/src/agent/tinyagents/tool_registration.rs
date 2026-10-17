@@ -140,6 +140,60 @@ struct LiveSubagentControlDispatch {
     tool_sets: Vec<SharedToolSet>,
 }
 
+/// Preserves the product control contract where a nonempty `task_id` wins
+/// over `subagent_session_id`, while routing the selected value through the
+/// generic MessageTool's durable-session lookup. The session port then binds
+/// it to the authenticated full lifecycle key.
+struct TaskFirstSessionMessageDispatch {
+    inner: RegisteredToolDispatch,
+    tool: Arc<dyn Tool>,
+}
+
+#[async_trait]
+impl ToolDispatch<(), OpenHumanRunContext> for TaskFirstSessionMessageDispatch {
+    fn tool(&self) -> Arc<dyn Tool> {
+        self.tool.clone()
+    }
+
+    fn output_origin(&self) -> tinyagents_harness::host::ContentOrigin {
+        self.inner.output_origin()
+    }
+
+    async fn execute(
+        &self,
+        state: &(),
+        call_id: tinyagents_harness::CallId,
+        mut arguments: serde_json::Value,
+        options: ToolCallOptions,
+        parent: &tinyagents_harness::context::RunContext<OpenHumanRunContext>,
+    ) -> anyhow::Result<ToolResult> {
+        if let Some(object) = arguments.as_object_mut() {
+            let selected = object
+                .get("task_id")
+                .and_then(serde_json::Value::as_str)
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .or_else(|| {
+                    object
+                        .get("subagent_session_id")
+                        .and_then(serde_json::Value::as_str)
+                        .map(str::trim)
+                        .filter(|value| !value.is_empty())
+                });
+            if let Some(selected) = selected {
+                object.insert(
+                    "subagent_session_id".into(),
+                    serde_json::Value::String(selected.to_owned()),
+                );
+                object.remove("task_id");
+            }
+        }
+        self.inner
+            .execute(state, call_id, arguments, options, parent)
+            .await
+    }
+}
+
 #[async_trait]
 impl ToolDispatch<(), OpenHumanRunContext> for LiveSubagentControlDispatch {
     fn tool(&self) -> Arc<dyn Tool> {
@@ -401,9 +455,7 @@ fn subagent_control_dispatches(
     }
     if let Some(adapter) = find_tool("steer_subagent") {
         let parent_session = parent_session.clone();
-        dispatches.insert(
-            "steer_subagent".into(),
-            Arc::new(
+        let dispatch: RegisteredToolDispatch = Arc::new(
                 SubAgentMessageTool::new(jobs)
                     .with_tool_name("steer_subagent")
                     .with_description(adapter.description())
@@ -423,7 +475,13 @@ fn subagent_control_dispatches(
                     )
                     .with_owner_scope(owner_scope)
                     .with_sessions(store, move |_| parent_session.clone()),
-            ),
+            );
+        dispatches.insert(
+            "steer_subagent".into(),
+            Arc::new(TaskFirstSessionMessageDispatch {
+                tool: dispatch.tool(),
+                inner: dispatch,
+            }),
         );
     }
     dispatches
