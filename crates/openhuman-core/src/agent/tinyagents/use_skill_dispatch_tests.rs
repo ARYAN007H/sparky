@@ -132,6 +132,12 @@ fn parent_execution_context(workspace_dir: &Path) -> ParentExecutionContext {
 /// `PackRegistryHandle` bound to it, and the `CanonicalSharedToolAdapter`
 /// wrapping `use_skill` that the harness would have registered.
 fn build_use_skill_dispatch_with_handle() -> (UseSkillDispatch, PackRegistryHandle) {
+    build_use_skill_dispatch_with_target("image_agent")
+}
+
+fn build_use_skill_dispatch_with_target(
+    target_id: &str,
+) -> (UseSkillDispatch, PackRegistryHandle) {
     let handle = PackRegistryHandle::default();
     let use_skill_tool: Box<dyn Tool> = Box::new(UseSkillTool::new(
         handle.clone(),
@@ -139,7 +145,7 @@ fn build_use_skill_dispatch_with_handle() -> (UseSkillDispatch, PackRegistryHand
     ));
     let create_image_tool: Box<dyn Tool> = Box::new(StubCreateImage {
         result: "original",
-        target: crate::agent::orchestration::tools::DelegationTarget("image_agent".into()),
+        target: crate::agent::orchestration::tools::DelegationTarget(target_id.into()),
     });
     let durable: Arc<Vec<Box<dyn Tool>>> = Arc::new(vec![use_skill_tool, create_image_tool]);
     handle.bind(Arc::downgrade(&durable));
@@ -209,7 +215,7 @@ async fn use_skill_dispatch_keeps_authorized_target_after_registry_rebind() {
 #[tokio::test]
 async fn use_skill_dispatch_reaches_live_parent_for_packed_archetype_delegate() {
     let _ = AgentDefinitionRegistry::init_global_builtins();
-    let dispatch = build_use_skill_dispatch();
+    let (dispatch, _) = build_use_skill_dispatch_with_target("scoped_only_packed_worker");
     let workspace = tempfile::TempDir::new().expect("workspace");
 
     let parent_data = crate::agent::tinyagents::host::OpenHumanRunContext::new()
