@@ -206,6 +206,7 @@ fn failed_outer_run_promotes_completed_nested_usage_once() {
     outer.promote_completed_descendant_usage();
     assert_eq!(root.subagent_usage_entries().len(), 1);
     assert_eq!(root.subagent_usage_entries()[0].task_id, "nested");
+    assert_eq!(root.subagent_usage_entries()[0].run_id, "run-nested");
 }
 
 #[test]
