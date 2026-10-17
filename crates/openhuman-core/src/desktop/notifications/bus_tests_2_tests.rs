@@ -64,18 +64,11 @@ async fn cron_completion_owner_is_event_data_and_survives_repeated_reads() {
     })
     .await
     .expect("both completion events arrive");
-    let dispatch = crate::core::runtime::DispatchCtx::host_default();
-    let config = crate::config::Config::default();
-    let mut owners = Vec::new();
-    for event in &events {
-        owners.push(event_owner(&dispatch, &config, event).await);
-    }
-
-    assert_eq!(owners[0], Ok(Some("completion-owner-a".into())));
-    assert_eq!(owners[1], Ok(Some("completion-owner-b".into())));
+    assert_eq!(event_owner(&events[0]).as_deref(), Some("completion-owner-a"));
+    assert_eq!(event_owner(&events[1]).as_deref(), Some("completion-owner-b"));
     assert_eq!(
-        event_owner(&dispatch, &config, &events[0]).await,
-        Ok(Some("completion-owner-a".into())),
+        event_owner(&events[0]).as_deref(),
+        Some("completion-owner-a"),
         "reading an event repeatedly must not consume or change its owner"
     );
 }
@@ -612,48 +605,14 @@ fn the_announcement_rule_fails_closed_on_an_unknown_workspace() {
     assert!(!announces_to(Some(a), None));
 }
 
-/// A cron job that completed as an agent is stored with that agent: the
-/// scheduler's note names it even when the job is already gone.
-#[tokio::test]
-async fn a_noted_cron_completion_names_its_agent() {
-    let context =
-        crate::core::runtime::CoreContext::for_test(crate::core::runtime::DomainSet::full(), None)
-            .derive_with(
-                crate::core::runtime::ContextOverlay::new(
-                    crate::config::Config::default(),
-                    crate::core::runtime::DomainSet::full(),
-                    Default::default(),
-                )
-                .session_agent("notif-owner-agent"),
-            );
-    {
-        let scope_ctx = crate::core::runtime::DispatchCtx::new(context);
-
-        crate::cron::completion_owner::note(&scope_ctx, "notif-owner-job");
-    };
+#[test]
+fn legacy_cron_completion_without_tenant_does_not_guess_the_current_agent() {
     let event = DomainEvent::CronJobCompleted {
-        job_id: "notif-owner-job".into(),
+        job_id: "legacy-cron-event".into(),
         success: true,
         output: String::new(),
         tenant: None,
     };
-    let owner = event_owner(
-        &crate::core::runtime::DispatchCtx::host_default(),
-        &crate::config::Config::default(),
-        &event,
-    )
-    .await;
-    assert_eq!(owner, Ok(Some("notif-owner-agent".to_string())));
-    // Taken: asked again, the job is no one's (no backend installed here).
-    if crate::storage::installed().is_none() {
-        assert_eq!(
-            event_owner(
-                &crate::core::runtime::DispatchCtx::host_default(),
-                &crate::config::Config::default(),
-                &event
-            )
-            .await,
-            Ok(None)
-        );
-    }
+
+    assert_eq!(event_owner(&event), None);
 }
