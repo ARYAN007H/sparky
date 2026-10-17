@@ -24,6 +24,7 @@ mod store_rows;
 use store_rows::rows_to_notifications;
 
 use super::storage_schema::{LEGACY_CORE, LEGACY_NOTIFICATIONS, LEGACY_SETTINGS};
+use super::types::IntegrationNotification;
 use crate::config::Config;
 use crate::storage::import::{table_exists, ImportDoc};
 
