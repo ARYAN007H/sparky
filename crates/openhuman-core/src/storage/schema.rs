@@ -11,7 +11,8 @@
 //! gap, so a collision between two owners fails here, at boot and in
 //! `scripts/ci/check-storage-schema.mjs`, never at a first write.
 //!
-//! Owners whose crate is gated off in a build are absent from its registry, as
+//! Module owners come from their `*-bus` contract crates (optional `storage` feature),
+//! never from the implementation libraries. Owners whose crate is gated off in a build are absent from its registry, as
 //! their data is.
 
 use std::sync::OnceLock;
@@ -38,16 +39,16 @@ pub fn owner_schemas() -> Vec<Schema> {
     schemas.push(tinyskills_drivers::storage_schema());
     #[cfg(feature = "modules")]
     {
-        schemas.push(tinymcp::storage::storage_schema());
-        schemas.push(tinychannels::storage::storage_schema());
-        schemas.push(tinyconnectors::state::storage_schema());
-        schemas.push(tinybox_drivers::storage_schema());
-        schemas.push(tinyjuice_drivers::storage_schema());
+        schemas.push(tinymcp_bus::storage::storage_schema());
+        schemas.push(tinychannels_bus::storage::storage_schema());
+        schemas.push(tinyconnectors_bus::storage::storage_schema());
+        schemas.push(tinybox_bus::storage::storage_schema());
+        schemas.push(tinyjuice_bus::storage::storage_schema());
     }
     #[cfg(feature = "web3")]
-    schemas.push(tinywallet_x402::ledger::storage_schema());
+    schemas.push(tinywallet_bus::storage::storage_schema());
     #[cfg(feature = "tinymemes")]
-    schemas.push(tinymemes_module::storage_schema());
+    schemas.push(tinymemes_bus::storage::storage_schema());
     schemas
 }
 

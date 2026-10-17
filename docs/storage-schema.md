@@ -106,6 +106,12 @@ Migration steps:
 | collection | `flows.revisions` | 2 | tenant | `flow_id`, `created_ms` |
 | collection | `flows.runs` | 2 | tenant | `flow_id`, `started_ms`, `status`, `started_ms`, `started_ms` |
 | collection | `flows.suggestions` | 2 | tenant | `status`, `created_ms` |
+| collection | `flows.workflow_notes` | 2 | tenant |  |
+| collection | `flows.workflow_proposals` | 2 | tenant | `workflow_id`, `created_ms` |
+| collection | `flows.workflow_quarantine` | 2 | tenant |  |
+| collection | `flows.workflow_revisions` | 2 | tenant | `workflow_id`, `superseded_ms` |
+| collection | `flows.workflow_runs` | 2 | tenant | `workflow_id`, `started_ms`, `settled`, `started_ms` |
+| collection | `flows.workflows` | 2 | tenant |  |
 
 Migration steps:
 
@@ -114,6 +120,12 @@ Migration steps:
 - `runs_v2`: `flows.runs` v1 to v2 from `flows_runs`
 - `suggestions_v2`: `flows.suggestions` v1 to v2 from `flows_suggestions`
 - `drafts_v2`: `flows.drafts` v1 to v2 from `flows_drafts`
+- `workflows_v2`: `flows.workflows` v1 to v2 from `wf_definitions`
+- `workflow_revisions_v2`: `flows.workflow_revisions` v1 to v2 from `wf_revisions`
+- `workflow_runs_v2`: `flows.workflow_runs` v1 to v2 from `wf_runs`
+- `workflow_notes_v2`: `flows.workflow_notes` v1 to v2 from `wf_notes`
+- `workflow_proposals_v2`: `flows.workflow_proposals` v1 to v2 from `wf_proposals`
+- `workflow_quarantine_v2`: `flows.workflow_quarantine` v1 to v2 from `wf_quarantine`
 
 ## graph
 

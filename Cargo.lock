@@ -5449,7 +5449,6 @@ dependencies = [
  "tinyagents-tasks",
  "tinybox-bus 0.1.36",
  "tinybox-core",
- "tinybox-drivers",
  "tinybus",
  "tinybus-module",
  "tinychannels",
@@ -5457,7 +5456,6 @@ dependencies = [
  "tinychannels-module",
  "tinychannels-runtime",
  "tinycomputer-bus",
- "tinyconnectors",
  "tinyconnectors-bus",
  "tinydocs-bus",
  "tinyflows",
@@ -5476,11 +5474,8 @@ dependencies = [
  "tinyinference-providers",
  "tinyinference-voice",
  "tinyjuice-bus",
- "tinyjuice-drivers",
- "tinymcp",
  "tinymcp-bus",
  "tinymemes-bus",
- "tinymemes-module",
  "tinymemory-api",
  "tinymemory-integrations",
  "tinymemory-tools",
@@ -5498,7 +5493,6 @@ dependencies = [
  "tinyvoice-bus",
  "tinywallet",
  "tinywallet-bus",
- "tinywallet-x402",
  "tokio",
  "tokio-tungstenite 0.29.0",
  "tokio-util",
@@ -8598,6 +8592,8 @@ name = "tinybox-bus"
 version = "0.1.36"
 dependencies = [
  "serde",
+ "serde_json",
+ "tinystoragedrivers-core",
 ]
 
 [[package]]
@@ -8636,6 +8632,7 @@ dependencies = [
  "log",
  "serde",
  "serde_json",
+ "tinybox-bus 0.1.36",
  "tinybox-core",
  "tinybox-jail",
  "tinystoragedrivers-core",
@@ -8821,6 +8818,7 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror 2.0.20",
+ "tinystoragedrivers-core",
  "tokio",
 ]
 
@@ -9010,6 +9008,7 @@ version = "0.19.3"
 dependencies = [
  "serde",
  "serde_json",
+ "tinystoragedrivers-core",
 ]
 
 [[package]]
@@ -9470,6 +9469,7 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror 2.0.20",
+ "tinystoragedrivers-core",
 ]
 
 [[package]]
@@ -9478,6 +9478,7 @@ version = "0.9.0"
 dependencies = [
  "log",
  "tinyjuice",
+ "tinyjuice-bus",
  "tinystoragedrivers-core",
 ]
 
@@ -9553,22 +9554,7 @@ dependencies = [
  "schemars",
  "serde",
  "serde_json",
-]
-
-[[package]]
-name = "tinymemes"
-version = "0.4.0"
-dependencies = [
- "async-trait",
- "futures",
- "reqwest 0.12.28",
- "serde",
- "serde_json",
- "thiserror 2.0.20",
- "tinyinference-decisions 0.4.1",
- "tinymemes-bus",
- "tokio",
- "tracing",
+ "tinystoragedrivers-core",
 ]
 
 [[package]]
@@ -9577,24 +9563,7 @@ version = "0.4.0"
 dependencies = [
  "serde",
  "serde_json",
-]
-
-[[package]]
-name = "tinymemes-module"
-version = "0.4.0"
-dependencies = [
- "async-trait",
- "reqwest 0.12.28",
- "serde",
- "serde_json",
- "tinybus",
- "tinybus-module",
- "tinymemes",
- "tinymemes-bus",
- "tinystoragedrivers-bus",
  "tinystoragedrivers-core",
- "tokio",
- "tracing",
 ]
 
 [[package]]
@@ -10001,6 +9970,7 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror 2.0.20",
+ "tinystoragedrivers-core",
 ]
 
 [[package]]
@@ -10086,6 +10056,7 @@ dependencies = [
  "sha3 0.12.0",
  "thiserror 2.0.20",
  "tinystoragedrivers-core",
+ "tinywallet-bus",
  "tinywallet-crypto",
  "tokio",
 ]
