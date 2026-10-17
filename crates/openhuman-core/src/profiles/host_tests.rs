@@ -12,6 +12,15 @@ fn profile(name: &str) -> ProfileId {
     ProfileId::for_user(name, crate::profiles::ProfileIdMode::Raw).unwrap()
 }
 
+fn raw_profile_agent_add() -> tinyflows_bus::schedule::StoreOperation {
+    tinyflows_bus::schedule::StoreOperation::AddAgent {
+        spec: tinyflows_bus::schedule::AgentJobSpec::new(
+            tinyflows_bus::schedule::Schedule::Every { every_ms: 600_000 },
+            "profile quota transition probe",
+        ),
+    }
+}
+
 #[tokio::test]
 async fn provisioning_creates_the_layout_once() {
     let tmp = tempfile::tempdir().unwrap();
@@ -437,4 +446,86 @@ async fn provisioning_installs_the_cron_cap_in_the_profile_scope() {
         error.to_string().contains("active job limit"),
         "unexpected admission error: {error}"
     );
+}
+
+#[tokio::test]
+async fn opening_an_existing_profile_adopts_the_enforced_cron_cap() {
+    let tmp = tempfile::tempdir().unwrap();
+    let id = profile("cron-cap-adopt-existing");
+    let unenforced = ProfileHost::new(
+        SaasConfig::new(tmp.path()),
+        CoreContext::for_test(DomainSet::full(), None),
+    );
+    unenforced.provision(&id).await.unwrap();
+
+    let mut saas = SaasConfig::new(tmp.path());
+    saas.cron.agent_jobs_only = true;
+    saas.cron.max_active_jobs = 1;
+    let enforced = ProfileHost::new(saas, CoreContext::for_test(DomainSet::full(), None));
+    assert!(!enforced.provision(&id).await.unwrap());
+    let _profile = enforced.open(&id).await.unwrap();
+    let config = enforced.provisioned_config(&id).await.unwrap();
+    let scope = crate::cron::documents_port::DocScope::for_scope(
+        &config,
+        crate::storage::scope_for_profile(id.as_str()),
+    );
+
+    crate::cron::client::store_in::<crate::cron::CronJob>(
+        &config,
+        &scope,
+        raw_profile_agent_add(),
+    )
+    .await
+    .unwrap();
+    let second = crate::cron::client::store_in::<crate::cron::CronJob>(
+        &config,
+        &scope,
+        raw_profile_agent_add(),
+    )
+    .await;
+    let error = second.expect_err("opening a profile should adopt the configured cron cap");
+    assert!(error.to_string().contains("active job limit"), "{error}");
+}
+
+#[tokio::test]
+async fn disabling_profile_cron_limits_clears_the_persisted_store_cap() {
+    let tmp = tempfile::tempdir().unwrap();
+    let id = profile("cron-cap-toggle-off");
+    let mut saas = SaasConfig::new(tmp.path());
+    saas.cron.agent_jobs_only = true;
+    saas.cron.max_active_jobs = 1;
+    let enforced = ProfileHost::new(saas, CoreContext::for_test(DomainSet::full(), None));
+    enforced.provision(&id).await.unwrap();
+    let config = enforced.provisioned_config(&id).await.unwrap();
+    let scope = crate::cron::documents_port::DocScope::for_scope(
+        &config,
+        crate::storage::scope_for_profile(id.as_str()),
+    );
+    crate::cron::client::store_in::<crate::cron::CronJob>(
+        &config,
+        &scope,
+        raw_profile_agent_add(),
+    )
+    .await
+    .unwrap();
+
+    let unenforced = ProfileHost::new(
+        SaasConfig::new(tmp.path()),
+        CoreContext::for_test(DomainSet::full(), None),
+    );
+    unenforced.provision(&id).await.unwrap();
+    let _profile = unenforced.open(&id).await.unwrap();
+    let config = unenforced.provisioned_config(&id).await.unwrap();
+    let scope = crate::cron::documents_port::DocScope::for_scope(
+        &config,
+        crate::storage::scope_for_profile(id.as_str()),
+    );
+
+    crate::cron::client::store_in::<crate::cron::CronJob>(
+        &config,
+        &scope,
+        raw_profile_agent_add(),
+    )
+    .await
+    .expect("disabling operator policy should clear its persisted cap");
 }
