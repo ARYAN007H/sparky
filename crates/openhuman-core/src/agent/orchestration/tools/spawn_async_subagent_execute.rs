@@ -182,15 +182,12 @@ impl SpawnAsyncSubagentTool {
         if let Some(session) = reusable.as_ref() {
             if session.status == DurableSubagentStatus::Running {
                 if let Some(ref running_task_id) = session.current_task_id {
-                    match running_subagents::steer(
-                        &dispatch,
-                        running_task_id,
-                        &parent_session,
+                    match super::steer_reusable_session(
+                        &detached_parent,
+                        &session.subagent_session_id,
                         follow_up_prompt.clone(),
-                        tinyagents_harness::run_queue::QueueLane::Steer,
                     )
-                    .await
-                    {
+                    .await {
                         Ok(()) => {
                             log::info!(
                                 "[subagent_reuse] parent_thread_id={} subagent_session_id={} task_id={} agent_id={} reuse_decision={}",
@@ -373,7 +370,7 @@ impl SpawnAsyncSubagentTool {
         );
         let completion_core = dispatch.clone().into_core();
         let completion_origin = detached_parent.data.origin.clone();
-        let completion = move |_target: String, result: Result<SubagentRunOutcome, String>| {
+        let completion = move |_target: String, result: Result<SubagentRunOutcome, String>, emit_lifecycle_effects: bool| {
             let core = completion_core.clone();
             let origin = completion_origin.clone();
             let progress_sink = progress_sink.clone();
@@ -387,7 +384,6 @@ impl SpawnAsyncSubagentTool {
                     let result = result.map_err(anyhow::Error::msg);
                     match result {
                     Ok(outcome) => {
-                        let emit_lifecycle_effects = outcome.should_emit_lifecycle_effects();
                         match outcome.status {
                             SubagentRunStatus::Completed => {
                                 if let Err(err) = subagent_sessions::mark_finished(
