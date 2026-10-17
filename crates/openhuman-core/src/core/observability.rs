@@ -16,6 +16,10 @@
 
 pub(crate) mod progress_tracing;
 
+#[cfg(test)]
+#[path = "observability/trace_export_adoption_tests.rs"]
+mod trace_export_adoption_tests;
+
 #[path = "observability_channel_message.rs"]
 mod channel_message;
 #[cfg(feature = "crash-reporting")]
