@@ -13,6 +13,61 @@ use super::types::{
     SubagentSessionStore, SubagentSessionUpsert,
 };
 
+/// Requests cancellation of driver-backed children owned by a thread being
+/// removed. The TinyAgents registry owns cancellation and settlement; this
+/// adapter only selects durable rows and resolves their authenticated keys.
+pub fn cancel_driver_jobs_for_thread(
+    store: &SubagentSessionStore,
+    workspace_dir: &Path,
+    jobs: &tinyagents_orchestration::subagent::SubAgentJobRegistry,
+    thread_id: &str,
+) -> usize {
+    let sessions = match store.load() {
+        Ok(sessions) => sessions,
+        Err(error) => {
+            log::warn!("[subagent_sessions] failed to load sessions for thread cancellation: {error}");
+            return 0;
+        }
+    };
+    let mut cancelled = 0;
+    for session in sessions.into_iter().filter(|session| {
+        session.parent_thread_id.as_deref() == Some(thread_id)
+            && matches!(
+                session.status,
+                DurableSubagentStatus::Running | DurableSubagentStatus::AwaitingUser
+            )
+    }) {
+        let Some(task_id) = session.current_task_id.as_deref() else {
+            continue;
+        };
+        let key = session
+            .lifecycle_key
+            .filter(|key| key.task_id == task_id)
+            .or_else(|| {
+                resolve_lifecycle_key(
+                    store,
+                    &session.subagent_session_id,
+                    &session.parent_session,
+                    Some(thread_id),
+                    &workspace_dir.join(".openhuman/subagent_checkpoints"),
+                )
+                .ok()
+                .filter(|key| key.task_id == task_id)
+            });
+        let Some(key) = key else {
+            continue;
+        };
+        let owner = crate::agent::tinyagents::tool_registration::subagent_owner_key(
+            &session.parent_session,
+            Some(thread_id),
+        );
+        if jobs.cancel_key_owned(&key, owner).is_ok() {
+            cancelled += 1;
+        }
+    }
+    cancelled
+}
+
 /// Resolve a saved product session to its exact TinyAgents lifecycle key.
 ///
 /// The product session lookup is scoped by the authenticated parent session,
