@@ -210,7 +210,7 @@ impl OpenHumanTurnPrelude {
     /// Assemble every dynamic, host-owned user-turn addition after the runtime
     /// has selected/resumed its transcript.  The returned message is then the
     /// sole input which `Session` appends to generic history.
-    async fn enrich_request(
+    pub(super) async fn enrich_request(
         &self,
         original_user_message: &str,
         turn: &super::super::types::TurnInputs,
