@@ -46,8 +46,8 @@ use tinyagents_orchestration::subagent::{
     record_detached_completion, DetachedCompletionTarget, DetachedSubagentStatus,
 };
 use tinyagents_tasks::{
-    CompletionRecord, CompletionResult, CompletionRouter, CompletionRouterPool, CompletionState,
-    CompletionStatus, CompletionStore, NotifyMode, TombstoneOutcome,
+    CompletionRecord, CompletionResult, CompletionRouter, CompletionState, CompletionStatus,
+    CompletionStore, NotifyMode, TombstoneOutcome,
 };
 
 use super::completion_notice::BackgroundCompletionFormatter;

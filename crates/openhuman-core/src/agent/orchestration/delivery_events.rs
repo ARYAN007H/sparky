@@ -4,7 +4,7 @@ use super::*;
 
 /// One drain an event asks for: the thread, how soon, and the context of the
 /// profile that owns it (`None` on the desktop, where nothing is per profile).
-pub(super) struct Drain {
+pub(in crate::agent::orchestration) struct Drain {
     pub(super) owner: Option<Arc<CoreContext>>,
     pub(super) thread_id: String,
     pub(super) delay: Duration,
@@ -14,7 +14,9 @@ pub(super) struct Drain {
 /// profile. A session that maps to no thread (cron, voice, skills) has nothing
 /// to deliver into.
 #[cfg(test)]
-pub(super) fn drain_schedule(event: &DomainEvent) -> Option<(String, Duration)> {
+pub(in crate::agent::orchestration) fn drain_schedule(
+    event: &DomainEvent,
+) -> Option<(String, Duration)> {
     let drain = drain_schedule_in(false, event, |_| None)
         .into_iter()
         .next()?;
@@ -69,7 +71,7 @@ fn owners_of(session: &str, task: Option<&String>) -> Vec<String> {
 }
 
 /// The profiles whose contexts [`drain_schedule_in`] will ask for.
-pub(super) fn owning_profiles(event: &DomainEvent) -> Vec<String> {
+pub(in crate::agent::orchestration) fn owning_profiles(event: &DomainEvent) -> Vec<String> {
     drain_target(event)
         .map(|(session, task, _)| owners_of(session, task))
         .unwrap_or_default()
@@ -81,7 +83,7 @@ pub(super) fn owning_profiles(event: &DomainEvent) -> Vec<String> {
 /// [`completion_owners`] and each is resolved through `resolve` and drained in
 /// its own scope, where it reaches only its own tables. In SaaS (`saas`) an id
 /// with no owner is dropped; elsewhere it drains unscoped, as on the desktop.
-pub(super) fn drain_schedule_in(
+pub(in crate::agent::orchestration) fn drain_schedule_in(
     saas: bool,
     event: &DomainEvent,
     resolve: impl Fn(&str) -> Option<Arc<CoreContext>>,

@@ -1,8 +1,15 @@
 //! Storage and router-pool adapters for background completion records.
 
 use super::*;
+use tinyagents_tasks::{
+    CompletionRouterPool, CompletionStoreReplaceOutcome, DriverCompletionStore,
+    InMemoryCompletionStore, DEFAULT_MAX_ATTEMPTS,
+};
 
-pub(super) fn router_scope_for(ctx: &DispatchCtx, workspace_dir: &Path) -> RouterScope {
+pub(in crate::agent::orchestration) fn router_scope_for(
+    ctx: &DispatchCtx,
+    workspace_dir: &Path,
+) -> RouterScope {
     let profile = crate::core::runtime::tenant::isolated_unless_tenant(
         ctx.tenant(),
         "background_completions",
@@ -15,13 +22,13 @@ pub(super) fn router_scope_for(ctx: &DispatchCtx, workspace_dir: &Path) -> Route
 }
 
 #[cfg(test)]
-pub(super) fn router_scope(workspace_dir: &Path) -> RouterScope {
+pub(in crate::agent::orchestration) fn router_scope(workspace_dir: &Path) -> RouterScope {
     router_scope_for(&DispatchCtx::ambient(), workspace_dir)
 }
 
 /// The durable completion queue of `workspace_dir` in the storage backend,
 /// under the calling tenant's scope.
-pub(super) fn open_driver_store(
+pub(in crate::agent::orchestration) fn open_driver_store(
     ctx: &DispatchCtx,
     workspace_dir: &Path,
 ) -> anyhow::Result<Arc<dyn CompletionStore>> {
@@ -52,7 +59,7 @@ fn with_storage_context<R>(
     ))
 }
 
-pub(super) fn router_pool() -> &'static CompletionRouterPool<RouterScope> {
+pub(in crate::agent::orchestration) fn router_pool() -> &'static CompletionRouterPool<RouterScope> {
     static POOL: OnceLock<CompletionRouterPool<RouterScope>> = OnceLock::new();
     POOL.get_or_init(|| {
         CompletionRouterPool::new(|scope: &RouterScope| {
@@ -83,14 +90,17 @@ pub(super) fn router_pool() -> &'static CompletionRouterPool<RouterScope> {
 }
 
 #[cfg(test)]
-pub(super) fn test_store_overrides(
+pub(in crate::agent::orchestration) fn test_store_overrides(
 ) -> &'static Mutex<HashMap<RouterScope, Arc<dyn CompletionStore>>> {
     static STORES: OnceLock<Mutex<HashMap<RouterScope, Arc<dyn CompletionStore>>>> =
         OnceLock::new();
     STORES.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
-pub(super) fn entry_for_ctx(ctx: &DispatchCtx, workspace_dir: &Path) -> Arc<Entry> {
+pub(in crate::agent::orchestration) fn entry_for_ctx(
+    ctx: &DispatchCtx,
+    workspace_dir: &Path,
+) -> Arc<Entry> {
     let scope = router_scope_for(ctx, workspace_dir);
     let unbound_saas_without_foreign_scope = crate::core::runtime::is_saas()
         && ctx.resolved().is_none()
@@ -120,7 +130,7 @@ pub(super) fn entry_for_ctx(ctx: &DispatchCtx, workspace_dir: &Path) -> Arc<Entr
 }
 
 #[cfg(test)]
-pub(super) fn entry_for(workspace_dir: &Path) -> Arc<Entry> {
+pub(in crate::agent::orchestration) fn entry_for(workspace_dir: &Path) -> Arc<Entry> {
     entry_for_ctx(&DispatchCtx::ambient(), workspace_dir)
 }
 
@@ -131,7 +141,7 @@ pub(super) fn entry_for(workspace_dir: &Path) -> Arc<Entry> {
 /// The owner migrates the store under the same lock as claims and transitions,
 /// so concurrent callers keep the same router, leases and parent markers.
 /// `failed` is the router the caller just saw fail.
-pub(super) fn degrade_to_memory(
+pub(in crate::agent::orchestration) fn degrade_to_memory(
     ctx: &DispatchCtx,
     workspace_dir: &Path,
     failed: &Arc<CompletionRouter>,
@@ -175,14 +185,16 @@ pub(super) fn degrade_to_memory(
     }
 }
 
-pub(super) fn new_router(store: Arc<dyn CompletionStore>) -> CompletionRouter {
+pub(in crate::agent::orchestration) fn new_router(
+    store: Arc<dyn CompletionStore>,
+) -> CompletionRouter {
     CompletionRouter::new(store)
         .with_formatter(Arc::new(BackgroundCompletionFormatter))
         .with_max_attempts(DEFAULT_MAX_ATTEMPTS)
 }
 
 /// The router for `workspace_dir`, opening it on first use.
-pub(crate) fn router_for_workspace_ctx(
+pub(in crate::agent::orchestration) fn router_for_workspace_ctx(
     ctx: &DispatchCtx,
     workspace_dir: &Path,
 ) -> Arc<CompletionRouter> {
@@ -191,6 +203,8 @@ pub(crate) fn router_for_workspace_ctx(
 
 #[cfg(test)]
 #[cfg(test)]
-pub(crate) fn router_for_workspace(workspace_dir: &Path) -> Arc<CompletionRouter> {
+pub(in crate::agent::orchestration) fn router_for_workspace(
+    workspace_dir: &Path,
+) -> Arc<CompletionRouter> {
     router_for_workspace_ctx(&DispatchCtx::ambient(), workspace_dir)
 }
