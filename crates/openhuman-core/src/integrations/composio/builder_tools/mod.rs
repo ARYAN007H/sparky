@@ -21,5 +21,5 @@ pub use connection_reads::{
 pub use tool_contract::{GetToolContractTool, GetToolOutputSampleTool};
 
 #[cfg(test)]
-#[path = "owner_tools_tests.rs"]
+#[path = "mod_tests.rs"]
 mod tests;

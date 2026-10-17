@@ -77,7 +77,7 @@ fn capability_error_display(message: &str) -> String {
 }
 
 #[cfg(test)]
-#[path = "composio_adapter_tests.rs"]
+#[path = "composio_tests.rs"]
 mod tests;
 
 #[async_trait]
