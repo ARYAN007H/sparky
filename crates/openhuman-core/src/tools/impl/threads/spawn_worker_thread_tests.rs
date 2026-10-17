@@ -62,9 +62,11 @@ async fn rejects_if_already_worker_thread() {
     let result = spawn_from_thread(temp.path(), thread_id).await;
 
     assert!(result.is_error);
-    assert!(result
-        .output()
-        .contains("cannot spawn other worker threads"));
+    assert!(
+        result
+            .output()
+            .contains("cannot spawn other worker threads")
+    );
 }
 
 #[tokio::test]
@@ -89,9 +91,11 @@ async fn rejects_if_has_parent_thread_id() {
     let result = spawn_from_thread(temp.path(), thread_id).await;
 
     assert!(result.is_error);
-    assert!(result
-        .output()
-        .contains("cannot spawn other worker threads"));
+    assert!(
+        result
+            .output()
+            .contains("cannot spawn other worker threads")
+    );
 }
 
 async fn spawn_from_thread(workspace: &std::path::Path, thread_id: &str) -> tinytools::ToolResult {
