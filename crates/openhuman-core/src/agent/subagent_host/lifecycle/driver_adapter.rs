@@ -345,7 +345,24 @@ pub(in crate::agent::subagent_host) fn outcome_to_host(
         None
     };
     let durable_metadata = if host.is_none() {
-        persistence.durable_host_metadata(task_key).ok().flatten()
+        let extensions = &outcome.extensions;
+        let agent_id = extensions
+            .get("agent_id")
+            .and_then(serde_json::Value::as_str)
+            .filter(|agent_id| !agent_id.is_empty())
+            .map(str::to_owned);
+        let elapsed_ms = extensions
+            .get("elapsed_ms")
+            .and_then(serde_json::Value::as_u64);
+        match (agent_id, elapsed_ms) {
+            (Some(agent_id), elapsed_ms) => Some((agent_id, elapsed_ms.unwrap_or_default())),
+            (None, Some(elapsed_ms)) => persistence
+                .durable_host_metadata(task_key)
+                .ok()
+                .flatten()
+                .or_else(|| Some((fallback_agent_id.to_owned(), elapsed_ms))),
+            (None, None) => persistence.durable_host_metadata(task_key).ok().flatten(),
+        }
     } else {
         None
     };
