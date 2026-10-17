@@ -21,9 +21,9 @@ use async_trait::async_trait;
 use serde_json::json;
 use std::path::Path;
 use std::sync::Arc;
+use tinyagents_harness::CallId;
 use tinyagents_harness::context::RunConfig;
 use tinyagents_harness::tool::packs::{PackRegistryHandle, UseSkillTool};
-use tinyagents_harness::CallId;
 use tinyinference_llm::message::Message;
 use tinyinference_llm::model::{ChatModel, ModelProfile, ModelRequest, ModelResponse};
 use tinytools::{Tool, ToolCallOptions, ToolResult};
@@ -303,9 +303,7 @@ async fn packed_delegate_uses_scoped_target_and_registers_shared_job() {
 
     assert!(!result.is_error, "{}", result.output());
     assert!(
-        result
-            .text()
-            .starts_with("a generated image description"),
+        result.text().starts_with("a generated image description"),
         "the typed inline delegation result keeps the child output: {}",
         result.text()
     );

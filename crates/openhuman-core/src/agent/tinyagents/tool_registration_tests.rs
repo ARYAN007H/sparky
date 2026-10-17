@@ -188,7 +188,7 @@ async fn live_close_alias_enforces_parent_thread_ownership() {
         DurableSubagentSession, DurableSubagentStatus, SubagentSessionStore,
     };
     use tinyagents_harness::{
-        agent_loop::phases::execute_tool_batch, context::RunConfig, ComponentId,
+        ComponentId, agent_loop::phases::execute_tool_batch, context::RunConfig,
     };
 
     let workspace = tempfile::tempdir().expect("live harness workspace");
@@ -269,14 +269,14 @@ async fn live_close_alias_enforces_parent_thread_ownership() {
         .into_tinyagents(RunConfig::new("live-close-parent").with_thread("voice-thread"));
     let foreign = dispatch
         .execute(
-        &(),
-        tinyagents_harness::CallId::new("close-foreign-call"),
-        serde_json::json!({"subagent_session_id":"foreign-session"}),
-        tinytools::ToolCallOptions::default(),
-        &run,
-    )
-    .await
-    .expect("foreign close dispatch");
+            &(),
+            tinyagents_harness::CallId::new("close-foreign-call"),
+            serde_json::json!({"subagent_session_id":"foreign-session"}),
+            tinytools::ToolCallOptions::default(),
+            &run,
+        )
+        .await
+        .expect("foreign close dispatch");
     assert!(
         foreign.text().contains("not found for this parent thread"),
         "foreign live close should fail closed: {}",
@@ -288,14 +288,14 @@ async fn live_close_alias_enforces_parent_thread_ownership() {
 
     let owned = dispatch
         .execute(
-        &(),
-        tinyagents_harness::CallId::new("close-owned-call"),
-        serde_json::json!({"subagent_session_id":"owned-session"}),
-        tinytools::ToolCallOptions::default(),
-        &run,
-    )
-    .await
-    .expect("owned close dispatch");
+            &(),
+            tinyagents_harness::CallId::new("close-owned-call"),
+            serde_json::json!({"subagent_session_id":"owned-session"}),
+            tinytools::ToolCallOptions::default(),
+            &run,
+        )
+        .await
+        .expect("owned close dispatch");
     assert!(
         owned.text().contains("closed"),
         "owned live close should report closure: {}",
@@ -309,7 +309,7 @@ async fn live_close_alias_enforces_parent_thread_ownership() {
 #[tokio::test]
 async fn registered_memory_dispatch_enforces_one_budget_across_distinct_calls() {
     use crate::memory::test_fixtures::{bind_reference, config_in};
-    use tinyagents_harness::{context::RunConfig, CallId};
+    use tinyagents_harness::{CallId, context::RunConfig};
     use tinytools::ToolCallOptions;
     let workspace = tempfile::tempdir().unwrap();
     let config = config_in(&workspace);
