@@ -99,7 +99,6 @@ fn schedule_workflow_drive(
                 return;
             };
             run_engine_loop(
-                &ctx,
                 &config,
                 &run_id,
                 definition,
@@ -289,7 +288,6 @@ pub async fn resume_workflow_run(
 /// lifecycle. Errors are recorded on the run row (status `Failed`) rather than
 /// propagated — there is no caller to receive them.
 pub(crate) async fn run_engine_loop(
-    ctx: &DispatchCtx,
     config: &Config,
     run_id: &str,
     definition: WorkflowDefinition,
@@ -311,7 +309,9 @@ pub(crate) async fn run_engine_loop(
         Ok(tier) => tier,
         Err(error) => {
             log::error!(target: LOG_TARGET, "[workflow_run_engine] loop.safety_admission_failed run={run_id} err={error}");
-            if let Ok(Some(run)) = get_workflow_run(config, run_id) {
+            if workflow_supervisor().is_current(&handle)
+                && let Ok(Some(run)) = get_workflow_run(config, run_id)
+            {
                 let _ = compare_and_swap_workflow_run_lifecycle(
                     config,
                     WorkflowRunUpsert {
@@ -339,38 +339,26 @@ pub(crate) async fn run_engine_loop(
             return;
         }
     };
-    let outcome = with_root_parent(
-        ctx,
-        parent_override,
-        config,
-        "workflow_engine",
-        "workflow",
-        "workflow",
-        |parent| async move {
-            let engine = WorkflowEngine::new(
-                store,
-                Arc::new(super::host::OpenHumanWorkflowExecutor::new(
-                    run_id,
-                    model_override,
-                    safety_tier,
-                    Some(parent),
-                )),
-            )
-            .with_event_sink(Arc::new(tinyagents_graph::GraphTracingSink::new(format!(
-                "workflow:{run_id}"
-            ))));
-            engine
-                .drive(run_id, &definition, cancel_token)
-                .await
-                .map_err(anyhow::Error::msg)
-        },
+    let parent = parent_override.expect("owner lifecycle created the OpenHuman root parent");
+    let engine = WorkflowEngine::new(
+        store,
+        Arc::new(super::host::OpenHumanWorkflowExecutor::new(
+            run_id,
+            model_override,
+            safety_tier,
+            Some(parent),
+        )),
     )
-    .await
-    // Flatten: outer Err = root-parent build failure, inner = drive_phases result.
-    .unwrap_or_else(Err);
+    .with_event_sink(Arc::new(tinyagents_graph::GraphTracingSink::new(format!(
+        "workflow:{run_id}"
+    ))));
+    let outcome = engine
+        .drive(run_id, &definition, cancel_token)
+        .await
+        .map_err(anyhow::Error::msg);
 
     if let Err(err) = outcome {
-        if !is_current_cancel_signal(run_id, &cancel) {
+        if !workflow_supervisor().is_current(&handle) {
             log::debug!(
                 target: LOG_TARGET,
                 "[workflow_run_engine] loop.owner_lost run={run_id}; suppressing stale failure"
@@ -390,7 +378,8 @@ pub(crate) async fn run_engine_loop(
                     | WorkflowRunStatus::Cancelled
                     | WorkflowRunStatus::Interrupted
             ) {
-                let _ = compare_and_swap_workflow_run_lifecycle(
+                if workflow_supervisor().is_current(&handle) {
+                    let _ = compare_and_swap_workflow_run_lifecycle(
                     config,
                     WorkflowRunUpsert {
                         id: run.id.clone(),
@@ -404,13 +393,13 @@ pub(crate) async fn run_engine_loop(
                         started_at: Some(run.started_at),
                         completed_at: Some(chrono::Utc::now()),
                     },
-                    run.revision,
-                );
+                        run.revision,
+                    );
+                }
             }
         }
     }
 
-    clear_cancel_signal(run_id, &cancel);
 }
 
 #[cfg(test)]
