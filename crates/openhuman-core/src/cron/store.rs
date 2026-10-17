@@ -194,7 +194,33 @@ pub fn due_jobs(config: &Config, now: DateTime<Utc>) -> Result<Vec<CronJob>> {
 }
 
 pub fn update_job(config: &Config, job_id: &str, patch: CronJobPatch) -> Result<CronJob> {
+    update_job_with_origin(config, job_id, patch, None)
+}
+
+/// Update a job, using only a host-verified conversation origin for delivery
+/// validation. Raw origins stored on jobs or supplied by RPC are not trusted.
+pub(crate) fn update_job_with_origin(
+    config: &Config,
+    job_id: &str,
+    patch: CronJobPatch,
+    trusted_origin: Option<tinyflows_bus::schedule::types::JobOrigin>,
+) -> Result<CronJob> {
     limits::check_patch(config, &patch)?;
+    if patch.delivery.is_some() || patch.origin.is_some() {
+        let existing = get_job(config, job_id)?;
+        let delivery = patch
+            .delivery
+            .clone()
+            .unwrap_or_else(|| existing.delivery.clone());
+        // Validation only needs a verified current-turn origin. A persisted
+        // or request-provided origin may have come from an untrusted RPC.
+        crate::cron::job_builder::validate_delivery_for_config(
+            config,
+            &delivery,
+            trusted_origin.as_ref(),
+        )
+        .map_err(anyhow::Error::msg)?;
+    }
     store_blocking(
         config,
         StoreOperation::Update {
