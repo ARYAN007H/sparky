@@ -3,7 +3,7 @@
 # and ci-fast-hosted.yml (everyone else, GitHub-hosted runners).
 #
 # Both profiles run the same lane plan (scripts/ci/self-hosted/lanes-plan.mjs):
-# every check ci-lite.yml runs, grouped into lanes that execute in parallel,
+# the complete area suites, with sequential private lanes and parallel hosted jobs,
 # with changed-line coverage enforced at >= 80% by the same diff-cover gate.
 #
 #   ex63    one job on one throwaway Firecracker microVM (runner group
@@ -55,6 +55,8 @@ jobs:
           ref: refs/pull/${{ inputs.pr-number }}/merge
           fetch-depth: 0
           submodules: recursive
+          # Pin ancestry checks also inspect compile-only vendor repositories.
+          submodule-depth: 0
           exclude-submodules: wiki
           # Trusted-base membership routing authorizes team fork merge refs.
           allow-unsafe-pr-checkout: true

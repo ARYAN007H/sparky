@@ -110,7 +110,8 @@ for any commit without posting it.
     checks preinstalled tools (Python 3.10 with tomli, or stdlib tomllib), and selects `rust-toolchain.toml` explicitly.
     Missing metadata, tools, or the compiler fail; CI does not install replacements.
   - The pinned shared checkout action fetches the PR merge ref with full root
-    history, recursive build dependencies, and the `wiki` exclusion.
+    and submodule history for pin ancestry checks, recursive build dependencies,
+    and the `wiki` exclusion.
   - The pinned Tinymold setup/save actions use the image's binary and signed
     remote cache. The supervisor supplies credentials through guest metadata;
     the workflow masks them and needs no additional repository secrets. Cache
@@ -124,6 +125,7 @@ for any commit without posting it.
   - Cargo registry, pnpm store, and content-based frontend caches remain on the
     slot cache disk. Rust output caching uses Tinymold alone.
   - VM sizing is a supervisor setting; it is not assumed by the lane scheduler.
+    The frontend lint/check lane has an explicit 4-GiB Node heap budget.
     Vitest currently uses 8 workers.
 - **`hosted`**: lanes grouped into jobs sized for 4-core, ~14 GB runners:
   `checks`, `rust-lint` (lint and gates-off in turn), `rust-cov`, `tauri`,
