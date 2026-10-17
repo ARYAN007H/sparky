@@ -52,6 +52,15 @@ async fn force_runs_job_and_records_history() {
         let runs = cron::list_runs(&cfg, &job.id, 10).unwrap();
         assert_eq!(runs.len(), 1);
     }
+
+    let runs = cron::list_runs(&cfg, &job.id, 10).unwrap();
+    if let Some(run) = runs.first() {
+        assert_eq!(run.status, if result.is_error { "error" } else { "ok" });
+        assert_eq!(
+            run.delivery_status,
+            Some(cron::DeliveryStatus::NotRequested)
+        );
+    }
 }
 
 #[tokio::test]
