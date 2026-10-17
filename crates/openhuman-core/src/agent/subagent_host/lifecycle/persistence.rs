@@ -23,7 +23,7 @@ enum CompatibleTerminalRecord {
 }
 
 impl OpenHumanPersistence {
-    pub(super) fn new(checkpoint_dir: std::path::PathBuf) -> Self {
+    pub(in crate::agent::subagent_host) fn new(checkpoint_dir: std::path::PathBuf) -> Self {
         Self {
             checkpoint_dir,
             host_outcome: Arc::new(Mutex::new(HashMap::new())),

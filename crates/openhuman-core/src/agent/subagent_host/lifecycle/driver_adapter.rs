@@ -325,7 +325,7 @@ impl SubagentExecutor<crate::agent::tinyagents::host::OpenHumanRunContext> for O
 /// task key.  The key is encoded rather than using a task id as a filename, so
 /// equally named children of separate roots/parents can never resume or close
 /// one another's lifecycle.
-use super::outcome::{HostInFlightMap, host_outcome_to_neutral};
+use super::outcome::host_outcome_to_neutral;
 use super::persistence::OpenHumanPersistence;
 
 pub(in crate::agent::subagent_host) fn outcome_to_host(

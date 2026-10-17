@@ -12,7 +12,7 @@ use crate::agent::orchestration::subagent_sessions::{
     SubagentSessionUpsert,
 };
 use crate::agent::orchestration::tools::dispatch::incomplete_stop;
-use crate::agent::subagent_host::{SubagentRunOptions, SubagentRunOutcome, SubagentRunStatus};
+use crate::agent::subagent_host::SubagentRunOptions;
 use crate::agent_registry::host_definition::AgentDefinitionRegistry;
 use crate::core::runtime::DispatchCtx;
 use crate::progress::AgentProgress;
