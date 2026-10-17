@@ -101,28 +101,11 @@ pub(super) fn tier_gate_decision(
 /// final assistant text. On failure the error is suitable for stringifying
 /// into a `tool_result` block — including the two dispatch refusals, whose
 /// messages tell the model to summarise rather than delegate again.
-pub(crate) async fn run_subagent_direct(
-    definition: &AgentDefinition,
-    task_prompt: &str,
-    options: SubagentRunOptions,
-) -> Result<SubagentRunOutcome, SubagentRunError> {
-    run_subagent_direct_inner(definition, task_prompt, options, None).await
-}
-
 pub(crate) async fn run_subagent_direct_with_native_context(
     definition: &AgentDefinition,
     task_prompt: &str,
-    options: SubagentRunOptions,
-    native: crate::agent::tinyagents::NativeSubagentRunContext,
-) -> Result<SubagentRunOutcome, SubagentRunError> {
-    run_subagent_direct_inner(definition, task_prompt, options, Some(native)).await
-}
-
-async fn run_subagent_direct_inner(
-    definition: &AgentDefinition,
-    task_prompt: &str,
     mut options: SubagentRunOptions,
-    native: Option<crate::agent::tinyagents::NativeSubagentRunContext>,
+    native: crate::agent::tinyagents::NativeSubagentRunContext,
 ) -> Result<SubagentRunOutcome, SubagentRunError> {
     // Unconditionally heap-allocate the entire run_subagent body so
     // every caller doesn't have to carry this future's state inline.
@@ -850,7 +833,7 @@ async fn run_typed_mode(
             // The spawn-wide config snapshot supplies the `[context]`
             // knobs the graph used to load for itself.
             config.as_ref().ok().map(|c| c.as_ref()),
-            native,
+            Some(native),
         )
         .await?;
 
