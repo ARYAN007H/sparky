@@ -25,13 +25,13 @@
 //! thread that delivered the callback: an agent turn is deep and long, and the
 //! bus runtime is for serving. The binding's context is re-entered around it.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::future::Future;
 use std::sync::{Arc, RwLock, Weak};
 
 use tinybus::Result as BusResult;
 use tinyflows_bus::schedule::types::{CronJob, DeliveryStatus, JobType};
-use tinyflows_bus::schedule::{Attempt, CallbackAddress};
+use tinyflows_bus::schedule::{Attempt, CallbackAddress, DeliveryProjection};
 
 use super::scheduler::executor::HostExecutor;
 use super::scheduler::run_delivery;
@@ -206,30 +206,44 @@ impl ScheduleHost {
             .map_err(|e| bus_error("Failed", e))
     }
 
-    /// Delivery of a finished run's output; the reply is the delivery status.
-    async fn deliver(&self, job: CronJob, run_id: String, attempt: Attempt) -> BusResult<String> {
-        tracing::debug!(job_id = %job.id, %run_id, "[cron:bus] Deliver");
+    /// Send a finished run's output exactly once; the reply is its status.
+    async fn send(&self, job: CronJob, run_id: String, attempt: Attempt) -> BusResult<String> {
+        tracing::debug!(job_id = %job.id, %run_id, "[cron:bus] Send");
         let binding = self.binding.clone();
         let status: Result<DeliveryStatus, String> = self
             .binding
             .offload(async move {
-                run_delivery::deliver(&binding, &job, &run_id, &attempt)
+                run_delivery::send(&binding, &job, &run_id, &attempt)
                     .await
                     .map_err(|error| error.to_string())
             })
             .await
-            .map_err(|e| bus_error("Deliver", e))?;
+            .map_err(|e| bus_error("Send", e))?;
         status
             .map(|status| status.as_str().to_string())
+            .map_err(|e| bus_error("Send", e))
+    }
+
+    /// Project the module's terminal decision without sending a second time.
+    async fn deliver(&self, projection: DeliveryProjection) -> BusResult<()> {
+        tracing::debug!(job_id = %projection.job.id, run_id = %projection.run_id, "[cron:bus] Deliver");
+        let binding = self.binding.clone();
+        let run_id = projection.run_id.clone();
+        self.binding
+            .offload(async move {
+                run_delivery::deliver(&binding, &projection).await;
+                release_manual_host(&run_id);
+            })
+            .await
             .map_err(|e| bus_error("Deliver", e))
     }
 
     /// A flow row's schedule tick (or a `system:<name>` job).
-    async fn schedule_trigger(&self, flow_id: String, run_id: String) -> BusResult<Attempt> {
-        tracing::debug!(%flow_id, %run_id, "[cron:bus] ScheduleTrigger");
+    async fn schedule_trigger(&self, job: CronJob, run_id: String) -> BusResult<Attempt> {
+        tracing::debug!(job_id = %job.id, %run_id, "[cron:bus] ScheduleTrigger");
         let binding = self.binding.clone();
         self.binding
-            .offload(async move { run_delivery::trigger(&binding, &flow_id, &run_id).await })
+            .offload(async move { run_delivery::trigger(&binding, &job, &run_id).await })
             .await
             .map_err(|e| bus_error("ScheduleTrigger", e))
     }
@@ -240,6 +254,24 @@ impl ScheduleHost {
 pub(crate) struct HostRegistration {
     path: String,
     address: CallbackAddress,
+}
+
+static MANUAL_HOSTS: std::sync::LazyLock<std::sync::Mutex<HashMap<String, HostRegistration>>> =
+    std::sync::LazyLock::new(Default::default);
+
+/// Keep a detached run's callback served until its terminal projection.
+pub(crate) fn retain_manual_host(run_id: &str, host: HostRegistration) {
+    MANUAL_HOSTS
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .insert(run_id.to_string(), host);
+}
+
+fn release_manual_host(run_id: &str) {
+    MANUAL_HOSTS
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .remove(run_id);
 }
 
 impl HostRegistration {
