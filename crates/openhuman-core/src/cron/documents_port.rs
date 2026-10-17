@@ -36,11 +36,14 @@ use crate::config::Config;
 use crate::modules::tinyflows as module;
 
 /// The collections the schedule store owns.
-const COLLECTIONS: [&str; 4] = [
-    "cron_jobs",
-    "cron_runs",
-    "cron_counters",
+const COLLECTIONS: [&str; 7] = [
+    "cron.jobs",
+    "cron.runs",
+    "cron.admission",
     "cron_job_policies",
+    "tsd.counters",
+    "tsd.leases",
+    "tsd.migrations",
 ];
 
 /// Where one scope's cron documents live: the workspace whose default backend

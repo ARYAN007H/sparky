@@ -19,7 +19,12 @@ async fn a_v1_agent_scope_is_moved_before_its_owner_steps_run() {
     let backend: Arc<dyn StorageBackend> = Arc::new(MemoryStorage::new());
     let old = backend.for_scope(&Scope::new("asha").unwrap()).unwrap();
     old.documents()
-        .put("harness_run_status", "run-1", json!({"status": "done"}), Precondition::None)
+        .put(
+            "harness_embedding_cache",
+            "legacy-id",
+            json!({"sig": "s", "key": "k", "vector": [1.0]}),
+            Precondition::None,
+        )
         .await
         .unwrap();
     let report = prepare_and_migrate(&backend).await.unwrap();
@@ -28,7 +33,7 @@ async fn a_v1_agent_scope_is_moved_before_its_owner_steps_run() {
     let new = backend.for_scope(&Scope::local().agent("asha").unwrap()).unwrap();
     assert!(new
         .documents()
-        .get("harness.run_status", "run-1")
+        .get("harness.embedding_cache", "s/k")
         .await
         .unwrap()
         .is_some());
