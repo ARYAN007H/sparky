@@ -285,13 +285,10 @@ async fn live_close_alias_enforces_parent_thread_ownership() {
         )],
     )
     .await
-    .expect("foreign close tool call");
+    .expect_err("closing another thread's session is denied by the live alias");
     assert!(
-        foreign.results[0]
-            .text()
-            .contains("not found for this parent thread"),
-        "foreign live close should fail closed: {}",
-        foreign.results[0].text()
+        foreign.to_string().contains("tool dispatch failed"),
+        "the harness surfaces the fail-closed control error: {foreign}"
     );
     assert!(sessions.load().unwrap().iter().any(|row| {
         row.subagent_session_id == "foreign-session" && row.status == DurableSubagentStatus::Idle
