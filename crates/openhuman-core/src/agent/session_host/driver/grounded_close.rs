@@ -304,6 +304,23 @@ pub(super) async fn close_if_needed(
         minimum_harness_phrase_chars: 1,
         on_call_completed: Some(&mut on_call_completed),
     };
+    let verification_prompt = |candidate: &str| -> String {
+        close_verification_prompt(user_message, &rendered, candidate)
+    };
+    let repair_instruction = |violation: tinyagents_harness::close::CloseViolation| -> String {
+        let violation = match violation {
+            tinyagents_harness::close::CloseViolation::NoReply => {
+                crate::agent::session_host::turn_checkpoint::CloseViolation::NoReply
+            }
+            tinyagents_harness::close::CloseViolation::QuotedInstruction => {
+                crate::agent::session_host::turn_checkpoint::CloseViolation::QuotedHarnessText
+            }
+            tinyagents_harness::close::CloseViolation::Unverified => {
+                crate::agent::session_host::turn_checkpoint::CloseViolation::Unverified
+            }
+        };
+        crate::agent::session_host::turn_checkpoint::close_repair_instruction(&instruction, violation)
+    };
     let output = tinyagents_harness::close::grounded_close_with_options(
         &model_client,
         &(),
@@ -311,26 +328,8 @@ pub(super) async fn close_if_needed(
         tinyagents_harness::close::GroundedCloseConfig {
             history: &history,
             initial_prompt: &instruction,
-            verification_prompt: |candidate| {
-                close_verification_prompt(user_message, &rendered, candidate)
-            },
-            repair_instruction: |violation| {
-                let violation = match violation {
-                    tinyagents_harness::close::CloseViolation::NoReply => {
-                        crate::agent::session_host::turn_checkpoint::CloseViolation::NoReply
-                    }
-                    tinyagents_harness::close::CloseViolation::QuotedInstruction => {
-                        crate::agent::session_host::turn_checkpoint::CloseViolation::QuotedHarnessText
-                    }
-                    tinyagents_harness::close::CloseViolation::Unverified => {
-                        crate::agent::session_host::turn_checkpoint::CloseViolation::Unverified
-                    }
-                };
-                crate::agent::session_host::turn_checkpoint::close_repair_instruction(
-                    &instruction,
-                    violation,
-                )
-            },
+            verification_prompt,
+            repair_instruction,
             harness_phrases: &harness_phrases,
             budget,
             deterministic_fallback: fallback,
