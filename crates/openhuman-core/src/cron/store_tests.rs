@@ -28,7 +28,12 @@ fn remove_job_does_not_write_to_stdout() {
             action_dir: std::env::temp_dir(),
             ..Config::default()
         };
+        println!("BEGIN_CRON_REMOVE_CAPTURE");
+        use std::io::Write;
+        std::io::stdout().flush().unwrap();
         remove_job(&config, &std::env::var("OPENHUMAN_CRON_REMOVE_JOB").unwrap()).unwrap();
+        println!("END_CRON_REMOVE_CAPTURE");
+        std::io::stdout().flush().unwrap();
         return;
     }
 
@@ -42,7 +47,10 @@ fn remove_job_does_not_write_to_stdout() {
         .output()
         .unwrap();
     assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
-    assert!(output.stdout.is_empty(), "unexpected stdout: {}", String::from_utf8_lossy(&output.stdout));
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let captured = stdout.split("BEGIN_CRON_REMOVE_CAPTURE\n").nth(1).unwrap();
+    let captured = captured.split("END_CRON_REMOVE_CAPTURE\n").next().unwrap();
+    assert!(captured.is_empty(), "unexpected stdout: {captured}");
 }
 
 #[cfg(feature = "storage-sqlite")]

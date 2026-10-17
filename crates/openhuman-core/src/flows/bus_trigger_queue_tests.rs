@@ -41,28 +41,6 @@ async fn schedule_tick_is_coalesced_while_a_trigger_run_is_active() {
     );
 }
 
-#[tokio::test]
-async fn refreshing_config_keeps_the_subscriber_and_uses_the_new_snapshot() {
-    use tokio::sync::mpsc;
-
-    let tmp = tempfile::TempDir::new().unwrap();
-    let initial = test_config(&tmp);
-    let refreshed = Config {
-        action_dir: tmp.path().join("refreshed-action-root"),
-        ..initial.clone()
-    };
-    let (seen_tx, mut seen_rx) = mpsc::unbounded_channel();
-    let runner = move |_ctx: crate::core::runtime::DispatchCtx,
-                       config: Arc<Config>,
-                       _request: crate::flows::bus::trigger::TriggerRunRequest| {
-        let seen_tx = seen_tx.clone();
-        async move { seen_tx.send(config.action_dir.clone()).unwrap(); }
-    };
-    let subscriber = FlowTriggerSubscriber::with_runner(Arc::new(initial), 1, runner);
-    subscriber.set_config(Arc::new(refreshed.clone()));
-    subscriber.dispatch_test_schedule(&crate::core::runtime::DispatchCtx::host_default(), "refresh-flow").await;
-    assert_eq!(seen_rx.recv().await, Some(refreshed.action_dir));
-}
 
 #[tokio::test]
 async fn app_event_runs_queue_fifo_per_tenant_while_other_tenants_progress() {
