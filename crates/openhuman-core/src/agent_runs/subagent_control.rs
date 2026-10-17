@@ -140,42 +140,42 @@ fn handle_subagent_cancel(ctx: DispatchCtx, params: Map<String, Value>) -> Contr
                     // duplicate both effects.
                     (true, None)
                 } else {
-                let summary = match reason.as_deref().map(str::trim).filter(|r| !r.is_empty()) {
-                    Some(r) => format!(
+                    let summary = match reason.as_deref().map(str::trim).filter(|r| !r.is_empty()) {
+                        Some(r) => format!(
                         "You cancelled this background sub-agent before it finished. Reason: {r}"
                     ),
-                    None => {
-                        "You cancelled this background sub-agent before it finished.".to_string()
-                    }
-                };
-                // The thread is still alive (unlike the delete path), so we
-                // record a completion that flows through the same idle-gated
-                // delivery and surfaces the cancellation in chat.
-                background_completions::record_completion(
-                    &ctx,
-                    &meta.workspace_dir,
-                    &meta.parent_session,
-                    &task_id,
-                    meta.agent_id.clone(),
-                    summary,
-                    meta.parent_thread_id.clone(),
-                )
-                .await;
-                if let Some(subagent_session_id) = meta.subagent_session_id {
-                    let store = subagent_sessions::SubagentSessionStore::new(meta.workspace_dir);
-                    if let Err(err) = subagent_sessions::mark_failed(
-                        &store,
-                        &subagent_session_id,
+                        None => "You cancelled this background sub-agent before it finished."
+                            .to_string(),
+                    };
+                    // The thread is still alive (unlike the delete path), so we
+                    // record a completion that flows through the same idle-gated
+                    // delivery and surfaces the cancellation in chat.
+                    background_completions::record_completion(
+                        &ctx,
+                        &meta.workspace_dir,
+                        &meta.parent_session,
                         &task_id,
-                        "cancelled by user".to_string(),
-                    ) {
-                        log::warn!(
-                            target: "subagent_control_rpc",
-                            "[subagent_control_rpc][{cid}] cancel.mark_failed_failed task_id={task_id} subagent_session_id={subagent_session_id} error={err}"
-                        );
+                        meta.agent_id.clone(),
+                        summary,
+                        meta.parent_thread_id.clone(),
+                    )
+                    .await;
+                    if let Some(subagent_session_id) = meta.subagent_session_id {
+                        let store =
+                            subagent_sessions::SubagentSessionStore::new(meta.workspace_dir);
+                        if let Err(err) = subagent_sessions::mark_failed(
+                            &store,
+                            &subagent_session_id,
+                            &task_id,
+                            "cancelled by user".to_string(),
+                        ) {
+                            log::warn!(
+                                target: "subagent_control_rpc",
+                                "[subagent_control_rpc][{cid}] cancel.mark_failed_failed task_id={task_id} subagent_session_id={subagent_session_id} error={err}"
+                            );
+                        }
                     }
-                }
-                (true, None)
+                    (true, None)
                 }
             }
             None => (false, Some("unknown")),

@@ -184,17 +184,13 @@ pub fn cancel_driver_job_by_task(
     jobs: &tinyagents_orchestration::subagent::SubAgentJobRegistry,
     task_id: &str,
 ) -> Option<DriverTaskCancellation> {
-    let mut matches = store
-        .load()
-        .ok()?
-        .into_iter()
-        .filter(|session| {
-            session.current_task_id.as_deref() == Some(task_id)
-                && matches!(
-                    session.status,
-                    DurableSubagentStatus::Running | DurableSubagentStatus::AwaitingUser
-                )
-        });
+    let mut matches = store.load().ok()?.into_iter().filter(|session| {
+        session.current_task_id.as_deref() == Some(task_id)
+            && matches!(
+                session.status,
+                DurableSubagentStatus::Running | DurableSubagentStatus::AwaitingUser
+            )
+    });
     let session = matches.next()?;
     if matches.next().is_some()
         || !cancel_driver_job_for_observed_session(

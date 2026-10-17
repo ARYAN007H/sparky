@@ -73,7 +73,7 @@ async fn committed_progress_uses_each_turns_receipt_sender() {
 #[tokio::test]
 async fn committed_progress_carries_the_sidecar_stop_on_turn_completed() {
     use crate::progress::AgentProgress;
-    use tinyagents_harness::{TurnFailureClass, TurnStop, turn_stop::TurnStopKind};
+    use tinyagents_harness::{turn_stop::TurnStopKind, TurnFailureClass, TurnStop};
     use tinyagents_runtime::{
         CommitReceipt, ResumeMode, SessionTurnOutcome, TranscriptTurnOptions,
     };
