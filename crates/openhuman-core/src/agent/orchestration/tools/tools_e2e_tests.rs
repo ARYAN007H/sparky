@@ -414,6 +414,10 @@ async fn stopped_async_spawn_is_refused_before_progress_or_session_effects() {
     assert!(result.output().contains("stopped or deleted"), "{}", result.output());
     assert!(provider.seen.lock().is_empty(), "refusal must not dispatch the model");
     assert!(progress_rx.try_recv().is_err(), "refusal must not publish spawn progress");
+    let jobs = crate::core::runtime::slot_for::<
+        tinyagents_orchestration::subagent::SubAgentJobRegistry,
+    >(&dispatch);
+    assert!(jobs.list().is_empty(), "refusal must not register a shared job");
     assert!(
         crate::agent::orchestration::subagent_sessions::SubagentSessionStore::new(
             workspace.clone()
