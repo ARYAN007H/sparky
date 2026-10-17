@@ -528,8 +528,8 @@ pub async fn build_with_profile_capabilities(
             runtime.context().clone(),
             backend,
         )
-            .map_err(|e| anyhow::anyhow!("[saas] {e}"))?
-            .with_capabilities(capabilities),
+        .map_err(|e| anyhow::anyhow!("[saas] {e}"))?
+        .with_capabilities(capabilities),
     );
     crate::profiles::host::install(Arc::clone(&host));
     crate::profiles::lease::heartbeat(Arc::clone(&host), runtime.context().clone());
