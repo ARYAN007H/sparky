@@ -32,7 +32,7 @@ pub mod documents;
 pub mod fence;
 pub mod fenced_backend;
 pub mod import;
-pub mod import_claim;
+pub mod import_state;
 pub mod lease;
 mod lease_documents;
 mod lease_local;
