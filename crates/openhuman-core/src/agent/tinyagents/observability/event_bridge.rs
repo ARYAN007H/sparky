@@ -17,6 +17,14 @@ use super::bridge_types::{ProviderUsageCarry, SubagentScope, ToolFailureMap, Too
 use tinyagents_harness::events::{CallDedupe, IterationCursor, OrderedSender};
 use tinyagents_harness::events::{AgentEvent, EventSink};
 
+fn valid_provider_id(value: &str) -> bool {
+    !value.is_empty()
+        && value.len() <= 64
+        && value
+            .chars()
+            .all(|character| character.is_ascii_alphanumeric() || matches!(character, '_' | '.' | ':' | '-'))
+}
+
 #[derive(Default)]
 pub(super) struct BridgeState {
     pub(super) input_tokens: u64,
@@ -226,6 +234,32 @@ impl OpenhumanEventBridge {
         }
     }
 
+    pub(super) fn base_generation_enrichment(
+        &self,
+    ) -> tinyagents_harness::events::GenerationEnrichment {
+        let provider_id = valid_provider_id(&self.provider_id).then(|| self.provider_id.clone());
+        let pricing = if self.model.trim().to_ascii_lowercase().ends_with(":free") {
+            Some(tinyagents_harness::events::GenerationPricing {
+                input_per_mtok_usd: Some(0.0),
+                cached_input_per_mtok_usd: Some(0.0),
+                output_per_mtok_usd: Some(0.0),
+            })
+        } else {
+            tinyagents_registry::pricing::lookup(&self.model).map(|price| {
+                tinyagents_harness::events::GenerationPricing {
+                    input_per_mtok_usd: Some(price.input_per_mtok_usd),
+                    cached_input_per_mtok_usd: Some(price.cached_input_per_mtok_usd),
+                    output_per_mtok_usd: Some(price.output_per_mtok_usd),
+                }
+            })
+        };
+        tinyagents_harness::events::GenerationEnrichment {
+            provider_id,
+            pricing,
+            estimated_cost_usd: None,
+        }
+    }
+
     /// Resolve `tool_name` against the turn's registered tool sets and
     /// compute the presentation pair from the tool's OWN
     /// [`tinytools::Tool::display_label`] / [`tinytools::Tool::display_detail`]
@@ -369,6 +403,22 @@ impl OpenhumanEventBridge {
             },
         };
         let call_cost = cost.usd();
+        if let tinyagents_harness::cost::CallCost::Estimated(estimated_cost_usd) = cost
+            && let Some(call_id) = self
+                .call_ids
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .get(&iteration)
+                .cloned()
+        {
+            self.emit_generation_enrichment(
+                call_id,
+                tinyagents_harness::events::GenerationEnrichment {
+                    estimated_cost_usd: Some(estimated_cost_usd),
+                    ..Default::default()
+                },
+            );
+        }
         // The context window + cache-creation/reasoning breakdown only exist on
         // the carried provider usage (the crate `Usage` mapping drops them); fall
         // back to the catalogue window and the crate token counts when absent.

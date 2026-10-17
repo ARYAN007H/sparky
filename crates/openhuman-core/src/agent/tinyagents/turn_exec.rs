@@ -451,6 +451,7 @@ async fn drive_turn(
                 .as_ref()
                 .and_then(|identity| identity.agent_id.as_deref()),
         );
+        bridge.set_native_events(sink.clone());
         sink.subscribe(bridge.clone());
         bridge
     };

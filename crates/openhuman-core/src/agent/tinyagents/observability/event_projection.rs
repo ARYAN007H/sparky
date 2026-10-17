@@ -14,8 +14,16 @@ use super::event_bridge::OpenhumanEventBridge;
 impl EventListener for OpenhumanEventBridge {
     fn on_event(&self, record: &EventRecord) {
         match &record.event {
-            AgentEvent::ModelStarted { .. } => {
+            AgentEvent::ModelStarted { call_id, .. } => {
                 let iteration = tinyagents_harness::events::advance_iteration(&self.cursor);
+                self.call_ids
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .insert(iteration, call_id.clone());
+                self.emit_generation_enrichment(
+                    call_id.clone(),
+                    self.base_generation_enrichment(),
+                );
                 match &self.scope {
                     None => self.send(AgentProgress::IterationStarted {
                         iteration,
@@ -143,6 +151,10 @@ impl EventListener for OpenhumanEventBridge {
                 ..
             } => {
                 let iteration = self.iteration();
+                self.call_ids
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .remove(&iteration);
                 let usage = usage.unwrap_or_default();
                 // Prefer the figures `record_usage` resolved for this call
                 // (charged>estimate cost + carried cache/reasoning breakdown —
