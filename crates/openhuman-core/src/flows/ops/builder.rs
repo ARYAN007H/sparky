@@ -52,7 +52,8 @@ pub(crate) async fn flows_build_with_extra_hidden_tools(
     ) {
         if let Some(assistant_text) = req.error.as_deref().and_then(backend_repair_message) {
             if let Some(target) = &stream {
-                finalize_flow_stream(ctx, target, &Ok(assistant_text.clone()), &prompt).await;
+                finalize_flow_stream(ctx, target, &Ok(assistant_text.clone()), &prompt, config)
+                    .await;
             }
             return Ok(Outcome::single_log(
                 json!({
@@ -315,7 +316,7 @@ pub(crate) async fn flows_build_with_extra_hidden_tools(
     if cancelled {
         if let Some(target) = &stream {
             let terminal: Result<String, String> = Ok(assistant_text.clone());
-            finalize_flow_stream(ctx, target, &terminal, &prompt).await;
+            finalize_flow_stream(ctx, target, &terminal, &prompt, config).await;
         }
         tracing::info!(
             target: "flows",
@@ -341,7 +342,7 @@ pub(crate) async fn flows_build_with_extra_hidden_tools(
         if let Some(err) = &run_error {
             if let Some(target) = &stream {
                 let terminal: Result<String, String> = Err(err.clone());
-                finalize_flow_stream(ctx, target, &terminal, &prompt).await;
+                finalize_flow_stream(ctx, target, &terminal, &prompt, config).await;
             }
             return Err(format!("workflow_builder produced no proposal: {err}"));
         }
@@ -398,7 +399,7 @@ pub(crate) async fn flows_build_with_extra_hidden_tools(
             None => Ok(assistant_text.clone()),
             Some(err) => Err(err.clone()),
         };
-        finalize_flow_stream(ctx, target, &terminal, &prompt).await;
+        finalize_flow_stream(ctx, target, &terminal, &prompt, config).await;
     }
 
     tracing::info!(

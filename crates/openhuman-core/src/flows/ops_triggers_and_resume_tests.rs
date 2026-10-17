@@ -72,6 +72,42 @@ async fn flows_delete_unbinds_schedule_cron_job() {
 }
 
 #[tokio::test]
+async fn failed_flow_removal_preserves_the_schedule_binding() {
+    let tmp = TempDir::new().unwrap();
+    let config = test_config(&tmp);
+    let created = flows_create(
+        &config,
+        "retained-scheduled".to_string(),
+        schedule_trigger_graph("0 9 * * *"),
+        false,
+    )
+    .await
+    .unwrap();
+    flows_set_enabled(&config, &created.value.id, true)
+        .await
+        .unwrap();
+
+    let result = flows_delete_with_remove(&config, &created.value.id, |_, _| {
+        Err("injected flow document removal failure".to_string())
+    })
+    .await;
+
+    assert!(result.is_err(), "the storage failure must be returned");
+    assert!(
+        store::get_flow(&config, &created.value.id)
+            .unwrap()
+            .is_some(),
+        "the failed delete must leave its flow definition in place"
+    );
+    assert!(
+        crate::cron::find_flow_schedule_job(&config, &created.value.id)
+            .unwrap()
+            .is_some(),
+        "a retained enabled flow must retain its automatic-dispatch schedule"
+    );
+}
+
+#[tokio::test]
 async fn reconcile_schedule_triggers_on_boot_survives_a_corrupt_row() {
     // R-M4: `reconcile_schedule_triggers_on_boot` is driven by
     // `list_enabled_flows`, which used to hard-fail its entire query on the
