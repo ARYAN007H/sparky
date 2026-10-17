@@ -11,7 +11,6 @@ use super::registry::ProfileRegistry;
 use crate::core::runtime::{CoreContext, SaasConfig};
 use crate::storage::fence::FenceRegistry;
 use crate::storage::fenced_backend::FencedBackend;
-use crate::storage::lease::LeaseStore;
 use crate::storage::StorageBackend;
 
 impl ProfileHost {
