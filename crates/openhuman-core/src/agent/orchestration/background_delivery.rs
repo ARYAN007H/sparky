@@ -28,18 +28,24 @@
 //! `chat_done`, so a reconnect cannot lose a completed delegated result.
 
 use crate::core::runtime::DispatchCtx;
-use std::collections::HashSet;
-use std::future::Future;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::{Arc, OnceLock};
+#[cfg(test)]
+use std::{
+    collections::HashSet,
+    future::Future,
+    sync::Mutex,
+};
 use std::time::Duration;
 
 use async_trait::async_trait;
 use serde_json::json;
 use tinyagents_tasks::{
-    CompletionDelivery, CompletionDeliveryConfig, CompletionRecord, CompletionRouter,
-    DeliveryOutcome, DeliveryTarget, ThreadDeliveryLeases,
+    CompletionDelivery, CompletionDeliveryConfig, CompletionRecord, DeliveryOutcome,
+    DeliveryTarget, ThreadDeliveryLeases,
 };
+#[cfg(test)]
+use tinyagents_tasks::CompletionRouter;
 
 use crate::core::bus::BUS;
 use crate::core::events::DomainEvent;
@@ -418,6 +424,7 @@ async fn try_deliver(
     let give_up_ctx = busy_ctx.clone();
     let format_router = router.clone();
     let turn_thread_id = thread_id.clone();
+    let give_up_thread_id = thread_id.clone();
     let scoped_thread = crate::core::runtime::tenant::profile_key_in(
         &super::busy_guard::caller(&busy_ctx),
         &thread_id,
@@ -446,7 +453,7 @@ async fn try_deliver(
             if let Err(error) = persist_delivery_reply(
                 &give_up_ctx,
                 workspace_dir.clone(),
-                &thread_id,
+                &give_up_thread_id,
                 &run_id,
                 notice,
                 false,
