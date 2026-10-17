@@ -187,6 +187,7 @@ pub fn cancel_driver_job_by_task(
     checkpoint_dir: &Path,
     jobs: &tinyagents_orchestration::subagent::SubAgentJobRegistry,
     task_id: &str,
+    reason: Option<&str>,
 ) -> Option<DriverTaskCancellation> {
     let mut matches = store
         .load()
@@ -208,6 +209,17 @@ pub fn cancel_driver_job_by_task(
         DurableSubagentStatus::Closed => return None,
     };
     if already_finished.is_none()
+        && reason.is_some()
+        && !record_cancel_reason(
+            store,
+            &session.subagent_session_id,
+            task_id,
+            reason.expect("checked above").trim(),
+        )
+    {
+        return None;
+    }
+    if already_finished.is_none()
         && !cancel_driver_job_for_observed_session(
             store,
             checkpoint_dir,
@@ -217,6 +229,9 @@ pub fn cancel_driver_job_by_task(
             session.parent_thread_id.as_deref(),
         )
     {
+        if reason.is_some() {
+            clear_cancel_reason(store, &session.subagent_session_id, task_id);
+        }
         return None;
     }
     Some(DriverTaskCancellation {
@@ -227,6 +242,35 @@ pub fn cancel_driver_job_by_task(
         parent_thread_id: session.parent_thread_id,
         already_finished,
     })
+}
+
+/// Persist an optional RPC cancellation reason before signaling TinyAgents so
+/// the awaited completion callback can include it in the single cancellation
+/// notice. The current task check prevents a stale cancel from annotating a
+/// later reuse of the same durable session.
+fn record_cancel_reason(
+    store: &SubagentSessionStore,
+    subagent_session_id: &str,
+    task_id: &str,
+    reason: &str,
+) -> bool {
+    if reason.is_empty() {
+        return true;
+    }
+    update_session_for_task(store, subagent_session_id, task_id, |session, now| {
+        if matches!(session.status, DurableSubagentStatus::Running | DurableSubagentStatus::AwaitingUser) {
+            session.latest_error = Some(reason.to_owned());
+            session.updated_at = now;
+        }
+    })
+    .unwrap_or(false)
+}
+
+fn clear_cancel_reason(store: &SubagentSessionStore, subagent_session_id: &str, task_id: &str) {
+    let _ = update_session_for_task(store, subagent_session_id, task_id, |session, now| {
+        session.latest_error = None;
+        session.updated_at = now;
+    });
 }
 
 /// Resolve a saved product session to its exact TinyAgents lifecycle key.
