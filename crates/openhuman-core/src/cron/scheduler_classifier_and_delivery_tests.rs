@@ -18,10 +18,10 @@ impl Channel for AnnounceMockChannel {
     }
 
     async fn send(&self, message: &SendMessage) -> anyhow::Result<()> {
-        self.sends.lock().unwrap().push((
-            message.recipient.clone(),
-            message.idempotency_key.clone(),
-        ));
+        self.sends
+            .lock()
+            .unwrap()
+            .push((message.recipient.clone(), message.idempotency_key.clone()));
         if self.fail {
             anyhow::bail!("mock announce send failed");
         }
@@ -33,7 +33,10 @@ impl Channel for AnnounceMockChannel {
     }
 }
 
-fn install_announce_mock_channel(name: String, fail: bool) -> Arc<Mutex<Vec<(String, Option<String>)>>> {
+fn install_announce_mock_channel(
+    name: String,
+    fail: bool,
+) -> Arc<Mutex<Vec<(String, Option<String>)>>> {
     let sends = Arc::new(Mutex::new(Vec::new()));
     let channel: Arc<dyn Channel> = Arc::new(AnnounceMockChannel {
         name: name.clone(),
