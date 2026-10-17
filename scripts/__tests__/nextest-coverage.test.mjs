@@ -101,3 +101,29 @@ test("ignored-only binaries remain inventoried without requiring nonexistent JUn
     "matches";
   assert.equal(report(xml, ["active", "ignored"], inventory).status, 1);
 });
+
+test("standalone manifest config omits absent binaries while root metadata retains serialization", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "nextest-config-"));
+  try {
+    fs.writeFileSync(path.join(dir, "cargo"), `#!/usr/bin/env node
+const fs = require('node:fs');
+const args = process.argv.slice(2);
+if (args[0] === 'metadata') {
+  console.log(JSON.stringify({packages: [{targets: JSON.parse(process.env.MOCK_TARGETS).map(name => ({name}))}]}));
+} else {
+  const config = fs.readFileSync(args[args.indexOf('--config-file') + 1], 'utf8');
+  const report = JSON.parse(config.split('\\n').find(line => line.startsWith('path = ')).slice(7));
+  fs.writeFileSync(report, '<testsuites><testsuite name="fixture" tests="1"/></testsuites>');
+}
+`, { mode: 0o755 });
+    for (const targets of [[], ["agent_harness_e2e", "json_rpc_e2e", "mcp_registry_multi_server"]]) {
+      execFileSync("bash", [path.join(root, "scripts/ci/nextest-coverage.sh"), "config", "cargo", "llvm-cov", "nextest", "--manifest-path", "standalone/Cargo.toml"], {
+        cwd: root,
+        env: { ...process.env, PATH: `${dir}:${process.env.PATH}`, NEXTEST_REPORT_DIR: dir, MOCK_TARGETS: JSON.stringify(targets) },
+        stdio: "pipe",
+      });
+      const generated = fs.readFileSync(path.join(dir, "config.toml"), "utf8");
+      assert.equal(generated.includes("[[profile.ci.overrides]]"), targets.length > 0);
+    }
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
