@@ -1,3 +1,4 @@
+use crate::agent::subagent_host::types::SubagentCheckpointData;
 use std::{
     collections::HashMap,
     sync::{Arc, Mutex},
@@ -8,8 +9,8 @@ use tinyagents_orchestration::subagent::{
 };
 
 use super::lifecycle::{
-    decode_driver_job_result, host_in_flight, load_subagent_checkpoint, merged_resume_history,
-    resolve_inline_driver_outcome, HostInFlight, OpenHumanDriverBundle, OpenHumanPersistence,
+    decode_driver_job_result, load_subagent_checkpoint, merged_resume_history,
+    resolve_inline_driver_outcome, OpenHumanDriverBundle, OpenHumanPersistence,
 };
 use super::{SubagentMode, SubagentRunError, SubagentRunOutcome, SubagentRunStatus, SubagentUsage};
 
@@ -402,6 +403,177 @@ async fn persistence_inserts_one_terminal_and_returns_the_durable_winner() {
 }
 
 #[tokio::test]
+async fn canonical_terminal_hides_legacy_pause_without_rewriting_legacy_files() {
+    let directory = tempfile::tempdir().unwrap();
+    let key = key();
+    let legacy = OpenHumanPersistence::new(directory.path().to_path_buf());
+    let checkpoint = SubagentCheckpointData {
+        task_key: Some(key.clone()),
+        task_id: key.task_id.clone(),
+        agent_id: "researcher".into(),
+        worker_thread_id: None,
+        history: Vec::new(),
+        question: "legacy question".into(),
+        options: Some(vec!["continue".into()]),
+        skill_filter_override: None,
+        model_override: None,
+        created_at: "2026-10-01T00:00:00Z".into(),
+        resume_checkpoint: None,
+        resume_metadata: Default::default(),
+        output: "legacy partial".into(),
+        iterations: 3,
+        usage: SubagentUsage::default(),
+        artifact_paths: Vec::new(),
+        elapsed_ms: 12,
+    };
+    let pause_path = legacy.legacy_pause_path(&key);
+    let index_path = legacy.index_path(&key.task_id);
+    std::fs::create_dir_all(pause_path.parent().unwrap()).unwrap();
+    let pause_bytes = serde_json::to_vec_pretty(&checkpoint).unwrap();
+    let index_bytes = serde_json::to_vec(&serde_json::json!({"keys": [key]})).unwrap();
+    std::fs::write(&pause_path, &pause_bytes).unwrap();
+    std::fs::write(&index_path, &index_bytes).unwrap();
+
+    let mut terminal = SubagentOutcome::cancelled("task");
+    terminal.status = SubagentOutcomeKind::Completed;
+    terminal.output = "canonical terminal winner".into();
+    OpenHumanPersistence::new(directory.path().to_path_buf())
+        .record_terminal(&key, &terminal, None)
+        .await
+        .unwrap();
+
+    assert!(load_subagent_checkpoint(directory.path(), &key.task_id).is_err());
+    assert_eq!(std::fs::read(&pause_path).unwrap(), pause_bytes);
+    assert_eq!(std::fs::read(&index_path).unwrap(), index_bytes);
+}
+
+#[tokio::test]
+async fn legacy_pause_migration_preserves_host_checkpoint_metadata_and_bytes() {
+    let directory = tempfile::tempdir().unwrap();
+    let legacy_key = key();
+    let legacy = OpenHumanPersistence::new(directory.path().to_path_buf());
+    let checkpoint = SubagentCheckpointData {
+        task_key: Some(legacy_key.clone()),
+        task_id: legacy_key.task_id.clone(),
+        agent_id: "legacy-agent".into(),
+        worker_thread_id: Some("worker-thread".into()),
+        history: vec![
+            tinyagents_session::transcript::TranscriptMessage::assistant("legacy history"),
+        ],
+        question: "legacy question".into(),
+        options: Some(vec!["yes".into(), "no".into()]),
+        skill_filter_override: Some("docs".into()),
+        model_override: Some("model-x".into()),
+        created_at: "2026-10-01T00:00:00Z".into(),
+        resume_checkpoint: Some("legacy-checkpoint".into()),
+        resume_metadata: Default::default(),
+        output: "legacy partial output".into(),
+        iterations: 5,
+        usage: SubagentUsage {
+            input_tokens: 13,
+            output_tokens: 7,
+            cached_input_tokens: 2,
+            charged_amount_usd: 0.75,
+            cost_source: tinyagents_harness::cost::CostSource::Estimated,
+        },
+        artifact_paths: vec!["artifacts/report.md".into()],
+        elapsed_ms: 321,
+    };
+    let pause_path = legacy.legacy_pause_path(&legacy_key);
+    std::fs::create_dir_all(pause_path.parent().unwrap()).unwrap();
+    let pause_bytes = serde_json::to_vec_pretty(&checkpoint).unwrap();
+    std::fs::write(&pause_path, &pause_bytes).unwrap();
+
+    let migrated = OpenHumanPersistence::new(directory.path().to_path_buf());
+    assert!(migrated.load_pause(&legacy_key).await.unwrap().is_some());
+    let recovered = load_subagent_checkpoint(directory.path(), &legacy_key.task_id).unwrap();
+
+    assert_eq!(recovered.agent_id, checkpoint.agent_id);
+    assert_eq!(recovered.worker_thread_id, checkpoint.worker_thread_id);
+    assert_eq!(recovered.question, checkpoint.question);
+    assert_eq!(recovered.options, checkpoint.options);
+    assert_eq!(
+        recovered.skill_filter_override,
+        checkpoint.skill_filter_override
+    );
+    assert_eq!(recovered.model_override, checkpoint.model_override);
+    assert_eq!(recovered.created_at, checkpoint.created_at);
+    assert_eq!(recovered.output, checkpoint.output);
+    assert_eq!(recovered.iterations, checkpoint.iterations);
+    assert_eq!(recovered.usage, checkpoint.usage);
+    assert_eq!(recovered.artifact_paths, checkpoint.artifact_paths);
+    assert_eq!(recovered.elapsed_ms, checkpoint.elapsed_ms);
+    assert_eq!(std::fs::read(&pause_path).unwrap(), pause_bytes);
+
+    let mut newer_checkpoint = checkpoint;
+    let mut newer_key = key();
+    newer_key.task_id = "task-with-new-resume-metadata".into();
+    newer_checkpoint.task_key = Some(newer_key.clone());
+    newer_checkpoint.task_id = newer_key.task_id.clone();
+    newer_checkpoint
+        .resume_metadata
+        .insert("skill_filter_override".into(), "new-skill".into());
+    newer_checkpoint
+        .resume_metadata
+        .insert("model_override".into(), "new-model".into());
+    let newer_path = migrated.legacy_pause_path(&newer_key);
+    std::fs::create_dir_all(newer_path.parent().unwrap()).unwrap();
+    std::fs::write(
+        &newer_path,
+        serde_json::to_vec_pretty(&newer_checkpoint).unwrap(),
+    )
+    .unwrap();
+    let newer_store = OpenHumanPersistence::new(directory.path().to_path_buf());
+    assert!(newer_store.load_pause(&newer_key).await.unwrap().is_some());
+    let newer = load_subagent_checkpoint(directory.path(), &newer_key.task_id).unwrap();
+    assert_eq!(newer.skill_filter_override.as_deref(), Some("new-skill"));
+    assert_eq!(newer.model_override.as_deref(), Some("new-model"));
+}
+
+#[tokio::test]
+async fn legacy_pause_migration_does_not_return_a_stale_pause_after_terminal_commit() {
+    let directory = tempfile::tempdir().unwrap();
+    let key = key();
+    let persistence = OpenHumanPersistence::new(directory.path().to_path_buf());
+    let mut terminal = SubagentOutcome::cancelled("task");
+    terminal.status = SubagentOutcomeKind::Completed;
+    terminal.output = "terminal winner".into();
+    persistence
+        .record_terminal(&key, &terminal, None)
+        .await
+        .unwrap();
+
+    let stale_pause = SubagentCheckpointData {
+        task_key: Some(key.clone()),
+        task_id: key.task_id.clone(),
+        agent_id: "legacy-agent".into(),
+        worker_thread_id: None,
+        history: Vec::new(),
+        question: "stale pause".into(),
+        options: None,
+        skill_filter_override: None,
+        model_override: None,
+        created_at: "2026-10-01T00:00:00Z".into(),
+        resume_checkpoint: None,
+        resume_metadata: Default::default(),
+        output: "stale output".into(),
+        iterations: 1,
+        usage: SubagentUsage::default(),
+        artifact_paths: Vec::new(),
+        elapsed_ms: 1,
+    };
+
+    let migrated = persistence
+        .migrate_legacy_pause(&key, stale_pause)
+        .await
+        .unwrap();
+    assert!(
+        migrated.is_none(),
+        "terminal CAS winner must close the stale pause"
+    );
+}
+
+#[tokio::test]
 async fn driver_inline_projection_returns_the_durable_winner_not_a_local_loser() {
     use tinyagents_orchestration::subagent::SubagentPersistenceDisposition as Disposition;
 
@@ -423,10 +595,14 @@ async fn driver_inline_projection_returns_the_durable_winner_not_a_local_loser()
         tinyagents_orchestration::subagent::SubagentIncomplete::new("winner stopped"),
     );
     winner.output = "durable winning output".into();
+    winner.cost_usd = Some(0.75);
+    winner.cost_source = Some(tinyagents_harness::cost::CostSource::Estimated);
     winner.history = vec![tinyinference_llm::message::Message::assistant(
         "durable winning history",
     )];
     winner.usage.calls = 7;
+    winner.usage.usage.charged_amount =
+        Some(tinyinference_llm::usage::ChargedAmount::usd_micros(750_000));
     winner
         .extensions
         .insert("agent_id".into(), serde_json::json!("winner-agent"));
@@ -458,6 +634,11 @@ async fn driver_inline_projection_returns_the_durable_winner_not_a_local_loser()
     assert_eq!(projected.output, "durable winning output");
     assert_eq!(projected.agent_id, "winner-agent");
     assert_eq!(projected.iterations, 7);
+    assert_eq!(
+        projected.usage.cost_source,
+        tinyagents_harness::cost::CostSource::Estimated
+    );
+    assert_eq!(projected.usage.charged_amount_usd, 0.75);
     assert!(matches!(
         projected.status,
         SubagentRunStatus::Incomplete { ref reason } if reason == "winner stopped"
@@ -470,6 +651,47 @@ async fn driver_inline_projection_returns_the_durable_winner_not_a_local_loser()
     assert_eq!(
         projected.persistence_disposition,
         Disposition::TerminalExisting
+    );
+}
+
+#[tokio::test]
+async fn observer_cancel_survives_a_leader_commit_before_host_projection() {
+    let directory = tempfile::tempdir().unwrap();
+    let key = key();
+    let bundle = OpenHumanDriverBundle::new(directory.path().join("checkpoints")).unwrap();
+
+    // Model the Tiny driver ordering: this invocation has already received
+    // ObserverCancelled, then the independent leader commits before the host
+    // adapter reads the durable lifecycle record.
+    let mut observer = cached_outcome(SubagentRunStatus::Cancelled);
+    observer.persistence_disposition =
+        tinyagents_orchestration::subagent::SubagentPersistenceDisposition::ObserverCancelled;
+    bundle
+        .host_outcome
+        .lock()
+        .unwrap()
+        .insert(key.clone(), observer);
+    let mut leader = SubagentOutcome::cancelled("task");
+    leader.status = SubagentOutcomeKind::Completed;
+    leader.output = "leader result".into();
+    OpenHumanPersistence::new(directory.path().join("checkpoints"))
+        .record_terminal(&key, &leader, None)
+        .await
+        .unwrap();
+
+    let result = tinytools::ToolResult::error(
+        serde_json::json!({"task_id":"public-job-42", "status":"cancelled"}).to_string(),
+    );
+    let (projected, public_job_id) =
+        resolve_inline_driver_outcome(result, &bundle, &key, "fallback-agent")
+            .await
+            .expect("observer cancellation must survive the leader's later commit");
+
+    assert_eq!(public_job_id, "public-job-42");
+    assert!(matches!(projected.status, SubagentRunStatus::Cancelled));
+    assert_eq!(
+        projected.persistence_disposition,
+        tinyagents_orchestration::subagent::SubagentPersistenceDisposition::ObserverCancelled
     );
 }
 

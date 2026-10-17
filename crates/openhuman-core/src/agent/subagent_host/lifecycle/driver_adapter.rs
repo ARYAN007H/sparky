@@ -11,6 +11,16 @@ pub(crate) struct OpenHumanDriverBundle {
 
 impl OpenHumanDriverBundle {
     pub(crate) fn new(checkpoint_dir: PathBuf) -> Result<Self, SubagentRunError> {
+        Self::with_in_flight(
+            checkpoint_dir,
+            tinyagents_orchestration::subagent::SubagentInFlight::default(),
+        )
+    }
+
+    pub(crate) fn with_in_flight(
+        checkpoint_dir: PathBuf,
+        in_flight: tinyagents_orchestration::subagent::SubagentInFlight,
+    ) -> Result<Self, SubagentRunError> {
         let failures = Arc::new(Mutex::new(HashMap::new()));
         let host_outcome = Arc::new(Mutex::new(HashMap::new()));
         let configured_tool_result = Arc::new(Mutex::new(HashMap::new()));
@@ -36,7 +46,8 @@ impl OpenHumanDriverBundle {
                 executor: Some(executor),
                 persistence: Some(lifecycle_persistence),
             })
-            .map_err(map_lifecycle_error)?,
+            .map_err(map_lifecycle_error)?
+            .with_shared_in_flight(in_flight),
         );
         Ok(Self {
             driver,
@@ -324,6 +335,11 @@ pub(in crate::agent::subagent_host) fn outcome_to_host(
 ) -> SubagentRunOutcome {
     let persistence_disposition = result.disposition;
     let outcome = result.outcome;
+    let elapsed_from_neutral = outcome
+        .extensions
+        .get("elapsed_ns")
+        .and_then(serde_json::Value::as_u64)
+        .map(std::time::Duration::from_nanos);
     // A driver that lost a pause/terminal CAS may have a perfectly valid local
     // execution result, but it is not the authoritative lifecycle outcome.
     // Reconstruct the durable winner instead of leaking the loser’s output,
@@ -334,7 +350,24 @@ pub(in crate::agent::subagent_host) fn outcome_to_host(
         None
     };
     let durable_metadata = if host.is_none() {
-        persistence.durable_host_metadata(task_key).ok().flatten()
+        let extensions = &outcome.extensions;
+        let agent_id = extensions
+            .get("agent_id")
+            .and_then(serde_json::Value::as_str)
+            .filter(|agent_id| !agent_id.is_empty())
+            .map(str::to_owned);
+        let elapsed_ms = extensions
+            .get("elapsed_ms")
+            .and_then(serde_json::Value::as_u64);
+        match (agent_id, elapsed_ms) {
+            (Some(agent_id), elapsed_ms) => Some((agent_id, elapsed_ms.unwrap_or_default())),
+            (None, Some(elapsed_ms)) => persistence
+                .durable_host_metadata(task_key)
+                .ok()
+                .flatten()
+                .or_else(|| Some((fallback_agent_id.to_owned(), elapsed_ms))),
+            (None, None) => persistence.durable_host_metadata(task_key).ok().flatten(),
+        }
     } else {
         None
     };
@@ -368,7 +401,9 @@ pub(in crate::agent::subagent_host) fn outcome_to_host(
                 .charged_amount
                 .map(|amount| amount.micros as f64 / 1_000_000.0)
                 .unwrap_or_default(),
-            cost_source: cost_source_of(outcome.usage.usage.charged_amount.as_ref()),
+            cost_source: outcome
+                .cost_source
+                .unwrap_or_else(|| cost_source_of(outcome.usage.usage.charged_amount.as_ref())),
         },
         artifact_paths: outcome
             .artifacts
@@ -377,6 +412,9 @@ pub(in crate::agent::subagent_host) fn outcome_to_host(
             .collect(),
         persistence_disposition,
     });
+    if let Some(elapsed) = elapsed_from_neutral {
+        host.elapsed = elapsed;
+    }
     let is_awaiting_input = matches!(outcome.status, SubagentOutcomeKind::AwaitingInput(_));
     let status = match outcome.status {
         SubagentOutcomeKind::Completed => SubagentRunStatus::Completed,

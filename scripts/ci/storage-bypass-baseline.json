@@ -8,27 +8,6 @@
   },
   {
     "rule": "json-write",
-    "path": "crates/openhuman-core/src/agent/subagent_host/lifecycle/persistence.rs",
-    "line": 115,
-    "text": "let file = OpenOptions::new()",
-    "occurrence": 1
-  },
-  {
-    "rule": "json-write",
-    "path": "crates/openhuman-core/src/agent/subagent_host/lifecycle/persistence.rs",
-    "line": 205,
-    "text": "std::fs::write(&temporary, bytes)",
-    "occurrence": 1
-  },
-  {
-    "rule": "json-write",
-    "path": "crates/openhuman-core/src/agent/subagent_host/lifecycle/persistence.rs",
-    "line": 221,
-    "text": "std::fs::write(&temporary, bytes)",
-    "occurrence": 2
-  },
-  {
-    "rule": "json-write",
     "path": "crates/openhuman-core/src/attachments/legacy.rs",
     "line": 143,
     "text": "let mut file = tokio::fs::OpenOptions::new()",

@@ -75,4 +75,4 @@ pub use types::{
     SubagentRunStatus, SubagentUsage,
 };
 
-pub(crate) use ops::{append_subagent_role_contract, resolve_subagent_source};
+pub(crate) use ops::resolve_subagent_source;

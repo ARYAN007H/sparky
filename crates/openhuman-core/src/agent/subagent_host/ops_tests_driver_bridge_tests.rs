@@ -43,6 +43,223 @@ async fn prepared_subagent_runs_through_driver_jobs_dispatcher() {
     );
 }
 
+struct BlockingCrossBundleTool {
+    started: tokio::sync::mpsc::Sender<()>,
+    release: Arc<tokio::sync::Notify>,
+    executions: Arc<std::sync::atomic::AtomicUsize>,
+}
+
+#[async_trait::async_trait]
+impl tinytools::Tool for BlockingCrossBundleTool {
+    fn name(&self) -> &str {
+        "blocking_cross_bundle_fixture"
+    }
+
+    fn description(&self) -> &str {
+        "Blocks the shared child until the test releases it."
+    }
+
+    fn parameters_schema(&self) -> serde_json::Value {
+        serde_json::json!({"type": "object"})
+    }
+
+    async fn execute(&self, _args: serde_json::Value) -> anyhow::Result<tinytools::ToolResult> {
+        self.executions
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        let _ = self.started.send(()).await;
+        self.release.notified().await;
+        Ok(tinytools::ToolResult::success("released"))
+    }
+
+    fn permission_level(&self) -> tinytools::PermissionLevel {
+        tinytools::PermissionLevel::None
+    }
+}
+
+#[tokio::test]
+async fn independent_host_bundles_share_and_project_the_persisted_winner() {
+    use tinyagents_orchestration::subagent::SubagentTaskKey;
+
+    let scratch = tempfile::tempdir().expect("isolated cross-bundle fixture");
+    let workspace = scratch.path().join("workspace");
+    std::fs::create_dir_all(&workspace).expect("create isolated workspace");
+    let (started_tx, mut started_rx) = tokio::sync::mpsc::channel(1);
+    let release = Arc::new(tokio::sync::Notify::new());
+    let executions = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let provider = ScriptedProvider::new(vec![
+        tool_response("blocking_cross_bundle_fixture", "{}"),
+        {
+            let mut response = text_response(
+                "[artifact] kind=output path=outputs/report.md bytes=1\nreport ready",
+            );
+            response.usage = Some(tinyinference_llm::usage::Usage {
+                input_tokens: 12,
+                output_tokens: 7,
+                total_tokens: 19,
+                ..Default::default()
+            });
+            response
+        },
+    ]);
+    let mut parent_context = make_parent(
+        provider.clone(),
+        vec![Box::new(BlockingCrossBundleTool {
+            started: started_tx,
+            release: release.clone(),
+            executions: executions.clone(),
+        })],
+    );
+    parent_context.workspace_dir = workspace;
+    let definition = make_def_named_tools(&["blocking_cross_bundle_fixture"]);
+    let mut options = with_parent(parent_context, SubagentRunOptions::default());
+    options.task_id = Some("cross-bundle-task".into());
+    options.thread_id = Some("cross-bundle-thread".into());
+    let checkpoint_dir = scratch.path().join("checkpoints");
+    options.checkpoint_dir = Some(checkpoint_dir.clone());
+    let mut test_config = crate::config::Config::default();
+    test_config.components.juice = false;
+    let core = crate::core::runtime::CoreContext::for_test_with_config(
+        crate::core::runtime::DomainSet::full(),
+        test_config,
+    );
+    options.run_context = options.run_context.with_core(Some(Arc::clone(&core)));
+    let leader_parent = options.run_context.clone().into_tinyagents(
+        tinyagents_harness::context::RunConfig::new("cross-bundle-parent")
+            .with_thread("cross-bundle-thread"),
+    );
+    let follower_parent = options.run_context.clone().into_tinyagents(
+        tinyagents_harness::context::RunConfig::new("cross-bundle-parent")
+            .with_thread("cross-bundle-thread"),
+    );
+    let task_key = SubagentTaskKey::from_context(&leader_parent, "cross-bundle-task", None);
+    let flights = crate::agent::subagent_host::lifecycle::shared_subagent_flight(
+        &leader_parent.data.dispatch_ctx(),
+        &checkpoint_dir,
+    );
+    let leader_definition = definition.clone();
+    let leader_options = options.clone();
+    let leader = tokio::spawn(async move {
+        crate::agent::subagent_host::OpenHumanSubagentHost::new(leader_definition, leader_options)
+            .run(&leader_parent, "produce a report".into())
+            .await
+    });
+    tokio::time::timeout(std::time::Duration::from_secs(5), started_rx.recv())
+        .await
+        .expect("leader reaches the blocking child tool")
+        .expect("blocking tool start notification");
+    let leader_entry = flights
+        .get(&task_key)
+        .expect("leader reserves the shared task key");
+
+    let cancelled_context = options.run_context.clone();
+    let cancelled_options = options.clone();
+    let follower = tokio::spawn(async move {
+        crate::agent::subagent_host::OpenHumanSubagentHost::new(definition, options)
+            .run(&follower_parent, "produce a report".into())
+            .await
+    });
+    let mut cancelled_parent = cancelled_context.into_tinyagents(
+        tinyagents_harness::context::RunConfig::new("cross-bundle-parent")
+            .with_thread("cross-bundle-thread"),
+    );
+    let observer_cancellation = tinyagents_harness::CancellationToken::new();
+    cancelled_parent.cancellation = observer_cancellation.clone();
+    let cancelled_definition = make_def_named_tools(&["blocking_cross_bundle_fixture"]);
+    let cancelled_follower = tokio::spawn(async move {
+        crate::agent::subagent_host::OpenHumanSubagentHost::new(
+            cancelled_definition,
+            cancelled_options,
+        )
+        .run(&cancelled_parent, "produce a report".into())
+        .await
+    });
+    tokio::time::timeout(std::time::Duration::from_secs(5), async {
+        while leader_entry.waiter_count() != 2 {
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .expect("both independent host bundles join the leader's flight");
+
+    observer_cancellation.cancel();
+    let cancelled = tokio::time::timeout(std::time::Duration::from_secs(5), cancelled_follower)
+        .await
+        .expect("cancelled observer exits independently")
+        .expect("cancelled observer task")
+        .expect("observer cancellation is a normal lifecycle outcome");
+    assert!(
+        matches!(cancelled.status, SubagentRunStatus::Cancelled),
+        "the cancelled observer receives its own cancelled result"
+    );
+    assert_eq!(
+        executions.load(std::sync::atomic::Ordering::SeqCst),
+        1,
+        "cancelling a waiter does not cancel or duplicate the leader"
+    );
+
+    release.notify_waiters();
+    let leader = tokio::time::timeout(std::time::Duration::from_secs(5), leader)
+        .await
+        .expect("leader completes after release")
+        .expect("leader task")
+        .expect("leader outcome");
+    let follower = tokio::time::timeout(std::time::Duration::from_secs(5), follower)
+        .await
+        .expect("follower receives the persisted winner")
+        .expect("follower task")
+        .expect("follower outcome");
+
+    assert_eq!(leader.output, follower.output);
+    assert_eq!(leader.agent_id, follower.agent_id);
+    assert_eq!(leader.iterations, follower.iterations);
+    assert_eq!(leader.elapsed, follower.elapsed);
+    assert_eq!(leader.mode, follower.mode);
+    assert!(matches!(leader.status, SubagentRunStatus::Completed));
+    assert!(matches!(follower.status, SubagentRunStatus::Completed));
+    assert_eq!(leader.final_history.len(), follower.final_history.len());
+    // The neutral transcript contract identifies a tool result row by its
+    // call ID, even when the host's transient row left `id` unset. Normalize
+    // only that documented field so all other native row metadata remains
+    // subject to the full-history equality check.
+    let mut canonical_leader_history = leader.final_history.clone();
+    for row in &mut canonical_leader_history {
+        if row.role == "tool" && !row.preserve_request_id {
+            row.id = row.tool_call_id.clone().or_else(|| row.id.clone());
+        }
+    }
+    assert_eq!(
+        serde_json::to_value(&canonical_leader_history).unwrap(),
+        serde_json::to_value(&follower.final_history).unwrap(),
+        "follower receives the full winner history"
+    );
+    assert!(
+        !leader.final_history.is_empty(),
+        "winner history is preserved"
+    );
+    assert!(leader
+        .final_history
+        .iter()
+        .any(|row| { row.role == "tool" && row.tool_call_id.as_deref() == Some("call-1") }));
+    assert_eq!(leader.usage.input_tokens, follower.usage.input_tokens);
+    assert!(leader.usage.input_tokens > 0, "winner usage is preserved");
+    assert_eq!(leader.artifact_paths, follower.artifact_paths);
+    assert_eq!(leader.artifact_paths, vec!["outputs/report.md"]);
+    assert_eq!(
+        leader.persistence_disposition,
+        tinyagents_orchestration::subagent::SubagentPersistenceDisposition::TerminalInserted
+    );
+    assert_eq!(
+        follower.persistence_disposition,
+        tinyagents_orchestration::subagent::SubagentPersistenceDisposition::TerminalExisting
+    );
+    assert_eq!(
+        executions.load(std::sync::atomic::Ordering::SeqCst),
+        1,
+        "the child executes once across independently constructed bundles"
+    );
+    assert_eq!(provider.captured.lock().len(), 2, "one model loop ran");
+}
+
 #[tokio::test]
 async fn closing_a_durable_driver_session_cancels_only_its_registered_child() {
     use crate::agent::orchestration::subagent_sessions::{

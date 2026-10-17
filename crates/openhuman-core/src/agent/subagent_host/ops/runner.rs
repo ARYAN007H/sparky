@@ -9,10 +9,10 @@
 use std::collections::HashSet;
 use std::time::Instant;
 
-use crate::agent::harness::artifact_offload::offload_run_result;
 use crate::agent::harness::fork_context::ParentExecutionContext;
 use crate::agent::prompts::render_subagent_system_prompt_with_format;
 use crate::agent::prompts::{PromptContext, SubagentRenderOptions};
+use crate::agent::session_host::dedup_visible_tool_specs;
 use crate::agent::subagent_host::definition_iter_cap;
 use crate::agent::subagent_host::tool_prep::{
     filter_tool_indices, is_subagent_spawn_tool, load_prompt_source, subagent_prompt_protocol,
@@ -27,17 +27,11 @@ use tinyagents_definition::{
     validate_tier_transition, AgentTier, IterationPolicy, PromptSource,
     SandboxMode as AgentSandboxMode,
 };
-use tinyagents_harness::artifacts::{
-    effective_offload_threshold, extract_artifact_paths, note_artifact_handoff,
-    DEFAULT_OFFLOAD_THRESHOLD_BYTES, HANDOFF_STAGE_RECORDED,
-};
 use tinyagents_harness::context::{current_run_depth, with_run_depth, RunConfig, RunDepth};
 use tinytools::{SandboxMode as TinyagentsSandboxMode, ToolSpec, WorkspaceDescriptor};
 use tinytools_std::file_state::with_file_state_agent_id;
 
-use super::prompt::{
-    append_artifact_offload_contract, append_subagent_role_contract, dedup_tool_specs_by_name,
-};
+use super::prompt::compose_subagent_system_prompt;
 use super::provider::resolve_subagent_source;
 
 /// Runtime spawn-hierarchy gate decision for one delegation hop.
@@ -364,21 +358,19 @@ pub(crate) async fn run_subagent_direct(
             usage: outcome.usage,
         });
 
-        // #3883: offload an oversized worker result to `action_dir/outputs/`
-        // BEFORE the cap below truncates it, so the parent receives a path plus
-        // an abstract and the full-fidelity body survives on disk instead of
-        // being cut. A refused or failed offload is soft: the inline payload
-        // continues on to the cap and the summarizer detour exactly as before.
-        Box::pin(offload_outcome_artifacts(&mut outcome, definition, &options, &task_id)).await;
-
-        // Use TinyAgents' shared character-safe result cap so subagent output
-        // follows the same truncation contract as other orchestration paths.
-        if let Some(cap) = definition.max_result_chars {
-            outcome.output = tinyagents_orchestration::subagent::truncate_head_tail(
-                &outcome.output,
-                cap,
-            )
-            .0;
+        // The owner policy makes the generic byte-overflow decision and calls
+        // this host's authorized artifact store. Project its opaque reference
+        // into the product pointer before applying the independent character
+        // cap, preserving the existing full-output-first behavior.
+        if let Some(error) = super::runner_artifacts::apply_subagent_result_policies(
+            &mut outcome,
+            definition,
+            &options,
+            &task_id,
+        )
+        .await
+        {
+            tracing::debug!(task_id = %task_id, error = %error, "[artifact] sub-agent result policy fell back to inline output");
         }
 
         tracing::info!(
@@ -395,114 +387,6 @@ pub(crate) async fn run_subagent_direct(
         Ok(outcome)
     })
     .await
-}
-
-/// Apply the filesystem-offload convention to a finished sub-agent run (#3883).
-///
-/// Writes an oversized result to `action_dir/outputs/` and swaps `output` for a
-/// path + abstract, then records every `[artifact]` pointer the outgoing payload
-/// carries — the harness-written one and any the worker authored itself by
-/// following the prompt contract — onto `SubagentRunOutcome::artifact_paths`, so
-/// the parent receives the paths structurally, not only as prose.
-///
-/// Every failure is soft. With no resolvable action root (or a refused target)
-/// the outcome is left untouched and the summarizer detour plus
-/// `tool_result_budget_bytes` truncation stay in charge as the fallback.
-async fn offload_outcome_artifacts(
-    outcome: &mut SubagentRunOutcome,
-    definition: &AgentDefinition,
-    options: &SubagentRunOptions,
-    task_id: &str,
-) {
-    // Pointers the WORKER authored itself (prompt contract) are read first: the
-    // harness may be about to replace `output` wholesale with its own pointer,
-    // which would otherwise drop them. They also have to survive the early
-    // returns below, so a run with no resolvable action root still reports the
-    // paths its child wrote by hand.
-    let mut paths = extract_artifact_paths(&outcome.output);
-
-    // A worktree-isolated worker offloads into its own checkout; everyone else
-    // uses the live policy's action root, which is the same root a parent's
-    // relative read resolves the returned path against.
-    let policy = crate::security::live_policy::effective_in(&options.run_context.dispatch_ctx());
-    let Some(action_dir) = options
-        .worktree_action_dir
-        .clone()
-        .or_else(|| policy.as_ref().map(|p| p.action_dir.clone()))
-    else {
-        tracing::debug!(
-            task_id = %task_id,
-            agent_id = %outcome.agent_id,
-            worker_authored_paths = paths.len(),
-            "[artifact] no resolvable action_dir — skipping offload (summarizer/truncation backstop applies)"
-        );
-        outcome.artifact_paths = paths;
-        note_artifact_handoff(
-            HANDOFF_STAGE_RECORDED,
-            &outcome.agent_id,
-            task_id,
-            &outcome.artifact_paths,
-        );
-        return;
-    };
-
-    // A read-only tier means this run may not mutate the disk at all, so the
-    // harness does not persist on its behalf either. The result stays inline and
-    // the summarizer / truncation backstops handle it, exactly as before #3883.
-    if policy
-        .as_ref()
-        .is_some_and(|p| p.autonomy == crate::security::AutonomyLevel::ReadOnly)
-    {
-        tracing::debug!(
-            task_id = %task_id,
-            agent_id = %outcome.agent_id,
-            "[artifact] readonly autonomy tier — skipping offload (summarizer/truncation backstop applies)"
-        );
-        outcome.artifact_paths = paths;
-        note_artifact_handoff(
-            HANDOFF_STAGE_RECORDED,
-            &outcome.agent_id,
-            task_id,
-            &outcome.artifact_paths,
-        );
-        return;
-    }
-
-    // Offload at the tighter of the global default and this agent's own result
-    // cap, so a definition capped below the default (flow_memory_agent at 4 000
-    // chars) gets its full body on disk instead of truncated immediately after.
-    let threshold =
-        effective_offload_threshold(DEFAULT_OFFLOAD_THRESHOLD_BYTES, definition.max_result_chars);
-
-    // The parent that receives the pointer resolves relative paths against ITS
-    // action root, so the stored artifact is materialised there (also for a
-    // worktree-isolated worker) and the handed-back `outputs/…` path opens.
-    let (output, _artifact) = offload_run_result(
-        std::mem::take(&mut outcome.output),
-        policy,
-        action_dir,
-        outcome.agent_id.clone(),
-        task_id,
-        threshold,
-    )
-    .await;
-    outcome.output = output;
-
-    // Merge: the harness pointer (if it fired) plus any worker-authored pointer
-    // read before the swap. `extract_artifact_paths` already de-duplicates
-    // within a payload; dedupe across the two sources here.
-    for path in extract_artifact_paths(&outcome.output) {
-        if !paths.contains(&path) {
-            paths.push(path);
-        }
-    }
-    outcome.artifact_paths = paths;
-    note_artifact_handoff(
-        HANDOFF_STAGE_RECORDED,
-        &outcome.agent_id,
-        task_id,
-        &outcome.artifact_paths,
-    );
 }
 
 fn workspace_descriptor_for_subagent(
@@ -703,8 +587,7 @@ async fn run_typed_mode(
         .iter()
         .map(|&i| parent.all_tools[i].name().to_string())
         .collect();
-    let filtered_specs = crate::agent::session_host::dedup_visible_tool_specs(filtered_specs);
-    let filtered_specs = dedup_tool_specs_by_name(&definition.id, filtered_specs);
+    let filtered_specs = dedup_visible_tool_specs(filtered_specs);
 
     tracing::debug!(
         agent_id = %definition.id,
@@ -802,12 +685,13 @@ async fn run_typed_mode(
         }
     };
 
-    let system_prompt = append_subagent_role_contract(system_prompt, &definition.id);
-    // #3883: only agents that actually hold a file-write tool are told to
-    // offload. `visible_tool_names` is this sub-agent's real, post-filter tool
-    // surface, so the contract can never advertise a tool the child cannot call.
-    let system_prompt =
-        append_artifact_offload_contract(system_prompt, &definition.id, &visible_tool_names);
+    let system_prompt = compose_subagent_system_prompt(
+        system_prompt,
+        &definition.id,
+        &visible_tool_names,
+        task_prompt,
+        options.run_context.spawn_depth,
+    );
 
     // ── Build the user message (with optional context prefix) ──────────
     // Shared one-line stamp (#3602), in the user's zone like the main agent's.

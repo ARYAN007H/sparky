@@ -202,80 +202,36 @@ async fn terminal_and_pause_race_leave_only_one_authoritative_state() {
 }
 
 #[tokio::test]
-async fn host_coalescer_keeps_the_leader_winner_and_cancels_only_the_observer() {
-    let entry = HostInFlight::new();
-    let key = key();
-    let cancelled = tinyagents_harness::CancellationToken::new();
-    cancelled.cancel();
-
-    let observer = entry
-        .wait(&cancelled, &key, "observer-agent")
-        .await
-        .unwrap()
-        .expect("cancelled follower reports an outcome");
-    assert!(matches!(observer.status, SubagentRunStatus::Cancelled));
-    assert_eq!(
-        observer.persistence_disposition,
-        tinyagents_orchestration::subagent::SubagentPersistenceDisposition::ObserverCancelled
-    );
-
-    let winner = SubagentRunOutcome {
-        task_id: key.task_id.clone(),
-        agent_id: "leader-agent".into(),
-        output: "durable winner".into(),
-        iterations: 3,
-        elapsed: std::time::Duration::from_millis(42),
-        mode: SubagentMode::Typed,
-        status: SubagentRunStatus::Completed,
-        final_history: Vec::new(),
-        usage: SubagentUsage::default(),
-        artifact_paths: Vec::new(),
-        persistence_disposition:
-            tinyagents_orchestration::subagent::SubagentPersistenceDisposition::TerminalInserted,
-    };
-    entry.complete(Some(winner)).await;
-
-    let active = tinyagents_harness::CancellationToken::new();
-    let follower = entry
-        .wait(&active, &key, "other-agent")
-        .await
-        .unwrap()
-        .expect("leader result remains available");
-    assert_eq!(follower.output, "durable winner");
-    assert_eq!(follower.agent_id, "leader-agent");
-    assert_eq!(follower.elapsed, std::time::Duration::from_millis(42));
-    assert_eq!(
-        follower.persistence_disposition,
-        tinyagents_orchestration::subagent::SubagentPersistenceDisposition::TerminalExisting
-    );
-}
-
-#[tokio::test]
-async fn each_agent_dedupes_its_own_in_flight_sub_agents() {
+async fn shared_flights_are_partitioned_by_agent_and_workspace() {
     use crate::core::runtime::agent_scope::test_agent_context;
     use crate::core::runtime::{context::CoreContext, DomainSet};
-    use std::sync::Arc;
 
     let root = CoreContext::for_test(DomainSet::full(), None);
     let alpha = test_agent_context(&root, "alpha");
     let beta = test_agent_context(&root, "beta");
+    let key = key();
+    let alpha_ctx = crate::core::runtime::DispatchCtx::new(Arc::clone(&alpha));
+    let beta_ctx = crate::core::runtime::DispatchCtx::new(beta);
 
-    let alpha_map = {
-        let scope_ctx = crate::core::runtime::DispatchCtx::new(Arc::clone(&alpha));
+    let alpha_workspace_a = super::super::lifecycle::shared_subagent_flight(
+        &alpha_ctx,
+        std::path::Path::new("/workspace-a"),
+    );
+    let alpha_workspace_b = super::super::lifecycle::shared_subagent_flight(
+        &alpha_ctx,
+        std::path::Path::new("/workspace-b"),
+    );
+    let alpha_workspace_a_again = super::super::lifecycle::shared_subagent_flight(
+        &alpha_ctx,
+        std::path::Path::new("/workspace-a"),
+    );
+    let beta_workspace_a = super::super::lifecycle::shared_subagent_flight(
+        &beta_ctx,
+        std::path::Path::new("/workspace-a"),
+    );
 
-        host_in_flight(&scope_ctx)
-    };
-    let beta_map = {
-        let scope_ctx = crate::core::runtime::DispatchCtx::new(beta);
-
-        host_in_flight(&scope_ctx)
-    };
-    let alpha_again = {
-        let scope_ctx = crate::core::runtime::DispatchCtx::new(alpha);
-
-        host_in_flight(&scope_ctx)
-    };
-
-    assert!(!Arc::ptr_eq(&alpha_map, &beta_map));
-    assert!(Arc::ptr_eq(&alpha_map, &alpha_again));
+    assert!(alpha_workspace_a.claim(key.clone()).1);
+    assert!(!alpha_workspace_a_again.claim(key.clone()).1);
+    assert!(alpha_workspace_b.claim(key.clone()).1);
+    assert!(beta_workspace_a.claim(key).1);
 }

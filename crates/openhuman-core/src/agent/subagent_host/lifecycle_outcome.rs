@@ -2,9 +2,6 @@
 
 use super::*;
 
-/// The host's in-flight subagent runs of one agent context.
-pub(super) type HostInFlightMap = AsyncMutex<HashMap<HostLifecycleKey, Arc<HostInFlight>>>;
-
 pub(super) fn host_outcome_to_neutral(
     outcome: SubagentRunOutcome,
     definition: &crate::agent_registry::host_definition::AgentDefinition,
@@ -21,6 +18,10 @@ pub(super) fn host_outcome_to_neutral(
         (
             "elapsed_ms".into(),
             serde_json::json!(outcome.elapsed.as_millis() as u64),
+        ),
+        (
+            "elapsed_ns".into(),
+            serde_json::json!(outcome.elapsed.as_nanos().min(u64::MAX as u128) as u64),
         ),
         (
             "artifact_paths".into(),

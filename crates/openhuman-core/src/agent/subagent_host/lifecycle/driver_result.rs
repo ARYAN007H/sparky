@@ -39,6 +39,15 @@ pub(crate) async fn resolve_inline_driver_outcome(
         .unwrap_or_else(|poisoned| poisoned.into_inner())
         .remove(task_key);
 
+    // Observer cancellation belongs to this waiter, not to the persisted
+    // child outcome. It must remain authoritative even if the leader commits
+    // while this caller is projecting its ToolResult.
+    if let Some(outcome) = cached.as_ref().filter(|host| {
+        host.persistence_disposition == SubagentPersistenceDisposition::ObserverCancelled
+    }) {
+        return Ok((outcome.clone(), public_job_id));
+    }
+
     // The driver's persistence CAS result is authoritative. Another
     // invocation can win terminal/pause persistence while this executor's
     // host-side cache still contains its local loser. Read the same scoped
@@ -94,11 +103,6 @@ pub(crate) async fn resolve_inline_driver_outcome(
         return Ok((host, public_job_id));
     }
 
-    if let Some(outcome) = cached.filter(|host| {
-        host.persistence_disposition == SubagentPersistenceDisposition::ObserverCancelled
-    }) {
-        return Ok((outcome, public_job_id));
-    }
     Err(SubagentRunError::Provider(anyhow::anyhow!(
         "driver-backed subagent returned without a durable host outcome"
     )))

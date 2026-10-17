@@ -212,8 +212,8 @@ pub(in super::super) async fn run_subagent_via_graph(
         history: dispatch_history,
         // Dynamic (per-spawn) tools first so a dynamic tool that intentionally
         // shadows a parent-registry tool of the same name is the one that
-        // *executes* — matching the advertisement order (`dedup_tool_specs_by_name`
-        // lists dynamic specs before parent specs in `runner.rs`). The shared
+        // *executes* — matching the advertisement order (`dedup_visible_tool_specs`
+        // keeps the first dynamic spec before parent specs in `runner.rs`). The shared
         // adapter resolves a name by scanning the sets in order, so a
         // parent-first order would run the parent impl for a shadowed name.
         tool_sets: vec![Arc::new(dynamic_tools), parent_tools],
@@ -383,7 +383,7 @@ pub(in super::super) async fn run_subagent_via_graph(
     // checkpoint (the delegating agent continues from partial progress) rather
     // than surfacing an empty/partial answer — the legacy `SubagentCheckpoint`.
     if outcome.hit_cap {
-        let digest = build_cap_digest(&outcome.conversation, &outcome.tool_outcomes);
+        let results = cap_tool_results(&outcome.conversation, &outcome.tool_outcomes);
         let strategy = checkpoint::SubagentCheckpoint {
             chat_model: summary_model.clone(),
             agent_id: agent_id.to_string(),
@@ -395,7 +395,7 @@ pub(in super::super) async fn run_subagent_via_graph(
             // cap-summary call too.
             max_output_tokens,
         };
-        match strategy.summarize_cap_hit(&digest, max_iterations).await {
+        match strategy.summarize_cap_hit(&results, max_iterations).await {
             Ok(co) => {
                 if let Some(u) = co.usage {
                     // Fold ALL four token fields (the legacy cap-summary folded
@@ -602,12 +602,12 @@ fn map_tinyagents_subagent_error(err: anyhow::Error) -> SubagentRunError {
 /// — e.g. a hallucinated/unknown tool the crate recovered without running
 /// `after_tool` — is marked `failed`, so the summary no longer tells the model
 /// every call succeeded.
-fn build_cap_digest(
-    conversation: &[TranscriptEntry],
+fn cap_tool_results<'a>(
+    conversation: &'a [TranscriptEntry],
     tool_outcomes: &[tinyagents_harness::turn_outcome::ToolCallOutcome],
-) -> String {
+) -> Vec<tinyagents_harness::summarization::CapToolResult<'a>> {
     use std::collections::HashMap;
-    use std::fmt::Write as _;
+    use tinyagents_harness::summarization::CapToolResult;
 
     // call_id -> tool name, from this turn's assistant tool-call rounds.
     let mut names: HashMap<&str, &str> = HashMap::new();
@@ -625,25 +625,26 @@ fn build_cap_digest(
         .map(|o| (o.call_id.as_str(), o.success))
         .collect();
 
-    let mut out = String::new();
-    for msg in conversation {
-        if let TranscriptEntry::ToolResults(results) = msg {
-            for r in results {
-                let name = names
-                    .get(r.tool_call_id.as_str())
-                    .copied()
-                    .unwrap_or("tool");
-                // Missing outcome → `false` (unknown/hallucinated tool): honest
-                // failed status rather than an optimistic `[ok]`.
-                let ok = success_by_id
-                    .get(r.tool_call_id.as_str())
-                    .copied()
-                    .unwrap_or(false);
-                let tag = if ok { "ok" } else { "failed" };
-                let body = crate::util::truncate_with_ellipsis(&r.content, 800);
-                let _ = writeln!(out, "- {name} [{tag}]: {body}");
-            }
-        }
-    }
-    out.trim_end().to_string()
+    let results: Vec<_> = conversation
+        .iter()
+        .filter_map(|entry| match entry {
+            TranscriptEntry::ToolResults(results) => Some(results),
+            _ => None,
+        })
+        .flatten()
+        .map(|result| CapToolResult {
+            call_id: &result.tool_call_id,
+            name: names
+                .get(result.tool_call_id.as_str())
+                .copied()
+                .unwrap_or("tool"),
+            output: &result.content,
+            // Missing outcome means the tool was never run successfully.
+            success: success_by_id
+                .get(result.tool_call_id.as_str())
+                .copied()
+                .unwrap_or(false),
+        })
+        .collect();
+    results
 }
