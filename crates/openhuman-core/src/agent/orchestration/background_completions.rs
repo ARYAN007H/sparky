@@ -80,6 +80,12 @@ pub(super) struct RouterScope {
     workspace_dir: PathBuf,
 }
 
+impl RouterScope {
+    pub(super) fn workspace_dir(&self) -> &Path {
+        &self.workspace_dir
+    }
+}
+
 pub(super) fn router_scope_for(ctx: &DispatchCtx, workspace_dir: &Path) -> RouterScope {
     let profile = crate::core::runtime::tenant::isolated_unless_tenant(
         ctx.tenant(),

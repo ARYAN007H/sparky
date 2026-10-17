@@ -53,7 +53,7 @@ pub(crate) fn forget_workspace_for_test(workspace_dir: &Path) {
     let scopes: Vec<_> = st
         .stores
         .keys()
-        .filter(|scope| scope.workspace_dir == workspace_dir)
+        .filter(|scope| scope.workspace_dir() == workspace_dir)
         .cloned()
         .collect();
     for scope in &scopes {
@@ -71,7 +71,7 @@ pub(crate) fn forget_workspace_for_test(workspace_dir: &Path) {
         st.deleted_threads.remove(&thread);
     }
     st.recovered_workspaces
-        .retain(|scope| scope.workspace_dir != workspace_dir);
+        .retain(|scope| scope.workspace_dir() != workspace_dir);
     st.session_threads.clear();
     st.session_order.clear();
     drop(st);
