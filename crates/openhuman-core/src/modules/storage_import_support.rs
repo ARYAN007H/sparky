@@ -37,9 +37,6 @@ pub(super) fn marker_id(prefix: &str, source: &Path) -> String {
     format!("{prefix}@{}", &hex::encode(digest)[..16])
 }
 
-/// The `tsd.migrations` owner of the host's module importers.
-const IMPORT_OWNER: &str = "host";
-
 /// Whether the importer `kind` already finished for marker `id`, recorded in
 /// `tsd.migrations` of the module's scope. `kind` is the old marker
 /// collection name (`tinybox_host_import`), so a marker row an older build
@@ -50,24 +47,16 @@ pub(super) async fn already_imported(
     kind: &str,
     id: &str,
 ) -> Result<bool> {
-    crate::storage::import_state::done(
-        scoped,
-        IMPORT_OWNER,
-        &crate::storage::import_state::step_id(kind, id),
-    )
-    .await
-    .map_err(|error| anyhow!("read the import state: {:?}", error.kind()))
+    crate::storage::import_state::host_import_done(scoped, kind, id)
+        .await
+        .map_err(|error| anyhow!("read the import state: {:?}", error.kind()))
 }
 
 /// Records that the import of `id` finished. Marking twice is harmless.
 pub(super) async fn mark_imported(scoped: &ScopedStorage, kind: &str, id: &str) -> Result<()> {
-    crate::storage::import_state::mark_done(
-        scoped,
-        IMPORT_OWNER,
-        &crate::storage::import_state::step_id(kind, id),
-    )
-    .await
-    .map_err(|error| anyhow!("write the import state: {:?}", error.kind()))
+    crate::storage::import_state::host_import_mark(scoped, kind, id)
+        .await
+        .map_err(|error| anyhow!("write the import state: {:?}", error.kind()))
 }
 
 /// Writes `doc` only when `id` is absent; `true` when it was written.

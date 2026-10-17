@@ -95,6 +95,37 @@ pub async fn mark_done(scoped: &ScopedStorage, owner: &str, step: &str) -> Resul
     Migrations::new(scoped).mark_done(owner, step).await
 }
 
+/// The `tsd.migrations` owner of the module importers, which run in a module's
+/// scope on behalf of the host (`kind` is the old marker collection name).
+pub const HOST_OWNER: &str = "host";
+
+/// Whether the module importer `kind` already finished for marker `id` in
+/// `scoped`'s (module) scope.
+///
+/// # Errors
+///
+/// A storage error.
+pub async fn host_import_done(
+    scoped: &ScopedStorage,
+    kind: &str,
+    id: &str,
+) -> Result<bool, StorageError> {
+    done(scoped, HOST_OWNER, &step_id(kind, id)).await
+}
+
+/// Records the module importer `kind` as finished for marker `id`.
+///
+/// # Errors
+///
+/// A storage error.
+pub async fn host_import_mark(
+    scoped: &ScopedStorage,
+    kind: &str,
+    id: &str,
+) -> Result<(), StorageError> {
+    mark_done(scoped, HOST_OWNER, &step_id(kind, id)).await
+}
+
 /// [`done`] from synchronous code, over the scope `repo` was opened on.
 ///
 /// # Errors

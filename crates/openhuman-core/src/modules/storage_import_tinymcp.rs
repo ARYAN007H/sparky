@@ -93,7 +93,9 @@ async fn import_into(
 ) -> Result<Outcome> {
     let docs = scoped.documents();
     let marker = marker_id(data_dir);
-    if support::already_imported(scoped, MARKER_COLLECTION, &marker).await? {
+    if crate::storage::import_state::host_import_done(scoped, MARKER_COLLECTION, &marker)
+        .await
+        .map_err(|error| anyhow!("read the import state: {:?}", error.kind()))? {
         return Ok(Outcome::AlreadyDone);
     }
     let clients = data_dir.join(CLIENTS_DB);
@@ -166,7 +168,9 @@ async fn import_into(
         }
     }
 
-    support::mark_imported(scoped, MARKER_COLLECTION, &marker).await?;
+    crate::storage::import_state::host_import_mark(scoped, MARKER_COLLECTION, &marker)
+        .await
+        .map_err(|error| anyhow!("write the import state: {:?}", error.kind()))?;
     tracing::info!(
         "{LOG_PREFIX} imported servers={servers} secrets={secret_count} audit={audited}"
     );
