@@ -285,13 +285,20 @@ impl ModelMiddleware<(), crate::agent::tinyagents::host::OpenHumanRunContext>
             let provider_id = route
                 .map(|route| route.provider.as_str())
                 .unwrap_or(&self.provider_id);
-            let provider_id = tinyagents_harness::events::generation_enrichment::is_valid_provider_id(provider_id)
-                .then(|| provider_id.to_owned());
-            let pricing = tinyagents_registry::pricing::lookup(model).map(|price| GenerationPricing {
-                input_per_mtok_usd: Some(price.input_per_mtok_usd),
-                cached_input_per_mtok_usd: Some(price.cached_input_per_mtok_usd),
-                output_per_mtok_usd: Some(price.output_per_mtok_usd),
-            });
+            let provider_id = valid_trace_provider_id(provider_id).then(|| provider_id.to_owned());
+            let pricing = if model.trim().to_ascii_lowercase().ends_with(":free") {
+                Some(GenerationPricing {
+                    input_per_mtok_usd: Some(0.0),
+                    cached_input_per_mtok_usd: Some(0.0),
+                    output_per_mtok_usd: Some(0.0),
+                })
+            } else {
+                tinyagents_registry::pricing::lookup(model).map(|price| GenerationPricing {
+                    input_per_mtok_usd: Some(price.input_per_mtok_usd),
+                    cached_input_per_mtok_usd: Some(price.cached_input_per_mtok_usd),
+                    output_per_mtok_usd: Some(price.output_per_mtok_usd),
+                })
+            };
             let billed = crate::inference::provider::model::usage_info_from_response(&response);
             let estimated_cost_usd = if response.served_from_cache
                 || billed.is_some_and(|usage| usage.charge_reported && !usage.cost_is_estimate)
@@ -317,6 +324,14 @@ impl ModelMiddleware<(), crate::agent::tinyagents::host::OpenHumanRunContext>
         }
         Ok(MiddlewareModelOutcome::from(response))
     }
+}
+
+fn valid_trace_provider_id(value: &str) -> bool {
+    !value.is_empty()
+        && value.len() <= 64
+        && value
+            .chars()
+            .all(|character| character.is_ascii_alphanumeric() || matches!(character, '_' | '.' | ':' | '-'))
 }
 
 #[cfg(test)]
