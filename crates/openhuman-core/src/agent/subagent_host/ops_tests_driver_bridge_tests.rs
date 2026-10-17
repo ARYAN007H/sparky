@@ -214,12 +214,30 @@ async fn independent_host_bundles_share_and_project_the_persisted_winner() {
 
     assert_eq!(leader.output, follower.output);
     assert_eq!(leader.agent_id, follower.agent_id);
+    assert_eq!(leader.iterations, follower.iterations);
+    assert_eq!(leader.elapsed, follower.elapsed);
+    assert_eq!(leader.mode, follower.mode);
+    assert!(matches!(leader.status, SubagentRunStatus::Completed));
+    assert!(matches!(follower.status, SubagentRunStatus::Completed));
     assert_eq!(leader.final_history.len(), follower.final_history.len());
+    assert_eq!(
+        serde_json::to_value(&leader.final_history).unwrap(),
+        serde_json::to_value(&follower.final_history).unwrap(),
+        "follower receives the full winner history"
+    );
     assert!(!leader.final_history.is_empty(), "winner history is preserved");
     assert_eq!(leader.usage.input_tokens, follower.usage.input_tokens);
     assert!(leader.usage.input_tokens > 0, "winner usage is preserved");
     assert_eq!(leader.artifact_paths, follower.artifact_paths);
     assert_eq!(leader.artifact_paths, vec!["outputs/report.md"]);
+    assert_eq!(
+        leader.persistence_disposition,
+        tinyagents_orchestration::subagent::SubagentPersistenceDisposition::TerminalInserted
+    );
+    assert_eq!(
+        follower.persistence_disposition,
+        tinyagents_orchestration::subagent::SubagentPersistenceDisposition::TerminalExisting
+    );
     assert_eq!(
         executions.load(std::sync::atomic::Ordering::SeqCst),
         1,
