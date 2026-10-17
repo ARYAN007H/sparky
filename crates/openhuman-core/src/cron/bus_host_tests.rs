@@ -273,6 +273,39 @@ async fn schedule_trigger_runs_a_system_job_and_records_the_handler_result() {
     assert_eq!(calls.load(Ordering::SeqCst), 1);
 }
 
+#[tokio::test]
+async fn schedule_trigger_checks_agent_only_limits_before_running_a_flow_handler() {
+    let tmp = TempDir::new().unwrap();
+    let mut config = config(&tmp);
+    let job = crate::cron::add_flow_schedule_job(
+        &config,
+        "issue56-flow:",
+        Schedule::Every { every_ms: 60_000 },
+    )
+    .unwrap();
+    config.cron.agent_jobs_only = true;
+
+    let (_host, proxy) = host(&config, false).await;
+    let calls = Arc::new(AtomicUsize::new(0));
+    let _handler = register_kind(
+        JobType::Flow,
+        Arc::new(Marker {
+            prefix: "issue56-flow:",
+            inner: kind_handler(&JobType::Flow).unwrap(),
+            calls: Arc::clone(&calls),
+            permanent: false,
+        }),
+    );
+    let attempt: Attempt = proxy
+        .call(callbacks::SCHEDULE_TRIGGER, (&job.command, "run-issue56"))
+        .await
+        .unwrap();
+
+    assert!(!attempt.success);
+    assert!(attempt.output.contains("only agent cron jobs"), "{}", attempt.output);
+    assert_eq!(calls.load(Ordering::SeqCst), 0, "the flow handler never ran");
+}
+
 #[cfg(feature = "flows")]
 #[tokio::test]
 async fn schedule_trigger_for_an_unknown_flow_is_answered_not_failed() {
