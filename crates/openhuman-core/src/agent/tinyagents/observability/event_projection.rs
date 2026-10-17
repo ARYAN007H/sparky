@@ -14,7 +14,7 @@ use super::event_bridge::OpenhumanEventBridge;
 impl EventListener for OpenhumanEventBridge {
     fn on_event(&self, record: &EventRecord) {
         match &record.event {
-            AgentEvent::ModelStarted { call_id, .. } => {
+            AgentEvent::ModelStarted { .. } => {
                 let iteration = tinyagents_harness::events::advance_iteration(&self.cursor);
                 match &self.scope {
                     None => self.send(AgentProgress::IterationStarted {

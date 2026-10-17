@@ -153,7 +153,7 @@ async fn resolved_route_enrichment_uses_actual_provider_model_and_call_identity(
     )));
 
     let host = crate::agent::tinyagents::host::OpenHumanRunContext::new();
-    let mut ctx = host.into_tinyagents(RunConfig::new("route-enrichment"));
+    let ctx = host.into_tinyagents(RunConfig::new("route-enrichment"));
     let recorder = Arc::new(RouteEventRecorder::default());
     ctx.events.subscribe(recorder.clone());
     harness
