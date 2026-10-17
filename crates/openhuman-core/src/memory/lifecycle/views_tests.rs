@@ -50,9 +50,11 @@ fn the_policy_round_trips_and_refuses_out_of_range_values() {
         },
     ] {
         let before = serde_json::to_value(&config).unwrap();
+        let log_conversations = !config.memory.conversations.enabled;
+        let recall_enabled = !config.memory.recall.enabled;
         let result = apply_policy_set(&mut config, &PolicySetParams {
-            log_conversations: Some(!config.memory.conversations.enabled),
-            recall_enabled: Some(!config.memory.recall.enabled),
+            log_conversations: Some(log_conversations),
+            recall_enabled: Some(recall_enabled),
             ..bad
         });
         assert!(matches!(result, Err(MemoryError::InvalidRequest(_))));
