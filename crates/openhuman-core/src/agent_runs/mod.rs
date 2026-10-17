@@ -5,6 +5,7 @@ pub(crate) mod command_center;
 pub(crate) mod context_breakdown;
 pub(crate) mod replay;
 mod schemas;
+mod subagent_finalize;
 pub(crate) mod subagent_control;
 pub(crate) mod workflow_runs;
 pub(crate) mod worktree_schemas;
@@ -27,6 +28,11 @@ pub(crate) use worktree_schemas::{
     all_controller_schemas as all_worktree_controller_schemas,
     all_registered_controllers as all_worktree_registered_controllers,
 };
+
+/// Registers the agent-run lifecycle projection for detached sub-agent events.
+pub(crate) fn register_subagent_finalize_subscriber(config: &crate::config::Config) {
+    subagent_finalize::register_subagent_finalize_subscriber(config);
+}
 
 /// Registers the orchestration RPC surfaces in their catalogue order.
 pub(crate) fn all_orchestration_registered_controllers(
