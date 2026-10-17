@@ -29,7 +29,7 @@ use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tinystoragedrivers::{
-    CollectionSpec, DocumentStore, DocumentStoreExt, Key, Kv, Precondition, ScopedStorage,
+    CollectionSpec, DocumentStore, DocumentStoreExt, Key, Kv, ScopedStorage,
     StorageError,
 };
 
