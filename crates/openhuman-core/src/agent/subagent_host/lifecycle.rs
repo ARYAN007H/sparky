@@ -8,7 +8,9 @@
 use std::{
     collections::HashMap,
     fs::OpenOptions,
+    future::Future,
     path::PathBuf,
+    pin::Pin,
     sync::{Arc, Mutex},
 };
 
@@ -147,7 +149,13 @@ pub(crate) async fn spawn_async_via_driver_tool(
     definition: crate::agent_registry::host_definition::AgentDefinition,
     input: String,
     options: SubagentRunOptions,
-    completion: impl Fn(&str, Result<SubagentRunOutcome, String>) + Send + Sync + 'static,
+    completion: impl Fn(
+            String,
+            Result<SubagentRunOutcome, String>,
+        ) -> Pin<Box<dyn Future<Output = ()> + Send>>
+        + Send
+        + Sync
+        + 'static,
 ) -> Result<String, SubagentRunError> {
     let task_id = options
         .task_id
@@ -166,7 +174,11 @@ pub(crate) async fn spawn_async_via_driver_tool(
     decode_driver_job_result(tool_result, &bundle, &task_key)
 }
 
-type HostCompletion = Arc<dyn Fn(&str, Result<SubagentRunOutcome, String>) + Send + Sync>;
+type HostCompletion = Arc<
+    dyn Fn(String, Result<SubagentRunOutcome, String>) -> Pin<Box<dyn Future<Output = ()> + Send>>
+        + Send
+        + Sync,
+>;
 
 async fn invoke_async_spawn_driver_tool(
     parent: &RunContext<crate::agent::tinyagents::host::OpenHumanRunContext>,
@@ -276,7 +288,7 @@ async fn invoke_async_spawn_driver_tool(
                         Err(host_error.unwrap_or(error))
                     }
                 };
-                completion(&target, projected);
+                completion(target, projected).await;
             })
         });
     }
