@@ -71,6 +71,16 @@ pub struct PolicySetParams {
     /// How long a turn waits for its pack, in ms (100–30000).
     #[serde(default)]
     pub pre_turn_timeout_ms: Option<u64>,
+    /// Whether to use a small model call to identify dates in each turn.
+    #[serde(default)]
+    pub date_hint: Option<bool>,
+    /// How long compaction waits for recalled context, in milliseconds.
+    #[serde(default)]
+    pub compaction_timeout_ms: Option<u64>,
+    /// How long queued belief builds wait for newer writes, in seconds.
+    /// Must fit within chrono's supported date range when subtracted from now.
+    #[serde(default)]
+    pub build_delay_secs: Option<u64>,
 }
 
 fn within<T: PartialOrd + std::fmt::Display + Copy>(
@@ -89,6 +99,22 @@ fn within<T: PartialOrd + std::fmt::Display + Copy>(
 
 /// Applies `params` to `config`; the caller persists it.
 pub fn apply_policy_set(config: &mut Config, params: &PolicySetParams) -> MemoryResult<()> {
+    // Validate every value before changing the config. Callers may use this
+    // function directly, without a persistence layer to discard partial edits.
+    let budget_tokens = within("budget_tokens", params.budget_tokens, 100, 16_000)?;
+    let learnings_limit = within("learnings_limit", params.learnings_limit, 0, 50)?;
+    let brain_limit = within("brain_limit", params.brain_limit, 0, 50)?;
+    let history_limit = within("history_limit", params.history_limit, 0, 50)?;
+    let team_limit = within("team_limit", params.team_limit, 0, 50)?;
+    let build_beliefs_every = within("build_beliefs_every", params.build_beliefs_every, 0, 1000)?;
+    let pre_turn_timeout_ms = within(
+        "pre_turn_timeout_ms",
+        params.pre_turn_timeout_ms,
+        100,
+        30_000,
+    )?;
+    let build_delay_secs = validate_build_delay_secs(params.build_delay_secs)?;
+
     let recall = &mut config.memory.recall;
     if let Some(value) = params.log_conversations {
         config.memory.conversations.enabled = value;
@@ -96,40 +122,56 @@ pub fn apply_policy_set(config: &mut Config, params: &PolicySetParams) -> Memory
     if let Some(value) = params.recall_enabled {
         recall.enabled = value;
     }
-    if let Some(value) = within("budget_tokens", params.budget_tokens, 100, 16_000)? {
+    if let Some(value) = budget_tokens {
         recall.budget_tokens = value;
     }
-    for (name, value, slot) in [
-        (
-            "learnings_limit",
-            params.learnings_limit,
-            &mut recall.learnings_limit,
-        ),
-        ("brain_limit", params.brain_limit, &mut recall.brain_limit),
-        (
-            "history_limit",
-            params.history_limit,
-            &mut recall.history_limit,
-        ),
-        ("team_limit", params.team_limit, &mut recall.team_limit),
-    ] {
-        if let Some(value) = within(name, value, 0, 50)? {
-            *slot = value;
-        }
+    if let Some(value) = learnings_limit {
+        recall.learnings_limit = value;
     }
-    if let Some(value) = within("build_beliefs_every", params.build_beliefs_every, 0, 1000)? {
+    if let Some(value) = brain_limit {
+        recall.brain_limit = value;
+    }
+    if let Some(value) = history_limit {
+        recall.history_limit = value;
+    }
+    if let Some(value) = team_limit {
+        recall.team_limit = value;
+    }
+    if let Some(value) = build_beliefs_every {
         recall.build_beliefs_every = value;
     }
-    if let Some(value) = within(
-        "pre_turn_timeout_ms",
-        params.pre_turn_timeout_ms,
-        100,
-        30_000,
-    )? {
+    if let Some(value) = pre_turn_timeout_ms {
         recall.pre_turn_timeout_ms = value;
+    }
+    if let Some(value) = params.date_hint {
+        recall.date_hint = value;
+    }
+    if let Some(value) = params.compaction_timeout_ms {
+        recall.compaction_timeout_ms = value;
+    }
+    if let Some(value) = build_delay_secs {
+        recall.build_delay_secs = value;
     }
     tracing::info!("[memory:policy] recall policy updated");
     Ok(())
+}
+
+fn validate_build_delay_secs(value: Option<u64>) -> MemoryResult<Option<u64>> {
+    let Some(seconds) = value else {
+        return Ok(None);
+    };
+    let delay = i64::try_from(seconds)
+        .ok()
+        .and_then(chrono::Duration::try_seconds);
+    if delay
+        .and_then(|delay| chrono::Utc::now().checked_sub_signed(delay))
+        .is_none()
+    {
+        return Err(MemoryError::invalid(
+            "build_delay_secs must fit within the supported date range",
+        ));
+    }
+    Ok(Some(seconds))
 }
 
 /// `memory_pack_preview` params.

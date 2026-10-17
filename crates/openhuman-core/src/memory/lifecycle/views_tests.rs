@@ -45,6 +45,21 @@ fn the_policy_round_trips_and_refuses_out_of_range_values() {
     assert_eq!(view.recall.team_limit, 0);
     assert_eq!(view.recall.build_beliefs_every, 0);
 
+    apply_policy_set(
+        &mut config,
+        &PolicySetParams {
+            date_hint: Some(true),
+            compaction_timeout_ms: Some(12_000),
+            build_delay_secs: Some(900),
+            ..PolicySetParams::default()
+        },
+    )
+    .unwrap();
+    let view = policy_view(&config);
+    assert!(view.recall.date_hint);
+    assert_eq!(view.recall.compaction_timeout_ms, 12_000);
+    assert_eq!(view.recall.build_delay_secs, 900);
+
     for bad in [
         PolicySetParams {
             budget_tokens: Some(10),
@@ -58,19 +73,25 @@ fn the_policy_round_trips_and_refuses_out_of_range_values() {
             pre_turn_timeout_ms: Some(0),
             ..PolicySetParams::default()
         },
+        PolicySetParams {
+            build_delay_secs: Some(u64::MAX),
+            ..PolicySetParams::default()
+        },
     ] {
         let before = serde_json::to_value(&config).unwrap();
         let log_conversations = !config.memory.conversations.enabled;
         let recall_enabled = !config.memory.recall.enabled;
-        let result = apply_policy_set(&mut config, &PolicySetParams {
-            log_conversations: Some(log_conversations),
-            recall_enabled: Some(recall_enabled),
-            ..bad
-        });
+        let result = apply_policy_set(
+            &mut config,
+            &PolicySetParams {
+                log_conversations: Some(log_conversations),
+                recall_enabled: Some(recall_enabled),
+                ..bad
+            },
+        );
         assert!(matches!(result, Err(MemoryError::InvalidRequest(_))));
-        assert_eq!(
-            serde_json::to_value(&config).unwrap(),
-            before,
+        assert!(
+            serde_json::to_value(&config).unwrap() == before,
             "invalid policy update must be atomic"
         );
     }
