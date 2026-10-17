@@ -183,11 +183,12 @@ fn a_legacy_marker_row_is_honoured_and_removed() {
         assert_eq!(moved, 1);
         assert!(done(&scoped, "storage", &step_id("storage_import", "approval@abcd")).await?);
         assert!(!done(&scoped, "storage", &step_id("storage_import", "other@x")).await?);
-        assert!(!docs
-            .collections("")
-            .await?
-            .iter()
-            .any(|name| name == "storage_import"));
+        assert!(
+            docs.query_all("storage_import", &tinystoragedrivers::Query::all())
+                .await
+                .map_or(true, |rows| rows.is_empty()),
+            "the marker rows are gone"
+        );
         // A second sweep has nothing to do and keeps the entry.
         assert_eq!(migrate_legacy_markers(&scoped).await?, 0);
         assert!(done(&scoped, "storage", &step_id("storage_import", "approval@abcd")).await?);
