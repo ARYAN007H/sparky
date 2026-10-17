@@ -143,14 +143,14 @@ pub(crate) async fn run_subagent_direct(
                 }
             }
         }
-        let task_id = options
-            .task_id
-            .clone()
-            .unwrap_or_else(|| format!("sub-{}", uuid::Uuid::new_v4()));
         let mut usage_finalizer = UsageFinalizer {
             context: options.run_context.clone(),
             complete: false,
         };
+        let task_id = options
+            .task_id
+            .clone()
+            .unwrap_or_else(|| format!("sub-{}", uuid::Uuid::new_v4()));
 
         // Turn-scoped dispatch gate (#5804) — deliberately the FIRST gate, for
         // the same reason the depth gate is synchronous and pre-dispatch: a

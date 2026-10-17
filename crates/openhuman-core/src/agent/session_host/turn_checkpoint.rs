@@ -529,7 +529,6 @@ pub(crate) fn close_verification_prompt(user_request: &str, records: &str, reply
 }
 
 /// The check call's verdict on a closing message.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) use tinyagents_harness::close::{CloseVerdict, parse_close_verdict};
 
 /// Build a deterministic final answer from this turn's tool results.
