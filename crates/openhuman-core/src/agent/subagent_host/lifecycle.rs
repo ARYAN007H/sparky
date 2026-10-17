@@ -182,7 +182,7 @@ pub(crate) async fn run_configured_delegate_via_driver_tool(
         parent.thread_id().map(|id| id.as_str().to_owned()),
     );
     decode_driver_job_result(tool_result, &bundle, &task_key)?;
-    bundle
+    let result = bundle
         .configured_tool_result
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner())
@@ -191,7 +191,8 @@ pub(crate) async fn run_configured_delegate_via_driver_tool(
             SubagentRunError::Provider(anyhow::anyhow!(
                 "driver-backed configured delegate completed without a host result"
             ))
-        })
+        });
+    result
 }
 
 /// Continues a host-authorized pause through TinyAgents' registered Jobs
@@ -1013,6 +1014,7 @@ impl SubagentPlanner<crate::agent::tinyagents::host::OpenHumanRunContext, HostRe
     {
         let request = request.into_parts();
         let task_key = request.task_key.clone();
+        let agent_id = request.host_request.agent_id().to_owned();
         let mut options = request.host_request.options;
         let input = request.input;
         // The generic persistence seam supplies the pause *before* host
@@ -1044,7 +1046,7 @@ impl SubagentPlanner<crate::agent::tinyagents::host::OpenHumanRunContext, HostRe
         // declaration here advertises no unresolved authority.
         Ok(PreparedSubagent::new(
             request.task_key.task_id,
-            request.host_request.agent_id().to_owned(),
+            agent_id,
             planned_input,
             ToolSnapshot::default(),
             request.run_context,
