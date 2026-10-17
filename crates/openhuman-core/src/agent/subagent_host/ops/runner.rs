@@ -924,4 +924,5 @@ async fn run_typed_mode(
         persistence_disposition:
             tinyagents_orchestration::subagent::SubagentPersistenceDisposition::TerminalExisting,
     })
+    .await
 }
