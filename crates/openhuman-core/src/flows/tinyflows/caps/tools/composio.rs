@@ -18,9 +18,9 @@ struct FlowPolicy;
 impl FlowCallPolicy for FlowPolicy {
     async fn tier_decision(&self, dispatch: &DispatchCtx, captured: &Config, live: &Config, security: &SecurityPolicy, class: tinybox_bus::CommandClass) -> std::result::Result<GateDecision, String> {
         let policy = super::super::tier_policy_from_config(dispatch, captured, Some(live), security)
-            .map_err(|error| error.to_string())?;
+            .map_err(capability_payload)?;
         super::super::enforce_node_tier_gate(&policy, class, "tool_call")
-            .map_err(|error| error.to_string())
+            .map_err(capability_payload)
     }
     async fn approve(&self, dispatch: &DispatchCtx, approval: &ApprovalTurnContext, decision: GateDecision, slug: &str, args: &Value) -> std::result::Result<Option<String>, String> {
         let summary = crate::security::approval::summarize_action(slug, args);
@@ -34,8 +34,19 @@ impl FlowCallPolicy for FlowPolicy {
     fn record(&self, audit_id: &str, result: &std::result::Result<Value, String>) {
         if let Some(gate) = crate::security::approval::ApprovalGate::try_global() {
             let outcome = if result.is_ok() { crate::security::approval::ExecutionOutcome::Success } else { crate::security::approval::ExecutionOutcome::Failure };
-            gate.record_execution(audit_id, outcome, result.as_ref().err().map(String::as_str));
+            let display_error = result
+                .as_ref()
+                .err()
+                .map(|message| EngineError::Capability(message.clone()).to_string());
+            gate.record_execution(audit_id, outcome, display_error.as_deref());
         }
+    }
+}
+
+fn capability_payload(error: EngineError) -> String {
+    match error {
+        EngineError::Capability(message) => message,
+        other => other.to_string(),
     }
 }
 

@@ -98,7 +98,10 @@ pub(crate) fn tools(config: Arc<Config>, security: &Arc<SecurityPolicy>) -> Vec<
         Box::new(ListAgentDefinitionsTool::new(host.clone())),
         // Steer toolkit choice toward what's already connected + surface which
         // toolkits a flow still needs (Phase 5, item 19). Read-only.
-        Box::new(ListConnectableToolkitsTool::new(config.clone())),
+        Box::new(ListConnectableToolkitsTool::new(
+            config.clone(),
+            Arc::new(FlowsConnectionProvider),
+        )),
         // Queryable DSL schema (F2): enumerate the 13 node kinds and fetch one
         // kind's full config-field/port/example/gotcha contract — the DSL
         // analogue of search_tool_catalog + get_tool_contract, so an agent need
