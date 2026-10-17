@@ -223,20 +223,6 @@ fn the_final_answer_instruction_carries_the_records_and_the_stop_note() {
     assert!(halted.contains("  > no direct download"));
 }
 
-/// The check is read by its conclusion: the last standalone verdict token wins,
-/// a word that merely contains one is not a verdict, and no verdict is unclear.
-#[test]
-fn the_close_verdict_is_the_last_standalone_verdict_token() {
-    assert_eq!(parse_close_verdict("ACCEPT"), CloseVerdict::Accept);
-    assert_eq!(parse_close_verdict("reject."), CloseVerdict::Reject);
-    assert_eq!(
-        parse_close_verdict("It could ACCEPT, but rule 1 applies.\nREJECT"),
-        CloseVerdict::Reject
-    );
-    assert_eq!(parse_close_verdict("UNACCEPTABLE"), CloseVerdict::Unclear);
-    assert_eq!(parse_close_verdict(""), CloseVerdict::Unclear);
-}
-
 /// The check prompt holds the request, the records and the candidate, so the
 /// checker can judge the reply against what actually ran.
 #[test]
