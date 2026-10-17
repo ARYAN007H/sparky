@@ -1,4 +1,5 @@
 use super::*;
+use tinymemory_tools::queue::QueueState;
 
 use tinymemory_api::{ConsolidateRequest, ItemKind, Reach};
 
@@ -139,7 +140,7 @@ async fn the_build_delay_comes_from_the_recall_config_and_the_file_store_is_the_
     config.memory.recall.build_delay_secs = 3600;
     enqueue(&config, &Namespace::ROOT, vec![build("a")]).await;
     assert!(has_pending(&config.workspace_dir));
-    let on_disk: JobQueue =
+    let on_disk: QueueState =
         serde_json::from_str(&std::fs::read_to_string(path(&config.workspace_dir)).unwrap())
             .unwrap();
     assert_eq!(on_disk.pending.len(), 1, "persisted in memory/jobs.json");

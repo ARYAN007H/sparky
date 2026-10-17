@@ -60,4 +60,3 @@ pub use schemas::{
 pub use tools::{MemoryTool, MEMORY_TOOL_NAME};
 
 /// Host-specific connector prefix configuration for memory provenance.
-pub mod provenance;

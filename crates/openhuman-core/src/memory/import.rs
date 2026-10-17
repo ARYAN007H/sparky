@@ -13,7 +13,7 @@ use std::sync::{Arc, LazyLock, Mutex};
 use std::time::Duration;
 
 use tinymemory_integrations::import::{
-    Begun, CheckpointStore, ImportError, ImportFile, Importer, Pacer,
+    Begun, CheckpointStore, ImportError, ImportFile, ImportPhase, ImportState, Importer, Pacer,
 };
 
 use crate::config::Config;
@@ -21,7 +21,7 @@ use crate::security::secret_storage::file_store::write_atomic;
 
 use super::engine;
 use super::error::{MemoryError, MemoryResult};
-use super::types::{ImportCounts, ImportPhase, ImportScanView, ImportState};
+use super::types::{ImportCounts, ImportScanView};
 
 /// Whether background work is paused right now. An automatic resume asks
 /// before it starts and again before every batch it stores.
@@ -129,21 +129,12 @@ fn importer(
     Arc::new(importer)
 }
 
-/// Counts what a legacy store at `workspace_dir` holds, or `None` when there
-/// is no v1 store there. Blocking (SQLite, and memory-tree chunk files).
-pub fn count_legacy(workspace_dir: &Path) -> Option<ImportCounts> {
-    let counts = tinymemory_integrations::import::count_legacy(workspace_dir)?;
-    Some(ImportCounts {
-        documents: counts.documents,
-        conversations: counts.conversations,
-        learnings: counts.learnings,
-    })
-}
-
 /// `memory_import_scan`.
 pub async fn scan(config: &Config) -> MemoryResult<ImportScanView> {
     let workspace_dir = config.workspace_dir.clone();
-    let counts = tokio::task::spawn_blocking(move || count_legacy(&workspace_dir))
+    let counts = tokio::task::spawn_blocking(move || {
+        tinymemory_integrations::import::count_legacy(&workspace_dir)
+    })
         .await
         .map_err(|error| MemoryError::Engine(format!("import scan failed: {error}")))?;
     Ok(ImportScanView {
