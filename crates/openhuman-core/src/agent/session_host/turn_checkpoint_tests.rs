@@ -61,6 +61,21 @@ fn checkpoint_records_keep_the_captured_tool_failure_status_and_body() {
     assert!(rendered.contains("permission denied"));
 }
 
+/// Keep OpenHuman's quoted checkpoint format stable while TinyAgents owns
+/// the generic selection and budget walk.
+#[test]
+fn tool_result_renderer_preserves_the_openhuman_block_format() {
+    let rendered = render_tool_results(
+        &[result("read_file", true, "first line\nsecond line")],
+        CHECKPOINT_TOTAL_CHARS,
+    );
+
+    assert_eq!(
+        rendered,
+        "\n- `read_file` — ok\n  > first line\n  > second line\n"
+    );
+}
+
 /// Over the budget the checkpoint starts later rather than truncating every
 /// body, and says how many it skipped — a silent drop reads as "that is all
 /// there was".
