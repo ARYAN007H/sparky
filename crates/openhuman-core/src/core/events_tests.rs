@@ -206,15 +206,6 @@ fn all_variants_have_correct_domain() {
             "cron",
         ),
         (
-            DomainEvent::CronDeliveryRequested {
-                job_id: "j".into(),
-                channel: "c".into(),
-                target: "t".into(),
-                output: "o".into(),
-            },
-            "cron",
-        ),
-        (
             DomainEvent::ProactiveMessageRequested {
                 source: "cron:morning_briefing".into(),
                 message: "Good morning!".into(),

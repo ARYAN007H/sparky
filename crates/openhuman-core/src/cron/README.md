@@ -170,7 +170,7 @@ alerts tab and run history.
 | --- | --- |
 | `none` | Silent. Output lives in the job's `last_output` only. This is `DeliveryConfig::default()`. |
 | `proactive` | Publishes `ProactiveMessageRequested`. `channels::proactive::ProactiveMessageSubscriber` pushes to the in-app web stream and mirrors to `channels_config.active_channel` when set. Used for briefings and other desktop-first output. |
-| `announce` | Requires `channel` and `to`. Publishes `CronDeliveryRequested`; `cron::bus::CronDeliverySubscriber` (`cron::delivery`) sends it through the named `tinychannels_bus::Channel`. The `cron_add` tool checks `to` against the channel's `allowed_users`. |
+| `announce` | Requires `channel` and `to`. Sends synchronously through `cron::channel_bridge::send_to_channel`; the run records `Delivered` only after the channel accepts the message, otherwise `Failed`. The `cron_add` tool checks `to` against the channel's `allowed_users`. |
 | `origin` | Sends the reply back into the conversation that created the job ([`scheduler/origin_delivery.rs`](./scheduler/origin_delivery.rs)). Requires `CronJob.origin`. |
 
 Origin delivery treats blank output or exactly `NO_REPLY` as `Suppressed`:
@@ -318,7 +318,6 @@ feature) nothing loads and every cron call answers `COMPONENT_DISABLED:tinyflows
 | [`origin.rs`](./origin.rs) | `JobOrigin` capture from the live turn, the approval-gate exemption, and the turn origin a run executes under. |
 | [`job_builder.rs`](./job_builder.rs) | `create_agent_job`: origin-aware defaults and delivery validation shared by the `cron` and `schedule` tools. |
 | [`channel_bridge.rs`](./channel_bridge.rs) | Cron's handle on the channel runtime: per-chat history and live channels, registered by `start_channels`. |
-| [`bus.rs`](./bus.rs) | `CronDeliverySubscriber`, which sends `announce` output to a channel. |
 | [`seed.rs`](./seed.rs) | Built-in proactive jobs and pruning of retired rows. |
 | `system_jobs.rs` | `system:<name>` flow rows owned by other domains. |
 | [`tools.rs`](./tools.rs), `tools/` | Agent tools. See [tools/README.md](tools/README.md). |
@@ -377,8 +376,6 @@ Cron publishes, through [`core/bus.rs`](../core/bus.rs), these `DomainEvent` var
   (output truncated to 512 characters).
 - `ProactiveMessageRequested` (`proactive` delivery), consumed by
   `channels::proactive`.
-- `CronDeliveryRequested` (`announce` delivery), consumed by
-  `cron::bus::CronDeliverySubscriber`.
 - `CronSystemJobDue`, consumed by `memory::bus`.
 
 ## Who calls in
@@ -390,7 +387,7 @@ Cron publishes, through [`core/bus.rs`](../core/bus.rs), these `DomainEvent` var
 - [`tools/impl/system/schedule.rs`](../tools/impl/system/schedule.rs) is the `schedule` tool, built on the same
   store functions and `create_agent_job`.
 - [`channels/runtime/startup/start_channels.rs`](../channels/runtime/startup/start_channels.rs) registers
-  `CronDeliverySubscriber` and the channel bridge.
+  the channel bridge used by `announce` and origin delivery.
 - [`flows/ops/triggers.rs`](../flows/ops/triggers.rs) creates and removes flow schedule rows
   (`bind_schedule_trigger` / `unbind_schedule_trigger`), idempotent through
   `find_flow_schedule_job`. These rows are never created by the `cron_add`

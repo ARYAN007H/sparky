@@ -218,11 +218,6 @@ async fn start_channels_inner(mut config: Config, session: CancellationToken) ->
         component: "channels".into(),
     });
 
-    // Register the cron delivery subscriber so cron jobs can deliver output
-    // to channels via events instead of directly constructing channel instances.
-    let _cron_delivery_handle = bus.subscribe(Arc::new(
-        crate::cron::bus::CronDeliverySubscriber::new(Arc::clone(&channels_by_name)),
-    ));
     // NOTE: the flows `FlowTriggerSubscriber` is registered in
     // `runtime/subscribers.rs::register_domain_subscribers` (unconditional core boot), NOT
     // here — `start_channels` is skipped when no channel is configured or
