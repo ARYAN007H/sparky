@@ -77,6 +77,12 @@ fn host_outcome_terminal_record_round_trips_through_json_bytes() {
     };
 
     let neutral = host_outcome_to_neutral(outcome, definition, &options);
+    assert_eq!(neutral.extensions["agent_id"], definition.id);
+    assert_eq!(neutral.extensions["iterations"], 2);
+    assert!(!neutral.extensions.contains_key("task_id"));
+    assert!(!neutral.extensions.contains_key("tier"));
+    assert!(!neutral.extensions.contains_key("worker_thread_id"));
+    assert!(!neutral.extensions.contains_key("model_override"));
     let encoded = serde_json::to_vec(&neutral).unwrap();
     let decoded: tinyagents_orchestration::subagent::SubagentOutcome =
         serde_json::from_slice(&encoded)
