@@ -222,18 +222,52 @@ async fn closing_a_durable_driver_session_cancels_only_its_registered_child() {
         Some("close-driver-thread".into()),
     )
     .with_jobs(jobs.clone());
-    assert!(port
-        .close("close-driver-session")
-        .await
-        .expect("Tiny close adapter cancels then closes the durable row"));
-    assert!(!parent_cancellation.is_cancelled(), "parent stays live");
-
     let owner = crate::agent::tinyagents::tool_registration::subagent_owner_key(
         "test-session",
         Some("close-driver-thread"),
     );
     let owner_scope: std::sync::Arc<dyn Fn(u64) -> String + Send + Sync> =
         std::sync::Arc::new(move |_| owner.clone());
+    let message_store: std::sync::Arc<dyn TinySessionStore> = std::sync::Arc::new(port.clone());
+    let message_dispatch: crate::agent::tinyagents::tool_registration::RegisteredToolDispatch =
+        std::sync::Arc::new(
+            tinyagents_orchestration::subagent::SubAgentMessageTool::new(jobs.clone())
+                .with_tool_name("steer_subagent")
+                .with_argument_fields("task_id", "subagent_session_id", "message", "__request_id")
+                .with_lane_field("mode")
+                .with_owner_scope(owner_scope.clone())
+                .with_sessions(message_store, |_| "test-session".to_owned()),
+        );
+    let message_dispatch =
+        crate::agent::tinyagents::tool_registration::TaskFirstSessionMessageDispatch::new(
+            message_dispatch,
+        );
+    let steered = tinyagents_harness::tool::ToolDispatch::execute(
+        &message_dispatch,
+        &(),
+        tinyagents_harness::CallId::new("steer-raw-task-id"),
+        serde_json::json!({
+            "task_id": "close-driver-task",
+            "subagent_session_id": "foreign-session-must-not-win",
+            "message": "please continue after this note",
+            "mode": "collect"
+        }),
+        tinytools::ToolCallOptions::default(),
+        &parent,
+    )
+    .await
+    .expect("TaskFirst host adapter resolves raw task ID via the owned session port");
+    let steered_payload: serde_json::Value =
+        serde_json::from_str(&steered.output()).expect("message dispatch returns JSON");
+    assert_eq!(steered_payload["job_id"], job_id);
+    assert_eq!(steered_payload["status"], "message_queued");
+
+    assert!(port
+        .close("close-driver-session")
+        .await
+        .expect("Tiny close adapter cancels then closes the durable row"));
+    assert!(!parent_cancellation.is_cancelled(), "parent stays live");
+
     let tiny_store: std::sync::Arc<dyn TinySessionStore> = std::sync::Arc::new(port.clone());
     let wait = SubAgentJobsTool::new(jobs.clone())
         .with_tool_name("wait_subagent")
@@ -257,7 +291,9 @@ async fn closing_a_durable_driver_session_cancels_only_its_registered_child() {
         "raw product task ID resolves through the authenticated session port: {}",
         wait_result.output()
     );
-    release_tx.send(()).expect("release child for cooperative settlement");
+    release_tx
+        .send(())
+        .expect("release child for cooperative settlement");
     let wait_result = tinyagents_harness::tool::ToolDispatch::execute(
         &wait,
         &(),

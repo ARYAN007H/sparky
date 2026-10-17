@@ -465,26 +465,21 @@ fn subagent_control_dispatches(
     if let Some(adapter) = find_tool("steer_subagent") {
         let parent_session = parent_session.clone();
         let dispatch: RegisteredToolDispatch = Arc::new(
-                SubAgentMessageTool::new(jobs)
-                    .with_tool_name("steer_subagent")
-                    .with_description(adapter.description())
-                    .with_parameters(adapter.parameters_schema())
-                    .with_argument_fields(
-                        "task_id",
-                        "subagent_session_id",
-                        "message",
-                        "__request_id",
-                    )
-                    .with_lane_field("mode")
-                    .with_metadata(
-                        adapter.permission_level(),
-                        adapter.scope(),
-                        adapter.category(),
-                        adapter.timeout_policy(&serde_json::Value::Null),
-                    )
-                    .with_owner_scope(owner_scope)
-                    .with_sessions(store, move |_| parent_session.clone()),
-            );
+            SubAgentMessageTool::new(jobs)
+                .with_tool_name("steer_subagent")
+                .with_description(adapter.description())
+                .with_parameters(adapter.parameters_schema())
+                .with_argument_fields("task_id", "subagent_session_id", "message", "__request_id")
+                .with_lane_field("mode")
+                .with_metadata(
+                    adapter.permission_level(),
+                    adapter.scope(),
+                    adapter.category(),
+                    adapter.timeout_policy(&serde_json::Value::Null),
+                )
+                .with_owner_scope(owner_scope)
+                .with_sessions(store, move |_| parent_session.clone()),
+        );
         dispatches.insert(
             "steer_subagent".into(),
             Arc::new(TaskFirstSessionMessageDispatch::new(dispatch)),
