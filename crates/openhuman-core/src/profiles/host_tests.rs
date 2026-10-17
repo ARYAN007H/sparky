@@ -497,6 +497,32 @@ async fn opening_an_existing_profile_adopts_the_enforced_cron_cap() {
 }
 
 #[tokio::test]
+async fn opening_replaces_a_dropped_hosts_fence_before_cron_reconciliation() {
+    let tmp = tempfile::tempdir().unwrap();
+    let id = profile(&format!("cron-fence-{}", uuid::Uuid::new_v4().simple()));
+    let mut first_saas = SaasConfig::new(tmp.path());
+    first_saas.cron.agent_jobs_only = true;
+    first_saas.cron.max_active_jobs = 1;
+    let first = ProfileHost::new(first_saas, CoreContext::for_test(DomainSet::full(), None));
+    first.provision(&id).await.unwrap();
+    let opened = first.open(&id).await.unwrap();
+    drop(opened);
+    drop(first);
+
+    let mut second_saas = SaasConfig::new(tmp.path());
+    second_saas.cron.agent_jobs_only = true;
+    second_saas.cron.max_active_jobs = 1;
+    let second = ProfileHost::new(second_saas, CoreContext::for_test(DomainSet::full(), None));
+    assert!(!second.provision(&id).await.unwrap());
+    let reopened = second.open(&id).await;
+    assert!(
+        reopened.is_ok(),
+        "the new lease must replace the dropped host's profile fence: {:?}",
+        reopened.err()
+    );
+}
+
+#[tokio::test]
 async fn disabling_profile_cron_limits_clears_the_persisted_store_cap() {
     let tmp = tempfile::tempdir().unwrap();
     let id = profile("cron-cap-toggle-off");
