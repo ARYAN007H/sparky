@@ -207,7 +207,11 @@ async fn a_damaged_state_file_surfaces_as_the_hosts_engine_error() {
     let tmp = tempfile::tempdir().unwrap();
     let config = crate::memory::test_fixtures::config_in(&tmp);
     std::fs::create_dir_all(config.workspace_dir.join("memory")).unwrap();
-    std::fs::write(state::path(&config.workspace_dir), b"{ torn").unwrap();
+    std::fs::write(
+        crate::memory::state_store::legacy_path(&config.workspace_dir, "layout_migration"),
+        b"{ torn",
+    )
+    .unwrap();
     let error = status(&config).unwrap_err();
     assert_eq!(error.code(), "ENGINE");
     let host = Arc::new(FakeHost::with(1, &config).await);

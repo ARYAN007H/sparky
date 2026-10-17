@@ -15,12 +15,12 @@ use crate::memory::error::{MemoryError, MemoryResult};
 const STATE: &str = "layout_migration";
 
 /// Whether a migration state exists in `workspace_dir`: the migration has
-/// begun there.
+/// begun there (a state that cannot be read counts: it was begun).
 #[must_use]
 pub fn exists(workspace_dir: &Path) -> bool {
     crate::memory::state_store::load_strict::<serde_json::Value>(workspace_dir, STATE)
         .map(|state| state.is_some())
-        .unwrap_or(false)
+        .unwrap_or(true)
 }
 
 /// The migration state kept in one workspace.
