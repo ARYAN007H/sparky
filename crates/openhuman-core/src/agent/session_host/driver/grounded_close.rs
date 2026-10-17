@@ -13,10 +13,13 @@ use std::sync::{
 };
 use tinyagents_runtime::transcript::message_to_native_transcript as message_to_native_chat_message;
 use tinyagents_session::transcript::TranscriptMessage;
-use tinyinference_llm::model::{CallId, ModelCallCorrelation, ModelRequest, ModelStreamItem};
+use tinyinference_llm::model::{ModelCallCorrelation, ModelRequest, ModelStreamItem};
 use tinytools_agent::dialect::ToolDialect;
 
-use tinyagents_harness::{events::{AgentEvent, EventSink, GenerationEnrichment, GenerationPricing}, ids::RunId};
+use tinyagents_harness::{
+    events::{AgentEvent, EventSink, GenerationEnrichment, GenerationPricing},
+    ids::{CallId, RunId},
+};
 use tinyagents_harness::middleware::wrap_harness_instruction;
 
 use crate::agent::{
@@ -54,11 +57,17 @@ pub(super) struct SupplementalTrace {
     events: EventSink,
     run_id: RunId,
     next_call: AtomicUsize,
+    actual_model: std::sync::Mutex<Option<String>>,
 }
 
 impl SupplementalTrace {
     pub(super) fn new(events: EventSink, run_id: RunId) -> Arc<Self> {
-        Arc::new(Self { events, run_id, next_call: AtomicUsize::new(1) })
+        Arc::new(Self {
+            events,
+            run_id,
+            next_call: AtomicUsize::new(1),
+            actual_model: std::sync::Mutex::new(None),
+        })
     }
 
     fn begin(&self, model: &str) -> (CallId, u64) {
@@ -91,6 +100,10 @@ impl SupplementalTrace {
         let actual_model = route.map(|route| route.model.as_str())
             .or_else(|| response.resolved_model.as_ref().map(|model| model.name.as_str()))
             .unwrap_or(model);
+        *self
+            .actual_model
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(actual_model.to_owned());
         let provider_id = route.map(|route| route.provider.as_str()).filter(|provider| valid_provider_id(provider)).map(str::to_owned);
         let pricing = tinyagents_registry::pricing::lookup(actual_model).map(|price| GenerationPricing {
             input_per_mtok_usd: Some(price.input_per_mtok_usd),
@@ -108,6 +121,13 @@ impl SupplementalTrace {
             self.events.emit(AgentEvent::GenerationEnriched { call_id, enrichment });
         }
     }
+
+    fn actual_model(&self) -> Option<String> {
+        self.actual_model
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone()
+    }
 }
 
 fn valid_provider_id(value: &str) -> bool {
@@ -123,9 +143,17 @@ impl RepairUsage {
         }
     }
 
-    fn record(&mut self, usage: Option<BilledUsage>, measures_context: bool) {
+    fn record(
+        &mut self,
+        usage: Option<BilledUsage>,
+        measures_context: bool,
+        trace: Option<&SupplementalTrace>,
+    ) {
         self.model_calls += 1;
         if let Some(usage) = usage {
+            if let Some(model) = trace.and_then(SupplementalTrace::actual_model) {
+                self.pricing_model = model;
+            }
             if measures_context {
                 self.last_call_input_tokens = usage.input_tokens;
                 self.last_call_output_tokens = usage.output_tokens;
