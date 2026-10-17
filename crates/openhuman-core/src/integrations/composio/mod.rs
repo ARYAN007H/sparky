@@ -44,6 +44,7 @@ pub mod client;
 pub mod connected_integrations;
 pub mod contract;
 pub mod contract_gate;
+pub mod flow_gate;
 pub(crate) mod direct_auth;
 pub mod execute_dispatch;
 pub(crate) mod file_store;
