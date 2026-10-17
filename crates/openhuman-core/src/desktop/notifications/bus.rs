@@ -469,44 +469,26 @@ fn translate(event: &DomainEvent) -> Option<CoreNotificationEvent> {
     }
 }
 
-/// The agent whose storage scope a notification raised by `event` belongs
-/// in: the owner of the cron job a `CronJobCompleted` names, when a storage
-/// backend is installed and an agent's scope holds the job; `None` (`local`)
-/// otherwise — including a job found in `local` or found nowhere.
-///
-/// # Errors
-///
-/// When no scope reported the job and a scope's lookup failed.
-async fn event_owner(
-    ctx: &crate::core::runtime::DispatchCtx,
-    config: &crate::config::Config,
-    event: &DomainEvent,
-) -> Result<Option<String>, crate::storage::agents::LookupFailed> {
-    let DomainEvent::CronJobCompleted { job_id, .. } = event else {
-        return Ok(None);
-    };
-    // Noted by the scheduler as the job completed — the only record of a
-    // one-shot job, which is deleted before the event is published.
-    if let Some(agent) = crate::cron::completion_owner::take(job_id) {
-        return Ok(Some(agent));
-    }
-    if crate::storage::installed().is_none() {
-        return Ok(None);
-    }
-    let owner = crate::storage::agents::find_owner(ctx, "notification owner", |_| async {
-        match crate::cron::get_job(config, job_id) {
-            Ok(_) => Ok(true),
-            // tinyflows reports a missing job as `Cron job '<id>' not found`
-            // (an untyped `anyhow` error in the vendored crate); match that
-            // whole shape for this job rather than any message mentioning it.
-            Err(error) if error.to_string() == format!("Cron job '{job_id}' not found") => {
-                Ok(false)
-            }
-            Err(error) => Err(error.to_string()),
+/// The event's captured owner. Missing ownership on older wire events stays
+/// unknown; the bridge never guesses from whichever agent is currently live.
+fn event_owner(event: &DomainEvent) -> Option<String> {
+    match event {
+        DomainEvent::CronJobCompleted { tenant, .. } => {
+            tenant.as_ref().and_then(|tenant| tenant.agent.clone())
         }
-    })
-    .await?;
-    Ok(owner.flatten())
+        _ => None,
+    }
+}
+
+/// Rebuild the dispatch context captured by a cron completion. Older events
+/// without a tenant are handled only by single-tenant hosts; SaaS fails closed.
+fn event_dispatch(event: &DomainEvent) -> Option<crate::core::runtime::DispatchCtx> {
+    match event {
+        DomainEvent::CronJobCompleted { tenant, .. } => {
+            crate::core::runtime::DispatchCtx::for_event(tenant.as_ref())
+        }
+        _ => Some(crate::core::runtime::DispatchCtx::host_default()),
+    }
 }
 
 #[async_trait]
@@ -532,22 +514,23 @@ impl EventHandler<DomainEvent> for NotificationBridgeSubscriber {
                 // whichever one this bridge was registered with (#5931).
                 let config = self.store_target(config, event);
                 // The bridge serves the host's own notifications.
-                let dispatch = crate::core::runtime::DispatchCtx::host_default();
+                let dispatch = event_dispatch(event);
                 // Stored with the record that raised it: a cron job's
                 // completion goes to the agent the job belongs to
                 // (`crate::storage`), `local` otherwise.
-                let stored = match event_owner(&dispatch, &config, event).await {
-                    Ok(owner) => {
+                let stored = match dispatch {
+                    Some(dispatch) => {
+                        let owner = event_owner(event);
                         crate::storage::agents::within_agent(&dispatch, owner.as_deref(), async {
                             super::store::insert_core_notification(&config, &notification)
                         })
                         .await
                     }
-                    Err(failed) => {
+                    None => {
                         // Unknown owner: not stored rather than stored in the
                         // wrong scope. The live broadcast below still goes out.
                         log::warn!(
-                            "{LOG_PREFIX} notification owner unknown ({failed}); not persisted"
+                            "{LOG_PREFIX} notification owner context unavailable; not persisted"
                         );
                         None
                     }
