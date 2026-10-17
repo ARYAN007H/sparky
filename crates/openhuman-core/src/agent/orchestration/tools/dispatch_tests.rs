@@ -229,14 +229,20 @@ async fn config_delegate_dispatch_preserves_tool_failure_in_shared_jobs() {
         .expect("the host returns the configured tool result");
 
     assert!(result.is_error);
-    assert!(result.output().contains("configured policy rejected the request"));
-    assert!(jobs.list().iter().any(|job| {
-        job.agent == "configured-error"
-            && job.status == tinyagents_orchestration::subagent::SubAgentJobStatus::Incomplete
-            && job.output.as_deref().is_some_and(|error| {
-                error.contains("configured policy rejected the request")
-            })
-    }), "the registered job retains the configured product failure");
+    assert!(result
+        .output()
+        .contains("configured policy rejected the request"));
+    assert!(
+        jobs.list().iter().any(|job| {
+            job.agent == "configured-error"
+                && job.status == tinyagents_orchestration::subagent::SubAgentJobStatus::Incomplete
+                && job
+                    .output
+                    .as_deref()
+                    .is_some_and(|error| error.contains("configured policy rejected the request"))
+        }),
+        "the registered job retains the configured product failure"
+    );
 }
 
 #[test]
