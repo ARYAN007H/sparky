@@ -296,6 +296,12 @@ impl OpenHumanPersistence {
     fn checkpoint_from_persisted_pause(
         persisted: tinyagents_orchestration::subagent::PersistedSubagentPause,
     ) -> Result<SubagentCheckpointData, SubagentError> {
+        let host = persisted
+            .outcome
+            .extensions
+            .get("openhuman_checkpoint")
+            .cloned()
+            .unwrap_or_default();
         let outcome = persisted.outcome;
         let paused = match &outcome.status {
             SubagentOutcomeKind::AwaitingInput(paused) => paused.clone(),
@@ -306,12 +312,6 @@ impl OpenHumanPersistence {
             }
         };
         let metadata = paused.resume.metadata;
-        let host = persisted
-            .outcome
-            .extensions
-            .get("openhuman_checkpoint")
-            .cloned()
-            .unwrap_or_default();
         let host_string = |name: &str| {
             host.get(name)
                 .and_then(serde_json::Value::as_str)
