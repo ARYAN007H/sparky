@@ -242,7 +242,7 @@ pub(super) async fn flows_delete_with_remove(
 ) -> Result<Outcome<Value>, String> {
     let flow = match store::get_flow(config, id) {
         Ok(Some(flow)) => Some(flow),
-        Ok(None) => {}
+        Ok(None) => None,
         Err(e) => {
             tracing::warn!(target: "flows", flow_id = %id, error = %e, "[flows] flows_delete: failed to load flow before unbind — proceeding with delete anyway");
             None

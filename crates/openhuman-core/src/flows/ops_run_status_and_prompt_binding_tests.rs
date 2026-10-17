@@ -293,9 +293,18 @@ async fn flows_build_copilot_toolset_unhides_the_live_run_tools() {
     restrict_builder_toolset_for_copilot(&mut agent);
 
     let log = String::from_utf8(capture.0.lock().unwrap().clone()).unwrap();
-    assert!(log.contains("cancel_flow_run"), "trace should name the hidden tool: {log}");
-    assert!(log.contains("only the unrelated legacy"), "trace should explain the restriction: {log}");
-    assert!(!log.contains("stay visible"), "trace contradicts the actual hidden toolset: {log}");
+    assert!(
+        log.contains("cancel_flow_run"),
+        "trace should name the hidden tool: {log}"
+    );
+    assert!(
+        log.contains("only the unrelated legacy"),
+        "trace should explain the restriction: {log}"
+    );
+    assert!(
+        !log.contains("stay visible"),
+        "trace contradicts the actual hidden toolset: {log}"
+    );
 
     let visible = agent.visible_tool_names_for_test();
     for still_reachable in ["run_flow", "resume_flow_run"] {

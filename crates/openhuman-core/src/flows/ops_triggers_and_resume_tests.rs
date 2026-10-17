@@ -94,7 +94,9 @@ async fn failed_flow_removal_preserves_the_schedule_binding() {
 
     assert!(result.is_err(), "the storage failure must be returned");
     assert!(
-        store::get_flow(&config, &created.value.id).unwrap().is_some(),
+        store::get_flow(&config, &created.value.id)
+            .unwrap()
+            .is_some(),
         "the failed delete must leave its flow definition in place"
     );
     assert!(

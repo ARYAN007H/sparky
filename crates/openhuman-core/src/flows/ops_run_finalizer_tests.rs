@@ -73,6 +73,7 @@ async fn streamed_flow_finalizer_settles_the_bridge_workspace_turn_state() {
         &target,
         &Err("fixture agent failure".to_string()),
         "fixture prompt",
+        &config_b,
     )
     .await;
 
