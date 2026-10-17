@@ -289,6 +289,197 @@ async fn force_fresh_cancels_old_driver_before_creating_a_new_session() {
 }
 
 #[tokio::test]
+async fn driver_job_controls_are_isolated_by_workspace_with_shared_runtime_state() {
+    use crate::agent::subagent_host::{run_subagent_via_driver_tool, SubagentRunOptions};
+    use crate::agent::tinyagents::host::OpenHumanRunContext;
+    use crate::core::runtime::{ContextOverlay, CoreContext, DomainSet};
+    use crate::tools::toolpacks::ToolGroups;
+    use tinyagents_harness::context::RunContext;
+    use tinyagents_harness::tool::ToolDispatch;
+    use tinyagents_orchestration::subagent::{
+        SubAgentJobAction, SubAgentJobRegistry, SubAgentJobsTool,
+    };
+
+    struct PausedModel {
+        started: tokio::sync::mpsc::UnboundedSender<()>,
+        release: Arc<tokio::sync::Notify>,
+    }
+
+    #[async_trait]
+    impl ChatModel<()> for PausedModel {
+        async fn invoke(
+            &self,
+            _state: &(),
+            _request: ModelRequest,
+        ) -> tinyinference_llm::Result<ModelResponse> {
+            let _ = self.started.send(());
+            self.release.notified().await;
+            Ok(ModelResponse::assistant("workspace child finished"))
+        }
+    }
+
+    let scratch = tempfile::tempdir().expect("workspace owner isolation fixture");
+    let workspace_a = scratch.path().join("workspace-a");
+    let workspace_b = scratch.path().join("workspace-b");
+    std::fs::create_dir_all(&workspace_a).expect("create workspace A");
+    std::fs::create_dir_all(&workspace_b).expect("create workspace B");
+    let mut base_config = crate::config::Config::default();
+    base_config.workspace_dir = workspace_a.clone();
+    base_config.components.juice = false;
+    let base = CoreContext::for_test_with_config(DomainSet::full(), base_config.clone());
+    let definitions = Arc::new(AgentDefinitionRegistry::builtins_only());
+    let mut config_a = base_config.clone();
+    config_a.workspace_dir = workspace_a.clone();
+    let mut config_b = base_config;
+    config_b.workspace_dir = workspace_b.clone();
+    let core_a = base.derive_with(
+        ContextOverlay::new(config_a, DomainSet::full(), ToolGroups::none())
+            .definitions(definitions.clone()),
+    );
+    let core_b = base.derive_with(
+        ContextOverlay::new(config_b, DomainSet::full(), ToolGroups::none())
+            .definitions(definitions),
+    );
+
+    let (started_tx, mut started_rx) = tokio::sync::mpsc::unbounded_channel();
+    let release = Arc::new(tokio::sync::Notify::new());
+    let model: Arc<dyn ChatModel<()>> = Arc::new(PausedModel {
+        started: started_tx,
+        release: release.clone(),
+    });
+    let build_parent = |workspace: &std::path::Path, core: &Arc<CoreContext>| {
+        let mut product_parent = parent_context(workspace, model.clone(), vec![]);
+        product_parent.workspace_dir = workspace.to_path_buf();
+        product_parent.session_id = "same-parent-session".into();
+        let mut options = with_parent(product_parent, SubagentRunOptions::default());
+        options.task_id = Some("same-raw-task-id".into());
+        options.thread_id = Some("same-parent-thread".into());
+        options.run_context = options
+            .run_context
+            .with_core(Some(Arc::clone(core)));
+        let run = options.run_context.clone().into_tinyagents(
+            tinyagents_harness::context::RunConfig::new("same-parent-run")
+                .with_thread("same-parent-thread"),
+        );
+        (options, run)
+    };
+    let (options_a, parent_a) = build_parent(&workspace_a, &core_a);
+    let (options_b, parent_b) = build_parent(&workspace_b, &core_b);
+    let jobs_a = crate::core::runtime::slot_for::<SubAgentJobRegistry>(&parent_a.data.dispatch_ctx());
+    let jobs_b = crate::core::runtime::slot_for::<SubAgentJobRegistry>(&parent_b.data.dispatch_ctx());
+    assert!(
+        Arc::ptr_eq(&jobs_a, &jobs_b),
+        "the two workspace overlays must exercise one shared registry"
+    );
+
+    let definition_a = make_def_named_tools(&[]);
+    let mut definition_b = make_def_named_tools(&[]);
+    definition_b.id = definition_a.id.clone();
+    let child_a = tokio::spawn(run_subagent_via_driver_tool(
+        &parent_a,
+        definition_a,
+        "run in workspace A".into(),
+        options_a,
+    ));
+    let child_b = tokio::spawn(run_subagent_via_driver_tool(
+        &parent_b,
+        definition_b,
+        "run in workspace B".into(),
+        options_b,
+    ));
+    for _ in 0..2 {
+        tokio::time::timeout(std::time::Duration::from_secs(5), started_rx.recv())
+            .await
+            .expect("both driver children enter the gated model")
+            .expect("model start notification");
+    }
+
+    let owner_a = crate::agent::tinyagents::tool_registration::subagent_owner_key(
+        &workspace_a,
+        "same-parent-session",
+        Some("same-parent-thread"),
+    );
+    let owner_b = crate::agent::tinyagents::tool_registration::subagent_owner_key(
+        &workspace_b,
+        "same-parent-session",
+        Some("same-parent-thread"),
+    );
+    let query = |owner: String| {
+        SubAgentJobsTool::new((*jobs_a).clone())
+            .with_fixed_action(SubAgentJobAction::Query)
+            .with_owner_scope(Arc::new(move |_| owner.clone()))
+    };
+    let list_a = ToolDispatch::execute(
+        &query(owner_a.clone()),
+        &(),
+        tinyagents_harness::CallId::new("workspace-a-list"),
+        serde_json::json!({}),
+        tinytools::ToolCallOptions::default(),
+        &parent_a,
+    )
+    .await
+    .expect("workspace A list dispatch");
+    let list_a: serde_json::Value = serde_json::from_str(&list_a.output()).unwrap();
+    let list_b = ToolDispatch::execute(
+        &query(owner_b.clone()),
+        &(),
+        tinyagents_harness::CallId::new("workspace-b-list"),
+        serde_json::json!({}),
+        tinytools::ToolCallOptions::default(),
+        &parent_b,
+    )
+    .await
+    .expect("workspace B list dispatch");
+    let list_b: serde_json::Value = serde_json::from_str(&list_b.output()).unwrap();
+    let jobs_a_rows = list_a.as_array().expect("A query returns rows");
+    let jobs_b_rows = list_b.as_array().expect("B query returns rows");
+    assert_eq!(jobs_a_rows.len(), 1, "A sees only its child: {list_a}");
+    assert_eq!(jobs_b_rows.len(), 1, "B sees only its child: {list_b}");
+    let id_a = jobs_a_rows[0]["id"].as_str().unwrap().to_owned();
+    let id_b = jobs_b_rows[0]["id"].as_str().unwrap().to_owned();
+    assert_ne!(id_a, id_b, "full lifecycle scope keeps raw-ID reuse distinct");
+
+    let cancel_as_a = SubAgentJobsTool::new((*jobs_a).clone())
+        .recover_selector_errors()
+        .with_fixed_action(SubAgentJobAction::Cancel)
+        .with_owner_scope(Arc::new(move |_| owner_a.clone()));
+    let denied = ToolDispatch::execute(
+        &cancel_as_a,
+        &(),
+        tinyagents_harness::CallId::new("workspace-a-cancel-b"),
+        serde_json::json!({"job_id":id_b}),
+        tinytools::ToolCallOptions::default(),
+        &parent_a,
+    )
+    .await;
+    assert!(denied.is_err(), "A must not acquire B's workspace child");
+    let job_b = jobs_b.get(&id_b).expect("B's child remains registered");
+    assert_eq!(job_b.status, tinyagents_orchestration::subagent::SubAgentJobStatus::Running);
+
+    let cancel_as_b = SubAgentJobsTool::new((*jobs_b).clone())
+        .with_fixed_action(SubAgentJobAction::Cancel)
+        .with_owner_scope(Arc::new(move |_| owner_b.clone()));
+    let cancelled = ToolDispatch::execute(
+        &cancel_as_b,
+        &(),
+        tinyagents_harness::CallId::new("workspace-b-cancel-own"),
+        serde_json::json!({"job_id":id_b}),
+        tinytools::ToolCallOptions::default(),
+        &parent_b,
+    )
+    .await
+    .expect("B can control its own child");
+    assert!(!cancelled.is_error, "{}", cancelled.output());
+    release.notify_waiters();
+    let _ = tokio::time::timeout(std::time::Duration::from_secs(5), child_a)
+        .await
+        .expect("A child settles");
+    let _ = tokio::time::timeout(std::time::Duration::from_secs(5), child_b)
+        .await
+        .expect("B child settles");
+}
+
+#[tokio::test]
 async fn stopped_async_spawn_is_refused_before_progress_or_session_effects() {
     use crate::agent::tinyagents::host::OpenHumanRunContext;
     use crate::core::runtime::{ContextOverlay, CoreContext, DomainSet};

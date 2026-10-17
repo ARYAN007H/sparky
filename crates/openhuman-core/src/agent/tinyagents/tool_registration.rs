@@ -83,8 +83,12 @@ pub(crate) fn subagent_owner_key(
 ) -> String {
     format!(
         "openhuman-subagent-owner:{}",
-        serde_json::to_string(&(workspace, parent_session, thread_id))
-            .unwrap_or_else(|_| "null".into())
+        serde_json::to_string(&(
+            workspace.as_os_str().as_encoded_bytes(),
+            parent_session,
+            thread_id,
+        ))
+        .expect("owner scope tuple is always JSON serializable")
     )
 }
 
