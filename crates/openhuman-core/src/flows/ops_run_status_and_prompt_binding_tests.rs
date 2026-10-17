@@ -298,8 +298,9 @@ async fn flows_build_copilot_toolset_unhides_the_live_run_tools() {
         "trace should name the hidden tool: {log}"
     );
     assert!(
-        log.contains("only the unrelated legacy"),
-        "trace should explain the restriction: {log}"
+        log.contains("run_flow/resume_flow_run stay visible")
+            && log.contains("cancel_flow_run and the unrelated legacy run_workflow are hidden"),
+        "trace should describe the actual builder tool visibility: {log}"
     );
     assert!(
         !log.contains("stay visible"),
