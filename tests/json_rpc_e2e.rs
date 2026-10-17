@@ -11445,6 +11445,40 @@ fn opus_sonnet_demo_graph() -> Value {
 #[cfg(feature = "flows")]
 #[test]
 fn json_rpc_flows_full_arc_discover_build_create_run() {
+    const CHILD_ENV: &str = "OPENHUMAN_COPILOT_RUN_FLOW_E2E_CHILD";
+    if std::env::var_os(CHILD_ENV).is_none() {
+        // ApprovalGate is process-global and one-shot. Run this case in an
+        // exact-filtered child so the test's narrow run_flow auto-approval
+        // cannot leak into any sibling E2E case in a broad cargo invocation.
+        let output = std::process::Command::new(std::env::current_exe().expect("test executable"))
+            .args([
+                "--exact",
+                "json_rpc_flows_full_arc_discover_build_create_run",
+                "--nocapture",
+                "--test-threads=1",
+            ])
+            .env(CHILD_ENV, "1")
+            .output()
+            .expect("run the isolated Copilot RunFlow E2E child");
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        print!("{stdout}");
+        eprint!("{stderr}");
+        let child_output = format!("{stdout}{stderr}");
+        assert!(
+            output.status.success(),
+            "isolated Copilot RunFlow E2E child failed:\n{child_output}"
+        );
+        assert!(
+            child_output.contains("running 1 test")
+                && child_output.contains(
+                    "test json_rpc_flows_full_arc_discover_build_create_run ... ok"
+                )
+                && child_output.contains("1 passed; 0 failed"),
+            "child must prove exactly one test ran and passed:\n{child_output}"
+        );
+        return;
+    }
     run_json_rpc_e2e_on_agent_stack(
         "json_rpc_flows_full_arc_discover_build_create_run",
         json_rpc_flows_full_arc_discover_build_create_run_inner,
