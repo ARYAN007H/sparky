@@ -133,6 +133,56 @@ fn active_jobs_are_capped_by_the_store_count() {
 }
 
 #[test]
+fn concurrent_preflight_admissions_cannot_oversubscribe_the_store_cap() {
+    use std::sync::{Arc, Barrier};
+
+    let tmp = TempDir::new().unwrap();
+    let mut config = limited(&tmp);
+    config.cron.max_active_jobs = 1;
+    let schedule = Schedule::Every { every_ms: 600_000 };
+    let delivery = delivery("none");
+    let barrier = Arc::new(Barrier::new(2));
+    let results = std::thread::scope(|scope| {
+        let workers: Vec<_> = (0..2)
+            .map(|index| {
+                let config = config.clone();
+                let schedule = schedule.clone();
+                let delivery = delivery.clone();
+                let barrier = Arc::clone(&barrier);
+                scope.spawn(move || {
+                    barrier.wait();
+                    limits::check_new(
+                        &config,
+                        &JobType::Agent,
+                        &schedule,
+                        Some(&delivery),
+                    )
+                    .unwrap();
+                    barrier.wait();
+                    crate::cron::client::store_blocking(
+                        &config,
+                        tinyflows_bus::schedule::StoreOperation::AddAgent {
+                            spec: tinyflows_bus::schedule::AgentJobSpec::new(
+                                schedule,
+                                format!("parallel job {index}"),
+                            ),
+                        },
+                    )
+                })
+            })
+            .collect();
+        workers
+            .into_iter()
+            .map(|worker| worker.join().unwrap())
+            .collect::<Vec<_>>()
+    });
+
+    assert_eq!(results.len(), 2);
+    assert_eq!(results.iter().filter(|result| result.is_ok()).count(), 1);
+    assert_eq!(crate::cron::list_jobs(&config).unwrap().len(), 1);
+}
+
+#[test]
 fn renaming_an_enabled_job_does_not_consume_another_slot() {
     let tmp = TempDir::new().unwrap();
     let mut config = limited(&tmp);

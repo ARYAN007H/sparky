@@ -405,3 +405,36 @@ async fn the_operators_cron_limits_bind_every_profile_whatever_its_config_says()
         assert_eq!(config.cron.max_active_jobs, 3);
     }
 }
+
+#[tokio::test]
+async fn provisioning_installs_the_cron_cap_in_the_profile_scope() {
+    let tmp = tempfile::tempdir().unwrap();
+    let mut saas = SaasConfig::new(tmp.path());
+    saas.cron.agent_jobs_only = true;
+    saas.cron.max_active_jobs = 1;
+    let host = ProfileHost::new(saas, CoreContext::for_test(DomainSet::full(), None));
+    let id = profile("cron-cap-provisioned");
+    host.provision(&id).await.unwrap();
+    let config = host.provisioned_config(&id).await.unwrap();
+    let scope = crate::cron::documents_port::DocScope::for_scope(
+        &config,
+        crate::storage::scope_for_profile(id.as_str()),
+    );
+    let operation = || tinyflows_bus::schedule::StoreOperation::AddAgent {
+        spec: tinyflows_bus::schedule::AgentJobSpec::new(
+            tinyflows_bus::schedule::Schedule::Every { every_ms: 600_000 },
+            "profile quota probe",
+        ),
+    };
+
+    crate::cron::client::store_in::<crate::cron::CronJob>(&config, &scope, operation())
+        .await
+        .unwrap();
+    let second = crate::cron::client::store_in::<crate::cron::CronJob>(
+        &config,
+        &scope,
+        operation(),
+    )
+    .await;
+    assert!(second.is_err(), "the profile store must enforce its provisioned cap");
+}
