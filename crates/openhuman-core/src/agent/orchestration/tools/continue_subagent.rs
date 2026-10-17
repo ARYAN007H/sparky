@@ -366,7 +366,11 @@ impl ContinueSubagentTool {
         }
 
         // Look up the agent definition
-        let registry = match AgentDefinitionRegistry::current() {
+        let registry = match run_context
+            .dispatch_ctx()
+            .into_core()
+            .and_then(|core| AgentDefinitionRegistry::for_core_context(&core))
+        {
             Some(reg) => reg,
             None => {
                 return Ok(ToolResult::error(
