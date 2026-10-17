@@ -7,7 +7,7 @@ async fn cron_test_runtime(config: crate::config::Config) -> crate::core::runtim
     use crate::core::types::HostKind;
 
     CoreBuilder::new(HostKind::Cli)
-        .domains(DomainSet::all())
+        .domains(DomainSet::full())
         .services(ServiceSet::none())
         .config(config)
         .build()
