@@ -39,7 +39,7 @@ async fn assert_supplied_backend_owns_the_cap_and_fence(
         .to_string()
         .contains("Failed to insert cron agent job"));
 
-    let opened = host.open(id).await.unwrap();
+    let _opened = host.open(id).await.unwrap();
     let lease_ttl = host.saas().lease_ttl();
     let thief = crate::storage::lease::DocumentLeases::cluster(
         query_backend.as_ref(),
