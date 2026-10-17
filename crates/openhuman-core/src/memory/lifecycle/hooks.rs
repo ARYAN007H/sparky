@@ -404,7 +404,7 @@ pub async fn post_turn(
         }
         Err(error) => {
             tracing::warn!(
-                thread_id = %input.thread_id,
+                thread_id = %thread_id,
                 %error,
                 elapsed_ms,
                 "[memory:hooks] reply not logged"
