@@ -221,3 +221,101 @@ async fn losing_resume_cas_keeps_the_installed_workflow_generation() {
         "a losing resume must not cancel the committed generation"
     );
 }
+
+#[tokio::test]
+async fn lost_engine_lease_does_not_project_failure_over_the_winning_owner() {
+    use crate::agent::harness::ParentExecutionContext;
+    use crate::config::AgentConfig;
+    use tinyagents_session::run_ledger::WorkflowLeaseClaim;
+
+    let workspace = tempfile::tempdir().expect("workspace");
+    let config = Config {
+        workspace_dir: workspace.path().to_path_buf(),
+        ..Config::default()
+    };
+    let run_id = format!("workflow-lease-owner-{}", uuid::Uuid::new_v4());
+    let seeded = crate::storage::sessions::with_ledger(&config.workspace_dir, |ledger| {
+        let row = WorkflowRunUpsert {
+            id: run_id.clone(),
+            definition_id: "parallel_research_cross_check".into(),
+            parent_thread_id: None,
+            input: json!({"question":"q"}),
+            phase_states: json!({"research":{"status":"pending","outputs":[]}}),
+            child_run_ids: Vec::new(),
+            status: WorkflowRunStatus::Running,
+            summary: None,
+            started_at: None,
+            completed_at: None,
+        };
+        async move { ledger.upsert_workflow_run(row).await }
+    })
+    .expect("seed run");
+    let claim = crate::storage::sessions::with_ledger(&config.workspace_dir, |ledger| {
+        let id = run_id.clone();
+        async move {
+            ledger
+                .try_claim_workflow_run(&id, "other-process", chrono::Duration::hours(1))
+                .await
+        }
+    })
+    .expect("claim workflow lease");
+    assert!(matches!(claim, WorkflowLeaseClaim::Acquired(_)));
+
+    let definition = definition_by_id("parallel_research_cross_check").expect("definition");
+    let supervisor = workflow_supervisor().clone();
+    let handle = supervisor.start_scoped_with_handle(
+        run_id.clone(),
+        |token| async move { token.cancelled().await },
+        |future| future,
+        |future| future,
+        |_handle, future| {
+            tokio::spawn(future);
+        },
+    );
+    let parent = ParentExecutionContext {
+        workspace_descriptor: None,
+        agent_definition_id: "workflow-test".into(),
+        allowed_subagent_ids: Default::default(),
+        turn_model_source: crate::agent::tinyagents::TurnModelSource::from_model(Arc::new(
+            tinyagents_harness::testkit::ScriptedModel::replies(vec!["unused"]),
+        )),
+        all_tools: Arc::new(Vec::new()),
+        all_tool_specs: Arc::new(Vec::new()),
+        visible_tool_specs: Arc::new(Vec::new()),
+        visible_tool_names: Default::default(),
+        subagent_tool_ceiling_names: Default::default(),
+        model_name: "test-model".into(),
+        temperature: 0.0,
+        workspace_dir: workspace.path().to_path_buf(),
+        agent_config: AgentConfig::default(),
+        workflows: Arc::new(Vec::new()),
+        memory_context: Arc::new(None),
+        session_id: "workflow-test-session".into(),
+        channel: "test".into(),
+        connected_integrations: Vec::new(),
+        tool_call_format: tinytools_agent::dialect::ToolCallFormat::Native,
+        session_key: "workflow-test-session".into(),
+        session_parent_prefix: None,
+        on_progress: None,
+        run_queue: None,
+        host_env: Default::default(),
+    };
+
+    run_engine_loop(
+        &config,
+        &run_id,
+        definition,
+        handle,
+        seeded.revision,
+        tinyagents_harness::CancellationToken::new(),
+        Some(parent),
+    )
+    .await;
+
+    let after = get_workflow_run(&config, &run_id)
+        .expect("read run")
+        .expect("run remains present");
+    assert_eq!(after.status, WorkflowRunStatus::Running);
+    assert_eq!(after.lease_owner.as_deref(), Some("other-process"));
+    assert_ne!(after.summary.as_deref(), Some("workflow safety admission failed"));
+}
