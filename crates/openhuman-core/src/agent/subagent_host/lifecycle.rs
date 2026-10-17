@@ -453,6 +453,10 @@ async fn invoke_async_spawn_driver_tool(
     Ok((tool_result, bundle))
 }
 
+pub(crate) fn checkpoint_resume(checkpoint: &super::SubagentCheckpointData) -> SubagentResume {
+    OpenHumanPersistence::checkpoint_resume(checkpoint)
+}
+
 pub(super) fn decode_driver_job_result(
     tool_result: tinytools::ToolResult,
     bundle: &OpenHumanDriverBundle,
