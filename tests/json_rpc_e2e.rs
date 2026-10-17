@@ -11545,9 +11545,16 @@ async fn json_rpc_flows_full_arc_discover_build_create_run_inner() {
     clear_forced_chat_completions();
     with_chat_completion_requests(|requests| requests.clear());
     let demo_graph = opus_sonnet_demo_graph();
-    // Turn 1: propose the demo graph. Turn 2: a plain reply ends the builder's
-    // loop. Both gate on "propose_workflow" (in the builder's tool schema every
-    // turn, absent from the scout / plain agent nodes).
+    // Turn 1: dry-run the graph through TinyFlows' sandbox bus path. Turn 2:
+    // propose it after reading the sandbox result. Turn 3: a plain reply ends
+    // the builder loop.
+    push_forced_chat_completion_when(
+        "dry_run_workflow",
+        forced_tool_call_completion(
+            "dry_run_workflow",
+            json!({ "graph": demo_graph.clone() }),
+        ),
+    );
     push_forced_chat_completion_when(
         "propose_workflow",
         forced_tool_call_completion(
@@ -11592,6 +11599,16 @@ async fn json_rpc_flows_full_arc_discover_build_create_run_inner() {
     assert!(
         proposed_ids.contains(&"planner") && proposed_ids.contains(&"drafter"),
         "proposal graph must carry the agent nodes: {proposed_ids:?}"
+    );
+    let builder_requests = with_chat_completion_requests(|requests| requests.clone());
+    assert!(
+        builder_requests.iter().any(|request| {
+            request
+                .get("body")
+                .map(Value::to_string)
+                .is_some_and(|body| body.contains("\\\"sandbox\\\": true"))
+        }),
+        "the second builder call must receive the released module's sandbox report: {builder_requests:?}"
     );
 
     // ── 3. flows_create + flows_run: the saved graph runs its agent nodes ──

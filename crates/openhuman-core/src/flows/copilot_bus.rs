@@ -32,6 +32,10 @@ pub(crate) struct CopilotToolCatalog {
 impl CopilotToolCatalog {
     /// Load the tools the compiled module serves for this host configuration.
     pub(crate) fn load(config: Arc<Config>) -> Result<Self, String> {
+        // Tool registration is synchronous, so this metadata-only call uses
+        // the storage blocking bridge. It carries the supplied Config
+        // explicitly and does not make a host callback or resolve tenant data;
+        // actual tool calls below take their authority from ToolRunContext.
         let node_kinds = serde_json::to_value(crate::flows::all_node_kind_contracts())
             .map_err(|error| format!("could not encode workflow node contracts: {error}"))?
             .as_array()
