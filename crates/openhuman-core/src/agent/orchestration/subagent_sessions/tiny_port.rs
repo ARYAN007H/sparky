@@ -122,14 +122,15 @@ impl TinySessionStore for OpenHumanTinySubagentSessionStore {
         if parent_session != self.parent_session {
             return Ok(Vec::new());
         }
-        let thread_id = match (self.parent_thread_id.as_deref(), parent_thread_id) {
-            (Some(bound), Some(requested)) if bound != requested => return Ok(Vec::new()),
-            (Some(bound), _) => Some(bound),
-            (None, requested) => requested,
-        };
+        if parent_thread_id.is_some_and(|requested| {
+            self.parent_thread_id.as_deref() != Some(requested)
+        }) {
+            return Ok(Vec::new());
+        }
         super::list_for_parent(&self.store, parent_session, thread_id)
             .map_err(SubagentError::Persistence)?
             .into_iter()
+            .filter(|row| self.is_owned(row))
             .map(|row| self.convert(row))
             .collect()
     }
@@ -150,6 +151,15 @@ impl TinySessionStore for OpenHumanTinySubagentSessionStore {
         &self,
         upsert: TinyUpsert,
     ) -> Result<(TinySession, TinyReuseDecision), SubagentError> {
+        if upsert.selector.parent_session != self.parent_session
+            || upsert.selector.parent_thread_id != self.parent_thread_id
+            || upsert.lifecycle_key.thread_id != self.parent_thread_id
+            || upsert.lifecycle_key.task_id != upsert.task_id
+        {
+            return Err(SubagentError::Session(
+                "subagent session upsert is outside its authenticated owner scope".into(),
+            ));
+        }
         let selector = Self::selector(upsert.selector);
         let reuse = if upsert.force_fresh {
             None
