@@ -1,9 +1,6 @@
-//! OpenHuman's three host seams for the neutral subagent lifecycle.
-//!
-//! The old runner deliberately remains the execution leaf while its policy-rich
-//! prompt/tool assembly is decomposed.  This adapter makes the ownership
-//! boundary explicit now: TinyAgents owns the lifecycle and OpenHuman owns the
-//! plan, execution details, and translation back to its public DTOs.
+//! OpenHuman's product policy adapters for TinyAgents' subagent lifecycle.
+//! OpenHuman supplies planning, execution details, persistence, and DTO
+//! projection; TinyAgents owns lifecycle coordination.
 
 use std::{
     collections::HashMap,
