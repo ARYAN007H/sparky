@@ -42,9 +42,7 @@ struct NativeFlowPolicyHooks<'a, 'ctx> {
 }
 
 #[async_trait]
-impl crate::tools::native_ops::flow_backend::FlowPolicyHooks
-    for NativeFlowPolicyHooks<'_, '_>
-{
+impl crate::tools::native_ops::flow_backend::FlowPolicyHooks for NativeFlowPolicyHooks<'_, '_> {
     async fn resolve_policy(
         &self,
         config: &crate::config::Config,
