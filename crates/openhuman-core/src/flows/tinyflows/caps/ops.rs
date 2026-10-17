@@ -48,8 +48,6 @@ pub(crate) use crate::integrations::composio::catalog::{
 
 use super::*;
 
-use tinyagents_harness::tool::missing_required_args;
-
 pub(crate) use crate::integrations::composio::flow_gate::composio_connection_id;
 
 /// Parses a `"http_cred:<name>"` `connection_ref` for [`OpenHumanHttp`],
@@ -68,7 +66,7 @@ pub(crate) fn http_cred_name(conn: &str) -> Option<&str> {
 }
 
 pub(crate) use crate::integrations::composio::flow_gate::{
-    flow_tool_allowed, resolve_account, resolve_composio_account, slug_needs_connected_set,
+    flow_tool_allowed, resolve_account, resolve_composio_account,
 };
 
 pub(crate) async fn classify_composio_action_for_tier(slug: &str) -> CommandClass {
