@@ -76,6 +76,7 @@ pub(in super::super) async fn run_subagent_via_graph(
     // TinyAgents, where there is no config file. `None` yields the safe
     // byte-cap-only defaults.
     config: Option<&crate::config::Config>,
+    native_subagent: Option<crate::agent::tinyagents::NativeSubagentRunContext>,
 ) -> Result<
     (
         String,
@@ -204,7 +205,7 @@ pub(in super::super) async fn run_subagent_via_graph(
     child_context.thread_id = thread_id.clone();
     child_context.progress = on_progress.clone().or(child_context.progress);
     child_context.workspace = workspace_descriptor.clone().or(child_context.workspace);
-    let run_result = TurnSpec {
+    let turn_spec = TurnSpec {
         run_context: child_context,
         turn_models,
         provider_id,
@@ -256,9 +257,11 @@ pub(in super::super) async fn run_subagent_via_graph(
         // `subagent_scope`, so the seam never emits a top-level `TurnCompleted`
         // (they report via `Subagent*` events). Pass `false` for clarity.
         defer_turn_completed_to_caller: false,
-    }
-    .run()
-    .await;
+    };
+    let run_result = match native_subagent {
+        Some(native) => turn_spec.run_with_native_subagent(native).await,
+        None => turn_spec.run().await,
+    };
 
     if let Some(config) = config.filter(|config| config.observability.share_usage_data) {
         let journal_run_id = child_journal_run_id

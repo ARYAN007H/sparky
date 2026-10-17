@@ -113,7 +113,7 @@ pub(crate) async fn run_subagent_direct_with_native_context(
     definition: &AgentDefinition,
     task_prompt: &str,
     options: SubagentRunOptions,
-    native: crate::agent::tinyagents::turn_exec::NativeSubagentRunContext,
+    native: crate::agent::tinyagents::NativeSubagentRunContext,
 ) -> Result<SubagentRunOutcome, SubagentRunError> {
     run_subagent_direct_inner(definition, task_prompt, options, Some(native)).await
 }
@@ -122,7 +122,7 @@ async fn run_subagent_direct_inner(
     definition: &AgentDefinition,
     task_prompt: &str,
     mut options: SubagentRunOptions,
-    native: Option<crate::agent::tinyagents::turn_exec::NativeSubagentRunContext>,
+    native: Option<crate::agent::tinyagents::NativeSubagentRunContext>,
 ) -> Result<SubagentRunOutcome, SubagentRunError> {
     // Unconditionally heap-allocate the entire run_subagent body so
     // every caller doesn't have to carry this future's state inline.
