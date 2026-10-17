@@ -1,6 +1,6 @@
 use super::*;
 use serde_json::json;
-use tinystoragedrivers::{DocumentStoreExt, Meta, MemoryStorage, Precondition, Scope, StorageBackend};
+use tinystoragedrivers::{Meta, MemoryStorage, Precondition, Scope, StorageBackend};
 
 #[test]
 fn a_registry_row_loses_its_seconds_field_and_keeps_its_creation_time() {

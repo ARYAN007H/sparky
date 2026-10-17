@@ -160,6 +160,7 @@ fn a_legacy_marker_row_is_honoured_and_removed() {
     let backend: Arc<dyn StorageBackend> = Arc::new(MemoryStorage::new());
     let scoped = backend.for_scope(&Scope::local()).unwrap();
     crate::storage::block_on(async {
+        let scoped = scoped.clone();
         let docs = scoped.documents();
         docs.ensure_collection(&CollectionSpec::new("storage_import"))
             .await?;
