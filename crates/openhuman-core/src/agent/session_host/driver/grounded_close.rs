@@ -207,6 +207,7 @@ pub(super) async fn repair_required_output(
     progress: Option<&tokio::sync::mpsc::Sender<crate::progress::AgentProgress>>,
     iteration: u32,
     usage: &mut RepairUsage,
+    trace: Option<&Arc<SupplementalTrace>>,
 ) -> Option<String> {
     use tinyagents_harness::config as required;
 
@@ -222,8 +223,8 @@ pub(super) async fn repair_required_output(
         &required::repair_instruction(contract),
     )));
     let (candidate, candidate_usage) =
-        completion(source, model, temperature, thread_id, prompt_history).await;
-    usage.record(candidate_usage, true);
+        completion(source, model, temperature, thread_id, prompt_history, trace.map(Arc::as_ref)).await;
+    usage.record(candidate_usage, true, trace.map(Arc::as_ref));
     let candidate = candidate.trim().to_owned();
     let candidate_is_usable = !candidate.is_empty()
         && !contains_tool_call(dispatcher, &candidate)
@@ -305,6 +306,7 @@ pub(super) async fn close_if_needed(
     user_message: &str,
     outcome: &TinyagentsTurnOutcome,
     budget: Option<std::time::Duration>,
+    trace: Option<&Arc<SupplementalTrace>>,
 ) -> Option<GroundedClose> {
     let needs_cap_close = outcome.hit_cap && !outcome.wrap_up_injected;
     let needs_final_close = outcome.text.trim().is_empty() || outcome.breaker_halt.is_some();
@@ -327,7 +329,7 @@ pub(super) async fn close_if_needed(
     let ask = |prompt: String| {
         let mut messages = base.clone();
         messages.push(TranscriptMessage::user(prompt));
-        async move { completion(source, model, temperature, thread_id, messages).await }
+        async move { completion(source, model, temperature, thread_id, messages, trace.map(Arc::as_ref)).await }
     };
     // A closing response is only user-visible after a separate, tool-less
     // verifier accepts it.  This prevents a fluent repair from contradicting a
@@ -345,6 +347,7 @@ pub(super) async fn close_if_needed(
                 temperature,
                 thread_id,
                 vec![TranscriptMessage::user(prompt)],
+                trace.map(Arc::as_ref),
             )
             .await;
             let violation = match parse_close_verdict(&verdict) {
@@ -365,7 +368,7 @@ pub(super) async fn close_if_needed(
     let mut usage = RepairUsage::for_model(model);
     let output = within_close_budget(
         budget,
-        close_with_one_repair(instruction, stop_reason, ask, verify, &fallback, &mut usage),
+        close_with_one_repair(instruction, stop_reason, ask, verify, &fallback, &mut usage, trace.map(Arc::as_ref)),
         &fallback,
     )
     .await;
@@ -417,6 +420,7 @@ async fn close_with_one_repair<A, AF, V, VF>(
     verify: V,
     fallback: impl FnOnce() -> String,
     usage: &mut RepairUsage,
+    trace: Option<&SupplementalTrace>,
 ) -> String
 where
     A: Fn(String) -> AF,
@@ -427,7 +431,7 @@ where
     let mut prompt = instruction.clone();
     for attempt in 0..2 {
         let (candidate, candidate_usage) = ask(prompt).await;
-        usage.record(candidate_usage, true);
+        usage.record(candidate_usage, true, trace);
         let candidate = candidate.trim().to_owned();
         let violation = if candidate.is_empty() {
             Some(CloseViolation::NoReply)
@@ -437,7 +441,7 @@ where
             let (violation, verify_usage) = verify(candidate.clone()).await;
             // The verifier sees one synthetic prompt, not the conversation
             // context that will be resumed, so it must not replace the gauge.
-            usage.record(verify_usage, false);
+            usage.record(verify_usage, false, trace);
             violation
         };
         let Some(violation) = violation else {
