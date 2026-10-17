@@ -186,7 +186,7 @@ fn an_old_schema_is_brought_forward_and_its_session_ids_scrubbed() {
         .scoped()
         .unwrap();
     let docs = std::sync::Arc::clone(docs.documents());
-    let stored = crate::storage::block_on(async move { docs.get("approvals", "old").await })
+    let stored = crate::storage::block_on(async move { docs.get("approvals.requests", "old").await })
         .unwrap()
         .unwrap();
     assert_eq!(stored.doc["session_id"], PRE_MIGRATION_SESSION_ID);
