@@ -179,6 +179,64 @@ mod imp {
         served
     }
 
+    /// Serve two interfaces at one object path and return an RAII token for
+    /// their shared registration. The token is created on the module runtime
+    /// task, so if the caller is cancelled while this operation is in flight,
+    /// the detached task's output drops the token and unregisters the object.
+    pub(crate) async fn serve_pair(
+        path: String,
+        first: impl tinybus::service::Interface + 'static,
+        second: impl tinybus::service::Interface + 'static,
+    ) -> Result<ServedObjectRegistration, String> {
+        serve_pair_after_first(path, first, second, async {}).await
+    }
+
+    async fn serve_pair_after_first<F>(
+        path: String,
+        first: impl tinybus::service::Interface + 'static,
+        second: impl tinybus::service::Interface + 'static,
+        after_first: F,
+    ) -> Result<ServedObjectRegistration, String>
+    where
+        F: std::future::Future<Output = ()> + Send + 'static,
+    {
+        let runtime = runtime::runtime()
+            .await
+            .map_err(|error| format!("the module bus is unavailable: {error}"))?;
+        let connection = runtime.connection().clone();
+        runtime
+            .spawn(async move {
+                let object_path = ObjectPath::new(&path).map_err(|error| error.to_string())?;
+                connection
+                    .request_name(HOST_BUS_NAME)
+                    .await
+                    .map_err(|error| error.to_string())?;
+                connection
+                    .serve_at(object_path.clone(), first)
+                    .await
+                    .map_err(|error| error.to_string())?;
+                after_first.await;
+                if let Err(error) = connection.serve_at(object_path.clone(), second).await {
+                    let _ = connection.unserve(&object_path).await;
+                    return Err(error.to_string());
+                }
+                Ok(ServedObjectRegistration { path })
+            })
+            .await
+            .map_err(|error| format!("serving the host object did not finish: {error}"))?
+    }
+
+    /// Owns the registration of interfaces served at one path.
+    pub(crate) struct ServedObjectRegistration {
+        path: String,
+    }
+
+    impl Drop for ServedObjectRegistration {
+        fn drop(&mut self) {
+            unserve(std::mem::take(&mut self.path));
+        }
+    }
+
     /// Stop serving `path`. Fire and forget: a call already admitted finishes.
     /// Without a runtime to run on (a sync drop at exit) the object is left;
     /// the process is ending anyway.
@@ -211,7 +269,10 @@ mod imp {
 mod fixture;
 
 #[cfg(feature = "modules")]
-pub(crate) use imp::{copilot_invoke_proxy, copilot_proxy, proxy, run_proxy, serve, unserve};
+pub(crate) use imp::{
+    copilot_invoke_proxy, copilot_proxy, proxy, run_proxy, serve, serve_pair,
+    ServedObjectRegistration, unserve,
+};
 
 #[cfg(not(feature = "modules"))]
 mod imp {

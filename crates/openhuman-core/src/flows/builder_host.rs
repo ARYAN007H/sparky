@@ -319,19 +319,13 @@ impl CopilotCapsHost {
 /// A served Copilot host callback. Its address is passed in the invocation
 /// envelope and remains fixed for the entire tool call.
 pub(crate) struct HostRegistration {
-    path: String,
+    _registration: module::ServedObjectRegistration,
     address: CopilotHost,
 }
 
 impl HostRegistration {
     pub(crate) fn address(&self) -> CopilotHost {
         self.address.clone()
-    }
-}
-
-impl Drop for HostRegistration {
-    fn drop(&mut self) {
-        module::unserve(std::mem::take(&mut self.path));
     }
 }
 
@@ -348,13 +342,14 @@ pub(crate) async fn register(
         context,
         runtime: tokio::runtime::Handle::try_current().ok(),
     };
-    module::serve(path.clone(), host.clone()).await?;
-    if let Err(error) = module::serve(path.clone(), CopilotCapsHost(host)).await {
-        module::unserve(path);
-        return Err(error);
-    }
+    let registration = module::serve_pair(
+        path.clone(),
+        host.clone(),
+        CopilotCapsHost(host),
+    )
+    .await?;
     Ok(HostRegistration {
-        path: path.clone(),
+        _registration: registration,
         address: CopilotHost {
             bus_name: module::HOST_BUS_NAME.to_string(),
             object_path: path,
