@@ -13,7 +13,7 @@
 use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, LazyLock, Mutex};
+use std::sync::{Arc, LazyLock, Mutex, Weak};
 use std::time::Duration;
 
 use async_trait::async_trait;
@@ -34,7 +34,6 @@ use crate::config::Config;
 const MAX_PENDING: usize = 256;
 const MAX_BYTES: usize = 2 * 1024 * 1024;
 const WRITE_TIMEOUT: Duration = Duration::from_secs(120);
-static PROCESS_EPOCH: LazyLock<String> = LazyLock::new(|| uuid::Uuid::new_v4().to_string());
 const QUEUED: &str = "queued; not yet saved to memory";
 static LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
 
@@ -45,21 +44,21 @@ struct DrainState {
 
 /// One owner's erasure state: the module's gate (generation, fences) and the
 /// barrier an erasure takes exclusively to wait for the write in flight.
-/// Kept for the life of the process (a few bytes per owner) because a fence
-/// token borrows its gate.
+/// Kept alive by active mutations and fences; the registry only holds a weak
+/// reference so owners with no active work can be released.
 struct OwnerState {
     gate: WriteGate,
     barrier: Arc<tokio::sync::RwLock<()>>,
 }
 
-type Owners = HashMap<PathBuf, &'static OwnerState>;
+type Owners = HashMap<PathBuf, Weak<OwnerState>>;
 static OWNERS: LazyLock<Mutex<Owners>> = LazyLock::new(|| Mutex::new(HashMap::new()));
 
 type DrainLocks = HashMap<PathBuf, std::sync::Weak<DrainState>>;
 static DRAINS: LazyLock<Mutex<DrainLocks>> = LazyLock::new(|| Mutex::new(HashMap::new()));
 
 type Queue = PendingWrites<FileStore>;
-static QUEUES: LazyLock<Mutex<HashMap<PathBuf, Arc<Queue>>>> =
+static QUEUES: LazyLock<Mutex<HashMap<PathBuf, Weak<Queue>>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
 
 /// An entry as older builds wrote it: the owner and layout as two fields.
@@ -275,20 +274,21 @@ fn queue(file: &Path) -> Arc<Queue> {
     let mut queues = QUEUES
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner);
-    queues
-        .entry(file.to_path_buf())
-        .or_insert_with(|| {
-            Arc::new(PendingWrites::new(
-                FileStore {
-                    file: file.to_path_buf(),
-                },
-                Limits {
-                    max_entries: MAX_PENDING,
-                    max_bytes: MAX_BYTES,
-                },
-            ))
-        })
-        .clone()
+    queues.retain(|_, queue| queue.strong_count() > 0);
+    if let Some(queue) = queues.get(file).and_then(Weak::upgrade) {
+        return queue;
+    }
+    let queue = Arc::new(PendingWrites::new(
+        FileStore {
+            file: file.to_path_buf(),
+        },
+        Limits {
+            max_entries: MAX_PENDING,
+            max_bytes: MAX_BYTES,
+        },
+    ));
+    queues.insert(file.to_path_buf(), Arc::downgrade(&queue));
+    queue
 }
 
 fn map_pending(error: PendingError) -> MemoryError {
@@ -330,7 +330,7 @@ fn drain_state(workspace: &Path) -> Arc<DrainState> {
     lock
 }
 
-fn owner_state(config: &Config) -> &'static OwnerState {
+fn owner_state(config: &Config) -> Arc<OwnerState> {
     let key = config
         .workspace_dir
         .join("memory")
@@ -338,12 +338,18 @@ fn owner_state(config: &Config) -> &'static OwnerState {
     let mut owners = OWNERS
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner);
-    owners.entry(key).or_insert_with(|| {
-        Box::leak(Box::new(OwnerState {
-            gate: WriteGate::new(PROCESS_EPOCH.clone()),
-            barrier: Arc::default(),
-        }))
-    })
+    owners.retain(|_, owner| owner.strong_count() > 0);
+    if let Some(owner) = owners.get(&key).and_then(Weak::upgrade) {
+        return owner;
+    }
+    let owner = Arc::new(OwnerState {
+        // A new gate starts at generation zero, so it needs a distinct epoch
+        // identity to make entries from a released gate stale after eviction.
+        gate: WriteGate::new(uuid::Uuid::new_v4().to_string()),
+        barrier: Arc::default(),
+    });
+    owners.insert(key, Arc::downgrade(&owner));
+    owner
 }
 
 fn partitions(config: &Config) -> MemoryResult<Vec<PathBuf>> {
@@ -374,7 +380,7 @@ fn partitions(config: &Config) -> MemoryResult<Vec<PathBuf>> {
 /// wait in the prefetch queue. Erasure retires older work and waits for active
 /// mutations while subsequent work waits behind the exclusive barrier.
 pub(crate) struct AutomaticMutation {
-    state: &'static OwnerState,
+    state: Arc<OwnerState>,
     generation: u64,
 }
 
@@ -394,20 +400,48 @@ impl AutomaticMutation {
 /// Captures authority without waiting on the engine or an active erasure.
 pub(crate) fn automatic_mutation(config: &Config) -> AutomaticMutation {
     let state = owner_state(config);
-    AutomaticMutation {
-        state,
-        generation: state.gate.generation(),
-    }
+    let generation = state.gate.generation();
+    AutomaticMutation { state, generation }
 }
 
 /// Holds the owner's mutation barrier through explicit engine erasure.
 /// Subsequent queued writes resume only after the outer erasure finishes.
 pub(crate) struct WriteFence {
     guard: Option<tokio::sync::OwnedRwLockWriteGuard<()>>,
-    token: Option<FenceToken<'static>>,
-    state: &'static OwnerState,
+    token: Option<OwnedFenceToken>,
+    state: Arc<OwnerState>,
     config: Arc<Config>,
     ctx: crate::core::runtime::DispatchCtx,
+}
+
+/// An owned fence token. The token borrows its gate, so keep the owner alive
+/// and drop the token before releasing that owner.
+struct OwnedFenceToken {
+    _state: Arc<OwnerState>,
+    token: Option<FenceToken<'static>>,
+}
+
+impl OwnedFenceToken {
+    fn new(state: Arc<OwnerState>) -> Self {
+        let token = state.gate.begin_fence();
+        // SAFETY: `state` owns the borrowed gate and remains alive in this
+        // wrapper. `Drop` takes the token before Rust drops the state field.
+        let token = unsafe { std::mem::transmute::<FenceToken<'_>, FenceToken<'static>>(token) };
+        Self {
+            _state: state,
+            token: Some(token),
+        }
+    }
+
+    fn generation(&self) -> u64 {
+        self.token.as_ref().expect("live fence token").generation()
+    }
+}
+
+impl Drop for OwnedFenceToken {
+    fn drop(&mut self) {
+        drop(self.token.take());
+    }
 }
 
 impl Drop for WriteFence {
@@ -428,12 +462,12 @@ pub(crate) async fn fence_and_clear(
     config: &Config,
 ) -> MemoryResult<WriteFence> {
     let state = owner_state(config);
-    let token = state.gate.begin_fence();
+    let token = OwnedFenceToken::new(state.clone());
     let fencing_generation = token.generation();
     let mut fence = WriteFence {
         guard: None,
         token: Some(token),
-        state,
+        state: state.clone(),
         config: Arc::new(config.clone()),
         ctx: ctx.clone(),
     };
@@ -512,7 +546,7 @@ fn schedule_partition(ctx: &crate::core::runtime::DispatchCtx, config: Arc<Confi
         let _guard = guard;
         let _owner_guard = owner_guard;
         let _state = state;
-        drain_locked(&config, &file, owner, generation).await;
+        drain_locked(&config, &file, &owner, generation).await;
     });
 }
 
@@ -530,7 +564,7 @@ pub(crate) async fn drain(config: &Config) -> usize {
     let state = drain_state(&file);
     let _draining = state.barrier.lock().await;
     let generation = owner.gate.generation();
-    drain_locked(config, &file, owner, generation).await
+    drain_locked(config, &file, &owner, generation).await
 }
 
 /// Runs one queued write against the bound engine, bounded by [`WRITE_TIMEOUT`].

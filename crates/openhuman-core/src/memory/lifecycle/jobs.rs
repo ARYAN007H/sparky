@@ -19,7 +19,7 @@
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, LazyLock, Mutex};
+use std::sync::{Arc, LazyLock, Mutex, Weak};
 
 use tinymemory_api::Namespace;
 use tinymemory_tools::queue::{JobQueue as Queue, QueueError, QueueState, QueueStore};
@@ -79,19 +79,20 @@ impl QueueStore for FileQueueStore {
 type WorkspaceQueue = Queue<FileQueueStore>;
 
 /// One queue per workspace, so its lock serialises every run in the process.
-static QUEUES: LazyLock<Mutex<HashMap<PathBuf, Arc<WorkspaceQueue>>>> =
+static QUEUES: LazyLock<Mutex<HashMap<PathBuf, Weak<WorkspaceQueue>>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
 
 fn queue_of(workspace_dir: &Path) -> Arc<WorkspaceQueue> {
     let mut queues = QUEUES.lock().unwrap_or_else(|e| e.into_inner());
-    queues
-        .entry(workspace_dir.to_path_buf())
-        .or_insert_with(|| {
-            Arc::new(Queue::new(FileQueueStore {
-                file: path(workspace_dir),
-            }))
-        })
-        .clone()
+    queues.retain(|_, queue| queue.strong_count() > 0);
+    if let Some(queue) = queues.get(workspace_dir).and_then(Weak::upgrade) {
+        return queue;
+    }
+    let queue = Arc::new(Queue::new(FileQueueStore {
+        file: path(workspace_dir),
+    }));
+    queues.insert(workspace_dir.to_path_buf(), Arc::downgrade(&queue));
+    queue
 }
 
 /// Queues `jobs` under `root`; a job already queued is kept once, at its
