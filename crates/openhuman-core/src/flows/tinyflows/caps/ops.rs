@@ -37,7 +37,6 @@ use tinybox_bus::CommandClass;
 
 use super::*;
 
-
 /// Parses a `"http_cred:<name>"` `connection_ref` for [`OpenHumanHttp`],
 /// returning the trailing credential name. The host-side
 /// [`HttpCredentialsStore`] (encrypted-at-rest bearer/basic/header
