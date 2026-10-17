@@ -80,7 +80,7 @@ pub async fn status(target: &Target, config: &Config, env_url: Option<String>) -
 
 async fn read_versions(db: &std::path::Path) -> Result<(Vec<OwnerVersion>, Option<i64>), LayoutError> {
     use tinystoragedrivers::schema::Progress;
-    use tinystoragedrivers::{DocumentStoreExt, Query, StorageBackend, MIGRATIONS_COLLECTION};
+    use tinystoragedrivers::{DocumentStoreExt, Query, MIGRATIONS_COLLECTION};
     let url = crate::storage::StorageUrl::parse(&format!("sqlite:{}", db.display()))
         .map_err(|e| LayoutError::Other(anyhow::anyhow!("{e}")))?;
     let backend = tinystoragedrivers::open(&url)
