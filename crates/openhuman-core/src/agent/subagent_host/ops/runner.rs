@@ -390,7 +390,6 @@ pub(crate) async fn run_subagent_direct(
     .await
 }
 
-
 fn workspace_descriptor_for_subagent(
     definition: &AgentDefinition,
     options: &SubagentRunOptions,

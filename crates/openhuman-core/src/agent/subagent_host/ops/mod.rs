@@ -26,8 +26,8 @@ mod pause_checkpoint;
 pub(crate) use pause_checkpoint::is_safe_task_id;
 mod prompt;
 mod provider;
-mod runner_artifacts;
 mod runner;
+mod runner_artifacts;
 
 // The lifecycle adapter owns the public entry point.  This is its host-only
 // execution leaf after a neutral driver has prepared and admitted a request.

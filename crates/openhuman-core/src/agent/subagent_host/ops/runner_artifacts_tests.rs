@@ -66,13 +66,8 @@ async fn byte_policy_projects_a_parent_readable_artifact_before_the_result_cap()
         assert!(options.run_context.dispatch_ctx().tenant().is_ok());
         assert!(crate::storage::sessions::artifact_blobs_for(&workspace_dir).is_some());
         assert_eq!(
-            apply_subagent_result_policies(
-                &mut outcome,
-                &definition,
-                &options,
-                "task-policy-test"
-            )
-            .await,
+            apply_subagent_result_policies(&mut outcome, &definition, &options, "task-policy-test")
+                .await,
             None,
             "artifact storage should succeed"
         );
