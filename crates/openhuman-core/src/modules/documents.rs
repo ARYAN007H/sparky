@@ -37,11 +37,8 @@ use crate::config::Config;
 /// Registry id of the module these calls go to.
 const MODULE_ID: &str = "tinydocs";
 
-/// Temporary host-side stop while the published TinyMemory spreadsheet parser
-/// is being repaired. Keep the wire format recognized so callers cannot fall
-/// through to a different parser.
-const SPREADSHEET_IMPORT_UNAVAILABLE: &str =
-    "spreadsheet imports are temporarily unavailable pending a safe TinyMemory release";
+/// User-facing reason for the temporary host-side spreadsheet import stop.
+const SPREADSHEET_IMPORT_UNAVAILABLE: &str = "spreadsheet imports are temporarily unavailable";
 
 /// How much of a held document to pull per `ReadOutput`.
 ///
@@ -378,7 +375,7 @@ mod tests;
 
 /// Extract structured document sections using the published intake contract.
 /// XLSX is recognized by the contract but temporarily refused before loading
-/// the module while the published TinyMemory parser is repaired.
+/// the module while the published parser dependencies are being repaired.
 pub async fn extract_document(
     config: &Config,
     document: &[u8],
@@ -404,7 +401,7 @@ pub async fn extract_document(
 
 /// Convert a streamed PDF, Word document, or presentation to complete
 /// normalized Markdown. XLSX is temporarily refused before loading the module
-/// while the published TinyMemory parser is repaired.
+/// while the published parser dependencies are being repaired.
 ///
 /// Unlike [`extract_document`], this operation preserves the full text needed
 /// for memory persistence and returns it through the module's bounded held

@@ -268,7 +268,7 @@ async fn spreadsheet_memory_import_is_refused_before_loading_tinydocs() {
     assert!(
         matches!(error, Error::Converter { ref converter, ref message }
             if converter == "tinydocs"
-                && message == "spreadsheet imports are temporarily unavailable pending a safe TinyMemory release"),
+                && message == "spreadsheet imports are temporarily unavailable"),
         "spreadsheet import should fail with the temporary typed-unavailable reason, got {error}"
     );
 }
