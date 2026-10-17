@@ -63,6 +63,35 @@ pub(crate) fn load<T: DeserializeOwned + Send + 'static>(
     open(workspace_dir, name)?.get(name)
 }
 
+/// The names of the state values starting with `prefix`: those stored, plus
+/// those whose legacy file is still in `<workspace>/memory/` (each is
+/// imported first, so a name appears once).
+///
+/// # Errors
+///
+/// A storage error, or an unparsable legacy file.
+pub(crate) fn names(workspace_dir: &Path, prefix: &str) -> Result<Vec<String>> {
+    if let Ok(entries) = std::fs::read_dir(workspace_dir.join("memory")) {
+        for entry in entries.flatten() {
+            let file = entry.file_name();
+            let Some(name) = file
+                .to_str()
+                .and_then(|file| file.strip_suffix(".json"))
+                .filter(|name| name.starts_with(prefix))
+            else {
+                continue;
+            };
+            open_strict(workspace_dir, name)?;
+        }
+    }
+    let kv = StateKv::open(workspace_dir, OWNER, NS)?;
+    Ok(kv
+        .list::<serde_json::Value>(prefix)?
+        .into_iter()
+        .map(|(name, _)| name)
+        .collect())
+}
+
 /// Stores `value` as state value `name`.
 ///
 /// # Errors
