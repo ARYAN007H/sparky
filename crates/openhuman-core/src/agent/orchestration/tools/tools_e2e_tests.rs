@@ -433,10 +433,19 @@ async fn continue_subagent_resumes_paused_job_through_shared_driver() {
         calls: std::sync::atomic::AtomicUsize::new(0),
         seen: Mutex::new(Vec::new()),
     });
-    let live = super::live_parent_run_context(
-        "continue-paused-e2e",
-        parent_context(workspace.path(), provider.clone(), vec![]),
+    let ask_tool: Box<dyn tinytools::Tool> = Box::new(
+        tinyagents_harness::tools::AskClarificationTool::new(),
     );
+    let ask_spec = Arc::new(ask_tool.spec());
+    let mut parent = parent_context(workspace.path(), provider.clone(), vec![]);
+    parent.all_tools = Arc::new(vec![ask_tool]);
+    parent.all_tool_specs = Arc::new(vec![ask_spec.clone()]);
+    parent.visible_tool_specs = Arc::new(vec![ask_spec]);
+    parent.visible_tool_names.insert("ask_user_clarification".into());
+    parent
+        .subagent_tool_ceiling_names
+        .insert("ask_user_clarification".into());
+    let live = super::live_parent_run_context("continue-paused-e2e", parent);
     let paused = SpawnSubagentTool::new()
         .execute_with_live_parent_context(
             json!({
@@ -452,6 +461,7 @@ async fn continue_subagent_resumes_paused_job_through_shared_driver() {
         .await
         .expect("initial spawn");
     assert!(!paused.is_error, "{}", paused.output());
+    assert_eq!(provider.calls.load(std::sync::atomic::Ordering::SeqCst), 1);
     let task_id = paused
         .output()
         .lines()
