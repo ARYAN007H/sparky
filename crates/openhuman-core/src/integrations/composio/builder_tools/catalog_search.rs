@@ -9,7 +9,7 @@ use crate::config::Config;
 use tinytools::{PermissionLevel, Tool, ToolResult};
 
 mod ranking;
-pub(crate) use ranking::search_live_catalog;
+pub(crate) use ranking::{search_catalog, search_live_catalog};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // search_tool_catalog — read-only: real Composio tool slugs from the FULL
@@ -99,7 +99,7 @@ impl Tool for SearchToolCatalogTool {
             toolkit = toolkit.unwrap_or("(any)"),
             "[flows] search_tool_catalog: searching the FULL LIVE Composio catalog (read-only)"
         );
-        let outcome = ranking::search_catalog(&self.config, &query, toolkit, ranking::MAX_CATALOG_RESULTS).await;
+        let outcome = search_catalog(&self.config, &query, toolkit, ranking::MAX_CATALOG_RESULTS).await;
         // Build with `note` first so an agent reading top-down sees the
         // near-miss / keyword-based advisory before the (possibly zero) rows.
         // `count` is always the number of returned rows, never a stand-in for

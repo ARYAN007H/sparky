@@ -4,7 +4,7 @@ use serde_json::{json, Value};
 use crate::config::Config;
 
 /// Cap on returned matches so a broad query can't flood the agent's context.
-const MAX_CATALOG_RESULTS: usize = 40;
+pub(super) const MAX_CATALOG_RESULTS: usize = 40;
 
 /// Search the FULL LIVE Composio catalog (via
 /// [`crate::integrations::composio::catalog::fetch_live_toolkit_catalog`]) for
