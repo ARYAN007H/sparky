@@ -297,6 +297,68 @@ fn cancellation_reason_is_written_only_for_the_observed_full_lifecycle() {
 }
 
 #[test]
+fn paused_driver_cancel_marks_only_the_observed_session_failed() {
+    let dir = tempfile::tempdir().unwrap();
+    let store = SubagentSessionStore::new(dir.path().to_path_buf());
+    let lifecycle_key = SubagentTaskKey {
+        root_run_id: "root-a".into(),
+        parent_run_id: "parent-a".into(),
+        thread_id: Some("thread-a".into()),
+        task_id: "paused-cancel-task".into(),
+    };
+    let session = upsert_running(
+        &store,
+        SubagentSessionUpsert {
+            selector: selector("paused-cancel"),
+            display_name: None,
+            task_title: "Paused child".into(),
+            worker_thread_id: None,
+            task_id: lifecycle_key.task_id.clone(),
+            lifecycle_key: Some(lifecycle_key.clone()),
+        },
+        None,
+    )
+    .unwrap();
+    mark_finished(
+        &store,
+        &session.subagent_session_id,
+        &lifecycle_key.task_id,
+        &SubagentRunStatus::AwaitingUser {
+            question: "Need input".into(),
+            options: None,
+            checkpoint: None,
+        },
+        vec![TranscriptMessage::user("Need input")],
+    )
+    .unwrap();
+
+    let selected = DriverTaskCancellation {
+        task_id: lifecycle_key.task_id.clone(),
+        agent_id: session.agent_id.clone(),
+        parent_session: session.parent_session.clone(),
+        subagent_session_id: session.subagent_session_id.clone(),
+        workspace_dir: dir.path().to_path_buf(),
+        parent_thread_id: session.parent_thread_id.clone(),
+        already_finished: None,
+        was_paused: true,
+        lifecycle_key: Some(lifecycle_key.clone()),
+    };
+    assert!(mark_driver_pause_cancelled(&store, &selected).unwrap());
+    assert!(!mark_driver_pause_cancelled(&store, &selected).unwrap());
+    let cancelled = store.load().unwrap().remove(0);
+    assert_eq!(cancelled.status, DurableSubagentStatus::Failed);
+    assert_eq!(cancelled.current_task_id.as_deref(), Some("paused-cancel-task"));
+    assert_eq!(cancelled.latest_history.as_ref().unwrap().len(), 1);
+
+    let mut stale = selected;
+    stale.lifecycle_key = Some(SubagentTaskKey {
+        root_run_id: "root-b".into(),
+        ..lifecycle_key
+    });
+    assert!(!mark_driver_pause_cancelled(&store, &stale).unwrap());
+}
+
+#[test]
 fn stale_close_and_reuse_snapshots_cannot_change_a_newer_lifecycle() {
     let dir = tempfile::tempdir().unwrap();
     let store = SubagentSessionStore::new(dir.path().to_path_buf());
