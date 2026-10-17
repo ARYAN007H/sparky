@@ -456,7 +456,7 @@ async fn continue_subagent_resumes_paused_job_through_shared_driver() {
         .output()
         .lines()
         .find_map(|line| line.strip_prefix("task_id: "))
-        .expect("pause envelope carries task id")
+        .unwrap_or_else(|| panic!("pause envelope carries task id: {}", paused.output()))
         .to_owned();
     assert!(paused.output().contains("which file should I inspect?"));
 
