@@ -1,5 +1,11 @@
 use super::build_http_schema_dump;
 
+#[derive(serde::Deserialize)]
+struct RawSchemaDump<'a> {
+    #[serde(borrow)]
+    methods: Vec<&'a serde_json::value::RawValue>,
+}
+
 #[tokio::test]
 async fn get_schema_response_bytes_match_the_pre_refactor_baseline() {
     use axum::body::{to_bytes, Body};
@@ -16,10 +22,35 @@ async fn get_schema_response_bytes_match_the_pre_refactor_baseline() {
     let body = to_bytes(response.into_body(), usize::MAX)
         .await
         .expect("read GET /schema response body");
-    let digest = format!("{:x}", Sha256::digest(&body));
+    let full_digest = format!("{:x}", Sha256::digest(&body));
+
+    let dump: RawSchemaDump = serde_json::from_slice(&body).expect("parse GET /schema methods");
+    let memory_methods: Vec<&str> = dump
+        .methods
+        .iter()
+        .filter_map(|method| {
+            let value: serde_json::Value =
+                serde_json::from_str(method.get()).expect("parse raw schema method");
+            (value["namespace"] == "memory").then_some(method.get())
+        })
+        .collect();
+    assert_eq!(memory_methods.len(), 35, "all memory controller schemas appear");
+
+    let mut memory_bytes = Vec::new();
+    for method in &memory_methods {
+        memory_bytes.extend_from_slice(method.as_bytes());
+        memory_bytes.push(b'\n');
+    }
+    let memory_digest = format!("{:x}", Sha256::digest(&memory_bytes));
+    println!(
+        "GET /schema full: {} bytes, SHA-256 {full_digest}; memory raw methods: {} bytes, SHA-256 {memory_digest}",
+        body.len(),
+        memory_bytes.len()
+    );
+
     assert_eq!(body.len(), 211_864, "GET /schema response byte count");
     assert_eq!(
-        digest,
+        full_digest,
         "47c63cfa2f0da8e671da19ea0048d48a2cd88897d4db3abefb206dc65bb46719",
         "GET /schema response SHA-256"
     );
