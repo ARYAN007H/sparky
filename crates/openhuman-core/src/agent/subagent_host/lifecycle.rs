@@ -939,8 +939,7 @@ pub(super) use persistence::OpenHumanPersistence;
 mod driver_adapter;
 
 pub(super) use driver_adapter::{
-    HostRequest, OpenHumanDriverBundle, OpenHumanPersistence, checkpoint_resume,
-    decode_driver_job_result, load_subagent_checkpoint, merged_resume_history, outcome_to_host,
+    HostRequest, OpenHumanDriverBundle, merged_resume_history, outcome_to_host,
 };
 
 fn map_lifecycle_error(error: SubagentError) -> SubagentRunError {
