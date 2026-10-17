@@ -113,9 +113,6 @@ impl Binding {
         if runs.contains(run_id) {
             return;
         }
-        if runs.len() >= 1024 {
-            runs.clear();
-        }
         runs.insert(run_id.to_string());
         crate::core::bus::BUS.publish(crate::core::events::DomainEvent::CronJobTriggered {
             job_id: job.id.clone(),

@@ -375,10 +375,11 @@ async fn triggered_run_guard_keeps_a_long_lived_run_deduplicated_past_1024_start
         async fn handle(&self, event: &DomainEvent) {
             match event {
                 DomainEvent::CronJobTriggered { job_id, .. } => {
-                    let _ = self.0.send(Seen::Trigger(job_id.clone()));
-                }
-                DomainEvent::SystemStartup { component } if component == "issue57-overflow-barrier" => {
-                    let _ = self.0.send(Seen::Barrier);
+                    if job_id == "issue57-overflow-barrier" {
+                        let _ = self.0.send(Seen::Barrier);
+                    } else {
+                        let _ = self.0.send(Seen::Trigger(job_id.clone()));
+                    }
                 }
                 _ => {}
             }
@@ -446,9 +447,9 @@ async fn triggered_run_guard_keeps_a_long_lived_run_deduplicated_past_1024_start
         ));
     }
     binding.publish_triggered_once(&job, "long-lived-run-0");
-    crate::core::bus::BUS.publish(DomainEvent::SystemStartup {
-        component: "issue57-overflow-barrier".into(),
-    });
+    let mut barrier_job = job.clone();
+    barrier_job.id = "issue57-overflow-barrier".into();
+    binding.publish_triggered_once(&barrier_job, "issue57-overflow-barrier-run");
     let after_retry = tokio::time::timeout(std::time::Duration::from_secs(2), events_rx.recv())
         .await
         .expect("retry and barrier events drain")
