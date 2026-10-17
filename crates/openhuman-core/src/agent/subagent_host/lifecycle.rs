@@ -112,16 +112,9 @@ pub(crate) async fn run_async_spawn_via_driver_tool(
     let mut options = options;
     options.task_id = Some(task_id.clone());
     let task_key = SubagentTaskKey::from_context(parent, task_id.clone(), None);
-    let (tool_result, bundle) = invoke_async_spawn_driver_tool(
-        parent,
-        definition,
-        input,
-        options,
-        "inline",
-        None,
-        None,
-    )
-    .await?;
+    let (tool_result, bundle) =
+        invoke_async_spawn_driver_tool(parent, definition, input, options, "inline", None, None)
+            .await?;
     let public_job_id = decode_driver_job_result(tool_result, &bundle, &task_key)?;
     if let Some(outcome) = bundle
         .host_outcome
@@ -161,7 +154,8 @@ pub(crate) async fn spawn_async_via_driver_tool(
         + Sync
         + 'static,
 ) -> Result<String, SubagentRunError> {
-    spawn_async_via_driver_tool_using_jobs(parent, definition, input, options, None, completion).await
+    spawn_async_via_driver_tool_using_jobs(parent, definition, input, options, None, completion)
+        .await
 }
 
 #[cfg(test)]
@@ -227,8 +221,11 @@ async fn spawn_async_via_driver_tool_using_jobs(
 }
 
 type HostCompletion = Arc<
-    dyn Fn(String, Result<SubagentRunOutcome, String>, bool)
-            -> Pin<Box<dyn Future<Output = ()> + Send>>
+    dyn Fn(
+            String,
+            Result<SubagentRunOutcome, String>,
+            bool,
+        ) -> Pin<Box<dyn Future<Output = ()> + Send>>
         + Send
         + Sync,
 >;
@@ -244,20 +241,25 @@ async fn invoke_async_spawn_driver_tool(
 ) -> Result<(tinytools::ToolResult, OpenHumanDriverBundle), SubagentRunError> {
     use tinyagents_harness::tool::ToolDispatch;
     use tinyagents_orchestration::subagent::{DriverSubAgentTool, SubAgentJobRegistry};
-    use tinytools::{PermissionLevel, ToolCategory, ToolCallOptions, ToolScope, ToolTimeout};
+    use tinytools::{PermissionLevel, ToolCallOptions, ToolCategory, ToolScope, ToolTimeout};
 
     let task_id = options
         .task_id
         .clone()
         .unwrap_or_else(|| format!("sub-{}", uuid::Uuid::new_v4()));
-    let checkpoint_dir = absolute_checkpoint_dir(options.checkpoint_dir.clone().unwrap_or_else(|| {
-        parent
-            .data
-            .parent
-            .as_ref()
-            .map(|context| context.workspace_dir.join(".openhuman/subagent_checkpoints"))
-            .unwrap_or_else(|| PathBuf::from(".openhuman/subagent_checkpoints"))
-    }));
+    let checkpoint_dir =
+        absolute_checkpoint_dir(options.checkpoint_dir.clone().unwrap_or_else(|| {
+            parent
+                .data
+                .parent
+                .as_ref()
+                .map(|context| {
+                    context
+                        .workspace_dir
+                        .join(".openhuman/subagent_checkpoints")
+                })
+                .unwrap_or_else(|| PathBuf::from(".openhuman/subagent_checkpoints"))
+        }));
     let bundle = OpenHumanDriverBundle::new(checkpoint_dir)?;
     let host_request = HostRequest {
         definition: definition.clone(),
@@ -422,7 +424,6 @@ fn bundle_failure_for_key(
         .unwrap_or_else(|poisoned| poisoned.into_inner())
         .remove(task_key)
 }
-
 
 /// Recover the original durable key and complete host pause payload from the
 /// safe task-id index written at the pause persistence boundary.
@@ -1505,7 +1506,7 @@ impl tinyagents_orchestration::subagent::SubagentPersistence for OpenHumanPersis
 
 #[path = "lifecycle_outcome.rs"]
 mod outcome;
-use outcome::{HostInFlightMap, host_outcome_to_neutral};
+use outcome::{host_outcome_to_neutral, HostInFlightMap};
 
 fn outcome_to_host(
     result: SubagentRunResult,
