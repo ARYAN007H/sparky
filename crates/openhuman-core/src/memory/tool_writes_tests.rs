@@ -89,7 +89,11 @@ fn persistence_failure_and_invalid_scope_never_acknowledge_a_write() {
     let args = json!({"action":"learn","text":"Prefers tea"});
     assert!(enqueue(&config, &args, &facts).is_err());
     assert!(!path(&config.workspace_dir).exists());
-    std::fs::write(config.workspace_dir.join("storage"), "blocks the storage directory").unwrap();
+    std::fs::write(
+        config.workspace_dir.join("storage"),
+        "blocks the storage directory",
+    )
+    .unwrap();
     assert!(enqueue(&config, &args, &self::facts(&config)).is_err());
 }
 
