@@ -706,3 +706,45 @@ async fn durable_fallback_store_uses_explicit_profile_context_at_shared_workspac
         "Bob's profile store must not expose Alice's task"
     );
 }
+
+#[tokio::test]
+async fn unbound_desktop_wait_keeps_local_durable_fallback() {
+    if !child(
+        "unbound_desktop_wait_keeps_local_durable_fallback",
+        Mode::SingleUser,
+    ) {
+        return;
+    }
+    let ctx = DispatchCtx::unbound();
+    assert!(ctx.resolved().is_none());
+    assert!(CoreContext::scoped().is_none());
+
+    let workspace = tempfile::tempdir().unwrap();
+    let task_id = uuid::Uuid::new_v4().to_string();
+    super::super::task_ledger::record_spawned(
+        &task_id,
+        "researcher",
+        PARENT,
+        None,
+        None,
+        workspace.path(),
+        None,
+    );
+
+    assert!(
+        matches!(
+            super::super::wait_in_workspace(
+                &ctx,
+                &task_id,
+                PARENT,
+                workspace.path(),
+                std::time::Duration::ZERO,
+            )
+            .await,
+            Ok(tinyagents_orchestration::subagent::WaitOutcome::TimedOut(
+                tinyagents_orchestration::subagent::DetachedSubagentStatus::Running
+            )),
+        ),
+        "an unbound single-user caller still reaches its local durable task store"
+    );
+}
