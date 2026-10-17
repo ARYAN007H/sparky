@@ -241,6 +241,7 @@ function runMockedCoverage(exitCode) {
     write("scripts/ci-cancel-aware.sh", '#!/bin/bash\nexec "$@"\n');
     write("scripts/ci/assert-coverage-presence.sh", "#!/bin/bash\nexit 0\n");
     write("crates/openhuman-cli/Cargo.toml", "");
+    write("tests/active.rs", "#[test] fn active() {}\n");
     write("bin/rustup", "#!/bin/bash\nexit 1\n");
     write(
       "bin/cargo",
@@ -250,11 +251,14 @@ case "$*" in *"-p openhuman --lib --bins"*) [ "${exitCode}" = 0 ] || exit "${exi
 node - "$@" <<'JS'
 const fs = require('node:fs');
 const args = process.argv.slice(2);
+if (args[0] === 'nextest' && args[1] === 'list') {
+  console.log(JSON.stringify({ 'rust-suites': { active: { 'binary-name': 'active', testcases: { active: { ignored: false, 'filter-match': { status: 'matches' } } } } } }));
+}
 const pos = args.indexOf('--config-file');
 if (pos >= 0) {
   const config = fs.readFileSync(args[pos + 1], 'utf8');
   const report = JSON.parse(config.split('\\n').find(line => line.startsWith('path = ')).slice(7));
-  fs.writeFileSync(report, '<testsuites><testsuite name="mock" tests="1"></testsuite></testsuites>');
+  fs.writeFileSync(report, '<testsuites><testsuite name="openhuman-cli::active" tests="1"></testsuite></testsuites>');
 }
 JS
 `,
