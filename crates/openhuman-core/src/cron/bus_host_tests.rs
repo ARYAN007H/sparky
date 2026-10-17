@@ -334,37 +334,36 @@ async fn refreshing_binding_config_updates_existing_flow_subscriber() {
 #[tokio::test]
 async fn a_scheduled_flow_run_publishes_a_trigger_before_completion() {
     use crate::core::events::DomainEvent;
-    use std::sync::Mutex as StdMutex;
+    use tokio::sync::mpsc;
     use tinybus::EventHandler;
 
-    struct CronEvents(Arc<StdMutex<Vec<&'static str>>>);
+    struct CronEvents(String, mpsc::UnboundedSender<&'static str>);
     #[async_trait]
     impl EventHandler<DomainEvent> for CronEvents {
         fn name(&self) -> &str { "test::cron::flow_event_pair" }
         async fn handle(&self, event: &DomainEvent) {
-            let name = match event {
-                DomainEvent::CronJobTriggered { .. } => Some("triggered"),
-                DomainEvent::CronJobCompleted { .. } => Some("completed"),
-                _ => None,
+            let (job_id, name) = match event {
+                DomainEvent::CronJobTriggered { job_id, .. } => (job_id, "triggered"),
+                DomainEvent::CronJobCompleted { job_id, .. } => (job_id, "completed"),
+                _ => return,
             };
-            if let Some(name) = name { self.0.lock().unwrap().push(name); }
+            if job_id == &self.0 { let _ = self.1.send(name); }
         }
     }
 
     crate::core::bus::init().await.unwrap();
-    let events = Arc::new(StdMutex::new(Vec::new()));
-    let _subscription = crate::core::bus::BUS
-        .subscribe(Arc::new(CronEvents(Arc::clone(&events))))
-        .unwrap();
     let tmp = TempDir::new().unwrap();
     let config = config(&tmp);
     let (_host, proxy) = host(&config, false).await;
-    let mut job = crate::cron::add_flow_schedule_job(
+    let job = crate::cron::add_flow_schedule_job(
         &config,
         "flow-event-pair",
         Schedule::Every { every_ms: 3_600_000 },
     ).unwrap();
-    job.delivery.mode = "none".into();
+    let (events_tx, mut events_rx) = mpsc::unbounded_channel();
+    let _subscription = crate::core::bus::BUS
+        .subscribe(Arc::new(CronEvents(job.id.clone(), events_tx)))
+        .unwrap();
     let run_id = format!("flow-event-{}", uuid::Uuid::new_v4());
     let _: Attempt = proxy.call(callbacks::SCHEDULE_TRIGGER, ("flow-event-pair", &run_id)).await.unwrap();
     let _: String = proxy.call(callbacks::DELIVER, (&job, &run_id, &Attempt {
@@ -372,11 +371,16 @@ async fn a_scheduled_flow_run_publishes_a_trigger_before_completion() {
         output: "done".into(),
         retryable: false,
     })).await.unwrap();
-    for _ in 0..100 {
-        if events.lock().unwrap().len() >= 2 { break; }
-        tokio::task::yield_now().await;
-    }
-    assert_eq!(*events.lock().unwrap(), vec!["triggered", "completed"]);
+    let completion = tokio::time::timeout(std::time::Duration::from_secs(2), async {
+        let mut seen = Vec::new();
+        loop {
+            let event = events_rx.recv().await.expect("event subscriber remains open");
+            seen.push(event);
+            if event == "completed" { break; }
+        }
+        seen
+    }).await.expect("completion event arrives");
+    assert_eq!(completion, vec!["triggered", "completed"]);
 }
 
 #[tokio::test]
