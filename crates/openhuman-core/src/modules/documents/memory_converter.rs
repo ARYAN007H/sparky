@@ -1,8 +1,10 @@
 //! Memory document conversion through the TinyDocs module.
 //!
 //! Brain ingest and file-backed sources share this chain. Textual formats stay
-//! with TinyMemory's native converter; PDF, DOCX, PPTX and XLSX are extracted
-//! by the configured TinyDocs module, with no host-side parser fallback.
+//! with TinyMemory's native converter; PDF, DOCX and PPTX are extracted by the
+//! configured TinyDocs module, with no host-side parser fallback. XLSX remains
+//! routed here to prevent native fallback, but the host refuses spreadsheet
+//! imports until a safe TinyMemory release is available.
 
 use crate::config::Config;
 use tinymemory_integrations::documents::ConverterChain;
@@ -29,6 +31,8 @@ impl DocumentConverter for TinyDocsConverter {
     }
 
     fn supports(&self, format: DocumentFormat) -> bool {
+        // Keep XLSX on this route so the explicit temporary refusal cannot
+        // fall through to TinyMemory's native converter.
         matches!(
             format,
             DocumentFormat::Pdf
