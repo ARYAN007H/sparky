@@ -12,7 +12,7 @@
 //! | File                | Contents                                                       |
 //! | ------------------- | -------------------------------------------------------------- |
 //! | `provider.rs`       | `resolve_subagent_source`, `user_is_signed_in_to_composio`       |
-//! | `prompt.rs`         | Role-contract suffix, `append_subagent_role_contract`, `dedup_tool_specs_by_name` |
+//! | `prompt.rs`         | Artifact-offload contract and tool-spec deduplication |
 //! | `runner.rs`         | `run_subagent`, `run_typed_mode`                               |
 //! | `graph.rs`          | `run_subagent_via_graph` — the sub-agent turn graph + tools    |
 //! | `checkpoint.rs`     | `SubagentCheckpoint` — cap-hit summary                         |
@@ -32,7 +32,6 @@ mod runner;
 // execution leaf after a neutral driver has prepared and admitted a request.
 pub(crate) use runner::run_subagent_direct;
 
-pub(crate) use prompt::append_subagent_role_contract;
 pub(crate) use provider::resolve_subagent_source;
 
 // Re-exports for test companion modules that use `use super::*`.
