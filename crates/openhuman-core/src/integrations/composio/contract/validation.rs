@@ -107,11 +107,15 @@ pub(crate) fn validate_connection_refs(
         }
         match first_connection_ref_for_toolkit(connections, &slug_toolkit) {
             Some(reference) => errors.push(format!(
-                "Node '{}': `connection_ref` `{conn_ref}` does not match any connected `{slug_toolkit}` account — did you mean `{reference}`?",
+                "Node '{}': `connection_ref` `{conn_ref}` does not match any connected \
+                 `{slug_toolkit}` account — did you mean `{reference}`? Call list_flow_connections and \
+                 copy a `connection_ref` value verbatim.",
                 node.id
             )),
             None => errors.push(format!(
-                "Node '{}': `connection_ref` `{conn_ref}` names a `{slug_toolkit}` account, but none is connected. Connect one with composio_connect (or ask the user to), then use its `connection_ref`.",
+                "Node '{}': `connection_ref` `{conn_ref}` names a `{slug_toolkit}` account, but \
+                 no `{slug_toolkit}` account is connected — connect one with composio_connect \
+                 (or ask the user to), then use its `connection_ref`.",
                 node.id
             )),
         }
