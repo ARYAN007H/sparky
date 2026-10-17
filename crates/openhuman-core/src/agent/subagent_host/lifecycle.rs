@@ -138,6 +138,62 @@ pub(crate) async fn run_subagent_via_driver_tool(
     )))
 }
 
+/// Runs the configured one-shot `delegate` executor inside the shared Tiny
+/// subagent job lifecycle. Its captured Tool still owns config lookup, model
+/// routing, security checks and response formatting; this adapter supplies the
+/// authenticated parent, cancellation, stable target identity and Jobs record.
+pub(crate) async fn run_configured_delegate_via_driver_tool(
+    parent: &RunContext<crate::agent::tinyagents::host::OpenHumanRunContext>,
+    tool: Arc<dyn tinytools::Tool>,
+    arguments: serde_json::Value,
+    agent_id: String,
+) -> Result<tinytools::ToolResult, SubagentRunError> {
+    let task_id = format!("delegate-{}", uuid::Uuid::new_v4());
+    let mut options = SubagentRunOptions::default();
+    options.task_id = Some(task_id.clone());
+    options.thread_id = parent.thread_id().map(|id| id.as_str().to_owned());
+    options.run_context = parent.data.clone();
+    let input = arguments
+        .get("prompt")
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or_default()
+        .to_owned();
+    let request = HostRequest {
+        invocation: HostInvocation::ConfiguredTool {
+            agent_id,
+            tool,
+            arguments,
+        },
+        options,
+    };
+    let (tool_result, bundle) = invoke_driver_tool_with_request(
+        parent,
+        request,
+        input,
+        "inline",
+        None,
+        None,
+        None,
+    )
+    .await?;
+    let task_key = SubagentTaskKey::from_context(
+        parent,
+        task_id,
+        parent.thread_id().map(|id| id.as_str().to_owned()),
+    );
+    decode_driver_job_result(tool_result, &bundle, &task_key)?;
+    bundle
+        .configured_tool_result
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .remove(&task_key)
+        .ok_or_else(|| {
+            SubagentRunError::Provider(anyhow::anyhow!(
+                "driver-backed configured delegate completed without a host result"
+            ))
+        })
+}
+
 /// Continues a host-authorized pause through TinyAgents' registered Jobs
 /// dispatcher, preserving the original lifecycle key and checkpoint payload.
 pub(crate) async fn continue_subagent_via_driver_tool(
@@ -799,7 +855,7 @@ impl OpenHumanSubagentHost {
     ) -> Result<SubagentRunOutcome, SubagentRunError> {
         let fallback_agent_id = self.definition.id.clone();
         let request = HostRequest {
-            definition: self.definition,
+            invocation: HostInvocation::Agent(self.definition),
             options: self.options,
         };
         let driver = OpenHumanDriverBundle::new(checkpoint_dir)?;
@@ -980,7 +1036,7 @@ impl SubagentPlanner<crate::agent::tinyagents::host::OpenHumanRunContext, HostRe
         self.plans.lock().unwrap_or_else(|p| p.into_inner()).insert(
             task_key,
             PreparedHostPlan {
-                definition: request.host_request.definition.clone(),
+                invocation: request.host_request.invocation.clone(),
                 options,
             },
         );
@@ -988,7 +1044,7 @@ impl SubagentPlanner<crate::agent::tinyagents::host::OpenHumanRunContext, HostRe
         // declaration here advertises no unresolved authority.
         Ok(PreparedSubagent::new(
             request.task_key.task_id,
-            request.host_request.definition.id,
+            request.host_request.agent_id().to_owned(),
             planned_input,
             ToolSnapshot::default(),
             request.run_context,
@@ -1000,6 +1056,7 @@ struct OpenHumanExecutor {
     plans: Arc<Mutex<HashMap<SubagentTaskKey, PreparedHostPlan>>>,
     failures: Arc<Mutex<HashMap<SubagentTaskKey, SubagentRunError>>>,
     host_outcome: Arc<Mutex<HashMap<SubagentTaskKey, SubagentRunOutcome>>>,
+    configured_tool_result: Arc<Mutex<HashMap<SubagentTaskKey, tinytools::ToolResult>>>,
 }
 
 #[async_trait]
@@ -1010,7 +1067,7 @@ impl SubagentExecutor<crate::agent::tinyagents::host::OpenHumanRunContext> for O
     ) -> Result<SubagentOutcome, SubagentError> {
         let task_key = execution.task_key.clone();
         let PreparedHostPlan {
-            definition,
+            invocation,
             mut options,
         } = self
             .plans
@@ -1034,33 +1091,134 @@ impl SubagentExecutor<crate::agent::tinyagents::host::OpenHumanRunContext> for O
             .last()
             .map(Message::text)
             .unwrap_or_default();
-        let run = Box::pin(super::ops::run_subagent_direct(
-            &definition,
-            &input,
-            options.clone(),
-        ));
-        let result = match dispatch.into_core() {
-            Some(core) => {
-                crate::core::runtime::CoreContext::scope_with_turn_origin(core, origin, run).await
+        match invocation {
+            HostInvocation::Agent(definition) => {
+                let run = Box::pin(super::ops::run_subagent_direct(
+                    &definition,
+                    &input,
+                    options.clone(),
+                ));
+                let result = match dispatch.into_core() {
+                    Some(core) => {
+                        crate::core::runtime::CoreContext::scope_with_turn_origin(
+                            core, origin, run,
+                        )
+                        .await
+                    }
+                    None => run.await,
+                };
+                match result {
+                    Ok(outcome) => {
+                        self.host_outcome
+                            .lock()
+                            .unwrap_or_else(|p| p.into_inner())
+                            .insert(task_key, outcome.clone());
+                        Ok(host_outcome_to_neutral(outcome, &definition, &options))
+                    }
+                    Err(error) => {
+                        self.failures
+                            .lock()
+                            .unwrap_or_else(|p| p.into_inner())
+                            .insert(task_key, error);
+                        Err(SubagentError::Execution(
+                            "OpenHuman execution failed".into(),
+                        ))
+                    }
+                }
             }
-            None => run.await,
-        };
-        match result {
-            Ok(outcome) => {
-                self.host_outcome
-                    .lock()
-                    .unwrap_or_else(|p| p.into_inner())
-                    .insert(task_key, outcome.clone());
-                Ok(host_outcome_to_neutral(outcome, &definition, &options))
-            }
-            Err(error) => {
-                self.failures
-                    .lock()
-                    .unwrap_or_else(|p| p.into_inner())
-                    .insert(task_key, error);
-                Err(SubagentError::Execution(
-                    "OpenHuman execution failed".into(),
-                ))
+            HostInvocation::ConfiguredTool {
+                agent_id,
+                tool,
+                arguments,
+            } => {
+                let tool_context = tinyagents_harness::tool::ToolExecutionContext::from_run_context(
+                    &execution.prepared.run_context,
+                    tinyagents_harness::CallId::new(format!("delegate-{}", task_key.task_id)),
+                );
+                let cancellation = execution.cancellation.clone();
+                let invoke = Box::pin(async move {
+                    tokio::select! {
+                        _ = cancellation.cancelled() => Ok(tinytools::ToolResult::error(
+                            "delegate: cancelled before the configured agent completed"
+                        )),
+                        result = tool.execute_with_context(
+                            arguments,
+                            tinytools::ToolCallOptions::default(),
+                            Some(&tool_context),
+                        ) => result,
+                    }
+                });
+                let result = match dispatch.into_core() {
+                    Some(core) => {
+                        crate::core::runtime::CoreContext::scope_with_turn_origin(
+                            core, origin, invoke,
+                        )
+                        .await
+                    }
+                    None => invoke.await,
+                };
+                match result {
+                    Ok(tool_result) => {
+                        let output = tool_result.output();
+                        let status = if tool_result.is_error {
+                            SubagentRunStatus::Incomplete {
+                                reason: "configured delegate reported failure".into(),
+                            }
+                        } else {
+                            SubagentRunStatus::Completed
+                        };
+                        self.host_outcome
+                            .lock()
+                            .unwrap_or_else(|p| p.into_inner())
+                            .insert(
+                                task_key.clone(),
+                                SubagentRunOutcome {
+                                    task_id: task_key.task_id.clone(),
+                                    agent_id: agent_id.clone(),
+                                    output: output.clone(),
+                                    iterations: 1,
+                                    elapsed: std::time::Duration::ZERO,
+                                    mode: super::SubagentMode::Typed,
+                                    status,
+                                    final_history: Vec::new(),
+                                    usage: SubagentUsage::default(),
+                                    artifact_paths: Vec::new(),
+                                    persistence_disposition: tinyagents_orchestration::subagent::SubagentPersistenceDisposition::TerminalInserted,
+                                },
+                            );
+                        let mut neutral = SubagentOutcome::cancelled(task_key.task_id.clone());
+                        neutral.output = output;
+                        neutral.extensions.insert(
+                            "agent_id".into(),
+                            serde_json::Value::String(agent_id),
+                        );
+                        neutral.extensions.insert(
+                            "iterations".into(),
+                            serde_json::Value::Number(1.into()),
+                        );
+                        neutral.status = if tool_result.is_error {
+                            SubagentOutcomeKind::Incomplete(SubagentIncomplete::new(
+                                "configured delegate reported failure",
+                            ))
+                        } else {
+                            SubagentOutcomeKind::Completed
+                        };
+                        self.configured_tool_result
+                            .lock()
+                            .unwrap_or_else(|p| p.into_inner())
+                            .insert(task_key, tool_result);
+                        Ok(neutral)
+                    }
+                    Err(error) => {
+                        self.failures
+                            .lock()
+                            .unwrap_or_else(|p| p.into_inner())
+                            .insert(task_key, SubagentRunError::Provider(error));
+                        Err(SubagentError::Execution(
+                            "configured delegate execution failed".into(),
+                        ))
+                    }
+                }
             }
         }
     }
