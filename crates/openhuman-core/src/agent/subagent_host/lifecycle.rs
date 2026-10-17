@@ -396,7 +396,7 @@ async fn invoke_async_spawn_driver_tool(
     Ok((tool_result, bundle))
 }
 
-fn decode_driver_job_result(
+pub(super) fn decode_driver_job_result(
     tool_result: tinytools::ToolResult,
     bundle: &OpenHumanDriverBundle,
     task_key: &SubagentTaskKey,
@@ -427,11 +427,11 @@ fn decode_driver_job_result(
                 .lock()
                 .unwrap_or_else(|poisoned| poisoned.into_inner())
                 .get(task_key)
-                .map(|outcome| match &outcome.status {
-                    SubagentRunStatus::AwaitingUser { .. } => "awaiting_input",
-                    SubagentRunStatus::Incomplete { .. } => "incomplete",
-                    SubagentRunStatus::Cancelled => "cancelled",
-                    SubagentRunStatus::Completed => "completed",
+                .and_then(|outcome| match &outcome.status {
+                    SubagentRunStatus::AwaitingUser { .. } => Some("awaiting_input"),
+                    SubagentRunStatus::Incomplete { .. } => Some("incomplete"),
+                    SubagentRunStatus::Cancelled => Some("cancelled"),
+                    SubagentRunStatus::Completed => None,
                 });
             if !expected_status.is_some_and(|status| {
                 reply.get("status").and_then(serde_json::Value::as_str) == Some(status)
@@ -453,6 +453,7 @@ fn decode_driver_job_result(
     reply
         .get("task_id")
         .and_then(serde_json::Value::as_str)
+        .filter(|task_id| !task_id.is_empty())
         .map(str::to_owned)
         .ok_or_else(|| {
             SubagentRunError::Provider(anyhow::anyhow!(
