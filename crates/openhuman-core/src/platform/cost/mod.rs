@@ -8,6 +8,8 @@ mod schemas;
 pub mod scope;
 pub mod tools;
 pub mod tracker;
+mod storage_schema;
+pub use storage_schema::storage_schema;
 mod tracker_documents;
 pub mod types;
 
