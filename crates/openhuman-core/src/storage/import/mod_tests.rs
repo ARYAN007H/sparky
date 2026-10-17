@@ -1,5 +1,4 @@
 use super::*;
-use serde_json::json;
 use crate::storage::rusqlite;
 use crate::storage::{MemoryStorage, Scope};
 use std::collections::BTreeMap;
@@ -213,8 +212,9 @@ fn a_marker_row_an_older_build_wrote_counts_as_a_finished_import() {
     })
     .unwrap();
     // Boot moves the marker row into `tsd.migrations`.
-    crate::storage::block_on(async {
-        crate::storage::import_state::migrate_legacy_markers(&scoped).await
+    let owned = scoped.clone();
+    crate::storage::block_on(async move {
+        crate::storage::import_state::migrate_legacy_markers(&owned).await
     })
     .unwrap();
 
