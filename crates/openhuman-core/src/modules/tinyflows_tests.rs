@@ -154,7 +154,7 @@ async fn cancelling_partial_callback_registration_unserves_and_releases_its_cont
 
     let path = format!(
         "/ai/tinyhumans/openhuman/TestRegistration/{}",
-        uuid::Uuid::new_v4()
+        uuid::Uuid::new_v4().simple()
     );
     let dropped = Arc::new(tokio::sync::Notify::new());
     let context = Arc::new(());
@@ -192,10 +192,7 @@ async fn cancelling_partial_callback_registration_unserves_and_releases_its_cont
             "ai.tinyhumans.openhuman.TestRegistration",
         )
         .expect("probe proxy");
-    assert!(proxy
-        .call::<serde_json::Value>("Ping", ())
-        .await
-        .is_ok());
+    assert!(proxy.call::<serde_json::Value>("Ping", ()).await.is_ok());
 
     registration.abort();
     let cleanup = dropped.notified();
@@ -208,8 +205,5 @@ async fn cancelling_partial_callback_registration_unserves_and_releases_its_cont
         weak_context.upgrade().is_none(),
         "callback context is released"
     );
-    assert!(proxy
-        .call::<serde_json::Value>("Ping", ())
-        .await
-        .is_err());
+    assert!(proxy.call::<serde_json::Value>("Ping", ()).await.is_err());
 }

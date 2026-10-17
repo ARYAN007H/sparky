@@ -47,11 +47,11 @@ async fn model_arguments_cannot_replace_the_scoped_host_callback_address() {
 }
 
 fn tool_context(
-    core: Arc<crate::core::runtime::CoreContext>,
+    core: &Arc<crate::core::runtime::CoreContext>,
     id: &str,
 ) -> tinyagents_harness::tool::ToolExecutionContext {
     let run = crate::agent::tinyagents::host::run_context::OpenHumanRunContext::new()
-        .with_core(Some(core))
+        .with_core(Some(Arc::clone(core)))
         .into_tinyagents(tinyagents_harness::context::RunConfig::new(id));
     tinyagents_harness::tool::ToolExecutionContext::from_run_context(
         &run,
@@ -90,14 +90,9 @@ async fn concurrent_tool_callbacks_keep_each_explicit_profile_scope() {
         let graph = graph.clone();
         let name = name.to_string();
         CoreContext::scope(context.clone(), async move {
-            crate::flows::ops::flows_create(
-                &config,
-                name,
-                graph,
-                false,
-            )
-            .await
-            .expect("profile flow creation");
+            crate::flows::ops::flows_create(&config, name, graph, false)
+                .await
+                .expect("profile flow creation");
         })
         .await;
     }
@@ -106,8 +101,8 @@ async fn concurrent_tool_callbacks_keep_each_explicit_profile_scope() {
     let tool = catalog
         .tool("list_flows")
         .expect("list_flows is catalogued");
-    let alice_call = tool_context(alice, "copilot-alice");
-    let bob_call = tool_context(bob, "copilot-bob");
+    let alice_call = tool_context(&alice, "copilot-alice");
+    let bob_call = tool_context(&bob, "copilot-bob");
     let alice_future = tool.execute_with_context(
         json!({}),
         tinytools::ToolCallOptions::default(),
