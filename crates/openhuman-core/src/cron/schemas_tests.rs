@@ -145,6 +145,69 @@ async fn rpc_add_rejects_disallowed_target_even_with_request_origin_spoof() {
 }
 
 #[tokio::test]
+async fn rpc_origin_delivery_accepts_web_origin_without_trusting_channel_origin() {
+    let tmp = TempDir::new().unwrap();
+    let config = cron_test_config(&tmp);
+    let runtime = cron_test_runtime(config.clone()).await;
+    let result = runtime
+        .invoke(
+            "openhuman.cron_add",
+            json!({
+                "job_type": "agent",
+                "schedule": {"kind":"every", "every_ms":300000},
+                "prompt": "check inbox",
+                "session_target": "current",
+                "delivery": {"mode":"origin"},
+                "origin": {"kind":"web", "thread_id":"thread-1"}
+            }),
+        )
+        .await
+        .expect("a caller-provided Web origin is structurally valid for RPC origin delivery");
+    assert_eq!(result["logs"][0], "cron job created");
+    let jobs = crate::cron::list_jobs(&config).unwrap();
+    assert_eq!(jobs.len(), 1);
+    assert_eq!(
+        jobs[0].origin,
+        Some(tinyflows_bus::schedule::types::JobOrigin::Web {
+            thread_id: "thread-1".into(),
+            agent_id: None,
+        })
+    );
+}
+
+#[tokio::test]
+async fn rpc_origin_delivery_rejects_channel_origin_outside_allowed_users() {
+    let tmp = TempDir::new().unwrap();
+    let mut config = cron_test_config(&tmp);
+    config.channels_config.telegram = Some(crate::config::TelegramConfig {
+        bot_token: "test-token".into(),
+        chat_id: None,
+        allowed_users: vec!["alice".into()],
+        stream_mode: Default::default(),
+        draft_update_interval_ms: 1000,
+        silent_streaming: true,
+        mention_only: false,
+    });
+    let runtime = cron_test_runtime(config.clone()).await;
+    let result = runtime
+        .invoke(
+            "openhuman.cron_add",
+            json!({
+                "job_type": "agent",
+                "schedule": {"kind":"every", "every_ms":300000},
+                "prompt": "check inbox",
+                "session_target": "isolated",
+                "delivery": {"mode":"origin"},
+                "origin": {"kind":"channel", "channel":"telegram", "reply_target":"999", "history_key":"telegram-eve-999", "sender":"eve"}
+            }),
+        )
+        .await
+        .unwrap_err();
+    assert!(result.contains("allowed_users"), "{result}");
+    assert!(crate::cron::list_jobs(&config).unwrap().is_empty());
+}
+
+#[tokio::test]
 async fn rpc_add_refuses_when_cron_is_disabled_without_creating_job() {
     let tmp = TempDir::new().unwrap();
     let mut config = cron_test_config(&tmp);
