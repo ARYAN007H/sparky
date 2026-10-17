@@ -44,8 +44,10 @@ pub(in super::super) async fn run_subagent_via_graph(
     specs: Vec<ToolSpec>,
     allowed_names: HashSet<String>,
     max_iterations: usize,
-    run_queue: Option<Arc<RunQueue<crate::agent::queued_turn::QueuedTurn>>>,
-    message_run_queue: Option<RunQueueHandle>,
+    queues: (
+        Option<Arc<RunQueue<crate::agent::queued_turn::QueuedTurn>>>,
+        Option<RunQueueHandle>,
+    ),
     on_progress: Option<tokio::sync::mpsc::Sender<AgentProgress>>,
     agent_id: &str,
     task_id: &str,
@@ -88,6 +90,7 @@ pub(in super::super) async fn run_subagent_via_graph(
     ),
     SubagentRunError,
 > {
+    let (run_queue, message_run_queue) = queues;
     // One resolved thread identity drives every child-facing boundary. An
     // explicit worker/task thread deliberately replaces the inherited parent;
     // otherwise a child remains in its parent's conversation. Do this before
