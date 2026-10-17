@@ -12,12 +12,12 @@ use async_trait::async_trait;
 use tinyagents_runtime::{
     DriverFailure, DriverOutcome, DriverRequest, RuntimeError, SessionDriver, TranscriptPartial,
 };
+use crate::agent::tinyagents::TurnSpec;
 use tinyagents_session::transcript::TranscriptMessage;
 use tinyinference_llm::message::Message;
 use tinytools_agent::dialect::ToolDialect;
 
 use crate::agent::{
-    session_host::turn::graph::{self, ChatTurnGraph},
     tinyagents::{host::OpenHumanHostBase, host::OpenHumanRunContext, TurnModelSource},
 };
 
@@ -186,28 +186,47 @@ impl SessionDriver<OpenHumanRunContext> for OpenHumanSessionDriver {
             tinyagents_harness::dialect::dispatcher_for_format(self.dispatcher.tool_call_format()),
         );
         let cancellation = request.run_context.cancellation.clone();
-        // Boxed: the graph future is very large, and holding it inline in the
+        // Boxed: the hosted turn future is very large, and holding it inline in the
         // `select!` below overflows the worker stack in debug builds.
-        let turn = Box::pin(graph::run_chat_turn_graph(ChatTurnGraph {
-            turn_models,
-            model: self.model_name.clone(),
-            messages,
-            tools,
-            synthesized_tools,
-            visible_tool_names,
-            max_iterations: self.max_iterations,
-            on_progress: run_context.progress.clone(),
-            context_window,
-            run_queue: self.run_queue.clone(),
-            context_mw,
-            tool_policy: Some(tool_policy),
-            workspace_descriptor: self.workspace.clone(),
-            sandbox_mode: self.sandbox_mode,
-            thread_id: run_context.thread_id.clone(),
-            run_context,
-            hosted_base: self.hosted_base.clone(),
-            agent_id: self.agent_id.clone(),
-        }));
+        let turn = Box::pin(async move {
+            let hosted_base = self.hosted_base.clone().ok_or_else(|| {
+                anyhow::anyhow!(
+                    "hosted root invocation is unavailable because the session has no hosted authority"
+                )
+            })?;
+            let provider_id = turn_models.provider_id().to_string();
+            let mut run_context = run_context;
+            run_context.workspace = self.workspace.clone().or(run_context.workspace);
+            run_context.sandbox_mode = Some(self.sandbox_mode);
+            TurnSpec {
+                run_context,
+                turn_models,
+                provider_id,
+                model: &self.model_name,
+                history: messages,
+                // Keep durable and synthesized registrations in the same order
+                // as the runtime snapshot, so each advertised name resolves to
+                // the executable instance that owns it.
+                tool_sets: vec![tools, synthesized_tools],
+                // `Some(empty)` is authoritative deny-all; `None` would expose
+                // the construction-time registry.
+                allowed: Some(visible_tool_names),
+                max_iterations: self.max_iterations,
+                subagent_scope: None,
+                context_window,
+                run_queue: self.run_queue.clone(),
+                message_run_queue: None,
+                early_exit_tools: &["ask_user_clarification"],
+                pause_at_cap: true,
+                max_output_tokens: Some(crate::inference::provider::AGENT_TURN_MAX_OUTPUT_TOKENS),
+                context_mw,
+                tool_policy: Some(tool_policy),
+                deterministic_cacheable: false,
+                defer_turn_completed_to_caller: true,
+            }
+            .run_hosted(hosted_base, self.agent_id.clone())
+            .await
+        });
         // A Stop hands the runtime the rounds the provider already accepted,
         // so the stopped turn's prompt and work stay in the session (#7715).
         let result = tokio::select! {
