@@ -77,6 +77,14 @@ fn the_policy_round_trips_and_refuses_out_of_range_values() {
             build_delay_secs: Some(u64::MAX),
             ..PolicySetParams::default()
         },
+        PolicySetParams {
+            build_delay_secs: Some(i64::MAX as u64),
+            ..PolicySetParams::default()
+        },
+        PolicySetParams {
+            build_delay_secs: Some(10_000_000_000_000),
+            ..PolicySetParams::default()
+        },
     ] {
         let before = serde_json::to_value(&config).unwrap();
         let log_conversations = !config.memory.conversations.enabled;
