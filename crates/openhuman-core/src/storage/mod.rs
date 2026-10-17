@@ -33,6 +33,7 @@ pub mod fence;
 pub mod fenced_backend;
 pub mod import;
 pub mod import_claim;
+pub mod journal_maintenance;
 pub mod lease;
 mod lease_documents;
 mod lease_local;
