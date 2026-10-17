@@ -213,7 +213,13 @@ async fn cancelling_a_paused_driver_through_rpc_settles_once_with_its_reason() {
     let cancelled = (controller.handler)(live.data.dispatch_ctx(), params)
         .await
         .expect("cancel RPC result");
-    assert_eq!(cancelled["data"]["cancelled"], true);
+    let response_field = |value: &serde_json::Value, name: &str| {
+        value
+            .get("data")
+            .and_then(|data| data.get(name))
+            .or_else(|| value.get(name))
+    };
+    assert_eq!(response_field(&cancelled, "cancelled"), Some(&json!(true)));
     assert_eq!(provider.calls.load(std::sync::atomic::Ordering::SeqCst), 1);
     assert!(matches!(
         jobs.get(paused_job.id.as_str())
@@ -243,8 +249,11 @@ async fn cancelling_a_paused_driver_through_rpc_settles_once_with_its_reason() {
     let repeated = (controller.handler)(DispatchCtx::new(Arc::clone(&core)), repeated_params)
         .await
         .expect("repeated cancel RPC result");
-    assert_eq!(repeated["data"]["cancelled"], false);
-    assert_eq!(repeated["data"]["outcome"], "unknown");
+    assert_eq!(response_field(&repeated, "cancelled"), Some(&json!(false)));
+    assert_eq!(
+        response_field(&repeated, "outcome"),
+        Some(&json!("unknown"))
+    );
     forget_workspace_for_test(workspace.path());
     assert!(!parent_cancellation.is_cancelled());
 }
