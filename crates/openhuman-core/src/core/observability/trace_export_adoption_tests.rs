@@ -335,6 +335,124 @@ fn child_native_failure_survives_parent_acknowledgement_at_same_timestamp() {
 }
 
 #[test]
+fn run_finalization_bounds_orphaned_child_tools_before_export_finish() {
+    use tinyagents_harness::observability::trace_export::{SpanKind, SpanStatus};
+    use tinyagents_harness::terminal::{TerminalOutcome, TerminalReason};
+
+    let parent = vec![
+        root_observation(
+            0,
+            10,
+            AgentEvent::RunStarted {
+                run_id: RunId::new("root-run"),
+                thread_id: None,
+            },
+        ),
+        root_observation(
+            1,
+            11,
+            AgentEvent::SubAgentRunStarted {
+                name: "researcher".into(),
+                depth: 1,
+                run_id: RunId::new("child-run"),
+            },
+        ),
+        root_observation(
+            2,
+            20,
+            AgentEvent::RunCompleted {
+                run_id: RunId::new("root-run"),
+                outcome: Some(TerminalOutcome::new(TerminalReason::Completed, "done")),
+            },
+        ),
+        root_observation(
+            3,
+            29,
+            AgentEvent::SubAgentRunCompleted {
+                run_id: RunId::new("child-run"),
+            },
+        ),
+        root_observation(
+            4,
+            30,
+            AgentEvent::RunFinalized {
+                run_id: RunId::new("root-run"),
+            },
+        ),
+    ];
+    let child = vec![
+        child_observation(
+            0,
+            12,
+            AgentEvent::RunStarted {
+                run_id: RunId::new("child-run"),
+                thread_id: None,
+            },
+        ),
+        child_observation(
+            1,
+            15,
+            AgentEvent::ToolStarted {
+                parent_call_id: None,
+                call_id: CallId::new("orphan-tool-call"),
+                tool_name: "lookup".into(),
+                input: None,
+            },
+        ),
+        child_observation(
+            2,
+            18,
+            AgentEvent::RunCompleted {
+                run_id: RunId::new("child-run"),
+                outcome: Some(TerminalOutcome::new(TerminalReason::Completed, "done")),
+            },
+        ),
+        child_observation(
+            3,
+            28,
+            AgentEvent::RunFinalized {
+                run_id: RunId::new("child-run"),
+            },
+        ),
+    ];
+
+    // This is the same composition used by export_run_trace_from_journal:
+    // each run keeps its journal offset order, while finalization timestamps
+    // arrive after the harness terminal event and the host persists the result.
+    let observations = crate::agent::tinyagents::journal::merge_run_observations(vec![parent, child]);
+    let mut collector = NativeSpanCollector::new(
+        TraceContext::new("root-trace", None)
+            .with_run_lineage(Some("root-run".into()), None, Some("root-run".into())),
+    );
+    for observation in &observations {
+        collector.record(observation);
+    }
+    collector.finish(1_000);
+
+    let root = collector
+        .spans()
+        .iter()
+        .find(|span| span.kind == SpanKind::Turn)
+        .expect("root run span");
+    assert_eq!(root.end_unix_ms, Some(30));
+    let orphan = collector
+        .spans()
+        .iter()
+        .find(|span| span.name == "tool.lookup")
+        .expect("orphan child tool span");
+    assert_eq!(orphan.end_unix_ms, Some(28));
+    assert_eq!(orphan.status, SpanStatus::Unset);
+    assert_eq!(orphan.attributes["force_closed"], true);
+    assert_eq!(orphan.attributes["observation.level"], "WARNING");
+    let child = collector
+        .spans()
+        .iter()
+        .find(|span| span.kind == SpanKind::Subagent)
+        .expect("linked child span");
+    assert_eq!(child.end_unix_ms, Some(29));
+}
+
+#[test]
 fn separate_child_trace_roots_observations_but_retains_parent_lineage() {
     use tinyagents_harness::observability::trace_export::{RunType, SpanKind};
 
