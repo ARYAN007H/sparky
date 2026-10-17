@@ -572,15 +572,18 @@ pub struct OpenHumanSubagentHost {
 
 /// Shared TinyAgents reservations are partitioned by the canonical checkpoint
 /// root because product task IDs can repeat across workspaces.
-type ScopedSubagentFlights =
-    std::sync::Mutex<std::collections::HashMap<PathBuf, tinyagents_orchestration::subagent::SubagentInFlight>>;
+type ScopedSubagentFlights = std::sync::Mutex<
+    std::collections::HashMap<PathBuf, tinyagents_orchestration::subagent::SubagentInFlight>,
+>;
 
 pub(super) fn shared_subagent_flight(
     ctx: &crate::core::runtime::DispatchCtx,
     checkpoint_dir: &std::path::Path,
 ) -> tinyagents_orchestration::subagent::SubagentInFlight {
     let flights = crate::core::runtime::slot_for::<ScopedSubagentFlights>(ctx);
-    let mut flights = flights.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+    let mut flights = flights
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
     flights
         .entry(checkpoint_dir.to_path_buf())
         .or_default()
@@ -615,11 +618,19 @@ impl OpenHumanSubagentHost {
             child_config,
         )
         .map_err(|error| SubagentRunError::Provider(anyhow::anyhow!(error.to_string())))?;
-        let checkpoint_dir = absolute_checkpoint_dir(self.options.checkpoint_dir.clone().unwrap_or_else(|| {
-            parent.data.parent.as_ref().map(|context| {
-                context.workspace_dir.join(".openhuman/subagent_checkpoints")
-            }).unwrap_or_else(|| PathBuf::from(".openhuman/subagent_checkpoints"))
-        }));
+        let checkpoint_dir =
+            absolute_checkpoint_dir(self.options.checkpoint_dir.clone().unwrap_or_else(|| {
+                parent
+                    .data
+                    .parent
+                    .as_ref()
+                    .map(|context| {
+                        context
+                            .workspace_dir
+                            .join(".openhuman/subagent_checkpoints")
+                    })
+                    .unwrap_or_else(|| PathBuf::from(".openhuman/subagent_checkpoints"))
+            }));
         Box::pin(self.run_leader(parent, task_key, child, input, false, checkpoint_dir)).await
     }
 
@@ -636,11 +647,19 @@ impl OpenHumanSubagentHost {
             child_config,
         )
         .map_err(|error| SubagentRunError::Provider(anyhow::anyhow!(error.to_string())))?;
-        let checkpoint_dir = absolute_checkpoint_dir(self.options.checkpoint_dir.clone().unwrap_or_else(|| {
-            parent.data.parent.as_ref().map(|context| {
-                context.workspace_dir.join(".openhuman/subagent_checkpoints")
-            }).unwrap_or_else(|| PathBuf::from(".openhuman/subagent_checkpoints"))
-        }));
+        let checkpoint_dir =
+            absolute_checkpoint_dir(self.options.checkpoint_dir.clone().unwrap_or_else(|| {
+                parent
+                    .data
+                    .parent
+                    .as_ref()
+                    .map(|context| {
+                        context
+                            .workspace_dir
+                            .join(".openhuman/subagent_checkpoints")
+                    })
+                    .unwrap_or_else(|| PathBuf::from(".openhuman/subagent_checkpoints"))
+            }));
         Box::pin(self.run_leader(parent, task_key, child, input, true, checkpoint_dir)).await
     }
 

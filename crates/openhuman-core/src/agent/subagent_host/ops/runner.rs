@@ -27,18 +27,16 @@ use tinyagents_definition::{
     validate_tier_transition, AgentTier, IterationPolicy, PromptSource,
     SandboxMode as AgentSandboxMode,
 };
-use tinyagents_orchestration::subagent::{subagent_framing, SubagentRole};
 use tinyagents_harness::artifacts::{
     effective_offload_threshold, extract_artifact_paths, note_artifact_handoff,
     DEFAULT_OFFLOAD_THRESHOLD_BYTES, HANDOFF_STAGE_RECORDED,
 };
 use tinyagents_harness::context::{current_run_depth, with_run_depth, RunConfig, RunDepth};
+use tinyagents_orchestration::subagent::{subagent_framing, SubagentRole};
 use tinytools::{SandboxMode as TinyagentsSandboxMode, ToolSpec, WorkspaceDescriptor};
 use tinytools_std::file_state::with_file_state_agent_id;
 
-use super::prompt::{
-    append_artifact_offload_contract, dedup_tool_specs_by_name,
-};
+use super::prompt::{append_artifact_offload_contract, dedup_tool_specs_by_name};
 use super::provider::resolve_subagent_source;
 
 /// Runtime spawn-hierarchy gate decision for one delegation hop.
@@ -803,7 +801,11 @@ async fn run_typed_mode(
         }
     };
 
-    let framing = subagent_framing(SubagentRole::Leaf, options.run_context.spawn_depth, task_prompt);
+    let framing = subagent_framing(
+        SubagentRole::Leaf,
+        options.run_context.spawn_depth,
+        task_prompt,
+    );
     let system_prompt = format!("{}\n\n{framing}", system_prompt.trim_end());
     // #3883: only agents that actually hold a file-write tool are told to
     // offload. `visible_tool_names` is this sub-agent's real, post-filter tool

@@ -3,9 +3,9 @@
 use crate::inference::provider::BilledUsage;
 use std::sync::{Arc, Mutex};
 use tinyagents_harness::summarization::CapToolResult;
+use tinyagents_orchestration::subagent::{summarize_at_cap, CapSummaryModel};
 use tinyinference_llm::message::Message;
 use tinyinference_llm::model::{ChatModel, ModelRequest};
-use tinyagents_orchestration::subagent::{CapSummaryModel, summarize_at_cap};
 
 /// The provider usage from a summary call, charged by the host after the owner
 /// API applies its shared digest and fallback policy.
@@ -58,8 +58,8 @@ impl CapSummaryModel for HostCapSummaryModel<'_> {
              accomplished, what still remains) for the agent that delegated to you. Do not call tools.\n\n{digest}",
             self.checkpoint.agent_id,
         ))];
-        let request = ModelRequest::new(summary_input)
-            .with_max_tokens(self.checkpoint.max_output_tokens);
+        let request =
+            ModelRequest::new(summary_input).with_max_tokens(self.checkpoint.max_output_tokens);
         match self.checkpoint.chat_model.invoke(&(), request).await {
             Ok(response) => {
                 let usage = crate::inference::provider::model::usage_info_from_response(&response);

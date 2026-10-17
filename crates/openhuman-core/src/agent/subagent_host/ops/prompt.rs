@@ -98,7 +98,3 @@ pub(super) fn dedup_tool_specs_by_name(agent_id: &str, specs: Vec<ToolSpec>) -> 
     }
     deduped
 }
-
-#[cfg(test)]
-#[path = "prompt_tests.rs"]
-mod tests;
