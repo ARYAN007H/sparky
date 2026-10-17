@@ -36,14 +36,19 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 use serde_json::json;
-use tinyagents_tasks::{CompletionRecord, CompletionRouter};
+use tinyagents_tasks::{
+    CompletionDelivery, CompletionDeliveryConfig, CompletionRecord, CompletionRouter,
+    DeliveryOutcome, DeliveryTarget, ThreadDeliveryLeases,
+};
 
 use crate::core::bus::BUS;
 use crate::core::events::DomainEvent;
 use tinybus::EventHandler;
 use tinybus::SubscriptionHandle;
 
+#[cfg(test)]
 mod slot;
+#[cfg(test)]
 use slot::DeliverySlot;
 
 use super::background_completions;
@@ -64,6 +69,7 @@ const RECOVERY_DELAY: Duration = Duration::from_secs(15);
 
 /// Threads whose delivery turn is in flight — prevents two concurrent turns.
 /// Keyed by the tenant profile derived from the thread id, for the same reason.
+#[cfg(test)]
 fn delivering() -> &'static Mutex<HashSet<String>> {
     static D: OnceLock<Mutex<HashSet<String>>> = OnceLock::new();
     D.get_or_init(|| Mutex::new(HashSet::new()))
@@ -263,7 +269,7 @@ fn schedule_delivery(ctx: &DispatchCtx, thread_id: String, delay: Duration) {
 fn schedule_delivery_inner(
     ctx: DispatchCtx,
     thread_id: String,
-    delay: Duration,
+    _delay: Duration,
     wait_idle: bool,
     fence: DrainFence,
 ) {
@@ -275,19 +281,8 @@ fn schedule_delivery_inner(
     // Scoped: the thread -> workspace table is keyed per profile, so the
     // delayed task must run under the profile that scheduled it.
     ctx.clone().spawn(async move {
-        let turn_fence = fence.clone();
-        let turn_thread = thread_id.clone();
-        let outcome = run_drain(
-            &ctx,
-            &thread_id,
-            delay,
-            wait_idle,
-            &fence,
-            RECOVERY_BUSY_POLL,
-            || try_deliver(ctx.clone(), turn_thread, turn_fence),
-        )
-        .await;
-        if outcome == DrainOutcome::StillBusy {
+        let outcome = try_deliver(ctx.clone(), thread_id.clone(), fence.clone(), wait_idle).await;
+        if outcome == DeliveryOutcome::Busy {
             // Still running past the ceiling: leave the record pending and
             // wait again rather than overlap the user's turn.
             log::debug!(
@@ -388,37 +383,108 @@ fn claim_ready(
 
 /// Drain + deliver pending completions for a thread — if idle and not already
 /// delivering. Batches everything ready at this instant into one system turn.
-async fn try_deliver(busy_ctx: DispatchCtx, thread_id: String, fence: DrainFence) {
+async fn try_deliver(
+    busy_ctx: DispatchCtx,
+    thread_id: String,
+    fence: DrainFence,
+    recovering: bool,
+) -> DeliveryOutcome {
     if !fence.admits() {
         log::info!(
             "[background_delivery] profile lease lost; not delivering thread_id={thread_id}"
         );
-        return;
+        return DeliveryOutcome::Fenced;
     }
     let Some(workspace_dir) = background_completions::workspace_for_thread(&busy_ctx, &thread_id)
     else {
         log::debug!("[background_delivery] no workspace for thread_id={thread_id}");
-        return;
+        return DeliveryOutcome::Empty;
     };
     let router = background_completions::router_for_workspace(&workspace_dir);
-    let turn_workspace = workspace_dir.clone();
-    // The turn runs under the context the drain was scheduled for.
+    let delivery = CompletionDelivery::new(
+        CompletionDeliveryConfig {
+            debounce: DEBOUNCE,
+            recovery_delay: RECOVERY_DELAY,
+            retry_backoff: Duration::from_secs(2),
+            busy_poll: RECOVERY_BUSY_POLL,
+            max_busy_polls: super::delivery_drain::RECOVERY_BUSY_POLLS,
+            batch_size: usize::MAX,
+        },
+        delivery_leases().clone(),
+    );
     let ctx = busy_ctx.clone();
+    let turn_workspace = workspace_dir.clone();
     let give_up_ctx = busy_ctx.clone();
-    let retry_after = try_deliver_with(
-        &busy_ctx,
-        thread_id.clone(),
-        router,
-        move |thread_id, notice| {
-            let workspace_dir = turn_workspace.clone();
-            let ctx = ctx.clone();
-            async move { run_system_turn_on_thread(&ctx, workspace_dir, thread_id, notice).await }
-        },
-        move |thread_id, notice| async move {
-            persist_undelivered(give_up_ctx, workspace_dir, thread_id, notice).await
-        },
-    )
-    .await;
+    let format_router = router.clone();
+    let turn_thread_id = thread_id.clone();
+    let scoped_thread = crate::core::runtime::tenant::profile_key_in(
+        &super::busy_guard::caller(&busy_ctx),
+        &thread_id,
+    );
+    let deliver = move |records: &[CompletionRecord]| {
+        let notice = format_router.formatter().format_batch(records);
+        let ctx = ctx.clone();
+        let workspace_dir = turn_workspace.clone();
+        let thread_id = turn_thread_id.clone();
+        async move {
+            run_system_turn_on_thread(&ctx, workspace_dir, thread_id, notice)
+                .await
+                .map(|_| ())
+        }
+    };
+    let write_undelivered = move |records: &[CompletionRecord]| {
+        let attempts = records.iter().map(|record| record.attempts).max().unwrap_or(1);
+        let notice = build_undelivered_notice(
+            records,
+            attempts,
+            "the background delivery turn failed",
+        );
+        if let Some(notice) = notice {
+            let run_id = format!("bgdeliver-undelivered-{}", uuid::Uuid::new_v4());
+            if let Err(error) = persist_delivery_reply(
+                &give_up_ctx,
+                workspace_dir.clone(),
+                &thread_id,
+                &run_id,
+                notice,
+                false,
+            ) {
+                log::error!(
+                    "[background_delivery] undelivered results LOST thread_id={thread_id} run_id={run_id} error={error}"
+                );
+            }
+        }
+    };
+    let target = DeliveryTarget {
+        router: &router,
+        parent_key: &thread_id,
+        thread_key: &scoped_thread,
+    };
+    let outcome = if recovering {
+        delivery
+            .recover_on_boot(
+                target,
+                || is_busy(&busy_ctx, &thread_id),
+                fence.clone(),
+                deliver,
+                write_undelivered,
+            )
+            .await
+    } else {
+        delivery
+            .deliver_once(
+                target,
+                || is_busy(&busy_ctx, &thread_id),
+                fence.clone(),
+                deliver,
+                write_undelivered,
+            )
+            .await
+    };
+    let retry_after = match outcome {
+        DeliveryOutcome::Failed { count, gave_up } if count > gave_up => Some(Duration::from_secs(2)),
+        _ => None,
+    };
     // A failed turn that published no `AgentError` (a session checkout failure,
     // or the only post-boot attempt) re-triggers nothing, so a quiet thread would
     // keep its record pending for the rest of the process. The attempt ceiling
@@ -432,6 +498,12 @@ async fn try_deliver(busy_ctx: DispatchCtx, thread_id: String, fence: DrainFence
         );
         schedule_delivery_inner(busy_ctx, thread_id, delay, false, fence);
     }
+    outcome
+}
+
+fn delivery_leases() -> &'static ThreadDeliveryLeases {
+    static LEASES: OnceLock<ThreadDeliveryLeases> = OnceLock::new();
+    LEASES.get_or_init(ThreadDeliveryLeases::default)
 }
 
 /// One pass of the delivery loop whose turn only counts itself, for tests
