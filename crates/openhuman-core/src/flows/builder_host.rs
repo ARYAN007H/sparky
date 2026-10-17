@@ -277,6 +277,8 @@ fn bus_error(member: &str, error: impl std::fmt::Display) -> tinybus::Error {
     tinybus::Error::failed(error)
 }
 
+struct CopilotCapsHost(FlowsHost);
+
 #[tinybus::interface(name = "ai.tinyhumans.tinyflows.CopilotHost")]
 impl FlowsHost {
     async fn call_port(&self, request: copilot::PortCallRequest) -> BusResult<Value> {
@@ -299,10 +301,11 @@ impl FlowsHost {
 }
 
 #[tinybus::interface(name = "ai.tinyhumans.tinyflows.CapsHost")]
-impl FlowsHost {
+impl CopilotCapsHost {
     /// Validate mock tool arguments only; sandbox results stay module-owned.
     async fn tool_invoke(&self, slug: String, args: Value, _connection: Option<String>) -> BusResult<Value> {
-        self.preflight_tool(slug, args)
+        self.0
+            .preflight_tool(slug, args)
             .await
             .map_err(|error| bus_error("ToolInvoke", error))
     }
@@ -335,15 +338,16 @@ pub(crate) async fn register(
         "/ai/tinyhumans/openhuman/CopilotHost/h{}",
         uuid::Uuid::new_v4().simple()
     );
-    module::serve(
-        path.clone(),
-        FlowsHost {
-            config,
-            context,
-            runtime: tokio::runtime::Handle::try_current().ok(),
-        },
-    )
-    .await?;
+    let host = FlowsHost {
+        config,
+        context,
+        runtime: tokio::runtime::Handle::try_current().ok(),
+    };
+    module::serve(path.clone(), host.clone()).await?;
+    if let Err(error) = module::serve(path.clone(), CopilotCapsHost(host)).await {
+        module::unserve(path);
+        return Err(error);
+    }
     Ok(HostRegistration {
         path: path.clone(),
         address: CopilotHost {
