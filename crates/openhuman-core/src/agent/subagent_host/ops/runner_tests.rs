@@ -1,57 +1,97 @@
 use super::*;
 
 #[tokio::test]
-async fn byte_policy_offloads_full_output_before_applying_the_character_cap() {
+async fn byte_policy_projects_a_parent_readable_artifact_before_the_result_cap() {
+    use crate::agent::subagent_host::types::{SubagentMode, SubagentRunStatus, SubagentUsage};
     use crate::core::runtime::agent_scope::test_agent_context;
     use crate::core::runtime::{CoreContext, DomainSet};
     use crate::security::{SecurityPolicy, TrustedAccess, TrustedRoot};
 
     let scratch = tempfile::tempdir().expect("artifact workspace");
-    let action_dir = scratch.path().join("action");
+    let parent_action_dir = scratch.path().join("parent-action");
+    let worktree_action_dir = scratch.path().join("worker-checkout");
     let workspace_dir = scratch.path().join("workspace");
-    std::fs::create_dir_all(&action_dir).expect("action directory");
-    std::fs::create_dir_all(&workspace_dir).expect("workspace directory");
-    let trusted_action_dir = action_dir
+    for path in [&parent_action_dir, &worktree_action_dir, &workspace_dir] {
+        std::fs::create_dir_all(path).expect("create artifact root");
+    }
+    let trusted_action_dir = parent_action_dir
         .canonicalize()
-        .expect("canonical action directory");
+        .expect("canonical parent action directory");
     let policy = Arc::new(SecurityPolicy {
         trusted_roots: vec![TrustedRoot {
             path: trusted_action_dir.to_string_lossy().into_owned(),
             access: TrustedAccess::ReadWrite,
         }],
-        action_dir: action_dir.clone(),
-        workspace_dir,
+        action_dir: parent_action_dir.clone(),
+        workspace_dir: workspace_dir.clone(),
         ..SecurityPolicy::default()
     });
     let root = CoreContext::for_test(DomainSet::full(), None);
     let scoped = test_agent_context(&root, "subagent-artifact-policy-test");
-    let output = "full sub-agent result that must survive the visible preview\n".repeat(16);
-    let store = Arc::new(SubagentArtifactStore::new(
-        Some(policy),
-        action_dir.clone(),
-        "worker".into(),
-    ));
+    let run_context = crate::agent::tinyagents::host::OpenHumanRunContext::new()
+        .with_core(Some(Arc::clone(&scoped)));
+    let options = SubagentRunOptions {
+        run_context,
+        worktree_action_dir: Some(worktree_action_dir.clone()),
+        ..SubagentRunOptions::default()
+    };
+    let mut definition = AgentDefinitionRegistry::builtins_only()
+        .get("code_executor")
+        .expect("code executor builtin")
+        .clone();
+    definition.max_result_chars = Some(16);
+    let original = format!(
+        "[artifact] kind=output path=authored.txt bytes=11\nworker-authored artifact\n{}",
+        "full sub-agent result that must survive the visible preview\n".repeat(16)
+    );
+    let mut outcome = SubagentRunOutcome {
+        task_id: "task-policy-test".into(),
+        agent_id: definition.id.clone(),
+        output: original.clone(),
+        iterations: 1,
+        elapsed: std::time::Duration::ZERO,
+        mode: SubagentMode::Typed,
+        status: SubagentRunStatus::Completed,
+        final_history: Vec::new(),
+        usage: SubagentUsage::default(),
+        artifact_paths: Vec::new(),
+        persistence_disposition:
+            tinyagents_orchestration::subagent::SubagentPersistenceDisposition::TerminalInserted,
+    };
 
-    let stored = CoreContext::scope(scoped, async {
-        offload_result_by_policy("task-policy-test", &output, 8, &store)
-            .await
-            .expect("TinyAgents byte policy invokes the host artifact store")
+    CoreContext::scope(scoped, async {
+        let _policy = crate::security::live_policy::install_scoped(
+            Arc::clone(&policy),
+            workspace_dir.clone(),
+            parent_action_dir.clone(),
+        );
+        apply_subagent_result_policies(
+            &mut outcome,
+            &definition,
+            &options,
+            "task-policy-test",
+        )
+        .await;
     })
     .await;
 
-    assert!(stored.relative_path.starts_with("outputs/"));
-    assert!(stored.pointer.contains(&stored.relative_path));
-    assert_ne!(stored.pointer, output);
-    let materialized = std::fs::read_to_string(action_dir.join(&stored.relative_path))
-        .expect("parent-readable artifact was materialized under its action root");
-    assert_eq!(materialized, output, "the full original output is retained");
-
-    let capped = tinyagents_orchestration::subagent::ResultPolicy::new()
-        .with_max_chars(512)
-        .apply("task-policy-test", &stored.pointer, None)
-        .await;
+    assert_eq!(outcome.output.chars().count(), 16, "the product cap is applied");
+    assert_ne!(outcome.output, original);
+    assert!(outcome.artifact_paths.contains(&"authored.txt".to_owned()));
+    let stored_path = outcome
+        .artifact_paths
+        .iter()
+        .find(|path| path.starts_with("outputs/"))
+        .expect("host projection records its artifact path");
+    let parent_copy = parent_action_dir.join(stored_path);
+    assert!(parent_copy.is_file(), "the parent action root owns the copy");
     assert_eq!(
-        capped.text, stored.pointer,
-        "the existing pointer fits its cap"
+        std::fs::read_to_string(parent_copy).expect("read parent artifact"),
+        original,
+        "the byte-policy store writes the complete pre-cap result"
+    );
+    assert!(
+        !worktree_action_dir.join(stored_path).exists(),
+        "a worktree worker returns an artifact readable from its parent's root"
     );
 }
