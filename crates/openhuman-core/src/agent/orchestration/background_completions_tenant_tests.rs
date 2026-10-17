@@ -220,6 +220,28 @@ async fn explicit_profiles_share_a_workspace_without_sharing_completion_routers(
 #[tokio::test]
 async fn an_unbound_single_user_caller_keeps_workspace_local_persistence() {
     let _guard = crate::config::TEST_ENV_LOCK.lock().await;
+    const CHILD_FLAG: &str = "OPENHUMAN_UNBOUND_COMPLETION_TEST_CHILD";
+    if std::env::var_os(CHILD_FLAG).is_none() {
+        let output = std::process::Command::new(
+            std::env::current_exe().expect("test executable path"),
+        )
+        .args([
+            "--exact",
+            "agent::orchestration::background_completions_tenant_tests::an_unbound_single_user_caller_keeps_workspace_local_persistence",
+            "--nocapture",
+        ])
+        .env(CHILD_FLAG, "1")
+        .output()
+        .expect("run the isolated no-core persistence case");
+        assert!(
+            output.status.success(),
+            "isolated no-core case failed: stdout={} stderr={}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+        return;
+    }
+
     let ws = TestWorkspace::new();
     let ctx = DispatchCtx::unbound();
     assert!(
