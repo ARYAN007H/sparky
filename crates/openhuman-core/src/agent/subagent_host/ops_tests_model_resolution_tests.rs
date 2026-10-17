@@ -58,7 +58,6 @@ async fn prepared_async_spawn_runs_through_driver_jobs_dispatcher() {
     let mut parent_context = make_parent(provider.clone(), vec![]);
     parent_context.workspace_dir = workspace;
     let mut options = with_parent(parent_context, SubagentRunOptions::default());
-    options.task_id = Some("driver-backed-async-spawn".into());
     options.checkpoint_dir = Some(scratch.path().join("checkpoints"));
     options.run_context.thread_id = Some("driver-spawn-thread".into());
     let parent = options.run_context.clone().into_tinyagents(
@@ -77,7 +76,7 @@ async fn prepared_async_spawn_runs_through_driver_jobs_dispatcher() {
 
     assert!(matches!(outcome.status, SubagentRunStatus::Completed));
     assert_eq!(outcome.output, "driver result");
-    assert_eq!(outcome.task_id, "driver-backed-async-spawn");
+    assert!(!outcome.task_id.is_empty(), "host must retain generated task ID");
     assert_eq!(provider.captured.lock().len(), 1, "child provider must run");
     let jobs = crate::core::runtime::slot_for::<
         tinyagents_orchestration::subagent::SubAgentJobRegistry,

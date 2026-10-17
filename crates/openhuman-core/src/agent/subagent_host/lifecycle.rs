@@ -109,6 +109,8 @@ pub(crate) async fn run_async_spawn_via_driver_tool(
         .task_id
         .clone()
         .unwrap_or_else(|| format!("sub-{}", uuid::Uuid::new_v4()));
+    let mut options = options;
+    options.task_id = Some(task_id.clone());
     let task_key = SubagentTaskKey::from_context(parent, task_id.clone(), None);
     let (tool_result, bundle) = invoke_async_spawn_driver_tool(
         parent,
@@ -162,6 +164,8 @@ pub(crate) async fn spawn_async_via_driver_tool(
         .task_id
         .clone()
         .unwrap_or_else(|| format!("sub-{}", uuid::Uuid::new_v4()));
+    let mut options = options;
+    options.task_id = Some(task_id.clone());
     let task_key = SubagentTaskKey::from_context(parent, task_id, None);
     let (tool_result, bundle) = invoke_async_spawn_driver_tool(
         parent,
@@ -302,9 +306,10 @@ async fn invoke_async_spawn_driver_tool(
                         Err(host_error.unwrap_or(error))
                     }
                 };
-                let emit_effects = projected.as_ref().is_ok_and(|outcome| {
-                    outcome.persistence_disposition.should_emit_host_effects()
-                });
+                let emit_effects = match &projected {
+                    Ok(outcome) => outcome.persistence_disposition.should_emit_host_effects(),
+                    Err(_) => true,
+                };
                 completion(target, projected, emit_effects).await;
             })
         });
