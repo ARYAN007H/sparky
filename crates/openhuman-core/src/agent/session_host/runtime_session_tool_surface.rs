@@ -92,19 +92,6 @@ impl OpenHumanTurnPrelude {
             synthesized_names.clone(),
         );
         let auto_include_new_synthesized_tools = surface.auto_include_new_synthesized_tools;
-        let mut managed = tinyagents_runtime::ManagedToolNames {
-            visible: std::mem::take(&mut surface.visible_tool_names),
-            deferred: std::mem::take(&mut surface.deferred_tool_names),
-            permanent: std::mem::take(&mut surface.permanent_tool_names),
-        };
-        managed.refresh_synthesized(
-            &previous_synthesized,
-            &synthesized_names,
-            auto_include_new_synthesized_tools,
-        );
-        surface.visible_tool_names = managed.visible;
-        surface.deferred_tool_names = managed.deferred;
-        surface.permanent_tool_names = managed.permanent;
         if recorded_tool_snapshot_adopted {
             surface.visible_tool_names.extend(
                 self.mutable
@@ -120,10 +107,7 @@ impl OpenHumanTurnPrelude {
             &mut surface.visible_tool_names,
             &agent_definition_name,
         );
-        // OpenHuman decides which product-discovered tools stay searchable
-        // under its configured discovery belt. TinyAgents owns the shared
-        // visible/deferred/permanent name-set reconciliation above.
-        if surface.discovery_enabled {
+        let discovery_deferred = if surface.discovery_enabled {
             let deferred = tinytools::deferred_set(
                 surface.tools.as_slice(),
                 &synthesized,
@@ -133,11 +117,29 @@ impl OpenHumanTurnPrelude {
                 .visible_tool_names
                 .retain(|name| !deferred.contains(name));
             surface.deferred_tool_names = deferred;
-            let permanent_tool_names = surface.permanent_tool_names.clone();
-            surface
-                .deferred_tool_names
-                .retain(|name| !permanent_tool_names.contains(name));
+            Some(surface.deferred_tool_names.clone())
+        } else {
+            None
+        };
+        // Apply host-specific packed/deferred policy before the shared name
+        // reconciliation. TinyAgents restores permanent visibility after
+        // those filters and protects permanent names from deferred discovery.
+        let mut managed = tinyagents_runtime::ManagedToolNames {
+            visible: std::mem::take(&mut surface.visible_tool_names),
+            deferred: std::mem::take(&mut surface.deferred_tool_names),
+            permanent: std::mem::take(&mut surface.permanent_tool_names),
+        };
+        managed.refresh_synthesized(
+            &previous_synthesized,
+            &synthesized_names,
+            auto_include_new_synthesized_tools,
+        );
+        if let Some(deferred) = &discovery_deferred {
+            managed.defer_visible(deferred);
         }
+        surface.visible_tool_names = managed.visible;
+        surface.deferred_tool_names = managed.deferred;
+        surface.permanent_tool_names = managed.permanent;
         let mut specs = surface
             .durable_tool_specs
             .iter()
