@@ -139,12 +139,9 @@ async fn independent_host_bundles_share_and_project_the_persisted_winner() {
     let leader_definition = definition.clone();
     let leader_options = options.clone();
     let leader = tokio::spawn(async move {
-        crate::agent::subagent_host::OpenHumanSubagentHost::new(
-            leader_definition,
-            leader_options,
-        )
-        .run(&leader_parent, "produce a report".into())
-        .await
+        crate::agent::subagent_host::OpenHumanSubagentHost::new(leader_definition, leader_options)
+            .run(&leader_parent, "produce a report".into())
+            .await
     });
     tokio::time::timeout(std::time::Duration::from_secs(5), started_rx.recv())
         .await
@@ -162,9 +159,9 @@ async fn independent_host_bundles_share_and_project_the_persisted_winner() {
             .await
     });
     let mut cancelled_parent = cancelled_context.into_tinyagents(
-            tinyagents_harness::context::RunConfig::new("cross-bundle-parent")
-                .with_thread("cross-bundle-thread"),
-        );
+        tinyagents_harness::context::RunConfig::new("cross-bundle-parent")
+            .with_thread("cross-bundle-thread"),
+    );
     let observer_cancellation = tinyagents_harness::CancellationToken::new();
     cancelled_parent.cancellation = observer_cancellation.clone();
     let cancelled_definition = make_def_named_tools(&["blocking_cross_bundle_fixture"]);
@@ -225,7 +222,10 @@ async fn independent_host_bundles_share_and_project_the_persisted_winner() {
         serde_json::to_value(&follower.final_history).unwrap(),
         "follower receives the full winner history"
     );
-    assert!(!leader.final_history.is_empty(), "winner history is preserved");
+    assert!(
+        !leader.final_history.is_empty(),
+        "winner history is preserved"
+    );
     assert_eq!(leader.usage.input_tokens, follower.usage.input_tokens);
     assert!(leader.usage.input_tokens > 0, "winner usage is preserved");
     assert_eq!(leader.artifact_paths, follower.artifact_paths);

@@ -401,9 +401,9 @@ pub(in crate::agent::subagent_host) fn outcome_to_host(
                 .charged_amount
                 .map(|amount| amount.micros as f64 / 1_000_000.0)
                 .unwrap_or_default(),
-            cost_source: outcome.cost_source.unwrap_or_else(|| {
-                cost_source_of(outcome.usage.usage.charged_amount.as_ref())
-            }),
+            cost_source: outcome
+                .cost_source
+                .unwrap_or_else(|| cost_source_of(outcome.usage.usage.charged_amount.as_ref())),
         },
         artifact_paths: outcome
             .artifacts

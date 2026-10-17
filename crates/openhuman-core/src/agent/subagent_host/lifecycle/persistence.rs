@@ -216,12 +216,17 @@ impl OpenHumanPersistence {
             agent_id: metadata
                 .get("agent_id")
                 .cloned()
-                .or_else(|| host.get("agent_id").and_then(serde_json::Value::as_str).map(str::to_owned))
+                .or_else(|| {
+                    host.get("agent_id")
+                        .and_then(serde_json::Value::as_str)
+                        .map(str::to_owned)
+                })
                 .unwrap_or_default(),
-            worker_thread_id: metadata
-                .get("worker_thread_id")
-                .cloned()
-                .or_else(|| host.get("worker_thread_id").and_then(serde_json::Value::as_str).map(str::to_owned)),
+            worker_thread_id: metadata.get("worker_thread_id").cloned().or_else(|| {
+                host.get("worker_thread_id")
+                    .and_then(serde_json::Value::as_str)
+                    .map(str::to_owned)
+            }),
             history: outcome
                 .history
                 .iter()
@@ -263,9 +268,7 @@ impl OpenHumanPersistence {
                             .cloned()
                             .and_then(|value| serde_json::from_value(value).ok())
                     })
-                    .unwrap_or_else(|| {
-                        cost_source_of(outcome.usage.usage.charged_amount.as_ref())
-                    }),
+                    .unwrap_or_else(|| cost_source_of(outcome.usage.usage.charged_amount.as_ref())),
             },
             artifact_paths: outcome
                 .artifacts

@@ -510,10 +510,9 @@ async fn legacy_pause_migration_preserves_host_checkpoint_metadata_and_bytes() {
     newer_key.task_id = "task-with-new-resume-metadata".into();
     newer_checkpoint.task_key = Some(newer_key.clone());
     newer_checkpoint.task_id = newer_key.task_id.clone();
-    newer_checkpoint.resume_metadata.insert(
-        "skill_filter_override".into(),
-        "new-skill".into(),
-    );
+    newer_checkpoint
+        .resume_metadata
+        .insert("skill_filter_override".into(), "new-skill".into());
     newer_checkpoint
         .resume_metadata
         .insert("model_override".into(), "new-model".into());
