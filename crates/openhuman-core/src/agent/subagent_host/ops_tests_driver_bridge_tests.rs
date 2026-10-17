@@ -65,9 +65,18 @@ async fn prepared_child_run_is_exported_from_its_native_journal_lineage() {
         config,
     );
 
-    let provider = ScriptedProvider::new(vec![text_response(
-        "private-child-answer-should-not-be-exported",
-    )]);
+    let mut response = text_response("private-child-answer-should-not-be-exported");
+    let reported_usage = tinyinference_llm::usage::Usage {
+        input_tokens: 120,
+        output_tokens: 8,
+        total_tokens: 128,
+        cache_read_tokens: 20,
+        charged_amount: Some(tinyinference_llm::usage::ChargedAmount::usd_micros(4_200)),
+        ..Default::default()
+    };
+    response.usage = Some(reported_usage);
+    response.message.usage = Some(reported_usage);
+    let provider = ScriptedProvider::new(vec![response]);
     let mut parent_context = make_parent(provider.clone(), vec![]);
     parent_context.workspace_dir = workspace.clone();
     parent_context.core = Some(Arc::downgrade(&core));
@@ -153,6 +162,33 @@ async fn prepared_child_run_is_exported_from_its_native_journal_lineage() {
         observation.parent_run_id.as_ref() == Some(&root_run_id)
             && observation.root_run_id == root_run_id
     }), "the persisted child stream keeps actual parent/root lineage");
+    let reported_call = child_observations
+        .iter()
+        .find_map(|observation| match &observation.event {
+            AgentEvent::ModelCompleted {
+                call_id,
+                usage: Some(usage),
+                input,
+                output,
+                ..
+            } => {
+                assert_eq!(usage.charged_amount.map(|amount| amount.micros), Some(4_200));
+                assert_eq!(usage.input_tokens, 120);
+                assert_eq!(usage.output_tokens, 8);
+                assert!(input.is_none() && output.is_none(), "model content capture stays off");
+                Some(call_id.clone())
+            }
+            _ => None,
+        })
+        .expect("the real host model response is journaled with provider usage");
+    assert!(
+        child_observations.iter().any(|observation| matches!(
+            &observation.event,
+            AgentEvent::GenerationEnriched { call_id, enrichment }
+                if call_id == &reported_call && enrichment.provider_id.is_some()
+        )),
+        "host route/provider enrichment accompanies the actual generation"
+    );
 
     let trace_context = TraceContext::new("native-trace-root", None)
         .with_session_group("native-trace-thread")
@@ -177,6 +213,14 @@ async fn prepared_child_run_is_exported_from_its_native_journal_lineage() {
         .expect("native collector projects the actual linked child");
     assert_eq!(child_span.attributes["parent_run_id"], root_run_id.as_str());
     assert_eq!(child_span.attributes["root_run_id"], root_run_id.as_str());
+    let generation = spans
+        .iter()
+        .find(|span| span.attributes.get("gen_ai.request.model").is_some_and(|_| {
+            span.attributes.get("gen_ai.usage.cost_usd") == Some(&serde_json::json!(0.0042))
+        }))
+        .expect("native projection preserves the provider-reported charge");
+    assert_eq!(generation.attributes["gen_ai.usage.input_tokens"], 120);
+    assert_eq!(generation.attributes["gen_ai.usage.output_tokens"], 8);
     let exported = spans_to_ndjson(
         tinyagents_harness::observability::trace_export::serialize::SpanEnvelope::Otel,
         spans,
