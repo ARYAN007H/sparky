@@ -45,6 +45,7 @@ pub mod schema_support;
 pub mod scope;
 pub mod scope_move;
 pub mod secrets;
+pub mod state_kv;
 
 pub use scope::{scope_for_agent, scope_for_module, scope_for_profile, tenant_scope};
 

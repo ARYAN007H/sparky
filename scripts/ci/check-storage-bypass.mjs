@@ -139,10 +139,10 @@ export const ALLOW = new Map(
       "a derived view of a blob-stored tool-result artifact, written under the workspace's read-only artifacts root so file_read can open the key a pointer hands back; re-derived from the tenant's blob store on every read, which stays the source of truth",
     ],
     [
-      "inference/tokenjuice/savings.rs",
+      "modules/browser_task_report.rs",
       "json-write",
-      "if let Err(e) = std::fs::write(path, json) {",
-      "one process-global savings counter snapshot, cheap to lose; not per-user data a scope would mean anything for",
+      "let mut options = tokio::fs::OpenOptions::new();",
+      "opt-in debug trace (`[computer] trace`): the module's full task report, written as a file beside the module's own traces in the same trace directory so a person can open both; page text stays in a file only its owner can read and no store reads it back",
     ],
     [
       "agent/artifacts/files.rs",

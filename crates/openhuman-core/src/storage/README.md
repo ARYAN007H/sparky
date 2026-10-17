@@ -57,6 +57,22 @@ against the known definitions, else the default agent), and the turn-state
 JSON into the default agent. Each importer records a `tsd.migrations` entry per workspace, so a
 record deleted afterwards is not resurrected from the untouched legacy file.
 
+## Runtime state values
+
+Small pieces of runtime state that used to be one JSON file each live in
+`tsd.kv` through `state_kv::StateKv` (one `(owner, namespace)` per domain, one
+entry per value, in the acting scope): the memory domain's `jobs`,
+`channel_threads`, `pending_deletions`, `sources_state`, `import_state`,
+`conversations_backfill`, `layout_migration`, `local_root` and tool-write
+outbox partitions (`memory::state_store`), the sub-agent lifecycle records
+(`agent::subagent_host::lifecycle_store`) and the computer site memory
+(`modules::site_memory_host`). The first read in a backend copies the legacy
+file once (`StateKv::import_file` / `import_once`: an existing entry wins, a
+`tsd.migrations` entry stops a re-import from resurrecting a deleted value, the
+file stays in place for the legacy archive step). A value a damaged file must
+not reset (`layout_migration`, `local_root`, the tool-write outbox) uses the
+strict import, which fails closed on an unparsable file.
+
 ## Entry points
 
 - `configured_url(&Config)` / `url_from(env, &Config)`: the URL in effect.
