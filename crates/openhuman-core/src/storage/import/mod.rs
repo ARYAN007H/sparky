@@ -270,7 +270,7 @@ pub fn run_with(
 
 /// The marker id for `source` in `workspace`: a backend shared by several
 /// workspaces keeps one marker per workspace.
-fn marker_id(domain: &str, workspace: &Path) -> String {
+pub(crate) fn marker_id(domain: &str, workspace: &Path) -> String {
     let digest = sha2::Sha256::digest(workspace.as_os_str().as_encoded_bytes());
     format!("{domain}@{}", &hex::encode(digest)[..16])
 }
@@ -290,7 +290,6 @@ fn import_one(
     source: &Source,
 ) -> Result<Outcome> {
     let domain = source.domain;
-    let marker = marker_id(domain, &config.workspace_dir);
     let repo = Repo::on(
         backend,
         &super::scope::tenant_scope(None),
@@ -366,8 +365,9 @@ fn import_one(
         if written > 0 {
             let scope = super::scope::tenant_scope(None);
             let owner = source.owner;
+            let backend = Arc::clone(backend);
             block_on_anyhow(async move {
-                super::boot::remigrate_owner(backend, &scope, owner)
+                super::boot::remigrate_owner(&backend, &scope, owner)
                     .await
                     .map(|_| ())
                     .map_err(Into::into)
