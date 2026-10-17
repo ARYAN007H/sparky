@@ -2,23 +2,6 @@
 
 use super::*;
 
-/// Reconcile visible delegate names without reopening a caller's explicit
-/// restriction. Revoked names disappear; a newly connected name is admitted
-/// only for the wildcard belt.
-pub(in crate::agent::session_host) fn reconcile_synthesized_visibility(
-    visible: &mut std::collections::HashSet<String>,
-    previous: &std::collections::HashSet<String>,
-    next: &std::collections::HashSet<String>,
-    auto_include_new: bool,
-) {
-    for name in previous.difference(next) {
-        visible.remove(name);
-    }
-    if auto_include_new {
-        visible.extend(next.iter().cloned());
-    }
-}
-
 impl OpenHumanTurnPrelude {
     /// Rebuild every delegation-dependent tool view from the current cached
     /// integration set, replacing rather than appending. A revoked delegate is
@@ -109,12 +92,19 @@ impl OpenHumanTurnPrelude {
             synthesized_names.clone(),
         );
         let auto_include_new_synthesized_tools = surface.auto_include_new_synthesized_tools;
-        reconcile_synthesized_visibility(
-            &mut surface.visible_tool_names,
+        let mut managed = tinyagents_runtime::ManagedToolNames {
+            visible: std::mem::take(&mut surface.visible_tool_names),
+            deferred: std::mem::take(&mut surface.deferred_tool_names),
+            permanent: std::mem::take(&mut surface.permanent_tool_names),
+        };
+        managed.refresh_synthesized(
             &previous_synthesized,
             &synthesized_names,
             auto_include_new_synthesized_tools,
         );
+        surface.visible_tool_names = managed.visible;
+        surface.deferred_tool_names = managed.deferred;
+        surface.permanent_tool_names = managed.permanent;
         if recorded_tool_snapshot_adopted {
             surface.visible_tool_names.extend(
                 self.mutable
@@ -125,9 +115,6 @@ impl OpenHumanTurnPrelude {
                     .map(|spec| spec.name.clone()),
             );
         }
-        // Preserve permanently attached tools when re-deriving the surface.
-        permanent::refresh_visibility(&mut surface, &synthesized);
-
         let mut specs = surface
             .durable_tool_specs
             .iter()
