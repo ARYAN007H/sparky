@@ -63,7 +63,7 @@ record deleted afterwards is not resurrected from the untouched legacy file.
 - `open(url)`: parse and open a backend (credentials are redacted in logs).
 - `install(backend)` / `installed()` / `clear()`: the process slot domains
   read the backend from.
-- `scope_for_agent(agent_id)`: the storage scope an agent's records live
+- `scope_for_agent(agent_id)`: the storage scope (`local/agent:<id>`) an agent's records live
   under, the same mapping TinyAgents' `DriverSessionStores` uses, so every
   domain agrees.
 - `driver_is_shared(driver)` / `installed_is_shared()`: whether other
@@ -75,7 +75,7 @@ record deleted afterwards is not resurrected from the untouched legacy file.
   within one process.
 - `blob_sweep`: reclaims expired blobs (`StorageBackend::sweep_expired_blobs`)
   for `local`, each known agent scope and each provisioned SaaS profile
-  (`profile:<id>` plus the blob-owning modules' scopes for it) every hour,
+  (`u:<id>` plus the blob-owning modules' scopes for it) every hour,
   spawned with the cron `ServiceSet` switch (`core::runtime::services`; not
   gated on `[cron] enabled`, since it reclaims storage rather than running
   jobs). Each scope's sweep is bounded by `SCOPE_SWEEP_TIMEOUT`; a timeout
@@ -83,7 +83,7 @@ record deleted afterwards is not resurrected from the untouched legacy file.
 - `fence` / `fenced_backend`: lease-epoch write fencing (see
   [Write fencing](#write-fencing)).
 - `scope_for_profile(profile_id)`: the scope a SaaS profile's records live
-  under (`profile:<id>`, hashed when that is not a valid scope).
+  under (`u:<id>`; tsd hashes the segment when it is not valid).
 - `current_scope()` / `current_scoped()`: the tenant's scope — its profile's
   when it serves one, else the acting agent's, else `local` on a single-user
   host; an error in SaaS mode without a profile — and the installed backend
@@ -290,3 +290,11 @@ the session store over them is `tinyagents-session`. This domain only
 resolves the URL, opens the backend, and holds it for the process. The
 `[storage]` section is bootstrap configuration and is never read from
 storage itself.
+
+## Schema, scopes and boot
+
+- `scope.rs`: the one scope grammar (`tenant_scope`, `scope_for_profile`, `scope_for_agent`, `scope_for_module`), built on tsd's `Scope::tenant/local/agent/module`.
+- `schema.rs`: `owner_schemas()` and the composed `registry()`; `module_items(owner)` feeds the generated module grants.
+- `boot.rs`: `prepare_and_migrate`, called by `open`: prepare, scope move, then per scope the importers and `Registry::migrate`.
+- `scope_move.rs`: the resumable copy of v1 scopes (`profile:`, `<profile>~<agent>`, raw agent ids, `module:<id>@<base>`, the `*-sha256:` fallbacks) into the v2 scopes.
+- The generated reference is `docs/storage-schema.md`; `node scripts/ci/check-storage-schema.mjs` lints it.
