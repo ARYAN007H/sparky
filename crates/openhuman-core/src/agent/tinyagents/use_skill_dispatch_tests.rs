@@ -275,15 +275,26 @@ async fn packed_delegate_uses_scoped_target_and_registers_shared_job() {
         .with_parent(parent_context);
     let parent = parent_data.into_tinyagents(RunConfig::new("scoped-packed-delegate-parent"));
 
+    let arguments = json!({
+        "skill": "media",
+        "tool": "create_image",
+        "args": { "prompt": "render a small blue square", "blocking": true },
+    });
+    let bound = dispatch
+        .bind_call(&arguments)
+        .expect("marked packed delegation binds")
+        .expect("known packed target binds");
+    assert_eq!(
+        bound.output_origin(),
+        tinyagents_harness::host::ContentOrigin::Agent,
+        "a marked delegation keeps the delegated-agent output origin"
+    );
+
     let result = dispatch
         .execute(
             &(),
             CallId::new("scoped-packed-delegate-call"),
-            json!({
-                "skill": "media",
-                "tool": "create_image",
-                "args": { "prompt": "render a small blue square", "blocking": true },
-            }),
+            arguments,
             ToolCallOptions::default(),
             &parent,
         )
