@@ -367,3 +367,32 @@ test("CLI inventory sends product features only to nextest, preserving instrumen
   ].join("\n");
   execFileSync("bash", ["-c", script], { encoding: "utf8" });
 });
+
+for (const platform of ["Linux", "Darwin", "MINGW64_NT-10.0", "Windows_NT"]) {
+  test(`coverage inventory applies only documented target exceptions on ${platform}`, () => {
+    const windows = platform.startsWith("MINGW") || platform === "Windows_NT";
+    const result = withRunnerFunctions(
+      ["target_expected_in_coverage"],
+      'log() { printf "%s\\n" "$*"; }',
+      [
+        `if target_expected_in_coverage composio_list_tools_stack_overflow_regression '${platform}'; then exit 11; fi`,
+        `if target_expected_in_coverage windows_sandbox_env_e2e '${platform}'; then ${windows ? ":" : "exit 12"}; else ${windows ? "exit 13" : ":"}; fi`,
+        `target_expected_in_coverage json_rpc_e2e '${platform}'`,
+        `target_expected_in_coverage future_empty_suite '${platform}'`,
+      ].join("\n"),
+    );
+    assert.equal(result.status, 0, result.output);
+    assert.match(result.output, /cfg\(not\(coverage\)\)/);
+  });
+}
+
+test("coverage inventory exceptions match the source gates and remain required at selection", () => {
+  assert.match(
+    fs.readFileSync(path.join(repoRoot, "tests/composio_list_tools_stack_overflow_regression.rs"), "utf8"),
+    /#!\[cfg\(not\(coverage\)\)\]/,
+  );
+  const windows = fs.readFileSync(path.join(repoRoot, "tests/windows_sandbox_env_e2e.rs"), "utf8");
+  const functions = [...windows.matchAll(/#\[cfg\(windows\)\]\s*#\[(?:tokio::)?test(?:\([^\n]*\))?\]/g)];
+  assert.ok(functions.length > 0, "Windows-only fixture must retain gated tests");
+  assert.match(fs.readFileSync(runner, "utf8"), /target_features_satisfied "\$\{target\}" && target_expected_in_coverage "\$\{target\}"/);
+});
