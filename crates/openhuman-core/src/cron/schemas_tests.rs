@@ -1,5 +1,7 @@
-use super::handlers::{read_optional_u64, read_required, type_name};
 use super::*;
+
+// Additional names from the extracted schema handler modules.
+use super::handlers::{read_optional_u64, read_required, type_name};
 use crate::core::TypeSchema;
 use serde_json::{json, Map, Value};
 use tempfile::TempDir;

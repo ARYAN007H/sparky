@@ -1,5 +1,7 @@
-use super::handlers::*;
 use super::*;
+
+// Additional names from the extracted schema handler modules.
+use super::handlers::*;
 use serde_json::json;
 
 #[test]
