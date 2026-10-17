@@ -1034,15 +1034,45 @@ test("failed offline examples block release cleanup while independent Rust valid
 test("private ordinary Rust builds keep line tables while coverage and hosted profiles remain unchanged", () => {
   for (const plan of plans()) {
     for (const lane of plan.lanes.filter((lane) => lane.heavy != null)) {
-      const expected = lane.name === "rust-cov" ? "0" : plan.profile === "ex63" ? "line-tables-only" : undefined;
-      assert.equal(lane.env.CARGO_PROFILE_DEV_DEBUG, expected, `${plan.profile}:${lane.name}`);
-      assert.equal(lane.env.CARGO_PROFILE_TEST_DEBUG, undefined, "test inherits the dev profile without a separate override");
-      assert.equal(lane.env.CARGO_PROFILE_RELEASE_DEBUG, undefined, "release keeps the manifest profile");
+      const expected =
+        lane.name === "rust-cov"
+          ? "0"
+          : plan.profile === "ex63"
+            ? "line-tables-only"
+            : undefined;
+      assert.equal(
+        lane.env.CARGO_PROFILE_DEV_DEBUG,
+        expected,
+        `${plan.profile}:${lane.name}`,
+      );
+      assert.equal(
+        lane.env.CARGO_PROFILE_TEST_DEBUG,
+        undefined,
+        "test inherits the dev profile without a separate override",
+      );
+      assert.equal(
+        lane.env.CARGO_PROFILE_RELEASE_DEBUG,
+        undefined,
+        "release keeps the manifest profile",
+      );
       for (const check of lane.checks) {
         const env = { ...lane.env, ...check.env };
-        const coverage = check.name === "rust-core-coverage" || check.run.includes("cargo llvm-cov nextest") || check.name === "tauri-coverage";
-        if (coverage) assert.equal(env.CARGO_PROFILE_DEV_DEBUG, "0", `${plan.profile}:${check.name} remains uninstrumented-debug-free`);
-        if (plan.profile === "ex63" && lane.name === "rust-lint") assert.equal(env.CARGO_PROFILE_DEV_DEBUG, "line-tables-only", check.name);
+        const coverage =
+          check.name === "rust-core-coverage" ||
+          check.run.includes("cargo llvm-cov nextest") ||
+          check.name === "tauri-coverage";
+        if (coverage)
+          assert.equal(
+            env.CARGO_PROFILE_DEV_DEBUG,
+            "0",
+            `${plan.profile}:${check.name} keeps coverage debug=0`,
+          );
+        if (plan.profile === "ex63" && lane.name === "rust-lint")
+          assert.equal(
+            env.CARGO_PROFILE_DEV_DEBUG,
+            "line-tables-only",
+            check.name,
+          );
         assert.equal(env.CARGO_PROFILE_TEST_DEBUG, undefined);
         assert.equal(env.CARGO_PROFILE_RELEASE_DEBUG, undefined);
       }

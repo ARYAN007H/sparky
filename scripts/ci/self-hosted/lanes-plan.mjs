@@ -141,6 +141,9 @@ export function buildPlan({ profile, areas, env = {}, isPullRequest = true }) {
   const rustEnv = ex63
     ? {
         CARGO_INCREMENTAL: "0",
+        // Keep file/line backtraces without full variable/type DWARF in
+        // ordinary dev and inherited test builds. Coverage overrides this.
+        CARGO_PROFILE_DEV_DEBUG: "line-tables-only",
         CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER:
           "/usr/local/bin/rust-mold-linker",
       }
