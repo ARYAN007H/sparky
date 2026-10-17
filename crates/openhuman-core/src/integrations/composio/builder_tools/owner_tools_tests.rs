@@ -11,17 +11,29 @@ use tempfile::TempDir;
 use tinytools::{PermissionLevel, Tool};
 
 struct EmptyConnectableProvider {
-    observed_tier_source: Arc<std::sync::Mutex<Option<crate::core::runtime::AutonomyTierSource>>>,
+    observed_thread_id: Arc<std::sync::Mutex<Option<String>>>,
+}
+
+struct TestToolContext {
+    thread_id: String,
+}
+
+impl tinytools::ToolRunContext for TestToolContext {
+    fn thread_id(&self) -> Option<&str> {
+        Some(&self.thread_id)
+    }
 }
 
 #[async_trait::async_trait]
 impl ConnectableToolkitProvider for EmptyConnectableProvider {
     async fn connected(
         &self,
-        dispatch: &crate::core::runtime::DispatchCtx,
+        tool_context: Option<&dyn tinytools::ToolRunContext>,
+        _dispatch: &crate::core::runtime::DispatchCtx,
         _config: &Config,
     ) -> Vec<String> {
-        *self.observed_tier_source.lock().unwrap() = Some(dispatch.autonomy_tier_source());
+        *self.observed_thread_id.lock().unwrap() =
+            tool_context.and_then(tinytools::ToolRunContext::thread_id).map(str::to_string);
         Vec::new()
     }
 }
@@ -29,14 +41,24 @@ impl ConnectableToolkitProvider for EmptyConnectableProvider {
 #[tokio::test]
 async fn connectable_toolkits_uses_the_injected_host_snapshot_and_fails_closed_empty() {
     let tmp = TempDir::new().unwrap();
-    let observed_tier_source = Arc::new(std::sync::Mutex::new(None));
+    let observed_thread_id = Arc::new(std::sync::Mutex::new(None));
     let tool = ListConnectableToolkitsTool::new(
         test_config(&tmp),
         Arc::new(EmptyConnectableProvider {
-            observed_tier_source: observed_tier_source.clone(),
+            observed_thread_id: observed_thread_id.clone(),
         }),
     );
-    let result = tool.execute(json!({})).await.unwrap();
+    let context = TestToolContext {
+        thread_id: "captured-tool-run".into(),
+    };
+    let result = tool
+        .execute_with_context(
+            json!({}),
+            tinytools::ToolCallOptions::default(),
+            Some(&context),
+        )
+        .await
+        .unwrap();
     assert!(!result.is_error, "{}", result.output());
     let value: Value = serde_json::from_str(&result.output()).unwrap();
     assert!(value["toolkits"]
@@ -44,11 +66,7 @@ async fn connectable_toolkits_uses_the_injected_host_snapshot_and_fails_closed_e
         .unwrap()
         .iter()
         .all(|item| item["connected"] == false));
-    assert_eq!(
-        *observed_tier_source.lock().unwrap(),
-        Some(crate::core::runtime::DispatchCtx::ambient().autonomy_tier_source()),
-        "the run context must reach the injected source"
-    );
+    assert_eq!(*observed_thread_id.lock().unwrap(), Some("captured-tool-run".into()));
 }
 
 fn test_config(tmp: &TempDir) -> Arc<Config> {

@@ -23,6 +23,7 @@ pub trait FlowConnectionProvider: Send + Sync {
 pub trait ConnectableToolkitProvider: Send + Sync {
     async fn connected(
         &self,
+        tool_context: Option<&dyn ToolRunContext>,
         dispatch: &crate::core::runtime::DispatchCtx,
         config: &Config,
     ) -> Vec<String>;
@@ -145,7 +146,10 @@ impl Tool for ListConnectableToolkitsTool {
         // read through the host's curated snapshot.
         use crate::integrations::composio::contract::agent_ready_toolkits;
         tracing::debug!(target: "flows", "[flows] list_connectable_toolkits: listing toolkits + connected state (read-only) via the memory contract");
-        let connected = self.provider.connected(&ctx, &self.config).await;
+        let connected = self
+            .provider
+            .connected(tool_context, &ctx, &self.config)
+            .await;
         let toolkits: Vec<Value> = agent_ready_toolkits()
             .into_iter()
             .map(|tk| {

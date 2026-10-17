@@ -11,6 +11,7 @@ impl crate::integrations::composio::builder_tools::ConnectableToolkitProvider
 {
     async fn connected(
         &self,
+        _tool_context: Option<&dyn tinytools::ToolRunContext>,
         dispatch: &crate::core::runtime::DispatchCtx,
         config: &crate::config::Config,
     ) -> Vec<String> {
