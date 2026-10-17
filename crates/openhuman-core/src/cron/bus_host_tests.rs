@@ -356,6 +356,39 @@ async fn refreshing_binding_config_updates_existing_flow_subscriber() {
     assert_eq!(seen_rx.recv().await, Some(refreshed.action_dir));
 }
 
+#[test]
+fn triggered_run_guard_retains_long_lived_ids_past_1024_runs() {
+    let tmp = TempDir::new().unwrap();
+    let config = config(&tmp);
+    let binding = Binding::new(
+        &DispatchCtx::ambient(),
+        &config,
+        Arc::new(SecurityPolicy::from_config(
+            &config.autonomy,
+            &config.workspace_dir,
+            &config.action_dir,
+        )),
+    );
+    let job = shell_job(&config, "echo guard");
+    for index in 0..1025 {
+        binding.publish_triggered_once(&job, &format!("long-lived-run-{index}"));
+    }
+
+    let before = binding
+        .triggered_runs
+        .lock()
+        .unwrap()
+        .len();
+    assert_eq!(before, 1025);
+    binding.publish_triggered_once(&job, "long-lived-run-0");
+    let after = binding
+        .triggered_runs
+        .lock()
+        .unwrap()
+        .len();
+    assert_eq!(after, before, "an active run must remain deduplicated");
+}
+
 #[cfg(feature = "flows")]
 #[tokio::test]
 async fn a_scheduled_flow_run_publishes_a_trigger_before_completion() {
