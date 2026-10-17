@@ -337,3 +337,33 @@ test("instrumented CLI inventory is cancellation-aware and reuses llvm-cov's env
     /bash scripts\/ci-cancel-aware\.sh cargo nextest list --message-format json/,
   );
 });
+
+test("CLI inventory sends product features only to nextest, preserving instrumentation", () => {
+  const source = fs.readFileSync(runner, "utf8");
+  const start = source.indexOf("    cli_inventory() (");
+  const end = source.indexOf("\n    )", start);
+  assert.notEqual(start, -1);
+  assert.notEqual(end, -1);
+  const inventory = source.slice(start, end + "\n    )".length);
+  const script = [
+    "set -euo pipefail",
+    'CORE_PRODUCT_FEATURES="channels,modules"',
+    'expected_inventory=/dev/null',
+    'export CARGO_BUILD_TARGET_DIR=preserved-target',
+    `bash() {
+      if [[ "$*" == *"llvm-cov show-env"* ]]; then
+        for arg in "$@"; do
+          [[ "$arg" != --features ]] || { echo 'show-env rejects --features' >&2; return 64; }
+        done
+        printf '%s\\n' 'export INVENTORY_INSTRUMENTED=1' 'export CARGO_TARGET_DIR=instrumented-target'
+      elif [[ "$*" == *"nextest list"* ]]; then
+        [[ "$*" == *"--features channels,modules"* ]] || return 65
+        [[ "$INVENTORY_INSTRUMENTED" == 1 && "$CARGO_TARGET_DIR" == instrumented-target && "$CARGO_BUILD_TARGET_DIR" == preserved-target ]] || return 66
+      else return 67
+      fi
+    }`,
+    inventory,
+    "cli_inventory",
+  ].join("\n");
+  execFileSync("bash", ["-c", script], { encoding: "utf8" });
+});
