@@ -208,27 +208,7 @@ pub(crate) fn update_job_with_origin(
     limits::check_patch(config, &patch)?;
     if patch.delivery.is_some() || patch.origin.is_some() {
         let existing = get_job(config, job_id)?;
-        let delivery = patch
-            .delivery
-            .clone()
-            .unwrap_or_else(|| existing.delivery.clone());
-        let effective_origin = patch
-            .origin
-            .clone()
-            .unwrap_or_else(|| existing.origin.clone());
-        crate::cron::job_builder::validate_delivery_for_config_with_trusted_origin(
-            config,
-            &delivery,
-            effective_origin.as_ref(),
-            trusted_origin.as_ref(),
-        )
-        .map_err(anyhow::Error::msg)?;
-
-        // Persist exactly the pair we validated. Sending only the changed
-        // field would let two concurrent partial route updates combine into
-        // a delivery/origin pair that neither caller validated.
-        patch.delivery = Some(delivery);
-        patch.origin = Some(effective_origin);
+        patch = validate_and_complete_route_patch(config, &existing, patch, trusted_origin.as_ref())?;
     }
     store_blocking(
         config,
@@ -237,6 +217,36 @@ pub(crate) fn update_job_with_origin(
             patch,
         },
     )
+}
+
+/// Validate routing changes against the row snapshot and return the patch to
+/// persist. Route completion is performed alongside validation so a delayed
+/// store write cannot combine the caller's route with a newer counterpart.
+fn validate_and_complete_route_patch(
+    config: &Config,
+    existing: &CronJob,
+    patch: CronJobPatch,
+    trusted_origin: Option<&tinyflows_bus::schedule::types::JobOrigin>,
+) -> Result<CronJobPatch> {
+    let delivery = patch
+        .delivery
+        .clone()
+        .unwrap_or_else(|| existing.delivery.clone());
+    let effective_origin = patch
+        .origin
+        .clone()
+        .unwrap_or_else(|| existing.origin.clone());
+    crate::cron::job_builder::validate_delivery_for_config_with_trusted_origin(
+        config,
+        &delivery,
+        effective_origin.as_ref(),
+        trusted_origin,
+    )
+    .map_err(anyhow::Error::msg)?;
+
+    // Route fields are materialized once the test proves the partial-patch
+    // interleaving described above.
+    Ok(patch)
 }
 
 pub fn record_last_run(

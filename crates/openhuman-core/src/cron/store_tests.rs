@@ -51,6 +51,90 @@ fn run_history_cap_follows_cron_max_run_history() {
     assert_eq!(list_runs(&config, &job.id, 10).unwrap().len(), 2);
 }
 
+#[test]
+fn a_stale_routing_patch_cannot_combine_with_a_newer_unvalidated_route() {
+    use tinyflows_bus::schedule::AgentJobSpec;
+
+    let tmp = TempDir::new().unwrap();
+    let mut config = test_config(&tmp);
+    config.channels_config.telegram = Some(crate::config::TelegramConfig {
+        bot_token: "test-token".into(),
+        chat_id: None,
+        allowed_users: vec!["42".into()],
+        stream_mode: Default::default(),
+        draft_update_interval_ms: 1000,
+        silent_streaming: true,
+        mention_only: false,
+    });
+    let channel_origin = |target: &str| JobOrigin::Channel {
+        channel: "telegram".into(),
+        reply_target: target.into(),
+        history_key: format!("telegram-target-{target}"),
+        sender: None,
+        thread_id: None,
+    };
+    let origin_42 = channel_origin("42");
+    let origin_999 = channel_origin("999");
+    let mut spec = AgentJobSpec::new(Schedule::Every { every_ms: 300_000 }, "remind me");
+    spec.delivery = Some(DeliveryConfig::default());
+    spec.origin = Some(origin_42.clone());
+    let job = add_agent_job_from_spec(&config, spec).unwrap();
+    let initial = get_job(&config, &job.id).unwrap();
+
+    // Both callers validate against the same initial row. A routes through
+    // the authorized chat 42; B changes only the origin while delivery is
+    // `none`. Pause before either request reaches the module store.
+    let stale_a = validate_and_complete_route_patch(
+        &config,
+        &initial,
+        CronJobPatch {
+            delivery: Some(DeliveryConfig {
+                mode: "origin".into(),
+                ..DeliveryConfig::default()
+            }),
+            ..CronJobPatch::default()
+        },
+        None,
+    )
+    .unwrap();
+    let stale_b = validate_and_complete_route_patch(
+        &config,
+        &initial,
+        CronJobPatch {
+            origin: Some(Some(origin_999.clone())),
+            ..CronJobPatch::default()
+        },
+        None,
+    )
+    .unwrap();
+
+    store_blocking::<CronJob>(
+        &config,
+        StoreOperation::Update {
+            job_id: job.id.clone(),
+            patch: stale_a,
+        },
+    )
+    .unwrap();
+    store_blocking::<CronJob>(
+        &config,
+        StoreOperation::Update {
+            job_id: job.id.clone(),
+            patch: stale_b,
+        },
+    )
+    .unwrap();
+
+    let saved = get_job(&config, &job.id).unwrap();
+    assert_eq!(saved.delivery.mode, "none");
+    assert_eq!(saved.origin, Some(origin_999));
+    assert_ne!(
+        (saved.delivery.mode.as_str(), saved.origin.as_ref()),
+        ("origin", Some(&origin_999)),
+        "a delayed origin-only patch must not inherit A's delivery route"
+    );
+}
+
 fn agent_context(
     config: &Config,
     agent: &str,
