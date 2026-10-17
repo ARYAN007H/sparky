@@ -90,17 +90,7 @@ mod search_path;
 pub(crate) mod site_memory_host;
 mod source;
 #[cfg(feature = "modules")]
-mod storage_grant_tinybox;
-#[cfg(feature = "modules")]
-mod storage_grant_tinychannels;
-#[cfg(feature = "modules")]
-mod storage_grant_tinyconnectors;
-#[cfg(feature = "modules")]
-mod storage_grant_tinyjuice;
-#[cfg(feature = "modules")]
-mod storage_grant_tinymcp;
-#[cfg(feature = "modules")]
-mod storage_grant_tinywallet;
+mod storage_grant_schemas;
 #[cfg(feature = "modules")]
 pub mod storage_grants;
 #[cfg(feature = "modules")]
