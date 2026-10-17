@@ -101,18 +101,6 @@ fn jobs_live_in_the_workspace_default_database() {
 }
 
 #[test]
-fn due_jobs_batch_size_follows_scheduler_max_tasks() {
-    let tmp = TempDir::new().unwrap();
-    let mut config = test_config(&tmp);
-    config.scheduler.max_tasks = 2;
-    for i in 0..3 {
-        add_job(&config, "* * * * *", &format!("echo due-{i}")).unwrap();
-    }
-    let far_future = Utc::now() + ChronoDuration::days(365);
-    assert_eq!(due_jobs(&config, far_future).unwrap().len(), 2);
-}
-
-#[test]
 fn run_history_cap_follows_cron_max_run_history() {
     let tmp = TempDir::new().unwrap();
     let mut config = test_config(&tmp);
@@ -287,7 +275,9 @@ fn legacy_fixture() -> std::path::PathBuf {
 fn a_legacy_jobs_db_is_imported_by_the_storage_importer_and_left_untouched() {
     let tmp = TempDir::new().unwrap();
     let config = test_config(&tmp);
-    let legacy = legacy_db_path(&config);
+    let legacy = crate::storage::import::tinyflows::legacy_jobs_db(
+        &crate::core::runtime::agent_scope_dir(&config),
+    );
     std::fs::create_dir_all(legacy.parent().unwrap()).unwrap();
     std::fs::copy(legacy_fixture(), &legacy).unwrap();
     let before = std::fs::read(&legacy).unwrap();

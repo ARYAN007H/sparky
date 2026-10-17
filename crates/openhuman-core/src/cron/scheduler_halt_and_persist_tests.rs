@@ -355,7 +355,7 @@ async fn cron_agent_job_uses_agent_definition_tool_scope() {
 /// Runs `job_id` once through the schedule runtime (claim, execute, deliver,
 /// record, complete) the way a poll would find it: due now, never retried.
 async fn run_through_scheduler(config: &Config, job_id: &str) {
-    crate::cron::store::force_next_run_for_test(
+    crate::cron::store::tests::force_next_run_for_test(
         config,
         job_id,
         Utc::now() - ChronoDuration::seconds(1),
@@ -417,7 +417,7 @@ async fn scheduler_flow_runs_active_hours_job_and_reschedules_inside_window() {
         "echo active-hours-fired",
     )
     .unwrap();
-    crate::cron::store::force_next_run_for_test(
+    crate::cron::store::tests::force_next_run_for_test(
         &config,
         &job.id,
         Utc::now() - ChronoDuration::seconds(1),
@@ -537,7 +537,14 @@ async fn an_at_job_without_the_delete_flag_runs_once_and_is_never_due_again() {
     assert_eq!(updated.last_status.as_deref(), Some("ok"));
 
     // It is never due again — even at a time past its `at` instant.
-    let due = cron::due_jobs(&config, at + ChronoDuration::minutes(1)).unwrap();
+    let due = crate::cron::client::store::<Vec<CronJob>>(
+        &config,
+        tinyflows_bus::schedule::StoreOperation::Due {
+            now: at + ChronoDuration::minutes(1),
+        },
+    )
+    .await
+    .unwrap();
     assert!(
         !due.iter().any(|j| j.id == job.id),
         "disabled At job must not be re-selected by due_jobs"
