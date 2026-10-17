@@ -112,7 +112,7 @@ fn subagent_turn() -> Vec<AgentObservation> {
         ),
         obs(
             3,
-            1_030,
+            1_090,
             AgentEvent::ToolStarted {
                 parent_call_id: None,
                 call_id: CallId::new("scout-tool"),
@@ -209,7 +209,7 @@ fn legacy_export_snapshot_for_root_and_child_with_reused_call_ids() {
         ),
         obs(
             4,
-            1_040,
+            1_100,
             AgentEvent::ModelCompleted {
                 call_id: CallId::new("same-call"),
                 started_at_ms: Some(1_010),
@@ -220,10 +220,10 @@ fn legacy_export_snapshot_for_root_and_child_with_reused_call_ids() {
         ),
         obs(
             5,
-            1_050,
-            AgentEvent::RunCompleted {
-                run_id: RunId::new("run-1"),
-                outcome: None,
+            1_030,
+            AgentEvent::SubAgentStarted {
+                name: "researcher".to_string(),
+                depth: 1,
             },
         ),
     ];
@@ -233,7 +233,7 @@ fn legacy_export_snapshot_for_root_and_child_with_reused_call_ids() {
         parent_run_id: Some(RunId::new("run-1")),
         root_run_id: RunId::new("run-1"),
         offset: 0,
-        ts_ms: 1_060,
+        ts_ms: 1_040,
         event: AgentEvent::RunStarted {
             run_id: RunId::new("child-run"),
             thread_id: None,
@@ -245,7 +245,7 @@ fn legacy_export_snapshot_for_root_and_child_with_reused_call_ids() {
         parent_run_id: Some(RunId::new("run-1")),
         root_run_id: RunId::new("run-1"),
         offset: 1,
-        ts_ms: 1_070,
+        ts_ms: 1_050,
         event: AgentEvent::ModelStarted {
             call_id: CallId::new("same-call"),
             model: "gpt-4-mini".to_string(),
@@ -257,7 +257,7 @@ fn legacy_export_snapshot_for_root_and_child_with_reused_call_ids() {
         parent_run_id: Some(RunId::new("run-1")),
         root_run_id: RunId::new("run-1"),
         offset: 2,
-        ts_ms: 1_080,
+        ts_ms: 1_060,
         event: AgentEvent::ModelCompleted {
             call_id: CallId::new("same-call"),
             started_at_ms: Some(1_070),
@@ -272,12 +272,28 @@ fn legacy_export_snapshot_for_root_and_child_with_reused_call_ids() {
         parent_run_id: Some(RunId::new("run-1")),
         root_run_id: RunId::new("run-1"),
         offset: 3,
-        ts_ms: 1_090,
+        ts_ms: 1_070,
         event: AgentEvent::RunCompleted {
             run_id: RunId::new("child-run"),
             outcome: None,
         },
     });
+    observations.push(obs(
+        6,
+        1_080,
+        AgentEvent::SubAgentCompleted {
+            name: "researcher".to_string(),
+            depth: 1,
+        },
+    ));
+    observations.push(obs(
+        7,
+        1_110,
+        AgentEvent::RunCompleted {
+            run_id: RunId::new("run-1"),
+            outcome: None,
+        },
+    ));
 
     let spans = spans_from_observations(ctx(), 10, &observations);
     let snapshot = spans_to_ndjson(SpanEnvelope::Otel, &spans);
