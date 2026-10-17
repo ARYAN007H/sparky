@@ -182,7 +182,7 @@ fn handle_subagent_cancel(ctx: DispatchCtx, params: Map<String, Value>) -> Contr
                         meta.parent_thread_id.clone(),
                     )
                     .await;
-                    if let Some(subagent_session_id) = meta.subagent_session_id {
+                    if let Some(subagent_session_id) = meta.subagent_session_id.as_deref() {
                         let store =
                             subagent_sessions::SubagentSessionStore::new(meta.workspace_dir);
                         if let Err(err) = subagent_sessions::mark_failed(

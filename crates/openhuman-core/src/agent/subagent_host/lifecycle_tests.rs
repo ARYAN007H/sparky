@@ -467,7 +467,7 @@ async fn driver_inline_projection_returns_the_durable_winner_not_a_local_loser()
         SubagentRunStatus::Incomplete { ref reason } if reason == "winner stopped"
     ));
     assert_eq!(projected.final_history.len(), 1);
-    assert_eq!(projected.final_history[0].text(), "durable winning history");
+    assert_eq!(projected.final_history[0].content, "durable winning history");
     assert_eq!(projected.persistence_disposition, Disposition::TerminalExisting);
 }
 
