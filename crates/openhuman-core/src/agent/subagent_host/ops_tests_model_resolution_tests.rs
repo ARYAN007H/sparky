@@ -115,7 +115,7 @@ async fn stopped_parent_thread_rejects_a_new_driver_spawn_before_execution() {
         "stopped-driver-thread",
     );
 
-    let result = run_async_spawn_via_driver_tool(
+    let result = run_subagent_via_driver_tool(
         &parent,
         make_def_named_tools(&[]),
         "return the requested result".into(),
