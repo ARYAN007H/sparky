@@ -35,4 +35,3 @@ fn gather_acts_as_the_identity_the_run_carries() {
     );
     assert!(bare.reach.at.is_root());
 }
-

@@ -35,13 +35,10 @@ use crate::core::runtime::DispatchCtx;
 use super::error::MemoryError;
 use super::ops;
 pub use super::tool_budget::is_budget_refusal;
-use super::types::{
-    FetchParams, ForgetParams, LearnParams, RecallParams, RecallView,
-};
+use super::types::{FetchParams, ForgetParams, LearnParams, RecallParams, RecallView};
 
 /// How many matches one `fetch` returns; the model pages on with `cursor`.
 const FETCH_TOP: usize = 5;
-
 
 /// The tool's name.
 pub const MEMORY_TOOL_NAME: &str = "memory";
