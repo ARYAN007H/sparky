@@ -374,11 +374,11 @@ pub(crate) async fn run_subagent_direct(
         // Use TinyAgents' shared character-safe result cap so subagent output
         // follows the same truncation contract as other orchestration paths.
         if let Some(cap) = definition.max_result_chars {
-            outcome.output = tinyagents_orchestration::subagent::truncate_head_tail(
-                &outcome.output,
-                cap,
-            )
-            .0;
+            outcome.output = tinyagents_orchestration::subagent::ResultPolicy::new()
+                .with_max_chars(cap)
+                .apply(&task_id, &outcome.output, None)
+                .await
+                .text;
         }
 
         tracing::info!(
