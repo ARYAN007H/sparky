@@ -26,6 +26,13 @@ modules, coverage-presence checks and the 80% changed-line gate remain required.
 Doctests, clippy, rustdoc, examples and uninstrumented link checks remain separate
 because coverage/nextest does not replace them.
 
+The Composio stack-budget regression has `#![cfg(not(coverage))]` and runs once
+through uninstrumented nextest in `rust-lint`. Instrumented integration
+expectations exclude that target and, outside Windows, the entirely
+`#[cfg(windows)]` sandbox target. Present binaries containing only ignored tests
+are checked against nextest's compiled inventory; all other missing or empty
+expected targets fail validation.
+
 ## Full-workflow overlap audit
 
 [CI Full](../.github/workflows/ci-full.yml) calls
