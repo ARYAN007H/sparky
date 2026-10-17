@@ -226,6 +226,7 @@ async fn closing_a_durable_driver_session_cancels_only_its_registered_child() {
         "test-session",
         Some("close-driver-thread"),
     );
+    let wait_owner = owner.clone();
     let owner_scope: std::sync::Arc<dyn Fn(u64) -> String + Send + Sync> =
         std::sync::Arc::new(move |_| owner.clone());
     let message_store: std::sync::Arc<dyn TinySessionStore> = std::sync::Arc::new(port.clone());
@@ -292,21 +293,14 @@ async fn closing_a_durable_driver_session_cancels_only_its_registered_child() {
         wait_result.output()
     );
     release.notify_one();
-    let wait_result = tinyagents_harness::tool::ToolDispatch::execute(
-        &wait,
-        &(),
-        tinyagents_harness::CallId::new("wait-cancelled-close-child-settled"),
-        serde_json::json!({"task_id":"close-driver-task","timeout_secs":1}),
-        tinytools::ToolCallOptions::default(),
-        &parent,
+    let settled = tokio::time::timeout(
+        std::time::Duration::from_secs(5),
+        jobs.wait_owned(job_id.as_str(), wait_owner),
     )
     .await
-    .expect("Tiny await observes settled cancellation");
-    assert!(
-        !wait_result.is_error,
-        "shared Jobs await returns the settled cancellation: {}",
-        wait_result.output()
-    );
+    .expect("shared Jobs wait observes cooperative cancellation settlement")
+    .expect("child stays owned until cancellation settles");
+    assert_eq!(settled.status, SubAgentJobStatus::Cancelled);
 
     let cancelled = jobs
         .list()
