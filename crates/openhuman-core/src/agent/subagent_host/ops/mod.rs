@@ -36,12 +36,6 @@ pub(crate) use provider::resolve_subagent_source;
 
 // Re-exports for test companion modules that use `use super::*`.
 // These provide the same flat namespace the original ops.rs had.
-// `dedup_tool_specs_by_name` is private in its source
-// module and cannot be `pub`-re-exported; a plain `use` still makes them
-// reachable from the `#[cfg(test)]` companion modules via their `use super::*`
-// (descendants can name ancestor-private imports).
-#[cfg(test)]
-use prompt::dedup_tool_specs_by_name;
 // filter_tool_indices lives in tool_prep (sibling of ops).
 #[cfg(test)]
 pub(super) use super::tool_prep::filter_tool_indices;
@@ -64,6 +58,3 @@ use tinytools::ToolSpec;
 #[path = "../ops_tests.rs"]
 mod tests;
 
-#[cfg(test)]
-#[path = "../ops_dedup_tests.rs"]
-mod dedup_tests;

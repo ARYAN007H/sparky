@@ -14,6 +14,7 @@ use crate::agent::harness::fork_context::ParentExecutionContext;
 use crate::agent::prompts::render_subagent_system_prompt_with_format;
 use crate::agent::prompts::{PromptContext, SubagentRenderOptions};
 use crate::agent::subagent_host::definition_iter_cap;
+use crate::agent::session_host::dedup_visible_tool_specs;
 use crate::agent::subagent_host::tool_prep::{
     filter_tool_indices, is_subagent_spawn_tool, load_prompt_source, subagent_prompt_protocol,
 };
@@ -35,7 +36,7 @@ use tinyagents_harness::context::{current_run_depth, with_run_depth, RunConfig, 
 use tinytools::{SandboxMode as TinyagentsSandboxMode, ToolSpec, WorkspaceDescriptor};
 use tinytools_std::file_state::with_file_state_agent_id;
 
-use super::prompt::{compose_subagent_system_prompt, dedup_tool_specs_by_name};
+use super::prompt::compose_subagent_system_prompt;
 use super::provider::resolve_subagent_source;
 
 /// Runtime spawn-hierarchy gate decision for one delegation hop.
@@ -701,8 +702,7 @@ async fn run_typed_mode(
         .iter()
         .map(|&i| parent.all_tools[i].name().to_string())
         .collect();
-    let filtered_specs = crate::agent::session_host::dedup_visible_tool_specs(filtered_specs);
-    let filtered_specs = dedup_tool_specs_by_name(&definition.id, filtered_specs);
+    let filtered_specs = dedup_visible_tool_specs(filtered_specs);
 
     tracing::debug!(
         agent_id = %definition.id,

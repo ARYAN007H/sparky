@@ -212,8 +212,8 @@ pub(in super::super) async fn run_subagent_via_graph(
         history: dispatch_history,
         // Dynamic (per-spawn) tools first so a dynamic tool that intentionally
         // shadows a parent-registry tool of the same name is the one that
-        // *executes* — matching the advertisement order (`dedup_tool_specs_by_name`
-        // lists dynamic specs before parent specs in `runner.rs`). The shared
+        // *executes* — matching the advertisement order (`dedup_visible_tool_specs`
+        // keeps the first dynamic spec before parent specs in `runner.rs`). The shared
         // adapter resolves a name by scanning the sets in order, so a
         // parent-first order would run the parent impl for a shadowed name.
         tool_sets: vec![Arc::new(dynamic_tools), parent_tools],
