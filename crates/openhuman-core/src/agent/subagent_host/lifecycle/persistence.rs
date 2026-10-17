@@ -130,9 +130,8 @@ impl OpenHumanPersistence {
         };
         let value: serde_json::Value = serde_json::from_str(&raw)
             .map_err(|error| SubagentError::Persistence(error.to_string()))?;
-        // Accept the short-lived single-key format written by the first
-        // lifecycle extraction, but immediately write the collision-safe
-        // vector format on the next mutation.
+        // Accept both legacy index shapes during read-only migration. New
+        // writes and indexes are owned by FileSubagentPersistence.
         let keys = value
             .get("keys")
             .cloned()

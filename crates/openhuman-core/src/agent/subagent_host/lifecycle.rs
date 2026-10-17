@@ -3,7 +3,6 @@
 
 use std::{
     collections::HashMap,
-    fs::OpenOptions,
     future::Future,
     path::PathBuf,
     pin::Pin,
@@ -11,7 +10,6 @@ use std::{
 };
 
 use async_trait::async_trait;
-use fs2::FileExt;
 use sha2::{Digest, Sha256};
 use tinyagents_harness::context::{RunConfig, RunContext};
 use tinyagents_orchestration::subagent::{
