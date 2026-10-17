@@ -423,8 +423,11 @@ async fn try_deliver(
     let turn_workspace = workspace_dir.clone();
     let give_up_ctx = busy_ctx.clone();
     let format_router = router.clone();
+    let last_delivery_error = Arc::new(std::sync::Mutex::new(None::<String>));
+    let delivery_error_sink = Arc::clone(&last_delivery_error);
     let turn_thread_id = thread_id.clone();
     let give_up_thread_id = thread_id.clone();
+    let give_up_log_thread_id = thread_id.clone();
     let scoped_thread = crate::core::runtime::tenant::profile_key_in(
         &super::busy_guard::caller(&busy_ctx),
         &thread_id,
@@ -435,9 +438,15 @@ async fn try_deliver(
         let workspace_dir = turn_workspace.clone();
         let thread_id = turn_thread_id.clone();
         async move {
-            run_system_turn_on_thread(&ctx, workspace_dir, thread_id, notice)
+            let result = run_system_turn_on_thread(&ctx, workspace_dir, thread_id, notice)
                 .await
-                .map(|_| ())
+                .map(|_| ());
+            if let Err(error) = &result {
+                if let Ok(mut last_error) = delivery_error_sink.lock() {
+                    *last_error = Some(error.clone());
+                }
+            }
+            result
         }
     };
     let write_undelivered = move |records: &[CompletionRecord]| {
@@ -446,8 +455,12 @@ async fn try_deliver(
             .map(|record| record.attempts)
             .max()
             .unwrap_or(1);
-        let notice =
-            build_undelivered_notice(records, attempts, "the background delivery turn failed");
+        let error = last_delivery_error
+            .lock()
+            .ok()
+            .and_then(|error| error.clone())
+            .unwrap_or_else(|| "the background delivery turn failed".to_string());
+        let notice = build_undelivered_notice(records, attempts, &error);
         if let Some(notice) = notice {
             let run_id = format!("bgdeliver-undelivered-{}", uuid::Uuid::new_v4());
             if let Err(error) = persist_delivery_reply(
@@ -459,7 +472,7 @@ async fn try_deliver(
                 false,
             ) {
                 log::error!(
-                    "[background_delivery] undelivered results LOST thread_id={thread_id} run_id={run_id} error={error}"
+                    "[background_delivery] undelivered results LOST thread_id={give_up_log_thread_id} run_id={run_id} error={error}"
                 );
             }
         }
