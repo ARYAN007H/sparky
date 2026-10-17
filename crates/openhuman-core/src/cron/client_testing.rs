@@ -10,8 +10,7 @@ fn run<T: Send + DeserializeOwned + 'static>(
     backend: &Arc<dyn StorageBackend>,
     scope: &Scope,
     operation: StoreOperation,
-) -> Result<T>
-{
+) -> Result<T> {
     let config = Config::default();
     let scope = DocScope::on_backend(&config, Arc::clone(backend), scope.clone());
     crate::storage::block_on_anyhow(async move { store_in(&config, &scope, operation).await })
