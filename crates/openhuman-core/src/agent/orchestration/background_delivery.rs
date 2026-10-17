@@ -433,6 +433,7 @@ async fn try_deliver(
         let ctx = ctx.clone();
         let workspace_dir = turn_workspace.clone();
         let thread_id = turn_thread_id.clone();
+        let delivery_error_sink = Arc::clone(&delivery_error_sink);
         async move {
             let result = run_system_turn_on_thread(&ctx, workspace_dir, thread_id, notice)
                 .await

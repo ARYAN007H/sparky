@@ -324,7 +324,7 @@ pub(crate) async fn record_outcome(
         );
         let fallback = degrade_to_memory(workspace_dir, &router);
         let fallback_target = DetachedCompletionTarget::new(
-            fallback.router,
+            fallback.router.clone(),
             thread_id.clone(),
             target.agent_id.clone(),
         )
