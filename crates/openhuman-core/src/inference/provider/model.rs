@@ -119,21 +119,7 @@ fn response_to_model_response(
         content.push(block);
     }
     let report = response.usage.as_ref().map(billed_usage_report);
-    let usage = report.as_ref().map(|report| {
-        let mut usage = report.to_usage();
-        // Preserve the difference between an explicitly reported free call and
-        // an unknown charge in TinyAgents' durable native Usage. The generic
-        // ProviderUsageReport conversion intentionally only records positive
-        // amounts; OpenHuman's provider DTO also carries an explicit-zero fact.
-        if report.charge_reported
-            && !report.cost_is_estimate
-            && report.charged_amount_usd.is_finite()
-            && report.charged_amount_usd == 0.0
-        {
-            usage.charged_amount = Some(tinyinference_llm::usage::ChargedAmount::usd_micros(0));
-        }
-        usage
-    });
+    let usage = report.as_ref().map(ProviderUsageReport::to_usage);
     let finish_reason = if tool_calls.is_empty() {
         "stop"
     } else {
