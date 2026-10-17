@@ -114,7 +114,7 @@ pub(crate) async fn run_subagent_via_driver_tool(
     let parent_thread_id = parent.thread_id().map(|id| id.as_str().to_owned());
     let task_key = SubagentTaskKey::from_context(parent, task_id.clone(), parent_thread_id);
     let (tool_result, bundle) =
-        invoke_async_spawn_driver_tool(parent, definition, input, options, "inline", None, None)
+        invoke_async_spawn_driver_tool(parent, definition, input, options, "inline", None, None, None)
             .await?;
     let public_job_id = decode_driver_job_result(tool_result, &bundle, &task_key)?;
     if let Some(outcome) = bundle
@@ -135,6 +135,50 @@ pub(crate) async fn run_subagent_via_driver_tool(
     }
     Err(SubagentRunError::Provider(anyhow::anyhow!(
         "driver-backed async spawn returned without a host outcome"
+    )))
+}
+
+/// Continues a host-authorized pause through TinyAgents' registered Jobs
+/// dispatcher, preserving the original lifecycle key and checkpoint payload.
+pub(crate) async fn continue_subagent_via_driver_tool(
+    parent: &RunContext<crate::agent::tinyagents::host::OpenHumanRunContext>,
+    original_key: SubagentTaskKey,
+    definition: crate::agent_registry::host_definition::AgentDefinition,
+    input: String,
+    mut options: SubagentRunOptions,
+    resume: SubagentResume,
+) -> Result<(SubagentRunOutcome, String), SubagentRunError> {
+    options.task_id = Some(original_key.task_id.clone());
+    let (tool_result, bundle) = invoke_async_spawn_driver_tool(
+        parent,
+        definition,
+        input,
+        options,
+        "inline",
+        None,
+        None,
+        Some((original_key.clone(), resume)),
+    )
+    .await?;
+    let public_job_id = decode_driver_job_result(tool_result, &bundle, &original_key)?;
+    if let Some(outcome) = bundle
+        .host_outcome
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .remove(&original_key)
+    {
+        return Ok((outcome, public_job_id));
+    }
+    if let Some(error) = bundle
+        .failures
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .remove(&original_key)
+    {
+        return Err(error);
+    }
+    Err(SubagentRunError::Provider(anyhow::anyhow!(
+        "driver-backed subagent continuation returned without a host outcome"
     )))
 }
 
@@ -216,6 +260,7 @@ async fn spawn_async_via_driver_tool_using_jobs(
         "background",
         Some(Arc::new(completion)),
         jobs,
+        None,
     )
     .await?;
     decode_driver_job_result(tool_result, &bundle, &task_key)
@@ -239,6 +284,7 @@ async fn invoke_async_spawn_driver_tool(
     mode: &str,
     completion: Option<HostCompletion>,
     jobs_override: Option<tinyagents_orchestration::subagent::SubAgentJobRegistry>,
+    continuation: Option<(SubagentTaskKey, SubagentResume)>,
 ) -> Result<(tinytools::ToolResult, OpenHumanDriverBundle), SubagentRunError> {
     use tinyagents_harness::tool::ToolDispatch;
     use tinyagents_orchestration::subagent::{DriverSubAgentTool, SubAgentJobRegistry};
@@ -268,6 +314,7 @@ async fn invoke_async_spawn_driver_tool(
     };
     let request_host = host_request.clone();
     let request_task_id = task_id.clone();
+    let request_continuation = continuation;
     let dispatcher = DriverSubAgentTool::new(
         "spawn_async_subagent",
         "Host-prepared asynchronous subagent invocation.",
@@ -285,15 +332,25 @@ async fn invoke_async_spawn_driver_tool(
             )
             .map_err(|error| SubagentError::InvalidRequest(error.to_string()))?;
             debug_assert_eq!(key.task_id, request_task_id);
-            SubagentRequest::fresh_from_parent(
-                parent,
-                child,
-                request_task_id.clone(),
-                request_host.clone(),
-                input,
-                None,
-            )
-            .map(|request| request.with_target(request_host.definition.id.clone()))
+            let request = if let Some((original_key, resume)) = request_continuation.clone() {
+                SubagentRequest::continue_with_task_key(
+                    original_key,
+                    child,
+                    request_host.clone(),
+                    input,
+                    Some(resume),
+                )
+            } else {
+                SubagentRequest::fresh_from_parent(
+                    parent,
+                    child,
+                    request_task_id.clone(),
+                    request_host.clone(),
+                    input,
+                    None,
+                )
+            };
+            request.map(|request| request.with_target(request_host.definition.id.clone()))
         },
         |request| Some(request.task_id().to_owned()),
     );
@@ -1255,7 +1312,7 @@ impl OpenHumanPersistence {
         }))
     }
 
-    fn checkpoint_resume(checkpoint: &super::SubagentCheckpointData) -> SubagentResume {
+    pub(crate) fn checkpoint_resume(checkpoint: &super::SubagentCheckpointData) -> SubagentResume {
         SubagentResume {
             history: checkpoint
                 .history
