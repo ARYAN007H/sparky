@@ -307,6 +307,15 @@ pub(crate) async fn read_run_tree_events(
         }
     }
 
+    Ok(merge_run_observations(streams))
+}
+
+/// Stable timestamp merge for independent run journals. Offsets are preserved
+/// within every source stream; ties place child lifecycle/terminal facts before
+/// parent acknowledgements and final run completion.
+pub(crate) fn merge_run_observations(
+    streams: Vec<Vec<AgentObservation>>,
+) -> Vec<AgentObservation> {
     let mut cursors = vec![0usize; streams.len()];
     let mut merged = Vec::new();
     loop {
@@ -329,7 +338,7 @@ pub(crate) async fn read_run_tree_events(
         merged.push(streams[stream_index][cursors[stream_index]].clone());
         cursors[stream_index] += 1;
     }
-    Ok(merged)
+    merged
 }
 
 fn cross_run_event_order(event: &tinyagents_harness::events::AgentEvent) -> u8 {
