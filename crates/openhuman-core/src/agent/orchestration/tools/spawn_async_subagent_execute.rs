@@ -765,6 +765,15 @@ impl SpawnAsyncSubagentTool {
                 registration_agent_id.clone(),
                 message.clone(),
             );
+            if let Some(progress) = registration_progress {
+                let _ = progress
+                    .send(AgentProgress::SubagentFailed {
+                        agent_id: registration_agent_id,
+                        task_id: registration_task_id,
+                        error: message,
+                    })
+                    .await;
+            }
             return Ok(ToolResult::error(format!(
                 "spawn_async_subagent: failed to register detached sub-agent: {error}"
             )));
