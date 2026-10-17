@@ -167,7 +167,11 @@ pub async fn import_legacy_mcp(
 ) {
     #[cfg(feature = "modules")]
     match storage_import_tinymcp::import_legacy(ctx, data_dir).await {
-        Ok(outcome) => log::debug!("[mcp] legacy storage import: {outcome:?}"),
+        Ok(outcome) => {
+            log::debug!("[mcp] legacy storage import: {outcome:?}");
+            storage_grant_schemas::migrate_imported(ctx, storage_grant_schemas::tinymcp::MODULE_ID)
+                .await;
+        }
         Err(error) => log::warn!("[mcp] legacy storage import failed, will retry: {error:#}"),
     }
     #[cfg(not(feature = "modules"))]
@@ -248,6 +252,7 @@ where
         Ok(outcome) => {
             log::debug!("[{kind}] legacy storage import: {outcome:?}");
             if outcome.settled() {
+                storage_grant_schemas::migrate_imported(ctx, module_id).await;
                 done.insert(key);
             }
             true

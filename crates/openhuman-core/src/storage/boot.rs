@@ -73,6 +73,55 @@ pub async fn prepare_and_migrate(
     Ok(report)
 }
 
+/// Runs `owner`'s steps again over `scope` after a legacy-file importer wrote
+/// v1-shaped records there. The steps finished at boot (or an earlier import),
+/// and a finished step is skipped, so the owner's progress records are cleared
+/// first; the steps are pure and write absent-only, so re-running over the
+/// already migrated records changes nothing. Returns the steps that ran.
+///
+/// # Errors
+///
+/// The first storage error. The importer's records stay in their v1 form and
+/// the next call retries.
+pub async fn remigrate_owner(
+    backend: &Arc<dyn StorageBackend>,
+    scope: &Scope,
+    owner: &str,
+) -> Result<usize, StorageError> {
+    use tinystoragedrivers::{DocumentStoreExt, Query};
+    let registry = super::schema::registry()?;
+    let scoped = backend.for_scope(scope)?;
+    let docs = scoped.documents();
+    docs.ensure_collection(&tinystoragedrivers::CollectionSpec::new(
+        tinystoragedrivers::MIGRATIONS_COLLECTION,
+    ))
+    .await?;
+    for progress in docs
+        .query_all(tinystoragedrivers::MIGRATIONS_COLLECTION, &Query::all())
+        .await?
+    {
+        if progress.doc.get("owner").and_then(|v| v.as_str()) == Some(owner)
+            && progress.doc.get("to").and_then(|v| v.as_u64()).unwrap_or(0) > 0
+        {
+            docs.delete(
+                tinystoragedrivers::MIGRATIONS_COLLECTION,
+                &progress.id,
+                tinystoragedrivers::Precondition::None,
+            )
+            .await?;
+        }
+    }
+    let report = registry.migrate(&scoped, &MigrateOptions::new()).await?;
+    tracing::info!(
+        target: "openhuman::storage",
+        scope = scope.as_str(),
+        owner,
+        steps = report.ran.len(),
+        "[storage][boot] re-ran an owner's steps after a legacy import"
+    );
+    Ok(report.ran.len())
+}
+
 /// `local`, plus every v2 scope the backend reports (when it can enumerate).
 async fn scopes_to_migrate(backend: &Arc<dyn StorageBackend>) -> Vec<Scope> {
     let mut scopes = vec![Scope::local()];

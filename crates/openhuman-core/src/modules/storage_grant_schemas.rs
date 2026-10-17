@@ -62,6 +62,38 @@ const ROWS: [Row; 6] = [
     },
 ];
 
+/// The schema owner whose declarations hold `module_id`'s storage.
+pub(super) fn owner_of(module_id: &str) -> Option<&'static str> {
+    ROWS.iter()
+        .find(|row| row.module == module_id)
+        .map(|row| row.owner)
+}
+
+/// Carries what a legacy-file importer just wrote into `module_id`'s scope
+/// (v1 names and shapes) forward to the owner's v2 schema.
+pub(super) async fn migrate_imported(
+    ctx: &crate::core::runtime::DispatchCtx,
+    module_id: &str,
+) {
+    let (Some(owner), Some(backend)) = (owner_of(module_id), crate::storage::installed()) else {
+        return;
+    };
+    let scope = match super::storage_host::current_module_scope(ctx, module_id) {
+        Ok(scope) => scope,
+        Err(error) => {
+            tracing::warn!(module = module_id, kind = ?error.kind(), "[storage_grant] no module scope to migrate");
+            return;
+        }
+    };
+    if let Err(error) = crate::storage::boot::remigrate_owner(&backend, &scope, owner).await {
+        tracing::warn!(
+            module = module_id,
+            %error,
+            "[storage_grant] could not migrate the imported legacy records; retried at the next import"
+        );
+    }
+}
+
 /// The grant generated for `module_id`, or `None` for a module with no row.
 pub(super) fn grant_for(module_id: &str) -> Option<StorageGrant> {
     let row = ROWS.iter().find(|row| row.module == module_id)?;
