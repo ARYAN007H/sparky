@@ -10,14 +10,6 @@ use {
     tinyflows_bus::schedule::types::Schedule,
 };
 
-/// Claim `job_id` as running. `None` when a Run Now of it already holds it. The
-/// claim is released when the guard drops, including on panic or future
-/// cancellation, so an aborted task can never lock a job id. A *scheduled* run
-/// of the same job is refused by the module's own claim when the run starts.
-pub(crate) fn try_acquire_run(job_id: &str) -> Option<crate::cron::scheduler::RunGuard> {
-    crate::cron::scheduler::try_acquire_run(job_id)
-}
-
 /// Loads `job_id` for a run, failing closed. The job document carries the
 /// run policy (retry budget, single-flight), so a store that cannot produce it
 /// refuses the run. A missing job reads as such; any other error is reduced to
@@ -70,66 +62,6 @@ pub fn resume_job(config: &Config, id: &str) -> Result<CronJob> {
             ..CronJobPatch::default()
         },
     )
-}
-
-/// Update an existing cron job using the same rules as the legacy CLI, but without CLI wiring.
-///
-/// `expression` and `tz` are merged with the existing [`Schedule::Cron`] fields; the
-/// existing `active_hours` is always preserved as-is.  To set or clear `active_hours`
-/// directly, use the RPC path (`cron.update` with a full [`CronJobPatch`]).
-#[cfg(test)]
-pub fn update_cron_job(
-    config: &Config,
-    id: &str,
-    expression: Option<String>,
-    tz: Option<String>,
-    command: Option<String>,
-    name: Option<String>,
-) -> Result<CronJob> {
-    if expression.is_none() && tz.is_none() && command.is_none() && name.is_none() {
-        anyhow::bail!("At least one of --expression, --tz, --command, or --name must be provided");
-    }
-
-    // Merge expression/tz with the existing schedule so that
-    // tz alone updates the timezone and expression alone preserves the timezone.
-    let schedule = if expression.is_some() || tz.is_some() {
-        let existing = cron::get_job(config, id)?;
-        let (existing_expr, existing_tz, existing_active) = match existing.schedule {
-            Schedule::Cron {
-                expr,
-                tz: existing_tz,
-                active_hours: existing_active,
-            } => (expr, existing_tz, existing_active),
-            _ => anyhow::bail!("Cannot update expression/tz on a non-cron schedule"),
-        };
-        Some(Schedule::Cron {
-            expr: expression.unwrap_or(existing_expr),
-            tz: tz.or(existing_tz),
-            active_hours: existing_active,
-        })
-    } else {
-        None
-    };
-
-    if let Some(ref cmd) = command {
-        let security = SecurityPolicy::from_config(
-            &config.autonomy,
-            &config.workspace_dir,
-            &config.action_dir,
-        );
-        if !security.is_command_allowed(cmd) {
-            anyhow::bail!("Command blocked by security policy: {cmd}");
-        }
-    }
-
-    let patch = CronJobPatch {
-        schedule,
-        command,
-        name,
-        ..CronJobPatch::default()
-    };
-
-    update_job(config, id, patch)
 }
 
 pub async fn cron_list(config: &Config) -> Result<Outcome<Vec<CronJob>>, String> {
@@ -213,7 +145,7 @@ pub async fn cron_run(
 
     // Guard against duplicate concurrent executions for the same job. The
     // claim is taken before the job is loaded and moves into the task.
-    let Some(run_guard) = try_acquire_run(job_id) else {
+    let Some(run_guard) = crate::cron::scheduler::try_acquire_run(job_id) else {
         tracing::debug!(job_id, "[cron_run] rejected duplicate concurrent execution");
         return Err(format!("cron job '{job_id}' is already running"));
     };
@@ -260,7 +192,7 @@ pub async fn run_job_now(
 ) -> Result<(bool, String), String> {
     let job = load_job_for_run(config, job_id.trim()).map_err(|e| e.to_string())?;
     cron::limits::check_run(config, &job).map_err(|e| e.to_string())?;
-    let Some(_guard) = try_acquire_run(&job.id) else {
+    let Some(_guard) = crate::cron::scheduler::try_acquire_run(&job.id) else {
         tracing::debug!(job_id = %job.id, "[cron_run] job already running; refused");
         return Err(format!("cron job '{}' is already running", job.id));
     };

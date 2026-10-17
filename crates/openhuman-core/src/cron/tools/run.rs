@@ -95,7 +95,7 @@ impl Tool for CronRunTool {
         }
 
         // Claim the job so this run cannot overlap a scheduled tick or a Run Now.
-        let Some(_run_guard) = cron::ops::try_acquire_run(&job.id) else {
+        let Some(_run_guard) = cron::scheduler::try_acquire_run(&job.id) else {
             return Ok(ToolResult::error(format!(
                 "cron job '{}' is already running",
                 job.id
