@@ -152,6 +152,18 @@ fn stale_completion_cannot_overwrite_reused_or_closed_session() {
 fn stale_close_and_reuse_snapshots_cannot_change_a_newer_lifecycle() {
     let dir = tempfile::tempdir().unwrap();
     let store = SubagentSessionStore::new(dir.path().to_path_buf());
+    let first_key = tinyagents_orchestration::subagent::SubagentTaskKey {
+        root_run_id: "root-a".into(),
+        parent_run_id: "parent-a".into(),
+        thread_id: Some("thread-a".into()),
+        task_id: "same-public-task".into(),
+    };
+    let second_key = tinyagents_orchestration::subagent::SubagentTaskKey {
+        root_run_id: "root-b".into(),
+        parent_run_id: "parent-b".into(),
+        thread_id: Some("thread-a".into()),
+        task_id: "same-public-task".into(),
+    };
     let first = upsert_running(
         &store,
         SubagentSessionUpsert {
@@ -159,8 +171,8 @@ fn stale_close_and_reuse_snapshots_cannot_change_a_newer_lifecycle() {
             display_name: None,
             task_title: "First run".into(),
             worker_thread_id: None,
-            task_id: "first-task".into(),
-            lifecycle_key: None,
+            task_id: "same-public-task".into(),
+            lifecycle_key: Some(first_key.clone()),
         },
         None,
     )
@@ -172,8 +184,8 @@ fn stale_close_and_reuse_snapshots_cannot_change_a_newer_lifecycle() {
             display_name: None,
             task_title: "Second run".into(),
             worker_thread_id: None,
-            task_id: "second-task".into(),
-            lifecycle_key: None,
+            task_id: "same-public-task".into(),
+            lifecycle_key: Some(second_key.clone()),
         },
         Some(&first),
     )
@@ -187,8 +199,10 @@ fn stale_close_and_reuse_snapshots_cannot_change_a_newer_lifecycle() {
         .unwrap()
         .pop()
         .unwrap();
-    assert_eq!(current.current_task_id.as_deref(), Some("second-task"));
+    assert_eq!(current.current_task_id.as_deref(), Some("same-public-task"));
+    assert_eq!(current.lifecycle_key, Some(second_key));
     assert_eq!(current.status, DurableSubagentStatus::Running);
+    assert!(current.reusable, "stale close must preserve replacement reuse");
     assert!(
         upsert_running(
             &store,

@@ -144,9 +144,11 @@ async fn static_live_harness_builder_resolves_control_aliases_from_the_execution
     let sets = vec![tools];
     let mut harness: AgentHarness<(), OpenHumanRunContext> = AgentHarness::new();
     host_tool_set_builder(&sets, &None, true, &HashSet::new()).register(&mut harness, None);
-    let mut run = OpenHumanRunContext::new()
+    let mut live_context = OpenHumanRunContext::new()
         .with_core(Some(Arc::clone(&core)))
-        .with_parent(parent)
+        .with_parent(parent);
+    live_context.thread_id = Some("voice-thread".into());
+    let mut run = live_context
         .into_tinyagents(RunConfig::new("live-harness-parent").with_thread("voice-thread"));
     let mut status = tinyagents_harness::events::HarnessRunStatus::new(
         run.run_id().clone(),
