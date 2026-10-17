@@ -138,6 +138,7 @@ async fn closing_a_durable_driver_session_cancels_only_its_registered_child() {
     std::fs::create_dir_all(&workspace).expect("create isolated workspace");
     let (started_tx, mut started_rx) = tokio::sync::mpsc::channel(1);
     let (finished_tx, mut finished_rx) = tokio::sync::mpsc::channel(1);
+    let (completion_tx, mut completion_rx) = tokio::sync::mpsc::channel(1);
     let release = Arc::new(tokio::sync::Notify::new());
     let provider = ScriptedProvider::new(vec![
         tool_response("blocking_close_fixture", "{}"),
@@ -205,7 +206,12 @@ async fn closing_a_durable_driver_session_cancels_only_its_registered_child() {
         "must be cancelled before the child runs".into(),
         options,
         jobs.clone(),
-        |_target, _result, _emit_effects| Box::pin(async {}),
+        move |_target, result, _emit_effects| {
+            let completion_tx = completion_tx.clone();
+            Box::pin(async move {
+                let _ = completion_tx.send(result).await;
+            })
+        },
     )
     .await
     .expect("background driver registers the child");
@@ -315,6 +321,14 @@ async fn closing_a_durable_driver_session_cancels_only_its_registered_child() {
         .await
         .expect("released tool future must unwind")
         .expect("tool reports that it unwound");
+    let completion = tokio::time::timeout(std::time::Duration::from_secs(2), completion_rx.recv())
+        .await
+        .expect("driver should finish after the tool unwinds")
+        .expect("driver invokes the host completion projection");
+    assert!(
+        matches!(completion, Ok(outcome) if matches!(outcome.status, SubagentRunStatus::Cancelled)),
+        "the driver should classify the released child as cancelled: {completion:?}"
+    );
     let final_wait = SubAgentJobsTool::new(jobs.clone())
         .with_tool_name("wait_subagent")
         .with_fixed_action(SubAgentJobAction::Await)
