@@ -448,6 +448,61 @@ async fn canonical_terminal_hides_legacy_pause_without_rewriting_legacy_files() 
 }
 
 #[tokio::test]
+async fn legacy_pause_migration_preserves_host_checkpoint_metadata_and_bytes() {
+    let directory = tempfile::tempdir().unwrap();
+    let key = key();
+    let legacy = OpenHumanPersistence::new(directory.path().to_path_buf());
+    let checkpoint = SubagentCheckpointData {
+        task_key: Some(key.clone()),
+        task_id: key.task_id.clone(),
+        agent_id: "legacy-agent".into(),
+        worker_thread_id: Some("worker-thread".into()),
+        history: vec![tinyagents_session::transcript::TranscriptMessage::assistant(
+            "legacy history",
+        )],
+        question: "legacy question".into(),
+        options: Some(vec!["yes".into(), "no".into()]),
+        skill_filter_override: Some("docs".into()),
+        model_override: Some("model-x".into()),
+        created_at: "2026-10-01T00:00:00Z".into(),
+        resume_checkpoint: Some("legacy-checkpoint".into()),
+        resume_metadata: Default::default(),
+        output: "legacy partial output".into(),
+        iterations: 5,
+        usage: SubagentUsage {
+            input_tokens: 13,
+            output_tokens: 7,
+            cached_input_tokens: 2,
+            ..SubagentUsage::default()
+        },
+        artifact_paths: vec!["artifacts/report.md".into()],
+        elapsed_ms: 321,
+    };
+    let pause_path = legacy.legacy_pause_path(&key);
+    std::fs::create_dir_all(pause_path.parent().unwrap()).unwrap();
+    let pause_bytes = serde_json::to_vec_pretty(&checkpoint).unwrap();
+    std::fs::write(&pause_path, &pause_bytes).unwrap();
+
+    let migrated = OpenHumanPersistence::new(directory.path().to_path_buf());
+    assert!(migrated.load_pause(&key).await.unwrap().is_some());
+    let recovered = load_subagent_checkpoint(directory.path(), &key.task_id).unwrap();
+
+    assert_eq!(recovered.agent_id, checkpoint.agent_id);
+    assert_eq!(recovered.worker_thread_id, checkpoint.worker_thread_id);
+    assert_eq!(recovered.question, checkpoint.question);
+    assert_eq!(recovered.options, checkpoint.options);
+    assert_eq!(recovered.skill_filter_override, checkpoint.skill_filter_override);
+    assert_eq!(recovered.model_override, checkpoint.model_override);
+    assert_eq!(recovered.created_at, checkpoint.created_at);
+    assert_eq!(recovered.output, checkpoint.output);
+    assert_eq!(recovered.iterations, checkpoint.iterations);
+    assert_eq!(recovered.usage, checkpoint.usage);
+    assert_eq!(recovered.artifact_paths, checkpoint.artifact_paths);
+    assert_eq!(recovered.elapsed_ms, checkpoint.elapsed_ms);
+    assert_eq!(std::fs::read(&pause_path).unwrap(), pause_bytes);
+}
+
+#[tokio::test]
 async fn driver_inline_projection_returns_the_durable_winner_not_a_local_loser() {
     use tinyagents_orchestration::subagent::SubagentPersistenceDisposition as Disposition;
 
