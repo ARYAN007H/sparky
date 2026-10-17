@@ -8,8 +8,8 @@ use crate::cron::handlers::{
 use async_trait::async_trait;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use tempfile::TempDir;
-use tinyflows_bus::schedule::types::{DeliveryConfig, Schedule};
-use tinyflows_bus::schedule::{callbacks, CALLBACK_INTERFACE};
+use tinyflows_bus::schedule::types::{DeliveryConfig, DeliveryStatus, Schedule};
+use tinyflows_bus::schedule::{callbacks, CALLBACK_INTERFACE, DeliveryProjection};
 
 fn config(tmp: &TempDir) -> Config {
     let config = Config {
@@ -56,6 +56,15 @@ fn shell_job(config: &Config, command: &str) -> CronJob {
             every_ms: 3_600_000,
         },
         command,
+    )
+    .unwrap()
+}
+
+fn flow_job(config: &Config, flow_id: &str) -> CronJob {
+    crate::cron::add_flow_schedule_job(
+        config,
+        flow_id,
+        Schedule::Every { every_ms: 3_600_000 },
     )
     .unwrap()
 }
@@ -163,8 +172,9 @@ async fn an_agent_only_scheduler_refuses_shell_jobs_before_running_anything() {
         attempt.output
     );
     assert_eq!(calls.load(Ordering::SeqCst), 0, "the handler never ran");
+    let flow = flow_job(&config, "some-flow");
     let trigger: Attempt = proxy
-        .call(callbacks::SCHEDULE_TRIGGER, ("some-flow", "run-d"))
+        .call(callbacks::SCHEDULE_TRIGGER, (&flow, "run-d"))
         .await
         .unwrap();
     assert!(!trigger.success, "flow ticks are refused too");
@@ -180,6 +190,7 @@ async fn failed_is_accepted_for_any_job() {
         success: false,
         output: "boom".into(),
         retryable: false,
+        raw_detail: None,
     };
     proxy
         .call::<()>(callbacks::FAILED, (&job, "run-e", &attempt))
@@ -199,7 +210,7 @@ async fn deliver_answers_with_the_delivery_status_string() {
         retryable: true,
     };
     let status: String = proxy
-        .call(callbacks::DELIVER, (&job, "run-f", &attempt))
+        .call(callbacks::SEND, (&job, "run-f", &attempt))
         .await
         .unwrap();
     assert_eq!(
@@ -207,6 +218,17 @@ async fn deliver_answers_with_the_delivery_status_string() {
         "delivery mode `none` sends nothing"
     );
     assert!(DeliveryStatus::parse(&status).is_some());
+    let projection = DeliveryProjection {
+        job,
+        run_id: "run-f".into(),
+        attempt,
+        success: true,
+        delivery_status: Some(DeliveryStatus::NotRequested),
+    };
+    proxy
+        .call::<()>(callbacks::DELIVER, (&projection,))
+        .await
+        .unwrap();
 }
 
 #[tokio::test]
@@ -225,10 +247,11 @@ async fn scheduled_announce_returns_failed_when_its_channel_is_unavailable() {
         success: true,
         output: "result".into(),
         retryable: true,
+        raw_detail: None,
     };
 
     let status: String = proxy
-        .call(callbacks::DELIVER, (&job, "run-announce", &attempt))
+        .call(callbacks::SEND, (&job, "run-announce", &attempt))
         .await
         .unwrap();
 
@@ -237,6 +260,17 @@ async fn scheduled_announce_returns_failed_when_its_channel_is_unavailable() {
         "the scheduler must receive actual send status"
     );
     assert!(DeliveryStatus::parse(&status).is_some());
+    let projection = DeliveryProjection {
+        job,
+        run_id: "run-announce".into(),
+        attempt,
+        success: false,
+        delivery_status: Some(DeliveryStatus::Failed),
+    };
+    proxy
+        .call::<()>(callbacks::DELIVER, (&projection,))
+        .await
+        .unwrap();
 }
 
 #[tokio::test]
@@ -259,13 +293,11 @@ async fn schedule_trigger_runs_a_system_job_and_records_the_handler_result() {
     let row = crate::cron::system_jobs::ensure_system_job(
         &config,
         "bus-host-system",
-        Schedule::Every {
-            every_ms: 3_600_000,
-        },
+        Schedule::Every { every_ms: 3_600_000 },
     )
     .unwrap();
     let attempt: Attempt = proxy
-        .call(callbacks::SCHEDULE_TRIGGER, (&row.command, "run-g"))
+        .call(callbacks::SCHEDULE_TRIGGER, (&row, "run-g"))
         .await
         .unwrap();
     assert!(attempt.success, "{}", attempt.output);
@@ -277,12 +309,7 @@ async fn schedule_trigger_runs_a_system_job_and_records_the_handler_result() {
 async fn schedule_trigger_checks_agent_only_limits_before_running_a_flow_handler() {
     let tmp = TempDir::new().unwrap();
     let mut config = config(&tmp);
-    let job = crate::cron::add_flow_schedule_job(
-        &config,
-        "issue56-flow:",
-        Schedule::Every { every_ms: 60_000 },
-    )
-    .unwrap();
+    let job = flow_job(&config, "issue56-flow:");
     config.cron.agent_jobs_only = true;
 
     let (_host, proxy) = host(&config, false).await;
@@ -297,7 +324,7 @@ async fn schedule_trigger_checks_agent_only_limits_before_running_a_flow_handler
         }),
     );
     let attempt: Attempt = proxy
-        .call(callbacks::SCHEDULE_TRIGGER, (&job.command, "run-issue56"))
+        .call(callbacks::SCHEDULE_TRIGGER, (&job, "run-issue56"))
         .await
         .unwrap();
 
@@ -320,8 +347,10 @@ async fn schedule_trigger_for_an_unknown_flow_is_answered_not_failed() {
     let tmp = TempDir::new().unwrap();
     let config = config(&tmp);
     let (_host, proxy) = host(&config, false).await;
+    let job = flow_job(&config, "flow-never-saved");
+    crate::cron::remove_job(&config, &job.id).unwrap();
     let attempt: Attempt = proxy
-        .call(callbacks::SCHEDULE_TRIGGER, ("flow-never-saved", "run-h"))
+        .call(callbacks::SCHEDULE_TRIGGER, (&job, "run-h"))
         .await
         .unwrap();
     assert!(attempt.success, "{}", attempt.output);
