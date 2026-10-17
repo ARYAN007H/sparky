@@ -109,9 +109,7 @@ fn handle_subagent_cancel(ctx: DispatchCtx, params: Map<String, Value>) -> Contr
         if std::env::var_os("OPENHUMAN_DEBUG_DRIVER_CANCEL").is_some() {
             eprintln!(
                 "CANCEL_HANDLER task={task_id:?} dispatch_core={:?} current_core={:?} default_core={:?} saas={}",
-                ctx.core()
-                    .as_ref()
-                    .map(std::sync::Arc::as_ptr),
+                ctx.core().map(std::sync::Arc::as_ptr),
                 crate::core::runtime::CoreContext::current()
                     .as_ref()
                     .map(std::sync::Arc::as_ptr),
