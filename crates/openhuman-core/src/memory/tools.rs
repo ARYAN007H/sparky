@@ -78,7 +78,7 @@ fn record_turn_citations(
 }
 
 /// Records `citations` for `thread_id`'s in-flight turn: what the turn's
-/// memory pack cited (`lifecycle::hooks::pre_turn`), beside what `recall`
+/// memory pack cited (`lifecycle::prefetch::pre_turn`), beside what `recall`
 /// cites.
 pub fn record_pack_citations(ctx: &DispatchCtx, thread_id: &str, citations: Vec<TurnCitation>) {
     if citations.is_empty() {
