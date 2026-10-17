@@ -89,6 +89,30 @@ async fn identity_config_thread_workspace_and_context_are_isolated() {
     assert!(completed(&Cache::default(), &key).is_none());
 }
 
+#[test]
+fn prefetch_key_tracks_memory_config_without_hashing_unrelated_config() {
+    let tmp = tempfile::tempdir().unwrap();
+    let config = config_in(&tmp);
+    let identity = MemoryIdentity::agent("a").resolve(&config);
+    let key = Key::new(&config, &identity, "t", false);
+
+    let mut memory_changed = config.clone();
+    memory_changed.memory.recall.brain_limit += 1;
+    assert!(key != Key::new(&memory_changed, &identity, "t", false));
+
+    let mut engine_changed = config.clone();
+    engine_changed.api_url = Some("https://memory.example.test".into());
+    assert!(key != Key::new(&engine_changed, &identity, "t", false));
+
+    let mut inference_changed = config.clone();
+    inference_changed.inference_url = Some("https://inference.example.test".into());
+    assert!(key != Key::new(&inference_changed, &identity, "t", false));
+
+    let mut unrelated_changed = config;
+    unrelated_changed.context.enabled = false;
+    assert!(key == Key::new(&unrelated_changed, &identity, "t", false));
+}
+
 #[tokio::test]
 async fn invalidation_rejects_late_results_and_preserves_bounded_pending_logs() {
     let _guard = TEST_LOCK.lock().await;
