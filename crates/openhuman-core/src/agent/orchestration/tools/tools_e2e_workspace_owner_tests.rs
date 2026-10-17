@@ -236,10 +236,12 @@ async fn driver_job_controls_are_isolated_by_workspace_with_shared_runtime_state
     )
     .await
     .expect("native list alias works for A");
-    assert!(listed_a.results[0].text().contains(&id_a));
+    assert!(listed_a.results[0]
+        .text()
+        .contains("workspace-a-session"));
     assert!(
-        !listed_a.results[0].text().contains(&id_b),
-        "A must not see B's driver job: {}",
+        !listed_a.results[0].text().contains("workspace-b-session"),
+        "A must not see B's durable session: {}",
         listed_a.results[0].text()
     );
     let listed_b = execute_tool_batch(
@@ -257,8 +259,12 @@ async fn driver_job_controls_are_isolated_by_workspace_with_shared_runtime_state
     )
     .await
     .expect("native list alias works for B");
-    assert!(listed_b.results[0].text().contains(&id_b));
-    assert!(!listed_b.results[0].text().contains(&id_a));
+    assert!(listed_b.results[0]
+        .text()
+        .contains("workspace-b-session"));
+    assert!(!listed_b.results[0]
+        .text()
+        .contains("workspace-a-session"));
 
     let foreign_wait = execute_tool_batch(
         &harness,

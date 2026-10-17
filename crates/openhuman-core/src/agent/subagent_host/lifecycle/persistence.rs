@@ -30,7 +30,7 @@ impl OpenHumanPersistence {
         }
     }
 
-    pub(super) fn with_host_outcome(
+    pub(in crate::agent::subagent_host) fn with_host_outcome(
         mut self,
         host_outcome: Arc<Mutex<HashMap<SubagentTaskKey, SubagentRunOutcome>>>,
     ) -> Self {

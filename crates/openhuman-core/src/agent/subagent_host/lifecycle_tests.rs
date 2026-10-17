@@ -402,7 +402,7 @@ async fn persistence_inserts_one_terminal_and_returns_the_durable_winner() {
 }
 
 #[tokio::test]
-async fn inline_driver_projection_returns_the_durable_winner_not_a_local_loser() {
+async fn driver_inline_projection_returns_the_durable_winner_not_a_local_loser() {
     use tinyagents_orchestration::subagent::SubagentPersistenceDisposition as Disposition;
 
     let directory = tempfile::tempdir().unwrap();
