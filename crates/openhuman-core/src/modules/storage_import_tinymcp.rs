@@ -93,15 +93,7 @@ async fn import_into(
 ) -> Result<Outcome> {
     let docs = scoped.documents();
     let marker = marker_id(data_dir);
-    docs.ensure_collection(&CollectionSpec::new(MARKER_COLLECTION))
-        .await
-        .map_err(|error| anyhow!("declare the marker collection: {:?}", error.kind()))?;
-    if docs
-        .get(MARKER_COLLECTION, &marker)
-        .await
-        .map_err(|error| anyhow!("read the marker: {:?}", error.kind()))?
-        .is_some()
-    {
+    if support::already_imported(scoped, MARKER_COLLECTION, &marker).await? {
         return Ok(Outcome::AlreadyDone);
     }
     let clients = data_dir.join(CLIENTS_DB);
@@ -174,20 +166,7 @@ async fn import_into(
         }
     }
 
-    let body = json!({
-        "servers": servers,
-        "secrets": secret_count,
-        "audit": audited,
-        "at": now_ms(),
-    });
-    match docs
-        .put(MARKER_COLLECTION, &marker, body, Precondition::Absent)
-        .await
-    {
-        Ok(_) => {}
-        Err(error) if matches!(error.kind(), ErrorKind::Conflict | ErrorKind::AlreadyExists) => {}
-        Err(error) => return Err(anyhow!("write the marker: {:?}", error.kind())),
-    }
+    support::mark_imported(scoped, MARKER_COLLECTION, &marker).await?;
     tracing::info!(
         "{LOG_PREFIX} imported servers={servers} secrets={secret_count} audit={audited}"
     );
