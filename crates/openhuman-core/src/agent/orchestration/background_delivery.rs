@@ -65,9 +65,9 @@ mod delivery_events;
 use crate::core::runtime::CoreContext;
 #[cfg(test)]
 pub(super) use delivery_events::drain_schedule;
-pub(super) use delivery_events::{drain_schedule_in, owning_profiles};
 #[cfg(test)]
 pub(super) use delivery_events::Drain;
+pub(super) use delivery_events::{drain_schedule_in, owning_profiles};
 
 /// Coalesce completions landing within this window into one delivery turn.
 const DEBOUNCE: Duration = Duration::from_secs(3);
