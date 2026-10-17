@@ -566,20 +566,20 @@ impl tinyagents_orchestration::subagent::SubagentPersistence for OpenHumanPersis
         &self,
         mut pause: tinyagents_orchestration::subagent::PersistedSubagentPause,
     ) -> Result<SubagentPausePersistenceDisposition, SubagentError> {
-        let elapsed_ms = self
+        let host_elapsed = self
             .host_outcome
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
             .get(&pause.key)
-            .map(|outcome| outcome.elapsed.as_millis() as u64)
+            .map(|outcome| outcome.elapsed)
             .unwrap_or_default();
         // Product checkpoint fields absent from the neutral pause stay in a
         // namespaced extension; reserved TinyAgents fields remain untouched.
         let host_checkpoint = serde_json::json!({
             "created_at": chrono::Utc::now().to_rfc3339(),
             "options": pause.outcome.extensions.get("options"),
-            "elapsed_ms": elapsed_ms,
-            "elapsed_ns": outcome.elapsed.as_nanos().min(u64::MAX as u128) as u64,
+            "elapsed_ms": host_elapsed.as_millis() as u64,
+            "elapsed_ns": host_elapsed.as_nanos().min(u64::MAX as u128) as u64,
         });
         pause
             .outcome
@@ -630,6 +630,10 @@ impl tinyagents_orchestration::subagent::SubagentPersistence for OpenHumanPersis
             durable_outcome.extensions.insert(
                 "elapsed_ms".into(),
                 serde_json::json!(host.elapsed.as_millis() as u64),
+            );
+            durable_outcome.extensions.insert(
+                "elapsed_ns".into(),
+                serde_json::json!(host.elapsed.as_nanos().min(u64::MAX as u128) as u64),
             );
         }
         let disposition = tinyagents_orchestration::subagent::SubagentPersistence::record_terminal(
