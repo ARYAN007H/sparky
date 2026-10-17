@@ -379,13 +379,14 @@ pub async fn resume_workflow_run(
 }
 
 /// Drive the phase DAG with the parent context created by the owner's scoped
-/// lifecycle. Errors are recorded on the run row (status `Failed`) rather than
-/// propagated — there is no caller to receive them.
+/// lifecycle. The owner engine fences durable drive transitions with its run
+/// lease; the host only projects failures from setup before that engine starts.
 pub(crate) async fn run_engine_loop(
     config: &Config,
     run_id: &str,
     definition: WorkflowDefinition,
     handle: WorkflowRunHandle,
+    admission_revision: u64,
     cancel_token: tinyagents_harness::CancellationToken,
     parent_override: Option<ParentExecutionContext>,
 ) {
@@ -407,6 +408,7 @@ pub(crate) async fn run_engine_loop(
                 config,
                 run_id,
                 &handle,
+                admission_revision,
                 format!("workflow safety admission failed: {error}"),
             );
             return;
@@ -438,19 +440,10 @@ pub(crate) async fn run_engine_loop(
         .map_err(anyhow::Error::msg);
 
     if let Err(err) = outcome {
-        if !workflow_supervisor().is_current(&handle) {
-            log::debug!(
-                target: LOG_TARGET,
-                "[workflow_run_engine] loop.owner_lost run={run_id}; suppressing stale failure"
-            );
-            return;
-        }
         log::error!(
             target: LOG_TARGET,
             "[workflow_run_engine] loop.failed run={run_id} err={err}"
         );
-        // Best-effort terminal failure write, preserving partial phase state.
-        record_failed_if_current(config, run_id, &handle, format!("engine error: {err}"));
     }
 }
 
