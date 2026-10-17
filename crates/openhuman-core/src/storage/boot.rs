@@ -194,9 +194,6 @@ async fn post_migrate_importers(
     scope: &Scope,
     report: &mut BootReport,
 ) {
-    for (step, error) in super::host_importers::run(scoped).await {
-        record(report, scope, step, &error);
-    }
     use tinyagents_harness::storage::{import_legacy_kv, LegacyKv};
     for (owner, legacy, kind) in [
         ("harness", "harness_store", LegacyKv::Flat),
@@ -213,6 +210,9 @@ async fn post_migrate_importers(
     }
     if let Err(error) = tinyagents_graph::import_legacy_task_cache(scoped).await {
         record(report, scope, "import_legacy_task_cache", &error);
+    }
+    for (step, error) in super::host_importers::run(scoped).await {
+        record(report, scope, step, &error);
     }
     #[cfg(feature = "flows")]
     {
