@@ -1,7 +1,6 @@
 use super::handlers::*;
 use crate::core::all::RegisteredController;
 use crate::core::{ControllerSchema, FieldSchema, TypeSchema};
-use tinyflows_bus::schedule::types::{CronJobPatch, DeliveryConfig};
 
 fn job_id_input(comment: &'static str) -> FieldSchema {
     FieldSchema {
