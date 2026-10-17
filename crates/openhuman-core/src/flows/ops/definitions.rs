@@ -220,12 +220,10 @@ pub async fn flows_list(config: &Config) -> Result<Outcome<Vec<Flow>>, String> {
 
 /// Deletes a flow by id.
 ///
-/// Removes the flow definition before unbinding its automatic-dispatch trigger
-/// (e.g. the schedule-trigger cron job). `flow_runs` cascades on delete via a
-/// same-database `FOREIGN KEY ... ON DELETE CASCADE`, but a bound cron job lives
-/// in the entirely separate `cron.db`. Removing the flow first means a failed
-/// delete leaves its still-existing schedule intact. Best-effort: a lookup
-/// failure is logged and does not block the delete itself.
+/// Removes the flow definition before unbinding its separately persisted
+/// automatic-dispatch trigger (e.g. the schedule-trigger job). Removing the
+/// flow first means a failed delete leaves its still-existing schedule intact.
+/// Best-effort: a lookup failure is logged and does not block the delete.
 pub async fn flows_delete(config: &Config, id: &str) -> Result<Outcome<Value>, String> {
     flows_delete_with_remove(config, id, |config, id| {
         store::remove_flow(config, id).map_err(|e| e.to_string())
