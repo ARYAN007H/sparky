@@ -35,7 +35,7 @@ use std::sync::Arc;
 use sha2::Digest;
 use tinystoragedrivers::schema::Migrations;
 use tinystoragedrivers::{
-    Capability, DocumentStore, ErrorKind, Filter, Precondition, Query, Scope, ScopedStorage,
+    Capability, DocumentStore, DocumentStoreExt, ErrorKind, Filter, Precondition, Query, Scope, ScopedStorage,
     StorageBackend, StorageError, WriteOptions,
 };
 
@@ -171,7 +171,7 @@ pub struct MoveReport {
 pub async fn known_ids(backend: &Arc<dyn StorageBackend>) -> Known {
     let mut known = Known::default();
     if let Ok(local) = backend.for_scope(&Scope::local()) {
-        if let Ok(found) = ids_of(local.documents(), super::agents::AGENTS_COLLECTION).await {
+        if let Ok(found) = ids_of(local.documents(), super::agents::AGENTS).await {
             known.agents = found;
         }
     }
