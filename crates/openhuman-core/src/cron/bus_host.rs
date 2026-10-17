@@ -292,3 +292,7 @@ pub(crate) fn kind_refusal(binding: &Binding, job_type: &JobType) -> Option<Stri
 #[cfg(test)]
 #[path = "bus_host_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "bus_host_trusted_system_tests.rs"]
+mod trusted_system_tests;

@@ -269,6 +269,30 @@ fn only_reserved_memory_system_jobs_pass_the_agent_only_run_check() {
     assert!(limits::check_run(&config, &other_system).is_err());
 }
 
+#[test]
+fn only_reserved_memory_system_jobs_pass_the_agent_only_run_check() {
+    let tmp = TempDir::new().unwrap();
+    let mut config = limited(&tmp);
+    config.cron.agent_jobs_only = false;
+    crate::cron::system_jobs::ensure_memory_jobs(&config).unwrap();
+    let memory = crate::cron::list_jobs(&config)
+        .unwrap()
+        .into_iter()
+        .find(|job| {
+            crate::cron::system_jobs::system_job_name(job)
+                == Some(crate::memory::lifecycle::jobs::BACKGROUND_JOB)
+        })
+        .unwrap();
+
+    config.cron.agent_jobs_only = true;
+    limits::check_run(&config, &memory)
+        .expect("the memory owner may run its internally seeded system job");
+
+    let mut other_system = memory;
+    other_system.command = "system:untrusted_flow".into();
+    assert!(limits::check_run(&config, &other_system).is_err());
+}
+
 #[tokio::test]
 async fn run_now_refuses_a_stored_job_that_breaks_the_limits() {
     let tmp = TempDir::new().unwrap();

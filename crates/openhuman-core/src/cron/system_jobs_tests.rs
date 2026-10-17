@@ -147,3 +147,22 @@ fn memory_jobs_seed_under_agent_only_without_authorizing_generic_flows() {
     assert!(add_flow_schedule_job(&config, "system:memory_background", every(30)).is_err());
     assert!(ensure_system_job(&config, "untrusted_flow", every(30)).is_err());
 }
+
+#[test]
+fn memory_jobs_seed_under_agent_only_without_authorizing_generic_flows() {
+    let tmp = TempDir::new().unwrap();
+    let mut config = test_config(&tmp);
+    config.cron.agent_jobs_only = true;
+
+    ensure_memory_jobs(&config).expect("trusted memory jobs should seed in an enforced scope");
+    let background = system_rows(&config, BACKGROUND_JOB);
+    let sync = system_rows(&config, SOURCES_SYNC_JOB);
+    assert_eq!(background.len(), 1);
+    assert_eq!(sync.len(), 1);
+    for job in background.iter().chain(sync.iter()) {
+        crate::cron::limits::check_run(&config, job).unwrap();
+    }
+
+    assert!(add_flow_schedule_job(&config, "system:memory_background", every(30)).is_err());
+    assert!(ensure_system_job(&config, "untrusted_flow", every(30)).is_err());
+}
