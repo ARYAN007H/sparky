@@ -20,6 +20,13 @@ fn reconcile_surface_names(
         permanent: std::mem::take(permanent),
     };
     managed.refresh_synthesized(previous_synthesized, synthesized, auto_include_new);
+    // The host's wildcard belt re-admits every live synthesized name at each
+    // refresh. TinyAgents only adds names new since the prior snapshot, so
+    // preserve the narrower host policy before applying its packed/deferred
+    // projection. Explicit belts leave this disabled.
+    if auto_include_new {
+        managed.visible.extend(synthesized.iter().cloned());
+    }
     // New wildcard-synthesized names must participate in packed-tool
     // filtering so a withheld name can add its `use_skill` route. Restore
     // permanent names afterward, preserving their precedence over both
