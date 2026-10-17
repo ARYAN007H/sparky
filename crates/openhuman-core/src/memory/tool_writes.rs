@@ -34,7 +34,6 @@ use crate::config::Config;
 const MAX_PENDING: usize = 256;
 const MAX_BYTES: usize = 2 * 1024 * 1024;
 const WRITE_TIMEOUT: Duration = Duration::from_secs(120);
-static PROCESS_EPOCH: LazyLock<String> = LazyLock::new(|| uuid::Uuid::new_v4().to_string());
 const QUEUED: &str = "queued; not yet saved to memory";
 static LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
 
@@ -344,7 +343,9 @@ fn owner_state(config: &Config) -> Arc<OwnerState> {
         return owner;
     }
     let owner = Arc::new(OwnerState {
-        gate: WriteGate::new(PROCESS_EPOCH.clone()),
+        // A new gate starts at generation zero, so it needs a distinct epoch
+        // identity to make entries from a released gate stale after eviction.
+        gate: WriteGate::new(uuid::Uuid::new_v4().to_string()),
         barrier: Arc::default(),
     });
     owners.insert(key, Arc::downgrade(&owner));
