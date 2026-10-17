@@ -80,3 +80,18 @@ pub(crate) fn forget_workspace_for_test(workspace_dir: &Path) {
     }
     let _ = router_pool().remove(&ambient_scope);
 }
+
+#[test]
+fn forgetting_one_workspace_keeps_other_cached_routers() {
+    let first = TestWorkspace::new();
+    let second = TestWorkspace::new();
+    let second_router = entry_for(second.path()).router;
+
+    forget_workspace_for_test(first.path());
+
+    let still_cached = router_pool()
+        .get(&router_scope(second.path()))
+        .expect("lookup second workspace router")
+        .expect("second workspace remains cached");
+    assert!(Arc::ptr_eq(&still_cached, &second_router));
+}
