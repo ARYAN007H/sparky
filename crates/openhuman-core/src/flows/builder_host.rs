@@ -57,17 +57,13 @@ impl FlowsHost {
                     wire!(ops::flows_draft_get(&config, &required::<String>(&payload, "id")?)?.value)
                 }
                 PortOperation::DraftCreate => {
-                    let origin = decode::<tinyflows_catalog::DraftOrigin>(
-                        required::<Value>(&payload, "origin")?,
-                    )?;
-                    wire!(ops::flows_draft_create(
+                    ops::flows_draft_create_from_copilot(
                         &config,
                         optional_field(&payload, "flow_id")?,
                         required(&payload, "name")?,
                         required(&payload, "graph")?,
-                        origin,
+                        required(&payload, "origin")?,
                     )?
-                    .value)
                 }
                 PortOperation::DraftUpdate => {
                     wire!(ops::flows_draft_update(
@@ -178,11 +174,9 @@ impl FlowsHost {
                         .collect::<Vec<_>>())
                 }
                 PortOperation::SuggestionsUpsert => {
-                    let suggestions = decode::<Vec<tinyflows_catalog::FlowSuggestion>>(
-                        payload.clone(),
-                    )?;
-                    json!(crate::flows::store::upsert_suggestions(&config, &suggestions)
-                        .map_err(|error| error.to_string())?)
+                    json!(ops::flows_suggestions_upsert_from_copilot(
+                        &config, payload
+                    )?)
                 }
                 PortOperation::GatesValidate => wire!(ops::flows_validate(payload).value),
                 PortOperation::GatesRun => {
