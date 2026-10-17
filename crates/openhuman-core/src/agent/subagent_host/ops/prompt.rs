@@ -16,7 +16,7 @@ pub(crate) fn compose_subagent_system_prompt(
     agent_id: &str,
     visible_tool_names: &HashSet<String>,
     task_prompt: &str,
-    spawn_depth: Option<usize>,
+    spawn_depth: usize,
 ) -> String {
     let framed = format!(
         "{}\n\n{}",
