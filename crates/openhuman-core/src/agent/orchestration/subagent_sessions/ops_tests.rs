@@ -347,7 +347,10 @@ fn paused_driver_cancel_marks_only_the_observed_session_failed() {
     assert!(!mark_driver_pause_cancelled(&store, &selected).unwrap());
     let cancelled = store.load().unwrap().remove(0);
     assert_eq!(cancelled.status, DurableSubagentStatus::Failed);
-    assert_eq!(cancelled.current_task_id.as_deref(), Some("paused-cancel-task"));
+    assert_eq!(
+        cancelled.current_task_id.as_deref(),
+        Some("paused-cancel-task")
+    );
     assert_eq!(cancelled.latest_history.as_ref().unwrap().len(), 1);
 
     let mut stale = selected;

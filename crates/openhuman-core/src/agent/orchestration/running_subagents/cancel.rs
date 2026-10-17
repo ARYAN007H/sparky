@@ -30,7 +30,8 @@ pub(crate) struct CancelledSubagent {
     pub(crate) already_finished: Option<FinishedOutcome>,
     /// The selected durable driver row when a paused child needs host-side
     /// terminal projection (its driver callback already returned on pause).
-    pub(crate) driver_pause: Option<crate::agent::orchestration::subagent_sessions::DriverTaskCancellation>,
+    pub(crate) driver_pause:
+        Option<crate::agent::orchestration::subagent_sessions::DriverTaskCancellation>,
     /// TinyAgents' awaited completion handler owns terminal delivery for this
     /// driver-backed child; the RPC handler must not publish a duplicate.
     pub(crate) driver_managed: bool,

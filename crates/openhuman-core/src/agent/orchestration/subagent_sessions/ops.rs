@@ -223,7 +223,9 @@ pub fn cancel_driver_job_by_task(
                 session.parent_thread_id.as_deref(),
                 checkpoint_dir,
             )
-            .map_err(|error| format!("failed to resolve subagent lifecycle for cancellation: {error}"))?,
+            .map_err(|error| {
+                format!("failed to resolve subagent lifecycle for cancellation: {error}")
+            })?,
         )
     } else {
         session.lifecycle_key.clone()
@@ -277,9 +279,10 @@ pub fn mark_driver_pause_cancelled(
         .lock()
         .map_err(|_| "subagent session store lock poisoned".to_string())?;
     let mut sessions = store.load()?;
-    let Some(session) = sessions.iter_mut().find(|session| {
-        session.subagent_session_id == observed.subagent_session_id
-    }) else {
+    let Some(session) = sessions
+        .iter_mut()
+        .find(|session| session.subagent_session_id == observed.subagent_session_id)
+    else {
         return Ok(false);
     };
     if session.parent_session != observed.parent_session

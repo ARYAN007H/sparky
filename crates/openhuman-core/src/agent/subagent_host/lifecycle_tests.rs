@@ -1,10 +1,10 @@
-use tinyagents_orchestration::subagent::{
-    PersistedSubagentPause, SubagentOutcome, SubagentOutcomeKind, SubagentPause,
-    SubagentPausePersistenceDisposition, SubagentPersistence, SubagentResume, SubagentTaskKey,
-};
 use std::{
     collections::HashMap,
     sync::{Arc, Mutex},
+};
+use tinyagents_orchestration::subagent::{
+    PersistedSubagentPause, SubagentOutcome, SubagentOutcomeKind, SubagentPause,
+    SubagentPausePersistenceDisposition, SubagentPersistence, SubagentResume, SubagentTaskKey,
 };
 
 use super::lifecycle::{
@@ -449,14 +449,10 @@ async fn driver_inline_projection_returns_the_durable_winner_not_a_local_loser()
     let result = tinytools::ToolResult::error(
         serde_json::json!({"task_id":"public-job-42", "status":"incomplete"}).to_string(),
     );
-    let (projected, public_job_id) = resolve_inline_driver_outcome(
-        result,
-        &bundle,
-        &key,
-        "fallback-agent",
-    )
-    .await
-    .unwrap();
+    let (projected, public_job_id) =
+        resolve_inline_driver_outcome(result, &bundle, &key, "fallback-agent")
+            .await
+            .unwrap();
 
     assert_eq!(public_job_id, "public-job-42");
     assert_eq!(projected.output, "durable winning output");
@@ -467,8 +463,14 @@ async fn driver_inline_projection_returns_the_durable_winner_not_a_local_loser()
         SubagentRunStatus::Incomplete { ref reason } if reason == "winner stopped"
     ));
     assert_eq!(projected.final_history.len(), 1);
-    assert_eq!(projected.final_history[0].content, "durable winning history");
-    assert_eq!(projected.persistence_disposition, Disposition::TerminalExisting);
+    assert_eq!(
+        projected.final_history[0].content,
+        "durable winning history"
+    );
+    assert_eq!(
+        projected.persistence_disposition,
+        Disposition::TerminalExisting
+    );
 }
 
 #[tokio::test]

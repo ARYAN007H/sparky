@@ -161,15 +161,16 @@ fn handle_subagent_cancel(ctx: DispatchCtx, params: Map<String, Value>) -> Contr
                     // Publishing the legacy pseudo-completion here would
                     // duplicate both effects.
                     if let Some(paused) = meta.driver_pause.as_ref() {
-                        let store =
-                            subagent_sessions::SubagentSessionStore::new(meta.workspace_dir.clone());
-                        let transitioned = subagent_sessions::mark_driver_pause_cancelled(
-                            &store,
-                            paused,
-                        )
-                        .map_err(|error| {
-                            format!("subagent_cancel: failed to settle paused child: {error}")
-                        })?;
+                        let store = subagent_sessions::SubagentSessionStore::new(
+                            meta.workspace_dir.clone(),
+                        );
+                        let transitioned =
+                            subagent_sessions::mark_driver_pause_cancelled(&store, paused)
+                                .map_err(|error| {
+                                    format!(
+                                        "subagent_cancel: failed to settle paused child: {error}"
+                                    )
+                                })?;
                         if transitioned {
                             let summary = match reason
                                 .as_deref()
