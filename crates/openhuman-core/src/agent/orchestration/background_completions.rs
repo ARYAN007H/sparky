@@ -79,8 +79,7 @@ pub(super) struct RouterScope {
     workspace_dir: PathBuf,
 }
 
-pub(super) fn router_scope(workspace_dir: &Path) -> RouterScope {
-    let ctx = DispatchCtx::ambient();
+pub(super) fn router_scope_for(ctx: &DispatchCtx, workspace_dir: &Path) -> RouterScope {
     let profile = crate::core::runtime::tenant::isolated_unless_tenant(
         ctx.tenant(),
         "background_completions",
@@ -90,6 +89,11 @@ pub(super) fn router_scope(workspace_dir: &Path) -> RouterScope {
         profile_key: crate::core::runtime::tenant::profile_key_in(&profile, ""),
         workspace_dir: workspace_dir.to_path_buf(),
     }
+}
+
+#[cfg(test)]
+pub(super) fn router_scope(workspace_dir: &Path) -> RouterScope {
+    router_scope_for(&DispatchCtx::ambient(), workspace_dir)
 }
 
 /// A workspace's router plus the store it sits on (kept so boot recovery and
@@ -178,8 +182,8 @@ pub(super) fn test_store_overrides(
     STORES.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
-pub(super) fn entry_for(workspace_dir: &Path) -> Arc<Entry> {
-    let scope = router_scope(workspace_dir);
+pub(super) fn entry_for_ctx(ctx: &DispatchCtx, workspace_dir: &Path) -> Arc<Entry> {
+    let scope = router_scope_for(ctx, workspace_dir);
     let router = match router_pool().get_or_open(&scope) {
         Ok(router) => router,
         Err(error) => {
@@ -192,6 +196,11 @@ pub(super) fn entry_for(workspace_dir: &Path) -> Arc<Entry> {
     Arc::new(Entry { router, store })
 }
 
+#[cfg(test)]
+pub(super) fn entry_for(workspace_dir: &Path) -> Arc<Entry> {
+    entry_for_ctx(&DispatchCtx::ambient(), workspace_dir)
+}
+
 /// Replace a workspace's failing durable store with an in-memory one that starts
 /// from the same records, so delivery keeps working in this process. The log on
 /// disk is left as it is and replays on the next boot.
@@ -200,8 +209,12 @@ pub(super) fn entry_for(workspace_dir: &Path) -> Arc<Entry> {
 /// finds the first's fallback already installed and uses it, rather than
 /// installing a second one the delivery loop would never see. `failed` is the
 /// router the caller just saw fail.
-fn degrade_to_memory(workspace_dir: &Path, failed: &Arc<CompletionRouter>) -> Arc<Entry> {
-    let scope = router_scope(workspace_dir);
+fn degrade_to_memory(
+    ctx: &DispatchCtx,
+    workspace_dir: &Path,
+    failed: &Arc<CompletionRouter>,
+) -> Arc<Entry> {
+    let scope = router_scope_for(ctx, workspace_dir);
     let store = Arc::new(InMemoryCompletionStore::new());
     for record in failed.store().list(None) {
         if let Err(error) = store.put(&record) {
@@ -229,11 +242,11 @@ fn degrade_to_memory(workspace_dir: &Path, failed: &Arc<CompletionRouter>) -> Ar
             // A lifecycle release removed the key while records were copied.
             // Reopen the current scope; never reinstall the stale replacement.
             state().stores.remove(&scope);
-            entry_for(workspace_dir)
+            entry_for_ctx(ctx, workspace_dir)
         }
         Err(error) => {
             log::error!("[background_completions] router fallback replace failed: {error}");
-            entry_for(workspace_dir)
+            entry_for_ctx(ctx, workspace_dir)
         }
     }
 }
@@ -245,8 +258,16 @@ pub(super) fn new_router(store: Arc<dyn CompletionStore>) -> CompletionRouter {
 }
 
 /// The router for `workspace_dir`, opening it on first use.
+pub(crate) fn router_for_workspace_ctx(
+    ctx: &DispatchCtx,
+    workspace_dir: &Path,
+) -> Arc<CompletionRouter> {
+    entry_for_ctx(ctx, workspace_dir).router.clone()
+}
+
+#[cfg(test)]
 pub(crate) fn router_for_workspace(workspace_dir: &Path) -> Arc<CompletionRouter> {
-    entry_for(workspace_dir).router.clone()
+    router_for_workspace_ctx(&DispatchCtx::ambient(), workspace_dir)
 }
 
 /// Record a finished background sub-agent for idle delivery, keyed by its
@@ -330,7 +351,7 @@ pub(crate) async fn record_outcome(
     note_session_thread(ctx, parent_session, &thread_id);
     super::completion_owners::note(ctx, &[&task_id, parent_session]); // owner, for off-task delivery
 
-    let router = router_for_workspace(workspace_dir);
+    let router = router_for_workspace_ctx(ctx, workspace_dir);
     let summary = summary.into();
     let target = DetachedCompletionTarget::new(router.clone(), thread_id.clone(), agent_id)
         .with_notify_mode(NotifyMode::Followup);
@@ -368,7 +389,7 @@ pub(crate) async fn record_outcome(
             "[background_completions] store write failed after retries; continuing in memory \
              task_id={task_id} thread_id={thread_id}"
         );
-        let fallback = degrade_to_memory(workspace_dir, &router);
+        let fallback = degrade_to_memory(ctx, workspace_dir, &router);
         let fallback_target = DetachedCompletionTarget::new(
             fallback.router.clone(),
             thread_id.clone(),
@@ -397,7 +418,7 @@ async fn record_completion_record(
         log::error!(
             "[background_completions] store write failed after retries; continuing in memory task_id={task_id} thread_id={thread_id} error={error}"
         );
-        let _ = degrade_to_memory(workspace_dir, router)
+        let _ = degrade_to_memory(&DispatchCtx::ambient(), workspace_dir, router)
             .router
             .record(record)
             .await;
