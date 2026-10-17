@@ -74,6 +74,8 @@ mod runtime_adapter_session_state_tests;
 #[cfg(test)]
 mod runtime_adapter_tests;
 #[cfg(test)]
+mod runtime_adapter_usage_tests;
+#[cfg(test)]
 mod transcript_compat_tests;
 #[cfg(test)]
 #[path = "transcript_resume_stable_tests.rs"]
