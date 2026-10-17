@@ -60,12 +60,18 @@ pub(in crate::agent::session_host) fn holistic_last_turn_usage(
     let rollup = rollup_usage(sidecar, records);
     let mut details = std::collections::HashMap::new();
     for record in records {
-        details.entry(record.run_id.as_str()).or_insert(&record.entry);
+        details
+            .entry(record.run_id.as_str())
+            .or_insert(&record.entry);
     }
     let subagents = rollup
         .subagents
         .iter()
-        .filter_map(|usage| details.get(usage.run_id.as_str()).map(|entry| (*entry).clone()))
+        .filter_map(|usage| {
+            details
+                .get(usage.run_id.as_str())
+                .map(|entry| (*entry).clone())
+        })
         .collect();
     crate::agent::tinyagents::host::LastTurnUsage {
         input_tokens: rollup.input_tokens,

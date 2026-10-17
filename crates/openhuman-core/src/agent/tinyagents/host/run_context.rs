@@ -717,10 +717,7 @@ impl OpenHumanRunContext {
     /// completed children visible at the root without leaking siblings into one
     /// another's in-flight ledger. Direct/root callers retain their own entry.
     pub fn record_completed_subagent_usage(&self, entry: SubagentUsageEntry) {
-        self.record_completed_subagent_usage_with_run_id(
-            uuid::Uuid::new_v4().to_string(),
-            entry,
-        );
+        self.record_completed_subagent_usage_with_run_id(uuid::Uuid::new_v4().to_string(), entry);
     }
 
     /// Records one actual child execution with its stable identity. The runner

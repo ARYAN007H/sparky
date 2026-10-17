@@ -193,21 +193,23 @@ fn last_turn_usage_reports_the_same_holistic_totals_as_transcript_billing() {
         ..Default::default()
     };
     let child = crate::agent::tinyagents::host::SubagentUsageEntry {
-            task_id: "child-ui".into(),
-            agent_id: "researcher".into(),
-            usage: crate::agent::subagent_host::SubagentUsage {
-                input_tokens: 5,
-                output_tokens: 2,
-                cached_input_tokens: 1,
-                charged_amount_usd: 0.001,
-                cost_source: tinyagents_harness::cost::CostSource::Charged,
-            },
-        };
+        task_id: "child-ui".into(),
+        agent_id: "researcher".into(),
+        usage: crate::agent::subagent_host::SubagentUsage {
+            input_tokens: 5,
+            output_tokens: 2,
+            cached_input_tokens: 1,
+            charged_amount_usd: 0.001,
+            cost_source: tinyagents_harness::cost::CostSource::Charged,
+        },
+    };
     sidecar.subagents.push(child.clone());
-    let records = [crate::agent::tinyagents::host::run_context::SubagentUsageRecord {
-        run_id: "run-child-ui".into(),
-        entry: child,
-    }];
+    let records = [
+        crate::agent::tinyagents::host::run_context::SubagentUsageRecord {
+            run_id: "run-child-ui".into(),
+            entry: child,
+        },
+    ];
 
     let usage = holistic_last_turn_usage(&sidecar, &records);
     assert_eq!(usage.input_tokens, 18);
@@ -248,16 +250,16 @@ fn child_usage_rollup_deduplicates_runs_without_merging_repeated_task_ids() {
         ..Default::default()
     };
     let second_execution = crate::agent::tinyagents::host::SubagentUsageEntry {
-            // Same task, distinct actual execution: its usage is retained.
-            task_id: "reused-task".into(),
-            agent_id: "researcher".into(),
-            usage: crate::agent::subagent_host::SubagentUsage {
-                input_tokens: 7,
-                output_tokens: 2,
-                cost_source: tinyagents_harness::cost::CostSource::Unknown,
-                ..Default::default()
-            },
-        };
+        // Same task, distinct actual execution: its usage is retained.
+        task_id: "reused-task".into(),
+        agent_id: "researcher".into(),
+        usage: crate::agent::subagent_host::SubagentUsage {
+            input_tokens: 7,
+            output_tokens: 2,
+            cost_source: tinyagents_harness::cost::CostSource::Unknown,
+            ..Default::default()
+        },
+    };
     sidecar.subagents.extend([
         inclusive_child.clone(),
         inclusive_child.clone(),
@@ -369,27 +371,24 @@ async fn committed_goal_accounting_uses_direct_and_completed_child_usage() {
         ..Default::default()
     };
     let child = crate::agent::tinyagents::host::SubagentUsageEntry {
-            task_id: "child-goal".into(),
-            agent_id: "researcher".into(),
-            usage: crate::agent::subagent_host::SubagentUsage {
-                input_tokens: 5,
-                output_tokens: 3,
-                ..Default::default()
-            },
-        };
+        task_id: "child-goal".into(),
+        agent_id: "researcher".into(),
+        usage: crate::agent::subagent_host::SubagentUsage {
+            input_tokens: 5,
+            output_tokens: 3,
+            ..Default::default()
+        },
+    };
     sidecar.subagents.push(child.clone());
-    let records = [crate::agent::tinyagents::host::run_context::SubagentUsageRecord {
-        run_id: "run-child-goal".into(),
-        entry: child,
-    }];
+    let records = [
+        crate::agent::tinyagents::host::run_context::SubagentUsageRecord {
+            run_id: "run-child-goal".into(),
+            entry: child,
+        },
+    ];
 
-    account_committed_turn_against_goal(
-        workspace.path(),
-        Some("receipt-goal"),
-        &sidecar,
-        &records,
-    )
-    .await;
+    account_committed_turn_against_goal(workspace.path(), Some("receipt-goal"), &sidecar, &records)
+        .await;
 
     let goal = tinyagents_graph::goals::store::get(
         &crate::storage::sessions::stores_or_ephemeral(workspace.path()).kv,

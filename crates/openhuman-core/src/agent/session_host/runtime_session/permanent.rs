@@ -23,4 +23,3 @@ impl OpenHumanTurnPrelude {
         .or(preparation.prefix.take());
     }
 }
-
