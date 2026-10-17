@@ -522,10 +522,20 @@ async fn provisioning_with_a_new_root_replaces_a_dead_higher_epoch_fence() {
             .unwrap();
         assert!(
             output.status.success(),
-            "isolated profile fence child failed: {}",
+            "isolated profile fence child failed:\n{}\n{}",
+            String::from_utf8_lossy(&output.stdout),
             String::from_utf8_lossy(&output.stderr)
         );
-        assert!(String::from_utf8_lossy(&output.stdout).contains("test result: ok"));
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        assert!(
+            stdout.contains("running 1 test"),
+            "child selected no test: {stdout}"
+        );
+        assert!(stdout.contains("test profiles::host::tests::provisioning_with_a_new_root_replaces_a_dead_higher_epoch_fence ... ok"), "expected child test did not run: {stdout}");
+        assert!(
+            stdout.contains("test result: ok. 1 passed"),
+            "child did not pass exactly one test: {stdout}"
+        );
         return;
     }
 
@@ -581,10 +591,20 @@ async fn opening_replaces_a_dropped_hosts_fence_before_cron_reconciliation() {
             .unwrap();
         assert!(
             output.status.success(),
-            "isolated profile reopen child failed: {}",
+            "isolated profile reopen child failed:\n{}\n{}",
+            String::from_utf8_lossy(&output.stdout),
             String::from_utf8_lossy(&output.stderr)
         );
-        assert!(String::from_utf8_lossy(&output.stdout).contains("test result: ok"));
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        assert!(
+            stdout.contains("running 1 test"),
+            "child selected no test: {stdout}"
+        );
+        assert!(stdout.contains("test profiles::host::tests::opening_replaces_a_dropped_hosts_fence_before_cron_reconciliation ... ok"), "expected child test did not run: {stdout}");
+        assert!(
+            stdout.contains("test result: ok. 1 passed"),
+            "child did not pass exactly one test: {stdout}"
+        );
         return;
     }
 
