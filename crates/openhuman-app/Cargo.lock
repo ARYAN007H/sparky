@@ -348,7 +348,7 @@ dependencies = [
  "serde_json",
  "serde_path_to_error",
  "serde_urlencoded",
- "sha1",
+ "sha1 0.10.7",
  "sync_wrapper",
  "tokio",
  "tokio-tungstenite 0.29.0",
@@ -805,6 +805,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "cmov"
+version = "0.5.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0c9ea0ac24bc397ab3c98583a3c9ba74fa56b09a4449bbe172b9b1ddb016027a"
+
+[[package]]
 name = "combine"
 version = "4.6.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -855,8 +861,27 @@ version = "0.18.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1a373e3602691c3cdea496d2f0ee5935151e6168fe87739483c463db1b2f2f87"
 dependencies = [
+ "percent-encoding",
  "time",
  "version_check",
+]
+
+[[package]]
+name = "cookie_store"
+version = "0.22.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "15b2c103cf610ec6cae3da84a766285b42fd16aad564758459e6ecf128c75206"
+dependencies = [
+ "cookie",
+ "document-features",
+ "idna",
+ "indexmap 2.14.2",
+ "log",
+ "serde",
+ "serde_derive",
+ "serde_json",
+ "time",
+ "url",
 ]
 
 [[package]]
@@ -934,6 +959,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "01a7799fd6b852db0e61728dde9a204c423b44d689dbd432522543614b490e78"
 dependencies = [
  "cfg-if",
+]
+
+[[package]]
+name = "cron"
+version = "0.17.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a5dcd6f69605c2956916ce24e8af637b754964c9a83f4662d3a2361654cdba09"
+dependencies = [
+ "chrono",
+ "once_cell",
+ "phf 0.11.3",
+ "winnow 0.7.15",
 ]
 
 [[package]]
@@ -1023,6 +1060,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0369ee1ad671834580515889b80f2ea915f23b8be8d0daa4bbaf2ac5c7590835"
 dependencies = [
  "cipher",
+]
+
+[[package]]
+name = "ctutils"
+version = "0.4.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "03bb0e1cc970d482d121d9a1744999169b69a07470b3d644a7894e53fcaf4574"
+dependencies = [
+ "cmov",
 ]
 
 [[package]]
@@ -1199,6 +1245,7 @@ dependencies = [
  "block-buffer 0.12.1",
  "const-oid",
  "crypto-common 0.2.2",
+ "ctutils",
 ]
 
 [[package]]
@@ -1224,6 +1271,15 @@ name = "dirs"
 version = "6.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c3e8aa94d75141228480295a7d0e7feb620b1a5ad9f12bc40be62411e38cce4e"
+dependencies = [
+ "dirs-sys 0.5.0",
+]
+
+[[package]]
+name = "dirs"
+version = "7.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8d57d423b3c82e89b9a24ca3091fee61f456a26edbd28d26c65906f4bc1dcd8f"
 dependencies = [
  "dirs-sys 0.5.0",
 ]
@@ -1314,6 +1370,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "442039f5147480ba31067cb00ada1adae6892028e40e45fc5de7b7df6dcc1b5f"
 dependencies = [
  "const-random",
+]
+
+[[package]]
+name = "document-features"
+version = "0.2.12"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d4b8a88685455ed29a21542a33abd9cb6510b6b129abadabdcef0f4c55bc8f61"
+dependencies = [
+ "litrs",
 ]
 
 [[package]]
@@ -2256,7 +2321,7 @@ version = "0.12.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7b5f8eb2ad728638ea2c7d47a21db23b7b58a72ed6a38256b8a1849f15fbbdf7"
 dependencies = [
- "hmac",
+ "hmac 0.12.1",
 ]
 
 [[package]]
@@ -2266,6 +2331,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6c49c37c09c17a53d937dfbb742eb3a961d65a994e6bcdcf37e7399d0cc8ab5e"
 dependencies = [
  "digest 0.10.7",
+]
+
+[[package]]
+name = "hmac"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6303bc9732ae41b04cb554b844a762b4115a61bfaa81e3e83050991eeb56863f"
+dependencies = [
+ "digest 0.11.3",
 ]
 
 [[package]]
@@ -2976,6 +3050,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "landlock"
+version = "0.4.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4cca98e95f35b29d469dade6724c6f96cec9236640f745a0e99b0334ec320ab1"
+dependencies = [
+ "enumflags2",
+ "libc",
+ "thiserror 2.0.20",
+]
+
+[[package]]
 name = "lazy_static"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3084,6 +3169,12 @@ name = "litemap"
 version = "0.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "47d9d19d1d6efa0109d2f65ff4c85cddd50bd572e5a00127ab10987290bcefae"
+
+[[package]]
+name = "litrs"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4744e383959f0db86ede514b809b1c53251889093803c05267acc7d4e7030d70"
 
 [[package]]
 name = "lock_api"
@@ -3782,7 +3873,7 @@ dependencies = [
  "chrono",
  "chrono-tz",
  "directories 6.0.0",
- "dirs",
+ "dirs 6.0.0",
  "dotenvy",
  "flate2",
  "fs2",
@@ -3790,7 +3881,7 @@ dependencies = [
  "futures-util",
  "hex",
  "hkdf",
- "hmac",
+ "hmac 0.12.1",
  "hostname",
  "iana-time-zone",
  "libc",
@@ -3823,11 +3914,14 @@ dependencies = [
  "tinyagents-runtime",
  "tinyagents-session",
  "tinyagents-tasks",
- "tinybox-bus",
- "tinybus",
- "tinybus-module",
+ "tinybox-bus 0.1.36",
+ "tinybox-drivers",
+ "tinybus 0.1.6",
+ "tinybus-module 0.1.6",
+ "tinychannels",
  "tinychannels-bus",
  "tinycomputer-bus",
+ "tinyconnectors",
  "tinyconnectors-bus",
  "tinydocs-bus",
  "tinyflows",
@@ -3845,8 +3939,11 @@ dependencies = [
  "tinyinference-providers",
  "tinyinference-voice",
  "tinyjuice-bus",
+ "tinyjuice-drivers",
+ "tinymcp",
  "tinymcp-bus",
  "tinymemes-bus",
+ "tinymemes-module",
  "tinymemory-api",
  "tinymemory-integrations",
  "tinymemory-tools",
@@ -3863,6 +3960,7 @@ dependencies = [
  "tinytools-std",
  "tinyvoice-bus",
  "tinywallet-bus",
+ "tinywallet-x402",
  "tokio",
  "tokio-tungstenite 0.29.0",
  "tokio-util",
@@ -3945,7 +4043,7 @@ dependencies = [
  "tinyagents-graph",
  "tinyagents-harness",
  "tinyagents-session",
- "tinybus",
+ "tinybus 0.1.6",
  "tinyinference-embeddings",
  "tinyinference-llm",
  "tinymcp-bus",
@@ -4195,6 +4293,16 @@ checksum = "9b4f627cb1b25917193a259e49bdad08f671f8d9708acfd5fe0a8c1455d87220"
 
 [[package]]
 name = "phf"
+version = "0.11.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1fd6780a80ae0c52cc120a26a1a42c1ae51b247a253e4e06113d23d2c2edd078"
+dependencies = [
+ "phf_macros 0.11.3",
+ "phf_shared 0.11.3",
+]
+
+[[package]]
+name = "phf"
 version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "913273894cec178f401a31ec4b656318d95473527be05c0752cc41cdc32be8b7"
@@ -4208,7 +4316,7 @@ version = "0.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c1562dc717473dbaa4c1f85a36410e03c047b2e7df7f45ee938fbef64ae7fadf"
 dependencies = [
- "phf_macros",
+ "phf_macros 0.13.1",
  "phf_shared 0.13.1",
  "serde",
 ]
@@ -4219,8 +4327,18 @@ version = "0.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "49aa7f9d80421bca176ca8dbfebe668cc7a2684708594ec9f3c0db0805d5d6e1"
 dependencies = [
- "phf_generator",
+ "phf_generator 0.13.1",
  "phf_shared 0.13.1",
+]
+
+[[package]]
+name = "phf_generator"
+version = "0.11.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3c80231409c20246a13fddb31776fb942c38553c51e871f8cbd687a4cfb5843d"
+dependencies = [
+ "phf_shared 0.11.3",
+ "rand 0.8.8",
 ]
 
 [[package]]
@@ -4235,15 +4353,37 @@ dependencies = [
 
 [[package]]
 name = "phf_macros"
+version = "0.11.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f84ac04429c13a7ff43785d75ad27569f2951ce0ffd30a3321230db2fc727216"
+dependencies = [
+ "phf_generator 0.11.3",
+ "phf_shared 0.11.3",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.119",
+]
+
+[[package]]
+name = "phf_macros"
 version = "0.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "812f032b54b1e759ccd5f8b6677695d5268c588701effba24601f6932f8269ef"
 dependencies = [
- "phf_generator",
+ "phf_generator 0.13.1",
  "phf_shared 0.13.1",
  "proc-macro2",
  "quote",
  "syn 2.0.119",
+]
+
+[[package]]
+name = "phf_shared"
+version = "0.11.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "67eabc2ef2a60eb7faa00097bd1ffdb5bd28e62bf39990626a582201b7a754e5"
+dependencies = [
+ "siphasher",
 ]
 
 [[package]]
@@ -5544,6 +5684,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "sha1"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "aacc4cc499359472b4abe1bf11d0b12e688af9a805fa5e3016f9a386dc2d0214"
+dependencies = [
+ "cfg-if",
+ "cpufeatures 0.3.1",
+ "digest 0.11.3",
+]
+
+[[package]]
 name = "sha2"
 version = "0.10.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5691,6 +5842,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "socks"
+version = "0.3.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f0c3dbbd9ae980613c6dd8e28a9407b50509d3803b57624d5dfe8315218cd58b"
+dependencies = [
+ "byteorder",
+ "libc",
+ "winapi",
+]
+
+[[package]]
 name = "softbuffer"
 version = "0.4.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5793,7 +5955,7 @@ version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "585635e46db231059f76c5849798146164652513eb9e8ab2685939dd90f29b69"
 dependencies = [
- "phf_generator",
+ "phf_generator 0.13.1",
  "phf_shared 0.13.1",
  "proc-macro2",
  "quote",
@@ -6023,7 +6185,7 @@ dependencies = [
  "bytes",
  "cookie",
  "data-url",
- "dirs",
+ "dirs 6.0.0",
  "dunce",
  "embed_plist",
  "getrandom 0.3.4",
@@ -6073,7 +6235,7 @@ checksum = "bc9ce40b16101cb6ea63d3e221567affd1c3a9205f95d7bc574941a10636b632"
 dependencies = [
  "anyhow",
  "cargo_toml",
- "dirs",
+ "dirs 6.0.0",
  "glob",
  "heck 0.5.0",
  "json-patch",
@@ -6243,7 +6405,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b28d8cabdeb0564f03ae261963de4bc3d98321cd3d213e76a81b7d344e5df606"
 dependencies = [
  "base64 0.22.1",
- "dirs",
+ "dirs 6.0.0",
  "flate2",
  "futures-util",
  "http",
@@ -6544,7 +6706,7 @@ dependencies = [
  "base64 0.22.1",
  "chrono",
  "chrono-tz",
- "dirs",
+ "dirs 6.0.0",
  "flate2",
  "futures",
  "regex",
@@ -6690,6 +6852,63 @@ dependencies = [
 ]
 
 [[package]]
+name = "tinybox-bus"
+version = "0.1.36"
+source = "git+https://github.com/tinyhumansai/tinybox?tag=v0.1.36#39fe22189431bdf787dafce5eea6d7d49d1a00f8"
+dependencies = [
+ "serde",
+]
+
+[[package]]
+name = "tinybox-core"
+version = "0.1.36"
+dependencies = [
+ "async-trait",
+ "serde",
+ "thiserror 2.0.20",
+ "tinybox-bus 0.1.36",
+]
+
+[[package]]
+name = "tinybox-drivers"
+version = "0.1.36"
+dependencies = [
+ "log",
+ "serde",
+ "serde_json",
+ "tinybox-core",
+ "tinybox-jail",
+ "tinystoragedrivers-core",
+]
+
+[[package]]
+name = "tinybox-jail"
+version = "0.1.36"
+dependencies = [
+ "landlock",
+ "log",
+ "serde",
+ "serde_json",
+ "tinybox-bus 0.1.36",
+ "tinybox-core",
+ "windows-sys 0.61.2",
+]
+
+[[package]]
+name = "tinybus"
+version = "0.1.5"
+source = "git+https://github.com/tinyhumansai/tinybus?rev=d5b949be8ea56eb5a17289a09aa28e8c09bd88b7#d5b949be8ea56eb5a17289a09aa28e8c09bd88b7"
+dependencies = [
+ "async-trait",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "thiserror 2.0.20",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "tinybus"
 version = "0.1.6"
 dependencies = [
@@ -6721,14 +6940,65 @@ dependencies = [
 
 [[package]]
 name = "tinybus-module"
+version = "0.1.5"
+source = "git+https://github.com/tinyhumansai/tinybus?rev=d5b949be8ea56eb5a17289a09aa28e8c09bd88b7#d5b949be8ea56eb5a17289a09aa28e8c09bd88b7"
+dependencies = [
+ "async-trait",
+ "serde",
+ "serde_json",
+ "tinybus 0.1.5",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "tinybus-module"
 version = "0.1.6"
 dependencies = [
  "async-trait",
  "serde",
  "serde_json",
- "tinybus",
+ "tinybus 0.1.6",
  "tokio",
  "tracing",
+]
+
+[[package]]
+name = "tinychannels"
+version = "0.1.34"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "base64 0.23.1",
+ "chrono",
+ "directories 6.0.0",
+ "futures",
+ "futures-util",
+ "hex",
+ "hmac 0.13.0",
+ "parking_lot",
+ "rand 0.10.2",
+ "reqwest 0.12.28",
+ "rusqlite",
+ "rustls",
+ "rustls-pki-types",
+ "schemars 1.2.2",
+ "serde",
+ "serde_json",
+ "sha1 0.11.0",
+ "sha2 0.11.0",
+ "thiserror 2.0.20",
+ "tinychannels-bus",
+ "tinychannels-runtime",
+ "tinystoragedrivers-core",
+ "tokio",
+ "tokio-rustls",
+ "tokio-tungstenite 0.30.0",
+ "tracing",
+ "url",
+ "urlencoding",
+ "uuid",
+ "webpki-roots 1.0.9",
 ]
 
 [[package]]
@@ -6746,6 +7016,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "tinychannels-runtime"
+version = "0.1.34"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "base64 0.23.1",
+ "hex",
+ "hmac 0.13.0",
+ "parking_lot",
+ "rand 0.10.2",
+ "serde",
+ "serde_json",
+ "sha2 0.11.0",
+ "tinychannels-bus",
+ "tokio",
+ "tokio-util",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
 name = "tinycomputer-bus"
 version = "0.14.0"
 dependencies = [
@@ -6755,11 +7046,42 @@ dependencies = [
 ]
 
 [[package]]
+name = "tinyconnectors"
+version = "0.19.3"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "getrandom 0.4.3",
+ "percent-encoding",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.20",
+ "tinyconnectors-bus",
+ "tinyconnectors-sync",
+ "tinystoragedrivers-core",
+ "tokio",
+ "tracing",
+ "ureq",
+ "url",
+]
+
+[[package]]
 name = "tinyconnectors-bus"
 version = "0.19.3"
 dependencies = [
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "tinyconnectors-sync"
+version = "0.19.3"
+dependencies = [
+ "async-trait",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.20",
+ "tinyconnectors-bus",
 ]
 
 [[package]]
@@ -6842,6 +7164,7 @@ dependencies = [
  "sha2 0.11.0",
  "tinyflows",
  "tinyflows-catalog",
+ "tinyflows-schedule",
  "tinystoragedrivers-core",
  "tokio",
  "tracing",
@@ -6866,6 +7189,22 @@ dependencies = [
  "tinystoragedrivers-core",
  "tinystoragedrivers-sqlite",
  "tracing",
+]
+
+[[package]]
+name = "tinyflows-schedule"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "chrono",
+ "chrono-tz",
+ "cron",
+ "serde",
+ "tinyflows-bus",
+ "tokio",
+ "tracing",
+ "uuid",
 ]
 
 [[package]]
@@ -7051,12 +7390,41 @@ dependencies = [
 ]
 
 [[package]]
+name = "tinyjuice"
+version = "0.10.5"
+dependencies = [
+ "async-trait",
+ "dirs 7.0.0",
+ "hex",
+ "log",
+ "once_cell",
+ "regex",
+ "serde",
+ "serde_json",
+ "sha2 0.11.0",
+ "thiserror 2.0.20",
+ "tinyjuice-bus",
+ "tokio",
+ "unicode-segmentation",
+ "unicode-width",
+]
+
+[[package]]
 name = "tinyjuice-bus"
 version = "0.10.5"
 dependencies = [
  "serde",
  "serde_json",
  "thiserror 2.0.20",
+]
+
+[[package]]
+name = "tinyjuice-drivers"
+version = "0.9.0"
+dependencies = [
+ "log",
+ "tinyjuice",
+ "tinystoragedrivers-core",
 ]
 
 [[package]]
@@ -7078,6 +7446,32 @@ dependencies = [
 ]
 
 [[package]]
+name = "tinymcp"
+version = "0.18.7"
+dependencies = [
+ "base64 0.23.1",
+ "dirs 7.0.0",
+ "futures-util",
+ "parking_lot",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
+ "sha2 0.11.0",
+ "thiserror 2.0.20",
+ "tinybox-bus 0.1.36 (git+https://github.com/tinyhumansai/tinybox?tag=v0.1.36)",
+ "tinymcp-bus",
+ "tinystoragedrivers-core",
+ "tinystoragedrivers-secrets",
+ "tinytools",
+ "tinytools-std",
+ "tokio",
+ "tracing",
+ "url",
+ "urlencoding",
+ "uuid",
+]
+
+[[package]]
 name = "tinymcp-bus"
 version = "0.18.7"
 dependencies = [
@@ -7088,11 +7482,45 @@ dependencies = [
 ]
 
 [[package]]
+name = "tinymemes"
+version = "0.4.0"
+dependencies = [
+ "async-trait",
+ "futures",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.20",
+ "tinyinference-decisions",
+ "tinymemes-bus",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "tinymemes-bus"
 version = "0.4.0"
 dependencies = [
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "tinymemes-module"
+version = "0.4.0"
+dependencies = [
+ "async-trait",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
+ "tinybus 0.1.6",
+ "tinybus-module 0.1.5",
+ "tinymemes",
+ "tinymemes-bus",
+ "tinystoragedrivers-bus",
+ "tinystoragedrivers-core",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]
@@ -7212,7 +7640,7 @@ version = "1.0.0"
 dependencies = [
  "serde",
  "serde_json",
- "tinybus",
+ "tinybus 0.1.6",
 ]
 
 [[package]]
@@ -7222,7 +7650,7 @@ dependencies = [
  "async-trait",
  "serde",
  "serde_json",
- "tinybus",
+ "tinybus 0.1.6",
  "tinystoragedrivers-bus",
  "tinystoragedrivers-client",
  "tinystoragedrivers-core",
@@ -7391,6 +7819,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "tinywallet-x402"
+version = "0.23.3"
+dependencies = [
+ "chrono",
+ "log",
+ "serde",
+ "serde_json",
+ "tinystoragedrivers-core",
+ "tokio",
+]
+
+[[package]]
 name = "tokio"
 version = "1.53.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7478,6 +7918,22 @@ dependencies = [
  "tokio-native-tls",
  "tokio-rustls",
  "tungstenite 0.29.0",
+ "webpki-roots 0.26.11",
+]
+
+[[package]]
+name = "tokio-tungstenite"
+version = "0.30.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "17a073bfed563fa236697a068031408a93cd9522e08abf9933ead3e73411bd71"
+dependencies = [
+ "futures-util",
+ "log",
+ "rustls",
+ "rustls-pki-types",
+ "tokio",
+ "tokio-rustls",
+ "tungstenite 0.30.0",
  "webpki-roots 0.26.11",
 ]
 
@@ -7742,7 +8198,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "045979e3f037cd18ad1cb2a419dfda133c5c29c9f3453370079f2255d46c257e"
 dependencies = [
  "crossbeam-channel",
- "dirs",
+ "dirs 6.0.0",
  "libappindicator",
  "muda",
  "objc2",
@@ -7776,7 +8232,7 @@ dependencies = [
  "httparse",
  "log",
  "rand 0.8.8",
- "sha1",
+ "sha1 0.10.7",
  "thiserror 1.0.69",
  "utf-8",
 ]
@@ -7796,7 +8252,25 @@ dependencies = [
  "rand 0.9.5",
  "rustls",
  "rustls-pki-types",
- "sha1",
+ "sha1 0.10.7",
+ "thiserror 2.0.20",
+]
+
+[[package]]
+name = "tungstenite"
+version = "0.30.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e48ac77174b19c110a50ab2128b24215ac9cb40e0e12e093fb602d175c569d22"
+dependencies = [
+ "bytes",
+ "data-encoding",
+ "http",
+ "httparse",
+ "log",
+ "rand 0.10.2",
+ "rustls",
+ "rustls-pki-types",
+ "sha1 0.11.0",
  "thiserror 2.0.20",
 ]
 
@@ -7914,6 +8388,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c6f5d3c3b1bf09027a88a6bc961fc00497d651009560b5463668dc81b0fa87a8"
 
 [[package]]
+name = "unicode-width"
+version = "0.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b4ac048d71ede7ee76d585517add45da530660ef4390e49b098733c6e897f254"
+
+[[package]]
 name = "universal-hash"
 version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7952,11 +8432,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9a7ac20be9b7726e0bbdbf974c059676d9acb1cd414961f570a4e8231cacd7fc"
 dependencies = [
  "base64 0.23.1",
+ "cookie_store",
  "flate2",
  "log",
  "percent-encoding",
  "rustls",
  "rustls-pki-types",
+ "rustls-platform-verifier",
+ "serde",
+ "serde_json",
+ "socks",
  "ureq-proto",
  "utf8-zero",
  "webpki-roots 1.0.9",
@@ -8975,6 +9460,9 @@ name = "winnow"
 version = "0.7.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "df79d97927682d2fd8adb29682d1140b343be4ac0f08fd68b7765d9c059d3945"
+dependencies = [
+ "memchr",
+]
 
 [[package]]
 name = "winnow"
@@ -9033,7 +9521,7 @@ dependencies = [
  "block2",
  "cookie",
  "crossbeam-channel",
- "dirs",
+ "dirs 6.0.0",
  "dom_query",
  "dpi",
  "dunce",
