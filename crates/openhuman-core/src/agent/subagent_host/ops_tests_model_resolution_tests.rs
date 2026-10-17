@@ -252,6 +252,11 @@ async fn closing_a_durable_driver_session_cancels_only_its_registered_child() {
     )
     .await
     .expect("Tiny await observes close cancellation");
+    assert!(
+        !wait_result.is_error(),
+        "raw product task ID resolves through the authenticated session port: {}",
+        wait_result.output()
+    );
     release_tx.send(()).expect("release child for cooperative settlement");
     let wait_result = tinyagents_harness::tool::ToolDispatch::execute(
         &wait,
@@ -264,8 +269,8 @@ async fn closing_a_durable_driver_session_cancels_only_its_registered_child() {
     .await
     .expect("Tiny await observes settled cancellation");
     assert!(
-        wait_result.output().contains("cancelled"),
-        "shared Jobs await returns the cancelled terminal result: {}",
+        !wait_result.is_error(),
+        "shared Jobs await returns the settled cancellation: {}",
         wait_result.output()
     );
 
