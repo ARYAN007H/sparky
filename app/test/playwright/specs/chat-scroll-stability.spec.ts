@@ -68,6 +68,24 @@ test.describe('Chat scroll paint stability', () => {
       '[data-slot="aui_assistant-message-root"], [data-slot="aui_user-message-root"]'
     );
     await expect(roots).toHaveCount(TURN_COUNT * 2, { timeout: 20_000 });
+    await expect
+      .poll(() =>
+        page.evaluate(currentThreadId => {
+          const store = (
+            window as unknown as {
+              __OPENHUMAN_STORE__?: {
+                getState?: () => {
+                  thread?: { selectedThreadId?: string | null; isLoadingMessages?: boolean };
+                };
+              };
+            }
+          ).__OPENHUMAN_STORE__;
+          const thread = store?.getState?.().thread;
+          return thread?.selectedThreadId === currentThreadId && !thread.isLoadingMessages;
+        }, threadId)
+      )
+      .toBe(true);
+    await page.waitForLoadState('networkidle');
     expect(
       await roots.evaluateAll(elements =>
         elements.every(
