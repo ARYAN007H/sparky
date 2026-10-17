@@ -1,6 +1,6 @@
 use super::*;
 
-pub(super) fn decode_driver_job_result(
+pub(crate) fn decode_driver_job_result(
     tool_result: tinytools::ToolResult,
     bundle: &OpenHumanDriverBundle,
     task_key: &SubagentTaskKey,
@@ -22,7 +22,7 @@ pub(super) fn decode_driver_job_result(
     Ok(public_id)
 }
 
-pub(super) async fn resolve_inline_driver_outcome(
+pub(crate) async fn resolve_inline_driver_outcome(
     tool_result: tinytools::ToolResult,
     bundle: &OpenHumanDriverBundle,
     task_key: &SubagentTaskKey,
