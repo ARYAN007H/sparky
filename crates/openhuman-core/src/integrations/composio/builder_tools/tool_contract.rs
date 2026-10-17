@@ -6,7 +6,6 @@ use async_trait::async_trait;
 use serde_json::{json, Value};
 
 use crate::config::Config;
-use crate::flows::ops;
 use tinytools::{PermissionLevel, Tool, ToolResult};
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -88,7 +87,7 @@ impl Tool for GetToolContractTool {
         // otherwise resolve to a bogus toolkit and come back as the catalog
         // error below, which tells the model to retry a fetch that can never
         // succeed.
-        match ops::lookup_contract(&self.config, &slug).await {
+        match crate::integrations::composio::catalog::lookup_contract(&self.config, &slug).await {
             Ok((contract, runtime_gate)) => {
                 // B12: a prior real-output probe (get_tool_output_sample) for
                 // this exact slug is ACTUAL observed data and always wins
@@ -123,18 +122,18 @@ impl Tool for GetToolContractTool {
                     &contract,
                 )?))
             }
-            Err(ops::ContractLookupError::InvalidSlug { slug }) => Ok(ToolResult::error(format!(
+            Err(crate::integrations::composio::catalog::ContractLookupError::InvalidSlug { slug }) => Ok(ToolResult::error(format!(
                 "Could not extract a toolkit from slug '{slug}' — it must look like \
                  '<TOOLKIT>_<ACTION>' (e.g. 'GMAIL_SEND_EMAIL')."
             ))),
-            Err(ops::ContractLookupError::CatalogUnavailable { toolkit }) => {
+            Err(crate::integrations::composio::catalog::ContractLookupError::CatalogUnavailable { toolkit }) => {
                 Ok(ToolResult::error(format!(
                     "Could not fetch the live Composio catalog for toolkit '{toolkit}' (no backend \
                      session, or a transient failure) — try again, or use search_tool_catalog to \
                      confirm the toolkit is reachable."
                 )))
             }
-            Err(ops::ContractLookupError::ActionNotFound { slug, toolkit }) => {
+            Err(crate::integrations::composio::catalog::ContractLookupError::ActionNotFound { slug, toolkit }) => {
                 Ok(ToolResult::error(format!(
                     "'{slug}' is not a real action in the '{toolkit}' toolkit's live catalog — use \
                      search_tool_catalog to find a real slug."

@@ -35,17 +35,14 @@
 //! — this makes exactly one bounded real read to observe the actual shape
 //! instead. It can never send/create/update/delete anything.
 
-mod catalog_search;
-mod connection_reads;
-mod tool_contract;
-
-pub(crate) use catalog_search::search_live_catalog;
-pub use catalog_search::SearchToolCatalogTool;
-pub use connection_reads::{ListConnectableToolkitsTool, ListFlowConnectionsTool};
-pub use tool_contract::{GetToolContractTool, GetToolOutputSampleTool};
+pub(crate) use crate::integrations::composio::builder_tools::search_live_catalog;
+pub use crate::integrations::composio::builder_tools::{
+    GetToolContractTool, GetToolOutputSampleTool, ListConnectableToolkitsTool,
+    ListFlowConnectionsTool, SearchToolCatalogTool,
+};
 
 #[cfg(test)]
-use connection_reads::flow_connection_to_json;
+use crate::integrations::composio::builder_tools::flow_connection_to_json;
 
 #[cfg(test)]
 #[path = "builder_tools_support.rs"]

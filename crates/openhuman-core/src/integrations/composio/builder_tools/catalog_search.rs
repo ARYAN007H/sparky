@@ -6,7 +6,6 @@ use async_trait::async_trait;
 use serde_json::{json, Value};
 
 use crate::config::Config;
-use crate::flows::ops;
 use tinytools::{PermissionLevel, Tool, ToolResult};
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -17,7 +16,7 @@ use tinytools::{PermissionLevel, Tool, ToolResult};
 /// `search_tool_catalog`: search the FULL LIVE Composio catalog — every real
 /// action for a named app, connected or not, curated or not — so `tool_call`
 /// nodes are grounded in slugs that actually exist (rather than a hallucinated
-/// slug that fails the save-time [`crate::flows::ops::validate_tool_contracts`]
+/// slug that fails the save-time flow contract validation
 /// gate).
 ///
 /// Also grounds the OUTPUT side: each result carries the action's real
@@ -199,7 +198,7 @@ pub(crate) async fn search_catalog(
         // allowlist at RUNTIME, so any `featured: false` action of it is
         // rejected on every real run. Compute once per toolkit and flag those
         // rows so the blocker is visible at search time (transcript failure #2).
-        let toolkit_curated = ops::toolkit_has_curated_catalog(toolkit);
+        let toolkit_curated = crate::integrations::composio::catalog::has_curated_catalog(toolkit);
         for tool in catalog {
             let slug_lc = tool.slug.to_ascii_lowercase();
             let desc_lc = tool
@@ -261,7 +260,7 @@ pub(crate) async fn search_catalog(
     // tiebreak. Rows go through the SAME `shape_catalog_row` path as primary.
     let mut scored: Vec<(usize, bool, Value)> = Vec::new();
     for (toolkit, catalog) in &fetched {
-        let toolkit_curated = ops::toolkit_has_curated_catalog(toolkit);
+        let toolkit_curated = crate::integrations::composio::catalog::has_curated_catalog(toolkit);
         for tool in catalog {
             let slug_lc = tool.slug.to_ascii_lowercase();
             let desc_lc = tool

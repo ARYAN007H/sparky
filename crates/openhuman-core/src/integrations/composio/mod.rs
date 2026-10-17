@@ -39,6 +39,7 @@
 
 pub mod action_tool;
 pub mod bus;
+pub(crate) mod builder_tools;
 pub mod catalog;
 pub mod client;
 pub mod connected_integrations;
