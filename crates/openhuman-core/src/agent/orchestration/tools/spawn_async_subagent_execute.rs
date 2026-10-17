@@ -136,13 +136,22 @@ impl SpawnAsyncSubagentTool {
                     let jobs = crate::core::runtime::slot_for::<
                         tinyagents_orchestration::subagent::SubAgentJobRegistry,
                     >(&dispatch);
-                    let _ = jobs;
-                    let _ = running_subagents::cancel_by_session_in_workspace(
-                        &dispatch,
-                        &session.subagent_session_id,
+                    let cancelled = subagent_sessions::cancel_driver_job_for_observed_session(
+                        &store,
+                        &parent.workspace_dir.join(".openhuman/subagent_checkpoints"),
+                        &jobs,
+                        &session,
                         &parent_session,
-                        &parent.workspace_dir,
+                        parent_thread_id.as_deref(),
                     );
+                    if !cancelled {
+                        let _ = running_subagents::cancel_by_session_in_workspace(
+                            &dispatch,
+                            &session.subagent_session_id,
+                            &parent_session,
+                            &parent.workspace_dir,
+                        );
+                    }
                     match subagent_sessions::close_if_current(&store, &session) {
                         Ok(true) => {}
                         Ok(false) => {
