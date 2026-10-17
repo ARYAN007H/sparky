@@ -20,7 +20,7 @@ use crate::threads::store::{self as conversations, ConversationMessage};
 use async_trait::async_trait;
 use serde_json::json;
 use std::sync::Arc;
-use tinyagents_harness::context::{RunConfig, RunContext};
+use tinyagents_harness::context::RunContext;
 use tinyagents_harness::tool::{ToolDispatch, ToolExecutionContext};
 use tinyagents_session::transcript::TranscriptMessage;
 use tinytools::ToolRunContext;
@@ -61,10 +61,8 @@ impl ToolDispatch<(), crate::agent::tinyagents::host::OpenHumanRunContext>
         parent: &RunContext<crate::agent::tinyagents::host::OpenHumanRunContext>,
     ) -> anyhow::Result<ToolResult> {
         let context = ToolExecutionContext::from_run_context(parent, _call_id.clone());
-        let detached_parent = crate::agent::subagent_host::detached_subagent_parent(
-            parent,
-            "async-subagent",
-        )?;
+        let detached_parent =
+            crate::agent::subagent_host::detached_subagent_parent(parent, "async-subagent")?;
         SpawnAsyncSubagentTool::new()
             .execute_with_live_parent_context(
                 arguments,
@@ -324,10 +322,8 @@ impl SpawnAsyncSubagentTool {
         parent: crate::agent::harness::ParentExecutionContext,
     ) -> anyhow::Result<ToolResult> {
         let live_parent = super::live_parent_run_context("direct-async-subagent", parent);
-        let detached_parent = crate::agent::subagent_host::detached_subagent_parent(
-            &live_parent,
-            "async-subagent",
-        )?;
+        let detached_parent =
+            crate::agent::subagent_host::detached_subagent_parent(&live_parent, "async-subagent")?;
         self.execute_with_context_inner(
             args,
             options,

@@ -7,7 +7,7 @@ use crate::agent_registry::host_definition::AgentDefinitionRegistry;
 use crate::progress::AgentProgress;
 use async_trait::async_trait;
 use std::sync::Arc;
-use tinyagents_harness::context::{RunConfig, RunContext};
+use tinyagents_harness::context::RunContext;
 use tinyagents_harness::tool::{ToolDispatch, ToolExecutionContext};
 use tinytools::ToolRunContext;
 use tinytools::{ToolCallOptions, ToolResult};
@@ -297,11 +297,10 @@ pub(crate) async fn dispatch_subagent_with_live_parent(
             // agent-turn futures) overflows the test-thread stack on deep
             // parallel-delegation flows.
             return Box::pin(async move {
-                let detached_parent =
-                    crate::agent::subagent_host::detached_subagent_parent(
-                        live_parent,
-                        "async-subagent",
-                    )?;
+                let detached_parent = crate::agent::subagent_host::detached_subagent_parent(
+                    live_parent,
+                    "async-subagent",
+                )?;
                 super::spawn_async_subagent::SpawnAsyncSubagentTool::new()
                     .execute_with_live_parent_context(
                         async_args,

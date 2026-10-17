@@ -126,18 +126,18 @@ impl SpawnSubagentTool {
         if prompt.is_empty() {
             return Ok(ToolResult::error("spawn_subagent: `prompt` is required"));
         }
-        let registry = match AgentDefinitionRegistry::for_core_context(
-            run_context.dispatch_ctx().into_core(),
-        ) {
-            Some(reg) => reg,
-            None => {
-                return Ok(ToolResult::error(
-                    "spawn_subagent: AgentDefinitionRegistry has not been initialised. \
+        let registry =
+            match AgentDefinitionRegistry::for_core_context(run_context.dispatch_ctx().into_core())
+            {
+                Some(reg) => reg,
+                None => {
+                    return Ok(ToolResult::error(
+                        "spawn_subagent: AgentDefinitionRegistry has not been initialised. \
                      This usually means the core process started without calling \
                      AgentDefinitionRegistry::init_global at startup.",
-                ));
-            }
-        };
+                    ));
+                }
+            };
 
         let definition = match registry.get(agent_id.as_str()) {
             Some(def) => def,
@@ -319,14 +319,10 @@ impl SpawnSubagentTool {
             message_run_queue: None,
         };
 
-        let run = run_subagent_via_driver_tool(
-            live_parent,
-            definition.clone(),
-            prompt.clone(),
-            options,
-        )
-        .await
-        .map(|(outcome, _job_id)| outcome);
+        let run =
+            run_subagent_via_driver_tool(live_parent, definition.clone(), prompt.clone(), options)
+                .await
+                .map(|(outcome, _job_id)| outcome);
         match run {
             Ok(outcome) => {
                 let emit_lifecycle_effects = outcome.should_emit_lifecycle_effects();

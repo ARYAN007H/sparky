@@ -247,7 +247,10 @@ async fn live_close_alias_enforces_parent_thread_ownership() {
         last_used_at: "2026-01-01T00:00:00Z".into(),
     };
     sessions
-        .save(&[row("owned-session", "voice-thread"), row("foreign-session", "other-thread")])
+        .save(&[
+            row("owned-session", "voice-thread"),
+            row("foreign-session", "other-thread"),
+        ])
         .expect("seed scoped rows");
 
     let tools: SharedToolSet = Arc::new(vec![Box::new(

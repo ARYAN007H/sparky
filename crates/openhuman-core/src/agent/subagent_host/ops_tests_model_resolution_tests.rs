@@ -1,9 +1,9 @@
 use super::*;
 use crate::agent::subagent_host::run_subagent;
 use crate::agent::subagent_host::{
-    SubagentRunStatus, run_subagent_via_driver_tool, spawn_async_via_driver_tool_with_jobs,
+    run_subagent_via_driver_tool, spawn_async_via_driver_tool_with_jobs, SubagentRunStatus,
 };
-use tinyagents_harness::context::{RunDepth, current_run_depth, with_run_depth};
+use tinyagents_harness::context::{current_run_depth, with_run_depth, RunDepth};
 
 struct BlockingSubagentCloseTool {
     started: tokio::sync::mpsc::Sender<()>,
@@ -278,21 +278,19 @@ async fn closing_a_durable_driver_session_cancels_only_its_registered_child() {
     assert_eq!(steered_payload["job_id"].as_str(), Some(job_id.as_str()));
     assert_eq!(steered_payload["status"], "message_queued");
 
-    assert!(
-        port.close("close-driver-session")
-            .await
-            .expect("Tiny close adapter cancels then closes the durable row")
-    );
+    assert!(port
+        .close("close-driver-session")
+        .await
+        .expect("Tiny close adapter cancels then closes the durable row"));
     assert_eq!(
         jobs.get(job_id.as_str()).unwrap().status,
         SubAgentJobStatus::Running,
         "the job remains visible while cooperative cancellation unwinds"
     );
-    assert!(
-        port.close("close-driver-session")
-            .await
-            .expect("repeated close is idempotent without re-cancelling")
-    );
+    assert!(port
+        .close("close-driver-session")
+        .await
+        .expect("repeated close is idempotent without re-cancelling"));
     assert!(!parent_cancellation.is_cancelled(), "parent stays live");
 
     let tiny_store: std::sync::Arc<dyn TinySessionStore> = std::sync::Arc::new(port.clone());

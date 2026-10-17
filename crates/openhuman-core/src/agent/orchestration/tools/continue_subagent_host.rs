@@ -155,10 +155,8 @@ impl ContinueSubagentTool {
                 serde_json::Value::String(model.clone()),
             );
         }
-        let detached_parent = crate::agent::subagent_host::detached_subagent_parent(
-            live_parent,
-            "async-subagent",
-        )?;
+        let detached_parent =
+            crate::agent::subagent_host::detached_subagent_parent(live_parent, "async-subagent")?;
         super::spawn_async_subagent::SpawnAsyncSubagentTool::new()
             .execute_with_live_parent_context(
                 async_args,
