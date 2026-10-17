@@ -1,6 +1,6 @@
 //! Builder tools backed by the Composio catalog and connected accounts.
 
-mod catalog_search;
+pub(crate) mod catalog_search;
 mod connection_reads;
 mod tool_contract;
 

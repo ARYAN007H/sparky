@@ -229,9 +229,9 @@ async fn revise_workflow_proposal_is_marked_unpersisted() {
 fn module_doc_tool_table_matches_registered_tools() {
     const SOURCE: &str = concat!(
         include_str!("builder_tools.rs"),
-        include_str!("builder_tools/catalog_search.rs"),
-        include_str!("builder_tools/connection_reads.rs"),
-        include_str!("builder_tools/tool_contract.rs"),
+        include_str!("../integrations/composio/builder_tools/catalog_search.rs"),
+        include_str!("../integrations/composio/builder_tools/connection_reads.rs"),
+        include_str!("../integrations/composio/builder_tools/tool_contract.rs"),
     );
 
     let module_doc: String = SOURCE
