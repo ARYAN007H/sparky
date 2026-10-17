@@ -618,3 +618,59 @@ async fn saas_controls_follow_the_explicit_context_not_the_tasks_scope() {
         "each cancel removed only that profile's worker, and it is gone"
     );
 }
+
+#[tokio::test]
+async fn durable_fallback_store_uses_explicit_profile_context_at_shared_workspace() {
+    if !child(
+        "durable_fallback_store_uses_explicit_profile_context_at_shared_workspace",
+        Mode::Saas,
+    ) {
+        return;
+    }
+    let workspace = tempfile::tempdir().unwrap();
+    let alice_context = profile("durable-alice", workspace.path());
+    let bob_context = profile("durable-bob", workspace.path());
+    let alice = DispatchCtx::new(alice_context.clone());
+    let bob = DispatchCtx::new(bob_context.clone());
+    let task_id = uuid::Uuid::new_v4().to_string();
+    let session_id = uuid::Uuid::new_v4().to_string();
+
+    CoreContext::sync_scope(alice_context, || {
+        super::super::task_ledger::record_spawned(
+            &task_id,
+            "researcher",
+            PARENT,
+            None,
+            Some(&session_id),
+            workspace.path(),
+            None,
+        );
+    });
+
+    let assert_alice_can_recover = || {
+        assert_eq!(
+            task_id_for_session_in_workspace(&alice, &session_id, PARENT, workspace.path())
+                .unwrap(),
+            task_id
+        );
+        assert_eq!(
+            resume_ref_for_task_in_workspace(&alice, &task_id, PARENT, workspace.path())
+                .unwrap()
+                .task_id,
+            task_id
+        );
+    };
+
+    // No ambient task scope is installed: the explicit Alice context owns the
+    // durable lookup even though both profiles use the same workspace path.
+    assert!(CoreContext::scoped().is_none());
+    assert_alice_can_recover();
+
+    // A foreign ambient scope must not redirect Alice's explicit lookup to
+    // Bob's profile store.
+    CoreContext::sync_scope(bob_context, assert_alice_can_recover);
+    assert!(matches!(
+        resume_ref_for_task_in_workspace(&bob, &task_id, PARENT, workspace.path()),
+        Err(WaitError::Unknown)
+    ));
+}
