@@ -214,7 +214,10 @@ async fn owner_admission_receipt_ids_flow_into_completed_member_evidence() {
     assert_eq!(done.evidence.len(), 1, "worker output captured as evidence");
     assert!(done.evidence[0].contains(&receipt.run_id));
     assert_eq!(receipt.task.id, "task-a");
-    assert_eq!(receipt.member.run_id.as_deref(), Some(receipt.run_id.as_str()));
+    assert_eq!(
+        receipt.member.run_id.as_deref(),
+        Some(receipt.run_id.as_str())
+    );
     assert!(receipt.member.worker_thread_id.is_some());
 
     let member = crate::storage::sessions::with_ledger(&config.workspace_dir, |ledger| {
@@ -230,8 +233,7 @@ async fn owner_admission_receipt_ids_flow_into_completed_member_evidence() {
 /// Covers `run_member_loop` — the `with_root_parent` wrapper around
 /// `drive_member`. With a mock parent passed explicitly, `with_root_parent`
 /// uses it (rather than building a real root), so the member drives to
-/// completion under the canned provider. Same setup as the `drive_member`
-/// happy-path test, but through the wrapper the live runtime spawns.
+/// execution under the canned provider and returns owner-ready evidence.
 #[tokio::test]
 async fn run_member_loop_drives_member_under_an_explicit_parent() {
     AgentDefinitionRegistry::init_global_builtins().unwrap();
@@ -246,37 +248,6 @@ async fn run_member_loop_drives_member_under_an_explicit_parent() {
         None,
         vec![],
     );
-    crate::storage::sessions::with_ledger(&config.workspace_dir, |ledger| {
-        let ledger_arg_0 = ("team-1").to_string();
-        let ledger_arg_1 = ("task-a").to_string();
-        let ledger_arg_2 = ("m1").to_string();
-        let ledger_arg_3 = ("teamrun-y").to_string();
-        async move {
-            ledger
-                .claim_agent_team_task(&ledger_arg_0, &ledger_arg_1, &ledger_arg_2, &ledger_arg_3)
-                .await
-        }
-    })
-    .unwrap();
-    crate::storage::sessions::with_ledger(&config.workspace_dir, |ledger| {
-        let ledger_arg_0 = ("team-1").to_string();
-        let ledger_arg_1 = ("m1").to_string();
-        let ledger_arg_2 = ("task-a").to_string();
-        let ledger_arg_3 = ("teamrun-y").to_string();
-        let ledger_arg_4 = ("teamrun-y").to_string();
-        async move {
-            ledger
-                .mark_agent_team_member_running(
-                    &ledger_arg_0,
-                    &ledger_arg_1,
-                    &ledger_arg_2,
-                    &ledger_arg_3,
-                    &ledger_arg_4,
-                )
-                .await
-        }
-    })
-    .unwrap();
     let task = crate::storage::sessions::with_ledger(&config.workspace_dir, |ledger| {
         let ledger_arg_0 = ("task-a").to_string();
         async move { ledger.get_agent_team_task(&ledger_arg_0).await }
@@ -288,7 +259,7 @@ async fn run_member_loop_drives_member_under_an_explicit_parent() {
         output: "did the thing".into(),
         fail: false,
     });
-    run_member_loop(
+    let evidence = run_member_loop(
         &crate::core::runtime::DispatchCtx::ambient(),
         &config,
         "team-1",
@@ -299,23 +270,14 @@ async fn run_member_loop_drives_member_under_an_explicit_parent() {
         Some("test-model".into()),
         Some(mock_parent(provider)),
     )
-    .await;
-
-    let done = crate::storage::sessions::with_ledger(&config.workspace_dir, |ledger| {
-        let ledger_arg_0 = ("task-a").to_string();
-        async move { ledger.get_agent_team_task(&ledger_arg_0).await }
-    })
-    .unwrap()
-    .unwrap();
-    assert_eq!(
-        done.status,
-        AgentTeamTaskStatus::Done,
-        "run_member_loop drove the member to completion through with_root_parent"
-    );
+    .await
+    .expect("run_member_loop returns evidence through with_root_parent");
+    assert_eq!(evidence.len(), 1);
+    assert!(evidence[0].contains("teamrun-y"));
 }
 
 #[tokio::test]
-async fn drive_member_releases_task_when_worker_fails() {
+async fn owner_releases_task_when_host_worker_fails() {
     AgentDefinitionRegistry::init_global_builtins().unwrap();
     let (_dir, config) = test_config();
     seed_team(&config, "team-1");
@@ -328,60 +290,22 @@ async fn drive_member_releases_task_when_worker_fails() {
         None,
         vec![],
     );
-    crate::storage::sessions::with_ledger(&config.workspace_dir, |ledger| {
-        let ledger_arg_0 = ("team-1").to_string();
-        let ledger_arg_1 = ("task-a").to_string();
-        let ledger_arg_2 = ("m1").to_string();
-        let ledger_arg_3 = ("teamrun-x").to_string();
-        async move {
-            ledger
-                .claim_agent_team_task(&ledger_arg_0, &ledger_arg_1, &ledger_arg_2, &ledger_arg_3)
-                .await
-        }
-    })
-    .unwrap();
-    crate::storage::sessions::with_ledger(&config.workspace_dir, |ledger| {
-        let ledger_arg_0 = ("team-1").to_string();
-        let ledger_arg_1 = ("m1").to_string();
-        let ledger_arg_2 = ("task-a").to_string();
-        let ledger_arg_3 = ("teamrun-x").to_string();
-        let ledger_arg_4 = ("teamrun-x").to_string();
-        async move {
-            ledger
-                .mark_agent_team_member_running(
-                    &ledger_arg_0,
-                    &ledger_arg_1,
-                    &ledger_arg_2,
-                    &ledger_arg_3,
-                    &ledger_arg_4,
-                )
-                .await
-        }
-    })
-    .unwrap();
-    let task = crate::storage::sessions::with_ledger(&config.workspace_dir, |ledger| {
-        let ledger_arg_0 = ("task-a").to_string();
-        async move { ledger.get_agent_team_task(&ledger_arg_0).await }
-    })
-    .unwrap()
-    .unwrap();
-
     let provider = Arc::new(CannedModel {
         output: String::new(),
         fail: true,
     });
-    drive_member(
-        &config,
-        "team-1",
-        "m1",
-        "task_manager_agent",
-        &task,
-        "teamrun-x",
-        Some("test-model".into()),
-        mock_parent(provider),
-    )
-    .await
-    .expect("drive_member handles worker failure without erroring");
+    let executor = HostTeamMemberExecutor {
+        ctx: crate::core::runtime::DispatchCtx::ambient(),
+        config: config.clone(),
+        team_id: "team-1".into(),
+        member_id: "m1".into(),
+        model_override: Some("test-model".into()),
+        parent_override: Some(mock_parent(provider)),
+    };
+    assert!(team_service(&config)
+        .start_member_with_started("team-1", "task-a", "m1", &executor, false, |_| {})
+        .await
+        .is_err());
 
     // Task released back to todo, claim cleared → reclaimable.
     let released = crate::storage::sessions::with_ledger(&config.workspace_dir, |ledger| {

@@ -210,11 +210,7 @@ impl AgentOrchestrationSession {
             if !state.is_terminal() {
                 completed = false;
             }
-            agents.push(snapshot_of(
-                item.task_id.as_str(),
-                &item.metadata,
-                &state,
-            ));
+            agents.push(snapshot_of(item.task_id.as_str(), &item.metadata, &state));
         }
 
         Ok(WaitAgentResponse { completed, agents })

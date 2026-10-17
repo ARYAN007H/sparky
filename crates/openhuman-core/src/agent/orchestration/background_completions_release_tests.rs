@@ -37,9 +37,7 @@ async fn release_all_closes_every_router_and_the_log_stays_replayable() {
 
     assert!(release_all().await >= 1);
     assert!(
-        !state()
-            .stores
-            .contains_key(&super::router_scope(w)),
+        !state().stores.contains_key(&super::router_scope(w)),
         "the router (and its log handle) is dropped"
     );
     assert!(

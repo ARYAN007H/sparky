@@ -37,8 +37,8 @@ use tinyagents_orchestration::subagent::{
     record_detached_completion, DetachedCompletionTarget, DetachedSubagentStatus,
 };
 use tinyagents_tasks::{
-    CompletionRecord, CompletionResult, CompletionRouter, CompletionState, CompletionStatus,
-    CompletionRouterPool, CompletionRouterReplaceOutcome, CompletionStore,
+    CompletionRecord, CompletionResult, CompletionRouter, CompletionRouterPool,
+    CompletionRouterReplaceOutcome, CompletionState, CompletionStatus, CompletionStore,
     DriverCompletionStore, InMemoryCompletionStore, NotifyMode, TombstoneOutcome,
     DEFAULT_MAX_ATTEMPTS,
 };

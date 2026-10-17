@@ -143,7 +143,8 @@ pub async fn start_member_run(
     // admitted the run; the same owner future then continues executing it.
     let ledger = crate::storage::sessions::require_ledger(&config.workspace_dir)
         .map_err(|error| anyhow!("{error}"))?;
-    let service = SessionTeamLedger::new(ledger).map(tinyagents_orchestration::teams::TeamService::new)?;
+    let service =
+        SessionTeamLedger::new(ledger).map(tinyagents_orchestration::teams::TeamService::new)?;
     let executor = HostTeamMemberExecutor {
         ctx: ctx.clone(),
         config: config.clone(),
@@ -196,10 +197,12 @@ pub async fn start_member_run(
         Ok(Err(error)) => {
             if let Some(error) = error.downcast_ref::<TeamMemberStartError>() {
                 return Ok(match error {
-                    TeamMemberStartError::AlreadyClaimed { .. } => StartMemberOutcome::AlreadyClaimed,
-                    TeamMemberStartError::Blocked { unmet, .. } => {
-                        StartMemberOutcome::Blocked { unmet: unmet.clone() }
+                    TeamMemberStartError::AlreadyClaimed { .. } => {
+                        StartMemberOutcome::AlreadyClaimed
                     }
+                    TeamMemberStartError::Blocked { unmet, .. } => StartMemberOutcome::Blocked {
+                        unmet: unmet.clone(),
+                    },
                     TeamMemberStartError::UnknownTask { .. } => StartMemberOutcome::UnknownTask,
                     TeamMemberStartError::Other(_) => return Err(anyhow!("{error}")),
                 });
