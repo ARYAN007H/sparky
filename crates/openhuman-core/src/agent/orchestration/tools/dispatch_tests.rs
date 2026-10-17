@@ -157,7 +157,12 @@ async fn config_delegate_dispatch_honours_the_parent_cancellation_token() {
     });
     let dispatch = DelegateToolDispatch::new(tool);
     let cancellation = tinyagents_harness::CancellationToken::new();
+    let core = crate::core::runtime::CoreContext::for_test_with_config(
+        crate::core::runtime::DomainSet::full(),
+        crate::config::Config::default(),
+    );
     let parent = crate::agent::tinyagents::host::OpenHumanRunContext::new()
+        .with_core(Some(Arc::clone(&core)))
         .with_cancellation(cancellation.clone())
         .into_tinyagents(RunConfig::new("config-delegate-parent").with_thread("thread-parent"));
     let jobs = crate::core::runtime::slot_for::<
@@ -186,18 +191,27 @@ async fn config_delegate_dispatch_honours_the_parent_cancellation_token() {
         .expect("cancellation is reported as a tool result");
     assert!(result.is_error);
     assert!(result.output().contains("cancelled"), "{}", result.output());
-    assert!(
-        jobs.list()
-            .iter()
-            .any(|job| { job.agent == "configured" && job.status.is_terminal() }),
-        "configured child cancellation settles the shared Jobs lifecycle"
+    let cancelled = jobs
+        .list()
+        .into_iter()
+        .find(|job| job.agent == "configured")
+        .expect("configured child remains in the isolated shared registry");
+    assert_eq!(
+        cancelled.status,
+        tinyagents_orchestration::subagent::SubAgentJobStatus::Cancelled,
+        "configured child cancellation settles as Cancelled"
     );
 }
 
 #[tokio::test]
 async fn config_delegate_dispatch_preserves_tool_failure_in_shared_jobs() {
     let dispatch = DelegateToolDispatch::new(Arc::new(FailingDelegationTool));
+    let core = crate::core::runtime::CoreContext::for_test_with_config(
+        crate::core::runtime::DomainSet::full(),
+        crate::config::Config::default(),
+    );
     let parent = crate::agent::tinyagents::host::OpenHumanRunContext::new()
+        .with_core(Some(Arc::clone(&core)))
         .into_tinyagents(RunConfig::new("config-delegate-error-parent"));
     let jobs = crate::core::runtime::slot_for::<
         tinyagents_orchestration::subagent::SubAgentJobRegistry,

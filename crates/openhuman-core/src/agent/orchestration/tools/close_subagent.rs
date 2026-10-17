@@ -152,8 +152,22 @@ impl CloseSubagentTool {
                 "close_subagent: sub-agent session not found for this parent thread",
             ));
         }
-        let cancelled = running_subagents::cancel_by_session_in_workspace(
-            &crate::agent::tinyagents::host::run_context::dispatch_ctx_for_tool(tool_context),
+        let dispatch =
+            crate::agent::tinyagents::host::run_context::dispatch_ctx_for_tool(tool_context);
+        let thread_id = tool_context.and_then(ToolRunContext::thread_id);
+        let jobs = crate::core::runtime::slot_for::<
+            tinyagents_orchestration::subagent::SubAgentJobRegistry,
+        >(&dispatch);
+        let store = SubagentSessionStore::new(parent.workspace_dir.clone());
+        let cancelled = subagent_sessions::cancel_driver_job_for_session(
+            &store,
+            &parent.workspace_dir.join(".openhuman/subagent_checkpoints"),
+            &jobs,
+            &subagent_session_id,
+            &parent.session_id,
+            thread_id,
+        ) || running_subagents::cancel_by_session_in_workspace(
+            &dispatch,
             &subagent_session_id,
             &parent.session_id,
             &parent.workspace_dir,
