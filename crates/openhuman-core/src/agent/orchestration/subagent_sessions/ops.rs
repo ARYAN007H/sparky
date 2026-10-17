@@ -174,12 +174,15 @@ pub fn cancel_driver_job_for_observed_session(
 /// authenticated TinyAgents lifecycle key.
 #[derive(Debug, Clone)]
 pub struct DriverTaskCancellation {
+    pub task_id: String,
     pub agent_id: String,
     pub parent_session: String,
     pub subagent_session_id: String,
     pub workspace_dir: std::path::PathBuf,
     pub parent_thread_id: Option<String>,
     pub already_finished: Option<tinyagents_orchestration::subagent::FinishedOutcome>,
+    pub was_paused: bool,
+    pub lifecycle_key: Option<tinyagents_orchestration::subagent::SubagentTaskKey>,
 }
 
 pub fn cancel_driver_job_by_task(
@@ -200,6 +203,7 @@ pub fn cancel_driver_job_by_task(
     if matches.next().is_some() {
         return Ok(None);
     }
+    let was_paused = session.status == DurableSubagentStatus::AwaitingUser;
     let already_finished = match session.status {
         DurableSubagentStatus::Idle => {
             Some(tinyagents_orchestration::subagent::FinishedOutcome::Completed)
@@ -209,6 +213,20 @@ pub fn cancel_driver_job_by_task(
         }
         DurableSubagentStatus::Running | DurableSubagentStatus::AwaitingUser => None,
         DurableSubagentStatus::Closed => return Ok(None),
+    };
+    let lifecycle_key = if already_finished.is_none() {
+        Some(
+            resolve_lifecycle_key(
+                store,
+                task_id,
+                &session.parent_session,
+                session.parent_thread_id.as_deref(),
+                checkpoint_dir,
+            )
+            .map_err(|error| format!("failed to resolve subagent lifecycle for cancellation: {error}"))?,
+        )
+    } else {
+        session.lifecycle_key.clone()
     };
     if already_finished.is_none()
         && reason.is_some()
@@ -232,13 +250,52 @@ pub fn cancel_driver_job_by_task(
         return Ok(None);
     }
     Ok(Some(DriverTaskCancellation {
+        task_id: task_id.to_owned(),
         agent_id: session.agent_id,
         parent_session: session.parent_session,
         subagent_session_id: session.subagent_session_id,
         workspace_dir: store.workspace_dir.clone(),
         parent_thread_id: session.parent_thread_id,
         already_finished,
+        was_paused,
+        lifecycle_key,
     }))
+}
+
+/// Mark a paused driver's durable product row cancelled only if it is still
+/// the same lifecycle selected by the RPC. Paused driver completion has
+/// already returned, so there is no live callback left to project this host
+/// state transition.
+pub fn mark_driver_pause_cancelled(
+    store: &SubagentSessionStore,
+    observed: &DriverTaskCancellation,
+) -> Result<bool, String> {
+    if !observed.was_paused {
+        return Ok(false);
+    }
+    let _guard = store_write_lock()
+        .lock()
+        .map_err(|_| "subagent session store lock poisoned".to_string())?;
+    let mut sessions = store.load()?;
+    let Some(session) = sessions.iter_mut().find(|session| {
+        session.subagent_session_id == observed.subagent_session_id
+    }) else {
+        return Ok(false);
+    };
+    if session.parent_session != observed.parent_session
+        || session.parent_thread_id != observed.parent_thread_id
+        || session.current_task_id.as_deref() != Some(observed.task_id.as_str())
+        || session.lifecycle_key != observed.lifecycle_key
+        || session.status != DurableSubagentStatus::AwaitingUser
+    {
+        return Ok(false);
+    }
+    session.status = DurableSubagentStatus::Failed;
+    session.latest_error = Some("cancelled by user".into());
+    session.updated_at = chrono::Utc::now().to_rfc3339();
+    session.last_used_at = session.updated_at.clone();
+    store.save(&sessions)?;
+    Ok(true)
 }
 
 /// Persist an optional RPC cancellation reason before signaling TinyAgents so

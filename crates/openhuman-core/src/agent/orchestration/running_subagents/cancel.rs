@@ -28,6 +28,9 @@ pub(crate) struct CancelledSubagent {
     /// "Cancel" still finds it; the caller must not rewrite that outcome as a
     /// user cancellation, and reports it instead.
     pub(crate) already_finished: Option<FinishedOutcome>,
+    /// The selected durable driver row when a paused child needs host-side
+    /// terminal projection (its driver callback already returned on pause).
+    pub(crate) driver_pause: Option<crate::agent::orchestration::subagent_sessions::DriverTaskCancellation>,
     /// TinyAgents' awaited completion handler owns terminal delivery for this
     /// driver-backed child; the RPC handler must not publish a duplicate.
     pub(crate) driver_managed: bool,
@@ -87,6 +90,7 @@ pub(crate) fn cancel_by_task_with_workspace_reason(
             workspace_dir: metadata.workspace_dir,
             parent_thread_id: metadata.parent_thread_id,
             already_finished,
+            driver_pause: None,
             driver_managed: false,
         }));
     }
@@ -112,6 +116,10 @@ pub(crate) fn cancel_by_task_with_workspace_reason(
         task_id,
         reason,
     )?;
+    let driver_pause = selected
+        .as_ref()
+        .filter(|selected| selected.was_paused)
+        .cloned();
     Ok(selected.map(|selected| CancelledSubagent {
         agent_id: selected.agent_id,
         parent_session: selected.parent_session,
@@ -119,6 +127,7 @@ pub(crate) fn cancel_by_task_with_workspace_reason(
         workspace_dir: selected.workspace_dir,
         parent_thread_id: selected.parent_thread_id,
         already_finished: selected.already_finished,
+        driver_pause,
         driver_managed: true,
     }))
 }
