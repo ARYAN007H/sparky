@@ -11,7 +11,10 @@ fn an_unprofiled_key_routes_to_the_local_tenant() {
     let (provider, agent) = router.route("asha");
     assert_eq!(provider.tenant(), &Scope::local());
     assert_eq!(agent, "asha");
-    assert_eq!(provider.scope_for(&agent).unwrap().as_str(), "local/agent:asha");
+    assert_eq!(
+        provider.scope_for(&agent).unwrap().as_str(),
+        "local/agent:asha"
+    );
 }
 
 #[test]
@@ -23,7 +26,10 @@ fn a_profile_key_routes_to_the_profile_tenant() {
     });
     let (provider, agent) = router.route(&key);
     assert_eq!(provider.tenant().as_str(), "u:alice");
-    assert_eq!(provider.scope_for(&agent).unwrap().as_str(), "u:alice/agent:asha");
+    assert_eq!(
+        provider.scope_for(&agent).unwrap().as_str(),
+        "u:alice/agent:asha"
+    );
 }
 
 #[test]
@@ -34,7 +40,10 @@ fn escaped_keys_round_trip_to_the_same_tenant_and_agent() {
         agent: None,
     });
     let (provider, agent) = router.route(&key);
-    assert_eq!(provider.tenant(), &crate::storage::scope_for_profile("a~b%c"));
+    assert_eq!(
+        provider.tenant(),
+        &crate::storage::scope_for_profile("a~b%c")
+    );
     assert_eq!(agent, "default");
 }
 

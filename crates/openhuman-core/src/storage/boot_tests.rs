@@ -30,7 +30,9 @@ async fn a_v1_agent_scope_is_moved_before_its_owner_steps_run() {
     let report = prepare_and_migrate(&backend).await.unwrap();
     assert!(report.failures.is_empty(), "{:?}", report.failures);
 
-    let new = backend.for_scope(&Scope::local().agent("asha").unwrap()).unwrap();
+    let new = backend
+        .for_scope(&Scope::local().agent("asha").unwrap())
+        .unwrap();
     assert!(new
         .documents()
         .get("harness.embedding_cache", "s/k")

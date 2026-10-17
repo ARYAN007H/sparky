@@ -70,7 +70,11 @@ impl TenantSessionStores {
         backend: Arc<dyn StorageBackend>,
         recover_on_open: bool,
     ) -> Result<Self, StorageError> {
-        Ok(Self::with_bridge(backend, Blocking::new()?, recover_on_open))
+        Ok(Self::with_bridge(
+            backend,
+            Blocking::new()?,
+            recover_on_open,
+        ))
     }
 
     /// The provider of the tenant `key` belongs to, and the agent id within it.

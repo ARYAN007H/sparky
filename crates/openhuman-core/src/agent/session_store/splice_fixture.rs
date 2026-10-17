@@ -18,9 +18,9 @@ pub(crate) fn memory_locator() -> Arc<dyn TranscriptLocator> {
         Arc::new(crate::storage::MemoryStorage::new()),
         crate::storage::Scope::local(),
     )
-        .expect("driver session stores over memory")
-        .for_agent("fixture")
-        .transcripts
+    .expect("driver session stores over memory")
+    .for_agent("fixture")
+    .transcripts
 }
 
 /// A thread's head transcript as the model reads it.

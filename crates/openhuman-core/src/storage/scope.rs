@@ -60,7 +60,10 @@ pub fn scope_for_agent(agent_id: &str) -> Scope {
 /// # Errors
 ///
 /// When `module_id` is empty.
-pub fn scope_for_module(profile: Option<&str>, module_id: &str) -> Result<Scope, super::StorageError> {
+pub fn scope_for_module(
+    profile: Option<&str>,
+    module_id: &str,
+) -> Result<Scope, super::StorageError> {
     tenant_scope(profile).module(module_id)
 }
 

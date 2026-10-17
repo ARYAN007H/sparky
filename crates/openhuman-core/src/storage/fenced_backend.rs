@@ -54,10 +54,7 @@ impl std::fmt::Debug for FencedBackend {
 impl FencedBackend {
     /// `inner`, its writes checked against `fences`.
     pub fn new(inner: Arc<dyn StorageBackend>, fences: Arc<FenceRegistry>) -> Self {
-        Self {
-            inner,
-            fences,
-        }
+        Self { inner, fences }
     }
 }
 
@@ -125,7 +122,11 @@ impl StorageBackend for FencedBackend {
 
     /// The driver's own fenced handles; the fence wrapper itself builds on
     /// these, so they are not wrapped a second time.
-    fn for_scope_fenced(&self, scope: &Scope, fence: &tinystoragedrivers::Fence) -> Result<ScopedStorage> {
+    fn for_scope_fenced(
+        &self,
+        scope: &Scope,
+        fence: &tinystoragedrivers::Fence,
+    ) -> Result<ScopedStorage> {
         self.inner.for_scope_fenced(scope, fence)
     }
 
@@ -144,7 +145,8 @@ impl StorageBackend for FencedBackend {
         generation: tinystoragedrivers::ScopeGeneration,
         fence: &tinystoragedrivers::Fence,
     ) -> Result<ScopedStorage> {
-        self.inner.for_scope_fenced_generation(scope, generation, fence)
+        self.inner
+            .for_scope_fenced_generation(scope, generation, fence)
     }
 
     async fn maintain(
@@ -172,7 +174,6 @@ impl StorageBackend for FencedBackend {
     async fn sweep_expired_blobs(&self, scope: &Scope) -> Result<u64> {
         self.inner.sweep_expired_blobs(scope).await
     }
-
 }
 
 #[derive(Clone)]

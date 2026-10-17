@@ -59,7 +59,12 @@ pub(super) fn marked(
     body: impl FnOnce() -> Result<Option<(usize, usize, usize)>>,
 ) -> Result<Outcome> {
     let marker = marker_id(domain, workspace);
-    let markers = Repo::on(backend, &Scope::local(), "storage::import", marker_spec)?;
+    let markers = Repo::on(
+        backend,
+        &crate::storage::tenant_scope(None),
+        "storage::import",
+        marker_spec,
+    )?;
     let id = marker.clone();
     let done = markers
         .run(move |docs| async move { docs.get(MARKER_COLLECTION, &id).await })?
@@ -287,7 +292,7 @@ pub fn run_with(backend: &Arc<dyn StorageBackend>, config: &Config) -> Vec<Repor
     #[cfg(feature = "flows")]
     reports.push(finish(
         FLOWS_DOMAIN,
-        import_flows(backend, &Scope::local(), config),
+        import_flows(backend, &crate::storage::tenant_scope(None), config),
     ));
     #[cfg(not(feature = "flows"))]
     if config.workspace_dir.join("flows").exists() {
@@ -298,7 +303,13 @@ pub fn run_with(backend: &Arc<dyn StorageBackend>, config: &Config) -> Vec<Repor
     }
     reports.push(finish(
         CRON_DOMAIN,
-        import_cron(backend, &Scope::local(), config, &config.workspace_dir, ""),
+        import_cron(
+            backend,
+            &crate::storage::tenant_scope(None),
+            config,
+            &config.workspace_dir,
+            "",
+        ),
     ));
     for (agent, dir) in agent_cron_dirs(&config.workspace_dir) {
         let scope = crate::storage::scope_for_agent(&agent);

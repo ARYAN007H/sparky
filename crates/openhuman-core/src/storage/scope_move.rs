@@ -35,8 +35,8 @@ use std::sync::Arc;
 use sha2::Digest;
 use tinystoragedrivers::schema::Migrations;
 use tinystoragedrivers::{
-    Capability, DocumentStore, DocumentStoreExt, ErrorKind, Filter, Precondition, Query, Scope, ScopedStorage,
-    StorageBackend, StorageError, WriteOptions,
+    Capability, DocumentStore, DocumentStoreExt, ErrorKind, Filter, Precondition, Query, Scope,
+    ScopedStorage, StorageBackend, StorageError, WriteOptions,
 };
 
 use super::scope::{scope_for_agent, scope_for_profile, tenant_scope};
@@ -214,7 +214,10 @@ async fn ids_of(
 /// The first storage error. Nothing is lost: re-running resumes.
 pub async fn run(backend: &Arc<dyn StorageBackend>) -> Result<MoveReport, StorageError> {
     let mut report = MoveReport::default();
-    if !backend.capabilities().contains(Capability::ScopeEnumeration) {
+    if !backend
+        .capabilities()
+        .contains(Capability::ScopeEnumeration)
+    {
         tracing::debug!(
             target: "openhuman::storage",
             driver = backend.driver(),

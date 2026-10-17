@@ -76,7 +76,7 @@ impl Snapshot {
         let storage = tinystoragedrivers::sqlite::SqliteStorage::open(&self.db)
             .with_context(|| format!("open the copy {}", self.db.display()))?;
         let scoped = storage
-            .for_scope(&Scope::local())
+            .for_scope(&crate::storage::tenant_scope(None))
             .context("open the local scope of the copy")?;
         let docs = std::sync::Arc::clone(scoped.documents());
         let specs = collections();

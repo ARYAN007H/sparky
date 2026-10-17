@@ -76,7 +76,10 @@ pub async fn prepare_and_migrate(
 /// `local`, plus every v2 scope the backend reports (when it can enumerate).
 async fn scopes_to_migrate(backend: &Arc<dyn StorageBackend>) -> Vec<Scope> {
     let mut scopes = vec![Scope::local()];
-    if backend.capabilities().contains(Capability::ScopeEnumeration) {
+    if backend
+        .capabilities()
+        .contains(Capability::ScopeEnumeration)
+    {
         match backend.scopes("").await {
             Ok(found) => {
                 for scope in found {
@@ -165,7 +168,12 @@ async fn post_migrate_importers(
     }
 }
 
-fn record(report: &mut BootReport, scope: &Scope, step: &'static str, error: &dyn std::fmt::Display) {
+fn record(
+    report: &mut BootReport,
+    scope: &Scope,
+    step: &'static str,
+    error: &dyn std::fmt::Display,
+) {
     tracing::warn!(
         target: "openhuman::storage",
         scope = scope.as_str(),

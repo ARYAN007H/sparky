@@ -39,8 +39,8 @@ mod lease_local;
 pub mod local;
 pub mod rebind;
 pub mod schema;
-pub mod scope_move;
 pub mod scope;
+pub mod scope_move;
 pub mod secrets;
 
 pub use scope::{scope_for_agent, scope_for_module, scope_for_profile, tenant_scope};

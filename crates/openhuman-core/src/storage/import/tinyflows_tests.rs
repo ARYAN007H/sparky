@@ -186,7 +186,11 @@ fn cron_jobs_and_runs_come_across_with_their_fields() {
     let before = tree(dir.path());
     let backend = backend();
 
-    let outcome = import_cron(&backend, &Scope::local(), &config, dir.path(), "").unwrap_or_else(|e| { eprintln!("ERR {e:#}"); panic!() });
+    let outcome =
+        import_cron(&backend, &Scope::local(), &config, dir.path(), "").unwrap_or_else(|e| {
+            eprintln!("ERR {e:#}");
+            panic!()
+        });
     assert_eq!(written(outcome), 3 + 4);
 
     let expected = expected()["cron"].clone();
