@@ -136,7 +136,7 @@ async fn driver_job_controls_are_isolated_by_workspace_with_shared_runtime_state
         )
         .await
     });
-    tokio::time::timeout(std::time::Duration::from_secs(5), async {
+    let both_started = tokio::time::timeout(std::time::Duration::from_secs(5), async {
         for _ in 0..2 {
             tokio::select! {
                 notification = started_rx.recv() => {
@@ -161,8 +161,19 @@ async fn driver_job_controls_are_isolated_by_workspace_with_shared_runtime_state
             }
         }
     })
-    .await
-    .expect("both driver children enter the gated model");
+    .await;
+    if both_started.is_err() {
+        let jobs = jobs_a
+            .list()
+            .into_iter()
+            .map(|job| format!("{}:{}:{:?}", job.id, job.agent, job.status))
+            .collect::<Vec<_>>();
+        panic!(
+            "both driver children enter the gated model; jobs={jobs:?}, child_finished=({}, {})",
+            child_a.is_finished(),
+            child_b.is_finished()
+        );
+    }
 
     let job_a = jobs_a
         .list()
