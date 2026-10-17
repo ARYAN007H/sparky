@@ -26,10 +26,37 @@ modules, coverage-presence checks and the 80% changed-line gate remain required.
 Doctests, clippy, rustdoc, examples and uninstrumented link checks remain separate
 because coverage/nextest does not replace them.
 
-The full reusable workflow was inspected: `ci-full.yml` calls
-`test-reusable.yml` for uninstrumented unit/quality checks and retains separate
-core E2E, browser/desktop E2E, and platform suites. It does not invoke the private
-coverage lane. These distinct workflows and their release callers are retained.
+## Full-workflow overlap audit
+
+[CI Full](../.github/workflows/ci-full.yml) calls
+[test-reusable.yml](../.github/workflows/test-reusable.yml), whose core job
+already enumerates all **46 root Rust integration targets**. The
+[Rust E2E runner](../scripts/test-rust-e2e.sh) selects **35 of those same target
+names**: `tests/*_e2e.rs` plus `in_process_all`. Job names do not establish
+that their test selections are distinct.
+
+| Executions or mode                                                                     | Overlap and configuration differences                                                                                                                                                                                                                                                                                                                                            | Decision                                                                                                           |
+| -------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| CI Full's direct Rust E2E job and its `e2e-desktop` call's nested `rust-e2e-linux` job | Both invoke `pnpm test:rust:e2e`, selecting the same 35 targets with product features and the Node mock. The direct job pins its container digest and sets line-table debug information; the reusable job uses a moving image tag and inherits its own workflow's `OPENHUMAN_NODE_ENABLED=0`. Caller workflow environment is not automatically inherited by a reusable workflow. | Retain: repeated selections, but runtime environments are not proven equivalent.                                   |
+| Reusable core integrations and Rust E2E                                                | All 35 E2E target names occur in the core job's 46-target inventory. The core job selects `-p openhuman-cli` with product features plus `bin-tools`; E2E selects the workspace with product features and starts an ambient Node mock. Individual tests may also start their own mocks or clear inherited backend settings.                                                       | Retain: package, feature, mock and process setup differ; a shared target name does not prove equivalent execution. |
+| `mcp_registry_e2e`                                                                     | The E2E runner explicitly adds `--ignored --test-threads=1`; ordinary integration execution skips these ignored cases.                                                                                                                                                                                                                                                           | Preserve this distinct test mode.                                                                                  |
+| `tinymcp_storage_smoke_e2e`                                                            | The E2E runner adds `e2e-test-support` and serial execution.                                                                                                                                                                                                                                                                                                                     | Preserve this distinct feature configuration.                                                                      |
+| `tinydocs_linked_e2e`                                                                  | The E2E runner adds non-product `linked-modules`.                                                                                                                                                                                                                                                                                                                                | Preserve this distinct feature configuration.                                                                      |
+| Browser/desktop E2E, Windows secrets and MongoDB validation                            | These exercise frontend or native host flows, Windows-specific code, or a separate storage feature and external-service configuration.                                                                                                                                                                                                                                           | Preserve these distinct contexts.                                                                                  |
+
+These full/reusable workflows do not invoke the private coverage lane. No
+execution above is removed on the assumption that private coverage replaces an
+equivalent selection in the same validation run. Further deduplication would
+require checking the resolved package features and normalizing the relevant
+runtime settings first.
+
+The current local callers of `test-reusable.yml` are `ci-full.yml` and
+[test.yml](../.github/workflows/test.yml); the callers of `e2e-reusable.yml` are
+`ci-full.yml` and [e2e.yml](../.github/workflows/e2e.yml). Comments describing
+direct staging/production pretest callers are stale. The
+[staging](../.github/workflows/release-staging.yml) and
+[production](../.github/workflows/release-production.yml) workflows remain
+untouched by this change.
 
 ## Historical warm baseline
 
