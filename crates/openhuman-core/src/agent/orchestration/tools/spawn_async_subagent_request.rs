@@ -1,7 +1,7 @@
 // Argument decoding for `spawn_async_subagent`.
 //
 // Textually included into `spawn_async_subagent.rs` beside
-// `spawn_async_subagent_execute.rs`, so it shares that module's imports. Split
+// `spawn_async_subagent_host_impl.rs`, so it shares that module's imports. Split
 // out because the execute fragment had grown to 847 lines against the layout
 // gate's pin, and this prologue is the one phase of that function that is a
 // pure function of `args` — every other phase closes over the run context, the

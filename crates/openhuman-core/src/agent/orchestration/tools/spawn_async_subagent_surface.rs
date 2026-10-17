@@ -366,9 +366,9 @@ impl SpawnAsyncSubagentTool {
     }
 }
 
-include!("spawn_async_subagent_execute.rs");
-include!("spawn_async_subagent_args.rs");
-include!("spawn_async_subagent_results.rs");
+include!("spawn_async_subagent_host_impl.rs");
+include!("spawn_async_subagent_request.rs");
+include!("spawn_async_subagent_projection.rs");
 
 /// Settle a late registration refusal before an accepted response is built.
 #[cfg(test)]

@@ -16,23 +16,23 @@
 //! Execution crosses the shared TinyAgents Jobs/Message and subagent driver
 //! ports while this module retains product-specific policies and envelopes.
 
-#[path = "tools/archetype_delegation.rs"]
+#[path = "tools/archetype_delegation_host.rs"]
 mod archetype_delegation;
 #[path = "tools/awaiting_user.rs"]
 pub(crate) mod awaiting_user;
-#[path = "tools/collapsed_delegation.rs"]
+#[path = "tools/collapsed_delegation_host.rs"]
 mod collapsed_delegation;
-#[path = "tools/continue_subagent.rs"]
+#[path = "tools/continue_subagent_host.rs"]
 mod continue_subagent;
 #[path = "tools/delegate_graph.rs"]
 mod delegate_graph;
-#[path = "tools/dispatch.rs"]
+#[path = "tools/subagent_dispatch_host.rs"]
 mod dispatch;
-#[path = "tools/spawn_async_subagent.rs"]
+#[path = "tools/spawn_async_subagent_surface.rs"]
 mod spawn_async_subagent;
 #[path = "tools/spawn_parallel_agents.rs"]
 mod spawn_parallel_agents;
-#[path = "tools/spawn_subagent.rs"]
+#[path = "tools/spawn_subagent_surface.rs"]
 mod spawn_subagent;
 #[path = "tools/subagent_abort_report.rs"]
 mod subagent_abort_report;
