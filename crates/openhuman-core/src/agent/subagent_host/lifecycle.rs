@@ -595,8 +595,8 @@ impl OpenHumanPersistence {
     ) -> Result<Option<(String, u64)>, SubagentError> {
         let record = self.store()?.record(key)?;
         if let Some(terminal) = record.terminal {
-            return Ok((!terminal.agent_id.is_empty())
-                .then_some((terminal.agent_id, terminal.elapsed_ms)));
+            let named = !terminal.agent_id.is_empty();
+            return Ok(named.then_some((terminal.agent_id, terminal.elapsed_ms)));
         }
         Ok(Self::pause_of(&record, key)?.and_then(|checkpoint| {
             (!checkpoint.agent_id.is_empty())

@@ -79,7 +79,10 @@ async fn legacy_site_files_are_imported_once_dated_by_their_last_change_and_left
     let store = SiteStore::open(dir.path()).unwrap();
     assert_eq!(store.load("fresh.com").await.unwrap(), memory());
     assert!(store.load("broken.com").await.unwrap().is_empty());
-    assert!(sites.join("fresh.com.json").exists(), "the legacy file is not touched");
+    assert!(
+        sites.join("fresh.com.json").exists(),
+        "the legacy file is not touched"
+    );
     // The imported old site is swept like any other that nothing changed.
     store.sweep();
     assert!(store.load("old.com").await.unwrap().is_empty());
