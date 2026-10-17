@@ -21,6 +21,29 @@ fn raw_profile_agent_add() -> tinyflows_bus::schedule::StoreOperation {
     }
 }
 
+struct RestoreInstalledStorage(Option<Arc<dyn crate::storage::StorageBackend>>);
+
+impl Drop for RestoreInstalledStorage {
+    fn drop(&mut self) {
+        crate::storage::clear();
+        if let Some(previous) = self.0.take() {
+            crate::storage::install(previous);
+        }
+    }
+}
+
+struct RetireProfileFence {
+    registry: Arc<crate::storage::fence::FenceRegistry>,
+    profile_id: String,
+    epoch: u64,
+}
+
+impl Drop for RetireProfileFence {
+    fn drop(&mut self) {
+        self.registry.retire(&self.profile_id, self.epoch);
+    }
+}
+
 #[tokio::test]
 async fn provisioning_creates_the_layout_once() {
     let tmp = tempfile::tempdir().unwrap();
@@ -486,8 +509,18 @@ async fn opening_an_existing_profile_adopts_the_enforced_cron_cap() {
 
 #[tokio::test]
 async fn opening_replaces_a_dropped_hosts_fence_before_cron_reconciliation() {
-    let tmp = tempfile::tempdir().unwrap();
+    let first_root = tempfile::tempdir().unwrap();
+    let second_root = tempfile::tempdir().unwrap();
     let id = profile(&format!("cron-fence-{}", uuid::Uuid::new_v4().simple()));
+    let registry = crate::storage::fence::registry();
+    let backend: Arc<dyn crate::storage::StorageBackend> = Arc::new(
+        crate::storage::fenced_backend::FencedBackend::new(
+            Arc::new(crate::storage::MemoryStorage::new()),
+            Arc::clone(&registry),
+        ),
+    );
+    let _storage = RestoreInstalledStorage(crate::storage::install(backend));
+
     let mut first_saas = SaasConfig::new(tmp.path());
     first_saas.cron.agent_jobs_only = true;
     first_saas.cron.max_active_jobs = 1;
