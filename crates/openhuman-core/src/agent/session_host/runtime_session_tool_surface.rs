@@ -147,10 +147,16 @@ impl OpenHumanTurnPrelude {
         // reconciliation. TinyAgents restores permanent visibility after
         // those filters and protects permanent names from deferred discovery.
         let agent_definition_name = surface.agent_definition_name.clone();
+        let OpenHumanTurnToolSurface {
+            visible_tool_names,
+            deferred_tool_names,
+            permanent_tool_names,
+            ..
+        } = &mut *surface;
         reconcile_surface_names(
-            &mut surface.visible_tool_names,
-            &mut surface.deferred_tool_names,
-            &mut surface.permanent_tool_names,
+            visible_tool_names,
+            deferred_tool_names,
+            permanent_tool_names,
             &previous_synthesized,
             &synthesized_names,
             auto_include_new_synthesized_tools,
