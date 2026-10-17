@@ -8,7 +8,7 @@ struct RawSchemaDump<'a> {
 
 #[tokio::test]
 async fn get_schema_memory_entries_match_the_pre_refactor_raw_bytes() {
-    use axum::body::{Body, to_bytes};
+    use axum::body::{to_bytes, Body};
     use axum::http::{Request, StatusCode};
     use sha2::{Digest, Sha256};
     use tower::ServiceExt;
