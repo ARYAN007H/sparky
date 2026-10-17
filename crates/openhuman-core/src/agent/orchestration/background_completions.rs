@@ -342,7 +342,7 @@ pub(crate) async fn record_outcome(
             return;
         }
     }
-    if is_marked_deleted(&entry_for(workspace_dir), &thread_id) {
+    if is_marked_deleted(&entry_for_ctx(ctx, workspace_dir), &thread_id) {
         log::debug!(
             "[background_completions] dropping completion task_id={task_id} for deleted \
              thread_id={thread_id}"
@@ -570,12 +570,24 @@ pub(crate) fn pending_for(workspace_dir: &Path, thread_id: &str) -> Vec<Completi
     router_for_workspace(workspace_dir).pending_for(thread_id)
 }
 
+pub(crate) fn pending_for_ctx(
+    ctx: &DispatchCtx,
+    workspace_dir: &Path,
+    thread_id: &str,
+) -> Vec<CompletionRecord> {
+    router_for_workspace_ctx(ctx, workspace_dir).pending_for(thread_id)
+}
+
 /// Mark `task_id` as collected inline by the parent (via `wait_subagent`) so its
 /// background completion is not independently delivered as a second, duplicate
 /// answer. The router withdraws an already-recorded completion and drops one
 /// that arrives later. Returns whether a pending completion was withdrawn.
 pub(crate) fn mark_collected(workspace_dir: &Path, task_id: &str) -> bool {
     let entry = entry_for(workspace_dir);
+    mark_collected_in_entry(entry, task_id)
+}
+
+fn mark_collected_in_entry(entry: Arc<Entry>, task_id: &str) -> bool {
     let router = &entry.router;
     let completion = router.tombstone(task_id);
     // A parent that collected the final result inline has no use for any
@@ -623,7 +635,7 @@ pub(crate) fn discard_for_thread(
         st.stopped_threads.remove(&thread_key);
         st.thread_workspaces.contains_key(&thread_key)
     };
-    let entry = entry_for(workspace_dir);
+    let entry = entry_for_ctx(ctx, workspace_dir);
     // Nothing in this process or on disk refers to the thread (an ordinary chat
     // thread that never spawned background work): the in-memory gate is enough
     // and no log line is written for it.
@@ -753,7 +765,7 @@ pub(crate) fn mark_stopped_task_if_thread_stopped(
     thread_id: &str,
     task_id: &str,
 ) -> bool {
-    let entry = entry_for(workspace_dir);
+    let entry = entry_for_ctx(ctx, workspace_dir);
     let thread_key = key(ctx, thread_id);
     let (first_sight, mut stopped) = {
         let mut st = state();
@@ -788,7 +800,7 @@ pub(crate) fn mark_stopped_task_if_thread_stopped(
 /// durably (and remembered as deleted), so stragglers are still dropped. Other
 /// workspaces are untouched. Returns the number of completions removed.
 pub(crate) fn clear_all(ctx: &DispatchCtx, workspace_dir: &Path) -> usize {
-    let entry = entry_for(workspace_dir);
+    let entry = entry_for_ctx(ctx, workspace_dir);
     let parents: HashSet<String> = entry
         .store
         .list(None)
@@ -810,7 +822,7 @@ pub(crate) fn clear_all(ctx: &DispatchCtx, workspace_dir: &Path) -> usize {
 /// process finished the work but never delivered it). Remembers each thread's
 /// workspace so the delivery loop can claim them.
 pub(crate) fn recover_pending_threads(ctx: &DispatchCtx, workspace_dir: &Path) -> Vec<String> {
-    let entry = entry_for(workspace_dir);
+    let entry = entry_for_ctx(ctx, workspace_dir);
     if let Err(error) = entry.router.compact(SETTLED_RETENTION) {
         log::warn!("[background_completions] compact failed error={error}");
     }
