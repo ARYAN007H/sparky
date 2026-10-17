@@ -1,21 +1,33 @@
 use super::*;
 
-/// Run `job` now under the caller's `run_id` (also the id its delivery and
-/// run record use), with the same executor, retry budget and failure
-/// classification as a scheduled run: the module's `ExecuteJob` runs the
-/// retry loop and calls back into a host object bound to `ctx`. The caller
-/// holds the job's manual-run guard; the module holds the cross-scheduler
-/// claim and answers [`ALREADY_RUNNING`] when a scheduled run has the job.
+/// Compatibility adapter for callers that need a synchronous Run Now result.
+/// TinyFlows owns admission, retries, delivery and persistence.
 pub async fn execute_job_now(
     ctx: &crate::core::runtime::DispatchCtx,
     config: &Config,
     job: &CronJob,
     run_id: &str,
 ) -> (bool, String) {
-    match execute_via_bus(ctx, config, job, run_id).await {
-        Ok(attempt) => (attempt.success, attempt.output),
+    match run_job_now(
+        ctx,
+        config,
+        job.clone(),
+        run_id.to_string(),
+        true,
+        ManualDelivery::Requested,
+    )
+    .await
+    {
+        Ok(RunJobReply::Completed {
+            success, attempt, ..
+        }) => (success, attempt.output),
+        Ok(RunJobReply::Refused { reason }) => (false, format!("cron job refused: {reason:?}")),
+        Ok(RunJobReply::Accepted { .. }) => (
+            false,
+            "cron module accepted a synchronous run without completing it".to_string(),
+        ),
         Err(error) => {
-            tracing::debug!(job_id = %job.id, %run_id, %error, "[cron:scheduler] ExecuteJob failed");
+            tracing::debug!(job_id = %job.id, %run_id, %error, "[cron:scheduler] RunJobNow failed");
             (false, error.to_string())
         }
     }
@@ -84,45 +96,6 @@ pub(crate) async fn run_job_now(
             Err(error)
         }
     }
-}
-
-async fn execute_via_bus(
-    ctx: &crate::core::runtime::DispatchCtx,
-    config: &Config,
-    job: &CronJob,
-    run_id: &str,
-) -> Result<Attempt> {
-    let security = Arc::new(SecurityPolicy::from_config(
-        &config.autonomy,
-        &config.workspace_dir,
-        &config.action_dir,
-    ));
-    let binding = Binding::new(ctx, config, security);
-    let host = bus_host::register(binding).await.map_err(|e| anyhow!(e))?;
-    let proxy = module::run_proxy(config).await.map_err(|e| anyhow!(e))?;
-    tracing::debug!(job_id = %job.id, %run_id, "[cron:scheduler] ExecuteJob");
-    let attempt: Attempt = proxy
-        .call(
-            members::EXECUTE_JOB,
-            (
-                CLAIM_SCOPE,
-                host.address(),
-                scheduler_config(config),
-                job,
-                run_id,
-            ),
-        )
-        .await
-        .map_err(|error| {
-            let message = error.wire_message();
-            if message.contains(ALREADY_RUNNING) {
-                anyhow!("cron job '{}' is already running", job.id)
-            } else {
-                anyhow!(message)
-            }
-        })?;
-    drop(host);
-    Ok(attempt)
 }
 
 /// Single poll cycle of the scheduler loop, extracted so tests can drive
