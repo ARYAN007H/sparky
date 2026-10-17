@@ -267,7 +267,7 @@ async fn force_fresh_cancels_the_registered_driver_before_reusing_its_session() 
             "force-fresh-parent-session",
             Some("force-fresh-parent-thread".into()),
         );
-    let wait = SubAgentJobsTool::new(jobs.clone())
+    let wait = SubAgentJobsTool::new((*jobs).clone())
         .with_fixed_action(tinyagents_orchestration::subagent::SubAgentJobAction::Await)
         .with_identifier_fields("task_id", "subagent_session_id")
         .with_sessions(Arc::new(session_port), |_| {
