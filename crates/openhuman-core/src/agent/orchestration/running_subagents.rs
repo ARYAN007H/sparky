@@ -70,6 +70,8 @@ pub(crate) use cancel::{
     cancel_all, cancel_by_session_in_workspace, cancel_by_task_with_workspace_reason,
     cancel_for_thread, stop_for_thread, CancelledSubagent,
 };
+#[cfg(test)]
+pub(crate) use cancel::cancel_by_task;
 pub(crate) use registry::admit_spawn;
 #[cfg(test)]
 pub(crate) use registry::{register, status_channel, RegistrationError};
