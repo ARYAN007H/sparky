@@ -179,15 +179,12 @@ impl SessionDriver<OpenHumanRunContext> for OpenHumanSessionDriver {
             &synthesized_tools,
             &request.run_context.data.recorded_tool_names,
         )?;
-        // The harness must speak the dialect this session's prompt was
-        // composed for: a text dialect strips schemas off the wire and needs
-        // the positional registry to recover P-Format / code-style calls.
+        // Text dialects need the positional registry to recover P-Format and code-style calls.
         let run_context = request.run_context.data.clone().with_tool_dialect(
             tinyagents_harness::dialect::dispatcher_for_format(self.dispatcher.tool_call_format()),
         );
         let cancellation = request.run_context.cancellation.clone();
-        // Boxed: the hosted turn future is very large, and holding it inline in the
-        // `select!` below overflows the worker stack in debug builds.
+        // Boxing avoids worker-stack overflow in debug builds.
         let turn = Box::pin(async move {
             let hosted_base = self.hosted_base.clone().ok_or_else(|| {
                 anyhow::anyhow!(
@@ -214,8 +211,7 @@ impl SessionDriver<OpenHumanRunContext> for OpenHumanSessionDriver {
             .run_hosted(hosted_base, self.agent_id.clone())
             .await
         });
-        // A Stop hands the runtime the rounds the provider already accepted,
-        // so the stopped turn's prompt and work stay in the session (#7715).
+        // A Stop hands provider-accepted rounds back so the runtime retains them (#7715).
         let result = tokio::select! {
             biased;
             _ = cancellation.cancelled() => {
