@@ -284,7 +284,6 @@ async fn connected_uncatalogued_toolkit_rejects_a_hallucinated_slug() {
     );
 }
 
-
 /// Unit coverage of the classifier itself, independent of the gate: a
 /// curated Read entry classifies as `Read`; curated Write/Admin entries,
 /// an uncurated toolkit, and an unparseable/empty slug all classify as
@@ -309,12 +308,8 @@ fn classify_composio_action_for_tier_matches_curated_scope_fail_safe() {
         CommandClass::Network
     );
     // Unparseable / empty slug.
-    assert_eq!(
-        classify_composio_action_for_tier(""),
-        CommandClass::Network
-    );
+    assert_eq!(classify_composio_action_for_tier(""), CommandClass::Network);
 }
-
 
 fn seeded_required_args_contract(slug: &str, toolkit: &str, required: &[&str]) -> ToolContract {
     ToolContract {
@@ -352,7 +347,10 @@ async fn preflight_fails_before_dispatch_naming_the_missing_field() {
     )
     .await
     .expect_err("null required arg must fail preflight");
-    assert!(message.contains("`to`"), "error must name the field: {message}");
+    assert!(
+        message.contains("`to`"),
+        "error must name the field: {message}"
+    );
     assert!(
         message.contains("=nodes.<node_id>.item.json.<field>"),
         "error must suggest the wiring fix: {message}"

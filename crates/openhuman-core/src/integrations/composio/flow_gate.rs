@@ -194,10 +194,6 @@ pub(crate) async fn preflight_composio_args(
     Err(format!("tool_call `{slug}`: required arg(s) {list} missing or resolved to null — wire each from an upstream node's output, e.g. \"{first}\": \"=nodes.<node_id>.item.json.<field>\" (drop `.json` only if `<node_id>` is a code/transform/split_out/merge/trigger node — `agent`/`tool_call`/`http_request` nodes wrap their output in a `{{json,text,raw}}` envelope). If the value comes from an agent node, give that agent an output schema (config.output_parser.schema) so its fields are addressable."))
 }
 
-#[cfg(test)]
-#[path = "flow_gate_tests.rs"]
-mod tests;
-
 /// Converts a provider-side unsuccessful execution response into a policy error.
 pub(crate) fn reject_unsuccessful_composio_response(
     slug: &str,
@@ -216,3 +212,7 @@ pub(crate) fn reject_unsuccessful_composio_response(
         "tool_call `{slug}` failed at the connected provider: {detail}"
     ))
 }
+
+#[cfg(test)]
+#[path = "flow_gate_tests.rs"]
+mod tests;
