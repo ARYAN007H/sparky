@@ -403,21 +403,22 @@ impl OpenhumanEventBridge {
             },
         };
         let call_cost = cost.usd();
-        if let tinyagents_harness::cost::CallCost::Estimated(estimated_cost_usd) = cost
-            && let Some(call_id) = self
+        if let tinyagents_harness::cost::CallCost::Estimated(estimated_cost_usd) = cost {
+            if let Some(call_id) = self
                 .call_ids
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner)
                 .get(&iteration)
                 .cloned()
-        {
-            self.emit_generation_enrichment(
-                call_id,
-                tinyagents_harness::events::GenerationEnrichment {
-                    estimated_cost_usd: Some(estimated_cost_usd),
-                    ..Default::default()
-                },
-            );
+            {
+                self.emit_generation_enrichment(
+                    call_id,
+                    tinyagents_harness::events::GenerationEnrichment {
+                        estimated_cost_usd: Some(estimated_cost_usd),
+                        ..Default::default()
+                    },
+                );
+            }
         }
         // The context window + cache-creation/reasoning breakdown only exist on
         // the carried provider usage (the crate `Usage` mapping drops them); fall

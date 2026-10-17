@@ -166,13 +166,15 @@ pub(super) async fn finalize_turn_outcome(
         false,
         hit_cap,
     );
-    if !defer_terminal_to_caller && let Some(stop_fact) = stop.clone() {
-        event_sink.emit(tinyagents_harness::events::AgentEvent::TurnStopped {
-            // The event uses a 1-based attempt ordinal, even when the run
-            // stopped before the first model request.
-            turn: (run.model_calls as u32).max(1),
-            stop: stop_fact,
-        });
+    if !defer_terminal_to_caller {
+        if let Some(stop_fact) = stop.clone() {
+            event_sink.emit(tinyagents_harness::events::AgentEvent::TurnStopped {
+                // The event uses a 1-based attempt ordinal, even when the run
+                // stopped before the first model request.
+                turn: (run.model_calls as u32).max(1),
+                stop: stop_fact,
+            });
+        }
     }
     let deferred_terminal = if defer_terminal_to_caller {
         Some(crate::agent::tinyagents::turn_outcome::DeferredTurnTerminal {

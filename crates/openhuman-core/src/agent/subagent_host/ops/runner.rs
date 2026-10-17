@@ -321,6 +321,7 @@ pub(crate) async fn run_subagent_direct_with_native_context(
                     &parent_for_subagent,
                     &task_id,
                     &loaded_config,
+                    native,
                 ))
                 .await
             })
@@ -447,6 +448,7 @@ async fn run_typed_mode(
     parent: &ParentExecutionContext,
     task_id: &str,
     config: &LoadedConfig,
+    native: crate::agent::tinyagents::NativeSubagentRunContext,
 ) -> Result<SubagentRunOutcome, SubagentRunError> {
     let started = Instant::now();
 
@@ -924,5 +926,4 @@ async fn run_typed_mode(
         persistence_disposition:
             tinyagents_orchestration::subagent::SubagentPersistenceDisposition::TerminalExisting,
     })
-    .await
 }
