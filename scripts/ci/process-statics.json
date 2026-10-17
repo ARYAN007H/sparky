@@ -327,7 +327,7 @@
     "count": 1,
     "category": "D",
     "reason": "This process-local router cache is keyed by RouterScope (authenticated profile key plus workspace path); each router retains the matching driver's storage scope, and storage opens run under that explicit context.",
-    "verification": "background_completions_tenant_tests.rs: explicit_profiles_on_one_workspace_keep_durable_completion_records_separate"
+    "verification": "background_completions_tenant_tests.rs: explicit_profiles_share_a_workspace_without_sharing_completion_routers"
   },
   {
     "file": "crates/openhuman-core/src/agent/orchestration/background_completions/store_adapter.rs",
