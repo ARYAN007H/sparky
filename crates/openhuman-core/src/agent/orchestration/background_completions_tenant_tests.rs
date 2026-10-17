@@ -197,9 +197,11 @@ async fn explicit_profiles_share_a_workspace_without_sharing_completion_routers(
         .await;
     }
 
-    router_pool()
-        .clear()
-        .expect("simulate reopening each profile's storage-backed router");
+    for ctx in [&alice, &bob] {
+        router_pool()
+            .remove(&router_scope_for(ctx, ws.path()))
+            .expect("reopen only this profile's storage-backed router");
+    }
     let alice_recovered = recover_pending_threads(&alice, ws.path());
     let bob_recovered = recover_pending_threads(&bob, ws.path());
     assert_eq!(alice_recovered, ["same-thread"]);
@@ -270,7 +272,9 @@ async fn an_unbound_single_user_caller_keeps_workspace_local_persistence() {
         "persisted locally"
     );
 
-    router_pool().clear().unwrap();
+    router_pool()
+        .remove(&router_scope_for(&ctx, ws.path()))
+        .unwrap();
     assert_eq!(
         recover_pending_threads(&ctx, ws.path()),
         ["local-thread"],
