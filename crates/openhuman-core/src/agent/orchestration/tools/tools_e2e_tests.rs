@@ -65,7 +65,7 @@ async fn spawn_subagent_tool_runs_child_agent_e2e() {
 }
 
 #[tokio::test]
-async fn force_fresh_cancels_the_registered_driver_before_reusing_its_session() {
+async fn force_fresh_cancels_old_driver_before_creating_a_new_session() {
     use crate::agent::orchestration::subagent_sessions::{
         DurableSubagentStatus, SubagentSessionStore,
     };
