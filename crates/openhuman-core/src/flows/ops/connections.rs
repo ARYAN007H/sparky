@@ -164,18 +164,10 @@ pub(super) fn build_flow_connections(
     let normalize_connection_identifier =
         |raw: &str| keys.get(raw).cloned().unwrap_or_else(|| raw.to_string());
 
-    let identity_lookup: std::collections::HashMap<(String, String), &_> = identities
-        .iter()
-        .map(|id| {
-            (
-                (
-                    normalize_connection_identifier(&id.source),
-                    normalize_connection_identifier(&id.identifier),
-                ),
-                id,
-            )
-        })
-        .collect();
+    let identity_lookup = crate::integrations::composio::ops::connections::identity_lookup(
+        identities,
+        keys,
+    );
 
     let mut out = Vec::with_capacity(composio.len() + http.len());
     for conn in composio {
