@@ -37,9 +37,12 @@ worktree policy.
   from the global bus regardless of the parent turn's lifecycle
   (`running_subagents*.rs`, [`background_completions.rs`](./background_completions.rs),
   [`completion_notice.rs`](./completion_notice.rs),
-  [`background_delivery.rs`](./background_delivery.rs)). The AgentRun status projection lives in
-  [`agent_runs/subagent_finalize.rs`](../../agent_runs/subagent_finalize.rs), because it updates the
-  product run ledger separately from TinyAgents' orchestration task store. The delivery turn runs
+  [`background_delivery.rs`](./background_delivery.rs)). Generic retry,
+  give-up, replay, and router caching belong to TinyAgents' completion owner;
+  OpenHuman keeps its thread session delivery and synchronous durable give-up
+  writer. AgentRun status projection lives in
+  [`agent_runs/subagent_finalize.rs`](../../agent_runs/subagent_finalize.rs),
+  because that product ledger is separate from TinyAgents' task store. The delivery turn runs
   on the originating thread's cached chat session via
   `web_chat::run_system_turn_on_thread`, never on a throwaway host.
 - A shared root `ParentExecutionContext` builder for surfaces that spawn real
