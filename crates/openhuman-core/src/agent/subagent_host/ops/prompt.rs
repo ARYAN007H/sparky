@@ -6,7 +6,7 @@
 use crate::agent::harness::artifact_offload::OFFLOAD_WRITE_TOOL;
 use std::collections::HashSet;
 use tinyagents_harness::artifacts::{
-    render_artifact_offload_contract, should_render_offload_contract, ARTIFACT_OFFLOAD_HEADING,
+    ARTIFACT_OFFLOAD_HEADING, render_artifact_offload_contract, should_render_offload_contract,
 };
 use tinytools::ToolSpec;
 
