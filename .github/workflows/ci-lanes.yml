@@ -47,7 +47,9 @@ jobs:
     runs-on:
       group: openhuman-ex63
       labels: [self-hosted, openhuman-ex63]
-    timeout-minutes: 120
+    # Sequential diagnostic validation plus cache save already took 118 min
+    # before seven coverage suites could execute; reserve a complete-run budget.
+    timeout-minutes: 180
     steps:
       - name: Checkout PR merge commit
         uses: tinyhumansai/.github/actions/checkout@35fa65b76c80d48779592b111837e55d9d0860d4
@@ -167,8 +169,8 @@ jobs:
       - name: Save Tinymold cache
         if: ${{ always() && steps.tinymold.outcome == 'success' }}
         continue-on-error: true
-        # Bound remote cache uploads so lane artifacts still get their turn.
-        timeout-minutes: 5
+        # A measured cache push took 8m36s; keep headroom and a finite bound.
+        timeout-minutes: 15
         uses: tinyhumansai/tinymold/save@b7c4c26f184acdbf7133487b158062fc610d2f28
 
       - name: Record cache statistics and save time

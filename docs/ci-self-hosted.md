@@ -109,7 +109,8 @@ for any commit without posting it.
 ## Profiles
 
 - **`ex63`**: one job selects both the `openhuman-ex63` runner group and label.
-  Lanes run sequentially, including after an independent check fails. Compatible
+  Lanes run sequentially within a 180-minute job budget, including after an
+  independent check fails. Compatible
   uninstrumented outputs share `target/ci-private-build`; coverage uses
   `target/ci-private-coverage`. Neither is restored as an Actions artifact cache.
   - `scripts/ci/self-hosted/guest-image.txt` pins the guest OCI digest. Before
@@ -122,7 +123,7 @@ for any commit without posting it.
   - The pinned Tinymold setup/save actions use the image's binary and signed
     remote cache. The supervisor supplies credentials through guest metadata;
     the workflow masks them and needs no additional repository secrets. Cache
-    save runs after failures, has a five-minute limit, and cannot replace the
+    save runs after failures, has a fifteen-minute limit, and cannot replace the
     validation result or indefinitely delay artifact upload.
   - Cargo's target linker points at `/usr/local/bin/rust-mold-linker`. It survives
     coverage clearing `RUSTFLAGS`. `verify-linkage.mjs` checks `.comment` and LLVM

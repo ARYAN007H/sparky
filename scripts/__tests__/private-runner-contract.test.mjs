@@ -167,7 +167,10 @@ test("private validation and cache save have measured budgets without suppressin
   const saveEnd = workflow.indexOf("\n      - name:", saveStart + 1);
   const save = workflow.slice(saveStart, saveEnd);
   assert.match(save, /timeout-minutes: 15/);
-  const job = workflow.slice(workflow.indexOf("  ex63:"), workflow.indexOf("    steps:"));
+  const job = workflow.slice(
+    workflow.indexOf("  ex63:"),
+    workflow.indexOf("    steps:"),
+  );
   assert.match(job, /timeout-minutes: 180/);
   assert.match(save, /continue-on-error: true/);
   const upload = workflow.slice(
