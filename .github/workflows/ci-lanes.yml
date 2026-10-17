@@ -154,10 +154,25 @@ jobs:
            steps.filter.outputs['rust-tauri'] == 'true')
         run: node scripts/ci/self-hosted/verify-linkage.mjs
 
+      - name: Start cache save timer
+        if: ${{ always() && steps.tinymold.outcome == 'success' }}
+        run: |
+          mkdir -p ci-out
+          date +%s > ci-out/cache-save-start
+
       - name: Save Tinymold cache
         if: ${{ always() && steps.tinymold.outcome == 'success' }}
         continue-on-error: true
         uses: tinyhumansai/tinymold/save@b7c4c26f184acdbf7133487b158062fc610d2f28
+
+      - name: Record cache statistics and save time
+        if: ${{ always() && steps.tinymold.outcome == 'success' }}
+        run: |
+          mkdir -p ci-out
+          tinymold stats > ci-out/tinymold-stats.txt || true
+          if [ -f ci-out/cache-save-start ]; then
+            echo "$(( $(date +%s) - $(cat ci-out/cache-save-start) ))" > ci-out/cache-save-seconds.txt
+          fi
 
       - name: Upload lane logs, timings and coverage
         if: always()

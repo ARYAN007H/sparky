@@ -18,14 +18,26 @@ export function findProof(root, instrumented) {
     for (const entry of readdirSync(directory, { withFileTypes: true })) {
       const path = join(directory, entry.name);
       if (entry.isDirectory()) {
-        if (["incremental", "build", ".fingerprint"].includes(entry.name)) continue;
+        if (["incremental", "build", ".fingerprint"].includes(entry.name))
+          continue;
         const result = visit(path);
         if (result) return result;
-      } else if (entry.isFile() && (statSync(path).mode & 0o111) && /\/debug\/(deps|examples)\//.test(path)) {
+      } else if (
+        entry.isFile() &&
+        statSync(path).mode & 0o111 &&
+        /\/debug\/(deps|examples)\//.test(path)
+      ) {
         try {
-          const options = { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] };
+          const options = {
+            encoding: "utf8",
+            stdio: ["ignore", "pipe", "ignore"],
+          };
           const sections = execFileSync("readelf", ["-SW", path], options);
-          const comments = execFileSync("readelf", ["--string-dump=.comment", path], options);
+          const comments = execFileSync(
+            "readelf",
+            ["--string-dump=.comment", path],
+            options,
+          );
           const kind = classifyElf(sections, comments);
           if (!kind.executable || kind.instrumented !== instrumented) continue;
           if (!kind.mold) throw new Error(`ELF lacks mold metadata: ${path}`);
@@ -38,11 +50,17 @@ export function findProof(root, instrumented) {
     return null;
   };
   const result = visit(root);
-  if (!result) throw new Error(`No ${instrumented ? "instrumented" : "uninstrumented"} lane executable under ${root}`);
+  if (!result)
+    throw new Error(
+      `No ${instrumented ? "instrumented" : "uninstrumented"} lane executable under ${root}`,
+    );
   return result;
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (
+  process.argv[1] &&
+  import.meta.url === pathToFileURL(process.argv[1]).href
+) {
   const output = process.argv[2] ?? "ci-out/linkage.json";
   const proof = [
     findProof("target/ci-private-build", false),
