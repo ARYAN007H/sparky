@@ -149,6 +149,83 @@ fn stale_completion_cannot_overwrite_reused_or_closed_session() {
 }
 
 #[test]
+fn stale_close_and_reuse_snapshots_cannot_change_a_newer_lifecycle() {
+    let dir = tempfile::tempdir().unwrap();
+    let store = SubagentSessionStore::new(dir.path().to_path_buf());
+    let first = upsert_running(
+        &store,
+        SubagentSessionUpsert {
+            selector: selector("same-task"),
+            display_name: None,
+            task_title: "First run".into(),
+            worker_thread_id: None,
+            task_id: "first-task".into(),
+            lifecycle_key: None,
+        },
+        None,
+    )
+    .unwrap();
+    let second = upsert_running(
+        &store,
+        SubagentSessionUpsert {
+            selector: selector("same-task"),
+            display_name: None,
+            task_title: "Second run".into(),
+            worker_thread_id: None,
+            task_id: "second-task".into(),
+            lifecycle_key: None,
+        },
+        Some(&first),
+    )
+    .unwrap();
+
+    assert!(
+        !close_if_current(&store, &first).unwrap(),
+        "a close based on the stale first snapshot must lose the race"
+    );
+    let current = list_for_parent(&store, "parent-a", Some("thread-a"))
+        .unwrap()
+        .pop()
+        .unwrap();
+    assert_eq!(current.current_task_id.as_deref(), Some("second-task"));
+    assert_eq!(current.status, DurableSubagentStatus::Running);
+    assert!(
+        upsert_running(
+            &store,
+            SubagentSessionUpsert {
+                selector: selector("same-task"),
+                display_name: None,
+                task_title: "Stale retry".into(),
+                worker_thread_id: None,
+                task_id: "stale-task".into(),
+                lifecycle_key: None,
+            },
+            Some(&first),
+        )
+        .is_err(),
+        "a stale reuse snapshot must not replace the newer lifecycle"
+    );
+
+    assert!(close_if_current(&store, &second).unwrap());
+    assert!(
+        upsert_running(
+            &store,
+            SubagentSessionUpsert {
+                selector: selector("same-task"),
+                display_name: None,
+                task_title: "Late retry".into(),
+                worker_thread_id: None,
+                task_id: "late-task".into(),
+                lifecycle_key: None,
+            },
+            Some(&second),
+        )
+        .is_err(),
+        "a stale retry must not reopen a session closed after observation"
+    );
+}
+
+#[test]
 fn upsert_persists_the_full_lifecycle_key_without_collapsing_to_task_id() {
     let dir = tempfile::tempdir().unwrap();
     let store = SubagentSessionStore::new(dir.path().to_path_buf());

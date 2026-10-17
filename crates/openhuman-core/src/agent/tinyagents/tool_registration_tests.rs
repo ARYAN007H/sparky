@@ -170,7 +170,11 @@ async fn static_live_harness_builder_resolves_control_aliases_from_the_execution
     .await
     .expect("the live control resolves its execution parent");
     assert_eq!(result.results.len(), 1);
-    assert!(result.results[0].text().contains("live-owned-session"));
+    assert!(
+        result.results[0].text().contains("live-owned-session"),
+        "live control query should project its scoped session, got: {}",
+        result.results[0].text()
+    );
 }
 
 #[tokio::test]
