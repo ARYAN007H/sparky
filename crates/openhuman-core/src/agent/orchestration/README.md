@@ -35,8 +35,10 @@ worktree policy.
   finished background results back into chat, and settling run-ledger rows
   from the global bus regardless of the parent turn's lifecycle
   (`running_subagents*.rs`, [`background_completions.rs`](./background_completions.rs),
+  [`background_completions/store_adapter.rs`](./background_completions/store_adapter.rs),
   [`completion_notice.rs`](./completion_notice.rs),
-  [`background_delivery.rs`](./background_delivery.rs)). Generic retry,
+  [`background_delivery.rs`](./background_delivery.rs),
+  [`delivery_events.rs`](./delivery_events.rs)). Generic retry,
   give-up, replay, and router caching belong to TinyAgents' completion owner;
   OpenHuman keeps its thread session delivery and synchronous durable give-up
   writer. AgentRun status projection lives in
@@ -62,8 +64,10 @@ worktree policy.
   (`ops.rs`) plus stop/retry/continue/follow-up transitions (`control.rs`).
 - `workflow_runs/`: OpenHuman's workflow RPC and executor adapters. The
   `WorkflowRunSupervisor` owns live generation/cancellation state; OpenHuman
-  retains durable revision-CAS lifecycle transitions, policy admission,
-  root-parent construction, origin propagation, and failure projection.
+  commits durable revision-CAS lifecycle transitions inside the owner's
+  generation handoff, while retaining policy admission, root-parent
+  construction and origin propagation. Pre-drive setup errors use the captured
+  lifecycle revision; drive errors rely on engine lease-fenced lifecycle writes.
 - [`delegation.rs`](./delegation.rs): production worker for TinyAgents' durable
   plan→execute⇄review→finalize graph; every stage runs through `run_subagent`.
 - `spawn_parallel_agents` stages through
