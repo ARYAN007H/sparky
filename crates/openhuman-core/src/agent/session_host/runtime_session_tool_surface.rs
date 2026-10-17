@@ -14,7 +14,6 @@ fn reconcile_surface_names(
     discovery_deferred: Option<std::collections::HashSet<String>>,
     strip_packed: impl FnOnce(&mut std::collections::HashSet<String>),
 ) {
-    strip_packed(visible);
     if let Some(names) = &discovery_deferred {
         visible.retain(|name| !names.contains(name));
         *deferred = names.clone();
@@ -25,7 +24,11 @@ fn reconcile_surface_names(
         permanent: std::mem::take(permanent),
     };
     managed.refresh_synthesized(previous_synthesized, synthesized, auto_include_new);
-    // Temporary baseline ordering for the required failing regression run.
+    // New wildcard-synthesized names must participate in packed-tool
+    // filtering so a withheld name can add its `use_skill` route. Restore
+    // permanent names afterward, preserving their precedence over both
+    // packed and deferred visibility filters.
+    strip_packed(&mut managed.visible);
     managed.make_permanent(std::iter::empty::<String>());
     if let Some(names) = &discovery_deferred {
         managed.defer_visible(names);
