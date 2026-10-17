@@ -16,7 +16,7 @@ use std::path::{Path, PathBuf};
 use sha2::{Digest, Sha256};
 use tinyagents_orchestration::subagent::{SubagentError, SubagentOutcome, SubagentTaskKey};
 
-use super::SubagentCheckpointData;
+use crate::agent::subagent_host::SubagentCheckpointData;
 use crate::storage::state_kv::StateKv;
 
 const OWNER: &str = "subagents";

@@ -562,6 +562,16 @@ impl OpenHumanPersistence {
         self
     }
 
+    /// The name callers report for `key`'s pause. The pause itself is a
+    /// storage record now; this keeps the historical
+    /// `lifecycle/<component>.pause.json` spelling so reported checkpoint
+    /// names are unchanged and stay unique per scoped key.
+    fn pause_path(&self, key: &SubagentTaskKey) -> std::path::PathBuf {
+        self.checkpoint_dir
+            .join("lifecycle")
+            .join(format!("{}.pause.json", store::key_component(key)))
+    }
+
     fn store(&self) -> Result<LifecycleStore, SubagentError> {
         LifecycleStore::open(&self.checkpoint_dir)
     }
