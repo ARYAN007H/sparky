@@ -18,8 +18,7 @@
 //! team's). A `reach` in the model's filter is overwritten.
 
 use crate::tools::schema_cache::static_schema;
-use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use async_trait::async_trait;
 use serde_json::{json, Value};
@@ -36,79 +35,10 @@ use crate::core::runtime::DispatchCtx;
 use super::error::MemoryError;
 use super::ops;
 pub use super::tool_budget::is_budget_refusal;
-use super::types::{
-    FetchParams, ForgetParams, LearnParams, RecallParams, RecallView, TurnCitation,
-};
-
-/// Most citations kept per thread between two drains.
-const MAX_TURN_CITATIONS: usize = 20;
+use super::types::{FetchParams, ForgetParams, LearnParams, RecallParams, RecallView};
 
 /// How many matches one `fetch` returns; the model pages on with `cursor`.
 const FETCH_TOP: usize = 5;
-
-type TurnCitations = Mutex<HashMap<String, Vec<TurnCitation>>>;
-
-/// Citations `recall` produced during a thread's in-flight turn, drained by
-/// the chat surface once the turn returns ([`take_turn_citations`]).
-fn turn_citations(ctx: &DispatchCtx) -> Arc<TurnCitations> {
-    crate::core::runtime::slot_for::<TurnCitations>(ctx)
-}
-
-fn record_turn_citations(
-    ctx: &DispatchCtx,
-    thread_id: &str,
-    citations: &[tinymemory_api::Citation],
-) {
-    if citations.is_empty() {
-        return;
-    }
-    let citations_by_thread = turn_citations(ctx);
-    let mut all = citations_by_thread
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner);
-    let entry = all.entry(thread_id.to_string()).or_default();
-    for citation in citations {
-        if entry.len() >= MAX_TURN_CITATIONS {
-            break;
-        }
-        if !entry.iter().any(|existing| existing.id == citation.id.0) {
-            entry.push(TurnCitation::from(citation));
-        }
-    }
-}
-
-/// Records `citations` for `thread_id`'s in-flight turn: what the turn's
-/// memory pack cited (`lifecycle::prefetch::pre_turn`), beside what `recall`
-/// cites.
-pub fn record_pack_citations(ctx: &DispatchCtx, thread_id: &str, citations: Vec<TurnCitation>) {
-    if citations.is_empty() {
-        return;
-    }
-    let citations_by_thread = turn_citations(ctx);
-    let mut all = citations_by_thread
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner);
-    let entry = all.entry(thread_id.to_string()).or_default();
-    for citation in citations {
-        if entry.len() >= MAX_TURN_CITATIONS {
-            break;
-        }
-        if !entry.iter().any(|existing| existing.id == citation.id) {
-            entry.push(citation);
-        }
-    }
-}
-
-/// Drains the citations `recall` and the turn's pack produced for
-/// `thread_id` since the last drain.
-#[must_use]
-pub fn take_turn_citations(ctx: &DispatchCtx, thread_id: &str) -> Vec<TurnCitation> {
-    turn_citations(ctx)
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner)
-        .remove(thread_id)
-        .unwrap_or_default()
-}
 
 /// The tool's name.
 pub const MEMORY_TOOL_NAME: &str = "memory";
@@ -369,7 +299,11 @@ pub async fn run_action(
                     .await
                     .map(|view| {
                         if let Some(thread_id) = facts.thread_id.as_deref() {
-                            record_turn_citations(ctx, thread_id, &view.citations);
+                            crate::web_chat::citations::record_recall_citations(
+                                ctx,
+                                thread_id,
+                                &view.citations,
+                            );
                         }
                         BUS.publish(DomainEvent::MemoryRecalled {
                             query: question,
