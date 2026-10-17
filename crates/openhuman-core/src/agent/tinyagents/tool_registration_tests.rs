@@ -191,7 +191,7 @@ async fn registered_memory_dispatch_enforces_one_budget_across_distinct_calls() 
         crate::memory::tools::MemoryTool::new(Arc::new(config.clone())),
     )]);
     let adapter = shared_tool_adapter(vec![tools], "memory").unwrap();
-    let dispatch = typed_dispatch_for("memory", Arc::new(adapter))
+    let dispatch = typed_dispatch_for("memory", Arc::new(adapter), None)
         .expect("memory registration must preserve the harness run context");
     let parent = OpenHumanRunContext::new().into_tinyagents(RunConfig::new("memory-dispatch"));
     for index in 0..9 {
