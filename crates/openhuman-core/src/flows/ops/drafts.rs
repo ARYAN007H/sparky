@@ -25,8 +25,8 @@ pub(crate) fn flows_draft_create_from_copilot(
     graph: Value,
     origin: Value,
 ) -> Result<Value, String> {
-    let origin = serde_json::from_value(origin)
-        .map_err(|error| format!("bad `origin`: {error}"))?;
+    let origin =
+        serde_json::from_value(origin).map_err(|error| format!("bad `origin`: {error}"))?;
     let draft = flows_draft_create(config, flow_id, name, graph, origin)?.value;
     serde_json::to_value(draft).map_err(|error| error.to_string())
 }

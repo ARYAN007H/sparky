@@ -42,9 +42,9 @@ pub(crate) fn disabled_message() -> String {
 
 #[cfg(feature = "modules")]
 mod imp {
-    use super::{HOST_BUS_NAME, disabled_message};
     #[cfg(not(test))]
     use super::MODULE_ID;
+    use super::{HOST_BUS_NAME, disabled_message};
     use crate::config::Config;
     #[cfg(not(test))]
     use crate::modules::ops;
@@ -239,9 +239,7 @@ mod imp {
         Err(unavailable(config))
     }
 
-    pub(crate) async fn copilot_invoke_proxy(
-        config: &Config,
-    ) -> Result<tinybus::Proxy, String> {
+    pub(crate) async fn copilot_invoke_proxy(config: &Config) -> Result<tinybus::Proxy, String> {
         Err(unavailable(config))
     }
 

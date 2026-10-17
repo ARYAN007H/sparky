@@ -256,10 +256,6 @@ fn optional_field<T: DeserializeOwned>(value: &Value, key: &str) -> Result<Optio
     }
 }
 
-fn decode<T: DeserializeOwned>(value: Value) -> Result<T, String> {
-    serde_json::from_value(value).map_err(|error| error.to_string())
-}
-
 fn bus_error(member: &str, error: impl std::fmt::Display) -> tinybus::Error {
     tracing::debug!(callback = member, %error, "[flows:copilot] host callback failed");
     tinybus::Error::failed(error)

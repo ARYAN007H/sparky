@@ -26,7 +26,9 @@ async fn model_arguments_cannot_replace_the_scoped_host_callback_address() {
     config.workspace_dir = workspace.path().to_path_buf();
     config.config_path = workspace.path().join("config.toml");
     let catalog = CopilotToolCatalog::load(Arc::new(config)).expect("module tool catalog loads");
-    let tool = catalog.tool("list_flows").expect("list_flows is catalogued");
+    let tool = catalog
+        .tool("list_flows")
+        .expect("list_flows is catalogued");
     let result = tool
         .execute(json!({
             "host": {
@@ -102,7 +104,9 @@ async fn concurrent_tool_callbacks_keep_each_explicit_profile_scope() {
     }
 
     let catalog = CopilotToolCatalog::load(Arc::new(config)).expect("module tool catalog loads");
-    let tool = catalog.tool("list_flows").expect("list_flows is catalogued");
+    let tool = catalog
+        .tool("list_flows")
+        .expect("list_flows is catalogued");
     let alice_call = tool_context(alice, "copilot-alice");
     let bob_call = tool_context(bob, "copilot-bob");
     let alice_future = tool.execute_with_context(
