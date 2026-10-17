@@ -148,6 +148,7 @@ async fn announce_to_unavailable_channel_is_reported_as_failed() {
 
 #[tokio::test]
 async fn announce_send_failure_is_reported_as_failed() {
+    let _bridge_lock = crate::cron::channel_bridge::TEST_BRIDGE_LOCK.lock().await;
     let tmp = TempDir::new().unwrap();
     let config = test_config(&tmp).await;
     let channel = format!("failing-{}", uuid::Uuid::new_v4());
@@ -177,6 +178,7 @@ async fn announce_send_failure_is_reported_as_failed() {
 
 #[tokio::test]
 async fn announce_success_is_reported_and_uses_a_run_idempotency_key() {
+    let _bridge_lock = crate::cron::channel_bridge::TEST_BRIDGE_LOCK.lock().await;
     let tmp = TempDir::new().unwrap();
     let config = test_config(&tmp).await;
     let channel = format!("working-{}", uuid::Uuid::new_v4());
