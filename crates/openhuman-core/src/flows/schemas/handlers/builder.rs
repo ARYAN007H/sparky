@@ -11,12 +11,11 @@ pub(in crate::flows::schemas) fn handle_build(
         // Optional streaming target: when the copilot passes its chat `thread_id`
         // the builder turn streams live text/tool/proposal events into that
         // thread (Phase B). Read + strip the transport-only keys before the rest
-        // of the object is deserialized into the structured BuilderRequest.
+        // of the object is deserialized into the Copilot bus request.
         let stream = read_flow_stream_target(&params);
-        // Deserialize the remaining param object into the structured BuilderRequest
-        // (mode/instruction/graph/flow_id/run_id/error/failing_node_ids). The
-        // stream keys are ignored (BuilderRequest doesn't declare them).
-        let req: crate::flows::agents::workflow_builder::builder_prompt::BuilderRequest =
+        // Deserialize the remaining param object into the stable Copilot bus
+        // request shape. Stream keys are not part of that request.
+        let req: tinyflows_bus::copilot::BuilderPromptRequest =
             serde_json::from_value(Value::Object(params))
                 .map_err(|e| format!("invalid flows.build params: {e}"))?;
         to_json(ops::flows_build(&ctx, &config, req, stream).await?)
