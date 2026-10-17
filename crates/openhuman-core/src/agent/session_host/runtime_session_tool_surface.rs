@@ -270,3 +270,7 @@ impl OpenHumanTurnPrelude {
         Ok(())
     }
 }
+
+#[cfg(test)]
+#[path = "runtime_session_tool_surface_tests.rs"]
+mod tests;
