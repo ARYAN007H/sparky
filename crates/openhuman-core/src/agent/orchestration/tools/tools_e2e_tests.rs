@@ -527,9 +527,11 @@ async fn continue_subagent_resumes_paused_job_through_shared_driver() {
 #[tokio::test]
 async fn delegate_graph_runs_every_stage_through_shared_driver_jobs() {
     use super::DelegateGraphTool;
+    use crate::agent_registry::host_definition::AgentDefinitionRegistry;
+    use crate::core::runtime::{ContextOverlay, CoreContext, DomainSet};
+    use crate::tools::toolpacks::ToolGroups;
     use tinyagents_orchestration::subagent::{SubAgentJobRegistry, SubAgentJobStatus};
 
-    let _ = AgentDefinitionRegistry::init_global_builtins();
     let workspace = tempfile::TempDir::new().expect("workspace");
     let provider = Arc::new(ScriptedModel::new(vec![
         ("Produce a short, concrete", "1. inspect the fixture"),
@@ -538,10 +540,28 @@ async fn delegate_graph_runs_every_stage_through_shared_driver_jobs() {
     ]));
     let mut parent = parent_context(workspace.path(), provider.clone(), vec![]);
     parent.session_id = "delegate-graph-jobs-e2e".into();
-    let live = Arc::new(super::live_parent_run_context(
-        "delegate-graph-jobs-e2e",
-        parent,
-    ));
+    let mut test_definition = AgentDefinitionRegistry::builtins_only()
+        .get("task_manager_agent")
+        .expect("task manager definition")
+        .clone();
+    test_definition.model = tinyagents_definition::ModelSpec::Exact("test-model".into());
+    let definitions = Arc::new(
+        AgentDefinitionRegistry::builtins_only().with_definitions([test_definition]),
+    );
+    let mut config = crate::config::Config::default();
+    config.workspace_dir = workspace.path().to_path_buf();
+    let core = CoreContext::for_test_with_config(DomainSet::full(), config.clone()).derive_with(
+        ContextOverlay::new(config, DomainSet::full(), ToolGroups::none())
+            .definitions(definitions),
+    );
+    let live = Arc::new(
+        crate::agent::tinyagents::host::OpenHumanRunContext::new()
+            .with_core(Some(core))
+            .with_parent(parent)
+            .into_tinyagents(tinyagents_harness::context::RunConfig::new(
+                "delegate-graph-jobs-e2e",
+            )),
+    );
     let result = DelegateGraphTool::new()
         .execute_with_live_parent_context(
             json!({
