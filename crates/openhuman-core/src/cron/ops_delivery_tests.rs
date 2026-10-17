@@ -264,7 +264,7 @@ async fn cancelled_waiting_caller_keeps_manual_run_callback_served_until_complet
     };
     tokio::time::timeout(std::time::Duration::from_secs(3), async {
         loop {
-            let result: Result<(), _> = probe
+            let result: std::result::Result<(), _> = probe
                 .call(callbacks::FAILED, (&job, "lifecycle-probe", &failed))
                 .await;
             if result.is_err() {
@@ -322,6 +322,9 @@ async fn cancelled_waiting_caller_keeps_manual_run_callback_served_until_complet
         "cancelling the waiter must not orphan the module worker before terminal projection"
     );
     let runs = cron::list_runs(&config, &job.id, 10).unwrap();
-    assert!(runs.iter().any(|run| run.run_id == first_run_id && run.status == "ok"));
-    assert!(runs.iter().any(|run| run.run_id == second_run_id && run.status == "ok"));
+    assert_eq!(runs.len(), 2);
+    assert!(
+        runs.iter().all(|run| run.status == "ok"),
+        "the cancelled caller's worker must not leave a queued occurrence behind: {runs:?}"
+    );
 }

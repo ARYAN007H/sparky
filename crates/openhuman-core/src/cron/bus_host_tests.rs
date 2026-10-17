@@ -588,7 +588,7 @@ async fn captured_deleted_flow_job_publishes_trigger_and_completion_identity() {
         &config,
         &job.id,
         tinyflows_bus::schedule::types::CronJobPatch {
-            name: Some(Some("captured flow name".into())),
+            name: Some("captured flow name".into()),
             ..Default::default()
         },
     )
