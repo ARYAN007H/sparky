@@ -47,3 +47,30 @@ fn permanent_tools_survive_packed_and_deferred_filters_but_revocation_wins() {
     assert!(deferred.contains("ordinary"));
     assert!(!permanent.contains("revoked_permanent"));
 }
+
+#[test]
+fn newly_synthesized_packed_tool_keeps_its_use_skill_route_visible() {
+    let mut visible = std::collections::HashSet::new();
+    let mut deferred = std::collections::HashSet::new();
+    let mut permanent = std::collections::HashSet::new();
+    let previous = std::collections::HashSet::new();
+    let next = ["packed_delegate".to_string()].into_iter().collect();
+
+    reconcile_surface_names(
+        &mut visible,
+        &mut deferred,
+        &mut permanent,
+        &previous,
+        &next,
+        true,
+        None,
+        |visible| {
+            if visible.remove("packed_delegate") {
+                visible.insert("use_skill".to_string());
+            }
+        },
+    );
+
+    assert!(visible.contains("use_skill"));
+    assert!(!visible.contains("packed_delegate"));
+}
