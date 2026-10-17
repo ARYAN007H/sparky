@@ -200,7 +200,7 @@ mod imp {
         serve_pair_after_first(path, first, second, async {}).await
     }
 
-    pub(super) async fn serve_pair_after_first<F>(
+    pub(crate) async fn serve_pair_after_first<F>(
         path: String,
         first: impl tinybus::service::Interface + 'static,
         second: impl tinybus::service::Interface + 'static,
