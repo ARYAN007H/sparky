@@ -147,6 +147,13 @@ jobs:
            steps.filter.outputs['rust-tauri'] == 'true')
         run: bash scripts/ci/self-hosted/diff-cover.sh ci-out/lcov "origin/${{ inputs.base-ref }}" ci-out/diff-cover
 
+      - name: Verify mold in actual lane executables
+        if: >-
+          !cancelled() && steps.summary.outcome == 'success' &&
+          (steps.filter.outputs['rust-core'] == 'true' ||
+           steps.filter.outputs['rust-tauri'] == 'true')
+        run: node scripts/ci/self-hosted/verify-linkage.mjs
+
       - name: Save Tinymold cache
         if: ${{ always() && steps.tinymold.outcome == 'success' }}
         continue-on-error: true
