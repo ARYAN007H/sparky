@@ -41,7 +41,7 @@ pub(super) const PENDING_POST_COMMIT_WAIT: Duration = Duration::from_secs(10);
 /// iterations. When the sidecar is empty (a driver that does not fill it),
 /// this falls back to the assistant rows after the last user row, which is
 /// this turn's exchange. Never reports zero.
-pub(super) fn turn_iterations(sidecar_model_calls: usize, history: &[Message]) -> u32 {
+pub(super) fn turn_iterations(sidecar_model_calls: usize, history: &[Message]) -> usize {
     let calls = if sidecar_model_calls > 0 {
         sidecar_model_calls
     } else {
@@ -54,7 +54,7 @@ pub(super) fn turn_iterations(sidecar_model_calls: usize, history: &[Message]) -
             .filter(|message| matches!(message, Message::Assistant(_)))
             .count()
     };
-    calls.clamp(1, u32::MAX as usize) as u32
+    calls.max(1)
 }
 
 /// Await `publish` (the completion), then spawn `tail` (deferred work) and
