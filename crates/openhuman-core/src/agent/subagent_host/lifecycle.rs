@@ -166,11 +166,6 @@ pub(crate) async fn spawn_async_via_driver_tool(
     decode_driver_job_result(tool_result, &bundle, &task_key)
 }
 
-type DriverCompletion = Arc<
-    dyn Fn(&str, Result<tinyagents_orchestration::subagent::SubagentOutcome, String>)
-        + Send
-        + Sync,
->;
 type HostCompletion = Arc<dyn Fn(&str, Result<SubagentRunOutcome, String>) + Send + Sync>;
 
 async fn invoke_async_spawn_driver_tool(
@@ -331,6 +326,17 @@ fn decode_driver_job_result(
                 "driver-backed async spawn omitted its registered job id"
             ))
         })
+}
+
+fn bundle_failure_for_key(
+    bundle: &OpenHumanDriverBundle,
+    task_key: &SubagentTaskKey,
+) -> Option<SubagentRunError> {
+    bundle
+        .failures
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .remove(task_key)
 }
 
 
