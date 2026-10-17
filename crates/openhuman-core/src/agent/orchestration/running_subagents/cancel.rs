@@ -43,6 +43,33 @@ pub(crate) fn cancel_by_task(
     ctx: &crate::core::runtime::DispatchCtx,
     task_id: &str,
 ) -> Option<CancelledSubagent> {
+    if std::env::var_os("OPENHUMAN_DEBUG_DRIVER_CANCEL").is_some() {
+        let resolved = ctx.resolved();
+        let describe = |label: &str, core: &std::sync::Arc<crate::core::runtime::CoreContext>| {
+            let jobs = crate::core::runtime::slot_for::<
+                tinyagents_orchestration::subagent::SubAgentJobRegistry,
+            >(&crate::core::runtime::DispatchCtx::new(
+                std::sync::Arc::clone(core),
+            ));
+            let entries: Vec<_> = jobs
+                .list()
+                .into_iter()
+                .map(|job| (job.id, job.agent, job.status))
+                .collect();
+            eprintln!(
+                "CANCEL_CTX {label} core={:p} workspace={:?} agent={:?} jobs={entries:?}",
+                core,
+                core.workspace_dir().ok(),
+                core.session_agent(),
+            );
+        };
+        if let Some(core) = resolved.as_ref() {
+            describe("dispatch", core);
+        }
+        for (id, core) in crate::core::runtime::AgentContextRegistry::live() {
+            describe(&format!("agent:{id}"), &core);
+        }
+    }
     let id = TaskId::new(task_id);
     if let Ok(snapshot) = registry().snapshot_trusted(&id) {
         if !control_admits(ctx, &snapshot.metadata) {
@@ -83,6 +110,21 @@ pub(crate) fn cancel_by_task(
     let jobs = crate::core::runtime::slot_for::<
         tinyagents_orchestration::subagent::SubAgentJobRegistry,
     >(ctx);
+    if std::env::var_os("OPENHUMAN_DEBUG_DRIVER_CANCEL").is_some() {
+        eprintln!(
+            "CANCEL_LOOKUP task={task_id:?} workspace={workspace_dir:?} rows={:?}",
+            store.load().map(|rows| rows
+                .into_iter()
+                .map(|row| (
+                    row.current_task_id,
+                    row.parent_session,
+                    row.parent_thread_id,
+                    row.status,
+                    row.lifecycle_key,
+                ))
+                .collect::<Vec<_>>())
+        );
+    }
     let selected = crate::agent::orchestration::subagent_sessions::cancel_driver_job_by_task(
         &store,
         &workspace_dir.join(".openhuman/subagent_checkpoints"),

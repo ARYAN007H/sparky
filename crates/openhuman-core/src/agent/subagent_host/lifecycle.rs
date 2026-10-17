@@ -472,6 +472,16 @@ async fn invoke_driver_tool_with_request(
         &parent_session,
         thread_id.as_deref(),
     );
+    if std::env::var_os("OPENHUMAN_DEBUG_DRIVER_CANCEL").is_some() {
+        let core = dispatch_ctx.resolved();
+        eprintln!(
+            "SPAWN_CTX core={:?} workspace={:?} agent={:?} parent_session={parent_session:?} thread={thread_id:?} owner={owner:?} jobs={:?}",
+            core.as_deref().map(|core| core as *const _),
+            core.as_ref().and_then(|core| core.workspace_dir().ok()),
+            core.as_ref().and_then(|core| core.session_agent().map(str::to_owned)),
+            jobs.list().into_iter().map(|job| (job.id, job.agent, job.status)).collect::<Vec<_>>(),
+        );
+    }
     let owner_scope: Arc<dyn Fn(u64) -> String + Send + Sync> = Arc::new(move |_| owner.clone());
     let mut dispatcher = dispatcher
         .with_job_registry(jobs)
