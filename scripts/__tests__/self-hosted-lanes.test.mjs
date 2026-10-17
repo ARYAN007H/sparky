@@ -317,6 +317,7 @@ test("the storage area arms only the storage-drivers lane, with the sqlite and f
       [
         "storage-drivers:storage-e2e",
         "storage-drivers:storage-lib-tests",
+        "storage-drivers:cron-module-tests",
         "storage-drivers:storage-session-store-tests",
       ],
       profile,
