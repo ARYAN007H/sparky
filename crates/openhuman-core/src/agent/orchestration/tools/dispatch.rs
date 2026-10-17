@@ -106,7 +106,12 @@ impl ToolDispatch<(), crate::agent::tinyagents::host::OpenHumanRunContext> for D
                 .await
             }
             DelegationDispatchKind::Archetype => {
-                let Some(agent_id) = AgentDefinitionRegistry::current().and_then(|registry| {
+                let Some(agent_id) = parent
+                    .data
+                    .dispatch_ctx()
+                    .into_core()
+                    .and_then(|core| AgentDefinitionRegistry::for_core_context(&core))
+                    .and_then(|registry| {
                     registry.list().into_iter().find_map(|definition| {
                         let name = definition
                             .delegate_name
@@ -167,7 +172,11 @@ pub(crate) async fn dispatch_subagent_with_live_parent(
     let parent_workspace_descriptor = tool_context
         .and_then(|ctx| ctx.workspace().cloned())
         .or_else(|| run_context.workspace.clone());
-    let registry = match AgentDefinitionRegistry::current() {
+    let registry = match run_context
+        .dispatch_ctx()
+        .into_core()
+        .and_then(|core| AgentDefinitionRegistry::for_core_context(&core))
+    {
         Some(reg) => reg,
         None => {
             return Ok(ToolResult::error(

@@ -227,8 +227,7 @@ impl DelegateGraphTool {
         let registry = match run_context
             .dispatch_ctx()
             .into_core()
-            .and_then(|core| core.definitions())
-            .or_else(AgentDefinitionRegistry::global_arc)
+            .and_then(|core| AgentDefinitionRegistry::for_core_context(&core))
         {
             Some(reg) => reg,
             None => {
