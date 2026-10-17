@@ -162,10 +162,10 @@ fn seed_task(
     .unwrap();
 }
 
-// ── drive_member (the live-exec core) ───────────────────────────────────────
+// ── Host executor adapted through the owner service ────────────────────────
 
 #[tokio::test]
-async fn drive_member_completes_task_with_worker_output_as_evidence() {
+async fn owner_admission_receipt_ids_flow_into_completed_member_evidence() {
     AgentDefinitionRegistry::init_global_builtins().unwrap();
     let (_dir, config) = test_config();
     seed_team(&config, "team-1");
@@ -178,61 +178,30 @@ async fn drive_member_completes_task_with_worker_output_as_evidence() {
         None,
         vec![],
     );
-    // Claim + mark running, mirroring what start_member_run does pre-spawn.
-    crate::storage::sessions::with_ledger(&config.workspace_dir, |ledger| {
-        let ledger_arg_0 = ("team-1").to_string();
-        let ledger_arg_1 = ("task-a").to_string();
-        let ledger_arg_2 = ("m1").to_string();
-        let ledger_arg_3 = ("teamrun-x").to_string();
-        async move {
-            ledger
-                .claim_agent_team_task(&ledger_arg_0, &ledger_arg_1, &ledger_arg_2, &ledger_arg_3)
-                .await
-        }
-    })
-    .unwrap();
-    crate::storage::sessions::with_ledger(&config.workspace_dir, |ledger| {
-        let ledger_arg_0 = ("team-1").to_string();
-        let ledger_arg_1 = ("m1").to_string();
-        let ledger_arg_2 = ("task-a").to_string();
-        let ledger_arg_3 = ("teamrun-x").to_string();
-        let ledger_arg_4 = ("teamrun-x").to_string();
-        async move {
-            ledger
-                .mark_agent_team_member_running(
-                    &ledger_arg_0,
-                    &ledger_arg_1,
-                    &ledger_arg_2,
-                    &ledger_arg_3,
-                    &ledger_arg_4,
-                )
-                .await
-        }
-    })
-    .unwrap();
-    let task = crate::storage::sessions::with_ledger(&config.workspace_dir, |ledger| {
-        let ledger_arg_0 = ("task-a").to_string();
-        async move { ledger.get_agent_team_task(&ledger_arg_0).await }
-    })
-    .unwrap()
-    .unwrap();
-
     let provider = Arc::new(CannedModel {
         output: "did the thing".into(),
         fail: false,
     });
-    drive_member(
-        &config,
-        "team-1",
-        "m1",
-        "task_manager_agent",
-        &task,
-        "teamrun-x",
-        Some("test-model".into()),
-        mock_parent(provider),
-    )
-    .await
-    .expect("drive_member ok");
+    let executor = HostTeamMemberExecutor {
+        ctx: crate::core::runtime::DispatchCtx::ambient(),
+        config: config.clone(),
+        team_id: "team-1".into(),
+        member_id: "m1".into(),
+        model_override: Some("test-model".into()),
+        parent_override: Some(mock_parent(provider)),
+    };
+    let mut receipt = None;
+    let completion = team_service(&config)
+        .start_member_with_started("team-1", "task-a", "m1", &executor, false, |started| {
+            receipt = Some(started);
+        })
+        .await
+        .expect("owner completes member");
+    assert!(matches!(
+        completion,
+        tinyagents_session::run_ledger::CompletionOutcome::Completed(_)
+    ));
+    let receipt = receipt.expect("owner returns actual admission receipt");
 
     let done = crate::storage::sessions::with_ledger(&config.workspace_dir, |ledger| {
         let ledger_arg_0 = ("task-a").to_string();
@@ -243,7 +212,10 @@ async fn drive_member_completes_task_with_worker_output_as_evidence() {
     assert_eq!(done.status, AgentTeamTaskStatus::Done);
     assert_eq!(done.gate_status, "passed");
     assert_eq!(done.evidence.len(), 1, "worker output captured as evidence");
-    assert!(done.evidence[0].contains("teamrun-x"));
+    assert!(done.evidence[0].contains(&receipt.run_id));
+    assert_eq!(receipt.task.id, "task-a");
+    assert_eq!(receipt.member.run_id.as_deref(), Some(receipt.run_id.as_str()));
+    assert!(receipt.member.worker_thread_id.is_some());
 
     let member = crate::storage::sessions::with_ledger(&config.workspace_dir, |ledger| {
         let ledger_arg_0 = ("m1").to_string();
