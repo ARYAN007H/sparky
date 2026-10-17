@@ -96,6 +96,22 @@ mod imp {
             .map_err(|error| format!("the tinyflows schedule object is unreachable: {error}"))
     }
 
+    async fn copilot_interface_proxy(config: &Config) -> Result<Proxy, String> {
+        ensure(config).await?;
+        let runtime = runtime::runtime()
+            .await
+            .map_err(|error| format!("the module bus is unavailable: {error}"))?;
+        runtime
+            .connection()
+            .proxy(
+                tinyflows_bus::BUS_NAME,
+                tinyflows_bus::OBJECT_PATH,
+                tinyflows_bus::copilot::INTERFACE,
+            )
+            .map(|proxy| proxy.with_timeout(CALL_TIMEOUT))
+            .map_err(|error| format!("the tinyflows copilot object is unreachable: {error}"))
+    }
+
     /// A proxy for the module's `Schedule` object (store, maths and
     /// validation members, which answer quickly).
     pub(crate) async fn proxy(config: &Config) -> Result<Proxy, String> {
@@ -105,6 +121,11 @@ mod imp {
     /// A proxy whose deadline fits a call that runs a whole job (`ExecuteJob`).
     pub(crate) async fn run_proxy(config: &Config) -> Result<Proxy, String> {
         schedule_proxy(config, RUN_TIMEOUT).await
+    }
+
+    /// A proxy for the module's Copilot tool, prompt and fallback services.
+    pub(crate) async fn copilot_proxy(config: &Config) -> Result<Proxy, String> {
+        copilot_interface_proxy(config).await
     }
 
     /// Serve `object` at `path` on the module bus, on the module runtime, and
@@ -167,7 +188,7 @@ mod imp {
 mod fixture;
 
 #[cfg(feature = "modules")]
-pub(crate) use imp::{proxy, run_proxy, serve, unserve};
+    pub(crate) use imp::{copilot_proxy, proxy, run_proxy, serve, unserve};
 
 #[cfg(not(feature = "modules"))]
 mod imp {
@@ -191,6 +212,10 @@ mod imp {
         Err(unavailable(config))
     }
 
+    pub(crate) async fn copilot_proxy(config: &Config) -> Result<tinybus::Proxy, String> {
+        Err(unavailable(config))
+    }
+
     pub(crate) async fn serve(
         _path: String,
         _object: impl tinybus::service::Interface + 'static,
@@ -202,7 +227,7 @@ mod imp {
 }
 
 #[cfg(not(feature = "modules"))]
-pub(crate) use imp::{proxy, run_proxy, serve, unserve};
+pub(crate) use imp::{copilot_proxy, proxy, run_proxy, serve, unserve};
 
 /// Whether the module can serve in this build and configuration (the switch
 /// is on and the loader exists). Does not load anything.
