@@ -115,15 +115,15 @@ fn tools_adapter(config: Arc<Config>) -> OpenHumanTools {
     }
 }
 
-/// Minimal seeded [`ToolContract`](super::caps::ToolContract) for the tests
+/// Minimal seeded [`ToolContract`](crate::integrations::composio::catalog::ToolContract) for the tests
 /// below — only `required_args` matters for the preflight, so every other
 /// field is left at its "unknown" default.
 fn seeded_required_args_contract(
     slug: &str,
     toolkit: &str,
     required: &[&str],
-) -> super::caps::ToolContract {
-    super::caps::ToolContract {
+) -> crate::integrations::composio::catalog::ToolContract {
+    crate::integrations::composio::catalog::ToolContract {
         slug: slug.to_string(),
         toolkit: toolkit.to_string(),
         description: None,

@@ -13,7 +13,7 @@ use tinytools::{PermissionLevel, Tool, ToolResult};
 // get_tool_contract — read-only: the FULL live contract for one action slug
 // ─────────────────────────────────────────────────────────────────────────────
 
-/// `get_tool_contract`: fetch the FULL live [`ToolContract`](crate::flows::tinyflows::caps::ToolContract)
+/// `get_tool_contract`: fetch the FULL live [`ToolContract`](crate::integrations::composio::catalog::ToolContract)
 /// for one Composio action slug — the grounding step the builder MUST take
 /// before wiring a `search_tool_catalog` match's args or a downstream
 /// binding/`split_out.path` off it. Where `search_tool_catalog` is for
@@ -110,7 +110,7 @@ impl Tool for GetToolContractTool {
                     struct ContractWithRuntimeGate {
                         runtime_gate: &'static str,
                         #[serde(flatten)]
-                        contract: crate::flows::tinyflows::caps::ToolContract,
+                        contract: crate::integrations::composio::catalog::ToolContract,
                     }
                     let payload = ContractWithRuntimeGate {
                         runtime_gate,
@@ -168,7 +168,7 @@ impl Tool for GetToolContractTool {
 /// "propose/read only, no composio_execute" invariant** (see this module's
 /// top doc): unlike `composio_execute`, this tool can ONLY ever perform a
 /// `Read`-scope action (gated by
-/// [`crate::flows::tinyflows::caps::probe_tool_output_sample`]'s scope
+/// [`crate::integrations::composio::catalog::probe_tool_output_sample`]'s scope
 /// check, which ignores the user's per-toolkit scope preference — a probe
 /// must never perform a real mutation no matter what the user has toggled
 /// on) against a toolkit the user has ALREADY connected. No message is sent,
@@ -260,7 +260,7 @@ impl Tool for GetToolOutputSampleTool {
             "[flows] get_tool_output_sample: tool invoked"
         );
 
-        match crate::flows::tinyflows::caps::probe_tool_output_sample(
+        match crate::integrations::composio::catalog::probe_tool_output_sample(
             &self.config,
             &slug,
             call_args,

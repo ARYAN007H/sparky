@@ -1,42 +1,8 @@
 use super::*;
-use crate::flows::tinyflows::caps::{fetch_live_toolkit_catalog, ToolContract};
 
-pub(crate) const RUNTIME_GATE_WARNING: &str = "This action will be REJECTED on every real run — the runtime tool gate only allows curated actions for this toolkit. Pick a `featured: true` result from search_tool_catalog instead.";
-
-pub(crate) enum ContractLookupError {
-    InvalidSlug { slug: String },
-    CatalogUnavailable { toolkit: String },
-    ActionNotFound { slug: String, toolkit: String },
-}
-
-/// Resolves one live action and the runtime-curation warning used by both
-/// builder surfaces. The runtime allowlist remains authoritative; this only
-/// classifies an action so authoring can explain an inevitable rejection.
-pub(crate) async fn lookup_contract(
-    config: &Config,
-    slug: &str,
-) -> Result<(ToolContract, Option<&'static str>), ContractLookupError> {
-    let trimmed = slug.trim();
-    let Some(toolkit) = toolkit_for_contract_slug(trimmed) else {
-        return Err(ContractLookupError::InvalidSlug {
-            slug: slug.to_string(),
-        });
-    };
-    let Some(catalog) = fetch_live_toolkit_catalog(config, &toolkit).await else {
-        return Err(ContractLookupError::CatalogUnavailable { toolkit });
-    };
-    let Some(contract) = catalog.iter().find(|contract| {
-        crate::integrations::composio::contract::action_slug_matches(&contract.slug, trimmed)
-    }) else {
-        return Err(ContractLookupError::ActionNotFound {
-            slug: trimmed.to_string(),
-            toolkit,
-        });
-    };
-    let warning = (!contract.is_curated && toolkit_has_curated_catalog(&toolkit))
-        .then_some(RUNTIME_GATE_WARNING);
-    Ok((contract.clone(), warning))
-}
+#[cfg(test)]
+pub(crate) use crate::integrations::composio::catalog::toolkit_for_contract_slug;
+pub(crate) use crate::integrations::composio::catalog::{lookup_contract, ContractLookupError};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Catalog RPCs for the UI (Phase 5, item 16) — one implementation, two consumers
@@ -58,33 +24,6 @@ pub async fn flows_search_tool_catalog(
         json!({ "tools": tools }),
         "tool catalog searched",
     ))
-}
-
-/// Resolves the toolkit for a *single action* slug, rejecting anything that is
-/// not shaped `<TOOLKIT>_<ACTION>`.
-///
-/// [`crate::integrations::composio::contract::toolkit_from_slug`] falls back to the whole
-/// string when there is no `_`, so it answers `Some` for every non-empty input
-/// — `toolkit_from_slug("nodashhere") == Some("nodashhere")`. That permissive
-/// fall-back is load-bearing for `compute_required_connections`, which maps
-/// toolkit-ish tokens and legitimately wants the whole string back, so the
-/// stricter rule belongs to this caller rather than to the shared helper.
-///
-/// A contract fetch returns *one action*, so a slug with no action segment
-/// cannot name anything it could return; rejecting it here also spares the
-/// caller a pointless catalog round trip (which takes a per-toolkit fetch lock)
-/// before failing with an unrelated "could not fetch the catalog" message.
-///
-/// The multi-segment toolkit prefixes (`MICROSOFT_TEAMS_`, `ONE_DRIVE_`,
-/// `ZOHO_MAIL_`) all end in `_`, so a real action under one of them always has
-/// non-empty segments either side of its first `_` and passes unchanged.
-pub(crate) fn toolkit_for_contract_slug(slug: &str) -> Option<String> {
-    let trimmed = slug.trim();
-    let (toolkit_segment, action_segment) = trimmed.split_once('_')?;
-    if toolkit_segment.is_empty() || action_segment.is_empty() {
-        return None;
-    }
-    crate::integrations::composio::contract::toolkit_from_slug(trimmed)
 }
 
 /// Fetches one Composio action's full contract (secret-free) — the RPC the

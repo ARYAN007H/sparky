@@ -1,5 +1,5 @@
 use super::*;
-use crate::flows::tinyflows::caps::{seed_live_catalog_cache, ToolContract};
+use crate::integrations::composio::catalog::{seed_live_catalog_cache, ToolContract};
 
 fn seeded_alias_contract() -> ToolContract {
     ToolContract {

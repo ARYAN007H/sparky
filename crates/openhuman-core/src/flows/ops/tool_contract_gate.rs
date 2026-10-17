@@ -12,7 +12,7 @@ use super::*;
 // which 404s at runtime) or omit a genuinely required arg, and
 // `validate_binding_resolvability` would have nothing to say about either.
 // [`validate_tool_contracts`] is that missing HARD gate, grounded in
-// [`crate::flows::tinyflows::caps::fetch_live_toolkit_catalog`] — the
+// [`crate::integrations::composio::catalog::fetch_live_toolkit_catalog`] — the
 // FULL LIVE Composio catalog, not the static curated subset.
 
 /// Statically proves every `tool_call` node's `config.slug` is a REAL action
@@ -53,174 +53,25 @@ pub(crate) fn toolkit_has_curated_catalog(toolkit: &str) -> bool {
     // to `catalog_for_toolkit(toolkit)` for every toolkit that had one, and
     // tinymemory v1.13.4 deleted the registry outright, so the hop is gone
     // rather than merely unnecessary.
-    use crate::integrations::composio::contract::catalog_for_toolkit;
-    catalog_for_toolkit(toolkit).is_some()
+    crate::integrations::composio::catalog::has_curated_catalog(toolkit)
 }
 
 pub(crate) async fn validate_tool_contracts(config: &Config, graph: &WorkflowGraph) -> Vec<String> {
-    use crate::flows::tinyflows::caps::fetch_live_toolkit_catalog;
-    use crate::integrations::composio::contract::toolkit_from_slug;
-    use tinyagents_harness::tool::{missing_required_args, unsupported_arg_names};
+    use crate::integrations::composio::contract::validation::{
+        validate_tool_contract_nodes, ToolContractNode,
+    };
 
-    let mut errors = Vec::new();
-    for node in &graph.nodes {
-        if node.kind != NodeKind::ToolCall {
-            continue;
-        }
-        let Some(slug) = node.config.get("slug").and_then(Value::as_str) else {
-            continue;
-        };
-        // `=`-derived slugs resolve from upstream/trigger data at runtime —
-        // nothing to check statically. Native `oh:` tools have no Composio
-        // contract.
-        if slug.starts_with('=') || slug.starts_with("oh:") {
-            continue;
-        }
-        let Some(toolkit) = toolkit_from_slug(slug) else {
-            continue;
-        };
-        let Some(catalog) = fetch_live_toolkit_catalog(config, &toolkit).await else {
-            tracing::debug!(
-                target: "flows",
-                node = %node.id,
-                %slug,
-                %toolkit,
-                "[flows] tool-contract check: live catalog fetch failed — skipping (best-effort, never false-rejects)"
-            );
-            continue;
-        };
-
-        let Some(contract) = catalog
-            .iter()
-            .find(|c| crate::integrations::composio::contract::action_slug_matches(&c.slug, slug))
-        else {
-            tracing::warn!(
-                target: "flows",
-                node = %node.id,
-                %slug,
-                %toolkit,
-                "[flows] tool-contract check: slug is not a real action in the live catalog — rejecting"
-            );
-            errors.push(format!(
-                "Node '{}': `{slug}` is not a real action in the `{toolkit}` toolkit's live \
-                 Composio catalog — use search_tool_catalog {{ query: ..., toolkit: \"{toolkit}\" \
-                 }} to find a real action slug.",
-                node.id
-            ));
-            continue;
-        };
-
-        // Mirror `flow_tool_allowed`'s Path A: a toolkit OpenHuman ships a
-        // static curated catalog for is a hard curated-only allowlist at
-        // RUNTIME — `find_curated` rejects any slug that isn't one of the
-        // curated actions, regardless of whether it's a real live action.
-        // `search_tool_catalog`/`get_tool_contract` deliberately surface
-        // real-but-uncurated actions too (ranking signal only, never
-        // hidden — see `ToolContract::is_curated`'s doc), so without this
-        // check a graph could pass authoring/save with a real-but-uncurated
-        // action on a curated toolkit and then fail every run with "tool
-        // not permitted". Hold authoring to the same bar the runtime gate
-        // enforces instead of loosening the runtime gate.
-        let has_static_catalog = toolkit_has_curated_catalog(&toolkit);
-        if has_static_catalog && !contract.is_curated {
-            tracing::warn!(
-                target: "flows",
-                node = %node.id,
-                %slug,
-                %toolkit,
-                "[flows] tool-contract check: slug is real but not curated for a statically-catalogued toolkit — rejecting to match the runtime allowlist"
-            );
-            errors.push(format!(
-                "Node '{}': `{slug}` is a real `{toolkit}` action but not one of OpenHuman's \
-                 curated actions for `{toolkit}` — the runtime tool gate only allows curated \
-                 actions for toolkits with a curated catalog, so this would be rejected on \
-                 every run. Use search_tool_catalog {{ query: ..., toolkit: \"{toolkit}\" }} and \
-                 pick a result with `featured: true`.",
-                node.id
-            ));
-            continue;
-        }
-
-        let args = node.config.get("args").cloned().unwrap_or(Value::Null);
-        let missing = missing_required_args(&contract.required_args, &args);
-        if !missing.is_empty() {
-            tracing::warn!(
-                target: "flows",
-                node = %node.id,
-                %slug,
-                ?missing,
-                "[flows] tool-contract check: required arg(s) missing or null — rejecting"
-            );
-            let list = missing
-                .iter()
-                .map(|m| format!("`{m}`"))
-                .collect::<Vec<_>>()
-                .join(", ");
-            errors.push(format!(
-                "Node '{}': tool_call `{slug}` is missing required arg(s) {list} — wire each \
-                 from an upstream node's output, e.g. \"{}\": \
-                 \"=nodes.<node_id>.item.json.<field>\" (call get_tool_contract {{ slug: \
-                 \"{slug}\" }} for the exact required_args list).",
-                node.id, missing[0]
-            ));
-        }
-
-        // [B13] Arg-NAME validity: `missing_required_args` only proves a
-        // required arg is PRESENT — it says nothing about whether every arg
-        // the builder wired is actually a property this action's schema
-        // recognizes. A misnamed/unsupported field (the live bug: wiring
-        // `SLACK_SEND_MESSAGE` with `text` when the action wants
-        // `markdown_text`) sails through the check above unrejected — a
-        // value IS present, just under the wrong key — and only surfaces as
-        // a runtime 400 from the real provider. `unsupported_arg_names`
-        // returns `None` when the schema can't be used to validate names
-        // (unknown schema, or `additionalProperties: true`) — that case is
-        // deliberately never rejected here (best-effort, same posture as the
-        // rest of this gate).
-        if let Some(unsupported) = unsupported_arg_names(contract.input_schema.as_ref(), &args) {
-            if !unsupported.is_empty() {
-                let valid_names: Vec<String> = contract
-                    .input_schema
-                    .as_ref()
-                    .and_then(|s| s.get("properties"))
-                    .and_then(Value::as_object)
-                    .map(|props| {
-                        let mut names: Vec<String> = props.keys().cloned().collect();
-                        names.sort();
-                        names
-                    })
-                    .unwrap_or_default();
-                tracing::warn!(
-                    target: "flows",
-                    node = %node.id,
-                    %slug,
-                    ?unsupported,
-                    ?valid_names,
-                    "[flows] tool-contract check: arg name(s) not declared by the action's \
-                     input schema — rejecting"
-                );
-                let bad_list = unsupported
-                    .iter()
-                    .map(|m| format!("`{m}`"))
-                    .collect::<Vec<_>>()
-                    .join(", ");
-                let valid_suffix = if valid_names.is_empty() {
-                    String::new()
-                } else {
-                    format!(
-                        " — valid arg names for `{slug}` are: {}",
-                        valid_names.join(", ")
-                    )
-                };
-                errors.push(format!(
-                    "Node '{}': tool_call `{slug}` has unsupported arg name(s) {bad_list} — not \
-                     a property of this action's input schema{valid_suffix}. Call \
-                     get_tool_contract {{ slug: \"{slug}\" }} and use the exact property names \
-                     from `input_schema` (never guess an arg name).",
-                    node.id
-                ));
-            }
-        }
-    }
-    errors
+    let nodes: Vec<_> = graph
+        .nodes
+        .iter()
+        .filter(|node| node.kind == NodeKind::ToolCall)
+        .filter_map(|node| {
+            Some(ToolContractNode {
+                id: node.id.clone(),
+                slug: node.config.get("slug")?.as_str()?.to_string(),
+                args: node.config.get("args").cloned().unwrap_or(Value::Null),
+            })
+        })
+        .collect();
+    validate_tool_contract_nodes(config, &nodes).await
 }

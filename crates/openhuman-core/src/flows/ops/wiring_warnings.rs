@@ -11,7 +11,7 @@ use super::*;
 /// Composio schema). Best-effort like the runtime preflight — no schema, no
 /// warning, never a block.
 pub(crate) async fn graph_wiring_warnings(config: &Config, graph: &WorkflowGraph) -> Vec<String> {
-    use crate::flows::tinyflows::caps::composio_required_args;
+    use crate::integrations::composio::catalog::composio_required_args;
     use tinyagents_harness::tool::missing_required_args;
 
     let mut warnings = Vec::new();
@@ -63,7 +63,7 @@ pub(crate) async fn graph_wiring_warnings(config: &Config, graph: &WorkflowGraph
 /// message) when the binding is missing the `data.` segment entirely — a
 /// Composio `tool_call`'s real runtime output always wraps its payload in
 /// `data` (`ComposioExecuteResponse`; see
-/// [`crate::flows::tinyflows::caps::ToolContract::output_fields`]'s doc),
+/// [`crate::integrations::composio::catalog::ToolContract::output_fields`]'s doc),
 /// so `=nodes.<id>.item.json.<field>` (no `data.`) is GUARANTEED to resolve
 /// `null` even when `<field>` names a real output field — that used to be
 /// silently accepted here (B1: the exact bug that produces a hollow run).
@@ -93,7 +93,7 @@ pub(super) async fn graph_output_field_warnings(
     config: &Config,
     graph: &WorkflowGraph,
 ) -> Vec<String> {
-    use crate::flows::tinyflows::caps::fetch_live_toolkit_catalog;
+    use crate::integrations::composio::catalog::fetch_live_toolkit_catalog;
     // Reading a graph's `=`-bindings is the engine's grammar, not this host's:
     // both helpers were a private copy here until the gates moved upstream.
     use crate::integrations::composio::contract::toolkit_from_slug;
@@ -238,7 +238,7 @@ pub(super) async fn graph_output_field_warnings(
 /// `primary_array_path` NOR an `output_schema` is known (truly nothing to
 /// check against).
 async fn graph_split_out_path_warnings(config: &Config, graph: &WorkflowGraph) -> Vec<String> {
-    use crate::flows::tinyflows::caps::fetch_live_toolkit_catalog;
+    use crate::integrations::composio::catalog::fetch_live_toolkit_catalog;
     use crate::integrations::composio::contract::toolkit_from_slug;
 
     let mut warnings = Vec::new();

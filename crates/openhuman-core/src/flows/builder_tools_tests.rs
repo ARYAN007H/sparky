@@ -37,7 +37,7 @@ fn valid_graph() -> Value {
 // share a toolkit key (same discipline the pre-fix required-args/response-
 // fields caches already required).
 
-use crate::flows::tinyflows::caps::{
+use crate::integrations::composio::catalog::{
     seed_live_catalog_cache, seed_probe_cache, ProbedOutputSample, ToolContract,
 };
 

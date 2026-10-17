@@ -1,31 +1,5 @@
 use super::*;
-use crate::agent::prompts::types::IntegrationConnection;
-use crate::integrations::composio::{ComposioExecuteResponse, ConnectedIntegration};
 use tinytools::{ToolContent, ToolResult};
-
-fn integration(
-    toolkit: &str,
-    connected: bool,
-    connections: Vec<IntegrationConnection>,
-) -> ConnectedIntegration {
-    ConnectedIntegration {
-        toolkit: toolkit.to_string(),
-        description: String::new(),
-        tools: Vec::new(),
-        gated_tools: Vec::new(),
-        connected,
-        connections,
-        non_active_status: None,
-    }
-}
-
-fn connection(id: &str, label: Option<&str>, is_default: bool) -> IntegrationConnection {
-    IntegrationConnection {
-        connection_id: id.to_string(),
-        label: label.map(str::to_string),
-        is_default,
-    }
-}
 
 fn http_cred_store() -> (tempfile::TempDir, HttpCredentialsStore) {
     let dir = tempfile::tempdir().expect("tempdir");
