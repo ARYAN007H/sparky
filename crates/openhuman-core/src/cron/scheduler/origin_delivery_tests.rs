@@ -71,7 +71,7 @@ fn seed_thread(config: &Config, id: &str) {
             working_dir: None,
         },
     )
-    .unwrap();
+    .unwrap_or_else(|e| { eprintln!("ERR {e:#}"); panic!() });
 }
 
 #[test]
