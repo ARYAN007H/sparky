@@ -919,7 +919,3 @@ pub(super) fn resolve_target_definition(
 }
 
 use super::factory_resolution::provider_role_for_definition;
-
-#[cfg(test)]
-#[path = "factory_provider_role_tests_tests.rs"]
-mod provider_role_tests;

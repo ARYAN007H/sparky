@@ -40,3 +40,7 @@ pub(crate) fn provider_role_for_definition(
         .flatten();
     provider_role_for(master_hint.as_deref().or(default_model))
 }
+
+#[cfg(test)]
+#[path = "factory_resolution_tests.rs"]
+mod tests;
