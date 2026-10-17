@@ -397,18 +397,10 @@ fn triggered_run_guard_retains_long_lived_ids_past_1024_runs() {
         binding.publish_triggered_once(&job, &format!("long-lived-run-{index}"));
     }
 
-    let before = binding
-        .triggered_runs
-        .lock()
-        .unwrap()
-        .len();
+    let before = binding.triggered_runs.lock().unwrap().len();
     assert_eq!(before, 1025);
     binding.publish_triggered_once(&job, "long-lived-run-0");
-    let after = binding
-        .triggered_runs
-        .lock()
-        .unwrap()
-        .len();
+    let after = binding.triggered_runs.lock().unwrap().len();
     assert_eq!(after, before, "an active run must remain deduplicated");
 }
 
