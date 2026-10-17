@@ -1,9 +1,5 @@
 //! Agent-definition fallback resolution and provider-role selection for session construction.
 
-use crate::agent_registry::host_definition::AgentDefinitionRegistry;
-use crate::config::Config;
-use anyhow::Result;
-
 /// Resolve the provider/workload role for a session build.
 ///
 /// Explicit `hint:<role>` markers route to their workload; everything else
