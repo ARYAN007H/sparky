@@ -271,7 +271,7 @@ fn schedule_delivery(ctx: &DispatchCtx, thread_id: String, delay: Duration) {
 fn schedule_delivery_inner(
     ctx: DispatchCtx,
     thread_id: String,
-    _delay: Duration,
+    delay: Duration,
     wait_idle: bool,
     fence: DrainFence,
 ) {
@@ -280,8 +280,10 @@ fn schedule_delivery_inner(
         .lock()
         .expect("scheduled")
         .push((thread_id.clone(), delay));
-    // Scoped: the thread -> workspace table is keyed per profile, so the
-    // delayed task must run under the profile that scheduled it.
+    #[cfg(not(test))]
+    let _ = delay; // The owner applies debounce/recovery timing inside its delivery API.
+                   // Scoped: the thread -> workspace table is keyed per profile, so the
+                   // delayed task must run under the profile that scheduled it.
     ctx.clone().spawn(async move {
         let outcome = try_deliver(ctx.clone(), thread_id.clone(), fence.clone(), wait_idle).await;
         if outcome == DeliveryOutcome::Busy {
