@@ -538,7 +538,10 @@ async fn delegate_graph_runs_every_stage_through_shared_driver_jobs() {
     ]));
     let mut parent = parent_context(workspace.path(), provider.clone(), vec![]);
     parent.session_id = "delegate-graph-jobs-e2e".into();
-    let live = super::live_parent_run_context("delegate-graph-jobs-e2e", parent);
+    let live = Arc::new(super::live_parent_run_context(
+        "delegate-graph-jobs-e2e",
+        parent,
+    ));
     let result = DelegateGraphTool::new()
         .execute_with_live_parent_context(
             json!({
@@ -548,7 +551,7 @@ async fn delegate_graph_runs_every_stage_through_shared_driver_jobs() {
             }),
             None,
             live.data.child(),
-            Some(Arc::new(live.clone())),
+            Some(Arc::clone(&live)),
         )
         .await
         .expect("graph delegation returns a tool result");
