@@ -508,7 +508,7 @@ async fn opening_an_existing_profile_adopts_the_enforced_cron_cap() {
 }
 
 #[tokio::test]
-async fn opening_replaces_a_dropped_hosts_fence_before_cron_reconciliation() {
+async fn provisioning_with_a_new_root_replaces_a_dead_higher_epoch_fence() {
     let first_root = tempfile::tempdir().unwrap();
     let second_root = tempfile::tempdir().unwrap();
     let id = profile(&format!("cron-fence-{}", uuid::Uuid::new_v4().simple()));
@@ -540,12 +540,48 @@ async fn opening_replaces_a_dropped_hosts_fence_before_cron_reconciliation() {
     second_saas.cron.max_active_jobs = 1;
     let second = ProfileHost::new(second_saas, CoreContext::for_test(DomainSet::full(), None));
     let provisioned = second.provision(&id).await;
-    if let Err(error) = &provisioned {
-        eprintln!("new-root provision error: {error}");
-    }
     assert!(
         provisioned.unwrap(),
         "the new root must be able to register its own profile fence"
+    );
+}
+
+#[tokio::test]
+async fn opening_replaces_a_dropped_hosts_fence_before_cron_reconciliation() {
+    let tmp = tempfile::tempdir().unwrap();
+    let id = profile(&format!("cron-fence-{}", uuid::Uuid::new_v4().simple()));
+    let registry = crate::storage::fence::registry();
+    let backend: Arc<dyn crate::storage::StorageBackend> =
+        Arc::new(crate::storage::fenced_backend::FencedBackend::new(
+            Arc::new(crate::storage::MemoryStorage::new()),
+            Arc::clone(&registry),
+        ));
+    let _storage = RestoreInstalledStorage(crate::storage::install(backend));
+
+    let mut first_saas = SaasConfig::new(tmp.path());
+    first_saas.cron.agent_jobs_only = true;
+    first_saas.cron.max_active_jobs = 1;
+    let first = ProfileHost::new(first_saas, CoreContext::for_test(DomainSet::full(), None));
+    first.provision(&id).await.unwrap();
+    let opened = first.open(&id).await.unwrap();
+    let old_epoch = opened.lease_fence().epoch();
+    let _retire_stale_fence = RetireProfileFence {
+        registry: Arc::clone(&registry),
+        profile_id: id.as_str().to_string(),
+        epoch: old_epoch,
+    };
+    drop(opened);
+    drop(first);
+
+    let mut second_saas = SaasConfig::new(tmp.path());
+    second_saas.cron.agent_jobs_only = true;
+    second_saas.cron.max_active_jobs = 1;
+    let second = ProfileHost::new(second_saas, CoreContext::for_test(DomainSet::full(), None));
+    assert!(!second.provision(&id).await.unwrap());
+    let reopened = second.open(&id).await;
+    assert!(
+        reopened.is_ok(),
+        "the later lease in this root must replace the dropped host's profile fence"
     );
 }
 
