@@ -6,6 +6,32 @@ use super::*;
 use chrono::Duration as ChronoDuration;
 use tempfile::TempDir;
 
+/// Move one scheduled row into the past for scheduler tests. The document
+/// representation belongs to the module store; this helper is test-only.
+pub(crate) fn force_next_run_for_test(
+    config: &Config,
+    job_id: &str,
+    at: DateTime<Utc>,
+) -> Result<()> {
+    use tinystoragedrivers::Precondition;
+    let opened = crate::storage::local::open("cron::store", &config.workspace_dir)?;
+    let docs = std::sync::Arc::clone(opened.scoped()?.documents());
+    let job_id = job_id.to_string();
+    crate::storage::block_on_anyhow(async move {
+        let stored = docs
+            .get("cron_jobs", &job_id)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("no job {job_id}"))?;
+        let mut doc = stored.doc;
+        doc["next_run"] = serde_json::json!(at.to_rfc3339());
+        doc["next_run_ms"] = serde_json::json!(at.timestamp_millis());
+        doc["next_run_ns"] = serde_json::json!(at.timestamp_nanos_opt().unwrap_or(i64::MAX));
+        docs.put("cron_jobs", &job_id, doc, Precondition::None)
+            .await?;
+        Ok(())
+    })
+}
+
 fn test_config(tmp: &TempDir) -> Config {
     let config = Config {
         workspace_dir: tmp.path().join("workspace"),
