@@ -5,8 +5,10 @@ async fn force_fresh_cancels_old_driver_before_creating_a_new_session() {
     use crate::agent::orchestration::subagent_sessions::{
         DurableSubagentStatus, SubagentSessionStore,
     };
+    use crate::agent::tinyagents::host::OpenHumanRunContext;
     use crate::core::runtime::{ContextOverlay, CoreContext, DomainSet};
     use crate::tools::toolpacks::ToolGroups;
+    use tinyagents_harness::context::RunContext;
     use tinyagents_harness::tool::ToolDispatch;
     use tinyagents_orchestration::subagent::{
         SubAgentJobRegistry, SubAgentJobStatus, SubAgentJobsTool,
@@ -289,10 +291,8 @@ async fn force_fresh_cancels_old_driver_before_creating_a_new_session() {
 #[tokio::test]
 async fn driver_job_controls_are_isolated_by_workspace_with_shared_runtime_state() {
     use crate::agent::subagent_host::{run_subagent_via_driver_tool, SubagentRunOptions};
-    use crate::agent::tinyagents::host::OpenHumanRunContext;
     use crate::core::runtime::{ContextOverlay, CoreContext, DomainSet};
     use crate::tools::toolpacks::ToolGroups;
-    use tinyagents_harness::context::RunContext;
     use tinyagents_harness::tool::ToolDispatch;
     use tinyagents_orchestration::subagent::{
         SubAgentJobAction, SubAgentJobRegistry, SubAgentJobsTool,
