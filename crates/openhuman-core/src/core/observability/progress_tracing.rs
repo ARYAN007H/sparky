@@ -94,5 +94,9 @@ pub(crate) use export::{export_run_trace, export_run_trace_from_journal};
 mod journal_projection_tests;
 
 #[cfg(test)]
+#[path = "trace_export_adoption_tests.rs"]
+mod trace_export_adoption_tests;
+
+#[cfg(test)]
 #[path = "../../agent/progress_tracing/progress_tracing_tests.rs"]
 mod tests;
