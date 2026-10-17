@@ -154,18 +154,51 @@ async fn independent_host_bundles_share_and_project_the_persisted_winner() {
         .get(&task_key)
         .expect("leader reserves the shared task key");
 
+    let cancelled_context = options.run_context.clone();
+    let cancelled_options = options.clone();
     let follower = tokio::spawn(async move {
         crate::agent::subagent_host::OpenHumanSubagentHost::new(definition, options)
             .run(&follower_parent, "produce a report".into())
             .await
     });
+    let mut cancelled_parent = cancelled_context.into_tinyagents(
+            tinyagents_harness::context::RunConfig::new("cross-bundle-parent")
+                .with_thread("cross-bundle-thread"),
+        );
+    let observer_cancellation = tinyagents_harness::CancellationToken::new();
+    cancelled_parent.cancellation = observer_cancellation.clone();
+    let cancelled_definition = make_def_named_tools(&["blocking_cross_bundle_fixture"]);
+    let cancelled_follower = tokio::spawn(async move {
+        crate::agent::subagent_host::OpenHumanSubagentHost::new(
+            cancelled_definition,
+            cancelled_options,
+        )
+        .run(&cancelled_parent, "produce a report".into())
+        .await
+    });
     tokio::time::timeout(std::time::Duration::from_secs(5), async {
-        while leader_entry.waiter_count() != 1 {
+        while leader_entry.waiter_count() != 2 {
             tokio::task::yield_now().await;
         }
     })
     .await
-    .expect("the independent host bundle joins the leader's flight");
+    .expect("both independent host bundles join the leader's flight");
+
+    observer_cancellation.cancel();
+    let cancelled = tokio::time::timeout(std::time::Duration::from_secs(5), cancelled_follower)
+        .await
+        .expect("cancelled observer exits independently")
+        .expect("cancelled observer task")
+        .expect("observer cancellation is a normal lifecycle outcome");
+    assert!(
+        matches!(cancelled.status, SubagentRunStatus::Cancelled),
+        "the cancelled observer receives its own cancelled result"
+    );
+    assert_eq!(
+        executions.load(std::sync::atomic::Ordering::SeqCst),
+        1,
+        "cancelling a waiter does not cancel or duplicate the leader"
+    );
 
     release.notify_waiters();
     let leader = tokio::time::timeout(std::time::Duration::from_secs(5), leader)
