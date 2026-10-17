@@ -33,6 +33,13 @@ pub fn owner_schemas() -> Vec<Schema> {
         crate::security::devices::storage_schema(),
         crate::desktop::notifications::storage_schema(),
         crate::integrations::task_sources::storage_schema(),
+        crate::agent::artifacts::storage_schema(),
+        crate::platform::cost::storage_schema(),
+        crate::config::schema::config_storage_schema(),
+        crate::profiles::storage_schema(),
+        crate::threads::store::storage_schema(),
+        crate::agent::orchestration::subagent_sessions::storage_schema(),
+        super::agents::storage_schema(),
     ];
     #[cfg(feature = "flows")]
     {

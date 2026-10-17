@@ -1,6 +1,7 @@
 mod ops;
 mod store;
 mod storage_schema;
+pub use storage_schema::storage_schema;
 mod store_documents;
 mod types;
 
