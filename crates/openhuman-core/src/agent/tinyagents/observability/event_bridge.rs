@@ -17,14 +17,6 @@ use super::bridge_types::{ProviderUsageCarry, SubagentScope, ToolFailureMap, Too
 use tinyagents_harness::events::{CallDedupe, IterationCursor, OrderedSender};
 use tinyagents_harness::events::AgentEvent;
 
-fn valid_provider_id(value: &str) -> bool {
-    !value.is_empty()
-        && value.len() <= 64
-        && value
-            .chars()
-            .all(|character| character.is_ascii_alphanumeric() || matches!(character, '_' | '.' | ':' | '-'))
-}
-
 #[derive(Default)]
 pub(super) struct BridgeState {
     pub(super) input_tokens: u64,
@@ -343,23 +335,6 @@ impl OpenhumanEventBridge {
             },
         };
         let call_cost = cost.usd();
-        if let tinyagents_harness::cost::CallCost::Estimated(estimated_cost_usd) = cost {
-            if let Some(call_id) = self
-                .call_ids
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
-                .get(&iteration)
-                .cloned()
-            {
-                self.emit_generation_enrichment(
-                    call_id,
-                    tinyagents_harness::events::GenerationEnrichment {
-                        estimated_cost_usd: Some(estimated_cost_usd),
-                        ..Default::default()
-                    },
-                );
-            }
-        }
         // The context window + cache-creation/reasoning breakdown only exist on
         // the carried provider usage (the crate `Usage` mapping drops them); fall
         // back to the catalogue window and the crate token counts when absent.
