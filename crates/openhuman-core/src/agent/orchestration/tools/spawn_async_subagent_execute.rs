@@ -237,6 +237,18 @@ impl SpawnAsyncSubagentTool {
         }
 
         let task_id = format!("sub-{}", uuid::Uuid::new_v4());
+        if let Some(thread_id) = parent_thread_id.as_deref() {
+            if crate::agent::orchestration::background_completions::mark_stopped_task_if_thread_stopped(
+                &dispatch,
+                &parent.workspace_dir,
+                thread_id,
+                &task_id,
+            ) {
+                return Ok(ToolResult::error(
+                    "spawn_async_subagent: parent thread is stopped or deleted",
+                ));
+            }
+        }
         let worker_thread_id = reusable
             .as_ref()
             .and_then(|session| session.worker_thread_id.clone())
@@ -677,6 +689,14 @@ impl SpawnAsyncSubagentTool {
                 }
             })
         };
+        let registration_progress = progress_sink.clone();
+        let registration_completion_target = completion_target.clone();
+        let registration_parent_session = parent_session.clone();
+        let registration_agent_id = definition.id.clone();
+        let registration_task_id = task_id.clone();
+        let registration_display_name = Some(definition.display_name().to_string());
+        let registration_worker_thread_id = worker_thread_id.clone();
+        let registration_prompt = prompt.clone();
         let background_prompt = add_background_contract(&prompt);
         let options = SubagentRunOptions {
             skill_filter_override: None,
@@ -718,6 +738,34 @@ impl SpawnAsyncSubagentTool {
                     store_err
                 );
             }
+            let message = error.to_string();
+            registration_completion_target
+                .failed(
+                    &registration_task_id,
+                    &registration_agent_id,
+                    &message,
+                )
+                .await;
+            crate::agent::orchestration::subagent_events::publish_subagent_failed(
+                registration_parent_session,
+                registration_task_id.clone(),
+                registration_agent_id.clone(),
+                message.clone(),
+            );
+            if let Some(progress) = registration_progress {
+                let _ = progress
+                    .send(AgentProgress::SubagentFailed {
+                        agent_id: registration_agent_id,
+                        task_id: registration_task_id,
+                        error: message,
+                    })
+                    .await;
+            }
+            let _ = (
+                registration_display_name,
+                registration_worker_thread_id,
+                registration_prompt,
+            );
             return Ok(ToolResult::error(format!(
                 "spawn_async_subagent: failed to register detached sub-agent: {error}"
             )));
