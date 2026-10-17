@@ -208,6 +208,7 @@ pub(crate) async fn continue_subagent_via_driver_tool(
     mut options: SubagentRunOptions,
     resume: SubagentResume,
 ) -> Result<(SubagentRunOutcome, String), SubagentRunError> {
+    let fallback_agent_id = definition.id.clone();
     options.task_id = Some(original_key.task_id.clone());
     let (tool_result, bundle) = invoke_async_spawn_driver_tool(
         parent,
@@ -220,7 +221,6 @@ pub(crate) async fn continue_subagent_via_driver_tool(
         Some((original_key.clone(), resume)),
     )
     .await?;
-    let fallback_agent_id = definition.id.clone();
     resolve_inline_driver_outcome(tool_result, &bundle, &original_key, &fallback_agent_id).await
 }
 
