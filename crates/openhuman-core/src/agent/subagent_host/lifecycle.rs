@@ -578,7 +578,7 @@ pub struct OpenHumanSubagentHost {
 type ScopedSubagentFlights =
     std::sync::Mutex<std::collections::HashMap<PathBuf, tinyagents_orchestration::subagent::SubagentInFlight>>;
 
-fn shared_subagent_flight(
+pub(super) fn shared_subagent_flight(
     ctx: &crate::core::runtime::DispatchCtx,
     checkpoint_dir: &std::path::Path,
 ) -> tinyagents_orchestration::subagent::SubagentInFlight {
