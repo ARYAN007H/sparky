@@ -97,6 +97,7 @@ pub fn cancel_driver_job_for_session(
     };
     let key = session
         .lifecycle_key
+        .clone()
         .filter(|key| key.task_id == task_id && key.thread_id.as_deref() == parent_thread_id)
         .or_else(|| {
             resolve_lifecycle_key(
