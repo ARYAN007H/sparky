@@ -34,6 +34,7 @@ pub(crate) use builder::provider_role_for_definition;
 pub use builder::{HostOnlyToolPolicy, HostTools, HostTurnTools, TurnContext};
 
 mod builder;
+mod builder_config;
 mod codec;
 mod driver;
 // Tool surface for live voice sessions (`voice::live`).
