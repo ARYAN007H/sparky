@@ -12,7 +12,6 @@ use tinyagents_harness::observability::LangfuseClient;
 
 use super::langfuse::{environment_for_base, ingestion_url, skip_push};
 use crate::config::Config;
-use crate::security::credentials::jwt::bearer_authorization_value;
 use crate::security::credentials::session_support::direct_backend_credential;
 
 const PUSH_TIMEOUT: Duration = Duration::from_secs(10);
@@ -42,11 +41,10 @@ pub(super) async fn push_spans(config: &Config, spans: &[TraceSpan]) -> Result<(
     // and route policy. LangfuseClient owns the proxy route, bearer header,
     // OTLP v4 header, and response validation.
     let transport = crate::backend::resolve_backend_transport()
-        .map_err(|err| format!("Langfuse OTLP push has no backend transport: {err}"))?
-        ;
+        .map_err(|err| format!("Langfuse OTLP push has no backend transport: {err}"))?;
     let client = LangfuseClient::proxy_with_transport(
         url,
-        bearer_authorization_value(&token),
+        token,
         transport.http_client(crate::backend::TransportProfile::Api),
         transport.attribution_headers(),
     )
