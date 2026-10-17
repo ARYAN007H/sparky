@@ -130,10 +130,8 @@ async fn steer_reusable_session(
         thread_id.as_deref(),
     );
     let owner_scope: Arc<dyn Fn(u64) -> String + Send + Sync> = Arc::new(move |_| owner.clone());
-    let jobs = (*crate::core::runtime::slot_for::<SubAgentJobRegistry>(
-        &context.dispatch_ctx(),
-    ))
-    .clone();
+    let jobs =
+        (*crate::core::runtime::slot_for::<SubAgentJobRegistry>(&context.dispatch_ctx())).clone();
     let store: Arc<dyn tinyagents_orchestration::subagent::SubagentSessionStore> = Arc::new(
         crate::agent::orchestration::subagent_sessions::OpenHumanTinySubagentSessionStore::new(
             product_parent.workspace_dir.clone(),
@@ -155,19 +153,19 @@ async fn steer_reusable_session(
             ToolTimeout::Inherit,
         );
     let result = ToolDispatch::execute(
-            &dispatch,
-            &(),
-            tinyagents_harness::CallId::new(format!("reuse-steer-{session_id}")),
-            json!({
-                "subagent_session_id": session_id,
-                "message": message,
-                "mode": "steer",
-            }),
-            ToolCallOptions::default(),
-            parent,
-        )
-        .await
-        .map_err(|error| error.to_string())?;
+        &dispatch,
+        &(),
+        tinyagents_harness::CallId::new(format!("reuse-steer-{session_id}")),
+        json!({
+            "subagent_session_id": session_id,
+            "message": message,
+            "mode": "steer",
+        }),
+        ToolCallOptions::default(),
+        parent,
+    )
+    .await
+    .map_err(|error| error.to_string())?;
     if result.is_error {
         Err(result.output())
     } else {

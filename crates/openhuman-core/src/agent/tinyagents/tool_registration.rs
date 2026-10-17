@@ -6,6 +6,7 @@
 use std::collections::HashSet;
 use std::sync::Arc;
 
+use async_trait::async_trait;
 use tinyagents_graph::goals::GoalToolKind;
 use tinyagents_harness::tool::packs::USE_SKILL;
 use tinyagents_harness::tool::{
@@ -13,18 +14,17 @@ use tinyagents_harness::tool::{
 };
 use tinyagents_registry::{CapabilityRegistry, ComponentKind, RegistryDiagnostic};
 use tinyagents_runtime::turn_driver::{SharedToolSet, ToolSetBuilder};
-use tinyagents_runtime::{ToolAdmission, project_descriptors};
+use tinyagents_runtime::{project_descriptors, ToolAdmission};
 use tinyinference_llm::model::ChatModel;
 use tinytools::{Tool, ToolCallOptions, ToolResult, ToolRunContext};
-use async_trait::async_trait;
 
 use crate::agent::orchestration::tools::{
     CloseSubagentDispatch, ContinueSubagentDispatch, DelegateGraphDispatch, DelegationDispatch,
     ListSubagentsDispatch, SpawnAsyncSubagentDispatch, SpawnParallelAgentsDispatch,
     SpawnSubagentDispatch, SteerSubagentDispatch, WaitSubagentDispatch,
 };
-use crate::agent::tinyagents::host::OpenHumanRunContext;
 use crate::agent::tinyagents::host::run_context::HostOperationContext;
+use crate::agent::tinyagents::host::OpenHumanRunContext;
 use crate::agent::tinyagents::turn_policy::is_subagent_spawn_or_delegate_tool;
 use crate::agent::tinyagents::use_skill_dispatch::UseSkillDispatch;
 use crate::agent::tools::TodoToolDispatch;

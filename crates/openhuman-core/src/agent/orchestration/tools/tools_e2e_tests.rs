@@ -432,15 +432,16 @@ async fn continue_subagent_resumes_paused_job_through_shared_driver() {
         calls: std::sync::atomic::AtomicUsize::new(0),
         seen: Mutex::new(Vec::new()),
     });
-    let ask_tool: Box<dyn tinytools::Tool> = Box::new(
-        tinyagents_harness::tools::AskClarificationTool::new(),
-    );
+    let ask_tool: Box<dyn tinytools::Tool> =
+        Box::new(tinyagents_harness::tools::AskClarificationTool::new());
     let ask_spec = Arc::new(ask_tool.spec());
     let mut parent = parent_context(workspace.path(), provider.clone(), vec![]);
     parent.all_tools = Arc::new(vec![ask_tool]);
     parent.all_tool_specs = Arc::new(vec![ask_spec.clone()]);
     parent.visible_tool_specs = Arc::new(vec![ask_spec]);
-    parent.visible_tool_names.insert("ask_user_clarification".into());
+    parent
+        .visible_tool_names
+        .insert("ask_user_clarification".into());
     parent
         .subagent_tool_ceiling_names
         .insert("ask_user_clarification".into());
@@ -545,14 +546,12 @@ async fn delegate_graph_runs_every_stage_through_shared_driver_jobs() {
         .expect("task manager definition")
         .clone();
     test_definition.model = tinyagents_definition::ModelSpec::Exact("test-model".into());
-    let definitions = Arc::new(
-        AgentDefinitionRegistry::builtins_only().with_definitions([test_definition]),
-    );
+    let definitions =
+        Arc::new(AgentDefinitionRegistry::builtins_only().with_definitions([test_definition]));
     let mut config = crate::config::Config::default();
     config.workspace_dir = workspace.path().to_path_buf();
     let core = CoreContext::for_test_with_config(DomainSet::full(), config.clone()).derive_with(
-        ContextOverlay::new(config, DomainSet::full(), ToolGroups::none())
-            .definitions(definitions),
+        ContextOverlay::new(config, DomainSet::full(), ToolGroups::none()).definitions(definitions),
     );
     // `OpenHumanRunContext::with_core` retains a weak handle; keep this strong
     // owner alive through the graph execution so the scoped definition
@@ -597,7 +596,10 @@ async fn delegate_graph_runs_every_stage_through_shared_driver_jobs() {
                 })
         })
         .count();
-    assert_eq!(completed_stages, 3, "each graph stage is registered in Jobs");
+    assert_eq!(
+        completed_stages, 3,
+        "each graph stage is registered in Jobs"
+    );
 }
 
 #[tokio::test]

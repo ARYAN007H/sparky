@@ -113,9 +113,10 @@ pub(crate) async fn run_subagent_via_driver_tool(
     options.task_id = Some(task_id.clone());
     let parent_thread_id = parent.thread_id().map(|id| id.as_str().to_owned());
     let task_key = SubagentTaskKey::from_context(parent, task_id.clone(), parent_thread_id);
-    let (tool_result, bundle) =
-        invoke_async_spawn_driver_tool(parent, definition, input, options, "inline", None, None, None)
-            .await?;
+    let (tool_result, bundle) = invoke_async_spawn_driver_tool(
+        parent, definition, input, options, "inline", None, None, None,
+    )
+    .await?;
     let public_job_id = decode_driver_job_result(tool_result, &bundle, &task_key)?;
     if let Some(outcome) = bundle
         .host_outcome
@@ -166,16 +167,8 @@ pub(crate) async fn run_configured_delegate_via_driver_tool(
         },
         options,
     };
-    let (tool_result, bundle) = invoke_driver_tool_with_request(
-        parent,
-        request,
-        input,
-        "inline",
-        None,
-        None,
-        None,
-    )
-    .await?;
+    let (tool_result, bundle) =
+        invoke_driver_tool_with_request(parent, request, input, "inline", None, None, None).await?;
     let task_key = SubagentTaskKey::from_context(
         parent,
         task_id,
@@ -376,19 +369,24 @@ async fn invoke_driver_tool_with_request(
         .task_id
         .clone()
         .unwrap_or_else(|| format!("sub-{}", uuid::Uuid::new_v4()));
-    let checkpoint_dir =
-        absolute_checkpoint_dir(host_request.options.checkpoint_dir.clone().unwrap_or_else(|| {
-            parent
-                .data
-                .parent
-                .as_ref()
-                .map(|context| {
-                    context
-                        .workspace_dir
-                        .join(".openhuman/subagent_checkpoints")
-                })
-                .unwrap_or_else(|| PathBuf::from(".openhuman/subagent_checkpoints"))
-        }));
+    let checkpoint_dir = absolute_checkpoint_dir(
+        host_request
+            .options
+            .checkpoint_dir
+            .clone()
+            .unwrap_or_else(|| {
+                parent
+                    .data
+                    .parent
+                    .as_ref()
+                    .map(|context| {
+                        context
+                            .workspace_dir
+                            .join(".openhuman/subagent_checkpoints")
+                    })
+                    .unwrap_or_else(|| PathBuf::from(".openhuman/subagent_checkpoints"))
+            }),
+    );
     let bundle = OpenHumanDriverBundle::new(checkpoint_dir)?;
     let request_host = host_request.clone();
     let request_task_id = task_id.clone();
@@ -1102,10 +1100,8 @@ impl SubagentExecutor<crate::agent::tinyagents::host::OpenHumanRunContext> for O
                 ));
                 let result = match dispatch.into_core() {
                     Some(core) => {
-                        crate::core::runtime::CoreContext::scope_with_turn_origin(
-                            core, origin, run,
-                        )
-                        .await
+                        crate::core::runtime::CoreContext::scope_with_turn_origin(core, origin, run)
+                            .await
                     }
                     None => run.await,
                 };
@@ -1190,14 +1186,12 @@ impl SubagentExecutor<crate::agent::tinyagents::host::OpenHumanRunContext> for O
                             );
                         let mut neutral = SubagentOutcome::cancelled(task_key.task_id.clone());
                         neutral.output = output;
-                        neutral.extensions.insert(
-                            "agent_id".into(),
-                            serde_json::Value::String(agent_id),
-                        );
-                        neutral.extensions.insert(
-                            "iterations".into(),
-                            serde_json::Value::Number(1.into()),
-                        );
+                        neutral
+                            .extensions
+                            .insert("agent_id".into(), serde_json::Value::String(agent_id));
+                        neutral
+                            .extensions
+                            .insert("iterations".into(), serde_json::Value::Number(1.into()));
                         neutral.status = if tool_result.is_error {
                             SubagentOutcomeKind::Incomplete(SubagentIncomplete::new(
                                 "configured delegate reported failure",

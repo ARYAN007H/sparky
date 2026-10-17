@@ -5,9 +5,9 @@ use crate::config::AgentConfig;
 use std::collections::HashSet;
 use std::path::Path;
 use std::sync::Arc;
+use tinyagents_harness::run_queue::RunQueue;
 use tinytools::{ToolCallOptions, ToolRunContext};
 use tinytools_agent::dialect::ToolCallFormat;
-use tinyagents_harness::run_queue::RunQueue;
 
 struct ThreadContext(&'static str);
 

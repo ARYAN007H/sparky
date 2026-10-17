@@ -170,18 +170,17 @@ pub(crate) async fn dispatch_subagent_with_live_parent(
     let parent_workspace_descriptor = tool_context
         .and_then(|ctx| ctx.workspace().cloned())
         .or_else(|| run_context.workspace.clone());
-    let registry = match AgentDefinitionRegistry::for_core_context(
-        run_context.dispatch_ctx().into_core(),
-    ) {
-        Some(reg) => reg,
-        None => {
-            return Ok(ToolResult::error(
-                "Agent registry not initialised. This usually means the \
+    let registry =
+        match AgentDefinitionRegistry::for_core_context(run_context.dispatch_ctx().into_core()) {
+            Some(reg) => reg,
+            None => {
+                return Ok(ToolResult::error(
+                    "Agent registry not initialised. This usually means the \
                  core process started without calling \
                  AgentDefinitionRegistry::init_global at startup.",
-            ));
-        }
-    };
+                ));
+            }
+        };
 
     let definition = match registry.get(agent_id) {
         Some(def) => def,
@@ -423,14 +422,10 @@ pub(crate) async fn dispatch_subagent_with_live_parent(
         message_run_queue: None,
     };
 
-    let run = run_subagent_via_driver_tool(
-        live_parent,
-        definition.clone(),
-        prompt.to_owned(),
-        options,
-    )
-    .await
-    .map(|(outcome, _job_id)| outcome);
+    let run =
+        run_subagent_via_driver_tool(live_parent, definition.clone(), prompt.to_owned(), options)
+            .await
+            .map(|(outcome, _job_id)| outcome);
     match run {
         Ok(outcome) => {
             let emit_lifecycle_effects = outcome.should_emit_lifecycle_effects();

@@ -7,9 +7,7 @@ use super::lifecycle::{
     decode_driver_job_result, host_in_flight, load_subagent_checkpoint, merged_resume_history,
     HostInFlight, OpenHumanDriverBundle, OpenHumanPersistence,
 };
-use super::{
-    SubagentMode, SubagentRunError, SubagentRunOutcome, SubagentRunStatus, SubagentUsage,
-};
+use super::{SubagentMode, SubagentRunError, SubagentRunOutcome, SubagentRunStatus, SubagentUsage};
 
 fn key() -> SubagentTaskKey {
     SubagentTaskKey {
@@ -72,12 +70,9 @@ fn driver_error_accepts_only_matching_nonterminal_lifecycle_snapshots() {
             .lock()
             .unwrap()
             .insert(task_key.clone(), cached_outcome(host_status));
-        let decoded = decode_driver_job_result(
-            lifecycle_error(status, public_id),
-            &bundle,
-            &task_key,
-        )
-        .unwrap();
+        let decoded =
+            decode_driver_job_result(lifecycle_error(status, public_id), &bundle, &task_key)
+                .unwrap();
         assert_eq!(decoded, public_id);
     }
 }
@@ -87,15 +82,14 @@ fn driver_error_does_not_hide_completed_mismatched_or_persistence_failures() {
     let workspace = tempfile::tempdir().unwrap();
     let bundle = OpenHumanDriverBundle::new(workspace.path().join("checkpoints")).unwrap();
     let task_key = key();
-    bundle
-        .host_outcome
-        .lock()
-        .unwrap()
-        .insert(task_key.clone(), cached_outcome(SubagentRunStatus::AwaitingUser {
+    bundle.host_outcome.lock().unwrap().insert(
+        task_key.clone(),
+        cached_outcome(SubagentRunStatus::AwaitingUser {
             question: "Need clarification".into(),
             options: None,
             checkpoint: None,
-        }));
+        }),
+    );
 
     for result in [
         lifecycle_error("cancelled", "subagent-job-42"),
@@ -103,7 +97,9 @@ fn driver_error_does_not_hide_completed_mismatched_or_persistence_failures() {
         tinytools::ToolResult::error("provider transport failed"),
     ] {
         let error = decode_driver_job_result(result, &bundle, &task_key).unwrap_err();
-        assert!(error.to_string().contains("driver-backed async spawn failed"));
+        assert!(error
+            .to_string()
+            .contains("driver-backed async spawn failed"));
     }
 
     bundle.failures.lock().unwrap().insert(
@@ -129,7 +125,9 @@ fn driver_error_does_not_hide_completed_mismatched_or_persistence_failures() {
         &task_key,
     )
     .unwrap_err();
-    assert!(error.to_string().contains("driver-backed async spawn failed"));
+    assert!(error
+        .to_string()
+        .contains("driver-backed async spawn failed"));
 
     bundle.host_outcome.lock().unwrap().insert(
         task_key.clone(),
@@ -139,12 +137,8 @@ fn driver_error_does_not_hide_completed_mismatched_or_persistence_failures() {
             checkpoint: None,
         }),
     );
-    let error = decode_driver_job_result(
-        lifecycle_error("awaiting_input", ""),
-        &bundle,
-        &task_key,
-    )
-    .unwrap_err();
+    let error = decode_driver_job_result(lifecycle_error("awaiting_input", ""), &bundle, &task_key)
+        .unwrap_err();
     assert!(error.to_string().contains("omitted its registered job id"));
 }
 

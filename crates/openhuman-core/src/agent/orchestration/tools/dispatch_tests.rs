@@ -140,6 +140,9 @@ async fn config_delegate_dispatch_honours_the_parent_cancellation_token() {
     let parent = crate::agent::tinyagents::host::OpenHumanRunContext::new()
         .with_cancellation(cancellation.clone())
         .into_tinyagents(RunConfig::new("config-delegate-parent").with_thread("thread-parent"));
+    let jobs = crate::core::runtime::slot_for::<
+        tinyagents_orchestration::subagent::SubAgentJobRegistry,
+    >(&parent.data.dispatch_ctx());
     let execution = dispatch.execute(
         &(),
         tinyagents_harness::CallId::new("test-call"),
@@ -149,7 +152,13 @@ async fn config_delegate_dispatch_honours_the_parent_cancellation_token() {
     );
     tokio::pin!(execution);
     tokio::select! {
-        _ = started_rx.recv() => cancellation.cancel(),
+        _ = started_rx.recv() => {
+            assert!(jobs.list().iter().any(|job| {
+                job.agent == "configured"
+                    && job.status == tinyagents_orchestration::subagent::SubAgentJobStatus::Running
+            }), "configured executor is registered in the shared Jobs lifecycle");
+            cancellation.cancel();
+        },
         result = &mut execution => panic!("blocking delegate returned before cancellation: {result:?}"),
     }
     let result = execution
@@ -157,6 +166,12 @@ async fn config_delegate_dispatch_honours_the_parent_cancellation_token() {
         .expect("cancellation is reported as a tool result");
     assert!(result.is_error);
     assert!(result.output().contains("cancelled"), "{}", result.output());
+    assert!(
+        jobs.list()
+            .iter()
+            .any(|job| { job.agent == "configured" && job.status.is_terminal() }),
+        "configured child cancellation settles the shared Jobs lifecycle"
+    );
 }
 
 #[test]

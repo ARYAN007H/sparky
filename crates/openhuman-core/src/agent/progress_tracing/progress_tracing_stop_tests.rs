@@ -57,8 +57,10 @@ fn a_breaker_stopped_turn_closes_at_warning_with_stop_attributes() {
         (
             AgentProgress::TurnCompleted {
                 iterations: 4,
-                stop: Some(crate::agent::session_host::stop_summary::breaker_stop(
+                stop: Some(tinyagents_harness::TurnStop::breaker_with_cause(
                     BREAKER_NOTE,
+                    tinyagents_harness::TurnFailureClass::new("uncertain_side_effect"),
+                    Some("web_answer_tool".to_owned()),
                 )),
             },
             50,
@@ -171,8 +173,10 @@ fn a_stopped_subagent_span_closes_at_warning_with_stop_attributes() {
         (
             subagent_completed(
                 "t-stop",
-                Some(crate::agent::session_host::stop_summary::breaker_stop(
+                Some(tinyagents_harness::TurnStop::breaker_with_cause(
                     BREAKER_NOTE,
+                    tinyagents_harness::TurnFailureClass::new("uncertain_side_effect"),
+                    Some("web_answer_tool".to_owned()),
                 )),
             ),
             40,

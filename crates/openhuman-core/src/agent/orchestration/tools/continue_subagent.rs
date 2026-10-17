@@ -10,8 +10,8 @@
 
 use crate::agent::orchestration::tools::dispatch::{incomplete_stop, stopped_subagent_result};
 use crate::agent::subagent_host::{
-    continue_subagent, continue_subagent_via_driver_tool,
-    load_subagent_checkpoint, SubagentRunOptions, SubagentRunStatus,
+    continue_subagent, continue_subagent_via_driver_tool, load_subagent_checkpoint,
+    SubagentRunOptions, SubagentRunStatus,
 };
 use crate::agent_registry::host_definition::AgentDefinitionRegistry;
 use crate::progress::AgentProgress;
@@ -366,16 +366,16 @@ impl ContinueSubagentTool {
         }
 
         // Look up the agent definition
-        let registry = match AgentDefinitionRegistry::for_core_context(
-            run_context.dispatch_ctx().into_core(),
-        ) {
-            Some(reg) => reg,
-            None => {
-                return Ok(ToolResult::error(
-                    "continue_subagent: AgentDefinitionRegistry not initialised",
-                ));
-            }
-        };
+        let registry =
+            match AgentDefinitionRegistry::for_core_context(run_context.dispatch_ctx().into_core())
+            {
+                Some(reg) => reg,
+                None => {
+                    return Ok(ToolResult::error(
+                        "continue_subagent: AgentDefinitionRegistry not initialised",
+                    ));
+                }
+            };
         let definition = match registry.get(&agent_id) {
             Some(def) => def,
             None => {
