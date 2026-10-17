@@ -914,13 +914,24 @@ test("private CI executes the coverage-disabled Composio stack regression once w
 });
 
 test("nextest validation helpers arm Rust validation and script regressions on their own", () => {
-  const filters = fs.readFileSync(path.join(repoRoot, ".github/ci-paths-filter.yml"), "utf8");
+  const filters = fs.readFileSync(
+    path.join(repoRoot, ".github/ci-paths-filter.yml"),
+    "utf8",
+  );
   for (const area of ["rust-core", "scripts"]) {
-    const block = filters.split(new RegExp(`^${area}:\\s*$`, "m"))[1].split(/^\S[^\n]*:/m)[0];
-    for (const file of ["scripts/ci/nextest-coverage.sh", "scripts/ci/nextest-report.mjs"]) {
+    const block = filters
+      .split(new RegExp(`^${area}:\\s*$`, "m"))[1]
+      .split(/^\S[^\n]*:/m)[0];
+    for (const file of [
+      "scripts/ci/nextest-coverage.sh",
+      "scripts/ci/nextest-report.mjs",
+    ]) {
       assert.ok(block.includes(`'${file}'`), `${file} must arm ${area}`);
     }
   }
   const scripts = filters.split(/^scripts:\s*$/m)[1].split(/^\S[^\n]*:/m)[0];
-  assert.ok(scripts.includes("'scripts/lib/**'"), "module-pin-inventory.mjs is covered by the shared script library glob");
+  assert.ok(
+    scripts.includes("'scripts/lib/**'"),
+    "module-pin-inventory.mjs is covered by the shared script library glob",
+  );
 });
