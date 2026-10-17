@@ -17,6 +17,29 @@ use super::super::types::{
     ComposioAuthorizeRequest, ComposioAuthorizeResponse, ComposioConnectionsResponse,
     ComposioDeleteConnectionRequest, ComposioDeleteResponse,
 };
+
+/// Matches cached identity records to normalized provider/account keys shared
+/// by the settings response and the flow connection picker.
+pub(crate) fn identity_lookup<'a>(
+    identities: &'a [crate::integrations::composio::contract::ConnectedIdentity],
+    normalized_keys: &HashMap<String, String>,
+) -> HashMap<(String, String), &'a crate::integrations::composio::contract::ConnectedIdentity> {
+    let normalize = |value: &str| {
+        normalized_keys
+            .get(value)
+            .cloned()
+            .unwrap_or_else(|| value.to_string())
+    };
+    identities
+        .iter()
+        .map(|identity| {
+            (
+                (normalize(&identity.source), normalize(&identity.identifier)),
+                identity,
+            )
+        })
+        .collect()
+}
 use super::error_utils::{
     backend_mode_without_session, direct_mode_without_key, report_composio_op_error, OpResult,
     COMPOSIO_NO_SESSION,
