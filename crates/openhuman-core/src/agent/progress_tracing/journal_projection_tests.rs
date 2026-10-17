@@ -155,6 +155,139 @@ fn ctx() -> TraceContext {
     TraceContext::new("session-1", Some("user-1".into()))
 }
 
+/// A stable projection snapshot for the collector migration. Keep this fixture
+/// at the export boundary so the native owner collector can be compared with
+/// the current host projection before that projection is removed.
+#[test]
+fn legacy_export_snapshot_for_root_and_child_with_reused_call_ids() {
+    use tinyagents_harness::observability::trace_export::serialize::{
+        SpanEnvelope, spans_to_ndjson,
+    };
+
+    let mut observations = vec![
+        obs(
+            0,
+            1_000,
+            AgentEvent::RunStarted {
+                run_id: RunId::new("run-1"),
+                thread_id: None,
+            },
+        ),
+        obs(
+            1,
+            1_010,
+            AgentEvent::ModelStarted {
+                call_id: CallId::new("same-call"),
+                model: "gpt-4".to_string(),
+            },
+        ),
+        obs(
+            2,
+            1_020,
+            AgentEvent::ToolStarted {
+                parent_call_id: None,
+                call_id: CallId::new("tool-1"),
+                tool_name: "lookup".to_string(),
+                input: Some(serde_json::json!({"query":"CONTENT_SENTINEL_INPUT"})),
+            },
+        ),
+        obs(
+            3,
+            1_030,
+            AgentEvent::ToolCompleted {
+                parent_call_id: None,
+                call_id: CallId::new("tool-1"),
+                tool_name: "lookup".to_string(),
+                started_at_ms: Some(1_020),
+                input: Some(serde_json::json!({"query":"CONTENT_SENTINEL_INPUT"})),
+                output: Some(serde_json::json!({"result":"CONTENT_SENTINEL_OUTPUT"})),
+                duration_ms: Some(10),
+                output_bytes: Some(33),
+                error: None,
+                metadata: None,
+            },
+        ),
+        obs(
+            4,
+            1_040,
+            AgentEvent::ModelCompleted {
+                call_id: CallId::new("same-call"),
+                started_at_ms: Some(1_010),
+                usage: Some(Usage::new(100, 20)),
+                input: Some(serde_json::json!(["CONTENT_SENTINEL_PROMPT"])),
+                output: Some(serde_json::json!(["CONTENT_SENTINEL_REPLY"])),
+            },
+        ),
+        obs(
+            5,
+            1_050,
+            AgentEvent::RunCompleted {
+                run_id: RunId::new("run-1"),
+                outcome: None,
+            },
+        ),
+    ];
+    observations.push(AgentObservation {
+        event_id: EventId::new("child-evt-0"),
+        run_id: RunId::new("child-run"),
+        parent_run_id: Some(RunId::new("run-1")),
+        root_run_id: RunId::new("run-1"),
+        offset: 0,
+        ts_ms: 1_060,
+        event: AgentEvent::RunStarted {
+            run_id: RunId::new("child-run"),
+            thread_id: None,
+        },
+    });
+    observations.push(AgentObservation {
+        event_id: EventId::new("child-evt-1"),
+        run_id: RunId::new("child-run"),
+        parent_run_id: Some(RunId::new("run-1")),
+        root_run_id: RunId::new("run-1"),
+        offset: 1,
+        ts_ms: 1_070,
+        event: AgentEvent::ModelStarted {
+            call_id: CallId::new("same-call"),
+            model: "gpt-4-mini".to_string(),
+        },
+    });
+    observations.push(AgentObservation {
+        event_id: EventId::new("child-evt-2"),
+        run_id: RunId::new("child-run"),
+        parent_run_id: Some(RunId::new("run-1")),
+        root_run_id: RunId::new("run-1"),
+        offset: 2,
+        ts_ms: 1_080,
+        event: AgentEvent::ModelCompleted {
+            call_id: CallId::new("same-call"),
+            started_at_ms: Some(1_070),
+            usage: Some(Usage::new(7, 3)),
+            input: None,
+            output: None,
+        },
+    });
+    observations.push(AgentObservation {
+        event_id: EventId::new("child-evt-3"),
+        run_id: RunId::new("child-run"),
+        parent_run_id: Some(RunId::new("run-1")),
+        root_run_id: RunId::new("run-1"),
+        offset: 3,
+        ts_ms: 1_090,
+        event: AgentEvent::RunCompleted {
+            run_id: RunId::new("child-run"),
+            outcome: None,
+        },
+    });
+
+    let spans = spans_from_observations(ctx(), 10, &observations);
+    let snapshot = spans_to_ndjson(SpanEnvelope::Otel, &spans);
+    assert!(
+        !snapshot.contains("CONTENT_SENTINEL"),
+        "content-off export must not contain captured payloads"
+    );
+    println!("{snapshot}");
+}
+
 #[test]
 fn projects_single_agent_turn_span_tree() {
     let spans = spans_from_observations(ctx(), 10, &single_turn(None));
