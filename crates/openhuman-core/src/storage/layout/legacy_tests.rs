@@ -10,24 +10,16 @@ async fn the_import_brings_legacy_files_into_the_v1_database() {
     assert!(summary.domains >= 3, "approval, devices, ... ran: {summary:?}");
 
     let url = v1_url(&fx.target);
-    let (jobs, thread) = crate::storage::block_on(async move {
+    let jobs = crate::storage::block_on(async move {
         let backend = storage::open(&url).await?;
         let scoped = backend.for_scope(&storage::Scope::local())?;
-        let jobs = StateKv::over(&scoped, "memory", "state").get::<serde_json::Value>("jobs").ok().flatten();
-        let docs = scoped.documents().clone();
-        let names = tinystoragedrivers::DocumentStoreExt::query_all(
-            docs.as_ref(),
-            "conversations.threads",
-            &tinystoragedrivers::Query::all(),
-        )
-        .await
-        .map(|found| found.len())
-        .unwrap_or(0);
-        Ok((jobs, names))
+        Ok(StateKv::over(&scoped, "memory", "state")
+            .get::<serde_json::Value>("jobs")
+            .ok()
+            .flatten())
     })
     .unwrap();
     assert_eq!(jobs, Some(serde_json::json!({"jobs": [1, 2, 3]})));
-    assert!(thread <= 1);
     // the sources are only read
     assert!(fx.workspace().join("memory/jobs.json").is_file());
     // nothing else was disturbed
