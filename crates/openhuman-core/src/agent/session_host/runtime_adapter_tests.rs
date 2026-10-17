@@ -204,14 +204,7 @@ fn last_turn_usage_reports_the_same_holistic_totals_as_transcript_billing() {
         },
     };
     sidecar.subagents.push(child.clone());
-    let records = [
-        crate::agent::tinyagents::host::run_context::SubagentUsageRecord {
-            run_id: "run-child-ui".into(),
-            entry: child,
-        },
-    ];
-
-    let usage = holistic_last_turn_usage(&sidecar, &records);
+    let usage = holistic_last_turn_usage(&sidecar);
     assert_eq!(usage.input_tokens, 18);
     assert_eq!(usage.output_tokens, 10);
     assert_eq!(usage.cached_input_tokens, 4);
@@ -221,75 +214,6 @@ fn last_turn_usage_reports_the_same_holistic_totals_as_transcript_billing() {
     // summed spend nor the child's tokens, which ran in their own window.
     assert_eq!(usage.context_tokens, 11);
     assert_eq!(usage.subagents.len(), 1, "detail breakdown is retained");
-}
-
-#[test]
-fn child_usage_rollup_deduplicates_runs_without_merging_repeated_task_ids() {
-    let charged = tinyagents_harness::cost::CostTally {
-        known_usd: 0.004,
-        source: tinyagents_harness::cost::CostSource::Charged,
-    };
-    let inclusive_child = crate::agent::tinyagents::host::SubagentUsageEntry {
-        task_id: "reused-task".into(),
-        agent_id: "researcher".into(),
-        usage: crate::agent::subagent_host::SubagentUsage {
-            // This completed child's total already includes its own model
-            // calls and the grandchild which completed inside its isolated
-            // ledger. The host records the subtree once as this one entry.
-            input_tokens: 20,
-            output_tokens: 8,
-            cached_input_tokens: 3,
-            charged_amount_usd: charged.known_usd,
-            cost_source: charged.source,
-        },
-    };
-    let mut sidecar = crate::agent::tinyagents::host::run_context::SessionTurnSidecar {
-        input_tokens: 10,
-        output_tokens: 4,
-        cost: charged,
-        ..Default::default()
-    };
-    let second_execution = crate::agent::tinyagents::host::SubagentUsageEntry {
-        // Same task, distinct actual execution: its usage is retained.
-        task_id: "reused-task".into(),
-        agent_id: "researcher".into(),
-        usage: crate::agent::subagent_host::SubagentUsage {
-            input_tokens: 7,
-            output_tokens: 2,
-            cost_source: tinyagents_harness::cost::CostSource::Unknown,
-            ..Default::default()
-        },
-    };
-    sidecar.subagents.extend([
-        inclusive_child.clone(),
-        inclusive_child.clone(),
-        second_execution.clone(),
-    ]);
-    let records = [
-        crate::agent::tinyagents::host::run_context::SubagentUsageRecord {
-            run_id: "run-inclusive-child".into(),
-            entry: inclusive_child.clone(),
-        },
-        crate::agent::tinyagents::host::run_context::SubagentUsageRecord {
-            run_id: "run-inclusive-child".into(),
-            entry: inclusive_child,
-        },
-        crate::agent::tinyagents::host::run_context::SubagentUsageRecord {
-            run_id: "run-second-execution".into(),
-            entry: second_execution,
-        },
-    ];
-
-    let usage = holistic_last_turn_usage(&sidecar, &records);
-    assert_eq!(usage.input_tokens, 37);
-    assert_eq!(usage.output_tokens, 14);
-    assert_eq!(usage.cached_input_tokens, 3);
-    assert_eq!(usage.subagents.len(), 2, "duplicate run rows are omitted");
-    assert_eq!(usage.cost_usd, None, "unknown child cost remains unknown");
-    assert_eq!(
-        usage.cost_source,
-        tinyagents_harness::cost::CostSource::Unknown
-    );
 }
 
 #[test]
