@@ -106,6 +106,21 @@ fn handle_subagent_cancel(ctx: DispatchCtx, params: Map<String, Value>) -> Contr
     Box::pin(async move {
         let cid = new_correlation_id();
         let task_id = require_str(&params, "taskId")?;
+        if std::env::var_os("OPENHUMAN_DEBUG_DRIVER_CANCEL").is_some() {
+            eprintln!(
+                "CANCEL_HANDLER task={task_id:?} dispatch_core={:?} current_core={:?} default_core={:?} saas={}",
+                ctx.core()
+                    .as_ref()
+                    .map(std::sync::Arc::as_ptr),
+                crate::core::runtime::CoreContext::current()
+                    .as_ref()
+                    .map(std::sync::Arc::as_ptr),
+                crate::core::runtime::CoreContext::default_context()
+                    .as_ref()
+                    .map(std::sync::Arc::as_ptr),
+                crate::core::runtime::is_saas(),
+            );
+        }
         let reason = opt_str(&params, "reason");
         log::debug!(
             target: "subagent_control_rpc",
