@@ -291,6 +291,45 @@ async fn schedule_trigger_for_an_unknown_flow_is_answered_not_failed() {
     );
 }
 
+#[cfg(feature = "flows")]
+#[tokio::test]
+async fn refreshing_binding_config_updates_existing_flow_subscriber() {
+    use tokio::sync::mpsc;
+
+    let tmp = TempDir::new().unwrap();
+    let initial = config(&tmp);
+    let refreshed = Config {
+        action_dir: tmp.path().join("refreshed-action-root"),
+        ..initial.clone()
+    };
+    let binding = Binding::new(
+        &DispatchCtx::ambient(),
+        &initial,
+        Arc::new(SecurityPolicy::from_config(
+            &initial.autonomy,
+            &initial.workspace_dir,
+            &initial.action_dir,
+        )),
+    );
+    let (seen_tx, mut seen_rx) = mpsc::unbounded_channel();
+    let subscriber = crate::flows::bus::FlowTriggerSubscriber::with_runner(
+        Arc::new(initial),
+        1,
+        move |_ctx, config, _request| {
+            let seen_tx = seen_tx.clone();
+            async move { seen_tx.send(config.action_dir.clone()).unwrap(); }
+        },
+    );
+    binding.flows.set(subscriber).ok().expect("subscriber initialized once");
+
+    binding.set_config(&refreshed);
+    binding
+        .flows()
+        .dispatch_test_schedule(&DispatchCtx::ambient(), "refresh-flow")
+        .await;
+    assert_eq!(seen_rx.recv().await, Some(refreshed.action_dir));
+}
+
 #[tokio::test]
 async fn dropping_the_registration_stops_serving_the_object() {
     let tmp = TempDir::new().unwrap();
