@@ -23,8 +23,6 @@
 mod archetype_delegation;
 #[path = "tools/awaiting_user.rs"]
 pub(crate) mod awaiting_user;
-#[path = "tools/close_subagent.rs"]
-mod close_subagent;
 #[path = "tools/collapsed_delegation.rs"]
 mod collapsed_delegation;
 #[path = "tools/continue_subagent.rs"]
@@ -33,28 +31,27 @@ mod continue_subagent;
 mod delegate_graph;
 #[path = "tools/dispatch.rs"]
 mod dispatch;
-#[path = "tools/list_subagents.rs"]
-mod list_subagents;
 #[path = "tools/spawn_async_subagent.rs"]
 mod spawn_async_subagent;
 #[path = "tools/spawn_parallel_agents.rs"]
 mod spawn_parallel_agents;
 #[path = "tools/spawn_subagent.rs"]
 mod spawn_subagent;
-#[path = "tools/steer_subagent.rs"]
-mod steer_subagent;
+#[path = "tools/subagent_control_surfaces.rs"]
+mod subagent_control_surfaces;
 #[path = "tools/subagent_abort_report.rs"]
 mod subagent_abort_report;
 #[cfg(test)]
 #[path = "tools/tools_e2e_tests.rs"]
 mod tools_e2e_tests;
-#[path = "tools/wait_subagent.rs"]
-mod wait_subagent;
 
 pub(crate) use dispatch::DelegationDispatch;
-pub(crate) use list_subagents::overlay_task_store_status;
-pub(crate) use wait_subagent::{
+pub(crate) use subagent_control_surfaces::overlay_task_store_status;
+pub(crate) use subagent_control_surfaces::{
     format_running_wait_message, requested_timeout_secs, wait_status_payload,
+};
+pub(crate) use subagent_control_surfaces::{
+    CloseSubagentTool, ListSubagentsTool, SteerSubagentTool, WaitSubagentTool,
 };
 
 /// A minimal live TinyAgents carrier over `parent`, for tests that drive a
@@ -73,22 +70,14 @@ pub(crate) fn live_parent_run_context(
 }
 
 pub use archetype_delegation::{ArchetypeDelegationTool, DelegationTarget};
-pub(crate) use close_subagent::CloseSubagentDispatch;
-pub use close_subagent::CloseSubagentTool;
 pub use collapsed_delegation::{CollapsedDelegationTool, DelegateTarget, DELEGATE_TO_TOOL_NAME};
 pub(crate) use continue_subagent::ContinueSubagentDispatch;
 pub use continue_subagent::ContinueSubagentTool;
 pub(crate) use delegate_graph::DelegateGraphDispatch;
 pub use delegate_graph::DelegateGraphTool;
-pub(crate) use list_subagents::ListSubagentsDispatch;
-pub use list_subagents::ListSubagentsTool;
 pub(crate) use spawn_async_subagent::SpawnAsyncSubagentDispatch;
 pub use spawn_async_subagent::{scope_spawn_async_subagent_spec, SpawnAsyncSubagentTool};
 pub(crate) use spawn_parallel_agents::SpawnParallelAgentsDispatch;
 pub use spawn_parallel_agents::SpawnParallelAgentsTool;
 pub(crate) use spawn_subagent::SpawnSubagentDispatch;
 pub use spawn_subagent::SpawnSubagentTool;
-pub(crate) use steer_subagent::SteerSubagentDispatch;
-pub use steer_subagent::SteerSubagentTool;
-pub(crate) use wait_subagent::WaitSubagentDispatch;
-pub use wait_subagent::WaitSubagentTool;
