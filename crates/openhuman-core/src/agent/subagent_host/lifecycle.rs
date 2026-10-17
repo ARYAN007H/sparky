@@ -190,9 +190,10 @@ pub(crate) async fn run_async_spawn_via_driver_tool(
         )
         .await
         .map_err(|error| SubagentRunError::Provider(anyhow::anyhow!(error.to_string())))?;
-    let reply: serde_json::Value = serde_json::from_str(&tool_result.output()).map_err(|error| {
+    let rendered_result = tool_result.output();
+    let reply: serde_json::Value = serde_json::from_str(&rendered_result).map_err(|error| {
         SubagentRunError::Provider(anyhow::anyhow!(format!(
-            "driver-backed async spawn returned an invalid job reference: {error}"
+            "driver-backed async spawn returned an invalid job reference: {error}; result={rendered_result}"
         )))
     })?;
     let public_job_id = reply
