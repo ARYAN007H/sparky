@@ -23,7 +23,7 @@ pub(crate) async fn authorize_shell_command(
         {
             Ok(analysis) => analysis,
             Err(e) => {
-                eprintln!("DBGANALYZE {e}");
+                tracing::warn!(error = %e, "[cron:shell] command analysis unavailable");
                 #[cfg(test)]
                 {
                     if !config.modules.enabled {
