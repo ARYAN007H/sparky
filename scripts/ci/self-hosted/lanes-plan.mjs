@@ -136,16 +136,18 @@ export function buildPlan({ profile, areas, env = {}, isPullRequest = true }) {
 
   // Private lanes run sequentially and share compatible build products.
   // Instrumented objects stay separate from ordinary build/link checks.
-  const targetDir = (lane) => ex63
-    ? `target/ci-private-${lane === "cov" ? "coverage" : "build"}`
-    : null;
-  const rustEnv = ex63 ? {
-    CARGO_INCREMENTAL: "0",
-    CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER: "/usr/local/bin/rust-mold-linker",
-  } : {
-    CARGO_INCREMENTAL: "0",
-    RUSTFLAGS: "-C link-arg=-fuse-ld=mold",
-  };
+  const targetDir = (lane) =>
+    ex63 ? `target/ci-private-${lane === "cov" ? "coverage" : "build"}` : null;
+  const rustEnv = ex63
+    ? {
+        CARGO_INCREMENTAL: "0",
+        CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER:
+          "/usr/local/bin/rust-mold-linker",
+      }
+    : {
+        CARGO_INCREMENTAL: "0",
+        RUSTFLAGS: "-C link-arg=-fuse-ld=mold",
+      };
   const covEnv = {
     ...rustEnv,
     CARGO_PROFILE_DEV_DEBUG: "0",
@@ -593,7 +595,9 @@ export function buildPlan({ profile, areas, env = {}, isPullRequest = true }) {
       if (!["rust-gates-off", "storage-drivers"].includes(lane.name)) continue;
       for (const check of lane.checks) {
         if (!check.run.startsWith("cargo test ")) continue;
-        const [cargoArgs, filters] = check.run.slice("cargo test ".length).split(" -- ");
+        const [cargoArgs, filters] = check.run
+          .slice("cargo test ".length)
+          .split(" -- ");
         let args = cargoArgs.replace("--no-fail-fast ", "");
         let expression = "";
         let serial = "";
@@ -603,14 +607,21 @@ export function buildPlan({ profile, areas, env = {}, isPullRequest = true }) {
           const tokens = filters.trim().split(/\s+/);
           for (let i = 0; i < tokens.length; i++) {
             if (tokens[i] === "--skip") exclude.push(tokens[++i]);
-            else if (tokens[i] === "--test-threads=1") serial = " --test-threads=1";
+            else if (tokens[i] === "--test-threads=1")
+              serial = " --test-threads=1";
             else include.push(tokens[i]);
           }
           const terms = include.map((f) => `test(${f})`).join(" | ");
           expression = ` -E '${terms ? `(${terms})` : "all()"}${exclude.map((f) => ` & not test(${f})`).join("")}'`;
         }
-        check.env = { ...covEnv, CARGO_BUILD_TARGET_DIR: "target/ci-private-coverage" };
-        check.run = coverageSuite(`${args}${expression}${serial}`, `lcov-${check.name}.info`);
+        check.env = {
+          ...covEnv,
+          CARGO_BUILD_TARGET_DIR: "target/ci-private-coverage",
+        };
+        check.run = coverageSuite(
+          `${args}${expression}${serial}`,
+          `lcov-${check.name}.info`,
+        );
       }
     }
     const tauriLane = lanes.find((l) => l.name === "tauri");
@@ -622,8 +633,17 @@ export function buildPlan({ profile, areas, env = {}, isPullRequest = true }) {
       run: "bash scripts/ci-cancel-aware.sh cargo build --manifest-path crates/openhuman-app/Cargo.toml --bin OpenHuman",
     });
     const tauri = tauriLane.checks.find((c) => c.name === "tauri-coverage");
-    tauri.env = { ...covEnv, CARGO_BUILD_TARGET_DIR: "target/ci-private-coverage" };
-    tauri.run = "unset RUSTFLAGS; " + coverageSuite("--manifest-path crates/openhuman-app/Cargo.toml", "lcov-tauri.info", "crates/openhuman-app/Cargo.toml");
+    tauri.env = {
+      ...covEnv,
+      CARGO_BUILD_TARGET_DIR: "target/ci-private-coverage",
+    };
+    tauri.run =
+      "unset RUSTFLAGS; " +
+      coverageSuite(
+        "--manifest-path crates/openhuman-app/Cargo.toml",
+        "lcov-tauri.info",
+        "crates/openhuman-app/Cargo.toml",
+      );
   }
 
   for (const lane of lanes) {

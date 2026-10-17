@@ -291,7 +291,12 @@ export class Runner {
   constructor(plan, { out, maxParallel, maxHeavy = Infinity }) {
     this.plan = plan;
     this.out = out;
-    this.maxParallel = plan.profile === "ex63" ? 1 : maxParallel > 0 ? maxParallel : plan.lanes.length;
+    this.maxParallel =
+      plan.profile === "ex63"
+        ? 1
+        : maxParallel > 0
+          ? maxParallel
+          : plan.lanes.length;
     this.heavy = new PrioritySemaphore(maxHeavy);
     this.maxHeavy = maxHeavy;
     // check id -> { pgid, peakRssMiB } while running; sampled every 5 s.
@@ -351,7 +356,8 @@ export class Runner {
   runCommand(lane, check, logStream, record) {
     const env = { ...process.env, ...(lane.env ?? {}), ...(check.env ?? {}) };
     if (lane.targetDir) {
-      env.CARGO_BUILD_TARGET_DIR = check.env?.CARGO_BUILD_TARGET_DIR ?? lane.targetDir;
+      env.CARGO_BUILD_TARGET_DIR =
+        check.env?.CARGO_BUILD_TARGET_DIR ?? lane.targetDir;
       delete env.CARGO_TARGET_DIR;
       mkdirSync(lane.targetDir, { recursive: true });
     }
@@ -774,7 +780,7 @@ async function main() {
     runner: process.env.RUNNER_NAME ?? null,
     areas,
     lanes,
-    
+
     heavySlots: Number.isFinite(maxHeavy) ? maxHeavy : null,
     memory: runner.memory,
     cacheBytes: du(process.env.CI_CACHE_DIR),

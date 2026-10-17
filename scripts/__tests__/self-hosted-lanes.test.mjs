@@ -46,7 +46,10 @@ const NONE = Object.fromEntries(Object.keys(AREA_ENV).map((k) => [k, false]));
 const EX63_ENV = { CI_SCRATCH_DIR: "/scratch" };
 
 test("EX63 verifies preinstalled tools before cache setup and validation", () => {
-  const privateJob = ciLanes.slice(ciLanes.indexOf("  ex63:"), ciLanes.indexOf("  plan:"));
+  const privateJob = ciLanes.slice(
+    ciLanes.indexOf("  ex63:"),
+    ciLanes.indexOf("  plan:"),
+  );
   const verify = privateJob.indexOf("- name: Verify private runner contract");
   const cache = privateJob.indexOf("- name: Setup Tinymold");
   const detect = privateJob.indexOf("- name: Detect changed areas");
@@ -366,21 +369,37 @@ test("hosted matrix only spins up groups with active lanes", () => {
 test("private lanes reuse checkout targets, preserve mold through RUSTFLAGS resets, and omit wrappers", () => {
   const plan = buildPlan({ profile: "ex63", areas: ALL, env: EX63_ENV });
   const rust = plan.lanes.filter((l) => l.heavy != null);
-  assert.equal(new Set(rust.filter((l) => l.name !== "rust-cov").map((l) => l.targetDir)).size, 1);
+  assert.equal(
+    new Set(rust.filter((l) => l.name !== "rust-cov").map((l) => l.targetDir))
+      .size,
+    1,
+  );
   for (const lane of rust) {
     assert.match(lane.targetDir, /^target\/ci-private-/);
-    assert.equal(lane.env.CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER, "/usr/local/bin/rust-mold-linker");
+    assert.equal(
+      lane.env.CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER,
+      "/usr/local/bin/rust-mold-linker",
+    );
     assert.equal(lane.env.RUSTC_WRAPPER, undefined);
     assert.equal(lane.env.RUSTC_WORKSPACE_WRAPPER, undefined);
   }
-  assert.notEqual(rust.find((l) => l.name === "rust-cov").targetDir, rust.find((l) => l.name === "rust-lint").targetDir);
-  assert.ok(buildPlan({ profile: "hosted", areas: ALL }).lanes.every((l) => !l.targetDir));
+  assert.notEqual(
+    rust.find((l) => l.name === "rust-cov").targetDir,
+    rust.find((l) => l.name === "rust-lint").targetDir,
+  );
+  assert.ok(
+    buildPlan({ profile: "hosted", areas: ALL }).lanes.every(
+      (l) => !l.targetDir,
+    ),
+  );
 });
 
 test("private gates-off, storage, and Tauri execute equivalent coverage suites with nextest", () => {
   const plan = buildPlan({ profile: "ex63", areas: ALL, env: EX63_ENV });
   for (const name of ["rust-gates-off", "storage-drivers", "tauri"]) {
-    for (const c of plan.lanes.find((l) => l.name === name).checks.filter((c) => /cargo (test|llvm-cov)/.test(c.run))) {
+    for (const c of plan.lanes
+      .find((l) => l.name === name)
+      .checks.filter((c) => /cargo (test|llvm-cov)/.test(c.run))) {
       assert.match(c.run, /cargo llvm-cov nextest/);
       assert.match(c.run, /--no-tests=fail/);
       assert.match(c.run, /--lcov --output-path ci-out\/lcov\//);
@@ -388,23 +407,43 @@ test("private gates-off, storage, and Tauri execute equivalent coverage suites w
       assert.match(c.run, /exit "\$rc"$/);
     }
   }
-  const checks = Object.fromEntries(plan.lanes.flatMap((l) => l.checks.map((c) => [c.name, c])));
-  assert.match(checks["gate-contract-tests-features"].run, /--features modules,mcp,e2e-test-support/);
+  const checks = Object.fromEntries(
+    plan.lanes.flatMap((l) => l.checks.map((c) => [c.name, c])),
+  );
+  assert.match(
+    checks["gate-contract-tests-features"].run,
+    /--features modules,mcp,e2e-test-support/,
+  );
   assert.match(checks["gate-contract-tests-features"].run, /--test-threads=1/);
   assert.match(checks["cron-module-tests"].run, /--test-threads=1/);
-  assert.match(checks["storage-lib-tests"].run, /not test\(cron::bus_host::tests::\)/);
-  assert.equal(checks["tauri-coverage"].env.CARGO_BUILD_TARGET_DIR, "target/ci-private-coverage");
+  assert.match(
+    checks["storage-lib-tests"].run,
+    /not test\(cron::bus_host::tests::\)/,
+  );
+  assert.equal(
+    checks["tauri-coverage"].env.CARGO_BUILD_TARGET_DIR,
+    "target/ci-private-coverage",
+  );
 });
 
 test("private auxiliary coverage reports after failed tests and preserves the failure", () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "lane-coverage-report-"));
   const cargo = path.join(dir, "cargo");
   const calls = path.join(dir, "calls");
-  fs.writeFileSync(cargo, '#!/bin/sh\necho "$*" >> "$CARGO_CALLS"\nif [ "$2" = nextest ]; then exit 17; fi\nexit 0\n', { mode: 0o755 });
+  fs.writeFileSync(
+    cargo,
+    '#!/bin/sh\necho "$*" >> "$CARGO_CALLS"\nif [ "$2" = nextest ]; then exit 17; fi\nexit 0\n',
+    { mode: 0o755 },
+  );
   const plan = buildPlan({ profile: "ex63", areas: ALL, env: EX63_ENV });
   const check = plan.lanes.find((l) => l.name === "storage-drivers").checks[0];
   const result = spawnSync("bash", ["-o", "pipefail", "-c", check.run], {
-    cwd: repoRoot, env: { ...process.env, PATH: `${dir}:${process.env.PATH}`, CARGO_CALLS: calls },
+    cwd: repoRoot,
+    env: {
+      ...process.env,
+      PATH: `${dir}:${process.env.PATH}`,
+      CARGO_CALLS: calls,
+    },
   });
   assert.equal(result.status, 17);
   const commands = fs.readFileSync(calls, "utf8").trim().split("\n");
@@ -412,7 +451,10 @@ test("private auxiliary coverage reports after failed tests and preserves the fa
   assert.match(commands[0], /^llvm-cov nextest /);
   assert.match(commands[1], /^llvm-cov report /);
   const tauri = plan.lanes.find((l) => l.name === "tauri");
-  assert.match(tauri.checks.find((c) => c.name === "build-tauri").run, /cargo build .*--bin OpenHuman/);
+  assert.match(
+    tauri.checks.find((c) => c.name === "build-tauri").run,
+    /cargo build .*--bin OpenHuman/,
+  );
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
@@ -420,18 +462,33 @@ test("private runner serializes independent lanes after failures even when paral
   const out = fs.mkdtempSync(path.join(os.tmpdir(), "lanes-private-"));
   fs.mkdirSync(path.join(out, "logs"));
   const check = (name, run) => ({ name, run, when: true, needs: [] });
-  const plan = { profile: "ex63", lanes: [
-    { name: "first", checks: [check("fails", "exit 1"), check("continues", "echo continued")] },
-    { name: "second", checks: [check("independent", "echo independent")] },
-  ] };
+  const plan = {
+    profile: "ex63",
+    lanes: [
+      {
+        name: "first",
+        checks: [
+          check("fails", "exit 1"),
+          check("continues", "echo continued"),
+        ],
+      },
+      { name: "second", checks: [check("independent", "echo independent")] },
+    ],
+  };
   const runner = new Runner(plan, { out, maxParallel: 8 });
   assert.equal(runner.maxParallel, 1);
   const lanes = await runner.run();
   assert.equal(lanes[0].checks[0].status, "failure");
   assert.equal(lanes[0].checks[1].status, "success");
   assert.equal(lanes[1].checks[0].status, "success");
-  assert.ok(Date.parse(lanes[1].checks[0].start) >= Date.parse(lanes[0].checks[1].end));
-  assert.equal(new Runner({ ...plan, profile: "hosted" }, { out, maxParallel: 8 }).maxParallel, 8);
+  assert.ok(
+    Date.parse(lanes[1].checks[0].start) >= Date.parse(lanes[0].checks[1].end),
+  );
+  assert.equal(
+    new Runner({ ...plan, profile: "hosted" }, { out, maxParallel: 8 })
+      .maxParallel,
+    8,
+  );
   fs.rmSync(out, { recursive: true, force: true });
 });
 
