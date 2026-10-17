@@ -330,6 +330,55 @@ async fn refreshing_binding_config_updates_existing_flow_subscriber() {
     assert_eq!(seen_rx.recv().await, Some(refreshed.action_dir));
 }
 
+#[cfg(feature = "flows")]
+#[tokio::test]
+async fn a_scheduled_flow_run_publishes_a_trigger_before_completion() {
+    use crate::core::events::DomainEvent;
+    use std::sync::Mutex as StdMutex;
+    use tinybus::EventHandler;
+
+    struct CronEvents(Arc<StdMutex<Vec<&'static str>>>);
+    #[async_trait]
+    impl EventHandler<DomainEvent> for CronEvents {
+        fn name(&self) -> &str { "test::cron::flow_event_pair" }
+        async fn handle(&self, event: &DomainEvent) {
+            let name = match event {
+                DomainEvent::CronJobTriggered { .. } => Some("triggered"),
+                DomainEvent::CronJobCompleted { .. } => Some("completed"),
+                _ => None,
+            };
+            if let Some(name) = name { self.0.lock().unwrap().push(name); }
+        }
+    }
+
+    crate::core::bus::init().await.unwrap();
+    let events = Arc::new(StdMutex::new(Vec::new()));
+    let _subscription = crate::core::bus::BUS
+        .subscribe(Arc::new(CronEvents(Arc::clone(&events))))
+        .unwrap();
+    let tmp = TempDir::new().unwrap();
+    let config = config(&tmp);
+    let (_host, proxy) = host(&config, false).await;
+    let mut job = crate::cron::add_flow_schedule_job(
+        &config,
+        "flow-event-pair",
+        Schedule::Every { every_ms: 3_600_000 },
+    ).unwrap();
+    job.delivery.mode = "none".into();
+    let run_id = format!("flow-event-{}", uuid::Uuid::new_v4());
+    let _: Attempt = proxy.call(callbacks::SCHEDULE_TRIGGER, ("flow-event-pair", &run_id)).await.unwrap();
+    let _: String = proxy.call(callbacks::DELIVER, (&job, &run_id, &Attempt {
+        success: true,
+        output: "done".into(),
+        retryable: false,
+    })).await.unwrap();
+    for _ in 0..100 {
+        if events.lock().unwrap().len() >= 2 { break; }
+        tokio::task::yield_now().await;
+    }
+    assert_eq!(*events.lock().unwrap(), vec!["triggered", "completed"]);
+}
+
 #[tokio::test]
 async fn dropping_the_registration_stops_serving_the_object() {
     let tmp = TempDir::new().unwrap();
