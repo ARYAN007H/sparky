@@ -100,7 +100,7 @@ impl HostExecutor {
             warn_if_high_frequency_agent_job(&config, job).await;
             self.binding.publish_triggered_once(job, run_id);
         }
-        // A hosted-profile sweep runs agent jobs only.
+        // A hosted-profile sweep runs agent jobs and trusted memory jobs.
         if let Some(refusal) = kind_refusal(&self.binding, job) {
             self.halt(run_id, Halt::Refused);
             return Attempt {

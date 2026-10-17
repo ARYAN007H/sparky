@@ -52,8 +52,8 @@ pub(crate) struct Binding {
     config: Arc<RwLock<Config>>,
     pub(crate) security: Arc<SecurityPolicy>,
     context: Option<Weak<CoreContext>>,
-    /// Only agent jobs run (the hosted-profile sweep): shell and flow rows are
-    /// refused whatever the config says.
+    /// The hosted-profile sweep runs agent jobs plus trusted memory system
+    /// jobs; shell and user-owned flow rows are refused.
     agent_only: bool,
     runtime: Option<tokio::runtime::Handle>,
     #[cfg(feature = "flows")]
@@ -280,16 +280,16 @@ pub(crate) async fn register(binding: Binding) -> Result<HostRegistration, Strin
     })
 }
 
-/// Whether a job of `job_type` may run under `binding`, and the refusal text
+/// Whether a job may run under `binding`, and the refusal text
 /// if not.
 pub(crate) fn kind_refusal(binding: &Binding, job: &CronJob) -> Option<String> {
-    let owner_allowed =
+    let trusted_memory_job =
         crate::cron::system_jobs::trusted_system_job_owner(job).is_some();
     (binding.is_agent_only()
         && !matches!(job.job_type, JobType::Agent)
-        && !owner_allowed)
+        && !trusted_memory_job)
         .then(|| {
-        "blocked by hosting policy: only agent cron jobs run here; shell and flow jobs are disabled"
+        "blocked by hosting policy: only agent cron jobs and trusted memory maintenance run here; shell and user flow jobs are disabled"
             .to_string()
         })
 }

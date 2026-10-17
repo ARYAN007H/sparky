@@ -1,8 +1,9 @@
 //! Operator-owned limits for hosted deployments (`[cron] agent_jobs_only`).
 //!
-//! With the mode on, a profile may only hold agent jobs bound to the
-//! conversation that created them: shell and flow jobs are refused whatever the
-//! autonomy level, delivery is limited to `origin` and `none` (no model- or
+//! With the mode on, a profile may hold agent jobs bound to the conversation
+//! that created them and the memory domain's two trusted maintenance jobs.
+//! User-owned shell and flow jobs are refused whatever the autonomy level;
+//! delivery is limited to `origin` and `none` (no model- or
 //! user-chosen destination), recurring jobs keep `min_interval_secs` apart and
 //! at most `max_active_jobs` jobs are enabled at once, counted in the job
 //! store rather than in this process. Each check runs where a job is added or
@@ -25,7 +26,7 @@ fn check_type(job_type: &JobType) -> Result<()> {
     if matches!(job_type, JobType::Agent) {
         return Ok(());
     }
-    bail!("only agent cron jobs are allowed here; shell and flow jobs are disabled")
+    bail!("only agent cron jobs are allowed here; shell and user flow jobs are disabled")
 }
 
 fn check_schedule(config: &Config, schedule: &Schedule) -> Result<()> {
