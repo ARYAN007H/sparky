@@ -1,14 +1,6 @@
 use std::path::Path;
-use std::sync::{Mutex, OnceLock};
-
-use crate::agent::subagent_host::SubagentRunStatus;
-use tinyagents_session::transcript::TranscriptMessage;
 
 use super::*;
-use super::{
-    DurableSubagentSession, DurableSubagentStatus, ReuseDecision, SubagentSessionSelector,
-    SubagentSessionStore, SubagentSessionUpsert,
-};
 
 /// Requests cancellation of driver-backed children owned by a thread being
 /// removed. The TinyAgents registry owns cancellation and settlement; this
@@ -347,7 +339,7 @@ pub fn mark_driver_pause_cancelled(
 /// the awaited completion callback can include it in the single cancellation
 /// notice. The current task check prevents a stale cancel from annotating a
 /// later reuse of the same durable session.
-pub(super) fn record_cancel_reason(
+pub(crate) fn record_cancel_reason(
     store: &SubagentSessionStore,
     observed: &DurableSubagentSession,
     reason: &str,
