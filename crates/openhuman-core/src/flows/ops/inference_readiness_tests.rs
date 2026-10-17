@@ -35,7 +35,7 @@ fn mixed_failures_keep_per_role_guidance_order_and_failure_count() {
                 session_wide: false,
                 role: "reasoning",
                 message: "API key not configured for provider".into(),
-                node_ids: vec!["agent-reasoning".into()],
+                node_ids: vec!["agent-reasoning".into(), "agent-reasoning-followup".into()],
             },
         ],
     };
@@ -47,5 +47,6 @@ fn mixed_failures_keep_per_role_guidance_order_and_failure_count() {
         chat < reasoning,
         "roles retain deterministic order: {message}"
     );
+    assert!(message.contains("'agent-reasoning', 'agent-reasoning-followup'"));
     assert!(message.contains("Configure your provider API key in OpenHuman Settings > Providers"));
 }
