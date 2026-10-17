@@ -10,7 +10,7 @@
 
 use openhuman_core::storage::schema::owner_schemas;
 use serde_json::{json, Value};
-use tinystoragedrivers::schema::{Item, ScopeClass};
+use tinystoragedrivers_core::schema::{Item, ScopeClass};
 
 fn scope(class: ScopeClass) -> &'static str {
     match class {
@@ -59,7 +59,11 @@ fn main() {
                 "owner": schema.owner.as_str(),
                 "items": schema.items.iter().map(item).collect::<Vec<_>>(),
                 "steps": schema.steps.iter().map(|step| json!({
-                    "id": step.id(),
+                    "id": step.id,
+                    "item": step.item,
+                    "from": step.from,
+                    "to": step.to,
+                    "source": step.source,
                 })).collect::<Vec<_>>(),
             })
         })

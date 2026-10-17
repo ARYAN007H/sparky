@@ -74,6 +74,10 @@ required-features = ["http-server", "bin-tools"]
 # files. #5021 is still the right fix for symbols named in the middle of an
 # otherwise gate-free target — required-features is the blunt instrument, and
 # it costs the whole target when the gate is off.
+[[example]]
+name = "storage_schema_dump"
+path = "../../examples/storage_schema_dump.rs"
+
 [[test]]
 # Loads the tinydocs module from the linked executable and calls GenerateDocx
 # end to end. Local only: needs `--features linked-modules,documents`.
