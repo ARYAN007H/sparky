@@ -9,7 +9,7 @@ use std::path::Path;
 use std::sync::Arc;
 
 use super::background_completions::*;
-use super::background_delivery::{drain_schedule_in, Drain};
+use super::background_delivery::{Drain, drain_schedule_in};
 use crate::core::events::DomainEvent;
 use crate::core::runtime::{ContextOverlay, CoreContext, DomainSet};
 use crate::tools::toolpacks::ToolGroups;
@@ -151,7 +151,7 @@ fn an_unknown_session_is_dropped_in_saas() {
 /// its own marks.
 #[tokio::test]
 async fn busy_marks_are_keyed_by_the_explicit_context() {
-    use super::busy_guard::{clear_busy_for_thread, is_busy, TurnBusy};
+    use super::busy_guard::{TurnBusy, clear_busy_for_thread, is_busy};
     let _guard = crate::config::TEST_ENV_LOCK.lock().await;
     let (ws_a, ws_b) = (TestWorkspace::new(), TestWorkspace::new());
     let alice = DispatchCtx::new(profile(&unique("b-alice"), ws_a.path()));

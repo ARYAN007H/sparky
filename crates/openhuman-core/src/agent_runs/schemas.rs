@@ -1,11 +1,11 @@
 use crate::core::runtime::DispatchCtx;
-use serde::de::DeserializeOwned;
 use serde::Deserialize;
+use serde::de::DeserializeOwned;
 use serde_json::{Map, Value};
 
 use crate::config::rpc as config_rpc;
-use crate::core::all::{ControllerFuture, RegisteredController};
 use crate::core::Outcome;
+use crate::core::all::{ControllerFuture, RegisteredController};
 use crate::core::{ControllerSchema, FieldSchema, TypeSchema};
 
 /// Params for `agent.chat` and `agent.chat_simple`.
@@ -136,8 +136,7 @@ pub fn schemas(function: &str) -> ControllerSchema {
         "list_definitions" => ControllerSchema {
             namespace: "agent",
             function: "list_definitions",
-            description:
-                "List safe display metadata for sub-agent definitions in the global registry.",
+            description: "List safe display metadata for sub-agent definitions in the global registry.",
             inputs: vec![],
             outputs: vec![json_output(
                 "definitions",
@@ -552,7 +551,7 @@ fn handle_graph_topologies(_ctx: DispatchCtx, _params: Map<String, Value>) -> Co
 fn local_catalog_models_from_config(
     config: &crate::config::Config,
 ) -> Vec<crate::platform::cost::catalog::LocalCatalogModel> {
-    use tinyinference_local::profile::{profile_for_kind, LocalProviderKind, ToolSupport};
+    use tinyinference_local::profile::{LocalProviderKind, ToolSupport, profile_for_kind};
 
     config
         .model_registry

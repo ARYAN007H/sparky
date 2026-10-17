@@ -1,7 +1,7 @@
 //! Read-only rosters over the sub-agent registry: the durable+live merge used to render the
 //! `[active_subagents]` context block.
 
-use tinyagents_orchestration::subagent::{snapshot_for_owner, SubagentSnapshot};
+use tinyagents_orchestration::subagent::{SubagentSnapshot, snapshot_for_owner};
 
 use super::registry::{admit_workspace, owner_key, registry};
 use crate::agent::orchestration::fleet_tools::FleetToolSet;

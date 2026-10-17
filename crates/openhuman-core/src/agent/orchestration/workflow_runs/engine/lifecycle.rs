@@ -2,24 +2,24 @@
 //! that drives a run's phase DAG to completion.
 
 use crate::core::runtime::DispatchCtx;
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 use serde_json::Value;
 use std::sync::Arc;
-use tinyagents_orchestration::workflow::{reset_running_phases, WorkflowEngine};
+use tinyagents_orchestration::workflow::{WorkflowEngine, reset_running_phases};
 
 use crate::agent::harness::ParentExecutionContext;
 use crate::agent::orchestration::parent_context::with_root_parent;
 use crate::config::Config;
 use tinyagents_session::run_ledger::{WorkflowRun, WorkflowRunStatus, WorkflowRunUpsert};
 
+use super::LOG_TARGET;
 use super::cancel::{
-    cancel_signal_if_current, clear_cancel_signal, is_current_cancel_signal, lookup_cancel_signal,
-    register_cancel_signal, replace_cancel_signal, WorkflowCancelSignal,
+    WorkflowCancelSignal, cancel_signal_if_current, clear_cancel_signal, is_current_cancel_signal,
+    lookup_cancel_signal, register_cancel_signal, replace_cancel_signal,
 };
 use super::ops::{
     compare_and_swap_workflow_run_lifecycle, definition_by_id, get_workflow_run, workflow_store,
 };
-use super::LOG_TARGET;
 use tinyagents_orchestration::workflow::WorkflowDefinition;
 
 /// Start a new workflow run and return immediately.

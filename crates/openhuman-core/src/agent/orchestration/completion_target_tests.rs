@@ -1,7 +1,7 @@
 use std::path::Path;
 use std::sync::Arc;
 
-use super::super::background_completions::{new_router, state, Entry};
+use super::super::background_completions::{Entry, new_router, state};
 use tinyagents_tasks::CompletionStore;
 
 /// A temporary workspace that forgets its router when dropped, so the

@@ -56,7 +56,7 @@
 //! [`ToolExposure::Hidden`]: tinytools::ToolExposure::Hidden
 
 use async_trait::async_trait;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use super::archetype_delegation::{delegation_envelope_properties, render_structured_handoff};
 use tinytools::ToolRunContext;

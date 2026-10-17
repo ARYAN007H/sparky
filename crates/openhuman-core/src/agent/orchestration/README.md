@@ -37,7 +37,9 @@ RPC/tool formatting, and OpenHuman's worktree policy.
   from the global bus regardless of the parent turn's lifecycle
   (`running_subagents*.rs`, [`background_completions.rs`](./background_completions.rs),
   [`completion_notice.rs`](./completion_notice.rs),
-  [`background_delivery.rs`](./background_delivery.rs), [`run_ledger_finalize.rs`](./run_ledger_finalize.rs)). The delivery turn runs
+  [`background_delivery.rs`](./background_delivery.rs)). The AgentRun status projection lives in
+  [`agent_runs/subagent_finalize.rs`](../../agent_runs/subagent_finalize.rs), because it updates the
+  product run ledger separately from TinyAgents' orchestration task store. The delivery turn runs
   on the originating thread's cached chat session via
   `web_chat::run_system_turn_on_thread`, never on a throwaway host.
 - A shared root `ParentExecutionContext` builder for surfaces that spawn real
@@ -97,9 +99,8 @@ RPC/tool formatting, and OpenHuman's worktree policy.
   `[BACKGROUND_DELIVERY_FAILED]` give-up notice. `background_delivery.rs` keeps
   the host policy: idle-gated, debounced (3s), batched delivery of finished
   background runs back into chat, the system turn, and the give-up writer fed by
-  `mark_failed`. `run_ledger_finalize.rs` is the
-  global-bus subscriber that settles ledger rows for runs that outlive their
-  spawning turn.
+  `mark_failed`. The `agent_runs` domain subscribes to terminal sub-agent events
+  to settle its ledger for runs that outlive their spawning turn.
 - [`fleet_tools.rs`](./fleet_tools.rs): decides which fleet-control tools (`wait_subagent`,
   `steer_subagent`, `wait_loop`, `close_subagent`) a given parent agent's
   definition actually exposes, so the delegation prompts and the
@@ -172,7 +173,7 @@ races it against the inherited cancellation token. Execution itself routes throu
   `{workspace}/session_db/sessions.db` (see [`sessions/mod.rs`](../../sessions/mod.rs)). Every
   spawn path (`spawn_subagent`, `spawn_async_subagent`,
   `spawn_parallel_agents`, `continue_subagent`, `dispatch`) writes a `running`
-  `agent_runs` row; `run_ledger_finalize.rs` settles it from the global event
+  `agent_runs` row; the `agent_runs` domain settles it from the global event
   bus so detached runs that outlive their spawning turn are not left `running`
   forever.
 - `subagent_sessions/`: `SubagentSessionStore` writes
@@ -209,7 +210,7 @@ what the harness exposes to the child.
 - `core::bus::BUS`: `DomainEvent::AgentOrchestration*` /
   `Subagent*` publication and subscription.
 - `web_chat::progress_bridge`: the per-turn progress-channel counterpart to
-  `run_ledger_finalize.rs`'s global-bus settlement.
+  `agent_runs::subagent_finalize`'s global-bus settlement.
 
 ## Used by
 

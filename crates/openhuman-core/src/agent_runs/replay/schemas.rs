@@ -113,8 +113,7 @@ fn replay_schema(function: &str) -> ControllerSchema {
         "run_events" => ControllerSchema {
             namespace: NAMESPACE,
             function: "run_events",
-            description:
-                "Read-only paged replay of a durable agent run's event stream (late-attach \
+            description: "Read-only paged replay of a durable agent run's event stream (late-attach \
                  reconnect/backfill). Returns AgentObservations at offset >= `offset` in order, \
                  plus `next_offset` (null once drained). Never mutates state.",
             inputs: vec![
@@ -156,8 +155,7 @@ fn replay_schema(function: &str) -> ControllerSchema {
         "run_status" => ControllerSchema {
             namespace: NAMESPACE,
             function: "run_status",
-            description:
-                "Read-only latest durable status snapshot (HarnessRunStatus) for a run, or null \
+            description: "Read-only latest durable status snapshot (HarnessRunStatus) for a run, or null \
                  when the run is unknown. Counters/phase/usage/cost only — never prompts or \
                  payloads.",
             inputs: vec![FieldSchema {
@@ -176,8 +174,7 @@ fn replay_schema(function: &str) -> ControllerSchema {
         "runs_active" => ControllerSchema {
             namespace: NAMESPACE,
             function: "runs_active",
-            description:
-                "Read-only listing of active (pending/running/interrupted) agent runs, optionally \
+            description: "Read-only listing of active (pending/running/interrupted) agent runs, optionally \
                  filtered by `thread_id` and/or `root_run_id`. Never mutates state.",
             inputs: vec![
                 FieldSchema {
