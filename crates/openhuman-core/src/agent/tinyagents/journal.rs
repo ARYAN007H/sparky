@@ -191,6 +191,8 @@ pub(crate) async fn attach_turn_journal(
     model: &str,
     run_id: RunId,
     thread_id: Option<ThreadId>,
+    parent_run_id: Option<RunId>,
+    root_run_id: RunId,
 ) -> Option<TurnJournal> {
     let (journal_store, status_store) = match journal_stores(ctx).await {
         Ok(stores) => stores,
@@ -206,7 +208,10 @@ pub(crate) async fn attach_turn_journal(
     // `events` was seeded with `with_stream_id(run_id)`, every persisted
     // observation's `event_id` is the stable `{run_id}-evt-{offset}`.
     let journal: Arc<dyn HarnessEventJournal> = Arc::new(StoreEventJournal::new(journal_store));
-    let journal_sink = Arc::new(JournalSink::new(journal, run_id.clone()));
+    let journal_sink = Arc::new(
+        JournalSink::new(journal, run_id.clone())
+            .with_lineage(parent_run_id.clone(), root_run_id.clone()),
+    );
     let redacting = RedactingSink::new(journal_sink.clone(), process_env_secrets());
 
     // FanOutSink is the durable-observer composition seam (05.2 adds graph sinks
@@ -219,6 +224,8 @@ pub(crate) async fn attach_turn_journal(
     // recording the thread (when known) so list_by_thread answers at run start.
     let status_store = Arc::new(status_store);
     let mut status = HarnessRunStatus::new(run_id.clone(), ComponentId::new(model.to_string()));
+    status.parent_run_id = parent_run_id;
+    status.root_run_id = root_run_id;
     if let Some(thread_id) = thread_id {
         status = status.with_thread(thread_id);
     }
