@@ -1,4 +1,4 @@
-use crate::core::{ControllerSchema, FieldSchema, TypeSchema};
+use crate::core::{FieldSchema, TypeSchema};
 
 fn field(name: &'static str, ty: TypeSchema, comment: &'static str, required: bool) -> FieldSchema {
     FieldSchema {
@@ -64,6 +64,3 @@ pub(super) fn cursor() -> FieldSchema {
         "Engine cursor from a previous page.",
     )
 }
-
-/// The schema of `function`; an unknown function gets the namespace's
-/// `unknown` placeholder, as every namespace does.
