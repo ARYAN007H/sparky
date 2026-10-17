@@ -270,7 +270,7 @@ fn inclusive_child_usage_counts_each_public_entry_once_and_keeps_unknown_cost() 
 
 #[test]
 fn explicit_hidden_delegate_stays_hidden_across_dynamic_refreshes() {
-    let mut visible = ["read_file".to_string()]
+    let visible = ["read_file".to_string()]
         .into_iter()
         .collect::<std::collections::HashSet<_>>();
     let prior = [
@@ -308,7 +308,7 @@ fn explicit_hidden_delegate_stays_hidden_across_dynamic_refreshes() {
 
 #[test]
 fn wildcard_delegate_visibility_admits_new_connections_and_removes_revoked_ones() {
-    let mut visible = ["read_file".to_string(), "delegate_calendar".to_string()]
+    let visible = ["read_file".to_string(), "delegate_calendar".to_string()]
         .into_iter()
         .collect::<std::collections::HashSet<_>>();
     let prior = ["delegate_calendar".to_string()]
