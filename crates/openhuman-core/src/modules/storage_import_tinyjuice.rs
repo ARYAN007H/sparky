@@ -86,7 +86,7 @@ async fn import_into(
 ) -> Result<Outcome> {
     let docs = scoped.documents();
     let marker = support::marker_id("ccr", root);
-    if support::already_imported(docs, MARKER_COLLECTION, &marker).await? {
+    if support::already_imported(scoped, MARKER_COLLECTION, &marker).await? {
         return Ok(Outcome::AlreadyDone);
     }
     if !root.is_dir() {
@@ -138,12 +138,7 @@ async fn import_into(
         imported += 1;
     }
 
-    support::mark_imported(
-        docs,
-        MARKER_COLLECTION,
-        &marker,
-        json!({ "imported": imported, "expired": expired, "skipped": skipped }),
-    )
+    support::mark_imported(scoped, MARKER_COLLECTION, &marker)
     .await?;
     tracing::info!("{LOG_PREFIX} imported={imported} expired={expired} skipped={skipped}");
     Ok(Outcome::Imported {
