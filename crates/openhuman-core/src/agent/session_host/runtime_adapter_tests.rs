@@ -376,6 +376,44 @@ async fn committed_goal_accounting_uses_direct_and_completed_child_usage() {
     );
 }
 
+#[tokio::test]
+async fn committed_goal_accounting_saturates_direct_plus_inclusive_child_tokens() {
+    let workspace = tempfile::tempdir().unwrap();
+    tinyagents_graph::goals::store::set(
+        &crate::storage::sessions::stores_or_ephemeral(workspace.path()).kv,
+        "saturated-goal",
+        "complete safely",
+        Some(u64::MAX),
+    )
+    .await
+    .unwrap();
+    let mut sidecar = crate::agent::tinyagents::host::run_context::SessionTurnSidecar {
+        input_tokens: u64::MAX - 1,
+        output_tokens: u64::MAX - 2,
+        ..Default::default()
+    };
+    sidecar.subagents.push(crate::agent::tinyagents::host::SubagentUsageEntry {
+        task_id: "large-child".into(),
+        agent_id: "researcher".into(),
+        usage: crate::agent::subagent_host::SubagentUsage {
+            input_tokens: 10,
+            output_tokens: 10,
+            ..Default::default()
+        },
+    });
+
+    account_committed_turn_against_goal(workspace.path(), Some("saturated-goal"), &sidecar).await;
+
+    let goal = tinyagents_graph::goals::store::get(
+        &crate::storage::sessions::stores_or_ephemeral(workspace.path()).kv,
+        "saturated-goal",
+    )
+    .await
+    .unwrap()
+    .unwrap();
+    assert_eq!(goal.tokens_used, u64::MAX);
+}
+
 fn meta() -> TranscriptMeta {
     TranscriptMeta {
         session_id: None,
