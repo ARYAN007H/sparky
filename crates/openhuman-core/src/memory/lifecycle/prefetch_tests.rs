@@ -104,6 +104,10 @@ fn prefetch_key_tracks_memory_config_without_hashing_unrelated_config() {
     engine_changed.api_url = Some("https://memory.example.test".into());
     assert!(key != Key::new(&engine_changed, &identity, "t", false));
 
+    let mut inference_changed = config.clone();
+    inference_changed.inference_url = Some("https://inference.example.test".into());
+    assert!(key != Key::new(&inference_changed, &identity, "t", false));
+
     let mut unrelated_changed = config;
     unrelated_changed.context.enabled = false;
     assert!(key == Key::new(&unrelated_changed, &identity, "t", false));
