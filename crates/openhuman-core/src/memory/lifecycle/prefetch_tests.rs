@@ -98,11 +98,11 @@ fn prefetch_key_tracks_memory_config_without_hashing_unrelated_config() {
 
     let mut memory_changed = config.clone();
     memory_changed.memory.recall.brain_limit += 1;
-    assert_ne!(key, Key::new(&memory_changed, &identity, "t", false));
+    assert!(key != Key::new(&memory_changed, &identity, "t", false));
 
     let mut unrelated_changed = config;
-    unrelated_changed.context.max_tokens += 1;
-    assert_eq!(key, Key::new(&unrelated_changed, &identity, "t", false));
+    unrelated_changed.context.enabled = false;
+    assert!(key == Key::new(&unrelated_changed, &identity, "t", false));
 }
 
 #[tokio::test]
