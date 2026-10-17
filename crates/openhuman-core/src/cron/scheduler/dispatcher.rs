@@ -51,6 +51,8 @@ pub(crate) async fn run_job_now(
     ));
     let binding = Binding::new(ctx, config, security);
     let host = bus_host::register(binding.clone()).await.map_err(|e| anyhow!(e))?;
+    #[cfg(test)]
+    bus_host::record_callback_address_for_test(&run_id, host.address());
     let scope = binding
         .within(async { DocScope::current(config) })
         .await?;
