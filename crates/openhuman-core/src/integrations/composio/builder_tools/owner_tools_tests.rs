@@ -11,29 +11,20 @@ use tempfile::TempDir;
 use tinytools::{PermissionLevel, Tool};
 
 struct EmptyConnectableProvider {
-    observed_thread_id: Arc<std::sync::Mutex<Option<String>>>,
-}
-
-struct TestToolContext {
-    thread_id: String,
-}
-
-impl tinytools::ToolRunContext for TestToolContext {
-    fn thread_id(&self) -> Option<&str> {
-        Some(&self.thread_id)
-    }
+    expected_core: Arc<crate::core::runtime::CoreContext>,
 }
 
 #[async_trait::async_trait]
 impl ConnectableToolkitProvider for EmptyConnectableProvider {
     async fn connected(
         &self,
-        tool_context: Option<&dyn tinytools::ToolRunContext>,
-        _dispatch: &crate::core::runtime::DispatchCtx,
+        dispatch: &crate::core::runtime::DispatchCtx,
         _config: &Config,
     ) -> Vec<String> {
-        *self.observed_thread_id.lock().unwrap() =
-            tool_context.and_then(tinytools::ToolRunContext::thread_id).map(str::to_string);
+        assert!(Arc::ptr_eq(
+            dispatch.core().expect("tool run core must reach provider"),
+            &self.expected_core,
+        ));
         Vec::new()
     }
 }
@@ -41,16 +32,21 @@ impl ConnectableToolkitProvider for EmptyConnectableProvider {
 #[tokio::test]
 async fn connectable_toolkits_uses_the_injected_host_snapshot_and_fails_closed_empty() {
     let tmp = TempDir::new().unwrap();
-    let observed_thread_id = Arc::new(std::sync::Mutex::new(None));
+    let core = crate::core::runtime::CoreContext::for_test(
+        crate::core::runtime::DomainSet::full(),
+        None,
+    );
     let tool = ListConnectableToolkitsTool::new(
         test_config(&tmp),
-        Arc::new(EmptyConnectableProvider {
-            observed_thread_id: observed_thread_id.clone(),
-        }),
+        Arc::new(EmptyConnectableProvider { expected_core: core.clone() }),
     );
-    let context = TestToolContext {
-        thread_id: "captured-tool-run".into(),
-    };
+    let run = crate::agent::tinyagents::host::run_context::OpenHumanRunContext::new()
+        .with_core(Some(core.clone()))
+        .into_tinyagents(tinyagents_harness::context::RunConfig::new("composio-provider-test"));
+    let context = tinyagents_harness::tool::ToolExecutionContext::from_run_context(
+        &run,
+        tinyagents_harness::ids::CallId::new("composio-provider-call"),
+    );
     let result = tool
         .execute_with_context(
             json!({}),
@@ -66,7 +62,6 @@ async fn connectable_toolkits_uses_the_injected_host_snapshot_and_fails_closed_e
         .unwrap()
         .iter()
         .all(|item| item["connected"] == false));
-    assert_eq!(*observed_thread_id.lock().unwrap(), Some("captured-tool-run".into()));
 }
 
 fn test_config(tmp: &TempDir) -> Arc<Config> {
