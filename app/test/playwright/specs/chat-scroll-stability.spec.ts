@@ -12,10 +12,13 @@ const TURN_COUNT = 18;
 
 test.describe('Chat scroll paint stability', () => {
   test('keeps every message laid out while scrolling a long transcript', async ({ page }) => {
-    let transcriptRpcCount = 0;
+    const transcriptRequests: string[] = [];
     page.on('request', request => {
-      if (request.postData()?.includes('openhuman.threads_transcript_get')) {
-        transcriptRpcCount += 1;
+      const body = request.postDataJSON() as
+        | { method?: string; params?: { thread_id?: string } }
+        | null;
+      if (body?.method === 'openhuman.threads_transcript_get') {
+        transcriptRequests.push(body.params?.thread_id ?? '<missing-thread-id>');
       }
     });
     await bootAuthenticatedPage(page, USER_ID, '/chat');
@@ -82,7 +85,7 @@ test.describe('Chat scroll paint stability', () => {
         '[data-slot="aui_assistant-message-root"], [data-slot="aui_user-message-root"]'
       ).length,
     }));
-    const rpcCountBeforeScroll = transcriptRpcCount;
+    const rpcCountBeforeScroll = transcriptRequests.length;
 
     for (const fraction of [0, 0.25, 0.5, 0.75, 1, 0.5, 0]) {
       const metrics = await viewport.evaluate(async (element, nextFraction) => {
@@ -103,6 +106,8 @@ test.describe('Chat scroll paint stability', () => {
       // checking the loading element.
       await expect(page.getByText('Loading conversation')).toHaveCount(0);
     }
-    expect(transcriptRpcCount).toBe(rpcCountBeforeScroll);
+    expect(transcriptRequests.length, `transcript requests: ${JSON.stringify(transcriptRequests)}`).toBe(
+      rpcCountBeforeScroll
+    );
   });
 });
