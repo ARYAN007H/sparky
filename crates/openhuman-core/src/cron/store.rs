@@ -59,8 +59,7 @@ pub fn add_shell_job(
     )
 }
 
-/// Like [`add_agent_job`] but accepts an optional built-in agent definition
-/// ID and the initial enabled state.
+/// Adds an agent job with an optional built-in definition and enabled state.
 #[allow(clippy::too_many_arguments)]
 pub fn add_agent_job_with_definition(
     config: &Config,
