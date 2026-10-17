@@ -1,11 +1,12 @@
-//! Tool: `delegate` — run a multi-stage, durable sub-agent delegation.
+//! Tool: `delegate_graph` — run a multi-stage, durable sub-agent delegation.
 //!
-//! Where `spawn_subagent` hands a sub-task to a single sub-agent turn, `delegate`
-//! drives the durable plan→execute⇄review→finalize graph
-//! ([`agent_orchestration::delegation::run_subagent_delegation`](crate::agent::orchestration::delegation::run_subagent_delegation)):
-//! the chosen agent first plans, then executes, then reviews its own work and
-//! revises up to `max_revisions` times before finalizing. The graph checkpoints
-//! its typed state to the session DB, so a crashed or paused run is resumable.
+//! Where `spawn_subagent` hands a sub-task to a single sub-agent turn,
+//! `delegate_graph` runs TinyAgents' resumable plan→execute⇄review→finalize
+//! tool. OpenHuman supplies the chosen agent, stage prompts, worker execution,
+//! checkpoints, and product result projection through
+//! [`run_subagent_delegation_with_parent_context`](crate::agent::orchestration::delegation::run_subagent_delegation_with_parent_context).
+//! Each stage is also
+//! registered with the shared subagent Jobs service.
 //!
 //! Use it for non-trivial sub-tasks that benefit from a self-review/revision
 //! loop; use `spawn_subagent` for a single focused hand-off.
