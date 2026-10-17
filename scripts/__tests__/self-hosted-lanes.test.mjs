@@ -1,6 +1,7 @@
 // Self-test for the CI lane flow: scripts/ci/self-hosted/{lanes-plan,lanes}.mjs
 // (run by ci-fast.yml / ci-fast-hosted.yml through ci-lanes.yml).
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -393,6 +394,26 @@ test("private gates-off, storage, and Tauri execute equivalent coverage suites w
   assert.match(checks["cron-module-tests"].run, /--test-threads=1/);
   assert.match(checks["storage-lib-tests"].run, /not test\(cron::bus_host::tests::\)/);
   assert.equal(checks["tauri-coverage"].env.CARGO_BUILD_TARGET_DIR, "target/ci-private-coverage");
+});
+
+test("private auxiliary coverage reports after failed tests and preserves the failure", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "lane-coverage-report-"));
+  const cargo = path.join(dir, "cargo");
+  const calls = path.join(dir, "calls");
+  fs.writeFileSync(cargo, '#!/bin/sh\necho "$*" >> "$CARGO_CALLS"\nif [ "$2" = nextest ]; then exit 17; fi\nexit 0\n', { mode: 0o755 });
+  const plan = buildPlan({ profile: "ex63", areas: ALL, env: EX63_ENV });
+  const check = plan.lanes.find((l) => l.name === "storage-drivers").checks[0];
+  const result = spawnSync("bash", ["-o", "pipefail", "-c", check.run], {
+    cwd: dir, env: { ...process.env, PATH: `${dir}:${process.env.PATH}`, CARGO_CALLS: calls },
+  });
+  assert.equal(result.status, 17);
+  const commands = fs.readFileSync(calls, "utf8").trim().split("\n");
+  assert.equal(commands.length, 2);
+  assert.match(commands[0], /^llvm-cov nextest /);
+  assert.match(commands[1], /^llvm-cov report /);
+  const tauri = plan.lanes.find((l) => l.name === "tauri");
+  assert.match(tauri.checks.find((c) => c.name === "build-tauri").run, /cargo build .*--bin OpenHuman/);
+  fs.rmSync(dir, { recursive: true, force: true });
 });
 
 test("private runner serializes independent lanes after failures even when parallelism is requested", async () => {

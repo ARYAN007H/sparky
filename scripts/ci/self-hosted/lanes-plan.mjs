@@ -613,7 +613,15 @@ export function buildPlan({ profile, areas, env = {}, isPullRequest = true }) {
         check.run = coverageSuite(`${args}${expression}${serial}`, `lcov-${check.name}.info`);
       }
     }
-    const tauri = lanes.find((l) => l.name === "tauri").checks.find((c) => c.name === "tauri-coverage");
+    const tauriLane = lanes.find((l) => l.name === "tauri");
+    // Clippy emits metadata only; a real uninstrumented link proves that
+    // Tauri-only changes also use the target linker checked by the workflow.
+    tauriLane.checks.splice(1, 0, {
+      name: "build-tauri",
+      when: areas.rustTauri,
+      run: "bash scripts/ci-cancel-aware.sh cargo build --manifest-path crates/openhuman-app/Cargo.toml --bin OpenHuman",
+    });
+    const tauri = tauriLane.checks.find((c) => c.name === "tauri-coverage");
     tauri.env = { ...covEnv, CARGO_BUILD_TARGET_DIR: "target/ci-private-coverage" };
     tauri.run = "unset RUSTFLAGS; " + coverageSuite("--manifest-path crates/openhuman-app/Cargo.toml", "lcov-tauri.info", "crates/openhuman-app/Cargo.toml");
   }
