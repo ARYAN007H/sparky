@@ -566,6 +566,7 @@ pub(crate) async fn release_all() -> usize {
 
 /// Undelivered completions for `thread_id`, oldest first (read-only; includes
 /// records an in-flight delivery currently holds).
+#[cfg(test)]
 pub(crate) fn pending_for(workspace_dir: &Path, thread_id: &str) -> Vec<CompletionRecord> {
     router_for_workspace(workspace_dir).pending_for(thread_id)
 }
@@ -582,11 +583,13 @@ pub(crate) fn pending_for_ctx(
 /// background completion is not independently delivered as a second, duplicate
 /// answer. The router withdraws an already-recorded completion and drops one
 /// that arrives later. Returns whether a pending completion was withdrawn.
+#[cfg(test)]
 pub(crate) fn mark_collected(workspace_dir: &Path, task_id: &str) -> bool {
     let entry = entry_for(workspace_dir);
     mark_collected_in_entry(entry, task_id)
 }
 
+#[cfg(test)]
 fn mark_collected_in_entry(entry: Arc<Entry>, task_id: &str) -> bool {
     let router = &entry.router;
     let completion = router.tombstone(task_id);

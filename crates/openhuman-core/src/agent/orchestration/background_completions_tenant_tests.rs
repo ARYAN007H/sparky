@@ -174,3 +174,36 @@ async fn the_explicit_context_keys_completions_without_any_ambient_scope() {
     resume_stopped_thread(&alice, "t-x");
     discard_for_thread(&bob, ws_b.path(), "t-x");
 }
+
+#[tokio::test]
+async fn explicit_profiles_share_a_workspace_without_sharing_completion_routers() {
+    let _guard = crate::config::TEST_ENV_LOCK.lock().await;
+    let ws = TestWorkspace::new();
+    let alice = DispatchCtx::new(profile("same-ws-alice", ws.path()));
+    let bob = DispatchCtx::new(profile("same-ws-bob", ws.path()));
+
+    for (ctx, task) in [(&alice, "alice-task"), (&bob, "bob-task")] {
+        record_completion(
+            ctx,
+            ws.path(),
+            "same-session",
+            task,
+            "researcher",
+            "done",
+            Some("same-thread".into()),
+        )
+        .await;
+    }
+
+    let alice_tasks: Vec<_> = pending_for_ctx(&alice, ws.path(), "same-thread")
+        .into_iter()
+        .map(|record| record.task_id)
+        .collect();
+    let bob_tasks: Vec<_> = pending_for_ctx(&bob, ws.path(), "same-thread")
+        .into_iter()
+        .map(|record| record.task_id)
+        .collect();
+
+    assert_eq!(alice_tasks, ["alice-task"]);
+    assert_eq!(bob_tasks, ["bob-task"]);
+}
