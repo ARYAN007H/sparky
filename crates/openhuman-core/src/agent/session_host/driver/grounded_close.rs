@@ -6,6 +6,8 @@
 //! It deliberately uses the same explicit model source as the turn and keeps
 //! its usage in a sidecar; it never owns transcript history or persistence.
 
+use tinyagents_runtime::transcript::message_to_native_transcript as message_to_native_chat_message;
+use tinyagents_session::transcript::TranscriptMessage;
 use tinyinference_llm::model::{ChatModel, ModelRequest, ModelResponse, ModelStream};
 use tinytools_agent::dialect::ToolDialect;
 
@@ -157,7 +159,12 @@ pub(super) async fn repair_required_output(
         return None;
     }
 
-    let prompt_history: Vec<tinyinference_llm::message::Message> = history.to_vec();
+    let prompt_history: Vec<tinyinference_llm::message::Message> = history
+        .iter()
+        .filter_map(message_to_native_chat_message)
+        .map(crate::agent::tinyagents::chat_message_to_message)
+        .collect();
+    let repair_instruction = wrap_harness_instruction(&required::repair_instruction(contract));
     let mut on_call_completed = |kind, response: Option<&ModelResponse>| {
         usage.record_close_call(kind, response);
     };
@@ -185,7 +192,7 @@ pub(super) async fn repair_required_output(
             history: &prompt_history,
             reply,
             contract,
-            repair_instruction: &wrap_harness_instruction(&required::repair_instruction(contract)),
+            repair_instruction: &repair_instruction,
             reply_already_streamed,
         },
         options,
@@ -269,6 +276,11 @@ pub(super) async fn close_if_needed(
     let records = results_from_tool_outcomes(&outcome.tool_outcomes);
     let rendered = render_tool_results(&records, turn_checkpoint::GROUNDING_TOTAL_CHARS);
     let instruction = close_instruction(outcome, needs_cap_close, &rendered);
+    let history: Vec<tinyinference_llm::message::Message> = base_history
+        .iter()
+        .filter_map(message_to_native_chat_message)
+        .map(crate::agent::tinyagents::chat_message_to_message)
+        .collect();
     let stop_reason = outcome.breaker_halt.as_deref();
     let harness_needles = harness_instruction_needles(stop_reason);
     let harness_phrases: Vec<&str> = harness_needles.iter().map(String::as_str).collect();
@@ -302,7 +314,7 @@ pub(super) async fn close_if_needed(
         &(),
         dispatcher,
         tinyagents_harness::close::GroundedCloseConfig {
-            history: base_history,
+            history: &history,
             initial_prompt: &instruction,
             verification_prompt: |candidate| {
                 close_verification_prompt(user_message, &rendered, candidate)
