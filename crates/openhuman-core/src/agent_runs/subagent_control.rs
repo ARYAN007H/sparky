@@ -106,19 +106,6 @@ fn handle_subagent_cancel(ctx: DispatchCtx, params: Map<String, Value>) -> Contr
     Box::pin(async move {
         let cid = new_correlation_id();
         let task_id = require_str(&params, "taskId")?;
-        if std::env::var_os("OPENHUMAN_DEBUG_DRIVER_CANCEL").is_some() {
-            eprintln!(
-                "CANCEL_HANDLER task={task_id:?} dispatch_core={:?} current_core={:?} default_core={:?} saas={}",
-                ctx.core().map(std::sync::Arc::as_ptr),
-                crate::core::runtime::CoreContext::current()
-                    .as_ref()
-                    .map(std::sync::Arc::as_ptr),
-                crate::core::runtime::CoreContext::default_context()
-                    .as_ref()
-                    .map(std::sync::Arc::as_ptr),
-                crate::core::runtime::is_saas(),
-            );
-        }
         let reason = opt_str(&params, "reason");
         log::debug!(
             target: "subagent_control_rpc",
@@ -128,7 +115,21 @@ fn handle_subagent_cancel(ctx: DispatchCtx, params: Map<String, Value>) -> Contr
         // `outcome` is set only when nothing was cancelled: how the run ended
         // if the registry still knew it, else "unknown" (never registered, or
         // already swept). The card settles on it instead of assuming success.
-        let (cancelled, outcome) = match running_subagents::cancel_by_task(&ctx, &task_id) {
+        let mut cancelled_subagent = running_subagents::cancel_by_task(&ctx, &task_id);
+        if cancelled_subagent.is_none()
+            && ctx.resolved().is_none()
+            && !crate::core::runtime::is_saas()
+        {
+            let config = crate::config::ops::load_config_in(&ctx)
+                .await
+                .map_err(|error| format!("subagent_cancel: failed to resolve active workspace: {error}"))?;
+            cancelled_subagent = running_subagents::cancel_by_task_with_workspace(
+                &ctx,
+                &task_id,
+                Some(&config.workspace_dir),
+            );
+        }
+        let (cancelled, outcome) = match cancelled_subagent {
             // Finished before the click landed (it stays registered until the
             // terminal sweep). Its outcome is already recorded and delivered;
             // announcing a cancellation would overwrite a completed session
