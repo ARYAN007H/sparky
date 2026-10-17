@@ -37,7 +37,10 @@ use tinytools_agent::dialect::ToolCallFormat;
 /// `execute_archetype_delegation_with_live_parent`; the separate packed-target
 /// binding regression intentionally exercises this stub's own authorization
 /// and execution methods.
-struct StubCreateImage(&'static str);
+struct StubCreateImage {
+    result: &'static str,
+    target: crate::agent::orchestration::tools::DelegationTarget,
+}
 
 #[async_trait]
 impl Tool for StubCreateImage {
@@ -50,15 +53,18 @@ impl Tool for StubCreateImage {
     fn parameters_schema(&self) -> serde_json::Value {
         json!({})
     }
+    fn host_extension(&self) -> Option<&(dyn std::any::Any + Send + Sync)> {
+        Some(&self.target)
+    }
     async fn execute(&self, _args: serde_json::Value) -> anyhow::Result<ToolResult> {
-        Ok(ToolResult::success(self.0))
+        Ok(ToolResult::success(self.result))
     }
 
     async fn prepare_authorization(
         &self,
         _args: &serde_json::Value,
     ) -> anyhow::Result<Option<serde_json::Value>> {
-        Ok(Some(json!({"target": self.0})))
+        Ok(Some(json!({"target": self.result})))
     }
 }
 
@@ -131,7 +137,10 @@ fn build_use_skill_dispatch_with_handle() -> (UseSkillDispatch, PackRegistryHand
         handle.clone(),
         crate::tools::toolpacks::CATALOG,
     ));
-    let create_image_tool: Box<dyn Tool> = Box::new(StubCreateImage("original"));
+    let create_image_tool: Box<dyn Tool> = Box::new(StubCreateImage {
+        result: "original",
+        target: crate::agent::orchestration::tools::DelegationTarget("image_agent".into()),
+    });
     let durable: Arc<Vec<Box<dyn Tool>>> = Arc::new(vec![use_skill_tool, create_image_tool]);
     handle.bind(Arc::downgrade(&durable));
 
@@ -171,7 +180,10 @@ async fn use_skill_dispatch_keeps_authorized_target_after_registry_rebind() {
             handle.clone(),
             crate::tools::toolpacks::CATALOG,
         )),
-        Box::new(StubCreateImage("replacement")),
+        Box::new(StubCreateImage {
+            result: "replacement",
+            target: crate::agent::orchestration::tools::DelegationTarget("image_agent".into()),
+        }),
     ]);
     handle.bind(Arc::downgrade(&replacement));
 
@@ -225,6 +237,61 @@ async fn use_skill_dispatch_reaches_live_parent_for_packed_archetype_delegate() 
         "use_skill must hand the packed delegation its live parent, not fail on the \
          standalone-caller guard: {output}"
     );
+}
+
+#[tokio::test]
+async fn packed_delegate_uses_scoped_target_and_registers_shared_job() {
+    use crate::core::runtime::{ContextOverlay, CoreContext, DomainSet};
+    use crate::tools::toolpacks::ToolGroups;
+    use tinyagents_orchestration::subagent::{SubAgentJobRegistry, SubAgentJobStatus};
+
+    let workspace = tempfile::TempDir::new().expect("workspace");
+    let dispatch = build_use_skill_dispatch();
+    let mut target = crate::agent::harness::test_support::test_inherit_echo_def();
+    target.id = "scoped_only_packed_worker".into();
+    target.delegate_name = Some("create_image".into());
+    let definitions = Arc::new(
+        AgentDefinitionRegistry::default().with_definitions([target]),
+    );
+    let mut config = crate::config::Config::default();
+    config.workspace_dir = workspace.path().to_path_buf();
+    let core = CoreContext::for_test_with_config(DomainSet::full(), config.clone()).derive_with(
+        ContextOverlay::new(config, DomainSet::full(), ToolGroups::none())
+            .definitions(definitions),
+    );
+    let mut parent_context = parent_execution_context(workspace.path());
+    parent_context.allowed_subagent_ids = ["scoped_only_packed_worker".to_string()]
+        .into_iter()
+        .collect();
+    parent_context.session_id = "scoped-packed-delegate-parent".into();
+    let parent_data = crate::agent::tinyagents::host::OpenHumanRunContext::new()
+        .with_core(Some(Arc::clone(&core)))
+        .with_parent(parent_context);
+    let parent = parent_data.into_tinyagents(RunConfig::new("scoped-packed-delegate-parent"));
+
+    let result = dispatch
+        .execute(
+            &(),
+            CallId::new("scoped-packed-delegate-call"),
+            json!({
+                "skill": "media",
+                "tool": "create_image",
+                "args": { "prompt": "render a small blue square", "blocking": true },
+            }),
+            ToolCallOptions::default(),
+            &parent,
+        )
+        .await
+        .expect("packed delegation returns a tool result");
+
+    assert!(!result.is_error, "{}", result.output());
+    assert_eq!(result.text(), "a generated image description");
+    let jobs = crate::core::runtime::slot_for::<SubAgentJobRegistry>(&parent.data.dispatch_ctx());
+    assert!(jobs.list().iter().any(|job| {
+        job.agent == "scoped_only_packed_worker"
+            && job.status == SubAgentJobStatus::Completed
+            && job.output.as_deref() == Some("a generated image description")
+    }), "the packed target executes through the shared driver job registry");
 }
 
 /// The disclosure half (no `tool` named) needs no live parent at all, and

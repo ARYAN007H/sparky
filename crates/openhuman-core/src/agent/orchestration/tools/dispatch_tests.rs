@@ -90,7 +90,7 @@ fn typed_dispatch_registration_recognises_every_synthesised_delegate_surface() {
         .expect("one collapsed target is routable"),
     );
     assert!(
-        DelegationDispatch::for_tool(collapsed.clone()).is_some(),
+        DelegationDispatch::for_tool(collapsed.clone(), None).is_some(),
         "every synthesised delegation name must select the typed dispatch: {}",
         collapsed.name(),
     );
@@ -104,7 +104,7 @@ fn typed_dispatch_registration_recognises_every_synthesised_delegate_surface() {
         }),
     });
     assert!(
-        DelegationDispatch::for_tool(retired).is_none(),
+        DelegationDispatch::for_tool(retired, None).is_none(),
         "delegate_to_integrations_agent must no longer select the typed dispatch"
     );
 }
@@ -116,8 +116,27 @@ fn delegate_graph_is_not_misclassified_as_an_archetype_delegate() {
         parameters: serde_json::json!({}),
     });
     assert!(
-        DelegationDispatch::for_tool(graph).is_none(),
+        DelegationDispatch::for_tool(graph, None).is_none(),
         "delegate_graph must retain its dedicated durable-graph dispatcher"
+    );
+}
+
+#[test]
+fn archetype_dispatch_uses_the_registered_target_marker_not_ambient_names() {
+    let tool: Arc<dyn Tool> = Arc::new(super::super::ArchetypeDelegationTool {
+        tool_name: "packed_custom_route".to_string(),
+        agent_id: super::super::DelegationTarget("scoped_only_agent".to_string()),
+        tool_description: "Scoped packed route".to_string(),
+    });
+
+    assert!(
+        DelegationDispatch::for_tool(tool.clone(), Some("scoped_only_agent".to_string()))
+            .is_some(),
+        "an explicitly registered delegation target is routable even when its name is not in the ambient catalogue"
+    );
+    assert!(
+        DelegationDispatch::for_tool(tool, None).is_none(),
+        "a delegate-like spelling without the host target marker must not acquire delegation authority"
     );
 }
 
