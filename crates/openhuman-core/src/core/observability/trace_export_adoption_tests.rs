@@ -247,3 +247,89 @@ fn per_run_trace_snapshots_keep_reused_call_ids_scoped_and_content_gated() {
     assert!(snapshot.iter().any(|span| span["name"] == "agent.iteration"));
     assert!(snapshot.iter().any(|span| span["name"] == "subagent.iteration"));
 }
+
+#[test]
+fn child_native_failure_survives_parent_acknowledgement_at_same_timestamp() {
+    use tinyagents_harness::terminal::{TerminalOutcome, TerminalReason};
+    use tinyagents_harness::observability::trace_export::{SpanKind, SpanStatus};
+
+    let parent = vec![
+        root_observation(
+            0,
+            10,
+            AgentEvent::RunStarted {
+                run_id: RunId::new("root-run"),
+                thread_id: None,
+            },
+        ),
+        root_observation(
+            1,
+            11,
+            AgentEvent::SubAgentRunStarted {
+                name: "researcher".into(),
+                depth: 1,
+                run_id: RunId::new("child-run"),
+            },
+        ),
+        root_observation(
+            2,
+            20,
+            AgentEvent::SubAgentRunCompleted {
+                run_id: RunId::new("child-run"),
+            },
+        ),
+        root_observation(
+            3,
+            30,
+            AgentEvent::RunCompleted {
+                run_id: RunId::new("root-run"),
+                outcome: Some(TerminalOutcome::new(TerminalReason::Completed, "done")),
+            },
+        ),
+    ];
+    let child = vec![
+        child_observation(
+            0,
+            12,
+            AgentEvent::RunStarted {
+                run_id: RunId::new("child-run"),
+                thread_id: None,
+            },
+        ),
+        child_observation(
+            1,
+            20,
+            AgentEvent::RunFailed {
+                run_id: RunId::new("child-run"),
+                error: "child provider failed".into(),
+                outcome: Some(TerminalOutcome::new(
+                    TerminalReason::ToolFailed,
+                    "child provider failed",
+                )),
+            },
+        ),
+    ];
+    let observations =
+        crate::agent::tinyagents::journal::merge_run_observations(vec![parent, child]);
+    assert!(matches!(
+        observations[3].event,
+        AgentEvent::SubAgentRunCompleted { .. }
+    ));
+    assert!(matches!(observations[4].event, AgentEvent::RunFailed { .. }));
+
+    let mut collector = NativeSpanCollector::new(
+        TraceContext::new("root-trace", None)
+            .with_run_lineage(Some("root-run".into()), None, Some("root-run".into())),
+    );
+    for observation in &observations {
+        collector.record(observation);
+    }
+    collector.finish(30);
+    let child_span = collector
+        .spans()
+        .iter()
+        .find(|span| span.kind == SpanKind::Subagent)
+        .expect("native child span");
+    assert_eq!(child_span.status, SpanStatus::Error);
+    assert_eq!(child_span.attributes["error.message"], "child provider failed");
+}

@@ -272,8 +272,8 @@ pub(crate) async fn read_run_events(
 }
 
 /// Read a run and its lineage-linked descendants while retaining each journal
-/// stream's offset order. The stable merge uses timestamps across runs and
-/// places child terminal records before a same-timestamp parent acknowledgement.
+/// stream's offset order. The stable merge uses timestamps across runs while
+/// retaining each stream's event offsets.
 pub(crate) async fn read_run_tree_events(
     ctx: &DispatchCtx,
     root_run_id: &str,
@@ -287,12 +287,14 @@ pub(crate) async fn read_run_tree_events(
     let mut run_ids = statuses
         .into_iter()
         .map(|status| status.run_id.as_str().to_owned())
+        .filter(|run_id| run_id != root_run_id)
         .collect::<Vec<_>>();
-    if !run_ids.iter().any(|run_id| run_id == root_run_id) {
-        run_ids.push(root_run_id.to_owned());
-    }
     run_ids.sort();
     run_ids.dedup();
+    // Keep the parent stream first for equal timestamps. The merge itself
+    // does not invent event-specific precedence; the native collector must
+    // handle terminal facts in either arrival order.
+    run_ids.insert(0, root_run_id.to_owned());
 
     let journal = StoreEventJournal::new(journal_store);
     let mut streams = Vec::with_capacity(run_ids.len());
@@ -309,8 +311,8 @@ pub(crate) async fn read_run_tree_events(
 }
 
 /// Stable timestamp merge for independent run journals. Offsets are preserved
-/// within every source stream; ties place child lifecycle/terminal facts before
-/// parent acknowledgements and final run completion.
+/// within every source stream; equal timestamps retain source-list order, with
+/// the root run supplied first by `read_run_tree_events`.
 pub(crate) fn merge_run_observations(streams: Vec<Vec<AgentObservation>>) -> Vec<AgentObservation> {
     let mut cursors = vec![0usize; streams.len()];
     let mut merged = Vec::new();
@@ -320,32 +322,16 @@ pub(crate) fn merge_run_observations(streams: Vec<Vec<AgentObservation>>) -> Vec
             .enumerate()
             .filter_map(|(stream_index, stream)| {
                 let observation = stream.get(cursors[stream_index])?;
-                Some((
-                    stream_index,
-                    observation.ts_ms,
-                    cross_run_event_order(&observation.event),
-                    observation.offset,
-                ))
+                Some((stream_index, observation.ts_ms, observation.offset))
             })
-            .min_by_key(|(_, ts_ms, event_order, offset)| (*ts_ms, *event_order, *offset));
-        let Some((stream_index, _, _, _)) = next else {
+            .min_by_key(|(stream_index, ts_ms, offset)| (*ts_ms, *stream_index, *offset));
+        let Some((stream_index, _, _)) = next else {
             break;
         };
         merged.push(streams[stream_index][cursors[stream_index]].clone());
         cursors[stream_index] += 1;
     }
     merged
-}
-
-fn cross_run_event_order(event: &tinyagents_harness::events::AgentEvent) -> u8 {
-    use tinyagents_harness::events::AgentEvent;
-    match event {
-        AgentEvent::SubAgentRunStarted { .. } => 0,
-        AgentEvent::RunCompleted { .. } => 4,
-        AgentEvent::SubAgentRunCompleted { .. } => 3,
-        AgentEvent::RunFailed { .. } => 2,
-        _ => 1,
-    }
 }
 
 #[cfg(test)]
