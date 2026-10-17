@@ -193,7 +193,7 @@ async fn cancelling_partial_callback_registration_unserves_and_releases_its_cont
         )
         .expect("probe proxy");
     assert!(proxy
-        .call::<_, (), serde_json::Value>("Ping", ())
+        .call::<serde_json::Value>("Ping", ())
         .await
         .is_ok());
 
@@ -209,7 +209,7 @@ async fn cancelling_partial_callback_registration_unserves_and_releases_its_cont
         "callback context is released"
     );
     assert!(proxy
-        .call::<_, (), serde_json::Value>("Ping", ())
+        .call::<serde_json::Value>("Ping", ())
         .await
         .is_err());
 }
