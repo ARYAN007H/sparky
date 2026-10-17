@@ -74,7 +74,9 @@ async fn static_live_harness_builder_resolves_control_aliases_from_the_execution
     use crate::agent::orchestration::subagent_sessions::{
         DurableSubagentSession, DurableSubagentStatus, SubagentSessionStore,
     };
-    use tinyagents_harness::{context::RunConfig, tool::ToolDispatch, CallId};
+    use tinyagents_harness::{
+        agent_loop::phases::execute_tool_batch, context::RunConfig, ComponentId,
+    };
 
     let workspace = tempfile::tempdir().expect("live harness workspace");
     let config = crate::config::Config::default();
@@ -142,27 +144,33 @@ async fn static_live_harness_builder_resolves_control_aliases_from_the_execution
     let sets = vec![tools];
     let mut harness: AgentHarness<(), OpenHumanRunContext> = AgentHarness::new();
     host_tool_set_builder(&sets, &None, true, &HashSet::new()).register(&mut harness, None);
-    let dispatch = harness
-        .tools()
-        .dispatch("list_subagents")
-        .expect("static builder registered the control surface");
-    let run = OpenHumanRunContext::new()
+    let mut run = OpenHumanRunContext::new()
         .with_core(Some(Arc::clone(&core)))
         .with_parent(parent)
         .into_tinyagents(RunConfig::new("live-harness-parent").with_thread("voice-thread"));
-
-    let result = dispatch
-        .execute(
-            &(),
-            CallId::new("live-list-call"),
+    let mut status = tinyagents_harness::events::HarnessRunStatus::new(
+        run.run_id().clone(),
+        ComponentId::new("live-harness-test".to_owned()),
+    );
+    let mut agent_run = tinyagents_harness::middleware::AgentRun::new();
+    let mut messages = Vec::new();
+    let result = execute_tool_batch(
+        &harness,
+        &(),
+        &mut run,
+        &mut agent_run,
+        &mut status,
+        &mut messages,
+        vec![tinyinference_llm::tool::ToolCall::new(
+            "live-list-call",
+            "list_subagents",
             serde_json::json!({}),
-            ToolCallOptions::default(),
-            &run,
-        )
+        )],
+    )
         .await
         .expect("the live control resolves its execution parent");
-    assert!(!result.is_error, "{}", result.output());
-    assert!(result.output().contains("live-owned-session"));
+    assert_eq!(result.results.len(), 1);
+    assert!(result.results[0].text().contains("live-owned-session"));
 }
 
 #[tokio::test]
