@@ -76,9 +76,11 @@ async fn spawn_subagent_reports_a_stopped_child_as_a_failed_tool_result() {
     let parent = parent_context(workspace.path(), Arc::new(LoopingToolModel), vec![]);
     // The live parent run a real turn hands the tool, with the turn's
     // progress channel on the child's run context.
-    let live = super::live_parent_run_context("stopped-child-test", parent);
-    let mut run_context = live.data.child();
-    run_context.progress = Some(progress_tx);
+    let mut live = super::live_parent_run_context("stopped-child-test", parent);
+    // The shared driver derives its child context from the live parent, so
+    // install the observer there as a real harness turn would.
+    live.data.progress = Some(progress_tx.clone());
+    let run_context = live.data.child();
     // Boxed: the inline spawn future is too large for a test thread's
     // stack (the trait `execute` path boxes it the same way).
     let tool = SpawnSubagentTool::new();

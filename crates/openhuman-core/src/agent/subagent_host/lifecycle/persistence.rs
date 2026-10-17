@@ -38,6 +38,21 @@ impl OpenHumanPersistence {
         self
     }
 
+    fn set_host_disposition(
+        &self,
+        key: &SubagentTaskKey,
+        disposition: tinyagents_orchestration::subagent::SubagentPersistenceDisposition,
+    ) {
+        if let Some(outcome) = self
+            .host_outcome
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .get_mut(key)
+        {
+            outcome.persistence_disposition = disposition;
+        }
+    }
+
     fn key_component(key: &SubagentTaskKey) -> String {
         fn hex(value: &str) -> String {
             value
@@ -440,6 +455,10 @@ impl tinyagents_orchestration::subagent::SubagentPersistence for OpenHumanPersis
     ) -> Result<SubagentPausePersistenceDisposition, SubagentError> {
         let _key_lock = self.key_lock(&pause.key)?;
         if self.terminal_path(&pause.key).exists() {
+            self.set_host_disposition(
+                &pause.key,
+                tinyagents_orchestration::subagent::SubagentPersistenceDisposition::TerminalExisting,
+            );
             return Ok(SubagentPausePersistenceDisposition::TerminalExisting);
         }
         let paused = match &pause.outcome.status {
@@ -508,7 +527,7 @@ impl tinyagents_orchestration::subagent::SubagentPersistence for OpenHumanPersis
             .map_err(|error| SubagentError::Persistence(error.to_string()))?;
         let path = self.pause_path(&pause.key);
         let existing = self.read_pause_checkpoint(&pause.key)?;
-        match (pause.replaces.as_ref(), existing) {
+        let disposition = match (pause.replaces.as_ref(), existing) {
             (None, None) => {
                 // Index first: a failed data write can leave a stale index,
                 // which readers filter by the live pause record. A successful
@@ -526,7 +545,23 @@ impl tinyagents_orchestration::subagent::SubagentPersistence for OpenHumanPersis
                 Ok(SubagentPausePersistenceDisposition::Replaced)
             }
             _ => Ok(SubagentPausePersistenceDisposition::Existing),
-        }
+        }?;
+        let host_disposition = match disposition {
+            SubagentPausePersistenceDisposition::Inserted => {
+                tinyagents_orchestration::subagent::SubagentPersistenceDisposition::PauseCommitted
+            }
+            SubagentPausePersistenceDisposition::Replaced => {
+                tinyagents_orchestration::subagent::SubagentPersistenceDisposition::PauseReplaced
+            }
+            SubagentPausePersistenceDisposition::Existing => {
+                tinyagents_orchestration::subagent::SubagentPersistenceDisposition::PauseExisting
+            }
+            SubagentPausePersistenceDisposition::TerminalExisting => {
+                tinyagents_orchestration::subagent::SubagentPersistenceDisposition::TerminalExisting
+            }
+        };
+        self.set_host_disposition(&pause.key, host_disposition);
+        Ok(disposition)
     }
 
     async fn record_terminal(
@@ -537,12 +572,20 @@ impl tinyagents_orchestration::subagent::SubagentPersistence for OpenHumanPersis
     ) -> Result<SubagentTerminalPersistenceDisposition, SubagentError> {
         let _key_lock = self.key_lock(key)?;
         if self.terminal_path(key).exists() {
+            self.set_host_disposition(
+                key,
+                tinyagents_orchestration::subagent::SubagentPersistenceDisposition::TerminalExisting,
+            );
             return Ok(SubagentTerminalPersistenceDisposition::Existing);
         }
         if let Some(current) = self.read_pause_checkpoint(key)? {
             let can_consume_pause =
                 replaces.is_some_and(|expected| Self::checkpoint_resume(&current) == *expected);
             if !can_consume_pause {
+                self.set_host_disposition(
+                    key,
+                    tinyagents_orchestration::subagent::SubagentPersistenceDisposition::PauseExisting,
+                );
                 return Ok(SubagentTerminalPersistenceDisposition::PauseExisting);
             }
         } else if replaces.is_some() {
@@ -569,7 +612,7 @@ impl tinyagents_orchestration::subagent::SubagentPersistence for OpenHumanPersis
                 .unwrap_or_default(),
         })
         .map_err(|error| SubagentError::Persistence(error.to_string()))?;
-        match Self::insert_file(&path, record)? {
+        let disposition = match Self::insert_file(&path, record)? {
             true => {
                 // Terminal is the durable winner. Retiring a matching pause
                 // afterwards cannot reopen the lifecycle because `load` first
@@ -584,6 +627,19 @@ impl tinyagents_orchestration::subagent::SubagentPersistence for OpenHumanPersis
                 Ok(SubagentTerminalPersistenceDisposition::Inserted)
             }
             false => Ok(SubagentTerminalPersistenceDisposition::Existing),
-        }
+        }?;
+        let host_disposition = match disposition {
+            SubagentTerminalPersistenceDisposition::Inserted => {
+                tinyagents_orchestration::subagent::SubagentPersistenceDisposition::TerminalInserted
+            }
+            SubagentTerminalPersistenceDisposition::Existing => {
+                tinyagents_orchestration::subagent::SubagentPersistenceDisposition::TerminalExisting
+            }
+            SubagentTerminalPersistenceDisposition::PauseExisting => {
+                tinyagents_orchestration::subagent::SubagentPersistenceDisposition::PauseExisting
+            }
+        };
+        self.set_host_disposition(key, host_disposition);
+        Ok(disposition)
     }
 }
