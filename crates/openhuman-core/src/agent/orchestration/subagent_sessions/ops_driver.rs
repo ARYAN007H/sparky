@@ -250,7 +250,11 @@ pub fn cancel_driver_job_by_task(
         };
     let already_finished = match session.status {
         DurableSubagentStatus::Idle => {
-            Some(tinyagents_orchestration::subagent::FinishedOutcome::Completed)
+            let finished = typed_finished()?;
+            if finished.is_none() {
+                return Ok(None);
+            }
+            finished
         }
         DurableSubagentStatus::Failed => match typed_finished()? {
             Some(finished) => Some(finished),

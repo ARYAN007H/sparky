@@ -38,9 +38,6 @@ pub(crate) async fn resolve_inline_driver_outcome(
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner())
         .remove(task_key);
-    if let Some(cached) = cached.clone() {
-        return Ok((cached, public_job_id));
-    }
 
     // The driver's persistence CAS result is authoritative. Another
     // invocation can win terminal/pause persistence while this executor's

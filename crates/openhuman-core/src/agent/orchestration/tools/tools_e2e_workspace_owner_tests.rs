@@ -393,7 +393,7 @@ async fn driver_job_controls_are_isolated_by_workspace_with_shared_runtime_state
         )),
         Err(error) => assert_eq!(
             error.to_string(),
-            "tinyagents harness run failed: run cancelled"
+            "provider call failed: tinyagents harness run failed: run cancelled"
         ),
     }
     assert_eq!(

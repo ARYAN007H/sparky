@@ -159,6 +159,9 @@ fn handle_subagent_cancel(ctx: DispatchCtx, params: Map<String, Value>) -> Contr
                     // Active driver jobs finish through the awaited host hook.
                     // A paused job has already returned from that hook, so this
                     // handler settles and reports that one terminal transition.
+                    if let Some(paused) = meta.driver_pause.as_ref() {
+                        settle_paused_driver_cancel(&ctx, paused, reason.as_deref()).await?;
+                    }
                     (true, None)
                 } else {
                     let summary = match reason.as_deref().map(str::trim).filter(|r| !r.is_empty()) {
