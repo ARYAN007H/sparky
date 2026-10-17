@@ -308,7 +308,7 @@ fn seed_app_session_for_gate_test(tmp: &TempDir) {
 // test below seeds the exact toolkit it needs via `seed_live_catalog_cache`
 // so none of this touches a live Composio backend.
 
-use crate::flows::tinyflows::caps::{
+use crate::integrations::composio::catalog::{
     seed_live_catalog_cache, seed_probe_cache, ProbedOutputSample, ToolContract,
 };
 
