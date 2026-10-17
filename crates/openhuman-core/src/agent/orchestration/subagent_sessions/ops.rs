@@ -406,7 +406,33 @@ pub fn close_if_current(
     store: &SubagentSessionStore,
     observed: &DurableSubagentSession,
 ) -> Result<bool, String> {
-    close(store, &observed.subagent_session_id)
+    let _guard = store_write_lock()
+        .lock()
+        .map_err(|_| "subagent session store lock poisoned".to_string())?;
+    let mut sessions = store.load()?;
+    let now = chrono::Utc::now().to_rfc3339();
+    let Some(session) = sessions
+        .iter_mut()
+        .find(|session| session.subagent_session_id == observed.subagent_session_id)
+    else {
+        return Ok(false);
+    };
+    if session.parent_session != observed.parent_session
+        || session.parent_thread_id != observed.parent_thread_id
+        || session.current_task_id != observed.current_task_id
+        || session.lifecycle_key != observed.lifecycle_key
+    {
+        return Ok(false);
+    }
+    if session.status == DurableSubagentStatus::Closed {
+        return Ok(true);
+    }
+    session.status = DurableSubagentStatus::Closed;
+    session.reusable = false;
+    session.updated_at = now.clone();
+    session.last_used_at = now;
+    store.save(&sessions)?;
+    Ok(true)
 }
 
 pub fn list_for_parent(
