@@ -50,6 +50,7 @@ pub(super) async fn finalize_turn_outcome(
     resolved_route: Option<tinyinference_llm::model::ResolvedModelRoute>,
     request_base_len: usize,
     dispatch: &crate::core::runtime::DispatchCtx,
+    run_id: tinyagents_harness::ids::RunId,
 ) -> TinyagentsTurnOutcome {
     // Context-compression provenance (issue #4249, 03.1 item 6): the harness's
     // `AgentEvent::Compressed` projection only carries token deltas, so drain the
@@ -175,10 +176,14 @@ pub(super) async fn finalize_turn_outcome(
     }
     let deferred_terminal = if defer_terminal_to_caller {
         Some(crate::agent::tinyagents::turn_outcome::DeferredTurnTerminal {
+            run_id: run_id.clone(),
             events: event_sink.clone(),
             journal: turn_journal.cloned(),
         })
     } else {
+        event_sink.emit(tinyagents_harness::events::AgentEvent::RunFinalized {
+            run_id,
+        });
         if let Some(journal) = turn_journal {
             journal.finish_completed().await;
         }

@@ -116,8 +116,34 @@ pub(crate) struct TurnSpec<'a> {
 pub(crate) struct NativeSubagentRunContext {
     pub config: tinyagents_harness::context::RunConfig,
     pub parent_events: EventSink,
+    pub child_events: Arc<std::sync::Mutex<Option<EventSink>>>,
+    pub child_journal: Arc<std::sync::Mutex<Option<journal::TurnJournal>>>,
     pub name: String,
     pub depth: usize,
+}
+
+impl NativeSubagentRunContext {
+    pub(crate) fn finalize_failed_boundary(&self) {
+        let events = self
+            .child_events
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone();
+        let Some(events) = events else {
+            return;
+        };
+        events.emit(tinyagents_harness::events::AgentEvent::RunFinalized {
+            run_id: self.config.run_id.clone(),
+        });
+        if let Some(journal) = self
+            .child_journal
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .as_ref()
+        {
+            journal.flush_events();
+        }
+    }
 }
 
 impl TurnSpec<'_> {
@@ -383,6 +409,10 @@ async fn drive_turn(
     // reconstructs the timeline from (05.1). The same id keys the journal + status.
     let sink = EventSink::with_stream_id(journal_run_id.as_str());
     if let Some(native) = &native_subagent {
+        *native
+            .child_events
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(sink.clone());
         native
             .parent_events
             .emit(tinyagents_harness::events::AgentEvent::SubAgentRunStarted {
@@ -445,6 +475,12 @@ async fn drive_turn(
         ctx.config.lineage.root_run_id.clone(),
     )
     .await;
+    if let Some(native) = &native_subagent {
+        *native
+            .child_journal
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = turn_journal.clone();
+    }
     if !is_subagent {
         if let Some(crate::security::turn_origin::AgentTurnOrigin::WebChat {
             request_id: Some(request_id),
@@ -710,7 +746,7 @@ async fn drive_turn(
         pause_at_cap,
         turn_journal.as_ref(),
         &sink,
-        defer_turn_completed_to_caller,
+        defer_turn_completed_to_caller || native_subagent.is_some(),
         compression_mw.as_ref(),
         prompt_cache_guard.as_ref(),
         turn_completed_sink,
@@ -723,6 +759,7 @@ async fn drive_turn(
         resolved_route,
         request_base_len,
         &run_context.dispatch_ctx(),
+        journal_run_id,
     )
     .await;
     if let Some(native) = native_subagent {
