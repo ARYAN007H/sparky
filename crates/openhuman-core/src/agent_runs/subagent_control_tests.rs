@@ -143,6 +143,94 @@ async fn cancel_of_a_finished_run_reports_its_outcome_and_rewrites_nothing() {
 }
 
 #[tokio::test]
+async fn cancelling_a_paused_driver_queues_a_failed_delivery_with_reason() {
+    use crate::agent::orchestration::background_completions::{
+        forget_workspace_for_test, pending_for,
+    };
+    use crate::agent::orchestration::subagent_sessions::{
+        mark_finished, upsert_running, DurableSubagentStatus, DriverTaskCancellation,
+        SubagentSessionSelector, SubagentSessionStore, SubagentSessionUpsert,
+    };
+    use tinyagents_orchestration::subagent::SubagentTaskKey;
+    use tinyagents_tasks::CompletionStatus;
+
+    let _lock = crate::config::TEST_ENV_LOCK.lock().await;
+    let workspace = tempfile::tempdir().expect("workspace");
+    let workspace_dir = workspace.path().to_path_buf();
+    let parent_session = "paused-cancel-parent";
+    let parent_thread = Some("paused-cancel-thread".to_string());
+    let task_id = "paused-cancel-public-id";
+    let key = SubagentTaskKey {
+        root_run_id: "paused-cancel-root".into(),
+        parent_run_id: parent_session.into(),
+        thread_id: parent_thread.clone(),
+        task_id: task_id.into(),
+    };
+    let store = SubagentSessionStore::new(workspace_dir.clone());
+    let session = upsert_running(
+        &store,
+        SubagentSessionUpsert {
+            selector: SubagentSessionSelector {
+                parent_session: parent_session.into(),
+                parent_thread_id: parent_thread.clone(),
+                agent_id: "researcher".into(),
+                model: None,
+                sandbox_mode: "read_only".into(),
+                action_root: None,
+                task_key: "paused cancellation".into(),
+            },
+            display_name: None,
+            task_title: "paused cancellation".into(),
+            worker_thread_id: None,
+            task_id: task_id.into(),
+            lifecycle_key: Some(key.clone()),
+        },
+        None,
+    )
+    .expect("session inserted");
+    mark_finished(
+        &store,
+        &session.subagent_session_id,
+        task_id,
+        &crate::agent::subagent_host::SubagentRunStatus::AwaitingUser {
+            question: "Need input".into(),
+            options: None,
+            checkpoint: None,
+        },
+        Vec::new(),
+    )
+    .expect("session paused");
+    let observed = DriverTaskCancellation {
+        task_id: task_id.into(),
+        agent_id: "researcher".into(),
+        parent_session: parent_session.into(),
+        subagent_session_id: session.subagent_session_id.clone(),
+        workspace_dir: workspace_dir.clone(),
+        parent_thread_id: parent_thread.clone(),
+        already_finished: None,
+        was_paused: true,
+        lifecycle_key: Some(key),
+    };
+
+    forget_workspace_for_test(&workspace_dir);
+    assert!(settle_paused_driver_cancel(
+        &DispatchCtx::process_default(),
+        &observed,
+        Some("user requested stop")
+    )
+    .await
+    .expect("paused cancellation settles"));
+
+    let row = store.load().unwrap().remove(0);
+    assert_eq!(row.status, DurableSubagentStatus::Failed);
+    let delivery = pending_for(&workspace_dir, parent_thread.as_deref().unwrap());
+    assert_eq!(delivery.len(), 1);
+    assert_eq!(delivery[0].status, CompletionStatus::Failed);
+    assert!(delivery[0].result.text.contains("[SUBAGENT_FAILED]"));
+    assert!(delivery[0].result.text.contains("user requested stop"));
+}
+
+#[tokio::test]
 async fn steer_unknown_task_is_a_noop_false() {
     let _lock = crate::config::TEST_ENV_LOCK.lock().await;
     let mut params = Map::new();
