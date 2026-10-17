@@ -113,6 +113,8 @@ for any commit without posting it.
   independent check fails. Compatible
   uninstrumented outputs share `target/ci-private-build`; coverage uses
   `target/ci-private-coverage`. Neither is restored as an Actions artifact cache.
+  The supervisor's `JOB_HARD_TIMEOUT_MIN=195` leaves a 15-minute shutdown grace
+  beyond the workflow budget; reload changed settings only on drained idle slots.
   - `scripts/ci/self-hosted/guest-image.txt` pins the guest OCI digest. Before
     validation, `verify-runner.sh` compares `/etc/ohci/build-info` with that pin,
     checks preinstalled tools (Python 3.10 with tomli, or stdlib tomllib), and selects `rust-toolchain.toml` explicitly.
