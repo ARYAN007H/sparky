@@ -666,3 +666,34 @@ async fn concurrent_degradation_installs_one_fallback() {
     );
     assert!(Arc::ptr_eq(&entry_for(w).router, &first.router));
 }
+
+#[tokio::test]
+async fn degrading_a_leased_completion_keeps_its_lease() {
+    let _guard = crate::config::TEST_ENV_LOCK.lock().await;
+    let ws = workspace();
+    let w = ws.path();
+    let ctx = crate::core::runtime::DispatchCtx::ambient();
+    let router = router_for_workspace(w);
+    router
+        .record(CompletionRecord::new(
+            "leased-task",
+            "leased-thread",
+            "researcher",
+            CompletionStatus::Completed,
+            CompletionResult::text("done"),
+        ))
+        .await
+        .expect("record completion");
+    assert_eq!(router.claim_pending("leased-thread", 1).unwrap().len(), 1);
+
+    let fallback = degrade_to_memory(&ctx, w, &router);
+
+    assert!(
+        fallback
+            .router
+            .claim_pending("leased-thread", 1)
+            .unwrap()
+            .is_empty(),
+        "a fallback router must not make another delivery claim while the first lease is active"
+    );
+}
