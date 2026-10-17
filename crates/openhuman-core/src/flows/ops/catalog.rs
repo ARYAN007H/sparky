@@ -18,8 +18,10 @@ pub async fn flows_search_tool_catalog(
     limit: usize,
 ) -> Result<Outcome<Value>, String> {
     tracing::debug!(target: "flows", %query, toolkit = toolkit.unwrap_or("<all>"), "[flows] flows_search_tool_catalog: searching live catalog");
-    let tools =
-        crate::flows::builder_tools::search_live_catalog(config, query, toolkit, limit).await;
+    let tools = crate::integrations::composio::builder_tools::search_live_catalog(
+        config, query, toolkit, limit,
+    )
+    .await;
     Ok(Outcome::single_log(
         json!({ "tools": tools }),
         "tool catalog searched",
