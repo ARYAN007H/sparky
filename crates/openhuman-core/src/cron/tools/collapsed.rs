@@ -175,68 +175,6 @@ impl Tool for CronTool {
         args: Value,
         options: ToolCallOptions,
     ) -> anyhow::Result<ToolResult> {
-        self.execute_with_context(args, options, None).await
-    }
-
-    async fn execute_with_context(
-        &self,
-        args: Value,
-        options: ToolCallOptions,
-        context: Option<&dyn tinytools::ToolRunContext>,
-    ) -> anyhow::Result<ToolResult> {
-         block, set `delivery` to `{\"mode\": \"announce\", \"channel\": <channel>, \
-         \"to\": <reply target>}` so the reminder returns to that chat rather \
-         than the desktop."
-    }
-
-    fn parameters_schema(&self) -> Value {
-        merge_action_schemas(&self.actions())
-    }
-
-    fn permission_level(&self) -> PermissionLevel {
-        strictest_permission(&self.actions())
-    }
-
-    fn permission_level_with_args(&self, args: &Value) -> PermissionLevel {
-        // The honest answer, once the action is known. Falls back to the
-        // strictest when the action is missing or unrecognised — such a call is
-        // about to be rejected anyway, and answering `None` for it would let an
-        // unparseable call past a gate that a parseable one would not clear.
-        let actions = self.actions();
-        args.get("action")
-            .and_then(Value::as_str)
-            .and_then(|action| resolve(&actions, action))
-            .map(|entry| entry.tool.permission_level_with_args(args))
-            .unwrap_or_else(|| strictest_permission(&actions))
-    }
-
-    fn external_effect(&self) -> bool {
-        any_external_effect(&self.actions())
-    }
-
-    fn external_effect_with_args(&self, args: &Value) -> bool {
-        let actions = self.actions();
-        args.get("action")
-            .and_then(Value::as_str)
-            .and_then(|action| resolve(&actions, action))
-            .map(|entry| entry.tool.external_effect_with_args(args))
-            .unwrap_or(true)
-    }
-
-    fn supports_markdown(&self) -> bool {
-        true
-    }
-
-    async fn execute(&self, args: Value) -> anyhow::Result<ToolResult> {
-        self.execute_with_options(args, ToolCallOptions::default())
-            .await
-    }
-
-    async fn execute_with_options(
-        &self,
-        args: Value,
-        options: ToolCallOptions,
-    ) -> anyhow::Result<ToolResult> {
         let actions = self.actions();
         let requested = args.get("action").and_then(Value::as_str);
         let Some(entry) = requested.and_then(|action| resolve(&actions, action)) else {
