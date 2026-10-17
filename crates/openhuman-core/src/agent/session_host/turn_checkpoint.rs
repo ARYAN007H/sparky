@@ -219,6 +219,36 @@ pub(crate) fn build_deterministic_checkpoint(
 /// result backwards (see [`CHECKPOINT_TOTAL_CHARS`] for why newest first) and
 /// disclosing how many earlier results were left out.
 pub(crate) fn render_tool_results(results: &[CheckpointToolResult], total_budget: usize) -> String {
+    tinyagents_harness::close::render_tool_results_with_options(
+        results,
+        tinyagents_harness::close::CloseResultRenderOptions {
+            per_result_cap: CHECKPOINT_RESULT_CHARS,
+            truncation_marker: "… [truncated]",
+            total_budget,
+            render_block: |result| {
+                let status = if result.success { "ok" } else { "failed" };
+                let mut block = format!("\n- `{}` — {}\n", result.name, status);
+                for line in result.content.lines() {
+                    block.push_str("  > ");
+                    block.push_str(line);
+                    block.push('\n');
+                }
+                block
+            },
+            omitted_notice: |count| {
+                if count == 0 {
+                    String::new()
+                } else {
+                    format!(
+                        "\n_({count} earlier tool result(s) omitted for length — the most recent are shown.)_\n"
+                    )
+                }
+            },
+        },
+    )
+}
+
+/*
     // Render each block before choosing, so the budget is charged what
     // the checkpoint will actually contain (CodeRabbit on #6068). Walking
     // `r.content` alone undercounts by the per-result header and the `"  > "`
