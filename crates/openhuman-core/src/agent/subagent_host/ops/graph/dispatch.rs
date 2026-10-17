@@ -607,7 +607,7 @@ fn build_cap_digest(
     tool_outcomes: &[tinyagents_harness::turn_outcome::ToolCallOutcome],
 ) -> String {
     use std::collections::HashMap;
-    use std::fmt::Write as _;
+    use tinyagents_harness::summarization::CapToolResult;
 
     // call_id -> tool name, from this turn's assistant tool-call rounds.
     let mut names: HashMap<&str, &str> = HashMap::new();
@@ -625,25 +625,26 @@ fn build_cap_digest(
         .map(|o| (o.call_id.as_str(), o.success))
         .collect();
 
-    let mut out = String::new();
-    for msg in conversation {
-        if let TranscriptEntry::ToolResults(results) = msg {
-            for r in results {
-                let name = names
-                    .get(r.tool_call_id.as_str())
-                    .copied()
-                    .unwrap_or("tool");
-                // Missing outcome → `false` (unknown/hallucinated tool): honest
-                // failed status rather than an optimistic `[ok]`.
-                let ok = success_by_id
-                    .get(r.tool_call_id.as_str())
-                    .copied()
-                    .unwrap_or(false);
-                let tag = if ok { "ok" } else { "failed" };
-                let body = crate::util::truncate_with_ellipsis(&r.content, 800);
-                let _ = writeln!(out, "- {name} [{tag}]: {body}");
-            }
-        }
-    }
-    out.trim_end().to_string()
+    let results: Vec<_> = conversation
+        .iter()
+        .filter_map(|entry| match entry {
+            TranscriptEntry::ToolResults(results) => Some(results),
+            _ => None,
+        })
+        .flatten()
+        .map(|result| CapToolResult {
+            call_id: &result.tool_call_id,
+            name: names
+                .get(result.tool_call_id.as_str())
+                .copied()
+                .unwrap_or("tool"),
+            output: &result.content,
+            // Missing outcome means the tool was never run successfully.
+            success: success_by_id
+                .get(result.tool_call_id.as_str())
+                .copied()
+                .unwrap_or(false),
+        })
+        .collect();
+    tinyagents_harness::summarization::build_cap_digest(&results, 800)
 }
