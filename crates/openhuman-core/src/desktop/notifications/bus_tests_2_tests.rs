@@ -64,24 +64,17 @@ async fn cron_completion_owner_is_event_data_and_survives_repeated_reads() {
     })
     .await
     .expect("both completion events arrive");
-    let owners = futures::future::join_all(events.iter().map(|event| {
-        event_owner(
-            &crate::core::runtime::DispatchCtx::host_default(),
-            &crate::config::Config::default(),
-            event,
-        )
-    }))
-    .await;
+    let dispatch = crate::core::runtime::DispatchCtx::host_default();
+    let config = crate::config::Config::default();
+    let mut owners = Vec::new();
+    for event in &events {
+        owners.push(event_owner(&dispatch, &config, event).await);
+    }
 
     assert_eq!(owners[0], Ok(Some("completion-owner-a".into())));
     assert_eq!(owners[1], Ok(Some("completion-owner-b".into())));
     assert_eq!(
-        event_owner(
-            &crate::core::runtime::DispatchCtx::host_default(),
-            &crate::config::Config::default(),
-            &events[0],
-        )
-        .await,
+        event_owner(&dispatch, &config, &events[0]).await,
         Ok(Some("completion-owner-a".into())),
         "reading an event repeatedly must not consume or change its owner"
     );
