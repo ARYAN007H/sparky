@@ -85,7 +85,7 @@ pub(crate) fn forget_workspace_for_test(workspace_dir: &Path) {
 fn forgetting_one_workspace_keeps_other_cached_routers() {
     let first = TestWorkspace::new();
     let second = TestWorkspace::new();
-    let second_router = entry_for(second.path()).router;
+    let second_router = entry_for(second.path()).router.clone();
 
     forget_workspace_for_test(first.path());
 
