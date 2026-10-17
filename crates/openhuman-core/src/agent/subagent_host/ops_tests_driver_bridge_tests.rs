@@ -79,9 +79,9 @@ async fn prepared_child_run_is_exported_from_its_native_journal_lineage() {
     let provider = ScriptedProvider::new(vec![response]);
     let mut parent_context = make_parent(provider.clone(), vec![]);
     parent_context.workspace_dir = workspace.clone();
-    parent_context.core = Some(Arc::downgrade(&core));
-    parent_context.thread_id = Some("native-trace-thread".into());
-    let options = with_parent(parent_context, SubagentRunOptions::default());
+    let mut options = with_parent(parent_context, SubagentRunOptions::default());
+    options.run_context = options.run_context.with_core(Some(Arc::clone(&core)));
+    options.run_context.thread_id = Some("native-trace-thread".into());
     let root_config = tinyagents_harness::context::RunConfig::new("native-trace-root")
         .with_thread("native-trace-thread");
     let root_run_id = root_config.run_id.clone();
