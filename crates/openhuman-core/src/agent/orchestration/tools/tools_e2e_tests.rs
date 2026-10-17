@@ -482,10 +482,13 @@ async fn deleted_thread_marker_survives_router_restart_and_refuses_async_spawn()
             .with_core(Some(Arc::clone(&core)))
             .with_parent(parent);
         host_context.thread_id = Some(thread_id.into());
-        RunContext::<OpenHumanRunContext>::new(
-            tinyagents_harness::context::RunConfig::new("deleted-async-parent")
-                .with_thread(thread_id),
-            host_context,
+        (
+            core,
+            RunContext::<OpenHumanRunContext>::new(
+                tinyagents_harness::context::RunConfig::new("deleted-async-parent")
+                    .with_thread(thread_id),
+                host_context,
+            ),
         )
     };
 
@@ -493,7 +496,7 @@ async fn deleted_thread_marker_survives_router_restart_and_refuses_async_spawn()
         Arc::new(tinyagents_tasks::InMemoryCompletionStore::new());
     background_completions::install_store_for_test(workspace.path(), completion_store.clone());
 
-    let before_delete = make_live(None);
+    let (_before_delete_core, before_delete) = make_live(None);
     let original_dispatch = before_delete.data.dispatch_ctx();
     background_completions::record_outcome(
         &original_dispatch,
@@ -514,13 +517,14 @@ async fn deleted_thread_marker_survives_router_restart_and_refuses_async_spawn()
     background_completions::discard_for_thread(&original_dispatch, workspace.path(), thread_id);
     assert!(background_completions::pending_for(workspace.path(), thread_id).is_empty());
 
-    // Drop process-local router and thread gates, then reopen the same durable
-    // completion store as a fresh process would.
+    // Drop process-local router and thread gates, then reopen the same backing
+    // store as a fresh process would. The in-memory store stands in for the
+    // durable store injected by the host; only process-local state is reset.
     background_completions::forget_workspace_for_test(workspace.path());
-    background_completions::install_store_for_test(workspace.path(), completion_store);
+    background_completions::install_store_for_test(workspace.path(), completion_store.clone());
 
     let (progress_tx, mut progress_rx) = tokio::sync::mpsc::channel(8);
-    let restarted = make_live(Some(progress_tx));
+    let (_restarted_core, restarted) = make_live(Some(progress_tx));
     let detached_data = restarted.data.detached_child();
     let detached = restarted
         .child(
@@ -571,8 +575,10 @@ async fn deleted_thread_marker_survives_router_restart_and_refuses_async_spawn()
     >(&restarted.data.dispatch_ctx());
     assert!(jobs.list().is_empty(), "refusal registers no shared job");
 
-    // A late terminal result after process-local state was forgotten is still
-    // suppressed by the durable marker alone.
+    // Clear the process-local deletion gate hydrated during refused spawn so
+    // the late-result check exercises the persisted marker by itself.
+    background_completions::forget_workspace_for_test(workspace.path());
+    background_completions::install_store_for_test(workspace.path(), completion_store);
     background_completions::record_outcome(
         &restarted.data.dispatch_ctx(),
         workspace.path(),
