@@ -5,7 +5,7 @@ pub(crate) struct OpenHumanDriverBundle {
         Arc<SubagentDriver<crate::agent::tinyagents::host::OpenHumanRunContext, HostRequest>>,
     pub(crate) failures: Arc<Mutex<HashMap<SubagentTaskKey, SubagentRunError>>>,
     pub(crate) host_outcome: Arc<Mutex<HashMap<SubagentTaskKey, SubagentRunOutcome>>>,
-    configured_tool_result: Arc<Mutex<HashMap<SubagentTaskKey, tinytools::ToolResult>>>,
+    pub(super) configured_tool_result: Arc<Mutex<HashMap<SubagentTaskKey, tinytools::ToolResult>>>,
     pub(crate) persistence: Arc<OpenHumanPersistence>,
 }
 
@@ -55,7 +55,7 @@ pub(crate) struct HostRequest {
 }
 
 #[derive(Clone)]
-enum HostInvocation {
+pub(super) enum HostInvocation {
     Agent(crate::agent_registry::host_definition::AgentDefinition),
     ConfiguredTool {
         agent_id: String,
@@ -65,7 +65,7 @@ enum HostInvocation {
 }
 
 impl HostRequest {
-    fn agent_id(&self) -> &str {
+    pub(super) fn agent_id(&self) -> &str {
         match &self.invocation {
             HostInvocation::Agent(definition) => &definition.id,
             HostInvocation::ConfiguredTool { agent_id, .. } => agent_id,
@@ -184,7 +184,7 @@ impl SubagentExecutor<crate::agent::tinyagents::host::OpenHumanRunContext> for O
             .unwrap_or_default();
         match invocation {
             HostInvocation::Agent(definition) => {
-                let run = Box::pin(super::ops::run_subagent_direct(
+                let run = Box::pin(crate::agent::subagent_host::ops::run_subagent_direct(
                     &definition,
                     &input,
                     options.clone(),
@@ -272,7 +272,7 @@ impl SubagentExecutor<crate::agent::tinyagents::host::OpenHumanRunContext> for O
                                     output: output.clone(),
                                     iterations: 1,
                                     elapsed: std::time::Duration::ZERO,
-                                    mode: super::SubagentMode::Typed,
+                                    mode: crate::agent::subagent_host::SubagentMode::Typed,
                                     status,
                                     final_history: Vec::new(),
                                     usage: SubagentUsage::default(),
@@ -361,7 +361,7 @@ pub(super) fn outcome_to_host(
                 .map(|(_, elapsed_ms)| elapsed_ms)
                 .unwrap_or_default(),
         ),
-        mode: super::SubagentMode::Typed,
+        mode: crate::agent::subagent_host::SubagentMode::Typed,
         status: SubagentRunStatus::Completed,
         final_history: outcome
             .history

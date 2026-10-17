@@ -36,6 +36,8 @@ mod checkpoint;
 #[path = "lifecycle_outcome.rs"]
 mod outcome;
 use checkpoint::absolute_checkpoint_dir;
+use outcome::HostInFlightMap;
+use driver_adapter::HostInvocation;
 
 use super::{
     SubagentRunError, SubagentRunOptions, SubagentRunOutcome, SubagentRunStatus, SubagentUsage,

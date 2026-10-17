@@ -1,6 +1,7 @@
 use super::*;
+use crate::agent::subagent_host::types::SubagentCheckpointData;
 
-pub(super) struct OpenHumanPersistence {
+pub(in crate::agent::subagent_host) struct OpenHumanPersistence {
     checkpoint_dir: std::path::PathBuf,
     host_outcome: Arc<Mutex<HashMap<SubagentTaskKey, SubagentRunOutcome>>>,
 }
@@ -29,7 +30,7 @@ impl OpenHumanPersistence {
         }
     }
 
-    fn with_host_outcome(
+    pub(super) fn with_host_outcome(
         mut self,
         host_outcome: Arc<Mutex<HashMap<SubagentTaskKey, SubagentRunOutcome>>>,
     ) -> Self {
@@ -65,7 +66,7 @@ impl OpenHumanPersistence {
         }
     }
 
-    fn pause_path(&self, key: &SubagentTaskKey) -> std::path::PathBuf {
+    pub(super) fn pause_path(&self, key: &SubagentTaskKey) -> std::path::PathBuf {
         self.checkpoint_dir
             .join("lifecycle")
             .join(format!("{}.pause.json", Self::key_component(key)))
@@ -239,13 +240,13 @@ impl OpenHumanPersistence {
     fn read_pause_checkpoint(
         &self,
         key: &SubagentTaskKey,
-    ) -> Result<Option<super::SubagentCheckpointData>, SubagentError> {
+    ) -> Result<Option<SubagentCheckpointData>, SubagentError> {
         let raw = match std::fs::read_to_string(self.pause_path(key)) {
             Ok(raw) => raw,
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
             Err(error) => return Err(SubagentError::Persistence(error.to_string())),
         };
-        let checkpoint = serde_json::from_str::<super::SubagentCheckpointData>(&raw)
+        let checkpoint = serde_json::from_str::<SubagentCheckpointData>(&raw)
             .map_err(|error| SubagentError::Persistence(error.to_string()))?;
         if checkpoint.task_key.as_ref() != Some(key) {
             return Err(SubagentError::Persistence("checkpoint key mismatch".into()));
@@ -274,7 +275,7 @@ impl OpenHumanPersistence {
         }
     }
 
-    fn durable_host_metadata(
+    pub(super) fn durable_host_metadata(
         &self,
         key: &SubagentTaskKey,
     ) -> Result<Option<(String, u64)>, SubagentError> {
@@ -290,7 +291,7 @@ impl OpenHumanPersistence {
         }))
     }
 
-    pub(crate) fn checkpoint_resume(checkpoint: &super::SubagentCheckpointData) -> SubagentResume {
+    pub(crate) fn checkpoint_resume(checkpoint: &SubagentCheckpointData) -> SubagentResume {
         SubagentResume {
             history: checkpoint
                 .history
@@ -302,7 +303,7 @@ impl OpenHumanPersistence {
         }
     }
 
-    fn checkpoint_outcome(checkpoint: super::SubagentCheckpointData) -> SubagentOutcome {
+    fn checkpoint_outcome(checkpoint: SubagentCheckpointData) -> SubagentOutcome {
         let resume = Self::checkpoint_resume(&checkpoint);
         SubagentOutcome {
             task_id: checkpoint.task_id,
@@ -350,7 +351,7 @@ impl OpenHumanPersistence {
     fn live_checkpoint(
         &self,
         key: &SubagentTaskKey,
-    ) -> Result<Option<super::SubagentCheckpointData>, SubagentError> {
+    ) -> Result<Option<SubagentCheckpointData>, SubagentError> {
         let _key_lock = self.key_lock(key)?;
         if self.terminal_path(key).exists() {
             return Ok(None);
@@ -358,11 +359,11 @@ impl OpenHumanPersistence {
         self.read_pause_checkpoint(key)
     }
 
-    fn checkpoint_for_task(
+    pub(super) fn checkpoint_for_task(
         &self,
         task_id: &str,
-    ) -> Result<super::SubagentCheckpointData, SubagentRunError> {
-        if !super::ops::is_safe_task_id(task_id) {
+    ) -> Result<SubagentCheckpointData, SubagentRunError> {
+        if !crate::agent::subagent_host::ops::is_safe_task_id(task_id) {
             return Err(SubagentRunError::Provider(anyhow::anyhow!(
                 "unsafe task id"
             )));
@@ -456,7 +457,7 @@ impl tinyagents_orchestration::subagent::SubagentPersistence for OpenHumanPersis
                 .filter(|value| !value.is_empty())
                 .cloned()
         };
-        let checkpoint = super::SubagentCheckpointData {
+        let checkpoint = SubagentCheckpointData {
             task_key: Some(pause.key.clone()),
             task_id: pause.key.task_id.clone(),
             agent_id: optional_metadata("agent_id").unwrap_or_default(),
