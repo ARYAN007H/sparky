@@ -25,9 +25,7 @@ use tinyinference_llm::message::Message;
 
 use super::OpenHumanTurnPrelude;
 use crate::agent::tinyagents::host::OpenHumanRunContext;
-use crate::memory::lifecycle::hooks::{
-    self, MemoryTurn, PostTurnInput, PreTurnInput, ToolCallSummary,
-};
+use crate::memory::lifecycle::hooks::{self, MemoryTurn, ToolCallSummary};
 use crate::memory::scope::ResolvedIdentity;
 
 /// The memory side of the turn in flight, held from pre-turn to commit.
@@ -149,17 +147,15 @@ impl OpenHumanTurnPrelude {
             &self.dispatch_ctx(),
             config.clone(),
             identity.clone(),
-            PreTurnInput {
-                thread_id: thread_id.clone(),
-                turn_index: user_index,
-                user_text,
-                in_prompt_from,
-                at: Utc::now(),
-                resumed_after_compaction: compacted && committed_turns > 0,
-                observed_actor: origin
-                    .as_ref()
-                    .and_then(crate::memory::lifecycle::sender::channel_actor),
-            },
+            thread_id.clone(),
+            user_index,
+            user_text,
+            in_prompt_from,
+            Utc::now(),
+            compacted && committed_turns > 0,
+            origin
+                .as_ref()
+                .and_then(crate::memory::lifecycle::sender::channel_actor),
             Some(self.event_channel.clone()),
         );
         Some(Arc::new(MemoryTurn {
@@ -228,13 +224,11 @@ impl OpenHumanTurnPrelude {
             hooks::post_turn(
                 &config,
                 &pending.identity,
-                PostTurnInput {
-                    thread_id,
-                    turn_index: pending.user_index.saturating_add(1),
-                    assistant_text,
-                    tool_calls,
-                    at: Utc::now(),
-                },
+                thread_id,
+                pending.user_index.saturating_add(1),
+                assistant_text,
+                tool_calls,
+                Utc::now(),
             )
             .await;
         };

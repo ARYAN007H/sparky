@@ -7,26 +7,33 @@ use tinymemory_api::{
 use crate::memory::scope::MemoryIdentity;
 use crate::memory::test_fixtures::{bind_reference, config_in, stored};
 
-fn input(thread: &str, index: u32, text: &str) -> PreTurnInput {
-    PreTurnInput {
-        thread_id: thread.to_string(),
-        turn_index: index,
-        user_text: text.to_string(),
-        in_prompt_from: 0,
-        at: Utc::now(),
-        resumed_after_compaction: false,
-        observed_actor: None,
-    }
+type PreTurnArgs = (String, u32, String, u32, DateTime<Utc>, bool, Option<tinymemory_api::ObservedActor>);
+
+type PostTurnArgs = (String, u32, String, Vec<ToolCallSummary>, DateTime<Utc>);
+
+fn input(thread: &str, index: u32, text: &str) -> PreTurnArgs {
+    (thread.to_string(), index, text.to_string(), 0, Utc::now(), false, None)
 }
 
-fn reply(thread: &str, index: u32, text: &str) -> PostTurnInput {
-    PostTurnInput {
-        thread_id: thread.to_string(),
-        turn_index: index,
-        assistant_text: text.to_string(),
-        tool_calls: Vec::new(),
-        at: Utc::now(),
-    }
+fn reply(thread: &str, index: u32, text: &str) -> PostTurnArgs {
+    (thread.to_string(), index, text.to_string(), Vec::new(), Utc::now())
+}
+
+async fn run_pre_turn(
+    ctx: &crate::core::runtime::DispatchCtx,
+    config: &crate::config::Config,
+    identity: &crate::memory::scope::ResolvedIdentity,
+    (thread, index, text, in_prompt_from, at, resumed, observed_actor): PreTurnArgs,
+) -> Option<TurnPack> {
+    pre_turn_work(ctx, config, identity, thread, index, text, in_prompt_from, at, resumed, observed_actor).await
+}
+
+async fn run_post_turn(
+    config: &crate::config::Config,
+    identity: &crate::memory::scope::ResolvedIdentity,
+    (thread, index, text, calls, at): PostTurnArgs,
+) {
+    post_turn(config, identity, thread, index, text, calls, at).await;
 }
 
 #[test]
@@ -78,7 +85,7 @@ async fn pre_turn_logs_the_user_turn_and_injects_what_memory_holds() {
         .unwrap();
     let identity = MemoryIdentity::agent("orchestrator").resolve(&config);
 
-    let pack = pre_turn(
+    let pack = run_pre_turn(
         &crate::core::runtime::DispatchCtx::ambient(),
         &config,
         &identity,
@@ -122,7 +129,7 @@ async fn recall_off_still_logs_and_logging_off_still_recalls() {
 
     config.memory.recall.enabled = false;
     let quiet = MemoryIdentity::agent("a").resolve(&config);
-    assert!(pre_turn(
+    assert!(run_pre_turn(
         &crate::core::runtime::DispatchCtx::ambient(),
         &config,
         &quiet,
@@ -140,7 +147,7 @@ async fn recall_off_still_logs_and_logging_off_still_recalls() {
     config.memory.recall.enabled = true;
     config.memory.conversations.enabled = false;
     let reader = MemoryIdentity::agent("a").resolve(&config);
-    let pack = pre_turn(
+    let pack = run_pre_turn(
         &crate::core::runtime::DispatchCtx::ambient(),
         &config,
         &reader,
@@ -158,7 +165,7 @@ async fn recall_off_still_logs_and_logging_off_still_recalls() {
 
     config.memory.recall.enabled = false;
     let none = MemoryIdentity::agent("a").resolve(&config);
-    assert!(pre_turn(
+    assert!(run_pre_turn(
         &crate::core::runtime::DispatchCtx::ambient(),
         &config,
         &none,
@@ -173,7 +180,7 @@ async fn pre_turn_without_an_engine_runs_the_turn_without_a_pack() {
     let tmp = tempfile::tempdir().unwrap();
     let config = config_in(&tmp);
     let identity = MemoryIdentity::agent("a").resolve(&config);
-    assert!(pre_turn(
+    assert!(run_pre_turn(
         &crate::core::runtime::DispatchCtx::ambient(),
         &config,
         &identity,
@@ -181,7 +188,7 @@ async fn pre_turn_without_an_engine_runs_the_turn_without_a_pack() {
     )
     .await
     .is_none());
-    post_turn(&config, &identity, reply("t", 1, "hi")).await;
+    run_post_turn(&config, &identity, reply("t", 1, "hi")).await;
 }
 
 #[tokio::test]
@@ -198,7 +205,7 @@ async fn post_turn_logs_the_reply_and_queues_belief_builds() {
         id: Some("call-1".into()),
         result: Some("outline.md: three sections".into()),
     });
-    post_turn(&config, &identity, first).await;
+    run_post_turn(&config, &identity, first).await;
 
     let turns = stored(&engine, MetaFilter::kinds([ItemKind::Conversation])).await;
     assert_eq!(turns.len(), 1);
@@ -212,7 +219,7 @@ async fn post_turn_logs_the_reply_and_queues_belief_builds() {
     );
 
     config.memory.conversations.enabled = false;
-    post_turn(&config, &identity, reply("t", 3, "Again.")).await;
+    run_post_turn(&config, &identity, reply("t", 3, "Again.")).await;
     assert_eq!(
         stored(&engine, MetaFilter::kinds([ItemKind::Conversation]))
             .await
@@ -227,22 +234,22 @@ async fn compaction_recalls_from_the_dropped_turns() {
     let config = config_in(&tmp);
     bind_reference(&config);
     let identity = MemoryIdentity::agent("a").resolve(&config);
-    let _ = pre_turn(
+    let _ = run_pre_turn(
         &crate::core::runtime::DispatchCtx::ambient(),
         &config,
         &identity,
         input("t", 0, "the project codename is Heron"),
     )
     .await;
-    post_turn(&config, &identity, reply("t", 1, "Noted: Heron.")).await;
+    run_post_turn(&config, &identity, reply("t", 1, "Noted: Heron.")).await;
 
     let dropped = vec![
         Turn::new(Role::User, "the project codename is Heron"),
         Turn::new(Role::Assistant, "Noted: Heron."),
     ];
-    let pack = compaction(&config, &identity, "t", dropped).await;
+    let pack = compaction_work(&config, &identity, "t", dropped).await;
     assert!(pack.expect("a pack").markdown.contains("Heron"));
-    assert!(compaction(&config, &identity, "t", Vec::new())
+    assert!(compaction_work(&config, &identity, "t", Vec::new())
         .await
         .is_none());
 }
@@ -254,7 +261,7 @@ async fn an_out_of_credits_recall_tells_the_turn_memory_is_unavailable() {
     crate::memory::test_fixtures::RefusingEngine::out_of_credits().bind(&config);
     let identity = MemoryIdentity::agent("orchestrator").resolve(&config);
 
-    let pack = pre_turn(
+    let pack = run_pre_turn(
         &crate::core::runtime::DispatchCtx::ambient(),
         &config,
         &identity,
@@ -287,7 +294,7 @@ async fn an_unreachable_engine_is_named_as_unreachable() {
     .bind(&config);
     let identity = MemoryIdentity::agent("orchestrator").resolve(&config);
 
-    let pack = pre_turn(
+    let pack = run_pre_turn(
         &crate::core::runtime::DispatchCtx::ambient(),
         &config,
         &identity,
@@ -314,7 +321,7 @@ async fn an_engine_fault_that_is_not_account_wide_injects_nothing() {
     .bind(&config);
     let identity = MemoryIdentity::agent("orchestrator").resolve(&config);
 
-    assert!(pre_turn(
+    assert!(run_pre_turn(
         &crate::core::runtime::DispatchCtx::ambient(),
         &config,
         &identity,
@@ -402,7 +409,7 @@ async fn a_turn_pack_stays_within_its_budget_against_a_large_store() {
     fill_with_learnings(&engine, 1500).await;
     let identity = MemoryIdentity::agent("orchestrator").resolve(&config);
 
-    let pack = pre_turn(
+    let pack = run_pre_turn(
         &crate::core::runtime::DispatchCtx::ambient(),
         &config,
         &identity,
@@ -443,7 +450,7 @@ async fn a_resumed_session_pack_stays_within_one_budget_and_repeats_nothing() {
     // Earlier turns of the thread, logged the way a session logs them. Each
     // line is distinct, so a repeat can only be one item injected twice.
     for turn in 0..6u32 {
-        let _ = pre_turn(
+        let _ = run_pre_turn(
             &crate::core::runtime::DispatchCtx::ambient(),
             &config,
             &identity,
@@ -454,7 +461,7 @@ async fn a_resumed_session_pack_stays_within_one_budget_and_repeats_nothing() {
             ),
         )
         .await;
-        post_turn(
+        run_post_turn(
             &config,
             &identity,
             reply(
@@ -469,7 +476,7 @@ async fn a_resumed_session_pack_stays_within_one_budget_and_repeats_nothing() {
     let mut resumed = input("t-resumed", 12, "when does the Lisbon release ship?");
     resumed.resumed_after_compaction = true;
     resumed.in_prompt_from = 12;
-    let pack = pre_turn(
+    let pack = run_pre_turn(
         &crate::core::runtime::DispatchCtx::ambient(),
         &config,
         &identity,
@@ -510,14 +517,14 @@ async fn a_resumed_session_without_logging_still_opens_with_the_thread() {
     let mut config = config_in(&tmp);
     let _engine = bind_reference(&config);
     let identity = MemoryIdentity::agent("orchestrator").resolve(&config);
-    let _ = pre_turn(
+    let _ = run_pre_turn(
         &crate::core::runtime::DispatchCtx::ambient(),
         &config,
         &identity,
         input("t-quiet", 0, "where is the Lisbon offsite?"),
     )
     .await;
-    post_turn(
+    run_post_turn(
         &config,
         &identity,
         reply("t-quiet", 1, "The offsite is at the Alfama hotel."),
@@ -529,7 +536,7 @@ async fn a_resumed_session_without_logging_still_opens_with_the_thread() {
     let mut resumed = input("t-quiet", 2, "remind me where the offsite is");
     resumed.resumed_after_compaction = true;
     resumed.in_prompt_from = 2;
-    let pack = pre_turn(
+    let pack = run_pre_turn(
         &crate::core::runtime::DispatchCtx::ambient(),
         &config,
         &reader,
@@ -547,7 +554,7 @@ async fn a_blank_turn_is_refused_without_a_pack_with_or_without_logging() {
     let mut config = config_in(&tmp);
     let engine = bind_reference(&config);
     let identity = MemoryIdentity::agent("orchestrator").resolve(&config);
-    assert!(pre_turn(
+    assert!(run_pre_turn(
         &crate::core::runtime::DispatchCtx::ambient(),
         &config,
         &identity,
@@ -564,7 +571,7 @@ async fn a_blank_turn_is_refused_without_a_pack_with_or_without_logging() {
 
     config.memory.conversations.enabled = false;
     let reader = MemoryIdentity::agent("orchestrator").resolve(&config);
-    assert!(pre_turn(
+    assert!(run_pre_turn(
         &crate::core::runtime::DispatchCtx::ambient(),
         &config,
         &reader,
@@ -574,7 +581,7 @@ async fn a_blank_turn_is_refused_without_a_pack_with_or_without_logging() {
     .is_none());
     let mut resumed = input("  ", 4, "where were we?");
     resumed.resumed_after_compaction = true;
-    assert!(pre_turn(
+    assert!(run_pre_turn(
         &crate::core::runtime::DispatchCtx::ambient(),
         &config,
         &reader,
@@ -612,7 +619,7 @@ async fn a_date_hint_asks_the_model_in_the_users_zone_and_never_costs_the_pack()
             .unwrap();
         let identity = MemoryIdentity::agent("orchestrator").resolve(&config);
 
-        let pack = pre_turn(
+        let pack = run_pre_turn(
             &crate::core::runtime::DispatchCtx::ambient(),
             &config,
             &identity,
