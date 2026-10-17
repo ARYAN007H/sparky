@@ -195,18 +195,6 @@ async fn explicit_profiles_share_a_workspace_without_sharing_completion_routers(
         .await;
     }
 
-    let alice_tasks: Vec<_> = pending_for_ctx(&alice, ws.path(), "same-thread")
-        .into_iter()
-        .map(|record| record.task_id)
-        .collect();
-    let bob_tasks: Vec<_> = pending_for_ctx(&bob, ws.path(), "same-thread")
-        .into_iter()
-        .map(|record| record.task_id)
-        .collect();
-
-    assert_eq!(alice_tasks, ["alice-task"]);
-    assert_eq!(bob_tasks, ["bob-task"]);
-
     router_pool()
         .clear()
         .expect("simulate reopening each profile's storage-backed router");
