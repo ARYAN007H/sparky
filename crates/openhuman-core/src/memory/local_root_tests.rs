@@ -92,7 +92,6 @@ fn the_legacy_root_is_the_old_hashed_user_dir_name() {
 fn a_record_already_written_wins_a_race() {
     let tmp = tempfile::tempdir().unwrap();
     let config = local_config(&tmp, "a");
-    let file = path(&config.workspace_dir);
     let first = LocalRoot {
         root: format!("{LOCAL_ROOT_PREFIX}aaaa"),
         origin: Origin::Minted,
@@ -101,8 +100,8 @@ fn a_record_already_written_wins_a_race() {
         root: format!("{LOCAL_ROOT_PREFIX}bbbb"),
         origin: Origin::Minted,
     };
-    assert_eq!(record_once(&file, &first).unwrap(), first);
-    assert_eq!(record_once(&file, &second).unwrap(), first);
+    assert_eq!(record_once(&config.workspace_dir, &first).unwrap(), first);
+    assert_eq!(record_once(&config.workspace_dir, &second).unwrap(), first);
     assert_eq!(resolve(&config, HOST_ID), Some(first.root));
 }
 
