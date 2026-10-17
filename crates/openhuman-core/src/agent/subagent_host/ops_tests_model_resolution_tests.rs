@@ -130,7 +130,13 @@ async fn detached_driver_spawn_repairs_replayed_host_outcome_without_reexecution
     )
     .await
     .expect("first detached driver spawn should register");
-    let (first_result, first_effects) = first_rx.await.expect("first completion callback");
+    let (first_result, first_effects) = tokio::time::timeout(
+        std::time::Duration::from_secs(5),
+        first_rx,
+    )
+    .await
+    .expect("first completion callback should not be skipped")
+    .expect("first completion callback");
     let first_result = first_result.expect("first host outcome");
     assert!(first_effects);
     assert_eq!(first_result.output, "durable driver result");
@@ -158,7 +164,13 @@ async fn detached_driver_spawn_repairs_replayed_host_outcome_without_reexecution
     )
     .await
     .expect("replayed detached driver spawn should register");
-    let (replay_result, replay_effects) = replay_rx.await.expect("replay repair callback");
+    let (replay_result, replay_effects) = tokio::time::timeout(
+        std::time::Duration::from_secs(5),
+        replay_rx,
+    )
+    .await
+    .expect("replay repair callback should run")
+    .expect("replay repair callback");
     let replay_result = replay_result.expect("durable replay must retain host result");
     assert!(!replay_effects, "terminal replay must not repeat effects");
     assert_eq!(replay_result.output, "durable driver result");
