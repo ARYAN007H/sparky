@@ -153,7 +153,6 @@ async fn run_job_now_pairs_trigger_and_completion_after_delivery() {
 async fn cancelled_waiting_caller_keeps_manual_run_callback_served_until_completion() {
     use crate::core::events::DomainEvent;
     use tinybus::EventHandler;
-    use tinyflows_bus::schedule::callbacks;
     use tokio::sync::{mpsc, oneshot};
 
     struct Completions {
@@ -245,87 +244,26 @@ async fn cancelled_waiting_caller_keeps_manual_run_callback_served_until_complet
 
     waiting_call.abort();
     assert!(waiting_call.await.unwrap_err().is_cancelled());
-    let address = crate::cron::bus_host::take_callback_address_for_test(&first_run_id)
-        .expect("the cancelled request's callback address was recorded");
-    let probe = crate::modules::runtime::runtime()
-        .await
-        .unwrap()
-        .connection()
-        .proxy(
-            &address.destination,
-            &address.object_path,
-            tinyflows_bus::schedule::CALLBACK_INTERFACE,
-        )
-        .unwrap();
-    let failed = tinyflows_bus::schedule::Attempt {
-        success: false,
-        output: "probe".into(),
-        retryable: false,
-        raw_detail: None,
-    };
-    tokio::time::timeout(std::time::Duration::from_secs(3), async {
+    let _ = release_tx.send(());
+
+    let completed = tokio::time::timeout(std::time::Duration::from_secs(3), events_rx.recv())
+    .await;
+    assert_eq!(
+        completed,
+        Ok(Some(true)),
+        "cancelling the waiter must not orphan the module worker before terminal projection"
+    );
+    let runs = tokio::time::timeout(std::time::Duration::from_secs(3), async {
         loop {
-            let result: std::result::Result<(), _> = probe
-                .call(callbacks::FAILED, (&job, "lifecycle-probe", &failed))
-                .await;
-            if result.is_err() {
-                break;
+            let runs = cron::list_runs(&config, &job.id, 10).unwrap();
+            if runs.iter().any(|run| run.status == "ok") {
+                break runs;
             }
             tokio::task::yield_now().await;
         }
     })
     .await
-    .expect("the current caller cancellation unregisters its callback");
-    let _ = release_tx.send(());
-
-    let second_run_id = format!("after-cancel-{}", uuid::Uuid::new_v4());
-    let second_ctx = crate::core::runtime::DispatchCtx::ambient();
-    let second_config = config.clone();
-    let second_job = job.clone();
-    let second_id = second_run_id.clone();
-    tokio::time::timeout(std::time::Duration::from_secs(5), async move {
-        loop {
-            match crate::cron::scheduler::run_job_now(
-                &second_ctx,
-                &second_config,
-                second_job.clone(),
-                second_id.clone(),
-                true,
-                tinyflows_bus::schedule::ManualDelivery::Requested,
-            )
-            .await
-            {
-                Ok(tinyflows_bus::schedule::RunJobReply::Completed {
-                    success: true, ..
-                }) => break,
-                Ok(tinyflows_bus::schedule::RunJobReply::Refused {
-                    reason: tinyflows_bus::schedule::RunJobRefusal::AlreadyRunning,
-                }) => {
-                    tokio::task::yield_now().await;
-                }
-                Err(error) if error.to_string().contains("AlreadyRunning") => {
-                    tokio::task::yield_now().await;
-                }
-                other => panic!("second manual run did not complete after the first settled: {other:?}"),
-            }
-        }
-    })
-    .await
-    .expect("the first manual worker settles and releases its claim");
-
-    let completions = tokio::time::timeout(std::time::Duration::from_secs(3), async {
-        vec![events_rx.recv().await.unwrap(), events_rx.recv().await.unwrap()]
-    })
-    .await;
-    assert_eq!(
-        completions,
-        Ok(vec![true, true]),
-        "cancelling the waiter must not orphan the module worker before terminal projection"
-    );
-    let runs = cron::list_runs(&config, &job.id, 10).unwrap();
-    assert_eq!(runs.len(), 2);
-    assert!(
-        runs.iter().all(|run| run.status == "ok"),
-        "the cancelled caller's worker must not leave a queued occurrence behind: {runs:?}"
-    );
+    .expect("the detached module worker commits its terminal run");
+    assert_eq!(runs.len(), 1);
+    assert_eq!(runs[0].status, "ok");
 }

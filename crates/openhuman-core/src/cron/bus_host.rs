@@ -261,27 +261,6 @@ pub(crate) struct HostRegistration {
 static MANUAL_HOSTS: std::sync::LazyLock<std::sync::Mutex<HashMap<String, HostRegistration>>> =
     std::sync::LazyLock::new(Default::default);
 
-#[cfg(test)]
-static TEST_CALLBACK_ADDRESSES: std::sync::LazyLock<
-    std::sync::Mutex<HashMap<String, CallbackAddress>>,
-> = std::sync::LazyLock::new(Default::default);
-
-#[cfg(test)]
-pub(crate) fn record_callback_address_for_test(run_id: &str, address: CallbackAddress) {
-    TEST_CALLBACK_ADDRESSES
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner)
-        .insert(run_id.to_string(), address);
-}
-
-#[cfg(test)]
-pub(crate) fn take_callback_address_for_test(run_id: &str) -> Option<CallbackAddress> {
-    TEST_CALLBACK_ADDRESSES
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner)
-        .remove(run_id)
-}
-
 /// Keep a detached run's callback served until its terminal projection.
 pub(crate) fn retain_manual_host(run_id: &str, host: HostRegistration) {
     MANUAL_HOSTS
