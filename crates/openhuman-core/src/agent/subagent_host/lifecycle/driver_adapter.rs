@@ -1013,4 +1013,3 @@ fn cost_source_of(charged: Option<&ChargedAmount>) -> tinyagents_harness::cost::
         None => tinyagents_harness::cost::CostSource::Unknown,
     }
 }
-

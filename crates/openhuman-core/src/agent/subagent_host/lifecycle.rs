@@ -932,9 +932,8 @@ impl OpenHumanSubagentHost {
 #[path = "lifecycle/driver_adapter.rs"]
 mod driver_adapter;
 
+use driver_adapter::map_lifecycle_error;
 pub(super) use driver_adapter::{
     HostRequest, OpenHumanDriverBundle, OpenHumanPersistence, checkpoint_resume,
-    decode_driver_job_result, load_subagent_checkpoint, merged_resume_history,
-    outcome_to_host,
+    decode_driver_job_result, load_subagent_checkpoint, merged_resume_history, outcome_to_host,
 };
-use driver_adapter::map_lifecycle_error;
