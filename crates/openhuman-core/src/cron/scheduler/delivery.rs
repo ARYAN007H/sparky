@@ -112,21 +112,6 @@ pub(super) fn cron_result_should_alert(success: bool, output: &str) -> bool {
     !success || !cron_output_is_empty(output)
 }
 
-/// [`deliver_run`] under a fresh run id, discarding the status.
-#[cfg(test)]
-pub(super) async fn deliver_if_configured(
-    ctx: &crate::core::runtime::DispatchCtx,
-    config: &Config,
-    job: &CronJob,
-    output: &str,
-    success: bool,
-) -> Result<()> {
-    let run_id = uuid::Uuid::new_v4().to_string();
-    deliver_run(ctx, config, job, &run_id, output, success)
-        .await
-        .map(|_| ())
-}
-
 pub(super) async fn deliver_run(
     ctx: &crate::core::runtime::DispatchCtx,
     config: &Config,
@@ -328,3 +313,10 @@ pub(super) fn push_cron_alert(config: &Config, job: &CronJob, output: &str) {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "delivery_tests.rs"]
+pub(super) mod tests;
+
+#[cfg(test)]
+pub(super) use tests::deliver_if_configured;
