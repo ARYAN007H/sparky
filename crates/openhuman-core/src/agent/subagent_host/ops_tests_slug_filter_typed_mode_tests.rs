@@ -126,13 +126,28 @@ async fn typed_mode_system_prompt_includes_subagent_role_contract() {
         .iter()
         .find(|m| m.role == "system")
         .expect("system message should be present");
-    assert!(system_msg.content.contains("## Sub-agent Role Contract"));
     assert!(system_msg
         .content
-        .contains("You are a sub-agent working for a parent OpenHuman agent"));
+        .contains("You are a subagent (depth 1) working for a parent agent, not the end user."));
     assert!(system_msg
         .content
-        .contains("Keep your final response concise and synthesis-ready"));
+        .contains("Your assignment: the actual task prompt"));
+    for heading in [
+        "Answer",
+        "Evidence used",
+        "Actions taken",
+        "Open uncertainties",
+        "Failed tool calls",
+        "Recommended next step",
+    ] {
+        assert!(
+            system_msg.content.contains(heading),
+            "missing {heading} heading"
+        );
+    }
+    assert!(system_msg
+        .content
+        .contains("Do not state unsupported facts; disclose truncated or partial tool results."));
 }
 
 #[tokio::test]

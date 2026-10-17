@@ -217,8 +217,20 @@ async fn independent_host_bundles_share_and_project_the_persisted_winner() {
     assert!(matches!(leader.status, SubagentRunStatus::Completed));
     assert!(matches!(follower.status, SubagentRunStatus::Completed));
     assert_eq!(leader.final_history.len(), follower.final_history.len());
+    // The neutral transcript contract identifies a tool result row by its
+    // call ID, even when the host's transient row left `id` unset. Compare the
+    // leader through that same canonical projection before checking the full
+    // durable winner history returned by the independent follower.
+    let canonical_leader_history: Vec<_> = leader
+        .final_history
+        .iter()
+        .filter_map(|row| {
+            let message = crate::agent::message_convert::chat_message_to_message(row);
+            tinyagents_runtime::transcript::message_to_native_transcript(&message)
+        })
+        .collect();
     assert_eq!(
-        serde_json::to_value(&leader.final_history).unwrap(),
+        serde_json::to_value(&canonical_leader_history).unwrap(),
         serde_json::to_value(&follower.final_history).unwrap(),
         "follower receives the full winner history"
     );
