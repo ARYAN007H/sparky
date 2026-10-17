@@ -60,57 +60,6 @@ pub fn cancel_driver_jobs_for_thread(
     cancelled
 }
 
-/// Cancels the current driver-backed lifecycle for one authenticated durable
-/// session. Legacy rows recover a key only through their validated checkpoint.
-pub fn cancel_driver_job_for_session(
-    store: &SubagentSessionStore,
-    checkpoint_dir: &Path,
-    jobs: &tinyagents_orchestration::subagent::SubAgentJobRegistry,
-    session_id: &str,
-    parent_session: &str,
-    parent_thread_id: Option<&str>,
-) -> bool {
-    let session = match list_for_parent(store, parent_session, parent_thread_id) {
-        Ok(sessions) => sessions
-            .into_iter()
-            .find(|session| session.subagent_session_id == session_id),
-        Err(error) => {
-            log::warn!("[subagent_sessions] session cancellation lookup failed: {error}");
-            None
-        }
-    };
-    let Some(session) = session else {
-        return false;
-    };
-    let Some(task_id) = session.current_task_id.as_deref() else {
-        return false;
-    };
-    let key = session
-        .lifecycle_key
-        .clone()
-        .filter(|key| key.task_id == task_id && key.thread_id.as_deref() == parent_thread_id)
-        .or_else(|| {
-            resolve_lifecycle_key(
-                store,
-                session_id,
-                parent_session,
-                parent_thread_id,
-                checkpoint_dir,
-            )
-            .ok()
-            .filter(|key| key.task_id == task_id)
-        });
-    let Some(key) = key else {
-        return false;
-    };
-    let owner = crate::agent::tinyagents::tool_registration::subagent_owner_key(
-        &store.workspace_dir,
-        parent_session,
-        parent_thread_id,
-    );
-    jobs.cancel_key_owned(&key, owner).is_ok()
-}
-
 /// Requests cancellation for the exact durable row observed by the caller.
 /// Keeping this separate from a fresh session-id lookup prevents concurrent
 /// reuse from redirecting cancellation to a replacement child.
