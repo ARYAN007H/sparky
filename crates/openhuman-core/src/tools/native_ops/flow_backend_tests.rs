@@ -1,5 +1,44 @@
 use super::*;
 
+struct NeverCalledHooks;
+
+#[async_trait]
+impl FlowPolicyHooks for NeverCalledHooks {
+    async fn resolve_policy(&self, _: &Config) -> Result<Arc<SecurityPolicy>, String> {
+        panic!("empty native slugs must be rejected before policy resolution")
+    }
+
+    async fn authorize(
+        &self,
+        _: &SecurityPolicy,
+        _: CommandClass,
+        _: &str,
+        _: &Value,
+    ) -> Result<Option<String>, String> {
+        panic!("empty native slugs must be rejected before authorization")
+    }
+
+    fn record_execution(&self, _: Option<&str>, _: &Result<Value, String>) {
+        panic!("empty native slugs must not record execution")
+    }
+}
+
+#[tokio::test]
+async fn empty_native_slug_is_rejected_before_policy_hooks() {
+    let error = invoke(
+        &Config::default(),
+        "oh:   ",
+        json!({}),
+        &NeverCalledHooks,
+    )
+    .await
+    .expect_err("empty tool names must fail");
+    assert_eq!(
+        error,
+        "tool_call node: native tool slug is empty (expected `oh:<tool_name>`)"
+    );
+}
+
 #[test]
 fn native_tool_payload_unwraps_a_single_json_block() {
     let result = ToolResult::json(json!({
