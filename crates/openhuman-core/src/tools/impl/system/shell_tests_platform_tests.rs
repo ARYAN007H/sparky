@@ -130,6 +130,13 @@ fn the_container_environment_forwards_explicit_turn_variables() {
     assert_eq!(env.get("WORKER_LABEL").map(String::as_str), Some("test"));
     assert!(!env.contains_key("PATH"));
     assert_eq!(env.get("PYTHONUTF8").map(String::as_str), Some("1"));
+
+    let mut sandbox = HashMap::<OsString, OsString>::new();
+    super::super::super::shell_support::extend_explicit_environment(&mut sandbox, Some(&explicit));
+    assert_eq!(
+        sandbox.get(OsString::from("TURN_OWNER").as_os_str()),
+        Some(&OsString::from("isolated"))
+    );
 }
 
 #[test]
