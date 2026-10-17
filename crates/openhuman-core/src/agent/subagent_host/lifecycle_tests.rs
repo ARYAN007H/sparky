@@ -5,7 +5,7 @@ use tinyagents_orchestration::subagent::{
 
 use super::lifecycle::{
     decode_driver_job_result, host_in_flight, load_subagent_checkpoint, merged_resume_history,
-    HostInFlight, OpenHumanDriverBundle, OpenHumanPersistence,
+    resolve_inline_driver_outcome, HostInFlight, OpenHumanDriverBundle, OpenHumanPersistence,
 };
 use super::{SubagentMode, SubagentRunError, SubagentRunOutcome, SubagentRunStatus, SubagentUsage};
 
@@ -395,6 +395,76 @@ async fn persistence_inserts_one_terminal_and_returns_the_durable_winner() {
         tinyagents_orchestration::subagent::SubagentTerminalPersistenceDisposition::Existing
     );
     assert_eq!(persistence.load_terminal(&key).await.unwrap(), Some(winner));
+}
+
+#[tokio::test]
+async fn inline_driver_projection_returns_the_durable_winner_not_a_local_loser() {
+    use tinyagents_orchestration::subagent::SubagentPersistenceDisposition as Disposition;
+
+    let directory = tempfile::tempdir().unwrap();
+    let key = key();
+    let bundle = OpenHumanDriverBundle::new(directory.path().join("checkpoints")).unwrap();
+    let mut local_loser = cached_outcome(SubagentRunStatus::Completed);
+    local_loser.output = "local losing output".into();
+    local_loser.iterations = 2;
+    local_loser.persistence_disposition = Disposition::TerminalExisting;
+    bundle
+        .host_outcome
+        .lock()
+        .unwrap()
+        .insert(key.clone(), local_loser);
+
+    let mut winner = SubagentOutcome::cancelled("task");
+    winner.status = SubagentOutcomeKind::Incomplete(
+        tinyagents_orchestration::subagent::SubagentIncomplete::new("winner stopped"),
+    );
+    winner.output = "durable winning output".into();
+    winner.history = vec![tinyinference_llm::message::Message::assistant(
+        "durable winning history",
+    )];
+    winner.usage.calls = 7;
+    winner
+        .extensions
+        .insert("agent_id".into(), serde_json::json!("winner-agent"));
+    let winning_host = SubagentRunOutcome {
+        output: winner.output.clone(),
+        agent_id: "winner-agent".into(),
+        iterations: 7,
+        ..cached_outcome(SubagentRunStatus::Incomplete {
+            reason: "winner stopped".into(),
+        })
+    };
+    let winner_cache = Arc::new(Mutex::new(HashMap::from([(key.clone(), winning_host)])));
+    let winner_persistence = OpenHumanPersistence::new(directory.path().join("checkpoints"))
+        .with_host_outcome(Arc::clone(&winner_cache));
+    winner_persistence
+        .record_terminal(&key, &winner, None)
+        .await
+        .unwrap();
+
+    let result = tinytools::ToolResult::error(
+        serde_json::json!({"task_id":"public-job-42", "status":"incomplete"}).to_string(),
+    );
+    let (projected, public_job_id) = resolve_inline_driver_outcome(
+        result,
+        &bundle,
+        &key,
+        "fallback-agent",
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(public_job_id, "public-job-42");
+    assert_eq!(projected.output, "durable winning output");
+    assert_eq!(projected.agent_id, "winner-agent");
+    assert_eq!(projected.iterations, 7);
+    assert!(matches!(
+        projected.status,
+        SubagentRunStatus::Incomplete { ref reason } if reason == "winner stopped"
+    ));
+    assert_eq!(projected.final_history.len(), 1);
+    assert_eq!(projected.final_history[0].text(), "durable winning history");
+    assert_eq!(projected.persistence_disposition, Disposition::TerminalExisting);
 }
 
 #[tokio::test]
