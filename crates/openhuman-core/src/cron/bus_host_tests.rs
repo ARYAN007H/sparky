@@ -208,6 +208,7 @@ async fn deliver_answers_with_the_delivery_status_string() {
         success: true,
         output: "result".into(),
         retryable: true,
+        raw_detail: None,
     };
     let status: String = proxy
         .call(callbacks::SEND, (&job, "run-f", &attempt))
@@ -612,10 +613,11 @@ async fn captured_deleted_flow_job_publishes_trigger_and_completion_identity() {
         .call(callbacks::SEND, (&job, &run_id, &attempt))
         .await
         .unwrap();
+    let success = attempt.success;
     let projection = DeliveryProjection {
         job: job.clone(),
         run_id: run_id.clone(),
-        success: attempt.success,
+        success,
         delivery_status: DeliveryStatus::parse(&delivery_status),
         attempt,
     };
@@ -641,7 +643,7 @@ async fn captured_deleted_flow_job_publishes_trigger_and_completion_identity() {
             },
             Seen::Completed {
                 job_id: job.id,
-                success: attempt.success,
+                success,
             },
         ]
     );
