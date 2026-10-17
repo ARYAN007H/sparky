@@ -649,6 +649,41 @@ async fn a_store_that_keeps_failing_degrades_to_memory_instead_of_losing_the_res
 }
 
 #[tokio::test]
+async fn reopening_a_durable_store_preserves_pending_memory_fallback_records() {
+    let _guard = crate::config::TEST_ENV_LOCK.lock().await;
+    let ws = workspace();
+    let w = ws.path();
+    install_store_for_test(w, Arc::new(FullDisk(InMemoryCompletionStore::new())));
+
+    record_completion(
+        &cx(),
+        w,
+        "sess-reopen",
+        "memory-task",
+        "researcher",
+        "held in memory",
+        Some("thread-reopen".into()),
+    )
+    .await;
+
+    let before = pending_for(w, "thread-reopen");
+    assert_eq!(before.len(), 1);
+    assert_eq!(before[0].result.text, "held in memory");
+    drop(before);
+
+    let ctx = crate::core::runtime::DispatchCtx::ambient();
+    forget_recovery_ctx(&ctx, w);
+
+    let after = pending_for(w, "thread-reopen");
+    assert_eq!(
+        after.len(),
+        1,
+        "re-opening must migrate memory-held records"
+    );
+    assert_eq!(after[0].result.text, "held in memory");
+}
+
+#[tokio::test]
 async fn concurrent_degradation_installs_one_fallback() {
     let _guard = crate::config::TEST_ENV_LOCK.lock().await;
     let ws = workspace();
