@@ -265,12 +265,92 @@ impl OpenHumanPersistence {
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
             Err(error) => return Err(SubagentError::Persistence(error.to_string())),
         };
-        let checkpoint = serde_json::from_str::<SubagentCheckpointData>(&raw)
-            .map_err(|error| SubagentError::Persistence(error.to_string()))?;
+        let checkpoint = match serde_json::from_str::<SubagentCheckpointData>(&raw) {
+            Ok(checkpoint) => checkpoint,
+            Err(legacy_error) => {
+                let persisted = serde_json::from_str::<
+                    tinyagents_orchestration::subagent::PersistedSubagentPause,
+                >(&raw)
+                .map_err(|_| SubagentError::Persistence(legacy_error.to_string()))?;
+                Self::checkpoint_from_persisted_pause(persisted)?
+            }
+        };
         if checkpoint.task_key.as_ref() != Some(key) {
             return Err(SubagentError::Persistence("checkpoint key mismatch".into()));
         }
         Ok(Some(checkpoint))
+    }
+
+    fn checkpoint_from_persisted_pause(
+        persisted: tinyagents_orchestration::subagent::PersistedSubagentPause,
+    ) -> Result<SubagentCheckpointData, SubagentError> {
+        let outcome = persisted.outcome;
+        let paused = match &outcome.status {
+            SubagentOutcomeKind::AwaitingInput(paused) => paused.clone(),
+            _ => {
+                return Err(SubagentError::Persistence(
+                    "persisted subagent checkpoint was not awaiting input".into(),
+                ));
+            }
+        };
+        let metadata = paused.resume.metadata;
+        let host = persisted
+            .outcome
+            .extensions
+            .get("openhuman_checkpoint")
+            .cloned()
+            .unwrap_or_default();
+        let host_string = |name: &str| {
+            host.get(name)
+                .and_then(serde_json::Value::as_str)
+                .unwrap_or_default()
+                .to_owned()
+        };
+        let task_key = Some(persisted.key.clone());
+        let task_id = persisted.key.task_id.clone();
+        Ok(SubagentCheckpointData {
+            task_key,
+            task_id,
+            agent_id: metadata.get("agent_id").cloned().unwrap_or_default(),
+            worker_thread_id: metadata.get("worker_thread_id").cloned(),
+            history: outcome
+                .history
+                .iter()
+                .filter_map(tinyagents_runtime::transcript::message_to_native_transcript)
+                .collect(),
+            question: paused.reason,
+            options: host
+                .get("options")
+                .and_then(|value| serde_json::from_value(value.clone()).ok()),
+            skill_filter_override: metadata.get("skill_filter_override").cloned(),
+            model_override: metadata.get("model_override").cloned(),
+            created_at: host_string("created_at"),
+            resume_checkpoint: paused.resume.checkpoint,
+            resume_metadata: metadata,
+            output: outcome.output,
+            iterations: outcome.usage.calls as usize,
+            usage: SubagentUsage {
+                input_tokens: outcome.usage.usage.input_tokens,
+                output_tokens: outcome.usage.usage.output_tokens,
+                cached_input_tokens: outcome.usage.usage.cache_read_tokens,
+                charged_amount_usd: outcome
+                    .usage
+                    .usage
+                    .charged_amount
+                    .map(|amount| amount.micros as f64 / 1_000_000.0)
+                    .unwrap_or_default(),
+                cost_source: cost_source_of(outcome.usage.usage.charged_amount.as_ref()),
+            },
+            artifact_paths: outcome
+                .artifacts
+                .into_iter()
+                .map(|artifact| artifact.id)
+                .collect(),
+            elapsed_ms: host
+                .get("elapsed_ms")
+                .and_then(serde_json::Value::as_u64)
+                .unwrap_or_default(),
+        })
     }
 
     fn read_terminal_record(
