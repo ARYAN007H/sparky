@@ -212,17 +212,21 @@ impl TinySessionStore for OpenHumanTinySubagentSessionStore {
             return Ok(false);
         };
         if let Some(jobs) = &self.jobs {
-            let _ = super::cancel_driver_job_for_session(
+            let _ = super::cancel_driver_job_for_observed_session(
                 &self.store,
                 &self.checkpoint_dir,
                 jobs,
-                id,
+                &session,
                 &self.parent_session,
                 self.parent_thread_id.as_deref(),
             );
         }
-        drop(session);
-        super::close(&self.store, id).map_err(SubagentError::Persistence)
+        match super::close_if_current(&self.store, &session).map_err(SubagentError::Persistence)? {
+            true => Ok(true),
+            false => Err(SubagentError::InvalidRequest(
+                "subagent session changed while it was being closed".into(),
+            )),
+        }
     }
 
     async fn mark_finished(

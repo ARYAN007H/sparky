@@ -136,11 +136,11 @@ impl SpawnAsyncSubagentTool {
                     let jobs = crate::core::runtime::slot_for::<
                         tinyagents_orchestration::subagent::SubAgentJobRegistry,
                     >(&dispatch);
-                    let cancelled = subagent_sessions::cancel_driver_job_for_session(
+                    let cancelled = subagent_sessions::cancel_driver_job_for_observed_session(
                         &store,
                         &parent.workspace_dir.join(".openhuman/subagent_checkpoints"),
                         &jobs,
-                        &session.subagent_session_id,
+                        &session,
                         &parent_session,
                         parent_thread_id.as_deref(),
                     );
@@ -152,16 +152,23 @@ impl SpawnAsyncSubagentTool {
                             &parent.workspace_dir,
                         );
                     }
-                    if let Err(err) = subagent_sessions::close(&store, &session.subagent_session_id)
-                    {
-                        log::warn!(
+                    match subagent_sessions::close_if_current(&store, &session) {
+                        Ok(true) => {}
+                        Ok(false) => log::warn!(
+                            "[subagent_reuse] fresh close lost lifecycle race parent_thread_id={} subagent_session_id={} agent_id={} task_key={}",
+                            parent_thread_id.as_deref().unwrap_or("none"),
+                            session.subagent_session_id,
+                            definition.id,
+                            task_key
+                        ),
+                        Err(err) => log::warn!(
                             "[subagent_reuse] fresh close failed parent_thread_id={} subagent_session_id={} agent_id={} task_key={} error={}",
                             parent_thread_id.as_deref().unwrap_or("none"),
                             session.subagent_session_id,
                             definition.id,
                             task_key,
                             err
-                        );
+                        ),
                     }
                 }
                 Ok(None) => {}

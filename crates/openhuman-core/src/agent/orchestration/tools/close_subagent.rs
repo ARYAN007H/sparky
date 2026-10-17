@@ -126,12 +126,12 @@ impl CloseSubagentTool {
         };
         let store = SubagentSessionStore::new(parent.workspace_dir.clone());
         let parent_thread_id = tool_context.and_then(ToolRunContext::thread_id);
-        let owned = match subagent_sessions::list_for_parent(
+        let observed = match subagent_sessions::list_for_parent(
             &store,
             &parent.session_id,
             parent_thread_id,
         ) {
-            Ok(sessions) => sessions.iter().any(|session| {
+            Ok(sessions) => sessions.into_iter().find(|session| {
                 session.subagent_session_id == subagent_session_id
                     && session.parent_thread_id.as_deref() == parent_thread_id
             }),
@@ -141,7 +141,7 @@ impl CloseSubagentTool {
                 )));
             }
         };
-        if !owned {
+        let Some(observed) = observed else {
             log::warn!(
                 "[subagent_reuse] close rejected parent_session={} parent_thread_id={} subagent_session_id={}",
                 parent.session_id,
@@ -159,11 +159,11 @@ impl CloseSubagentTool {
             tinyagents_orchestration::subagent::SubAgentJobRegistry,
         >(&dispatch);
         let store = SubagentSessionStore::new(parent.workspace_dir.clone());
-        let cancelled = subagent_sessions::cancel_driver_job_for_session(
+        let cancelled = subagent_sessions::cancel_driver_job_for_observed_session(
             &store,
             &parent.workspace_dir.join(".openhuman/subagent_checkpoints"),
             &jobs,
-            &subagent_session_id,
+            &observed,
             &parent.session_id,
             thread_id,
         ) || running_subagents::cancel_by_session_in_workspace(
@@ -173,7 +173,13 @@ impl CloseSubagentTool {
             &parent.workspace_dir,
         )
         .is_some();
-        match subagent_sessions::close(&store, &subagent_session_id) {
+        match subagent_sessions::close_if_current(&store, &observed) {
+            Ok(false) => Ok(ToolResult::error(
+                "close_subagent: session changed while it was being closed; retry with its current reference",
+            )),
+            Err(err) => Ok(ToolResult::error(format!(
+                "close_subagent: failed to update sub-agent session: {err}"
+            ))),
             Ok(closed) => {
                 log::info!(
                     "[subagent_reuse] close subagent_session_id={} parent_session={} closed={} cancelled_running={}",
@@ -186,9 +192,6 @@ impl CloseSubagentTool {
                     "Closed reusable sub-agent session `{subagent_session_id}` (closed={closed}, cancelled_running={cancelled})."
                 )))
             }
-            Err(err) => Ok(ToolResult::error(format!(
-                "close_subagent: failed to update sub-agent session: {err}"
-            ))),
         }
     }
 }

@@ -119,6 +119,49 @@ pub fn cancel_driver_job_for_session(
     jobs.cancel_key_owned(&key, owner).is_ok()
 }
 
+/// Requests cancellation for the exact durable row observed by the caller.
+/// Keeping this separate from a fresh session-id lookup prevents concurrent
+/// reuse from redirecting cancellation to a replacement child.
+pub fn cancel_driver_job_for_observed_session(
+    store: &SubagentSessionStore,
+    checkpoint_dir: &Path,
+    jobs: &tinyagents_orchestration::subagent::SubAgentJobRegistry,
+    session: &DurableSubagentSession,
+    parent_session: &str,
+    parent_thread_id: Option<&str>,
+) -> bool {
+    if session.parent_session != parent_session
+        || session.parent_thread_id.as_deref() != parent_thread_id
+    {
+        return false;
+    }
+    let Some(task_id) = session.current_task_id.as_deref() else {
+        return false;
+    };
+    let key = session
+        .lifecycle_key
+        .filter(|key| key.task_id == task_id && key.thread_id.as_deref() == parent_thread_id)
+        .or_else(|| {
+            resolve_lifecycle_key(
+                store,
+                &session.subagent_session_id,
+                parent_session,
+                parent_thread_id,
+                checkpoint_dir,
+            )
+            .ok()
+            .filter(|key| key.task_id == task_id)
+        });
+    let Some(key) = key else {
+        return false;
+    };
+    let owner = crate::agent::tinyagents::tool_registration::subagent_owner_key(
+        parent_session,
+        parent_thread_id,
+    );
+    jobs.cancel_key_owned(&key, owner).is_ok()
+}
+
 /// Resolve a saved product session to its exact TinyAgents lifecycle key.
 ///
 /// The product session lookup is scoped by the authenticated parent session,
@@ -249,6 +292,14 @@ pub fn upsert_running(
         .find(|session| session.subagent_session_id == session_id)
         .cloned()
     {
+        if let Some(reuse) = reuse {
+            if existing.status == DurableSubagentStatus::Closed
+                || existing.current_task_id != reuse.current_task_id
+                || existing.lifecycle_key != reuse.lifecycle_key
+            {
+                return Err("stale reusable sub-agent session changed during upsert".into());
+            }
+        }
         existing
     } else {
         DurableSubagentSession {
@@ -344,6 +395,40 @@ pub fn close(store: &SubagentSessionStore, subagent_session_id: &str) -> Result<
         session.updated_at = now.clone();
         session.last_used_at = now;
     })
+}
+
+/// Closes a session only if it still contains the lifecycle snapshot that the
+/// caller observed and cancelled. `false` means a concurrent reuse or close
+/// won the race and this stale request did not alter the newer row.
+pub fn close_if_current(
+    store: &SubagentSessionStore,
+    observed: &DurableSubagentSession,
+) -> Result<bool, String> {
+    let _guard = store_write_lock()
+        .lock()
+        .map_err(|_| "subagent session store lock poisoned".to_string())?;
+    let mut sessions = store.load()?;
+    let now = chrono::Utc::now().to_rfc3339();
+    let Some(session) = sessions
+        .iter_mut()
+        .find(|session| session.subagent_session_id == observed.subagent_session_id)
+    else {
+        return Ok(false);
+    };
+    if session.status == DurableSubagentStatus::Closed
+        || session.parent_session != observed.parent_session
+        || session.parent_thread_id != observed.parent_thread_id
+        || session.current_task_id != observed.current_task_id
+        || session.lifecycle_key != observed.lifecycle_key
+    {
+        return Ok(false);
+    }
+    session.status = DurableSubagentStatus::Closed;
+    session.reusable = false;
+    session.updated_at = now.clone();
+    session.last_used_at = now;
+    store.save(&sessions)?;
+    Ok(true)
 }
 
 pub fn list_for_parent(
