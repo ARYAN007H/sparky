@@ -230,6 +230,19 @@ pub async fn flows_list(config: &Config) -> Result<Outcome<Vec<Flow>>, String> {
 /// itself — `store::remove_flow` below still errors clearly if `id` doesn't
 /// exist.
 pub async fn flows_delete(config: &Config, id: &str) -> Result<Outcome<Value>, String> {
+    flows_delete_with_remove(config, id, |config, id| {
+        store::remove_flow(config, id).map_err(|e| e.to_string())
+    })
+    .await
+}
+
+/// Delete implementation split at the fallible store operation so failure
+/// ordering can be exercised without corrupting the configured storage.
+pub(super) async fn flows_delete_with_remove(
+    config: &Config,
+    id: &str,
+    remove: impl FnOnce(&Config, &str) -> Result<(), String>,
+) -> Result<Outcome<Value>, String> {
     match store::get_flow(config, id) {
         Ok(Some(flow)) => unbind_trigger(config, &flow),
         Ok(None) => {}
@@ -238,7 +251,7 @@ pub async fn flows_delete(config: &Config, id: &str) -> Result<Outcome<Value>, S
         }
     }
 
-    store::remove_flow(config, id).map_err(|e| e.to_string())?;
+    remove(config, id)?;
     tracing::debug!(target: "flows", flow_id = %id, "[flows] flows_delete: removed");
 
     // Best-effort: purge the flow's pre-authorized tool trust with its row —
