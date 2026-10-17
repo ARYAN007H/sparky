@@ -26,6 +26,7 @@
 
 pub mod agents;
 pub mod blob_sweep;
+pub mod boot;
 pub mod config;
 pub mod documents;
 pub mod fence;
@@ -167,9 +168,18 @@ pub async fn open(url: &str) -> Result<Arc<dyn StorageBackend>, StorageError> {
     );
     // Every opened backend checks the process's lease fences on write; with
     // no fence registered (every single-user host) that is a pass-through.
-    Ok(fenced_backend::wrap(
-        tinystoragedrivers::open(&parsed).await?,
-    ))
+    let backend = tinystoragedrivers::open(&parsed).await?;
+    // Schema, scope move and migrations run on the raw backend, before any
+    // lease fence exists to refuse them.
+    let report = boot::prepare_and_migrate(&backend).await?;
+    if !report.failures.is_empty() {
+        tracing::warn!(
+            target: "openhuman::storage",
+            failures = report.failures.len(),
+            "[storage] opened with unfinished migrations; they retry at the next boot"
+        );
+    }
+    Ok(fenced_backend::wrap(backend))
 }
 
 /// Makes `backend` the process's storage backend; returns the previous one.
