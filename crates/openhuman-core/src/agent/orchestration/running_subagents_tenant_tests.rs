@@ -2,6 +2,9 @@ use super::*;
 use crate::core::runtime::DispatchCtx;
 use crate::core::runtime::{ContextOverlay, CoreContext, DomainSet, Mode};
 use crate::tools::toolpacks::ToolGroups;
+use crate::agent::orchestration::running_subagents::resolve::{
+    resume_ref_for_task_in_workspace, task_id_for_session_in_workspace,
+};
 use tinyagents_orchestration::subagent::SteerError;
 
 const CHILD: &str = "OPENHUMAN_DETACHED_TENANT_TEST_CHILD";

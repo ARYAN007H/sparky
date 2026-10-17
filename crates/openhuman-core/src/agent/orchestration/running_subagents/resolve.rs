@@ -6,7 +6,8 @@
 use std::path::Path;
 
 use tinyagents_orchestration::subagent::{
-    resolve_detached_or_durable, SubagentResumeRef, WaitError,
+    resolve_detached_or_durable, resume_ref_for_task as live_resume_ref_for_task,
+    task_id_for_session as live_task_id_for_session, SubagentResumeRef, WaitError,
 };
 
 use super::registry::{admit_workspace, owner_key, registry};
@@ -19,10 +20,13 @@ pub(crate) fn task_id_for_session(
     subagent_session_id: &str,
     parent_session: &str,
 ) -> Result<String, WaitError> {
-    let workspace = ctx
-        .resolved()
-        .and_then(|context| context.workspace_dir().ok())
-        .ok_or(WaitError::NotOwned)?;
+    let owner = owner_key(ctx, parent_session)?;
+    let Some(context) = ctx.resolved() else {
+        return live_task_id_for_session(registry(), subagent_session_id, &owner);
+    };
+    let Ok(workspace) = context.workspace_dir() else {
+        return live_task_id_for_session(registry(), subagent_session_id, &owner);
+    };
     task_id_for_session_in_workspace(ctx, subagent_session_id, parent_session, &workspace)
 }
 
@@ -33,11 +37,13 @@ pub(crate) fn task_id_for_session_in_workspace(
     workspace_dir: &Path,
 ) -> Result<String, WaitError> {
     admit_workspace(ctx, workspace_dir)?;
+    let owner = owner_key(ctx, parent_session)?;
+    let store = scoped_task_store(ctx, workspace_dir)?;
     let resolved = resolve_detached_or_durable(
         registry(),
-        task_store_for_workspace(workspace_dir).as_ref(),
+        store.as_ref(),
         subagent_session_id,
-        &owner_key(ctx, parent_session)?,
+        &owner,
     )?;
     let task_id = resolved.task_id;
     log::debug!(
@@ -54,10 +60,13 @@ pub(crate) fn resume_ref_for_task(
     task_id: &str,
     parent_session: &str,
 ) -> Result<SubagentResumeRef, WaitError> {
-    let workspace = ctx
-        .resolved()
-        .and_then(|context| context.workspace_dir().ok())
-        .ok_or(WaitError::NotOwned)?;
+    let owner = owner_key(ctx, parent_session)?;
+    let Some(context) = ctx.resolved() else {
+        return live_resume_ref_for_task(registry(), task_id, &owner);
+    };
+    let Ok(workspace) = context.workspace_dir() else {
+        return live_resume_ref_for_task(registry(), task_id, &owner);
+    };
     resume_ref_for_task_in_workspace(ctx, task_id, parent_session, &workspace)
 }
 
@@ -68,11 +77,13 @@ pub(crate) fn resume_ref_for_task_in_workspace(
     workspace_dir: &Path,
 ) -> Result<SubagentResumeRef, WaitError> {
     admit_workspace(ctx, workspace_dir)?;
+    let owner = owner_key(ctx, parent_session)?;
+    let store = scoped_task_store(ctx, workspace_dir)?;
     let reference = resolve_detached_or_durable(
         registry(),
-        task_store_for_workspace(workspace_dir).as_ref(),
+        store.as_ref(),
         task_id,
-        &owner_key(ctx, parent_session)?,
+        &owner,
     )?;
     log::debug!(
         "[running_subagents] resolved resume ref from task store task_id={} workspace_dir={}",
@@ -80,4 +91,14 @@ pub(crate) fn resume_ref_for_task_in_workspace(
         workspace_dir.display()
     );
     Ok(reference)
+}
+
+fn scoped_task_store(
+    ctx: &crate::core::runtime::DispatchCtx,
+    workspace_dir: &Path,
+) -> Result<std::sync::Arc<dyn tinyagents_tasks::TaskStore>, WaitError> {
+    let context = ctx.resolved().ok_or(WaitError::NotOwned)?;
+    Ok(crate::core::runtime::CoreContext::sync_scope(context, || {
+        task_store_for_workspace(workspace_dir)
+    }))
 }

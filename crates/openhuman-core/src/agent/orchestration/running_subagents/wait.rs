@@ -5,7 +5,9 @@
 use std::path::Path;
 use std::time::Duration;
 
-use tinyagents_orchestration::subagent::{wait_detached_or_durable, WaitError, WaitOutcome};
+use tinyagents_orchestration::subagent::{
+    wait_detached, wait_detached_or_durable, WaitError, WaitOutcome,
+};
 
 use super::registry::{admit_workspace, owner_key, registry};
 
@@ -16,14 +18,20 @@ pub(crate) async fn wait(
     parent_session: &str,
     timeout: Duration,
 ) -> Result<WaitOutcome, WaitError> {
-    let workspace_dir = ctx
-        .resolved()
-        .and_then(|context| context.workspace_dir().ok())
-        .ok_or(WaitError::NotOwned)?;
     let owner = owner_key(ctx, parent_session)?;
+    let Some(context) = ctx.resolved() else {
+        return wait_detached(registry(), task_id, &owner, timeout).await;
+    };
+    let Ok(workspace_dir) = context.workspace_dir() else {
+        return wait_detached(registry(), task_id, &owner, timeout).await;
+    };
+    admit_workspace(ctx, &workspace_dir)?;
+    let store = crate::core::runtime::CoreContext::sync_scope(context, || {
+        super::task_ledger::task_store_for_workspace(&workspace_dir)
+    });
     wait_detached_or_durable(
         registry(),
-        super::task_ledger::task_store_for_workspace(&workspace_dir).as_ref(),
+        store.as_ref(),
         &super::super::background_completions::router_for_workspace_ctx(ctx, &workspace_dir),
         task_id,
         &owner,
@@ -41,9 +49,13 @@ pub(crate) async fn wait_in_workspace(
 ) -> Result<WaitOutcome, WaitError> {
     admit_workspace(ctx, workspace_dir)?;
     let owner = owner_key(ctx, parent_session)?;
+    let context = ctx.resolved().ok_or(WaitError::NotOwned)?;
+    let store = crate::core::runtime::CoreContext::sync_scope(context, || {
+        super::task_ledger::task_store_for_workspace(workspace_dir)
+    });
     wait_detached_or_durable(
         registry(),
-        super::task_ledger::task_store_for_workspace(workspace_dir).as_ref(),
+        store.as_ref(),
         &super::super::background_completions::router_for_workspace_ctx(ctx, workspace_dir),
         task_id,
         &owner,
