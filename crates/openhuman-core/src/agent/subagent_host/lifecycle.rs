@@ -31,6 +31,10 @@ use tinyinference_llm::{
 };
 use tokio::sync::{Mutex as AsyncMutex, Notify};
 
+#[path = "lifecycle_checkpoint.rs"]
+mod checkpoint;
+#[path = "lifecycle_outcome.rs"]
+mod outcome;
 use checkpoint::absolute_checkpoint_dir;
 
 use super::{

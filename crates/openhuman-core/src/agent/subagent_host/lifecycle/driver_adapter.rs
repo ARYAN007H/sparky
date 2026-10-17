@@ -909,9 +909,7 @@ impl tinyagents_orchestration::subagent::SubagentPersistence for OpenHumanPersis
     }
 }
 
-#[path = "lifecycle_outcome.rs"]
-mod outcome;
-use outcome::{HostInFlightMap, host_outcome_to_neutral};
+use super::outcome::{HostInFlightMap, host_outcome_to_neutral};
 
 pub(super) fn outcome_to_host(
     result: SubagentRunResult,
@@ -1016,5 +1014,3 @@ fn cost_source_of(charged: Option<&ChargedAmount>) -> tinyagents_harness::cost::
     }
 }
 
-#[path = "lifecycle_checkpoint.rs"]
-mod checkpoint;
