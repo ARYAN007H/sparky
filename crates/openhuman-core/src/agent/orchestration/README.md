@@ -119,6 +119,38 @@ worktree policy.
 - [`tools.rs`](./tools.rs): declares the LLM-callable tool files under `tools/` (see
   [Agent tools](#agent-tools)).
 
+## Owner call-site map
+
+The host calls the owner's lifecycle APIs directly; the old generic loops are
+removed rather than kept under new names:
+
+- `AgentOrchestrationSession::wait_agents` uses `DetachedTaskRegistry::wait_many`
+  for input ordering, one shared deadline and first-error behavior.
+- Background delivery uses `CompletionDelivery::recover_on_boot_with_error`
+  and `deliver_once_with_error`. TinyAgents owns retry, lease, replay, and
+  give-up transitions. OpenHuman's synchronous failure callback appends the
+  final notice before the lease is released. The rich awaited completion
+  callback still writes workflow-proposal and incomplete-run framing; the plain
+  owner status watcher is the sole generic TaskStore mirror.
+- `start_member_run` keeps product active-member and claimable-task prechecks,
+  then `TeamService::start_member_with_started` owns claim, active state,
+  completion and token-scoped cleanup. The host returns the owner's receipt
+  over a oneshot before continuing its real worker executor.
+- Workflow start/resume/stop use `WorkflowRunSupervisor` generation APIs.
+  OpenHuman retains durable revision-CAS transitions, policy admission,
+  root-parent construction, origin propagation and failure projection. Stop
+  captures the owner handle before CAS and cancels only that generation after
+  CAS succeeds.
+- Parallel dispatch uses `Plan::stage_with_preflight` and `parallel::run`.
+  Preflight only resolves definitions and trims prompts; worktree creation and
+  spawn events follow admission. Awaited host progress and results stay in the
+  adapter, with result projection in input order after collection. Sync-only
+  `RunHooks` cannot carry those awaited callbacks or preserve that order.
+- The old `run_ledger_finalize` subscriber moved to
+  [`agent_runs/subagent_finalize.rs`](../../agent_runs/subagent_finalize.rs):
+  it is the product AgentRun projection over bus events, not a TinyAgents task
+  status mirror.
+
 ## Public surface
 
 - `AgentOrchestrationSession`, `OrchestrationError`: `ops.rs`.
