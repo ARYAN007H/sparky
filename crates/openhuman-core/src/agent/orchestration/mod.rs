@@ -29,7 +29,6 @@ pub(crate) mod fleet_tools;
 mod ops;
 #[path = "parent_context/builder.rs"]
 pub(crate) mod parent_context;
-pub(crate) mod run_ledger_finalize;
 pub(crate) mod running_subagents;
 pub(crate) mod spawn_parallel;
 pub(crate) mod subagent_events;

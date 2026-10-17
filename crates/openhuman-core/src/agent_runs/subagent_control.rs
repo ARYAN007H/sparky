@@ -166,8 +166,8 @@ fn handle_subagent_cancel(ctx: DispatchCtx, params: Map<String, Value>) -> Contr
                 } else {
                     let summary = match reason.as_deref().map(str::trim).filter(|r| !r.is_empty()) {
                         Some(r) => format!(
-                        "You cancelled this background sub-agent before it finished. Reason: {r}"
-                    ),
+                            "You cancelled this background sub-agent before it finished. Reason: {r}"
+                        ),
                         None => "You cancelled this background sub-agent before it finished."
                             .to_string(),
                     };

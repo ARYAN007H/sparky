@@ -26,6 +26,35 @@ use tinyinference_llm::model::{ChatModel, ModelRequest, ModelResponse};
 use tinytools::Tool;
 use tinytools_agent::dialect::ToolCallFormat;
 
+struct BlockingTeamExecutor {
+    entered: std::sync::Mutex<Option<tokio::sync::oneshot::Sender<()>>>,
+    release: Arc<tokio::sync::Notify>,
+    dropped: std::sync::Mutex<Option<tokio::sync::oneshot::Sender<()>>>,
+}
+
+#[async_trait]
+impl TeamMemberExecutor for BlockingTeamExecutor {
+    async fn execute(
+        &self,
+        _member: &tinyagents_session::run_ledger::AgentTeamMember,
+        _task: &tinyagents_session::run_ledger::AgentTeamTask,
+    ) -> anyhow::Result<Vec<String>> {
+        if let Some(sender) = self.entered.lock().unwrap().take() {
+            let _ = sender.send(());
+        }
+        self.release.notified().await;
+        Ok(vec!["worker result".to_string()])
+    }
+}
+
+impl Drop for BlockingTeamExecutor {
+    fn drop(&mut self) {
+        if let Some(sender) = self.dropped.lock().unwrap().take() {
+            let _ = sender.send(());
+        }
+    }
+}
+
 // ── Mocks (mirror workflow_runs::engine_tests) ──────────────────────────────
 
 fn text_response(text: impl Into<String>) -> ModelResponse {
@@ -162,10 +191,10 @@ fn seed_task(
     .unwrap();
 }
 
-// ── drive_member (the live-exec core) ───────────────────────────────────────
+// ── Host executor adapted through the owner service ────────────────────────
 
 #[tokio::test]
-async fn drive_member_completes_task_with_worker_output_as_evidence() {
+async fn owner_admission_receipt_ids_flow_into_completed_member_evidence() {
     AgentDefinitionRegistry::init_global_builtins().unwrap();
     let (_dir, config) = test_config();
     seed_team(&config, "team-1");
@@ -178,61 +207,30 @@ async fn drive_member_completes_task_with_worker_output_as_evidence() {
         None,
         vec![],
     );
-    // Claim + mark running, mirroring what start_member_run does pre-spawn.
-    crate::storage::sessions::with_ledger(&config.workspace_dir, |ledger| {
-        let ledger_arg_0 = ("team-1").to_string();
-        let ledger_arg_1 = ("task-a").to_string();
-        let ledger_arg_2 = ("m1").to_string();
-        let ledger_arg_3 = ("teamrun-x").to_string();
-        async move {
-            ledger
-                .claim_agent_team_task(&ledger_arg_0, &ledger_arg_1, &ledger_arg_2, &ledger_arg_3)
-                .await
-        }
-    })
-    .unwrap();
-    crate::storage::sessions::with_ledger(&config.workspace_dir, |ledger| {
-        let ledger_arg_0 = ("team-1").to_string();
-        let ledger_arg_1 = ("m1").to_string();
-        let ledger_arg_2 = ("task-a").to_string();
-        let ledger_arg_3 = ("teamrun-x").to_string();
-        let ledger_arg_4 = ("teamrun-x").to_string();
-        async move {
-            ledger
-                .mark_agent_team_member_running(
-                    &ledger_arg_0,
-                    &ledger_arg_1,
-                    &ledger_arg_2,
-                    &ledger_arg_3,
-                    &ledger_arg_4,
-                )
-                .await
-        }
-    })
-    .unwrap();
-    let task = crate::storage::sessions::with_ledger(&config.workspace_dir, |ledger| {
-        let ledger_arg_0 = ("task-a").to_string();
-        async move { ledger.get_agent_team_task(&ledger_arg_0).await }
-    })
-    .unwrap()
-    .unwrap();
-
     let provider = Arc::new(CannedModel {
         output: "did the thing".into(),
         fail: false,
     });
-    drive_member(
-        &config,
-        "team-1",
-        "m1",
-        "task_manager_agent",
-        &task,
-        "teamrun-x",
-        Some("test-model".into()),
-        mock_parent(provider),
-    )
-    .await
-    .expect("drive_member ok");
+    let executor = HostTeamMemberExecutor {
+        ctx: crate::core::runtime::DispatchCtx::ambient(),
+        config: config.clone(),
+        team_id: "team-1".into(),
+        member_id: "m1".into(),
+        model_override: Some("test-model".into()),
+        parent_override: Some(mock_parent(provider)),
+    };
+    let mut receipt = None;
+    let completion = team_service(&config)
+        .start_member_with_started("team-1", "task-a", "m1", &executor, false, |started| {
+            receipt = Some(started);
+        })
+        .await
+        .expect("owner completes member");
+    assert!(matches!(
+        completion,
+        tinyagents_session::run_ledger::CompletionOutcome::Completed(_)
+    ));
+    let receipt = receipt.expect("owner returns actual admission receipt");
 
     let done = crate::storage::sessions::with_ledger(&config.workspace_dir, |ledger| {
         let ledger_arg_0 = ("task-a").to_string();
@@ -243,7 +241,13 @@ async fn drive_member_completes_task_with_worker_output_as_evidence() {
     assert_eq!(done.status, AgentTeamTaskStatus::Done);
     assert_eq!(done.gate_status, "passed");
     assert_eq!(done.evidence.len(), 1, "worker output captured as evidence");
-    assert!(done.evidence[0].contains("teamrun-x"));
+    assert!(done.evidence[0].contains(&receipt.run_id));
+    assert_eq!(receipt.task.id, "task-a");
+    assert_eq!(
+        receipt.member.run_id.as_deref(),
+        Some(receipt.run_id.as_str())
+    );
+    assert!(receipt.member.worker_thread_id.is_some());
 
     let member = crate::storage::sessions::with_ledger(&config.workspace_dir, |ledger| {
         let ledger_arg_0 = ("m1").to_string();
@@ -258,8 +262,7 @@ async fn drive_member_completes_task_with_worker_output_as_evidence() {
 /// Covers `run_member_loop` — the `with_root_parent` wrapper around
 /// `drive_member`. With a mock parent passed explicitly, `with_root_parent`
 /// uses it (rather than building a real root), so the member drives to
-/// completion under the canned provider. Same setup as the `drive_member`
-/// happy-path test, but through the wrapper the live runtime spawns.
+/// execution under the canned provider and returns owner-ready evidence.
 #[tokio::test]
 async fn run_member_loop_drives_member_under_an_explicit_parent() {
     AgentDefinitionRegistry::init_global_builtins().unwrap();
@@ -274,37 +277,6 @@ async fn run_member_loop_drives_member_under_an_explicit_parent() {
         None,
         vec![],
     );
-    crate::storage::sessions::with_ledger(&config.workspace_dir, |ledger| {
-        let ledger_arg_0 = ("team-1").to_string();
-        let ledger_arg_1 = ("task-a").to_string();
-        let ledger_arg_2 = ("m1").to_string();
-        let ledger_arg_3 = ("teamrun-y").to_string();
-        async move {
-            ledger
-                .claim_agent_team_task(&ledger_arg_0, &ledger_arg_1, &ledger_arg_2, &ledger_arg_3)
-                .await
-        }
-    })
-    .unwrap();
-    crate::storage::sessions::with_ledger(&config.workspace_dir, |ledger| {
-        let ledger_arg_0 = ("team-1").to_string();
-        let ledger_arg_1 = ("m1").to_string();
-        let ledger_arg_2 = ("task-a").to_string();
-        let ledger_arg_3 = ("teamrun-y").to_string();
-        let ledger_arg_4 = ("teamrun-y").to_string();
-        async move {
-            ledger
-                .mark_agent_team_member_running(
-                    &ledger_arg_0,
-                    &ledger_arg_1,
-                    &ledger_arg_2,
-                    &ledger_arg_3,
-                    &ledger_arg_4,
-                )
-                .await
-        }
-    })
-    .unwrap();
     let task = crate::storage::sessions::with_ledger(&config.workspace_dir, |ledger| {
         let ledger_arg_0 = ("task-a").to_string();
         async move { ledger.get_agent_team_task(&ledger_arg_0).await }
@@ -316,7 +288,7 @@ async fn run_member_loop_drives_member_under_an_explicit_parent() {
         output: "did the thing".into(),
         fail: false,
     });
-    run_member_loop(
+    let evidence = run_member_loop(
         &crate::core::runtime::DispatchCtx::ambient(),
         &config,
         "team-1",
@@ -324,26 +296,18 @@ async fn run_member_loop_drives_member_under_an_explicit_parent() {
         "task_manager_agent",
         task,
         "teamrun-y",
+        "teamworker-y",
         Some("test-model".into()),
         Some(mock_parent(provider)),
     )
-    .await;
-
-    let done = crate::storage::sessions::with_ledger(&config.workspace_dir, |ledger| {
-        let ledger_arg_0 = ("task-a").to_string();
-        async move { ledger.get_agent_team_task(&ledger_arg_0).await }
-    })
-    .unwrap()
-    .unwrap();
-    assert_eq!(
-        done.status,
-        AgentTeamTaskStatus::Done,
-        "run_member_loop drove the member to completion through with_root_parent"
-    );
+    .await
+    .expect("run_member_loop returns evidence through with_root_parent");
+    assert_eq!(evidence.len(), 1);
+    assert!(evidence[0].contains("teamrun-y"));
 }
 
 #[tokio::test]
-async fn drive_member_releases_task_when_worker_fails() {
+async fn owner_releases_task_when_host_worker_fails() {
     AgentDefinitionRegistry::init_global_builtins().unwrap();
     let (_dir, config) = test_config();
     seed_team(&config, "team-1");
@@ -356,60 +320,22 @@ async fn drive_member_releases_task_when_worker_fails() {
         None,
         vec![],
     );
-    crate::storage::sessions::with_ledger(&config.workspace_dir, |ledger| {
-        let ledger_arg_0 = ("team-1").to_string();
-        let ledger_arg_1 = ("task-a").to_string();
-        let ledger_arg_2 = ("m1").to_string();
-        let ledger_arg_3 = ("teamrun-x").to_string();
-        async move {
-            ledger
-                .claim_agent_team_task(&ledger_arg_0, &ledger_arg_1, &ledger_arg_2, &ledger_arg_3)
-                .await
-        }
-    })
-    .unwrap();
-    crate::storage::sessions::with_ledger(&config.workspace_dir, |ledger| {
-        let ledger_arg_0 = ("team-1").to_string();
-        let ledger_arg_1 = ("m1").to_string();
-        let ledger_arg_2 = ("task-a").to_string();
-        let ledger_arg_3 = ("teamrun-x").to_string();
-        let ledger_arg_4 = ("teamrun-x").to_string();
-        async move {
-            ledger
-                .mark_agent_team_member_running(
-                    &ledger_arg_0,
-                    &ledger_arg_1,
-                    &ledger_arg_2,
-                    &ledger_arg_3,
-                    &ledger_arg_4,
-                )
-                .await
-        }
-    })
-    .unwrap();
-    let task = crate::storage::sessions::with_ledger(&config.workspace_dir, |ledger| {
-        let ledger_arg_0 = ("task-a").to_string();
-        async move { ledger.get_agent_team_task(&ledger_arg_0).await }
-    })
-    .unwrap()
-    .unwrap();
-
     let provider = Arc::new(CannedModel {
         output: String::new(),
         fail: true,
     });
-    drive_member(
-        &config,
-        "team-1",
-        "m1",
-        "task_manager_agent",
-        &task,
-        "teamrun-x",
-        Some("test-model".into()),
-        mock_parent(provider),
-    )
-    .await
-    .expect("drive_member handles worker failure without erroring");
+    let executor = HostTeamMemberExecutor {
+        ctx: crate::core::runtime::DispatchCtx::ambient(),
+        config: config.clone(),
+        team_id: "team-1".into(),
+        member_id: "m1".into(),
+        model_override: Some("test-model".into()),
+        parent_override: Some(mock_parent(provider)),
+    };
+    assert!(team_service(&config)
+        .start_member_with_started("team-1", "task-a", "m1", &executor, false, |_| {})
+        .await
+        .is_err());
 
     // Task released back to todo, claim cleared → reclaimable.
     let released = crate::storage::sessions::with_ledger(&config.workspace_dir, |ledger| {
@@ -428,6 +354,83 @@ async fn drive_member_releases_task_when_worker_fails() {
     .unwrap()
     .unwrap();
     assert_eq!(member.member_status, AgentTeamMemberStatus::Idle);
+}
+
+#[tokio::test]
+async fn start_rpc_returns_owner_receipt_while_member_executor_is_blocked() {
+    let _guard = crate::config::TEST_ENV_LOCK.lock().await;
+    let (_dir, config) = test_config();
+    seed_team(&config, "team-rpc");
+    seed_member(
+        &config,
+        "team-rpc",
+        "member-rpc",
+        Some("task_manager_agent"),
+    );
+    seed_task(
+        &config,
+        "team-rpc",
+        "task-rpc",
+        AgentTeamTaskStatus::Todo,
+        None,
+        vec![],
+    );
+    let (entered_tx, entered_rx) = tokio::sync::oneshot::channel();
+    let (dropped_tx, dropped_rx) = tokio::sync::oneshot::channel();
+    let release = Arc::new(tokio::sync::Notify::new());
+    let executor = BlockingTeamExecutor {
+        entered: std::sync::Mutex::new(Some(entered_tx)),
+        release: Arc::clone(&release),
+        dropped: std::sync::Mutex::new(Some(dropped_tx)),
+    };
+    let ctx = crate::core::runtime::DispatchCtx::ambient();
+    let task_config = config.clone();
+    let start = tokio::spawn(async move {
+        start_member_with_executor(
+            &ctx,
+            &task_config,
+            "team-rpc",
+            "member-rpc",
+            crate::storage::sessions::with_ledger(&task_config.workspace_dir, |ledger| {
+                let id = "task-rpc".to_string();
+                async move { ledger.get_agent_team_task(&id).await }
+            })
+            .unwrap()
+            .unwrap(),
+            executor,
+        )
+        .await
+    });
+
+    let outcome = tokio::time::timeout(std::time::Duration::from_secs(5), start)
+        .await
+        .expect("start RPC waits only for owner admission")
+        .expect("start task joins")
+        .expect("owner admission succeeds");
+    let StartMemberOutcome::Started { run_id, task } = outcome else {
+        panic!("expected started receipt, got {outcome:?}");
+    };
+    assert_eq!(task.id, "task-rpc");
+    tokio::time::timeout(std::time::Duration::from_secs(5), entered_rx)
+        .await
+        .expect("executor started")
+        .expect("executor signal delivered");
+
+    let active = crate::storage::sessions::with_ledger(&config.workspace_dir, |ledger| {
+        let id = "member-rpc".to_string();
+        async move { ledger.get_agent_team_member(&id).await }
+    })
+    .unwrap()
+    .unwrap();
+    assert_eq!(active.member_status, AgentTeamMemberStatus::Active);
+    assert_eq!(active.run_id.as_deref(), Some(run_id.as_str()));
+    assert!(active.worker_thread_id.is_some());
+
+    release.notify_one();
+    tokio::time::timeout(std::time::Duration::from_secs(5), dropped_rx)
+        .await
+        .expect("owner finishes after executor release")
+        .expect("executor dropped after owner completion");
 }
 
 // ── start_member_run pre-spawn outcome routing ──────────────────────────────

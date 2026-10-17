@@ -6,7 +6,6 @@
 
 use std::path::Path;
 use std::path::PathBuf;
-use std::sync::Arc;
 
 use super::background_completions::state;
 
@@ -120,24 +119,47 @@ impl CompletionTarget {
 /// Claim `workspace_dir`'s boot recovery for this process. `true` exactly once
 /// per workspace, so the host can scan every workspace it opens (the bootstrap
 /// one, then any other a spawn later opens) without rescanning.
-pub(crate) fn claim_recovery(workspace_dir: &Path) -> bool {
+pub(crate) fn claim_recovery_ctx(
+    ctx: &crate::core::runtime::DispatchCtx,
+    workspace_dir: &Path,
+) -> bool {
     state()
         .recovered_workspaces
-        .insert(workspace_dir.to_path_buf())
+        .insert(super::background_completions::router_scope_for(
+            ctx,
+            workspace_dir,
+        ))
+}
+
+#[cfg(test)]
+pub(crate) fn claim_recovery(workspace_dir: &Path) -> bool {
+    claim_recovery_ctx(&crate::core::runtime::DispatchCtx::ambient(), workspace_dir)
 }
 
 /// Let `workspace_dir` be recovered again (a profile re-leased after release),
-/// and drop its cached router when nothing is using it so the next scan replays
-/// the log another holder may have appended to. A router still in use stays,
-/// so a log never has two writers.
-pub(crate) fn forget_recovery(workspace_dir: &Path) {
-    let mut st = state();
-    st.recovered_workspaces.remove(workspace_dir);
-    let idle = st
-        .routers
-        .get(workspace_dir)
-        .is_some_and(|e| Arc::strong_count(e) == 1 && Arc::strong_count(&e.router) == 1);
-    if idle {
-        st.routers.remove(workspace_dir);
+/// and reopen its durable store in the cached router before the next scan. The
+/// owner migrates records under the router's lease lock, so an active holder
+/// can continue through the same router without losing records or leases.
+pub(crate) fn forget_recovery_ctx(ctx: &crate::core::runtime::DispatchCtx, workspace_dir: &Path) {
+    let scope = super::background_completions::router_scope_for(ctx, workspace_dir);
+    state().recovered_workspaces.remove(&scope);
+    let Ok(Some(router)) = super::background_completions::router_pool().get(&scope) else {
+        return;
+    };
+    let Ok(store) = super::background_completions::open_driver_store(ctx, workspace_dir) else {
+        return;
+    };
+    let previous = router.store();
+    match router.replace_store_if_current(&previous, store) {
+        Ok(tinyagents_tasks::CompletionStoreReplaceOutcome::Replaced(store))
+        | Ok(tinyagents_tasks::CompletionStoreReplaceOutcome::Current(store)) => {
+            state().stores.insert(scope, store);
+        }
+        Err(error) => {
+            log::error!(
+                "[background_completions] could not reopen durable completion store workspace_dir={} error={error:#}",
+                workspace_dir.display()
+            );
+        }
     }
 }
