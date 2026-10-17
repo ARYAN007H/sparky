@@ -73,10 +73,13 @@ pub(super) fn activate_user_scope(ctx: &DispatchCtx, user_id: &str) -> Result<Ve
         // `list_threads` / `purge_threads` on any workspace, so purge and
         // concurrent thread RPC in this process cannot interleave.
         // The pre-login profile's workspace follows its layout (`workspace`
-        // for v1, `files` for v2); resolving never moves data.
-        let pre_ws = crate::config::schema::ProfileLayout::resolve_at(pre_login_user_dir(
-            &root_dir,
-        ))
+        // for v1, `files` for v2). Detection only: this must not create the
+        // profile directory as a side effect.
+        let pre_dir = pre_login_user_dir(&root_dir);
+        let pre_ws = crate::config::schema::ProfileLayout::with_version(
+            pre_dir.clone(),
+            crate::config::schema::profile_layout::LayoutVersion::detect(&pre_dir),
+        )
         .workspace_dir;
         let pre_ws_log = pre_ws.display().to_string();
         match conversations::purge_threads(ctx, pre_ws) {
