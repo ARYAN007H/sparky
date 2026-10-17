@@ -388,12 +388,35 @@ for (const platform of ["Linux", "Darwin", "MINGW64_NT-10.0", "Windows_NT"]) {
 
 test("coverage inventory exceptions match the source gates and remain required at selection", () => {
   assert.match(
-    fs.readFileSync(path.join(repoRoot, "tests/composio_list_tools_stack_overflow_regression.rs"), "utf8"),
+    fs.readFileSync(
+      path.join(
+        repoRoot,
+        "tests/composio_list_tools_stack_overflow_regression.rs",
+      ),
+      "utf8",
+    ),
     /#!\[cfg\(not\(coverage\)\)\]/,
   );
-  const windows = fs.readFileSync(path.join(repoRoot, "tests/windows_sandbox_env_e2e.rs"), "utf8");
-  const functions = [...windows.matchAll(/#\[cfg\(windows\)\]\s*#\[(?:tokio::)?test(?:\([^\n]*\))?\]/g)];
-  assert.ok(functions.length > 0, "Windows-only fixture must retain gated tests");
-  assert.equal(functions.length, [...windows.matchAll(/#\[(?:tokio::)?test(?:\([^\n]*\))?\]/g)].length, "every Windows fixture test must remain gated");
-  assert.match(fs.readFileSync(runner, "utf8"), /target_features_satisfied "\$\{target\}" && target_expected_in_coverage "\$\{target\}"/);
+  const windows = fs.readFileSync(
+    path.join(repoRoot, "tests/windows_sandbox_env_e2e.rs"),
+    "utf8",
+  );
+  const functions = [
+    ...windows.matchAll(
+      /#\[cfg\(windows\)\]\s*#\[(?:tokio::)?test(?:\([^\n]*\))?\]/g,
+    ),
+  ];
+  assert.ok(
+    functions.length > 0,
+    "Windows-only fixture must retain gated tests",
+  );
+  assert.equal(
+    functions.length,
+    [...windows.matchAll(/#\[(?:tokio::)?test(?:\([^\n]*\))?\]/g)].length,
+    "every Windows fixture test must remain gated",
+  );
+  assert.match(
+    fs.readFileSync(runner, "utf8"),
+    /target_features_satisfied "\$\{target\}" && target_expected_in_coverage "\$\{target\}"/,
+  );
 });

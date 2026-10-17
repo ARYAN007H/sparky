@@ -869,3 +869,25 @@ test("private frontend tools have an explicit 4 GiB Node heap while hosted keeps
     }
   }
 });
+
+test("private CI executes the coverage-disabled Composio stack regression once without instrumentation", () => {
+  for (const plan of plans()) {
+    const lint = plan.lanes.find((lane) => lane.name === "rust-lint");
+    const checks = lint.checks.filter((check) => check.name === "composio-stack-regression-uninstrumented");
+    if (plan.profile === "ex63") {
+      assert.equal(checks.length, 1);
+      assert.equal(checks[0].when, true);
+      assert.match(checks[0].run, /bash scripts\/ci\/nextest-coverage\.sh composio-stack-uninstrumented cargo nextest run --profile ci --no-tests=fail --no-fail-fast/);
+      assert.match(checks[0].run, /-p openhuman-cli --features "\$\(bash scripts\/ci\/product-features\.sh --core\)" --test composio_list_tools_stack_overflow_regression$/);
+      assert.doesNotMatch(checks[0].run, /llvm-cov|--no-default-features/);
+      assert.equal(lint.targetDir, "target/ci-private-build");
+    } else {
+      assert.equal(checks.length, 0);
+    }
+  }
+  const unrelated = buildPlan({ profile: "ex63", areas: NONE, env: EX63_ENV });
+  assert.ok(unrelated.lanes.flatMap((lane) => lane.checks).filter((check) => check.name === "composio-stack-regression-uninstrumented").every((check) => !check.when));
+  const source = fs.readFileSync(path.join(repoRoot, "tests/composio_list_tools_stack_overflow_regression.rs"), "utf8");
+  assert.match(source, /#!\[cfg\(not\(coverage\)\)\]/);
+  assert.doesNotMatch(source, /^\s*#\[ignore/m);
+});
