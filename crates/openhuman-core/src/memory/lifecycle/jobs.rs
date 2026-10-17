@@ -2,12 +2,12 @@
 //!
 //! The queue itself (dedupe, retry, history) is `tinymemory_tools::queue`;
 //! this module is the host adapter: one queue per workspace over a file
-//! store (`<workspace>/memory/jobs.json`), the engine and `[memory.recall]
+//! store (the `memory`/`state`/`jobs` storage value), the engine and `[memory.recall]
 //! build_delay_secs` it runs against, and the `memory_background` cron hook.
 //!
 //! `post_turn` and brain ingests return `BackgroundJob` values (belief builds,
 //! deferred ingests) instead of running them. They are queued here, persisted
-//! in `<workspace>/memory/jobs.json` so a restart loses none, de-duplicated
+//! in the `memory`/`state`/`jobs` storage value so a restart loses none, de-duplicated
 //! (two builds of one scope are one build), and run by the
 //! `memory_background` cron job ([`run_due`]) once they are at least
 //! `[memory.recall] build_delay_secs` old — a belief build reads the facts the
