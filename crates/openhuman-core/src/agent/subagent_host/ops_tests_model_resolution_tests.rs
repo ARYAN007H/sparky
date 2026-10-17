@@ -23,10 +23,7 @@ impl tinytools::Tool for BlockingSubagentCloseTool {
         serde_json::json!({"type": "object"})
     }
 
-    async fn execute(
-        &self,
-        _args: serde_json::Value,
-    ) -> anyhow::Result<tinytools::ToolResult> {
+    async fn execute(&self, _args: serde_json::Value) -> anyhow::Result<tinytools::ToolResult> {
         let _ = self.started.send(()).await;
         std::future::pending::<()>().await;
         unreachable!("driver cancellation must stop the blocked tool")
@@ -129,8 +126,8 @@ async fn closing_a_durable_driver_session_cancels_only_its_registered_child() {
         SubagentSessionStore as HostSessionStore,
     };
     use tinyagents_orchestration::subagent::{
-        SubagentTaskKey, SubagentSessionStore as TinySessionStore, SubAgentJobAction,
-        SubAgentJobRegistry, SubAgentJobStatus, SubAgentJobsTool,
+        SubAgentJobAction, SubAgentJobRegistry, SubAgentJobStatus, SubAgentJobsTool,
+        SubagentSessionStore as TinySessionStore, SubagentTaskKey,
     };
 
     let scratch = tempfile::tempdir().expect("isolated driver close fixture");
@@ -162,10 +159,9 @@ async fn closing_a_durable_driver_session_cancels_only_its_registered_child() {
             .with_thread("close-driver-thread"),
     );
     let parent_cancellation = parent.data.child().cancellation;
-    let jobs = (*crate::core::runtime::slot_for::<SubAgentJobRegistry>(
-        &parent.data.dispatch_ctx(),
-    ))
-    .clone();
+    let jobs =
+        (*crate::core::runtime::slot_for::<SubAgentJobRegistry>(&parent.data.dispatch_ctx()))
+            .clone();
     let task_key = SubagentTaskKey::from_context(&parent, "close-driver-task", None);
     let now = chrono::Utc::now().to_rfc3339();
     let sessions = HostSessionStore::new(workspace.clone());
@@ -266,7 +262,11 @@ async fn closing_a_durable_driver_session_cancels_only_its_registered_child() {
         DurableSubagentStatus::Closed,
         "the completion callback cannot revive a closed session"
     );
-    assert_eq!(provider.captured.lock().len(), 1, "child reaches one tool call");
+    assert_eq!(
+        provider.captured.lock().len(),
+        1,
+        "child reaches one tool call"
+    );
 
     let mut sibling_options = SubagentRunOptions::default();
     sibling_options.task_id = Some("close-driver-sibling-task".into());
