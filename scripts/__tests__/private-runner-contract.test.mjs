@@ -158,7 +158,7 @@ test("membership gate routes mixed identities, outsiders and bots away from EX63
   }
 });
 
-test("private cache save has a five-minute budget and cannot suppress artifact upload", () => {
+test("private validation and cache save have measured budgets without suppressing artifacts", () => {
   const workflow = readFileSync(
     new URL("../../.github/workflows/ci-lanes.yml", import.meta.url),
     "utf8",
@@ -166,7 +166,9 @@ test("private cache save has a five-minute budget and cannot suppress artifact u
   const saveStart = workflow.indexOf("      - name: Save Tinymold cache");
   const saveEnd = workflow.indexOf("\n      - name:", saveStart + 1);
   const save = workflow.slice(saveStart, saveEnd);
-  assert.match(save, /timeout-minutes: 5/);
+  assert.match(save, /timeout-minutes: 15/);
+  const job = workflow.slice(workflow.indexOf("  ex63:"), workflow.indexOf("    steps:"));
+  assert.match(job, /timeout-minutes: 180/);
   assert.match(save, /continue-on-error: true/);
   const upload = workflow.slice(
     workflow.indexOf("      - name: Upload lane logs, timings and coverage"),
