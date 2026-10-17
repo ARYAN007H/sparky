@@ -40,7 +40,7 @@ pub use crate::integrations::composio::builder_tools::{
     GetToolContractTool, GetToolOutputSampleTool, ListConnectableToolkitsTool,
     SearchToolCatalogTool,
 };
-pub use super::builder_tools_connection_reads::ListFlowConnectionsTool;
+pub use crate::integrations::composio::builder_tools::ListFlowConnectionsTool;
 
 #[cfg(test)]
 use super::builder_tools_connection_reads::flow_connection_to_json;

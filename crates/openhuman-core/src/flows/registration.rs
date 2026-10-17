@@ -1,10 +1,11 @@
 //! Registration of the flow authoring, execution, discovery, and memory tools.
 
 use super::builder_host::{FlowsHost, OverlayNodeKinds};
-use super::builder_tools::{
+use crate::integrations::composio::builder_tools::{
     GetToolContractTool, GetToolOutputSampleTool, ListConnectableToolkitsTool,
     ListFlowConnectionsTool, SearchToolCatalogTool,
 };
+use super::builder_tools_connection_reads::FlowsConnectionProvider;
 use super::memory_tools::{FlowMemoryRecallTool, FlowMemoryRememberTool};
 use super::tools::{ProposeWorkflowTool, RunFlowTool};
 use crate::config::Config;
@@ -72,7 +73,10 @@ pub(crate) fn tools(config: Arc<Config>, security: &Arc<SecurityPolicy>) -> Vec<
         Box::new(ListFlowsTool::new(host.clone())),
         Box::new(GetFlowTool::new(host.clone())),
         Box::new(GetFlowRunTool::new(host.clone())),
-        Box::new(ListFlowConnectionsTool::new(config.clone())),
+        Box::new(ListFlowConnectionsTool::new(
+            config.clone(),
+            Arc::new(FlowsConnectionProvider),
+        )),
         Box::new(SearchToolCatalogTool::new(config.clone())),
         // Full live contract (schemas, real required_args/output_fields,
         // primary_array_path) for one action slug found via

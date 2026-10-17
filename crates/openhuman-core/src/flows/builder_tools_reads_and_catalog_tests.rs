@@ -141,7 +141,10 @@ async fn get_flow_run_missing_id_is_error() {
 #[tokio::test]
 async fn list_flow_connections_is_read_only() {
     let tmp = TempDir::new().unwrap();
-    let tool = ListFlowConnectionsTool::new(test_config(&tmp));
+    let tool = ListFlowConnectionsTool::new(
+        test_config(&tmp),
+        Arc::new(crate::flows::builder_tools_connection_reads::FlowsConnectionProvider),
+    );
     assert_eq!(tool.permission_level(), PermissionLevel::None);
     assert!(!tool.external_effect());
 
