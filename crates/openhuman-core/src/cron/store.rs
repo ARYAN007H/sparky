@@ -212,11 +212,14 @@ pub(crate) fn update_job_with_origin(
             .delivery
             .clone()
             .unwrap_or_else(|| existing.delivery.clone());
-        // Validation only needs a verified current-turn origin. A persisted
-        // or request-provided origin may have come from an untrusted RPC.
-        crate::cron::job_builder::validate_delivery_for_config(
+        let effective_origin = patch
+            .origin
+            .clone()
+            .unwrap_or_else(|| existing.origin.clone());
+        crate::cron::job_builder::validate_delivery_for_config_with_trusted_origin(
             config,
             &delivery,
+            effective_origin.as_ref(),
             trusted_origin.as_ref(),
         )
         .map_err(anyhow::Error::msg)?;

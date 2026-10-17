@@ -385,9 +385,10 @@ fn handle_add(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture 
                 let delivery_cfg = delivery.clone().unwrap_or_default();
                 // RPC `origin` is request data, not a verified turn context;
                 // it cannot exempt a target from the configured allowlist.
-                crate::cron::job_builder::validate_delivery_for_config(
+                crate::cron::job_builder::validate_delivery_for_config_with_trusted_origin(
                     &config,
                     &delivery_cfg,
+                    origin.as_ref(),
                     None,
                 )?;
                 crate::cron::client::check_origin_requirements(
