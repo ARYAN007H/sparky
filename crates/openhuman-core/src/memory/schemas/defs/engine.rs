@@ -1,5 +1,5 @@
 use super::common::{opt, out, req};
-use crate::core::ControllerSchema;
+use crate::core::{ControllerSchema, TypeSchema};
 
 pub(super) fn schema(function: &str) -> Option<ControllerSchema> {
     match function {
