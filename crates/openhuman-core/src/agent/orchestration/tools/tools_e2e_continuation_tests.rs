@@ -201,15 +201,62 @@ async fn cancelling_a_paused_driver_through_rpc_settles_once_with_its_reason() {
     assert_eq!(paused_job.status, SubAgentJobStatus::AwaitingInput);
     assert!(pending_for(workspace.path(), "paused-cancel-rpc-thread").is_empty());
     let sessions = SubagentSessionStore::new(workspace.path().to_path_buf());
-    let before_rows = sessions.load().expect("paused durable session list");
-    let before_row = before_rows
+    let parent_session = live
+        .data
+        .parent
+        .as_ref()
+        .expect("live parent execution context")
+        .session_id
+        .clone();
+    let lifecycle_key = tinyagents_orchestration::subagent::SubagentTaskKey::from_context(
+        &live,
+        task_id.clone(),
+        Some("paused-cancel-rpc-thread".into()),
+    );
+    // Blocking spawn has no product session row in the legacy contract. Seed
+    // the row that a host-owned session surface would expose, using the real
+    // paused job's public id, full lifecycle key, and authenticated owner.
+    let session = crate::agent::orchestration::subagent_sessions::upsert_running(
+        &sessions,
+        crate::agent::orchestration::subagent_sessions::SubagentSessionUpsert {
+            selector: crate::agent::orchestration::subagent_sessions::SubagentSessionSelector {
+                parent_session: parent_session.clone(),
+                parent_thread_id: Some("paused-cancel-rpc-thread".into()),
+                agent_id: "task_manager_agent".into(),
+                model: Some("test-model".into()),
+                sandbox_mode: "workspace".into(),
+                action_root: None,
+                task_key: "paused-cancel-rpc-task".into(),
+            },
+            display_name: Some("Task Manager".into()),
+            task_title: "Pause cancellation fixture".into(),
+            worker_thread_id: None,
+            task_id: task_id.clone(),
+            lifecycle_key: Some(lifecycle_key),
+        },
+        None,
+    )
+    .expect("seed durable row for the actual paused job");
+    crate::agent::orchestration::subagent_sessions::mark_finished(
+        &sessions,
+        &session.subagent_session_id,
+        &task_id,
+        &crate::agent::subagent_host::SubagentRunStatus::AwaitingUser {
+            question: "which file should I inspect?".into(),
+            options: None,
+            checkpoint: None,
+        },
+        Vec::new(),
+    )
+    .expect("mark the seeded product row paused");
+    let before_row = sessions
+        .load()
+        .expect("paused durable session list")
         .into_iter()
-        .find(|row| row.current_task_id.as_deref() == Some(task_id.as_str()))
-        .unwrap_or_else(|| {
-            panic!("RPC selector uses accepted task id {task_id}; durable rows: {before_rows:#?}")
-        });
+        .find(|row| row.subagent_session_id == session.subagent_session_id)
+        .expect("seeded durable row remains available");
     assert_eq!(before_row.status, DurableSubagentStatus::AwaitingUser);
-    assert_eq!(before_row.parent_session, "paused-cancel-rpc-parent");
+    assert_eq!(before_row.parent_session, parent_session);
     assert_eq!(
         before_row.parent_thread_id.as_deref(),
         Some("paused-cancel-rpc-thread")
