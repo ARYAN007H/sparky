@@ -182,7 +182,7 @@ pub(crate) fn record_cancelled(
     match super::resolve::scoped_task_store(ctx, workspace_dir) {
         Ok(store) => record_cancelled_in_store(store.as_ref(), workspace_dir, task_id),
         Err(error) => log::debug!(
-            "[running_subagents] cancel ledger store unavailable task_id={task_id} error={error}"
+            "[running_subagents] cancel ledger store unavailable task_id={task_id} error={error:?}"
         ),
     }
 }
