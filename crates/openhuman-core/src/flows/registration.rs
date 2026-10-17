@@ -71,9 +71,7 @@ pub(crate) fn tools(config: Arc<Config>, security: &Arc<SecurityPolicy>) -> Vec<
         crate::integrations::composio::builder_tools::GetToolOutputSampleTool::new(config.clone()),
     ));
 
-    for name in ["list_agent_definitions"] {
-        push_copilot_tool(&mut tools, copilot.as_ref(), name);
-    }
+    push_copilot_tool(&mut tools, copilot.as_ref(), "list_agent_definitions");
     tools.push(Box::new(
         crate::integrations::composio::builder_tools::ListConnectableToolkitsTool::new(
             config.clone(),
