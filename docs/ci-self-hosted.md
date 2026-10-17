@@ -1,8 +1,8 @@
 # CI Fast: the lane flow and the EX63 runners
 
 CI Fast groups pre-merge checks into **lanes**, scheduled sequentially on the
-private runner and across a few hosted jobs. It is
-the whole pull-request flow: the `ci-lite.yml` workflow it was originally built
+private runner and across a few hosted jobs. Independent lanes within a hosted
+job may run in parallel. It is the pull-request lane flow: the `ci-lite.yml` workflow it was originally built
 alongside was deleted on 2026-10-01. The one check to require is **CI Gate**
 (see [CI Gate](#ci-gate)).
 
@@ -37,8 +37,7 @@ provisioning, deploys and the runner token.
 How lanes behave:
 
 - **Selection is by area only.** The changed-area filters in
-  `.github/ci-paths-filter.yml`, which CI Lite also uses, decide whether a
-  whole suite runs. Nothing narrows a suite to the changed files.
+  `.github/ci-paths-filter.yml` decide whether a whole suite runs. Nothing narrows a suite to the changed files.
 - **Nothing stops early.** A failed check never stops the checks after it
   in its lane, and never stops other lanes. Inside the coverage check,
   `scripts/ci/rust-coverage.sh` runs every crate and integration target even
@@ -50,47 +49,55 @@ How lanes behave:
   own lane's log live, with one folded group per check, and passes or fails
   on that lane alone. `Lane summary` carries the overall result.
 - **Changed-line coverage** must be at least 80% through
-  `scripts/ci/self-hosted/diff-cover.sh`, the same gate as `PR CI Gate`.
+  `scripts/ci/self-hosted/diff-cover.sh` in each lane profile.
 
-Private coverage includes the TUI and both default and product configurations
-of embed and TinyHumans. These configurations are distinct. Core doctests and
-the TinyJuice host-module regression retain their existing full/main workflow
-routes; embed doctests, rustdoc and offline examples remain in the private lint
-lane. The no-default embed check and gates-off tests compile their respective
-feature sets separately from product coverage.
+Both lane profiles include the TUI's default-feature test suite. Private core
+coverage runs eight configurations: core and CLI integration tests with product
+features; embed and TinyHumans with both product and default features; and RPC
+and TUI with default features. Default and product configurations remain
+separate. Embed doctests, rustdoc and offline examples run in the lint lane.
+The PR coverage check sets `OH_COV_DOCTESTS=0`; core doctests and the TinyJuice
+host-module regression run through [the reusable full unit suites](../.github/workflows/test-reusable.yml),
+called by [CI Full](../.github/workflows/ci-full.yml) for release validation.
+The no-default embed check and gates-off tests compile their respective feature
+sets separately from product coverage. Private Tauri validation also performs
+an uninstrumented application build before its nextest coverage suite.
 
 ## CI Gate
 
-`.github/workflows/ci-gate.yml` posts one commit status, `CI Gate`, on each PR
-head commit. It is the check branch protection should require, whichever flow
-ran the PR. It is re-evaluated whenever CI Fast, CI Fast (hosted) or CI Lite
-starts or finishes, from the decisive job of each:
+[CI Gate](../.github/workflows/ci-gate.yml) posts one commit status, `CI Gate`, on
+each PR head commit. Branch protection should require this status whichever
+lane profile handled the PR. The current flows and decisive jobs are:
 
-| Flow             | Decisive job                    |
-| ---------------- | ------------------------------- |
-| CI Fast          | `Lanes / CI Fast (EX63)`        |
-| CI Fast (hosted) | `Lanes / CI Fast (hosted) Gate` |
-| CI Lite          | `PR CI Gate`                    |
+| Flow                                                        | Decisive job                    |
+| ----------------------------------------------------------- | ------------------------------- |
+| [CI Fast](../.github/workflows/ci-fast.yml)                 | `Lanes / CI Fast (EX63)`        |
+| [CI Fast (hosted)](../.github/workflows/ci-fast-hosted.yml) | `Lanes / CI Fast (hosted) Gate` |
 
-- **success** as soon as one of those jobs passes. The GitHub-hosted runs
-  still working on that commit are then cancelled. The EX63 run is never
-  cancelled.
-- **pending** while nothing has passed and a flow is still running. An EX63
-  failure does not fail the gate while CI Lite is still running.
-- **failure** once every flow has finished without a pass.
+The gate workflow and script also recognize legacy `CI Lite` / `PR CI Gate`
+runs for compatibility; there is no current `ci-lite.yml` workflow.
 
-A skipped job is never a pass. That is why CI Lite skips `PR CI Gate` along
-with everything else when the EX63 runs the commit.
+- **success** when any observed flow's decisive job passes. Other running
+  GitHub-hosted flows for that commit are then cancelled; EX63 is never cancelled
+  by the gate.
+- **pending** while no decisive job has passed and an observed flow is still
+  running, or while no flow has appeared.
+- **failure** when all observed flows finish without a decisive job passing.
+  A skipped job is never a pass.
 
 Who runs what:
 
-- **Org members:** `ci-fast.yml` on `pull_request_target`, routed by
-  `scripts/ci/ci-fast-route.sh` (shared with `ci-fast-hosted.yml`). The route
-  decision falls back to the hosted lanes when no EX63 run starts within three
-  minutes, or when routing errors.
-- **Outsiders:** CI Lite and CI Fast (hosted) both run, and the first to pass
-  cancels the other.
-- **Pushes to `main`:** CI Lite runs, and the gate ignores them.
+- **Members admitted by the route:** `ci-fast.yml` uses the PR author and actor
+  membership check from the trusted base workflow to select EX63.
+- **Outsiders:** the EX63 lanes are skipped and `ci-fast-hosted.yml` runs the
+  hosted lanes. There is no CI Lite race.
+- **Routing fallback:** the hosted workflow polls the EX63 workflow's routing
+  decision using `scripts/ci/ci-fast-route.sh`. After about three minutes without
+  a decision it falls back to the PR's author association and author/actor
+  comparison; that fallback can still classify a member PR for EX63.
+- **Release validation:** CI Full separately handles PRs and pushes to `release`,
+  plus manual dispatch. CI Fast's workflows are triggered by PR events, and the
+  CI Gate updater ignores non-PR workflow runs.
 
 The workflow runs from the default branch through `workflow_run`, with
 `statuses: write` and `actions: write`. It never checks out PR code; the
@@ -109,9 +116,9 @@ for any commit without posting it.
     validation, `verify-runner.sh` compares `/etc/ohci/build-info` with that pin,
     checks preinstalled tools (Python 3.10 with tomli, or stdlib tomllib), and selects `rust-toolchain.toml` explicitly.
     Missing metadata, tools, or the compiler fail; CI does not install replacements.
-  - The pinned shared checkout action fetches the PR merge ref with full root
-    and submodule history for pin ancestry checks, recursive build dependencies,
-    and the `wiki` exclusion.
+  - The pinned shared checkout action fetches the PR merge ref with
+    `fetch-depth: 0` and `submodule-depth: 0`: full root and recursive submodule
+    history for pin ancestry checks, with unused `wiki` submodules excluded.
   - The pinned Tinymold setup/save actions use the image's binary and signed
     remote cache. The supervisor supplies credentials through guest metadata;
     the workflow masks them and needs no additional repository secrets. Cache
@@ -125,7 +132,8 @@ for any commit without posting it.
   - Cargo registry, pnpm store, and content-based frontend caches remain on the
     slot cache disk. Rust output caching uses Tinymold alone.
   - VM sizing is a supervisor setting; it is not assumed by the lane scheduler.
-    The frontend lint/check lane has an explicit 4-GiB Node heap budget.
+    The frontend lint/check lane sets `NODE_OPTIONS=--max-old-space-size=4096`
+    (4096 MiB of old-space heap); hosted keeps its default Node budget.
     Vitest currently uses 8 workers.
 - **`hosted`**: lanes grouped into jobs sized for 4-core, ~14 GB runners:
   `checks`, `rust-lint` (lint and gates-off in turn), `rust-cov`, `tauri`,
@@ -149,9 +157,13 @@ members may land on GitHub-hosted runners instead.
 ## Measuring
 
 ```bash
-node scripts/ci/self-hosted/compare-runs.mjs            # wall clock per commit
-node scripts/ci/self-hosted/compare-runs.mjs --lanes    # plus per-lane times
+node scripts/ci/self-hosted/compare-runs.mjs            # historical CI Lite comparisons
+node scripts/ci/self-hosted/compare-runs.mjs --lanes    # include historical lane times
 ```
+
+The comparison script requires a matching legacy CI Lite run, so it does not
+measure commits that only have the current lane flows. For current measurements,
+use workflow elapsed time and the uploaded per-check and cache timing records.
 
 Each run uploads `ci-out-*` artifacts with per-lane logs, `ci-timings.json`
 (per-check timings and target-dir sizes), linkage proof, and lcov. Tinymold
