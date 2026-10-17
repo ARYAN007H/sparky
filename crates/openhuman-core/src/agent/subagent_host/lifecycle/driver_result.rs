@@ -59,20 +59,20 @@ pub(crate) async fn resolve_inline_driver_outcome(
         ))
     } else {
         bundle
-        .persistence
-        .load_pause(task_key)
-        .await
-        .map_err(map_lifecycle_error)?
-        .map(|outcome| {
-            (
-                outcome,
-                cached
-                    .as_ref()
-                    .map_or(SubagentPersistenceDisposition::PauseExisting, |host| {
-                        host.persistence_disposition
-                    }),
-            )
-        })
+            .persistence
+            .load_pause(task_key)
+            .await
+            .map_err(map_lifecycle_error)?
+            .map(|outcome| {
+                (
+                    outcome,
+                    cached
+                        .as_ref()
+                        .map_or(SubagentPersistenceDisposition::PauseExisting, |host| {
+                            host.persistence_disposition
+                        }),
+                )
+            })
     };
 
     if let Some((outcome, disposition)) = persisted {
