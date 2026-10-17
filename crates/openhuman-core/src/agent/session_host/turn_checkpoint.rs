@@ -352,21 +352,7 @@ fn harness_instruction_needles(stop_reason: Option<&str>) -> Vec<String> {
     if let Some(reason) = stop_reason {
         sources.push(reason);
     }
-    sources
-        .iter()
-        .flat_map(|source| source.split(['.', '\n']))
-        .map(normalize_for_quote_match)
-        .filter(|span| span.split_whitespace().count() >= MIN_QUOTED_WORDS)
-        .collect()
-}
-
-/// Lowercase and collapse runs of whitespace, so a quotation is recognised
-/// through re-wrapping, indentation or a change of case.
-fn normalize_for_quote_match(text: &str) -> String {
-    text.split_whitespace()
-        .map(|word| word.to_lowercase())
-        .collect::<Vec<_>>()
-        .join(" ")
+    tinyagents_harness::close::harness_instruction_needles(&sources, MIN_QUOTED_WORDS)
 }
 
 /// Whether `candidate` reproduces a span of the harness directives or the stop
@@ -376,10 +362,9 @@ fn normalize_for_quote_match(text: &str) -> String {
 /// strings, and reproducing either is never the right reply, so this runs
 /// before the model-backed verification and cannot fail open on it.
 pub(crate) fn quotes_harness_instruction(candidate: &str, stop_reason: Option<&str>) -> bool {
-    let normalized = normalize_for_quote_match(candidate);
-    harness_instruction_needles(stop_reason)
-        .iter()
-        .any(|needle| normalized.contains(needle.as_str()))
+    let needles = harness_instruction_needles(stop_reason);
+    let phrases: Vec<&str> = needles.iter().map(String::as_str).collect();
+    tinyagents_harness::close::quotes_harness_instruction(candidate, &phrases)
 }
 
 /// Why a closing message cannot be shown, worded for the one corrective

@@ -63,6 +63,17 @@ impl RepairUsage {
                 .add(crate::agent::cost::call_cost(&self.pricing_model, &usage));
         }
     }
+
+    fn record_close_call(
+        &mut self,
+        kind: tinyagents_harness::close::CloseRequestKind,
+        response: Option<&ModelResponse>,
+    ) {
+        self.record(
+            response.and_then(crate::inference::provider::model::usage_info_from_response),
+            kind != tinyagents_harness::close::CloseRequestKind::Verification,
+        );
+    }
 }
 
 /// A repaired terminal reply and the extra provider usage it incurred.
@@ -112,41 +123,42 @@ pub(super) async fn repair_required_output(
         return None;
     }
 
-    let mut prompt_history: Vec<TranscriptMessage> = history
-        .iter()
-        .filter_map(message_to_native_chat_message)
-        .collect();
-    prompt_history.push(TranscriptMessage::user(wrap_harness_instruction(
-        &required::repair_instruction(contract),
-    )));
-    let (candidate, candidate_usage) =
-        completion(source, model, temperature, thread_id, prompt_history).await;
-    usage.record(candidate_usage, true);
-    let candidate = candidate.trim().to_owned();
-    let candidate_is_usable = !candidate.is_empty()
-        && !contains_tool_call(dispatcher, &candidate)
-        && required::output_satisfies_contract(&candidate, contract);
-
-    if !reply_already_streamed {
-        let output = if candidate_is_usable {
-            candidate
-        } else {
-            format!("{}\n\n{reply}", required::synthesize_block(contract))
-        };
-        return Some(output);
-    }
-
-    // The main loop may have already emitted the original reply.  Never
-    // replace what the user saw: append the recovered block (or a deterministic
-    // one) and stream that exact continuation before returning it for commit.
-    let correction = if candidate_is_usable {
-        required::find_required_block(&candidate, contract)
-            .and_then(|block| serde_json::to_string(&block).ok())
-            .unwrap_or_else(|| required::synthesize_block(contract))
-    } else {
-        required::synthesize_block(contract)
+    let prompt_history: Vec<tinyinference_llm::message::Message> = history.to_vec();
+    let mut on_call_completed = |kind, response: Option<&ModelResponse>| {
+        usage.record_close_call(kind, response);
     };
-    let continuation = format!("\n\n{correction}");
+    let options = tinyagents_harness::close::RequiredOutputRepairOptions {
+        request: tinyagents_harness::close::CloseRequestOptions {
+            model: Some(model),
+            temperature: Some(temperature),
+            max_output_tokens: Some(AGENT_TURN_MAX_OUTPUT_TOKENS),
+            minimum_harness_phrase_chars: 24,
+            on_call_completed: Some(&mut on_call_completed),
+        },
+        fallback_placement:
+            tinyagents_harness::close::RequiredOutputFallbackPlacement::Prepend,
+    };
+    let repaired = tinyagents_harness::close::repair_required_output_with_repair_options(
+        &*source.build_summarizer(model, temperature, thread_id).ok()?,
+        &(),
+        dispatcher,
+        tinyagents_harness::close::RequiredOutputRepairConfig {
+            history: &prompt_history,
+            reply,
+            contract,
+            repair_instruction: &wrap_harness_instruction(&required::repair_instruction(contract)),
+            reply_already_streamed,
+        },
+        options,
+    )
+    .await?;
+    // The main loop may already have emitted the reply. In that case send only
+    // TinyAgents' returned continuation, then commit the same full text.
+    let continuation = repaired
+        .text
+        .strip_prefix(reply)
+        .unwrap_or(&repaired.text)
+        .to_owned();
     if let Some(progress) = progress {
         if let Err(error) = progress
             .send(crate::progress::AgentProgress::TextDelta {
@@ -158,7 +170,7 @@ pub(super) async fn repair_required_output(
             tracing::debug!(%error, "[session-runtime] required-output repair progress receiver closed");
         }
     }
-    Some(format!("{reply}{continuation}"))
+    Some(repaired.text)
 }
 
 /// The tool-less closing instruction for `outcome`: the cap checkpoint when the
@@ -240,11 +252,7 @@ pub(super) async fn close_if_needed(
         }
     };
     let mut on_call_completed = |kind, response: Option<&ModelResponse>| {
-        let billed = response.and_then(crate::inference::provider::model::usage_info_from_response);
-        usage.record(
-            billed,
-            kind != tinyagents_harness::close::CloseRequestKind::Verification,
-        );
+        usage.record_close_call(kind, response);
     };
     let close_options = tinyagents_harness::close::CloseRequestOptions {
         model: Some(model),
@@ -265,8 +273,10 @@ pub(super) async fn close_if_needed(
             },
             repair_instruction: |violation| {
                 let violation = match violation {
-                    tinyagents_harness::close::CloseViolation::NoReply
-                    | tinyagents_harness::close::CloseViolation::QuotedInstruction => {
+                    tinyagents_harness::close::CloseViolation::NoReply => {
+                        crate::agent::session_host::turn_checkpoint::CloseViolation::NoReply
+                    }
+                    tinyagents_harness::close::CloseViolation::QuotedInstruction => {
                         crate::agent::session_host::turn_checkpoint::CloseViolation::QuotedHarnessText
                     }
                     tinyagents_harness::close::CloseViolation::Unverified => {
