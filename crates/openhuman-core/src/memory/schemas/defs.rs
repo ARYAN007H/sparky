@@ -40,9 +40,9 @@ pub const FUNCTIONS: [&str; 35] = [
     "migration_retry",
 ];
 
+mod brain;
 mod common;
 mod conversations;
-mod brain;
 mod engine;
 mod import;
 mod jobs;
@@ -52,6 +52,7 @@ mod retrieval;
 mod sources;
 
 use crate::core::{ControllerSchema, FieldSchema, TypeSchema};
+use common::req;
 
 /// The schema of `function`; an unknown function gets the namespace's
 /// `unknown` placeholder, as every namespace does.
