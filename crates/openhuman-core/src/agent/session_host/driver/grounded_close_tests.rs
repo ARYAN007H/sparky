@@ -11,6 +11,7 @@ const FALLBACK: &str = "deterministic fallback";
 fn classified_halt_returns_partial_work_without_provider_usage() {
     use tinyagents_harness::turn_outcome::ToolCallOutcome;
     let outcome = TinyagentsTurnOutcome {
+        deferred_terminal: None,
         text: String::new(),
         resolved_route: None,
         history: Vec::new(),
@@ -203,6 +204,7 @@ async fn an_empty_candidate_is_re_asked_before_the_fallback() {
 
 fn blank_outcome(truncated: bool) -> TinyagentsTurnOutcome {
     TinyagentsTurnOutcome {
+        deferred_terminal: None,
         text: String::new(),
         resolved_route: None,
         history: Vec::new(),
