@@ -404,12 +404,9 @@ impl ProfileHost {
         let anchor: Arc<dyn std::any::Any + Send + Sync> = context.clone();
         fence.anchor_to(Arc::downgrade(&anchor));
         self.fences.register(Arc::clone(&fence));
-        if let Err(error) = super::lifecycle::reconcile_cron_admission(
-            &config,
-            id,
-            self.cron_backend.as_ref(),
-        )
-        .await
+        if let Err(error) =
+            super::lifecycle::reconcile_cron_admission(&config, id, self.cron_backend.as_ref())
+                .await
         {
             self.fences.retire(id.as_str(), grant.epoch);
             profile_lease::release_all(self, vec![(id.clone(), grant)]).await;
