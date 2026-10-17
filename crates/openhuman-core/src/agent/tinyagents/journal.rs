@@ -173,6 +173,23 @@ impl TurnJournal {
             ),
         }
     }
+
+    /// Best-effort terminal write for a cooperatively cancelled run.
+    pub(crate) async fn finish_cancelled(&self, reason: &str) {
+        self.event_sink.flush();
+        let snapshot = {
+            let mut guard = self.status.lock().unwrap();
+            guard.mark_cancelled(reason);
+            guard.clone()
+        };
+        match self.status_store.put_status(snapshot).await {
+            Ok(()) => log::debug!("[journal] run cancelled run_id={}", self.run_id.as_str()),
+            Err(err) => log::debug!(
+                "[journal] cancelled status write failed run_id={} err={err}",
+                self.run_id.as_str()
+            ),
+        }
+    }
 }
 
 /// Attach a durable event journal + status writer to `events`, *in addition to*

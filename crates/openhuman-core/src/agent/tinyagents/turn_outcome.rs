@@ -41,6 +41,56 @@ impl DeferredTurnTerminal {
             journal.finish_completed().await;
         }
     }
+
+    /// Finalize a host turn that was cancelled after the harness had returned.
+    /// The host callback runs after Tiny persists any recoverable partial.
+    pub(crate) async fn finish_cancelled(self) {
+        use tinyagents_harness::terminal::{TerminalOutcome, TerminalReason};
+        self.events.emit(
+            tinyagents_harness::events::AgentEvent::RunFailed {
+                run_id: self.run_id.clone(),
+                error: "turn cancelled after harness completion".into(),
+                outcome: Some(TerminalOutcome::new(
+                    TerminalReason::Cancelled,
+                    "turn cancelled after harness completion",
+                )),
+            },
+        );
+        self.events
+            .emit(tinyagents_harness::events::AgentEvent::RunFinalized {
+                run_id: self.run_id,
+            });
+        if let Some(journal) = self.journal {
+            journal
+                .finish_cancelled("turn cancelled after harness completion")
+                .await;
+        }
+    }
+
+    /// Finalize a host turn that failed after the harness had returned.
+    /// Arbitrary runtime error text is kept out of the content-free trace.
+    pub(crate) async fn finish_failed(self) {
+        use tinyagents_harness::terminal::{TerminalOutcome, TerminalReason};
+        self.events.emit(
+            tinyagents_harness::events::AgentEvent::RunFailed {
+                run_id: self.run_id.clone(),
+                error: "host turn failed after harness completion".into(),
+                outcome: Some(TerminalOutcome::new(
+                    TerminalReason::Internal,
+                    "host turn failed after harness completion",
+                )),
+            },
+        );
+        self.events
+            .emit(tinyagents_harness::events::AgentEvent::RunFinalized {
+                run_id: self.run_id,
+            });
+        if let Some(journal) = self.journal {
+            journal
+                .finish_failed("host turn failed after harness completion")
+                .await;
+        }
+    }
 }
 
 /// The outcome of a turn driven on the `tinyagents` harness.
