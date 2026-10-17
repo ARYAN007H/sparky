@@ -402,6 +402,9 @@ test("private gates-off, storage, and Tauri execute equivalent coverage suites w
       .checks.filter((c) => /cargo (test|llvm-cov)/.test(c.run))) {
       assert.match(c.run, /cargo llvm-cov nextest/);
       assert.match(c.run, /--no-tests=fail/);
+      // Pinned cargo-llvm-cov 0.9.1 rejects combining these two flags;
+      // --no-report already preserves previous instrumentation profiles.
+      assert.doesNotMatch(c.run, /--no-clean(?:\s|$)/);
       assert.match(c.run, /--lcov --output-path ci-out\/lcov\//);
       assert.match(c.run, /--no-report .*\|\| rc=\$\?; cargo llvm-cov report/);
       assert.match(c.run, /exit "\$rc"$/);
