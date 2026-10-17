@@ -27,8 +27,6 @@
 //! timeline or worker thread" criterion via both paths; a live inbox would be a
 //! separate orchestration-layer change.
 
-use std::sync::Arc;
-
 use anyhow::{anyhow, Result};
 use serde_json::json;
 
@@ -36,8 +34,7 @@ use crate::agent::harness::ParentExecutionContext;
 use crate::agent::orchestration::parent_context::with_root_parent;
 use crate::config::Config;
 use tinyagents_session::run_ledger::{
-    AgentTeamMember, AgentTeamMemberStatus, AgentTeamTask, ClaimOutcome, CompletionOutcome,
-    RunEventAppend,
+    AgentTeamMember, AgentTeamMemberStatus, AgentTeamTask, RunEventAppend,
 };
 use {
     crate::agent::orchestration::AgentOrchestrationSession,
@@ -46,10 +43,9 @@ use {
 };
 
 use tinyagents_orchestration::teams::{
-    build_member_prompt, claimable_task, deliver_pending_messages, run_member_graph,
-    truncate_chars, MemberOutcome, SessionTeamLedger, TeamError,
+    build_member_prompt, claimable_task, deliver_pending_messages, truncate_chars,
+    SessionTeamLedger, TeamError, TeamMemberExecutor, TeamMemberStartError,
 };
-
 use tinyagents_graph::GraphTracingSink;
 
 const LOG_TARGET: &str = "agent_team_runtime";
@@ -144,74 +140,78 @@ pub async fn start_member_run(
         },
     };
 
-    // The team-run id doubles as the claim token (CAS guard) and the member's
-    // worker/run pointer surfaced to the UI.
-    let run_id = format!("teamrun-{}", uuid::Uuid::new_v4().simple());
-    let claimed = match run_ledger::claim_agent_team_task(
-        &config.workspace_dir,
-        team_id,
-        &target.id,
-        member_id,
-        &run_id,
-    )
-    .await?
-    {
-        ClaimOutcome::Claimed(task) => *task,
-        ClaimOutcome::AlreadyClaimed => return Ok(StartMemberOutcome::AlreadyClaimed),
-        ClaimOutcome::Blocked { unmet } => return Ok(StartMemberOutcome::Blocked { unmet }),
-        ClaimOutcome::UnknownTask => return Ok(StartMemberOutcome::UnknownTask),
+    // TinyAgents owns the claim, active transition, cleanup and completion.
+    // The receipt crosses back to this RPC as soon as the owner has durably
+    // admitted the run; the same owner future then continues executing it.
+    let ledger = crate::storage::sessions::require_ledger(&config.workspace_dir)
+        .map_err(|error| anyhow!("{error}"))?;
+    let service = SessionTeamLedger::new(ledger).map(tinyagents_orchestration::teams::TeamService::new)?;
+    let executor = HostTeamMemberExecutor {
+        ctx: ctx.clone(),
+        config: config.clone(),
+        team_id: team_id.to_string(),
+        member_id: member_id.to_string(),
+        model_override,
     };
-
-    // Mark active synchronously so the polling UI reflects the running member
-    // before the (async) worker even starts.
-    run_ledger::mark_agent_team_member_running(
-        &config.workspace_dir,
-        team_id,
-        member_id,
-        &claimed.id,
-        &run_id,
-        &run_id,
-    )
-    .await?;
-
-    let agent_id = member
-        .agent_id
-        .clone()
-        .unwrap_or_else(|| DEFAULT_TEAMMATE_AGENT_ID.to_string());
-    let cfg = config.clone();
-    let task_ctx = ctx.clone();
+    let (started_tx, started_rx) = tokio::sync::oneshot::channel();
+    let mut started_tx = Some(started_tx);
     let team = team_id.to_string();
     let mem = member_id.to_string();
-    let task_for_loop = claimed.clone();
-    let rid = run_id.clone();
+    let task_id = target.id.clone();
+    let task_config = config.clone();
+    let service_task = service.clone();
     // The member loop drives real agent work on a fresh task, and task-locals
     // don't cross `tokio::spawn` — capture the caller's turn origin here so the
     // worker keeps the label the approval gate needs. Inherit-only: no origin
     // in scope means the worker stays unlabelled and fails closed as before.
     let inherited_origin = crate::security::turn_origin::capture();
     ctx.spawn(async move {
-        crate::security::turn_origin::with_inherited_origin(
+        let owner_result = crate::security::turn_origin::with_inherited_origin(
             inherited_origin,
-            run_member_loop(
-                &task_ctx,
-                &cfg,
+            service_task.start_member_with_started(
                 &team,
+                &task_id,
                 &mem,
-                &agent_id,
-                task_for_loop,
-                &rid,
-                model_override,
-                None,
+                &executor,
+                false,
+                |started| {
+                    if let Some(sender) = started_tx.take() {
+                        let _ = sender.send(Ok(started));
+                    }
+                },
             ),
         )
         .await;
+        if let Err(error) = owner_result {
+            if let Some(sender) = started_tx.take() {
+                let _ = sender.send(Err(error));
+            } else {
+                log::error!(target: LOG_TARGET, "[agent_team_runtime] owner execution failed team={team} member={mem} task={task_id}: {error:#}");
+                record_failure_event(&task_config, &team, &mem, &task_id, &error.to_string()).await;
+            }
+        }
     });
 
-    log::debug!(
-        target: LOG_TARGET,
-        "[agent_team_runtime] start.spawned team={team_id} member={member_id} task={} run={run_id}",
-        claimed.id
-    );
+    let started = match started_rx.await {
+        Ok(Ok(started)) => started,
+        Ok(Err(error)) => {
+            if let Some(error) = error.downcast_ref::<TeamMemberStartError>() {
+                return Ok(match error {
+                    TeamMemberStartError::AlreadyClaimed { .. } => StartMemberOutcome::AlreadyClaimed,
+                    TeamMemberStartError::Blocked { unmet, .. } => {
+                        StartMemberOutcome::Blocked { unmet: unmet.clone() }
+                    }
+                    TeamMemberStartError::UnknownTask { .. } => StartMemberOutcome::UnknownTask,
+                    TeamMemberStartError::Other(_) => return Err(anyhow!("{error}")),
+                });
+            }
+            return Err(error);
+        }
+        Err(_) => return Err(anyhow!("team member start task exited before admission")),
+    };
+    let run_id = started.run_id;
+    let claimed = started.task;
+    log::debug!(target: LOG_TARGET, "[agent_team_runtime] start.spawned team={team_id} member={member_id} task={} run={run_id}", claimed.id);
     Ok(StartMemberOutcome::Started {
         run_id,
         task: Box::new(claimed),
