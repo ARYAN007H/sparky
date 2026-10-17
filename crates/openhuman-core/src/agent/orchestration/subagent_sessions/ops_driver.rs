@@ -281,7 +281,9 @@ pub fn mark_driver_pause_cancelled(
         return Ok(false);
     }
     session.status = DurableSubagentStatus::Failed;
-    session.latest_error = Some("cancelled by user".into());
+    session
+        .latest_error
+        .get_or_insert_with(|| "cancelled by user".into());
     session.updated_at = chrono::Utc::now().to_rfc3339();
     session.last_used_at = session.updated_at.clone();
     store.save(&sessions)?;
