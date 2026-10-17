@@ -35,8 +35,8 @@ use std::time::Duration;
 
 use tinyagents_tasks::{
     CompletionRecord, CompletionResult, CompletionRouter, CompletionState, CompletionStatus,
-    CompletionStore, DriverCompletionStore, InMemoryCompletionStore, NotifyMode, RecordOutcome,
-    TombstoneOutcome, DEFAULT_MAX_ATTEMPTS,
+    CompletionStore, DriverCompletionStore, InMemoryCompletionStore, NotifyMode, TombstoneOutcome,
+    DEFAULT_MAX_ATTEMPTS,
 };
 use tinyagents_orchestration::subagent::{
     DetachedCompletionTarget, DetachedSubagentStatus, record_detached_completion,
