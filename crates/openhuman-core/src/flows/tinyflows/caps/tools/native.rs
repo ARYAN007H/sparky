@@ -85,6 +85,7 @@ impl ToolBackend for NativeToolBackend {
                 slug,
                 &outcome.result,
             )
+            .map_err(EngineError::Capability)
             .map(|_| crate::tools::native_ops::flow_backend::native_tool_payload(&outcome.result))
         });
 
