@@ -430,11 +430,11 @@ async fn provisioning_installs_the_cron_cap_in_the_profile_scope() {
     crate::cron::client::store_in::<crate::cron::CronJob>(&config, &scope, operation())
         .await
         .unwrap();
-    let second = crate::cron::client::store_in::<crate::cron::CronJob>(
-        &config,
-        &scope,
-        operation(),
-    )
-    .await;
-    assert!(second.is_err(), "the profile store must enforce its provisioned cap");
+    let second =
+        crate::cron::client::store_in::<crate::cron::CronJob>(&config, &scope, operation()).await;
+    let error = second.expect_err("the profile store must enforce its provisioned cap");
+    assert!(
+        error.to_string().contains("active job limit"),
+        "unexpected admission error: {error}"
+    );
 }

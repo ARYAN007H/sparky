@@ -137,6 +137,13 @@ pub(crate) async fn trigger(binding: &Binding, flow_id: &str, run_id: &str) -> A
                 }
             };
             binding.publish_triggered_once(&job, run_id);
+            if let Err(error) = crate::cron::limits::check_run(&config, &job) {
+                return Attempt {
+                    success: false,
+                    output: error.to_string(),
+                    retryable: false,
+                };
+            }
             if let Some(refusal) = kind_refusal(binding, &job.job_type) {
                 return Attempt {
                     success: false,

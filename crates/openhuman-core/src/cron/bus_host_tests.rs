@@ -302,8 +302,16 @@ async fn schedule_trigger_checks_agent_only_limits_before_running_a_flow_handler
         .unwrap();
 
     assert!(!attempt.success);
-    assert!(attempt.output.contains("only agent cron jobs"), "{}", attempt.output);
-    assert_eq!(calls.load(Ordering::SeqCst), 0, "the flow handler never ran");
+    assert!(
+        attempt.output.contains("only agent cron jobs"),
+        "{}",
+        attempt.output
+    );
+    assert_eq!(
+        calls.load(Ordering::SeqCst),
+        0,
+        "the flow handler never ran"
+    );
 }
 
 #[cfg(feature = "flows")]

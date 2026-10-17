@@ -107,7 +107,24 @@ impl ProfileHost {
         if self.registry.get(id).await?.is_some() {
             return Ok(false);
         }
-        create_dirs(&self.layout_of(id))?;
+        let layout = self.layout_of(id);
+        create_dirs(&layout)?;
+        let config = self.forced_config(&layout, id);
+        if config.cron.agent_jobs_only {
+            let scope = crate::cron::documents_port::DocScope::for_scope(
+                &config,
+                crate::storage::scope_for_profile(id.as_str()),
+            );
+            crate::cron::client::store_in::<()>(
+                &config,
+                &scope,
+                tinyflows_bus::schedule::StoreOperation::SetMaxActiveJobs {
+                    limit: Some(config.cron.max_active_jobs as usize),
+                },
+            )
+            .await
+            .map_err(|error| format!("could not install the profile's cron job cap: {error}"))?;
+        }
         let meta = ProfileMeta {
             profile_id: id.clone(),
             created_at: unix_now(),

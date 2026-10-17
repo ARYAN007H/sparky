@@ -151,14 +151,10 @@ fn concurrent_preflight_admissions_cannot_oversubscribe_the_store_cap() {
                 let barrier = Arc::clone(&barrier);
                 scope.spawn(move || {
                     barrier.wait();
-                    limits::check_new(
-                        &config,
-                        &JobType::Agent,
-                        &schedule,
-                        Some(&delivery),
-                    )
-                    .unwrap();
+                    let preflight =
+                        limits::check_new(&config, &JobType::Agent, &schedule, Some(&delivery));
                     barrier.wait();
+                    preflight?;
                     crate::cron::client::store_blocking::<crate::cron::CronJob>(
                         &config,
                         tinyflows_bus::schedule::StoreOperation::AddAgent {
@@ -179,6 +175,14 @@ fn concurrent_preflight_admissions_cannot_oversubscribe_the_store_cap() {
 
     assert_eq!(results.len(), 2);
     assert_eq!(results.iter().filter(|result| result.is_ok()).count(), 1);
+    let rejected = results
+        .iter()
+        .find_map(|result| result.as_ref().err())
+        .unwrap();
+    assert!(
+        rejected.to_string().contains("active job limit"),
+        "unexpected admission error: {rejected}"
+    );
     assert_eq!(crate::cron::list_jobs(&config).unwrap().len(), 1);
 }
 
