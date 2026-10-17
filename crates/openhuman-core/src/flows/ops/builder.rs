@@ -467,19 +467,16 @@ pub(super) fn extract_workflow_proposal(
     history: &[tinytools_agent::dialect::TranscriptEntry],
 ) -> Option<Value> {
     use tinytools_agent::dialect::TranscriptEntry;
-    let mut latest = None;
-    for message in history {
-        if let TranscriptEntry::ToolResults(results) = message {
-            for result in results {
-                if let Ok(value) = serde_json::from_str::<Value>(&result.content) {
-                    if value.get("type").and_then(Value::as_str) == Some("workflow_proposal") {
-                        latest = Some(value);
-                    }
-                }
-            }
-        }
-    }
-    latest
+    crate::agent::orchestration::tools::structured_payload::extract_last_typed_payload(
+        history.iter().flat_map(|message| match message {
+            TranscriptEntry::ToolResults(results) => results
+                .iter()
+                .map(|result| result.content.as_str())
+                .collect::<Vec<_>>(),
+            _ => Vec::new(),
+        }),
+        "workflow_proposal",
+    )
 }
 
 /// Keep the builder's first turn from auto-resuming another flow's session.
