@@ -1,7 +1,7 @@
 //! Query matching, stable curation ranking, and fallback scoring for live catalog search.
 
-use serde_json::{json, Value};
 use crate::config::Config;
+use serde_json::{json, Value};
 
 /// Cap on returned matches so a broad query can't flood the agent's context.
 pub(super) const MAX_CATALOG_RESULTS: usize = 40;
@@ -289,4 +289,3 @@ pub(crate) async fn search_catalog(
         )),
     }
 }
-

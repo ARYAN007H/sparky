@@ -1,12 +1,14 @@
 use super::*;
 
-use std::sync::Arc;
-use serde_json::{json, Value};
 use super::catalog_search::search_catalog;
+use crate::config::Config;
+use crate::integrations::composio::catalog::{
+    seed_live_catalog_cache, seed_probe_cache, ProbedOutputSample, ToolContract,
+};
+use serde_json::{json, Value};
+use std::sync::Arc;
 use tempfile::TempDir;
 use tinytools::{PermissionLevel, Tool};
-use crate::config::Config;
-use crate::integrations::composio::catalog::{seed_live_catalog_cache, seed_probe_cache, ProbedOutputSample, ToolContract};
 
 struct EmptyConnectableProvider;
 
@@ -24,33 +26,82 @@ impl ConnectableToolkitProvider for EmptyConnectableProvider {
 #[tokio::test]
 async fn connectable_toolkits_uses_the_injected_host_snapshot_and_fails_closed_empty() {
     let tmp = TempDir::new().unwrap();
-    let tool = ListConnectableToolkitsTool::new(
-        test_config(&tmp),
-        Arc::new(EmptyConnectableProvider),
-    );
+    let tool =
+        ListConnectableToolkitsTool::new(test_config(&tmp), Arc::new(EmptyConnectableProvider));
     let result = tool.execute(json!({})).await.unwrap();
     assert!(!result.is_error, "{}", result.output());
     let value: Value = serde_json::from_str(&result.output()).unwrap();
-    assert!(value["toolkits"].as_array().unwrap().iter().all(|item| item["connected"] == false));
+    assert!(value["toolkits"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .all(|item| item["connected"] == false));
 }
 
 fn test_config(tmp: &TempDir) -> Arc<Config> {
-    let config = Config { workspace_dir: tmp.path().join("workspace"), action_dir: tmp.path().join("workspace"), config_path: tmp.path().join("config.toml"), ..Config::default() };
+    let config = Config {
+        workspace_dir: tmp.path().join("workspace"),
+        action_dir: tmp.path().join("workspace"),
+        config_path: tmp.path().join("config.toml"),
+        ..Config::default()
+    };
     std::fs::create_dir_all(&config.workspace_dir).unwrap();
     Arc::new(config)
 }
 
 fn seeded_gmail_send_contract() -> ToolContract {
-    ToolContract { slug: "GMAIL_SEND_EMAIL".into(), toolkit: "gmail".into(), description: Some("Send an email".into()), required_args: vec!["to".into(), "body".into()], input_schema: Some(json!({"type":"object","required":["to","body"]})), output_fields: vec!["id".into(),"threadId".into()], output_schema: Some(json!({"type":"object","properties":{"id":{"type":"string"},"threadId":{"type":"string"}}})), primary_array_path: None, is_curated: true }
+    ToolContract {
+        slug: "GMAIL_SEND_EMAIL".into(),
+        toolkit: "gmail".into(),
+        description: Some("Send an email".into()),
+        required_args: vec!["to".into(), "body".into()],
+        input_schema: Some(json!({"type":"object","required":["to","body"]})),
+        output_fields: vec!["id".into(), "threadId".into()],
+        output_schema: Some(
+            json!({"type":"object","properties":{"id":{"type":"string"},"threadId":{"type":"string"}}}),
+        ),
+        primary_array_path: None,
+        is_curated: true,
+    }
 }
 fn spotify_curated_action() -> ToolContract {
-    ToolContract { slug: "SPOTIFY_START_PLAYBACK".into(), toolkit: "spotify".into(), description: Some("Start playback".into()), required_args: vec![], input_schema: Some(json!({"type":"object"})), output_fields: vec![], output_schema: None, primary_array_path: None, is_curated: true }
+    ToolContract {
+        slug: "SPOTIFY_START_PLAYBACK".into(),
+        toolkit: "spotify".into(),
+        description: Some("Start playback".into()),
+        required_args: vec![],
+        input_schema: Some(json!({"type":"object"})),
+        output_fields: vec![],
+        output_schema: None,
+        primary_array_path: None,
+        is_curated: true,
+    }
 }
 fn twt_lookup() -> ToolContract {
-    ToolContract { slug: "TWTFALLBACKTEST_TWEET_LOOKUP".into(), toolkit: "twtfallbacktest".into(), description: Some("Look up a tweet".into()), required_args: vec!["id".into()], input_schema: None, output_fields: vec!["text".into()], output_schema: None, primary_array_path: None, is_curated: true }
+    ToolContract {
+        slug: "TWTFALLBACKTEST_TWEET_LOOKUP".into(),
+        toolkit: "twtfallbacktest".into(),
+        description: Some("Look up a tweet".into()),
+        required_args: vec!["id".into()],
+        input_schema: None,
+        output_fields: vec!["text".into()],
+        output_schema: None,
+        primary_array_path: None,
+        is_curated: true,
+    }
 }
 fn twt_replies() -> ToolContract {
-    ToolContract { slug: "TWTFALLBACKTEST_LIST_REPLIES".into(), toolkit: "twtfallbacktest".into(), description: Some("List replies to a tweet".into()), required_args: vec!["tweet_id".into()], input_schema: None, output_fields: vec!["replies".into()], output_schema: None, primary_array_path: None, is_curated: true }
+    ToolContract {
+        slug: "TWTFALLBACKTEST_LIST_REPLIES".into(),
+        toolkit: "twtfallbacktest".into(),
+        description: Some("List replies to a tweet".into()),
+        required_args: vec!["tweet_id".into()],
+        input_schema: None,
+        output_fields: vec!["replies".into()],
+        output_schema: None,
+        primary_array_path: None,
+        is_curated: true,
+    }
 }
 
 #[tokio::test]

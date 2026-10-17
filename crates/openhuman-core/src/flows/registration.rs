@@ -1,14 +1,14 @@
 //! Registration of the flow authoring, execution, discovery, and memory tools.
 
 use super::builder_host::{FlowsHost, OverlayNodeKinds};
-use crate::integrations::composio::builder_tools::{
-    GetToolContractTool, GetToolOutputSampleTool, ListConnectableToolkitsTool,
-    ListFlowConnectionsTool, SearchToolCatalogTool,
-};
 use super::builder_tools_connection_reads::FlowsConnectionProvider;
 use super::memory_tools::{FlowMemoryRecallTool, FlowMemoryRememberTool};
 use super::tools::{ProposeWorkflowTool, RunFlowTool};
 use crate::config::Config;
+use crate::integrations::composio::builder_tools::{
+    GetToolContractTool, GetToolOutputSampleTool, ListConnectableToolkitsTool,
+    ListFlowConnectionsTool, SearchToolCatalogTool,
+};
 use crate::security::SecurityPolicy;
 use std::sync::Arc;
 use tinyflows_copilot::tools::{

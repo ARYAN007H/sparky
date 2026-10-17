@@ -1,7 +1,7 @@
 use super::*;
 
-use crate::integrations::composio::builder_tools::catalog_search::search_catalog;
 use crate::flows::builder_tools_connection_reads::flow_connection_to_json;
+use crate::integrations::composio::builder_tools::catalog_search::search_catalog;
 // ── revise_workflow ──────────────────────────────────────────────────────────
 
 #[tokio::test]
@@ -177,4 +177,3 @@ fn list_flow_connections_json_surfaces_platform_user_id() {
     let json = flow_connection_to_json(&without_identity);
     assert!(json["platform_user_id"].is_null());
 }
-

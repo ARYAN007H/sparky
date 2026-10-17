@@ -99,7 +99,8 @@ impl Tool for SearchToolCatalogTool {
             toolkit = toolkit.unwrap_or("(any)"),
             "[flows] search_tool_catalog: searching the FULL LIVE Composio catalog (read-only)"
         );
-        let outcome = search_catalog(&self.config, &query, toolkit, ranking::MAX_CATALOG_RESULTS).await;
+        let outcome =
+            search_catalog(&self.config, &query, toolkit, ranking::MAX_CATALOG_RESULTS).await;
         // Build with `note` first so an agent reading top-down sees the
         // near-miss / keyword-based advisory before the (possibly zero) rows.
         // `count` is always the number of returned rows, never a stand-in for

@@ -122,23 +122,28 @@ impl Tool for GetToolContractTool {
                     &contract,
                 )?))
             }
-            Err(crate::integrations::composio::catalog::ContractLookupError::InvalidSlug { slug }) => Ok(ToolResult::error(format!(
+            Err(crate::integrations::composio::catalog::ContractLookupError::InvalidSlug {
+                slug,
+            }) => Ok(ToolResult::error(format!(
                 "Could not extract a toolkit from slug '{slug}' — it must look like \
                  '<TOOLKIT>_<ACTION>' (e.g. 'GMAIL_SEND_EMAIL')."
             ))),
-            Err(crate::integrations::composio::catalog::ContractLookupError::CatalogUnavailable { toolkit }) => {
-                Ok(ToolResult::error(format!(
-                    "Could not fetch the live Composio catalog for toolkit '{toolkit}' (no backend \
+            Err(
+                crate::integrations::composio::catalog::ContractLookupError::CatalogUnavailable {
+                    toolkit,
+                },
+            ) => Ok(ToolResult::error(format!(
+                "Could not fetch the live Composio catalog for toolkit '{toolkit}' (no backend \
                      session, or a transient failure) — try again, or use search_tool_catalog to \
                      confirm the toolkit is reachable."
-                )))
-            }
-            Err(crate::integrations::composio::catalog::ContractLookupError::ActionNotFound { slug, toolkit }) => {
-                Ok(ToolResult::error(format!(
-                    "'{slug}' is not a real action in the '{toolkit}' toolkit's live catalog — use \
+            ))),
+            Err(crate::integrations::composio::catalog::ContractLookupError::ActionNotFound {
+                slug,
+                toolkit,
+            }) => Ok(ToolResult::error(format!(
+                "'{slug}' is not a real action in the '{toolkit}' toolkit's live catalog — use \
                      search_tool_catalog to find a real slug."
-                )))
-            }
+            ))),
         }
     }
 }

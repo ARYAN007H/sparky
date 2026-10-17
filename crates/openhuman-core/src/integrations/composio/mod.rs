@@ -38,8 +38,8 @@
 //! crate::core::events::DomainEvent::ComposioTriggerReceived
 
 pub mod action_tool;
-pub mod bus;
 pub(crate) mod builder_tools;
+pub mod bus;
 pub mod catalog;
 pub mod client;
 pub mod connected_integrations;
@@ -49,8 +49,8 @@ pub(crate) mod direct_auth;
 pub mod execute_dispatch;
 pub(crate) mod file_store;
 mod file_store_documents;
-pub mod flow_gate;
 pub(crate) mod flow_backend;
+pub mod flow_gate;
 pub mod googlecalendar_args;
 pub mod identity;
 pub mod identity_store;
