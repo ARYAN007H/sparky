@@ -1,5 +1,6 @@
 use super::*;
 
+#[cfg(test)]
 pub(crate) use crate::integrations::composio::catalog::toolkit_for_contract_slug;
 pub(crate) use crate::integrations::composio::catalog::{lookup_contract, ContractLookupError};
 

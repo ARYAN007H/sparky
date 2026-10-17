@@ -190,6 +190,7 @@ fn http_credential_display(cred: &crate::security::credentials::HttpCredentialSu
     format!("{} ({})", cred.name, cred.scheme)
 }
 
+#[cfg(test)]
 pub(super) use crate::integrations::composio::ops::title_case_toolkit;
 
 // ─────────────────────────────────────────────────────────────────────────────
