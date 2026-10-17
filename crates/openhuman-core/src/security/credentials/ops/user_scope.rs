@@ -72,7 +72,12 @@ pub(super) fn activate_user_scope(ctx: &DispatchCtx, user_id: &str) -> Result<Ve
         // Shares `threads::store`' process-wide mutex with
         // `list_threads` / `purge_threads` on any workspace, so purge and
         // concurrent thread RPC in this process cannot interleave.
-        let pre_ws = pre_login_user_dir(&root_dir).join("workspace");
+        // The pre-login profile's workspace follows its layout (`workspace`
+        // for v1, `files` for v2); resolving never moves data.
+        let pre_ws = crate::config::schema::ProfileLayout::resolve_at(pre_login_user_dir(
+            &root_dir,
+        ))
+        .workspace_dir;
         let pre_ws_log = pre_ws.display().to_string();
         match conversations::purge_threads(ctx, pre_ws) {
             Ok(stats) => {
