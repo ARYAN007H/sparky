@@ -140,7 +140,7 @@ impl Tool for WaitSubagentTool {
             ));
         }
         Ok(ToolResult::error(
-            "wait_subagent requires a live harness control dispatch",
+            "wait_subagent called outside of an agent turn",
         ))
     }
 }
@@ -200,7 +200,7 @@ impl Tool for SteerSubagentTool {
             return Ok(ToolResult::error("steer_subagent: `message` is required"));
         }
         Ok(ToolResult::error(
-            "steer_subagent requires a live harness control dispatch",
+            "steer_subagent called outside of an agent turn",
         ))
     }
 }
