@@ -58,6 +58,7 @@ async fn spawn_subagent_tool_runs_child_agent_e2e() {
     assert!(
         jobs.list().iter().any(|job| {
             job.agent == "task_manager_agent"
+                && job.output.as_deref() == Some("spawn-subagent-child-answer")
                 && job.status
                     == tinyagents_orchestration::subagent::SubAgentJobStatus::Completed
         }),
@@ -178,6 +179,7 @@ async fn archetype_delegation_tool_runs_child_agent_e2e() {
     assert!(
         completed.iter().any(|job| {
             job.agent == "task_manager_agent"
+                && job.output.as_deref() == Some("archetype-delegation-child-answer")
                 && job.status
                     == tinyagents_orchestration::subagent::SubAgentJobStatus::Completed
         }),

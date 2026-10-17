@@ -325,9 +325,14 @@ impl SpawnSubagentTool {
             message_run_queue: None,
         };
 
-        let run =
-            run_subagent_with_parent(live_parent, definition.clone(), prompt.clone(), options)
-                .await;
+        let run = run_subagent_via_driver_tool(
+            live_parent,
+            definition.clone(),
+            prompt.clone(),
+            options,
+        )
+        .await
+        .map(|(outcome, _job_id)| outcome);
         match run {
             Ok(outcome) => {
                 let emit_lifecycle_effects = outcome.should_emit_lifecycle_effects();
