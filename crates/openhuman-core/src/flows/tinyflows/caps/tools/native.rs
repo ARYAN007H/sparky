@@ -81,8 +81,11 @@ impl ToolBackend for NativeToolBackend {
         .await
         .map_err(EngineError::Capability)
         .and_then(|outcome| {
-            super::super::reject_failed_native_tool_result(slug, &outcome.result)
-                .map(|_| super::super::native_tool_payload(&outcome.result))
+            crate::tools::native_ops::flow_backend::reject_failed_native_tool_result(
+                slug,
+                &outcome.result,
+            )
+            .map(|_| crate::tools::native_ops::flow_backend::native_tool_payload(&outcome.result))
         });
 
         // E-m1: close out the approval audit row (unlike the http/code/

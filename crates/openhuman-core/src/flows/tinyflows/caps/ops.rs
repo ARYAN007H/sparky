@@ -138,63 +138,6 @@ pub(crate) fn reject_unsuccessful_composio_response(
         .map_err(EngineError::Capability)
 }
 
-/// Native-tool analogue of [`reject_unsuccessful_composio_response`].
-///
-/// `execute_tool` returns `Ok(outcome)` for a tool that *ran* but *failed* —
-/// the failure rides on [`ToolResult::is_error`] (quota exceeded, file missing,
-/// no integration client configured). Nothing downstream inspected that flag,
-/// so the tinyflows engine recorded the step — and therefore the run — as
-/// `Success` even though the tool never did its job. Concretely: a file-upload
-/// step could fail, the next node would bind a `null` URL, and the run still
-/// reported "completed".
-///
-/// Mirrors the Composio branch's contract so both paths turn a failed step into
-/// `StepStatus::Error` (and, via `degrade_completed_status`, a failed run)
-/// rather than a false "Completed".
-pub(crate) fn reject_failed_native_tool_result(
-    slug: &str,
-    result: &tinytools::ToolResult,
-) -> Result<()> {
-    if !result.is_error {
-        return Ok(());
-    }
-    let rendered = result.output();
-    let detail = match rendered.trim() {
-        "" => "no error detail returned by the tool",
-        d => d,
-    };
-    tracing::warn!(
-        target: "flows",
-        %slug,
-        %detail,
-        "[flows] tool_call: native tool reported is_error — failing the step"
-    );
-    Err(EngineError::Capability(format!(
-        "tool_call `{slug}` failed: {detail}"
-    )))
-}
-
-/// Unwraps a native (`oh:`) tool's [`ToolResult`] into the value a downstream
-/// node actually binds against.
-///
-/// Serializing the `ToolResult` verbatim (the previous behavior) placed the
-/// whole envelope on `item.json`, so reaching a field required
-/// `=nodes.<id>.item.json.content[0].data.<field>`. That expression does
-/// evaluate, but no builder agent ever emits it, which left native tools
-/// effectively unbindable in practice.
-///
-/// A lone `Json` block therefore returns its `data` directly, so a native node
-/// binds with the same `=nodes.<id>.item.json.<field>` shape used everywhere
-/// else. Anything else (plain text, or mixed/multiple blocks) collapses to
-/// `{ "text": <output()> }` so there is always a predictable field to bind.
-pub(crate) fn native_tool_payload(result: &tinytools::ToolResult) -> Value {
-    use tinytools::ToolContent;
-    match result.content.as_slice() {
-        [ToolContent::Json { data }] => data.clone(),
-        _ => json!({ "text": result.output() }),
-    }
-}
-
 /// A [`ToolInvoker`] decorator that runs the host's Composio required-arg
 /// preflight before delegating to `inner`.
 ///
