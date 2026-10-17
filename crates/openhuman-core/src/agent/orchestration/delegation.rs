@@ -1,19 +1,13 @@
-//! Production wiring for the multi-stage sub-agent delegation graph (issue
-//! #4249, Phase 3).
+//! OpenHuman policy and worker adapters for the multi-stage delegation tool.
 //!
-//! [`tinyagents_graph::delegation::run_delegation`](tinyagents_graph::delegation::run_delegation)
-//! is the durable plan→execute⇄review→finalize state machine, but it takes an
-//! *injected* per-stage worker so its orchestration mechanics can be unit-tested
-//! with a mock. This module supplies the **production** worker: every stage runs
-//! through [`run_subagent`] (the same dispatch path `spawn_subagent` uses), and
-//! the run is made durable/resumable by checkpointing the typed
-//! [`DelegationState`] through the crate
-//! [`DriverCheckpointer`](tinyagents_graph::checkpoint::DriverCheckpointer) over
-//! the storage backend.
+//! TinyAgents' `DelegationTool` owns the durable plan→execute⇄review→finalize
+//! mechanics. This module supplies the product-specific stage prompts, target
+//! definition, checkpoint configuration, approval interpretation, and result
+//! projection. Each host stage worker enters the shared subagent driver so its
+//! lifecycle is visible to the same Jobs and Message tools as other children.
 //!
-//! Layering: the delegation *graph* lives in the `tinyagents` adapter seam; this
-//! production glue lives in `agent_orchestration`, which already depends on both
-//! the seam and `subagent_host` (so the seam stays free of orchestration deps).
+//! The host retains its caller context, trust and progress policy; it does not
+//! implement the generic graph state machine or job lifecycle.
 
 use std::sync::Arc;
 
