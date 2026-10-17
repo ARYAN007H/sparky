@@ -2,8 +2,58 @@
 //! TinyFlows. Tool execution itself remains in [`super`], which owns the
 //! native registry and its policy snapshot.
 
+use std::sync::Arc;
+
+use async_trait::async_trait;
 use serde_json::{json, Value};
+use tinybox_bus::CommandClass;
 use tinytools::ToolResult;
+
+use crate::{config::Config, security::SecurityPolicy};
+
+/// Flow-specific policy and approval operations supplied by the host adapter.
+#[async_trait]
+pub(crate) trait FlowPolicyHooks: Send + Sync {
+    async fn resolve_policy(&self, config: &Config) -> Result<Arc<SecurityPolicy>, String>;
+
+    async fn authorize(
+        &self,
+        policy: &SecurityPolicy,
+        class: CommandClass,
+        tool_name: &str,
+        args: &Value,
+    ) -> Result<Option<String>, String>;
+
+    fn record_execution(&self, audit_id: Option<&str>, result: &Result<Value, String>);
+}
+
+/// Invokes a native tool for a flow while keeping TinyFlows policy operations
+/// behind neutral host hooks.
+pub(crate) async fn invoke(
+    config: &Config,
+    slug: &str,
+    args: Value,
+    hooks: &dyn FlowPolicyHooks,
+) -> Result<Value, String> {
+    let tool_name = slug.strip_prefix("oh:").unwrap_or(slug).trim();
+    if tool_name.is_empty() {
+        return Err("tool_call node: native tool slug is empty (expected `oh:<tool_name>`)".into());
+    }
+
+    let policy = hooks.resolve_policy(config).await?;
+    let class = super::classify_tool_call_with_security(config, policy.clone(), tool_name, &args)?;
+    let audit_id = hooks.authorize(&policy, class, tool_name, &args).await?;
+    tracing::debug!(target: "flows", %tool_name, ?class, "[flows] dispatching NATIVE OpenHuman tool");
+    let result = super::execute_tool_with_security(config, policy, tool_name, args, false)
+        .await
+        .map_err(|error| format!("{error}"))
+        .and_then(|outcome| {
+            reject_failed_native_tool_result(slug, &outcome.result)
+                .map(|()| native_tool_payload(&outcome.result))
+        });
+    hooks.record_execution(audit_id.as_deref(), &result);
+    result
+}
 
 /// Turns a failed native tool result into the flow-facing error body.
 pub(crate) fn reject_failed_native_tool_result(
