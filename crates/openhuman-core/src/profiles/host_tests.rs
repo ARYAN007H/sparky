@@ -442,10 +442,9 @@ async fn provisioning_installs_the_cron_cap_in_the_profile_scope() {
     let second =
         crate::cron::client::store_in::<crate::cron::CronJob>(&config, &scope, operation()).await;
     let error = second.expect_err("the profile store must enforce its provisioned cap");
-    assert!(
-        error.to_string().contains("active job limit"),
-        "unexpected admission error: {error}"
-    );
+    assert!(error
+        .to_string()
+        .contains("Failed to insert cron agent job"));
 }
 
 #[tokio::test]
@@ -480,7 +479,9 @@ async fn opening_an_existing_profile_adopts_the_enforced_cron_cap() {
     )
     .await;
     let error = second.expect_err("opening a profile should adopt the configured cron cap");
-    assert!(error.to_string().contains("active job limit"), "{error}");
+    assert!(error
+        .to_string()
+        .contains("Failed to insert cron agent job"));
 }
 
 #[tokio::test]

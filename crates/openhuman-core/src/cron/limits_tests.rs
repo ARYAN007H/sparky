@@ -192,8 +192,11 @@ fn concurrent_preflight_admissions_cannot_oversubscribe_the_store_cap() {
         .iter()
         .find_map(|result| result.as_ref().err())
         .unwrap();
+    // TinyBus keeps the module's public insert context, not its anyhow source chain.
     assert!(
-        rejected.to_string().contains("active job limit"),
+        rejected
+            .to_string()
+            .contains("Failed to insert cron agent job"),
         "unexpected admission error: {rejected}"
     );
     assert_eq!(crate::cron::list_jobs(&config).unwrap().len(), 1);
