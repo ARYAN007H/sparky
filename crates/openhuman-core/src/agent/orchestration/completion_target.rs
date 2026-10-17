@@ -138,31 +138,29 @@ pub(crate) fn claim_recovery(workspace_dir: &Path) -> bool {
 }
 
 /// Let `workspace_dir` be recovered again (a profile re-leased after release),
-/// and drop its cached router when nothing is using it so the next scan replays
-/// the log another holder may have appended to. A router still in use stays,
-/// so a log never has two writers.
+/// and reopen its durable store in the cached router before the next scan. The
+/// owner migrates records under the router's lease lock, so an active holder
+/// can continue through the same router without losing records or leases.
 pub(crate) fn forget_recovery_ctx(ctx: &crate::core::runtime::DispatchCtx, workspace_dir: &Path) {
     let scope = super::background_completions::router_scope_for(ctx, workspace_dir);
     state().recovered_workspaces.remove(&scope);
     let Ok(Some(router)) = super::background_completions::router_pool().get(&scope) else {
         return;
     };
-    // The pool plus this lookup own two references; any additional reference
-    // means a delivery or a record still has the router open.
-    if Arc::strong_count(&router) != 2 {
-        return;
-    }
     let Ok(store) = super::background_completions::open_driver_store(ctx, workspace_dir) else {
         return;
     };
-    let replacement = Arc::new(super::background_completions::new_router(store));
-    if let Ok(tinyagents_tasks::CompletionRouterReplaceOutcome::Replaced(router)) =
-        super::background_completions::router_pool().replace_if_current(
-            &scope,
-            &router,
-            replacement,
-        )
-    {
-        state().stores.insert(scope, router.store());
+    let previous = router.store();
+    match router.replace_store_if_current(&previous, store) {
+        Ok(tinyagents_tasks::CompletionStoreReplaceOutcome::Replaced(store))
+        | Ok(tinyagents_tasks::CompletionStoreReplaceOutcome::Current(store)) => {
+            state().stores.insert(scope, store);
+        }
+        Err(error) => {
+            log::error!(
+                "[background_completions] could not reopen durable completion store workspace_dir={} error={error:#}",
+                workspace_dir.display()
+            );
+        }
     }
 }
