@@ -453,8 +453,8 @@ async fn legacy_pause_migration_preserves_host_checkpoint_metadata_and_bytes() {
     let legacy_key = key();
     let legacy = OpenHumanPersistence::new(directory.path().to_path_buf());
     let checkpoint = SubagentCheckpointData {
-        task_key: Some(key.clone()),
-        task_id: key.task_id.clone(),
+        task_key: Some(legacy_key.clone()),
+        task_id: legacy_key.task_id.clone(),
         agent_id: "legacy-agent".into(),
         worker_thread_id: Some("worker-thread".into()),
         history: vec![
@@ -479,7 +479,7 @@ async fn legacy_pause_migration_preserves_host_checkpoint_metadata_and_bytes() {
         artifact_paths: vec!["artifacts/report.md".into()],
         elapsed_ms: 321,
     };
-    let pause_path = legacy.legacy_pause_path(&key);
+    let pause_path = legacy.legacy_pause_path(&legacy_key);
     std::fs::create_dir_all(pause_path.parent().unwrap()).unwrap();
     let pause_bytes = serde_json::to_vec_pretty(&checkpoint).unwrap();
     std::fs::write(&pause_path, &pause_bytes).unwrap();
