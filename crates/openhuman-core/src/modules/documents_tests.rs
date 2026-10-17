@@ -154,7 +154,7 @@ async fn a_disabled_host_reports_unavailable_without_starting_a_broker() {
 }
 
 #[tokio::test]
-async fn spreadsheet_import_is_unavailable_before_loading_the_document_module() {
+async fn spreadsheet_markdown_conversion_is_unavailable_before_loading_the_document_module() {
     let mut config = offline_config();
     config.modules.enabled = false;
     let expected = "spreadsheet imports are temporarily unavailable pending a safe TinyMemory release";
@@ -164,7 +164,13 @@ async fn spreadsheet_import_is_unavailable_before_loading_the_document_module() 
             .await,
         Err(DocumentCallError::Unavailable(message)) if message == expected
     ));
+}
 
+#[tokio::test]
+async fn spreadsheet_structured_extraction_is_unavailable_before_loading_the_document_module() {
+    let mut config = offline_config();
+    config.modules.enabled = false;
+    let expected = "spreadsheet imports are temporarily unavailable pending a safe TinyMemory release";
     let extraction = tinydocs_bus::ExtractDocumentSpec::new(tinydocs_bus::DocumentFormat::Xlsx);
     assert!(matches!(
         super::extract_document(&config, b"workbook", &extraction).await,
