@@ -140,12 +140,8 @@ async fn static_live_harness_builder_resolves_control_aliases_from_the_execution
         crate::agent::orchestration::tools::ListSubagentsTool::new(),
     )]);
     let sets = vec![tools];
-    let adapter = shared_tool_adapter(sets.clone(), "close_subagent").expect("close tool adapter");
-    let dispatch = LiveSubagentControlDispatch {
-        name: "close_subagent".into(),
-        adapter: Arc::new(adapter),
-        tool_sets: sets,
-    };
+    let mut harness: AgentHarness<(), OpenHumanRunContext> = AgentHarness::new();
+    host_tool_set_builder(&sets, &None, true, &HashSet::new()).register(&mut harness, None);
     let mut live_context = OpenHumanRunContext::new()
         .with_core(Some(Arc::clone(&core)))
         .with_parent(parent);
@@ -259,8 +255,12 @@ async fn live_close_alias_enforces_parent_thread_ownership() {
         crate::agent::orchestration::tools::CloseSubagentTool::new(),
     )]);
     let sets = vec![tools];
-    let mut harness: AgentHarness<(), OpenHumanRunContext> = AgentHarness::new();
-    host_tool_set_builder(&sets, &None, true, &HashSet::new()).register(&mut harness, None);
+    let adapter = shared_tool_adapter(sets.clone(), "close_subagent").expect("close tool adapter");
+    let dispatch = LiveSubagentControlDispatch {
+        name: "close_subagent".into(),
+        adapter: Arc::new(adapter),
+        tool_sets: sets,
+    };
     let mut live_context = OpenHumanRunContext::new()
         .with_core(Some(Arc::clone(&core)))
         .with_parent(parent);
