@@ -24,10 +24,8 @@ async fn continue_subagent_resumes_paused_job_through_shared_driver() {
     parent
         .subagent_tool_ceiling_names
         .insert("ask_user_clarification".into());
-    let live = crate::agent::orchestration::tools::live_parent_run_context(
-        "continue-paused-e2e",
-        parent,
-    );
+    let live =
+        crate::agent::orchestration::tools::live_parent_run_context("continue-paused-e2e", parent);
     let paused = SpawnSubagentTool::new()
         .execute_with_live_parent_context(
             json!({

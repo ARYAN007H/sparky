@@ -85,7 +85,10 @@ struct OpenHumanPlanner {
 /// Appends the new continuation input to the exact durable history supplied by
 /// TinyAgents. Kept separate so the no-drop/no-duplicate resume contract has a
 /// focused regression test independent of provider execution.
-pub(super) fn merged_resume_history(mut history: Vec<Message>, input: String) -> Vec<Message> {
+pub(in crate::agent::subagent_host) fn merged_resume_history(
+    mut history: Vec<Message>,
+    input: String,
+) -> Vec<Message> {
     if !input.is_empty() {
         history.push(Message::user(input));
     }
@@ -325,7 +328,7 @@ impl SubagentExecutor<crate::agent::tinyagents::host::OpenHumanRunContext> for O
 use super::outcome::{HostInFlightMap, host_outcome_to_neutral};
 use super::persistence::OpenHumanPersistence;
 
-pub(super) fn outcome_to_host(
+pub(in crate::agent::subagent_host) fn outcome_to_host(
     result: SubagentRunResult,
     host: Option<SubagentRunOutcome>,
     persistence: &OpenHumanPersistence,
