@@ -339,7 +339,7 @@ pub async fn learn_with(
         super::user_scope::clamp_item(&mut item, &root);
     }
     let bound = bound(config)?;
-    let receipt = store_on_with(&bound, item, options).await?;
+    let receipt = bound.engine.store_with(item, options).await?;
     super::lifecycle::prefetch::invalidate(config);
     Ok(LearnView { id: receipt.id.0 })
 }
@@ -361,56 +361,9 @@ pub async fn store_item_with(
         super::user_scope::clamp_item(&mut item, &root);
     }
     let bound = bound(config)?;
-    let receipt = store_on_with(&bound, item, options).await?;
+    let receipt = bound.engine.store_with(item, options).await?;
     super::lifecycle::prefetch::invalidate(config);
     Ok(receipt)
-}
-
-/// Stores `item` on `bound`; the bound engine scrubs it ([`super::guard`]).
-pub async fn store_on(bound: &BoundEngine, item: StoreItem) -> MemoryResult<StoreReceipt> {
-    store_on_with(bound, item, WriteOptions::visible()).await
-}
-
-/// [`store_on`], returning as soon as `options` allows.
-pub async fn store_on_with(
-    bound: &BoundEngine,
-    item: StoreItem,
-    options: WriteOptions,
-) -> MemoryResult<StoreReceipt> {
-    let kind = item.kind();
-    let receipt = bound.engine.store_with(item, options).await?;
-    tracing::debug!(
-        engine = %bound.id,
-        kind = kind.as_str(),
-        wait = ?options.wait,
-        replayed = receipt.replayed,
-        "[memory:ops] item stored"
-    );
-    Ok(receipt)
-}
-
-/// Stores `items` on `bound` in one bulk call, returning as soon as
-/// `options` allows. With [`WriteOptions::visible`] each item is listed on
-/// return, and ranked recall may lag behind for all but the last. A backfill
-/// or an import that reads nothing back until it ends passes
-/// [`WriteOptions::accepted`]: an engine that supports it (CortexDB) returns
-/// once the items are durably accepted, before they are indexed, and any
-/// other stores them as with `visible`.
-pub async fn store_many_on_with(
-    bound: &BoundEngine,
-    items: Vec<StoreItem>,
-    options: WriteOptions,
-) -> MemoryResult<Vec<StoreReceipt>> {
-    let count = items.len();
-    let receipts = bound.engine.store_many_with(items, options).await?;
-    tracing::debug!(
-        engine = %bound.id,
-        count,
-        wait = ?options.wait,
-        replayed = receipts.iter().filter(|r| r.replayed).count(),
-        "[memory:ops] batch stored"
-    );
-    Ok(receipts)
 }
 
 /// `memory_forget`.

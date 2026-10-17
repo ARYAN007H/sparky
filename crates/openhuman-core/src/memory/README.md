@@ -155,9 +155,9 @@ preserving queued logs; engine/credential invalidation also clears pending
 refreshes. Scoped spawns retain the caller's core context; the key carries the
 resolved identity, so queued work needs nothing ambient.
 
-The explicit/manual `hooks::pre_turn` and `hooks::compaction` retain their
-configured `pre_turn_timeout_ms` and `compaction_timeout_ms` deadlines; they
-are not what the live prelude and compaction wrapper await.
+The live prelude and compaction summarizer call the underlying work directly
+from the scoped prefetch workers. Their background deadlines bound engine I/O
+without a second manual timeout wrapper.
 
 A few details hang off the turn. For a message that arrived on a channel,
 `lifecycle::sender::channel_actor` records the sender as the observed actor

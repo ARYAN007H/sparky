@@ -14,7 +14,7 @@ use crate::config::Config;
 use crate::core::runtime::{slot_for, DispatchCtx};
 use crate::memory::scope::ResolvedIdentity;
 
-use super::hooks::{self, PreTurnInput, TurnPack};
+use super::hooks::{self, TurnPack};
 
 const MAX_PACK_BYTES: usize = 64 * 1024;
 static WORKERS: LazyLock<WorkerPool> = LazyLock::new(|| WorkerPool::new(8));
@@ -176,7 +176,13 @@ pub(crate) fn pre_turn(
     ctx: &DispatchCtx,
     config: Arc<Config>,
     identity: ResolvedIdentity,
-    input: PreTurnInput,
+    thread_id: String,
+    turn_index: u32,
+    user_text: String,
+    in_prompt_from: u32,
+    at: chrono::DateTime<chrono::Utc>,
+    resumed_after_compaction: bool,
+    observed_actor: Option<tinymemory_api::ObservedActor>,
     channel: Option<String>,
 ) -> Option<TurnPack> {
     if !config.memory.conversations.enabled && !identity.recall {
@@ -187,13 +193,13 @@ pub(crate) fn pre_turn(
         &config,
         memory_config_fingerprint(&config),
         &identity,
-        &input.thread_id,
+        &thread_id,
         false,
     );
     let pack = identity.recall.then(|| completed(&cache, &key)).flatten();
     tracing::debug!(thread_id = %key.thread, agent_id = %key.identity.agent_id, cache_hit = pack.is_some(), "[memory:prefetch] pre_turn cache");
     if let Some(pack) = &pack {
-        crate::memory::tools::record_pack_citations(ctx, &input.thread_id, pack.citations.clone());
+        crate::memory::tools::record_pack_citations(ctx, &thread_id, pack.citations.clone());
     }
     let dispatch = ctx.clone();
     enqueue(
@@ -205,7 +211,7 @@ pub(crate) fn pre_turn(
                 if config.memory.conversations.enabled {
                     if let Some(channel) = channel {
                         let workspace = config.workspace_dir.clone();
-                        let thread = input.thread_id.clone();
+                        let thread = thread_id.clone();
                         let _ = dispatch
                             .spawn_blocking(move || {
                                 crate::memory::channels::record(&workspace, &channel, &thread)
@@ -213,7 +219,19 @@ pub(crate) fn pre_turn(
                             .await;
                     }
                 }
-                hooks::pre_turn_work(&dispatch, &config, &identity, input).await
+                hooks::pre_turn_work(
+                    &dispatch,
+                    &config,
+                    &identity,
+                    thread_id,
+                    turn_index,
+                    user_text,
+                    in_prompt_from,
+                    at,
+                    resumed_after_compaction,
+                    observed_actor,
+                )
+                .await
             })),
         ),
     );

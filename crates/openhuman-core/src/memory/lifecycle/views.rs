@@ -10,7 +10,8 @@ use crate::config::Config;
 use crate::memory::error::{MemoryError, MemoryResult};
 use crate::memory::scope::{self, MemoryIdentity};
 
-use super::jobs::{self, JobQueue, JobRun, Selection};
+use super::jobs;
+use tinymemory_tools::queue::{JobRun, QueueState, Selection};
 
 /// `memory_policy_get` / `_set` result.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -277,7 +278,7 @@ pub async fn agents_list(config: &Config, identity: &MemoryIdentity) -> MemoryRe
 }
 
 /// `memory_jobs_list` result.
-pub type JobsView = JobQueue;
+pub type JobsView = QueueState;
 
 /// `memory_jobs_list`.
 pub async fn jobs_list(config: &Config) -> JobsView {
@@ -301,12 +302,15 @@ pub struct JobsRunView {
 
 /// `memory_jobs_run`: runs now, ignoring the build delay.
 pub async fn jobs_run(config: &Config, params: JobsRunParams) -> MemoryResult<JobsRunView> {
-    let selection = match params.id.filter(|id| !id.trim().is_empty()) {
-        Some(id) => Selection::One(id),
-        None => Selection::All,
-    };
     Ok(JobsRunView {
-        runs: jobs::run(config, selection).await?,
+        runs: jobs::run(
+            config,
+            params
+                .id
+                .filter(|id| !id.trim().is_empty())
+                .map_or(Selection::All, Selection::One),
+        )
+        .await?,
     })
 }
 

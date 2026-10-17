@@ -450,23 +450,33 @@ async fn rpc_learn_invalidates_a_cached_prefetch_pack() {
     let dispatch = DispatchCtx::new(ctx.clone());
     let identity = crate::memory::scope::MemoryIdentity::root().resolve(&config);
     let thread = "rpc-learn-invalidates-prefetch";
-    let input = || crate::memory::lifecycle::hooks::PreTurnInput {
-        thread_id: thread.into(),
-        turn_index: 0,
-        user_text: "What coffee do I like?".into(),
-        in_prompt_from: 0,
-        at: chrono::Utc::now(),
-        resumed_after_compaction: false,
-        observed_actor: None,
+    let input = || {
+        (
+            thread.to_string(),
+            0,
+            "What coffee do I like?".to_string(),
+            0,
+            chrono::Utc::now(),
+            false,
+            None,
+        )
     };
 
     CoreContext::scope(ctx.clone(), async {
         let config = Arc::new(config.clone());
+        let (thread_id, turn_index, user_text, in_prompt_from, at, resumed, observed_actor) =
+            input();
         assert!(crate::memory::lifecycle::prefetch::pre_turn(
             &dispatch,
             config.clone(),
             identity.clone(),
-            input(),
+            thread_id,
+            turn_index,
+            user_text,
+            in_prompt_from,
+            at,
+            resumed,
+            observed_actor,
             None,
         )
         .is_none());
@@ -474,12 +484,20 @@ async fn rpc_learn_invalidates_a_cached_prefetch_pack() {
             &dispatch, &config, &identity, thread, false,
         )
         .await;
+        let (thread_id, turn_index, user_text, in_prompt_from, at, resumed, observed_actor) =
+            input();
         assert!(
             crate::memory::lifecycle::prefetch::pre_turn(
                 &dispatch,
                 config.clone(),
                 identity.clone(),
-                input(),
+                thread_id,
+                turn_index,
+                user_text,
+                in_prompt_from,
+                at,
+                resumed,
+                observed_actor,
                 None,
             )
             .is_some(),
@@ -494,12 +512,20 @@ async fn rpc_learn_invalidates_a_cached_prefetch_pack() {
         .await
         .unwrap();
 
+        let (thread_id, turn_index, user_text, in_prompt_from, at, resumed, observed_actor) =
+            input();
         assert!(
             crate::memory::lifecycle::prefetch::pre_turn(
                 &dispatch,
                 config,
                 identity,
-                input(),
+                thread_id,
+                turn_index,
+                user_text,
+                in_prompt_from,
+                at,
+                resumed,
+                observed_actor,
                 None,
             )
             .is_none(),

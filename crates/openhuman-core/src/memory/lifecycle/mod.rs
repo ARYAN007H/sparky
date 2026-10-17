@@ -12,9 +12,8 @@
 //! | [`prefetch`] | when the transcript is compacted | enriches from completed memory and queues recall of the folded span |
 //! | [`jobs`] | the `memory_background` cron job | runs queued belief builds and deferred ingests |
 //!
-//! Automatic hooks never await engine I/O. The explicit/manual hook primitives
-//! remain timeout-bounded; an engine outage degrades memory without blocking
-//! the live agent.
+//! Automatic hooks never await engine I/O; an engine outage degrades memory
+//! without blocking the live agent.
 
 pub mod date_hint;
 pub mod hooks;
