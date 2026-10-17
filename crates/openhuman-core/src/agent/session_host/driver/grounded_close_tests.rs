@@ -90,6 +90,7 @@ async fn run(candidates: Vec<String>, verdicts: Vec<Option<CloseViolation>>) -> 
         verify,
         || FALLBACK.to_string(),
         &mut usage,
+        None,
     )
     .await;
 
@@ -289,7 +290,7 @@ async fn timed_out_close_keeps_the_usage_of_finished_calls() {
 
     let output = within_close_budget(
         Some(std::time::Duration::from_secs(20)),
-        close_with_one_repair(instruction, None, ask, verify, fallback, &mut usage),
+        close_with_one_repair(instruction, None, ask, verify, fallback, &mut usage, None),
         fallback,
     )
     .await;
@@ -336,6 +337,7 @@ async fn timed_out_repair_keeps_the_usage_of_its_answered_call() {
             Some(&progress),
             2,
             &mut usage,
+            None,
         ),
     )
     .await;
