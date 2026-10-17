@@ -3,6 +3,7 @@
 use crate::agent::subagent_host::{
     run_subagent_via_driver_tool, SubagentRunOptions, SubagentRunStatus,
 };
+use crate::agent_registry::host_definition::AgentDefinitionRegistry;
 use crate::progress::AgentProgress;
 use async_trait::async_trait;
 use std::sync::Arc;
