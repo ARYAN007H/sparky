@@ -294,7 +294,7 @@ async fn schedule_trigger_for_an_unknown_flow_is_answered_not_failed() {
 #[cfg(feature = "flows")]
 #[tokio::test]
 async fn refreshing_binding_config_updates_existing_flow_subscriber() {
-    use tokio::sync::mpsc;
+    use tokio::sync::{mpsc, oneshot};
 
     let tmp = TempDir::new().unwrap();
     let initial = config(&tmp);
@@ -312,21 +312,37 @@ async fn refreshing_binding_config_updates_existing_flow_subscriber() {
         )),
     );
     let (seen_tx, mut seen_rx) = mpsc::unbounded_channel();
+    let (started_tx, started_rx) = oneshot::channel();
+    let started_tx = Arc::new(std::sync::Mutex::new(Some(started_tx)));
+    let (release_tx, release_rx) = oneshot::channel();
+    let release_rx = Arc::new(tokio::sync::Mutex::new(Some(release_rx)));
     let subscriber = crate::flows::bus::FlowTriggerSubscriber::with_runner_and_config_source(
         Arc::clone(&binding.config),
         1,
         move |_ctx, config, _request| {
             let seen_tx = seen_tx.clone();
-            async move { seen_tx.send(config.action_dir.clone()).unwrap(); }
+            let started_tx = Arc::clone(&started_tx);
+            let release_rx = Arc::clone(&release_rx);
+            async move {
+                if let Some(started_tx) = started_tx.lock().unwrap().take() {
+                    let _ = started_tx.send(());
+                }
+                if let Some(release) = release_rx.lock().await.take() {
+                    let _ = release.await;
+                }
+                seen_tx.send(config.action_dir.clone()).unwrap();
+            }
         },
     );
     binding.flows.set(subscriber).ok().expect("subscriber initialized once");
 
+    let ctx = DispatchCtx::ambient();
+    binding.flows().dispatch_test_app_event(&ctx, "refresh-flow", serde_json::json!({"event": "first"})).await;
+    started_rx.await.unwrap();
     binding.set_config(&refreshed);
-    binding
-        .flows()
-        .dispatch_test_schedule(&DispatchCtx::ambient(), "refresh-flow")
-        .await;
+    binding.flows().dispatch_test_app_event(&ctx, "refresh-flow", serde_json::json!({"event": "second"})).await;
+    release_tx.send(()).unwrap();
+    assert_eq!(seen_rx.recv().await, Some(initial.action_dir.clone()));
     assert_eq!(seen_rx.recv().await, Some(refreshed.action_dir));
 }
 
@@ -365,6 +381,7 @@ async fn a_scheduled_flow_run_publishes_a_trigger_before_completion() {
         .subscribe(Arc::new(CronEvents(job.id.clone(), events_tx)))
         .unwrap();
     let run_id = format!("flow-event-{}", uuid::Uuid::new_v4());
+    let _: Attempt = proxy.call(callbacks::SCHEDULE_TRIGGER, ("flow-event-pair", &run_id)).await.unwrap();
     let _: Attempt = proxy.call(callbacks::SCHEDULE_TRIGGER, ("flow-event-pair", &run_id)).await.unwrap();
     let _: String = proxy.call(callbacks::DELIVER, (&job, &run_id, &Attempt {
         success: true,
