@@ -9,10 +9,12 @@
 //!
 //! | Collection | Document id | Holds |
 //! | --- | --- | --- |
-//! | `integration_notifications` | notification id | one ingested notification |
-//! | `notification_dedup` | hash of provider, account, title, body | when that content last arrived |
-//! | `notification_settings` | provider | one provider's settings |
-//! | `core_notifications` | event id | one persisted core notification event |
+//! | `notifications.integration` | notification id | one ingested notification |
+//! | `notifications.dedup` | hash of provider, account, title, body | when that content last arrived |
+//! | `notifications.settings` | provider | one provider's settings |
+//! | `notifications.core` | `Key::of([workspace, event id])` | one persisted core notification event |
+//!
+//! The shapes and the v1 -> v2 steps are in [`super::storage_schema`].
 //!
 //! Optional columns are left out of a document rather than stored as `null`,
 //! so "is unscored" is a missing field on every driver. `received_ms` (epoch
@@ -32,7 +34,7 @@ use chrono::{DateTime, Duration, Utc};
 use serde_json::{json, Map, Value};
 use sha2::{Digest, Sha256};
 use tinystoragedrivers::{
-    CollectionSpec, ErrorKind, Filter, IndexSpec, Precondition, Query, Sort, Versioned,
+    CollectionSpec, ErrorKind, Filter, Precondition, Query, RetryPolicy, Sort, Versioned,
 };
 
 use super::types::{
@@ -40,13 +42,12 @@ use super::types::{
     NotificationStatus,
 };
 use crate::config::Config;
-use crate::storage::documents::{compare_and_swap, text, Repo, CAS_ATTEMPTS};
+use crate::storage::documents::{compare_and_swap, text, Repo};
 use crate::storage::{DocumentStore, DocumentStoreExt, StorageError};
 
-pub(super) const NOTIFICATIONS: &str = "integration_notifications";
-pub(super) const DEDUP: &str = "notification_dedup";
-pub(super) const SETTINGS: &str = "notification_settings";
-pub(super) const CORE: &str = "core_notifications";
+pub(super) use super::storage_schema::{core_id, CORE, DEDUP, NOTIFICATIONS, SETTINGS};
+use super::storage_schema::{legacy_collections, specs};
+use crate::storage::schema_support::{key_of, ms_rfc3339};
 
 /// The `workspace` key of core notifications in the per-workspace default
 /// file (see [`current`]).
@@ -66,21 +67,22 @@ const DEDUP_WINDOW_SECS: i64 = 60;
 pub(crate) fn import_source() -> crate::storage::import::Source {
     crate::storage::import::Source {
         domain: "notifications",
+        owner: "notifications",
         db: "notifications/notifications.db",
-        collections,
+        collections: legacy_collections,
         read_legacy: |scratch, real| {
             super::store_import::read_for(scratch, &workspace_key_for(real))
         },
         rekey: |mut record, config| {
-            if record.collection != CORE {
+            if record.collection != super::storage_schema::LEGACY_CORE {
                 return record;
             }
-            let prefix = core_id(LOCAL_WORKSPACE, "");
+            let prefix = super::store_import::legacy_core_id(LOCAL_WORKSPACE, "");
             let Some(event_id) = record.id.strip_prefix(&prefix) else {
                 return record;
             };
             let workspace = workspace_key_for(config);
-            record.id = core_id(&workspace, event_id);
+            record.id = super::store_import::legacy_core_id(&workspace, event_id);
             if let Some(doc) = record.doc.as_object_mut() {
                 doc.insert("workspace".into(), serde_json::json!(workspace));
             }
@@ -90,17 +92,7 @@ pub(crate) fn import_source() -> crate::storage::import::Source {
 }
 
 fn collections() -> Vec<CollectionSpec> {
-    vec![
-        CollectionSpec::new(NOTIFICATIONS)
-            .index(IndexSpec::new("by_provider", ["provider", "received_ms"]))
-            .index(IndexSpec::new("by_status", ["status"])),
-        CollectionSpec::new(DEDUP),
-        CollectionSpec::new(SETTINGS),
-        CollectionSpec::new(CORE).index(IndexSpec::new(
-            "by_read",
-            ["workspace", "read", "timestamp_ms"],
-        )),
-    ]
+    specs()
 }
 
 fn workspace_key(path: &std::path::Path) -> String {
@@ -137,8 +129,8 @@ fn status_of(raw: Option<&str>) -> NotificationStatus {
     }
 }
 
-fn parse_time(raw: Option<&str>) -> Option<DateTime<Utc>> {
-    raw.and_then(|value| value.parse().ok())
+fn from_ms(ms: Option<i64>) -> Option<DateTime<Utc>> {
+    ms.and_then(DateTime::from_timestamp_millis)
 }
 
 pub(super) fn to_doc(n: &IntegrationNotification) -> Value {
@@ -148,7 +140,6 @@ pub(super) fn to_doc(n: &IntegrationNotification) -> Value {
     doc.insert("body".into(), json!(n.body));
     doc.insert("raw_payload".into(), json!(n.raw_payload.to_string()));
     doc.insert("status".into(), json!(n.status.as_str()));
-    doc.insert("received_at".into(), json!(n.received_at.to_rfc3339()));
     doc.insert(
         "received_ms".into(),
         json!(n.received_at.timestamp_millis()),
@@ -158,7 +149,10 @@ pub(super) fn to_doc(n: &IntegrationNotification) -> Value {
         ("importance_score", n.importance_score.map(|v| json!(v))),
         ("triage_action", n.triage_action.as_ref().map(|v| json!(v))),
         ("triage_reason", n.triage_reason.as_ref().map(|v| json!(v))),
-        ("scored_at", n.scored_at.map(|v| json!(v.to_rfc3339()))),
+        (
+            "scored_ms",
+            n.scored_at.map(|v| json!(v.timestamp_millis())),
+        ),
     ];
     for (field, value) in optional {
         if let Some(value) = value {
@@ -168,13 +162,22 @@ pub(super) fn to_doc(n: &IntegrationNotification) -> Value {
     Value::Object(doc)
 }
 
+/// The notification id a document id was built from (`Key::of` of it).
+fn notification_id_of(id: &str) -> String {
+    tinystoragedrivers::Key::new(id)
+        .ok()
+        .and_then(|key| key.split())
+        .and_then(|mut parts| (parts.len() == 1).then(|| parts.remove(0)))
+        .unwrap_or_else(|| id.to_string())
+}
+
 fn to_notification(stored: &Versioned<Value>) -> IntegrationNotification {
     let doc = &stored.doc;
     let raw_payload = text(doc, "raw_payload").map_or(Value::Null, |raw| {
         serde_json::from_str(raw).unwrap_or_else(|_| Value::String(raw.to_string()))
     });
     IntegrationNotification {
-        id: stored.id.clone(),
+        id: notification_id_of(&stored.id),
         provider: text(doc, "provider").unwrap_or_default().to_string(),
         account_id: text(doc, "account_id").map(str::to_string),
         title: text(doc, "title").unwrap_or_default().to_string(),
@@ -187,8 +190,9 @@ fn to_notification(stored: &Versioned<Value>) -> IntegrationNotification {
         triage_action: text(doc, "triage_action").map(str::to_string),
         triage_reason: text(doc, "triage_reason").map(str::to_string),
         status: status_of(text(doc, "status")),
-        received_at: parse_time(text(doc, "received_at")).unwrap_or_else(Utc::now),
-        scored_at: parse_time(text(doc, "scored_at")),
+        received_at: from_ms(doc.get("received_ms").and_then(Value::as_i64))
+            .unwrap_or_else(Utc::now),
+        scored_at: from_ms(doc.get("scored_ms").and_then(Value::as_i64)),
     }
 }
 
@@ -223,7 +227,7 @@ async fn claim_content(
     skip_recent: bool,
 ) -> Result<Option<Option<i64>>, StorageError> {
     let window_start = now_ms - DEDUP_WINDOW_SECS * 1000;
-    for _ in 0..CAS_ATTEMPTS {
+    for _ in 0..RetryPolicy::default().attempts {
         let stored = docs.get(DEDUP, id).await?;
         let last = stored
             .as_ref()
@@ -245,7 +249,7 @@ async fn claim_content(
         }
     }
     Err(StorageError::conflict(format!(
-        "notification dedup {id} kept changing under {CAS_ATTEMPTS} attempts"
+        "notification dedup {id} kept changing under {} attempts", RetryPolicy::default().attempts"
     )))
 }
 

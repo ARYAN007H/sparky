@@ -51,7 +51,7 @@ fn an_unscored_notification_has_no_scored_field() {
 fn a_legacy_core_id_is_split_into_workspace_and_event() {
     assert_eq!(split_legacy_core_id("5:local/e1"), Some(("local", "e1")));
     assert_eq!(
-        split_legacy_core_id("7:a/b:c/d/ev"),
+        split_legacy_core_id("9:a/b:c/d/ev"),
         None,
         "a wrong length is not a v1 id"
     );
