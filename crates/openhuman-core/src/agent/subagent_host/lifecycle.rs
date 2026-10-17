@@ -2,7 +2,6 @@
 //! TinyAgents owns subagent lifecycle coordination.
 
 use std::{
-    collections::HashMap,
     fs::OpenOptions,
     future::Future,
     path::PathBuf,
@@ -26,7 +25,6 @@ use tinyinference_llm::{
     message::Message,
     usage::{ChargedAmount, Usage, UsageTotals},
 };
-use tokio::sync::Mutex as AsyncMutex;
 
 #[path = "lifecycle_checkpoint.rs"]
 mod checkpoint;
