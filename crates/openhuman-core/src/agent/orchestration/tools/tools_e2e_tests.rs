@@ -155,7 +155,10 @@ async fn force_fresh_cancels_the_registered_driver_before_reusing_its_session() 
             .with_thread("force-fresh-parent-thread"),
         host_context,
     );
-    let spawn = |live: &RunContext<OpenHumanRunContext>, args| async move {
+    async fn spawn(
+        live: &RunContext<OpenHumanRunContext>,
+        args: serde_json::Value,
+    ) -> tinytools::ToolResult {
         let detached_data = live.data.detached_child();
         let cancellation = detached_data.cancellation.clone();
         let detached = live
@@ -172,7 +175,7 @@ async fn force_fresh_cancels_the_registered_driver_before_reusing_its_session() 
             .execute_with_live_parent_context(args, None, live.data.child(), detached)
             .await
             .expect("spawn tool executes")
-    };
+    }
 
     let first = spawn(
         &live,
