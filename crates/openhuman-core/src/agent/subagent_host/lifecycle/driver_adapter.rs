@@ -50,7 +50,7 @@ impl OpenHumanDriverBundle {
 
 #[derive(Clone)]
 pub(crate) struct HostRequest {
-    invocation: HostInvocation,
+    pub(super) invocation: HostInvocation,
     pub(crate) options: SubagentRunOptions,
 }
 
