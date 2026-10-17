@@ -618,7 +618,12 @@ impl OpenHumanSubagentHost {
             child_config,
         )
         .map_err(|error| SubagentRunError::Provider(anyhow::anyhow!(error.to_string())))?;
-        Box::pin(self.run_with_request(parent, task_key, child, input, false)).await
+        let checkpoint_dir = absolute_checkpoint_dir(self.options.checkpoint_dir.clone().unwrap_or_else(|| {
+            parent.data.parent.as_ref().map(|context| {
+                context.workspace_dir.join(".openhuman/subagent_checkpoints")
+            }).unwrap_or_else(|| PathBuf::from(".openhuman/subagent_checkpoints"))
+        }));
+        Box::pin(self.run_leader(parent, task_key, child, input, false, checkpoint_dir)).await
     }
 
     async fn continue_with_key(
@@ -634,82 +639,12 @@ impl OpenHumanSubagentHost {
             child_config,
         )
         .map_err(|error| SubagentRunError::Provider(anyhow::anyhow!(error.to_string())))?;
-        Box::pin(self.run_with_request(parent, task_key, child, input, true)).await
-    }
-
-    async fn run_with_request(
-        self,
-        parent: &RunContext<crate::agent::tinyagents::host::OpenHumanRunContext>,
-        task_key: SubagentTaskKey,
-        child: RunContext<crate::agent::tinyagents::host::OpenHumanRunContext>,
-        input: String,
-        continuation: bool,
-    ) -> Result<SubagentRunOutcome, SubagentRunError> {
-        let checkpoint_dir =
-            absolute_checkpoint_dir(self.options.checkpoint_dir.clone().unwrap_or_else(|| {
-                parent
-                    .data
-                    .parent
-                    .as_ref()
-                    .map(|context| {
-                        context
-                            .workspace_dir
-                            .join(".openhuman/subagent_checkpoints")
-                    })
-                    .unwrap_or_else(|| std::path::PathBuf::from(".openhuman/subagent_checkpoints"))
-            }));
-        let lifecycle_key = HostLifecycleKey {
-            checkpoint_dir: checkpoint_dir.clone(),
-            task_key: task_key.clone(),
-        };
-        let dispatch_ctx = parent.data.dispatch_ctx();
-        let (entry, is_leader) = {
-            let mut entries = host_in_flight(&dispatch_ctx).lock_owned().await;
-            match entries.get(&lifecycle_key) {
-                Some(entry) => (entry.clone(), false),
-                None => {
-                    let entry = Arc::new(HostInFlight::new());
-                    entries.insert(lifecycle_key.clone(), entry.clone());
-                    (entry, true)
-                }
-            }
-        };
-        if !is_leader {
-            if let Some(outcome) = entry
-                .wait(&parent.cancellation, &task_key, &self.definition.id)
-                .await?
-            {
-                return Ok(outcome);
-            }
-            // Do not collapse the leader's typed error into an untyped string.
-            // A follower retries the reservation and, if it becomes leader,
-            // reports its own native planning/provider/policy classification.
-            // The retry is boxed because the host keeps the typed leader error
-            // out of the shared result. In practice it retries only after the
-            // prior entry has been removed; boxing keeps that recovery path
-            // from making the public host future infinitely sized.
-            return Box::pin(self.run_with_request(parent, task_key, child, input, continuation))
-                .await;
-        }
-
-        let result = Box::pin(self.run_leader(
-            parent,
-            task_key.clone(),
-            child,
-            input,
-            continuation,
-            checkpoint_dir,
-        ))
-        .await;
-        entry.complete(result.as_ref().ok().cloned()).await;
-        let mut entries = host_in_flight(&dispatch_ctx).lock_owned().await;
-        if entries
-            .get(&lifecycle_key)
-            .is_some_and(|current| Arc::ptr_eq(current, &entry))
-        {
-            entries.remove(&lifecycle_key);
-        }
-        result
+        let checkpoint_dir = absolute_checkpoint_dir(self.options.checkpoint_dir.clone().unwrap_or_else(|| {
+            parent.data.parent.as_ref().map(|context| {
+                context.workspace_dir.join(".openhuman/subagent_checkpoints")
+            }).unwrap_or_else(|| PathBuf::from(".openhuman/subagent_checkpoints"))
+        }));
+        Box::pin(self.run_leader(parent, task_key, child, input, true, checkpoint_dir)).await
     }
 
     async fn run_leader(
@@ -726,7 +661,10 @@ impl OpenHumanSubagentHost {
             invocation: HostInvocation::Agent(self.definition),
             options: self.options,
         };
-        let driver = OpenHumanDriverBundle::new(checkpoint_dir)?;
+        let driver = OpenHumanDriverBundle::with_in_flight(
+            checkpoint_dir.clone(),
+            shared_subagent_flight(&parent.data.dispatch_ctx(), &checkpoint_dir),
+        )?;
         let request = if continuation {
             SubagentRequest::continue_with_key(task_key.clone(), child, request, input, None, None)
                 .await
