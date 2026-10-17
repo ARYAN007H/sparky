@@ -206,4 +206,23 @@ async fn explicit_profiles_share_a_workspace_without_sharing_completion_routers(
 
     assert_eq!(alice_tasks, ["alice-task"]);
     assert_eq!(bob_tasks, ["bob-task"]);
+
+    router_pool()
+        .clear()
+        .expect("simulate reopening each profile's storage-backed router");
+    let alice_recovered = recover_pending_threads(&alice, ws.path());
+    let bob_recovered = recover_pending_threads(&bob, ws.path());
+    assert_eq!(alice_recovered, ["same-thread"]);
+    assert_eq!(bob_recovered, ["same-thread"]);
+
+    let alice_after_reopen: Vec<_> = pending_for_ctx(&alice, ws.path(), "same-thread")
+        .into_iter()
+        .map(|record| record.task_id)
+        .collect();
+    let bob_after_reopen: Vec<_> = pending_for_ctx(&bob, ws.path(), "same-thread")
+        .into_iter()
+        .map(|record| record.task_id)
+        .collect();
+    assert_eq!(alice_after_reopen, ["alice-task"]);
+    assert_eq!(bob_after_reopen, ["bob-task"]);
 }
