@@ -1,7 +1,7 @@
 use super::*;
 use crate::agent::subagent_host::run_subagent;
 use crate::agent::subagent_host::{
-    run_async_spawn_via_driver_tool, spawn_async_via_driver_tool, SubagentRunStatus,
+    run_async_spawn_via_driver_tool, spawn_async_via_driver_tool_with_jobs, SubagentRunStatus,
 };
 use tinyagents_harness::context::{current_run_depth, with_run_depth, RunDepth};
 
@@ -114,11 +114,12 @@ async fn detached_driver_spawn_repairs_replayed_host_outcome_without_reexecution
     first_options.task_id = Some("driver-replay-task".into());
     first_options.checkpoint_dir = Some(scratch.path().join("checkpoints"));
     first_options.run_context.thread_id = Some("driver-replay-thread".into());
-    spawn_async_via_driver_tool(
+    spawn_async_via_driver_tool_with_jobs(
         &parent,
         make_def_named_tools(&[]),
         "return the persisted result".into(),
         first_options,
+        tinyagents_orchestration::subagent::SubAgentJobRegistry::new(),
         move |_target, result, effects| {
             let first_tx = first_tx.clone();
             Box::pin(async move {
@@ -148,11 +149,12 @@ async fn detached_driver_spawn_repairs_replayed_host_outcome_without_reexecution
     replay_options.task_id = Some("driver-replay-task".into());
     replay_options.checkpoint_dir = Some(scratch.path().join("checkpoints"));
     replay_options.run_context.thread_id = Some("driver-replay-thread".into());
-    spawn_async_via_driver_tool(
+    spawn_async_via_driver_tool_with_jobs(
         &parent,
         make_def_named_tools(&[]),
         "return the persisted result".into(),
         replay_options,
+        tinyagents_orchestration::subagent::SubAgentJobRegistry::new(),
         move |_target, result, effects| {
             let replay_tx = replay_tx.clone();
             Box::pin(async move {

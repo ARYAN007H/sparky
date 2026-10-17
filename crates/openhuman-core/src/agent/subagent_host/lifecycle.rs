@@ -119,6 +119,7 @@ pub(crate) async fn run_async_spawn_via_driver_tool(
         options,
         "inline",
         None,
+        None,
     )
     .await?;
     let public_job_id = decode_driver_job_result(tool_result, &bundle, &task_key)?;
@@ -160,6 +161,51 @@ pub(crate) async fn spawn_async_via_driver_tool(
         + Sync
         + 'static,
 ) -> Result<String, SubagentRunError> {
+    spawn_async_via_driver_tool_using_jobs(parent, definition, input, options, None, completion).await
+}
+
+#[cfg(test)]
+pub(crate) async fn spawn_async_via_driver_tool_with_jobs(
+    parent: &RunContext<crate::agent::tinyagents::host::OpenHumanRunContext>,
+    definition: crate::agent_registry::host_definition::AgentDefinition,
+    input: String,
+    options: SubagentRunOptions,
+    jobs: tinyagents_orchestration::subagent::SubAgentJobRegistry,
+    completion: impl Fn(
+            String,
+            Result<SubagentRunOutcome, String>,
+            bool,
+        ) -> Pin<Box<dyn Future<Output = ()> + Send>>
+        + Send
+        + Sync
+        + 'static,
+) -> Result<String, SubagentRunError> {
+    spawn_async_via_driver_tool_using_jobs(
+        parent,
+        definition,
+        input,
+        options,
+        Some(jobs),
+        completion,
+    )
+    .await
+}
+
+async fn spawn_async_via_driver_tool_using_jobs(
+    parent: &RunContext<crate::agent::tinyagents::host::OpenHumanRunContext>,
+    definition: crate::agent_registry::host_definition::AgentDefinition,
+    input: String,
+    options: SubagentRunOptions,
+    jobs: Option<tinyagents_orchestration::subagent::SubAgentJobRegistry>,
+    completion: impl Fn(
+            String,
+            Result<SubagentRunOutcome, String>,
+            bool,
+        ) -> Pin<Box<dyn Future<Output = ()> + Send>>
+        + Send
+        + Sync
+        + 'static,
+) -> Result<String, SubagentRunError> {
     let task_id = options
         .task_id
         .clone()
@@ -174,6 +220,7 @@ pub(crate) async fn spawn_async_via_driver_tool(
         options,
         "background",
         Some(Arc::new(completion)),
+        jobs,
     )
     .await?;
     decode_driver_job_result(tool_result, &bundle, &task_key)
@@ -193,6 +240,7 @@ async fn invoke_async_spawn_driver_tool(
     options: SubagentRunOptions,
     mode: &str,
     completion: Option<HostCompletion>,
+    jobs_override: Option<tinyagents_orchestration::subagent::SubAgentJobRegistry>,
 ) -> Result<(tinytools::ToolResult, OpenHumanDriverBundle), SubagentRunError> {
     use tinyagents_harness::tool::ToolDispatch;
     use tinyagents_orchestration::subagent::{DriverSubAgentTool, SubAgentJobRegistry};
@@ -247,7 +295,9 @@ async fn invoke_async_spawn_driver_tool(
         |request| Some(request.task_id().to_owned()),
     );
     let dispatch_ctx = parent.data.dispatch_ctx();
-    let jobs = (*crate::core::runtime::slot_for::<SubAgentJobRegistry>(&dispatch_ctx)).clone();
+    let jobs = jobs_override.unwrap_or_else(|| {
+        (*crate::core::runtime::slot_for::<SubAgentJobRegistry>(&dispatch_ctx)).clone()
+    });
     let parent_session = parent
         .data
         .parent
