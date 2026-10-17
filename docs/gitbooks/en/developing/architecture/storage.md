@@ -107,6 +107,23 @@ On a shared backend (MongoDB) other processes may write the same records, so boo
 | `file:<dir>`       | `<dir>/scopes/<scope>/docs/<collection>/<id>.json` for documents, with collection metadata in `<dir>/_meta/collections/<collection>.json`. Streams are JSONL and blobs are raw files under the same scope directory. |
 | `mongodb://…/<db>` | One database. Each named database is a collection prefix, and every record carries its scope.                                                                                                                        |
 
+### Profile layout v1 and v2
+
+A desktop profile lives in `~/.openhuman/users/<id>/`, in one of two layouts (`config/schema/profile_layout.rs`, `LayoutVersion`):
+
+```text
+v1 (every install before storage schema v2)    v2 (a brand-new profile)
+users/<id>/                                    users/<id>/
+  config.toml                                    .layout        marker: 2
+  workspace/    internal state + storage/        config.toml
+                                                 storage.db     every store, one SQLite file
+                                                 files/         Config.workspace_dir
+```
+
+The version is read from disk, never configured. A `.layout` file reading `2` is v2. A profile directory that is missing or empty is new and starts as v2 (the marker is written the first time it is resolved, so it stays v2 once `config.toml` appears). A directory with content and no marker is v1 and behaves exactly as before: `workspace_dir` is `users/<id>/workspace`, and the default URL is `sqlite:<workspace>/storage`. Resolving a v1 profile writes nothing.
+
+Under v2 `Config.workspace_dir` is `users/<id>/files`, so the call sites that join workspace-relative paths keep working, and `config.toml` and `storage.db` stay at the profile root, where `workspace_dir.parent()` finds them. The default URL is `sqlite:users/<id>/storage.db`. An explicit `OPENHUMAN_STORAGE_URL` or `[storage] url` wins under both layouts. Rebind (a different user signing in) and the no-backend local fallback derive the URL from the new workspace, so they follow the layout. The binary reads both layouts. SaaS profiles (`ProfileLayout::new`) stay v1. Moving a v1 profile to v2 is the migration tracked in #7997 and is not done at boot.
+
 ### The default follows the workspace
 
 The default URL is rooted at the workspace, so a different workspace is a different database. The desktop rebinds its workspace when a different user signs in. `storage::rebind` then re-resolves the URL for the new workspace, opens its backend, points the session store (`ReboundSessionStores`) and the process slot at it together, and runs the legacy importers over it. This happens before any other store is rebound, and a failed reopen is an error that leaves the previous backend installed rather than continuing on it. An explicit URL names one backend for every user and is never replaced.
