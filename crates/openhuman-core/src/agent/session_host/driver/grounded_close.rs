@@ -8,19 +8,19 @@
 
 use futures::StreamExt;
 use std::sync::{
-    Arc,
     atomic::{AtomicUsize, Ordering},
+    Arc,
 };
 use tinyagents_runtime::transcript::message_to_native_transcript as message_to_native_chat_message;
 use tinyagents_session::transcript::TranscriptMessage;
 use tinyinference_llm::model::{ModelCallCorrelation, ModelRequest, ModelStreamItem};
 use tinytools_agent::dialect::ToolDialect;
 
+use tinyagents_harness::middleware::wrap_harness_instruction;
 use tinyagents_harness::{
     events::{AgentEvent, EventSink, GenerationEnrichment, GenerationPricing},
     ids::{CallId, RunId},
 };
-use tinyagents_harness::middleware::wrap_harness_instruction;
 
 use crate::agent::{
     session_host::turn_checkpoint::{
@@ -74,7 +74,10 @@ impl SupplementalTrace {
         let n = self.next_call.fetch_add(1, Ordering::Relaxed);
         let call_id = CallId::new(format!("{}-host-supplemental-{n}", self.run_id.as_str()));
         let started_at_ms = tinyagents_harness::ids::now_ms();
-        self.events.emit(AgentEvent::ModelStarted { call_id: call_id.clone(), model: model.into() });
+        self.events.emit(AgentEvent::ModelStarted {
+            call_id: call_id.clone(),
+            model: model.into(),
+        });
         (call_id, started_at_ms)
     }
 
@@ -88,37 +91,69 @@ impl SupplementalTrace {
         });
     }
 
-    fn completed(&self, call_id: CallId, model: &str, started_at_ms: u64, input: serde_json::Value, response: &tinyinference_llm::model::ModelResponse) {
+    fn completed(
+        &self,
+        call_id: CallId,
+        model: &str,
+        started_at_ms: u64,
+        input: serde_json::Value,
+        response: &tinyinference_llm::model::ModelResponse,
+    ) {
         self.events.emit(AgentEvent::ModelCompleted {
             call_id: call_id.clone(),
             started_at_ms: Some(started_at_ms),
             usage: response.usage,
             input: Some(input),
-            output: Some(serde_json::to_value(&response.message).unwrap_or(serde_json::Value::Null)),
+            output: Some(
+                serde_json::to_value(&response.message).unwrap_or(serde_json::Value::Null),
+            ),
         });
         let route = response.resolved_route.as_ref();
-        let actual_model = route.map(|route| route.model.as_str())
-            .or_else(|| response.resolved_model.as_ref().map(|model| model.name.as_str()))
+        let actual_model = route
+            .map(|route| route.model.as_str())
+            .or_else(|| {
+                response
+                    .resolved_model
+                    .as_ref()
+                    .map(|model| model.name.as_str())
+            })
             .unwrap_or(model);
         *self
             .actual_model
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(actual_model.to_owned());
-        let provider_id = route.map(|route| route.provider.as_str()).filter(|provider| valid_provider_id(provider)).map(str::to_owned);
-        let pricing = tinyagents_registry::pricing::lookup(actual_model).map(|price| GenerationPricing {
-            input_per_mtok_usd: Some(price.input_per_mtok_usd),
-            cached_input_per_mtok_usd: Some(price.cached_input_per_mtok_usd),
-            output_per_mtok_usd: Some(price.output_per_mtok_usd),
-        });
+        let provider_id = route
+            .map(|route| route.provider.as_str())
+            .filter(|provider| valid_provider_id(provider))
+            .map(str::to_owned);
+        let pricing =
+            tinyagents_registry::pricing::lookup(actual_model).map(|price| GenerationPricing {
+                input_per_mtok_usd: Some(price.input_per_mtok_usd),
+                cached_input_per_mtok_usd: Some(price.cached_input_per_mtok_usd),
+                output_per_mtok_usd: Some(price.output_per_mtok_usd),
+            });
         let billed = crate::inference::provider::model::usage_info_from_response(response);
-        let estimated_cost_usd = if response.served_from_cache || billed.is_some_and(|usage| usage.charge_reported && !usage.cost_is_estimate) {
+        let estimated_cost_usd = if response.served_from_cache
+            || billed.is_some_and(|usage| usage.charge_reported && !usage.cost_is_estimate)
+        {
             None
         } else {
-            billed.and_then(|usage| crate::agent::cost::estimate_call_cost_usd(actual_model, &usage))
+            billed
+                .and_then(|usage| crate::agent::cost::estimate_call_cost_usd(actual_model, &usage))
         };
-        let enrichment = GenerationEnrichment { provider_id, pricing, estimated_cost_usd };
-        if enrichment.provider_id.is_some() || enrichment.pricing.is_some() || enrichment.estimated_cost_usd.is_some() {
-            self.events.emit(AgentEvent::GenerationEnriched { call_id, enrichment });
+        let enrichment = GenerationEnrichment {
+            provider_id,
+            pricing,
+            estimated_cost_usd,
+        };
+        if enrichment.provider_id.is_some()
+            || enrichment.pricing.is_some()
+            || enrichment.estimated_cost_usd.is_some()
+        {
+            self.events.emit(AgentEvent::GenerationEnriched {
+                call_id,
+                enrichment,
+            });
         }
     }
 
@@ -131,7 +166,11 @@ impl SupplementalTrace {
 }
 
 fn valid_provider_id(value: &str) -> bool {
-    !value.is_empty() && value.len() <= 64 && value.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '.' | ':' | '-'))
+    !value.is_empty()
+        && value.len() <= 64
+        && value
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '.' | ':' | '-'))
 }
 
 impl RepairUsage {
@@ -222,8 +261,15 @@ pub(super) async fn repair_required_output(
     prompt_history.push(TranscriptMessage::user(wrap_harness_instruction(
         &required::repair_instruction(contract),
     )));
-    let (candidate, candidate_usage) =
-        completion(source, model, temperature, thread_id, prompt_history, trace.map(Arc::as_ref)).await;
+    let (candidate, candidate_usage) = completion(
+        source,
+        model,
+        temperature,
+        thread_id,
+        prompt_history,
+        trace.map(Arc::as_ref),
+    )
+    .await;
     usage.record(candidate_usage, true, trace.map(Arc::as_ref));
     let candidate = candidate.trim().to_owned();
     let candidate_is_usable = !candidate.is_empty()
@@ -329,7 +375,17 @@ pub(super) async fn close_if_needed(
     let ask = |prompt: String| {
         let mut messages = base.clone();
         messages.push(TranscriptMessage::user(prompt));
-        async move { completion(source, model, temperature, thread_id, messages, trace.map(Arc::as_ref)).await }
+        async move {
+            completion(
+                source,
+                model,
+                temperature,
+                thread_id,
+                messages,
+                trace.map(Arc::as_ref),
+            )
+            .await
+        }
     };
     // A closing response is only user-visible after a separate, tool-less
     // verifier accepts it.  This prevents a fluent repair from contradicting a
@@ -368,7 +424,15 @@ pub(super) async fn close_if_needed(
     let mut usage = RepairUsage::for_model(model);
     let output = within_close_budget(
         budget,
-        close_with_one_repair(instruction, stop_reason, ask, verify, &fallback, &mut usage, trace.map(Arc::as_ref)),
+        close_with_one_repair(
+            instruction,
+            stop_reason,
+            ask,
+            verify,
+            &fallback,
+            &mut usage,
+            trace.map(Arc::as_ref),
+        ),
         &fallback,
     )
     .await;
@@ -472,7 +536,9 @@ async fn completion(
     };
     let (call_id, started_at_ms) = trace
         .map(|trace| trace.begin(model))
-        .map_or((None, None), |(call_id, started_at)| (Some(call_id), Some(started_at)));
+        .map_or((None, None), |(call_id, started_at)| {
+            (Some(call_id), Some(started_at))
+        });
     let request = ModelRequest::new(
         messages
             .iter()
@@ -507,7 +573,9 @@ async fn completion(
                 } else {
                     buffered
                 };
-                if let (Some(trace), Some(call_id), Some(started_at_ms)) = (trace, call_id, started_at_ms) {
+                if let (Some(trace), Some(call_id), Some(started_at_ms)) =
+                    (trace, call_id, started_at_ms)
+                {
                     trace.completed(call_id, model, started_at_ms, input, &response);
                 }
                 return (
@@ -516,7 +584,9 @@ async fn completion(
                 );
             }
             ModelStreamItem::Failed(_) | ModelStreamItem::ProviderFailed(_) => {
-                if let (Some(trace), Some(call_id), Some(started_at_ms)) = (trace, call_id, started_at_ms) {
+                if let (Some(trace), Some(call_id), Some(started_at_ms)) =
+                    (trace, call_id, started_at_ms)
+                {
                     trace.failed(call_id, model, started_at_ms);
                 }
                 return (String::new(), None);

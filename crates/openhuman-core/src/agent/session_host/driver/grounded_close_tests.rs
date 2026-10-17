@@ -228,10 +228,10 @@ fn blank_outcome(truncated: bool) -> TinyagentsTurnOutcome {
 
 #[tokio::test]
 async fn supplemental_close_call_emits_native_start_and_actual_completion() {
+    use std::sync::{Arc, Mutex};
     use tinyagents_harness::events::{AgentEvent, EventListener, EventSink};
     use tinyagents_harness::ids::RunId;
     use tinyagents_session::transcript::TranscriptMessage;
-    use std::sync::{Arc, Mutex};
 
     #[derive(Default)]
     struct Recorder(Mutex<Vec<AgentEvent>>);
