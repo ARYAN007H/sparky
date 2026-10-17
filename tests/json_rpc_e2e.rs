@@ -11480,7 +11480,10 @@ async fn json_rpc_flows_full_arc_discover_build_create_run_inner() {
     let mut approval_config = openhuman_core::config::Config::default();
     approval_config.workspace_dir = openhuman_home.join("workspace");
     approval_config.config_path = openhuman_home.join("config.toml");
-    approval_config.autonomy.auto_approve.push("run_flow".to_string());
+    approval_config
+        .autonomy
+        .auto_approve
+        .push("run_flow".to_string());
     openhuman_core::security::approval::ApprovalGate::init_global(
         approval_config,
         format!("session-{}", uuid::Uuid::new_v4()),
@@ -11787,10 +11790,7 @@ async fn json_rpc_flows_full_arc_discover_build_create_run_inner() {
     with_chat_completion_requests(|requests| requests.clear());
     push_forced_chat_completion_when(
         "run_flow",
-        forced_tool_call_completion(
-            "run_flow",
-            json!({ "flow_id": "missing-copilot-flow" }),
-        ),
+        forced_tool_call_completion("run_flow", json!({ "flow_id": "missing-copilot-flow" })),
     );
     push_forced_chat_completion_when(
         "Could not start flow",
@@ -11819,8 +11819,7 @@ async fn json_rpc_flows_full_arc_discover_build_create_run_inner() {
                 .and_then(Value::as_array)
                 .is_some_and(|tools| {
                     tools.iter().any(|tool| {
-                        tool.pointer("/function/name").and_then(Value::as_str)
-                            == Some("run_flow")
+                        tool.pointer("/function/name").and_then(Value::as_str) == Some("run_flow")
                     })
                 })
         }),
@@ -11837,10 +11836,7 @@ async fn json_rpc_flows_full_arc_discover_build_create_run_inner() {
     with_chat_completion_requests(|requests| requests.clear());
     push_forced_chat_completion_when(
         "run_flow",
-        forced_tool_call_completion(
-            "run_flow",
-            json!({ "flow_id": callback_flow_id }),
-        ),
+        forced_tool_call_completion("run_flow", json!({ "flow_id": callback_flow_id })),
     );
     push_forced_chat_completion_when(
         "workflow_run_started",
