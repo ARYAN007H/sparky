@@ -29,10 +29,12 @@
 //!   older build wrote is honoured (it becomes the same entry at boot,
 //!   [`super::import_state::migrate_legacy_markers`]). A failed import
 //!   records nothing and is retried on the next boot.
-//! - **v1 shapes, then the owner's steps.** The legacy readers write the v1
-//!   collections the domain used before schema v2; the importer then runs the
-//!   domain owner's steps over them ([`super::boot::remigrate_owner`]), so the
-//!   records land in the v2 collections and shapes.
+//! - **v1 shapes, then the owner's steps.** The legacy readers produce the v1
+//!   records the domain used before schema v2; [`upgrade`] runs the domain
+//!   owner's step functions over them in memory, so the records are written
+//!   to the v2 collections in the v2 shapes with `Precondition::Absent`. A
+//!   record the new code already wrote is therefore left alone, the way it
+//!   was before schema v2, instead of stopping a migration step.
 //!
 //! Records land under [`super::scope::tenant_scope`] of no profile
 //! (`local`), the one scope every unprofiled reader resolves to
@@ -268,6 +270,66 @@ pub fn run_with(
         .collect()
 }
 
+/// Runs `owner`'s document steps over the v1 `records`, in memory, and returns
+/// the v2 records they produce (in input order) with the collection specs to
+/// declare. A record in a collection no step reads passes through unchanged.
+fn upgrade(owner: &str, records: Vec<Record>) -> Result<(Vec<Record>, Vec<CollectionSpec>)> {
+    use tinystoragedrivers::schema::{Item, SourceRecord, StepBody};
+    use tinystoragedrivers::Meta;
+    let schema = super::schema::owner_schemas()
+        .into_iter()
+        .find(|schema| schema.owner.as_str() == owner)
+        .ok_or_else(|| anyhow!("no storage schema for owner `{owner}`"))?;
+    let specs = schema
+        .items
+        .iter()
+        .filter_map(|item| match item {
+            Item::Collection { spec, .. } => Some(spec.clone()),
+            _ => None,
+        })
+        .collect();
+    let mut upgraded = Vec::with_capacity(records.len());
+    let mut by_collection: Vec<(String, Vec<SourceRecord>)> = Vec::new();
+    for record in records {
+        match by_collection
+            .iter_mut()
+            .find(|(collection, _)| *collection == record.collection)
+        {
+            Some((_, batch)) => batch,
+            None => {
+                by_collection.push((record.collection.clone(), Vec::new()));
+                &mut by_collection.last_mut().expect("just pushed").1
+            }
+        }
+        .push(SourceRecord {
+            id: record.id,
+            body: record.doc,
+            meta: Meta::unknown(),
+        });
+    }
+    for (collection, batch) in by_collection {
+        let step = schema.steps.iter().find(|step| {
+            matches!(step.run, StepBody::Documents(_)) && step.source.unwrap_or(step.item) == collection
+        });
+        let Some(StepBody::Documents(run)) = step.map(|step| &step.run) else {
+            upgraded.extend(batch.into_iter().map(|r| Record {
+                collection: collection.clone(),
+                id: r.id,
+                doc: r.body,
+            }));
+            continue;
+        };
+        for target in run(batch)? {
+            upgraded.push(Record {
+                collection: target.collection,
+                id: target.id,
+                doc: target.body,
+            });
+        }
+    }
+    Ok((upgraded, specs))
+}
+
 /// The marker id for `source` in `workspace`: a backend shared by several
 /// workspaces keeps one marker per workspace.
 pub(crate) fn marker_id(domain: &str, workspace: &Path) -> String {
@@ -290,11 +352,13 @@ fn import_one(
     source: &Source,
 ) -> Result<Outcome> {
     let domain = source.domain;
+    // The v2 collections are declared by the write itself (`upgrade` names
+    // them); the v1 specs only tell the snapshot which document tables to read.
     let repo = Repo::on(
         backend,
         &super::scope::tenant_scope(None),
         domain,
-        source.collections,
+        Vec::new,
     )?;
     let markers = Repo::on(
         backend,
@@ -341,7 +405,12 @@ fn import_one(
         );
 
         let total = found.len();
+        let (found, specs) = upgrade(source.owner, found)
+            .with_context(|| format!("[{domain}] bring the legacy records to schema v2"))?;
         let written = repo.run(move |docs| async move {
+            for spec in &specs {
+                docs.ensure_collection(spec).await?;
+            }
             let mut written = 0usize;
             for record in found {
                 match docs
@@ -361,19 +430,6 @@ fn import_one(
             Ok(written)
         })?;
 
-        // The v1 records become the owner's v2 collections and shapes.
-        if written > 0 {
-            let scope = super::scope::tenant_scope(None);
-            let owner = source.owner;
-            let backend = Arc::clone(backend);
-            block_on_anyhow(async move {
-                super::boot::remigrate_owner(&backend, &scope, owner)
-                    .await
-                    .map(|_| ())
-                    .map_err(Into::into)
-            })
-            .with_context(|| format!("[{domain}] migrate the imported records"))?;
-        }
         super::import_state::set_done(&markers, MARKER_OWNER, &step)?;
         Ok(Outcome::Imported {
             found: total,
