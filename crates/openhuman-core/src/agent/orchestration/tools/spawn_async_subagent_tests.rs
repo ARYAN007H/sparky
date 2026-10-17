@@ -2,6 +2,7 @@ use super::*;
 use crate::agent::harness::fork_context::ParentExecutionContext;
 use crate::agent_registry::host_definition::AgentDefinitionRegistry;
 use crate::config::AgentConfig;
+use crate::agent::running_subagents::RunQueue;
 use std::collections::HashSet;
 use std::path::Path;
 use std::sync::Arc;
