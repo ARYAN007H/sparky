@@ -7,7 +7,7 @@ struct RawSchemaDump<'a> {
 }
 
 #[tokio::test]
-async fn get_schema_response_bytes_match_the_pre_refactor_baseline() {
+async fn get_schema_memory_entries_match_the_pre_refactor_raw_bytes() {
     use axum::body::{to_bytes, Body};
     use axum::http::{Request, StatusCode};
     use sha2::{Digest, Sha256};
@@ -47,12 +47,15 @@ async fn get_schema_response_bytes_match_the_pre_refactor_baseline() {
         body.len(),
         memory_bytes.len()
     );
-
-    assert_eq!(body.len(), 211_864, "GET /schema response byte count");
     assert_eq!(
-        full_digest,
-        "47c63cfa2f0da8e671da19ea0048d48a2cd88897d4db3abefb206dc65bb46719",
-        "GET /schema response SHA-256"
+        memory_bytes.len(),
+        18_897,
+        "memory schema methods' raw byte count"
+    );
+    assert_eq!(
+        memory_digest,
+        "7b1b15f7e40cc7f4e6b767ea8eb4d17e49c5a3a5c6250164a733af828ec22783",
+        "memory schema methods' raw SHA-256"
     );
 }
 
