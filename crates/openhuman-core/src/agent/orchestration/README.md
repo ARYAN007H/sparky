@@ -22,10 +22,9 @@ worktree policy.
   `AgentOrchestrationSession`) as thin wrappers over TinyAgents'
   `DetachedTaskRegistry`, including its ordered batch wait and shared deadline.
 - Host adapters for durable teams and workflows: RPC schemas, root-parent
-  worker execution, model selection, cancellation policy, and BUS/progress
-  integration. Their host-neutral types, storage services, scheduling graphs,
-  prompt composition, and delivery bookkeeping are in
-  `tinyagents-orchestration`.
+  worker execution, model selection, durable lifecycle CAS, and BUS/progress
+  integration. Their host-neutral types, storage services, workflow scheduling,
+  prompt composition, and delivery bookkeeping are in `tinyagents-orchestration`.
 - A read-only command-center view over background agent runs plus stop/retry/
   continue/follow-up control verbs (`command_center/`).
 - OpenHuman's `OpenHumanWorktreeIsolation` adapter and RPC surface; generic
@@ -95,11 +94,12 @@ worktree policy.
   detached sub-agent host glue (registry instance and metadata, store path,
   steering, boot reconcile). The status type, wait, ledger helpers, roster and
   session resolution live in `tinyagents_orchestration::subagent`
-  (`DetachedSubagentStatus`, `wait_detached`, `SubagentIdentity`, ...).
+  (`DetachedSubagentStatus`, `wait_detached`, `SubagentIdentity`, ...); batch
+  waits call the owner's ordered `wait_many` API.
   `background_completions.rs` is the host adapter over the harness
-  `tinyagents_tasks::CompletionRouter` (one durable `JsonlCompletionStore` per
-  workspace at `.openhuman/background_completions.jsonl`, parent key = chat
-  thread id): the router owns the queue, dedupe, tombstones (collected inline,
+  `tinyagents_tasks::CompletionRouter` and its owner pool, with a durable
+  `DriverCompletionStore` in the storage backend scoped by profile/workspace;
+  the router owns the queue, dedupe, tombstones (collected inline,
   stopped, cancelled thread), attempt counting and give-up, so a completion that
   was never delivered is redelivered after a restart
   (`background_delivery::recover_on_boot`, wired next to the orphaned-task
@@ -107,9 +107,10 @@ worktree policy.
   `<background_agent_*>` wording (a `CompletionFormatter`) and the
   `[BACKGROUND_DELIVERY_FAILED]` give-up notice. `background_delivery.rs` keeps
   the host policy: idle-gated, debounced (3s), batched delivery of finished
-  background runs back into chat, the system turn, and the give-up writer fed by
-  `mark_failed`. The `agent_runs` domain subscribes to terminal sub-agent events
-  to settle its ledger for runs that outlive their spawning turn.
+  background runs back into chat and the system turn; its synchronous error
+  callback writes the give-up notice before the owner releases its lease. The
+  `agent_runs` domain separately subscribes to terminal sub-agent events to
+  settle the product ledger for runs that outlive their spawning turn.
 - [`fleet_tools.rs`](./fleet_tools.rs): decides which fleet-control tools (`wait_subagent`,
   `steer_subagent`, `wait_loop`, `close_subagent`) a given parent agent's
   definition actually exposes, so the delegation prompts and the
