@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-// Run the CI lane plan (lanes-plan.mjs): lanes in parallel, checks in order.
+// Run the CI lane plan (lanes-plan.mjs): private lanes sequentially, hosted
+// lanes with bounded concurrency, and each lane's checks in order.
 //
 // Usage:
 //   node scripts/ci/self-hosted/lanes.mjs --profile ex63|hosted
@@ -9,7 +10,7 @@
 //   node scripts/ci/self-hosted/lanes.mjs --wait-all [--out ci-out]
 //
 // Step-per-lane mode, so a workflow shows every lane as its own step while
-// the lanes still run in parallel:
+// the profile's scheduling remains in effect:
 //   1. `--detach` starts the runner in the background (under
 //      scripts/ci-cancel-aware.sh) and writes the active lanes as JSON to
 //      $GITHUB_OUTPUT `lanes`.
