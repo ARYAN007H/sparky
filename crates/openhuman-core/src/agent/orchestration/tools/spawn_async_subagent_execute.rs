@@ -255,18 +255,6 @@ impl SpawnAsyncSubagentTool {
         }
 
         let task_id = format!("sub-{}", uuid::Uuid::new_v4());
-        if let Some(thread_id) = parent_thread_id.as_deref() {
-            if crate::agent::orchestration::background_completions::mark_stopped_task_if_thread_stopped(
-                &dispatch,
-                &parent.workspace_dir,
-                thread_id,
-                &task_id,
-            ) {
-                return Ok(ToolResult::error(
-                    "spawn_async_subagent: parent thread is stopped or deleted",
-                ));
-            }
-        }
         let worker_thread_id = reusable
             .as_ref()
             .and_then(|session| session.worker_thread_id.clone())
