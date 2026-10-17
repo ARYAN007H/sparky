@@ -2,6 +2,37 @@
 
 use super::*;
 
+/// Apply OpenHuman's packed/deferred filters around shared synthesized-name
+/// reconciliation. TinyAgents restores permanent names after these filters.
+fn reconcile_surface_names(
+    visible: &mut std::collections::HashSet<String>,
+    deferred: &mut std::collections::HashSet<String>,
+    permanent: &mut std::collections::HashSet<String>,
+    previous_synthesized: &std::collections::HashSet<String>,
+    synthesized: &std::collections::HashSet<String>,
+    auto_include_new: bool,
+    discovery_deferred: Option<std::collections::HashSet<String>>,
+    strip_packed: impl FnOnce(&mut std::collections::HashSet<String>),
+) {
+    strip_packed(visible);
+    if let Some(names) = &discovery_deferred {
+        visible.retain(|name| !names.contains(name));
+        *deferred = names.clone();
+    }
+    let mut managed = tinyagents_runtime::ManagedToolNames {
+        visible: std::mem::take(visible),
+        deferred: std::mem::take(deferred),
+        permanent: std::mem::take(permanent),
+    };
+    managed.refresh_synthesized(previous_synthesized, synthesized, auto_include_new);
+    if let Some(names) = &discovery_deferred {
+        managed.defer_visible(names);
+    }
+    *visible = managed.visible;
+    *deferred = managed.deferred;
+    *permanent = managed.permanent;
+}
+
 impl OpenHumanTurnPrelude {
     /// Rebuild every delegation-dependent tool view from the current cached
     /// integration set, replacing rather than appending. A revoked delegate is
@@ -102,44 +133,35 @@ impl OpenHumanTurnPrelude {
                     .map(|spec| spec.name.clone()),
             );
         }
-        let agent_definition_name = surface.agent_definition_name.clone();
-        crate::tools::toolpacks::strip_packed_from_visible(
-            &mut surface.visible_tool_names,
-            &agent_definition_name,
-        );
         let discovery_deferred = if surface.discovery_enabled {
             let deferred = tinytools::deferred_set(
                 surface.tools.as_slice(),
                 &synthesized,
                 &surface.requested_deferred_tools,
             );
-            surface
-                .visible_tool_names
-                .retain(|name| !deferred.contains(name));
-            surface.deferred_tool_names = deferred;
-            Some(surface.deferred_tool_names.clone())
+            Some(deferred)
         } else {
             None
         };
         // Apply host-specific packed/deferred policy before the shared name
         // reconciliation. TinyAgents restores permanent visibility after
         // those filters and protects permanent names from deferred discovery.
-        let mut managed = tinyagents_runtime::ManagedToolNames {
-            visible: std::mem::take(&mut surface.visible_tool_names),
-            deferred: std::mem::take(&mut surface.deferred_tool_names),
-            permanent: std::mem::take(&mut surface.permanent_tool_names),
-        };
-        managed.refresh_synthesized(
+        let agent_definition_name = surface.agent_definition_name.clone();
+        reconcile_surface_names(
+            &mut surface.visible_tool_names,
+            &mut surface.deferred_tool_names,
+            &mut surface.permanent_tool_names,
             &previous_synthesized,
             &synthesized_names,
             auto_include_new_synthesized_tools,
+            discovery_deferred,
+            |visible| {
+                crate::tools::toolpacks::strip_packed_from_visible(
+                    visible,
+                    &agent_definition_name,
+                )
+            },
         );
-        if let Some(deferred) = &discovery_deferred {
-            managed.defer_visible(deferred);
-        }
-        surface.visible_tool_names = managed.visible;
-        surface.deferred_tool_names = managed.deferred;
-        surface.permanent_tool_names = managed.permanent;
         let mut specs = surface
             .durable_tool_specs
             .iter()
