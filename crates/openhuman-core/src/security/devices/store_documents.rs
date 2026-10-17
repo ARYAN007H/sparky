@@ -52,8 +52,9 @@ pub(super) fn current(config: &Config) -> Result<Docs> {
 
 /// The channel id a document id was built from (ids are `Key::of` of it).
 fn channel_id_of(id: &str) -> String {
-    tinystoragedrivers::Key::from_stored(id)
-        .split()
+    tinystoragedrivers::Key::new(id)
+        .ok()
+        .and_then(|key| key.split())
         .and_then(|mut parts| (parts.len() == 1).then(|| parts.remove(0)))
         .unwrap_or_else(|| id.to_string())
 }
