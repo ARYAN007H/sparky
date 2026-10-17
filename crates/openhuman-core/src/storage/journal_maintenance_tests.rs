@@ -2,11 +2,10 @@ use super::*;
 use std::sync::atomic::{AtomicU64, Ordering};
 use tinyagents_harness::events::{AgentEvent, EventSink, HarnessRunStatus};
 use tinyagents_harness::ids::{ComponentId, HarnessPhase, RunId};
-use tinyagents_harness::observability::{
-    read_run_events_page, AgentObservation, HarnessEventJournal, HarnessStatusStore,
-    StoreEventJournal,
-};
+use tinyagents_harness::observability::replay::read_run_events_page;
+use tinyagents_harness::observability::{AgentObservation, HarnessEventJournal, StoreEventJournal};
 use tinyagents_harness::store::{AppendStore, DriverAppendStore};
+use tinyagents_harness::HarnessStatusStore;
 use tinystoragedrivers::MemoryStorage;
 
 fn backend_with_clock() -> (Arc<AtomicU64>, Arc<dyn StorageBackend>) {

@@ -19,6 +19,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use tinyagents_harness::observability::DriverStatusStore;
+use tinyagents_harness::HarnessStatusStore;
 use tinystoragedrivers::schema::{Item, Migrations, Registry};
 use tinystoragedrivers::{
     Capability, CollectionSpec, MaintenanceBudget, Scope, StorageBackend, StorageError,
@@ -200,7 +201,7 @@ async fn configured_retention_days(ctx: &crate::core::runtime::DispatchCtx) -> u
         Ok(config) => config.storage.journal_retention_days,
         Err(error) => {
             tracing::debug!(%error, "{LOG} config unavailable; using the default retention");
-            crate::config::StorageConfig::default().journal_retention_days
+            crate::config::schema::StorageConfig::default().journal_retention_days
         }
     }
 }
