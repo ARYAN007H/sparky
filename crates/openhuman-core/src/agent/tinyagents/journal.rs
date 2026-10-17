@@ -120,12 +120,13 @@ async fn journal_stores(
 /// `AgentEvent` stream carries no run-terminal event, so the authoritative
 /// terminal write is caller-driven here. Every method is best-effort and
 /// non-fatal.
+#[derive(Clone)]
 pub(crate) struct TurnJournal {
     run_id: RunId,
     status_store: Arc<DriverStatusStore>,
     event_sink: Arc<JournalSink>,
     /// The in-flight status snapshot, mutated in place to `completed`/`failed`.
-    status: Mutex<HarnessRunStatus>,
+    status: Arc<Mutex<HarnessRunStatus>>,
 }
 
 impl TurnJournal {
@@ -246,7 +247,7 @@ pub(crate) async fn attach_turn_journal(
         run_id,
         status_store,
         event_sink: journal_sink,
-        status: Mutex::new(status),
+        status: Arc::new(Mutex::new(status)),
     })
 }
 
