@@ -4,8 +4,8 @@ use tinyagents_orchestration::subagent::{
 };
 
 use super::lifecycle::{
-    host_in_flight, load_subagent_checkpoint, merged_resume_history, HostInFlight,
-    OpenHumanPersistence,
+    decode_driver_job_result, host_in_flight, load_subagent_checkpoint, merged_resume_history,
+    HostInFlight, OpenHumanDriverBundle, OpenHumanPersistence,
 };
 use super::{SubagentMode, SubagentRunOutcome, SubagentRunStatus, SubagentUsage};
 
@@ -16,6 +16,107 @@ fn key() -> SubagentTaskKey {
         thread_id: Some("thread".into()),
         task_id: "task".into(),
     }
+}
+
+fn cached_outcome(status: SubagentRunStatus) -> SubagentRunOutcome {
+    SubagentRunOutcome {
+        task_id: "task".into(),
+        agent_id: "researcher".into(),
+        output: "partial output".into(),
+        iterations: 1,
+        elapsed: std::time::Duration::from_millis(1),
+        mode: SubagentMode::Typed,
+        status,
+        final_history: Vec::new(),
+        usage: SubagentUsage::default(),
+        artifact_paths: Vec::new(),
+        persistence_disposition:
+            tinyagents_orchestration::subagent::SubagentPersistenceDisposition::PauseCommitted,
+    }
+}
+
+fn lifecycle_error(status: &str, task_id: &str) -> tinytools::ToolResult {
+    tinytools::ToolResult::error(
+        serde_json::json!({"task_id": task_id, "status": status}).to_string(),
+    )
+}
+
+#[test]
+fn driver_error_accepts_only_matching_nonterminal_lifecycle_snapshots() {
+    let workspace = tempfile::tempdir().unwrap();
+    let bundle = OpenHumanDriverBundle::new(workspace.path().join("checkpoints")).unwrap();
+    let task_key = key();
+    let public_id = "subagent-job-42";
+
+    for (status, host_status) in [
+        (
+            "awaiting_input",
+            SubagentRunStatus::AwaitingUser {
+                question: "Need clarification".into(),
+                options: None,
+                checkpoint: None,
+            },
+        ),
+        (
+            "incomplete",
+            SubagentRunStatus::Incomplete {
+                reason: "iteration limit".into(),
+            },
+        ),
+        ("cancelled", SubagentRunStatus::Cancelled),
+    ] {
+        bundle
+            .host_outcome
+            .lock()
+            .unwrap()
+            .insert(task_key.clone(), cached_outcome(host_status));
+        let decoded = decode_driver_job_result(
+            lifecycle_error(status, public_id),
+            &bundle,
+            &task_key,
+        )
+        .unwrap();
+        assert_eq!(decoded, public_id);
+    }
+}
+
+#[test]
+fn driver_error_does_not_hide_completed_mismatched_or_persistence_failures() {
+    let workspace = tempfile::tempdir().unwrap();
+    let bundle = OpenHumanDriverBundle::new(workspace.path().join("checkpoints")).unwrap();
+    let task_key = key();
+    bundle
+        .host_outcome
+        .lock()
+        .unwrap()
+        .insert(task_key.clone(), cached_outcome(SubagentRunStatus::AwaitingUser {
+            question: "Need clarification".into(),
+            options: None,
+            checkpoint: None,
+        }));
+
+    for result in [
+        lifecycle_error("completed", "subagent-job-42"),
+        lifecycle_error("cancelled", "subagent-job-42"),
+        lifecycle_error("unknown", "subagent-job-42"),
+        tinytools::ToolResult::error("provider transport failed"),
+        lifecycle_error("awaiting_input", ""),
+    ] {
+        let error = decode_driver_job_result(result, &bundle, &task_key).unwrap_err();
+        assert!(error.to_string().contains("driver-backed async spawn failed"));
+    }
+
+    bundle.failures.lock().unwrap().insert(
+        task_key.clone(),
+        SubagentRunError::Provider(anyhow::anyhow!("checkpoint write failed")),
+    );
+    let error = decode_driver_job_result(
+        lifecycle_error("awaiting_input", "subagent-job-42"),
+        &bundle,
+        &task_key,
+    )
+    .unwrap_err();
+    assert!(error.to_string().contains("checkpoint write failed"));
 }
 
 fn paused_outcome(question: &str, resume: SubagentResume) -> SubagentOutcome {
