@@ -294,6 +294,6 @@ pub(crate) async fn address(scope: &DocScope) -> Result<CallbackAddress> {
     Ok(address)
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "modules"))]
 #[path = "documents_port_tests.rs"]
 mod tests;
