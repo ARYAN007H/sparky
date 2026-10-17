@@ -15,8 +15,7 @@ async fn the_import_brings_legacy_files_into_the_v1_database() {
         let scoped = backend.for_scope(&storage::Scope::local())?;
         Ok(StateKv::over(&scoped, "memory", "state")
             .get::<serde_json::Value>("jobs")
-            .ok()
-            .flatten())
+            .unwrap_or_else(|e| panic!("kv get: {e:#}")))
     })
     .unwrap();
     assert_eq!(jobs, Some(serde_json::json!({"jobs": [1, 2, 3]})));
