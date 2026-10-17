@@ -24,6 +24,8 @@ pub struct TenantSessionStores {
     recover_on_open: bool,
     admission: SchemaAdmission,
     tenants: Mutex<HashMap<Scope, Arc<DriverSessionStores>>>,
+    /// Names this router in [`SessionStoreProvider::destination_key`].
+    id: uuid::Uuid,
 }
 
 impl std::fmt::Debug for TenantSessionStores {
@@ -58,6 +60,7 @@ impl TenantSessionStores {
             recover_on_open,
             admission,
             tenants: Mutex::new(HashMap::new()),
+            id: uuid::Uuid::new_v4(),
         }
     }
 
@@ -175,7 +178,7 @@ impl SessionStoreProvider for TenantSessionStores {
     }
 
     fn destination_key(&self) -> Option<String> {
-        Some(format!("{}://tenants", self.backend.driver()))
+        Some(format!("{}://{}", self.backend.driver(), self.id))
     }
 }
 

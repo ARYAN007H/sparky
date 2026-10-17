@@ -678,7 +678,7 @@ async fn every_call_is_audited_without_its_payload() {
         trail[0],
         AuditRecord {
             module: "alpha".into(),
-            scope: "module:alpha@local".into(),
+            scope: "local/module:alpha".into(),
             object: "Documents",
             op: "Put".into(),
             target: "notes".into(),
