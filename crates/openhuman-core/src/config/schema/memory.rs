@@ -70,7 +70,7 @@ pub const DEFAULT_MEMORY_ENGINE: &str = "tinyhumans";
 
 /// A legacy backend is retained only long enough to recognize migration input;
 /// its debug representation must not expose user-provided configuration text.
-#[derive(Clone, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Deserialize, PartialEq, Eq, Hash)]
 pub(crate) struct LegacyBackend(String);
 
 impl fmt::Debug for LegacyBackend {
@@ -86,7 +86,7 @@ fn is_true(value: &bool) -> bool {
 }
 
 /// The `[memory]` section.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema, Hash)]
 #[serde(default)]
 pub struct MemoryConfig {
     /// The selected engine id (`tinyhumans` or `cortexdb`), or `none` when memory is disabled.
@@ -165,7 +165,7 @@ pub struct MemoryConfig {
 }
 
 /// `[memory] layout`: where memory sits on the engine.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema, Hash)]
 #[serde(rename_all = "lowercase")]
 pub enum MemoryLayoutMode {
     /// The shared `app:tinymemory` tree, as before layout v3.
@@ -185,7 +185,7 @@ impl MemoryLayoutMode {
 }
 
 /// `[memory.agents.<definition>]`: one agent definition's memory.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema, Hash)]
 #[serde(default)]
 pub struct MemoryAgentConfig {
     /// The memory agent id this definition acts as; unset is the definition
@@ -252,7 +252,7 @@ impl MemoryConfig {
 }
 
 /// `[memory.engines.<id>]`.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema, Hash)]
 #[serde(default)]
 pub struct MemoryEngineSettings {
     /// Base URL of the engine; unset uses the engine's default.
@@ -261,7 +261,7 @@ pub struct MemoryEngineSettings {
 }
 
 /// `[memory.conversations]`.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema, Hash)]
 #[serde(default)]
 pub struct MemoryConversationsConfig {
     /// Whether every turn is logged to the acting agent's conversations.
@@ -285,7 +285,7 @@ pub const DEFAULT_BUILD_DELAY_SECS: u64 = 300;
 
 /// `[memory.recall]`: the context pack injected before every turn, and the
 /// lifecycle's budgets. Mirrors `tinymemory_tools::RecallPolicy`.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema, Hash)]
 #[serde(default)]
 pub struct MemoryRecallConfig {
     /// Whether a pack is recalled and injected before every turn.
@@ -388,7 +388,7 @@ impl MemorySourceKind {
 /// One `[[memory.sources]]` entry: what to read and how often. Sync state
 /// (last run, status, item count) is runtime state kept in the workspace,
 /// not here.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema, Hash)]
 pub struct MemorySourceConfig {
     /// Stable id.
     pub id: String,
