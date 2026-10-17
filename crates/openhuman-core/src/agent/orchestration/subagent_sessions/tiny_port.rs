@@ -208,7 +208,13 @@ impl TinySessionStore for OpenHumanTinySubagentSessionStore {
     }
 
     async fn close(&self, id: &str) -> Result<bool, SubagentError> {
-        let Some(session) = self.get(id).await? else {
+        let session = self
+            .store
+            .load()
+            .map_err(SubagentError::Persistence)?
+            .into_iter()
+            .find(|session| session.subagent_session_id == id && self.is_owned(session));
+        let Some(session) = session else {
             return Ok(false);
         };
         if let Some(jobs) = &self.jobs {
