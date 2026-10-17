@@ -25,6 +25,46 @@ fn workflow_supervisor() -> &'static WorkflowRunSupervisor {
     SUPERVISOR.get_or_init(WorkflowRunSupervisor::default)
 }
 
+fn record_failed_if_current(
+    config: &Config,
+    run_id: &str,
+    handle: &WorkflowRunHandle,
+    summary: String,
+) {
+    let supervisor = workflow_supervisor();
+    if !supervisor.is_current(handle) {
+        return;
+    }
+    if let Ok(Some(run)) = get_workflow_run(config, run_id) {
+        if matches!(
+            run.status,
+            WorkflowRunStatus::Completed
+                | WorkflowRunStatus::Failed
+                | WorkflowRunStatus::Cancelled
+                | WorkflowRunStatus::Interrupted
+        ) || !supervisor.is_current(handle)
+        {
+            return;
+        }
+        let _ = compare_and_swap_workflow_run_lifecycle(
+            config,
+            WorkflowRunUpsert {
+                id: run.id.clone(),
+                definition_id: run.definition_id.clone(),
+                parent_thread_id: run.parent_thread_id.clone(),
+                input: run.input.clone(),
+                phase_states: run.phase_states.clone(),
+                child_run_ids: run.child_run_ids.clone(),
+                status: WorkflowRunStatus::Failed,
+                summary: Some(summary),
+                started_at: Some(run.started_at),
+                completed_at: Some(chrono::Utc::now()),
+            },
+            run.revision,
+        );
+    }
+}
+
 /// Install the owner generation, then build OpenHuman's root context and
 /// origin around the scheduled drive. The host retains the callback handle
 /// only so failure projection can reject a stale generation.
@@ -48,17 +88,19 @@ fn schedule_workflow_drive(
     let root_ctx = task_ctx.clone();
     let root_config_slot = Arc::clone(&config_slot);
     let root_parent_slot = Arc::clone(&parent_slot);
+    let root_handle_slot = Arc::clone(&handle_slot);
     let root_run_id = run_id.clone();
     let root_parent = move |drive| {
         let task_ctx = root_ctx.clone();
         let config_slot = Arc::clone(&root_config_slot);
         let parent_slot = Arc::clone(&root_parent_slot);
+        let handle_slot = Arc::clone(&root_handle_slot);
         let run_id = root_run_id.clone();
         async move {
             match crate::config::ops::load_current_or_init(&task_ctx).await {
                 Ok(task_config) => {
                     let _ = config_slot.set(task_config.clone());
-                    let _ = with_root_parent(
+                    if let Err(error) = with_root_parent(
                         &task_ctx,
                         None,
                         &task_config,
@@ -71,6 +113,16 @@ fn schedule_workflow_drive(
                         },
                     )
                     .await;
+                    {
+                        if let Some(handle) = handle_slot.get() {
+                            record_failed_if_current(
+                                &task_config,
+                                &run_id,
+                                handle,
+                                format!("root parent context failed: {error:#}"),
+                            );
+                        }
+                    }
                 }
                 Err(error) => log::error!(
                     target: LOG_TARGET,
@@ -309,26 +361,12 @@ pub(crate) async fn run_engine_loop(
         Ok(tier) => tier,
         Err(error) => {
             log::error!(target: LOG_TARGET, "[workflow_run_engine] loop.safety_admission_failed run={run_id} err={error}");
-            if workflow_supervisor().is_current(&handle)
-                && let Ok(Some(run)) = get_workflow_run(config, run_id)
-            {
-                let _ = compare_and_swap_workflow_run_lifecycle(
-                    config,
-                    WorkflowRunUpsert {
-                        id: run.id.clone(),
-                        definition_id: run.definition_id.clone(),
-                        parent_thread_id: run.parent_thread_id.clone(),
-                        input: run.input.clone(),
-                        phase_states: run.phase_states.clone(),
-                        child_run_ids: run.child_run_ids.clone(),
-                        status: WorkflowRunStatus::Failed,
-                        summary: Some(format!("workflow safety admission failed: {error}")),
-                        started_at: Some(run.started_at),
-                        completed_at: Some(chrono::Utc::now()),
-                    },
-                    run.revision,
-                );
-            }
+            record_failed_if_current(
+                config,
+                run_id,
+                &handle,
+                format!("workflow safety admission failed: {error}"),
+            );
             return;
         }
     };
@@ -370,34 +408,7 @@ pub(crate) async fn run_engine_loop(
             "[workflow_run_engine] loop.failed run={run_id} err={err}"
         );
         // Best-effort terminal failure write, preserving partial phase state.
-        if let Ok(Some(run)) = get_workflow_run(config, run_id) {
-            if !matches!(
-                run.status,
-                WorkflowRunStatus::Completed
-                    | WorkflowRunStatus::Failed
-                    | WorkflowRunStatus::Cancelled
-                    | WorkflowRunStatus::Interrupted
-            ) {
-                if workflow_supervisor().is_current(&handle) {
-                    let _ = compare_and_swap_workflow_run_lifecycle(
-                    config,
-                    WorkflowRunUpsert {
-                        id: run.id.clone(),
-                        definition_id: run.definition_id.clone(),
-                        parent_thread_id: run.parent_thread_id.clone(),
-                        input: run.input.clone(),
-                        phase_states: run.phase_states.clone(),
-                        child_run_ids: run.child_run_ids.clone(),
-                        status: WorkflowRunStatus::Failed,
-                        summary: Some(format!("engine error: {err}")),
-                        started_at: Some(run.started_at),
-                        completed_at: Some(chrono::Utc::now()),
-                    },
-                        run.revision,
-                    );
-                }
-            }
-        }
+        record_failed_if_current(config, run_id, &handle, format!("engine error: {err}"));
     }
 
 }
