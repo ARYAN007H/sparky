@@ -317,6 +317,34 @@ fn legacy_export_snapshot_for_root_and_child_with_reused_call_ids() {
         !snapshot.contains("CONTENT_SENTINEL"),
         "content-off export must not contain captured payloads"
     );
+    let mut native = tinyagents_harness::observability::trace_export::SpanCollector::new(ctx());
+    for observation in &observations {
+        native.record(observation);
+    }
+    native.finish(1_110);
+    let native_spans = native.spans();
+    let native_by_id: std::collections::HashMap<_, _> = native_spans
+        .iter()
+        .map(|span| (span.span_id.as_str(), span))
+        .collect();
+    let native_normalized: Vec<_> = native_spans
+        .iter()
+        .map(|span| {
+            serde_json::json!({
+                "name": span.name,
+                "kind": format!("{:?}", span.kind),
+                "parent": span.parent_span_id.as_deref().and_then(|id| native_by_id.get(id)).map(|parent| parent.name.as_str()),
+                "start_unix_ms": span.start_unix_ms,
+                "end_unix_ms": span.end_unix_ms,
+                "status": format!("{:?}", span.status),
+                "attributes": span.attributes,
+            })
+        })
+        .collect();
+    println!(
+        "NATIVE:{}",
+        serde_json::to_string_pretty(&native_normalized).unwrap()
+    );
     let spans_by_id: std::collections::HashMap<_, _> = spans
         .iter()
         .map(|span| (span.span_id.as_str(), span))
