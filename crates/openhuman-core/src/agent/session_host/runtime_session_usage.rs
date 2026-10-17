@@ -2,6 +2,7 @@
 
 fn rollup_usage(
     sidecar: &crate::agent::tinyagents::host::run_context::SessionTurnSidecar,
+    records: &[crate::agent::tinyagents::host::run_context::SubagentUsageRecord],
 ) -> tinyagents_harness::cost::UsageRollup {
     // Each host entry already represents a complete child subtree. Treat it
     // as one leaf under its actual execution id; the owner rollup handles
@@ -12,10 +13,11 @@ fn rollup_usage(
         sidecar.output_tokens,
         sidecar.cached_input_tokens,
         sidecar.cost,
-        sidecar.subagents.iter().map(|entry| {
+        records.iter().map(|record| {
+            let entry = &record.entry;
             let usage = &entry.usage;
             tinyagents_harness::cost::SubagentUsage {
-                run_id: entry.run_id.clone(),
+                run_id: record.run_id.clone(),
                 task_id: entry.task_id.clone(),
                 input_tokens: usage.input_tokens,
                 output_tokens: usage.output_tokens,
@@ -33,8 +35,9 @@ pub(in crate::agent::session_host) async fn account_committed_turn_against_goal(
     workspace_dir: &std::path::Path,
     thread_id: Option<&str>,
     sidecar: &crate::agent::tinyagents::host::run_context::SessionTurnSidecar,
+    records: &[crate::agent::tinyagents::host::run_context::SubagentUsageRecord],
 ) {
-    let usage = rollup_usage(sidecar);
+    let usage = rollup_usage(sidecar, records);
     crate::agent::goals::runtime::account_turn_against_goal(
         workspace_dir,
         thread_id,
@@ -52,11 +55,12 @@ pub(in crate::agent::session_host) async fn account_committed_turn_against_goal(
 /// detailed display while reporting the same all-in totals the codec persists.
 pub(in crate::agent::session_host) fn holistic_last_turn_usage(
     sidecar: &crate::agent::tinyagents::host::run_context::SessionTurnSidecar,
+    records: &[crate::agent::tinyagents::host::run_context::SubagentUsageRecord],
 ) -> crate::agent::tinyagents::host::LastTurnUsage {
-    let rollup = rollup_usage(sidecar);
+    let rollup = rollup_usage(sidecar, records);
     let mut details = std::collections::HashMap::new();
-    for entry in &sidecar.subagents {
-        details.entry(entry.run_id.as_str()).or_insert(entry);
+    for record in records {
+        details.entry(record.run_id.as_str()).or_insert(&record.entry);
     }
     let subagents = rollup
         .subagents
