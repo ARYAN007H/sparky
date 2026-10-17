@@ -251,7 +251,7 @@ impl FlowsHost {
 }
 
 fn required<T: DeserializeOwned>(value: &Value, key: &str) -> Result<T, String> {
-    field(value, key)?.ok_or_else(|| format!("missing `{key}`"))
+    optional_field(value, key)?.ok_or_else(|| format!("missing `{key}`"))
 }
 
 fn optional_field<T: DeserializeOwned>(value: &Value, key: &str) -> Result<Option<T>, String> {
