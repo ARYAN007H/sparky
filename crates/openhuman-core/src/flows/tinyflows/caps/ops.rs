@@ -51,9 +51,7 @@ pub(crate) fn http_cred_name(conn: &str) -> Option<&str> {
     (!name.is_empty()).then_some(name)
 }
 
-pub(crate) use crate::integrations::composio::flow_gate::{
-    flow_tool_allowed, resolve_account, resolve_composio_account,
-};
+pub(crate) use crate::integrations::composio::flow_gate::resolve_composio_account;
 
 pub(crate) async fn classify_composio_action_for_tier(slug: &str) -> CommandClass {
     crate::integrations::composio::flow_gate::classify_composio_action_for_tier(slug)
