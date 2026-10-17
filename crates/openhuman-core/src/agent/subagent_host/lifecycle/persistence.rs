@@ -628,14 +628,16 @@ impl tinyagents_orchestration::subagent::SubagentPersistence for OpenHumanPersis
             .unwrap_or_default();
         // Product checkpoint fields absent from the neutral pause stay in a
         // namespaced extension; reserved TinyAgents fields remain untouched.
-        pause.outcome.extensions.insert(
-            "openhuman_checkpoint".into(),
-            serde_json::json!({
-                "created_at": chrono::Utc::now().to_rfc3339(),
-                "options": pause.outcome.extensions.get("options"),
-                "elapsed_ms": elapsed_ms,
-            }),
-        );
+        let host_checkpoint = serde_json::json!({
+            "created_at": chrono::Utc::now().to_rfc3339(),
+            "options": pause.outcome.extensions.get("options"),
+            "elapsed_ms": elapsed_ms,
+        });
+        pause
+            .outcome
+            .extensions
+            .entry("openhuman_checkpoint".into())
+            .or_insert(host_checkpoint);
         let disposition = tinyagents_orchestration::subagent::SubagentPersistence::save_pause(
             &self.file_store,
             pause.clone(),
