@@ -7,7 +7,7 @@
 //! conversations of every thread a channel owns.
 
 use std::collections::{BTreeMap, BTreeSet};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::{LazyLock, Mutex};
 
 use tinymemory_api::{ForgetTarget, ItemKind, MetaFilter};

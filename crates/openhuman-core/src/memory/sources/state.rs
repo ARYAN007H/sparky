@@ -6,7 +6,7 @@
 //! a run the previous process never finished, and reads as `idle`.
 
 use std::collections::BTreeMap;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::{LazyLock, Mutex};
 
 use chrono::{DateTime, Utc};
