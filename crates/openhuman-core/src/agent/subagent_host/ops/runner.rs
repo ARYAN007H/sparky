@@ -418,20 +418,19 @@ async fn apply_subagent_result_policies(
     let can_store = !policy
         .as_ref()
         .is_some_and(|p| p.autonomy == crate::security::AutonomyLevel::ReadOnly);
+    let threshold =
+        effective_offload_threshold(DEFAULT_OFFLOAD_THRESHOLD_BYTES, definition.max_result_chars);
     let store = match (action_dir.as_ref(), can_store) {
         (Some(action_dir), true) => Some(Arc::new(SubagentArtifactStore::new(
             policy,
             action_dir.clone(),
             outcome.agent_id.clone(),
+            threshold,
         ))),
         _ => None,
     };
 
     if let Some(store) = store.as_ref() {
-        let threshold = effective_offload_threshold(
-            DEFAULT_OFFLOAD_THRESHOLD_BYTES,
-            definition.max_result_chars,
-        );
         match offload_result_by_policy(task_id, &outcome.output, threshold, store).await {
             Ok(Some(stored)) => {
                 outcome.output = stored.pointer;
@@ -512,6 +511,7 @@ struct SubagentArtifactStore {
     policy: Option<Arc<crate::security::SecurityPolicy>>,
     action_dir: PathBuf,
     agent_id: String,
+    threshold_bytes: usize,
     artifacts: Mutex<HashMap<String, StoredSubagentArtifact>>,
 }
 
@@ -525,11 +525,13 @@ impl SubagentArtifactStore {
         policy: Option<Arc<crate::security::SecurityPolicy>>,
         action_dir: PathBuf,
         agent_id: String,
+        threshold_bytes: usize,
     ) -> Self {
         Self {
             policy,
             action_dir,
             agent_id,
+            threshold_bytes,
             artifacts: Mutex::new(HashMap::new()),
         }
     }
@@ -555,7 +557,7 @@ impl tinyagents_orchestration::subagent::ArtifactStore for SubagentArtifactStore
             self.action_dir.clone(),
             self.agent_id.clone(),
             task_id,
-            0,
+            self.threshold_bytes,
         )
         .await;
         let artifact = artifact.ok_or_else(|| "OpenHuman did not persist the result".to_owned())?;
