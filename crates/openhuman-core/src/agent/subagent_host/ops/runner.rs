@@ -411,8 +411,8 @@ async fn apply_subagent_result_policies(
         .or_else(|| policy.as_ref().map(|p| p.action_dir.clone()));
 
     let can_store = !policy
-            .as_ref()
-            .is_some_and(|p| p.autonomy == crate::security::AutonomyLevel::ReadOnly);
+        .as_ref()
+        .is_some_and(|p| p.autonomy == crate::security::AutonomyLevel::ReadOnly);
     let store = match (action_dir.as_ref(), can_store) {
         (Some(action_dir), true) => Some(Arc::new(SubagentArtifactStore::new(
             policy,
@@ -423,9 +423,13 @@ async fn apply_subagent_result_policies(
     };
 
     if let Some(store) = store.as_ref() {
-        let threshold =
-            effective_offload_threshold(DEFAULT_OFFLOAD_THRESHOLD_BYTES, definition.max_result_chars);
-        if let Some(stored) = offload_result_by_policy(task_id, &outcome.output, threshold, store).await {
+        let threshold = effective_offload_threshold(
+            DEFAULT_OFFLOAD_THRESHOLD_BYTES,
+            definition.max_result_chars,
+        );
+        if let Some(stored) =
+            offload_result_by_policy(task_id, &outcome.output, threshold, store).await
+        {
             outcome.output = stored.pointer;
             if !paths.contains(&stored.relative_path) {
                 paths.push(stored.relative_path);

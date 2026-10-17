@@ -50,5 +50,8 @@ async fn byte_policy_offloads_full_output_before_applying_the_character_cap() {
         .with_max_chars(512)
         .apply("task-policy-test", &stored.pointer, None)
         .await;
-    assert_eq!(capped.text, stored.pointer, "the existing pointer fits its cap");
+    assert_eq!(
+        capped.text, stored.pointer,
+        "the existing pointer fits its cap"
+    );
 }
