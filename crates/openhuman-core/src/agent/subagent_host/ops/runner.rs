@@ -128,13 +128,11 @@ pub(crate) async fn run_subagent_direct(
         // same entries into this run's single terminal total.
         struct UsageFinalizer {
             context: crate::agent::tinyagents::host::OpenHumanRunContext,
-            run_id: String,
             complete: bool,
         }
         impl UsageFinalizer {
             fn finish(&mut self, entry: crate::agent::tinyagents::host::SubagentUsageEntry) {
-                self.context
-                    .record_completed_subagent_usage_with_run_id(self.run_id.clone(), entry);
+                self.context.record_completed_subagent_usage(entry);
                 self.complete = true;
             }
         }
@@ -149,12 +147,8 @@ pub(crate) async fn run_subagent_direct(
             .task_id
             .clone()
             .unwrap_or_else(|| format!("sub-{}", uuid::Uuid::new_v4()));
-        // This point is inside the actual executor, after shared-flight
-        // coalescing has selected the run owner. Carry the same id through
-        // every completion record cloned or promoted by this run.
         let mut usage_finalizer = UsageFinalizer {
             context: options.run_context.clone(),
-            run_id: uuid::Uuid::new_v4().to_string(),
             complete: false,
         };
 

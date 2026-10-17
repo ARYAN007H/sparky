@@ -196,7 +196,6 @@ fn failed_outer_run_promotes_completed_nested_usage_once() {
             ..Default::default()
         },
     });
-    let nested_run_id = outer.subagent_usage_records()[0].run_id.clone();
 
     // This is the failure/cancellation finalizer path. Calling it once leaves
     // the root with the completed nested work even though the outer run has no
@@ -204,7 +203,6 @@ fn failed_outer_run_promotes_completed_nested_usage_once() {
     outer.promote_completed_descendant_usage();
     assert_eq!(root.subagent_usage_entries().len(), 1);
     assert_eq!(root.subagent_usage_entries()[0].task_id, "nested");
-    assert_eq!(root.subagent_usage_records()[0].run_id, nested_run_id);
 }
 
 #[test]

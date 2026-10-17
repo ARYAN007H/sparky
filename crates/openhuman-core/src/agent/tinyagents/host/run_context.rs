@@ -81,13 +81,6 @@ pub struct SubagentUsageEntry {
     pub usage: SubagentUsage,
 }
 
-/// Internal run identity paired with its host-facing usage projection.
-#[derive(Debug, Clone, PartialEq)]
-pub(crate) struct SubagentUsageRecord {
-    pub(crate) run_id: String,
-    pub(crate) entry: SubagentUsageEntry,
-}
-
 /// Complete usage for a completed root turn, including synchronous children.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct LastTurnUsage {
@@ -340,11 +333,11 @@ pub struct OpenHumanRunContext {
     /// Zero-based OpenHuman subagent depth (the root is zero).
     pub spawn_depth: usize,
     /// This run's subagent usage roll-up; intentionally isolated for children.
-    subagent_usage: Arc<Mutex<Vec<SubagentUsageRecord>>>,
+    pub subagent_usage: Arc<Mutex<Vec<SubagentUsageEntry>>>,
     /// The immediate parent's ledger. A child writes its own completed total to
     /// this explicit handle, while nested children first collect in this run's
     /// isolated ledger. It is never a task-local or a root-global collector.
-    parent_subagent_usage: Option<Arc<Mutex<Vec<SubagentUsageRecord>>>>,
+    parent_subagent_usage: Option<Arc<Mutex<Vec<SubagentUsageEntry>>>>,
     /// Provider/model/host-route observation for this run, written from the
     /// canonical response metadata by typed model middleware. Intentionally
     /// isolated for children.
@@ -707,27 +700,13 @@ impl OpenHumanRunContext {
         self.subagent_usage
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .push(SubagentUsageRecord {
-                run_id: uuid::Uuid::new_v4().to_string(),
-                entry,
-            });
+            .push(entry);
     }
 
     /// Record a completed child on the immediate parent's ledger. This makes
     /// completed children visible at the root without leaking siblings into one
     /// another's in-flight ledger. Direct/root callers retain their own entry.
     pub fn record_completed_subagent_usage(&self, entry: SubagentUsageEntry) {
-        self.record_completed_subagent_usage_with_run_id(uuid::Uuid::new_v4().to_string(), entry);
-    }
-
-    /// Records one actual child execution with its stable identity. The runner
-    /// mints this once inside the executor, so clones and failure promotion
-    /// deduplicate the same run while repeated task IDs remain distinct.
-    pub(crate) fn record_completed_subagent_usage_with_run_id(
-        &self,
-        run_id: String,
-        entry: SubagentUsageEntry,
-    ) {
         let ledger = self
             .parent_subagent_usage
             .as_ref()
@@ -735,23 +714,13 @@ impl OpenHumanRunContext {
         ledger
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .push(SubagentUsageRecord { run_id, entry });
+            .push(entry);
     }
 
     /// Snapshot child totals after the child has returned. A snapshot, rather
     /// than a task-local drain, preserves totals even when sibling futures are
     /// cancelled or one child fails after another has completed.
     pub fn subagent_usage_entries(&self) -> Vec<SubagentUsageEntry> {
-        self.subagent_usage
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .iter()
-            .map(|record| record.entry.clone())
-            .collect()
-    }
-
-    /// Internal snapshot retaining actual execution IDs for cost rollup.
-    pub(crate) fn subagent_usage_records(&self) -> Vec<SubagentUsageRecord> {
         self.subagent_usage
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
@@ -763,8 +732,8 @@ impl OpenHumanRunContext {
     /// it only from one terminal finalizer, so every completed descendant is
     /// promoted once without exposing a shared, in-flight sibling ledger.
     pub fn promote_completed_descendant_usage(&self) {
-        for record in self.subagent_usage_records() {
-            self.record_completed_subagent_usage_with_run_id(record.run_id, record.entry);
+        for entry in self.subagent_usage_entries() {
+            self.record_completed_subagent_usage(entry);
         }
     }
 
