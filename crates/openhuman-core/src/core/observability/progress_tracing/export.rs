@@ -8,7 +8,7 @@ use super::langfuse;
 use super::otlp;
 use crate::config::schema::AgentTracingBackend;
 use tinyagents_harness::observability::trace_export::serialize::{spans_to_ndjson, SpanEnvelope};
-use tinyagents_harness::observability::trace_export::{RunType, TraceContext, TraceSpan};
+use tinyagents_harness::observability::trace_export::{TraceContext, TraceSpan};
 
 /// Map the configured backend onto the upstream NDJSON envelope.
 pub(crate) fn envelope_for(backend: AgentTracingBackend) -> SpanEnvelope {
@@ -107,101 +107,62 @@ pub(crate) async fn export_run_trace(config: &Config, spans: &[TraceSpan]) {
 /// Remote usage-data sharing exports the live span tree as OTLP. The journal
 /// is still read for local parity checks and future recovery work.
 pub(crate) async fn export_run_trace_from_journal(
+    ctx: &crate::core::runtime::DispatchCtx,
     config: &Config,
-    _trace_ctx: &TraceContext,
-    _observations: &[tinyagents_harness::observability::AgentObservation],
-    _run_telemetry: Option<&tinyagents_session::run_ledger::RunTelemetry>,
-    live_spans: &[TraceSpan],
+    request_id: &str,
+    trace_ctx: TraceContext,
 ) {
-    if live_spans.is_empty() {
+    let observability = &config.observability;
+    if !observability.share_usage_data && !observability.agent_tracing.enabled {
         return;
     }
-    let observability = &config.observability;
-
-    if observability.share_usage_data && !live_spans.is_empty() {
-        if let Err(err) = otlp::push_spans(config, live_spans).await {
+    let Some(root_run_id) =
+        crate::agent::tinyagents::journal::take_request_journal_run(ctx, request_id)
+    else {
+        log::debug!("[agent-tracing] no durable root run registered request_id={request_id}");
+        return;
+    };
+    let observations = match crate::agent::tinyagents::journal::read_run_tree_events(
+        ctx,
+        &root_run_id,
+    )
+    .await
+    {
+        Ok(observations) if !observations.is_empty() => observations,
+        Ok(_) => return,
+        Err(err) => {
+            log::warn!("[agent-tracing] trace journal read failed run_id={root_run_id}: {err}");
+            return;
+        }
+    };
+    let Some(root) = observations.iter().find(|observation| {
+        observation.run_id.as_str() == root_run_id && observation.parent_run_id.is_none()
+    }) else {
+        log::warn!("[agent-tracing] trace root observation missing run_id={root_run_id}");
+        return;
+    };
+    let trace_ctx = trace_ctx.with_run_lineage(
+        Some(root_run_id.clone()),
+        None,
+        Some(root.root_run_id.as_str().to_owned()),
+    );
+    let mut collector = tinyagents_harness::observability::trace_export::collector::SpanCollector::new(
+        trace_ctx,
+    );
+    for observation in &observations {
+        collector.record(observation);
+    }
+    collector.finish(crate::agent::progress_tracing::unix_epoch_ms());
+    let spans = collector.spans().to_vec();
+    if spans.is_empty() {
+        return;
+    }
+    if observability.share_usage_data {
+        if let Err(err) = otlp::push_spans(config, &spans).await {
             log::warn!("[agent-tracing] Langfuse OTLP push failed ({err})");
         }
     }
-
-    if observability.agent_tracing.enabled && !live_spans.is_empty() {
-        export_spans(&observability.agent_tracing, live_spans);
-    }
-}
-
-/// Export one completed child turn as a separate trace in its conversation.
-/// The backend stamps the authenticated user onto the trace, while the child
-/// run's original parent/root ids remain in trace metadata for navigation.
-pub(crate) async fn export_subagent_journal_trace(
-    ctx: &crate::core::runtime::DispatchCtx,
-    config: &Config,
-    journal_run_id: &str,
-    thread_id: Option<&str>,
-    agent_id: &str,
-    task_id: &str,
-) {
-    if !config.observability.share_usage_data {
-        return;
-    }
-    // Check the push gates before reading the child's journal: without a live
-    // session the push refuses anyway, and the read and observation build were
-    // pure cost — on every delegated turn, since usage sharing defaults on.
-    if !langfuse::journal_push_ready(config) {
-        log::debug!(
-            "[agent-tracing] child trace export skipped: push not possible run_id={journal_run_id}"
-        );
-        return;
-    }
-    let observations =
-        match crate::agent::tinyagents::journal::read_run_events(ctx, journal_run_id, 0).await {
-            Ok(observations) if !observations.is_empty() => observations,
-            Ok(_) => return,
-            Err(err) => {
-                log::warn!(
-                    "[agent-tracing] child journal read failed run_id={journal_run_id}: {err}"
-                );
-                return;
-            }
-        };
-    let first = &observations[0];
-    let user_id = crate::security::credentials::identity::peek_credential_user_identity()
-        .and_then(|identity| identity.id.or(identity.email));
-    let trace_ctx = TraceContext::new(format!("subagent:{journal_run_id}"), user_id)
-        .with_session_group(thread_id.unwrap_or(task_id).to_string())
-        .with_agent_id(agent_id.to_string())
-        .with_channel_source("subagent".to_string())
-        .with_run_type(RunType::Subagent)
-        .with_capture_content(config.observability.agent_tracing.capture_content)
-        .with_run_lineage(
-            Some(first.run_id.as_str().to_string()),
-            first
-                .parent_run_id
-                .as_ref()
-                .map(|id| id.as_str().to_string()),
-            Some(first.root_run_id.as_str().to_string()),
-        );
-    let rooted =
-        tinyagents_harness::observability::trace_export::journal_export::root_subagent_observations(
-            &observations,
-        );
-    let mut spans =
-        super::journal_projection::spans_from_observations(trace_ctx.clone(), 0, &rooted);
-    if let Some(root) = spans.iter_mut().find(|span| span.parent_span_id.is_none()) {
-        for (key, value) in [
-            ("run_id", trace_ctx.run_id.as_deref()),
-            ("parent_run_id", trace_ctx.parent_run_id.as_deref()),
-            ("root_run_id", trace_ctx.root_run_id.as_deref()),
-        ] {
-            if let Some(value) = value {
-                root.attributes
-                    .insert(key.to_string(), serde_json::json!(value));
-            }
-        }
-    }
-    tinyagents_harness::observability::trace_export::otlp::prepare_subagent_root(&mut spans);
-    if let Err(err) = otlp::push_spans(config, &spans).await {
-        log::warn!(
-            "[agent-tracing] child Langfuse OTLP push failed run_id={journal_run_id}: {err}"
-        );
+    if observability.agent_tracing.enabled {
+        export_spans(&observability.agent_tracing, &spans);
     }
 }
