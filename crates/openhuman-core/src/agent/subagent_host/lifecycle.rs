@@ -838,6 +838,7 @@ pub(crate) struct OpenHumanDriverBundle {
         Arc<SubagentDriver<crate::agent::tinyagents::host::OpenHumanRunContext, HostRequest>>,
     pub(crate) failures: Arc<Mutex<HashMap<SubagentTaskKey, SubagentRunError>>>,
     pub(crate) host_outcome: Arc<Mutex<HashMap<SubagentTaskKey, SubagentRunOutcome>>>,
+    configured_tool_result: Arc<Mutex<HashMap<SubagentTaskKey, tinytools::ToolResult>>>,
     pub(crate) persistence: Arc<OpenHumanPersistence>,
 }
 
@@ -845,6 +846,7 @@ impl OpenHumanDriverBundle {
     pub(crate) fn new(checkpoint_dir: PathBuf) -> Result<Self, SubagentRunError> {
         let failures = Arc::new(Mutex::new(HashMap::new()));
         let host_outcome = Arc::new(Mutex::new(HashMap::new()));
+        let configured_tool_result = Arc::new(Mutex::new(HashMap::new()));
         let plans = Arc::new(Mutex::new(HashMap::new()));
         let planner = Arc::new(OpenHumanPlanner {
             plans: Arc::clone(&plans),
@@ -853,6 +855,7 @@ impl OpenHumanDriverBundle {
             plans,
             failures: Arc::clone(&failures),
             host_outcome: Arc::clone(&host_outcome),
+            configured_tool_result: Arc::clone(&configured_tool_result),
         });
         let persistence = Arc::new(
             OpenHumanPersistence::new(checkpoint_dir).with_host_outcome(Arc::clone(&host_outcome)),
@@ -872,6 +875,7 @@ impl OpenHumanDriverBundle {
             driver,
             failures,
             host_outcome,
+            configured_tool_result,
             persistence,
         })
     }
@@ -879,12 +883,31 @@ impl OpenHumanDriverBundle {
 
 #[derive(Clone)]
 pub(crate) struct HostRequest {
-    pub(crate) definition: crate::agent_registry::host_definition::AgentDefinition,
+    invocation: HostInvocation,
     pub(crate) options: SubagentRunOptions,
 }
 
+#[derive(Clone)]
+enum HostInvocation {
+    Agent(crate::agent_registry::host_definition::AgentDefinition),
+    ConfiguredTool {
+        agent_id: String,
+        tool: Arc<dyn tinytools::Tool>,
+        arguments: serde_json::Value,
+    },
+}
+
+impl HostRequest {
+    fn agent_id(&self) -> &str {
+        match &self.invocation {
+            HostInvocation::Agent(definition) => &definition.id,
+            HostInvocation::ConfiguredTool { agent_id, .. } => agent_id,
+        }
+    }
+}
+
 struct PreparedHostPlan {
-    definition: crate::agent_registry::host_definition::AgentDefinition,
+    invocation: HostInvocation,
     options: SubagentRunOptions,
 }
 
