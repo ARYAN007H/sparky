@@ -128,6 +128,7 @@ pub(crate) async fn run_subagent_direct(
         // same entries into this run's single terminal total.
         struct UsageFinalizer {
             context: crate::agent::tinyagents::host::OpenHumanRunContext,
+            run_id: String,
             complete: bool,
         }
         impl UsageFinalizer {
@@ -143,14 +144,18 @@ pub(crate) async fn run_subagent_direct(
                 }
             }
         }
-        let mut usage_finalizer = UsageFinalizer {
-            context: options.run_context.clone(),
-            complete: false,
-        };
         let task_id = options
             .task_id
             .clone()
             .unwrap_or_else(|| format!("sub-{}", uuid::Uuid::new_v4()));
+        // This point is inside the actual executor, after shared-flight
+        // coalescing has selected the run owner. Carry the same id through
+        // every completion record cloned or promoted by this run.
+        let mut usage_finalizer = UsageFinalizer {
+            context: options.run_context.clone(),
+            run_id: uuid::Uuid::new_v4().to_string(),
+            complete: false,
+        };
 
         // Turn-scoped dispatch gate (#5804) — deliberately the FIRST gate, for
         // the same reason the depth gate is synchronous and pre-dispatch: a
@@ -353,6 +358,7 @@ pub(crate) async fn run_subagent_direct(
         // offload. A cancellation while that filesystem work is pending must
         // not erase direct model usage or descendants that already finished.
         usage_finalizer.finish(crate::agent::tinyagents::host::SubagentUsageEntry {
+            run_id: usage_finalizer.run_id.clone(),
             task_id: task_id.clone(),
             agent_id: definition.id.clone(),
             usage: outcome.usage,

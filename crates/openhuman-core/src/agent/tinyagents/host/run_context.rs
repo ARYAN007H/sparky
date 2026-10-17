@@ -76,6 +76,10 @@ pub(crate) fn direct_subagent_child(
 /// usage breakdown.
 #[derive(Debug, Clone, PartialEq)]
 pub struct SubagentUsageEntry {
+    /// Identity for this actual execution, shared across cloned/promoted
+    /// completion records so usage rollup can ignore replayed entries without
+    /// conflating separate runs of the same task.
+    pub run_id: String,
     pub task_id: String,
     pub agent_id: String,
     pub usage: SubagentUsage,
