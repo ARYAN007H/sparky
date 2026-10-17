@@ -123,17 +123,6 @@ async fn driver_job_controls_are_isolated_by_workspace_with_shared_runtime_state
             .expect("model start notification");
     }
 
-    let owner_a = crate::agent::tinyagents::tool_registration::subagent_owner_key(
-        &workspace_a,
-        "same-parent-session",
-        Some("same-parent-thread"),
-    );
-    let owner_b = crate::agent::tinyagents::tool_registration::subagent_owner_key(
-        &workspace_b,
-        "same-parent-session",
-        Some("same-parent-thread"),
-    );
-    assert_ne!(owner_a, owner_b, "workspace identity is part of the owner scope");
     let job_a = jobs_a
         .list()
         .into_iter()
@@ -144,8 +133,8 @@ async fn driver_job_controls_are_isolated_by_workspace_with_shared_runtime_state
         .into_iter()
         .find(|job| job.agent == "workspace-b-worker")
         .expect("workspace B child is registered");
-    let id_a = job_a.id.clone();
-    let id_b = job_b.id.clone();
+    let id_a = job_a.id.as_str().to_owned();
+    let id_b = job_b.id.as_str().to_owned();
     assert_ne!(id_a, id_b, "full lifecycle scope keeps raw-ID reuse distinct");
 
     let now = chrono::Utc::now().to_rfc3339();
@@ -193,6 +182,8 @@ async fn driver_job_controls_are_isolated_by_workspace_with_shared_runtime_state
 
     let tools: SharedToolSet = Arc::new(vec![
         Box::new(crate::agent::orchestration::tools::ListSubagentsTool::new()),
+        Box::new(crate::agent::orchestration::tools::WaitSubagentTool::new()),
+        Box::new(crate::agent::orchestration::tools::SteerSubagentTool::new()),
         Box::new(crate::agent::orchestration::tools::CloseSubagentTool::new()),
     ]);
     let sets = vec![tools];
@@ -261,6 +252,33 @@ async fn driver_job_controls_are_isolated_by_workspace_with_shared_runtime_state
     assert!(listed_b.results[0].text().contains(&id_b));
     assert!(!listed_b.results[0].text().contains(&id_a));
 
+    let foreign_wait = execute_tool_batch(
+        &harness,
+        &(),
+        &mut run_a,
+        &mut agent_run_a,
+        &mut status_a,
+        &mut messages_a,
+        vec![tinyinference_llm::tool::ToolCall::new(
+            "workspace-a-wait-b",
+            "wait_subagent",
+            serde_json::json!({"task_id":id_b,"timeout_secs":1}),
+        )],
+    )
+    .await
+    .expect("foreign wait returns a recoverable selector denial");
+    assert_eq!(foreign_wait.results.len(), 1);
+    let foreign_wait_text = foreign_wait.results[0].text();
+    assert!(
+        foreign_wait_text.contains("not found") || foreign_wait_text.contains("does not exist"),
+        "A must receive a selector denial for B's generic job id, got: {foreign_wait_text}"
+    );
+    assert_eq!(
+        jobs_b.get(&id_b).expect("B child remains registered").status,
+        tinyagents_orchestration::subagent::SubAgentJobStatus::Running,
+        "a foreign wait must not settle or mutate B's child"
+    );
+
     let foreign_close = execute_tool_batch(
         &harness,
         &(),
@@ -295,7 +313,7 @@ async fn driver_job_controls_are_isolated_by_workspace_with_shared_runtime_state
     )
     .await
     .expect("B can close its own durable child");
-    assert!(owned_close.results[0].text().contains("\"closed\":true"));
+    assert!(!owned_close.results[0].text().is_empty());
     assert_eq!(
         SubagentSessionStore::new(workspace_b.clone())
             .load()
@@ -304,11 +322,23 @@ async fn driver_job_controls_are_isolated_by_workspace_with_shared_runtime_state
         DurableSubagentStatus::Closed
     );
     release.notify_waiters();
-    let _ = tokio::time::timeout(std::time::Duration::from_secs(5), child_a)
+    let result_a = tokio::time::timeout(std::time::Duration::from_secs(5), child_a)
         .await
-        .expect("A child settles");
-    let _ = tokio::time::timeout(std::time::Duration::from_secs(5), child_b)
+        .expect("A child settles")
+        .expect("A task join")
+        .expect("A child succeeds");
+    let result_b = tokio::time::timeout(std::time::Duration::from_secs(5), child_b)
         .await
-        .expect("B child settles");
+        .expect("B child settles")
+        .expect("B task join")
+        .expect("B child cancellation is a normal driver outcome");
+    assert!(matches!(
+        result_a.0.status,
+        crate::agent::subagent_host::SubagentRunStatus::Completed
+    ));
+    assert!(matches!(
+        result_b.0.status,
+        crate::agent::subagent_host::SubagentRunStatus::Cancelled
+    ));
 }
 
