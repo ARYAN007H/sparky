@@ -14,9 +14,10 @@ test.describe('Chat scroll paint stability', () => {
   test('keeps every message laid out while scrolling a long transcript', async ({ page }) => {
     const transcriptRequests: string[] = [];
     page.on('request', request => {
-      const body = request.postDataJSON() as
-        | { method?: string; params?: { thread_id?: string } }
-        | null;
+      const body = request.postDataJSON() as {
+        method?: string;
+        params?: { thread_id?: string };
+      } | null;
       if (body?.method === 'openhuman.threads_transcript_get') {
         transcriptRequests.push(body.params?.thread_id ?? '<missing-thread-id>');
       }
@@ -54,9 +55,7 @@ test.describe('Chat scroll paint stability', () => {
     await expect(row).toBeVisible({ timeout: 20_000 });
     const transcriptLoaded = page.waitForResponse(response => {
       const body = response.request().postData();
-      return Boolean(
-        body?.includes('openhuman.threads_transcript_get') && body.includes(threadId)
-      );
+      return Boolean(body?.includes('openhuman.threads_transcript_get') && body.includes(threadId));
     });
     await row.click({ force: true });
     // The message list can paint before the settled-turn projection request
@@ -124,8 +123,9 @@ test.describe('Chat scroll paint stability', () => {
       // checking the loading element.
       await expect(page.getByText('Loading conversation')).toHaveCount(0);
     }
-    expect(transcriptRequests.length, `transcript requests: ${JSON.stringify(transcriptRequests)}`).toBe(
-      rpcCountBeforeScroll
-    );
+    expect(
+      transcriptRequests.length,
+      `transcript requests: ${JSON.stringify(transcriptRequests)}`
+    ).toBe(rpcCountBeforeScroll);
   });
 });
