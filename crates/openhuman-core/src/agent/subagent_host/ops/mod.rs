@@ -36,7 +36,6 @@ pub(crate) use provider::resolve_subagent_source;
 
 // Re-exports for test companion modules that use `use super::*`.
 // These provide the same flat namespace the original ops.rs had.
-// `append_subagent_role_contract` is already re-exported (pub(crate)) above.
 // `dedup_tool_specs_by_name` is private in its source
 // module and cannot be `pub`-re-exported; a plain `use` still makes them
 // reachable from the `#[cfg(test)]` companion modules via their `use super::*`
