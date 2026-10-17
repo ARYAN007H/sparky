@@ -15,10 +15,11 @@ use super::types::{
 
 #[path = "ops_driver.rs"]
 mod driver;
+use driver::record_cancel_reason;
 pub use driver::{
     cancel_driver_job_by_task, cancel_driver_job_for_observed_session,
     cancel_driver_job_for_session, cancel_driver_jobs_for_thread, mark_driver_pause_cancelled,
-    record_cancel_reason, resolve_lifecycle_key, DriverTaskCancellation,
+    resolve_lifecycle_key, DriverTaskCancellation,
 };
 
 pub fn normalize_task_key(input: &str) -> String {
