@@ -11,8 +11,7 @@ async fn run_job_now_keeps_best_effort_failure_successful_and_records_failed_del
         "ops-run-now-best-effort-delivery-failure",
         std::sync::Arc::new(|_ctx| Box::pin(async { Ok(()) })),
     );
-    let job =
-        tests::single_flight_system_job(&config, "ops-run-now-best-effort-delivery-failure");
+    let job = tests::single_flight_system_job(&config, "ops-run-now-best-effort-delivery-failure");
     let missing_channel = format!("missing-{}", uuid::Uuid::new_v4());
     cron::update_job(
         &config,
