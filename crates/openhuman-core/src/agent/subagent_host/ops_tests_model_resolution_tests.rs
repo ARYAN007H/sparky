@@ -8,6 +8,7 @@ use tinyagents_harness::context::{current_run_depth, with_run_depth, RunDepth};
 struct BlockingSubagentCloseTool {
     started: tokio::sync::mpsc::Sender<()>,
     release: Arc<tokio::sync::Notify>,
+    finished: tokio::sync::mpsc::Sender<()>,
 }
 
 #[async_trait::async_trait]
@@ -17,7 +18,7 @@ impl tinytools::Tool for BlockingSubagentCloseTool {
     }
 
     fn description(&self) -> &str {
-        "Blocks until the driver's cancellation token is cancelled."
+        "Blocks until the test releases the in-flight tool after close."
     }
 
     fn parameters_schema(&self) -> serde_json::Value {
@@ -27,6 +28,7 @@ impl tinytools::Tool for BlockingSubagentCloseTool {
     async fn execute(&self, _args: serde_json::Value) -> anyhow::Result<tinytools::ToolResult> {
         let _ = self.started.send(()).await;
         self.release.notified().await;
+        let _ = self.finished.send(()).await;
         Ok(tinytools::ToolResult::success("tool released after close"))
     }
 }
@@ -135,6 +137,7 @@ async fn closing_a_durable_driver_session_cancels_only_its_registered_child() {
     let workspace = scratch.path().join("workspace");
     std::fs::create_dir_all(&workspace).expect("create isolated workspace");
     let (started_tx, mut started_rx) = tokio::sync::mpsc::channel(1);
+    let (finished_tx, mut finished_rx) = tokio::sync::mpsc::channel(1);
     let release = Arc::new(tokio::sync::Notify::new());
     let provider = ScriptedProvider::new(vec![
         tool_response("blocking_close_fixture", "{}"),
@@ -145,6 +148,7 @@ async fn closing_a_durable_driver_session_cancels_only_its_registered_child() {
         vec![Box::new(BlockingSubagentCloseTool {
             started: started_tx,
             release: release.clone(),
+            finished: finished_tx,
         })],
     );
     parent_context.workspace_dir = workspace.clone();
@@ -266,6 +270,14 @@ async fn closing_a_durable_driver_session_cancels_only_its_registered_child() {
         .close("close-driver-session")
         .await
         .expect("Tiny close adapter cancels then closes the durable row"));
+    let cancellation = jobs
+        .get(job_id.as_str())
+        .expect("registered child remains visible while it unwinds");
+    assert_eq!(cancellation.status, SubAgentJobStatus::Running);
+    assert_eq!(
+        cancellation.error.as_deref(),
+        Some("cancellation requested; job will be cancelled when the child unwinds")
+    );
     assert!(port
         .close("close-driver-session")
         .await
@@ -295,7 +307,15 @@ async fn closing_a_durable_driver_session_cancels_only_its_registered_child() {
         "raw product task ID resolves through the authenticated session port: {}",
         wait_result.output()
     );
+    let running_wait: serde_json::Value =
+        serde_json::from_str(&wait_result.output()).expect("Tiny wait returns a JSON job snapshot");
+    assert_eq!(running_wait["id"].as_str(), Some(job_id.as_str()));
+    assert_eq!(running_wait["status"], "running");
     release.notify_one();
+    tokio::time::timeout(std::time::Duration::from_secs(2), finished_rx.recv())
+        .await
+        .expect("released tool future must unwind")
+        .expect("tool reports that it unwound");
     let final_wait = SubAgentJobsTool::new(jobs.clone())
         .with_tool_name("wait_subagent")
         .with_fixed_action(SubAgentJobAction::Await)
@@ -316,7 +336,14 @@ async fn closing_a_durable_driver_session_cancels_only_its_registered_child() {
             &parent,
         ),
     )
-    .await
+    .await;
+    assert!(
+        settled.is_ok(),
+        "shared Jobs wait should settle after tool unwind: job={:?}, provider_calls={}",
+        jobs.get(job_id.as_str()),
+        provider.captured.lock().len()
+    );
+    let settled = settled
     .expect("shared Jobs wait observes cooperative cancellation settlement")
     .expect("Tiny await dispatches successfully");
     assert!(!settled.is_error, "settled Jobs wait must remain a result");
