@@ -52,6 +52,17 @@ async fn spawn_subagent_tool_runs_child_agent_e2e() {
     assert_eq!(result.output(), "spawn-subagent-child-answer");
     assert!(provider.saw(SPAWN_SUBAGENT_CANARY));
     assert!(provider.saw("parent supplied context"));
+    let jobs = crate::core::runtime::slot_for::<
+        tinyagents_orchestration::subagent::SubAgentJobRegistry,
+    >(&live.data.dispatch_ctx());
+    assert!(
+        jobs.list().iter().any(|job| {
+            job.agent == "task_manager_agent"
+                && job.status
+                    == tinyagents_orchestration::subagent::SubAgentJobStatus::Completed
+        }),
+        "spawn_subagent must register its real target and terminal state in shared Jobs"
+    );
 }
 
 /// A child the harness stops early (failure breaker / iteration cap) is not a
