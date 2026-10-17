@@ -222,4 +222,3 @@ async fn prepared_child_run_is_exported_from_its_native_journal_lineage() {
         "the native export keeps captured content off"
     );
 }
-
