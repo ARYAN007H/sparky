@@ -102,7 +102,8 @@ pub async fn run(ctx: &crate::core::runtime::DispatchCtx, config: Config) -> Res
     }
 }
 
-pub(crate) use dispatcher::{execute_job_now, tick_once, JobDispatcher};
+pub use dispatcher::execute_job_now;
+pub(crate) use dispatcher::{tick_once, JobDispatcher};
 pub use live_agents::run_live_agent_pass;
 pub(crate) use live_agents::LiveAgentSchedulers;
 pub use manual_run::is_running;

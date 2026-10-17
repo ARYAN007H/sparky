@@ -2,7 +2,7 @@
 
 use crate::inference::provider::{is_raw_passthrough_model, role_for_model_tier};
 
-/// Which execution path an `agent_ref` routes to (see [`OpenHumanAgentRunner`]).
+/// Which execution path an `agent_ref` routes to (see [`crate::flows::tinyflows::caps::OpenHumanAgentRunner`]).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum AgentRoute {
     /// A host-registered agent (`agent::host_agents`) — run the full agent
@@ -45,7 +45,7 @@ pub(crate) fn route_for_agent_ref(agent_ref: &str) -> AgentRoute {
 /// the session builder's generic `chat` role — which inherits
 /// `config.default_model` — to `make_openhuman_backend`, which forwards non-tier
 /// ids to the backend unchanged. Mirrors the per-node routing
-/// [`OpenHumanLlm::complete`] applies via `agent_prompt::resolve_completion_model`.
+/// [`crate::flows::tinyflows::caps::OpenHumanLlm::complete`] applies via `agent_prompt::resolve_completion_model`.
 pub(crate) fn harness_model_default_override(node_model: &str) -> String {
     if is_raw_passthrough_model(node_model) {
         return node_model.to_string();
