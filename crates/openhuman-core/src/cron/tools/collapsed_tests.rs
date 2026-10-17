@@ -122,9 +122,8 @@ async fn run_uses_the_explicit_core_context_and_preserves_markdown_options() {
     components.flows = false;
     let explicit = CoreContext::for_test_with_components(components);
     let ambient = CoreContext::for_test(DomainSet::full(), None);
-    let context = execution_context(
-        OpenHumanRunContext::new().with_core(Some(Arc::clone(&explicit))),
-    );
+    let context =
+        execution_context(OpenHumanRunContext::new().with_core(Some(Arc::clone(&explicit))));
     let cron = CronTool::new(config, Arc::new(SecurityPolicy::default()));
 
     let result = CoreContext::scope(ambient, async {
@@ -138,9 +137,20 @@ async fn run_uses_the_explicit_core_context_and_preserves_markdown_options() {
     })
     .await;
 
-    assert!(!result.is_error, "a disabled flow schedule is skipped: {}", result.output());
-    assert!(result.output().contains("COMPONENT_DISABLED:flows"), "{}", result.output());
-    assert!(result.markdown_formatted.as_deref().is_some_and(|md| md.contains("status")));
+    assert!(
+        !result.is_error,
+        "a disabled flow schedule is skipped: {}",
+        result.output()
+    );
+    assert!(
+        result.output().contains("COMPONENT_DISABLED:flows"),
+        "{}",
+        result.output()
+    );
+    assert!(result
+        .markdown_formatted
+        .as_deref()
+        .is_some_and(|md| md.contains("status")));
 }
 
 #[tokio::test]
@@ -186,13 +196,16 @@ async fn add_uses_the_explicit_channel_origin_without_ambient_turn_state() {
     assert!(!result.is_error, "{}", result.output());
     let jobs = crate::cron::list_jobs(&config).unwrap();
     assert_eq!(jobs.len(), 1);
-    assert_eq!(jobs[0].origin, Some(crate::cron::JobOrigin::Channel {
-        channel: "telegram".into(),
-        reply_target: "42".into(),
-        history_key: "telegram-alice-42".into(),
-        sender: Some("alice".into()),
-        thread_id: None,
-    }));
+    assert_eq!(
+        jobs[0].origin,
+        Some(crate::cron::JobOrigin::Channel {
+            channel: "telegram".into(),
+            reply_target: "42".into(),
+            history_key: "telegram-alice-42".into(),
+            sender: Some("alice".into()),
+            thread_id: None,
+        })
+    );
     assert_eq!(jobs[0].delivery.mode, "origin");
 }
 
