@@ -6,9 +6,38 @@ use tinyagents_session::transcript::TranscriptMessage;
 use tinyinference_llm::model::ResolvedModelRoute;
 use tinytools_agent::dialect::TranscriptEntry;
 
+/// Terminal journal work deferred until a session host has completed its
+/// post-run close/repair and classified any wind-down stop.
+#[derive(Clone)]
+pub(crate) struct DeferredTurnTerminal {
+    events: tinyagents_harness::events::EventSink,
+    journal: Option<crate::agent::tinyagents::journal::TurnJournal>,
+}
+
+impl DeferredTurnTerminal {
+    pub(crate) async fn finish(
+        self,
+        stop: Option<tinyagents_harness::turn_stop::TurnStop>,
+        turn: u32,
+    ) {
+        if let Some(stop) = stop {
+            self.events.emit(tinyagents_harness::events::AgentEvent::TurnStopped {
+                turn,
+                stop,
+            });
+        }
+        if let Some(journal) = self.journal {
+            journal.finish_completed().await;
+        }
+    }
+}
+
 /// The outcome of a turn driven on the `tinyagents` harness.
 #[derive(Debug, Clone)]
 pub(crate) struct TinyagentsTurnOutcome {
+    /// Present when a session host owns post-run completion and must emit a
+    /// final wind-down fact before the durable status is marked completed.
+    pub(crate) deferred_terminal: Option<DeferredTurnTerminal>,
     /// Final assistant text.
     pub text: String,
     /// Concrete provider/model/host route selected for the final successful
