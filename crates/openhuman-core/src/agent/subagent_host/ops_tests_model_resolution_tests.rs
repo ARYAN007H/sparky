@@ -1,7 +1,7 @@
 use super::*;
 use crate::agent::subagent_host::run_subagent;
 use crate::agent::subagent_host::{
-    run_async_spawn_via_driver_tool, spawn_async_via_driver_tool_with_jobs, SubagentRunStatus,
+    run_subagent_via_driver_tool, spawn_async_via_driver_tool_with_jobs, SubagentRunStatus,
 };
 use tinyagents_harness::context::{current_run_depth, with_run_depth, RunDepth};
 
@@ -52,7 +52,7 @@ async fn runner_rejects_spawn_beyond_max_depth() {
 }
 
 #[tokio::test]
-async fn prepared_async_spawn_runs_through_driver_jobs_dispatcher() {
+async fn prepared_subagent_runs_through_driver_jobs_dispatcher() {
     let scratch = tempfile::tempdir().expect("isolated async spawn fixture");
     let workspace = scratch.path().join("workspace");
     std::fs::create_dir_all(&workspace).expect("create isolated workspace");
@@ -67,7 +67,7 @@ async fn prepared_async_spawn_runs_through_driver_jobs_dispatcher() {
             .with_thread("driver-spawn-thread"),
     );
 
-    let (outcome, job_id) = run_async_spawn_via_driver_tool(
+    let (outcome, job_id) = run_subagent_via_driver_tool(
         &parent,
         make_def_named_tools(&[]),
         "return the requested result".into(),

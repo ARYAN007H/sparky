@@ -1,7 +1,7 @@
 //! Subagent dispatch logic shared by all agent delegation tools.
 
 use crate::agent::subagent_host::{
-    run_subagent_with_parent, SubagentRunOptions, SubagentRunStatus,
+    run_subagent_via_driver_tool, SubagentRunOptions, SubagentRunStatus,
 };
 use crate::agent_registry::host_definition::AgentDefinitionRegistry;
 use crate::progress::AgentProgress;
@@ -418,8 +418,14 @@ pub(crate) async fn dispatch_subagent_with_live_parent(
         message_run_queue: None,
     };
 
-    let run =
-        run_subagent_with_parent(live_parent, definition.clone(), prompt.to_owned(), options).await;
+    let run = run_subagent_via_driver_tool(
+        live_parent,
+        definition.clone(),
+        prompt.to_owned(),
+        options,
+    )
+    .await
+    .map(|(outcome, _job_id)| outcome);
     match run {
         Ok(outcome) => {
             let emit_lifecycle_effects = outcome.should_emit_lifecycle_effects();

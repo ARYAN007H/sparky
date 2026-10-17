@@ -95,11 +95,11 @@ pub async fn continue_subagent(
     continue_subagent_with_parent(&root, original_key, definition.clone(), input, options).await
 }
 
-/// Runs a host-prepared async spawn through TinyAgents' registered driver
+/// Runs a host-prepared subagent through TinyAgents' registered driver
 /// dispatcher and shared Jobs/Message registry. Product preflight and result
 /// delivery stay with the caller; the generic driver owns child registration,
 /// execution, control queues, and terminal lifecycle transitions.
-pub(crate) async fn run_async_spawn_via_driver_tool(
+pub(crate) async fn run_subagent_via_driver_tool(
     parent: &RunContext<crate::agent::tinyagents::host::OpenHumanRunContext>,
     definition: crate::agent_registry::host_definition::AgentDefinition,
     input: String,
@@ -111,7 +111,8 @@ pub(crate) async fn run_async_spawn_via_driver_tool(
         .unwrap_or_else(|| format!("sub-{}", uuid::Uuid::new_v4()));
     let mut options = options;
     options.task_id = Some(task_id.clone());
-    let task_key = SubagentTaskKey::from_context(parent, task_id.clone(), None);
+    let parent_thread_id = parent.thread_id().map(|id| id.as_str().to_owned());
+    let task_key = SubagentTaskKey::from_context(parent, task_id.clone(), parent_thread_id);
     let (tool_result, bundle) =
         invoke_async_spawn_driver_tool(parent, definition, input, options, "inline", None, None)
             .await?;
