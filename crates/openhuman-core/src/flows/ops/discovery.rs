@@ -6,7 +6,7 @@ pub(crate) fn flows_suggestions_upsert_from_copilot(
     config: &Config,
     suggestions: Value,
 ) -> Result<usize, String> {
-    let suggestions = serde_json::from_value(suggestions)
+    let suggestions: Vec<FlowSuggestion> = serde_json::from_value(suggestions)
         .map_err(|error| format!("invalid Copilot suggestions: {error}"))?;
     store::upsert_suggestions(config, &suggestions).map_err(|error| error.to_string())
 }
