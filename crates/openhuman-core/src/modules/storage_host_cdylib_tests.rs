@@ -131,7 +131,7 @@ impl Environment for Env {
         Some(Arc::clone(&self.0))
     }
     fn module_scope(&self, module_id: &str) -> Result<Scope, StorageError> {
-        module_scope(None, &Scope::local(), module_id)
+        module_scope(None, module_id)
     }
     fn grant(&self, module_id: &str) -> Option<StorageGrant> {
         declared(module_id)
@@ -259,7 +259,7 @@ impl Rig {
     }
 
     fn scope(&self, module_id: &str) -> Scope {
-        module_scope(None, &Scope::local(), module_id).unwrap()
+        module_scope(None, module_id).unwrap()
     }
 }
 

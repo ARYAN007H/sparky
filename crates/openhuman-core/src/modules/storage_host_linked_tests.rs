@@ -34,7 +34,7 @@ impl Environment for Env {
         Some(Arc::clone(&self.0))
     }
     fn module_scope(&self, module_id: &str) -> Result<Scope, StorageError> {
-        module_scope(None, &Scope::local(), module_id)
+        module_scope(None, module_id)
     }
     fn grant(&self, module_id: &str) -> Option<StorageGrant> {
         super::super::storage_grants::declared(module_id)
