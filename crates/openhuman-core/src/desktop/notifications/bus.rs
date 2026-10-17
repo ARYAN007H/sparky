@@ -512,21 +512,37 @@ impl EventHandler<DomainEvent> for NotificationBridgeSubscriber {
             if let Some(config) = &self.config {
                 // A workspace-bound event is stored in ITS OWN workspace, not
                 // whichever one this bridge was registered with (#5931).
-                let config = self.store_target(config, event);
-                // The bridge serves the host's own notifications.
                 let dispatch = event_dispatch(event);
-                // Stored with the record that raised it: a cron job's
-                // completion goes to the agent the job belongs to
-                // (`crate::storage`), `local` otherwise.
-                let stored = match dispatch {
-                    Some(dispatch) => {
+                let tenant_config = if matches!(event, DomainEvent::CronJobCompleted { .. }) {
+                    match dispatch.as_ref() {
+                        Some(dispatch) => match dispatch.load_config().await {
+                            Ok(config) => Some(config),
+                            Err(error) => {
+                                log::warn!(
+                                    "{LOG_PREFIX} cron notification tenant config unavailable ({error}); not persisted"
+                                );
+                                None
+                            }
+                        },
+                        None => None,
+                    }
+                } else {
+                    Some(config.clone())
+                };
+                let target_config = tenant_config
+                    .as_ref()
+                    .map(|config| self.store_target(config, event).into_owned());
+                // Store a completion under its captured tenant context and
+                // agent scope. Other notifications retain the bridge context.
+                let stored = match (dispatch, target_config) {
+                    (Some(dispatch), Some(config)) => {
                         let owner = event_owner(event);
                         crate::storage::agents::within_agent(&dispatch, owner.as_deref(), async {
                             super::store::insert_core_notification(&config, &notification)
                         })
                         .await
                     }
-                    None => {
+                    _ => {
                         // Unknown owner: not stored rather than stored in the
                         // wrong scope. The live broadcast below still goes out.
                         log::warn!(
