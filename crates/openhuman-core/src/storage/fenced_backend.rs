@@ -61,6 +61,33 @@ impl FencedBackend {
     }
 }
 
+impl FencedBackend {
+    /// `scoped`'s handles with every write passing the scope's fence.
+    fn wrap_scoped(&self, scope: &Scope, scoped: &ScopedStorage) -> ScopedStorage {
+        let guard = Guard {
+            scope: scope.clone(),
+            fences: Arc::clone(&self.fences),
+            backend: Some(Arc::clone(&self.inner)),
+        };
+        ScopedStorage::new(
+            scope.clone(),
+            scoped.driver(),
+            Arc::new(FencedDocuments {
+                inner: Arc::clone(scoped.documents()),
+                guard: guard.clone(),
+            }),
+            Arc::new(FencedStreams {
+                inner: Arc::clone(scoped.streams()),
+                guard: guard.clone(),
+            }),
+            Arc::new(FencedBlobs {
+                inner: Arc::clone(scoped.blobs()),
+                guard,
+            }),
+        )
+    }
+}
+
 /// `inner` fenced by the process's registry ([`super::fence::registry`]).
 pub fn wrap(inner: Arc<dyn StorageBackend>) -> Arc<dyn StorageBackend> {
     Arc::new(FencedBackend::new(inner, super::fence::registry()))
@@ -78,27 +105,65 @@ impl StorageBackend for FencedBackend {
 
     fn for_scope(&self, scope: &Scope) -> Result<ScopedStorage> {
         let scoped = self.inner.for_scope(scope)?;
-        let guard = Guard {
-            scope: scope.clone(),
+        Ok(self.wrap_scoped(scope, &scoped))
+    }
+
+    fn document_driver(&self) -> &'static str {
+        self.inner.document_driver()
+    }
+
+    fn existing_schema(&self) -> Result<Arc<dyn StorageBackend>> {
+        Ok(Arc::new(Self {
+            inner: self.inner.existing_schema()?,
             fences: Arc::clone(&self.fences),
-            backend: Some(Arc::clone(&self.inner)),
-        };
-        Ok(ScopedStorage::new(
-            scope.clone(),
-            scoped.driver(),
-            Arc::new(FencedDocuments {
-                inner: Arc::clone(scoped.documents()),
-                guard: guard.clone(),
-            }),
-            Arc::new(FencedStreams {
-                inner: Arc::clone(scoped.streams()),
-                guard: guard.clone(),
-            }),
-            Arc::new(FencedBlobs {
-                inner: Arc::clone(scoped.blobs()),
-                guard,
-            }),
-        ))
+        }))
+    }
+
+    async fn prepare_schema(&self) -> Result<()> {
+        self.inner.prepare_schema().await
+    }
+
+    /// The driver's own fenced handles; the fence wrapper itself builds on
+    /// these, so they are not wrapped a second time.
+    fn for_scope_fenced(&self, scope: &Scope, fence: &tinystoragedrivers::Fence) -> Result<ScopedStorage> {
+        self.inner.for_scope_fenced(scope, fence)
+    }
+
+    fn for_scope_generation(
+        &self,
+        scope: &Scope,
+        generation: tinystoragedrivers::ScopeGeneration,
+    ) -> Result<ScopedStorage> {
+        let scoped = self.inner.for_scope_generation(scope, generation)?;
+        Ok(self.wrap_scoped(scope, &scoped))
+    }
+
+    fn for_scope_fenced_generation(
+        &self,
+        scope: &Scope,
+        generation: tinystoragedrivers::ScopeGeneration,
+        fence: &tinystoragedrivers::Fence,
+    ) -> Result<ScopedStorage> {
+        self.inner.for_scope_fenced_generation(scope, generation, fence)
+    }
+
+    async fn maintain(
+        &self,
+        budget: tinystoragedrivers::MaintenanceBudget,
+    ) -> Result<tinystoragedrivers::MaintenanceReport> {
+        self.inner.maintain(budget).await
+    }
+
+    async fn checkpoint(&self, mode: tinystoragedrivers::Checkpoint) -> Result<()> {
+        self.inner.checkpoint(mode).await
+    }
+
+    async fn scopes(&self, prefix: &str) -> Result<Vec<Scope>> {
+        self.inner.scopes(prefix).await
+    }
+
+    async fn scopes_of_tenant(&self, tenant: &Scope) -> Result<Vec<Scope>> {
+        self.inner.scopes_of_tenant(tenant).await
     }
 
     /// Reclaiming blobs that already read as absent changes nothing a reader
@@ -231,6 +296,23 @@ impl DocumentStore for FencedDocuments {
             self,
             "documents.put",
             documents.put(collection, id, doc, precondition)
+        )
+    }
+
+    /// Forwarded (and fenced): without it the trait default refuses a write that
+    /// declares a schema version or expiry, which is every owner's write.
+    async fn put_with(
+        &self,
+        collection: &str,
+        id: &str,
+        doc: Value,
+        precondition: Precondition,
+        options: tinystoragedrivers::WriteOptions,
+    ) -> Result<Version> {
+        fenced_write!(
+            self,
+            "documents.put_with",
+            documents.put_with(collection, id, doc, precondition, options)
         )
     }
 
@@ -383,6 +465,23 @@ impl StreamStore for FencedStreams {
 
     async fn streams(&self, prefix: &str) -> Result<Vec<String>> {
         self.inner.streams(prefix).await
+    }
+
+    async fn info(&self, stream: &str) -> Result<Option<tinystoragedrivers::StreamInfo>> {
+        self.inner.info(stream).await
+    }
+
+    /// Forwarded (and fenced): sealing a finished stream is a write.
+    async fn seal(&self, stream: &str) -> Result<tinystoragedrivers::SealOutcome> {
+        fenced_write!(self, "streams.seal", streams.seal(stream))
+    }
+
+    async fn delete_sealed_stream(&self, stream: &str, sealed_ms: i64) -> Result<bool> {
+        fenced_write!(
+            self,
+            "streams.delete_sealed_stream",
+            streams.delete_sealed_stream(stream, sealed_ms)
+        )
     }
 }
 
