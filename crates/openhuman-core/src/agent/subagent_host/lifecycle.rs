@@ -132,6 +132,7 @@ pub(crate) async fn run_subagent_via_driver_tool(
     input: String,
     options: SubagentRunOptions,
 ) -> Result<(SubagentRunOutcome, String), SubagentRunError> {
+    let fallback_agent_id = definition.id.clone();
     let task_id = options
         .task_id
         .clone()
@@ -145,14 +146,11 @@ pub(crate) async fn run_subagent_via_driver_tool(
     )
     .await?;
     let public_job_id = decode_driver_job_result(tool_result, &bundle, &task_key)?;
-    if let Some(outcome) = bundle
+    let cached = bundle
         .host_outcome
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner())
-        .remove(&task_key)
-    {
-        return Ok((outcome, public_job_id));
-    }
+        .remove(&task_key);
     if let Some(error) = bundle
         .failures
         .lock()
@@ -161,8 +159,56 @@ pub(crate) async fn run_subagent_via_driver_tool(
     {
         return Err(error);
     }
+
+    // The driver's persistence CAS result is authoritative. Another
+    // invocation can win terminal/pause persistence while this executor's
+    // host-side cache still contains its local loser. Read the same scoped
+    // record the driver returned before projecting a host result.
+    if let Some(outcome) = bundle
+        .persistence
+        .load_terminal(&task_key)
+        .await
+        .map_err(map_lifecycle_error)?
+    {
+        let disposition = cached.as_ref().map_or(
+            SubagentPersistenceDisposition::TerminalExisting,
+            |host| host.persistence_disposition,
+        );
+        let host = outcome_to_host(
+            SubagentRunResult::new(outcome, disposition),
+            cached,
+            &bundle.persistence,
+            &task_key,
+            &fallback_agent_id,
+        );
+        return Ok((host, public_job_id));
+    }
+    if let Some(outcome) = bundle
+        .persistence
+        .load_pause(&task_key)
+        .await
+        .map_err(map_lifecycle_error)?
+    {
+        let disposition = cached.as_ref().map_or(
+            SubagentPersistenceDisposition::PauseExisting,
+            |host| host.persistence_disposition,
+        );
+        let host = outcome_to_host(
+            SubagentRunResult::new(outcome, disposition),
+            cached,
+            &bundle.persistence,
+            &task_key,
+            &fallback_agent_id,
+        );
+        return Ok((host, public_job_id));
+    }
+    if let Some(outcome) = cached.filter(|host| {
+        host.persistence_disposition == SubagentPersistenceDisposition::ObserverCancelled
+    }) {
+        return Ok((outcome, public_job_id));
+    }
     Err(SubagentRunError::Provider(anyhow::anyhow!(
-        "driver-backed async spawn returned without a host outcome"
+        "driver-backed async spawn returned without a durable host outcome"
     )))
 }
 
