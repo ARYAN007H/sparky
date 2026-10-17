@@ -173,10 +173,10 @@ async fn a_pdf_converts_to_its_text() {
 
 #[cfg(feature = "documents")]
 #[tokio::test]
-async fn the_released_module_extracts_all_memory_office_formats() {
+async fn the_released_module_extracts_pdf_word_and_presentation_formats() {
     if crate::util::module_test_process::run(
         module_path!(),
-        "the_released_module_extracts_all_memory_office_formats",
+        "the_released_module_extracts_pdf_word_and_presentation_formats",
     ) {
         return;
     }
@@ -194,10 +194,6 @@ async fn the_released_module_extracts_all_memory_office_formats() {
             RawDocument::new(pptx_saying("slide text")).with_filename("deck.pptx"),
             "slide text",
         ),
-        (
-            RawDocument::new(xlsx_saying("cell text")).with_filename("sheet.xlsx"),
-            "cell text",
-        ),
     ];
     for (raw, expected) in cases {
         let converted = converter(&config)
@@ -211,9 +207,6 @@ async fn the_released_module_extracts_all_memory_office_formats() {
         );
         assert_eq!(converted.source_bytes, raw.bytes.len());
         assert_eq!(converted.metadata["converter"], "office");
-        if raw.display_name() == "sheet.xlsx" {
-            assert_eq!(converted.markdown, "Sheet1 | cell text");
-        }
     }
 
     let large_docx = "complete paragraph ".repeat(12_500);
@@ -262,6 +255,22 @@ async fn the_released_module_extracts_all_memory_office_formats() {
         .expect("page counts beyond the intake section limit remain complete");
     assert!(converted.markdown.contains("Page 300 content"));
     assert_eq!(converted.markdown.matches('\u{c}').count(), 299);
+}
+
+#[cfg(feature = "documents")]
+#[tokio::test]
+async fn spreadsheet_memory_import_is_refused_before_loading_tinydocs() {
+    let raw = RawDocument::new(xlsx_saying("cell text")).with_filename("sheet.xlsx");
+    let mut config = Config::default();
+    config.modules.enabled = false;
+
+    let error = converter(&config).convert(&raw).await.unwrap_err();
+    assert!(
+        matches!(error, Error::Converter { ref converter, ref message }
+            if converter == "tinydocs"
+                && message == "spreadsheet imports are temporarily unavailable pending a safe TinyMemory release"),
+        "spreadsheet import should fail with the temporary typed-unavailable reason, got {error}"
+    );
 }
 
 #[tokio::test]
@@ -392,6 +401,8 @@ fn the_office_converter_names_itself_and_claims_only_office_formats() {
     assert!(office.supports(DocumentFormat::Pdf));
     assert!(office.supports(DocumentFormat::Docx));
     assert!(office.supports(DocumentFormat::Pptx));
+    // Keep XLSX in the TinyDocs route so a refusal cannot fall through to a
+    // native converter while spreadsheet parsing is temporarily disabled.
     assert!(office.supports(DocumentFormat::Xlsx));
     assert!(!office.supports(DocumentFormat::Markdown));
 }
