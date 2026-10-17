@@ -306,7 +306,7 @@ impl SessionDriver<OpenHumanRunContext> for OpenHumanSessionDriver {
         // the durable reply an explicit checkpoint.
         if outcome.text.trim().is_empty()
             && output.starts_with("I finished this turn without writing up a result.")
-        {
+        let (terminal_stop, terminal_turn) = {
             output = crate::agent::session_host::turn_checkpoint::build_deterministic_checkpoint(
                 &crate::agent::session_host::turn_checkpoint::results_from_tool_outcomes(
                     &outcome.tool_outcomes,
@@ -481,6 +481,10 @@ impl SessionDriver<OpenHumanRunContext> for OpenHumanSessionDriver {
                 );
             }
             observed.resolved_route = outcome.resolved_route.clone();
+            (observed.stop.clone(), (observed.model_calls as u32).max(1))
+        };
+        if let Some(terminal) = outcome.deferred_terminal.take() {
+            terminal.finish(terminal_stop, terminal_turn).await;
         }
         // The turn compacted its context: persist the compacted history, so the
         // next turn starts from the checkpoint. The runtime session seals the
