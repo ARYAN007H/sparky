@@ -134,29 +134,26 @@ export function buildPlan({ profile, areas, env = {}, isPullRequest = true }) {
   const nodeCache = ex63 ? "${CI_CACHE_DIR:-/cache}/node-tools" : null;
   const core = areas.rustCore;
 
-  // ex63: one throwaway target dir per lane so lanes never queue on cargo's
-  // build-dir lock; sccache warms the build from the host's shared, capped
-  // store (or the slot's /cache disk when the store is down). sccache keys
-  // include the target dir, so a lane shares with the same lane of every
-  // earlier job on any VM, not with the other lanes.
-  // hosted: cargo's default target dirs, which Swatinem/rust-cache restores.
-  const targetDir = (lane) => (ex63 ? `${scratch}/target/${lane}` : null);
-  const sccache = ex63 ? { RUSTC_WRAPPER: "sccache" } : {};
-  const rustEnv = {
+  // Private lanes run sequentially and share compatible build products.
+  // Instrumented objects stay separate from ordinary build/link checks.
+  const targetDir = (lane) => ex63
+    ? `target/ci-private-${lane === "cov" ? "coverage" : "build"}`
+    : null;
+  const rustEnv = ex63 ? {
+    CARGO_INCREMENTAL: "0",
+    RUSTC_WRAPPER: "",
+    RUSTC_WORKSPACE_WRAPPER: "",
+    CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER: "/usr/local/bin/rust-mold-linker",
+  } : {
     CARGO_INCREMENTAL: "0",
     RUSTFLAGS: "-C link-arg=-fuse-ld=mold",
   };
-  // Instrumented builds: no DWARF, a large test stack, and on hosted the
-  // serialized build ci-lite needs to fit the runner's disk. On ex63 they go
-  // through sccache too: cargo-llvm-cov chains an existing RUSTC_WRAPPER in
-  // both its wrapper and RUSTFLAGS modes, and cache hits give byte-identical
-  // lcov (checked with cargo-llvm-cov 0.8 and sccache 0.10). Hosted keeps
-  // ci-lite's wrapper-free setup.
+  const sccache = {};
   const covEnv = {
     ...rustEnv,
     CARGO_PROFILE_DEV_DEBUG: "0",
     RUST_MIN_STACK: "67108864",
-    ...(ex63 ? sccache : { CARGO_BUILD_JOBS: "1" }),
+    ...(!ex63 ? { CARGO_BUILD_JOBS: "1" } : {}),
   };
   const modulesDir = ex63
     ? `${scratch}/test-modules`
@@ -173,13 +170,6 @@ export function buildPlan({ profile, areas, env = {}, isPullRequest = true }) {
   // arms this job for any change under core, embed, tinyhumans, rpc, cli or
   // tui, which is every crate the TUI depends on.
   //
-  // Also left to those pushes, as duplicates of what runs here:
-  //  - `cargo test -p openhuman-embed` / `-p openhuman-tinyhumans` (default
-  //    features): rust-core-coverage already runs both crates' tests, with the
-  //    product features;
-  //  - `cargo check -p openhuman --no-default-features`: embed-check-no-default
-  //    builds the core with exactly that feature set (none) as its dependency.
-
   /** @type {Lane[]} */
   const lanes = [
     {
@@ -594,6 +584,36 @@ export function buildPlan({ profile, areas, env = {}, isPullRequest = true }) {
       ],
     },
   ];
+
+  if (ex63) {
+    for (const lane of lanes) {
+      if (!["rust-gates-off", "storage-drivers"].includes(lane.name)) continue;
+      for (const check of lane.checks) {
+        if (!check.run.startsWith("cargo test ")) continue;
+        const [cargoArgs, filters] = check.run.slice("cargo test ".length).split(" --");
+        let args = cargoArgs.replace("--no-fail-fast ", "");
+        let expression = "";
+        let serial = "";
+        if (filters) {
+          const include = [];
+          const exclude = [];
+          const tokens = filters.trim().split(/\s+/);
+          for (let i = 0; i < tokens.length; i++) {
+            if (tokens[i] === "--skip") exclude.push(tokens[++i]);
+            else if (tokens[i] === "--test-threads=1") serial = " --test-threads=1";
+            else include.push(tokens[i]);
+          }
+          const terms = include.map((f) => `test(${f})`).join(" | ");
+          expression = ` -E '${terms ? `(${terms})` : "all()"}${exclude.map((f) => ` & not test(${f})`).join("")}'`;
+        }
+        check.env = { ...covEnv, CARGO_BUILD_TARGET_DIR: "target/ci-private-coverage" };
+        check.run = `cargo llvm-cov nextest --profile ci --no-fail-fast --no-tests=fail --no-clean ${args}${expression}${serial} --lcov --output-path ci-out/lcov/lcov-${check.name}.info`;
+      }
+    }
+    const tauri = lanes.find((l) => l.name === "tauri").checks.find((c) => c.name === "tauri-coverage");
+    tauri.env = { ...covEnv, CARGO_BUILD_TARGET_DIR: "target/ci-private-coverage" };
+    tauri.run = "unset RUSTFLAGS RUSTC_WRAPPER && cargo llvm-cov nextest --profile ci --no-fail-fast --no-tests=fail --no-clean --no-rustc-wrapper --manifest-path crates/openhuman-app/Cargo.toml --lcov --output-path ci-out/lcov/lcov-tauri.info";
+  }
 
   for (const lane of lanes) {
     lane.checks = lane.checks.map((c) => ({

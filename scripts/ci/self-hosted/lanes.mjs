@@ -169,8 +169,6 @@ export function renderSummary(results) {
       "",
       `VM memory: ${(mem.totalMiB / 1024).toFixed(1)} GiB, lowest available ${mem.minAvailableMiB == null ? "?" : `${(mem.minAvailableMiB / 1024).toFixed(1)} GiB`}; heavy-compile slots: ${results.heavySlots ?? "uncapped"}.`,
     );
-  const sc = sccacheSummary(results.sccache);
-  if (sc) rows.push("", sc);
   rows.push(
     "",
     "`skipped` = area untouched; `blocked` = a check it needs did not succeed. Neither is a pass for the check itself.",
@@ -319,7 +317,7 @@ export class Runner {
   constructor(plan, { out, maxParallel, maxHeavy = Infinity }) {
     this.plan = plan;
     this.out = out;
-    this.maxParallel = maxParallel > 0 ? maxParallel : plan.lanes.length;
+    this.maxParallel = plan.profile === "ex63" ? 1 : maxParallel > 0 ? maxParallel : plan.lanes.length;
     this.heavy = new PrioritySemaphore(maxHeavy);
     this.maxHeavy = maxHeavy;
     // check id -> { pgid, peakRssMiB } while running; sampled every 5 s.
@@ -379,7 +377,8 @@ export class Runner {
   runCommand(lane, check, logStream, record) {
     const env = { ...process.env, ...(lane.env ?? {}), ...(check.env ?? {}) };
     if (lane.targetDir) {
-      env.CARGO_TARGET_DIR = lane.targetDir;
+      env.CARGO_BUILD_TARGET_DIR = check.env?.CARGO_BUILD_TARGET_DIR ?? lane.targetDir;
+      delete env.CARGO_TARGET_DIR;
       mkdirSync(lane.targetDir, { recursive: true });
     }
     const argv = ["bash", "-o", "pipefail", "-c", check.run];
@@ -775,8 +774,6 @@ async function main() {
     log(`detached runner pid=${child.pid} lanes=${lanesJson}`);
     return 0;
   }
-  if (args.profile === "ex63")
-    spawnSync("sccache", ["--start-server"], { stdio: "ignore" });
 
   const envHeavy = Number.parseInt(process.env.OH_LANES_MAX_HEAVY ?? "", 10);
   const maxHeavy =
@@ -803,7 +800,7 @@ async function main() {
     runner: process.env.RUNNER_NAME ?? null,
     areas,
     lanes,
-    sccache: args.profile === "ex63" ? sccacheStats() : null,
+    
     heavySlots: Number.isFinite(maxHeavy) ? maxHeavy : null,
     memory: runner.memory,
     cacheBytes: du(process.env.CI_CACHE_DIR),
