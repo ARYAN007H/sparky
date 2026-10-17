@@ -381,14 +381,6 @@ async fn drive_turn(
     // with it (`with_stream_id`), so every persisted observation's `event_id` is
     // the restart-stable `{run_id}-evt-{offset}` a late-attach replay
     // reconstructs the timeline from (05.1). The same id keys the journal + status.
-    if let Some(scope) = &subagent_scope {
-        if let Some(slot) = &scope.journal_run_id {
-            *slot
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner) =
-                Some(journal_run_id.as_str().to_string());
-        }
-    }
     let sink = EventSink::with_stream_id(journal_run_id.as_str());
     if let Some(native) = &native_subagent {
         native.parent_events.emit(

@@ -120,12 +120,10 @@ pub(in super::super) async fn run_subagent_via_graph(
     // seam this is a sub-agent turn, so the unknown-tool recovery uses the
     // sub-agent wording. With no progress sink the scoped events simply have
     // nowhere to go, which is harmless.
-    let child_journal_run_id = std::sync::Arc::new(std::sync::Mutex::new(None));
     let subagent_scope = Some(SubagentScope {
         agent_id: agent_id.to_string(),
         task_id: task_id.to_string(),
         extended_policy,
-        journal_run_id: Some(child_journal_run_id.clone()),
     });
 
     // A standalone summarizer model for the cap-hit checkpoint call below (the
