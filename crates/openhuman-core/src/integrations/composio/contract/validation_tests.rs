@@ -1,10 +1,10 @@
 use super::*;
 
 #[test]
-fn connection_ref_parser_keeps_colons_inside_toolkit_and_id() {
+fn connection_ref_parser_preserves_multi_segment_toolkit_and_trailing_id() {
     assert_eq!(
         parse_composio_connection_ref("composio:microsoft:teams:account:42"),
-        Some(("microsoft:teams", "account:42")),
+        Some(("microsoft:teams:account", "42")),
     );
     assert_eq!(parse_composio_connection_ref("composio::account"), None);
     assert_eq!(parse_composio_connection_ref("composio:slack:"), None);
