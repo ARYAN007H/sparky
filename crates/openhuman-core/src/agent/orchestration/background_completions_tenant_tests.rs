@@ -214,3 +214,38 @@ async fn explicit_profiles_share_a_workspace_without_sharing_completion_routers(
     assert_eq!(alice_after_reopen, ["alice-task"]);
     assert_eq!(bob_after_reopen, ["bob-task"]);
 }
+
+#[tokio::test]
+async fn an_unbound_single_user_caller_keeps_workspace_local_persistence() {
+    let _guard = crate::config::TEST_ENV_LOCK.lock().await;
+    let ws = TestWorkspace::new();
+    let ctx = DispatchCtx::unbound();
+    assert!(
+        ctx.resolved().is_none(),
+        "the case under test has no core context"
+    );
+
+    record_completion(
+        &ctx,
+        ws.path(),
+        "local-session",
+        "local-task",
+        "researcher",
+        "persisted locally",
+        Some("local-thread".into()),
+    )
+    .await;
+    assert_eq!(
+        pending_for_ctx(&ctx, ws.path(), "local-thread")[0]
+            .result
+            .text,
+        "persisted locally"
+    );
+
+    router_pool().clear().unwrap();
+    assert_eq!(
+        recover_pending_threads(&ctx, ws.path()),
+        ["local-thread"],
+        "unbound single-user storage reopens from the workspace-local backend"
+    );
+}
