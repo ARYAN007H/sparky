@@ -50,6 +50,10 @@ fn classified_halt_returns_partial_work_without_provider_usage() {
 #[tokio::test]
 async fn grounded_close_uses_the_selected_model_and_keeps_verifier_out_of_context_gauge() {
     use tinyagents_harness::testkit::ScriptedModel;
+    use tinyinference_llm::message::{
+        AssistantMessage, ContentBlock, ImageRef, Message, ToolMessage, UserMessage,
+    };
+    use tinyinference_llm::tool::ToolCall;
     use tinyinference_llm::usage::Usage;
 
     let generation = tinyinference_llm::model::ModelResponse::assistant(CLEAN_REPLY)
@@ -58,6 +62,38 @@ async fn grounded_close_uses_the_selected_model_and_keeps_verifier_out_of_contex
         tinyinference_llm::model::ModelResponse::assistant("ACCEPT").with_usage(Usage::new(7, 2));
     let scripted = Arc::new(ScriptedModel::new(vec![generation, verification]));
     let source = TurnModelSource::from_model(scripted.clone());
+    let history = vec![
+        Message::User(UserMessage {
+            content: vec![
+                ContentBlock::Text("inspect ".into()),
+                ContentBlock::Image(ImageRef {
+                    url: "data:image/png;base64,AAAA".into(),
+                    mime_type: Some("image/png".into()),
+                }),
+            ],
+        }),
+        Message::Assistant(AssistantMessage {
+            id: Some("assistant-1".into()),
+            content: vec![
+                ContentBlock::thinking("reasoning context"),
+                ContentBlock::Text("calling the tool".into()),
+            ],
+            tool_calls: vec![ToolCall {
+                id: "tool-call-1".into(),
+                name: "list_directory".into(),
+                arguments: serde_json::json!({"path": "."}),
+                invalid: None,
+            }],
+            usage: None,
+            origin: None,
+        }),
+        Message::Tool(ToolMessage {
+            tool_call_id: "tool-call-1".into(),
+            content: vec![ContentBlock::Text("three crates".into())],
+            trusted_verbatim: false,
+            artifact: None,
+        }),
+    ];
     let mut outcome = blank_outcome(false);
     outcome.tool_outcomes = vec![tinyagents_harness::turn_outcome::ToolCallOutcome {
         call_id: "call-1".into(),
@@ -74,7 +110,7 @@ async fn grounded_close_uses_the_selected_model_and_keeps_verifier_out_of_contex
         0.37,
         None,
         &tinytools_agent::dialect::NativeDialect,
-        &[],
+        &history,
         "Summarize the workspace.",
         &outcome,
         None,
@@ -90,12 +126,22 @@ async fn grounded_close_uses_the_selected_model_and_keeps_verifier_out_of_contex
     assert_eq!(closed.usage.last_call_output_tokens, 12);
     let requests = scripted.requests();
     assert_eq!(requests.len(), 2);
-    for request in requests {
+    for request in &requests {
         assert_eq!(request.model.as_deref(), Some("host-selected-model"));
         assert_eq!(request.temperature, Some(0.37));
         assert_eq!(request.max_tokens, Some(AGENT_TURN_MAX_OUTPUT_TOKENS));
         assert!(request.tools.is_empty());
     }
+    let expected_history: Vec<_> = history
+        .iter()
+        .filter_map(tinyagents_runtime::transcript::message_to_native_transcript)
+        .map(crate::agent::tinyagents::chat_message_to_message)
+        .collect();
+    assert_eq!(
+        &requests[0].messages[..expected_history.len()],
+        expected_history,
+        "close requests preserve the transcript roundtrip for attachments, reasoning and tool rows"
+    );
 }
 
 #[tokio::test]
