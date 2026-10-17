@@ -366,6 +366,21 @@ async fn invoke_async_spawn_driver_tool(
             })
         });
     }
+    if let (Some(thread_id), Some(parent_context)) = (
+        parent.thread_id().map(|id| id.as_str().to_owned()),
+        parent.data.parent.as_ref(),
+    ) {
+        if crate::agent::orchestration::background_completions::mark_stopped_task_if_thread_stopped(
+            &dispatch_ctx,
+            &parent_context.workspace_dir,
+            &thread_id,
+            &task_id,
+        ) {
+            return Err(SubagentRunError::Provider(anyhow::anyhow!(
+                "parent thread is stopped or deleted"
+            )));
+        }
+    }
     let args = serde_json::json!({ "input": input, "mode": mode });
     let tool_result = dispatcher
         .execute(
