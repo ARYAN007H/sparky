@@ -326,7 +326,7 @@ async fn closing_a_durable_driver_session_cancels_only_its_registered_child() {
         .expect("driver should finish after the tool unwinds")
         .expect("driver invokes the host completion projection");
     assert!(
-        matches!(completion, Ok(outcome) if matches!(outcome.status, SubagentRunStatus::Cancelled)),
+        matches!(&completion, Ok(outcome) if matches!(&outcome.status, SubagentRunStatus::Cancelled)),
         "the driver should classify the released child as cancelled: {completion:?}"
     );
     let final_wait = SubAgentJobsTool::new(jobs.clone())
