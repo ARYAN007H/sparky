@@ -12,7 +12,7 @@
 use std::sync::Arc;
 
 use crate::agent::subagent_host::{
-    run_subagent_via_driver_tool, SubagentRunOptions, SubagentRunStatus,
+    SubagentRunOptions, SubagentRunStatus, run_subagent_via_driver_tool,
 };
 use crate::agent::tinyagents::host::OpenHumanRunContext;
 use crate::agent_registry::host_definition::AgentDefinition;
@@ -155,15 +155,15 @@ pub(crate) async fn run_subagent_delegation_with_parent_context(
                                 }
                             }
                             return Err(format!(
-                                    "[SUBAGENT_AWAITING_USER]\nagent_id: {}\ntask_id: {}\nquestion: {}\ncheckpointed: {}\n[/SUBAGENT_AWAITING_USER]\n\
+                                "[SUBAGENT_AWAITING_USER]\nagent_id: {}\ntask_id: {}\nquestion: {}\ncheckpointed: {}\n[/SUBAGENT_AWAITING_USER]\n\
                                      delegation stage {stage:?} is awaiting user input; relay the answer with continue_subagent using this task_id.",
-                                    outcome.agent_id,
-                                    outcome.task_id,
-                                    serde_json::to_string(&question).unwrap_or_else(|_| {
-                                        "\"<unserializable question>\"".to_string()
-                                    }),
-                                    checkpoint.is_some(),
-                                ));
+                                outcome.agent_id,
+                                outcome.task_id,
+                                serde_json::to_string(&question).unwrap_or_else(|_| {
+                                    "\"<unserializable question>\"".to_string()
+                                }),
+                                checkpoint.is_some(),
+                            ));
                         }
                         SubagentRunStatus::Incomplete { reason } => {
                             return Err(format!(
