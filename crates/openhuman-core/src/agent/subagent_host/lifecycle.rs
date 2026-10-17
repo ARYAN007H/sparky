@@ -405,13 +405,44 @@ fn decode_driver_job_result(
         if let Some(error) = bundle_failure_for_key(bundle, task_key) {
             return Err(error);
         }
-        return Err(SubagentRunError::Provider(anyhow::anyhow!(format!(
-            "driver-backed async spawn failed: {}",
-            tool_result.output()
-        ))));
     }
     let reply = match tool_result.content.first() {
-        Some(tinytools::ToolContent::Json { data }) => data.clone(),
+        Some(tinytools::ToolContent::Json { data }) if !tool_result.is_error => data.clone(),
+        // The generic dispatcher encodes non-success lifecycle snapshots
+        // (awaiting input, incomplete, cancelled) as a JSON text error so the
+        // calling model sees the stop. For this host adapter, accept only that
+        // exact typed snapshot when the driver also produced the corresponding
+        // host outcome. Arbitrary text errors and persistence failures remain
+        // errors; in particular, a host executor outcome alone is not enough
+        // to override a failed driver call.
+        Some(tinytools::ToolContent::Text { text }) if tool_result.is_error => {
+            let reply: serde_json::Value = serde_json::from_str(text).map_err(|_| {
+                SubagentRunError::Provider(anyhow::anyhow!(format!(
+                    "driver-backed async spawn failed: {}",
+                    tool_result.output()
+                )))
+            })?;
+            let expected_status = bundle
+                .host_outcome
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .get(task_key)
+                .map(|outcome| match &outcome.status {
+                    SubagentRunStatus::AwaitingUser { .. } => "awaiting_input",
+                    SubagentRunStatus::Incomplete { .. } => "incomplete",
+                    SubagentRunStatus::Cancelled => "cancelled",
+                    SubagentRunStatus::Completed => "completed",
+                });
+            if !expected_status.is_some_and(|status| {
+                reply.get("status").and_then(serde_json::Value::as_str) == Some(status)
+            }) {
+                return Err(SubagentRunError::Provider(anyhow::anyhow!(format!(
+                    "driver-backed async spawn failed: {}",
+                    tool_result.output()
+                ))));
+            }
+            reply
+        }
         _ => {
             return Err(SubagentRunError::Provider(anyhow::anyhow!(format!(
                 "driver-backed async spawn returned no structured job reference: {}",
