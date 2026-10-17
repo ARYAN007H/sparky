@@ -4,10 +4,53 @@
 use crate::config::schema::AgentTracingConfig;
 use crate::config::Config;
 
-use super::otlp;
 use crate::config::schema::AgentTracingBackend;
 use tinyagents_harness::observability::trace_export::serialize::{spans_to_ndjson, SpanEnvelope};
 use tinyagents_harness::observability::trace_export::{TraceContext, TraceSpan};
+use tinyagents_harness::observability::trace_export::otlp::otlp_requests;
+use tinyagents_harness::observability::LangfuseClient;
+use std::time::Duration;
+
+const PUSH_TIMEOUT: Duration = Duration::from_secs(10);
+
+async fn push_spans(config: &Config, spans: &[TraceSpan]) -> Result<(), String> {
+    if spans.is_empty() {
+        return Ok(());
+    }
+    let url = crate::backend::telemetry::langfuse::ingestion_url(config);
+    let environment = crate::backend::telemetry::langfuse::environment_for_base(&url);
+    if crate::backend::telemetry::langfuse::skip_push(environment) {
+        return Ok(());
+    }
+    if !url.starts_with("http") {
+        return Err("Langfuse backend proxy URL is unavailable".to_string());
+    }
+    let token = match crate::security::credentials::session_support::direct_backend_credential(
+        config,
+        "langfuse otlp push",
+    ) {
+        Some(crate::security::credentials::session_support::BackendCredential::Session(token)) => {
+            token
+        }
+        _ => return Ok(()),
+    };
+    let transport = crate::backend::resolve_backend_transport()
+        .map_err(|err| format!("Langfuse OTLP push has no backend transport: {err}"))?;
+    let client = LangfuseClient::proxy_with_transport(
+        url,
+        token,
+        transport.http_client(crate::backend::TransportProfile::Api),
+        transport.attribution_headers(),
+    )
+    .map_err(|_| "Langfuse OTLP proxy client could not be configured".to_string())?;
+    for payload in otlp_requests(spans, environment, &super::export_brand()) {
+        tokio::time::timeout(PUSH_TIMEOUT, client.send_otlp(payload))
+            .await
+            .map_err(|_| "Langfuse OTLP proxy request timed out".to_string())?
+            .map_err(|_| "Langfuse OTLP proxy request failed".to_string())?;
+    }
+    Ok(())
+}
 
 /// Map the configured backend onto the upstream NDJSON envelope.
 pub(crate) fn envelope_for(backend: AgentTracingBackend) -> SpanEnvelope {
@@ -92,7 +135,7 @@ pub(crate) async fn export_run_trace(config: &Config, spans: &[TraceSpan]) {
     let observability = &config.observability;
 
     if observability.share_usage_data {
-        if let Err(err) = otlp::push_spans(config, spans).await {
+        if let Err(err) = push_spans(config, spans).await {
             log::warn!("[agent-tracing] Langfuse usage-data push failed ({err})");
         }
     }
@@ -160,3 +203,7 @@ pub(crate) async fn export_run_trace_from_journal(
     let spans = collector.spans().to_vec();
     export_run_trace(config, &spans).await;
 }
+
+#[cfg(test)]
+#[path = "export_tests.rs"]
+mod tests;
