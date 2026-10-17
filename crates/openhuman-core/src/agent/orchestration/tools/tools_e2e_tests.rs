@@ -160,19 +160,10 @@ async fn archetype_delegation_tool_runs_child_agent_e2e() {
     );
     assert!(provider.saw(ARCHETYPE_DELEGATION_CANARY));
 
-    let parent_context = live
-        .data
-        .parent
-        .as_ref()
-        .expect("test parent context");
-    let owner = crate::agent::tinyagents::tool_registration::subagent_owner_key(
-        &parent_context.session_id,
-        live.thread_id().map(|id| id.as_str()),
-    );
     let jobs = crate::core::runtime::slot_for::<
         tinyagents_orchestration::subagent::SubAgentJobRegistry,
     >(&live.data.dispatch_ctx());
-    let completed = jobs.list_owned(owner);
+    let completed = jobs.list();
     assert!(
         completed.iter().any(|job| {
             job.agent == "task_manager_agent"
