@@ -30,6 +30,7 @@ const DOMAIN: &str = "devices::store";
 pub(crate) fn import_source() -> crate::storage::import::Source {
     crate::storage::import::Source {
         domain: "devices",
+        owner: "devices",
         db: "devices/devices.db",
         collections: legacy_collections,
         read_legacy: |scratch, _real| super::store_import::read(scratch),

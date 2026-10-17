@@ -75,6 +75,7 @@ pub(super) fn for_agent(config: &Config, agent: &str) -> Result<Docs> {
 pub(crate) fn import_source() -> crate::storage::import::Source {
     crate::storage::import::Source {
         domain: "approval",
+        owner: "approvals",
         db: "approval/approval.db",
         collections: legacy_collections,
         read_legacy: |scratch, _real| super::store_import::read(scratch),
