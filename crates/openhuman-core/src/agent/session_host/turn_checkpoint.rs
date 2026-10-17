@@ -530,27 +530,7 @@ pub(crate) fn close_verification_prompt(user_request: &str, records: &str, reply
 
 /// The check call's verdict on a closing message.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum CloseVerdict {
-    Accept,
-    Reject,
-    /// Neither word found (or the call failed). The reply is unverified, so the
-    /// caller does not ship it and uses the deterministic fallback instead.
-    Unclear,
-}
-
-/// Read the verdict from the check call's text: the **last** standalone
-/// `ACCEPT`/`REJECT` token wins, so a model that reasons aloud before its
-/// answer is read by its conclusion, and `UNACCEPTABLE` is not an `ACCEPT`.
-pub(crate) fn parse_close_verdict(text: &str) -> CloseVerdict {
-    text.split(|c: char| !c.is_ascii_alphabetic())
-        .filter_map(|token| match token.to_ascii_uppercase().as_str() {
-            "ACCEPT" => Some(CloseVerdict::Accept),
-            "REJECT" => Some(CloseVerdict::Reject),
-            _ => None,
-        })
-        .next_back()
-        .unwrap_or(CloseVerdict::Unclear)
-}
+pub(crate) use tinyagents_harness::close::{CloseVerdict, parse_close_verdict};
 
 /// Build a deterministic final answer from this turn's tool results.
 /// Used as the guaranteed non-empty fallback when a turn ran tools but the
