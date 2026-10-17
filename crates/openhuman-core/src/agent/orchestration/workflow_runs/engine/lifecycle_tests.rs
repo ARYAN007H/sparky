@@ -223,9 +223,7 @@ async fn losing_resume_cas_keeps_the_installed_workflow_generation() {
 }
 
 #[tokio::test]
-async fn lost_engine_lease_does_not_project_failure_over_the_winning_owner() {
-    use crate::agent::harness::ParentExecutionContext;
-    use crate::config::AgentConfig;
+async fn stale_setup_failure_does_not_overwrite_another_process_lease() {
     use tinyagents_session::run_ledger::WorkflowLeaseClaim;
 
     let workspace = tempfile::tempdir().expect("workspace");
@@ -261,7 +259,6 @@ async fn lost_engine_lease_does_not_project_failure_over_the_winning_owner() {
     .expect("claim workflow lease");
     assert!(matches!(claim, WorkflowLeaseClaim::Acquired(_)));
 
-    let definition = definition_by_id("parallel_research_cross_check").expect("definition");
     let supervisor = workflow_supervisor().clone();
     let handle = supervisor.start_scoped_with_handle(
         run_id.clone(),
@@ -272,53 +269,18 @@ async fn lost_engine_lease_does_not_project_failure_over_the_winning_owner() {
             tokio::spawn(future);
         },
     );
-    let parent = ParentExecutionContext {
-        workspace_descriptor: None,
-        agent_definition_id: "workflow-test".into(),
-        allowed_subagent_ids: Default::default(),
-        turn_model_source: crate::agent::tinyagents::TurnModelSource::from_model(Arc::new(
-            tinyagents_harness::testkit::ScriptedModel::replies(vec!["unused"]),
-        )),
-        all_tools: Arc::new(Vec::new()),
-        all_tool_specs: Arc::new(Vec::new()),
-        visible_tool_specs: Arc::new(Vec::new()),
-        visible_tool_names: Default::default(),
-        subagent_tool_ceiling_names: Default::default(),
-        model_name: "test-model".into(),
-        temperature: 0.0,
-        workspace_dir: workspace.path().to_path_buf(),
-        agent_config: AgentConfig::default(),
-        workflows: Arc::new(Vec::new()),
-        memory_context: Arc::new(None),
-        session_id: "workflow-test-session".into(),
-        channel: "test".into(),
-        connected_integrations: Vec::new(),
-        tool_call_format: tinytools_agent::dialect::ToolCallFormat::Native,
-        session_key: "workflow-test-session".into(),
-        session_parent_prefix: None,
-        on_progress: None,
-        run_queue: None,
-        host_env: Default::default(),
-    };
-
-    run_engine_loop(
+    record_failed_if_current(
         &config,
         &run_id,
-        definition,
-        handle,
+        &handle,
         seeded.revision,
-        tinyagents_harness::CancellationToken::new(),
-        Some(parent),
-    )
-    .await;
+        "stale setup failure".into(),
+    );
 
     let after = get_workflow_run(&config, &run_id)
         .expect("read run")
         .expect("run remains present");
     assert_eq!(after.status, WorkflowRunStatus::Running);
     assert_eq!(after.lease_owner.as_deref(), Some("other-process"));
-    assert_ne!(
-        after.summary.as_deref(),
-        Some("workflow safety admission failed")
-    );
+    assert_ne!(after.summary.as_deref(), Some("stale setup failure"));
 }
