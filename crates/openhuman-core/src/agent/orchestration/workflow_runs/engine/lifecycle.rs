@@ -190,11 +190,16 @@ fn schedule_workflow_drive(
     };
 
     if resume {
-        supervisor
-            .resume_scoped_with_commit(run_id, commit, make_future, root_parent, origin, spawn)
+        supervisor.resume_scoped_with_commit(
+            run_id,
+            commit,
+            make_future,
+            root_parent,
+            origin,
+            spawn,
+        )
     } else {
-        supervisor
-            .start_scoped_with_commit(run_id, commit, make_future, root_parent, origin, spawn)
+        supervisor.start_scoped_with_commit(run_id, commit, make_future, root_parent, origin, spawn)
     }
 }
 
