@@ -129,7 +129,7 @@ async fn independent_host_bundles_share_and_project_the_persisted_winner() {
             .with_thread("cross-bundle-thread"),
     );
     let task_key = SubagentTaskKey::from_context(&parent, "cross-bundle-task", None);
-    let flights = super::super::super::lifecycle::shared_subagent_flight(
+    let flights = crate::agent::subagent_host::lifecycle::shared_subagent_flight(
         &parent.data.dispatch_ctx(),
         &checkpoint_dir,
     );
