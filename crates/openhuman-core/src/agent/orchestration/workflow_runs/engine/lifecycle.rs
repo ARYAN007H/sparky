@@ -279,56 +279,22 @@ pub async fn resume_workflow_run(
         anyhow!("workflow run {id} changed while resume was being applied; reload and retry")
     })?;
 
-    // Only replace the process-local signal after the durable hand-off won.
-    // Otherwise a losing resumer could erase the live driver's stop request.
-    let cancel = replace_cancel_signal(id);
-
-    let task_run_id = id.to_string();
-    // Same inherit-only origin propagation as `start_workflow_run`: the resumed
-    // loop runs on a fresh task, which would otherwise drop the caller's label.
-    let inherited_origin = crate::security::turn_origin::capture();
-    let task_ctx = ctx.clone();
-    ctx.spawn(async move {
-        match crate::config::ops::load_current_or_init(&task_ctx).await {
-            Ok(task_config) => {
-                crate::security::turn_origin::with_inherited_origin(
-                    inherited_origin,
-                    run_engine_loop(
-                        &task_ctx,
-                        &task_config,
-                        &task_run_id,
-                        definition,
-                        cancel,
-                        None,
-                    ),
-                )
-                .await;
-            }
-            Err(err) => {
-                log::error!(
-                    target: LOG_TARGET,
-                    "[workflow_run_engine] resume.config_load_failed run={task_run_id} err={err}"
-                );
-                clear_cancel_signal(&task_run_id, &cancel);
-            }
-        }
-    });
+    let _handle = schedule_workflow_drive(ctx, id.to_string(), definition, true);
 
     log::debug!(target: LOG_TARGET, "[workflow_run_engine] resume.spawned run={id}");
     Ok(resumed)
 }
 
-/// Build the root parent context + drive the phase DAG to completion.
-///
-/// Separated from [`start_workflow_run`] so it can run on the spawned task with
-/// an owned [`Config`]. Errors are recorded on the run row (status `Failed`)
-/// rather than propagated — there is no caller to receive them.
+/// Drive the phase DAG with the parent context created by the owner's scoped
+/// lifecycle. Errors are recorded on the run row (status `Failed`) rather than
+/// propagated — there is no caller to receive them.
 pub(crate) async fn run_engine_loop(
     ctx: &DispatchCtx,
     config: &Config,
     run_id: &str,
     definition: WorkflowDefinition,
-    cancel: WorkflowCancelSignal,
+    handle: WorkflowRunHandle,
+    cancel_token: tinyagents_harness::CancellationToken,
     parent_override: Option<ParentExecutionContext>,
 ) {
     let model_override = get_workflow_run(config, run_id)
@@ -363,7 +329,6 @@ pub(crate) async fn run_engine_loop(
                     run.revision,
                 );
             }
-            clear_cancel_signal(run_id, &cancel);
             return;
         }
     };
@@ -371,11 +336,9 @@ pub(crate) async fn run_engine_loop(
         Ok(store) => store,
         Err(error) => {
             log::error!(target: LOG_TARGET, "[workflow_run_engine] loop.no_store run={run_id} err={error:#}");
-            clear_cancel_signal(run_id, &cancel);
             return;
         }
     };
-    let cancel_token = cancel.token.clone();
     let outcome = with_root_parent(
         ctx,
         parent_override,
