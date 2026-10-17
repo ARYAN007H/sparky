@@ -448,6 +448,8 @@ async fn drive_turn(
         model,
         journal_run_id.clone(),
         journal_thread_id,
+        ctx.config.lineage.parent_run_id.clone(),
+        ctx.config.lineage.root_run_id.clone(),
     )
     .await;
     if !is_subagent {
