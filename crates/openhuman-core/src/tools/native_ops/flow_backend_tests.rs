@@ -25,14 +25,9 @@ impl FlowPolicyHooks for NeverCalledHooks {
 
 #[tokio::test]
 async fn empty_native_slug_is_rejected_before_policy_hooks() {
-    let error = invoke(
-        &Config::default(),
-        "oh:   ",
-        json!({}),
-        &NeverCalledHooks,
-    )
-    .await
-    .expect_err("empty tool names must fail");
+    let error = invoke(&Config::default(), "oh:   ", json!({}), &NeverCalledHooks)
+        .await
+        .expect_err("empty tool names must fail");
     assert_eq!(
         error,
         "tool_call node: native tool slug is empty (expected `oh:<tool_name>`)"
