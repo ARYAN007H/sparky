@@ -63,7 +63,9 @@ pub(super) struct OpenHumanSessionState {
     /// runtime. The session's terminal callback drains it after partial
     /// transcript persistence on cancellation or failure.
     active_terminal_sidecar: Option<
-        std::sync::Arc<std::sync::Mutex<crate::agent::tinyagents::host::SessionTurnSidecar>>,
+        std::sync::Arc<
+            std::sync::Mutex<crate::agent::tinyagents::host::run_context::SessionTurnSidecar>,
+        >,
     >,
     /// The previous turn's deferred post-commit work (thread-goal
     /// accounting). The next turn awaits it before loading the goal
@@ -961,7 +963,7 @@ impl OpenHumanSessionHost {
 }
 
 async fn finalize_deferred_terminal(
-    sidecar: &std::sync::Mutex<crate::agent::tinyagents::host::SessionTurnSidecar>,
+    sidecar: &std::sync::Mutex<crate::agent::tinyagents::host::run_context::SessionTurnSidecar>,
     terminal: &tinyagents_runtime::SessionTerminal,
 ) {
     let (deferred, stop, turn) = {

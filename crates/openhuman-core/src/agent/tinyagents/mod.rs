@@ -70,7 +70,7 @@ pub use crate::inference::turn_models::TurnModelSource;
 pub(crate) use crate::inference::turn_models::TurnModels;
 pub(crate) use observability::SubagentScope;
 pub(crate) use turn_exec::{NativeSubagentRunContext, TurnSpec};
-pub(crate) use turn_outcome::TinyagentsTurnOutcome;
+pub(crate) use turn_outcome::{DeferredTurnTerminal, TinyagentsTurnOutcome};
 #[cfg(test)]
 pub(crate) use turn_policy::is_subagent_spawn_or_delegate_tool;
 pub(crate) use turn_policy::{
