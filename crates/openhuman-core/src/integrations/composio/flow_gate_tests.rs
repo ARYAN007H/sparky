@@ -5,6 +5,7 @@ use crate::integrations::composio::catalog::{
 };
 use crate::integrations::composio::{ComposioExecuteResponse, ConnectedIntegration};
 use serde_json::json;
+use tinybox_bus::CommandClass;
 
 fn integration(
     toolkit: &str,
