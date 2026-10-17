@@ -43,6 +43,150 @@ async fn prepared_subagent_runs_through_driver_jobs_dispatcher() {
     );
 }
 
+/// The native journal tree must preserve the exact run identity handed to the
+/// prepared child by Tiny's driver, including the host lifecycle link and the
+/// durable child observations. This exercises the OpenHuman executor, not a
+/// collector fixture assembled from synthetic observations.
+#[tokio::test]
+async fn prepared_child_run_is_exported_from_its_native_journal_lineage() {
+    use tinyagents_harness::events::AgentEvent;
+    use tinyagents_harness::observability::trace_export::{
+        collector::SpanCollector, serialize::spans_to_ndjson, TraceContext,
+    };
+
+    let scratch = tempfile::tempdir().expect("isolated native trace fixture");
+    let workspace = scratch.path().join("workspace");
+    std::fs::create_dir_all(&workspace).expect("create isolated workspace");
+    let mut config = crate::config::Config::default();
+    config.workspace_dir = workspace.clone();
+    config.components.juice = false;
+    let core = crate::core::runtime::CoreContext::for_test_with_config(
+        crate::core::runtime::DomainSet::full(),
+        config,
+    );
+
+    let provider = ScriptedProvider::new(vec![text_response(
+        "private-child-answer-should-not-be-exported",
+    )]);
+    let mut parent_context = make_parent(provider.clone(), vec![]);
+    parent_context.workspace_dir = workspace.clone();
+    parent_context.core = Some(Arc::downgrade(&core));
+    parent_context.thread_id = Some("native-trace-thread".into());
+    let options = with_parent(parent_context, SubagentRunOptions::default());
+    let root_config = tinyagents_harness::context::RunConfig::new("native-trace-root")
+        .with_thread("native-trace-thread");
+    let root_run_id = root_config.run_id.clone();
+    let parent = options.run_context.clone().into_tinyagents(root_config);
+    let dispatch = parent.data.dispatch_ctx();
+    let _parent_journal = crate::agent::tinyagents::journal::attach_turn_journal(
+        &dispatch,
+        &parent.events,
+        "parent-model",
+        root_run_id.clone(),
+        parent.config.thread_id.clone(),
+        None,
+        root_run_id.clone(),
+    )
+    .await
+    .expect("the isolated workspace attaches the root journal");
+    parent.events.emit(AgentEvent::RunStarted {
+        run_id: root_run_id.clone(),
+        thread_id: parent.config.thread_id.clone(),
+    });
+
+    let mut options = options;
+    options.checkpoint_dir = Some(scratch.path().join("checkpoints"));
+    options.thread_id = Some("native-trace-thread".into());
+    let (outcome, _job_id) = run_subagent_via_driver_tool(
+        &parent,
+        make_def_named_tools(&[]),
+        "answer without exposing the private sentinel".into(),
+        options,
+    )
+    .await
+    .expect("driver-backed child run completes");
+    assert!(matches!(outcome.status, SubagentRunStatus::Completed));
+    assert_eq!(provider.captured.lock().len(), 1);
+
+    parent.events.emit(AgentEvent::RunCompleted {
+        run_id: root_run_id.clone(),
+        outcome: None,
+    });
+    parent.events.emit(AgentEvent::RunFinalized {
+        run_id: root_run_id.clone(),
+    });
+    _parent_journal.finish_completed().await;
+
+    let observations = crate::agent::tinyagents::journal::read_run_tree_events(
+        &dispatch,
+        root_run_id.as_str(),
+    )
+    .await
+    .expect("lineage-indexed journals load as a tree");
+    assert!(!observations.is_empty(), "the root stream is durable");
+    let child_run_id = observations
+        .iter()
+        .find_map(|observation| match &observation.event {
+            AgentEvent::SubAgentRunStarted { run_id, .. } => Some(run_id.clone()),
+            _ => None,
+        })
+        .expect("the host lifecycle link names the actual prepared child run");
+    let child_observations: Vec<_> = observations
+        .iter()
+        .filter(|observation| observation.run_id == child_run_id)
+        .collect();
+    assert!(
+        child_observations.iter().any(|observation| matches!(
+            observation.event,
+            AgentEvent::RunFinalized { ref run_id } if *run_id == child_run_id
+        )),
+        "the child journal is finalized after the host adapter returns"
+    );
+    assert!(
+        observations.iter().any(|observation| matches!(
+            observation.event,
+            AgentEvent::SubAgentRunCompleted { ref run_id } if *run_id == child_run_id
+        )),
+        "the parent acknowledges the same child identity"
+    );
+    assert!(child_observations.iter().all(|observation| {
+        observation.parent_run_id.as_ref() == Some(&root_run_id)
+            && observation.root_run_id == root_run_id
+    }), "the persisted child stream keeps actual parent/root lineage");
+
+    let trace_context = TraceContext::new("native-trace-root", None)
+        .with_session_group("native-trace-thread")
+        .with_capture_content(false)
+        .with_run_lineage(Some(root_run_id.as_str().into()), None, Some(root_run_id.as_str().into()));
+    let mut collector = SpanCollector::new(trace_context);
+    for observation in &observations {
+        collector.record(observation);
+    }
+    collector.finish(
+        observations
+            .iter()
+            .map(|observation| observation.ts_ms)
+            .max()
+            .unwrap_or_default()
+            .saturating_add(1),
+    );
+    let spans = collector.spans();
+    let child_span = spans
+        .iter()
+        .find(|span| span.attributes.get("run_id").is_some_and(|id| id == child_run_id.as_str()))
+        .expect("native collector projects the actual linked child");
+    assert_eq!(child_span.attributes["parent_run_id"], root_run_id.as_str());
+    assert_eq!(child_span.attributes["root_run_id"], root_run_id.as_str());
+    let exported = spans_to_ndjson(
+        tinyagents_harness::observability::trace_export::serialize::SpanEnvelope::Otel,
+        spans,
+    );
+    assert!(
+        !exported.contains("private-child-answer-should-not-be-exported"),
+        "the native export keeps captured content off"
+    );
+}
+
 struct BlockingCrossBundleTool {
     started: tokio::sync::mpsc::Sender<()>,
     release: Arc<tokio::sync::Notify>,
