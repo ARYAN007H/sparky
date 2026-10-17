@@ -3891,6 +3891,7 @@ dependencies = [
  "x25519-dalek",
  "zeroize",
  "zip 2.4.2",
+ "zstd",
 ]
 
 [[package]]

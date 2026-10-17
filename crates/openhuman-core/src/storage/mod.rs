@@ -35,6 +35,7 @@ mod host_importers;
 pub mod import;
 pub mod import_state;
 pub mod journal_maintenance;
+pub mod layout;
 pub mod lease;
 mod lease_documents;
 mod lease_local;

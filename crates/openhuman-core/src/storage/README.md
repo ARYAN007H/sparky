@@ -73,6 +73,19 @@ file stays in place for the legacy archive step). A value a damaged file must
 not reset (`layout_migration`, `local_root`, the tool-write outbox) uses the
 strict import, which fails closed on an unparsable file.
 
+## Layout migration
+
+`layout/` moves a layout-v1 profile (`users/<id>/workspace/`) to v2
+(`users/<id>/storage.db` + `files/`): lock, import the legacy files, migrate
+the schema, `VACUUM INTO` the database (counts verified), move user files into
+`files/`, write and verify `<root>/backups/<user>-<ts>.tar.zst`, then write the
+`.layout` marker and delete only the archived originals. Progress is in
+`users/<id>/.layout.state`; every step is idempotent, so a crash resumes.
+Controllers: `storage.migrate {dry_run}`, `storage.status`,
+`storage.restore {archive}`. `[storage] auto_migrate_layout = true` runs it at
+boot. No-op for SaaS, an explicit storage URL (including MongoDB) and v2. Run
+it with the core stopped.
+
 ## Entry points
 
 - `configured_url(&Config)` / `url_from(env, &Config)`: the URL in effect.

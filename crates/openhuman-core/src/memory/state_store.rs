@@ -38,6 +38,44 @@ fn open_strict(workspace_dir: &Path, name: &str) -> Result<StateKv> {
     Ok(kv)
 }
 
+/// Imports every `<workspace>/memory/*.json` state file into the `local` scope
+/// of an explicit `scoped` handle, once each. For the layout migration
+/// (`storage::layout`), which deletes those files afterwards; a file that is
+/// not JSON is an error here (nothing may be deleted unimported), so it is
+/// imported strictly. Returns the names imported.
+///
+/// # Errors
+///
+/// A storage error or an unparsable file.
+pub(crate) fn import_all(
+    scoped: &crate::storage::ScopedStorage,
+    workspace_dir: &Path,
+) -> Result<Vec<String>> {
+    let kv = StateKv::over(scoped, OWNER, NS);
+    let mut names = Vec::new();
+    let Ok(entries) = std::fs::read_dir(workspace_dir.join("memory")) else {
+        return Ok(names);
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        let Some(name) = path
+            .file_name()
+            .and_then(|f| f.to_str())
+            .and_then(|f| f.strip_suffix(".json"))
+            .map(str::to_owned)
+        else {
+            continue;
+        };
+        if !path.is_file() {
+            continue;
+        }
+        kv.import_file_strict(&name, &path)?;
+        names.push(name);
+    }
+    names.sort();
+    Ok(names)
+}
+
 /// [`load`], failing on a damaged legacy file instead of starting over.
 ///
 /// # Errors
