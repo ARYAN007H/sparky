@@ -190,12 +190,29 @@ pub(crate) async fn run_async_spawn_via_driver_tool(
         )
         .await
         .map_err(|error| SubagentRunError::Provider(anyhow::anyhow!(error.to_string())))?;
-    let rendered_result = tool_result.output();
-    let reply: serde_json::Value = serde_json::from_str(&rendered_result).map_err(|error| {
-        SubagentRunError::Provider(anyhow::anyhow!(format!(
-            "driver-backed async spawn returned an invalid job reference: {error}; result={rendered_result}"
-        )))
-    })?;
+    if tool_result.is_error {
+        if let Some(error) = bundle
+            .failures
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .remove(&task_key)
+        {
+            return Err(error);
+        }
+        return Err(SubagentRunError::Provider(anyhow::anyhow!(format!(
+            "driver-backed async spawn failed: {}",
+            tool_result.output()
+        ))));
+    }
+    let reply = match tool_result.content.first() {
+        Some(tinytools::ToolContent::Json { data }) => data.clone(),
+        _ => {
+            return Err(SubagentRunError::Provider(anyhow::anyhow!(format!(
+                "driver-backed async spawn returned no structured job reference: {}",
+                tool_result.output()
+            ))));
+        }
+    };
     let public_job_id = reply
         .get("task_id")
         .and_then(serde_json::Value::as_str)

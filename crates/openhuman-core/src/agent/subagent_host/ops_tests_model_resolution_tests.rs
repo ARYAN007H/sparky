@@ -51,9 +51,15 @@ async fn runner_rejects_spawn_beyond_max_depth() {
 
 #[tokio::test]
 async fn prepared_async_spawn_runs_through_driver_jobs_dispatcher() {
+    let scratch = tempfile::tempdir().expect("isolated async spawn fixture");
+    let workspace = scratch.path().join("workspace");
+    std::fs::create_dir_all(&workspace).expect("create isolated workspace");
     let provider = ScriptedProvider::new(vec![text_response("driver result")]);
-    let mut options = with_parent(make_parent(provider, vec![]), SubagentRunOptions::default());
+    let mut parent_context = make_parent(provider.clone(), vec![]);
+    parent_context.workspace_dir = workspace;
+    let mut options = with_parent(parent_context, SubagentRunOptions::default());
     options.task_id = Some("driver-backed-async-spawn".into());
+    options.checkpoint_dir = Some(scratch.path().join("checkpoints"));
     options.run_context.thread_id = Some("driver-spawn-thread".into());
     let parent = options.run_context.clone().into_tinyagents(
         tinyagents_harness::context::RunConfig::new("driver-spawn-parent")
@@ -72,6 +78,7 @@ async fn prepared_async_spawn_runs_through_driver_jobs_dispatcher() {
     assert!(matches!(outcome.status, SubagentRunStatus::Completed));
     assert_eq!(outcome.output, "driver result");
     assert_eq!(outcome.task_id, "driver-backed-async-spawn");
+    assert_eq!(provider.captured.lock().len(), 1, "child provider must run");
     let jobs = crate::core::runtime::slot_for::<
         tinyagents_orchestration::subagent::SubAgentJobRegistry,
     >(&parent.data.dispatch_ctx());
