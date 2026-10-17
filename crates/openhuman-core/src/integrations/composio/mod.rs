@@ -38,6 +38,7 @@
 //! crate::core::events::DomainEvent::ComposioTriggerReceived
 
 pub mod action_tool;
+#[cfg(any(feature = "flows", test))]
 pub(crate) mod builder_tools;
 pub mod bus;
 pub mod catalog;
