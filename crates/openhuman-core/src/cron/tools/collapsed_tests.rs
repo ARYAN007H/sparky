@@ -164,10 +164,9 @@ async fn add_uses_the_explicit_channel_origin_without_ambient_turn_state() {
         message_id: "message-1".into(),
         history_key: Some("telegram-alice-42".into()),
     };
-    let context = execution_context(OpenHumanRunContext {
-        origin: Some(origin),
-        ..OpenHumanRunContext::new()
-    });
+    let mut run = OpenHumanRunContext::new();
+    run.origin = Some(origin);
+    let context = execution_context(run);
     let cron = CronTool::new(config.clone(), Arc::new(SecurityPolicy::default()));
 
     let result = cron
