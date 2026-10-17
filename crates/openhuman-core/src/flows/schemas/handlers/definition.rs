@@ -2,7 +2,10 @@ use super::super::*;
 use super::{read_required, to_json};
 use crate::core::runtime::DispatchCtx;
 
-pub(super) fn handle_create(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+pub(in crate::flows::schemas) fn handle_create(
+    ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let config = ctx.load_config().await?;
         let name = read_required::<String>(&params, "name")?;
@@ -25,7 +28,10 @@ pub(super) fn handle_create(ctx: DispatchCtx, params: Map<String, Value>) -> Con
     })
 }
 
-pub(super) fn handle_validate(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+pub(in crate::flows::schemas) fn handle_validate(
+    _ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         // No config load: validation is pure (no persistence, no workspace).
         let graph = read_required::<Value>(&params, "graph")?;
@@ -33,7 +39,10 @@ pub(super) fn handle_validate(_ctx: DispatchCtx, params: Map<String, Value>) -> 
     })
 }
 
-pub(super) fn handle_import(_ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+pub(in crate::flows::schemas) fn handle_import(
+    _ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         // No config load: import is pure (no persistence, no workspace).
         let graph = read_required::<Value>(&params, "graph")?;
@@ -47,7 +56,10 @@ pub(super) fn handle_import(_ctx: DispatchCtx, params: Map<String, Value>) -> Co
     })
 }
 
-pub(super) fn handle_duplicate(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+pub(in crate::flows::schemas) fn handle_duplicate(
+    ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let config = ctx.load_config().await?;
         let id = read_required::<String>(&params, "id")?;
@@ -55,7 +67,10 @@ pub(super) fn handle_duplicate(ctx: DispatchCtx, params: Map<String, Value>) -> 
     })
 }
 
-pub(super) fn handle_get(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+pub(in crate::flows::schemas) fn handle_get(
+    ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let config = ctx.load_config().await?;
         let id = read_required::<String>(&params, "id")?;
@@ -63,14 +78,17 @@ pub(super) fn handle_get(ctx: DispatchCtx, params: Map<String, Value>) -> Contro
     })
 }
 
-pub(super) fn handle_list(ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
+pub(in crate::flows::schemas) fn handle_list(
+    ctx: DispatchCtx,
+    _params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let config = ctx.load_config().await?;
         to_json(ops::flows_list(&config).await?)
     })
 }
 
-pub(super) fn handle_list_connections(
+pub(in crate::flows::schemas) fn handle_list_connections(
     ctx: DispatchCtx,
     _params: Map<String, Value>,
 ) -> ControllerFuture {
@@ -80,7 +98,10 @@ pub(super) fn handle_list_connections(
     })
 }
 
-pub(super) fn handle_update(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+pub(in crate::flows::schemas) fn handle_update(
+    ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let config = ctx.load_config().await?;
         let id = read_required::<String>(&params, "id")?;
@@ -122,7 +143,10 @@ pub(super) fn handle_update(ctx: DispatchCtx, params: Map<String, Value>) -> Con
     })
 }
 
-pub(super) fn handle_delete(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+pub(in crate::flows::schemas) fn handle_delete(
+    ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let config = ctx.load_config().await?;
         let id = read_required::<String>(&params, "id")?;
@@ -130,7 +154,10 @@ pub(super) fn handle_delete(ctx: DispatchCtx, params: Map<String, Value>) -> Con
     })
 }
 
-pub(super) fn handle_set_enabled(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+pub(in crate::flows::schemas) fn handle_set_enabled(
+    ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let config = ctx.load_config().await?;
         let id = read_required::<String>(&params, "id")?;

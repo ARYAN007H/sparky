@@ -2,7 +2,7 @@ use super::super::*;
 use super::{read_required, to_json};
 use crate::core::runtime::DispatchCtx;
 
-pub(super) fn handle_draft_create(
+pub(in crate::flows::schemas) fn handle_draft_create(
     ctx: DispatchCtx,
     params: Map<String, Value>,
 ) -> ControllerFuture {
@@ -26,7 +26,10 @@ pub(super) fn handle_draft_create(
     })
 }
 
-pub(super) fn handle_draft_get(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+pub(in crate::flows::schemas) fn handle_draft_get(
+    ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let config = ctx.load_config().await?;
         let id = read_required::<String>(&params, "id")?;
@@ -34,7 +37,7 @@ pub(super) fn handle_draft_get(ctx: DispatchCtx, params: Map<String, Value>) -> 
     })
 }
 
-pub(super) fn handle_draft_update(
+pub(in crate::flows::schemas) fn handle_draft_update(
     ctx: DispatchCtx,
     params: Map<String, Value>,
 ) -> ControllerFuture {
@@ -60,14 +63,17 @@ pub(super) fn handle_draft_update(
     })
 }
 
-pub(super) fn handle_draft_list(ctx: DispatchCtx, _params: Map<String, Value>) -> ControllerFuture {
+pub(in crate::flows::schemas) fn handle_draft_list(
+    ctx: DispatchCtx,
+    _params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let config = ctx.load_config().await?;
         to_json(ops::flows_draft_list(&config)?)
     })
 }
 
-pub(super) fn handle_draft_delete(
+pub(in crate::flows::schemas) fn handle_draft_delete(
     ctx: DispatchCtx,
     params: Map<String, Value>,
 ) -> ControllerFuture {
@@ -78,7 +84,7 @@ pub(super) fn handle_draft_delete(
     })
 }
 
-pub(super) fn handle_draft_promote(
+pub(in crate::flows::schemas) fn handle_draft_promote(
     ctx: DispatchCtx,
     params: Map<String, Value>,
 ) -> ControllerFuture {
@@ -103,7 +109,7 @@ pub(super) fn handle_draft_promote(
 /// from its flow. A later `draft_promote` then creates a brand-new flow
 /// instead of updating the one the caller actually meant.
 
-pub(super) fn parse_draft_update_flow_id(
+pub(in crate::flows::schemas) fn parse_draft_update_flow_id(
     params: &Map<String, Value>,
 ) -> Result<Option<Option<String>>, String> {
     match params.get("flow_id") {

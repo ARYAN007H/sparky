@@ -2,7 +2,10 @@ use super::super::*;
 use super::{read_required, to_json};
 use crate::core::runtime::DispatchCtx;
 
-pub(super) fn handle_build(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+pub(in crate::flows::schemas) fn handle_build(
+    ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let config = ctx.load_config().await?;
         // Optional streaming target: when the copilot passes its chat `thread_id`
@@ -20,7 +23,7 @@ pub(super) fn handle_build(ctx: DispatchCtx, params: Map<String, Value>) -> Cont
     })
 }
 
-pub(super) fn handle_build_cancel(
+pub(in crate::flows::schemas) fn handle_build_cancel(
     _ctx: DispatchCtx,
     params: Map<String, Value>,
 ) -> ControllerFuture {
@@ -34,7 +37,10 @@ pub(super) fn handle_build_cancel(
     })
 }
 
-pub(super) fn handle_discover(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+pub(in crate::flows::schemas) fn handle_discover(
+    ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let config = ctx.load_config().await?;
         // Optional streaming target for the Flow Scout run (Phase B) — same
@@ -48,7 +54,7 @@ pub(super) fn handle_discover(ctx: DispatchCtx, params: Map<String, Value>) -> C
 /// `flows.build` and `flows.discover` into an [`ops::FlowStreamTarget`].
 /// Returns `None` (headless run) when no usable `thread_id` is present; a
 /// missing `request_id` is filled with a fresh uuid inside `from_params`.
-pub(super) fn read_flow_stream_target(
+pub(in crate::flows::schemas) fn read_flow_stream_target(
     params: &Map<String, Value>,
 ) -> Option<ops::FlowStreamTarget> {
     let thread_id = params
@@ -62,7 +68,7 @@ pub(super) fn read_flow_stream_target(
     ops::FlowStreamTarget::from_params(thread_id, request_id)
 }
 
-pub(super) fn handle_list_suggestions(
+pub(in crate::flows::schemas) fn handle_list_suggestions(
     ctx: DispatchCtx,
     params: Map<String, Value>,
 ) -> ControllerFuture {
@@ -78,7 +84,7 @@ pub(super) fn handle_list_suggestions(
     })
 }
 
-pub(super) fn handle_dismiss_suggestion(
+pub(in crate::flows::schemas) fn handle_dismiss_suggestion(
     ctx: DispatchCtx,
     params: Map<String, Value>,
 ) -> ControllerFuture {
@@ -89,7 +95,7 @@ pub(super) fn handle_dismiss_suggestion(
     })
 }
 
-pub(super) fn handle_mark_suggestion_built(
+pub(in crate::flows::schemas) fn handle_mark_suggestion_built(
     ctx: DispatchCtx,
     params: Map<String, Value>,
 ) -> ControllerFuture {
@@ -100,7 +106,7 @@ pub(super) fn handle_mark_suggestion_built(
     })
 }
 
-pub(super) fn handle_required_connections(
+pub(in crate::flows::schemas) fn handle_required_connections(
     ctx: DispatchCtx,
     params: Map<String, Value>,
 ) -> ControllerFuture {
@@ -111,7 +117,7 @@ pub(super) fn handle_required_connections(
     })
 }
 
-pub(super) fn handle_approval_manifest(
+pub(in crate::flows::schemas) fn handle_approval_manifest(
     ctx: DispatchCtx,
     params: Map<String, Value>,
 ) -> ControllerFuture {
@@ -127,7 +133,7 @@ pub(super) fn handle_approval_manifest(
     })
 }
 
-pub(super) fn handle_search_tool_catalog(
+pub(in crate::flows::schemas) fn handle_search_tool_catalog(
     ctx: DispatchCtx,
     params: Map<String, Value>,
 ) -> ControllerFuture {
@@ -147,7 +153,7 @@ pub(super) fn handle_search_tool_catalog(
     })
 }
 
-pub(super) fn handle_get_tool_contract(
+pub(in crate::flows::schemas) fn handle_get_tool_contract(
     ctx: DispatchCtx,
     params: Map<String, Value>,
 ) -> ControllerFuture {
@@ -158,7 +164,10 @@ pub(super) fn handle_get_tool_contract(
     })
 }
 
-pub(super) fn handle_get_history(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+pub(in crate::flows::schemas) fn handle_get_history(
+    ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let config = ctx.load_config().await?;
         let id = read_required::<String>(&params, "id")?;
@@ -171,7 +180,10 @@ pub(super) fn handle_get_history(ctx: DispatchCtx, params: Map<String, Value>) -
     })
 }
 
-pub(super) fn handle_rollback(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+pub(in crate::flows::schemas) fn handle_rollback(
+    ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let config = ctx.load_config().await?;
         let id = read_required::<String>(&params, "id")?;

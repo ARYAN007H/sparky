@@ -2,7 +2,10 @@ use super::super::*;
 use super::{read_required, to_json};
 use crate::core::runtime::DispatchCtx;
 
-pub(super) fn handle_run(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+pub(in crate::flows::schemas) fn handle_run(
+    ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let config = ctx.load_config().await?;
         let id = read_required::<String>(&params, "id")?;
@@ -22,7 +25,7 @@ pub(super) fn handle_run(ctx: DispatchCtx, params: Map<String, Value>) -> Contro
     })
 }
 
-pub(super) fn handle_run_detached(
+pub(in crate::flows::schemas) fn handle_run_detached(
     ctx: DispatchCtx,
     params: Map<String, Value>,
 ) -> ControllerFuture {
@@ -52,7 +55,7 @@ pub(super) fn handle_run_detached(
 /// inputs are all optional or defaulted. A present-but-non-object value is a
 /// caller error rejected here, before it reaches `ops`, so the message names the
 /// parameter rather than surfacing as a confusing per-input complaint.
-pub(super) fn read_declared_inputs(
+pub(in crate::flows::schemas) fn read_declared_inputs(
     params: &Map<String, Value>,
 ) -> Result<Map<String, Value>, String> {
     match params.get("inputs") {
@@ -71,7 +74,10 @@ pub(super) fn read_declared_inputs(
     }
 }
 
-pub(super) fn handle_resume(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+pub(in crate::flows::schemas) fn handle_resume(
+    ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let config = ctx.load_config().await?;
         let id = read_required::<String>(&params, "id")?;
@@ -106,7 +112,10 @@ pub(super) fn handle_resume(ctx: DispatchCtx, params: Map<String, Value>) -> Con
     })
 }
 
-pub(super) fn handle_cancel_run(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+pub(in crate::flows::schemas) fn handle_cancel_run(
+    ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let config = ctx.load_config().await?;
         let run_id = read_required::<String>(&params, "run_id")?;
@@ -114,7 +123,10 @@ pub(super) fn handle_cancel_run(ctx: DispatchCtx, params: Map<String, Value>) ->
     })
 }
 
-pub(super) fn handle_list_runs(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+pub(in crate::flows::schemas) fn handle_list_runs(
+    ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let config = ctx.load_config().await?;
         let id = read_required::<String>(&params, "id")?;
@@ -127,7 +139,7 @@ pub(super) fn handle_list_runs(ctx: DispatchCtx, params: Map<String, Value>) -> 
     })
 }
 
-pub(super) fn handle_list_all_runs(
+pub(in crate::flows::schemas) fn handle_list_all_runs(
     ctx: DispatchCtx,
     params: Map<String, Value>,
 ) -> ControllerFuture {
@@ -142,7 +154,10 @@ pub(super) fn handle_list_all_runs(
     })
 }
 
-pub(super) fn handle_get_run(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+pub(in crate::flows::schemas) fn handle_get_run(
+    ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let config = ctx.load_config().await?;
         let run_id = read_required::<String>(&params, "run_id")?;
@@ -150,7 +165,10 @@ pub(super) fn handle_get_run(ctx: DispatchCtx, params: Map<String, Value>) -> Co
     })
 }
 
-pub(super) fn handle_prune_runs(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+pub(in crate::flows::schemas) fn handle_prune_runs(
+    ctx: DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let config = ctx.load_config().await?;
         let id = read_required::<String>(&params, "id")?;

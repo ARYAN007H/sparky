@@ -3,16 +3,16 @@ mod definition;
 mod draft;
 mod run;
 
-pub(super) use builder::*;
-pub(super) use definition::*;
-pub(super) use draft::*;
-pub(super) use run::*;
+pub(in crate::flows::schemas) use builder::*;
+pub(in crate::flows::schemas) use definition::*;
+pub(in crate::flows::schemas) use draft::*;
+pub(in crate::flows::schemas) use run::*;
 
 use crate::core::Outcome;
 use serde::de::DeserializeOwned;
 use serde_json::{Map, Value};
 
-pub(super) fn read_required<T: DeserializeOwned>(
+pub(in crate::flows::schemas) fn read_required<T: DeserializeOwned>(
     params: &Map<String, Value>,
     key: &str,
 ) -> Result<T, String> {
@@ -23,6 +23,8 @@ pub(super) fn read_required<T: DeserializeOwned>(
     serde_json::from_value(value).map_err(|e| format!("invalid '{key}': {e}"))
 }
 
-pub(super) fn to_json<T: serde::Serialize>(outcome: Outcome<T>) -> Result<Value, String> {
+pub(in crate::flows::schemas) fn to_json<T: serde::Serialize>(
+    outcome: Outcome<T>,
+) -> Result<Value, String> {
     outcome.into_cli_compatible_json()
 }
