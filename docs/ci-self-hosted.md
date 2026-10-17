@@ -133,6 +133,13 @@ for any commit without posting it.
   - Coverage runs each selected package/feature set once through nextest, which
     fails when the selected suite has no tests. Process-per-test isolation and
     nextest resource groups retain external-resource serialization.
+    All private instrumented checks use `LLVM_PROFILE_FILE_NAME=openhuman-%8m.profraw`:
+    LLVM's locked merge pool bounds raw profiles to eight files per binary,
+    including the auxiliary gates, Tauri, and storage configurations.
+  - After all offline examples succeed, Cargo removes their completed
+    release-profile outputs from `target/ci-private-build`. The Linux fleet
+    example is the only release invocation in this plan. Debug/coverage outputs
+    and Tinymold's store remain available for later checks and cache saving.
   - Cargo registry, pnpm store, and content-based frontend caches remain on the
     slot cache disk. Rust output caching uses Tinymold alone.
   - VM sizing is a supervisor setting; it is not assumed by the lane scheduler.

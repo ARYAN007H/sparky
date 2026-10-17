@@ -152,6 +152,9 @@ export function buildPlan({ profile, areas, env = {}, isPullRequest = true }) {
     ...rustEnv,
     CARGO_PROFILE_DEV_DEBUG: "0",
     RUST_MIN_STACK: "67108864",
+    // Nextest forks per test. LLVM merges counters losslessly into eight
+    // files per binary instead of retaining a separate file per process.
+    ...(ex63 ? { LLVM_PROFILE_FILE_NAME: "openhuman-%8m.profraw" } : {}),
     ...(!ex63 ? { CARGO_BUILD_JOBS: "1" } : {}),
   };
   const modulesDir = ex63
@@ -594,6 +597,20 @@ export function buildPlan({ profile, areas, env = {}, isPullRequest = true }) {
   // retains prior instrumentation implicitly; each suite then writes its report.
   // Do not also pass --no-clean: the pinned cargo-llvm-cov rejects that pair.
   if (ex63) {
+    const lintLane = lanes.find((lane) => lane.name === "rust-lint");
+    const examplesIndex = lintLane.checks.findIndex(
+      (check) => check.name === "embed-offline-examples",
+    );
+    // linux_fleet alone builds release artifacts. Once the complete examples
+    // group succeeds, later checks need only debug and coverage products.
+    // Cargo scopes this cleanup to the ordinary release profile, preserving
+    // those other targets and the independent Tinymold compiler store.
+    lintLane.checks.splice(examplesIndex + 1, 0, {
+      name: "release-example-cleanup",
+      when: core,
+      needs: ["embed-offline-examples"],
+      run: "bash scripts/ci-cancel-aware.sh cargo clean --profile release --target-dir target/ci-private-build",
+    });
     // This target has cfg(not(coverage)): instrumentation makes its large
     // binary fail to link and would remove its deliberately small-stack test.
     // Run that distinct regression once in the ordinary build target, keeping

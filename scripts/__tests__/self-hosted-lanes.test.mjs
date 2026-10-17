@@ -946,15 +946,29 @@ test("nextest validation helpers arm Rust validation and script regressions on t
 test("private coverage pools profiles for every Rust configuration without changing hosted or ordinary builds", () => {
   for (const plan of plans()) {
     const coverage = [];
-    for (const lane of plan.lanes) for (const check of lane.checks) {
-      const env = { ...lane.env, ...check.env };
-      if (check.name === "rust-core-coverage" || check.run.includes("cargo llvm-cov nextest")) {
-        coverage.push(check.name);
-        assert.equal(env.LLVM_PROFILE_FILE_NAME, plan.profile === "ex63" ? "openhuman-%8m.profraw" : undefined, `${plan.profile}:${check.name}`);
-      } else if (/cargo (?:build|clippy|check|test|nextest run)/.test(check.run)) {
-        assert.equal(env.LLVM_PROFILE_FILE_NAME, undefined, `${plan.profile}:${check.name} is uninstrumented`);
+    for (const lane of plan.lanes)
+      for (const check of lane.checks) {
+        const env = { ...lane.env, ...check.env };
+        if (
+          check.name === "rust-core-coverage" ||
+          check.run.includes("cargo llvm-cov nextest")
+        ) {
+          coverage.push(check.name);
+          assert.equal(
+            env.LLVM_PROFILE_FILE_NAME,
+            plan.profile === "ex63" ? "openhuman-%8m.profraw" : undefined,
+            `${plan.profile}:${check.name}`,
+          );
+        } else if (
+          /cargo (?:build|clippy|check|test|nextest run)/.test(check.run)
+        ) {
+          assert.equal(
+            env.LLVM_PROFILE_FILE_NAME,
+            undefined,
+            `${plan.profile}:${check.name} is uninstrumented`,
+          );
+        }
       }
-    }
     if (plan.profile === "ex63") assert.equal(coverage.length, 8);
   }
 });
@@ -962,24 +976,41 @@ test("private coverage pools profiles for every Rust configuration without chang
 test("private release cleanup follows successful examples and names only the ordinary release profile", () => {
   for (const plan of plans()) {
     const lint = plan.lanes.find((lane) => lane.name === "rust-lint");
-    const cleanupIndex = lint.checks.findIndex((check) => check.name === "release-example-cleanup");
-    if (plan.profile === "hosted") { assert.equal(cleanupIndex, -1); continue; }
-    const examplesIndex = lint.checks.findIndex((check) => check.name === "embed-offline-examples");
+    const cleanupIndex = lint.checks.findIndex(
+      (check) => check.name === "release-example-cleanup",
+    );
+    if (plan.profile === "hosted") {
+      assert.equal(cleanupIndex, -1);
+      continue;
+    }
+    const examplesIndex = lint.checks.findIndex(
+      (check) => check.name === "embed-offline-examples",
+    );
     assert.equal(cleanupIndex, examplesIndex + 1);
     const cleanup = lint.checks[cleanupIndex];
     assert.equal(cleanup.when, true);
     assert.deepEqual(cleanup.needs, ["embed-offline-examples"]);
-    assert.equal(cleanup.run, "bash scripts/ci-cancel-aware.sh cargo clean --profile release --target-dir target/ci-private-build");
-    assert.doesNotMatch(cleanup.run, /ci-private-coverage|tinymold|--profile dev|rm /);
+    assert.equal(
+      cleanup.run,
+      "bash scripts/ci-cancel-aware.sh cargo clean --profile release --target-dir target/ci-private-build",
+    );
+    assert.doesNotMatch(
+      cleanup.run,
+      /ci-private-coverage|tinymold|--profile dev|rm /,
+    );
   }
 });
 
 test("failed offline examples block release cleanup while independent Rust validation continues", async () => {
   const plan = buildPlan({ profile: "ex63", areas: ALL, env: EX63_ENV });
   const lint = plan.lanes.find((lane) => lane.name === "rust-lint");
-  const cleanup = lint.checks.find((check) => check.name === "release-example-cleanup");
+  const cleanup = lint.checks.find(
+    (check) => check.name === "release-example-cleanup",
+  );
   assert.ok(cleanup);
-  const out = fs.mkdtempSync(path.join(os.tmpdir(), "release-cleanup-dependency-"));
+  const out = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-cleanup-dependency-"),
+  );
   try {
     fs.mkdirSync(path.join(out, "logs"));
     const checks = [
@@ -987,7 +1018,15 @@ test("failed offline examples block release cleanup while independent Rust valid
       cleanup,
       { name: "independent", when: true, needs: [], run: "echo continued" },
     ];
-    const result = await new Runner({ profile: "ex63", lanes: [{ name: "rust-lint", checks }] }, { out, maxParallel: 1 }).run();
-    assert.deepEqual(result[0].checks.map((check) => check.status), ["failure", "blocked", "success"]);
-  } finally { fs.rmSync(out, { recursive: true, force: true }); }
+    const result = await new Runner(
+      { profile: "ex63", lanes: [{ name: "rust-lint", checks }] },
+      { out, maxParallel: 1 },
+    ).run();
+    assert.deepEqual(
+      result[0].checks.map((check) => check.status),
+      ["failure", "blocked", "success"],
+    );
+  } finally {
+    fs.rmSync(out, { recursive: true, force: true });
+  }
 });
