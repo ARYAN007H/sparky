@@ -67,8 +67,8 @@ pub(crate) use cancel::prune;
 #[cfg(test)]
 pub(crate) use cancel::{caller_workspace_in, CallerWorkspace};
 pub(crate) use cancel::{
-    cancel_all, cancel_by_session_in_workspace, cancel_by_task,
-    cancel_by_task_with_workspace_reason, cancel_for_thread, stop_for_thread, CancelledSubagent,
+    cancel_all, cancel_by_session_in_workspace, cancel_by_task_with_workspace_reason,
+    cancel_for_thread, stop_for_thread, CancelledSubagent,
 };
 pub(crate) use registry::admit_spawn;
 #[cfg(test)]

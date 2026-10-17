@@ -15,6 +15,7 @@ use super::types::{
 
 #[path = "ops_driver.rs"]
 mod driver;
+#[cfg(test)]
 use driver::record_cancel_reason;
 pub use driver::{
     cancel_driver_job_by_task, cancel_driver_job_for_observed_session,
