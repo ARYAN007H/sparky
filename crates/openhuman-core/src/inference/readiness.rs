@@ -32,8 +32,7 @@ pub struct ReadinessEvaluation {
     pub failures: Vec<ReadinessFailure>,
 }
 
-static PROBE_CACHE: LazyLock<Mutex<Cache>> =
-    LazyLock::new(|| Mutex::new(HashMap::new()));
+static PROBE_CACHE: LazyLock<Mutex<Cache>> = LazyLock::new(|| Mutex::new(HashMap::new()));
 
 fn invalidate_cache_if_signed_out() {
     if crate::platform::llm_gate::is_signed_out() {
@@ -45,11 +44,7 @@ fn invalidate_cache_if_signed_out() {
 }
 
 /// Probe one role, caching both definitive success and failure for one minute.
-pub async fn cached_probe(
-    ctx: &DispatchCtx,
-    role: &str,
-    config: &Config,
-) -> Result<(), String> {
+pub async fn cached_probe(ctx: &DispatchCtx, role: &str, config: &Config) -> Result<(), String> {
     invalidate_cache_if_signed_out();
     let key = (role.to_string(), config.config_path.clone());
     if let Some((checked_at, result)) = PROBE_CACHE
@@ -134,7 +129,9 @@ pub async fn evaluate(
             status: "signed_out",
             failures: vec![ReadinessFailure {
                 role: nodes[0].1,
-                message: format!("Inference unavailable: {error} Sign in to OpenHuman to run agent nodes."),
+                message: format!(
+                    "Inference unavailable: {error} Sign in to OpenHuman to run agent nodes."
+                ),
                 node_ids: vec![first_node_id.clone()],
             }],
         });
@@ -149,13 +146,23 @@ pub async fn evaluate(
         tracing::debug!(target: "inference", nodes = ?node_ids, role, "probing inference readiness");
         if let Err(message) = cached_probe(ctx, role, config).await {
             tracing::warn!(target: "inference", nodes = ?node_ids, role, "inference readiness probe rejected: {message}");
-            failures.push(ReadinessFailure { role, message, node_ids });
+            failures.push(ReadinessFailure {
+                role,
+                message,
+                node_ids,
+            });
         }
     }
     if failures.is_empty() {
-        return Some(ReadinessEvaluation { status: "ready", failures });
+        return Some(ReadinessEvaluation {
+            status: "ready",
+            failures,
+        });
     }
-    let statuses: Vec<_> = failures.iter().map(|failure| classify(&failure.message)).collect();
+    let statuses: Vec<_> = failures
+        .iter()
+        .map(|failure| classify(&failure.message))
+        .collect();
     let status = if statuses.contains(&"signed_out") {
         "signed_out"
     } else if statuses.contains(&"provider_not_configured") {

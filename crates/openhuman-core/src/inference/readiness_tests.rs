@@ -48,10 +48,15 @@ async fn cached_probe_serves_definitive_negative_results() {
     config.api_url = Some(format!("http://{addr}"));
 
     let first = cached_probe(&DispatchCtx::ambient(), "summarization", &config).await;
-    assert!(first.unwrap_err().to_ascii_lowercase().contains("api key not configured"));
+    assert!(first
+        .unwrap_err()
+        .to_ascii_lowercase()
+        .contains("api key not configured"));
     assert_eq!(hit_count.load(Ordering::SeqCst), 1);
-    assert!(cached_probe(&DispatchCtx::ambient(), "summarization", &config)
-        .await
-        .is_err());
+    assert!(
+        cached_probe(&DispatchCtx::ambient(), "summarization", &config)
+            .await
+            .is_err()
+    );
     assert_eq!(hit_count.load(Ordering::SeqCst), 1);
 }

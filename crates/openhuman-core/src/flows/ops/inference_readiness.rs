@@ -23,13 +23,14 @@ pub(super) fn agent_node_role(config: &Config, node: &tinyflows::model::Node) ->
             } else {
                 custom.as_ref().and_then(|entry| entry.model.as_deref())
             };
-            let override_model = crate::flows::tinyflows::caps::resolve_node_model(
-                &node.config,
-                entry_model,
-            )
-            .map(|model| crate::flows::tinyflows::caps::harness_model_default_override(&model));
+            let override_model =
+                crate::flows::tinyflows::caps::resolve_node_model(&node.config, entry_model).map(
+                    |model| crate::flows::tinyflows::caps::harness_model_default_override(&model),
+                );
             return crate::agent::session_host::provider_role_for_definition(
-                override_model.as_deref().or(config.default_model.as_deref()),
+                override_model
+                    .as_deref()
+                    .or(config.default_model.as_deref()),
                 definition.as_ref(),
             );
         }
@@ -46,7 +47,9 @@ pub(super) fn agent_node_role(config: &Config, node: &tinyflows::model::Node) ->
     "summarization"
 }
 
-fn format_evaluation(evaluation: crate::inference::readiness::ReadinessEvaluation) -> Option<String> {
+fn format_evaluation(
+    evaluation: crate::inference::readiness::ReadinessEvaluation,
+) -> Option<String> {
     if evaluation.status == "ready" {
         return None;
     }
@@ -60,7 +63,10 @@ fn format_evaluation(evaluation: crate::inference::readiness::ReadinessEvaluatio
                     failure.message
                 )
             } else {
-                format!("This flow's agent step needs a working AI provider: {}", failure.message)
+                format!(
+                    "This flow's agent step needs a working AI provider: {}",
+                    failure.message
+                )
             });
         }
     }
@@ -75,7 +81,10 @@ fn format_evaluation(evaluation: crate::inference::readiness::ReadinessEvaluatio
                 .collect::<Vec<_>>()
                 .join(", ");
             if evaluation.status == "provider_not_configured"
-                && failure.message.to_ascii_lowercase().contains("api key not configured")
+                && failure
+                    .message
+                    .to_ascii_lowercase()
+                    .contains("api key not configured")
             {
                 format!(
                     "Node(s) {nodes} (role `{}`): the provider returned: '{}'. Configure \
@@ -83,7 +92,10 @@ fn format_evaluation(evaluation: crate::inference::readiness::ReadinessEvaluatio
                     failure.role, failure.message
                 )
             } else {
-                format!("Node(s) {nodes} (role `{}`): {}", failure.role, failure.message)
+                format!(
+                    "Node(s) {nodes} (role `{}`): {}",
+                    failure.role, failure.message
+                )
             }
         })
         .collect::<Vec<_>>()
@@ -122,7 +134,10 @@ pub(crate) async fn validate_inference_readiness(
         return Vec::new();
     };
     if evaluation.failures.len() == 1 && evaluation.failures[0].node_ids.len() == 1 {
-        vec![format!("Node '{}': {message}", evaluation.failures[0].node_ids[0])]
+        vec![format!(
+            "Node '{}': {message}",
+            evaluation.failures[0].node_ids[0]
+        )]
     } else {
         vec![message]
     }
