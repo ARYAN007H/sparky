@@ -6,8 +6,7 @@ use serde_json::json;
 use {
     crate::cron, crate::cron::add_shell_job, crate::cron::update_job,
     tinyflows_bus::schedule::types::CronJob, tinyflows_bus::schedule::types::CronJobPatch,
-    tinyflows_bus::schedule::types::CronRun, tinyflows_bus::schedule::types::DeliveryStatus,
-    tinyflows_bus::schedule::types::Schedule,
+    tinyflows_bus::schedule::types::CronRun, tinyflows_bus::schedule::types::Schedule,
 };
 
 /// Loads `job_id` for a run, failing closed. The job document carries the
