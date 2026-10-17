@@ -110,7 +110,7 @@ impl OpenHumanSessionHost {
                 BUS.publish(DomainEvent::AgentTurnCompleted {
                     session_id: self.event_session_id().to_string(),
                     text_chars: response.chars().count(),
-                    iterations: self.last_turn_iterations(),
+                    iterations: self.last_turn_iterations() as usize,
                 });
                 drop(busy);
                 Ok(response)
