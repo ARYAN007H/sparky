@@ -32,6 +32,15 @@ pub(crate) const MODULE_ID: &str = "tinyflows";
 /// name serves them all, and the object path names the scope.
 pub(crate) const HOST_BUS_NAME: &str = "ai.tinyhumans.openhuman.CronHost";
 
+/// Owns the interfaces served at one module-bus object path.
+pub(crate) struct ServedObjectRegistration(String);
+
+impl Drop for ServedObjectRegistration {
+    fn drop(&mut self) {
+        unserve(std::mem::take(&mut self.0));
+    }
+}
+
 /// The switched-off message callers surface verbatim.
 pub(crate) fn disabled_message() -> String {
     format!(
@@ -220,21 +229,10 @@ mod imp {
                     let _ = connection.unserve(&object_path).await;
                     return Err(error.to_string());
                 }
-                Ok(ServedObjectRegistration { path })
+                Ok(ServedObjectRegistration(path))
             })
             .await
             .map_err(|error| format!("serving the host object did not finish: {error}"))?
-    }
-
-    /// Owns the registration of interfaces served at one path.
-    pub(crate) struct ServedObjectRegistration {
-        path: String,
-    }
-
-    impl Drop for ServedObjectRegistration {
-        fn drop(&mut self) {
-            unserve(std::mem::take(&mut self.path));
-        }
     }
 
     /// Stop serving `path`. Fire and forget: a call already admitted finishes.
