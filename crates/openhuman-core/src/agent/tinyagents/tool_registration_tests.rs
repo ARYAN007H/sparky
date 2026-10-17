@@ -284,7 +284,13 @@ async fn live_close_alias_enforces_parent_thread_ownership() {
     )
     .await
     .expect("foreign close dispatch");
-    assert!(foreign.results[0].is_error);
+    assert!(
+        foreign.results[0]
+            .text()
+            .contains("not found for this parent thread"),
+        "foreign live close should fail closed: {}",
+        foreign.results[0].text()
+    );
     assert!(sessions.load().unwrap().iter().any(|row| {
         row.subagent_session_id == "foreign-session" && row.status == DurableSubagentStatus::Idle
     }));
@@ -304,7 +310,11 @@ async fn live_close_alias_enforces_parent_thread_ownership() {
     )
     .await
     .expect("owned close dispatch");
-    assert!(!owned.results[0].is_error, "{}", owned.results[0].output());
+    assert!(
+        owned.results[0].text().contains("closed"),
+        "owned live close should report closure: {}",
+        owned.results[0].text()
+    );
     assert!(sessions.load().unwrap().iter().any(|row| {
         row.subagent_session_id == "owned-session" && row.status == DurableSubagentStatus::Closed
     }));
