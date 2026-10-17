@@ -261,7 +261,41 @@ async fn flows_build_copilot_toolset_unhides_the_live_run_tools() {
     .expect("build workflow_builder agent");
     agent.set_agent_definition_name("workflow_builder".to_string());
 
+    #[derive(Clone, Default)]
+    struct Capture(std::sync::Arc<std::sync::Mutex<Vec<u8>>>);
+
+    impl std::io::Write for Capture {
+        fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+            self.0.lock().unwrap().extend_from_slice(bytes);
+            Ok(bytes.len())
+        }
+
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+
+    impl<'a> tracing_subscriber::fmt::MakeWriter<'a> for Capture {
+        type Writer = Self;
+
+        fn make_writer(&'a self) -> Self::Writer {
+            self.clone()
+        }
+    }
+
+    let capture = Capture::default();
+    let subscriber = tracing_subscriber::fmt()
+        .with_writer(capture.clone())
+        .with_ansi(false)
+        .finish();
+    let _subscriber_guard = tracing::subscriber::set_default(subscriber);
+
     restrict_builder_toolset_for_copilot(&mut agent);
+
+    let log = String::from_utf8(capture.0.lock().unwrap().clone()).unwrap();
+    assert!(log.contains("cancel_flow_run"), "trace should name the hidden tool: {log}");
+    assert!(log.contains("only the unrelated legacy"), "trace should explain the restriction: {log}");
+    assert!(!log.contains("stay visible"), "trace contradicts the actual hidden toolset: {log}");
 
     let visible = agent.visible_tool_names_for_test();
     for still_reachable in ["run_flow", "resume_flow_run"] {
