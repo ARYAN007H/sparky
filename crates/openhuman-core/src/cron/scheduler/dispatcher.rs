@@ -21,6 +21,71 @@ pub async fn execute_job_now(
     }
 }
 
+/// Admit and optionally wait for a manual run through the module's durable
+/// occurrence path. Detached runs keep their callback object served until the
+/// module sends the terminal projection.
+pub(crate) async fn run_job_now(
+    ctx: &crate::core::runtime::DispatchCtx,
+    config: &Config,
+    job: CronJob,
+    run_id: String,
+    wait: bool,
+    delivery: ManualDelivery,
+) -> Result<RunJobReply> {
+    let security = Arc::new(SecurityPolicy::from_config(
+        &config.autonomy,
+        &config.workspace_dir,
+        &config.action_dir,
+    ));
+    let binding = Binding::new(ctx, config, security);
+    let host = bus_host::register(binding.clone()).await.map_err(|e| anyhow!(e))?;
+    let scope = binding
+        .within(async { DocScope::current(config) })
+        .await?;
+    let storage = StoreConfig {
+        backend: StoreBackend::Documents {
+            callback: crate::cron::documents_port::address(&scope).await?,
+        },
+        max_run_history: config.cron.max_run_history,
+        max_tasks: config.scheduler.max_tasks,
+    };
+    let request = RunJobNow {
+        scope: CLAIM_SCOPE.to_string(),
+        callback: host.address(),
+        config: scheduler_config(config),
+        storage,
+        job,
+        run_id: run_id.clone(),
+        delivery,
+        wait,
+    };
+    if !wait {
+        bus_host::retain_manual_host(&run_id, host);
+    }
+    let reply = async {
+        let proxy = module::run_proxy(config).await.map_err(|e| anyhow!(e))?;
+        proxy
+            .call(members::RUN_JOB_NOW, (request,))
+            .await
+            .map_err(|error| anyhow!(error.wire_message()))
+    }
+    .await;
+    match reply {
+        Ok(reply) => {
+            if !wait && !matches!(reply, RunJobReply::Accepted { .. }) {
+                bus_host::release_manual_host(&run_id);
+            }
+            Ok(reply)
+        }
+        Err(error) => {
+            if !wait {
+                bus_host::release_manual_host(&run_id);
+            }
+            Err(error)
+        }
+    }
+}
+
 async fn execute_via_bus(
     ctx: &crate::core::runtime::DispatchCtx,
     config: &Config,
@@ -184,7 +249,7 @@ impl JobDispatcher {
             max_tasks: config.scheduler.max_tasks,
         };
         let request = StartScheduler {
-            scope: CLAIM_SCOPE.to_string(),
+            scope: scope.scheduler_scope(),
             callback: host.address(),
             config: scheduler_config(config),
             manual_ticks: true,
