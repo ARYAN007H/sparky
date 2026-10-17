@@ -431,10 +431,23 @@ test("private gates-off, storage, and Tauri execute equivalent coverage suites w
   assert.equal(checks["tauri-coverage"].env.CARGO_BUILD_TARGET_DIR, "target/ci-private-coverage");
 });
 
-test("private runner serializes lanes even when parallelism is requested", () => {
-  const plan = { ...stubPlan(), profile: "ex63" };
-  assert.equal(new Runner(plan, { out: "unused", maxParallel: 8 }).maxParallel, 1);
-  assert.equal(new Runner({ ...plan, profile: "hosted" }, { out: "unused", maxParallel: 8 }).maxParallel, 8);
+test("private runner serializes independent lanes after failures even when parallelism is requested", async () => {
+  const out = fs.mkdtempSync(path.join(os.tmpdir(), "lanes-private-"));
+  fs.mkdirSync(path.join(out, "logs"));
+  const check = (name, run) => ({ name, run, when: true, needs: [] });
+  const plan = { profile: "ex63", lanes: [
+    { name: "first", checks: [check("fails", "exit 1"), check("continues", "echo continued")] },
+    { name: "second", checks: [check("independent", "echo independent")] },
+  ] };
+  const runner = new Runner(plan, { out, maxParallel: 8 });
+  assert.equal(runner.maxParallel, 1);
+  const lanes = await runner.run();
+  assert.equal(lanes[0].checks[0].status, "failure");
+  assert.equal(lanes[0].checks[1].status, "success");
+  assert.equal(lanes[1].checks[0].status, "success");
+  assert.ok(Date.parse(lanes[1].checks[0].start) >= Date.parse(lanes[0].checks[1].end));
+  assert.equal(new Runner({ ...plan, profile: "hosted" }, { out, maxParallel: 8 }).maxParallel, 8);
+  fs.rmSync(out, { recursive: true, force: true });
 });
 
 test("area flags are read strictly from CI_AREA_*", () => {

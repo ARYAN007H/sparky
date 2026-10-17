@@ -512,14 +512,13 @@ export function buildPlan({ profile, areas, env = {}, isPullRequest = true }) {
           run: "cargo clippy --manifest-path crates/openhuman-app/Cargo.toml -- -D warnings",
         },
         {
-          // llvm-cov's RUSTFLAGS mode with the linker flag cleared, as in
-          // ci-lite. ci-lite also clears RUSTC_WRAPPER because its container
-          // config installs sccache; on ex63 covEnv sets no compiler wrapper.
+          // Hosted keeps ci-lite's wrapper-free RUSTFLAGS instrumentation.
+          // The private plan below uses the Cargo target linker and nextest.
           name: "tauri-coverage",
           when: areas.rustTauri,
           env: { ...covEnv },
           run:
-            (ex63 ? "unset RUSTFLAGS" : "unset RUSTFLAGS RUSTC_WRAPPER") +
+            "unset RUSTFLAGS RUSTC_WRAPPER" +
             " && cargo llvm-cov clean --manifest-path crates/openhuman-app/Cargo.toml" +
             " && cargo llvm-cov --no-rustc-wrapper --manifest-path crates/openhuman-app/Cargo.toml" +
             " --lcov --output-path ci-out/lcov/lcov-tauri.info",
@@ -584,6 +583,10 @@ export function buildPlan({ profile, areas, env = {}, isPullRequest = true }) {
     },
   ];
 
+  // Coverage replaces each existing plain suite only for the private profile.
+  // Preserve the original package, features, target list, and libtest substring
+  // filters; union those filters in nextest's expression syntax. --no-clean
+  // retains prior instrumentation, while every suite writes its own report.
   if (ex63) {
     for (const lane of lanes) {
       if (!["rust-gates-off", "storage-drivers"].includes(lane.name)) continue;
@@ -685,7 +688,7 @@ export function validatePlan(plan) {
  * @typedef {object} Lane
  * @property {string} name
  * @property {Check[]} checks
- * @property {string|null} [targetDir]  CARGO_TARGET_DIR for this lane
+ * @property {string|null} [targetDir]  Cargo build.target-dir for this lane
  * @property {object} [env]
  * @property {number} [nice]
  * @property {number} [heavy]  compiles the core crate; priority for a
