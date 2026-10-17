@@ -346,16 +346,8 @@ impl SpawnAsyncSubagentTool {
                 .await;
         }
 
-        // Steering + status channels so the parent can `steer_subagent` this run
-        // mid-flight and `wait_subagent` for its result: the engine drains `steer_queue`
-        // at iteration boundaries; `status_tx` publishes the terminal state.
-        let steer_queue = Arc::new(RunQueue::new());
-        let task_queue = steer_queue.clone();
-        let (status_tx, status_rx) = running_subagents::status_channel();
-
         let background_workspace_dir = parent.workspace_dir.clone();
         let background_dispatch = dispatch.clone();
-        let background_definition = definition.clone();
         let background_agent_id = definition.id.clone();
         let background_task_id = task_id.clone();
         let background_parent_session = parent_session.clone();
@@ -369,64 +361,31 @@ impl SpawnAsyncSubagentTool {
         let background_worker_thread_id = worker_thread_id.clone();
         let background_store = store.clone();
         let background_subagent_session_id = durable_session.subagent_session_id.clone();
-        let background_workspace_descriptor = workspace_descriptor.clone();
-        let background_worktree_action_dir = background_workspace_descriptor
-            .as_ref()
-            .map(|descriptor| descriptor.root.clone());
         let background_thread_id = background_worker_thread_id
             .clone()
             .unwrap_or_else(|| background_subagent_session_id.clone());
-        let background_initial_history = initial_history;
-        // Capture the parent chat thread NOW (the spawning turn's thread) so the
-        // finished result can be delivered back into it as a system turn.
         let background_parent_thread_id = parent_thread_id.clone();
-        // Kept on this side (the closure moves its own clone) so the registry
-        // entry knows which parent thread owns this sub-agent — that's how
-        // `cancel_for_thread` aborts it when the thread is deleted.
-        let register_parent_thread_id = background_parent_thread_id.clone();
-        // Lifecycle-critical wiring: log the parent-thread binding so the
-        // thread-close cancellation path (`cancel_for_thread`) is grep-friendly.
         log::debug!(
             "[spawn_async_subagent] register task_id={} parent_session={} parent_thread_id={}",
             task_id,
             parent_session,
-            register_parent_thread_id.as_deref().unwrap_or("none")
+            background_parent_thread_id.as_deref().unwrap_or("none")
         );
-        let background_prompt = add_background_contract(&prompt);
-        // The detached child's carrier keeps authority, origin, thread and workspace but drops the
-        // turn's accounting, dispatch refusal and cancellation; origin/workspace propagation below
-        // bridges until B2h. Spawned scoped, so the child keeps the caller's `CoreContext` (in SaaS
-        // the user's profile): its completion lands in that profile's tables and notes the owner
-        // the off-task delivery subscriber resolves.
-        let detached_run_context = detached_parent.data.child();
-        let mut abort_report = AbortReport::arm(progress_sink.clone(), &definition.id, &task_id);
-        let join = dispatch.spawn(crate::security::turn_origin::propagate(
-            async move {
-                let options = SubagentRunOptions {
-                    skill_filter_override: None,
-                    context,
-                    model_override,
-                    task_id: Some(background_task_id.clone()),
-                    thread_id: Some(background_thread_id),
-                    run_context: detached_run_context,
-                    worker_thread_id: background_worker_thread_id.clone(),
-                    initial_history: background_initial_history,
-                    checkpoint_dir: None,
-                    worktree_action_dir: background_worktree_action_dir,
-                    workspace_descriptor: background_workspace_descriptor,
-                    run_queue: Some(task_queue),
-                    message_run_queue: None,
-                };
-
-                let result = crate::agent::subagent_host::run_async_spawn_via_driver_tool(
-                    &detached_parent,
-                    background_definition,
-                    background_prompt,
-                    options,
-                )
-                .await
-                .map(|(outcome, _job_id)| outcome);
-                match result {
+        let completion_core = dispatch.clone().into_core();
+        let completion_origin = detached_parent.data.origin.clone();
+        let completion = move |_target: String, result: Result<SubagentRunOutcome, String>| {
+            let core = completion_core.clone();
+            let origin = completion_origin.clone();
+            let progress_sink = progress_sink.clone();
+            Box::pin(async move {
+                let finish = async move {
+                    let mut abort_report = AbortReport::arm(
+                        progress_sink,
+                        &background_agent_id,
+                        &background_task_id,
+                    );
+                    let result = result.map_err(anyhow::Error::msg);
+                    match result {
                     Ok(outcome) => {
                         let emit_lifecycle_effects = outcome.should_emit_lifecycle_effects();
                         match outcome.status {
@@ -470,10 +429,6 @@ impl SpawnAsyncSubagentTool {
                                     )
                                     .await;
                                 // Status is published only after the completion is recorded (a racing cancel relies on it).
-                                let _ = status_tx.send(DetachedSubagentStatus::Completed {
-                                    output: outcome.output.clone(),
-                                    iterations: outcome.iterations,
-                                });
                                 if emit_lifecycle_effects {
                                     crate::agent::orchestration::subagent_events::publish_subagent_completed(
                             background_parent_session,
@@ -544,10 +499,6 @@ impl SpawnAsyncSubagentTool {
                                 completion_target
                                     .completed(&outcome.task_id, &outcome.agent_id, framed)
                                     .await;
-                                let _ = status_tx.send(DetachedSubagentStatus::Completed {
-                                    output: status_output,
-                                    iterations: outcome.iterations,
-                                });
                                 if emit_lifecycle_effects {
                                     crate::agent::orchestration::subagent_events::publish_subagent_completed(
                             background_parent_session,
@@ -598,9 +549,6 @@ impl SpawnAsyncSubagentTool {
                                 completion_target
                                     .failed(&outcome.task_id, &outcome.agent_id, &error)
                                     .await;
-                                let _ = status_tx.send(DetachedSubagentStatus::Failed {
-                                    error: error.clone(),
-                                });
                                 if emit_lifecycle_effects {
                                     crate::agent::orchestration::subagent_events::publish_subagent_failed(
                                         background_parent_session,
@@ -648,9 +596,6 @@ impl SpawnAsyncSubagentTool {
                                         checkpoint.is_some(),
                                     )
                                     .await;
-                                let _ = status_tx.send(DetachedSubagentStatus::AwaitingUser {
-                                    question: question.clone(),
-                                });
                                 if emit_lifecycle_effects {
                                     crate::agent::orchestration::subagent_events::publish_subagent_awaiting_user(
                                         background_parent_session,
@@ -697,9 +642,6 @@ impl SpawnAsyncSubagentTool {
                         completion_target
                             .failed(&background_task_id, &background_agent_id, &error)
                             .await;
-                        let _ = status_tx.send(DetachedSubagentStatus::Failed {
-                            error: error.clone(),
-                        });
                         crate::agent::orchestration::subagent_events::publish_subagent_failed(
                             background_parent_session,
                             background_task_id.clone(),
@@ -715,32 +657,63 @@ impl SpawnAsyncSubagentTool {
                             .await;
                     }
                 }
-                abort_report.disarm();
-            },
-        ));
-
-        // Register *after* spawn so the AbortHandle is available. The task owns
-        // `status_tx`; this side holds `status_rx` for `wait_subagent`.
-        let registration = running_subagents::register(
-            &dispatch,
-            task_id.clone(),
-            definition.id.clone(),
-            parent_session.clone(),
-            parent.session_parent_prefix.clone(),
-            Some(durable_session.subagent_session_id.clone()),
-            parent.workspace_dir.clone(),
-            register_parent_thread_id,
-            steer_queue,
-            join.abort_handle(),
-            status_rx,
-        );
-        if let Err(error) = finish_spawn_registration(
-            registration,
-            &store,
-            &durable_session.subagent_session_id,
-            &task_id,
-        ) {
-            return Ok(ToolResult::error(error));
+                    abort_report.disarm();
+                };
+                match core {
+                    Some(core) => crate::core::runtime::CoreContext::scope_with_turn_origin(
+                        core,
+                        origin,
+                        Box::pin(finish),
+                    )
+                    .await,
+                    None => finish.await,
+                }
+            })
+        };
+        let background_prompt = add_background_contract(&prompt);
+        let options = SubagentRunOptions {
+            skill_filter_override: None,
+            context,
+            model_override,
+            task_id: Some(task_id.clone()),
+            thread_id: Some(background_thread_id),
+            run_context: detached_parent.data.child(),
+            worker_thread_id: background_worker_thread_id,
+            initial_history,
+            checkpoint_dir: None,
+            worktree_action_dir: workspace_descriptor
+                .as_ref()
+                .map(|descriptor| descriptor.root.clone()),
+            workspace_descriptor,
+            run_queue: None,
+            message_run_queue: None,
+        };
+        if let Err(error) = crate::agent::subagent_host::spawn_async_via_driver_tool(
+            &detached_parent,
+            definition.clone(),
+            background_prompt,
+            options,
+            completion,
+        )
+        .await
+        {
+            if let Err(store_err) = subagent_sessions::mark_failed(
+                &store,
+                &durable_session.subagent_session_id,
+                &task_id,
+                error.to_string(),
+            ) {
+                log::warn!(
+                    "[subagent_reuse] mark_failed after driver registration error subagent_session_id={} task_id={} agent_id={} error={}",
+                    durable_session.subagent_session_id,
+                    task_id,
+                    definition.id,
+                    store_err
+                );
+            }
+            return Ok(ToolResult::error(format!(
+                "spawn_async_subagent: failed to register detached sub-agent: {error}"
+            )));
         }
 
         Ok(accepted_spawn_result(
