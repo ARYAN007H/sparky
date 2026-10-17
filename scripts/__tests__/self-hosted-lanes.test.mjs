@@ -402,39 +402,40 @@ test("hosted matrix only spins up groups with active lanes", () => {
   assert.equal(pester.find((g) => g.group === "pester").container, "");
 });
 
-test("ex63 needs a scratch dir and gives every Rust lane its own target dir under it", () => {
-  assert.throws(
-    () => buildPlan({ profile: "ex63", areas: ALL, env: {} }),
-    /CI_SCRATCH_DIR/,
-  );
+test("private lanes reuse checkout targets, preserve mold through RUSTFLAGS resets, and omit wrappers", () => {
   const plan = buildPlan({ profile: "ex63", areas: ALL, env: EX63_ENV });
-  const dirs = plan.lanes.map((l) => l.targetDir).filter(Boolean);
-  assert.equal(new Set(dirs).size, dirs.length);
-  for (const d of dirs) assert.match(d, /^\/scratch\/target\//);
-  // hosted keeps cargo's default target dirs (restored by rust-cache).
-  assert.ok(
-    buildPlan({ profile: "hosted", areas: ALL }).lanes.every(
-      (l) => !l.targetDir,
-    ),
-  );
+  const rust = plan.lanes.filter((l) => l.heavy != null);
+  assert.equal(new Set(rust.filter((l) => l.name !== "rust-cov").map((l) => l.targetDir)).size, 1);
+  for (const lane of rust) {
+    assert.match(lane.targetDir, /^target\/ci-private-/);
+    assert.equal(lane.env.CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER, "/usr/local/bin/rust-mold-linker");
+    assert.equal(lane.env.RUSTC_WRAPPER, "");
+  }
+  assert.notEqual(rust.find((l) => l.name === "rust-cov").targetDir, rust.find((l) => l.name === "rust-lint").targetDir);
+  assert.ok(buildPlan({ profile: "hosted", areas: ALL }).lanes.every((l) => !l.targetDir));
 });
 
-test("instrumented coverage uses sccache on ex63 and no wrapper on hosted", () => {
-  for (const plan of plans()) {
-    const ex63 = plan.profile === "ex63";
-    const cov = plan.lanes.find((l) => l.name === "rust-cov");
-    assert.equal(cov.env.RUSTC_WRAPPER, ex63 ? "sccache" : undefined);
-    const tauriCov = plan.lanes
-      .find((l) => l.name === "tauri")
-      .checks.find((c) => c.name === "tauri-coverage");
-    assert.equal(tauriCov.env.RUSTC_WRAPPER, ex63 ? "sccache" : undefined);
-    // The linker flag always goes: llvm-cov sets RUSTFLAGS itself.
-    assert.match(
-      tauriCov.run,
-      ex63 ? /^unset RUSTFLAGS &&/ : /^unset RUSTFLAGS RUSTC_WRAPPER &&/,
-    );
-    assert.match(tauriCov.run, /--no-rustc-wrapper/);
+test("private gates-off, storage, and Tauri execute equivalent coverage suites with nextest", () => {
+  const plan = buildPlan({ profile: "ex63", areas: ALL, env: EX63_ENV });
+  for (const name of ["rust-gates-off", "storage-drivers", "tauri"]) {
+    for (const c of plan.lanes.find((l) => l.name === name).checks.filter((c) => /cargo (test|llvm-cov)/.test(c.run))) {
+      assert.match(c.run, /cargo llvm-cov nextest/);
+      assert.match(c.run, /--no-tests=fail/);
+      assert.match(c.run, /--lcov --output-path ci-out\/lcov\//);
+    }
   }
+  const checks = Object.fromEntries(plan.lanes.flatMap((l) => l.checks.map((c) => [c.name, c])));
+  assert.match(checks["gate-contract-tests-features"].run, /--features modules,mcp,e2e-test-support/);
+  assert.match(checks["gate-contract-tests-features"].run, /--test-threads=1/);
+  assert.match(checks["cron-module-tests"].run, /--test-threads=1/);
+  assert.match(checks["storage-lib-tests"].run, /not test\(cron::bus_host::tests::\)/);
+  assert.equal(checks["tauri-coverage"].env.CARGO_BUILD_TARGET_DIR, "target/ci-private-coverage");
+});
+
+test("private runner serializes lanes even when parallelism is requested", () => {
+  const plan = { ...stubPlan(), profile: "ex63" };
+  assert.equal(new Runner(plan, { out: "unused", maxParallel: 8 }).maxParallel, 1);
+  assert.equal(new Runner({ ...plan, profile: "hosted" }, { out: "unused", maxParallel: 8 }).maxParallel, 8);
 });
 
 test("sccache summary reports hit rate and the store in use", () => {
