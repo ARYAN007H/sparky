@@ -41,8 +41,7 @@ fn record_failed_if_current(
                     | WorkflowRunStatus::Failed
                     | WorkflowRunStatus::Cancelled
                     | WorkflowRunStatus::Interrupted
-            ) || run.revision != expected_revision
-            {
+            ) {
                 return;
             }
             let _ = compare_and_swap_workflow_run_lifecycle(
@@ -59,7 +58,7 @@ fn record_failed_if_current(
                     started_at: Some(run.started_at),
                     completed_at: Some(chrono::Utc::now()),
                 },
-                expected_revision,
+                run.revision,
             );
         }
     });
