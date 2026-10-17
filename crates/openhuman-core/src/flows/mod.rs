@@ -26,6 +26,7 @@
 mod agent_route;
 pub mod agents;
 pub mod builder_host;
+mod copilot_bus;
 pub(crate) mod builder_tools;
 mod builder_tools_connection_reads;
 pub mod bus;
@@ -43,7 +44,6 @@ pub mod skills;
 mod store;
 /// The tinyflows engine seam (formerly `crate::tinyflows`).
 pub mod tinyflows;
-pub mod tools;
 
 // Portable catalog vocabulary is imported directly from `tinyflows-catalog`.
 

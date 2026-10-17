@@ -68,6 +68,16 @@ pub(crate) fn tools(config: Arc<Config>, security: &Arc<SecurityPolicy>) -> Vec<
 
     for name in [
         "list_agent_definitions",
+    ] {
+        push_copilot_tool(&mut tools, copilot.as_ref(), name);
+    }
+    tools.push(Box::new(
+        crate::integrations::composio::builder_tools::ListConnectableToolkitsTool::new(
+            config.clone(),
+            Arc::new(FlowsConnectionProvider),
+        ),
+    ));
+    for name in [
         "list_node_kinds",
         "get_node_kind_contract",
         "dry_run_workflow",
