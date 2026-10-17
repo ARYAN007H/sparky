@@ -40,31 +40,26 @@ pub const BACKGROUND_INTERVAL_MINS: u64 = 5;
 /// The persisted queue as the UI reads it.
 pub type JobQueue = QueueState;
 
-/// The queue file of a workspace.
-fn path(workspace_dir: &Path) -> PathBuf {
-    workspace_dir.join("memory").join("jobs.json")
-}
+const STATE: &str = "jobs";
 
-/// A [`QueueStore`] over `<workspace>/memory/jobs.json`.
+/// A [`QueueStore`] over the workspace's `jobs` state value.
 struct FileQueueStore {
-    file: PathBuf,
+    workspace_dir: PathBuf,
 }
 
 impl QueueStore for FileQueueStore {
     fn load(&self) -> QueueState {
-        std::fs::read_to_string(&self.file)
-            .ok()
-            .and_then(|text| serde_json::from_str(&text).ok())
+        crate::memory::state_store::load(&self.workspace_dir, STATE)
+            .unwrap_or_else(|error| {
+                tracing::warn!(%error, "[memory:jobs] reading the queue failed");
+                None
+            })
             .unwrap_or_default()
     }
 
     fn save(&self, state: &QueueState) -> Result<(), String> {
-        serde_json::to_vec_pretty(state)
+        crate::memory::state_store::save(&self.workspace_dir, STATE, state)
             .map_err(|error| error.to_string())
-            .and_then(|json| {
-                crate::memory::files::write_private(&self.file, &json)
-                    .map_err(|error| error.to_string())
-            })
     }
 }
 
@@ -80,7 +75,7 @@ fn queue_of(workspace_dir: &Path) -> Arc<WorkspaceQueue> {
         .entry(workspace_dir.to_path_buf())
         .or_insert_with(|| {
             Arc::new(Queue::new(FileQueueStore {
-                file: path(workspace_dir),
+                workspace_dir: workspace_dir.to_path_buf(),
             }))
         })
         .clone()

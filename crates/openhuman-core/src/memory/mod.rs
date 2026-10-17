@@ -40,6 +40,7 @@ pub mod ops;
 pub mod schemas;
 pub mod scope;
 pub mod sources;
+pub(crate) mod state_store;
 pub mod status;
 mod tool_budget;
 pub(crate) mod tool_writes;
