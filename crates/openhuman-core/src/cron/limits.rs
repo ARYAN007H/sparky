@@ -14,6 +14,7 @@ use chrono::{Duration, Utc};
 
 use crate::config::Config;
 use crate::cron::{delivery_mode, CronJob, CronJobPatch, DeliveryConfig, JobType, Schedule};
+use crate::cron::system_jobs::TrustedSystemJobOwner;
 
 /// Whether `config` restricts cron to agent jobs.
 pub fn enforced(config: &Config) -> bool {
@@ -59,6 +60,25 @@ fn install_capacity_limit(config: &Config) -> Result<()> {
         tinyflows_bus::schedule::StoreOperation::SetMaxActiveJobs { limit: Some(max) },
     )?;
     Ok(())
+}
+
+/// Admit a job for an owning system domain. The typed owner comes from the
+/// internal seeding call, never from a request or stored metadata.
+pub(crate) fn check_trusted_system_job(
+    config: &Config,
+    owner: TrustedSystemJobOwner,
+    name: &str,
+    schedule: &Schedule,
+) -> Result<()> {
+    if !owner.owns(name) {
+        bail!("system job name is outside its owning domain");
+    }
+    if !enforced(config) {
+        clear_capacity_limit_if_supported(config)?;
+        return Ok(());
+    }
+    check_schedule(config, schedule)?;
+    install_capacity_limit(config)
 }
 
 /// Clear a prior operator cap when enforcement is off. Backends without
@@ -127,6 +147,15 @@ pub(crate) fn check_patch(config: &Config, patch: &CronJobPatch) -> Result<()> {
 pub(crate) fn check_run(config: &Config, job: &CronJob) -> Result<()> {
     if !enforced(config) {
         return Ok(());
+    }
+    if let Some(owner) = crate::cron::system_jobs::trusted_system_job_owner(job) {
+        let name = crate::cron::system_jobs::system_job_name(job)
+            .expect("trusted system rows have a system job name");
+        if owner.owns(name) {
+            check_schedule(config, &job.schedule)?;
+            check_delivery(&job.delivery)?;
+            return Ok(());
+        }
     }
     check_type(&job.job_type)?;
     check_schedule(config, &job.schedule)?;

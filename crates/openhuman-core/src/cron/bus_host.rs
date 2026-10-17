@@ -282,11 +282,16 @@ pub(crate) async fn register(binding: Binding) -> Result<HostRegistration, Strin
 
 /// Whether a job of `job_type` may run under `binding`, and the refusal text
 /// if not.
-pub(crate) fn kind_refusal(binding: &Binding, job_type: &JobType) -> Option<String> {
-    (binding.is_agent_only() && !matches!(job_type, JobType::Agent)).then(|| {
+pub(crate) fn kind_refusal(binding: &Binding, job: &CronJob) -> Option<String> {
+    let owner_allowed =
+        crate::cron::system_jobs::trusted_system_job_owner(job).is_some();
+    (binding.is_agent_only()
+        && !matches!(job.job_type, JobType::Agent)
+        && !owner_allowed)
+        .then(|| {
         "blocked by hosting policy: only agent cron jobs run here; shell and flow jobs are disabled"
             .to_string()
-    })
+        })
 }
 
 #[cfg(test)]

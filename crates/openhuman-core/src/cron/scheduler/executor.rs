@@ -101,7 +101,7 @@ impl HostExecutor {
             self.binding.publish_triggered_once(job, run_id);
         }
         // A hosted-profile sweep runs agent jobs only.
-        if let Some(refusal) = kind_refusal(&self.binding, &job.job_type) {
+        if let Some(refusal) = kind_refusal(&self.binding, job) {
             self.halt(run_id, Halt::Refused);
             return Attempt {
                 success: false,
