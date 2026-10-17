@@ -5,6 +5,7 @@
 //! flow engine implementation.
 
 use serde_json::Value;
+use tinyagents_harness::tool::missing_required_args;
 
 use crate::config::Config;
 
@@ -178,10 +179,7 @@ pub(crate) async fn preflight_composio_args(
         tracing::info!(target: "flows", %slug, "[flows] preflight: no live catalog schema for action — required-arg check limited to static rules");
         return Ok(());
     };
-    let missing: Vec<_> = required
-        .iter()
-        .filter(|name| args.get(name.as_str()).is_none_or(Value::is_null))
-        .collect();
+    let missing = missing_required_args(&required, args);
     if missing.is_empty() {
         tracing::debug!(target: "flows", %slug, "[flows] preflight: all required args present");
         return Ok(());
@@ -192,9 +190,13 @@ pub(crate) async fn preflight_composio_args(
         .map(|name| format!("`{name}`"))
         .collect::<Vec<_>>()
         .join(", ");
-    let first = missing[0];
+    let first = &missing[0];
     Err(format!("tool_call `{slug}`: required arg(s) {list} missing or resolved to null — wire each from an upstream node's output, e.g. \"{first}\": \"=nodes.<node_id>.item.json.<field>\" (drop `.json` only if `<node_id>` is a code/transform/split_out/merge/trigger node — `agent`/`tool_call`/`http_request` nodes wrap their output in a `{{json,text,raw}}` envelope). If the value comes from an agent node, give that agent an output schema (config.output_parser.schema) so its fields are addressable."))
 }
+
+#[cfg(test)]
+#[path = "flow_gate_tests.rs"]
+mod tests;
 
 /// Converts a provider-side unsuccessful execution response into a policy error.
 pub(crate) fn reject_unsuccessful_composio_response(
