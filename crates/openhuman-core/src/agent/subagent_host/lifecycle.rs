@@ -152,6 +152,7 @@ pub(crate) async fn spawn_async_via_driver_tool(
     completion: impl Fn(
             String,
             Result<SubagentRunOutcome, String>,
+            bool,
         ) -> Pin<Box<dyn Future<Output = ()> + Send>>
         + Send
         + Sync
@@ -175,7 +176,8 @@ pub(crate) async fn spawn_async_via_driver_tool(
 }
 
 type HostCompletion = Arc<
-    dyn Fn(String, Result<SubagentRunOutcome, String>) -> Pin<Box<dyn Future<Output = ()> + Send>>
+    dyn Fn(String, Result<SubagentRunOutcome, String>, bool)
+            -> Pin<Box<dyn Future<Output = ()> + Send>>
         + Send
         + Sync,
 >;
@@ -267,7 +269,7 @@ async fn invoke_async_spawn_driver_tool(
         let callback_task_key = SubagentTaskKey::from_context(parent, task_id.clone(), None);
         let host_outcome = Arc::clone(&bundle.host_outcome);
         let failures = Arc::clone(&bundle.failures);
-        dispatcher = dispatcher.with_async_completion_handler(move |target, result| {
+        dispatcher = dispatcher.with_async_completion_handler(move |target, result, emit_effects| {
             let completion = Arc::clone(&completion);
             let host_outcome = Arc::clone(&host_outcome);
             let failures = Arc::clone(&failures);
@@ -288,7 +290,7 @@ async fn invoke_async_spawn_driver_tool(
                         Err(host_error.unwrap_or(error))
                     }
                 };
-                completion(target, projected).await;
+                completion(target, projected, emit_effects).await;
             })
         });
     }
@@ -800,7 +802,9 @@ impl SubagentExecutor<crate::agent::tinyagents::host::OpenHumanRunContext> for O
         options.run_context = execution.prepared.run_context.data.clone();
         options.run_context.cancellation = execution.cancellation.clone();
         options.message_run_queue = execution.prepared.run_context.run_queue.clone();
-        match Box::pin(super::ops::run_subagent_direct(
+        let dispatch = options.run_context.dispatch_ctx();
+        let origin = options.run_context.origin.clone();
+        let run = Box::pin(super::ops::run_subagent_direct(
             &definition,
             &execution
                 .prepared
@@ -809,9 +813,14 @@ impl SubagentExecutor<crate::agent::tinyagents::host::OpenHumanRunContext> for O
                 .map(Message::text)
                 .unwrap_or_default(),
             options.clone(),
-        ))
-        .await
-        {
+        ));
+        let result = match dispatch.into_core() {
+            Some(core) => {
+                crate::core::runtime::CoreContext::scope_with_turn_origin(core, origin, run).await
+            }
+            None => run.await,
+        };
+        match result {
             Ok(outcome) => {
                 self.host_outcome
                     .lock()
