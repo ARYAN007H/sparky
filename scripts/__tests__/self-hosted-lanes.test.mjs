@@ -452,6 +452,7 @@ test("private auxiliary coverage reports after failed tests and preserves the fa
     },
   });
   assert.equal(result.status, 17);
+  assert.equal(fs.readFileSync(path.join(dir, "expected-targets"), "utf8").trim().split("\n").length, 10);
   const commands = fs.readFileSync(calls, "utf8").trim().split("\n");
   assert.equal(commands.length, 3);
   assert.match(commands[0], /^metadata /);
