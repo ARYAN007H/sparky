@@ -373,6 +373,7 @@ include!("spawn_async_subagent_args.rs");
 include!("spawn_async_subagent_results.rs");
 
 /// Settle a late registration refusal before an accepted response is built.
+#[cfg(test)]
 fn finish_spawn_registration(
     registration: Result<(), running_subagents::RegistrationError>,
     store: &SubagentSessionStore,
