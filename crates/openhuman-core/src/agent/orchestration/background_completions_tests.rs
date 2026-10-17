@@ -1,5 +1,6 @@
 use super::*;
 use crate::core::runtime::DispatchCtx;
+use std::sync::atomic::{AtomicBool, Ordering};
 use tinyagents_tasks::CompletionStatus;
 use tokio::sync::MutexGuard;
 
@@ -625,6 +626,31 @@ impl CompletionStore for FullDisk {
     }
 }
 
+#[derive(Default)]
+struct ToggleStore {
+    inner: InMemoryCompletionStore,
+    fail_writes: AtomicBool,
+}
+
+impl CompletionStore for ToggleStore {
+    fn get(&self, task_id: &str) -> Option<CompletionRecord> {
+        self.inner.get(task_id)
+    }
+
+    fn put(&self, record: &CompletionRecord) -> tinyagents_harness::error::Result<()> {
+        if self.fail_writes.load(Ordering::SeqCst) {
+            return Err(tinyagents_harness::error::TinyAgentsError::Graph(
+                "disk full".into(),
+            ));
+        }
+        self.inner.put(record)
+    }
+
+    fn list(&self, parent_key: Option<&str>) -> Vec<CompletionRecord> {
+        self.inner.list(parent_key)
+    }
+}
+
 #[tokio::test]
 async fn a_store_that_keeps_failing_degrades_to_memory_instead_of_losing_the_result() {
     let _guard = crate::config::TEST_ENV_LOCK.lock().await;
@@ -708,6 +734,8 @@ async fn degrading_a_leased_completion_keeps_its_lease() {
     let ws = workspace();
     let w = ws.path();
     let ctx = crate::core::runtime::DispatchCtx::ambient();
+    let store = Arc::new(ToggleStore::default());
+    install_store_for_test(w, store.clone());
     let router = router_for_workspace(w);
     router
         .record(CompletionRecord::new(
@@ -720,15 +748,24 @@ async fn degrading_a_leased_completion_keeps_its_lease() {
         .await
         .expect("record completion");
     assert_eq!(router.claim_pending("leased-thread", 1).unwrap().len(), 1);
+    store.fail_writes.store(true, Ordering::SeqCst);
 
-    let fallback = degrade_to_memory(&ctx, w, &router);
+    record_completion(
+        &ctx,
+        w,
+        "leased-session",
+        "trigger-task",
+        "researcher",
+        "force fallback",
+        Some("leased-thread".into()),
+    )
+    .await;
 
+    let claims = router_for_workspace(w)
+        .claim_pending("leased-thread", 10)
+        .unwrap();
     assert!(
-        fallback
-            .router
-            .claim_pending("leased-thread", 1)
-            .unwrap()
-            .is_empty(),
+        claims.iter().all(|record| record.task_id != "leased-task"),
         "a fallback router must not make another delivery claim while the first lease is active"
     );
 }
