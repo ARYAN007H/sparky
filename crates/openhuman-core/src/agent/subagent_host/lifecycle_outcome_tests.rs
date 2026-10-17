@@ -90,5 +90,8 @@ fn host_outcome_terminal_record_round_trips_through_json_bytes() {
     assert_eq!(decoded.task_id, "task-123");
     assert_eq!(decoded.worker_thread_id.as_deref(), Some("worker-thread"));
     assert_eq!(decoded.model_override.as_deref(), Some("worker-model"));
-    assert_eq!(decoded.tier.as_deref(), Some("orchestrator"));
+    assert_eq!(
+        decoded.tier.as_deref(),
+        Some(definition.agent_tier.as_str())
+    );
 }
