@@ -10,7 +10,8 @@ use crate::config::Config;
 use crate::memory::error::{MemoryError, MemoryResult};
 use crate::memory::scope::{self, MemoryIdentity};
 
-use super::jobs::{self, JobQueue, JobRun, Selection};
+use super::jobs::{self};
+use tinymemory_tools::queue::{JobRun, QueueState, Selection};
 
 /// `memory_policy_get` / `_set` result.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -277,7 +278,7 @@ pub async fn agents_list(config: &Config, identity: &MemoryIdentity) -> MemoryRe
 }
 
 /// `memory_jobs_list` result.
-pub type JobsView = JobQueue;
+pub type JobsView = QueueState;
 
 /// `memory_jobs_list`.
 pub async fn jobs_list(config: &Config) -> JobsView {

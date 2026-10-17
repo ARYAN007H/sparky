@@ -25,7 +25,7 @@ use tinymemory_api::Namespace;
 use tinymemory_tools::queue::{JobQueue as Queue, QueueError, QueueState, QueueStore};
 use tinymemory_tools::BackgroundJob;
 
-pub use tinymemory_tools::queue::{JobRun, QueuedJob, Selection, MAX_ATTEMPTS, MAX_HISTORY};
+use tinymemory_tools::queue::{JobRun, QueuedJob, Selection, MAX_ATTEMPTS, MAX_HISTORY};
 
 use crate::config::Config;
 use crate::memory::engine;
@@ -36,9 +36,6 @@ pub const BACKGROUND_JOB: &str = "memory_background";
 
 /// Minutes between queue runs.
 pub const BACKGROUND_INTERVAL_MINS: u64 = 5;
-
-/// The persisted queue as the UI reads it.
-pub type JobQueue = QueueState;
 
 /// The queue file of a workspace.
 fn path(workspace_dir: &Path) -> PathBuf {
@@ -108,7 +105,7 @@ pub fn has_pending(workspace_dir: &Path) -> bool {
 }
 
 /// The queue as it stands.
-pub async fn snapshot(config: &Config) -> JobQueue {
+pub async fn snapshot(config: &Config) -> QueueState {
     queue_of(&config.workspace_dir).snapshot().await
 }
 

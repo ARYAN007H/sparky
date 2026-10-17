@@ -8,10 +8,6 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-pub use tinymemory_api::{
-    Citation, EngineDescriptor, FetchMode, Hit, ItemKind, LearningKind, MemoryMeta, MetaFilter,
-};
-
 use crate::config::schema::MemorySourceKind;
 
 /// Default `limit` of recall, fetch and list.
@@ -383,8 +379,6 @@ pub struct ImportStartParams {
 
 /// Where an import stands, and its progress (`memory_import_*` state): the
 /// module's own types, so the persisted file and the wire share one shape.
-pub use tinymemory_integrations::import::{ImportPhase, ImportState};
-
 /// `memory_import_start` / `_status` result.
 #[derive(Debug, Clone, Serialize)]
 pub struct ImportStateView {

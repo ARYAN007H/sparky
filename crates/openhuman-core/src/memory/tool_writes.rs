@@ -580,9 +580,10 @@ impl WriteExecutor for Executor<'_> {
             match operation {
                 WriteOperation::Learn { item } => {
                     let bound = super::engine::resolve(config).engine()?;
-                    let receipt =
-                        super::ops::store_on_with(&bound, item.clone(), WriteOptions::accepted())
-                            .await?;
+                    let receipt = bound
+                        .engine
+                        .store_with(item.clone(), WriteOptions::accepted())
+                        .await?;
                     let category = match item {
                         StoreItem::Learning { kind, .. } => kind.as_str(),
                         _ => "learning",
