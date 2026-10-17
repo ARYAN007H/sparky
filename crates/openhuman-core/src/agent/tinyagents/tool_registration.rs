@@ -15,7 +15,8 @@ use tinyagents_registry::{CapabilityRegistry, ComponentKind, RegistryDiagnostic}
 use tinyagents_runtime::turn_driver::{SharedToolSet, ToolSetBuilder};
 use tinyagents_runtime::{ToolAdmission, project_descriptors};
 use tinyinference_llm::model::ChatModel;
-use tinytools::ToolRunContext;
+use tinytools::{Tool, ToolCallOptions, ToolResult, ToolRunContext};
+use async_trait::async_trait;
 
 use crate::agent::orchestration::tools::{
     CloseSubagentDispatch, ContinueSubagentDispatch, DelegateGraphDispatch, DelegationDispatch,
@@ -32,6 +33,40 @@ use crate::tools::delegate::DelegateToolDispatch;
 use crate::tools::implementations::threads::SpawnWorkerThreadDispatch;
 
 type RegisteredToolDispatch = Arc<dyn ToolDispatch<(), OpenHumanRunContext>>;
+
+/// Keeps tools that need the live turn's execution context on their original
+/// run instead of treating them as sub-agent work. In particular, the memory
+/// tool's request budget is keyed to the parent run id.
+struct LiveToolContextDispatch {
+    tool: Arc<dyn Tool>,
+}
+
+impl LiveToolContextDispatch {
+    fn new(tool: Arc<dyn Tool>) -> Self {
+        Self { tool }
+    }
+}
+
+#[async_trait]
+impl ToolDispatch<(), OpenHumanRunContext> for LiveToolContextDispatch {
+    fn tool(&self) -> Arc<dyn Tool> {
+        self.tool.clone()
+    }
+
+    async fn execute(
+        &self,
+        _state: &(),
+        call_id: tinyagents_harness::CallId,
+        arguments: serde_json::Value,
+        options: ToolCallOptions,
+        parent: &tinyagents_harness::context::RunContext<OpenHumanRunContext>,
+    ) -> anyhow::Result<ToolResult> {
+        let context = ToolExecutionContext::from_run_context(parent, call_id);
+        self.tool
+            .execute_with_context(arguments, options, Some(&context))
+            .await
+    }
+}
 
 /// Collision-free stable scope for controls over a host-owned parent session
 /// and optional chat thread. JSON tuple encoding distinguishes absent thread
@@ -79,7 +114,8 @@ pub(crate) fn typed_dispatch_for(
         "close_subagent" => Arc::new(CloseSubagentDispatch::new(adapter)),
         "list_subagents" => Arc::new(ListSubagentsDispatch::new(adapter)),
         "delegate_graph" => Arc::new(DelegateGraphDispatch::new(adapter)),
-        "delegate" | "memory" => Arc::new(DelegateToolDispatch::new(adapter)),
+        "delegate" => Arc::new(DelegateToolDispatch::new(adapter)),
+        "memory" => Arc::new(LiveToolContextDispatch::new(adapter)),
         "todo" => Arc::new(TodoToolDispatch::new(adapter)),
         _ => {
             return DelegationDispatch::for_tool(adapter).map(|dispatch| {

@@ -224,7 +224,9 @@ impl DelegateGraphTool {
         // catalogue (or none at all) when callers execute the typed tool with
         // an explicit parent carrier. Keep the process registry as the legacy
         // fallback for contexts that do not carry an agent-local catalogue.
-        let registry = match AgentDefinitionRegistry::current() {
+        let registry = match AgentDefinitionRegistry::for_core_context(
+            run_context.dispatch_ctx().into_core(),
+        ) {
             Some(reg) => reg,
             None => {
                 return Ok(ToolResult::error(
