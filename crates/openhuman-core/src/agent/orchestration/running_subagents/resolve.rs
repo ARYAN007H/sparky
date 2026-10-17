@@ -97,8 +97,6 @@ fn scoped_task_store(
     ctx: &crate::core::runtime::DispatchCtx,
     workspace_dir: &Path,
 ) -> Result<std::sync::Arc<dyn tinyagents_tasks::TaskStore>, WaitError> {
-    let context = ctx.resolved().ok_or(WaitError::NotOwned)?;
-    Ok(crate::core::runtime::CoreContext::sync_scope(context, || {
-        task_store_for_workspace(workspace_dir)
-    }))
+    let _ = ctx;
+    Ok(task_store_for_workspace(workspace_dir))
 }
