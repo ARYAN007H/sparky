@@ -34,7 +34,9 @@ pub(crate) fn install_store_for_test(workspace_dir: &Path, store: Arc<dyn Comple
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner())
         .insert(scope, store);
-    router_pool().clear().expect("clear completion router pool");
+    router_pool()
+        .remove(&router_scope(workspace_dir))
+        .expect("remove the scoped completion router");
     let _ = entry_for(workspace_dir);
 }
 
@@ -42,14 +44,21 @@ pub(crate) fn install_store_for_test(workspace_dir: &Path, store: Arc<dyn Comple
 /// would: the router (and its open log handle) and every thread/session mapping
 /// that points at it. The on-disk log is untouched.
 pub(crate) fn forget_workspace_for_test(workspace_dir: &Path) {
-    let scope = router_scope(workspace_dir);
-    let _ = router_pool().clear();
+    let ambient_scope = router_scope(workspace_dir);
     test_store_overrides()
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner())
-        .remove(&scope);
+        .remove(&ambient_scope);
     let mut st = state();
-    st.stores.remove(&scope);
+    let scopes: Vec<_> = st
+        .stores
+        .keys()
+        .filter(|scope| scope.workspace_dir == workspace_dir)
+        .cloned()
+        .collect();
+    for scope in &scopes {
+        st.stores.remove(scope);
+    }
     let gone: Vec<String> = st
         .thread_workspaces
         .iter()
@@ -61,7 +70,13 @@ pub(crate) fn forget_workspace_for_test(workspace_dir: &Path) {
         st.stopped_threads.remove(&thread);
         st.deleted_threads.remove(&thread);
     }
-    st.recovered_workspaces.remove(&scope);
+    st.recovered_workspaces
+        .retain(|scope| scope.workspace_dir != workspace_dir);
     st.session_threads.clear();
     st.session_order.clear();
+    drop(st);
+    for scope in scopes {
+        let _ = router_pool().remove(&scope);
+    }
+    let _ = router_pool().remove(&ambient_scope);
 }
