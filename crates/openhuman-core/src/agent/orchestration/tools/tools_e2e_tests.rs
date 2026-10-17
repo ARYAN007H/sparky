@@ -525,6 +525,56 @@ async fn continue_subagent_resumes_paused_job_through_shared_driver() {
 }
 
 #[tokio::test]
+async fn delegate_graph_runs_every_stage_through_shared_driver_jobs() {
+    use super::DelegateGraphTool;
+    use tinyagents_orchestration::subagent::{SubAgentJobRegistry, SubAgentJobStatus};
+
+    let _ = AgentDefinitionRegistry::init_global_builtins();
+    let workspace = tempfile::TempDir::new().expect("workspace");
+    let provider = Arc::new(ScriptedModel::new(vec![
+        ("Produce a short, concrete", "1. inspect the fixture"),
+        ("Carry out the plan below", "graph-stage-execution-canary"),
+        ("Review the result below", "APPROVE\nThe result is correct."),
+    ]));
+    let mut parent = parent_context(workspace.path(), provider.clone(), vec![]);
+    parent.session_id = "delegate-graph-jobs-e2e".into();
+    let live = super::live_parent_run_context("delegate-graph-jobs-e2e", parent);
+    let result = DelegateGraphTool::new()
+        .execute_with_live_parent_context(
+            json!({
+                "agent_id": "task_manager_agent",
+                "task": "Verify the driver-backed graph stage fixture",
+                "max_revisions": 1
+            }),
+            None,
+            live.data.child(),
+            Some(Arc::new(live.clone())),
+        )
+        .await
+        .expect("graph delegation returns a tool result");
+
+    assert!(!result.is_error, "{}", result.output());
+    assert!(result.output().contains("graph-stage-execution-canary"));
+    assert_eq!(provider.seen.lock().len(), 3);
+
+    let jobs = crate::core::runtime::slot_for::<SubAgentJobRegistry>(&live.data.dispatch_ctx());
+    let completed_stages = jobs
+        .list()
+        .into_iter()
+        .filter(|job| {
+            job.agent == "task_manager_agent"
+                && job.status == SubAgentJobStatus::Completed
+                && job.output.as_deref().is_some_and(|output| {
+                    output.contains("1. inspect the fixture")
+                        || output.contains("graph-stage-execution-canary")
+                        || output.contains("APPROVE")
+                })
+        })
+        .count();
+    assert_eq!(completed_stages, 3, "each graph stage is registered in Jobs");
+}
+
+#[tokio::test]
 async fn continue_subagent_without_checkpoint_or_durable_session_names_the_roster() {
     use super::ContinueSubagentTool;
     let _ = AgentDefinitionRegistry::init_global_builtins();
