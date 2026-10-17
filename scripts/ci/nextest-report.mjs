@@ -49,7 +49,9 @@ const expected = expectedFile
   ? fs.readFileSync(expectedFile, "utf8").split(/\r?\n/).filter(Boolean)
   : [];
 const inventory = inventoryFile
-  ? Object.values(JSON.parse(fs.readFileSync(inventoryFile, "utf8"))["rust-suites"] ?? {})
+  ? Object.values(
+      JSON.parse(fs.readFileSync(inventoryFile, "utf8"))["rust-suites"] ?? {},
+    )
   : null;
 const missing = expected.filter((target) => {
   if (inventory) {
@@ -58,9 +60,14 @@ const missing = expected.filter((target) => {
     // complete selected inventory is ignored may omit its JUnit testsuite.
     if (!binary) return true;
     const selected = Object.values(binary.testcases ?? {});
-    if (selected.length > 0 && selected.every((test) => test.ignored === true)) return false;
+    if (selected.length > 0 && selected.every((test) => test.ignored === true))
+      return false;
   }
-  return !suites.some((suite) => (suite.name === target || suite.name?.endsWith(`::${target}`)) && suite.tests > 0);
+  return !suites.some(
+    (suite) =>
+      (suite.name === target || suite.name?.endsWith(`::${target}`)) &&
+      suite.tests > 0,
+  );
 });
 if (counts.tests === 0 || missing.length > 0) {
   console.error(

@@ -12,7 +12,8 @@ function report(xml, expected = [], inventory) {
   try {
     fs.writeFileSync(`${dir}/junit.xml`, xml);
     fs.writeFileSync(`${dir}/expected`, expected.join("\n"));
-    if (inventory) fs.writeFileSync(`${dir}/inventory.json`, JSON.stringify(inventory));
+    if (inventory)
+      fs.writeFileSync(`${dir}/inventory.json`, JSON.stringify(inventory));
     let status = 0;
     try {
       execFileSync(
@@ -69,14 +70,34 @@ test("nextest serialization retains JSON-RPC and multi-server suites", () => {
 });
 
 test("ignored-only binaries remain inventoried without requiring nonexistent JUnit suites", () => {
-  const xml = '<testsuites><testsuite name="openhuman-cli::active" tests="1"/></testsuites>';
-  const inventory = { "rust-suites": {
-    active: { "binary-name": "active", testcases: { runs: { ignored: false, "filter-match": { status: "matches" } } } },
-    ignored: { "binary-name": "ignored", testcases: { live: { ignored: true, "filter-match": { status: "mismatch", reason: "ignored" } } } },
-  } };
+  const xml =
+    '<testsuites><testsuite name="openhuman-cli::active" tests="1"/></testsuites>';
+  const inventory = {
+    "rust-suites": {
+      active: {
+        "binary-name": "active",
+        testcases: {
+          runs: { ignored: false, "filter-match": { status: "matches" } },
+        },
+      },
+      ignored: {
+        "binary-name": "ignored",
+        testcases: {
+          live: {
+            ignored: true,
+            "filter-match": { status: "mismatch", reason: "ignored" },
+          },
+        },
+      },
+    },
+  };
   assert.equal(report(xml, ["active", "ignored"], inventory).status, 0);
-  assert.equal(report(xml, ["active", "ignored", "missing"], inventory).status, 1);
+  assert.equal(
+    report(xml, ["active", "ignored", "missing"], inventory).status,
+    1,
+  );
   inventory["rust-suites"].ignored.testcases.live.ignored = false;
-  inventory["rust-suites"].ignored.testcases.live["filter-match"].status = "matches";
+  inventory["rust-suites"].ignored.testcases.live["filter-match"].status =
+    "matches";
   assert.equal(report(xml, ["active", "ignored"], inventory).status, 1);
 });
