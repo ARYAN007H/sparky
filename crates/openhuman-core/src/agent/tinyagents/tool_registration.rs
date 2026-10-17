@@ -390,6 +390,7 @@ fn subagent_control_dispatches(
             let adapter = find_tool(name)?;
             let parent_session = parent_session.clone();
             let dispatch = SubAgentJobsTool::new(jobs.clone())
+                .recover_selector_errors()
                 .with_tool_name(name)
                 .with_description(adapter.description())
                 .with_parameters(adapter.parameters_schema())
@@ -424,6 +425,7 @@ fn subagent_control_dispatches(
         );
         let wait_dispatch: RegisteredToolDispatch = Arc::new(
             SubAgentJobsTool::new(jobs.clone())
+                .recover_selector_errors()
                 .with_tool_name("wait_subagent")
                 .with_description(adapter.description())
                 .with_parameters(adapter.parameters_schema())
@@ -459,6 +461,7 @@ fn subagent_control_dispatches(
             "close_subagent".into(),
             Arc::new(
                 SubAgentJobsTool::new(jobs.clone())
+                    .recover_selector_errors()
                     .with_tool_name("close_subagent")
                     .with_description(adapter.description())
                     .with_parameters(adapter.parameters_schema())
@@ -480,6 +483,7 @@ fn subagent_control_dispatches(
         let parent_session = parent_session.clone();
         let dispatch: RegisteredToolDispatch = Arc::new(
             SubAgentMessageTool::new(jobs)
+                .recover_selector_errors()
                 .with_tool_name("steer_subagent")
                 .with_description(adapter.description())
                 .with_parameters(adapter.parameters_schema())
