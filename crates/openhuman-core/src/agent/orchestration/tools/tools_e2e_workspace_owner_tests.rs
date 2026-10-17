@@ -83,6 +83,8 @@ async fn driver_job_controls_are_isolated_by_workspace_with_shared_runtime_state
     };
     let (options_a, parent_a) = build_parent(&workspace_a, &core_a);
     let (options_b, parent_b) = build_parent(&workspace_b, &core_b);
+    let parent_cancel_a = options_a.run_context.cancellation.clone();
+    let parent_cancel_b = options_b.run_context.cancellation.clone();
     // Control aliases run in a fresh turn context, as they do after a parent
     // turn resumes. Keep the original parents intact for their spawned child
     // futures; RunContext is intentionally not Clone.
@@ -377,15 +379,24 @@ async fn driver_job_controls_are_isolated_by_workspace_with_shared_runtime_state
     let result_b = tokio::time::timeout(std::time::Duration::from_secs(5), child_b)
         .await
         .expect("B child settles")
-        .expect("B task join")
-        .expect("B child cancellation is a normal driver outcome");
+        .expect("B task join");
     assert!(matches!(
         result_a.0.status,
         crate::agent::subagent_host::SubagentRunStatus::Completed
     ));
-    assert!(matches!(
-        result_b.0.status,
-        crate::agent::subagent_host::SubagentRunStatus::Cancelled
-    ));
+    match result_b {
+        Ok((outcome, _)) => assert!(matches!(
+            outcome.status,
+            crate::agent::subagent_host::SubagentRunStatus::Cancelled
+        )),
+        Err(error) => assert_eq!(error.to_string(), "tinyagents harness run failed: run cancelled"),
+    }
+    assert_eq!(
+        jobs_b.get(&id_b).expect("B driver job remains inspectable").status,
+        tinyagents_orchestration::subagent::SubAgentJobStatus::Cancelled,
+        "the shared driver registry is authoritative for B's cancellation"
+    );
+    assert!(!parent_cancel_a.is_cancelled());
+    assert!(!parent_cancel_b.is_cancelled());
 }
 
