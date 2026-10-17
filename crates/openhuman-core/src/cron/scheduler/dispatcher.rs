@@ -222,7 +222,7 @@ impl JobDispatcher {
             max_tasks: config.scheduler.max_tasks,
         };
         let request = StartScheduler {
-            scope: CLAIM_SCOPE.to_string(),
+            scope: scope.scheduler_scope(),
             callback: host.address(),
             config: scheduler_config(config),
             manual_ticks: true,
