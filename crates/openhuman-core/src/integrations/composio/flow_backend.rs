@@ -82,7 +82,7 @@ pub(crate) async fn invoke(
         ctx.policy.approve(ctx.dispatch, ctx.approval, decision, slug, &args).await?
     };
 
-    let connection_id = crate::integrations::composio::flow_gate::composio_connection_id(conn);
+    let connection_id = conn.and_then(crate::integrations::composio::flow_gate::composio_connection_id);
     let response = execute_for_connection(&live, slug, (!args.is_null()).then_some(args), connection_id)
       .await
       .and_then(|result| crate::integrations::composio::flow_gate::reject_unsuccessful_composio_response(slug, result).map_err(|error| error.to_string()))
