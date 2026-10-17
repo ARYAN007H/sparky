@@ -31,7 +31,7 @@ mod runner_artifacts;
 
 // The lifecycle adapter owns the public entry point.  This is its host-only
 // execution leaf after a neutral driver has prepared and admitted a request.
-pub(crate) use runner::{run_subagent_direct, run_subagent_direct_with_native_context};
+pub(crate) use runner::run_subagent_direct_with_native_context;
 
 pub(crate) use provider::resolve_subagent_source;
 
