@@ -922,7 +922,10 @@ test("nextest validation helpers arm Rust validation and script regressions on t
     const block = filters
       .split(new RegExp(`^${area}:\\s*$`, "m"))[1]
       .split(/^\S[^\n]*:/m)[0];
-    assert.ok(block.includes("'scripts/ci/self-hosted/**'"), `${area} covers guest verifier, linkage verifier and image pin changes`);
+    assert.ok(
+      block.includes("'scripts/ci/self-hosted/**'"),
+      `${area} covers guest verifier, linkage verifier and image pin changes`,
+    );
     for (const file of [
       "scripts/ci/nextest-coverage.sh",
       "scripts/ci/nextest-report.mjs",
