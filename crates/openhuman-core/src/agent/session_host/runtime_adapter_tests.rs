@@ -10,7 +10,6 @@ use tinyagents_session::port::{InMemorySessionStores, SessionStoreProvider};
 use tinyagents_session::transcript::TranscriptMeta;
 use tinyinference_llm::message::Message;
 
-use super::runtime_session::tool_surface::reconcile_synthesized_visibility;
 use super::runtime_session::{account_committed_turn_against_goal, holistic_last_turn_usage};
 use super::{OpenHumanSessionHooks, OpenHumanTranscriptCodec};
 use crate::agent::tinyagents::host::OpenHumanRunContext;
@@ -237,18 +236,22 @@ fn explicit_hidden_delegate_stays_hidden_across_dynamic_refreshes() {
     .into_iter()
     .collect::<std::collections::HashSet<_>>();
 
-    reconcile_synthesized_visibility(&mut visible, &prior, &refreshed, false);
+    let mut managed = tinyagents_runtime::ManagedToolNames {
+        visible,
+        ..Default::default()
+    };
+    managed.refresh_synthesized(&prior, &refreshed, false);
 
     assert!(
-        !visible.contains("delegate_research"),
+        !managed.visible.contains("delegate_research"),
         "an explicitly hidden existing delegate remains hidden after refresh"
     );
     assert!(
-        !visible.contains("delegate_drive"),
+        !managed.visible.contains("delegate_drive"),
         "a new connection cannot bypass an explicit visibility restriction"
     );
     assert!(
-        !visible.contains("delegate_calendar"),
+        !managed.visible.contains("delegate_calendar"),
         "a revoked connection leaves the surface"
     );
 }
@@ -265,11 +268,15 @@ fn wildcard_delegate_visibility_admits_new_connections_and_removes_revoked_ones(
         .into_iter()
         .collect::<std::collections::HashSet<_>>();
 
-    reconcile_synthesized_visibility(&mut visible, &prior, &refreshed, true);
+    let mut managed = tinyagents_runtime::ManagedToolNames {
+        visible,
+        ..Default::default()
+    };
+    managed.refresh_synthesized(&prior, &refreshed, true);
 
-    assert!(visible.contains("delegate_drive"));
-    assert!(!visible.contains("delegate_calendar"));
-    assert!(visible.contains("read_file"));
+    assert!(managed.visible.contains("delegate_drive"));
+    assert!(!managed.visible.contains("delegate_calendar"));
+    assert!(managed.visible.contains("read_file"));
 }
 
 #[tokio::test]
