@@ -167,8 +167,7 @@ in [`channels.rs`](./channels.rs) so a channel's memory can be forgotten later. 
 `[memory.recall] date_hint` on, `lifecycle::date_hint::extract` makes one
 small model call to work out which days the user means; a late or bad
 answer just leaves the pack in its normal order. The pack's citations are
-parked per thread (`tools::record_pack_citations`) and `web_chat` takes them
-for the chat's memory chips (`tools::take_turn_citations`).
+recorded by the web chat citation sink and drained for the chat's memory chips.
 
 ### Background work
 
@@ -302,7 +301,7 @@ The agent `memory` tool applies the same confinement and overwrites any
 | [`layout_migration/`](./layout_migration/) | Host adapter over `tinymemory_tools::layout_migration` (copy, placement, cleanup and the job live in tinymemory): `app_host.rs` (the real `LayoutHost`), `claim.rs`, `state.rs` (file-backed `MigrationStateStore`), `service.rs` (RPC/tick entry points). |
 | [`billing.rs`](./billing.rs) | Whether background rewrites are free for the user right now. |
 | [`files.rs`](./files.rs) | Owner-only (0600 / 0700 on unix) writes of the local state files. |
-| [`tools.rs`](./tools.rs) | The single `memory` agent tool and per-turn citations. |
+| [`tools.rs`](./tools.rs) | The single `memory` agent tool; citations are collected by `web_chat`. |
 | [`bus.rs`](./bus.rs) | The cron subscriber and the pending-deletions subscriber. |
 | [`schemas.rs`](./schemas.rs), [`schemas/defs.rs`](./schemas/defs.rs), [`schemas/handlers.rs`](./schemas/handlers.rs) | The `openhuman.memory_*` controller schemas and thin handlers. |
 | [`types.rs`](./types.rs) | RPC request and view shapes; contract types are re-exported from `tinymemory_api`. |
