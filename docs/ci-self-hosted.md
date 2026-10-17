@@ -122,7 +122,8 @@ for any commit without posting it.
   - The pinned Tinymold setup/save actions use the image's binary and signed
     remote cache. The supervisor supplies credentials through guest metadata;
     the workflow masks them and needs no additional repository secrets. Cache
-    save runs after failures and cannot replace the validation result.
+    save runs after failures, has a five-minute limit, and cannot replace the
+    validation result or indefinitely delay artifact upload.
   - Cargo's target linker points at `/usr/local/bin/rust-mold-linker`. It survives
     coverage clearing `RUSTFLAGS`. `verify-linkage.mjs` checks `.comment` and LLVM
     sections in actual ordinary and instrumented lane executables and archives proof.
