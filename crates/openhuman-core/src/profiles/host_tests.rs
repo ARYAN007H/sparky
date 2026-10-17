@@ -531,7 +531,7 @@ async fn provisioning_with_a_new_root_replaces_a_dead_higher_epoch_fence() {
             stdout.contains("running 1 test"),
             "child selected no test: {stdout}"
         );
-        assert!(stdout.contains("test profiles::host::tests::provisioning_with_a_new_root_replaces_a_dead_higher_epoch_fence ... ok"), "expected child test did not run: {stdout}");
+        assert!(stdout.contains("test profiles::host::tests::provisioning_with_a_new_root_replaces_a_dead_higher_epoch_fence"), "expected child test did not run: {stdout}");
         assert!(
             stdout.contains("test result: ok. 1 passed"),
             "child did not pass exactly one test: {stdout}"
@@ -600,7 +600,7 @@ async fn opening_replaces_a_dropped_hosts_fence_before_cron_reconciliation() {
             stdout.contains("running 1 test"),
             "child selected no test: {stdout}"
         );
-        assert!(stdout.contains("test profiles::host::tests::opening_replaces_a_dropped_hosts_fence_before_cron_reconciliation ... ok"), "expected child test did not run: {stdout}");
+        assert!(stdout.contains("test profiles::host::tests::opening_replaces_a_dropped_hosts_fence_before_cron_reconciliation"), "expected child test did not run: {stdout}");
         assert!(
             stdout.contains("test result: ok. 1 passed"),
             "child did not pass exactly one test: {stdout}"

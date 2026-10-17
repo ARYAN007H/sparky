@@ -393,7 +393,8 @@ impl FenceRegistry {
     }
 
     /// Registers `fence`, replacing any fence on the same key unless that
-    /// one is from a newer epoch.
+    /// one is from a newer epoch. Fences with dead anchors are pruned first;
+    /// newer live or unanchored fences retain their epoch protection.
     pub fn register(&self, fence: Arc<LeaseFence>) {
         let mut fences = self.lock();
         // A dead anchor means no work can still write through the old grant.
