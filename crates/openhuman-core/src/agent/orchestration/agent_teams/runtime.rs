@@ -2,12 +2,11 @@
 //!
 //! PR1–PR3 shipped the durable team model, race-safe claiming, quality-gated
 //! completion, and the read-only board. They were entirely *store-only*: a
-//! claim flipped a row, nothing ran. This module makes a teammate actually
-//! **execute** — [`start_member_run`] atomically claims a task for a member,
-//! marks the member `active`, and spawns a background worker that drives a real
-//! sub-agent to completion, captures its output as the task's completion
-//! evidence, runs it through the existing quality gate, and returns the member
-//! to `idle`.
+//! claim flipped a row, nothing ran. This module adapts the owner
+//! `TeamService::start_member_with_started` to OpenHuman's actual sub-agent
+//! executor. The owner atomically claims and activates a member, returns an
+//! admission receipt, then keeps the same future through evidence validation,
+//! completion, and cleanup.
 //!
 //! ## Root parent context
 //!
@@ -234,10 +233,9 @@ async fn start_member_with_executor<E: TeamMemberExecutor + 'static>(
     })
 }
 
-/// Build the root parent context, then drive the member's worker inside it.
-/// Engine-internal failures (config/agent build, spawn, wait) release the task
-/// and idle the member so the work is reclaimable; they are recorded, not
-/// propagated (there is no caller on the spawned task).
+/// Owner-provided executor: build the root parent context, then run the
+/// member's OpenHuman worker inside it. Returned errors let TinyAgents perform
+/// token-scoped release and idle cleanup.
 struct HostTeamMemberExecutor {
     ctx: crate::core::runtime::DispatchCtx,
     config: Config,
