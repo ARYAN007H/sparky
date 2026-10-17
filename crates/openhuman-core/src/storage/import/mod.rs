@@ -21,12 +21,18 @@
 //! - **Idempotent.** Every document is written with `Precondition::Absent`,
 //!   so a record that already exists in the backend (a resumed import, or one
 //!   the new code has since changed) is never overwritten.
-//! - **Runs once.** After a domain's documents are written, a marker document
-//!   (collection [`MARKER_COLLECTION`], id `<domain>@<workspace digest>`) is
-//!   stored in the backend's [`Scope::local`]. A later boot sees the marker
-//!   and does nothing, so a record deleted since is not resurrected from the
-//!   untouched legacy file. A failed import leaves no marker and is retried
-//!   on the next boot.
+//! - **Runs once.** After a domain's documents are written, the importer is
+//!   recorded as done in `tsd.migrations` of the backend's local scope
+//!   ([`super::import_state`], step `storage_import/<domain>@<workspace
+//!   digest>`). A later boot sees it and does nothing, so a record deleted
+//!   since is not resurrected from the untouched legacy file. A marker row an
+//!   older build wrote is honoured (it becomes the same entry at boot,
+//!   [`super::import_state::migrate_legacy_markers`]). A failed import
+//!   records nothing and is retried on the next boot.
+//! - **v1 shapes, then the owner's steps.** The legacy readers write the v1
+//!   collections the domain used before schema v2; the importer then runs the
+//!   domain owner's steps over them ([`super::boot::remigrate_owner`]), so the
+//!   records land in the v2 collections and shapes.
 //!
 //! Records land under [`super::scope::tenant_scope`] of no profile
 //! (`local`), the one scope every unprofiled reader resolves to
@@ -48,13 +54,12 @@ use std::path::Path;
 use std::sync::Arc;
 
 use anyhow::{anyhow, Context, Result};
-use serde_json::json;
 use sha2::Digest;
 use tinystoragedrivers::{CollectionSpec, ErrorKind, Precondition};
 
 use super::documents::Repo;
 use super::rusqlite;
-use super::{block_on, StorageBackend};
+use super::{block_on, block_on_anyhow, StorageBackend};
 use crate::config::Config;
 use rusqlite::Connection;
 use serde_json::Value;
@@ -107,23 +112,24 @@ impl From<ImportDoc> for Record {
     }
 }
 
-/// The collection that records finished imports.
-pub const MARKER_COLLECTION: &str = "storage_import";
+/// The legacy marker collection that recorded finished imports; its name is
+/// now the `kind` part of the `tsd.migrations` step
+/// ([`super::import_state::step_id`]).
+pub const MARKER_KIND: &str = "storage_import";
 
-/// Marker document schema version, recorded for diagnostics. An existing
-/// marker of any version counts as a finished import; redoing one after an
-/// importer change needs an explicit re-import policy (the marker is written
-/// with `Precondition::Absent`), which a future bump must introduce.
-const MARKER_VERSION: u32 = 1;
+/// The `tsd.migrations` owner of the host's importers.
+pub const MARKER_OWNER: &str = "storage";
 
 /// One legacy store the importer knows how to read.
 #[derive(Clone, Copy)]
 pub struct Source {
     /// Log and marker name, e.g. `approval`.
     pub domain: &'static str,
+    /// The schema owner whose steps carry the imported v1 records to v2.
+    pub owner: &'static str,
     /// The legacy database, relative to the workspace directory.
     pub db: &'static str,
-    /// The collections the domain keeps in the backend.
+    /// The v1 collections the legacy readers write.
     pub collections: fn() -> Vec<CollectionSpec>,
     /// Reads the original legacy tables. Receives a config whose workspace is
     /// the scratch copy (the reader opens and migrates that copy) and the
@@ -270,7 +276,12 @@ fn marker_id(domain: &str, workspace: &Path) -> String {
 }
 
 fn marker_spec() -> Vec<CollectionSpec> {
-    vec![CollectionSpec::new(MARKER_COLLECTION)]
+    Vec::new()
+}
+
+/// The `tsd.migrations` step of the import of `domain` in `workspace`.
+pub(crate) fn marker_step(domain: &str, workspace: &Path) -> String {
+    super::import_state::step_id(MARKER_KIND, &marker_id(domain, workspace))
 }
 
 fn import_one(
@@ -293,11 +304,8 @@ fn import_one(
         marker_spec,
     )?;
 
-    let marker_id = marker.clone();
-    let done = markers
-        .run(move |docs| async move { docs.get(MARKER_COLLECTION, &marker_id).await })?
-        .is_some();
-    if done {
+    let step = marker_step(domain, &config.workspace_dir);
+    if super::import_state::is_done(&markers, MARKER_OWNER, &step)? {
         return Ok(Outcome::AlreadyDone);
     }
 
@@ -306,101 +314,87 @@ fn import_one(
         return Ok(Outcome::NoSource);
     }
 
-    let claimed =
-        super::import_claim::with_claim(&markers, MARKER_COLLECTION, &marker.clone(), || {
-            // Another process may have finished between our check and the claim.
-            let again = marker.clone();
-            let done = markers
-                .run(move |docs| async move { docs.get(MARKER_COLLECTION, &again).await })?
-                .is_some();
-            if done {
-                return Ok(Outcome::AlreadyDone);
-            }
-            let snapshot = Snapshot::of(&legacy, source.db)
-                .with_context(|| format!("[{domain}] copy the legacy file for reading"))?;
-            let scratch = Config {
-                workspace_dir: snapshot.workspace().to_path_buf(),
-                ..config.clone()
-            };
+    let claimed = super::import_state::with_claim(&markers, MARKER_OWNER, &step, || {
+        // Another process may have finished between our check and the claim.
+        if super::import_state::is_done(&markers, MARKER_OWNER, &step)? {
+            return Ok(Outcome::AlreadyDone);
+        }
+        let snapshot = Snapshot::of(&legacy, source.db)
+            .with_context(|| format!("[{domain}] copy the legacy file for reading"))?;
+        let scratch = Config {
+            workspace_dir: snapshot.workspace().to_path_buf(),
+            ..config.clone()
+        };
 
-            // Driver document records first: they are the newer copy of a row whose
-            // legacy table was retired, so they win an id clash.
-            let mut found: Vec<Record> = snapshot
-                .driver_docs(source.collections)
-                .with_context(|| format!("[{domain}] read the document tables"))?
+        // Driver document records first: they are the newer copy of a row whose
+        // legacy table was retired, so they win an id clash.
+        let mut found: Vec<Record> = snapshot
+            .driver_docs(source.collections)
+            .with_context(|| format!("[{domain}] read the document tables"))?
+            .into_iter()
+            .map(|doc| (source.rekey)(doc, config))
+            .collect();
+        found.extend(
+            (source.read_legacy)(&scratch, config)
+                .with_context(|| format!("[{domain}] read the legacy tables"))?
                 .into_iter()
-                .map(|doc| (source.rekey)(doc, config))
-                .collect();
-            found.extend(
-                (source.read_legacy)(&scratch, config)
-                    .with_context(|| format!("[{domain}] read the legacy tables"))?
-                    .into_iter()
-                    .map(Record::from),
-            );
+                .map(Record::from),
+        );
 
-            let total = found.len();
-            let written = repo.run(move |docs| async move {
-                let mut written = 0usize;
-                for record in found {
-                    match docs
-                        .put(
-                            &record.collection,
-                            &record.id,
-                            record.doc,
-                            Precondition::Absent,
-                        )
-                        .await
-                    {
-                        Ok(_) => written += 1,
-                        Err(error) if error.kind() == ErrorKind::Conflict => {}
-                        Err(error) => return Err(error),
-                    }
-                }
-                Ok(written)
-            })?;
-
-            let body = json!({
-                "version": MARKER_VERSION,
-                "domain": domain,
-                "found": total,
-                "written": written,
-                "at": chrono::Utc::now().to_rfc3339(),
-            });
-            markers.run(move |docs| async move {
+        let total = found.len();
+        let written = repo.run(move |docs| async move {
+            let mut written = 0usize;
+            for record in found {
                 match docs
-                    .put(MARKER_COLLECTION, &marker, body, Precondition::Absent)
+                    .put(
+                        &record.collection,
+                        &record.id,
+                        record.doc,
+                        Precondition::Absent,
+                    )
                     .await
                 {
-                    Ok(_) => Ok(()),
-                    // Another process finished first.
-                    Err(error) if error.kind() == ErrorKind::Conflict => Ok(()),
-                    Err(error) => Err(error),
+                    Ok(_) => written += 1,
+                    Err(error) if error.kind() == ErrorKind::Conflict => {}
+                    Err(error) => return Err(error),
                 }
-            })?;
-            Ok(Outcome::Imported {
-                found: total,
-                written,
-            })
+            }
+            Ok(written)
         })?;
+
+        // The v1 records become the owner's v2 collections and shapes.
+        if written > 0 {
+            let scope = super::scope::tenant_scope(None);
+            let owner = source.owner;
+            block_on_anyhow(async move {
+                super::boot::remigrate_owner(backend, &scope, owner)
+                    .await
+                    .map(|_| ())
+                    .map_err(Into::into)
+            })
+            .with_context(|| format!("[{domain}] migrate the imported records"))?;
+        }
+        super::import_state::set_done(&markers, MARKER_OWNER, &step)?;
+        Ok(Outcome::Imported {
+            found: total,
+            written,
+        })
+    })?;
     Ok(claimed.unwrap_or(Outcome::InProgress))
 }
 
-/// Whether the marker for `source` exists (test and diagnostics helper).
+/// Whether the import of `source` is recorded as done (test and diagnostics
+/// helper).
 pub fn is_done(
     backend: &Arc<dyn StorageBackend>,
     config: &Config,
     source: &Source,
 ) -> Result<bool> {
-    let marker = marker_id(source.domain, &config.workspace_dir);
     let scoped = backend
         .for_scope(&super::scope::tenant_scope(None))
         .map_err(|error| anyhow!("open the local scope: {error}"))?;
-    let docs = Arc::clone(scoped.documents());
-    let found = block_on(async move {
-        docs.ensure_collection(&marker_spec().remove(0)).await?;
-        docs.get(MARKER_COLLECTION, &marker).await
-    })?;
-    Ok(found.is_some())
+    let step = marker_step(source.domain, &config.workspace_dir);
+    Ok(block_on(super::import_state::done(&scoped, MARKER_OWNER, &step))?)
 }
 
 #[cfg(test)]
