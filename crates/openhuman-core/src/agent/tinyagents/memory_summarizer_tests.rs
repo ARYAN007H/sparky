@@ -3,7 +3,7 @@ use super::*;
 use chrono::Utc;
 use tinyagents_harness::summarization::ConcatSummarizer;
 
-use crate::memory::lifecycle::hooks::{post_turn, pre_turn, PostTurnInput, PreTurnInput};
+use crate::memory::lifecycle::hooks::{post_turn, pre_turn_work};
 use crate::memory::scope::MemoryIdentity;
 use crate::memory::test_fixtures::{bind_reference, config_in};
 
@@ -22,31 +22,27 @@ async fn bound_turn(tmp: &tempfile::TempDir) -> Arc<MemoryTurn> {
     let config = config_in(tmp);
     bind_reference(&config);
     let identity = MemoryIdentity::agent("orchestrator").resolve(&config);
-    pre_turn(
+    pre_turn_work(
         &crate::core::runtime::DispatchCtx::ambient(),
         &config,
         &identity,
-        PreTurnInput {
-            thread_id: "t".into(),
-            turn_index: 0,
-            user_text: "our launch date is March 3rd".into(),
-            in_prompt_from: 0,
-            at: Utc::now(),
-            resumed_after_compaction: false,
-            observed_actor: None,
-        },
+        "t".into(),
+        0,
+        "our launch date is March 3rd".into(),
+        0,
+        Utc::now(),
+        false,
+        None,
     )
     .await;
     post_turn(
         &config,
         &identity,
-        PostTurnInput {
-            thread_id: "t".into(),
-            turn_index: 1,
-            assistant_text: "Noted: launch on March 3rd.".into(),
-            tool_calls: Vec::new(),
-            at: Utc::now(),
-        },
+        "t".into(),
+        1,
+        "Noted: launch on March 3rd.".into(),
+        Vec::new(),
+        Utc::now(),
     )
     .await;
     Arc::new(MemoryTurn {
