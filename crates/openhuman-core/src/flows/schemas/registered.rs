@@ -1,4 +1,4 @@
-use super::super::*;
+use super::*;
 
 pub(super) fn all_registered_controllers() -> Vec<RegisteredController> {
     vec![
