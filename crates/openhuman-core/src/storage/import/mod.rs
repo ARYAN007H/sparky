@@ -54,7 +54,7 @@ use tinystoragedrivers::{CollectionSpec, ErrorKind, Precondition};
 
 use super::documents::Repo;
 use super::rusqlite;
-use super::{block_on, Scope, StorageBackend};
+use super::{block_on, StorageBackend};
 use crate::config::Config;
 use rusqlite::Connection;
 use serde_json::Value;
