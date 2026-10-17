@@ -140,13 +140,16 @@ pub(super) async fn finalize_committed_turn(
     let input = tinyagents_harness::summarization::last_user_message(&receipt.outcome.history)
         .map(crate::agent::message_convert::user_text_with_markers)
         .unwrap_or_default();
-    let sidecar = receipt
-        .options
-        .context
-        .session_sidecar
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner)
-        .clone();
+    let (sidecar, deferred_terminal) = {
+        let mut sidecar = receipt
+            .options
+            .context
+            .session_sidecar
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let terminal = sidecar.deferred_terminal.take();
+        (sidecar.clone(), terminal)
+    };
     // This turn's model calls, not every assistant row of the
     // whole conversation (`turn_iterations`).
     let iterations = turn_iterations(sidecar.model_calls, &receipt.outcome.history);
@@ -160,6 +163,15 @@ pub(super) async fn finalize_committed_turn(
     );
     let usage = super::holistic_last_turn_usage(&sidecar);
     let interrupted = sidecar.hit_cap || receipt.outcome.interrupted;
+    // This hook runs only after the runtime durably appended the turn. Emit
+    // OpenHuman's classified stop before the terminal journal flush, so native
+    // completion cannot overwrite a cancellation/timeout/stop or hide commit
+    // time from the exported span.
+    if let Some(terminal) = deferred_terminal {
+        terminal
+            .finish(sidecar.stop.clone(), (sidecar.model_calls as u32).max(1))
+            .await;
+    }
     // State the caller reads as soon as `run_turn` returns.
     let prelude = {
         let mut state = state

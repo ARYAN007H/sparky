@@ -481,11 +481,9 @@ impl SessionDriver<OpenHumanRunContext> for OpenHumanSessionDriver {
                 );
             }
             observed.resolved_route = outcome.resolved_route.clone();
+            observed.deferred_terminal = outcome.deferred_terminal.take();
             (observed.stop.clone(), (observed.model_calls as u32).max(1))
         };
-        if let Some(terminal) = outcome.deferred_terminal.take() {
-            terminal.finish(terminal_stop, terminal_turn).await;
-        }
         // The turn compacted its context: persist the compacted history, so the
         // next turn starts from the checkpoint. The runtime session seals the
         // current generation and opens the next (the history no longer extends
