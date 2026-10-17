@@ -37,6 +37,37 @@ use crate::config::Config;
 use crate::core::runtime::CoreContext;
 use crate::storage::lease::{LeaseError, LeaseGrant};
 
+/// Adopt or clear the schedule store's operator cap for an explicit profile
+/// scope. Clearing is skipped only when the backend cannot support a policy
+/// at all; the module refuses writes if a policy ledger already exists.
+pub(super) async fn reconcile_cron_admission(
+    config: &Config,
+    id: &ProfileId,
+) -> Result<(), String> {
+    let scope = crate::cron::documents_port::DocScope::for_scope(
+        config,
+        crate::storage::scope_for_profile(id.as_str()),
+    );
+    let limit = if config.cron.agent_jobs_only {
+        Some(config.cron.max_active_jobs as usize)
+    } else {
+        if !scope
+            .supports_transactions()
+            .map_err(|error| format!("checking profile cron store capabilities: {error}"))?
+        {
+            return Ok(());
+        }
+        None
+    };
+    crate::cron::client::store_in::<()>(
+        config,
+        &scope,
+        tinyflows_bus::schedule::StoreOperation::SetMaxActiveJobs { limit },
+    )
+    .await
+    .map_err(|error| format!("reconciling the profile's cron job cap: {error}"))
+}
+
 /// One async lock per profile id. See the module docs.
 #[derive(Default)]
 pub struct ProfileLocks {
@@ -91,6 +122,11 @@ impl ProfileHost {
     pub async fn provision(&self, id: &ProfileId) -> Result<bool, String> {
         let _profile = self.lifecycle.lock(id).await;
         if self.registry.get(id).await?.is_some() {
+            let grant = self.acquire_for_lifecycle(id, "provision").await?;
+            let config = self.forced_config(&self.layout_of(id), id);
+            let reconciled = reconcile_cron_admission(&config, id).await;
+            profile_lease::release_all(self, vec![(id.clone(), grant)]).await;
+            reconciled?;
             log::debug!("[profiles] provision profile={id}: already provisioned");
             return Ok(false);
         }
@@ -110,21 +146,7 @@ impl ProfileHost {
         let layout = self.layout_of(id);
         create_dirs(&layout)?;
         let config = self.forced_config(&layout, id);
-        if config.cron.agent_jobs_only {
-            let scope = crate::cron::documents_port::DocScope::for_scope(
-                &config,
-                crate::storage::scope_for_profile(id.as_str()),
-            );
-            crate::cron::client::store_in::<()>(
-                &config,
-                &scope,
-                tinyflows_bus::schedule::StoreOperation::SetMaxActiveJobs {
-                    limit: Some(config.cron.max_active_jobs as usize),
-                },
-            )
-            .await
-            .map_err(|error| format!("could not install the profile's cron job cap: {error}"))?;
-        }
+        reconcile_cron_admission(&config, id).await?;
         let meta = ProfileMeta {
             profile_id: id.clone(),
             created_at: unix_now(),

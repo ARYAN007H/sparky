@@ -52,13 +52,31 @@ fn check_delivery(delivery: &DeliveryConfig) -> Result<()> {
     bail!("cron output can only return to the conversation that created the job")
 }
 
-fn check_capacity(config: &Config) -> Result<()> {
+fn install_capacity_limit(config: &Config) -> Result<()> {
     let max = config.cron.max_active_jobs as usize;
     crate::cron::client::store_blocking::<()>(
         config,
         tinyflows_bus::schedule::StoreOperation::SetMaxActiveJobs { limit: Some(max) },
     )?;
     Ok(())
+}
+
+/// Clear a prior operator cap when enforcement is off. Backends without
+/// transactions could never install one, so they remain compatible without
+/// attempting an unsupported `SetMaxActiveJobs(None)` write.
+fn clear_capacity_limit_if_supported(config: &Config) -> Result<()> {
+    let scope = super::documents_port::DocScope::current(config)?;
+    if !scope.supports_transactions()? {
+        return Ok(());
+    }
+    crate::cron::client::blocking(config, move |config| async move {
+        crate::cron::client::store_in::<()>(
+            &config,
+            &scope,
+            tinyflows_bus::schedule::StoreOperation::SetMaxActiveJobs { limit: None },
+        )
+        .await
+    })
 }
 
 /// Refuse a new job that breaks the limits. No-op unless [`enforced`].
@@ -69,6 +87,7 @@ pub(crate) fn check_new(
     delivery: Option<&DeliveryConfig>,
 ) -> Result<()> {
     if !enforced(config) {
+        clear_capacity_limit_if_supported(config)?;
         return Ok(());
     }
     check_type(job_type)?;
@@ -76,12 +95,13 @@ pub(crate) fn check_new(
     if let Some(delivery) = delivery {
         check_delivery(delivery)?;
     }
-    check_capacity(config)
+    install_capacity_limit(config)
 }
 
 /// Refuse an update that breaks the limits. No-op unless [`enforced`].
 pub(crate) fn check_patch(config: &Config, patch: &CronJobPatch) -> Result<()> {
     if !enforced(config) {
+        clear_capacity_limit_if_supported(config)?;
         return Ok(());
     }
     if patch.command.is_some() {
@@ -97,7 +117,7 @@ pub(crate) fn check_patch(config: &Config, patch: &CronJobPatch) -> Result<()> {
         check_delivery(delivery)?;
     }
     if patch.enabled == Some(true) {
-        check_capacity(config)?;
+        install_capacity_limit(config)?;
     }
     Ok(())
 }

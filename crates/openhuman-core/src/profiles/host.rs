@@ -250,7 +250,9 @@ impl ProfileHost {
         if self.registry.get(id).await?.is_none() {
             return Err(format!("profile {id} is not provisioned"));
         }
-        self.serving_config(&self.layout_of(id), id)
+        let config = self.serving_config(&self.layout_of(id), id)?;
+        super::lifecycle::reconcile_cron_admission(&config, id).await?;
+        Ok(config)
     }
 
     /// Profile `id`, opening it — and taking its lease — if it is provisioned
@@ -327,6 +329,10 @@ impl ProfileHost {
         let mut config = self
             .serving_config(&layout, id)
             .map_err(OpenError::Storage)?;
+        if let Err(error) = super::lifecycle::reconcile_cron_admission(&config, id).await {
+            profile_lease::release_all(self, vec![(id.clone(), grant)]).await;
+            return Err(OpenError::Storage(error));
+        }
         if let Some(capabilities) = &self.capabilities {
             capabilities.configure(&mut config);
         }
