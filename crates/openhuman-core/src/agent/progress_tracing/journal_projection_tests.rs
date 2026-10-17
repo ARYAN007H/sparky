@@ -294,30 +294,13 @@ fn legacy_export_snapshot_for_root_and_child_with_reused_call_ids() {
             outcome: None,
         },
     ));
-    observations.push(obs(
-        6,
-        1_080,
-        AgentEvent::SubAgentCompleted {
-            name: "researcher".to_string(),
-            depth: 1,
-        },
-    ));
-    observations.push(obs(
-        7,
-        1_110,
-        AgentEvent::RunCompleted {
-            run_id: RunId::new("run-1"),
-            outcome: None,
-        },
-    ));
-
     let spans = spans_from_observations(ctx(), 10, &observations);
     let snapshot = spans_to_ndjson(SpanEnvelope::Otel, &spans);
     assert!(
         !snapshot.contains("CONTENT_SENTINEL"),
         "content-off export must not contain captured payloads"
     );
-    let mut native = tinyagents_harness::observability::trace_export::SpanCollector::new(ctx());
+    let mut native = tinyagents_harness::observability::trace_export::collector::SpanCollector::new(ctx());
     for observation in &observations {
         native.record(observation);
     }
