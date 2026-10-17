@@ -271,9 +271,9 @@ if [ "${OH_COV_RUNNER:-cargo}" = "nextest" ]; then
     # Listing executes no tests. cargo-llvm-cov supplies the same wrapper and
     # instrumentation environment, so Cargo can reuse this CLI test build.
     cli_inventory() (
-      inventory_env="$(cargo llvm-cov show-env --sh --features "${CORE_PRODUCT_FEATURES}")" || exit $?
+      inventory_env="$(bash scripts/ci-cancel-aware.sh cargo llvm-cov show-env --sh --features "${CORE_PRODUCT_FEATURES}")" || exit $?
       eval "${inventory_env}"
-      cargo nextest list --message-format json --features "${CORE_PRODUCT_FEATURES}" \
+      bash scripts/ci-cancel-aware.sh cargo nextest list --message-format json --features "${CORE_PRODUCT_FEATURES}" \
         -p openhuman-cli --tests -E 'kind(test)' >"${expected_inventory}"
     )
     suite "openhuman-cli test inventory" cli_inventory

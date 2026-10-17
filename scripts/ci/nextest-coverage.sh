@@ -13,12 +13,14 @@ report="${report_dir}/${suite}.xml"
 # cleanup. A fresh config retains the repository's timeouts/resource groups.
 node - "$config" "$report" "$@" <<'JS'
 const fs = require('node:fs');
-const { execFileSync } = require('node:child_process');
+const { spawnSync } = require('node:child_process');
 const [config, report, ...command] = process.argv.slice(2);
 const manifest = command.indexOf('--manifest-path');
 const metadataArgs = ['metadata', '--no-deps', '--format-version', '1'];
 if (manifest >= 0) metadataArgs.push('--manifest-path', command[manifest + 1]);
-const metadata = JSON.parse(execFileSync('cargo', metadataArgs, { encoding: 'utf8' }));
+const metadataResult = spawnSync('bash', ['scripts/ci-cancel-aware.sh', 'cargo', ...metadataArgs], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'] });
+if (metadataResult.status !== 0) process.exit(metadataResult.status ?? 1);
+const metadata = JSON.parse(metadataResult.stdout);
 const targets = new Set(metadata.packages.flatMap(pkg => pkg.targets.map(target => target.name)));
 // Nextest validates binary predicates against the selected workspace, even
 // regex predicates. A standalone Tauri workspace has none of the root CLI's

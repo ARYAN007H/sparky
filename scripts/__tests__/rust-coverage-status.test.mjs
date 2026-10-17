@@ -324,3 +324,9 @@ test("private coverage passes when all eight selected configurations report test
   const { status } = runMockedCoverage(0);
   assert.equal(status, 0);
 });
+
+test("instrumented CLI inventory is cancellation-aware and reuses llvm-cov's environment", () => {
+  assert.match(source, /bash scripts\/ci-cancel-aware\.sh cargo llvm-cov show-env --sh/);
+  assert.match(source, /eval "\$\{inventory_env\}"/);
+  assert.match(source, /bash scripts\/ci-cancel-aware\.sh cargo nextest list --message-format json/);
+});
