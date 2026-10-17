@@ -373,15 +373,12 @@ async fn triggered_run_guard_keeps_a_long_lived_run_deduplicated_past_1024_start
             "test::cron::trigger_guard_overflow"
         }
         async fn handle(&self, event: &DomainEvent) {
-            match event {
-                DomainEvent::CronJobTriggered { job_id, .. } => {
-                    if job_id == "issue57-overflow-barrier" {
-                        let _ = self.0.send(Seen::Barrier);
-                    } else {
-                        let _ = self.0.send(Seen::Trigger(job_id.clone()));
-                    }
+            if let DomainEvent::CronJobTriggered { job_id, .. } = event {
+                if job_id == "issue57-overflow-barrier" {
+                    let _ = self.0.send(Seen::Barrier);
+                } else {
+                    let _ = self.0.send(Seen::Trigger(job_id.clone()));
                 }
-                _ => {}
             }
         }
     }
