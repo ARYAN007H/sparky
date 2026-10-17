@@ -14,7 +14,7 @@ use chrono::{Duration, Utc};
 
 use crate::config::Config;
 use crate::cron::{
-    delivery_mode, list_jobs, CronJob, CronJobPatch, DeliveryConfig, JobType, Schedule,
+    delivery_mode, CronJob, CronJobPatch, DeliveryConfig, JobType, Schedule,
 };
 
 /// Whether `config` restricts cron to agent jobs.
@@ -54,16 +54,12 @@ fn check_delivery(delivery: &DeliveryConfig) -> Result<()> {
     bail!("cron output can only return to the conversation that created the job")
 }
 
-/// Enabled jobs in the current scope, read from the store.
-fn active_jobs(config: &Config) -> Result<usize> {
-    Ok(list_jobs(config)?.iter().filter(|job| job.enabled).count())
-}
-
 fn check_capacity(config: &Config) -> Result<()> {
     let max = config.cron.max_active_jobs as usize;
-    if active_jobs(config)? >= max {
-        bail!("this profile already has {max} active cron jobs; remove one first");
-    }
+    crate::cron::client::store_blocking::<()>(
+        config,
+        tinyflows_bus::schedule::StoreOperation::SetMaxActiveJobs { limit: Some(max) },
+    )?;
     Ok(())
 }
 
