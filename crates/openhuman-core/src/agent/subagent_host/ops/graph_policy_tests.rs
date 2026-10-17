@@ -145,6 +145,7 @@ async fn run_with_spawn_tool_in_parent_surface(allowed: HashSet<String>) -> (boo
         "mock-channel",
         AgentTokenjuiceCompression::Off,
         None,
+        None,
     )
     .await
     .expect("graph subagent runs");

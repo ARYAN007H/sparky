@@ -110,6 +110,7 @@ async fn failed_subagent_run_keeps_its_unanswered_round_out_of_history() {
         "mock-channel",
         AgentTokenjuiceCompression::Off,
         None,
+        None,
     )
     .await;
     assert!(result.is_err(), "the rejected third call fails the run");
