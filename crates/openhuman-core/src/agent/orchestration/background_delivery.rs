@@ -421,8 +421,6 @@ async fn try_deliver(
     let turn_workspace = workspace_dir.clone();
     let give_up_ctx = busy_ctx.clone();
     let format_router = router.clone();
-    let last_delivery_error = Arc::new(std::sync::Mutex::new(None::<String>));
-    let delivery_error_sink = Arc::clone(&last_delivery_error);
     let turn_thread_id = thread_id.clone();
     let give_up_thread_id = thread_id.clone();
     let give_up_log_thread_id = thread_id.clone();
@@ -435,31 +433,21 @@ async fn try_deliver(
         let ctx = ctx.clone();
         let workspace_dir = turn_workspace.clone();
         let thread_id = turn_thread_id.clone();
-        let delivery_error_sink = Arc::clone(&delivery_error_sink);
         async move {
             let result = run_system_turn_on_thread(&ctx, workspace_dir, thread_id, notice)
                 .await
-                .map(|_| ());
-            if let Err(error) = &result {
-                if let Ok(mut last_error) = delivery_error_sink.lock() {
-                    *last_error = Some(error.clone());
-                }
-            }
+                .map(|_| ())
+                .map_err(|error| error.to_string());
             result
         }
     };
-    let write_undelivered = move |records: &[CompletionRecord]| {
+    let write_undelivered = move |records: &[CompletionRecord], error: &str| {
         let attempts = records
             .iter()
             .map(|record| record.attempts)
             .max()
             .unwrap_or(1);
-        let error = last_delivery_error
-            .lock()
-            .ok()
-            .and_then(|error| error.clone())
-            .unwrap_or_else(|| "the background delivery turn failed".to_string());
-        let notice = build_undelivered_notice(records, attempts, &error);
+        let notice = build_undelivered_notice(records, attempts, error);
         if let Some(notice) = notice {
             let run_id = format!("bgdeliver-undelivered-{}", uuid::Uuid::new_v4());
             if let Err(error) = persist_delivery_reply(
@@ -483,7 +471,7 @@ async fn try_deliver(
     };
     let outcome = if recovering {
         delivery
-            .recover_on_boot(
+            .recover_on_boot_with_error(
                 target,
                 || is_busy(&busy_ctx, &thread_id),
                 fence.clone(),
@@ -493,7 +481,7 @@ async fn try_deliver(
             .await
     } else {
         delivery
-            .deliver_once(
+            .deliver_once_with_error(
                 target,
                 || is_busy(&busy_ctx, &thread_id),
                 fence.clone(),
