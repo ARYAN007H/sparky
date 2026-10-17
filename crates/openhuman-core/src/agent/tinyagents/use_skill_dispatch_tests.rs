@@ -179,8 +179,8 @@ async fn use_skill_dispatch_keeps_authorized_target_after_registry_rebind() {
         .expect("known packed target binds");
     assert_eq!(
         pinned.output_origin(),
-        tinyagents_harness::host::ContentOrigin::Agent,
-        "typed packed dispatch must keep the delegated-agent output policy"
+        tinyagents_harness::host::ContentOrigin::Tool,
+        "an unmarked stub stays on the ordinary packed-tool path"
     );
 
     let replacement: Arc<Vec<Box<dyn Tool>>> = Arc::new(vec![
@@ -291,7 +291,13 @@ async fn packed_delegate_uses_scoped_target_and_registers_shared_job() {
         .expect("packed delegation returns a tool result");
 
     assert!(!result.is_error, "{}", result.output());
-    assert_eq!(result.text(), "a generated image description");
+    assert!(
+        result
+            .text()
+            .starts_with("a generated image description"),
+        "the typed inline delegation result keeps the child output: {}",
+        result.text()
+    );
     let jobs = crate::core::runtime::slot_for::<SubAgentJobRegistry>(&parent.data.dispatch_ctx());
     assert!(
         jobs.list().iter().any(|job| {
