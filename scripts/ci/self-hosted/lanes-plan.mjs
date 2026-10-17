@@ -593,6 +593,17 @@ export function buildPlan({ profile, areas, env = {}, isPullRequest = true }) {
   // filters; union those filters in nextest's expression syntax. --no-clean
   // retains prior instrumentation, while every suite writes its own report.
   if (ex63) {
+    // This target has cfg(not(coverage)): instrumentation makes its large
+    // binary fail to link and would remove its deliberately small-stack test.
+    // Run that distinct regression once in the ordinary build target, keeping
+    // the CLI's defaults plus the same product features as core coverage.
+    lanes
+      .find((lane) => lane.name === "rust-lint")
+      .checks.push({
+        name: "composio-stack-regression-uninstrumented",
+        when: core,
+        run: `bash scripts/ci/nextest-coverage.sh composio-stack-uninstrumented cargo nextest run --profile ci --no-tests=fail --no-fail-fast -p openhuman-cli --features ${CORE_PRODUCT} --test composio_list_tools_stack_overflow_regression`,
+      });
     const coverageSuite = (args, output, manifest = "Cargo.toml") =>
       `rc=0; bash scripts/ci/nextest-coverage.sh ${output.replace(/^lcov-|\.info$/g, "")} cargo llvm-cov nextest --profile ci --no-fail-fast --no-tests=fail --no-clean --no-report ${args} || rc=$?; ` +
       `cargo llvm-cov report --manifest-path ${manifest} --lcov --output-path ci-out/lcov/${output} || { report_rc=$?; if [ "$rc" -eq 0 ]; then rc=$report_rc; fi; }; exit "$rc"`;
