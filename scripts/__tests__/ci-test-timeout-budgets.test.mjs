@@ -4,7 +4,11 @@ import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
-const repoRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+const repoRoot = path.join(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "..",
+  "..",
+);
 
 function workflowJob(workflowPath, jobName) {
   const workflow = fs.readFileSync(path.join(repoRoot, workflowPath), "utf8");
@@ -24,14 +28,16 @@ function timeoutMinutes(workflowPath, jobName) {
 
 test("full Rust core tests have time to finish under hosted load", () => {
   assert.ok(
-    timeoutMinutes(".github/workflows/test-reusable.yml", "rust-core-tests") >= 120,
+    timeoutMinutes(".github/workflows/test-reusable.yml", "rust-core-tests") >=
+      120,
     "the complete Rust core suite needs at least two hours on hosted runners",
   );
 });
 
 test("Linux Rust integration E2E has time to finish the complete suite", () => {
   assert.ok(
-    timeoutMinutes(".github/workflows/e2e-reusable.yml", "rust-e2e-linux") >= 60,
+    timeoutMinutes(".github/workflows/e2e-reusable.yml", "rust-e2e-linux") >=
+      60,
     "the full Rust integration E2E lane needs at least an hour on hosted runners",
   );
 });
