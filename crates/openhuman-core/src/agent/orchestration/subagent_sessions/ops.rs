@@ -172,7 +172,7 @@ pub fn cancel_driver_job_for_observed_session(
 /// The selector is scoped to the caller's durable session store and refuses
 /// ambiguous task IDs. The actual cancellation remains keyed by the full
 /// authenticated TinyAgents lifecycle key.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DriverTaskCancellation {
     pub task_id: String,
     pub agent_id: String,
