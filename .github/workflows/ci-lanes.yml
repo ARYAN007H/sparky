@@ -45,7 +45,7 @@ jobs:
     name: CI Fast (EX63)
     if: inputs.profile == 'ex63'
     runs-on: [self-hosted, openhuman-ex63]
-    timeout-minutes: 120
+    timeout-minutes: 180
     steps:
       - name: Checkout PR merge commit
         uses: actions/checkout@v7
