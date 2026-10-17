@@ -50,18 +50,7 @@ use super::*;
 
 use tinyagents_harness::tool::missing_required_args;
 
-/// Parses a `"composio:<toolkit>:<connection_id>"` `connection_ref` (see the
-/// node catalog, `my_docs/ohxtf/commons/12-node-catalog-0.2.md`) and returns
-/// the trailing connection id segment. Values that don't match this shape
-/// return `None` — the caller logs and falls back to the ambient session
-/// account (only Direct mode can actually forward the id today; see
-/// [`OpenHumanTools::invoke`]'s doc for the Backend-mode gap this leaves
-/// open).
-pub(crate) fn composio_connection_id(conn: &str) -> Option<&str> {
-    let rest = conn.strip_prefix("composio:")?;
-    let id = rest.rsplit(':').next()?;
-    (!id.is_empty()).then_some(id)
-}
+pub(crate) use crate::integrations::composio::flow_gate::composio_connection_id;
 
 /// Parses a `"http_cred:<name>"` `connection_ref` for [`OpenHumanHttp`],
 /// returning the trailing credential name. The host-side
@@ -78,265 +67,20 @@ pub(crate) fn http_cred_name(conn: &str) -> Option<&str> {
     (!name.is_empty()).then_some(name)
 }
 
-/// Strict, deny-by-default curation check for flow `tool_call` nodes (issue
-/// B2 finding #2).
-///
-/// This is intentionally **stricter** than
-/// `memory_sync::composio::providers::is_action_visible_with_pref` — the
-/// helper the normal agent tool-call loop uses. That helper is permissive by
-/// design for a toolkit it doesn't recognize: it falls back to the
-/// `classify_unknown` heuristic and lets the slug through (scope-gated), and
-/// treats a prefix-less slug as unconditionally visible. That's safe in the
-/// agent loop because the model only ever sees slugs the *backend itself*
-/// returned from live tool discovery (`composio_list_tools`) — there is no
-/// path for the model to invent a slug that reaches this check. A flow's
-/// `tool_call.slug`, by contrast, is a free-form string the flow *author*
-/// typed when building the graph; it never round-trips through Composio
-/// discovery before `invoke` is called. So here a slug is allowed **only**
-/// if it resolves to a real, known toolkit AND is present in that toolkit's
-/// curated catalog:
-/// - `toolkit_from_slug` fails to extract anything (empty/blank slug) → reject.
-/// - the extracted toolkit has no registered provider curated list AND no
-///   static `catalog_for_toolkit` entry (i.e. it isn't one of OpenHuman's
-///   known/curated toolkits at all — including a made-up prefix like
-///   `madeupkit`, or a prefix-less slug like `noop` which `toolkit_from_slug`
-///   degrades to treating as its own single-segment "toolkit") → reject.
-/// - the toolkit has a catalog but `slug` isn't one of its entries → reject.
-/// - otherwise, apply the same per-user read/write/admin scope preference
-///   the agent loop uses (`UserScopePref::allows`).
-///
-/// // (0.3) The former hard-reject of any *real* Composio toolkit not in the
-/// // static `catalog_for_toolkit` map is now lifted for toolkits the user has
-/// // actually connected: when a slug's toolkit has no static curated catalog,
-/// // the gate consults the user's **live connected-toolkit set** (from the
-/// // composio domain) and allows the call iff the user holds an ACTIVE
-/// // connection for that toolkit. A genuinely-unknown/made-up toolkit is never
-/// // connected, so it still rejects. Toolkits OpenHuman *does* ship a static
-/// // catalog for keep their stricter curated-action + per-user scope gating
-/// // unchanged (a connected-but-uncurated action on a cataloged toolkit is
-/// // still rejected — the catalog is the tighter allowlist there).
-///
-/// // (systemic tool-contract fix, PR2) Path B is now further tightened rather
-/// // than loosened: on top of the (0.3) connected-toolkit check, the SLUG
-/// // ITSELF must be a genuine action in that toolkit's LIVE Composio catalog
-/// // (`fetch_live_toolkit_catalog`) — previously any string sharing the
-/// // connected toolkit's prefix passed (e.g. a hallucinated/typo'd
-/// // `STRIPE_DOES_NOT_EXIST` for a connected `stripe`), with no per-user
-/// // read/write/admin scope check at all. Now: existence is broadened to the
-/// // real catalog (a real-but-uncurated action is allowed), but scope gating
-/// // is ADDED via [`classify_unknown`] — strictly narrower than before, never
-/// // looser.
-///
-/// Returns whether `slug` may be invoked as a flow `tool_call`, given (only when
-/// needed) the user's live connected-toolkit slug set. `config` is only used by
-/// Path B's live-catalog fetch (fed through [`fetch_live_toolkit_catalog`],
-/// which is itself cached — a seeded test cache never touches the network).
-///
-/// Split out from [`is_curated_flow_tool`] as a (mostly) pure function so the
-/// two decision paths are unit-testable without a live Composio backend:
-/// `connected_toolkits` is `None` when the toolkit has a static catalog (the
-/// connected set is never consulted then) or when the connected set could not
-/// be fetched (fail-closed).
-async fn flow_tool_allowed(
-    ctx: &crate::core::runtime::DispatchCtx,
-    config: &Config,
-    slug: &str,
-    connected_toolkits: Option<&[String]>,
-) -> bool {
-    use crate::integrations::composio::contract::{
-        catalog_for_toolkit, classify_unknown, find_curated, toolkit_from_slug,
-    };
-    use crate::integrations::composio::ops::load_user_scope_pref;
+pub(crate) use crate::integrations::composio::flow_gate::{
+    flow_tool_allowed, resolve_account, resolve_composio_account, slug_needs_connected_set,
+};
 
-    let Some(toolkit) = toolkit_from_slug(slug) else {
-        tracing::debug!(target: "flows", %slug, "[flows] tool_call curation: reject — slug has no extractable toolkit prefix");
-        return false;
-    };
-
-    // Path A: a toolkit OpenHuman ships a static curated catalog for keeps its
-    // strict curated-action + per-user scope gating (unchanged from B2).
-    if let Some(catalog) = catalog_for_toolkit(&toolkit) {
-        let Some(curated) = find_curated(&catalog, slug) else {
-            tracing::debug!(target: "flows", %slug, %toolkit, "[flows] tool_call curation: reject — slug is not a curated action of this toolkit");
-            return false;
-        };
-        let pref = load_user_scope_pref(ctx, config, &toolkit).await;
-        let allowed = pref.allows(curated.scope);
-        tracing::debug!(target: "flows", %slug, %toolkit, allowed, "[flows] tool_call curation: static curated catalog decision");
-        return allowed;
-    }
-
-    // Path B: no static catalog. First, the (0.3) toolkit-level gate — allow
-    // only when the user has a live ACTIVE Composio connection for it. A
-    // made-up toolkit is never connected, so it rejects right here without
-    // ever reaching the live-catalog fetch below.
-    let connected = match connected_toolkits {
-        Some(toolkits) => toolkits.iter().any(|t| t.eq_ignore_ascii_case(&toolkit)),
-        None => {
-            tracing::warn!(target: "flows", %slug, %toolkit, "[flows] tool_call curation: reject — no static catalog and the connected-toolkit set was unavailable (fail-closed)");
-            false
-        }
-    };
-    if !connected {
-        tracing::debug!(target: "flows", %slug, %toolkit, "[flows] tool_call curation: reject — toolkit has no static catalog and is not connected");
-        return false;
-    }
-
-    // Second, the (systemic tool-contract fix) slug-existence gate — the
-    // exact slug must be a genuine action in the toolkit's LIVE Composio
-    // catalog, not merely share its prefix. A fetch failure fails closed
-    // (never falls back to "any slug with the right prefix passes").
-    let Some(live_catalog) = fetch_live_toolkit_catalog(config, &toolkit).await else {
-        tracing::warn!(target: "flows", %slug, %toolkit, "[flows] tool_call curation: reject — connected but the live catalog fetch failed (fail-closed)");
-        return false;
-    };
-    if !live_catalog
-        .iter()
-        .any(|c| c.slug.eq_ignore_ascii_case(slug))
-    {
-        tracing::debug!(target: "flows", %slug, %toolkit, "[flows] tool_call curation: reject — slug is not a real action in this toolkit's live catalog");
-        return false;
-    }
-
-    // Finally, scope-gate the same way a curated action is — via the
-    // classify_unknown heuristic (mirrors
-    // `providers::is_action_visible_with_pref`'s uncurated branch), which the
-    // pre-fix Path B never applied at all.
-    let pref = load_user_scope_pref(ctx, config, &toolkit).await;
-    let allowed = pref.allows(classify_unknown(slug));
-    tracing::debug!(target: "flows", %slug, %toolkit, allowed, "[flows] tool_call curation: live catalog + scope decision");
-    allowed
-}
-
-/// Whether `slug`'s toolkit lacks a static curated catalog, i.e. the curation
-/// decision must consult the user's live connected-toolkit set. Kept cheap and
-/// offline (a registry lookup) so the common cataloged-toolkit path never pays
-/// for a connected-set fetch.
-fn slug_needs_connected_set(slug: &str) -> bool {
-    use crate::integrations::composio::contract::{catalog_for_toolkit, toolkit_from_slug};
-    match toolkit_from_slug(slug) {
-        Some(toolkit) => catalog_for_toolkit(&toolkit).is_none(),
-        None => false,
-    }
-}
-
-/// The user's live set of ACTIVE-connected Composio toolkit slugs (lowercased),
-/// or `None` when the backend is unreachable and no cached snapshot exists.
-///
-/// Uses [`fetch_connected_integrations_status`] so a transient backend failure
-/// (`Unavailable`) is distinguished from "confirmed zero connections" — on
-/// `Unavailable` we fall back to the last-known (even expired) cache rather than
-/// collapse the allowlist to empty, and only return `None` when there is truly
-/// nothing to go on (the caller then fails closed).
-async fn connected_toolkit_slugs(config: &Config) -> Option<Vec<String>> {
-    use crate::integrations::composio::{
-        cached_active_integrations, fetch_connected_integrations_status,
-        FetchConnectedIntegrationsStatus,
-    };
-
-    let integrations = match fetch_connected_integrations_status(config).await {
-        FetchConnectedIntegrationsStatus::Authoritative(v) => v,
-        FetchConnectedIntegrationsStatus::Unavailable => match cached_active_integrations(config) {
-            Some(v) => {
-                tracing::warn!(target: "flows", "[flows] connected-toolkit lookup: backend unavailable — using last-known (possibly stale) cached connections for the tool_call allowlist");
-                v
-            }
-            None => {
-                tracing::warn!(target: "flows", "[flows] connected-toolkit lookup: backend unavailable and no cached snapshot — connected-toolkit allowlist is empty this call");
-                return None;
-            }
-        },
-    };
-
-    Some(
-        integrations
-            .into_iter()
-            .filter(|i| i.connected)
-            .map(|i| i.toolkit.to_ascii_lowercase())
-            .collect(),
-    )
-}
-
-/// Effect-aware classification of a Composio `tool_call` slug into the
-/// [`CommandClass`] the autonomy-tier gate ([`enforce_node_tier_gate`])
-/// evaluates it under.
-///
-/// Reuses [`curated_scope_for`](crate::integrations::composio::contract::curated_scope_for),
-/// the same catalog walk `composio::ops`'s `gated_tools` hints use — a
-/// registered native provider's `curated_tools()` first, then the static
-/// `catalog_for_toolkit` fallback. **Fail-safe by construction:** only a
-/// slug that resolves to a curated entry with `ToolScope::Read` maps to
-/// `CommandClass::Read` (the one class every tier `Allow`s outright, so a
-/// read never parks as a pending approval). Every other outcome — a
-/// curated `Write`/`Admin` entry, a toolkit with no catalog entry for this
-/// slug, a toolkit with no catalog at all, or an unparseable/empty slug —
-/// maps to `CommandClass::Network`, the same class `http_request` uses
-/// (prompts under Supervised/Full, blocks under ReadOnly).
-///
-/// Deliberately does **not** fall back to
-/// [`classify_unknown`](crate::integrations::composio::contract::classify_unknown)
-/// for uncurated slugs: that heuristic is tuned for the *curation*
-/// allowlist (`flow_tool_allowed`'s Path B — "is this slug even visible to
-/// the agent"), not for deciding whether a real side-effecting call skips
-/// a human approval prompt. A "SEARCH"/"GET"-shaped uncurated slug must
-/// still prompt until OpenHuman has actually hand-curated it as `Read`.
-/// `pub(crate)` so `flows::ops::compute_approval_manifest` can reuse the
-/// exact runtime classifier at save time — the manifest must never drift
-/// from what actually gates (a parallel re-implementation would list
-/// permissions that never prompt, or miss ones that do).
 pub(crate) async fn classify_composio_action_for_tier(slug: &str) -> CommandClass {
-    use crate::integrations::composio::contract::{curated_scope_for, ToolScope};
-
-    match curated_scope_for(slug) {
-        Some(ToolScope::Read) => CommandClass::Read,
-        Some(ToolScope::Write) | Some(ToolScope::Admin) | None => CommandClass::Network,
-    }
+    crate::integrations::composio::flow_gate::classify_composio_action_for_tier(slug)
 }
 
-/// Deny-by-default curation gate for a flow `tool_call` slug (see
-/// [`flow_tool_allowed`] for the decision matrix). Fetches the user's live
-/// connected-toolkit set only when the slug's toolkit has no static catalog.
 pub(crate) async fn is_curated_flow_tool(
     ctx: &crate::core::runtime::DispatchCtx,
     config: &Config,
     slug: &str,
 ) -> bool {
-    let connected = if slug_needs_connected_set(slug) {
-        connected_toolkit_slugs(config).await
-    } else {
-        None
-    };
-    flow_tool_allowed(ctx, config, slug, connected.as_deref()).await
-}
-
-/// Finds the connected account a Composio `connection_id` refers to within a
-/// live connected-integrations snapshot, returning `(toolkit, display_label)`.
-/// UI-safe: the label is the pre-derived [`IntegrationConnection::label`], never
-/// a raw account-identity field. Pure over the snapshot so it is unit-testable.
-fn resolve_account<'a>(
-    integrations: &'a [crate::integrations::composio::ConnectedIntegration],
-    connection_id: &str,
-) -> Option<(&'a str, Option<&'a str>)> {
-    integrations.iter().find_map(|integ| {
-        integ
-            .connections
-            .iter()
-            .find(|c| c.connection_id == connection_id)
-            .map(|c| (integ.toolkit.as_str(), c.label.as_deref()))
-    })
-}
-
-/// Resolves a Composio `connection_id` to the specific connected account it
-/// targets, for logging "which account was used". Best-effort: `None` when the
-/// id isn't found in the user's live connected accounts (stale cache / foreign
-/// id) or the backend is unreachable.
-pub(crate) async fn resolve_composio_account(
-    config: &Config,
-    connection_id: &str,
-) -> Option<(String, Option<String>)> {
-    let integrations = crate::integrations::composio::fetch_connected_integrations(config).await;
-    resolve_account(&integrations, connection_id)
-        .map(|(toolkit, label)| (toolkit.to_string(), label.map(str::to_string)))
+    crate::integrations::composio::flow_gate::is_curated_flow_tool(ctx, config, slug).await
 }
 
 /// [`ToolInvoker`] adapter over Composio (`crates/openhuman-core/src/integrations/composio/client.rs`).
@@ -395,109 +139,22 @@ pub struct OpenHumanTools {
     pub approval: crate::security::approval::ApprovalTurnContext,
 }
 
-/// Required-arg preflight for a Composio `tool_call`: fails **before** the
-/// Composio dispatch when a required arg is missing or resolved to `null`,
-/// with a message that names the field and the likely fix — instead of letting
-/// the raw provider error surface from deep inside the call.
-///
-/// Two independent halves:
-///
-/// 1. The **static** rules `prepare_execute_arguments` already enforces at
-///    dispatch (`GMAIL_SEND_EMAIL` needs a recipient, `GOOGLECALENDAR_*` time
-///    bounds must be RFC 3339, …). These need no catalog, no network and no
-///    API key, so they always run.
-/// 2. The **catalog-driven** required-arg list, which is best-effort: when the
-///    action's schema cannot be looked up that half is skipped (never blocks
-///    on catalog availability).
-///
-/// Before #6154 only (2) existed, so a host with no reachable Composio
-/// catalog — the common case in a dry run, and any offline/unkeyed run — had
-/// a preflight that silently passed everything and left the failure to
-/// surface from inside the dispatch instead.
 pub(crate) async fn preflight_composio_args(
     config: &Config,
     slug: &str,
     args: &Value,
 ) -> Result<()> {
-    // (1) Static rules — the same validation the Composio dispatch runs, hoisted
-    // ahead of it. Only the `Err` matters here; the normalized arguments it
-    // returns are recomputed (and used) at dispatch.
-    if let Err(e) = crate::integrations::composio::processing::prepare(
-        config,
-        slug,
-        Some(args.clone()),
-        None,
-        None,
-    )
-    .await
-    {
-        tracing::warn!(target: "flows", %slug, error = %e, "[flows] preflight: static arg rule rejected the call — failing before dispatch");
-        return Err(EngineError::Capability(format!("tool_call `{slug}`: {e}")));
-    }
-
-    // (2) Catalog-driven required args.
-    let Some(required) = composio_required_args(config, slug).await else {
-        tracing::info!(target: "flows", %slug, "[flows] preflight: no live catalog schema for action — required-arg check limited to static rules");
-        return Ok(());
-    };
-    let missing = missing_required_args(&required, args);
-    if missing.is_empty() {
-        tracing::debug!(target: "flows", %slug, "[flows] preflight: all required args present");
-        return Ok(());
-    }
-    tracing::warn!(target: "flows", %slug, ?missing, "[flows] preflight: required arg(s) missing or null — failing before dispatch");
-    let list = missing
-        .iter()
-        .map(|m| format!("`{m}`"))
-        .collect::<Vec<_>>()
-        .join(", ");
-    let first = &missing[0];
-    Err(EngineError::Capability(format!(
-        "tool_call `{slug}`: required arg(s) {list} missing or resolved to null — wire each from \
-         an upstream node's output, e.g. \"{first}\": \"=nodes.<node_id>.item.json.<field>\" \
-         (drop `.json` only if `<node_id>` is a code/transform/split_out/merge/trigger node — \
-         `agent`/`tool_call`/`http_request` nodes wrap their output in a `{{json,text,raw}}` \
-         envelope). If the value comes from an agent node, give that agent an output schema \
-         (config.output_parser.schema) so its fields are addressable."
-    )))
+    crate::integrations::composio::flow_gate::preflight_composio_args(config, slug, args)
+        .await
+        .map_err(EngineError::Capability)
 }
 
-/// Turns a Composio execute response that reports a provider-side failure
-/// into a real capability error.
-///
-/// The Composio execute endpoint is a "successful HTTP request describing an
-/// unsuccessful tool call" API: a transport-level failure (network error, 5xx,
-/// bad JSON) already surfaces as `Err` via `?` in [`OpenHumanTools::invoke`],
-/// but a 200 response whose body is `{successful: false, error: "..."}` (e.g.
-/// Slack rejecting `SLACK_SEND_MESSAGE` with a 400 "Invalid request data")
-/// comes back as `Ok(ComposioExecuteResponse)` — nothing downstream ever
-/// inspected `successful`, so the tinyflows engine recorded the step (and
-/// therefore the run) as `Success`/`"completed"` even though the requested
-/// action never actually happened upstream.
-///
-/// Called on every Composio response (never on native `oh:` tool results,
-/// which don't carry this envelope and return earlier in `invoke`). A
-/// genuinely successful response (`successful: true`) passes through
-/// unchanged; an unsuccessful one becomes `Err(EngineError::Capability(_))`,
-/// which the engine turns into `StepStatus::Error` and — via
-/// `degrade_completed_status` — a degraded/failed run instead of a false
-/// "Completed".
 pub(crate) fn reject_unsuccessful_composio_response(
     slug: &str,
-    resp: crate::integrations::composio::ComposioExecuteResponse,
+    response: crate::integrations::composio::ComposioExecuteResponse,
 ) -> Result<crate::integrations::composio::ComposioExecuteResponse> {
-    if resp.successful {
-        return Ok(resp);
-    }
-    let detail = resp
-        .error
-        .as_deref()
-        .map(str::trim)
-        .filter(|e| !e.is_empty())
-        .unwrap_or("no error detail returned by the provider");
-    Err(EngineError::Capability(format!(
-        "tool_call `{slug}` failed at the connected provider: {detail}"
-    )))
+    crate::integrations::composio::flow_gate::reject_unsuccessful_composio_response(slug, response)
+        .map_err(EngineError::Capability)
 }
 
 /// Native-tool analogue of [`reject_unsuccessful_composio_response`].
