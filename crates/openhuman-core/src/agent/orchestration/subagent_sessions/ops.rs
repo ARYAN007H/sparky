@@ -25,7 +25,9 @@ pub fn cancel_driver_jobs_for_thread(
     let sessions = match store.load() {
         Ok(sessions) => sessions,
         Err(error) => {
-            log::warn!("[subagent_sessions] failed to load sessions for thread cancellation: {error}");
+            log::warn!(
+                "[subagent_sessions] failed to load sessions for thread cancellation: {error}"
+            );
             return Vec::new();
         }
     };

@@ -90,11 +90,8 @@ async fn unthreaded_port_lists_only_unthreaded_rows() {
     threaded.parent_thread_id = Some("thread-a".into());
     store.save(&[unthreaded, threaded]).unwrap();
 
-    let port = OpenHumanTinySubagentSessionStore::new(
-        workspace.path().to_path_buf(),
-        "owner",
-        None,
-    );
+    let port =
+        OpenHumanTinySubagentSessionStore::new(workspace.path().to_path_buf(), "owner", None);
     let sessions = port.list_for_parent("owner", None).await.unwrap();
     assert_eq!(sessions.len(), 1);
     assert_eq!(sessions[0].subagent_session_id, "unthreaded-session");
@@ -122,42 +119,59 @@ async fn upsert_rejects_a_selector_or_lifecycle_key_outside_bound_scope() {
             task_id: task_id.into(),
         }
     };
-    let upsert = |parent_session: &str,
-                  parent_thread_id: Option<&str>,
-                  lifecycle_key: tinyagents_orchestration::subagent::SubagentTaskKey| {
-        TinyUpsert {
-            selector: TinySelector {
-                parent_session: parent_session.into(),
-                parent_thread_id: parent_thread_id.map(str::to_owned),
-                agent_id: "researcher".into(),
-                model: None,
-                sandbox_mode: "workspace".into(),
-                action_root: None,
-                task_key: "analysis".into(),
-            },
-            lifecycle_key,
-            display_name: None,
-            task_title: "Task".into(),
-            worker_thread_id: None,
-            task_id: "task-1".into(),
-            force_fresh: true,
-        }
-    };
+    let upsert =
+        |parent_session: &str,
+         parent_thread_id: Option<&str>,
+         lifecycle_key: tinyagents_orchestration::subagent::SubagentTaskKey| {
+            TinyUpsert {
+                selector: TinySelector {
+                    parent_session: parent_session.into(),
+                    parent_thread_id: parent_thread_id.map(str::to_owned),
+                    agent_id: "researcher".into(),
+                    model: None,
+                    sandbox_mode: "workspace".into(),
+                    action_root: None,
+                    task_key: "analysis".into(),
+                },
+                lifecycle_key,
+                display_name: None,
+                task_title: "Task".into(),
+                worker_thread_id: None,
+                task_id: "task-1".into(),
+                force_fresh: true,
+            }
+        };
 
     assert!(port
-        .upsert_running(upsert("foreign", Some("thread-a"), key(Some("thread-a"), "task-1")))
+        .upsert_running(upsert(
+            "foreign",
+            Some("thread-a"),
+            key(Some("thread-a"), "task-1")
+        ))
         .await
         .is_err());
     assert!(port
-        .upsert_running(upsert("owner", Some("thread-b"), key(Some("thread-b"), "task-1")))
+        .upsert_running(upsert(
+            "owner",
+            Some("thread-b"),
+            key(Some("thread-b"), "task-1")
+        ))
         .await
         .is_err());
     assert!(port
-        .upsert_running(upsert("owner", Some("thread-a"), key(Some("thread-b"), "task-1")))
+        .upsert_running(upsert(
+            "owner",
+            Some("thread-a"),
+            key(Some("thread-b"), "task-1")
+        ))
         .await
         .is_err());
     assert!(port
-        .upsert_running(upsert("owner", Some("thread-a"), key(Some("thread-a"), "other-task")))
+        .upsert_running(upsert(
+            "owner",
+            Some("thread-a"),
+            key(Some("thread-a"), "other-task")
+        ))
         .await
         .is_err());
     assert!(store.load().unwrap().is_empty());

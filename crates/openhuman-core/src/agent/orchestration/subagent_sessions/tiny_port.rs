@@ -122,9 +122,9 @@ impl TinySessionStore for OpenHumanTinySubagentSessionStore {
         if parent_session != self.parent_session {
             return Ok(Vec::new());
         }
-        if parent_thread_id.is_some_and(|requested| {
-            self.parent_thread_id.as_deref() != Some(requested)
-        }) {
+        if parent_thread_id
+            .is_some_and(|requested| self.parent_thread_id.as_deref() != Some(requested))
+        {
             return Ok(Vec::new());
         }
         super::list_for_parent(
@@ -132,11 +132,11 @@ impl TinySessionStore for OpenHumanTinySubagentSessionStore {
             parent_session,
             self.parent_thread_id.as_deref(),
         )
-            .map_err(SubagentError::Persistence)?
-            .into_iter()
-            .filter(|row| self.is_owned(row))
-            .map(|row| self.convert(row))
-            .collect()
+        .map_err(SubagentError::Persistence)?
+        .into_iter()
+        .filter(|row| self.is_owned(row))
+        .map(|row| self.convert(row))
+        .collect()
     }
 
     async fn get(&self, id: &str) -> Result<Option<TinySession>, SubagentError> {

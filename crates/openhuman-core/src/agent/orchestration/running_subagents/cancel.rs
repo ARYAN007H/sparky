@@ -158,14 +158,15 @@ pub(crate) fn stop_for_thread(
             let jobs = crate::core::runtime::slot_for::<
                 tinyagents_orchestration::subagent::SubAgentJobRegistry,
             >(ctx);
-            let driver_stopped = crate::agent::orchestration::subagent_sessions::cancel_driver_jobs_for_thread(
-                &crate::agent::orchestration::subagent_sessions::SubagentSessionStore::new(
-                    workspace_dir.clone(),
-                ),
-                &workspace_dir,
-                &jobs,
-                thread_id,
-            );
+            let driver_stopped =
+                crate::agent::orchestration::subagent_sessions::cancel_driver_jobs_for_thread(
+                    &crate::agent::orchestration::subagent_sessions::SubagentSessionStore::new(
+                        workspace_dir.clone(),
+                    ),
+                    &workspace_dir,
+                    &jobs,
+                    thread_id,
+                );
             for task_id in driver_stopped {
                 if !task_ids.contains(&task_id) {
                     task_ids.push(task_id);

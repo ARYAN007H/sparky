@@ -494,13 +494,14 @@ async fn thread_delete_inner(
     let jobs = crate::core::runtime::slot_for::<
         tinyagents_orchestration::subagent::SubAgentJobRegistry,
     >(&ctx);
-    let cancelled_driver = crate::agent::orchestration::subagent_sessions::cancel_driver_jobs_for_thread(
-        &crate::agent::orchestration::subagent_sessions::SubagentSessionStore::new(dir.clone()),
-        &dir,
-        &jobs,
-        &request.thread_id,
-    )
-    .len();
+    let cancelled_driver =
+        crate::agent::orchestration::subagent_sessions::cancel_driver_jobs_for_thread(
+            &crate::agent::orchestration::subagent_sessions::SubagentSessionStore::new(dir.clone()),
+            &dir,
+            &jobs,
+            &request.thread_id,
+        )
+        .len();
     let cancelled = cancelled_legacy + cancelled_driver;
     let discarded = crate::agent::orchestration::background_completions::discard_for_thread(
         &ctx,

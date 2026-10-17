@@ -95,6 +95,42 @@ async fn prepared_async_spawn_runs_through_driver_jobs_dispatcher() {
 }
 
 #[tokio::test]
+async fn stopped_parent_thread_rejects_a_new_driver_spawn_before_execution() {
+    let scratch = tempfile::tempdir().expect("isolated stopped-thread fixture");
+    let workspace = scratch.path().join("workspace");
+    std::fs::create_dir_all(&workspace).expect("create isolated workspace");
+    let provider = ScriptedProvider::new(vec![text_response("must not run")]);
+    let mut parent_context = make_parent(provider.clone(), vec![]);
+    parent_context.workspace_dir = workspace;
+    let mut options = with_parent(parent_context, SubagentRunOptions::default());
+    options.checkpoint_dir = Some(scratch.path().join("checkpoints"));
+    options.run_context.thread_id = Some("stopped-driver-thread".into());
+    let parent = options.run_context.clone().into_tinyagents(
+        tinyagents_harness::context::RunConfig::new("stopped-driver-parent")
+            .with_thread("stopped-driver-thread"),
+    );
+    let dispatch_ctx = parent.data.dispatch_ctx();
+    crate::agent::orchestration::background_completions::discard_pending_for_thread(
+        &dispatch_ctx,
+        "stopped-driver-thread",
+    );
+
+    let result = run_async_spawn_via_driver_tool(
+        &parent,
+        make_def_named_tools(&[]),
+        "return the requested result".into(),
+        options,
+    )
+    .await;
+
+    assert!(result.is_err(), "stopped thread must reject new children");
+    assert!(
+        provider.captured.lock().is_empty(),
+        "the child model must not run after Stop"
+    );
+}
+
+#[tokio::test]
 async fn detached_driver_spawn_repairs_replayed_host_outcome_without_reexecution() {
     let scratch = tempfile::tempdir().expect("isolated async spawn fixture");
     let workspace = scratch.path().join("workspace");
