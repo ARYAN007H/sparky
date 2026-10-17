@@ -145,19 +145,27 @@ async fn prepared_child_run_is_exported_from_its_native_journal_lineage() {
         .iter()
         .filter(|observation| observation.run_id == child_run_id)
         .collect();
+    let child_finalized_at = child_observations
+        .iter()
+        .find_map(|observation| match &observation.event {
+            AgentEvent::RunFinalized { run_id } if run_id == &child_run_id => {
+                Some(observation.ts_ms)
+            }
+            _ => None,
+        })
+        .expect("the child journal is finalized after the host adapter returns");
+    let parent_ack_at = observations
+        .iter()
+        .find_map(|observation| match &observation.event {
+            AgentEvent::SubAgentRunCompleted { run_id } if run_id == &child_run_id => {
+                Some(observation.ts_ms)
+            }
+            _ => None,
+        })
+        .expect("the parent acknowledges the same child identity");
     assert!(
-        child_observations.iter().any(|observation| matches!(
-            observation.event,
-            AgentEvent::RunFinalized { ref run_id } if *run_id == child_run_id
-        )),
-        "the child journal is finalized after the host adapter returns"
-    );
-    assert!(
-        observations.iter().any(|observation| matches!(
-            observation.event,
-            AgentEvent::SubAgentRunCompleted { ref run_id } if *run_id == child_run_id
-        )),
-        "the parent acknowledges the same child identity"
+        parent_ack_at >= child_finalized_at,
+        "parent completion follows child durable finalization"
     );
     assert!(child_observations.iter().all(|observation| {
         observation.parent_run_id.as_ref() == Some(&root_run_id)
