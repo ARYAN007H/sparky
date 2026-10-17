@@ -208,7 +208,8 @@ pub(crate) fn update_job_with_origin(
     limits::check_patch(config, &patch)?;
     if patch.delivery.is_some() || patch.origin.is_some() {
         let existing = get_job(config, job_id)?;
-        patch = validate_and_complete_route_patch(config, &existing, patch, trusted_origin.as_ref())?;
+        patch =
+            validate_and_complete_route_patch(config, &existing, patch, trusted_origin.as_ref())?;
     }
     store_blocking(
         config,
