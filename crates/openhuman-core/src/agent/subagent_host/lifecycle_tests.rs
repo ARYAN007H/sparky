@@ -131,6 +131,14 @@ fn driver_error_does_not_hide_completed_mismatched_or_persistence_failures() {
     .unwrap_err();
     assert!(error.to_string().contains("driver-backed async spawn failed"));
 
+    bundle.host_outcome.lock().unwrap().insert(
+        task_key.clone(),
+        cached_outcome(SubagentRunStatus::AwaitingUser {
+            question: "Need clarification".into(),
+            options: None,
+            checkpoint: None,
+        }),
+    );
     let error = decode_driver_job_result(
         lifecycle_error("awaiting_input", ""),
         &bundle,
