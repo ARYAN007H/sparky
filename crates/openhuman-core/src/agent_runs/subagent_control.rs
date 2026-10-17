@@ -160,36 +160,7 @@ fn handle_subagent_cancel(ctx: DispatchCtx, params: Map<String, Value>) -> Contr
                     // A paused job has already returned from that hook, so this
                     // handler settles and reports that one terminal transition.
                     if let Some(paused) = meta.driver_pause.as_ref() {
-                        let store = subagent_sessions::SubagentSessionStore::new(
-                            meta.workspace_dir.clone(),
-                        );
-                        let transitioned =
-                            subagent_sessions::mark_driver_pause_cancelled(&store, paused)
-                                .map_err(|error| {
-                                    format!(
-                                        "subagent_cancel: failed to settle paused child: {error}"
-                                    )
-                                })?;
-                        if transitioned {
-                            let error = match reason
-                                .as_deref()
-                                .map(str::trim)
-                                .filter(|reason| !reason.is_empty())
-                            {
-                                Some(reason) => format!("cancelled by user. Reason: {reason}"),
-                                None => "cancelled by user".to_string(),
-                            };
-                            background_completions::record_failure(
-                                &ctx,
-                                &meta.workspace_dir,
-                                &meta.parent_session,
-                                &task_id,
-                                meta.agent_id,
-                                &error,
-                                meta.parent_thread_id.clone(),
-                            )
-                            .await;
-                        }
+                        settle_paused_driver_cancel(&ctx, paused, reason.as_deref()).await?;
                     }
                     (true, None)
                 } else {
@@ -244,6 +215,33 @@ fn handle_subagent_cancel(ctx: DispatchCtx, params: Map<String, Value>) -> Contr
         }
         to_json(reply)
     })
+}
+
+async fn settle_paused_driver_cancel(
+    ctx: &DispatchCtx,
+    paused: &subagent_sessions::DriverTaskCancellation,
+    reason: Option<&str>,
+) -> Result<bool, String> {
+    let store = subagent_sessions::SubagentSessionStore::new(paused.workspace_dir.clone());
+    let transitioned = subagent_sessions::mark_driver_pause_cancelled(&store, paused)
+        .map_err(|error| format!("subagent_cancel: failed to settle paused child: {error}"))?;
+    if transitioned {
+        let error = match reason.map(str::trim).filter(|reason| !reason.is_empty()) {
+            Some(reason) => format!("cancelled by user. Reason: {reason}"),
+            None => "cancelled by user".to_string(),
+        };
+        background_completions::record_failure(
+            ctx,
+            &paused.workspace_dir,
+            &paused.parent_session,
+            &paused.task_id,
+            &paused.agent_id,
+            &error,
+            paused.parent_thread_id.clone(),
+        )
+        .await;
+    }
+    Ok(transitioned)
 }
 
 fn handle_subagent_steer(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
