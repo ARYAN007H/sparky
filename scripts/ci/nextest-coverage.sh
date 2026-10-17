@@ -26,7 +26,7 @@ started=$SECONDS
 rc=0
 bash scripts/ci-cancel-aware.sh "${args[@]}" || rc=$?
 report_rc=0
-NEXTEST_ELAPSED_SECONDS="$((SECONDS - started))" node scripts/ci/nextest-report.mjs "$report" "${report_dir}/${suite}.json" ${NEXTEST_EXPECTED_TARGETS:+"${NEXTEST_EXPECTED_TARGETS}"} || report_rc=$?
+NEXTEST_ELAPSED_SECONDS="$((SECONDS - started))" node scripts/ci/nextest-report.mjs "$report" "${report_dir}/${suite}.json" ${NEXTEST_EXPECTED_TARGETS:+"${NEXTEST_EXPECTED_TARGETS}"} ${NEXTEST_EXPECTED_INVENTORY:+"${NEXTEST_EXPECTED_INVENTORY}"} || report_rc=$?
 # A report/inventory failure must not hide the test runner's actual failure or
 # cancellation. Successful executions must also produce nonempty reports.
 [ "$rc" != 0 ] || rc="$report_rc"

@@ -34,5 +34,5 @@ filter = 'binary(=json_rpc_e2e)'
 test-group = 'json-rpc-e2e'
 
 [[profile.ci.overrides]]
-filter = 'binary(=mcp_registry_multi_server)'
+filter = 'binary(/^mcp_registry_multi_server$/)'
 test-group = 'mcp-registry'

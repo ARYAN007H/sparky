@@ -2,7 +2,11 @@
 // Consume nextest's JUnit vocabulary; retain counts before checking inventory.
 import fs from "node:fs";
 
-const [report, output, expectedFile] = process.argv.slice(2);
+const [report, output, expectedFile, inventoryFile] = process.argv.slice(2);
+if (!fs.existsSync(report)) {
+  console.error(`[ci][nextest] JUnit report unavailable: ${report}`);
+  process.exit(1);
+}
 const xml = fs.readFileSync(report, "utf8");
 const decode = (value) =>
   value
@@ -44,14 +48,20 @@ console.log(
 const expected = expectedFile
   ? fs.readFileSync(expectedFile, "utf8").split(/\r?\n/).filter(Boolean)
   : [];
-const missing = expected.filter(
-  (target) =>
-    !suites.some(
-      (suite) =>
-        (suite.name === target || suite.name?.endsWith(`::${target}`)) &&
-        suite.tests > 0,
-    ),
-);
+const inventory = inventoryFile
+  ? Object.values(JSON.parse(fs.readFileSync(inventoryFile, "utf8"))["rust-suites"] ?? {})
+  : null;
+const missing = expected.filter((target) => {
+  if (inventory) {
+    const binary = inventory.find((suite) => suite["binary-name"] === target);
+    // A missing compiled target still fails. Only a present binary whose
+    // complete selected inventory is ignored may omit its JUnit testsuite.
+    if (!binary) return true;
+    const selected = Object.values(binary.testcases ?? {});
+    if (selected.length > 0 && selected.every((test) => test.ignored === true)) return false;
+  }
+  return !suites.some((suite) => (suite.name === target || suite.name?.endsWith(`::${target}`)) && suite.tests > 0);
+});
 if (counts.tests === 0 || missing.length > 0) {
   console.error(
     `[ci][nextest] expected nonempty suites; missing/empty: ${missing.join(", ") || "entire selection"}`,

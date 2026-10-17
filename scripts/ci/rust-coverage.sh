@@ -265,7 +265,20 @@ if [ "${OH_COV_RUNNER:-cargo}" = "nextest" ]; then
       printf '%s\n' "${target}" >>"${expected_targets}"
     fi
   done < <(integration_test_targets)
+  expected_inventory=""
+  if [ -s "${expected_targets}" ]; then
+    expected_inventory="${PWD}/ci-out/nextest/cli-inventory.json"
+    # Listing executes no tests. cargo-llvm-cov supplies the same wrapper and
+    # instrumentation environment, so Cargo can reuse this CLI test build.
+    cli_inventory() (
+      eval "$(cargo llvm-cov show-env --sh --features "${CORE_PRODUCT_FEATURES}")"
+      cargo nextest list --message-format json --features "${CORE_PRODUCT_FEATURES}" \
+        -p openhuman-cli --tests -E 'kind(test)' >"${expected_inventory}"
+    )
+    suite "openhuman-cli test inventory" cli_inventory
+  fi
   NEXTEST_EXPECTED_TARGETS="${expected_targets}" \
+  NEXTEST_EXPECTED_INVENTORY="${expected_inventory}" \
   suite "openhuman-cli integration tests (nextest)" llvm_cov \
     --no-report --no-fail-fast -p openhuman-cli --tests -E 'kind(test)'
 else

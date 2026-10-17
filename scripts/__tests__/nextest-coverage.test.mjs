@@ -64,8 +64,8 @@ test("nextest serialization retains JSON-RPC and multi-server suites", () => {
     path.join(root, ".config/nextest.toml"),
     "utf8",
   );
-  assert.match(config, /binary\(=json_rpc_e2e\)/);
-  assert.match(config, /binary\(=mcp_registry_multi_server\)/);
+  assert.match(config, /binary\(\/\^json_rpc_e2e\$\/\)/);
+  assert.match(config, /binary\(\/\^mcp_registry_multi_server\$\/\)/);
 });
 
 test("ignored-only binaries remain inventoried without requiring nonexistent JUnit suites", () => {
