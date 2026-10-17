@@ -257,13 +257,13 @@ pub(crate) async fn spawn_async_via_driver_tool(
     input: String,
     options: SubagentRunOptions,
     completion: impl Fn(
-            String,
-            Result<SubagentRunOutcome, String>,
-            bool,
-        ) -> Pin<Box<dyn Future<Output = ()> + Send>>
-        + Send
-        + Sync
-        + 'static,
+        String,
+        Result<SubagentRunOutcome, String>,
+        bool,
+    ) -> Pin<Box<dyn Future<Output = ()> + Send>>
+    + Send
+    + Sync
+    + 'static,
 ) -> Result<String, SubagentRunError> {
     spawn_async_via_driver_tool_using_jobs(parent, definition, input, options, None, completion)
         .await
@@ -277,13 +277,13 @@ pub(crate) async fn spawn_async_via_driver_tool_with_jobs(
     options: SubagentRunOptions,
     jobs: tinyagents_orchestration::subagent::SubAgentJobRegistry,
     completion: impl Fn(
-            String,
-            Result<SubagentRunOutcome, String>,
-            bool,
-        ) -> Pin<Box<dyn Future<Output = ()> + Send>>
-        + Send
-        + Sync
-        + 'static,
+        String,
+        Result<SubagentRunOutcome, String>,
+        bool,
+    ) -> Pin<Box<dyn Future<Output = ()> + Send>>
+    + Send
+    + Sync
+    + 'static,
 ) -> Result<String, SubagentRunError> {
     spawn_async_via_driver_tool_using_jobs(
         parent,
@@ -303,13 +303,13 @@ async fn spawn_async_via_driver_tool_using_jobs(
     options: SubagentRunOptions,
     jobs: Option<tinyagents_orchestration::subagent::SubAgentJobRegistry>,
     completion: impl Fn(
-            String,
-            Result<SubagentRunOutcome, String>,
-            bool,
-        ) -> Pin<Box<dyn Future<Output = ()> + Send>>
-        + Send
-        + Sync
-        + 'static,
+        String,
+        Result<SubagentRunOutcome, String>,
+        bool,
+    ) -> Pin<Box<dyn Future<Output = ()> + Send>>
+    + Send
+    + Sync
+    + 'static,
 ) -> Result<String, SubagentRunError> {
     let task_id = options
         .task_id
@@ -1836,7 +1836,7 @@ impl tinyagents_orchestration::subagent::SubagentPersistence for OpenHumanPersis
 
 #[path = "lifecycle_outcome.rs"]
 mod outcome;
-use outcome::{host_outcome_to_neutral, HostInFlightMap};
+use outcome::{HostInFlightMap, host_outcome_to_neutral};
 
 fn outcome_to_host(
     result: SubagentRunResult,
