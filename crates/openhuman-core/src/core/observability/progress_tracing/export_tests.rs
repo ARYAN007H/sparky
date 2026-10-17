@@ -2,6 +2,28 @@ use super::*;
 use std::collections::BTreeMap;
 use tinyagents_harness::observability::trace_export::{SpanKind, SpanStatus};
 
+#[test]
+fn partial_success_error_message_is_rejected_even_when_rejected_count_is_zero() {
+    let response = serde_json::json!({
+        "partialSuccess": { "rejectedSpans": "0", "errorMessage": "receiver warning" }
+    });
+    assert!(reject_partial_success(&response).is_err());
+}
+
+#[test]
+fn partial_success_positive_rejected_count_is_rejected() {
+    let response = serde_json::json!({
+        "partialSuccess": { "rejectedSpans": "2", "errorMessage": "some spans rejected" }
+    });
+    assert!(reject_partial_success(&response).is_err());
+}
+
+#[test]
+fn empty_partial_success_response_is_accepted() {
+    assert!(reject_partial_success(&serde_json::json!({ "partialSuccess": {} })).is_ok());
+    assert!(reject_partial_success(&serde_json::json!({})).is_ok());
+}
+
 #[tokio::test]
 async fn external_backend_is_skipped_before_session_lookup() {
     let mut config = Config::default();

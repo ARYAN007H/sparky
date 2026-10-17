@@ -92,6 +92,7 @@ pub(in super::super) async fn run_subagent_via_graph(
     SubagentRunError,
 > {
     let (run_queue, message_run_queue) = queues;
+    let trace_session_group = run_context.thread_id.clone().or_else(|| thread_id.clone());
     // One resolved thread identity drives every child-facing boundary. An
     // explicit worker/task thread deliberately replaces the inherited parent;
     // otherwise a child remains in its parent's conversation. Do this before
@@ -255,10 +256,38 @@ pub(in super::super) async fn run_subagent_via_graph(
         // (they report via `Subagent*` events). Pass `false` for clarity.
         defer_turn_completed_to_caller: false,
     };
+    let child_journal_run_id = native_subagent
+        .as_ref()
+        .map(|native| native.config.run_id.as_str().to_string());
     let run_result = match native_subagent {
         Some(native) => turn_spec.run_with_native_subagent(native).await,
         None => turn_spec.run().await,
     };
+
+    // Preserve the existing detached child trace export. It is separately
+    // gated by the usage-sharing/auth configuration and reads this run's
+    // durable native journal, including for unobserved child turns.
+    if let (Some(config), Some(journal_run_id)) = (
+        config.filter(|config| config.observability.share_usage_data),
+        child_journal_run_id,
+    ) {
+        let config = config.clone();
+        let thread_id = trace_session_group.clone();
+        let agent_id = agent_id.to_string();
+        let task_id = task_id.to_string();
+        let dispatch = dispatch.clone();
+        tokio::spawn(async move {
+            crate::core::observability::progress_tracing::export_subagent_journal_trace(
+                &dispatch,
+                &config,
+                &journal_run_id,
+                thread_id.as_deref(),
+                &agent_id,
+                &task_id,
+            )
+            .await;
+        });
+    }
 
     let mut outcome = match run_result {
         Ok(outcome) => outcome,

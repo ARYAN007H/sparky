@@ -13,6 +13,17 @@ use tinyagents_harness::observability::LangfuseClient;
 
 const PUSH_TIMEOUT: Duration = Duration::from_secs(10);
 
+fn reject_partial_success(response: &serde_json::Value) -> Result<(), String> {
+    if response["partialSuccess"]["errorMessage"]
+        .as_str()
+        .is_some_and(|message| !message.is_empty())
+    {
+        Err("Langfuse OTLP proxy reported partial success".to_string())
+    } else {
+        Ok(())
+    }
+}
+
 async fn push_spans(config: &Config, spans: &[TraceSpan]) -> Result<(), String> {
     if spans.is_empty() {
         return Ok(());
@@ -44,10 +55,11 @@ async fn push_spans(config: &Config, spans: &[TraceSpan]) -> Result<(), String> 
     )
     .map_err(|_| "Langfuse OTLP proxy client could not be configured".to_string())?;
     for payload in otlp_requests(spans, environment, &super::export_brand()) {
-        tokio::time::timeout(PUSH_TIMEOUT, client.send_otlp(payload))
+        let response = tokio::time::timeout(PUSH_TIMEOUT, client.send_otlp(payload))
             .await
             .map_err(|_| "Langfuse OTLP proxy request timed out".to_string())?
             .map_err(|_| "Langfuse OTLP proxy request failed".to_string())?;
+        reject_partial_success(&response)?;
     }
     Ok(())
 }
@@ -197,6 +209,72 @@ pub(crate) async fn export_run_trace_from_journal(
     collector.finish(finished_at_ms);
     let spans = collector.spans().to_vec();
     export_run_trace(config, &spans).await;
+}
+
+/// Export one completed child turn as a distinct trace in its conversation.
+/// The child journal retains its original parent/root lineage in trace metadata
+/// while its observations are rooted locally for span construction.
+pub(crate) async fn export_subagent_journal_trace(
+    ctx: &crate::core::runtime::DispatchCtx,
+    config: &Config,
+    journal_run_id: &str,
+    thread_id: Option<&str>,
+    agent_id: &str,
+    task_id: &str,
+) {
+    if !config.observability.share_usage_data {
+        return;
+    }
+    if !crate::backend::telemetry::langfuse::journal_push_ready(config) {
+        log::debug!("[agent-tracing] child trace export skipped: push not possible run_id={journal_run_id}");
+        return;
+    }
+    let observations = match crate::agent::tinyagents::journal::read_run_events(
+        ctx,
+        journal_run_id,
+        0,
+    )
+    .await
+    {
+        Ok(observations) if !observations.is_empty() => observations,
+        Ok(_) => return,
+        Err(err) => {
+            log::warn!("[agent-tracing] child journal read failed run_id={journal_run_id}: {err}");
+            return;
+        }
+    };
+    let first = &observations[0];
+    let user_id = crate::security::credentials::identity::peek_credential_user_identity()
+        .and_then(|identity| identity.id.or(identity.email));
+    let trace_ctx = TraceContext::new(format!("subagent:{journal_run_id}"), user_id)
+        .with_session_group(thread_id.unwrap_or(task_id).to_string())
+        .with_agent_id(agent_id.to_string())
+        .with_channel_source("subagent".to_string())
+        .with_run_type(tinyagents_harness::observability::trace_export::RunType::Subagent)
+        .with_capture_content(config.observability.agent_tracing.capture_content)
+        .with_run_lineage(
+            Some(first.run_id.as_str().to_string()),
+            first.parent_run_id.as_ref().map(|id| id.as_str().to_string()),
+            Some(first.root_run_id.as_str().to_string()),
+        );
+    let rooted = tinyagents_harness::observability::trace_export::journal_export::root_subagent_observations(&observations);
+    let observation_root = first.run_id.clone();
+    let mut collector = tinyagents_harness::observability::trace_export::collector::SpanCollector::new(trace_ctx)
+        .with_observation_root(observation_root);
+    for observation in &rooted {
+        collector.record(observation);
+    }
+    let finished_at_ms = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis()
+        .min(u128::from(u64::MAX)) as u64;
+    collector.finish(finished_at_ms);
+    let mut spans = collector.spans().to_vec();
+    tinyagents_harness::observability::trace_export::otlp::prepare_subagent_root(&mut spans);
+    if let Err(err) = push_spans(config, &spans).await {
+        log::warn!("[agent-tracing] child Langfuse OTLP push failed run_id={journal_run_id}: {err}");
+    }
 }
 
 #[cfg(test)]
