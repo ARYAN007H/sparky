@@ -10,6 +10,9 @@
 //! All host errors are mapped to `tinyflows::error::EngineError::Capability`,
 //! per the crate's contract (`caps` traits return `tinyflows::error::Result`).
 
+#[cfg(test)]
+pub(crate) use crate::integrations::composio::flow_gate::composio_connection_id;
+
 use std::sync::Arc;
 
 use async_trait::async_trait;
