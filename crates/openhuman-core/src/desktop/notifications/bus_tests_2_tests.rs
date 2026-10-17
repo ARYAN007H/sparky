@@ -64,6 +64,21 @@ async fn cron_completion_owner_is_event_data_and_survives_repeated_reads() {
     })
     .await
     .expect("both completion events arrive");
+
+    assert!(matches!(
+        &events[0],
+        DomainEvent::CronJobCompleted {
+            tenant: Some(crate::core::runtime::Tenant { agent: Some(agent), .. }),
+            ..
+        } if agent == "completion-owner-a"
+    ));
+    assert!(matches!(
+        &events[1],
+        DomainEvent::CronJobCompleted {
+            tenant: Some(crate::core::runtime::Tenant { agent: Some(agent), .. }),
+            ..
+        } if agent == "completion-owner-b"
+    ));
     assert_eq!(event_owner(&events[0]).as_deref(), Some("completion-owner-a"));
     assert_eq!(event_owner(&events[1]).as_deref(), Some("completion-owner-b"));
     assert_eq!(
@@ -613,6 +628,20 @@ fn legacy_cron_completion_without_tenant_does_not_guess_the_current_agent() {
         output: String::new(),
         tenant: None,
     };
+
+    assert_eq!(event_owner(&event), None);
+}
+
+#[test]
+fn a_legacy_completion_wire_payload_deserializes_without_an_owner() {
+    let event: DomainEvent = serde_json::from_value(serde_json::json!({
+        "CronJobCompleted": {
+            "job_id": "legacy-job",
+            "success": true,
+            "output": "done"
+        }
+    }))
+    .expect("pre-tenant completion payload remains readable");
 
     assert_eq!(event_owner(&event), None);
 }
