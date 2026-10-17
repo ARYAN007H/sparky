@@ -1,6 +1,6 @@
 use super::*;
 
-const MIN_POLL_SECONDS: u64 = 5;
+pub(super) const MIN_POLL_SECONDS: u64 = 5;
 
 /// What the module answers when another run of the job holds its claim.
 pub(crate) const ALREADY_RUNNING: &str = "job is already running";
@@ -10,10 +10,10 @@ static LOOP_RUNNING: AtomicBool = AtomicBool::new(false);
 
 /// The poll-loop slot: one loop per process, or two would each see the same
 /// due rows. Released when dropped.
-struct LoopSlot;
+pub(super) struct LoopSlot;
 
 impl LoopSlot {
-    fn acquire() -> Option<Self> {
+    pub(super) fn acquire() -> Option<Self> {
         LOOP_RUNNING
             .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
             .ok()

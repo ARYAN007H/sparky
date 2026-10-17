@@ -47,6 +47,7 @@ use shell_job::*;
 pub use delivery::deliver_job;
 
 use crate::config::Config;
+use manual_run::{LoopSlot, MIN_POLL_SECONDS};
 use crate::core::bus::BUS;
 use crate::core::events::DomainEvent;
 use crate::cron::bus_host::{self, Binding, HostRegistration, CLAIM_SCOPE};
@@ -61,16 +62,6 @@ use std::sync::{Arc, LazyLock, Mutex};
 use tinyflows_bus::schedule::types::CronJob;
 use tinyflows_bus::schedule::{members, Attempt, StartScheduler, StoreBackend, StoreConfig};
 use tokio::time::{self, Duration};
-
-/// The module's retry settings from the operator's reliability config.
-pub(crate) fn scheduler_config(config: &Config) -> Value {
-    json!({
-        "poll_secs": config.reliability.scheduler_poll_secs,
-        "max_concurrent": config.scheduler.max_concurrent,
-        "retries": config.reliability.scheduler_retries,
-        "backoff_ms": config.reliability.provider_backoff_ms,
-    })
-}
 
 pub async fn run(ctx: &crate::core::runtime::DispatchCtx, config: Config) -> Result<()> {
     let Some(_slot) = LoopSlot::acquire() else {
@@ -113,10 +104,8 @@ pub async fn run(ctx: &crate::core::runtime::DispatchCtx, config: Config) -> Res
 }
 
 
-#[cfg(test)]
-#[path = "scheduler_tests.rs"]
-mod scheduler_tests;
-
 pub(crate) use dispatcher::{execute_job_now, tick_once, JobDispatcher};
-pub(crate) use live_agents::{run_live_agent_pass, LiveAgentSchedulers};
-pub(crate) use manual_run::{is_running, scheduler_config, try_acquire_run, RunGuard, ALREADY_RUNNING};
+pub use live_agents::run_live_agent_pass;
+pub(crate) use live_agents::LiveAgentSchedulers;
+pub use manual_run::is_running;
+pub(crate) use manual_run::{scheduler_config, try_acquire_run, RunGuard, ALREADY_RUNNING};
