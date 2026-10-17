@@ -110,7 +110,7 @@ pub(crate) fn cancel_by_task_with_workspace(
         subagent_session_id: Some(selected.subagent_session_id),
         workspace_dir: selected.workspace_dir,
         parent_thread_id: selected.parent_thread_id,
-        already_finished: None,
+        already_finished: selected.already_finished,
         driver_managed: true,
     })
 }
