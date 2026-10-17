@@ -22,7 +22,7 @@
 use std::path::Path;
 
 use anyhow::{Context, Result};
-use serde_json::{json, Value};
+use serde_json::Value;
 use tinystoragedrivers::{CollectionSpec, ScopedStorage};
 
 use super::storage_grant_schemas::tinybox::{JAIL_INDEX_COLLECTION, MODULE_ID};

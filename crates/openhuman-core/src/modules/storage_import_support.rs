@@ -12,7 +12,7 @@ use std::sync::Arc;
 use anyhow::{anyhow, Result};
 use serde_json::Value;
 use sha2::Digest;
-use tinystoragedrivers::{CollectionSpec, DocumentStore, ErrorKind, Precondition, ScopedStorage};
+use tinystoragedrivers::{DocumentStore, ErrorKind, Precondition, ScopedStorage};
 
 /// The module's scope of the installed backend, or `None` when the process
 /// runs without a storage backend (the module is then not using this storage).

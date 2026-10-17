@@ -24,7 +24,6 @@ use std::path::Path;
 use std::time::{Duration, SystemTime};
 
 use anyhow::{anyhow, Context, Result};
-use serde_json::json;
 use tinystoragedrivers::{Capability, ScopedStorage};
 
 use super::storage_grant_schemas::tinyjuice::{CCR_BLOB_PREFIX, MODULE_ID};
@@ -84,7 +83,6 @@ async fn import_into(
     ttl: Option<Duration>,
     now: SystemTime,
 ) -> Result<Outcome> {
-    let docs = scoped.documents();
     let marker = support::marker_id("ccr", root);
     if support::already_imported(scoped, MARKER_COLLECTION, &marker).await? {
         return Ok(Outcome::AlreadyDone);

@@ -17,7 +17,6 @@
 
 use std::collections::BTreeMap;
 use std::path::Path;
-use std::sync::Arc;
 
 use serde_json::{json, Value};
 use sha2::Digest;
@@ -25,7 +24,7 @@ use tinychannels_bus::module_delivery::{
     DeliveryQueueEntry, DeliveryTerminalResult, DELIVERY_PENDING_CAPACITY, DELIVERY_RECORD_BYTES,
     DELIVERY_RESULT_CAPACITY, DELIVERY_RESULT_TTL_SECONDS,
 };
-use tinystoragedrivers::{CollectionSpec, DocumentStore, ErrorKind, Precondition};
+use tinystoragedrivers::{CollectionSpec, ErrorKind, Precondition};
 
 const LOG_PREFIX: &str = "[channel-delivery-import]";
 const MODULE_ID: &str = "tinychannels";
