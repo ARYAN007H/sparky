@@ -162,9 +162,7 @@ fn with_storage_context<R>(
     if let Some(core_context) = ctx.resolved() {
         return crate::core::runtime::CoreContext::sync_scope(core_context, open);
     }
-    if !crate::core::runtime::is_saas()
-        && crate::core::runtime::CoreContext::scoped().is_none()
-    {
+    if !crate::core::runtime::is_saas() && crate::core::runtime::CoreContext::scoped().is_none() {
         return open();
     }
     Err(anyhow::anyhow!(
@@ -631,11 +629,7 @@ pub(crate) fn mark_collected(workspace_dir: &Path, task_id: &str) -> bool {
     mark_collected_in_entry(entry, task_id)
 }
 
-pub(crate) fn mark_collected_ctx(
-    ctx: &DispatchCtx,
-    workspace_dir: &Path,
-    task_id: &str,
-) -> bool {
+pub(crate) fn mark_collected_ctx(ctx: &DispatchCtx, workspace_dir: &Path, task_id: &str) -> bool {
     mark_collected_in_entry(entry_for_ctx(ctx, workspace_dir), task_id)
 }
 
