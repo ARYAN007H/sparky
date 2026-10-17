@@ -24,7 +24,7 @@ pub(crate) async fn wait(
     wait_detached_or_durable(
         registry(),
         super::task_ledger::task_store_for_workspace(&workspace_dir).as_ref(),
-        &super::super::background_completions::router_for_workspace(&workspace_dir),
+        &super::super::background_completions::router_for_workspace_ctx(ctx, &workspace_dir),
         task_id,
         &owner,
         timeout,
@@ -44,7 +44,7 @@ pub(crate) async fn wait_in_workspace(
     wait_detached_or_durable(
         registry(),
         super::task_ledger::task_store_for_workspace(workspace_dir).as_ref(),
-        &super::super::background_completions::router_for_workspace(workspace_dir),
+        &super::super::background_completions::router_for_workspace_ctx(ctx, workspace_dir),
         task_id,
         &owner,
         timeout,

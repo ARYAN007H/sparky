@@ -120,18 +120,18 @@ impl CompletionTarget {
 /// Claim `workspace_dir`'s boot recovery for this process. `true` exactly once
 /// per workspace, so the host can scan every workspace it opens (the bootstrap
 /// one, then any other a spawn later opens) without rescanning.
-pub(crate) fn claim_recovery(workspace_dir: &Path) -> bool {
+pub(crate) fn claim_recovery(ctx: &crate::core::runtime::DispatchCtx, workspace_dir: &Path) -> bool {
     state()
         .recovered_workspaces
-        .insert(super::background_completions::router_scope(workspace_dir))
+        .insert(super::background_completions::router_scope_for(ctx, workspace_dir))
 }
 
 /// Let `workspace_dir` be recovered again (a profile re-leased after release),
 /// and drop its cached router when nothing is using it so the next scan replays
 /// the log another holder may have appended to. A router still in use stays,
 /// so a log never has two writers.
-pub(crate) fn forget_recovery(workspace_dir: &Path) {
-    let scope = super::background_completions::router_scope(workspace_dir);
+pub(crate) fn forget_recovery(ctx: &crate::core::runtime::DispatchCtx, workspace_dir: &Path) {
+    let scope = super::background_completions::router_scope_for(ctx, workspace_dir);
     state().recovered_workspaces.remove(&scope);
     let Ok(Some(router)) = super::background_completions::router_pool().get(&scope) else {
         return;

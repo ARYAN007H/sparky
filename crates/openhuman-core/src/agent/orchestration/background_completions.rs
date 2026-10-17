@@ -373,7 +373,8 @@ pub(crate) async fn record_outcome(
             )
             .with_notify_mode(NotifyMode::Followup)
             .with_label(AWAITING_INPUT_LABEL);
-            record_completion_record(workspace_dir, &router, record, &task_id, &thread_id).await;
+            record_completion_record(ctx, workspace_dir, &router, record, &task_id, &thread_id)
+                .await;
             return;
         }
     };
@@ -405,6 +406,7 @@ pub(crate) async fn record_outcome(
 }
 
 async fn record_completion_record(
+    ctx: &DispatchCtx,
     workspace_dir: &Path,
     router: &Arc<CompletionRouter>,
     record: CompletionRecord,
@@ -418,7 +420,7 @@ async fn record_completion_record(
         log::error!(
             "[background_completions] store write failed after retries; continuing in memory task_id={task_id} thread_id={thread_id} error={error}"
         );
-        let _ = degrade_to_memory(&DispatchCtx::ambient(), workspace_dir, router)
+        let _ = degrade_to_memory(ctx, workspace_dir, router)
             .router
             .record(record)
             .await;

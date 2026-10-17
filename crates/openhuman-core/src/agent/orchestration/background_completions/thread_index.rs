@@ -37,7 +37,7 @@ pub(crate) fn router_for_thread(
         .thread_workspaces
         .get(&key(ctx, thread_id))
         .cloned()?;
-    Some(router_for_workspace(&workspace))
+    Some(super::router_for_workspace_ctx(ctx, &workspace))
 }
 
 /// The workspace holding `thread_id`'s completions, if known to this process.
