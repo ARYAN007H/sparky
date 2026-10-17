@@ -238,31 +238,44 @@ pub fn cancel_driver_job_by_task(
     }) {
         return Ok(None);
     }
+    let typed_finished = || -> Result<Option<tinyagents_orchestration::subagent::FinishedOutcome>, String> {
+        let Some(key) = lifecycle_key.as_ref() else {
+            return Ok(None);
+        };
+        let Some(outcome) = crate::agent::subagent_host::load_terminal_outcome(
+            &store.workspace_dir,
+            key,
+        )? else {
+            return Ok(None);
+        };
+        Ok(match outcome.status {
+            tinyagents_orchestration::subagent::SubagentOutcomeKind::Completed => {
+                Some(tinyagents_orchestration::subagent::FinishedOutcome::Completed)
+            }
+            tinyagents_orchestration::subagent::SubagentOutcomeKind::Incomplete(_) => {
+                Some(tinyagents_orchestration::subagent::FinishedOutcome::Failed)
+            }
+            tinyagents_orchestration::subagent::SubagentOutcomeKind::Cancelled
+            | tinyagents_orchestration::subagent::SubagentOutcomeKind::AwaitingInput(_) => None,
+        })
+    };
     let already_finished = match session.status {
         DurableSubagentStatus::Idle => {
-            let Some(key) = lifecycle_key.as_ref() else {
+            let finished = typed_finished()?;
+            if finished.is_none() {
                 return Ok(None);
-            };
-            let Some(outcome) = crate::agent::subagent_host::load_terminal_outcome(
-                &store.workspace_dir,
-                key,
-            )? else {
-                return Ok(None);
-            };
-            match outcome.status {
-                tinyagents_orchestration::subagent::SubagentOutcomeKind::Completed => {
-                    Some(tinyagents_orchestration::subagent::FinishedOutcome::Completed)
-                }
-                tinyagents_orchestration::subagent::SubagentOutcomeKind::Incomplete(_)
-                | tinyagents_orchestration::subagent::SubagentOutcomeKind::Cancelled
-                | tinyagents_orchestration::subagent::SubagentOutcomeKind::AwaitingInput(_) => {
-                    Some(tinyagents_orchestration::subagent::FinishedOutcome::Failed)
-                }
             }
+            finished
         }
-        DurableSubagentStatus::Failed => {
-            Some(tinyagents_orchestration::subagent::FinishedOutcome::Failed)
-        }
+        DurableSubagentStatus::Failed => match typed_finished()? {
+            Some(finished) => Some(finished),
+            // Pre-driver failures have a failed product row but no typed
+            // lifecycle record. Keep that legacy outcome reportable.
+            None if session.lifecycle_key.is_none() => {
+                Some(tinyagents_orchestration::subagent::FinishedOutcome::Failed)
+            }
+            None => return Ok(None),
+        },
         DurableSubagentStatus::Running | DurableSubagentStatus::AwaitingUser => None,
         DurableSubagentStatus::Closed => unreachable!("closed handled above"),
     };
