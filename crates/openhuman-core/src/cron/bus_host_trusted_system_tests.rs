@@ -41,6 +41,42 @@ async fn agent_only_host(config: &Config) -> (HostRegistration, tinybus::Proxy) 
 
 #[tokio::test]
 async fn schedule_trigger_runs_an_internally_seeded_memory_job_in_agent_only_scope() {
+    const CHILD: &str = "OPENHUMAN_TRUSTED_MEMORY_TRIGGER_CHILD";
+    if std::env::var_os(CHILD).is_none() {
+        let output = std::process::Command::new(std::env::current_exe().unwrap())
+            .args([
+                "--exact",
+                "cron::bus_host::trusted_system_tests::schedule_trigger_runs_an_internally_seeded_memory_job_in_agent_only_scope",
+                "--nocapture",
+            ])
+            .env(CHILD, "1")
+            .output()
+            .unwrap();
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        assert!(
+            output.status.success(),
+            "isolated trigger child failed:\n{stdout}\n{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert!(
+            stdout.contains("running 1 test"),
+            "child selected no test: {stdout}"
+        );
+        assert!(
+            stdout.contains("test cron::bus_host::trusted_system_tests::schedule_trigger_runs_an_internally_seeded_memory_job_in_agent_only_scope"),
+            "expected child test did not run: {stdout}"
+        );
+        assert!(
+            stdout.contains("test result: ok. 1 passed"),
+            "child did not pass exactly one test: {stdout}"
+        );
+        return;
+    }
+
+    schedule_trigger_runs_trusted_memory_job_child().await;
+}
+
+async fn schedule_trigger_runs_trusted_memory_job_child() {
     let tmp = TempDir::new().unwrap();
     let mut config = config(&tmp);
     crate::cron::system_jobs::ensure_memory_jobs(&config).unwrap();
