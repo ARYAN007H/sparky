@@ -77,6 +77,15 @@ fn every_spec_method_is_registered_with_its_exact_name() {
 }
 
 #[test]
+fn policy_set_schema_exposes_all_recall_policy_fields() {
+    let schema = schema("policy_set");
+    let fields: Vec<_> = schema.inputs.iter().map(|field| field.name).collect();
+    assert!(fields.contains(&"date_hint"));
+    assert!(fields.contains(&"compaction_timeout_ms"));
+    assert!(fields.contains(&"build_delay_secs"));
+}
+
+#[test]
 fn every_function_resolves_through_its_handler_entry() {
     let expected_handlers: [(&str, crate::core::all::ControllerHandler); 35] = [
         ("engines_list", handlers::engines_list),
