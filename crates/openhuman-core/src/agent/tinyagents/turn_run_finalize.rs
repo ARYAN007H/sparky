@@ -177,15 +177,15 @@ pub(super) async fn finalize_turn_outcome(
         }
     }
     let deferred_terminal = if defer_terminal_to_caller {
-        Some(crate::agent::tinyagents::turn_outcome::DeferredTurnTerminal {
-            run_id: run_id.clone(),
-            events: event_sink.clone(),
-            journal: turn_journal.cloned(),
-        })
+        Some(
+            crate::agent::tinyagents::turn_outcome::DeferredTurnTerminal {
+                run_id: run_id.clone(),
+                events: event_sink.clone(),
+                journal: turn_journal.cloned(),
+            },
+        )
     } else {
-        event_sink.emit(tinyagents_harness::events::AgentEvent::RunFinalized {
-            run_id,
-        });
+        event_sink.emit(tinyagents_harness::events::AgentEvent::RunFinalized { run_id });
         if let Some(journal) = turn_journal {
             journal.finish_completed().await;
         }

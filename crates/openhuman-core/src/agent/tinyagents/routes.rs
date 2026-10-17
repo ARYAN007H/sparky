@@ -280,7 +280,12 @@ impl ModelMiddleware<(), crate::agent::tinyagents::host::OpenHumanRunContext>
             let route = response.resolved_route.as_ref();
             let model = route
                 .map(|route| route.model.as_str())
-                .or_else(|| response.resolved_model.as_ref().map(|resolved| resolved.name.as_str()))
+                .or_else(|| {
+                    response
+                        .resolved_model
+                        .as_ref()
+                        .map(|resolved| resolved.name.as_str())
+                })
                 .unwrap_or(&self.model);
             let provider_id = route
                 .map(|route| route.provider.as_str())
@@ -329,9 +334,9 @@ impl ModelMiddleware<(), crate::agent::tinyagents::host::OpenHumanRunContext>
 fn valid_trace_provider_id(value: &str) -> bool {
     !value.is_empty()
         && value.len() <= 64
-        && value
-            .chars()
-            .all(|character| character.is_ascii_alphanumeric() || matches!(character, '_' | '.' | ':' | '-'))
+        && value.chars().all(|character| {
+            character.is_ascii_alphanumeric() || matches!(character, '_' | '.' | ':' | '-')
+        })
 }
 
 #[cfg(test)]

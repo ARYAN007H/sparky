@@ -1,8 +1,8 @@
-use tinyagents_harness::observability::trace_export::TraceContext;
 use tinyagents_harness::events::AgentEvent;
 use tinyagents_harness::ids::{CallId, EventId, RunId};
 use tinyagents_harness::observability::trace_export::collector::SpanCollector as NativeSpanCollector;
 use tinyagents_harness::observability::trace_export::serialize::{spans_to_ndjson, SpanEnvelope};
+use tinyagents_harness::observability::trace_export::TraceContext;
 use tinyagents_harness::observability::trace_export::TraceSpan;
 use tinyagents_harness::observability::AgentObservation;
 use tinyinference_llm::usage::Usage;
@@ -41,11 +41,7 @@ fn parent_run() -> Vec<AgentObservation> {
                 thread_id: None,
             },
         ),
-        root_observation(
-            1,
-            1_005,
-            AgentEvent::TurnStarted { turn: 1 },
-        ),
+        root_observation(1, 1_005, AgentEvent::TurnStarted { turn: 1 }),
         root_observation(
             2,
             1_010,
@@ -137,11 +133,7 @@ fn child_run() -> Vec<AgentObservation> {
                 thread_id: None,
             },
         ),
-        child_observation(
-            1,
-            1_045,
-            AgentEvent::TurnStarted { turn: 1 },
-        ),
+        child_observation(1, 1_045, AgentEvent::TurnStarted { turn: 1 }),
         child_observation(
             2,
             1_050,
@@ -208,15 +200,20 @@ fn per_run_trace_snapshots_keep_reused_call_ids_scoped_and_content_gated() {
         .with_run_lineage(Some("root-run".into()), None, Some("root-run".into()));
     let parent_observations = parent_run();
     let child_observations = child_run();
-    let observations =
-        crate::agent::tinyagents::journal::merge_run_observations(vec![parent_observations.clone(), child_observations.clone()]);
+    let observations = crate::agent::tinyagents::journal::merge_run_observations(vec![
+        parent_observations.clone(),
+        child_observations.clone(),
+    ]);
     let mut native = NativeSpanCollector::new(parent_ctx.clone());
     for observation in &observations {
         native.record(observation);
     }
     native.finish(1_110);
     let snapshot = normalized(native.spans());
-    println!("NATIVE_TREE:{}", serde_json::to_string_pretty(&snapshot).unwrap());
+    println!(
+        "NATIVE_TREE:{}",
+        serde_json::to_string_pretty(&snapshot).unwrap()
+    );
 
     assert!(
         !spans_to_ndjson(SpanEnvelope::Otel, native.spans()).contains("CONTENT_SENTINEL"),
@@ -228,8 +225,7 @@ fn per_run_trace_snapshots_keep_reused_call_ids_scoped_and_content_gated() {
     }
     captured.finish(1_110);
     assert!(
-        spans_to_ndjson(SpanEnvelope::Otel, &captured.spans())
-            .contains("CONTENT_SENTINEL_PROMPT"),
+        spans_to_ndjson(SpanEnvelope::Otel, &captured.spans()).contains("CONTENT_SENTINEL_PROMPT"),
         "content-on export retains opted-in prompt content"
     );
     let root_generation = native
@@ -242,16 +238,26 @@ fn per_run_trace_snapshots_keep_reused_call_ids_scoped_and_content_gated() {
         .iter()
         .find(|span| span.name == "llm.gpt-4-mini")
         .expect("child generation survives export despite reused call id");
-    assert_eq!(root_generation.attributes["gen_ai.usage.input_tokens"], serde_json::json!(100));
-    assert_eq!(child_generation.attributes["gen_ai.usage.input_tokens"], serde_json::json!(7));
-    assert!(snapshot.iter().any(|span| span["name"] == "agent.iteration"));
-    assert!(snapshot.iter().any(|span| span["name"] == "subagent.iteration"));
+    assert_eq!(
+        root_generation.attributes["gen_ai.usage.input_tokens"],
+        serde_json::json!(100)
+    );
+    assert_eq!(
+        child_generation.attributes["gen_ai.usage.input_tokens"],
+        serde_json::json!(7)
+    );
+    assert!(snapshot
+        .iter()
+        .any(|span| span["name"] == "agent.iteration"));
+    assert!(snapshot
+        .iter()
+        .any(|span| span["name"] == "subagent.iteration"));
 }
 
 #[test]
 fn child_native_failure_survives_parent_acknowledgement_at_same_timestamp() {
-    use tinyagents_harness::terminal::{TerminalOutcome, TerminalReason};
     use tinyagents_harness::observability::trace_export::{SpanKind, SpanStatus};
+    use tinyagents_harness::terminal::{TerminalOutcome, TerminalReason};
 
     let parent = vec![
         root_observation(
@@ -315,12 +321,17 @@ fn child_native_failure_survives_parent_acknowledgement_at_same_timestamp() {
         observations[3].event,
         AgentEvent::SubAgentRunCompleted { .. }
     ));
-    assert!(matches!(observations[4].event, AgentEvent::RunFailed { .. }));
+    assert!(matches!(
+        observations[4].event,
+        AgentEvent::RunFailed { .. }
+    ));
 
-    let mut collector = NativeSpanCollector::new(
-        TraceContext::new("root-trace", None)
-            .with_run_lineage(Some("root-run".into()), None, Some("root-run".into())),
-    );
+    let mut collector =
+        NativeSpanCollector::new(TraceContext::new("root-trace", None).with_run_lineage(
+            Some("root-run".into()),
+            None,
+            Some("root-run".into()),
+        ));
     for observation in &observations {
         collector.record(observation);
     }
@@ -331,7 +342,10 @@ fn child_native_failure_survives_parent_acknowledgement_at_same_timestamp() {
         .find(|span| span.kind == SpanKind::Subagent)
         .expect("native child span");
     assert_eq!(child_span.status, SpanStatus::Error);
-    assert_eq!(child_span.attributes["error.message"], "child provider failed");
+    assert_eq!(
+        child_span.attributes["error.message"],
+        "child provider failed"
+    );
 }
 
 #[test]
@@ -419,11 +433,14 @@ fn run_finalization_bounds_orphaned_child_tools_before_export_finish() {
     // This is the same composition used by export_run_trace_from_journal:
     // each run keeps its journal offset order, while finalization timestamps
     // arrive after the harness terminal event and the host persists the result.
-    let observations = crate::agent::tinyagents::journal::merge_run_observations(vec![parent, child]);
-    let mut collector = NativeSpanCollector::new(
-        TraceContext::new("root-trace", None)
-            .with_run_lineage(Some("root-run".into()), None, Some("root-run".into())),
-    );
+    let observations =
+        crate::agent::tinyagents::journal::merge_run_observations(vec![parent, child]);
+    let mut collector =
+        NativeSpanCollector::new(TraceContext::new("root-trace", None).with_run_lineage(
+            Some("root-run".into()),
+            None,
+            Some("root-run".into()),
+        ));
     for observation in &observations {
         collector.record(observation);
     }
@@ -457,7 +474,10 @@ fn separate_child_trace_roots_observations_but_retains_parent_lineage() {
     use tinyagents_harness::observability::trace_export::{RunType, SpanKind};
 
     let child = child_run();
-    let rooted = tinyagents_harness::observability::trace_export::journal_export::root_subagent_observations(&child);
+    let rooted =
+        tinyagents_harness::observability::trace_export::journal_export::root_subagent_observations(
+            &child,
+        );
     let trace_context = TraceContext::new("subagent:child-run", Some("user-1".into()))
         .with_session_group("conversation-1")
         .with_agent_id("researcher")
@@ -469,8 +489,8 @@ fn separate_child_trace_roots_observations_but_retains_parent_lineage() {
             Some("root-run".into()),
             Some("root-run".into()),
         );
-    let mut collector = NativeSpanCollector::new(trace_context)
-        .with_observation_root(RunId::new("child-run"));
+    let mut collector =
+        NativeSpanCollector::new(trace_context).with_observation_root(RunId::new("child-run"));
     for observation in &rooted {
         collector.record(observation);
     }

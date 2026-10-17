@@ -14,8 +14,8 @@ use crate::progress::AgentProgress;
 use tinytools::humanize_tool_name;
 
 use super::bridge_types::{ProviderUsageCarry, SubagentScope, ToolFailureMap, ToolNameMap};
-use tinyagents_harness::events::{CallDedupe, IterationCursor, OrderedSender};
 use tinyagents_harness::events::AgentEvent;
+use tinyagents_harness::events::{CallDedupe, IterationCursor, OrderedSender};
 
 #[derive(Default)]
 pub(super) struct BridgeState {

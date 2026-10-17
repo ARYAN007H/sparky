@@ -226,23 +226,22 @@ pub(crate) async fn export_subagent_journal_trace(
         return;
     }
     if !crate::backend::telemetry::langfuse::journal_push_ready(config) {
-        log::debug!("[agent-tracing] child trace export skipped: push not possible run_id={journal_run_id}");
+        log::debug!(
+            "[agent-tracing] child trace export skipped: push not possible run_id={journal_run_id}"
+        );
         return;
     }
-    let observations = match crate::agent::tinyagents::journal::read_run_events(
-        ctx,
-        journal_run_id,
-        0,
-    )
-    .await
-    {
-        Ok(observations) if !observations.is_empty() => observations,
-        Ok(_) => return,
-        Err(err) => {
-            log::warn!("[agent-tracing] child journal read failed run_id={journal_run_id}: {err}");
-            return;
-        }
-    };
+    let observations =
+        match crate::agent::tinyagents::journal::read_run_events(ctx, journal_run_id, 0).await {
+            Ok(observations) if !observations.is_empty() => observations,
+            Ok(_) => return,
+            Err(err) => {
+                log::warn!(
+                    "[agent-tracing] child journal read failed run_id={journal_run_id}: {err}"
+                );
+                return;
+            }
+        };
     let first = &observations[0];
     let user_id = crate::security::credentials::identity::peek_credential_user_identity()
         .and_then(|identity| identity.id.or(identity.email));
@@ -254,13 +253,20 @@ pub(crate) async fn export_subagent_journal_trace(
         .with_capture_content(config.observability.agent_tracing.capture_content)
         .with_run_lineage(
             Some(first.run_id.as_str().to_string()),
-            first.parent_run_id.as_ref().map(|id| id.as_str().to_string()),
+            first
+                .parent_run_id
+                .as_ref()
+                .map(|id| id.as_str().to_string()),
             Some(first.root_run_id.as_str().to_string()),
         );
-    let rooted = tinyagents_harness::observability::trace_export::journal_export::root_subagent_observations(&observations);
+    let rooted =
+        tinyagents_harness::observability::trace_export::journal_export::root_subagent_observations(
+            &observations,
+        );
     let observation_root = first.run_id.clone();
-    let mut collector = tinyagents_harness::observability::trace_export::collector::SpanCollector::new(trace_ctx)
-        .with_observation_root(observation_root);
+    let mut collector =
+        tinyagents_harness::observability::trace_export::collector::SpanCollector::new(trace_ctx)
+            .with_observation_root(observation_root);
     for observation in &rooted {
         collector.record(observation);
     }
@@ -273,7 +279,9 @@ pub(crate) async fn export_subagent_journal_trace(
     let mut spans = collector.spans().to_vec();
     tinyagents_harness::observability::trace_export::otlp::prepare_subagent_root(&mut spans);
     if let Err(err) = push_spans(config, &spans).await {
-        log::warn!("[agent-tracing] child Langfuse OTLP push failed run_id={journal_run_id}: {err}");
+        log::warn!(
+            "[agent-tracing] child Langfuse OTLP push failed run_id={journal_run_id}: {err}"
+        );
     }
 }
 

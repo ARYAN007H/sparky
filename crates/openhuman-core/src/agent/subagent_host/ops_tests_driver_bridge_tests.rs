@@ -129,12 +129,10 @@ async fn prepared_child_run_is_exported_from_its_native_journal_lineage() {
     });
     _parent_journal.finish_completed().await;
 
-    let observations = crate::agent::tinyagents::journal::read_run_tree_events(
-        &dispatch,
-        root_run_id.as_str(),
-    )
-    .await
-    .expect("lineage-indexed journals load as a tree");
+    let observations =
+        crate::agent::tinyagents::journal::read_run_tree_events(&dispatch, root_run_id.as_str())
+            .await
+            .expect("lineage-indexed journals load as a tree");
     assert!(!observations.is_empty(), "the root stream is durable");
     let child_run_id = observations
         .iter()
@@ -169,10 +167,13 @@ async fn prepared_child_run_is_exported_from_its_native_journal_lineage() {
         parent_ack_at >= child_finalized_at,
         "parent completion follows child durable finalization"
     );
-    assert!(child_observations.iter().all(|observation| {
-        observation.parent_run_id.as_ref() == Some(&root_run_id)
-            && observation.root_run_id == root_run_id
-    }), "the persisted child stream keeps actual parent/root lineage");
+    assert!(
+        child_observations.iter().all(|observation| {
+            observation.parent_run_id.as_ref() == Some(&root_run_id)
+                && observation.root_run_id == root_run_id
+        }),
+        "the persisted child stream keeps actual parent/root lineage"
+    );
     let reported_call = child_observations
         .iter()
         .find_map(|observation| match &observation.event {
@@ -183,10 +184,16 @@ async fn prepared_child_run_is_exported_from_its_native_journal_lineage() {
                 output,
                 ..
             } => {
-                assert_eq!(usage.charged_amount.map(|amount| amount.micros), Some(4_200));
+                assert_eq!(
+                    usage.charged_amount.map(|amount| amount.micros),
+                    Some(4_200)
+                );
                 assert_eq!(usage.input_tokens, 120);
                 assert_eq!(usage.output_tokens, 8);
-                assert!(input.is_some() && output.is_some(), "the private native journal retains source observations");
+                assert!(
+                    input.is_some() && output.is_some(),
+                    "the private native journal retains source observations"
+                );
                 Some(call_id.clone())
             }
             _ => None,
@@ -206,7 +213,11 @@ async fn prepared_child_run_is_exported_from_its_native_journal_lineage() {
     let trace_context = TraceContext::new("native-trace-root", None)
         .with_session_group("native-trace-thread")
         .with_capture_content(capture_content)
-        .with_run_lineage(Some(root_run_id.as_str().into()), None, Some(root_run_id.as_str().into()));
+        .with_run_lineage(
+            Some(root_run_id.as_str().into()),
+            None,
+            Some(root_run_id.as_str().into()),
+        );
     let mut collector = SpanCollector::new(trace_context);
     for observation in &observations {
         collector.record(observation);
@@ -222,19 +233,29 @@ async fn prepared_child_run_is_exported_from_its_native_journal_lineage() {
     let spans = collector.spans();
     let child_span = spans
         .iter()
-        .find(|span| span.attributes.get("run_id").is_some_and(|id| id == child_run_id.as_str()))
+        .find(|span| {
+            span.attributes
+                .get("run_id")
+                .is_some_and(|id| id == child_run_id.as_str())
+        })
         .expect("native collector projects the actual linked child");
     assert_eq!(child_span.attributes["parent_run_id"], root_run_id.as_str());
     assert_eq!(child_span.attributes["root_run_id"], root_run_id.as_str());
     let generation = spans
         .iter()
-        .find(|span| span.attributes.get("gen_ai.request.model").is_some_and(|_| {
-            span.attributes.get("gen_ai.usage.cost_usd") == Some(&serde_json::json!(0.0042))
-        }))
+        .find(|span| {
+            span.attributes
+                .get("gen_ai.request.model")
+                .is_some_and(|_| {
+                    span.attributes.get("gen_ai.usage.cost_usd") == Some(&serde_json::json!(0.0042))
+                })
+        })
         .expect("native projection preserves the provider-reported charge");
     assert_eq!(generation.attributes["gen_ai.usage.input_tokens"], 120);
     assert_eq!(generation.attributes["gen_ai.usage.output_tokens"], 8);
-    assert!(generation.attributes.contains_key("gen_ai.pricing.input_per_mtok_usd"));
+    assert!(generation
+        .attributes
+        .contains_key("gen_ai.pricing.input_per_mtok_usd"));
     let exported = spans_to_ndjson(
         tinyagents_harness::observability::trace_export::serialize::SpanEnvelope::Otel,
         spans,

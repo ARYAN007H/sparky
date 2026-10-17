@@ -30,10 +30,8 @@ impl DeferredTurnTerminal {
         turn: u32,
     ) {
         if let Some(stop) = stop {
-            self.events.emit(tinyagents_harness::events::AgentEvent::TurnStopped {
-                turn,
-                stop,
-            });
+            self.events
+                .emit(tinyagents_harness::events::AgentEvent::TurnStopped { turn, stop });
         }
         self.events
             .emit(tinyagents_harness::events::AgentEvent::RunFinalized {
