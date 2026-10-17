@@ -38,6 +38,9 @@ use tinyagents_tasks::{
     CompletionStore, DriverCompletionStore, InMemoryCompletionStore, NotifyMode, RecordOutcome,
     TombstoneOutcome, DEFAULT_MAX_ATTEMPTS,
 };
+use tinyagents_orchestration::subagent::{
+    DetachedCompletionTarget, DetachedSubagentStatus, record_detached_completion,
+};
 
 use super::completion_notice::BackgroundCompletionFormatter;
 pub(crate) use super::completion_notice::{BackgroundAgentOutcome, AWAITING_INPUT_LABEL};
@@ -281,56 +284,77 @@ pub(crate) async fn record_outcome(
     note_session_thread(ctx, parent_session, &thread_id);
     super::completion_owners::note(ctx, &[&task_id, parent_session]); // owner, for off-task delivery
 
-    let record = CompletionRecord::new(
-        task_id.clone(),
-        thread_id.clone(),
-        agent_id,
-        outcome.status(),
-        CompletionResult::text(summary),
-    )
-    .with_notify_mode(NotifyMode::Followup);
-    let record = if outcome == BackgroundAgentOutcome::AwaitingInput {
-        record.with_label(AWAITING_INPUT_LABEL)
-    } else {
-        record
-    };
     let router = router_for_workspace(workspace_dir);
-    let mut outcome_of_record = router
-        .record_with_retries(record.clone(), RECORD_RETRIES)
-        .await;
-    if let Err(error) = &outcome_of_record {
+    let summary = summary.into();
+    let target = DetachedCompletionTarget::new(router.clone(), thread_id.clone(), agent_id)
+        .with_notify_mode(NotifyMode::Followup);
+    let status = match outcome {
+        BackgroundAgentOutcome::Completed => DetachedSubagentStatus::Completed {
+            output: summary,
+            iterations: 0,
+        },
+        BackgroundAgentOutcome::Failed => DetachedSubagentStatus::Failed { error: summary },
+        BackgroundAgentOutcome::AwaitingInput => {
+            // TinyAgents deliberately excludes pauses from terminal dedupe; the
+            // host gives each paused checkpoint its own record identity above.
+            let record = CompletionRecord::new(
+                task_id.clone(),
+                thread_id.clone(),
+                target.agent_id.clone(),
+                outcome.status(),
+                CompletionResult::text(summary),
+            )
+            .with_notify_mode(NotifyMode::Followup)
+            .with_label(AWAITING_INPUT_LABEL);
+            record_completion_record(workspace_dir, &router, record, &task_id, &thread_id).await;
+            return;
+        }
+    };
+    if record_detached_completion(&target, &task_id, &status).await {
+        log::debug!(
+            "[background_completions] recorded task_id={task_id} thread_id={thread_id} outcome={outcome:?}"
+        );
+    } else {
         // The log keeps refusing writes (disk full, permissions). Keep this
         // process delivering from memory rather than losing the result; what is
         // already on disk replays on the next boot.
         log::error!(
             "[background_completions] store write failed after retries; continuing in memory \
-             task_id={task_id} thread_id={thread_id} error={error}"
+             task_id={task_id} thread_id={thread_id}"
         );
-        outcome_of_record = degrade_to_memory(workspace_dir, &router)
+        let fallback = degrade_to_memory(workspace_dir, &router);
+        let fallback_target = DetachedCompletionTarget::new(
+            fallback.router,
+            thread_id.clone(),
+            target.agent_id.clone(),
+        )
+        .with_notify_mode(NotifyMode::Followup);
+        if !record_detached_completion(&fallback_target, &task_id, &status).await {
+            log::error!(
+                "[background_completions] completion LOST — in-memory fallback failed task_id={task_id} thread_id={thread_id}"
+            );
+        }
+    }
+}
+
+async fn record_completion_record(
+    workspace_dir: &Path,
+    router: &Arc<CompletionRouter>,
+    record: CompletionRecord,
+    task_id: &str,
+    thread_id: &str,
+) {
+    if let Err(error) = router
+        .record_with_retries(record.clone(), RECORD_RETRIES)
+        .await
+    {
+        log::error!(
+            "[background_completions] store write failed after retries; continuing in memory task_id={task_id} thread_id={thread_id} error={error}"
+        );
+        let _ = degrade_to_memory(workspace_dir, router)
             .router
             .record(record)
             .await;
-    }
-    match outcome_of_record {
-        Ok(RecordOutcome::Recorded { .. }) => log::debug!(
-            "[background_completions] recorded task_id={task_id} thread_id={thread_id} \
-             outcome={outcome:?}"
-        ),
-        Ok(RecordOutcome::Duplicate) => {
-            log::debug!("[background_completions] duplicate ignored task_id={task_id}")
-        }
-        Ok(RecordOutcome::Suppressed) => log::debug!(
-            "[background_completions] dropping completion task_id={task_id} for \
-             stopped/cancelled/collected thread_id={thread_id}"
-        ),
-        Ok(RecordOutcome::IdCollision) => log::warn!(
-            "[background_completions] task id already recorded for another thread \
-             task_id={task_id} thread_id={thread_id}"
-        ),
-        Err(error) => log::error!(
-            "[background_completions] completion LOST — store write failed \
-             task_id={task_id} thread_id={thread_id} error={error}"
-        ),
     }
 }
 
