@@ -11545,6 +11545,14 @@ async fn json_rpc_flows_full_arc_discover_build_create_run_inner() {
     clear_forced_chat_completions();
     with_chat_completion_requests(|requests| requests.clear());
     let demo_graph = opus_sonnet_demo_graph();
+    let invalid_preflight_graph = json!({
+        "nodes": [
+            { "id": "trigger", "kind": "trigger", "name": "Manual" },
+            { "id": "send", "kind": "tool_call", "name": "Incomplete action",
+              "config": { "slug": "GMAIL_ADD_LABEL_TO_EMAIL", "args": { "add_label_ids": ["INBOX"] } } }
+        ],
+        "edges": [ { "from_node": "trigger", "to_node": "send" } ]
+    });
     let sandbox_graph = json!({
         "nodes": [
             { "id": "trigger", "kind": "trigger", "name": "Manual" },
@@ -11553,15 +11561,22 @@ async fn json_rpc_flows_full_arc_discover_build_create_run_inner() {
         ],
         "edges": [ { "from_node": "trigger", "to_node": "search" } ]
     });
-    // Turn 1: dry-run the graph through TinyFlows' sandbox bus path. Turn 2:
-    // propose it after reading the sandbox result. Turn 3: a plain reply ends
-    // the builder loop.
+    // First reject a missing required arg through the preflight-only CapsHost
+    // callback. Then accept a valid native tool node using module MockTools,
+    // propose the demo graph, and end the turn with a plain reply.
     push_forced_chat_completion_when(
         "dry_run_workflow",
+        forced_tool_call_completion(
+            "dry_run_workflow",
+            json!({ "graph": invalid_preflight_graph }),
+        ),
+    );
+    push_forced_chat_completion_when(
+        "message_id",
         forced_tool_call_completion("dry_run_workflow", json!({ "graph": sandbox_graph })),
     );
     push_forced_chat_completion_when(
-        "propose_workflow",
+        "\\\"sandbox\\\": true",
         forced_tool_call_completion(
             "propose_workflow",
             json!({
@@ -11614,6 +11629,15 @@ async fn json_rpc_flows_full_arc_discover_build_create_run_inner() {
                 .is_some_and(|body| body.contains("\\\"sandbox\\\": true"))
         }),
         "the second builder call must receive the released module's sandbox report: {builder_requests:?}"
+    );
+    assert!(
+        builder_requests.iter().any(|request| {
+            request
+                .get("body")
+                .map(Value::to_string)
+                .is_some_and(|body| body.contains("message_id") && body.contains("required arg"))
+        }),
+        "the invalid sandbox graph must return the required-arg preflight error before any mock call: {builder_requests:?}"
     );
 
     // ── 3. flows_create + flows_run: the saved graph runs its agent nodes ──
