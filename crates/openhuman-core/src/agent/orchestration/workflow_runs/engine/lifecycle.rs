@@ -73,7 +73,7 @@ fn schedule_workflow_drive(
     run_id: String,
     definition: WorkflowDefinition,
     resume: bool,
-) -> WorkflowRunHandle {
+) -> (WorkflowRunHandle, tokio::sync::oneshot::Sender<()>) {
     let supervisor = workflow_supervisor().clone();
     let task_ctx = ctx.clone();
     let handle_slot = Arc::new(OnceLock::<WorkflowRunHandle>::new());
@@ -160,16 +160,22 @@ fn schedule_workflow_drive(
     };
     let spawn_ctx = task_ctx;
     let spawn_handle_slot = Arc::clone(&handle_slot);
+    let (start_tx, start_rx) = tokio::sync::oneshot::channel();
     let spawn = move |handle, future| {
         let _ = spawn_handle_slot.set(handle);
-        spawn_ctx.spawn(future);
+        spawn_ctx.spawn(async move {
+            if start_rx.await.is_ok() {
+                future.await;
+            }
+        });
     };
 
-    if resume {
+    let handle = if resume {
         supervisor.resume_scoped_with_handle(run_id, make_future, root_parent, origin, spawn)
     } else {
         supervisor.start_scoped_with_handle(run_id, make_future, root_parent, origin, spawn)
-    }
+    };
+    (handle, start_tx)
 }
 
 /// Start a new workflow run and return immediately.
@@ -208,7 +214,18 @@ pub async fn start_workflow_run(
         .initialise(run_id.clone(), &definition, input.clone(), parent_thread_id)
         .context("persist initial workflow run")?;
 
-    let _handle = schedule_workflow_drive(ctx, run_id.clone(), definition, false);
+    // Install the generation before scheduling can race with a stop. The drive
+    // remains gated until the durable row is still Running and this exact
+    // generation is current.
+    let (handle, start_gate) = schedule_workflow_drive(ctx, run_id.clone(), definition, false);
+    let current = get_workflow_run(config, &run_id)?;
+    if !matches!(current, Some(ref current) if current.status == WorkflowRunStatus::Running)
+        || !workflow_supervisor().is_current(&handle)
+    {
+        let _ = workflow_supervisor().stop_generation(&handle);
+        return Err(anyhow!("workflow run {run_id} was interrupted before its drive started"));
+    }
+    let _ = start_gate.send(());
 
     log::debug!(
         target: LOG_TARGET,
@@ -306,6 +323,9 @@ pub async fn resume_workflow_run(
         .ok_or_else(|| anyhow!("definition {} no longer exists", run.definition_id))?;
     let _safety_tier = super::host::admit_workflow(&definition)?;
 
+    // Register the successor before the durable transition so the prior
+    // generation cannot project a stale failure into the resumed row.
+    let (handle, start_gate) = schedule_workflow_drive(ctx, id.to_string(), definition.clone(), true);
     let resumed = compare_and_swap_workflow_run_lifecycle(
         config,
         WorkflowRunUpsert {
@@ -322,12 +342,27 @@ pub async fn resume_workflow_run(
         },
         run.revision,
     )
-    .context("persist workflow run resume")?;
-    let resumed = resumed.ok_or_else(|| {
-        anyhow!("workflow run {id} changed while resume was being applied; reload and retry")
-    })?;
-
-    let _handle = schedule_workflow_drive(ctx, id.to_string(), definition, true);
+    .context("persist workflow run resume");
+    let resumed = match resumed {
+        Ok(Some(resumed)) => resumed,
+        Ok(None) => {
+            let _ = workflow_supervisor().stop_generation(&handle);
+            return Err(anyhow!(
+                "workflow run {id} changed while resume was being applied; reload and retry"
+            ));
+        }
+        Err(error) => {
+            let _ = workflow_supervisor().stop_generation(&handle);
+            return Err(error);
+        }
+    };
+    let still_running = get_workflow_run(config, id)?
+        .is_some_and(|current| current.status == WorkflowRunStatus::Running);
+    if !still_running || !workflow_supervisor().is_current(&handle) {
+        let _ = workflow_supervisor().stop_generation(&handle);
+        return Err(anyhow!("workflow run {id} changed before its drive started"));
+    }
+    let _ = start_gate.send(());
 
     log::debug!(target: LOG_TARGET, "[workflow_run_engine] resume.spawned run={id}");
     Ok(resumed)
