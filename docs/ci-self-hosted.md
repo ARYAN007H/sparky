@@ -2,11 +2,11 @@
 
 CI Fast groups pre-merge checks into **lanes**, scheduled sequentially on the
 private runner and across a few hosted jobs. Independent lanes within a hosted
-job may run in parallel. It is the pull-request lane flow: the `ci-lite.yml` workflow it was originally built
-alongside was deleted on 2026-10-01. The one check to require is **CI Gate**
+job may run in parallel. It is the pull-request lane flow: the `ci-lite.yml`
+workflow it was originally built alongside was deleted on 2026-10-01. The one check to require is **CI Gate**
 (see [CI Gate](#ci-gate)).
 
-| Who opened the PR                               | Workflow                              | Where it runs                                                             |
+| Routing decision                                | Workflow                              | Where it runs                                                             |
 | ----------------------------------------------- | ------------------------------------- | ------------------------------------------------------------------------- |
 | author and actor admitted by membership routing | `ci-fast.yml` (`pull_request_target`) | one job on a throwaway Firecracker microVM on the Hetzner EX63            |
 | otherwise                                       | `ci-fast-hosted.yml` (`pull_request`) | the same lanes split over GitHub-hosted jobs, with GitHub's Actions cache |
@@ -31,7 +31,7 @@ provisioning, deploys and the runner token.
 | `rust-lint`       | clippy (product set; embed's clippy covers the core's contributor set), embed and tinyhumans lint, embed gates-off check                                                                                                                                                  |
 | `rust-gates-off`  | gates-off checks and gate-contract tests, kernel floor, dep-sim calibration                                                                                                                                                                                               |
 | `storage-drivers` | the `storage_*_e2e` targets and `cli_storage_url_e2e` once per driver (memory, sqlite, file), plus the lib tests of the stores on the storage ports, with `storage-sqlite,storage-file`; armed by the `storage` area. MongoDB has its own workflow, `storage-mongodb.yml` |
-| `tauri`           | Tauri clippy and coverage                                                                                                                                                                                                                                                 |
+| `tauri`           | Tauri clippy and coverage, plus a private uninstrumented application build                                                                                                                                                                                                |
 | `pester`          | `install.ps1` tests                                                                                                                                                                                                                                                       |
 
 How lanes behave:
