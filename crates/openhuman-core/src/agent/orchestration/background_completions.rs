@@ -609,6 +609,14 @@ pub(crate) fn mark_collected(workspace_dir: &Path, task_id: &str) -> bool {
     mark_collected_in_entry(entry, task_id)
 }
 
+pub(crate) fn mark_collected_ctx(
+    ctx: &DispatchCtx,
+    workspace_dir: &Path,
+    task_id: &str,
+) -> bool {
+    mark_collected_in_entry(entry_for_ctx(ctx, workspace_dir), task_id)
+}
+
 #[cfg(test)]
 fn mark_collected_in_entry(entry: Arc<Entry>, task_id: &str) -> bool {
     let router = &entry.router;
