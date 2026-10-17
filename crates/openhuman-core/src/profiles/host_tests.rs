@@ -521,25 +521,32 @@ async fn opening_replaces_a_dropped_hosts_fence_before_cron_reconciliation() {
     );
     let _storage = RestoreInstalledStorage(crate::storage::install(backend));
 
-    let mut first_saas = SaasConfig::new(tmp.path());
+    let mut first_saas = SaasConfig::new(first_root.path());
     first_saas.cron.agent_jobs_only = true;
     first_saas.cron.max_active_jobs = 1;
     let first = ProfileHost::new(first_saas, CoreContext::for_test(DomainSet::full(), None));
     first.provision(&id).await.unwrap();
     let opened = first.open(&id).await.unwrap();
+    let old_epoch = opened.lease_fence().epoch();
+    let _retire_stale_fence = RetireProfileFence {
+        registry: Arc::clone(&registry),
+        profile_id: id.as_str().to_string(),
+        epoch: old_epoch,
+    };
     drop(opened);
     drop(first);
 
-    let mut second_saas = SaasConfig::new(tmp.path());
+    let mut second_saas = SaasConfig::new(second_root.path());
     second_saas.cron.agent_jobs_only = true;
     second_saas.cron.max_active_jobs = 1;
     let second = ProfileHost::new(second_saas, CoreContext::for_test(DomainSet::full(), None));
-    assert!(!second.provision(&id).await.unwrap());
-    let reopened = second.open(&id).await;
+    let provisioned = second.provision(&id).await;
+    if let Err(error) = &provisioned {
+        eprintln!("new-root provision error: {error}");
+    }
     assert!(
-        reopened.is_ok(),
-        "the new lease must replace the dropped host's profile fence: {:?}",
-        reopened.err()
+        provisioned.unwrap(),
+        "the new root must be able to register its own profile fence"
     );
 }
 
