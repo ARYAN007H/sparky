@@ -8,6 +8,7 @@
 
 use std::sync::Arc;
 
+use tinyagents_harness::events::EventSink;
 use tinyagents_harness::middleware::AgentRun;
 use tinyagents_harness::middleware::{ContextCompressionMiddleware, PromptCacheGuardMiddleware};
 use tokio::sync::mpsc::Sender;
@@ -35,6 +36,8 @@ pub(super) async fn finalize_turn_outcome(
     subagent_scope: &Option<SubagentScope>,
     pause_at_cap: bool,
     turn_journal: Option<&TurnJournal>,
+    event_sink: &EventSink,
+    defer_terminal_to_caller: bool,
     compression_mw: Option<&Arc<ContextCompressionMiddleware>>,
     prompt_cache_guard: &PromptCacheGuardMiddleware,
     turn_completed_sink: Option<Sender<AgentProgress>>,
@@ -48,12 +51,6 @@ pub(super) async fn finalize_turn_outcome(
     request_base_len: usize,
     dispatch: &crate::core::runtime::DispatchCtx,
 ) -> TinyagentsTurnOutcome {
-    // Durable journal: the harness returned a transcript, so stamp the terminal
-    // completed status (best-effort, non-fatal). The event stream carries no
-    // run-terminal event, so this caller-driven write is authoritative.
-    if let Some(journal) = turn_journal {
-        journal.finish_completed().await;
-    }
     // Context-compression provenance (issue #4249, 03.1 item 6): the harness's
     // `AgentEvent::Compressed` projection only carries token deltas, so drain the
     // compression middleware's `records()` here — each carries the full
