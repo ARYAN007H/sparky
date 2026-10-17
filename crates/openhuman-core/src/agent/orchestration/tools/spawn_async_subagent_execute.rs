@@ -370,6 +370,7 @@ impl SpawnAsyncSubagentTool {
         );
         let completion_core = dispatch.clone().into_core();
         let completion_origin = detached_parent.data.origin.clone();
+        let completion_worker_thread_id = background_worker_thread_id.clone();
         let completion = move |_target: String,
                                result: Result<SubagentRunOutcome, String>,
                                emit_lifecycle_effects: bool|
@@ -383,17 +384,7 @@ impl SpawnAsyncSubagentTool {
             let background_task_id = background_task_id.clone();
             let background_parent_session = background_parent_session.clone();
             let completion_target = completion_target.clone();
-            let background_worker_thread_id = background_worker_thread_id.clone();
-            let background_store = background_store.clone();
-            let background_subagent_session_id = background_subagent_session_id.clone();
-            let background_parent_thread_id = background_parent_thread_id.clone();
-            let background_workspace_dir = background_workspace_dir.clone();
-            let background_dispatch = background_dispatch.clone();
-            let background_agent_id = background_agent_id.clone();
-            let background_task_id = background_task_id.clone();
-            let background_parent_session = background_parent_session.clone();
-            let completion_target = completion_target.clone();
-            let background_worker_thread_id = background_worker_thread_id.clone();
+            let background_worker_thread_id = completion_worker_thread_id.clone();
             let background_store = background_store.clone();
             let background_subagent_session_id = background_subagent_session_id.clone();
             let background_parent_thread_id = background_parent_thread_id.clone();
