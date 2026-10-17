@@ -486,8 +486,6 @@ pub(crate) fn close_verification_prompt(user_request: &str, records: &str, reply
     )
 }
 
-/// The check call's verdict on a closing message.
-
 /// Build a deterministic final answer from this turn's tool results.
 /// Used as the guaranteed non-empty fallback when a turn ran tools but the
 /// model produced no usable closing message (empty, a tool call, or rejected
