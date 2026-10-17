@@ -183,9 +183,7 @@ async fn live_close_alias_enforces_parent_thread_ownership() {
     use crate::agent::orchestration::subagent_sessions::{
         DurableSubagentSession, DurableSubagentStatus, SubagentSessionStore,
     };
-    use tinyagents_harness::{
-        ComponentId, agent_loop::phases::execute_tool_batch, context::RunConfig,
-    };
+    use tinyagents_harness::{context::RunConfig, tool::ToolDispatch};
 
     let workspace = tempfile::tempdir().expect("live harness workspace");
     let config = crate::config::Config::default();
