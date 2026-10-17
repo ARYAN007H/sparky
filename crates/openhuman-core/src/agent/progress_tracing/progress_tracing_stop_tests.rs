@@ -5,8 +5,8 @@
 
 use super::*;
 
-use tinyagents_harness::observability::trace_export::otlp::otlp_requests;
 use tinyagents_harness::observability::trace_export::SpanStatus;
+use tinyagents_harness::observability::trace_export::otlp::otlp_requests;
 use tinyagents_harness::turn_stop::TurnStop;
 
 const BREAKER_NOTE: &str = "Stopping after 2 attempt(s): failure class \
