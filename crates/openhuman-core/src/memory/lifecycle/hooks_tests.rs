@@ -7,16 +7,38 @@ use tinymemory_api::{
 use crate::memory::scope::MemoryIdentity;
 use crate::memory::test_fixtures::{bind_reference, config_in, stored};
 
-type PreTurnArgs = (String, u32, String, u32, DateTime<Utc>, bool, Option<tinymemory_api::ObservedActor>);
+type PreTurnArgs = (
+    String,
+    u32,
+    String,
+    u32,
+    DateTime<Utc>,
+    bool,
+    Option<tinymemory_api::ObservedActor>,
+);
 
 type PostTurnArgs = (String, u32, String, Vec<ToolCallSummary>, DateTime<Utc>);
 
 fn input(thread: &str, index: u32, text: &str) -> PreTurnArgs {
-    (thread.to_string(), index, text.to_string(), 0, Utc::now(), false, None)
+    (
+        thread.to_string(),
+        index,
+        text.to_string(),
+        0,
+        Utc::now(),
+        false,
+        None,
+    )
 }
 
 fn reply(thread: &str, index: u32, text: &str) -> PostTurnArgs {
-    (thread.to_string(), index, text.to_string(), Vec::new(), Utc::now())
+    (
+        thread.to_string(),
+        index,
+        text.to_string(),
+        Vec::new(),
+        Utc::now(),
+    )
 }
 
 async fn run_pre_turn(
@@ -25,7 +47,19 @@ async fn run_pre_turn(
     identity: &crate::memory::scope::ResolvedIdentity,
     (thread, index, text, in_prompt_from, at, resumed, observed_actor): PreTurnArgs,
 ) -> Option<TurnPack> {
-    pre_turn_work(ctx, config, identity, thread, index, text, in_prompt_from, at, resumed, observed_actor).await
+    pre_turn_work(
+        ctx,
+        config,
+        identity,
+        thread,
+        index,
+        text,
+        in_prompt_from,
+        at,
+        resumed,
+        observed_actor,
+    )
+    .await
 }
 
 async fn run_post_turn(

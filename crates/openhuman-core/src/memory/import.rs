@@ -136,8 +136,8 @@ pub async fn scan(config: &Config) -> MemoryResult<ImportScanView> {
     let counts = tokio::task::spawn_blocking(move || {
         tinymemory_integrations::import::count_legacy(&workspace_dir)
     })
-        .await
-        .map_err(|error| MemoryError::Engine(format!("import scan failed: {error}")))?;
+    .await
+    .map_err(|error| MemoryError::Engine(format!("import scan failed: {error}")))?;
     let counts = counts.map(|counts: LegacyImportCounts| ImportCounts {
         documents: counts.documents,
         conversations: counts.conversations,

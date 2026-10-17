@@ -327,16 +327,28 @@ async fn slow_engine_results_survive_the_manual_pre_turn_cutoff() {
         .unwrap();
     crate::memory::engine::install_test_engine(&config.workspace_dir, engine.clone());
     let identity = MemoryIdentity::agent("a").resolve(&config);
-    let input = |index| (
-        "slow".to_string(),
-        index,
-        "what is my favourite colour?".to_string(),
-        0,
-        chrono::Utc::now(),
-        false,
-        None,
-    );
-    let pre_turn = |config, identity, input: (String, u32, String, u32, chrono::DateTime<chrono::Utc>, bool, Option<tinymemory_api::ObservedActor>)| {
+    let input = |index| {
+        (
+            "slow".to_string(),
+            index,
+            "what is my favourite colour?".to_string(),
+            0,
+            chrono::Utc::now(),
+            false,
+            None,
+        )
+    };
+    let pre_turn = |config,
+                    identity,
+                    input: (
+        String,
+        u32,
+        String,
+        u32,
+        chrono::DateTime<chrono::Utc>,
+        bool,
+        Option<tinymemory_api::ObservedActor>,
+    )| {
         let (thread, index, text, in_prompt_from, at, resumed, observed_actor) = input;
         super::pre_turn(
             &crate::core::runtime::DispatchCtx::ambient(),

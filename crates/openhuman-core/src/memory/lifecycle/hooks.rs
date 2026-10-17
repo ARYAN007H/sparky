@@ -279,13 +279,13 @@ pub(crate) async fn pre_turn_work(
             .find_map(Result::ok)
             .and_then(TurnPack::from_pack)
             .or_else(|| {
-            let error = refusal?;
-            tracing::warn!(
-                code = error.code(),
-                %error,
-                "[memory:hooks] recall refused; the turn is told memory is unavailable"
-            );
-            TurnPack::refused(&error, engine_id)
+                let error = refusal?;
+                tracing::warn!(
+                    code = error.code(),
+                    %error,
+                    "[memory:hooks] recall refused; the turn is told memory is unavailable"
+                );
+                TurnPack::refused(&error, engine_id)
             })
     }
     .await;
