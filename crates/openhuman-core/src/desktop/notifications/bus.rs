@@ -528,11 +528,9 @@ async fn persist_in_event_context(
 ) -> Option<Result<bool>> {
     let persist = super::store::insert_core_notification(config, event);
     match dispatch.core() {
-        Some(core) => Some(crate::core::runtime::CoreContext::scope(
-            std::sync::Arc::clone(core),
-            persist,
-        )
-        .await),
+        Some(core) => Some(
+            crate::core::runtime::CoreContext::scope(std::sync::Arc::clone(core), persist).await,
+        ),
         None if !crate::core::runtime::is_saas() => Some(persist.await),
         None => None,
     }

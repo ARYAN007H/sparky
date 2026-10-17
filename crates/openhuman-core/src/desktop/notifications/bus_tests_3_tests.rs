@@ -12,8 +12,10 @@ async fn cron_completion_stays_in_each_profile_when_agent_ids_match() {
         CoreContext::for_test(DomainSet::full(), None),
     ));
     let suffix = uuid::Uuid::new_v4().simple().to_string();
-    let profile_a = ProfileId::for_user(&format!("profile-a-{suffix}"), ProfileIdMode::Raw).unwrap();
-    let profile_b = ProfileId::for_user(&format!("profile-b-{suffix}"), ProfileIdMode::Raw).unwrap();
+    let profile_a =
+        ProfileId::for_user(&format!("profile-a-{suffix}"), ProfileIdMode::Raw).unwrap();
+    let profile_b =
+        ProfileId::for_user(&format!("profile-b-{suffix}"), ProfileIdMode::Raw).unwrap();
     host.provision(&profile_a).await.unwrap();
     host.provision(&profile_b).await.unwrap();
     let state_a = host.open(&profile_a).await.unwrap();
@@ -37,21 +39,13 @@ async fn cron_completion_stays_in_each_profile_when_agent_ids_match() {
 
     let config_a = host.provisioned_config(&profile_a).await.unwrap();
     let config_b = host.provisioned_config(&profile_b).await.unwrap();
-    let events_a = CoreContext::scope(
-        state_a.context().for_agent("shared-agent-id"),
-        async {
-            crate::desktop::notifications::store::list_core_notifications(&config_a, true, 10)
-                .unwrap()
-        },
-    )
+    let events_a = CoreContext::scope(state_a.context().for_agent("shared-agent-id"), async {
+        crate::desktop::notifications::store::list_core_notifications(&config_a, true, 10).unwrap()
+    })
     .await;
-    let events_b = CoreContext::scope(
-        state_b.context().for_agent("shared-agent-id"),
-        async {
-            crate::desktop::notifications::store::list_core_notifications(&config_b, true, 10)
-                .unwrap()
-        },
-    )
+    let events_b = CoreContext::scope(state_b.context().for_agent("shared-agent-id"), async {
+        crate::desktop::notifications::store::list_core_notifications(&config_b, true, 10).unwrap()
+    })
     .await;
 
     assert_eq!(events_a.len(), 1, "profile A owns its completion");
