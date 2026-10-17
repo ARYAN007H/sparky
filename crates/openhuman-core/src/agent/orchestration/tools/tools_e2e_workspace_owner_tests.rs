@@ -118,7 +118,7 @@ async fn driver_job_controls_are_isolated_by_workspace_with_shared_runtime_state
     definition_a.id = "workspace-a-worker".into();
     let mut definition_b = definition_a.clone();
     definition_b.id = "workspace-b-worker".into();
-    let child_a = tokio::spawn(async move {
+    let mut child_a = tokio::spawn(async move {
         run_subagent_via_driver_tool(
             &parent_a,
             definition_a,
@@ -127,7 +127,7 @@ async fn driver_job_controls_are_isolated_by_workspace_with_shared_runtime_state
         )
         .await
     });
-    let child_b = tokio::spawn(async move {
+    let mut child_b = tokio::spawn(async move {
         run_subagent_via_driver_tool(
             &parent_b,
             definition_b,
@@ -136,12 +136,33 @@ async fn driver_job_controls_are_isolated_by_workspace_with_shared_runtime_state
         )
         .await
     });
-    for _ in 0..2 {
-        tokio::time::timeout(std::time::Duration::from_secs(5), started_rx.recv())
-            .await
-            .expect("both driver children enter the gated model")
-            .expect("model start notification");
-    }
+    tokio::time::timeout(std::time::Duration::from_secs(5), async {
+        for _ in 0..2 {
+            tokio::select! {
+                notification = started_rx.recv() => {
+                    notification.expect("model start notification");
+                }
+                result = &mut child_a => match result {
+                    Ok(Ok((outcome, output))) => panic!(
+                        "workspace A child returned before entering the gated model: {:?}, {output}",
+                        outcome.status,
+                    ),
+                    Ok(Err(error)) => panic!("workspace A child failed before model start: {error:?}"),
+                    Err(error) => panic!("workspace A child task panicked before model start: {error}"),
+                },
+                result = &mut child_b => match result {
+                    Ok(Ok((outcome, output))) => panic!(
+                        "workspace B child returned before entering the gated model: {:?}, {output}",
+                        outcome.status,
+                    ),
+                    Ok(Err(error)) => panic!("workspace B child failed before model start: {error:?}"),
+                    Err(error) => panic!("workspace B child task panicked before model start: {error}"),
+                },
+            }
+        }
+    })
+    .await
+    .expect("both driver children enter the gated model");
 
     let job_a = jobs_a
         .list()
