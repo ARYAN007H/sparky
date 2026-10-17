@@ -360,7 +360,7 @@ async fn driver_job_controls_are_isolated_by_workspace_with_shared_runtime_state
     )
     .await
     .expect("B can close its own durable child");
-    assert!(!owned_close.results[0].text().is_empty());
+    assert_eq!(owned_close.results.len(), 1);
     assert_eq!(
         SubagentSessionStore::new(workspace_b.clone())
             .load()
