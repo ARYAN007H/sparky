@@ -113,6 +113,7 @@ pub(crate) struct TurnSpec<'a> {
 /// Native execution identity retained by OpenHuman's neutral sub-agent
 /// adapter. Child model/tool events use their own run-local sink; the parent
 /// sink carries only the typed child lifecycle link.
+#[derive(Clone)]
 pub(crate) struct NativeSubagentRunContext {
     pub config: tinyagents_harness::context::RunConfig,
     pub parent_events: EventSink,
@@ -762,12 +763,5 @@ async fn drive_turn(
         journal_run_id,
     )
     .await;
-    if let Some(native) = native_subagent {
-        native.parent_events.emit(
-            tinyagents_harness::events::AgentEvent::SubAgentRunCompleted {
-                run_id: journal_run_id,
-            },
-        );
-    }
     Ok(outcome)
 }

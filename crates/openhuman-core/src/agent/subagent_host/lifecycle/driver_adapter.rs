@@ -191,6 +191,8 @@ impl SubagentExecutor<crate::agent::tinyagents::host::OpenHumanRunContext> for O
                     depth: native_run_config.lineage.depth,
                     config: native_run_config,
                     parent_events,
+                    child_events: std::sync::Arc::default(),
+                    child_journal: std::sync::Arc::default(),
                     name: definition.id.clone(),
                 };
                 let run = Box::pin(

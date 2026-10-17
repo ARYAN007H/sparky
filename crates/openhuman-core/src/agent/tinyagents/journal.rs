@@ -130,6 +130,12 @@ pub(crate) struct TurnJournal {
 }
 
 impl TurnJournal {
+    /// Flush events appended after the terminal status write without changing
+    /// that status. Child host persistence may finish after a typed RunFailed.
+    pub(crate) fn flush_events(&self) {
+        self.event_sink.flush();
+    }
+
     /// Best-effort terminal write: mark the run completed and persist. Non-fatal.
     pub(crate) async fn finish_completed(&self) {
         self.event_sink.flush();
