@@ -259,8 +259,8 @@ pub(in super::super) async fn run_subagent_via_graph(
     let child_journal_run_id = native_subagent
         .as_ref()
         .map(|native| native.config.run_id.as_str().to_string());
-    let run_result = match native_subagent {
-        Some(native) => turn_spec.run_with_native_subagent(native).await,
+    let run_result = match native_subagent.as_ref() {
+        Some(native) => turn_spec.run_with_native_subagent(native.clone()).await,
         None => turn_spec.run().await,
     };
 
@@ -347,6 +347,9 @@ pub(in super::super) async fn run_subagent_via_graph(
                 worker_thread_id.as_deref(),
                 &mapped,
             );
+            if let Some(native) = &native_subagent {
+                native.finalize_failed_boundary();
+            }
             return Err(mapped);
         }
     };
@@ -511,6 +514,28 @@ pub(in super::super) async fn run_subagent_via_graph(
                 Some(outcome.text.as_str())
             } else {
                 None
+            },
+        );
+    }
+
+    // The child run's own loop ends before OpenHuman persists its transcript
+    // and any cap checkpoint. Finish the native journal only after that durable
+    // host boundary, then acknowledge it on the parent stream so the linked
+    // sub-agent span cannot close ahead of its child record.
+    if let Some(terminal) = outcome.deferred_terminal.take() {
+        let stop = crate::agent::session_host::stop_summary::classify_stop(
+            outcome.breaker_halt.as_deref(),
+            false,
+            outcome.hit_cap,
+        );
+        terminal
+            .finish(stop, (outcome.model_calls as u32).max(1))
+            .await;
+    }
+    if let Some(native) = &native_subagent {
+        native.parent_events.emit(
+            tinyagents_harness::events::AgentEvent::SubAgentRunCompleted {
+                run_id: native.config.run_id.clone(),
             },
         );
     }
