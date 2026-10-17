@@ -86,7 +86,7 @@ pub(crate) fn cancel_by_task(
     let selected = crate::agent::orchestration::subagent_sessions::cancel_driver_job_by_task(
         &store,
         &workspace_dir.join(".openhuman/subagent_checkpoints"),
-        jobs,
+        &jobs,
         task_id,
     )?;
     Some(CancelledSubagent {
