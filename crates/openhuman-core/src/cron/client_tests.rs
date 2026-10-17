@@ -1,4 +1,5 @@
 use super::*;
+use tinyflows_bus::schedule::CronJob;
 
 #[tokio::test]
 async fn a_module_error_keeps_its_own_message() {
