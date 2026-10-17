@@ -25,12 +25,12 @@ use crate::core::runtime::DispatchCtx;
 use std::collections::{HashMap, HashSet, VecDeque};
 mod store_adapter;
 mod thread_index;
-#[cfg(test)]
-pub(super) use store_adapter::test_store_overrides;
 pub(super) use store_adapter::{
-    degrade_to_memory, entry_for, entry_for_ctx, new_router, open_driver_store, router_pool,
-    router_scope, router_scope_for,
+    degrade_to_memory, entry_for_ctx, new_router, open_driver_store, router_pool, router_scope_for,
 };
+pub(crate) use store_adapter::router_for_workspace_ctx;
+#[cfg(test)]
+pub(super) use store_adapter::{entry_for, router_for_workspace, router_scope, test_store_overrides};
 use thread_index::{key, note_thread_workspace};
 pub(crate) use thread_index::{
     note_session_thread, router_for_thread, thread_for_session, workspace_for_thread,
