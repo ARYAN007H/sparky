@@ -80,7 +80,7 @@ jobs:
           filters: .github/ci-paths-filter.yml
           base: ${{ inputs.base-ref }}
 
-      # The guest contract supplies Python >= 3.11 and jq. Lanes continue
+      # The guest contract supplies Python with a TOML parser and jq. Lanes continue
       # independently after failures, in order within this single private job.
       - name: Start lanes
         id: lanes

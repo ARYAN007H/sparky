@@ -115,7 +115,7 @@ for any commit without posting it.
   `target/ci-private-coverage`. Neither is restored as an Actions artifact cache.
   - `scripts/ci/self-hosted/guest-image.txt` pins the guest OCI digest. Before
     validation, `verify-runner.sh` compares `/etc/ohci/build-info` with that pin,
-    checks preinstalled tools, and selects `rust-toolchain.toml` explicitly.
+    checks preinstalled tools (Python 3.10 with tomli, or stdlib tomllib), and selects `rust-toolchain.toml` explicitly.
     Missing metadata, tools, or the compiler fail; CI does not install replacements.
   - The pinned shared checkout action fetches the PR merge ref with full root
     history, recursive build dependencies, and the `wiki` exclusion.

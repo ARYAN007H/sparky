@@ -17,14 +17,22 @@ for tool in rustup cargo rustc clang readelf tinymold python3 node pnpm jq; do
 done
 linker=/usr/local/bin/rust-mold-linker
 [[ -x "$linker" && -x /opt/mold/bin/mold ]] || { echo '::error::Missing pinned mold linker' >&2; exit 1; }
-channel="$(python3 -c 'import tomllib,sys; print(tomllib.load(open(sys.argv[1], "rb"))["toolchain"]["channel"])' "$root/rust-toolchain.toml")"
+channel="$(python3 - "$root/rust-toolchain.toml" <<'PYTHON'
+import sys
+try:
+    import tomllib
+except ModuleNotFoundError:
+    import tomli as tomllib
+assert sys.version_info >= (3, 10)
+print(tomllib.load(open(sys.argv[1], "rb"))["toolchain"]["channel"])
+PYTHON
+)"
 # rustup run --install is deliberately absent: an image without this toolchain fails.
 rustup run "$channel" rustc --version
 rustup run "$channel" cargo clippy --version
 rustup run "$channel" cargo fmt --version
 rustup run "$channel" cargo nextest --version
 rustup run "$channel" cargo llvm-cov --version
-python3 -c 'import sys,tomllib; assert sys.version_info >= (3,11)'
 tinymold --version
 /opt/mold/bin/mold --version
 for key in TINYMOLD_REMOTE_URL TINYMOLD_REMOTE_AUTH TINYMOLD_REMOTE_SIGNING_KEY TINYMOLD_REMOTE_TRUSTED_KEYS; do
