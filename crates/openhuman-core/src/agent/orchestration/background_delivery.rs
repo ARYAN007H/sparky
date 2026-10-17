@@ -60,11 +60,12 @@ use super::busy_guard::{busy, clear_busy_for_thread, TurnBusy};
 use super::completion_notice::build_undelivered_notice;
 use super::completion_owners;
 use super::delivery_drain::{DrainFence, RECOVERY_BUSY_POLL};
+#[path = "delivery_events.rs"]
 mod delivery_events;
 use crate::core::runtime::CoreContext;
 #[cfg(test)]
 pub(super) use delivery_events::drain_schedule;
-pub(super) use delivery_events::{drain_schedule_in, Drain};
+pub(super) use delivery_events::{drain_schedule_in, owning_profiles, Drain};
 
 /// Coalesce completions landing within this window into one delivery turn.
 const DEBOUNCE: Duration = Duration::from_secs(3);

@@ -14,7 +14,7 @@ pub(super) struct Drain {
 /// profile. A session that maps to no thread (cron, voice, skills) has nothing
 /// to deliver into.
 #[cfg(test)]
-fn drain_schedule(event: &DomainEvent) -> Option<(String, Duration)> {
+pub(super) fn drain_schedule(event: &DomainEvent) -> Option<(String, Duration)> {
     let drain = drain_schedule_in(false, event, |_| None)
         .into_iter()
         .next()?;
@@ -69,7 +69,7 @@ fn owners_of(session: &str, task: Option<&String>) -> Vec<String> {
 }
 
 /// The profiles whose contexts [`drain_schedule_in`] will ask for.
-fn owning_profiles(event: &DomainEvent) -> Vec<String> {
+pub(super) fn owning_profiles(event: &DomainEvent) -> Vec<String> {
     drain_target(event)
         .map(|(session, task, _)| owners_of(session, task))
         .unwrap_or_default()
