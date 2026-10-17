@@ -160,6 +160,40 @@ fn handle_subagent_cancel(ctx: DispatchCtx, params: Map<String, Value>) -> Contr
                     // terminal session state and delivers the failed event.
                     // Publishing the legacy pseudo-completion here would
                     // duplicate both effects.
+                    if let Some(paused) = meta.driver_pause.as_ref() {
+                        let store =
+                            subagent_sessions::SubagentSessionStore::new(meta.workspace_dir.clone());
+                        let transitioned = subagent_sessions::mark_driver_pause_cancelled(
+                            &store,
+                            paused,
+                        )
+                        .map_err(|error| {
+                            format!("subagent_cancel: failed to settle paused child: {error}")
+                        })?;
+                        if transitioned {
+                            let summary = match reason
+                                .as_deref()
+                                .map(str::trim)
+                                .filter(|reason| !reason.is_empty())
+                            {
+                                Some(reason) => format!(
+                                    "You cancelled this background sub-agent before it finished. Reason: {reason}"
+                                ),
+                                None => "You cancelled this background sub-agent before it finished."
+                                    .to_string(),
+                            };
+                            background_completions::record_completion(
+                                &ctx,
+                                &meta.workspace_dir,
+                                &meta.parent_session,
+                                &task_id,
+                                meta.agent_id.clone(),
+                                summary,
+                                meta.parent_thread_id.clone(),
+                            )
+                            .await;
+                        }
+                    }
                     (true, None)
                 } else {
                     let summary = match reason.as_deref().map(str::trim).filter(|r| !r.is_empty()) {
