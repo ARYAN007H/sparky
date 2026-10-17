@@ -52,16 +52,8 @@ impl DelegationDispatch {
             // inferred from an ambient registry or a tool's spelling. This
             // keeps hidden packed delegates scoped to the catalogue that
             // actually supplied them.
-            name if AgentDefinitionRegistry::current().is_some_and(|registry| {
-                registry.list().into_iter().any(|definition| {
-                    definition
-                        .delegate_name
-                        .clone()
-                        .unwrap_or_else(|| format!("delegate_{}", definition.id))
-                        == name
-                })
-            }) => DelegationDispatchKind::Archetype {
-                agent_id: delegation_target.unwrap_or_else(|| "image_agent".into()),
+            _ if delegation_target.is_some() => DelegationDispatchKind::Archetype {
+                agent_id: delegation_target.expect("checked above"),
             },
             _ => return None,
         };
