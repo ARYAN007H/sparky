@@ -164,7 +164,7 @@ pub(super) fn build_flow_connections(
     let normalize_connection_identifier =
         |raw: &str| keys.get(raw).cloned().unwrap_or_else(|| raw.to_string());
 
-    let identity_lookup = crate::integrations::composio::ops::connections::identity_lookup(
+    let identity_lookup = crate::integrations::composio::ops::identity_lookup(
         identities,
         keys,
     );
