@@ -225,8 +225,10 @@ fn committed_rows_mentioning_nudge(history: &[TranscriptEntry]) -> Vec<String> {
         .collect()
 }
 
-/// Every persisted file under the workspace, as (lossy) text: the session
-/// store's database files included, so a row written there is searched too.
+/// Every persisted file under the workspace, as (lossy) text. A session
+/// store database is also read row by row, because the storage layer keeps
+/// transcript entries zstd-compressed and a byte search of the file would
+/// never see them.
 fn persisted_text(root: &std::path::Path) -> Vec<(std::path::PathBuf, String)> {
     walkdir::WalkDir::new(root)
         .into_iter()
@@ -234,10 +236,40 @@ fn persisted_text(root: &std::path::Path) -> Vec<(std::path::PathBuf, String)> {
         .filter(|entry| entry.file_type().is_file())
         .filter_map(|entry| {
             let bytes = std::fs::read(entry.path()).ok()?;
-            let text = String::from_utf8_lossy(&bytes).into_owned();
+            let mut text = String::from_utf8_lossy(&bytes).into_owned();
+            if entry.path().extension().and_then(|e| e.to_str()) == Some("db") {
+                text.push_str(&database_rows_text(entry.path()));
+            }
             Some((entry.into_path(), text))
         })
         .collect()
+}
+
+/// The document bodies of the storage database at `path`, decompressed.
+fn database_rows_text(path: &std::path::Path) -> String {
+    use crate::storage::rusqlite::{types::Value, Connection, OpenFlags};
+    let Ok(conn) = Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_ONLY) else {
+        return String::new();
+    };
+    let Ok(mut statement) = conn.prepare("SELECT body FROM docs") else {
+        return String::new();
+    };
+    let Ok(rows) = statement.query_map([], |row| row.get::<_, Value>(0)) else {
+        return String::new();
+    };
+    let mut out = String::new();
+    for value in rows.filter_map(Result::ok) {
+        match value {
+            Value::Text(text) => out.push_str(&text),
+            Value::Blob(bytes) => {
+                let decoded = zstd::decode_all(bytes.as_slice()).unwrap_or(bytes);
+                out.push_str(&String::from_utf8_lossy(&decoded));
+            }
+            _ => {}
+        }
+        out.push('\n');
+    }
+    out
 }
 
 #[tokio::test]
