@@ -83,6 +83,7 @@ const STORAGE_E2E_TARGETS = [
   "storage_delegation_e2e",
   "storage_default_import_e2e",
   "storage_desktop_upgrade_e2e",
+  "storage_layout_migration_e2e",
   "cli_storage_url_e2e",
 ];
 const STORAGE_LIB_FILTERS = [
