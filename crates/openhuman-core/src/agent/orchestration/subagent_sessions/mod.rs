@@ -1,5 +1,6 @@
 mod ops;
 mod store;
+mod storage_schema;
 mod store_documents;
 mod types;
 
