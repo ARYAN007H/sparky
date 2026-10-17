@@ -219,5 +219,8 @@ fn rebinding_to_a_fresh_v2_profile_opens_its_storage_db_and_leaves_a_v1_one_alon
         !layout.workspace_dir.join("storage").exists(),
         "no v1 storage directory under files/"
     );
-    assert!(!v1.path().join("storage").exists(), "the old profile is untouched");
+    assert!(
+        !v1.path().join("storage").exists(),
+        "the old profile is untouched"
+    );
 }

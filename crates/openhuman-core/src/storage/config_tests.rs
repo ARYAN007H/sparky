@@ -97,7 +97,10 @@ fn the_default_url_per_layout_version() {
         default_url_for(&v1),
         "sqlite:/srv/oh/users/alice/workspace/storage"
     );
-    assert_eq!(default_url_for(&v2), "sqlite:/srv/oh/users/alice/storage.db");
+    assert_eq!(
+        default_url_for(&v2),
+        "sqlite:/srv/oh/users/alice/storage.db"
+    );
 }
 
 #[test]
