@@ -283,8 +283,7 @@ pub(crate) async fn register(binding: Binding) -> Result<HostRegistration, Strin
 /// Whether a job may run under `binding`, and the refusal text
 /// if not.
 pub(crate) fn kind_refusal(binding: &Binding, job: &CronJob) -> Option<String> {
-    let trusted_memory_job =
-        crate::cron::system_jobs::trusted_system_job_owner(job).is_some();
+    let trusted_memory_job = crate::cron::system_jobs::trusted_system_job_owner(job).is_some();
     (binding.is_agent_only()
         && !matches!(job.job_type, JobType::Agent)
         && !trusted_memory_job)

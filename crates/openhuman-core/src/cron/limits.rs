@@ -14,8 +14,8 @@ use anyhow::{bail, Result};
 use chrono::{Duration, Utc};
 
 use crate::config::Config;
-use crate::cron::{delivery_mode, CronJob, CronJobPatch, DeliveryConfig, JobType, Schedule};
 use crate::cron::system_jobs::TrustedSystemJobOwner;
+use crate::cron::{delivery_mode, CronJob, CronJobPatch, DeliveryConfig, JobType, Schedule};
 
 /// Whether `config` restricts cron to agent jobs.
 pub fn enforced(config: &Config) -> bool {
