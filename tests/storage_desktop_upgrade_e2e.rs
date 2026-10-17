@@ -402,7 +402,10 @@ async fn host_documents(backend: &dyn StorageBackend) -> usize {
     let docs = backend.for_scope(&Scope::local()).unwrap();
     let mut total = 0;
     // The importers write the v2 collections of the owners behind each source.
-    let owners: Vec<&str> = import::sources().iter().map(|source| source.owner).collect();
+    let owners: Vec<&str> = import::sources()
+        .iter()
+        .map(|source| source.owner)
+        .collect();
     for schema in openhuman_core::storage::schema::owner_schemas() {
         if !owners.contains(&schema.owner.as_str()) {
             continue;

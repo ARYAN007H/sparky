@@ -54,7 +54,7 @@ through TinyAgents' `legacy` importer, which owns those formats: the run ledger
 from a `VACUUM INTO` snapshot of `session_db/sessions.db`, each
 `session_raw` transcript into the scope of the agent its stem names (matched
 against the known definitions, else the default agent), and the turn-state
-JSON into the default agent. Each importer keeps a marker per workspace, so a
+JSON into the default agent. Each importer records a `tsd.migrations` entry per workspace, so a
 record deleted afterwards is not resurrected from the untouched legacy file.
 
 ## Entry points
