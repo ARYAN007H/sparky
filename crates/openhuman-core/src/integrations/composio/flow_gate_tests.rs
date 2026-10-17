@@ -314,3 +314,93 @@ fn classify_composio_action_for_tier_matches_curated_scope_fail_safe() {
     );
 }
 
+
+fn seeded_required_args_contract(slug: &str, toolkit: &str, required: &[&str]) -> ToolContract {
+    ToolContract {
+        slug: slug.to_string(),
+        toolkit: toolkit.to_string(),
+        description: None,
+        required_args: required.iter().map(|name| name.to_string()).collect(),
+        input_schema: Some(serde_json::json!({
+            "type": "object",
+            "required": required,
+        })),
+        output_fields: Vec::new(),
+        output_schema: None,
+        primary_array_path: None,
+        is_curated: false,
+    }
+}
+
+#[tokio::test]
+async fn preflight_fails_before_dispatch_naming_the_missing_field() {
+    let config = Config::default();
+    seed_live_catalog_cache(
+        "preflightfailtest",
+        vec![seeded_required_args_contract(
+            "PREFLIGHTFAILTEST_SEND_EMAIL",
+            "preflightfailtest",
+            &["to", "subject", "body"],
+        )],
+    );
+
+    let message = preflight_composio_args(
+        &config,
+        "PREFLIGHTFAILTEST_SEND_EMAIL",
+        &serde_json::json!({ "to": null, "subject": "hi", "body": "text" }),
+    )
+    .await
+    .expect_err("null required arg must fail preflight");
+    assert!(message.contains("`to`"), "error must name the field: {message}");
+    assert!(
+        message.contains("=nodes.<node_id>.item.json.<field>"),
+        "error must suggest the wiring fix: {message}"
+    );
+    assert!(
+        message.contains("output schema"),
+        "error must mention the agent output schema rule: {message}"
+    );
+
+    preflight_composio_args(
+        &config,
+        "PREFLIGHTFAILTEST_SEND_EMAIL",
+        &serde_json::json!({ "to": "a@b.com", "subject": "hi", "body": "text" }),
+    )
+    .await
+    .expect("wired args must pass preflight");
+}
+
+#[tokio::test]
+async fn preflight_skips_when_no_schema_is_available() {
+    preflight_composio_args(
+        &Config::default(),
+        "NOT_A_REAL_TOOLKIT_ACTION",
+        &serde_json::json!({}),
+    )
+    .await
+    .expect("preflight must be best-effort when no schema is available");
+}
+
+#[tokio::test]
+async fn preflight_applies_static_arg_rules_without_a_catalog() {
+    let config = Config::default();
+    let message = preflight_composio_args(
+        &config,
+        "GMAIL_ADD_LABEL_TO_EMAIL",
+        &serde_json::json!({ "add_label_ids": ["INBOX"] }),
+    )
+    .await
+    .expect_err("a statically-known missing required arg must fail preflight");
+    assert!(
+        message.contains("message_id"),
+        "error must name the missing field: {message}"
+    );
+
+    preflight_composio_args(
+        &config,
+        "GMAIL_ADD_LABEL_TO_EMAIL",
+        &serde_json::json!({ "message_id": "abc123", "add_label_ids": ["INBOX"] }),
+    )
+    .await
+    .expect("statically-valid args must pass preflight");
+}
