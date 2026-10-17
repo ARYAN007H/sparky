@@ -227,6 +227,28 @@ async fn rpc_add_refuses_when_cron_is_disabled_without_creating_job() {
     assert!(crate::cron::list_jobs(&config).unwrap().is_empty());
 }
 
+#[tokio::test]
+async fn rpc_add_cannot_create_a_memory_system_flow_from_parameters() {
+    let tmp = TempDir::new().unwrap();
+    let mut config = cron_test_config(&tmp);
+    config.cron.agent_jobs_only = true;
+    let runtime = cron_test_runtime(config.clone()).await;
+    let result = runtime
+        .invoke(
+            "openhuman.cron_add",
+            json!({
+                "job_type": "flow",
+                "schedule": {"kind":"every", "every_ms":300000},
+                "command": "system:memory_background"
+            }),
+        )
+        .await
+        .unwrap_err();
+
+    assert!(result.contains("allowed enum variants"), "{result}");
+    assert!(crate::cron::list_jobs(&config).unwrap().is_empty());
+}
+
 #[test]
 fn all_controller_schemas_covers_every_supported_function() {
     let names: Vec<_> = all_controller_schemas()

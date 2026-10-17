@@ -1,8 +1,9 @@
 //! Operator-owned limits for hosted deployments (`[cron] agent_jobs_only`).
 //!
-//! With the mode on, a profile may only hold agent jobs bound to the
-//! conversation that created them: shell and flow jobs are refused whatever the
-//! autonomy level, delivery is limited to `origin` and `none` (no model- or
+//! With the mode on, a profile may hold agent jobs bound to the conversation
+//! that created them and the memory domain's two trusted maintenance jobs.
+//! User-owned shell and flow jobs are refused whatever the autonomy level;
+//! delivery is limited to `origin` and `none` (no model- or
 //! user-chosen destination), recurring jobs keep `min_interval_secs` apart and
 //! at most `max_active_jobs` jobs are enabled at once, counted in the job
 //! store rather than in this process. Each check runs where a job is added or
@@ -13,6 +14,7 @@ use anyhow::{bail, Result};
 use chrono::{Duration, Utc};
 
 use crate::config::Config;
+use crate::cron::system_jobs::TrustedSystemJobOwner;
 use crate::cron::{delivery_mode, CronJob, CronJobPatch, DeliveryConfig, JobType, Schedule};
 
 /// Whether `config` restricts cron to agent jobs.
@@ -24,7 +26,7 @@ fn check_type(job_type: &JobType) -> Result<()> {
     if matches!(job_type, JobType::Agent) {
         return Ok(());
     }
-    bail!("only agent cron jobs are allowed here; shell and flow jobs are disabled")
+    bail!("only agent cron jobs are allowed here; shell and user flow jobs are disabled")
 }
 
 fn check_schedule(config: &Config, schedule: &Schedule) -> Result<()> {
@@ -59,6 +61,25 @@ fn install_capacity_limit(config: &Config) -> Result<()> {
         tinyflows_bus::schedule::StoreOperation::SetMaxActiveJobs { limit: Some(max) },
     )?;
     Ok(())
+}
+
+/// Admit a job for an owning system domain. The typed owner comes from the
+/// internal seeding call, never from a request or stored metadata.
+pub(crate) fn check_trusted_system_job(
+    config: &Config,
+    owner: TrustedSystemJobOwner,
+    name: &str,
+    schedule: &Schedule,
+) -> Result<()> {
+    if !owner.owns(name) {
+        bail!("system job name is outside its owning domain");
+    }
+    if !enforced(config) {
+        clear_capacity_limit_if_supported(config)?;
+        return Ok(());
+    }
+    check_schedule(config, schedule)?;
+    install_capacity_limit(config)
 }
 
 /// Clear a prior operator cap when enforcement is off. Backends without
@@ -127,6 +148,15 @@ pub(crate) fn check_patch(config: &Config, patch: &CronJobPatch) -> Result<()> {
 pub(crate) fn check_run(config: &Config, job: &CronJob) -> Result<()> {
     if !enforced(config) {
         return Ok(());
+    }
+    if let Some(owner) = crate::cron::system_jobs::trusted_system_job_owner(job) {
+        let name = crate::cron::system_jobs::system_job_name(job)
+            .expect("trusted system rows have a system job name");
+        if owner.owns(name) {
+            check_schedule(config, &job.schedule)?;
+            check_delivery(&job.delivery)?;
+            return Ok(());
+        }
     }
     check_type(&job.job_type)?;
     check_schedule(config, &job.schedule)?;

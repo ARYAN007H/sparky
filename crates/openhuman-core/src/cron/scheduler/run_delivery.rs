@@ -137,7 +137,7 @@ pub(crate) async fn trigger(binding: &Binding, flow_id: &str, run_id: &str) -> A
                     retryable: false,
                 };
             }
-            if let Some(refusal) = kind_refusal(binding, &job.job_type) {
+            if let Some(refusal) = kind_refusal(binding, &job) {
                 return Attempt {
                     success: false,
                     output: refusal,

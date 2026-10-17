@@ -440,9 +440,10 @@ Cron publishes, through [`core/bus.rs`](../core/bus.rs), these `DomainEvent` var
   unset, so an unrelated patch leaves the agent definition alone
   (`a_patch_over_the_bus_keeps_the_agent_definition_it_does_not_mention`).
 - The hosted-profile sweep runs an agent-only scheduler (`JobDispatcher::agent_only`):
-  a due shell or flow row of a profile is refused by the callback (and recorded
-  as a failed run), never executed. The sweep ticks on the module's clock; its
-  `now` only decides which profiles are opened.
+  due shell and user-owned flow rows are refused by the callback (and recorded
+  as failed runs), never executed. The memory domain's two code-owned system
+  jobs are admitted for their internal maintenance handlers. The sweep ticks on
+  the module's clock; its `now` only decides which profiles are opened.
 - System jobs: `system_job_handlers::register(name, handler)` installs an awaited in-process
   handler; the scheduler still publishes `CronSystemJobDue`, then records the handler's
   result as the run's status. With no handler, behaviour is unchanged.
@@ -476,7 +477,8 @@ pnpm debug rust cron
 `[cron] agent_jobs_only = true` is an operator-owned mode for hosted
 profiles (`SaasConfig::cron` forces it, with `min_interval_secs` = 300 and
 `max_active_jobs` = 20, onto every profile; a profile's own config cannot
-loosen it). It refuses shell and flow jobs, restricts delivery to `origin` and
+loosen it). It refuses shell and user-owned flow jobs, while allowing only the
+memory owner's two internal maintenance jobs. It restricts delivery to `origin` and
 `none`, requires a job to be created from a conversation (the origin is read
 from the live turn, never from tool arguments), keeps recurring jobs
 `min_interval_secs` apart and caps enabled jobs at `max_active_jobs`, counted
