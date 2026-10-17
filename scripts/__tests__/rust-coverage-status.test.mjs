@@ -261,3 +261,8 @@ test("private coverage cancels remaining suites but still preserves a report", (
   assert.equal(calls.filter((line) => line.includes("llvm-cov nextest")).length, 1);
   assert.equal(calls.filter((line) => line.includes("llvm-cov report")).length, 1);
 });
+
+test("private coverage passes when all eight selected configurations report tests", () => {
+  const { status } = runMockedCoverage(0);
+  assert.equal(status, 0);
+});
