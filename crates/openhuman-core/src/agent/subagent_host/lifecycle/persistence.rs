@@ -109,18 +109,6 @@ impl OpenHumanPersistence {
             .join(format!("task-{}.index.json", Self::task_component(task_id)))
     }
 
-    fn lock_path(&self, key: &SubagentTaskKey) -> std::path::PathBuf {
-        self.checkpoint_dir
-            .join("lifecycle")
-            .join(format!("{}.lock", Self::key_component(key)))
-    }
-
-    fn index_lock_path(&self, task_id: &str) -> std::path::PathBuf {
-        self.checkpoint_dir
-            .join("lifecycle")
-            .join(format!("task-{}.index.lock", Self::task_component(task_id)))
-    }
-
     fn task_component(task_id: &str) -> String {
         let encoded = task_id
             .as_bytes()
@@ -132,30 +120,6 @@ impl OpenHumanPersistence {
         } else {
             format!("sha256-{:x}", Sha256::digest(encoded.as_bytes()))
         }
-    }
-
-    fn lock_file(path: &std::path::Path) -> Result<std::fs::File, SubagentError> {
-        let parent = path.parent().expect("lifecycle lock path has a parent");
-        std::fs::create_dir_all(parent)
-            .map_err(|error| SubagentError::Persistence(error.to_string()))?;
-        let file = OpenOptions::new()
-            .create(true)
-            .truncate(false)
-            .read(true)
-            .write(true)
-            .open(path)
-            .map_err(|error| SubagentError::Persistence(error.to_string()))?;
-        file.lock_exclusive()
-            .map_err(|error| SubagentError::Persistence(error.to_string()))?;
-        Ok(file)
-    }
-
-    fn key_lock(&self, key: &SubagentTaskKey) -> Result<std::fs::File, SubagentError> {
-        Self::lock_file(&self.lock_path(key))
-    }
-
-    fn index_lock(&self, task_id: &str) -> Result<std::fs::File, SubagentError> {
-        Self::lock_file(&self.index_lock_path(task_id))
     }
 
     fn read_index_keys(&self, task_id: &str) -> Result<Vec<SubagentTaskKey>, SubagentError> {
@@ -184,82 +148,6 @@ impl OpenHumanPersistence {
             })
             .unwrap_or_default();
         Ok(keys)
-    }
-
-    fn write_index_keys(
-        &self,
-        task_id: &str,
-        keys: &[SubagentTaskKey],
-    ) -> Result<(), SubagentError> {
-        let path = self.index_path(task_id);
-        if keys.is_empty() {
-            match std::fs::remove_file(path) {
-                Ok(()) => return Ok(()),
-                Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
-                Err(error) => return Err(SubagentError::Persistence(error.to_string())),
-            }
-        }
-        Self::replace_file(
-            &path,
-            serde_json::to_vec(&serde_json::json!({"keys": keys}))
-                .map_err(|error| SubagentError::Persistence(error.to_string()))?,
-        )
-    }
-
-    fn add_index_key(&self, key: &SubagentTaskKey) -> Result<(), SubagentError> {
-        let _index_lock = self.index_lock(&key.task_id)?;
-        let mut keys = self.read_index_keys(&key.task_id)?;
-        if !keys.contains(key) {
-            keys.push(key.clone());
-            self.write_index_keys(&key.task_id, &keys)?;
-        }
-        Ok(())
-    }
-
-    fn remove_index_key(&self, key: &SubagentTaskKey) -> Result<(), SubagentError> {
-        let _index_lock = self.index_lock(&key.task_id)?;
-        let mut keys = self.read_index_keys(&key.task_id)?;
-        keys.retain(|candidate| candidate != key);
-        self.write_index_keys(&key.task_id, &keys)
-    }
-
-    fn replace_file(path: &std::path::Path, bytes: Vec<u8>) -> Result<(), SubagentError> {
-        let parent = path.parent().expect("lifecycle state path has a parent");
-        std::fs::create_dir_all(parent)
-            .map_err(|error| SubagentError::Persistence(error.to_string()))?;
-        let temporary = path.with_extension(format!("{}.tmp", uuid::Uuid::new_v4()));
-        std::fs::write(&temporary, bytes)
-            .map_err(|error| SubagentError::Persistence(error.to_string()))?;
-        match std::fs::rename(&temporary, path) {
-            Ok(()) => Ok(()),
-            Err(error) => {
-                let _ = std::fs::remove_file(&temporary);
-                Err(SubagentError::Persistence(error.to_string()))
-            }
-        }
-    }
-
-    fn insert_file(path: &std::path::Path, bytes: Vec<u8>) -> Result<bool, SubagentError> {
-        let parent = path.parent().expect("lifecycle state path has a parent");
-        std::fs::create_dir_all(parent)
-            .map_err(|error| SubagentError::Persistence(error.to_string()))?;
-        let temporary = path.with_extension(format!("{}.tmp", uuid::Uuid::new_v4()));
-        std::fs::write(&temporary, bytes)
-            .map_err(|error| SubagentError::Persistence(error.to_string()))?;
-        match std::fs::hard_link(&temporary, path) {
-            Ok(()) => {
-                let _ = std::fs::remove_file(&temporary);
-                Ok(true)
-            }
-            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
-                let _ = std::fs::remove_file(&temporary);
-                Ok(false)
-            }
-            Err(error) => {
-                let _ = std::fs::remove_file(&temporary);
-                Err(SubagentError::Persistence(error.to_string()))
-            }
-        }
     }
 
     fn read_pause_checkpoint(
