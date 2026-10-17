@@ -75,6 +75,65 @@ fn compatible_session_reuses_and_incompatible_shape_spawns_new() {
 }
 
 #[test]
+fn stale_completion_cannot_overwrite_reused_or_closed_session() {
+    let dir = tempfile::tempdir().unwrap();
+    let store = SubagentSessionStore::new(dir.path().to_path_buf());
+    let first = upsert_running(
+        &store,
+        SubagentSessionUpsert {
+            selector: selector("same-task"),
+            display_name: None,
+            task_title: "First run".into(),
+            worker_thread_id: None,
+            task_id: "first-task".into(),
+            lifecycle_key: None,
+        },
+        None,
+    )
+    .unwrap();
+    let second = upsert_running(
+        &store,
+        SubagentSessionUpsert {
+            selector: selector("same-task"),
+            display_name: None,
+            task_title: "Second run".into(),
+            worker_thread_id: None,
+            task_id: "second-task".into(),
+            lifecycle_key: None,
+        },
+        Some(&first),
+    )
+    .unwrap();
+    assert_eq!(first.subagent_session_id, second.subagent_session_id);
+
+    assert!(mark_finished(
+        &store,
+        &second.subagent_session_id,
+        "first-task",
+        &SubagentRunStatus::Completed,
+        vec![TranscriptMessage::user("stale")],
+    )
+    .is_err());
+    let current = store.load().unwrap().remove(0);
+    assert_eq!(current.current_task_id.as_deref(), Some("second-task"));
+    assert_eq!(current.status, DurableSubagentStatus::Running);
+    assert!(current.latest_history.is_none());
+
+    close(&store, &second.subagent_session_id).unwrap();
+    assert!(mark_finished(
+        &store,
+        &second.subagent_session_id,
+        "second-task",
+        &SubagentRunStatus::Completed,
+        vec![TranscriptMessage::user("late after close")],
+    )
+    .is_err());
+    let closed = store.load().unwrap().remove(0);
+    assert_eq!(closed.status, DurableSubagentStatus::Closed);
+    assert!(closed.latest_history.is_none());
+}
+
+#[test]
 fn upsert_persists_the_full_lifecycle_key_without_collapsing_to_task_id() {
     let dir = tempfile::tempdir().unwrap();
     let store = SubagentSessionStore::new(dir.path().to_path_buf());
