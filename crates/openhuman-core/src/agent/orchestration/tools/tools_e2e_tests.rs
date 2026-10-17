@@ -64,6 +64,225 @@ async fn spawn_subagent_tool_runs_child_agent_e2e() {
     );
 }
 
+#[tokio::test]
+async fn force_fresh_cancels_the_registered_driver_before_reusing_its_session() {
+    use crate::agent::orchestration::subagent_sessions::{
+        DurableSubagentStatus, SubagentSessionStore,
+    };
+    use crate::agent::tinyagents::host::OpenHumanRunContext;
+    use crate::core::runtime::{ContextOverlay, CoreContext, DomainSet};
+    use crate::tools::toolpacks::ToolGroups;
+    use tinyagents_harness::context::RunContext;
+    use tinyagents_orchestration::subagent::{
+        SubAgentJobRegistry, SubAgentJobStatus, SubAgentJobsTool,
+    };
+    use tinyagents_harness::tool::ToolDispatch;
+
+    struct GatedModel {
+        calls: std::sync::atomic::AtomicUsize,
+        first_started: tokio::sync::mpsc::Sender<()>,
+        release_first: Arc<tokio::sync::Notify>,
+        second_started: tokio::sync::mpsc::Sender<()>,
+    }
+
+    #[async_trait]
+    impl ChatModel<()> for GatedModel {
+        fn profile(&self) -> Option<&ModelProfile> {
+            static PROFILE: std::sync::OnceLock<ModelProfile> = std::sync::OnceLock::new();
+            Some(PROFILE.get_or_init(|| {
+                let mut profile = ModelProfile::default();
+                profile.tool_calling = true;
+                profile.parallel_tool_calls = true;
+                profile
+            }))
+        }
+
+        async fn invoke(
+            &self,
+            _state: &(),
+            _request: ModelRequest,
+        ) -> tinyinference_llm::Result<ModelResponse> {
+            use std::sync::atomic::Ordering;
+            match self.calls.fetch_add(1, Ordering::SeqCst) {
+                0 => {
+                    let _ = self.first_started.send(()).await;
+                    self.release_first.notified().await;
+                    Ok(ModelResponse::assistant("old child released"))
+                }
+                1 => {
+                    let _ = self.second_started.send(()).await;
+                    Ok(ModelResponse::assistant("fresh child completed"))
+                }
+                other => panic!("unexpected child model call {other}"),
+            }
+        }
+    }
+
+    let scratch = tempfile::tempdir().expect("isolated force-fresh fixture");
+    let workspace = scratch.path().join("workspace");
+    std::fs::create_dir_all(&workspace).expect("create workspace");
+    let (first_started_tx, mut first_started_rx) = tokio::sync::mpsc::channel(1);
+    let (second_started_tx, mut second_started_rx) = tokio::sync::mpsc::channel(1);
+    let release_first = Arc::new(tokio::sync::Notify::new());
+    let provider = Arc::new(GatedModel {
+        calls: std::sync::atomic::AtomicUsize::new(0),
+        first_started: first_started_tx,
+        release_first: release_first.clone(),
+        second_started: second_started_tx,
+    });
+    let mut parent = parent_context(workspace.as_path(), provider.clone(), vec![]);
+    parent.workspace_dir = workspace.clone();
+    parent.session_id = "force-fresh-parent-session".into();
+
+    let definitions = Arc::new(AgentDefinitionRegistry::builtins_only());
+    let mut config = crate::config::Config::default();
+    config.workspace_dir = workspace.clone();
+    config.components.juice = false;
+    let core = CoreContext::for_test_with_config(DomainSet::full(), config.clone()).derive_with(
+        ContextOverlay::new(config, DomainSet::full(), ToolGroups::none())
+            .definitions(definitions),
+    );
+    let live = RunContext::<OpenHumanRunContext>::new(
+        OpenHumanRunContext::new()
+            .with_core(Some(Arc::clone(&core)))
+            .with_parent(parent),
+        tinyagents_harness::context::RunConfig::new("force-fresh-parent")
+            .with_thread("force-fresh-parent-thread"),
+    );
+    let spawn = |live: &RunContext<OpenHumanRunContext>, args| async move {
+        let detached_data = live.data.detached_child();
+        let cancellation = detached_data.cancellation.clone();
+        let detached = live
+            .child(
+                tinyagents_harness::context::RunConfig::new(format!(
+                    "force-fresh-child-{}",
+                    uuid::Uuid::new_v4()
+                )),
+                detached_data,
+            )
+            .expect("detached child context")
+            .with_cancellation(cancellation);
+        SpawnAsyncSubagentTool::new()
+            .execute_with_live_parent_context(args, None, live.data.child(), detached)
+            .await
+            .expect("spawn tool executes")
+    };
+
+    let first = spawn(
+        &live,
+        json!({
+            "agent_id": "task_manager_agent",
+            "prompt": "start the old lifecycle canary",
+            "model": "test-model",
+            "task_key": "force-fresh-canary"
+        }),
+    )
+    .await;
+    assert!(!first.is_error, "{}", first.output());
+    tokio::time::timeout(std::time::Duration::from_secs(5), first_started_rx.recv())
+        .await
+        .expect("old child reaches the deterministic provider gate")
+        .expect("old child start notification");
+    let jobs = crate::core::runtime::slot_for::<SubAgentJobRegistry>(&live.data.dispatch_ctx());
+    let old_job = jobs
+        .list()
+        .into_iter()
+        .find(|job| job.agent == "task_manager_agent" && job.status == SubAgentJobStatus::Running)
+        .expect("first detached child is registered in shared Jobs");
+    let store = SubagentSessionStore::new(workspace.clone());
+    let before = store
+        .load()
+        .expect("first child session persisted")
+        .into_iter()
+        .find(|session| session.current_task_id.is_some())
+        .expect("durable row links to the live child");
+    assert_eq!(before.status, DurableSubagentStatus::Running);
+    let old_task_id = before.current_task_id.clone().expect("old task ID");
+    assert_eq!(old_job.extensions["task_id"], old_task_id);
+
+    let fresh = spawn(
+        &live,
+        json!({
+            "agent_id": "task_manager_agent",
+            "prompt": "replace the old lifecycle canary",
+            "model": "test-model",
+            "task_key": "force-fresh-canary",
+            "fresh": true
+        }),
+    )
+    .await;
+    assert!(!fresh.is_error, "{}", fresh.output());
+    tokio::time::timeout(std::time::Duration::from_secs(5), second_started_rx.recv())
+        .await
+        .expect("replacement child is actually dispatched")
+        .expect("replacement child start notification");
+    assert_eq!(
+        jobs.get(&old_job.id).expect("old job remains observable").status,
+        SubAgentJobStatus::Running,
+        "force-fresh requests cooperative cancellation before replacing the durable row"
+    );
+    let replacement = store
+        .load()
+        .expect("replacement session persisted")
+        .into_iter()
+        .find(|session| session.subagent_session_id == before.subagent_session_id)
+        .expect("fresh launch reuses the durable session identity");
+    assert_eq!(replacement.status, DurableSubagentStatus::Running);
+    assert_ne!(replacement.current_task_id.as_deref(), before.current_task_id.as_deref());
+
+    release_first.notify_one();
+    let session_port = crate::agent::orchestration::subagent_sessions::
+        OpenHumanTinySubagentSessionStore::new(
+            workspace.clone(),
+            "force-fresh-parent-session",
+            Some("force-fresh-parent-thread".into()),
+        );
+    let wait = SubAgentJobsTool::new()
+        .with_fixed_action(tinyagents_orchestration::subagent::SubAgentJobAction::Await)
+        .with_identifier_fields("task_id", "subagent_session_id")
+        .with_sessions(Arc::new(session_port), |_| {
+            "force-fresh-parent-session".to_owned()
+        })
+        .with_owner_scope(Arc::new({
+            let owner = crate::agent::tinyagents::tool_registration::subagent_owner_key(
+                "force-fresh-parent-session",
+                Some("force-fresh-parent-thread"),
+            );
+            move |_| owner.clone()
+        }));
+    let settled = tokio::time::timeout(
+        std::time::Duration::from_secs(5),
+        ToolDispatch::execute(
+            &wait,
+            &(),
+            tinyagents_harness::CallId::new("wait-force-fresh-old-child"),
+            json!({"task_id": old_task_id}),
+            tinytools::ToolCallOptions::default(),
+            &live,
+        ),
+    )
+    .await
+    .expect("old child settles after its provider future is released")
+    .expect("shared Jobs await succeeds");
+    assert!(!settled.is_error, "{}", settled.output());
+    let old_terminal: serde_json::Value =
+        serde_json::from_str(&settled.output()).expect("wait returns job JSON");
+    assert_eq!(old_terminal["status"], "cancelled");
+    assert_eq!(
+        jobs.get(&old_job.id).expect("old child remains registered").status,
+        SubAgentJobStatus::Cancelled
+    );
+    assert_eq!(provider.calls.load(std::sync::atomic::Ordering::SeqCst), 2);
+    let after = store
+        .load()
+        .expect("final durable state")
+        .into_iter()
+        .find(|session| session.subagent_session_id == before.subagent_session_id)
+        .expect("reused durable row remains present");
+    assert_eq!(after.current_task_id, replacement.current_task_id);
+    assert_eq!(after.status, DurableSubagentStatus::Completed);
+}
+
 /// A child the harness stops early (failure breaker / iteration cap) is not a
 /// finished delegation: the parent's tool result must be a failure, so its own
 /// failure policy and its trace see it, and the `SubagentCompleted` progress
