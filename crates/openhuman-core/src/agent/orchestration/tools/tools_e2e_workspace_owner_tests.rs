@@ -271,7 +271,7 @@ async fn driver_job_controls_are_isolated_by_workspace_with_shared_runtime_state
     assert_eq!(foreign_wait.results.len(), 1);
     let foreign_wait_text = foreign_wait.results[0].text();
     assert!(
-        foreign_wait_text.contains("not found") || foreign_wait_text.contains("does not exist"),
+        foreign_wait_text.contains("selected subagent job or session is unavailable"),
         "A must receive a selector denial for B's generic job id, got: {foreign_wait_text}"
     );
     assert_eq!(
