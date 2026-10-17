@@ -361,7 +361,12 @@ async fn start_rpc_returns_owner_receipt_while_member_executor_is_blocked() {
     let _guard = crate::config::TEST_ENV_LOCK.lock().await;
     let (_dir, config) = test_config();
     seed_team(&config, "team-rpc");
-    seed_member(&config, "team-rpc", "member-rpc", Some("task_manager_agent"));
+    seed_member(
+        &config,
+        "team-rpc",
+        "member-rpc",
+        Some("task_manager_agent"),
+    );
     seed_task(
         &config,
         "team-rpc",

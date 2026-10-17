@@ -360,7 +360,10 @@ async fn drive_member(
                     ("memberId".to_string(), member_id.to_string()),
                     ("taskId".to_string(), task.id.clone()),
                     ("teamRunId".to_string(), run_id.to_string()),
-                ("teamWorkerThreadId".to_string(), worker_thread_id.to_string()),
+                    (
+                        "teamWorkerThreadId".to_string(),
+                        worker_thread_id.to_string(),
+                    ),
                 ]
                 .into_iter()
                 .collect(),

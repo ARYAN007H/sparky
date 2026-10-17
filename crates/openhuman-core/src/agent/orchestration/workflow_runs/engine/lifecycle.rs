@@ -131,9 +131,8 @@ fn schedule_workflow_drive(
         }
     };
     let inherited_origin = crate::security::turn_origin::capture();
-    let origin = move |future| {
-        crate::security::turn_origin::with_inherited_origin(inherited_origin, future)
-    };
+    let origin =
+        move |future| crate::security::turn_origin::with_inherited_origin(inherited_origin, future);
     let make_future = move |cancel_token| {
         let run_id = drive_run_id.clone();
         let definition = drive_definition.clone();
@@ -408,7 +407,6 @@ pub(crate) async fn run_engine_loop(
         // Best-effort terminal failure write, preserving partial phase state.
         record_failed_if_current(config, run_id, &handle, format!("engine error: {err}"));
     }
-
 }
 
 #[cfg(test)]

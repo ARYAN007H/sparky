@@ -171,7 +171,8 @@ pub(super) fn router_pool() -> &'static CompletionRouterPool<RouterScope> {
 }
 
 #[cfg(test)]
-pub(super) fn test_store_overrides() -> &'static Mutex<HashMap<RouterScope, Arc<dyn CompletionStore>>> {
+pub(super) fn test_store_overrides(
+) -> &'static Mutex<HashMap<RouterScope, Arc<dyn CompletionStore>>> {
     static STORES: OnceLock<Mutex<HashMap<RouterScope, Arc<dyn CompletionStore>>>> =
         OnceLock::new();
     STORES.get_or_init(|| Mutex::new(HashMap::new()))
