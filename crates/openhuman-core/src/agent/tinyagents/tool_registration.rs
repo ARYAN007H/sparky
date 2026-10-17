@@ -19,9 +19,8 @@ use tinyinference_llm::model::ChatModel;
 use tinytools::{Tool, ToolCallOptions, ToolResult, ToolRunContext};
 
 use crate::agent::orchestration::tools::{
-    CloseSubagentDispatch, ContinueSubagentDispatch, DelegateGraphDispatch, DelegationDispatch,
-    ListSubagentsDispatch, SpawnAsyncSubagentDispatch, SpawnParallelAgentsDispatch,
-    SpawnSubagentDispatch, SteerSubagentDispatch, WaitSubagentDispatch,
+    ContinueSubagentDispatch, DelegateGraphDispatch, DelegationDispatch,
+    SpawnAsyncSubagentDispatch, SpawnParallelAgentsDispatch, SpawnSubagentDispatch,
 };
 use crate::agent::tinyagents::host::run_context::HostOperationContext;
 use crate::agent::tinyagents::host::OpenHumanRunContext;
@@ -115,10 +114,6 @@ pub(crate) fn typed_dispatch_for(
         "spawn_worker_thread" => Arc::new(SpawnWorkerThreadDispatch::new(adapter)),
         "spawn_subagent" => Arc::new(SpawnSubagentDispatch::new(adapter)),
         "continue_subagent" => Arc::new(ContinueSubagentDispatch::new(adapter)),
-        "wait_subagent" => Arc::new(WaitSubagentDispatch::new(adapter)),
-        "steer_subagent" => Arc::new(SteerSubagentDispatch::new(adapter)),
-        "close_subagent" => Arc::new(CloseSubagentDispatch::new(adapter)),
-        "list_subagents" => Arc::new(ListSubagentsDispatch::new(adapter)),
         "delegate_graph" => Arc::new(DelegateGraphDispatch::new(adapter)),
         "delegate" => Arc::new(DelegateToolDispatch::new(adapter)),
         "memory" => Arc::new(LiveToolContextDispatch::new(adapter)),

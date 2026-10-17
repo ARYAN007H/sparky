@@ -14,6 +14,7 @@ use tinytools::{PermissionLevel, Tool, ToolResult, ToolTimeout};
 use crate::agent::orchestration::subagent_sessions::{
     DurableSubagentSessionSummary, DurableSubagentStatus,
 };
+use crate::agent::orchestration::subagent_sessions;
 use tinyagents_tasks::{OrchestrationTaskRecord, OrchestrationTaskStatus};
 
 pub struct ListSubagentsTool;
@@ -394,3 +395,6 @@ mod steer_tests;
 #[cfg(test)]
 #[path = "steer_subagent_schema_tests.rs"]
 mod steer_schema_tests;
+#[cfg(test)]
+#[path = "close_subagent_tests.rs"]
+mod close_tests;
