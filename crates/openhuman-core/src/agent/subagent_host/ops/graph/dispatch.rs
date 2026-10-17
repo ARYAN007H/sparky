@@ -264,31 +264,6 @@ pub(in super::super) async fn run_subagent_via_graph(
         None => turn_spec.run().await,
     };
 
-    // Preserve the existing detached child trace export. It is separately
-    // gated by the usage-sharing/auth configuration and reads this run's
-    // durable native journal, including for unobserved child turns.
-    if let (Some(config), Some(journal_run_id)) = (
-        config.filter(|config| config.observability.share_usage_data),
-        child_journal_run_id,
-    ) {
-        let config = config.clone();
-        let thread_id = trace_session_group.clone();
-        let agent_id = agent_id.to_string();
-        let task_id = task_id.to_string();
-        let dispatch = dispatch.clone();
-        tokio::spawn(async move {
-            crate::core::observability::progress_tracing::export_subagent_journal_trace(
-                &dispatch,
-                &config,
-                &journal_run_id,
-                thread_id.as_deref(),
-                &agent_id,
-                &task_id,
-            )
-            .await;
-        });
-    }
-
     let mut outcome = match run_result {
         Ok(outcome) => outcome,
         Err(err) => {
@@ -350,6 +325,14 @@ pub(in super::super) async fn run_subagent_via_graph(
             if let Some(native) = &native_subagent {
                 native.finalize_failed_boundary();
             }
+            spawn_subagent_trace_export(
+                config,
+                &dispatch,
+                child_journal_run_id.as_deref(),
+                trace_session_group.as_deref(),
+                agent_id,
+                task_id,
+            );
             return Err(mapped);
         }
     };
@@ -539,6 +522,16 @@ pub(in super::super) async fn run_subagent_via_graph(
             },
         );
     }
+    // Export only after the child journal's finalization and status flush so a
+    // detached reader cannot race ahead and force-close its spans at wall time.
+    spawn_subagent_trace_export(
+        config,
+        &dispatch,
+        child_journal_run_id.as_deref(),
+        trace_session_group.as_deref(),
+        agent_id,
+        task_id,
+    );
 
     // On an early-exit (`ask_user_clarification`), `outcome.text` is the question
     // and the runner checkpoints + returns AwaitingUser. `None` = ran to a final
@@ -552,6 +545,39 @@ pub(in super::super) async fn run_subagent_via_graph(
         // #4466: propagate a circuit-breaker halt so the runner reports Incomplete.
         outcome.breaker_halt,
     ))
+}
+
+fn spawn_subagent_trace_export(
+    config: Option<&crate::config::Config>,
+    dispatch: &crate::core::runtime::DispatchCtx,
+    journal_run_id: Option<&str>,
+    thread_id: Option<&str>,
+    agent_id: &str,
+    task_id: &str,
+) {
+    let (Some(config), Some(journal_run_id)) = (
+        config.filter(|config| config.observability.share_usage_data),
+        journal_run_id,
+    ) else {
+        return;
+    };
+    let config = config.clone();
+    let dispatch = dispatch.clone();
+    let journal_run_id = journal_run_id.to_owned();
+    let thread_id = thread_id.map(str::to_owned);
+    let agent_id = agent_id.to_owned();
+    let task_id = task_id.to_owned();
+    tokio::spawn(async move {
+        crate::core::observability::progress_tracing::export_subagent_journal_trace(
+            &dispatch,
+            &config,
+            &journal_run_id,
+            thread_id.as_deref(),
+            &agent_id,
+            &task_id,
+        )
+        .await;
+    });
 }
 
 /// A task-specific thread explicitly routes a worker; an absent task thread
