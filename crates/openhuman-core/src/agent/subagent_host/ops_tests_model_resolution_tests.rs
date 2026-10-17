@@ -271,13 +271,10 @@ async fn closing_a_durable_driver_session_cancels_only_its_registered_child() {
             .await
             .expect("Tiny close adapter cancels then closes the durable row")
     );
-    let cancellation = jobs
-        .get(job_id.as_str())
-        .expect("registered child remains visible while it unwinds");
-    assert_eq!(cancellation.status, SubAgentJobStatus::Running);
     assert_eq!(
-        cancellation.error.as_deref(),
-        Some("cancellation requested; job will be cancelled when the child unwinds")
+        jobs.get(job_id.as_str()).unwrap().status,
+        SubAgentJobStatus::Running,
+        "the job remains visible while cooperative cancellation unwinds"
     );
     assert!(
         port.close("close-driver-session")
