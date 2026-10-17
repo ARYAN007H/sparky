@@ -16,9 +16,8 @@ use tinyagents_session::transcript::TranscriptMessage;
 use tinyinference_llm::message::Message;
 use tinytools_agent::dialect::ToolDialect;
 
-use crate::agent::session_host::turn::chat_spec::build_chat_turn_spec;
 use crate::agent::tinyagents::{
-    host::OpenHumanHostBase, host::OpenHumanRunContext, TurnModelSource,
+    host::OpenHumanHostBase, host::OpenHumanRunContext, TurnModelSource, TurnSpec,
 };
 
 /// Immutable host composition consumed by [`OpenHumanSessionDriver`].
@@ -194,20 +193,30 @@ impl SessionDriver<OpenHumanRunContext> for OpenHumanSessionDriver {
             let mut run_context = run_context;
             run_context.workspace = self.workspace.clone().or(run_context.workspace);
             run_context.sandbox_mode = Some(self.sandbox_mode);
-            build_chat_turn_spec(
+            let provider_id = turn_models.provider_id().to_string();
+            TurnSpec {
                 run_context,
                 turn_models,
-                &self.model_name,
-                messages,
-                tools,
-                synthesized_tools,
-                visible_tool_names,
-                self.max_iterations,
+                provider_id,
+                model: &self.model_name,
+                history: messages,
+                // Durable and synthesized tools follow the declared-snapshot order.
+                tool_sets: vec![tools, synthesized_tools],
+                // `Some(empty)` is deny-all; `None` re-exposes the driver registry.
+                allowed: Some(visible_tool_names),
+                max_iterations: self.max_iterations,
+                subagent_scope: None,
                 context_window,
-                self.run_queue.clone(),
+                run_queue: self.run_queue.clone(),
+                message_run_queue: None,
+                early_exit_tools: &["ask_user_clarification"],
+                pause_at_cap: true,
+                max_output_tokens: Some(crate::inference::provider::AGENT_TURN_MAX_OUTPUT_TOKENS),
                 context_mw,
-                tool_policy,
-            )
+                tool_policy: Some(tool_policy),
+                deterministic_cacheable: false,
+                defer_turn_completed_to_caller: true,
+            }
             .run_hosted(hosted_base, self.agent_id.clone())
             .await
         });
