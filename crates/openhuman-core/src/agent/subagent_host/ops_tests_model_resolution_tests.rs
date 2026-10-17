@@ -51,7 +51,6 @@ async fn runner_rejects_spawn_beyond_max_depth() {
 
 #[tokio::test]
 async fn prepared_async_spawn_runs_through_driver_jobs_dispatcher() {
-    eprintln!("7950 bridge: test entered");
     let provider = ScriptedProvider::new(vec![text_response("driver result")]);
     let mut options = with_parent(make_parent(provider, vec![]), SubagentRunOptions::default());
     options.task_id = Some("driver-backed-async-spawn".into());
@@ -61,9 +60,6 @@ async fn prepared_async_spawn_runs_through_driver_jobs_dispatcher() {
             .with_thread("driver-spawn-thread"),
     );
 
-    eprintln!("7950 bridge: before helper future size={}", std::mem::size_of_val(&run_async_spawn_via_driver_tool(
-        &parent, make_def_named_tools(&[]), "measure".into(), options.clone()
-    )));
     let (outcome, job_id) = run_async_spawn_via_driver_tool(
         &parent,
         make_def_named_tools(&[]),

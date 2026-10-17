@@ -103,7 +103,6 @@ pub(crate) async fn run_async_spawn_via_driver_tool(
     input: String,
     options: SubagentRunOptions,
 ) -> Result<(SubagentRunOutcome, String), SubagentRunError> {
-    eprintln!("7950 bridge: helper entered");
     use tinyagents_harness::tool::ToolDispatch;
     use tinyagents_orchestration::subagent::{DriverSubAgentTool, SubAgentJobRegistry};
     use tinytools::{PermissionLevel, ToolCategory, ToolCallOptions, ToolScope, ToolTimeout};
@@ -122,7 +121,6 @@ pub(crate) async fn run_async_spawn_via_driver_tool(
             .unwrap_or_else(|| PathBuf::from(".openhuman/subagent_checkpoints"))
     }));
     let bundle = OpenHumanDriverBundle::new(checkpoint_dir)?;
-    eprintln!("7950 bridge: bundle created");
     let host_request = HostRequest {
         definition: definition.clone(),
         options,
@@ -158,7 +156,6 @@ pub(crate) async fn run_async_spawn_via_driver_tool(
         },
         |_request| None,
     );
-    eprintln!("7950 bridge: dispatcher created");
     let dispatch_ctx = parent.data.dispatch_ctx();
     let jobs = (*crate::core::runtime::slot_for::<SubAgentJobRegistry>(&dispatch_ctx)).clone();
     let parent_session = parent
@@ -183,19 +180,16 @@ pub(crate) async fn run_async_spawn_via_driver_tool(
             ToolTimeout::Unbounded,
         );
     let args = serde_json::json!({ "input": input, "mode": "inline" });
-    eprintln!("7950 bridge: before dispatch, future_size={}", std::mem::size_of_val(&dispatcher.execute(
-        &(), tinyagents_harness::CallId::new("size"), args.clone(), ToolCallOptions::default(), parent
-    )));
-    let tool_result = Box::pin(dispatcher.execute(
+    let tool_result = dispatcher
+        .execute(
             &(),
             tinyagents_harness::CallId::new(format!("spawn-{task_id}")),
             args,
             ToolCallOptions::default(),
             parent,
-        ))
+        )
         .await
         .map_err(|error| SubagentRunError::Provider(anyhow::anyhow!(error.to_string())))?;
-    eprintln!("7950 bridge: dispatch returned");
     let reply: serde_json::Value = serde_json::from_str(&tool_result.output()).map_err(|error| {
         SubagentRunError::Provider(anyhow::anyhow!(format!(
             "driver-backed async spawn returned an invalid job reference: {error}"
@@ -662,7 +656,6 @@ impl SubagentExecutor<crate::agent::tinyagents::host::OpenHumanRunContext> for O
         &self,
         execution: SubagentExecution<crate::agent::tinyagents::host::OpenHumanRunContext>,
     ) -> Result<SubagentOutcome, SubagentError> {
-        eprintln!("7950 bridge: executor entered");
         let task_key = execution.task_key.clone();
         let PreparedHostPlan {
             definition,
@@ -675,14 +668,12 @@ impl SubagentExecutor<crate::agent::tinyagents::host::OpenHumanRunContext> for O
             .ok_or_else(|| {
                 SubagentError::Execution("OpenHuman subagent plan was consumed".into())
             })?;
-        eprintln!("7950 bridge: plan removed, task={}", task_key.task_id);
         // Both carriers observe one token.  The generic driver installs this
         // token on the prepared RunContext; the host graph polls the copy in
         // its explicit OpenHuman carrier.
         options.run_context = execution.prepared.run_context.data.clone();
         options.run_context.cancellation = execution.cancellation.clone();
         options.message_run_queue = execution.prepared.run_context.run_queue.clone();
-        eprintln!("7950 bridge: before direct, input_size={}", execution.prepared.input.last().map(Message::text).unwrap_or_default().len());
         match Box::pin(super::ops::run_subagent_direct(
             &definition,
             &execution
@@ -696,7 +687,6 @@ impl SubagentExecutor<crate::agent::tinyagents::host::OpenHumanRunContext> for O
         .await
         {
             Ok(outcome) => {
-                eprintln!("7950 bridge: direct returned");
                 self.host_outcome
                     .lock()
                     .unwrap_or_else(|p| p.into_inner())
