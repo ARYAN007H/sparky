@@ -34,7 +34,7 @@ use chrono::{DateTime, Duration, Utc};
 use serde_json::{json, Map, Value};
 use sha2::{Digest, Sha256};
 use tinystoragedrivers::{
-    CollectionSpec, ErrorKind, Filter, Precondition, Query, RetryPolicy, Sort, Versioned,
+    CollectionSpec, ErrorKind, Filter, Precondition, Query, Sort, Versioned,
 };
 
 use super::types::{
@@ -227,30 +227,22 @@ async fn claim_content(
     skip_recent: bool,
 ) -> Result<Option<Option<i64>>, StorageError> {
     let window_start = now_ms - DEDUP_WINDOW_SECS * 1000;
-    for _ in 0..RetryPolicy::default().attempts {
-        let stored = docs.get(DEDUP, id).await?;
-        let last = stored
+    let repo = tinystoragedrivers::Repo::<Value>::new(docs, DEDUP)?;
+    let mut previous: Option<Option<i64>> = None;
+    repo.update(id, |current| {
+        let last = current
             .as_ref()
-            .and_then(|stored| stored.doc.get("last_ms"))
+            .and_then(|doc| doc.get("last_ms"))
             .and_then(Value::as_i64);
         if skip_recent && last.is_some_and(|last| last >= window_start) {
+            previous = None;
             return Ok(None);
         }
-        let precondition = stored
-            .as_ref()
-            .map_or(Precondition::Absent, Versioned::unchanged);
-        match docs
-            .put(DEDUP, id, json!({ "last_ms": now_ms }), precondition)
-            .await
-        {
-            Ok(_) => return Ok(Some(last)),
-            Err(error) if error.kind() == ErrorKind::Conflict => {}
-            Err(error) => return Err(error),
-        }
-    }
-    Err(StorageError::conflict(format!(
-        "notification dedup {id} kept changing under {} attempts", RetryPolicy::default().attempts"
-    )))
+        previous = Some(last);
+        Ok(Some(json!({ "last_ms": now_ms })))
+    })
+    .await?;
+    Ok(previous)
 }
 
 /// Undoes a [`claim_content`] whose notification was never stored, so a retry
@@ -461,7 +453,7 @@ impl Docs {
     }
 
     pub(super) fn upsert_settings(&self, settings: &NotificationSettings) -> Result<()> {
-        let id = settings.provider.clone();
+        let id = key_of(&settings.provider)?;
         let doc = json!({
             "enabled": settings.enabled,
             "importance_threshold": f64::from(settings.importance_threshold),
@@ -475,10 +467,10 @@ impl Docs {
     }
 
     pub(super) fn get_settings(&self, provider: &str) -> Result<NotificationSettings> {
-        let id = provider.to_string();
+        let id = key_of(provider)?;
         self.0.run(|docs| async move {
             let defaults = NotificationSettings {
-                provider: id.clone(),
+                provider: provider.clone(),
                 ..NotificationSettings::default()
             };
             let Some(stored) = docs.get(SETTINGS, &id).await? else {
@@ -498,7 +490,7 @@ impl Docs {
                     .get("route_to_orchestrator")
                     .and_then(Value::as_bool)
                     .unwrap_or(defaults.route_to_orchestrator),
-                provider: id,
+                provider: provider.to_string(),
             })
         })
     }
