@@ -38,11 +38,12 @@
 pub(crate) use crate::integrations::composio::builder_tools::search_live_catalog;
 pub use crate::integrations::composio::builder_tools::{
     GetToolContractTool, GetToolOutputSampleTool, ListConnectableToolkitsTool,
-    ListFlowConnectionsTool, SearchToolCatalogTool,
+    SearchToolCatalogTool,
 };
+pub use super::builder_tools_connection_reads::ListFlowConnectionsTool;
 
 #[cfg(test)]
-use crate::integrations::composio::builder_tools::flow_connection_to_json;
+use super::builder_tools_connection_reads::flow_connection_to_json;
 
 #[cfg(test)]
 #[path = "builder_tools_support.rs"]

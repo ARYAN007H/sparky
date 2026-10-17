@@ -57,7 +57,7 @@ impl Tool for ListConnectableToolkitsTool {
         _options: ToolCallOptions,
         tool_context: Option<&dyn ToolRunContext>,
     ) -> anyhow::Result<ToolResult> {
-        let ctx = crate::agent::tinyagents::host::run_context::dispatch_ctx_for_tool(tool_context);
+        let _ctx = crate::agent::tinyagents::host::run_context::dispatch_ctx_for_tool(tool_context);
         // The agent-ready list is the connector module's (`GetVocabulary`),
         // read through the host's curated snapshot.
         use crate::integrations::composio::contract::agent_ready_toolkits;
