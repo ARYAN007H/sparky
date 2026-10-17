@@ -257,25 +257,7 @@ impl DelegateGraphTool {
         )
         .await
         {
-            Ok(state) => {
-                if state.cancelled {
-                    return Ok(ToolResult::error(format!(
-                        "delegate_graph cancelled for '{agent_id}'."
-                    )));
-                }
-                let final_output = state
-                    .final_output
-                    .unwrap_or_else(|| "(delegation produced no final output)".to_string());
-                let note = if state.revisions > 0 {
-                    " (after revision)"
-                } else {
-                    ""
-                };
-                Ok(ToolResult::success(format!(
-                    "[Delegated to {agent_id}{note}, {} review pass(es)]\n{final_output}",
-                    state.reviews.len()
-                )))
-            }
+            Ok(result) => Ok(result),
             Err(e) => Ok(ToolResult::error(format!(
                 "delegate_graph failed for '{agent_id}': {e}"
             ))),
