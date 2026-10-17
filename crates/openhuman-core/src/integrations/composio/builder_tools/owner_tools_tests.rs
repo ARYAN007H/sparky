@@ -8,6 +8,32 @@ use tinytools::{PermissionLevel, Tool};
 use crate::config::Config;
 use crate::integrations::composio::catalog::{seed_live_catalog_cache, seed_probe_cache, ProbedOutputSample, ToolContract};
 
+struct EmptyConnectableProvider;
+
+#[async_trait::async_trait]
+impl ConnectableToolkitProvider for EmptyConnectableProvider {
+    async fn connected(
+        &self,
+        _dispatch: &crate::core::runtime::DispatchCtx,
+        _config: &Config,
+    ) -> Vec<String> {
+        Vec::new()
+    }
+}
+
+#[tokio::test]
+async fn connectable_toolkits_uses_the_injected_host_snapshot_and_fails_closed_empty() {
+    let tmp = TempDir::new().unwrap();
+    let tool = ListConnectableToolkitsTool::new(
+        test_config(&tmp),
+        Arc::new(EmptyConnectableProvider),
+    );
+    let result = tool.execute(json!({})).await.unwrap();
+    assert!(!result.is_error, "{}", result.output());
+    let value: Value = serde_json::from_str(&result.output()).unwrap();
+    assert!(value["toolkits"].as_array().unwrap().iter().all(|item| item["connected"] == false));
+}
+
 fn test_config(tmp: &TempDir) -> Arc<Config> {
     let config = Config { workspace_dir: tmp.path().join("workspace"), action_dir: tmp.path().join("workspace"), config_path: tmp.path().join("config.toml"), ..Config::default() };
     std::fs::create_dir_all(&config.workspace_dir).unwrap();
