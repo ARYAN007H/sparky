@@ -83,6 +83,15 @@ pub(crate) async fn invoke(
     };
 
     let connection_id = conn.and_then(crate::integrations::composio::flow_gate::composio_connection_id);
+    let resolved_account = match connection_id {
+        Some(id) => Some((id, crate::integrations::composio::flow_gate::resolve_composio_account(&live, id).await)),
+        None => None,
+    };
+    match &resolved_account {
+        Some((id, Some((toolkit, _)))) => tracing::info!(target: "flows", %slug, connection_id = %id, %toolkit, mode = live.composio.mode.as_str(), "[flows] tool_call: executing against the resolved connected account"),
+        Some((id, None)) => tracing::warn!(target: "flows", %slug, connection_id = %id, mode = live.composio.mode.as_str(), "[flows] tool_call: connection_ref connection_id not found among the user's live connected accounts (stale cache or foreign id) — forwarding the exact id so the provider can reject it rather than falling back to an ambient account"),
+        None => tracing::debug!(target: "flows", %slug, mode = live.composio.mode.as_str(), "[flows] tool_call: no connection_ref — using the ambient signed-in account"),
+    }
     let response = execute_for_connection(&live, slug, (!args.is_null()).then_some(args), connection_id)
       .await
       .and_then(|result| crate::integrations::composio::flow_gate::reject_unsuccessful_composio_response(slug, result).map_err(|error| error.to_string()))

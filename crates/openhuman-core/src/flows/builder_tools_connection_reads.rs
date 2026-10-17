@@ -6,6 +6,19 @@ use serde_json::Value;
 pub(crate) struct FlowsConnectionProvider;
 
 #[async_trait]
+impl crate::integrations::composio::builder_tools::ConnectableToolkitProvider
+    for FlowsConnectionProvider
+{
+    async fn connected(
+        &self,
+        dispatch: &crate::core::runtime::DispatchCtx,
+        config: &crate::config::Config,
+    ) -> Vec<String> {
+        crate::flows::ops::connected_toolkits(dispatch, config).await
+    }
+}
+
+#[async_trait]
 impl crate::integrations::composio::builder_tools::FlowConnectionProvider
     for FlowsConnectionProvider
 {
