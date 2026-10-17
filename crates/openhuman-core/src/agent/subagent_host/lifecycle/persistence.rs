@@ -213,8 +213,15 @@ impl OpenHumanPersistence {
         Ok(SubagentCheckpointData {
             task_key,
             task_id,
-            agent_id: metadata.get("agent_id").cloned().unwrap_or_default(),
-            worker_thread_id: metadata.get("worker_thread_id").cloned(),
+            agent_id: metadata
+                .get("agent_id")
+                .cloned()
+                .or_else(|| host.get("agent_id").and_then(serde_json::Value::as_str).map(str::to_owned))
+                .unwrap_or_default(),
+            worker_thread_id: metadata
+                .get("worker_thread_id")
+                .cloned()
+                .or_else(|| host.get("worker_thread_id").and_then(serde_json::Value::as_str).map(str::to_owned)),
             history: outcome
                 .history
                 .iter()
@@ -241,7 +248,16 @@ impl OpenHumanPersistence {
                     .charged_amount
                     .map(|amount| amount.micros as f64 / 1_000_000.0)
                     .unwrap_or_default(),
-                cost_source: cost_source_of(outcome.usage.usage.charged_amount.as_ref()),
+                cost_source: outcome
+                    .cost_source
+                    .or_else(|| {
+                        host.get("cost_source")
+                            .cloned()
+                            .and_then(|value| serde_json::from_value(value).ok())
+                    })
+                    .unwrap_or_else(|| {
+                        cost_source_of(outcome.usage.usage.charged_amount.as_ref())
+                    }),
             },
             artifact_paths: outcome
                 .artifacts
@@ -331,9 +347,12 @@ impl OpenHumanPersistence {
     fn checkpoint_outcome(checkpoint: SubagentCheckpointData) -> SubagentOutcome {
         let resume = Self::checkpoint_resume(&checkpoint);
         let host_checkpoint = serde_json::json!({
+            "agent_id": checkpoint.agent_id.clone(),
+            "worker_thread_id": checkpoint.worker_thread_id.clone(),
             "created_at": checkpoint.created_at.clone(),
             "options": checkpoint.options.clone(),
             "elapsed_ms": checkpoint.elapsed_ms,
+            "cost_source": checkpoint.usage.cost_source,
         });
         let mut outcome =
             SubagentOutcome {
@@ -373,6 +392,8 @@ impl OpenHumanPersistence {
                         ..ArtifactReference::default()
                     })
                     .collect(),
+                cost_usd: checkpoint.usage.cost().usd(),
+                cost_source: Some(checkpoint.usage.cost_source),
                 ..SubagentOutcome::cancelled(String::new())
             };
         outcome
@@ -385,9 +406,9 @@ impl OpenHumanPersistence {
         &self,
         key: &SubagentTaskKey,
         checkpoint: SubagentCheckpointData,
-    ) -> Result<SubagentOutcome, SubagentError> {
+    ) -> Result<Option<SubagentOutcome>, SubagentError> {
         let outcome = Self::checkpoint_outcome(checkpoint);
-        let _ = tinyagents_orchestration::subagent::SubagentPersistence::save_pause(
+        let disposition = tinyagents_orchestration::subagent::SubagentPersistence::save_pause(
             &self.file_store,
             tinyagents_orchestration::subagent::PersistedSubagentPause {
                 key: key.clone(),
@@ -396,7 +417,21 @@ impl OpenHumanPersistence {
             },
         )
         .await?;
-        Ok(outcome)
+        use tinyagents_orchestration::subagent::SubagentPausePersistenceDisposition as Pause;
+        match disposition {
+            Pause::Inserted | Pause::Replaced => Ok(Some(outcome)),
+            Pause::Existing => {
+                if self.file_store.terminal_outcome(key)?.is_some() {
+                    return Ok(None);
+                }
+                tinyagents_orchestration::subagent::SubagentPersistence::load_pause(
+                    &self.file_store,
+                    key,
+                )
+                .await
+            }
+            Pause::TerminalExisting => Ok(None),
+        }
     }
 
     fn live_checkpoint(
@@ -484,7 +519,9 @@ impl tinyagents_orchestration::subagent::SubagentPersistence for OpenHumanPersis
         let Some(checkpoint) = self.read_pause_checkpoint(key)? else {
             return Ok(None);
         };
-        let outcome = self.migrate_legacy_pause(key, checkpoint).await?;
+        let Some(outcome) = self.migrate_legacy_pause(key, checkpoint).await? else {
+            return Ok(None);
+        };
         let SubagentOutcomeKind::AwaitingInput(paused) = outcome.status else {
             return Err(SubagentError::Persistence(
                 "legacy pause migration produced a non-paused outcome".into(),
@@ -509,7 +546,7 @@ impl tinyagents_orchestration::subagent::SubagentPersistence for OpenHumanPersis
             return Ok(Some(outcome));
         }
         match self.read_pause_checkpoint(key)? {
-            Some(checkpoint) => Ok(Some(self.migrate_legacy_pause(key, checkpoint).await?)),
+            Some(checkpoint) => self.migrate_legacy_pause(key, checkpoint).await,
             None => Ok(None),
         }
     }
