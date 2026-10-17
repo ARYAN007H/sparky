@@ -65,17 +65,16 @@ async fn byte_policy_projects_a_parent_readable_artifact_before_the_result_cap()
             workspace_dir.clone(),
             parent_action_dir.clone(),
         );
-        apply_subagent_result_policies(
-            &mut outcome,
-            &definition,
-            &options,
-            "task-policy-test",
-        )
-        .await;
+        apply_subagent_result_policies(&mut outcome, &definition, &options, "task-policy-test")
+            .await;
     })
     .await;
 
-    assert_eq!(outcome.output.chars().count(), 16, "the product cap is applied");
+    assert_eq!(
+        outcome.output.chars().count(),
+        16,
+        "the product cap is applied"
+    );
     assert_ne!(outcome.output, original);
     assert!(outcome.artifact_paths.contains(&"authored.txt".to_owned()));
     let stored_path = outcome
@@ -84,7 +83,10 @@ async fn byte_policy_projects_a_parent_readable_artifact_before_the_result_cap()
         .find(|path| path.starts_with("outputs/"))
         .expect("host projection records its artifact path");
     let parent_copy = parent_action_dir.join(stored_path);
-    assert!(parent_copy.is_file(), "the parent action root owns the copy");
+    assert!(
+        parent_copy.is_file(),
+        "the parent action root owns the copy"
+    );
     assert_eq!(
         std::fs::read_to_string(parent_copy).expect("read parent artifact"),
         original,
