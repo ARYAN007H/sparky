@@ -55,7 +55,9 @@ mcp/host.rs
 modules/registry_contract_tests.rs
 modules/registry.rs
 security/credentials/ops/credential.rs
+storage/boot.rs
 storage/import/tinyflows.rs
+storage/schema.rs
 skills/bundled/mod.rs
 skills/mod.rs
 skills/search.rs
