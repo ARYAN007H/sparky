@@ -143,11 +143,11 @@ async fn force_fresh_cancels_the_registered_driver_before_reusing_its_session() 
             .definitions(definitions),
     );
     let live = RunContext::<OpenHumanRunContext>::new(
+        tinyagents_harness::context::RunConfig::new("force-fresh-parent")
+            .with_thread("force-fresh-parent-thread"),
         OpenHumanRunContext::new()
             .with_core(Some(Arc::clone(&core)))
             .with_parent(parent),
-        tinyagents_harness::context::RunConfig::new("force-fresh-parent")
-            .with_thread("force-fresh-parent-thread"),
     );
     let spawn = |live: &RunContext<OpenHumanRunContext>, args| async move {
         let detached_data = live.data.detached_child();
@@ -162,7 +162,7 @@ async fn force_fresh_cancels_the_registered_driver_before_reusing_its_session() 
             )
             .expect("detached child context")
             .with_cancellation(cancellation);
-        SpawnAsyncSubagentTool::new()
+        crate::agent::orchestration::tools::SpawnAsyncSubagentTool::new()
             .execute_with_live_parent_context(args, None, live.data.child(), detached)
             .await
             .expect("spawn tool executes")
@@ -217,18 +217,22 @@ async fn force_fresh_cancels_the_registered_driver_before_reusing_its_session() 
         .expect("replacement child is actually dispatched")
         .expect("replacement child start notification");
     assert_eq!(
-        jobs.get(&old_job.id).expect("old job remains observable").status,
+        jobs.get(&old_job.id.to_string()).expect("old job remains observable").status,
         SubAgentJobStatus::Running,
         "force-fresh requests cooperative cancellation before replacing the durable row"
     );
-    let replacement = store
-        .load()
-        .expect("replacement session persisted")
-        .into_iter()
+    let rows = store.load().expect("replacement session persisted");
+    let closed_old = rows
+        .iter()
         .find(|session| session.subagent_session_id == before.subagent_session_id)
-        .expect("fresh launch reuses the durable session identity");
+        .expect("fresh launch retains the old durable session");
+    assert_eq!(closed_old.status, DurableSubagentStatus::Closed);
+    let replacement = rows
+        .iter()
+        .find(|session| session.current_task_id.as_deref() != Some(old_task_id.as_str()))
+        .expect("fresh launch writes a distinct durable session and task");
     assert_eq!(replacement.status, DurableSubagentStatus::Running);
-    assert_ne!(replacement.current_task_id.as_deref(), before.current_task_id.as_deref());
+    assert_ne!(replacement.subagent_session_id, before.subagent_session_id);
 
     release_first.notify_one();
     let session_port = crate::agent::orchestration::subagent_sessions::
@@ -237,7 +241,7 @@ async fn force_fresh_cancels_the_registered_driver_before_reusing_its_session() 
             "force-fresh-parent-session",
             Some("force-fresh-parent-thread".into()),
         );
-    let wait = SubAgentJobsTool::new()
+    let wait = SubAgentJobsTool::new(jobs.clone())
         .with_fixed_action(tinyagents_orchestration::subagent::SubAgentJobAction::Await)
         .with_identifier_fields("task_id", "subagent_session_id")
         .with_sessions(Arc::new(session_port), |_| {
@@ -269,18 +273,24 @@ async fn force_fresh_cancels_the_registered_driver_before_reusing_its_session() 
         serde_json::from_str(&settled.output()).expect("wait returns job JSON");
     assert_eq!(old_terminal["status"], "cancelled");
     assert_eq!(
-        jobs.get(&old_job.id).expect("old child remains registered").status,
+        jobs.get(&old_job.id.to_string()).expect("old child remains registered").status,
         SubAgentJobStatus::Cancelled
     );
     assert_eq!(provider.calls.load(std::sync::atomic::Ordering::SeqCst), 2);
-    let after = store
+    let after_rows = store
         .load()
-        .expect("final durable state")
-        .into_iter()
+        .expect("final durable state");
+    let old_after = after_rows
+        .iter()
         .find(|session| session.subagent_session_id == before.subagent_session_id)
-        .expect("reused durable row remains present");
-    assert_eq!(after.current_task_id, replacement.current_task_id);
-    assert_eq!(after.status, DurableSubagentStatus::Completed);
+        .expect("closed old durable row remains present");
+    assert_eq!(old_after.status, DurableSubagentStatus::Closed);
+    assert_eq!(old_after.current_task_id, before.current_task_id);
+    let new_after = after_rows
+        .iter()
+        .find(|session| session.subagent_session_id == replacement.subagent_session_id)
+        .expect("replacement durable row remains present");
+    assert_eq!(new_after.status, DurableSubagentStatus::Idle);
 }
 
 /// A child the harness stops early (failure breaker / iteration cap) is not a
