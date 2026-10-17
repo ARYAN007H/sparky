@@ -41,7 +41,7 @@ impl SearchToolCatalogTool {
 const MAX_CATALOG_RESULTS: usize = 40;
 
 /// Search the FULL LIVE Composio catalog (via
-/// [`crate::flows::tinyflows::caps::fetch_live_toolkit_catalog`]) for
+/// [`crate::integrations::composio::catalog::fetch_live_toolkit_catalog`]) for
 /// actions whose slug or description matches every whitespace-separated term
 /// in `query` (case-insensitive AND). When `toolkit` is set, only that
 /// toolkit is scanned — this is how the builder can search ANY named app
@@ -84,13 +84,13 @@ pub(crate) struct CatalogSearchOutcome {
     pub note: Option<String>,
 }
 
-/// Shape one live-catalog [`ToolContract`](crate::flows::tinyflows::caps::ToolContract)
+/// Shape one live-catalog [`ToolContract`](crate::integrations::composio::catalog::ToolContract)
 /// into a search-result row. The SINGLE row-construction site shared by both
 /// the primary AND-match path and the per-keyword fallback path, so every row
 /// carries the same fields — including WS3's `runtime_gated: true` on an
 /// uncurated action of a toolkit that ships a curated-only allowlist.
 fn shape_catalog_row(
-    tool: &crate::flows::tinyflows::caps::ToolContract,
+    tool: &crate::integrations::composio::catalog::ToolContract,
     toolkit: &str,
     toolkit_curated: bool,
 ) -> Value {
@@ -131,7 +131,7 @@ pub(crate) async fn search_catalog(
     toolkit_filter: Option<&str>,
     limit: usize,
 ) -> CatalogSearchOutcome {
-    use crate::flows::tinyflows::caps::fetch_live_toolkit_catalog;
+    use crate::integrations::composio::catalog::fetch_live_toolkit_catalog;
     // Contract crate — same item the `memory::sync::composio::providers` shim
     // re-exported; see `ListConnectableToolkitsTool::execute` for why (#5560).
     use crate::integrations::composio::contract::agent_ready_toolkits;
@@ -171,7 +171,7 @@ pub(crate) async fn search_catalog(
     // round trip back-to-back (the per-toolkit cache only helps repeats).
     let fetched: Vec<(
         String,
-        Option<Vec<crate::flows::tinyflows::caps::ToolContract>>,
+        Option<Vec<crate::integrations::composio::catalog::ToolContract>>,
     )> = futures::future::join_all(toolkits.into_iter().map(|toolkit| async move {
         let catalog = fetch_live_toolkit_catalog(config, &toolkit).await;
         (toolkit, catalog)
@@ -180,7 +180,7 @@ pub(crate) async fn search_catalog(
 
     // Drop toolkits whose fetch failed (no backend session / network error) —
     // they contribute zero results rather than erroring the whole search.
-    let fetched: Vec<(String, Vec<crate::flows::tinyflows::caps::ToolContract>)> = fetched
+    let fetched: Vec<(String, Vec<crate::integrations::composio::catalog::ToolContract>)> = fetched
         .into_iter()
         .filter_map(|(tk, catalog)| catalog.map(|c| (tk, c)))
         .collect();

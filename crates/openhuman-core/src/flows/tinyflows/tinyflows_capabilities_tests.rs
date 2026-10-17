@@ -288,7 +288,7 @@ async fn preflight_fails_before_dispatch_naming_the_missing_field() {
     // DIFFERENT required-args list under the same slug; under parallel
     // execution one test could overwrite the other's cache entry between
     // seed and assert, making both flaky.
-    super::super::caps::seed_live_catalog_cache(
+    crate::integrations::composio::catalog::seed_live_catalog_cache(
         "preflightfailtest",
         vec![seeded_required_args_contract(
             "PREFLIGHTFAILTEST_SEND_EMAIL",
@@ -381,7 +381,7 @@ async fn preflight_invoker_gates_the_mock_tool_path() {
     // Own toolkit/slug (never `"gmail"`) — see the comment in
     // `preflight_fails_before_dispatch_naming_the_missing_field` above for
     // why sharing the `"gmail"` cache key across parallel tests is flaky.
-    super::super::caps::seed_live_catalog_cache(
+    crate::integrations::composio::catalog::seed_live_catalog_cache(
         "preflightgatetest",
         vec![seeded_required_args_contract(
             "PREFLIGHTGATETEST_SEND_EMAIL",

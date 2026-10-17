@@ -12,7 +12,7 @@ use super::*;
 // which 404s at runtime) or omit a genuinely required arg, and
 // `validate_binding_resolvability` would have nothing to say about either.
 // [`validate_tool_contracts`] is that missing HARD gate, grounded in
-// [`crate::flows::tinyflows::caps::fetch_live_toolkit_catalog`] — the
+// [`crate::integrations::composio::catalog::fetch_live_toolkit_catalog`] — the
 // FULL LIVE Composio catalog, not the static curated subset.
 
 /// Statically proves every `tool_call` node's `config.slug` is a REAL action
