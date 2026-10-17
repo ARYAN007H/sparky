@@ -253,7 +253,6 @@ pub(crate) fn spawn_progress_bridge(
             metadata.hold_text_stream,
         );
         let mut round: u32 = 0;
-        let mut parent_max_iterations: u32 = 0;
         // Accumulates the parent agent's streamed narration for the current
         // round. When a tool call closes the round, this leading narration is
         // flushed as an interim chat bubble (`chat_interim`) so it persists in
@@ -280,7 +279,7 @@ pub(crate) fn spawn_progress_bridge(
             TurnStateMirror::new(turn_state_store, thread_id.clone(), request_id.clone());
 
         // #3886: structured tracing export (`progress_bridge_trace.rs`).
-        let mut journal_trace_ctx =
+        let journal_trace_ctx =
             trace::trace_context(&config, &metadata, &client_id, &thread_id, &request_id);
 
         // #4270: emit a periodic liveness beat for the whole in-flight turn so
@@ -464,7 +463,6 @@ pub(crate) fn spawn_progress_bridge(
                     max_iterations,
                 } => {
                     round = iteration;
-                    parent_max_iterations = max_iterations;
                     publish_seq_stamped(
                         &dispatch_ctx,
                         &mut emit_seq,
