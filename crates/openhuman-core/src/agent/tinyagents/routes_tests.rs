@@ -59,7 +59,7 @@ async fn run_recorded_route(
     fallback: bool,
     route: ResolvedModelRoute,
     successful_model: Arc<dyn ChatModel<()>>,
-) -> ResolvedModelRoute {
+) -> (ResolvedModelRoute, Vec<AgentEvent>) {
     let mut harness: AgentHarness<(), crate::agent::tinyagents::host::OpenHumanRunContext> =
         AgentHarness::new();
     let served_route = if fallback {
@@ -101,6 +101,8 @@ async fn run_recorded_route(
     let host = crate::agent::tinyagents::host::OpenHumanRunContext::new();
     let slot = host.resolved_route.clone();
     let ctx = host.into_tinyagents(RunConfig::new("route-recording"));
+    let recorder = Arc::new(RouteEventRecorder::default());
+    ctx.events.subscribe(recorder.clone());
     if streaming {
         let mut stream =
             Box::pin(harness.invoke_stream_in_context(&(), ctx, vec![Message::user("route")]));
@@ -122,7 +124,8 @@ async fn run_recorded_route(
         .expect("route slot")
         .clone()
         .expect("middleware records canonical response route");
-    resolved
+    let events = recorder.0.lock().unwrap().clone();
+    (resolved, events)
 }
 
 fn scripted_success() -> Arc<dyn ChatModel<()>> {
@@ -175,18 +178,17 @@ async fn resolved_route_enrichment_uses_actual_provider_model_and_call_identity(
             if enriched == &call_id
                 && enrichment.provider_id.as_deref() == Some("anthropic")
                 && enrichment.pricing.is_some()
-    )), "pricing and provider metadata use the actual response route, not configured fallback values");
+    )), "pricing and provider metadata use the actual response route, not configured fallback values; events={events:#?}");
 }
 
 #[tokio::test]
 async fn resolved_route_middleware_records_primary_routes_for_unary_and_streaming_runs() {
     for streaming in [false, true] {
         let route = ResolvedModelRoute::new("openhuman", "chat-concrete", "chat-v1");
-        assert_eq!(
-            run_recorded_route(streaming, false, route.clone(), scripted_success()).await,
-            route,
-            "streaming={streaming}"
-        );
+        let (observed, events) =
+            run_recorded_route(streaming, false, route.clone(), scripted_success()).await;
+        assert_eq!(observed, route, "streaming={streaming}");
+        assert_actual_provider_enrichment(&events, &route, streaming);
     }
 }
 
@@ -194,12 +196,35 @@ async fn resolved_route_middleware_records_primary_routes_for_unary_and_streamin
 async fn resolved_route_middleware_records_successful_fallback_for_unary_and_streaming_runs() {
     for streaming in [false, true] {
         let route = ResolvedModelRoute::new("anthropic", "claude-concrete", "backup");
-        assert_eq!(
-            run_recorded_route(streaming, true, route.clone(), scripted_success()).await,
-            route,
-            "streaming={streaming}"
-        );
+        let (observed, events) =
+            run_recorded_route(streaming, true, route.clone(), scripted_success()).await;
+        assert_eq!(observed, route, "streaming={streaming}");
+        assert_actual_provider_enrichment(&events, &route, streaming);
     }
+}
+
+fn assert_actual_provider_enrichment(
+    events: &[AgentEvent],
+    route: &ResolvedModelRoute,
+    streaming: bool,
+) {
+    let call_ids = events
+        .iter()
+        .filter_map(|event| match event {
+            AgentEvent::ModelStarted { call_id, .. } => Some(call_id),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    assert!(!call_ids.is_empty(), "native model start is recorded");
+    assert!(
+        events.iter().any(|event| matches!(
+            event,
+            AgentEvent::GenerationEnriched { call_id, enrichment }
+                if call_ids.contains(&call_id)
+                    && enrichment.provider_id.as_deref() == Some(route.provider.as_str())
+        )),
+        "resolved provider enriches the actual call; streaming={streaming}; events={events:#?}"
+    );
 }
 
 #[tokio::test]
