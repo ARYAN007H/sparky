@@ -73,27 +73,32 @@ fn schedule_workflow_drive(
     run_id: String,
     definition: WorkflowDefinition,
     resume: bool,
-) -> WorkflowRunHandle {
+    commit: impl FnOnce() -> Result<WorkflowRun>,
+) -> Result<(WorkflowRunHandle, WorkflowRun)> {
     let supervisor = workflow_supervisor().clone();
     let task_ctx = ctx.clone();
     let handle_slot = Arc::new(OnceLock::<WorkflowRunHandle>::new());
     let config_slot = Arc::new(OnceLock::<Config>::new());
     let parent_slot = Arc::new(OnceLock::<ParentExecutionContext>::new());
+    let admission_revision = Arc::new(OnceLock::<u64>::new());
     let drive_handle_slot = Arc::clone(&handle_slot);
     let drive_config_slot = Arc::clone(&config_slot);
     let drive_parent_slot = Arc::clone(&parent_slot);
+    let drive_revision_slot = Arc::clone(&admission_revision);
     let drive_run_id = run_id.clone();
     let drive_definition = definition.clone();
     let root_ctx = task_ctx.clone();
     let root_config_slot = Arc::clone(&config_slot);
     let root_parent_slot = Arc::clone(&parent_slot);
     let root_handle_slot = Arc::clone(&handle_slot);
+    let root_revision_slot = Arc::clone(&admission_revision);
     let root_run_id = run_id.clone();
     let root_parent = move |drive| {
         let task_ctx = root_ctx.clone();
         let config_slot = Arc::clone(&root_config_slot);
         let parent_slot = Arc::clone(&root_parent_slot);
         let handle_slot = Arc::clone(&root_handle_slot);
+        let revision_slot = Arc::clone(&root_revision_slot);
         let run_id = root_run_id.clone();
         async move {
             match crate::config::ops::load_current_or_init(&task_ctx).await {
@@ -114,12 +119,15 @@ fn schedule_workflow_drive(
                     .await
                     {
                         if let Some(handle) = handle_slot.get() {
-                            record_failed_if_current(
-                                &task_config,
-                                &run_id,
-                                handle,
-                                format!("root parent context failed: {error:#}"),
-                            );
+                            if let Some(revision) = revision_slot.get().copied() {
+                                record_failed_if_current(
+                                    &task_config,
+                                    &run_id,
+                                    handle,
+                                    revision,
+                                    format!("root parent context failed: {error:#}"),
+                                );
+                            }
                         }
                     }
                 }
@@ -139,6 +147,7 @@ fn schedule_workflow_drive(
         let handle_slot = Arc::clone(&drive_handle_slot);
         let config_slot = Arc::clone(&drive_config_slot);
         let parent_slot = Arc::clone(&drive_parent_slot);
+        let revision_slot = Arc::clone(&drive_revision_slot);
         async move {
             let (Some(handle), Some(config), Some(parent)) = (
                 handle_slot.get().cloned(),
@@ -152,6 +161,7 @@ fn schedule_workflow_drive(
                 &run_id,
                 definition,
                 handle,
+                revision_slot.get().copied().unwrap_or_default(),
                 cancel_token,
                 Some(parent),
             )
@@ -165,10 +175,21 @@ fn schedule_workflow_drive(
         spawn_ctx.spawn(future);
     };
 
+    let revision_slot = Arc::clone(&admission_revision);
+    let commit = move || {
+        let run = commit()?;
+        let _ = revision_slot.set(run.revision);
+        Ok(run)
+    };
+
     if resume {
-        supervisor.resume_scoped_with_handle(run_id, make_future, root_parent, origin, spawn)
+        supervisor
+            .resume_scoped_with_commit(run_id, commit, make_future, root_parent, origin, spawn)
+            .map_err(Into::into)
     } else {
-        supervisor.start_scoped_with_handle(run_id, make_future, root_parent, origin, spawn)
+        supervisor
+            .start_scoped_with_commit(run_id, commit, make_future, root_parent, origin, spawn)
+            .map_err(Into::into)
     }
 }
 
@@ -204,11 +225,25 @@ pub async fn start_workflow_run(
             None,
         )),
     );
-    let run = initial_engine
-        .initialise(run_id.clone(), &definition, input.clone(), parent_thread_id)
-        .context("persist initial workflow run")?;
-
-    let _handle = schedule_workflow_drive(ctx, run_id.clone(), definition, false);
+    let initial_run_id = run_id.clone();
+    let initial_definition = definition.clone();
+    let (handle, run) = schedule_workflow_drive(
+        ctx,
+        run_id.clone(),
+        definition,
+        false,
+        move || {
+            initial_engine
+                .initialise(
+                    initial_run_id,
+                    &initial_definition,
+                    input,
+                    parent_thread_id,
+                )
+                .context("persist initial workflow run")
+        },
+    )?;
+    let _handle = handle;
 
     log::debug!(
         target: LOG_TARGET,
@@ -306,28 +341,38 @@ pub async fn resume_workflow_run(
         .ok_or_else(|| anyhow!("definition {} no longer exists", run.definition_id))?;
     let _safety_tier = super::host::admit_workflow(&definition)?;
 
-    let resumed = compare_and_swap_workflow_run_lifecycle(
-        config,
-        WorkflowRunUpsert {
-            id: run.id.clone(),
-            definition_id: run.definition_id.clone(),
-            parent_thread_id: run.parent_thread_id.clone(),
-            input: run.input.clone(),
-            phase_states: run.phase_states.clone(),
-            child_run_ids: run.child_run_ids.clone(),
-            status: WorkflowRunStatus::Running,
-            summary: run.summary.clone(),
-            started_at: Some(run.started_at),
-            completed_at: None,
+    let resume_config = config.clone();
+    let resume_run = run.clone();
+    let resume_id = id.to_string();
+    let (handle, resumed) = schedule_workflow_drive(
+        ctx,
+        id.to_string(),
+        definition,
+        true,
+        move || {
+            compare_and_swap_workflow_run_lifecycle(
+                &resume_config,
+                WorkflowRunUpsert {
+                    id: resume_run.id.clone(),
+                    definition_id: resume_run.definition_id.clone(),
+                    parent_thread_id: resume_run.parent_thread_id.clone(),
+                    input: resume_run.input.clone(),
+                    phase_states: resume_run.phase_states.clone(),
+                    child_run_ids: resume_run.child_run_ids.clone(),
+                    status: WorkflowRunStatus::Running,
+                    summary: resume_run.summary.clone(),
+                    started_at: Some(resume_run.started_at),
+                    completed_at: None,
+                },
+                resume_run.revision,
+            )
+            .context("persist workflow run resume")?
+            .ok_or_else(|| {
+                anyhow!("workflow run {resume_id} changed while resume was being applied; reload and retry")
+            })
         },
-        run.revision,
-    )
-    .context("persist workflow run resume")?;
-    let resumed = resumed.ok_or_else(|| {
-        anyhow!("workflow run {id} changed while resume was being applied; reload and retry")
-    })?;
-
-    let _handle = schedule_workflow_drive(ctx, id.to_string(), definition, true);
+    )?;
+    let _handle = handle;
 
     log::debug!(target: LOG_TARGET, "[workflow_run_engine] resume.spawned run={id}");
     Ok(resumed)
