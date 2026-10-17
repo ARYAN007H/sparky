@@ -287,6 +287,21 @@ impl OpenHumanPersistence {
         &self,
         key: &SubagentTaskKey,
     ) -> Result<Option<(String, u64)>, SubagentError> {
+        if let Some(outcome) = self.file_store.terminal_outcome(key)? {
+            let agent_id = outcome
+                .extensions
+                .get("agent_id")
+                .and_then(serde_json::Value::as_str)
+                .unwrap_or_default();
+            if !agent_id.is_empty() {
+                let elapsed_ms = outcome
+                    .extensions
+                    .get("elapsed_ms")
+                    .and_then(serde_json::Value::as_u64)
+                    .unwrap_or_default();
+                return Ok(Some((agent_id.to_owned(), elapsed_ms)));
+            }
+        }
         if let Some(record) = self.read_terminal_record(key)? {
             return Ok(
                 (!record.agent_id.is_empty()).then_some((record.agent_id, record.elapsed_ms))
