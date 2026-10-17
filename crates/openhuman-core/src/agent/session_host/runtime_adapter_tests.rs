@@ -304,15 +304,7 @@ async fn committed_goal_accounting_uses_direct_and_completed_child_usage() {
         },
     };
     sidecar.subagents.push(child.clone());
-    let records = [
-        crate::agent::tinyagents::host::run_context::SubagentUsageRecord {
-            run_id: "run-child-goal".into(),
-            entry: child,
-        },
-    ];
-
-    account_committed_turn_against_goal(workspace.path(), Some("receipt-goal"), &sidecar, &records)
-        .await;
+    account_committed_turn_against_goal(workspace.path(), Some("receipt-goal"), &sidecar).await;
 
     let goal = tinyagents_graph::goals::store::get(
         &crate::storage::sessions::stores_or_ephemeral(workspace.path()).kv,
