@@ -394,7 +394,9 @@ pub fn is_done(
         .for_scope(&super::scope::tenant_scope(None))
         .map_err(|error| anyhow!("open the local scope: {error}"))?;
     let step = marker_step(source.domain, &config.workspace_dir);
-    Ok(block_on(super::import_state::done(&scoped, MARKER_OWNER, &step))?)
+    Ok(block_on(async move {
+        super::import_state::done(&scoped, MARKER_OWNER, &step).await
+    })?)
 }
 
 #[cfg(test)]

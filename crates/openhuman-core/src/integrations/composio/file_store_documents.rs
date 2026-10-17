@@ -114,7 +114,7 @@ impl Docs {
     pub(super) fn update<T, R>(
         &self,
         name: &str,
-        change: impl Fn(&mut T) -> (R, bool) + Send + 'static,
+        change: impl Fn(&mut T) -> (R, bool) + Send + Sync + 'static,
     ) -> Result<R>
     where
         T: DeserializeOwned + Serialize + Default + Send + 'static,

@@ -22,7 +22,7 @@
 use anyhow::{anyhow, Context, Result};
 use chrono::{DateTime, Utc};
 use serde_json::{json, Map, Value};
-use tinystoragedrivers::{CollectionSpec, Filter, IndexSpec, Precondition, Query, Sort, Versioned};
+use tinystoragedrivers::{CollectionSpec, Filter, Precondition, Query, Sort, Versioned};
 
 use super::store::{apply_patch, content_hash, IngestedTaskRef};
 use super::types::{

@@ -47,7 +47,7 @@ use crate::storage::{DocumentStore, DocumentStoreExt, StorageError};
 
 pub(super) use super::storage_schema::{core_id, CORE, DEDUP, NOTIFICATIONS, SETTINGS};
 use super::storage_schema::{legacy_collections, specs};
-use crate::storage::schema_support::{key_of, ms_rfc3339};
+use crate::storage::schema_support::key_of;
 
 /// The `workspace` key of core notifications in the per-workspace default
 /// file (see [`current`]).
