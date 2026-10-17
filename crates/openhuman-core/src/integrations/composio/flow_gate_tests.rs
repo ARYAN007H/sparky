@@ -404,5 +404,3 @@ async fn preflight_applies_static_arg_rules_without_a_catalog() {
     .await
     .expect("statically-valid args must pass preflight");
 }
-
-/// The classifier itself stays fail-safe: only a curated read skips approval.
