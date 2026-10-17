@@ -48,16 +48,16 @@ impl SpawnAsyncSubagentTool {
             )));
         }
 
-        let registry = match AgentDefinitionRegistry::for_core_context(
-            run_context.dispatch_ctx().into_core(),
-        ) {
-            Some(registry) => registry,
-            None => {
-                return Ok(ToolResult::error(
-                    "spawn_async_subagent: AgentDefinitionRegistry has not been initialised",
-                ));
-            }
-        };
+        let registry =
+            match AgentDefinitionRegistry::for_core_context(run_context.dispatch_ctx().into_core())
+            {
+                Some(registry) => registry,
+                None => {
+                    return Ok(ToolResult::error(
+                        "spawn_async_subagent: AgentDefinitionRegistry has not been initialised",
+                    ));
+                }
+            };
         let definition = match registry.get(&agent_id).cloned() {
             Some(definition) => definition,
             None => {
@@ -442,12 +442,12 @@ impl SpawnAsyncSubagentTool {
                                         outcome.final_history.clone(),
                                     ) {
                                         log::warn!(
-                                        "[subagent_reuse] mark_completed failed subagent_session_id={} task_id={} agent_id={} error={}",
-                                        background_subagent_session_id,
-                                        outcome.task_id,
-                                        outcome.agent_id,
-                                        err
-                                    );
+                                            "[subagent_reuse] mark_completed failed subagent_session_id={} task_id={} agent_id={} error={}",
+                                            background_subagent_session_id,
+                                            outcome.task_id,
+                                            outcome.agent_id,
+                                            err
+                                        );
                                     }
                                     // A workflow proposal from the child's tool history is
                                     // durable state, not prose: persist it into the parent chat
@@ -512,18 +512,18 @@ impl SpawnAsyncSubagentTool {
                                         outcome.final_history.clone(),
                                     ) {
                                         log::warn!(
-                                        "[subagent_reuse] mark_incomplete failed subagent_session_id={} task_id={} agent_id={} error={}",
-                                        background_subagent_session_id,
-                                        outcome.task_id,
-                                        outcome.agent_id,
-                                        err
-                                    );
+                                            "[subagent_reuse] mark_incomplete failed subagent_session_id={} task_id={} agent_id={} error={}",
+                                            background_subagent_session_id,
+                                            outcome.task_id,
+                                            outcome.agent_id,
+                                            err
+                                        );
                                     }
                                     let framed = format!(
-                                    "[SUBAGENT_INCOMPLETE] the sub-agent {reason} and did not finish. \
+                                        "[SUBAGENT_INCOMPLETE] the sub-agent {reason} and did not finish. \
                              Partial progress:\n{}",
-                                    outcome.output
-                                );
+                                        outcome.output
+                                    );
                                     // An incomplete run may still have produced a full
                                     // proposal before stalling — preserve it durably too.
                                     if emit_lifecycle_effects {
@@ -578,12 +578,12 @@ impl SpawnAsyncSubagentTool {
                                         outcome.final_history.clone(),
                                     ) {
                                         log::warn!(
-                                        "[subagent_reuse] mark_cancelled failed subagent_session_id={} task_id={} agent_id={} error={}",
-                                        background_subagent_session_id,
-                                        outcome.task_id,
-                                        outcome.agent_id,
-                                        err
-                                    );
+                                            "[subagent_reuse] mark_cancelled failed subagent_session_id={} task_id={} agent_id={} error={}",
+                                            background_subagent_session_id,
+                                            outcome.task_id,
+                                            outcome.agent_id,
+                                            err
+                                        );
                                     }
                                     if emit_lifecycle_effects {
                                         completion_target
@@ -617,12 +617,12 @@ impl SpawnAsyncSubagentTool {
                                         outcome.final_history.clone(),
                                     ) {
                                         log::warn!(
-                                        "[subagent_reuse] mark_awaiting_user failed subagent_session_id={} task_id={} agent_id={} error={}",
-                                        background_subagent_session_id,
-                                        outcome.task_id,
-                                        outcome.agent_id,
-                                        err
-                                    );
+                                            "[subagent_reuse] mark_awaiting_user failed subagent_session_id={} task_id={} agent_id={} error={}",
+                                            background_subagent_session_id,
+                                            outcome.task_id,
+                                            outcome.agent_id,
+                                            err
+                                        );
                                     }
                                     // #4896: a detached child that pauses for input won't continue
                                     // on its own — queue a framed notice so the parent chat learns it
@@ -667,12 +667,12 @@ impl SpawnAsyncSubagentTool {
                                 error.clone(),
                             ) {
                                 log::warn!(
-                                "[subagent_reuse] mark_failed failed subagent_session_id={} task_id={} agent_id={} error={}",
-                                background_subagent_session_id,
-                                background_task_id,
-                                background_agent_id,
-                                store_err
-                            );
+                                    "[subagent_reuse] mark_failed failed subagent_session_id={} task_id={} agent_id={} error={}",
+                                    background_subagent_session_id,
+                                    background_task_id,
+                                    background_agent_id,
+                                    store_err
+                                );
                             }
                             // #4896: a detached child that errors previously only
                             // published an event — nothing reached chat, so the parent
