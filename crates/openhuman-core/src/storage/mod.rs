@@ -37,6 +37,7 @@ mod lease_documents;
 mod lease_local;
 pub mod local;
 pub mod rebind;
+pub mod schema;
 pub mod scope;
 pub mod secrets;
 
