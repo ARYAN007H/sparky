@@ -112,7 +112,12 @@ impl ToolDispatch<(), OpenHumanRunContext> for UseSkillDispatch {
                 answer: Some(result),
             })));
         };
-        let typed = typed_dispatch_for(name, inner_adapter.clone());
+        let delegation_target = tools
+            .iter()
+            .find(|tool| tool.name() == name)
+            .and_then(|tool| crate::tools::host_extensions::delegation_target(tool.as_ref()))
+            .map(str::to_string);
+        let typed = typed_dispatch_for(name, inner_adapter.clone(), delegation_target);
         Ok(Some(Arc::new(BoundUseSkillDispatch {
             outer: self.tool.clone(),
             inner: Some(inner_adapter),
@@ -175,7 +180,12 @@ impl ToolDispatch<(), OpenHumanRunContext> for UseSkillDispatch {
                 .await;
         };
 
-        if let Some(dispatch) = typed_dispatch_for(&name, inner_adapter.clone()) {
+        let delegation_target = tools
+            .iter()
+            .find(|tool| tool.name() == name)
+            .and_then(|tool| crate::tools::host_extensions::delegation_target(tool.as_ref()))
+            .map(str::to_string);
+        if let Some(dispatch) = typed_dispatch_for(&name, inner_adapter.clone(), delegation_target) {
             return dispatch
                 .execute(&(), call_id, inner_args, options, parent)
                 .await;

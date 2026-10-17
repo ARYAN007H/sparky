@@ -3,7 +3,6 @@
 use crate::agent::subagent_host::{
     run_subagent_via_driver_tool, SubagentRunOptions, SubagentRunStatus,
 };
-use crate::agent_registry::host_definition::AgentDefinitionRegistry;
 use crate::progress::AgentProgress;
 use async_trait::async_trait;
 use std::sync::Arc;
@@ -30,11 +29,14 @@ enum DelegationDispatchKind {
     Collapsed {
         targets: Result<Vec<super::collapsed_delegation::DelegateTarget>, String>,
     },
-    Archetype,
+    Archetype { agent_id: String },
 }
 
 impl DelegationDispatch {
-    pub(crate) fn for_tool(tool: Arc<dyn tinytools::Tool>) -> Option<Self> {
+    pub(crate) fn for_tool(
+        tool: Arc<dyn tinytools::Tool>,
+        delegation_target: Option<String>,
+    ) -> Option<Self> {
         let kind = match tool.name() {
             super::collapsed_delegation::DELEGATE_TO_TOOL_NAME => {
                 DelegationDispatchKind::Collapsed {
@@ -43,22 +45,13 @@ impl DelegationDispatch {
                     ),
                 }
             }
-            // Only synthesized archetype delegate names enter this path.
-            // `delegate_graph` is a concrete durable graph tool with its own
-            // typed dispatcher, and arbitrary `delegate_*` tools must not be
-            // mistaken for an agent target merely because of their spelling.
-            name if AgentDefinitionRegistry::current().is_some_and(|registry| {
-                registry.list().into_iter().any(|definition| {
-                    definition
-                        .delegate_name
-                        .clone()
-                        .unwrap_or_else(|| format!("delegate_{}", definition.id))
-                        == name
-                })
-            }) =>
-            {
-                DelegationDispatchKind::Archetype
-            }
+            // The target is carried by the registered host extension, not
+            // inferred from an ambient registry or a tool's spelling. This
+            // keeps hidden packed delegates scoped to the catalogue that
+            // actually supplied them.
+            _ if delegation_target.is_some() => DelegationDispatchKind::Archetype {
+                agent_id: delegation_target.expect("checked above"),
+            },
             _ => return None,
         };
         Some(Self { tool, kind })
@@ -105,26 +98,9 @@ impl ToolDispatch<(), crate::agent::tinyagents::host::OpenHumanRunContext> for D
                 )
                 .await
             }
-            DelegationDispatchKind::Archetype => {
-                let Some(agent_id) = AgentDefinitionRegistry::for_core_context(
-                    parent.data.dispatch_ctx().into_core(),
-                )
-                .and_then(|registry| {
-                    registry.list().into_iter().find_map(|definition| {
-                        let name = definition
-                            .delegate_name
-                            .clone()
-                            .unwrap_or_else(|| format!("delegate_{}", definition.id));
-                        (name == self.tool.name()).then_some(definition.id.clone())
-                    })
-                }) else {
-                    return Ok(ToolResult::error(format!(
-                        "{}: delegation target is not registered",
-                        self.tool.name()
-                    )));
-                };
+            DelegationDispatchKind::Archetype { agent_id } => {
                 super::archetype_delegation::execute_archetype_delegation_with_live_parent(
-                    &agent_id,
+                    agent_id,
                     self.tool.name(),
                     arguments,
                     Some(&tool_context),

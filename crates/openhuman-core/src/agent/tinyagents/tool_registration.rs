@@ -107,6 +107,7 @@ type ToolDispatchSelector = Arc<ToolDispatchSelectorFn>;
 pub(crate) fn typed_dispatch_for(
     name: &str,
     adapter: Arc<dyn tinytools::Tool>,
+    delegation_target: Option<String>,
 ) -> Option<Arc<dyn ToolDispatch<(), OpenHumanRunContext>>> {
     let dispatch: Arc<dyn ToolDispatch<(), OpenHumanRunContext>> = match name {
         "spawn_parallel_agents" => Arc::new(SpawnParallelAgentsDispatch::new(adapter)),
@@ -123,7 +124,7 @@ pub(crate) fn typed_dispatch_for(
         "memory" => Arc::new(LiveToolContextDispatch::new(adapter)),
         "todo" => Arc::new(TodoToolDispatch::new(adapter)),
         _ => {
-            return DelegationDispatch::for_tool(adapter).map(|dispatch| {
+            return DelegationDispatch::for_tool(adapter, delegation_target).map(|dispatch| {
                 Arc::new(dispatch) as Arc<dyn ToolDispatch<(), OpenHumanRunContext>>
             });
         }
@@ -339,7 +340,13 @@ type DispatchSelector = Arc<
 fn dispatch_selector(tool_sets: Vec<SharedToolSet>) -> DispatchSelector {
     Arc::new(move |name, adapter| {
         if name != USE_SKILL {
-            return typed_dispatch_for(name, adapter);
+            let delegation_target = tool_sets
+                .iter()
+                .flat_map(|set| set.iter())
+                .find(|tool| tool.name() == name)
+                .and_then(|tool| crate::tools::host_extensions::delegation_target(tool.as_ref()))
+                .map(str::to_string);
+            return typed_dispatch_for(name, adapter, delegation_target);
         }
         // The pack-registry handle comes off the raw registered tool, not the
         // adapter.
