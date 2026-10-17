@@ -466,13 +466,7 @@ impl tinyagents_orchestration::subagent::SubagentPersistence for OpenHumanPersis
         &self,
         key: &SubagentTaskKey,
     ) -> Result<Option<SubagentOutcome>, SubagentError> {
-        if let Some(outcome) =
-            tinyagents_orchestration::subagent::SubagentPersistence::load_terminal(
-                &self.file_store,
-                key,
-            )
-            .await?
-        {
+        if let Some(outcome) = self.file_store.terminal_outcome(key)? {
             return Ok(Some(outcome));
         }
         Ok(self.read_terminal_record(key)?.map(|record| record.outcome))
