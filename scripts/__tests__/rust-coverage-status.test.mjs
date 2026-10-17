@@ -165,19 +165,26 @@ for (const [label, scriptPath, invoke] of [
   });
 }
 
-for (const helper of ["llvm_cov", "llvm_cov_package", "llvm_cov_product_facade"]) {
+for (const helper of [
+  "llvm_cov",
+  "llvm_cov_package",
+  "llvm_cov_product_facade",
+]) {
   test(`${helper} selects nextest for private suites and rejects empty selections`, () => {
     const result = withRunnerFunctions(
       [helper],
       [
-        'OH_COV_RUNNER=nextest',
-        'CORE_PRODUCT_FEATURES=channels',
+        "OH_COV_RUNNER=nextest",
+        "CORE_PRODUCT_FEATURES=channels",
         'bash() { printf "%s\\n" "$*"; }',
       ].join("\n"),
       `${helper} --no-report -p openhuman-embed --all-targets`,
     );
     assert.equal(result.status, 0, result.output);
-    assert.match(result.output, /cargo llvm-cov nextest --profile ci --no-tests=fail/);
+    assert.match(
+      result.output,
+      /cargo llvm-cov nextest --profile ci --no-tests=fail/,
+    );
     assert.match(result.output, /--no-report -p openhuman-embed --all-targets/);
   });
 }
@@ -187,38 +194,57 @@ test("private core coverage runs sequentially without a second target directory"
   assert.doesNotMatch(source, /UNIT_PID|cov-unit|export CARGO_TARGET_DIR/);
   assert.match(source, /suite "openhuman lib\+bins \(nextest\)" llvm_cov/);
   assert.match(source, /suite "openhuman-embed \(default\)" llvm_cov_package/);
-  assert.match(source, /suite "openhuman-tinyhumans \(default\)" llvm_cov_package/);
+  assert.match(
+    source,
+    /suite "openhuman-tinyhumans \(default\)" llvm_cov_package/,
+  );
 });
 
 test("coverage finalizer retains interrupted reports and the cancellation status", () => {
   const result = withRunnerFunctions(
     ["preserve_coverage"],
     [
-      'OUT=interrupted.info',
-      'COVERAGE_REPORTED=0',
+      "OUT=interrupted.info",
+      "COVERAGE_REPORTED=0",
       'log() { printf "%s\\n" "$*"; }',
       'llvm_cov() { printf "REPORT %s\\n" "$*"; return 9; }',
     ].join("\n"),
-    'trap preserve_coverage EXIT; exit 143',
+    "trap preserve_coverage EXIT; exit 143",
   );
   assert.equal(result.status, 143, result.output);
-  assert.match(result.output, /REPORT report --lcov --output-path interrupted.info/);
+  assert.match(
+    result.output,
+    /REPORT report --lcov --output-path interrupted.info/,
+  );
 });
 
 function runMockedCoverage(exitCode) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "rust-coverage-runner-"));
   try {
-    for (const folder of ["bin", "scripts/ci", "crates/openhuman-cli", ".config", "tests"])
+    for (const folder of [
+      "bin",
+      "scripts/ci",
+      "crates/openhuman-cli",
+      ".config",
+      "tests",
+    ])
       fs.mkdirSync(path.join(dir, folder), { recursive: true });
-    const write = (name, content) => fs.writeFileSync(path.join(dir, name), content, { mode: 0o755 });
-    for (const name of ["scripts/ci/nextest-coverage.sh", "scripts/ci/nextest-report.mjs", ".config/nextest.toml"])
+    const write = (name, content) =>
+      fs.writeFileSync(path.join(dir, name), content, { mode: 0o755 });
+    for (const name of [
+      "scripts/ci/nextest-coverage.sh",
+      "scripts/ci/nextest-report.mjs",
+      ".config/nextest.toml",
+    ])
       fs.copyFileSync(path.join(repoRoot, name), path.join(dir, name));
     write("scripts/ci/product-features.sh", "#!/bin/bash\necho channels\n");
     write("scripts/ci-cancel-aware.sh", '#!/bin/bash\nexec "$@"\n');
     write("scripts/ci/assert-coverage-presence.sh", "#!/bin/bash\nexit 0\n");
     write("crates/openhuman-cli/Cargo.toml", "");
     write("bin/rustup", "#!/bin/bash\nexit 1\n");
-    write("bin/cargo", `#!/bin/bash
+    write(
+      "bin/cargo",
+      `#!/bin/bash
 printf '%s\\n' "$*" >> "$MOCK_CALLS"
 case "$*" in *"-p openhuman --lib --bins"*) [ "${exitCode}" = 0 ] || exit "${exitCode}" ;; esac
 node - "$@" <<'JS'
@@ -231,17 +257,31 @@ if (pos >= 0) {
   fs.writeFileSync(report, '<testsuites><testsuite name="mock" tests="1"></testsuite></testsuites>');
 }
 JS
-`);
+`,
+    );
     let status = 0;
     try {
       execFileSync("bash", [runner], {
         cwd: dir,
-        env: { ...process.env, PATH: `${dir}/bin:${process.env.PATH}`, MOCK_CALLS: `${dir}/calls`, OH_COV_RUNNER: "nextest", OH_COV_DOCTESTS: "0" },
+        env: {
+          ...process.env,
+          PATH: `${dir}/bin:${process.env.PATH}`,
+          MOCK_CALLS: `${dir}/calls`,
+          OH_COV_RUNNER: "nextest",
+          OH_COV_DOCTESTS: "0",
+        },
         stdio: "pipe",
       });
-    } catch (error) { status = error.status; }
-    return { status, calls: fs.readFileSync(`${dir}/calls`, "utf8").trim().split("\n") };
-  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+    } catch (error) {
+      status = error.status;
+    }
+    return {
+      status,
+      calls: fs.readFileSync(`${dir}/calls`, "utf8").trim().split("\n"),
+    };
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 }
 
 test("private coverage executes every package configuration once and reports after a failed suite", () => {
@@ -251,15 +291,28 @@ test("private coverage executes every package configuration once and reports aft
   assert.equal(selections.length, 8);
   assert.equal(new Set(selections).size, 8);
   assert.ok(selections.every((line) => line.includes("--no-tests=fail")));
-  assert.ok(selections.some((line) => line.includes("-p openhuman-cli --tests -E kind(test)")));
-  assert.equal(calls.filter((line) => line.includes("llvm-cov report")).length, 1);
+  assert.ok(
+    selections.some((line) =>
+      line.includes("-p openhuman-cli --tests -E kind(test)"),
+    ),
+  );
+  assert.equal(
+    calls.filter((line) => line.includes("llvm-cov report")).length,
+    1,
+  );
 });
 
 test("private coverage cancels remaining suites but still preserves a report", () => {
   const { status, calls } = runMockedCoverage(143);
   assert.equal(status, 143);
-  assert.equal(calls.filter((line) => line.includes("llvm-cov nextest")).length, 1);
-  assert.equal(calls.filter((line) => line.includes("llvm-cov report")).length, 1);
+  assert.equal(
+    calls.filter((line) => line.includes("llvm-cov nextest")).length,
+    1,
+  );
+  assert.equal(
+    calls.filter((line) => line.includes("llvm-cov report")).length,
+    1,
+  );
 });
 
 test("private coverage passes when all eight selected configurations report tests", () => {
