@@ -290,6 +290,14 @@ impl OpenHumanPersistence {
         }
     }
 
+    pub(super) fn terminal_outcome(
+        &self,
+        key: &SubagentTaskKey,
+    ) -> Result<Option<SubagentOutcome>, SubagentError> {
+        let _key_lock = self.key_lock(key)?;
+        Ok(self.read_terminal_record(key)?.map(|record| record.outcome))
+    }
+
     pub(super) fn durable_host_metadata(
         &self,
         key: &SubagentTaskKey,

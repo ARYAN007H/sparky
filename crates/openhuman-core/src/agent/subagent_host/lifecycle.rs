@@ -58,6 +58,21 @@ pub(crate) fn detached_subagent_parent(
         .map_err(|error| anyhow::anyhow!(error.to_string()))
 }
 
+/// Read the typed terminal written for one exact driver lifecycle key.
+/// Cancellation uses this rather than inferring success from the product
+/// session's lossy `Idle` status (which also represents incomplete runs).
+pub(crate) fn load_terminal_outcome(
+    workspace_dir: &std::path::Path,
+    key: &SubagentTaskKey,
+) -> Result<Option<SubagentOutcome>, String> {
+    let checkpoint_dir = absolute_checkpoint_dir(
+        workspace_dir.join(".openhuman/subagent_checkpoints"),
+    );
+    OpenHumanPersistence::new(checkpoint_dir)
+        .terminal_outcome(key)
+        .map_err(|error| format!("failed to load subagent terminal outcome: {error}"))
+}
+
 /// Runs one host subagent through a neutral driver using a real direct child.
 ///
 /// Callers that are already inside a TinyAgents turn must use this entrypoint:
