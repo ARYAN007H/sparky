@@ -1,5 +1,5 @@
 use super::*;
-use crate::core::runtime::{ContextOverlay, CoreContext, DomainSet, DispatchCtx, Mode};
+use crate::core::runtime::{ContextOverlay, CoreContext, DispatchCtx, DomainSet, Mode};
 use crate::tools::toolpacks::ToolGroups;
 use tinyagents_orchestration::subagent::list_subagent_records;
 
@@ -20,7 +20,10 @@ fn profile(name: &str, workspace: &std::path::Path) -> Arc<CoreContext> {
     )
 }
 
-fn records(ctx: &DispatchCtx, workspace: &std::path::Path) -> Vec<tinyagents_tasks::OrchestrationTaskRecord> {
+fn records(
+    ctx: &DispatchCtx,
+    workspace: &std::path::Path,
+) -> Vec<tinyagents_tasks::OrchestrationTaskRecord> {
     let store = super::super::resolve::scoped_task_store(ctx, workspace)
         .expect("profile-scoped task store");
     list_subagent_records(store.as_ref())
@@ -47,7 +50,10 @@ async fn explicit_profile_projects_spawn_completion_and_cancel_without_ambient_s
     }
 
     crate::core::runtime::mode::lock_mode(Mode::Saas).expect("lock isolated SaaS mode");
-    assert!(CoreContext::scoped().is_none(), "test starts without ambient scope");
+    assert!(
+        CoreContext::scoped().is_none(),
+        "test starts without ambient scope"
+    );
     let _guard = test_guard_async().await;
     let workspace = tempfile::tempdir().expect("workspace");
     let alice = DispatchCtx::new(profile("projection-alice", workspace.path()));
@@ -90,10 +96,18 @@ async fn explicit_profile_projects_spawn_completion_and_cancel_without_ambient_s
 
     let alice_spawned = records(&alice, workspace.path());
     let bob_spawned = records(&bob, workspace.path());
-    assert!(alice_spawned.iter().any(|row| row.spec.task_id.as_str() == alice_task));
-    assert!(alice_spawned.iter().all(|row| row.spec.task_id.as_str() != bob_task));
-    assert!(bob_spawned.iter().any(|row| row.spec.task_id.as_str() == bob_task));
-    assert!(bob_spawned.iter().all(|row| row.spec.task_id.as_str() != alice_task));
+    assert!(alice_spawned
+        .iter()
+        .any(|row| row.spec.task_id.as_str() == alice_task));
+    assert!(alice_spawned
+        .iter()
+        .all(|row| row.spec.task_id.as_str() != bob_task));
+    assert!(bob_spawned
+        .iter()
+        .any(|row| row.spec.task_id.as_str() == bob_task));
+    assert!(bob_spawned
+        .iter()
+        .all(|row| row.spec.task_id.as_str() != alice_task));
 
     alice_tx
         .send(DetachedSubagentStatus::Completed {
