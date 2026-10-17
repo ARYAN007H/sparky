@@ -327,24 +327,33 @@ async fn slow_engine_results_survive_the_manual_pre_turn_cutoff() {
         .unwrap();
     crate::memory::engine::install_test_engine(&config.workspace_dir, engine.clone());
     let identity = MemoryIdentity::agent("a").resolve(&config);
-    let input = |index| PreTurnInput {
-        thread_id: "slow".into(),
-        turn_index: index,
-        user_text: "what is my favourite colour?".into(),
-        in_prompt_from: 0,
-        at: chrono::Utc::now(),
-        resumed_after_compaction: false,
-        observed_actor: None,
+    let input = |index| (
+        "slow".to_string(),
+        index,
+        "what is my favourite colour?".to_string(),
+        0,
+        chrono::Utc::now(),
+        false,
+        None,
+    );
+    let pre_turn = |config, identity, input: (String, u32, String, u32, chrono::DateTime<chrono::Utc>, bool, Option<tinymemory_api::ObservedActor>)| {
+        let (thread, index, text, in_prompt_from, at, resumed, observed_actor) = input;
+        super::pre_turn(
+            &crate::core::runtime::DispatchCtx::ambient(),
+            config,
+            identity,
+            thread,
+            index,
+            text,
+            in_prompt_from,
+            at,
+            resumed,
+            observed_actor,
+            None,
+        )
     };
     let config = Arc::new(config);
-    assert!(pre_turn(
-        &crate::core::runtime::DispatchCtx::ambient(),
-        config.clone(),
-        identity.clone(),
-        input(0),
-        None
-    )
-    .is_none());
+    assert!(pre_turn(config.clone(), identity.clone(), input(0)).is_none());
     // Even after the old one-millisecond cutoff, the pack remains owned by
     // the background worker instead of being discarded by the live turn.
     tokio::time::sleep(Duration::from_millis(5)).await;
@@ -353,27 +362,14 @@ async fn slow_engine_results_survive_the_manual_pre_turn_cutoff() {
     assert!(completed(&cache, &key).is_none());
     release.add_permits(100);
     drain(&cache, &key).await;
-    let pack = pre_turn(
-        &crate::core::runtime::DispatchCtx::ambient(),
-        config.clone(),
-        identity.clone(),
-        input(2),
-        None,
-    )
-    .expect("next turn uses completed slow lookup");
+    let pack = pre_turn(config.clone(), identity.clone(), input(2))
+        .expect("next turn uses completed slow lookup");
     assert!(pack.markdown.contains("teal"));
     assert!(pack.markdown.contains("earlier turn"));
     drain(&cache, &key).await;
     let mut omitted = identity;
     omitted.recall = false;
-    assert!(pre_turn(
-        &crate::core::runtime::DispatchCtx::ambient(),
-        config.clone(),
-        omitted.clone(),
-        input(4),
-        None
-    )
-    .is_none());
+    assert!(pre_turn(config.clone(), omitted.clone(), input(4)).is_none());
     drain(&cache, &Key::new(&config, &omitted, "slow", false)).await;
     let turns = crate::memory::test_fixtures::stored(
         &engine.inner,
