@@ -11341,6 +11341,9 @@ encrypt = false
 # content, so compaction must stay off for the arc to be observable in-test.
 [context]
 compaction_enabled = false
+
+[autonomy]
+auto_approve = ["run_flow"]
 "#
     );
     fn write_config_file(config_dir: &Path, cfg: &str) {
@@ -11442,6 +11445,40 @@ fn opus_sonnet_demo_graph() -> Value {
 #[cfg(feature = "flows")]
 #[test]
 fn json_rpc_flows_full_arc_discover_build_create_run() {
+    const CHILD_ENV: &str = "OPENHUMAN_COPILOT_RUN_FLOW_E2E_CHILD";
+    if std::env::var_os(CHILD_ENV).is_none() {
+        // ApprovalGate is process-global and one-shot. Run this case in an
+        // exact-filtered child so the test's narrow run_flow auto-approval
+        // cannot leak into any sibling E2E case in a broad cargo invocation.
+        let output = std::process::Command::new(std::env::current_exe().expect("test executable"))
+            .args([
+                "--exact",
+                "json_rpc_flows_full_arc_discover_build_create_run",
+                "--nocapture",
+                "--test-threads=1",
+            ])
+            .env(CHILD_ENV, "1")
+            .output()
+            .expect("run the isolated Copilot RunFlow E2E child");
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        print!("{stdout}");
+        eprint!("{stderr}");
+        let child_output = format!("{stdout}{stderr}");
+        assert!(
+            output.status.success(),
+            "isolated Copilot RunFlow E2E child failed:\n{child_output}"
+        );
+        assert!(
+            child_output.contains("running 1 test")
+                && child_output.contains(
+                    "test json_rpc_flows_full_arc_discover_build_create_run ... ok"
+                )
+                && child_output.contains("1 passed; 0 failed"),
+            "child must prove exactly one test ran and passed:\n{child_output}"
+        );
+        return;
+    }
     run_json_rpc_e2e_on_agent_stack(
         "json_rpc_flows_full_arc_discover_build_create_run",
         json_rpc_flows_full_arc_discover_build_create_run_inner,
@@ -11469,6 +11506,22 @@ async fn json_rpc_flows_full_arc_discover_build_create_run_inner() {
     write_flows_tier_config(&openhuman_home, &mock_origin);
     let user_scoped_dir = openhuman_home.join("users").join("e2e-user");
     write_flows_tier_config(&user_scoped_dir, &mock_origin);
+
+    // This test runs as its own exact-filtered JSON-RPC E2E process. Install
+    // only the approval needed for the real run_flow tool call below, so the
+    // streaming builder exposes that tool without parking the deterministic
+    // test completion for a human decision.
+    let mut approval_config = openhuman_core::config::Config::default();
+    approval_config.workspace_dir = openhuman_home.join("workspace");
+    approval_config.config_path = openhuman_home.join("config.toml");
+    approval_config
+        .autonomy
+        .auto_approve
+        .push("run_flow".to_string());
+    openhuman_core::security::approval::ApprovalGate::init_global(
+        approval_config,
+        format!("session-{}", uuid::Uuid::new_v4()),
+    );
 
     let (rpc_addr, rpc_join) = serve_on_ephemeral(build_core_http_router(false)).await;
     let rpc_base = format!("http://{rpc_addr}");
@@ -11725,6 +11778,133 @@ async fn json_rpc_flows_full_arc_discover_build_create_run_inner() {
     assert!(
         body_of(&drafter_req).contains("PLAN_MARKER"),
         "drafter prompt must reference the planner's structured plan (graph data passing)"
+    );
+
+    // ── 4. Copilot run_flow goes through InvokeTool → RunFlow over TinyBus ──
+    // The trigger-only flow finishes without a model call, keeping this proof
+    // focused on the detached-run callback rather than flow-node execution.
+    let callback_flow = post_json_rpc(
+        &rpc_base,
+        71_030,
+        "openhuman.flows_create",
+        json!({
+            "name": "Copilot RunFlow callback probe",
+            "graph": {
+                "nodes": [{"id":"trigger","kind":"trigger","name":"Manual"}],
+                "edges": []
+            }
+        }),
+    )
+    .await;
+    let callback_flow_id = peel_logs_envelope(assert_no_jsonrpc_error(
+        &callback_flow,
+        "flows_create for Copilot RunFlow callback",
+    ))
+    .get("id")
+    .and_then(Value::as_str)
+    .expect("saved callback flow id")
+    .to_string();
+    let callback_graph = json!({
+        "nodes": [{"id":"trigger","kind":"trigger","name":"Manual"}],
+        "edges": []
+    });
+
+    fn tool_result_with_marker(requests: &[Value], marker: &str) -> Option<String> {
+        requests
+            .iter()
+            .filter_map(|request| request.pointer("/body/messages").and_then(Value::as_array))
+            .flatten()
+            .filter(|message| message.get("role").and_then(Value::as_str) == Some("tool"))
+            .filter_map(|message| message.get("content").and_then(Value::as_str))
+            .find(|content| content.contains(marker))
+            .map(str::to_string)
+    }
+
+    clear_forced_chat_completions();
+    with_chat_completion_requests(|requests| requests.clear());
+    push_forced_chat_completion_when(
+        "run_flow",
+        forced_tool_call_completion("run_flow", json!({ "flow_id": "missing-copilot-flow" })),
+    );
+    push_forced_chat_completion_when(
+        "Could not start flow",
+        forced_text_completion("That flow is not saved, so I could not run it."),
+    );
+    let missing_run = post_json_rpc(
+        &rpc_base,
+        71_031,
+        "openhuman.flows_build",
+        json!({
+            "mode": "revise",
+            "flow_id": "missing-copilot-flow",
+            "graph": callback_graph,
+            "instruction": "The user confirmed a test run; attempt the saved flow now.",
+            "thread_id": "e2e-copilot-runflow-missing",
+            "request_id": "req-copilot-runflow-missing"
+        }),
+    )
+    .await;
+    assert_no_jsonrpc_error(&missing_run, "Copilot run_flow missing-flow path");
+    let missing_requests = with_chat_completion_requests(|requests| requests.clone());
+    assert!(
+        missing_requests.iter().any(|request| {
+            request
+                .pointer("/body/tools")
+                .and_then(Value::as_array)
+                .is_some_and(|tools| {
+                    tools.iter().any(|tool| {
+                        tool.pointer("/function/name").and_then(Value::as_str) == Some("run_flow")
+                    })
+                })
+        }),
+        "streaming Copilot builder must expose the real run_flow tool"
+    );
+    let missing_tool_result = tool_result_with_marker(&missing_requests, "Could not start flow")
+        .expect("module tool result reports the missing saved flow");
+    assert!(
+        missing_tool_result.contains("missing-copilot-flow"),
+        "missing flow result should identify the rejected id: {missing_tool_result}"
+    );
+
+    clear_forced_chat_completions();
+    with_chat_completion_requests(|requests| requests.clear());
+    push_forced_chat_completion_when(
+        "run_flow",
+        forced_tool_call_completion("run_flow", json!({ "flow_id": callback_flow_id })),
+    );
+    push_forced_chat_completion_when(
+        "workflow_run_started",
+        forced_text_completion("The confirmed test run started."),
+    );
+    let started_run = post_json_rpc(
+        &rpc_base,
+        71_032,
+        "openhuman.flows_build",
+        json!({
+            "mode": "revise",
+            "flow_id": callback_flow_id,
+            "graph": callback_graph,
+            "instruction": "The user confirmed a test run; run this saved flow now.",
+            "thread_id": "e2e-copilot-runflow-saved",
+            "request_id": "req-copilot-runflow-saved"
+        }),
+    )
+    .await;
+    assert_no_jsonrpc_error(&started_run, "Copilot run_flow saved-flow path");
+    let started_requests = with_chat_completion_requests(|requests| requests.clone());
+    let started_tool_result = tool_result_with_marker(&started_requests, "workflow_run_started")
+        .expect("module tool result reports a detached run");
+    let started_payload: Value =
+        serde_json::from_str(&started_tool_result).expect("run_flow result is JSON");
+    assert_eq!(started_payload["type"], "workflow_run_started");
+    assert_eq!(started_payload["flow_id"], callback_flow_id);
+    assert_eq!(started_payload["status"], "running");
+    assert_eq!(started_payload["detached"], true);
+    assert!(
+        started_payload["run_id"]
+            .as_str()
+            .is_some_and(|run_id| !run_id.is_empty()),
+        "detached tool result must contain its run id: {started_payload}"
     );
 
     // Hygiene: never let a leftover scripted completion bleed into another test
