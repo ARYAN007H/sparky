@@ -159,9 +159,15 @@ async fn closing_a_durable_driver_session_cancels_only_its_registered_child() {
     options.task_id = Some("close-driver-task".into());
     options.thread_id = Some("close-driver-thread".into());
     options.checkpoint_dir = Some(scratch.path().join("checkpoints"));
+    let mut test_config = crate::config::Config::default();
+    // This lifecycle fixture exercises driver cancellation, not TinyJuice's
+    // module-backed output compaction. Keep the optional component disabled so
+    // the scripted child cannot wait on a module service that this unit test
+    // does not install.
+    test_config.components.juice = false;
     let core = crate::core::runtime::CoreContext::for_test_with_config(
         crate::core::runtime::DomainSet::full(),
-        crate::config::Config::default(),
+        test_config,
     );
     options.run_context = options.run_context.with_core(Some(Arc::clone(&core)));
     let parent = options.run_context.clone().into_tinyagents(
