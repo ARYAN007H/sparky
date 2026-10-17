@@ -41,7 +41,7 @@ use crate::modules::tinyflows as module;
 /// admitted so a tinyflows module release that predates the schema (the pinned
 /// artifact is re-pinned only after the epic is released) keeps working against
 /// a fresh database; its v1 collections are not migrated by the owner's steps.
-const COLLECTIONS: [&str; 11] = [
+const COLLECTIONS: [&str; 10] = [
     "cron.jobs",
     "cron.runs",
     "cron.admission",
@@ -52,7 +52,6 @@ const COLLECTIONS: [&str; 11] = [
     "cron_jobs",
     "cron_runs",
     "cron_counters",
-    "cron_job_policies",
 ];
 
 /// Where one scope's cron documents live: the workspace whose default backend
