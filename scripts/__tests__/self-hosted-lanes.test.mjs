@@ -443,6 +443,7 @@ test("private auxiliary coverage reports after failed tests and preserves the fa
       ...process.env,
       PATH: `${dir}:${process.env.PATH}`,
       CARGO_CALLS: calls,
+      NEXTEST_REPORT_DIR: path.join(dir, "reports"),
     },
   });
   assert.equal(result.status, 17);

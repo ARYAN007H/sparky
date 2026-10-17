@@ -598,7 +598,7 @@ export function buildPlan({ profile, areas, env = {}, isPullRequest = true }) {
         const [cargoArgs, filters] = check.run
           .slice("cargo test ".length)
           .split(" -- ");
-        let args = cargoArgs.replace("--no-fail-fast ", "");
+        const args = cargoArgs.replace("--no-fail-fast ", "");
         let expression = "";
         let serial = "";
         if (filters) {
