@@ -26,6 +26,35 @@ use tinyinference_llm::model::{ChatModel, ModelRequest, ModelResponse};
 use tinytools::Tool;
 use tinytools_agent::dialect::ToolCallFormat;
 
+struct BlockingTeamExecutor {
+    entered: std::sync::Mutex<Option<tokio::sync::oneshot::Sender<()>>>,
+    release: Arc<tokio::sync::Notify>,
+    dropped: std::sync::Mutex<Option<tokio::sync::oneshot::Sender<()>>>,
+}
+
+#[async_trait]
+impl TeamMemberExecutor for BlockingTeamExecutor {
+    async fn execute(
+        &self,
+        _member: &tinyagents_session::run_ledger::AgentTeamMember,
+        _task: &tinyagents_session::run_ledger::AgentTeamTask,
+    ) -> anyhow::Result<Vec<String>> {
+        if let Some(sender) = self.entered.lock().unwrap().take() {
+            let _ = sender.send(());
+        }
+        self.release.notified().await;
+        Ok(vec!["worker result".to_string()])
+    }
+}
+
+impl Drop for BlockingTeamExecutor {
+    fn drop(&mut self) {
+        if let Some(sender) = self.dropped.lock().unwrap().take() {
+            let _ = sender.send(());
+        }
+    }
+}
+
 // ── Mocks (mirror workflow_runs::engine_tests) ──────────────────────────────
 
 fn text_response(text: impl Into<String>) -> ModelResponse {
@@ -325,6 +354,78 @@ async fn owner_releases_task_when_host_worker_fails() {
     .unwrap()
     .unwrap();
     assert_eq!(member.member_status, AgentTeamMemberStatus::Idle);
+}
+
+#[tokio::test]
+async fn start_rpc_returns_owner_receipt_while_member_executor_is_blocked() {
+    let _guard = crate::config::TEST_ENV_LOCK.lock().await;
+    let (_dir, config) = test_config();
+    seed_team(&config, "team-rpc");
+    seed_member(&config, "team-rpc", "member-rpc", Some("task_manager_agent"));
+    seed_task(
+        &config,
+        "team-rpc",
+        "task-rpc",
+        AgentTeamTaskStatus::Todo,
+        None,
+        vec![],
+    );
+    let (entered_tx, entered_rx) = tokio::sync::oneshot::channel();
+    let (dropped_tx, dropped_rx) = tokio::sync::oneshot::channel();
+    let release = Arc::new(tokio::sync::Notify::new());
+    let executor = BlockingTeamExecutor {
+        entered: std::sync::Mutex::new(Some(entered_tx)),
+        release: Arc::clone(&release),
+        dropped: std::sync::Mutex::new(Some(dropped_tx)),
+    };
+    let ctx = crate::core::runtime::DispatchCtx::ambient();
+    let task_config = config.clone();
+    let start = tokio::spawn(async move {
+        start_member_with_executor(
+            &ctx,
+            &task_config,
+            "team-rpc",
+            "member-rpc",
+            crate::storage::sessions::with_ledger(&task_config.workspace_dir, |ledger| {
+                let id = "task-rpc".to_string();
+                async move { ledger.get_agent_team_task(&id).await }
+            })
+            .unwrap()
+            .unwrap(),
+            executor,
+        )
+        .await
+    });
+
+    let outcome = tokio::time::timeout(std::time::Duration::from_secs(5), start)
+        .await
+        .expect("start RPC waits only for owner admission")
+        .expect("start task joins")
+        .expect("owner admission succeeds");
+    let StartMemberOutcome::Started { run_id, task } = outcome else {
+        panic!("expected started receipt, got {outcome:?}");
+    };
+    assert_eq!(task.id, "task-rpc");
+    tokio::time::timeout(std::time::Duration::from_secs(5), entered_rx)
+        .await
+        .expect("executor started")
+        .expect("executor signal delivered");
+
+    let active = crate::storage::sessions::with_ledger(&config.workspace_dir, |ledger| {
+        let id = "member-rpc".to_string();
+        async move { ledger.get_agent_team_member(&id).await }
+    })
+    .unwrap()
+    .unwrap();
+    assert_eq!(active.member_status, AgentTeamMemberStatus::Active);
+    assert_eq!(active.run_id.as_deref(), Some(run_id.as_str()));
+    assert!(active.worker_thread_id.is_some());
+
+    release.notify_one();
+    tokio::time::timeout(std::time::Duration::from_secs(5), dropped_rx)
+        .await
+        .expect("owner finishes after executor release")
+        .expect("executor dropped after owner completion");
 }
 
 // ── start_member_run pre-spawn outcome routing ──────────────────────────────

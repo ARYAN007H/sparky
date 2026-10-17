@@ -138,13 +138,6 @@ pub async fn start_member_run(
         },
     };
 
-    // TinyAgents owns the claim, active transition, cleanup and completion.
-    // The receipt crosses back to this RPC as soon as the owner has durably
-    // admitted the run; the same owner future then continues executing it.
-    let ledger = crate::storage::sessions::require_ledger(&config.workspace_dir)
-        .map_err(|error| anyhow!("{error}"))?;
-    let service =
-        SessionTeamLedger::new(ledger).map(tinyagents_orchestration::teams::TeamService::new)?;
     let executor = HostTeamMemberExecutor {
         ctx: ctx.clone(),
         config: config.clone(),
@@ -153,6 +146,27 @@ pub async fn start_member_run(
         model_override,
         parent_override: None,
     };
+    start_member_with_executor(ctx, config, team_id, member_id, target, executor).await
+}
+
+/// Run the owner admission path behind an immediate RPC receipt. Kept generic
+/// so tests can hold execution after the receipt and exercise the real host
+/// boundary without a model backend.
+async fn start_member_with_executor<E: TeamMemberExecutor + 'static>(
+    ctx: &crate::core::runtime::DispatchCtx,
+    config: &Config,
+    team_id: &str,
+    member_id: &str,
+    target: AgentTeamTask,
+    executor: E,
+) -> Result<StartMemberOutcome> {
+    // TinyAgents owns the claim, active transition, cleanup and completion.
+    // The receipt crosses back to this RPC as soon as the owner has durably
+    // admitted the run; the same owner future then continues executing it.
+    let ledger = crate::storage::sessions::require_ledger(&config.workspace_dir)
+        .map_err(|error| anyhow!("{error}"))?;
+    let service =
+        SessionTeamLedger::new(ledger).map(tinyagents_orchestration::teams::TeamService::new)?;
     let (started_tx, started_rx) = tokio::sync::oneshot::channel();
     let mut started_tx = Some(started_tx);
     let team = team_id.to_string();
