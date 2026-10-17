@@ -121,7 +121,7 @@ impl Docs {
             .0
             .run(|docs| async move { docs.get(ARTIFACTS, &id).await })?;
         stored
-            .map(|stored| serde_json::from_value(stored.doc).context("parse artifact meta"))
+            .map(|stored| meta_from_body(stored.doc).context("parse artifact meta"))
             .transpose()
     }
 
