@@ -160,14 +160,7 @@ pub(crate) async fn spawn_async_via_driver_tool(
         input,
         options,
         "background",
-        Some(Arc::new(move |target, result| {
-            let projected = match result {
-                Ok(_) => bundle_outcome_for_key(&bundle, &task_key),
-                Err(error) => bundle_failure_for_key(&bundle, &task_key)
-                    .map_or_else(|| Err(error), |failure| Err(failure.to_string())),
-            };
-            completion(target, projected);
-        })),
+        Some(Arc::new(completion)),
     )
     .await?;
     decode_driver_job_result(tool_result, &bundle, &task_key)
@@ -178,6 +171,7 @@ type DriverCompletion = Arc<
         + Send
         + Sync,
 >;
+type HostCompletion = Arc<dyn Fn(&str, Result<SubagentRunOutcome, String>) + Send + Sync>;
 
 async fn invoke_async_spawn_driver_tool(
     parent: &RunContext<crate::agent::tinyagents::host::OpenHumanRunContext>,
@@ -185,7 +179,7 @@ async fn invoke_async_spawn_driver_tool(
     input: String,
     options: SubagentRunOptions,
     mode: &str,
-    completion: Option<DriverCompletion>,
+    completion: Option<HostCompletion>,
 ) -> Result<(tinytools::ToolResult, OpenHumanDriverBundle), SubagentRunError> {
     use tinyagents_harness::tool::ToolDispatch;
     use tinyagents_orchestration::subagent::{DriverSubAgentTool, SubAgentJobRegistry};
@@ -263,8 +257,32 @@ async fn invoke_async_spawn_driver_tool(
             ToolTimeout::Unbounded,
         );
     if let Some(completion) = completion {
-        dispatcher = dispatcher.with_completion_handler(move |target, outcome| {
-            completion(target, outcome)
+        let callback_task_key = SubagentTaskKey::from_context(parent, task_id.clone(), None);
+        let host_outcome = Arc::clone(&bundle.host_outcome);
+        let failures = Arc::clone(&bundle.failures);
+        dispatcher = dispatcher.with_async_completion_handler(move |target, result| {
+            let completion = Arc::clone(&completion);
+            let host_outcome = Arc::clone(&host_outcome);
+            let failures = Arc::clone(&failures);
+            let key = callback_task_key.clone();
+            Box::pin(async move {
+                let projected = match result {
+                    Ok(_) => host_outcome
+                        .lock()
+                        .unwrap_or_else(|poisoned| poisoned.into_inner())
+                        .remove(&key)
+                        .ok_or_else(|| "driver completed without a persisted host outcome".to_string()),
+                    Err(error) => {
+                        let host_error = failures
+                            .lock()
+                            .unwrap_or_else(|poisoned| poisoned.into_inner())
+                            .remove(&key)
+                            .map(|failure| failure.to_string());
+                        Err(host_error.unwrap_or(error))
+                    }
+                };
+                completion(&target, projected);
+            })
         });
     }
     let args = serde_json::json!({ "input": input, "mode": mode });
@@ -315,28 +333,6 @@ fn decode_driver_job_result(
         })
 }
 
-fn bundle_outcome_for_key(
-    bundle: &OpenHumanDriverBundle,
-    task_key: &SubagentTaskKey,
-) -> Result<SubagentRunOutcome, String> {
-    bundle
-        .host_outcome
-        .lock()
-        .unwrap_or_else(|poisoned| poisoned.into_inner())
-        .remove(task_key)
-        .ok_or_else(|| "driver completed without a persisted host outcome".to_string())
-}
-
-fn bundle_failure_for_key(
-    bundle: &OpenHumanDriverBundle,
-    task_key: &SubagentTaskKey,
-) -> Option<SubagentRunError> {
-    bundle
-        .failures
-        .lock()
-        .unwrap_or_else(|poisoned| poisoned.into_inner())
-        .remove(task_key)
-}
 
 /// Recover the original durable key and complete host pause payload from the
 /// safe task-id index written at the pause persistence boundary.
