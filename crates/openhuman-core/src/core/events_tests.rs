@@ -202,6 +202,7 @@ fn all_variants_have_correct_domain() {
                 job_id: "j".into(),
                 success: true,
                 output: "ok".into(),
+                tenant: None,
             },
             "cron",
         ),
