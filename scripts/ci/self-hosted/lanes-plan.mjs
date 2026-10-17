@@ -622,6 +622,16 @@ export function buildPlan({ profile, areas, env = {}, isPullRequest = true }) {
           `${args}${expression}${serial}`,
           `lcov-${check.name}.info`,
         );
+        if (check.name === "storage-e2e") {
+          // Every explicitly selected storage target must report tests; a
+          // nonempty aggregate alone would hide an accidentally empty target.
+          check.env.NEXTEST_EXPECTED_TARGETS =
+            "ci-out/nextest/storage-e2e-expected-targets.txt";
+          check.run =
+            'mkdir -p "$(dirname "$NEXTEST_EXPECTED_TARGETS")" || exit $?; ' +
+            `printf '%s\\n' ${STORAGE_E2E_TARGETS.map((target) => `'${target}'`).join(" ")} > "$NEXTEST_EXPECTED_TARGETS" || exit $?; ` +
+            check.run;
+        }
       }
     }
     const tauriLane = lanes.find((l) => l.name === "tauri");
