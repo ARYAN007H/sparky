@@ -1,7 +1,8 @@
 use super::*;
 
 use std::sync::Arc;
-use serde_json::json;
+use serde_json::{json, Value};
+use super::catalog_search::search_catalog;
 use tempfile::TempDir;
 use tinytools::{PermissionLevel, Tool};
 use crate::config::Config;
