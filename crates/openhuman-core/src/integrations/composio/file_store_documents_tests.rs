@@ -164,7 +164,7 @@ fn the_import_marker_is_a_migrations_entry_and_stops_a_second_import() {
 
 #[tokio::test]
 async fn v1_state_documents_move_into_kv_without_replacing_a_newer_value() {
-    use tinystoragedrivers::{DocumentStoreExt, Precondition};
+    use tinystoragedrivers::{Precondition};
     let storage = MemoryStorage::new();
     let scoped = storage.for_scope(&Scope::new("local").unwrap()).unwrap();
     let raw = scoped.documents();
