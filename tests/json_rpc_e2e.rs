@@ -11545,12 +11545,20 @@ async fn json_rpc_flows_full_arc_discover_build_create_run_inner() {
     clear_forced_chat_completions();
     with_chat_completion_requests(|requests| requests.clear());
     let demo_graph = opus_sonnet_demo_graph();
+    let sandbox_graph = json!({
+        "nodes": [
+            { "id": "trigger", "kind": "trigger", "name": "Manual" },
+            { "id": "search", "kind": "tool_call", "name": "Mock search",
+              "config": { "slug": "oh:web_search", "args": { "query": "sandbox callback probe" } } }
+        ],
+        "edges": [ { "from_node": "trigger", "to_node": "search" } ]
+    });
     // Turn 1: dry-run the graph through TinyFlows' sandbox bus path. Turn 2:
     // propose it after reading the sandbox result. Turn 3: a plain reply ends
     // the builder loop.
     push_forced_chat_completion_when(
         "dry_run_workflow",
-        forced_tool_call_completion("dry_run_workflow", json!({ "graph": demo_graph.clone() })),
+        forced_tool_call_completion("dry_run_workflow", json!({ "graph": sandbox_graph })),
     );
     push_forced_chat_completion_when(
         "propose_workflow",

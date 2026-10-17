@@ -241,6 +241,22 @@ impl FlowsHost {
         })
         .await
     }
+
+    async fn preflight_tool(&self, slug: String, args: Value) -> Result<Value, String> {
+        let config = Arc::clone(&self.config);
+        self.in_context(async move {
+            if let Some(backend) = crate::flows::tinyflows::caps::tools::backend_for(&slug) {
+                backend
+                    .preflight(&config, &slug, &args)
+                    .await
+                    .map_err(|error| error.to_string())?;
+            }
+            // The module discards this acknowledgement and returns only its
+            // deterministic MockTools result. Never invoke the real backend.
+            Ok(Value::Null)
+        })
+        .await
+    }
 }
 
 fn required<T: DeserializeOwned>(value: &Value, key: &str) -> Result<T, String> {
@@ -279,6 +295,16 @@ impl FlowsHost {
         self.dispatch_run_flow(request)
             .await
             .map_err(|error| bus_error("RunFlow", error))
+    }
+}
+
+#[tinybus::interface(name = "ai.tinyhumans.tinyflows.CapsHost")]
+impl FlowsHost {
+    /// Validate mock tool arguments only; sandbox results stay module-owned.
+    async fn tool_invoke(&self, slug: String, args: Value, _connection: Option<String>) -> BusResult<Value> {
+        self.preflight_tool(slug, args)
+            .await
+            .map_err(|error| bus_error("ToolInvoke", error))
     }
 }
 
