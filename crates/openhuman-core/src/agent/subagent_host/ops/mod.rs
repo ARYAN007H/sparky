@@ -12,7 +12,7 @@
 //! | File                | Contents                                                       |
 //! | ------------------- | -------------------------------------------------------------- |
 //! | `provider.rs`       | `resolve_subagent_source`, `user_is_signed_in_to_composio`       |
-//! | `prompt.rs`         | Artifact-offload contract and tool-spec deduplication |
+//! | `prompt.rs`         | Child role framing and artifact-offload contract |
 //! | `runner.rs`         | `run_subagent`, `run_typed_mode`                               |
 //! | `graph.rs`          | `run_subagent_via_graph` — the sub-agent turn graph + tools    |
 //! | `checkpoint.rs`     | `SubagentCheckpoint` — cap-hit summary                         |
