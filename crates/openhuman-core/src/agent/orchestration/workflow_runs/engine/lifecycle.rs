@@ -35,32 +35,32 @@ fn record_failed_if_current(
     let supervisor = workflow_supervisor();
     let _ = supervisor.with_current(handle, || {
         if let Ok(Some(run)) = get_workflow_run(config, run_id) {
-        if matches!(
-            run.status,
-            WorkflowRunStatus::Completed
-                | WorkflowRunStatus::Failed
-                | WorkflowRunStatus::Cancelled
-                | WorkflowRunStatus::Interrupted
-        ) || run.revision != expected_revision
-        {
-            return;
-        }
-        let _ = compare_and_swap_workflow_run_lifecycle(
-            config,
-            WorkflowRunUpsert {
-                id: run.id.clone(),
-                definition_id: run.definition_id.clone(),
-                parent_thread_id: run.parent_thread_id.clone(),
-                input: run.input.clone(),
-                phase_states: run.phase_states.clone(),
-                child_run_ids: run.child_run_ids.clone(),
-                status: WorkflowRunStatus::Failed,
-                summary: Some(summary),
-                started_at: Some(run.started_at),
-                completed_at: Some(chrono::Utc::now()),
-            },
-            expected_revision,
-        );
+            if matches!(
+                run.status,
+                WorkflowRunStatus::Completed
+                    | WorkflowRunStatus::Failed
+                    | WorkflowRunStatus::Cancelled
+                    | WorkflowRunStatus::Interrupted
+            ) || run.revision != expected_revision
+            {
+                return;
+            }
+            let _ = compare_and_swap_workflow_run_lifecycle(
+                config,
+                WorkflowRunUpsert {
+                    id: run.id.clone(),
+                    definition_id: run.definition_id.clone(),
+                    parent_thread_id: run.parent_thread_id.clone(),
+                    input: run.input.clone(),
+                    phase_states: run.phase_states.clone(),
+                    child_run_ids: run.child_run_ids.clone(),
+                    status: WorkflowRunStatus::Failed,
+                    summary: Some(summary),
+                    started_at: Some(run.started_at),
+                    completed_at: Some(chrono::Utc::now()),
+                },
+                expected_revision,
+            );
         }
     });
 }
@@ -234,22 +234,12 @@ pub async fn start_workflow_run(
     );
     let initial_run_id = run_id.clone();
     let initial_definition = definition.clone();
-    let (handle, run) = schedule_workflow_drive(
-        ctx,
-        run_id.clone(),
-        definition,
-        false,
-        move || {
+    let (handle, run) =
+        schedule_workflow_drive(ctx, run_id.clone(), definition, false, move || {
             initial_engine
-                .initialise(
-                    initial_run_id,
-                    &initial_definition,
-                    input,
-                    parent_thread_id,
-                )
+                .initialise(initial_run_id, &initial_definition, input, parent_thread_id)
                 .context("persist initial workflow run")
-        },
-    )?;
+        })?;
     let _handle = handle;
 
     log::debug!(
