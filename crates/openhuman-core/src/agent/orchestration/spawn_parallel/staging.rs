@@ -9,6 +9,11 @@
 //! [`plan_shared_workspace_dispatch`](tinyagents_graph::parallel::plan_shared_workspace_dispatch).
 //! The rejection sentences stay here, which is why the crate reports conflicts
 //! as data.
+//!
+//! The host resolves definitions and normalizes prompts in the owner's async
+//! `Plan::stage_with_preflight` seam. That preparation has no external side
+//! effects: policy admission and whole-batch workspace arbitration finish
+//! before dispatch creates worktrees or emits spawn progress/events.
 
 use std::collections::HashMap;
 use std::path::PathBuf;

@@ -63,10 +63,15 @@ RPC/tool formatting, and OpenHuman's worktree policy.
   mechanics are imported directly from `tinyagents_orchestration::workflow`.
 - [`delegation.rs`](./delegation.rs): production worker for TinyAgents' durable
   plan→execute⇄review→finalize graph; every stage runs through `run_subagent`.
-- `spawn_parallel_agents` uses `tinyagents_graph::parallel::map_reduce` with
-  OpenHuman-owned request validation, worktree policy, dispatch, workers, and
-  result formatting. The former parallel coordinator/request graph modules
-  were removed; there is no OpenHuman forwarding layer around the graph API.
+- `spawn_parallel_agents` stages through
+  `tinyagents_orchestration::parallel::Plan::stage_with_preflight` and fans out
+  through the crate's `parallel::run`. OpenHuman owns identity/tool/workspace
+  policy and its async progress and result projections. Staging only resolves
+  definitions and trims prompts before admission; worktree creation and spawn
+  events happen after policy and batch arbitration. Results are projected in
+  input order after the worker batch completes. The sync-only `RunHooks` cannot
+  carry these awaited host callbacks, so the adapter keeps them at the async
+  preflight/execution and ordered-collection boundaries.
 - [`subagent_events.rs`](./subagent_events.rs): the single owner that constructs and publishes
   `DomainEvent::Subagent{Spawned,Completed,Failed,AwaitingUser}`.
 - `subagent_control.rs`: manual cancel/steer of detached background
