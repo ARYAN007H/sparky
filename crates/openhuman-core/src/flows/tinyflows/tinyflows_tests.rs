@@ -138,10 +138,6 @@ fn seeded_required_args_contract(
 
 // ── OpenHumanAgentRunner: routing + request/model mapping (Phase A) ───────────
 
-use crate::flows::agent_route::{
-    harness_model_default_override, route_custom_entry_lookup, route_for_agent_ref, AgentRoute,
-};
-
 // ── B38 (Gap 2): a custom agent_ref must route to the harness (real tools),
 // not the persona-only completion fallback ─────────────────────────────────
 
