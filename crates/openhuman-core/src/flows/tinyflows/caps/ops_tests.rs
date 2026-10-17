@@ -1,5 +1,4 @@
 use super::*;
-use tinytools::{ToolContent, ToolResult};
 
 fn http_cred_store() -> (tempfile::TempDir, HttpCredentialsStore) {
     let dir = tempfile::tempdir().expect("tempdir");

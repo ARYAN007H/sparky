@@ -1,22 +1,12 @@
-//! The `oh:` namespace — native OpenHuman tools.
-//!
-//! A "Tool" node in a flow, as opposed to an "App action" node. The slug names
-//! a tool in the same agent registry the assistant itself uses, so a flow
-//! reaches the full toolset (search, media generation, file, shell, …) rather
-//! than a flow-specific subset.
-//!
-//! Composio's curation gate does not apply here — an `oh:` slug is not a
-//! Composio action — but the autonomy-tier and approval gates do, and for the
-//! same reason they apply to the assistant: a flow is another way to reach the
-//! same effects.
+//! Thin TinyFlows registration and error adapter for native OpenHuman tools.
 
 use async_trait::async_trait;
 use serde_json::Value;
+use tinybox_bus::CommandClass;
 use tinyflows::error::{EngineError, Result};
 
 use super::{ToolBackend, ToolCallCtx, NATIVE_TOOL_PREFIX};
 
-/// Dispatches `oh:<tool_name>` to the agent tool registry.
 pub(crate) struct NativeToolBackend;
 
 #[async_trait]
@@ -36,87 +26,91 @@ impl ToolBackend for NativeToolBackend {
         args: Value,
         _conn: Option<&str>,
     ) -> Result<Value> {
-        let tool_name = slug.strip_prefix(NATIVE_TOOL_PREFIX).unwrap_or(slug).trim();
-        if tool_name.is_empty() {
-            return Err(EngineError::Capability(
-                "tool_call node: native tool slug is empty (expected `oh:<tool_name>`)".to_string(),
-            ));
-        }
-
-        let security = std::sync::Arc::new(
-            super::super::current_tier_policy(ctx.dispatch, ctx.config, ctx.security).await?,
-        );
-        let class = crate::tools::native_ops::classify_tool_call_with_security(
+        crate::tools::native_ops::flow_backend::invoke(
             ctx.config,
-            security.clone(),
-            tool_name,
-            &args,
+            slug,
+            args,
+            &NativeFlowPolicyHooks { ctx },
         )
-        .map_err(EngineError::Capability)?;
-        let tier_decision = super::super::enforce_node_tier_gate(&security, class, "tool_call")?;
-        let summary = crate::security::approval::summarize_action(tool_name, &args);
-        let redacted = crate::security::approval::redact_args(&args);
+        .await
+        .map_err(EngineError::Capability)
+    }
+}
+
+struct NativeFlowPolicyHooks<'a, 'ctx> {
+    ctx: &'a ToolCallCtx<'ctx>,
+}
+
+#[async_trait]
+impl crate::tools::native_ops::flow_backend::FlowPolicyHooks for NativeFlowPolicyHooks<'_, '_> {
+    async fn resolve_policy(
+        &self,
+        config: &crate::config::Config,
+    ) -> std::result::Result<std::sync::Arc<crate::security::SecurityPolicy>, String> {
+        super::super::current_tier_policy(self.ctx.dispatch, config, self.ctx.security)
+            .await
+            .map(std::sync::Arc::new)
+            .map_err(|error| match error {
+                EngineError::Capability(body) => body,
+                other => other.to_string(),
+            })
+    }
+
+    async fn authorize(
+        &self,
+        policy: &crate::security::SecurityPolicy,
+        class: CommandClass,
+        tool_name: &str,
+        args: &Value,
+    ) -> std::result::Result<Option<String>, String> {
+        let tier_decision = super::super::enforce_node_tier_gate(policy, class, "tool_call")
+            .map_err(|error| match error {
+                EngineError::Capability(body) => body,
+                other => other.to_string(),
+            })?;
+        let summary = crate::security::approval::summarize_action(tool_name, args);
+        let redacted = crate::security::approval::redact_args(args);
         let (outcome, audit_id) = super::super::gate_call_for_tier(
-            ctx.dispatch,
-            ctx.approval,
+            self.ctx.dispatch,
+            self.ctx.approval,
             tier_decision,
             tool_name,
             &summary,
             redacted,
         )
         .await;
-        if let crate::security::approval::GateOutcome::Deny { reason } = outcome {
-            return Err(EngineError::Capability(reason));
+        match outcome {
+            crate::security::approval::GateOutcome::Deny { reason } => Err(reason),
+            crate::security::approval::GateOutcome::Allow => Ok(audit_id),
         }
+    }
+
+    fn record_execution(
+        &self,
+        audit_id: Option<&str>,
+        result: &std::result::Result<Value, String>,
+    ) {
+        let Some(id) = audit_id else {
+            return;
+        };
+        let Some(gate) = crate::security::approval::ApprovalGate::try_global() else {
+            return;
+        };
+        let execution = if result.is_ok() {
+            crate::security::approval::ExecutionOutcome::Success
+        } else {
+            crate::security::approval::ExecutionOutcome::Failure
+        };
+        let error = result
+            .as_ref()
+            .err()
+            .map(|body| EngineError::Capability(body.clone()).to_string());
         tracing::debug!(
             target: "flows",
-            %tool_name,
-            ?class,
-            ?tier_decision,
-            "[flows] tool_call: dispatching NATIVE OpenHuman tool"
+            audit_id = %id,
+            success = result.is_ok(),
+            "[flows] recording native tool execution outcome on the approval audit trail"
         );
-        let exec_result = crate::tools::native_ops::execute_tool_with_security(
-            ctx.config, security, tool_name, args, false,
-        )
-        .await
-        .map_err(EngineError::Capability)
-        .and_then(|outcome| {
-            super::super::reject_failed_native_tool_result(slug, &outcome.result)
-                .map(|_| super::super::native_tool_payload(&outcome.result))
-        });
-
-        // E-m1: close out the approval audit row (unlike the http/code/
-        // Composio paths, this used to discard the request id and never
-        // call `record_execution`, leaving every prompted-and-approved
-        // native `oh:` tool_call's audit trail stuck open with no
-        // Success/Failure terminal outcome).
-        if let Some(id) = &audit_id {
-            if let Some(gate) = crate::security::approval::ApprovalGate::try_global() {
-                let exec = if exec_result.is_ok() {
-                    crate::security::approval::ExecutionOutcome::Success
-                } else {
-                    crate::security::approval::ExecutionOutcome::Failure
-                };
-                tracing::debug!(
-                    target: "flows",
-                    %tool_name,
-                    audit_id = %id,
-                    success = exec_result.is_ok(),
-                    "[flows] tool_call: recording native tool execution outcome on the \
-                     approval audit trail"
-                );
-                gate.record_execution(
-                    id,
-                    exec,
-                    exec_result
-                        .as_ref()
-                        .err()
-                        .map(ToString::to_string)
-                        .as_deref(),
-                );
-            }
-        }
-
-        exec_result
+        gate.record_execution(id, execution, error.as_deref());
     }
 }
