@@ -40,6 +40,7 @@ pub mod local;
 pub mod rebind;
 pub mod schema;
 pub mod scope;
+pub mod schema_support;
 pub mod scope_move;
 pub mod secrets;
 
