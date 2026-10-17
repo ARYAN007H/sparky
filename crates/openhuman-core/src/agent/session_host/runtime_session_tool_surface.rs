@@ -14,27 +14,21 @@ fn reconcile_surface_names(
     discovery_deferred: Option<std::collections::HashSet<String>>,
     strip_packed: impl FnOnce(&mut std::collections::HashSet<String>),
 ) {
-    eprintln!(
-        "AUDIT reconcile input visible={visible:?} previous={previous_synthesized:?} next={synthesized:?} deferred={discovery_deferred:?} permanent={permanent:?} auto={auto_include_new}"
-    );
     let mut managed = tinyagents_runtime::ManagedToolNames {
         visible: std::mem::take(visible),
         deferred: std::mem::take(deferred),
         permanent: std::mem::take(permanent),
     };
     managed.refresh_synthesized(previous_synthesized, synthesized, auto_include_new);
-    eprintln!("AUDIT owner-refresh visible={:?} deferred={:?} permanent={:?}", managed.visible, managed.deferred, managed.permanent);
     // New wildcard-synthesized names must participate in packed-tool
     // filtering so a withheld name can add its `use_skill` route. Restore
     // permanent names afterward, preserving their precedence over both
     // packed and deferred visibility filters.
     strip_packed(&mut managed.visible);
-    eprintln!("AUDIT packed-filter visible={:?}", managed.visible);
     if let Some(names) = &discovery_deferred {
         managed.visible.retain(|name| !names.contains(name));
         managed.deferred = names.clone();
     }
-    eprintln!("AUDIT discovery-filter visible={:?} deferred={:?}", managed.visible, managed.deferred);
     managed.make_permanent(std::iter::empty::<String>());
     if let Some(names) = &discovery_deferred {
         managed.defer_visible(names);
@@ -277,7 +271,6 @@ impl OpenHumanTurnPrelude {
                 &policy,
             ),
         );
-        eprintln!("AUDIT agent={} final-visible-names={:?} final-visible-specs={:?}", surface.agent_definition_name, surface.visible_tool_names, visible.iter().map(|spec| spec.name.as_str()).collect::<Vec<_>>());
         surface.tool_specs = Arc::new(specs);
         surface.synthesized_tools = synthesized_tools;
         surface.visible_tool_specs = Arc::new(visible);
