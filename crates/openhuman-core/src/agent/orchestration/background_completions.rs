@@ -46,13 +46,13 @@ use tinyagents_tasks::{
 use super::completion_notice::BackgroundCompletionFormatter;
 pub(crate) use super::completion_notice::{BackgroundAgentOutcome, AWAITING_INPUT_LABEL};
 #[cfg(test)]
+pub(crate) use super::completion_target::claim_recovery;
+#[cfg(test)]
 pub(crate) use super::completion_target::tests::{
     forget_workspace_for_test, install_store_for_test, TestWorkspace,
 };
 pub(crate) use super::completion_target::CompletionTarget;
 use super::completion_target::{awaiting_input_record_id, awaiting_input_record_prefix};
-#[cfg(test)]
-pub(crate) use super::completion_target::{claim_recovery, forget_recovery};
 pub(crate) use super::completion_target::{claim_recovery_ctx, forget_recovery_ctx};
 
 /// How long a settled record (delivered / gave up / tombstoned) is kept before

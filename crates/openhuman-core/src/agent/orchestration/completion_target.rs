@@ -166,8 +166,3 @@ pub(crate) fn forget_recovery_ctx(ctx: &crate::core::runtime::DispatchCtx, works
         state().stores.insert(scope, router.store());
     }
 }
-
-#[cfg(test)]
-pub(crate) fn forget_recovery(workspace_dir: &Path) {
-    forget_recovery_ctx(&crate::core::runtime::DispatchCtx::ambient(), workspace_dir)
-}
