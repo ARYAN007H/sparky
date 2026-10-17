@@ -73,7 +73,6 @@ pub(crate) use cancel::{
 pub(crate) use registry::admit_spawn;
 #[cfg(test)]
 pub(crate) use registry::{register, status_channel, RegistrationError};
-pub(crate) use resolve::{resume_ref_for_task_in_workspace, task_id_for_session_in_workspace};
 pub(crate) use roster::active_subagents_context_block;
 pub use steering::steer;
 pub(crate) use steering::steer_control;
