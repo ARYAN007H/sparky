@@ -26,9 +26,7 @@ pub(crate) async fn wait(
         return wait_detached(registry(), task_id, &owner, timeout).await;
     };
     admit_workspace(ctx, &workspace_dir)?;
-    let store = crate::core::runtime::CoreContext::sync_scope(context, || {
-        super::task_ledger::task_store_for_workspace(&workspace_dir)
-    });
+    let store = super::resolve::scoped_task_store(ctx, &workspace_dir)?;
     wait_detached_or_durable(
         registry(),
         store.as_ref(),
@@ -49,10 +47,7 @@ pub(crate) async fn wait_in_workspace(
 ) -> Result<WaitOutcome, WaitError> {
     admit_workspace(ctx, workspace_dir)?;
     let owner = owner_key(ctx, parent_session)?;
-    let context = ctx.resolved().ok_or(WaitError::NotOwned)?;
-    let store = crate::core::runtime::CoreContext::sync_scope(context, || {
-        super::task_ledger::task_store_for_workspace(workspace_dir)
-    });
+    let store = super::resolve::scoped_task_store(ctx, workspace_dir)?;
     wait_detached_or_durable(
         registry(),
         store.as_ref(),

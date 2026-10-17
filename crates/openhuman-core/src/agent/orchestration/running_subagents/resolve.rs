@@ -93,10 +93,17 @@ pub(crate) fn resume_ref_for_task_in_workspace(
     Ok(reference)
 }
 
-fn scoped_task_store(
+pub(super) fn scoped_task_store(
     ctx: &crate::core::runtime::DispatchCtx,
     workspace_dir: &Path,
 ) -> Result<std::sync::Arc<dyn tinyagents_tasks::TaskStore>, WaitError> {
-    let _ = ctx;
+    if let Some(context) = ctx.resolved() {
+        return Ok(crate::core::runtime::CoreContext::sync_scope(context, || {
+            task_store_for_workspace(workspace_dir)
+        }));
+    }
+    if crate::core::runtime::is_saas() {
+        return Err(WaitError::NotOwned);
+    }
     Ok(task_store_for_workspace(workspace_dir))
 }
