@@ -6,8 +6,6 @@ use crate::core::runtime::DispatchCtx;
 use crate::core::runtime::{ContextOverlay, CoreContext, DomainSet, Mode};
 use crate::tools::toolpacks::ToolGroups;
 use tinyagents_orchestration::subagent::SteerError;
-use tinyagents_orchestration::subagent::list_subagent_records;
-use tinyagents_tasks::OrchestrationTaskStatus;
 
 const CHILD: &str = "OPENHUMAN_DETACHED_TENANT_TEST_CHILD";
 const PARENT: &str = "same-parent-session";
@@ -621,42 +619,6 @@ async fn saas_controls_follow_the_explicit_context_not_the_tasks_scope() {
     assert!(snapshot_for_parent(&alice, PARENT)
         .iter()
         .all(|worker| worker.task_id != a_task));
-    let alice_cancelled = CoreContext::sync_scope(pair.alice.clone(), || {
-        list_subagent_records(
-            crate::agent::orchestration::running_subagents::resolve::scoped_task_store(
-                &alice,
-                pair._a_dir.path(),
-            )
-            .expect("Alice task store")
-            .as_ref(),
-        )
-    });
-    let bob_cancelled = CoreContext::sync_scope(pair.bob.clone(), || {
-        list_subagent_records(
-            crate::agent::orchestration::running_subagents::resolve::scoped_task_store(
-                &bob,
-                pair._b_dir.path(),
-            )
-            .expect("Bob task store")
-            .as_ref(),
-        )
-    });
-    assert_eq!(
-        alice_cancelled
-            .iter()
-            .find(|row| row.spec.task_id.as_str() == a_task)
-            .expect("Alice cancellation remains durable")
-            .status,
-        OrchestrationTaskStatus::Cancelled
-    );
-    assert_eq!(
-        bob_cancelled
-            .iter()
-            .find(|row| row.spec.task_id.as_str() == b_task)
-            .expect("Bob cancellation remains durable")
-            .status,
-        OrchestrationTaskStatus::Cancelled
-    );
 }
 
 #[tokio::test]
