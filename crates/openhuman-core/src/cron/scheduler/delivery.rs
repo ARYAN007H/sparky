@@ -5,6 +5,8 @@ use super::agent_run::EMPTY_AGENT_OUTPUT;
 use super::failure_classification::AGENT_JOB_USER_FAILURE_MESSAGE;
 use super::origin_delivery::{deliver_to_origin, is_suppressed_output};
 use crate::config::Config;
+use crate::core::bus::BUS;
+use crate::core::events::DomainEvent;
 use anyhow::Result;
 use chrono::Utc;
 use {
@@ -226,7 +228,7 @@ pub(super) async fn deliver_run(
                 .ok_or_else(|| anyhow::anyhow!("delivery.to is required for announce mode"))?;
 
             let idempotency_key = super::origin_delivery::origin_request_id(&job.id, run_id);
-            match super::channel_bridge::send_to_channel(
+            match crate::cron::channel_bridge::send_to_channel(
                 channel,
                 target,
                 None,

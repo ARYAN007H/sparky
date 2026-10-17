@@ -728,6 +728,6 @@ async fn run_job_now_keeps_best_effort_failure_successful_and_records_failed_del
     );
     let runs = cron::list_runs(&config, &job.id, 10).unwrap();
     assert_eq!(runs.len(), 1);
-    assert_eq!(runs[0].status, "success");
+    assert_eq!(runs[0].status, "ok");
     assert_eq!(runs[0].delivery_status, Some(DeliveryStatus::Failed));
 }
