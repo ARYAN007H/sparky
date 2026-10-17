@@ -325,7 +325,7 @@ pub(super) fn migration_start(ctx: DispatchCtx, params: Map<String, Value>) -> C
     rpc::<layout_migration::StartParams, _>(
         ctx,
         params,
-        |ctx, config, params: layout_migration::StartParams| async move {
+        |ctx: DispatchCtx, config: Config, params: layout_migration::StartParams| async move {
             let started = layout_migration::start(
                 &ctx,
                 config.clone(),
