@@ -3,6 +3,7 @@ use crate::agent::subagent_host::types::SubagentCheckpointData;
 
 pub(in crate::agent::subagent_host) struct OpenHumanPersistence {
     checkpoint_dir: std::path::PathBuf,
+    file_store: tinyagents_orchestration::subagent::FileSubagentPersistence,
     host_outcome: Arc<Mutex<HashMap<SubagentTaskKey, SubagentRunOutcome>>>,
 }
 
@@ -25,6 +26,9 @@ enum CompatibleTerminalRecord {
 impl OpenHumanPersistence {
     pub(in crate::agent::subagent_host) fn new(checkpoint_dir: std::path::PathBuf) -> Self {
         Self {
+            file_store: tinyagents_orchestration::subagent::FileSubagentPersistence::new(
+                checkpoint_dir.clone(),
+            ),
             checkpoint_dir,
             host_outcome: Arc::new(Mutex::new(HashMap::new())),
         }
@@ -82,9 +86,9 @@ impl OpenHumanPersistence {
     }
 
     pub(super) fn pause_path(&self, key: &SubagentTaskKey) -> std::path::PathBuf {
-        self.checkpoint_dir
-            .join("lifecycle")
-            .join(format!("{}.pause.json", Self::key_component(key)))
+        self.file_store
+            .pause_path(key)
+            .expect("valid subagent pause key has a persistence path")
     }
 
     fn terminal_path(&self, key: &SubagentTaskKey) -> std::path::PathBuf {
