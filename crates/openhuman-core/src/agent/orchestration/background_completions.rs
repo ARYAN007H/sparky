@@ -33,22 +33,22 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Duration;
 
-use tinyagents_tasks::{
-    CompletionRecord, CompletionResult, CompletionRouter, CompletionState, CompletionStatus,
-    CompletionStore, DriverCompletionStore, InMemoryCompletionStore, NotifyMode, TombstoneOutcome,
-    DEFAULT_MAX_ATTEMPTS,
-};
 use tinyagents_orchestration::subagent::{
     DetachedCompletionTarget, DetachedSubagentStatus, record_detached_completion,
 };
+use tinyagents_tasks::{
+    CompletionRecord, CompletionResult, CompletionRouter, CompletionState, CompletionStatus,
+    CompletionStore, DEFAULT_MAX_ATTEMPTS, DriverCompletionStore, InMemoryCompletionStore,
+    NotifyMode, TombstoneOutcome,
+};
 
 use super::completion_notice::BackgroundCompletionFormatter;
-pub(crate) use super::completion_notice::{BackgroundAgentOutcome, AWAITING_INPUT_LABEL};
+pub(crate) use super::completion_notice::{AWAITING_INPUT_LABEL, BackgroundAgentOutcome};
+pub(crate) use super::completion_target::CompletionTarget;
 #[cfg(test)]
 pub(crate) use super::completion_target::tests::{
-    forget_workspace_for_test, install_store_for_test, TestWorkspace,
+    TestWorkspace, forget_workspace_for_test, install_store_for_test,
 };
-pub(crate) use super::completion_target::CompletionTarget;
 use super::completion_target::{awaiting_input_record_id, awaiting_input_record_prefix};
 pub(crate) use super::completion_target::{claim_recovery, forget_recovery};
 

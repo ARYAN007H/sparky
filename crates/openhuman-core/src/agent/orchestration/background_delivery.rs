@@ -30,22 +30,18 @@
 use crate::core::runtime::DispatchCtx;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, OnceLock};
-#[cfg(test)]
-use std::{
-    collections::HashSet,
-    future::Future,
-    sync::Mutex,
-};
 use std::time::Duration;
+#[cfg(test)]
+use std::{collections::HashSet, future::Future, sync::Mutex};
 
 use async_trait::async_trait;
 use serde_json::json;
+#[cfg(test)]
+use tinyagents_tasks::CompletionRouter;
 use tinyagents_tasks::{
     CompletionDelivery, CompletionDeliveryConfig, CompletionRecord, DeliveryOutcome,
     DeliveryTarget, ThreadDeliveryLeases,
 };
-#[cfg(test)]
-use tinyagents_tasks::CompletionRouter;
 
 use crate::core::bus::BUS;
 use crate::core::events::DomainEvent;

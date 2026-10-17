@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 use tinyagents_tasks::CompletionRouter;
 
-use super::{router_for_workspace, state, SESSION_THREADS_CAP};
+use super::{SESSION_THREADS_CAP, router_for_workspace, state};
 use crate::core::runtime::DispatchCtx;
 
 /// The key of a thread or session id in `HostState`'s maps: per profile of
