@@ -124,7 +124,6 @@ async fn an_existing_module_record_is_never_overwritten() {
 async fn a_missing_file_imports_nothing_and_writes_no_marker() {
     let dir = tempfile::tempdir().unwrap();
     let scoped = scoped();
-    let docs = std::sync::Arc::clone(scoped.documents());
     assert_eq!(
         import_into(&scoped, dir.path()).await.unwrap(),
         Outcome::NoSource
@@ -143,7 +142,6 @@ async fn a_corrupt_file_fails_without_a_marker_and_is_retried_once_repaired() {
     std::fs::create_dir_all(path.parent().unwrap()).unwrap();
     std::fs::write(&path, b"{ not json").unwrap();
     let scoped = scoped();
-    let docs = std::sync::Arc::clone(scoped.documents());
     assert!(import_into(&scoped, dir.path()).await.is_err());
 
     write_legacy(dir.path(), &legacy_state());
@@ -161,7 +159,6 @@ async fn records_whose_key_does_not_match_their_id_are_skipped() {
         &json!({"pending": {"wrong-key": entry("p1", 1)}}),
     );
     let scoped = scoped();
-    let docs = std::sync::Arc::clone(scoped.documents());
     assert_eq!(
         import_into(&scoped, dir.path()).await.unwrap(),
         Outcome::Imported {
