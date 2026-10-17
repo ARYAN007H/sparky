@@ -97,7 +97,10 @@ pub async fn maintain_once(
     }
     let registry = registry_with_retention(retention_days)?;
     let budget = MaintenanceBudget::unlimited();
-    let report = if backend.capabilities().contains(Capability::ScopeEnumeration) {
+    let report = if backend
+        .capabilities()
+        .contains(Capability::ScopeEnumeration)
+    {
         registry
             .maintain_all(backend.as_ref(), now_ms, budget)
             .await?
@@ -121,7 +124,10 @@ pub async fn maintain_once(
 /// `local` plus every scope the backend can list.
 async fn scopes(backend: &Arc<dyn StorageBackend>) -> Vec<Scope> {
     let mut scopes = vec![Scope::local()];
-    if backend.capabilities().contains(Capability::ScopeEnumeration) {
+    if backend
+        .capabilities()
+        .contains(Capability::ScopeEnumeration)
+    {
         if let Ok(found) = backend.scopes("").await {
             for scope in found {
                 if scope.parsed().is_ok() && !scope.is_cluster() && !scopes.contains(&scope) {
@@ -180,7 +186,11 @@ pub async fn backfill_scope(
         }
     }
     migrations.mark_done(BACKFILL_OWNER, BACKFILL_STEP).await?;
-    tracing::info!(scope = scope.as_str(), sealed, "{LOG} journal seal backfill done");
+    tracing::info!(
+        scope = scope.as_str(),
+        sealed,
+        "{LOG} journal seal backfill done"
+    );
     Ok(sealed)
 }
 
