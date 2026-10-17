@@ -356,8 +356,40 @@ async fn refreshing_binding_config_updates_existing_flow_subscriber() {
     assert_eq!(seen_rx.recv().await, Some(refreshed.action_dir));
 }
 
-#[test]
-fn triggered_run_guard_retains_long_lived_ids_past_1024_runs() {
+#[tokio::test]
+async fn triggered_run_guard_keeps_a_long_lived_run_deduplicated_past_1024_starts() {
+    use crate::core::events::DomainEvent;
+    use tinybus::EventHandler;
+    use tokio::sync::mpsc;
+
+    enum Seen {
+        Trigger(String),
+        Barrier,
+    }
+    struct Events(mpsc::UnboundedSender<Seen>);
+    #[async_trait]
+    impl EventHandler<DomainEvent> for Events {
+        fn name(&self) -> &str {
+            "test::cron::trigger_guard_overflow"
+        }
+        async fn handle(&self, event: &DomainEvent) {
+            match event {
+                DomainEvent::CronJobTriggered { job_id, .. } => {
+                    let _ = self.0.send(Seen::Trigger(job_id.clone()));
+                }
+                DomainEvent::SystemStartup { component } if component == "issue57-overflow-barrier" => {
+                    let _ = self.0.send(Seen::Barrier);
+                }
+                _ => {}
+            }
+        }
+    }
+
+    crate::core::bus::init().await.unwrap();
+    let (events_tx, mut events_rx) = mpsc::unbounded_channel();
+    let _subscription = crate::core::bus::BUS
+        .subscribe(Arc::new(Events(events_tx)))
+        .unwrap();
     let tmp = TempDir::new().unwrap();
     let config = config(&tmp);
     let binding = Binding::new(
@@ -393,15 +425,38 @@ fn triggered_run_guard_retains_long_lived_ids_past_1024_runs() {
         last_output: None,
         origin: None,
     };
-    for index in 0..1025 {
-        binding.publish_triggered_once(&job, &format!("long-lived-run-{index}"));
-    }
-
-    let before = binding.triggered_runs.lock().unwrap().len();
-    assert_eq!(before, 1025);
     binding.publish_triggered_once(&job, "long-lived-run-0");
-    let after = binding.triggered_runs.lock().unwrap().len();
-    assert_eq!(after, before, "an active run must remain deduplicated");
+    assert!(matches!(
+        tokio::time::timeout(std::time::Duration::from_secs(2), events_rx.recv())
+            .await
+            .expect("first trigger is delivered")
+            .expect("subscriber remains open"),
+        Seen::Trigger(job_id) if job_id == job.id
+    ));
+    for index in 1..=1024 {
+        let mut other_job = job.clone();
+        other_job.id = format!("overflow-job-{index}");
+        binding.publish_triggered_once(&other_job, &format!("long-lived-run-{index}"));
+        assert!(matches!(
+            tokio::time::timeout(std::time::Duration::from_secs(2), events_rx.recv())
+                .await
+                .expect("overflow trigger is delivered")
+                .expect("subscriber remains open"),
+            Seen::Trigger(job_id) if job_id == other_job.id
+        ));
+    }
+    binding.publish_triggered_once(&job, "long-lived-run-0");
+    crate::core::bus::BUS.publish(DomainEvent::SystemStartup {
+        component: "issue57-overflow-barrier".into(),
+    });
+    let after_retry = tokio::time::timeout(std::time::Duration::from_secs(2), events_rx.recv())
+        .await
+        .expect("retry and barrier events drain")
+        .expect("subscriber remains open");
+    assert!(
+        matches!(after_retry, Seen::Barrier),
+        "a long-lived run retry must not queue another Triggered before the barrier"
+    );
 }
 
 #[cfg(feature = "flows")]
