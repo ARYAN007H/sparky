@@ -83,7 +83,7 @@ pub(super) struct RouterScope {
 
 pub(super) fn router_scope_for(ctx: &DispatchCtx, workspace_dir: &Path) -> RouterScope {
     let profile = crate::core::runtime::tenant::isolated_unless_tenant(
-        ctx.tenant(),
+        DispatchCtx::ambient().tenant(),
         "background_completions",
     )
     .profile_only();
