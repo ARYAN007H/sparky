@@ -170,9 +170,10 @@ async fn cancelled_waiting_caller_keeps_manual_run_callback_served_until_complet
             if let DomainEvent::CronJobCompleted {
                 job_id, success, ..
             } = event
-                && job_id == &self.job_id
             {
-                let _ = self.tx.send(*success);
+                if job_id == &self.job_id {
+                    let _ = self.tx.send(*success);
+                }
             }
         }
     }
