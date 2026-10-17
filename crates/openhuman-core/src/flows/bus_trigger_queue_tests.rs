@@ -41,7 +41,6 @@ async fn schedule_tick_is_coalesced_while_a_trigger_run_is_active() {
     );
 }
 
-
 #[tokio::test]
 async fn app_event_runs_queue_fifo_per_tenant_while_other_tenants_progress() {
     use crate::core::runtime::{ContextOverlay, CoreContext, DispatchCtx, DomainSet};

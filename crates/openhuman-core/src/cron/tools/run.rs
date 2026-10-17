@@ -131,12 +131,7 @@ impl Tool for CronRunTool {
             Some(delivery_status),
         );
         let _ = cron::record_last_run(&self.config, &job.id, finished_at, success, &output);
-        crate::cron::scheduler::run_delivery::publish_completion(
-            &dispatch,
-            &job,
-            success,
-            &output,
-        );
+        crate::cron::scheduler::run_delivery::publish_completion(&dispatch, &job, success, &output);
 
         let payload = json!({
             "job_id": job.id,

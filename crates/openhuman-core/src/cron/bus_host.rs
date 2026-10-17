@@ -25,8 +25,8 @@
 //! thread that delivered the callback: an agent turn is deep and long, and the
 //! bus runtime is for serving. The binding's context is re-entered around it.
 
-use std::future::Future;
 use std::collections::HashSet;
+use std::future::Future;
 use std::sync::{Arc, RwLock, Weak};
 
 use tinybus::Result as BusResult;
@@ -171,12 +171,9 @@ impl Binding {
     /// holds the per-flow in-flight dedupe across ticks.
     #[cfg(feature = "flows")]
     pub(crate) fn flows(&self) -> &crate::flows::bus::FlowTriggerSubscriber {
-        self.flows
-            .get_or_init(|| {
-                crate::flows::bus::FlowTriggerSubscriber::with_config_source(
-                    Arc::clone(&self.config),
-                )
-            })
+        self.flows.get_or_init(|| {
+            crate::flows::bus::FlowTriggerSubscriber::with_config_source(Arc::clone(&self.config))
+        })
     }
 }
 

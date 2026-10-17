@@ -96,14 +96,18 @@ async fn run_job_now_pairs_trigger_and_completion_after_delivery() {
     struct Events(String, mpsc::UnboundedSender<&'static str>);
     #[async_trait]
     impl EventHandler<DomainEvent> for Events {
-        fn name(&self) -> &str { "test::cron::run_now_event_pair" }
+        fn name(&self) -> &str {
+            "test::cron::run_now_event_pair"
+        }
         async fn handle(&self, event: &DomainEvent) {
             let (job_id, label) = match event {
                 DomainEvent::CronJobTriggered { job_id, .. } => (job_id, "triggered"),
                 DomainEvent::CronJobCompleted { job_id, .. } => (job_id, "completed"),
                 _ => return,
             };
-            if job_id == &self.0 { let _ = self.1.send(label); }
+            if job_id == &self.0 {
+                let _ = self.1.send(label);
+            }
         }
     }
 
@@ -111,10 +115,8 @@ async fn run_job_now_pairs_trigger_and_completion_after_delivery() {
     let tmp = TempDir::new().unwrap();
     let config = tests::test_config(&tmp);
     let name = "ops-run-now-event-pair";
-    let _handler = crate::cron::system_job_handlers::register(
-        name,
-        Arc::new(|_| Box::pin(async { Ok(()) })),
-    );
+    let _handler =
+        crate::cron::system_job_handlers::register(name, Arc::new(|_| Box::pin(async { Ok(()) })));
     let job = tests::single_flight_system_job(&config, name);
     let (tx, mut rx) = mpsc::unbounded_channel();
     let _subscription = crate::core::bus::BUS
@@ -134,10 +136,14 @@ async fn run_job_now_pairs_trigger_and_completion_after_delivery() {
         loop {
             let event = rx.recv().await.expect("cron event subscriber remains open");
             seen.push(event);
-            if event == "completed" { break; }
+            if event == "completed" {
+                break;
+            }
         }
         seen
-    }).await.expect("Run Now completion event arrives");
+    })
+    .await
+    .expect("Run Now completion event arrives");
     assert_eq!(pair, vec!["triggered", "completed"]);
     let runs = cron::list_runs(&config, &job.id, 10).unwrap();
     assert_eq!(runs[0].delivery_status, Some(DeliveryStatus::NotRequested));

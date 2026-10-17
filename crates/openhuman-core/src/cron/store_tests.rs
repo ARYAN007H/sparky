@@ -31,7 +31,11 @@ fn remove_job_does_not_write_to_stdout() {
         println!("BEGIN_CRON_REMOVE_CAPTURE");
         use std::io::Write;
         std::io::stdout().flush().unwrap();
-        remove_job(&config, &std::env::var("OPENHUMAN_CRON_REMOVE_JOB").unwrap()).unwrap();
+        remove_job(
+            &config,
+            &std::env::var("OPENHUMAN_CRON_REMOVE_JOB").unwrap(),
+        )
+        .unwrap();
         println!("END_CRON_REMOVE_CAPTURE");
         std::io::stdout().flush().unwrap();
         return;
@@ -41,12 +45,20 @@ fn remove_job_does_not_write_to_stdout() {
     let config = test_config(&tmp);
     let job = add_job(&config, "*/5 * * * *", "echo remove").unwrap();
     let output = Command::new(std::env::current_exe().unwrap())
-        .args(["--exact", "cron::store::tests::remove_job_does_not_write_to_stdout", "--nocapture"])
+        .args([
+            "--exact",
+            "cron::store::tests::remove_job_does_not_write_to_stdout",
+            "--nocapture",
+        ])
         .env(CHILD, &config.workspace_dir)
         .env("OPENHUMAN_CRON_REMOVE_JOB", &job.id)
         .output()
         .unwrap();
-    assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
     let stdout = String::from_utf8_lossy(&output.stdout);
     let captured = stdout.split("BEGIN_CRON_REMOVE_CAPTURE\n").nth(1).unwrap();
     let captured = captured.split("END_CRON_REMOVE_CAPTURE\n").next().unwrap();

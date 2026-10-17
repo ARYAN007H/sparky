@@ -206,7 +206,11 @@ impl FlowTriggerSubscriber {
             + 'static,
         Fut: Future<Output = ()> + Send + 'static,
     {
-        Self::with_executor(Arc::new(RwLock::new((*config).clone())), queue_capacity, runner)
+        Self::with_executor(
+            Arc::new(RwLock::new((*config).clone())),
+            queue_capacity,
+            runner,
+        )
     }
 
     #[cfg(test)]

@@ -334,13 +334,23 @@ async fn refreshing_binding_config_updates_existing_flow_subscriber() {
             }
         },
     );
-    binding.flows.set(subscriber).ok().expect("subscriber initialized once");
+    binding
+        .flows
+        .set(subscriber)
+        .ok()
+        .expect("subscriber initialized once");
 
     let ctx = DispatchCtx::ambient();
-    binding.flows().dispatch_test_app_event(&ctx, "refresh-flow", serde_json::json!({"event": "first"})).await;
+    binding
+        .flows()
+        .dispatch_test_app_event(&ctx, "refresh-flow", serde_json::json!({"event": "first"}))
+        .await;
     started_rx.await.unwrap();
     binding.set_config(&refreshed);
-    binding.flows().dispatch_test_app_event(&ctx, "refresh-flow", serde_json::json!({"event": "second"})).await;
+    binding
+        .flows()
+        .dispatch_test_app_event(&ctx, "refresh-flow", serde_json::json!({"event": "second"}))
+        .await;
     release_tx.send(()).unwrap();
     assert_eq!(seen_rx.recv().await, Some(initial.action_dir.clone()));
     assert_eq!(seen_rx.recv().await, Some(refreshed.action_dir));
@@ -350,20 +360,24 @@ async fn refreshing_binding_config_updates_existing_flow_subscriber() {
 #[tokio::test]
 async fn a_scheduled_flow_run_publishes_a_trigger_before_completion() {
     use crate::core::events::DomainEvent;
-    use tokio::sync::mpsc;
     use tinybus::EventHandler;
+    use tokio::sync::mpsc;
 
     struct CronEvents(String, mpsc::UnboundedSender<&'static str>);
     #[async_trait]
     impl EventHandler<DomainEvent> for CronEvents {
-        fn name(&self) -> &str { "test::cron::flow_event_pair" }
+        fn name(&self) -> &str {
+            "test::cron::flow_event_pair"
+        }
         async fn handle(&self, event: &DomainEvent) {
             let (job_id, name) = match event {
                 DomainEvent::CronJobTriggered { job_id, .. } => (job_id, "triggered"),
                 DomainEvent::CronJobCompleted { job_id, .. } => (job_id, "completed"),
                 _ => return,
             };
-            if job_id == &self.0 { let _ = self.1.send(name); }
+            if job_id == &self.0 {
+                let _ = self.1.send(name);
+            }
         }
     }
 
@@ -374,37 +388,69 @@ async fn a_scheduled_flow_run_publishes_a_trigger_before_completion() {
     let job = crate::cron::add_flow_schedule_job(
         &config,
         "flow-event-pair",
-        Schedule::Every { every_ms: 3_600_000 },
-    ).unwrap();
+        Schedule::Every {
+            every_ms: 3_600_000,
+        },
+    )
+    .unwrap();
     let (events_tx, mut events_rx) = mpsc::unbounded_channel();
     let _subscription = crate::core::bus::BUS
         .subscribe(Arc::new(CronEvents(job.id.clone(), events_tx)))
         .unwrap();
     let run_id = format!("flow-event-{}", uuid::Uuid::new_v4());
-    let _: Attempt = proxy.call(callbacks::EXECUTE, (&job, &run_id)).await.unwrap();
-    let _: Attempt = proxy.call(callbacks::SCHEDULE_TRIGGER, ("flow-event-pair", &run_id)).await.unwrap();
-    let _: Attempt = proxy.call(callbacks::SCHEDULE_TRIGGER, ("flow-event-pair", &run_id)).await.unwrap();
-    let _: String = proxy.call(callbacks::DELIVER, (&job, &run_id, &Attempt {
-        success: true,
-        output: "done".into(),
-        retryable: false,
-    })).await.unwrap();
+    let _: Attempt = proxy
+        .call(callbacks::EXECUTE, (&job, &run_id))
+        .await
+        .unwrap();
+    let _: Attempt = proxy
+        .call(callbacks::SCHEDULE_TRIGGER, ("flow-event-pair", &run_id))
+        .await
+        .unwrap();
+    let _: Attempt = proxy
+        .call(callbacks::SCHEDULE_TRIGGER, ("flow-event-pair", &run_id))
+        .await
+        .unwrap();
+    let _: String = proxy
+        .call(
+            callbacks::DELIVER,
+            (
+                &job,
+                &run_id,
+                &Attempt {
+                    success: true,
+                    output: "done".into(),
+                    retryable: false,
+                },
+            ),
+        )
+        .await
+        .unwrap();
     let completion = tokio::time::timeout(std::time::Duration::from_secs(2), async {
         let mut seen = Vec::new();
         loop {
-            let event = events_rx.recv().await.expect("event subscriber remains open");
+            let event = events_rx
+                .recv()
+                .await
+                .expect("event subscriber remains open");
             seen.push(event);
-            if event == "completed" { break; }
+            if event == "completed" {
+                break;
+            }
         }
         seen
-    }).await.expect("completion event arrives");
+    })
+    .await
+    .expect("completion event arrives");
     assert_eq!(completion, vec!["triggered", "completed"]);
 
     let refused_job = crate::cron::add_flow_schedule_job(
         &config,
         "flow-event-refused",
-        Schedule::Every { every_ms: 3_600_000 },
-    ).unwrap();
+        Schedule::Every {
+            every_ms: 3_600_000,
+        },
+    )
+    .unwrap();
     let (_refusing_host, refusing_proxy) = host(&config, true).await;
     let (refused_tx, mut refused_rx) = mpsc::unbounded_channel();
     let _refused_subscription = crate::core::bus::BUS
@@ -412,31 +458,47 @@ async fn a_scheduled_flow_run_publishes_a_trigger_before_completion() {
         .unwrap();
     let refused_run = format!("flow-refused-{}", uuid::Uuid::new_v4());
     let refused_attempt: Attempt = refusing_proxy
-        .call(callbacks::SCHEDULE_TRIGGER, ("flow-event-refused", &refused_run))
+        .call(
+            callbacks::SCHEDULE_TRIGGER,
+            ("flow-event-refused", &refused_run),
+        )
         .await
         .unwrap();
     assert!(!refused_attempt.success);
     let _: String = refusing_proxy
-        .call(callbacks::DELIVER, (&refused_job, &refused_run, &refused_attempt))
+        .call(
+            callbacks::DELIVER,
+            (&refused_job, &refused_run, &refused_attempt),
+        )
         .await
         .unwrap();
     let refused_pair = tokio::time::timeout(std::time::Duration::from_secs(2), async {
         let mut seen = Vec::new();
         loop {
-            let event = refused_rx.recv().await.expect("refusal event subscriber remains open");
+            let event = refused_rx
+                .recv()
+                .await
+                .expect("refusal event subscriber remains open");
             seen.push(event);
-            if event == "completed" { break; }
+            if event == "completed" {
+                break;
+            }
         }
         seen
-    }).await.expect("refused run completion event arrives");
+    })
+    .await
+    .expect("refused run completion event arrives");
     assert_eq!(refused_pair, vec!["triggered", "completed"]);
 
     let (system_tx, mut system_rx) = mpsc::unbounded_channel();
     let system_job = crate::cron::system_jobs::ensure_system_job(
         &config,
         "issue57-event-pair",
-        Schedule::Every { every_ms: 3_600_000 },
-    ).unwrap();
+        Schedule::Every {
+            every_ms: 3_600_000,
+        },
+    )
+    .unwrap();
     let _system_handler = crate::cron::system_job_handlers::register(
         "issue57-event-pair",
         Arc::new(|_| Box::pin(async { Ok(()) })),
@@ -451,18 +513,28 @@ async fn a_scheduled_flow_run_publishes_a_trigger_before_completion() {
         .unwrap();
     assert!(system_attempt.success);
     let _: String = proxy
-        .call(callbacks::DELIVER, (&system_job, &system_run, &system_attempt))
+        .call(
+            callbacks::DELIVER,
+            (&system_job, &system_run, &system_attempt),
+        )
         .await
         .unwrap();
     let system_pair = tokio::time::timeout(std::time::Duration::from_secs(2), async {
         let mut seen = Vec::new();
         loop {
-            let event = system_rx.recv().await.expect("system event subscriber remains open");
+            let event = system_rx
+                .recv()
+                .await
+                .expect("system event subscriber remains open");
             seen.push(event);
-            if event == "completed" { break; }
+            if event == "completed" {
+                break;
+            }
         }
         seen
-    }).await.expect("system completion event arrives");
+    })
+    .await
+    .expect("system completion event arrives");
     assert_eq!(system_pair, vec!["triggered", "completed"]);
 }
 

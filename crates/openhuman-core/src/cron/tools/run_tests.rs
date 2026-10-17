@@ -86,14 +86,18 @@ async fn cron_run_tool_pairs_start_and_completion_without_requesting_delivery() 
     struct Events(String, mpsc::UnboundedSender<&'static str>);
     #[async_trait::async_trait]
     impl EventHandler<DomainEvent> for Events {
-        fn name(&self) -> &str { "test::cron::run_tool_event_pair" }
+        fn name(&self) -> &str {
+            "test::cron::run_tool_event_pair"
+        }
         async fn handle(&self, event: &DomainEvent) {
             let (job_id, label) = match event {
                 DomainEvent::CronJobTriggered { job_id, .. } => (job_id, "triggered"),
                 DomainEvent::CronJobCompleted { job_id, .. } => (job_id, "completed"),
                 _ => return,
             };
-            if job_id == &self.0 { let _ = self.1.send(label); }
+            if job_id == &self.0 {
+                let _ = self.1.send(label);
+            }
         }
     }
 
@@ -103,8 +107,11 @@ async fn cron_run_tool_pairs_start_and_completion_without_requesting_delivery() 
     let job = crate::cron::system_jobs::ensure_system_job(
         &cfg,
         "cron-run-tool-event-pair",
-        tinyflows_bus::schedule::types::Schedule::Every { every_ms: 3_600_000 },
-    ).unwrap();
+        tinyflows_bus::schedule::types::Schedule::Every {
+            every_ms: 3_600_000,
+        },
+    )
+    .unwrap();
     let _handler = crate::cron::system_job_handlers::register(
         "cron-run-tool-event-pair",
         Arc::new(|_| Box::pin(async { Ok(()) })),
@@ -124,13 +131,20 @@ async fn cron_run_tool_pairs_start_and_completion_without_requesting_delivery() 
         loop {
             let event = rx.recv().await.expect("cron event subscriber remains open");
             seen.push(event);
-            if event == "completed" { break; }
+            if event == "completed" {
+                break;
+            }
         }
         seen
-    }).await.expect("cron_run completion event arrives");
+    })
+    .await
+    .expect("cron_run completion event arrives");
     assert_eq!(pair, vec!["triggered", "completed"]);
     let runs = cron::list_runs(&cfg, &job.id, 10).unwrap();
-    assert_eq!(runs[0].delivery_status, Some(cron::DeliveryStatus::NotRequested));
+    assert_eq!(
+        runs[0].delivery_status,
+        Some(cron::DeliveryStatus::NotRequested)
+    );
 }
 
 // ── GHSA-f46p-6vf9-64mm: approval gate must fire for cron_run ────
