@@ -396,7 +396,10 @@ async fn invoke_driver_tool_with_request(
                     .unwrap_or_else(|| PathBuf::from(".openhuman/subagent_checkpoints"))
             }),
     );
-    let bundle = OpenHumanDriverBundle::new(checkpoint_dir)?;
+    let bundle = OpenHumanDriverBundle::with_in_flight(
+        checkpoint_dir.clone(),
+        shared_subagent_flight(&parent.data.dispatch_ctx(), &checkpoint_dir),
+    )?;
     let request_host = host_request.clone();
     let request_task_id = task_id.clone();
     let request_continuation = continuation;

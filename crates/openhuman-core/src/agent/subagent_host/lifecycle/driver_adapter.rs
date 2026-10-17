@@ -11,6 +11,16 @@ pub(crate) struct OpenHumanDriverBundle {
 
 impl OpenHumanDriverBundle {
     pub(crate) fn new(checkpoint_dir: PathBuf) -> Result<Self, SubagentRunError> {
+        Self::with_in_flight(
+            checkpoint_dir,
+            tinyagents_orchestration::subagent::SubagentInFlight::default(),
+        )
+    }
+
+    pub(crate) fn with_in_flight(
+        checkpoint_dir: PathBuf,
+        in_flight: tinyagents_orchestration::subagent::SubagentInFlight,
+    ) -> Result<Self, SubagentRunError> {
         let failures = Arc::new(Mutex::new(HashMap::new()));
         let host_outcome = Arc::new(Mutex::new(HashMap::new()));
         let configured_tool_result = Arc::new(Mutex::new(HashMap::new()));
@@ -36,7 +46,8 @@ impl OpenHumanDriverBundle {
                 executor: Some(executor),
                 persistence: Some(lifecycle_persistence),
             })
-            .map_err(map_lifecycle_error)?,
+            .map_err(map_lifecycle_error)?
+            .with_shared_in_flight(in_flight),
         );
         Ok(Self {
             driver,
