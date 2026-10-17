@@ -112,7 +112,9 @@ async fn a_takeover_fences_the_old_holders_writes_before_its_heartbeat_runs() {
         .unwrap();
 
     // Node A's next write is refused at once, and the profile is latched.
-    let refused = write(&a_storage, "u:alice/agent:default").await.unwrap_err();
+    let refused = write(&a_storage, "u:alice/agent:default")
+        .await
+        .unwrap_err();
     assert!(matches!(
         fence_error(&refused),
         Some(FenceError::Superseded { .. })

@@ -39,13 +39,21 @@ fn item(item: &Item) -> Value {
                 .flat_map(|index| index.fields.iter().cloned())
                 .collect::<Vec<_>>(),
         }),
-        Item::Stream { name, scope: class, .. } => {
+        Item::Stream {
+            name, scope: class, ..
+        } => {
             json!({ "kind": "stream", "name": name, "scope": scope(*class) })
         }
-        Item::Blobs { prefix, scope: class } => {
+        Item::Blobs {
+            prefix,
+            scope: class,
+        } => {
             json!({ "kind": "blobs", "name": prefix, "scope": scope(*class) })
         }
-        Item::Secrets { prefix, scope: class } => {
+        Item::Secrets {
+            prefix,
+            scope: class,
+        } => {
             json!({ "kind": "secrets", "name": prefix, "scope": scope(*class) })
         }
     }
@@ -68,5 +76,8 @@ fn main() {
             })
         })
         .collect();
-    println!("{}", serde_json::to_string_pretty(&json!({ "owners": owners })).unwrap());
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&json!({ "owners": owners })).unwrap()
+    );
 }

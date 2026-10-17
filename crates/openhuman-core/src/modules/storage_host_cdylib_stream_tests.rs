@@ -31,9 +31,7 @@ async fn a_blob_over_the_bus_frame_round_trips_through_a_peer_bound_stream() {
     let rig = rig("tinyjuice").await;
     // 20 MiB: over the 16 MiB frame no inline call could carry.
     let len = 20 * MIB;
-    let stored = rig
-        .member("StreamPut", ("juice/ccr/streamed", len))
-        .await;
+    let stored = rig.member("StreamPut", ("juice/ccr/streamed", len)).await;
     assert_eq!(stored["ok"]["len"], len, "{stored}");
     // It is in the module's own scope, byte for byte.
     let handle = rig.backend.for_scope(&rig.scope("tinyjuice")).unwrap();
@@ -76,9 +74,7 @@ async fn a_streamed_blob_is_still_bound_by_the_grant_and_the_length() {
     let _turn = TURN.lock().await;
     let rig = rig("tinyjuice").await;
     // Outside the CCR prefix: refused before anything is stored.
-    let outside = rig
-        .member("StreamPut", ("juice/other/x", 2 * MIB))
-        .await;
+    let outside = rig.member("StreamPut", ("juice/other/x", 2 * MIB)).await;
     assert!(outside.get("err").is_some(), "{outside}");
     let handle = rig.backend.for_scope(&rig.scope("tinyjuice")).unwrap();
     assert!(handle
@@ -93,9 +89,7 @@ async fn a_streamed_blob_is_still_bound_by_the_grant_and_the_length() {
         "{denied_get}"
     );
     // The module keeps working after a refusal.
-    let after = rig
-        .member("StreamPut", ("juice/ccr/after", 3 * MIB))
-        .await;
+    let after = rig.member("StreamPut", ("juice/ccr/after", 3 * MIB)).await;
     assert_eq!(after["ok"]["len"], 3 * MIB, "{after}");
 }
 
@@ -125,9 +119,7 @@ async fn an_inline_blob_no_frame_can_carry_fails_fast_instead_of_hanging() {
         .await
         .unwrap()
         .is_none());
-    let after: Value = rig
-        .member("PutBlob", ("juice/ccr/after", 2048usize))
-        .await;
+    let after: Value = rig.member("PutBlob", ("juice/ccr/after", 2048usize)).await;
     assert!(
         after.get("ok").is_some(),
         "the module keeps working: {after}"
@@ -249,10 +241,7 @@ async fn a_second_module_cannot_read_or_take_the_first_modules_streams() {
         .peer_proxy(0, "Blobs")
         .call(
             "PutStream",
-            (
-                json!({"key": "juice/ccr/hijacked", "len": MIB}),
-                reference,
-            ),
+            (json!({"key": "juice/ccr/hijacked", "len": MIB}), reference),
         )
         .await;
     assert!(

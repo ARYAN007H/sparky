@@ -71,10 +71,7 @@ pub(super) fn owner_of(module_id: &str) -> Option<&'static str> {
 
 /// Carries what a legacy-file importer just wrote into `module_id`'s scope
 /// (v1 names and shapes) forward to the owner's v2 schema.
-pub(super) async fn migrate_imported(
-    ctx: &crate::core::runtime::DispatchCtx,
-    module_id: &str,
-) {
+pub(super) async fn migrate_imported(ctx: &crate::core::runtime::DispatchCtx, module_id: &str) {
     let (Some(owner), Some(backend)) = (owner_of(module_id), crate::storage::installed()) else {
         return;
     };
