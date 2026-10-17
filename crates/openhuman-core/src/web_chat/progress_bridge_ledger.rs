@@ -35,36 +35,3 @@ pub(in crate::web_chat) fn ledger_upsert_telemetry(
     }
 }
 
-pub(in crate::web_chat) fn ledger_get_telemetry(
-    config: &crate::config::Config,
-    run_id: &str,
-) -> Option<tinyagents_session::run_ledger::RunTelemetry> {
-    let run_id_owned = run_id.to_string();
-    match with_ledger(&config.workspace_dir, |ledger| async move {
-        ledger.get_agent_run(&run_id_owned).await
-    }) {
-        Ok(Some(run)) => {
-            let telemetry = run.telemetry;
-            log::debug!(
-                "[run_ledger][web_channel] read telemetry run_id={} present={}",
-                run_id,
-                telemetry.is_some()
-            );
-            telemetry
-        }
-        Ok(None) => {
-            log::debug!(
-                "[run_ledger][web_channel] telemetry unavailable; run missing run_id={}",
-                run_id
-            );
-            None
-        }
-        Err(err) => {
-            log::warn!(
-                "[run_ledger][web_channel] failed to read telemetry run_id={} err={err}",
-                run_id
-            );
-            None
-        }
-    }
-}
