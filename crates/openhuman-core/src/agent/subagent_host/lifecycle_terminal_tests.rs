@@ -213,19 +213,19 @@ async fn shared_flights_are_partitioned_by_agent_and_workspace() {
     let alpha_ctx = crate::core::runtime::DispatchCtx::new(Arc::clone(&alpha));
     let beta_ctx = crate::core::runtime::DispatchCtx::new(beta);
 
-    let alpha_workspace_a = super::shared_subagent_flight(
+    let alpha_workspace_a = super::lifecycle::shared_subagent_flight(
         &alpha_ctx,
         std::path::Path::new("/workspace-a"),
     );
-    let alpha_workspace_b = super::shared_subagent_flight(
+    let alpha_workspace_b = super::lifecycle::shared_subagent_flight(
         &alpha_ctx,
         std::path::Path::new("/workspace-b"),
     );
-    let alpha_workspace_a_again = super::shared_subagent_flight(
+    let alpha_workspace_a_again = super::lifecycle::shared_subagent_flight(
         &alpha_ctx,
         std::path::Path::new("/workspace-a"),
     );
-    let beta_workspace_a = super::shared_subagent_flight(
+    let beta_workspace_a = super::lifecycle::shared_subagent_flight(
         &beta_ctx,
         std::path::Path::new("/workspace-a"),
     );
