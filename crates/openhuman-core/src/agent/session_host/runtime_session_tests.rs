@@ -24,11 +24,13 @@ async fn failed_session_terminal_finalizes_native_run_without_error_text() {
     let recorder = Arc::new(NativeTerminalRecorder::default());
     events.subscribe(recorder.clone());
     let sidecar = std::sync::Mutex::new(crate::agent::tinyagents::host::SessionTurnSidecar {
-        deferred_terminal: Some(crate::agent::tinyagents::turn_outcome::DeferredTurnTerminal {
-            run_id: run_id.clone(),
-            events: events.clone(),
-            journal: None,
-        }),
+        deferred_terminal: Some(
+            crate::agent::tinyagents::turn_outcome::DeferredTurnTerminal {
+                run_id: run_id.clone(),
+                events: events.clone(),
+                journal: None,
+            },
+        ),
         ..Default::default()
     });
 
@@ -67,19 +69,18 @@ async fn cancelled_session_terminal_records_cancelled_native_run() {
     let recorder = Arc::new(NativeTerminalRecorder::default());
     events.subscribe(recorder.clone());
     let sidecar = std::sync::Mutex::new(crate::agent::tinyagents::host::SessionTurnSidecar {
-        deferred_terminal: Some(crate::agent::tinyagents::turn_outcome::DeferredTurnTerminal {
-            run_id: run_id.clone(),
-            events: events.clone(),
-            journal: None,
-        }),
+        deferred_terminal: Some(
+            crate::agent::tinyagents::turn_outcome::DeferredTurnTerminal {
+                run_id: run_id.clone(),
+                events: events.clone(),
+                journal: None,
+            },
+        ),
         ..Default::default()
     });
 
-    super::finalize_deferred_terminal(
-        &sidecar,
-        &tinyagents_runtime::SessionTerminal::Cancelled,
-    )
-    .await;
+    super::finalize_deferred_terminal(&sidecar, &tinyagents_runtime::SessionTerminal::Cancelled)
+        .await;
 
     let recorded = recorder.0.lock().unwrap();
     assert!(matches!(
