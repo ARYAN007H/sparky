@@ -115,9 +115,10 @@ impl OpenHumanTurnPrelude {
                     .map(|spec| spec.name.clone()),
             );
         }
+        let agent_definition_name = surface.agent_definition_name.clone();
         crate::tools::toolpacks::strip_packed_from_visible(
             &mut surface.visible_tool_names,
-            &surface.agent_definition_name.clone(),
+            &agent_definition_name,
         );
         // OpenHuman decides which product-discovered tools stay searchable
         // under its configured discovery belt. TinyAgents owns the shared
@@ -132,9 +133,10 @@ impl OpenHumanTurnPrelude {
                 .visible_tool_names
                 .retain(|name| !deferred.contains(name));
             surface.deferred_tool_names = deferred;
+            let permanent_tool_names = surface.permanent_tool_names.clone();
             surface
                 .deferred_tool_names
-                .retain(|name| !surface.permanent_tool_names.contains(name));
+                .retain(|name| !permanent_tool_names.contains(name));
         }
         let mut specs = surface
             .durable_tool_specs

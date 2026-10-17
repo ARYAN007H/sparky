@@ -51,7 +51,7 @@ pub(super) struct OpenHumanSessionState {
     terminals: Vec<SessionTerminal>,
     pub(super) last_turn_hit_cap: bool,
     pub(super) last_turn_usage: Option<crate::agent::tinyagents::host::LastTurnUsage>,
-    pub(super) last_turn_iterations: u32,
+    pub(super) last_turn_iterations: usize,
     pub(super) context_middleware: Option<TurnContextMiddleware>,
     required_output: Option<tinyagents_harness::config::RequiredOutput>,
     pub(crate) pending_turn_overrides: super::types::TurnOverrides,

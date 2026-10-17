@@ -6,7 +6,7 @@ use super::super::types::OpenHumanSessionHost;
 impl OpenHumanSessionHost {
     /// Iterations from the latest durable receipt, used by the legacy
     /// `AgentTurnCompleted` projection after the session turn returns.
-    pub(crate) fn last_turn_iterations(&self) -> u32 {
+    pub(crate) fn last_turn_iterations(&self) -> usize {
         self.runtime_state
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
