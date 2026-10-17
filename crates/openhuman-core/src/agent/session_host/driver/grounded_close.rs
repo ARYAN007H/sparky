@@ -319,7 +319,10 @@ pub(super) async fn close_if_needed(
                 crate::agent::session_host::turn_checkpoint::CloseViolation::Unverified
             }
         };
-        crate::agent::session_host::turn_checkpoint::close_repair_instruction(&instruction, violation)
+        crate::agent::session_host::turn_checkpoint::close_repair_instruction(
+            &instruction,
+            violation,
+        )
     };
     let output = tinyagents_harness::close::grounded_close_with_options(
         &model_client,
