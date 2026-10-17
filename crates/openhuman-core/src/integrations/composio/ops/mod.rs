@@ -35,6 +35,7 @@ mod triggers;
 // ── Public re-exports (match original ops.rs public surface) ───────────────
 
 pub(crate) use connections::flow_connection_entries;
+#[cfg(test)]
 pub(crate) use connections::title_case_toolkit;
 pub use connections::{
     active_connection_ids, composio_authorize, composio_delete_connection,
