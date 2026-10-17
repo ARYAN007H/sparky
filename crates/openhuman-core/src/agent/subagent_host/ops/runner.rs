@@ -7,7 +7,6 @@
 //! (or the iteration budget is exhausted).
 
 use std::collections::HashSet;
-use std::sync::Arc;
 use std::time::Instant;
 
 use crate::agent::harness::fork_context::ParentExecutionContext;
