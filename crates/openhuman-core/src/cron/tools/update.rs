@@ -118,8 +118,9 @@ impl Tool for CronUpdateTool {
             }
         }
 
-        let origin = crate::agent::tinyagents::host::run_context::turn_origin_for_tool(tool_context)
-            .and_then(|origin| crate::cron::origin::current_job_origin(Some(&origin)));
+        let origin =
+            crate::agent::tinyagents::host::run_context::turn_origin_for_tool(tool_context)
+                .and_then(|origin| crate::cron::origin::current_job_origin(Some(&origin)));
         match cron::store::update_job_with_origin(&self.config, job_id, patch, origin) {
             Ok(job) => {
                 let mut tr = ToolResult::success(serde_json::to_string_pretty(&job)?);

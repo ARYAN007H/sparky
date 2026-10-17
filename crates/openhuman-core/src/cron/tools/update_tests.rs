@@ -53,7 +53,10 @@ fn authorized_channel_config(tmp: &TempDir) -> Arc<Config> {
     Arc::new(config)
 }
 
-fn channel_agent_job(config: &Config, origin: JobOrigin) -> tinyflows_bus::schedule::types::CronJob {
+fn channel_agent_job(
+    config: &Config,
+    origin: JobOrigin,
+) -> tinyflows_bus::schedule::types::CronJob {
     let mut spec = AgentJobSpec::new(Schedule::Every { every_ms: 300_000 }, "check inbox");
     spec.session_target = SessionTarget::Isolated;
     spec.delivery = Some(DeliveryConfig::default());
@@ -238,7 +241,9 @@ async fn trusted_current_channel_can_update_delivery_to_its_own_target() {
         .unwrap();
 
     assert!(!result.is_error, "{}", result.output());
-    assert_eq!(cron::get_job(&cfg, &job.id).unwrap().delivery.mode, "origin");
+    let saved = cron::get_job(&cfg, &job.id).unwrap();
+    assert_eq!(saved.delivery.mode, "origin");
+    assert_eq!(saved.origin, Some(channel_origin("42")));
 }
 
 #[tokio::test]
@@ -270,4 +275,27 @@ async fn trusted_current_channel_cannot_authorize_spoofed_origin_update_target()
     let saved = cron::get_job(&cfg, &job.id).unwrap();
     assert_eq!(saved.origin, Some(original_origin));
     assert_eq!(saved.delivery.mode, "none");
+}
+
+#[tokio::test]
+async fn clearing_origin_and_selecting_origin_delivery_is_rejected_without_persisting() {
+    let tmp = TempDir::new().unwrap();
+    let cfg = authorized_channel_config(&tmp);
+    let original_origin = channel_origin("42");
+    let job = channel_agent_job(&cfg, original_origin.clone());
+    let tool = CronUpdateTool::new(cfg.clone(), test_security(&cfg));
+
+    let result = tool
+        .execute(json!({
+            "job_id": job.id,
+            "patch": {"delivery":{"mode":"origin"}, "origin":null}
+        }))
+        .await
+        .unwrap();
+
+    assert!(result.is_error, "{}", result.output());
+    assert!(result.output().contains("origin"), "{}", result.output());
+    let saved = cron::get_job(&cfg, &job.id).unwrap();
+    assert_eq!(saved.delivery.mode, "none");
+    assert_eq!(saved.origin, Some(original_origin));
 }
