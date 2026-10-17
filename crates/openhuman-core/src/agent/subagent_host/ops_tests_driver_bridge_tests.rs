@@ -129,7 +129,7 @@ async fn independent_host_bundles_share_and_project_the_persisted_winner() {
             .with_thread("cross-bundle-thread"),
     );
     let task_key = SubagentTaskKey::from_context(&parent, "cross-bundle-task", None);
-    let flights = super::super::lifecycle::shared_subagent_flight(
+    let flights = super::super::super::lifecycle::shared_subagent_flight(
         &parent.data.dispatch_ctx(),
         &checkpoint_dir,
     );
@@ -137,22 +137,26 @@ async fn independent_host_bundles_share_and_project_the_persisted_winner() {
         .get(&task_key)
         .expect("leader reserves the shared task key");
 
-    let leader = tokio::spawn(
+    let leader_parent = parent.clone();
+    let leader = tokio::spawn(async move {
         crate::agent::subagent_host::OpenHumanSubagentHost::new(
             definition.clone(),
             options.clone(),
         )
-        .run(&parent, "produce a report".into()),
-    );
+        .run(&leader_parent, "produce a report".into())
+        .await
+    });
     tokio::time::timeout(std::time::Duration::from_secs(5), started_rx.recv())
         .await
         .expect("leader reaches the blocking child tool")
         .expect("blocking tool start notification");
 
-    let follower = tokio::spawn(
+    let follower_parent = parent.clone();
+    let follower = tokio::spawn(async move {
         crate::agent::subagent_host::OpenHumanSubagentHost::new(definition, options)
-            .run(&parent, "produce a report".into()),
-    );
+            .run(&follower_parent, "produce a report".into())
+            .await
+    });
     tokio::time::timeout(std::time::Duration::from_secs(5), async {
         while leader_entry.waiter_count() != 1 {
             tokio::task::yield_now().await;
