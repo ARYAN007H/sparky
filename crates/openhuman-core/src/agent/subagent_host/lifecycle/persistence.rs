@@ -429,51 +429,49 @@ impl OpenHumanPersistence {
             "options": checkpoint.options.clone(),
             "elapsed_ms": checkpoint.elapsed_ms,
         });
-        let mut outcome = SubagentOutcome {
-            task_id: checkpoint.task_id,
-            output: checkpoint.output,
-            history: checkpoint
-                .history
-                .iter()
-                .map(crate::agent::message_convert::chat_message_to_message)
-                .collect(),
-            status: SubagentOutcomeKind::AwaitingInput(SubagentPause {
-                reason: checkpoint.question,
-                resume,
-            }),
-            usage: UsageTotals {
-                calls: checkpoint.iterations as u64,
-                usage: Usage {
-                    input_tokens: checkpoint.usage.input_tokens,
-                    output_tokens: checkpoint.usage.output_tokens,
-                    total_tokens: checkpoint
-                        .usage
-                        .input_tokens
-                        .saturating_add(checkpoint.usage.output_tokens),
-                    cache_read_tokens: checkpoint.usage.cached_input_tokens,
-                    // An unknown cost crosses as no charge at all, never as $0.
-                    charged_amount: checkpoint
-                        .usage
-                        .cost()
-                        .usd()
-                        .map(|usd| ChargedAmount::usd_micros((usd * 1_000_000.0).round() as i64)),
-                    ..Usage::default()
+        let mut outcome =
+            SubagentOutcome {
+                task_id: checkpoint.task_id,
+                output: checkpoint.output,
+                history: checkpoint
+                    .history
+                    .iter()
+                    .map(crate::agent::message_convert::chat_message_to_message)
+                    .collect(),
+                status: SubagentOutcomeKind::AwaitingInput(SubagentPause {
+                    reason: checkpoint.question,
+                    resume,
+                }),
+                usage: UsageTotals {
+                    calls: checkpoint.iterations as u64,
+                    usage: Usage {
+                        input_tokens: checkpoint.usage.input_tokens,
+                        output_tokens: checkpoint.usage.output_tokens,
+                        total_tokens: checkpoint
+                            .usage
+                            .input_tokens
+                            .saturating_add(checkpoint.usage.output_tokens),
+                        cache_read_tokens: checkpoint.usage.cached_input_tokens,
+                        // An unknown cost crosses as no charge at all, never as $0.
+                        charged_amount: checkpoint.usage.cost().usd().map(|usd| {
+                            ChargedAmount::usd_micros((usd * 1_000_000.0).round() as i64)
+                        }),
+                        ..Usage::default()
+                    },
                 },
-            },
-            artifacts: checkpoint
-                .artifact_paths
-                .into_iter()
-                .map(|id| ArtifactReference {
-                    id,
-                    ..ArtifactReference::default()
-                })
-                .collect(),
-            ..SubagentOutcome::cancelled(String::new())
-        };
-        outcome.extensions.insert(
-            "openhuman_checkpoint".into(),
-            host_checkpoint,
-        );
+                artifacts: checkpoint
+                    .artifact_paths
+                    .into_iter()
+                    .map(|id| ArtifactReference {
+                        id,
+                        ..ArtifactReference::default()
+                    })
+                    .collect(),
+                ..SubagentOutcome::cancelled(String::new())
+            };
+        outcome
+            .extensions
+            .insert("openhuman_checkpoint".into(), host_checkpoint);
         outcome
     }
 
@@ -563,11 +561,12 @@ impl tinyagents_orchestration::subagent::SubagentPersistence for OpenHumanPersis
         &self,
         key: &SubagentTaskKey,
     ) -> Result<Option<SubagentOutcome>, SubagentError> {
-        if let Some(outcome) = tinyagents_orchestration::subagent::SubagentPersistence::load_terminal(
-            &self.file_store,
-            key,
-        )
-        .await?
+        if let Some(outcome) =
+            tinyagents_orchestration::subagent::SubagentPersistence::load_terminal(
+                &self.file_store,
+                key,
+            )
+            .await?
         {
             return Ok(Some(outcome));
         }
@@ -577,11 +576,9 @@ impl tinyagents_orchestration::subagent::SubagentPersistence for OpenHumanPersis
         if self.load_terminal(key).await?.is_some() {
             return Ok(None);
         }
-        if let Some(resume) = tinyagents_orchestration::subagent::SubagentPersistence::load(
-            &self.file_store,
-            key,
-        )
-        .await?
+        if let Some(resume) =
+            tinyagents_orchestration::subagent::SubagentPersistence::load(&self.file_store, key)
+                .await?
         {
             return Ok(Some(resume));
         }
