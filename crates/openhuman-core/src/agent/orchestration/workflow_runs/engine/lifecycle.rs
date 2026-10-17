@@ -223,7 +223,9 @@ pub async fn start_workflow_run(
         || !workflow_supervisor().is_current(&handle)
     {
         let _ = workflow_supervisor().stop_generation(&handle);
-        return Err(anyhow!("workflow run {run_id} was interrupted before its drive started"));
+        return Err(anyhow!(
+            "workflow run {run_id} was interrupted before its drive started"
+        ));
     }
     let _ = start_gate.send(());
 
@@ -325,7 +327,8 @@ pub async fn resume_workflow_run(
 
     // Register the successor before the durable transition so the prior
     // generation cannot project a stale failure into the resumed row.
-    let (handle, start_gate) = schedule_workflow_drive(ctx, id.to_string(), definition.clone(), true);
+    let (handle, start_gate) =
+        schedule_workflow_drive(ctx, id.to_string(), definition.clone(), true);
     let resumed = compare_and_swap_workflow_run_lifecycle(
         config,
         WorkflowRunUpsert {
@@ -346,6 +349,20 @@ pub async fn resume_workflow_run(
     let resumed = match resumed {
         Ok(Some(resumed)) => resumed,
         Ok(None) => {
+            // Another resume may have committed the same Running transition
+            // after this generation replaced it. In that case this is the
+            // only current generation and can drive the winner's row. A stop
+            // or any other transition leaves a non-Running row and cancels
+            // this exact generation instead.
+            let current = get_workflow_run(config, id)?;
+            if workflow_supervisor().is_current(&handle)
+                && current
+                    .as_ref()
+                    .is_some_and(|current| current.status == WorkflowRunStatus::Running)
+            {
+                let _ = start_gate.send(());
+                return Ok(current.expect("running row was checked above"));
+            }
             let _ = workflow_supervisor().stop_generation(&handle);
             return Err(anyhow!(
                 "workflow run {id} changed while resume was being applied; reload and retry"
@@ -356,11 +373,19 @@ pub async fn resume_workflow_run(
             return Err(error);
         }
     };
-    let still_running = get_workflow_run(config, id)?
-        .is_some_and(|current| current.status == WorkflowRunStatus::Running);
+    let current = match get_workflow_run(config, id) {
+        Ok(current) => current,
+        Err(error) => {
+            let _ = workflow_supervisor().stop_generation(&handle);
+            return Err(error);
+        }
+    };
+    let still_running = current.is_some_and(|current| current.status == WorkflowRunStatus::Running);
     if !still_running || !workflow_supervisor().is_current(&handle) {
         let _ = workflow_supervisor().stop_generation(&handle);
-        return Err(anyhow!("workflow run {id} changed before its drive started"));
+        return Err(anyhow!(
+            "workflow run {id} changed before its drive started"
+        ));
     }
     let _ = start_gate.send(());
 
