@@ -7,14 +7,11 @@ use std::sync::Arc;
 use tinyflows_bus::schedule::types::CronRun;
 use tinyflows_bus::schedule::CronJob;
 
-fn run<T: Send + 'static>(
+fn run<T: DeserializeOwned + Send + 'static>(
     backend: &Arc<dyn StorageBackend>,
     scope: &Scope,
     operation: StoreOperation,
-) -> Result<T>
-where
-    T: DeserializeOwned,
-{
+) -> Result<T> {
     let config = Config::default();
     let scope = DocScope::on_backend(&config, Arc::clone(backend), scope.clone());
     crate::storage::block_on_anyhow(async move { store_in(&config, &scope, operation).await })
