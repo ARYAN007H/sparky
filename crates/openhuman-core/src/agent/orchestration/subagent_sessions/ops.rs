@@ -209,7 +209,16 @@ pub fn cancel_driver_job_by_task(
     }
     let lifecycle_key = match session.lifecycle_key.clone() {
         Some(key) => Some(key),
-        None if session.current_task_id.is_some() => Some(
+        None
+            if session.current_task_id.is_some()
+                && matches!(
+                    session.status,
+                    DurableSubagentStatus::Idle
+                        | DurableSubagentStatus::Running
+                        | DurableSubagentStatus::AwaitingUser
+                ) =>
+        {
+            Some(
             resolve_lifecycle_key(
                 store,
                 task_id,
@@ -220,7 +229,8 @@ pub fn cancel_driver_job_by_task(
             .map_err(|error| {
                 format!("failed to resolve subagent lifecycle for cancellation: {error}")
             })?,
-        ),
+            )
+        }
         None => None,
     };
     if lifecycle_key.as_ref().is_some_and(|key| {
