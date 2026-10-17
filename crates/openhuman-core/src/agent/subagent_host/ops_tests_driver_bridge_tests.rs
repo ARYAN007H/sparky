@@ -218,17 +218,15 @@ async fn independent_host_bundles_share_and_project_the_persisted_winner() {
     assert!(matches!(follower.status, SubagentRunStatus::Completed));
     assert_eq!(leader.final_history.len(), follower.final_history.len());
     // The neutral transcript contract identifies a tool result row by its
-    // call ID, even when the host's transient row left `id` unset. Compare the
-    // leader through that same canonical projection before checking the full
-    // durable winner history returned by the independent follower.
-    let canonical_leader_history: Vec<_> = leader
-        .final_history
-        .iter()
-        .filter_map(|row| {
-            let message = crate::agent::message_convert::chat_message_to_message(row);
-            tinyagents_runtime::transcript::message_to_native_transcript(&message)
-        })
-        .collect();
+    // call ID, even when the host's transient row left `id` unset. Normalize
+    // only that documented field so all other native row metadata remains
+    // subject to the full-history equality check.
+    let mut canonical_leader_history = leader.final_history.clone();
+    for row in &mut canonical_leader_history {
+        if row.role == "tool" && !row.preserve_request_id {
+            row.id = row.tool_call_id.clone().or_else(|| row.id.clone());
+        }
+    }
     assert_eq!(
         serde_json::to_value(&canonical_leader_history).unwrap(),
         serde_json::to_value(&follower.final_history).unwrap(),
@@ -238,6 +236,10 @@ async fn independent_host_bundles_share_and_project_the_persisted_winner() {
         !leader.final_history.is_empty(),
         "winner history is preserved"
     );
+    assert!(leader
+        .final_history
+        .iter()
+        .any(|row| { row.role == "tool" && row.tool_call_id.as_deref() == Some("call-1") }));
     assert_eq!(leader.usage.input_tokens, follower.usage.input_tokens);
     assert!(leader.usage.input_tokens > 0, "winner usage is preserved");
     assert_eq!(leader.artifact_paths, follower.artifact_paths);
