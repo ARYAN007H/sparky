@@ -1,7 +1,7 @@
 use super::*;
 
 /// Deliver under a fresh run id and discard the delivery status.
-pub(super) async fn deliver_if_configured(
+pub(crate) async fn deliver_if_configured(
     ctx: &crate::core::runtime::DispatchCtx,
     config: &Config,
     job: &CronJob,

@@ -1,7 +1,7 @@
 use super::*;
 
 /// Run an agent job under a fresh run id for focused scheduler tests.
-pub(super) async fn run_agent_job(
+pub(crate) async fn run_agent_job(
     config: &Config,
     job: &CronJob,
 ) -> (bool, String, Option<String>) {
