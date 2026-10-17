@@ -5,7 +5,8 @@ mod tiny_port;
 mod types;
 
 pub use ops::{
-    action_root_key, cancel_driver_jobs_for_thread, close, find_reusable, list_for_parent,
+    action_root_key, cancel_driver_job_for_session, cancel_driver_jobs_for_thread, close,
+    find_reusable, list_for_parent,
     mark_failed, mark_finished, normalize_task_key, resolve_lifecycle_key, reuse_decision,
     task_title_from_prompt, upsert_running,
 };

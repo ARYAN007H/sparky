@@ -21,6 +21,7 @@ pub(crate) struct OpenHumanTinySubagentSessionStore {
     checkpoint_dir: PathBuf,
     parent_session: String,
     parent_thread_id: Option<String>,
+    jobs: Option<tinyagents_orchestration::subagent::SubAgentJobRegistry>,
 }
 
 impl OpenHumanTinySubagentSessionStore {
@@ -34,7 +35,16 @@ impl OpenHumanTinySubagentSessionStore {
             store: SubagentSessionStore::new(workspace_dir),
             parent_session: parent_session.into(),
             parent_thread_id,
+            jobs: None,
         }
+    }
+
+    pub(crate) fn with_jobs(
+        mut self,
+        jobs: tinyagents_orchestration::subagent::SubAgentJobRegistry,
+    ) -> Self {
+        self.jobs = Some(jobs);
+        self
     }
 
     fn is_owned(&self, row: &DurableSubagentSession) -> bool {
@@ -198,9 +208,20 @@ impl TinySessionStore for OpenHumanTinySubagentSessionStore {
     }
 
     async fn close(&self, id: &str) -> Result<bool, SubagentError> {
-        if self.get(id).await?.is_none() {
+        let Some(session) = self.get(id).await? else {
             return Ok(false);
+        };
+        if let Some(jobs) = &self.jobs {
+            let _ = super::cancel_driver_job_for_session(
+                &self.store,
+                &self.checkpoint_dir,
+                jobs,
+                id,
+                &self.parent_session,
+                self.parent_thread_id.as_deref(),
+            );
         }
+        drop(session);
         super::close(&self.store, id).map_err(SubagentError::Persistence)
     }
 
