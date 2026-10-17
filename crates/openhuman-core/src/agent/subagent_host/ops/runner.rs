@@ -6,12 +6,10 @@
 //! calls and tool execution until the model returns without further tool calls
 //! (or the iteration budget is exhausted).
 
-use std::collections::{HashMap, HashSet};
-use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
+use std::collections::HashSet;
+use std::sync::Arc;
 use std::time::Instant;
 
-use crate::agent::harness::artifact_offload::offload_run_result;
 use crate::agent::harness::fork_context::ParentExecutionContext;
 use crate::agent::prompts::render_subagent_system_prompt_with_format;
 use crate::agent::prompts::{PromptContext, SubagentRenderOptions};
@@ -29,10 +27,6 @@ use crate::inference::provider::AGENT_TURN_MAX_OUTPUT_TOKENS;
 use tinyagents_definition::{
     validate_tier_transition, AgentTier, IterationPolicy, PromptSource,
     SandboxMode as AgentSandboxMode,
-};
-use tinyagents_harness::artifacts::{
-    effective_offload_threshold, extract_artifact_paths, note_artifact_handoff,
-    DEFAULT_OFFLOAD_THRESHOLD_BYTES, HANDOFF_STAGE_RECORDED,
 };
 use tinyagents_harness::context::{current_run_depth, with_run_depth, RunConfig, RunDepth};
 use tinytools::{SandboxMode as TinyagentsSandboxMode, ToolSpec, WorkspaceDescriptor};
@@ -369,8 +363,13 @@ pub(crate) async fn run_subagent_direct(
         // this host's authorized artifact store. Project its opaque reference
         // into the product pointer before applying the independent character
         // cap, preserving the existing full-output-first behavior.
-        if let Some(error) =
-            apply_subagent_result_policies(&mut outcome, definition, &options, &task_id).await
+        if let Some(error) = super::runner_artifacts::apply_subagent_result_policies(
+            &mut outcome,
+            definition,
+            &options,
+            &task_id,
+        )
+        .await
         {
             tracing::debug!(task_id = %task_id, error = %error, "[artifact] sub-agent result policy fell back to inline output");
         }
@@ -391,198 +390,6 @@ pub(crate) async fn run_subagent_direct(
     .await
 }
 
-/// Host-owned result adaptation around TinyAgents' generic result policy.
-///
-/// TinyAgents decides whether the full result crosses the product byte
-/// threshold and applies the character cap. This adapter supplies authorized
-/// storage, resolves the opaque artifact reference into the product's existing
-/// pointer/abstract text, and records user-authored or stored paths.
-async fn apply_subagent_result_policies(
-    outcome: &mut SubagentRunOutcome,
-    definition: &AgentDefinition,
-    options: &SubagentRunOptions,
-    task_id: &str,
-) -> Option<String> {
-    let mut paths = extract_artifact_paths(&outcome.output);
-    let mut artifact_error = None;
-
-    // A worktree-isolated worker offloads into its own checkout; everyone else
-    // uses the live policy's action root, which is the same root a parent's
-    // relative read resolves the returned path against.
-    let policy = crate::security::live_policy::effective_in(&options.run_context.dispatch_ctx());
-    let action_dir = options
-        .worktree_action_dir
-        .clone()
-        .or_else(|| policy.as_ref().map(|p| p.action_dir.clone()));
-
-    let can_store = !policy
-        .as_ref()
-        .is_some_and(|p| p.autonomy == crate::security::AutonomyLevel::ReadOnly);
-    let threshold =
-        effective_offload_threshold(DEFAULT_OFFLOAD_THRESHOLD_BYTES, definition.max_result_chars);
-    let store = match (action_dir.as_ref(), can_store) {
-        (Some(action_dir), true) => Some(Arc::new(SubagentArtifactStore::new(
-            policy,
-            action_dir.clone(),
-            outcome.agent_id.clone(),
-            threshold,
-        ))),
-        _ => None,
-    };
-
-    if let Some(store) = store.as_ref() {
-        match offload_result_by_policy(task_id, &outcome.output, threshold, store).await {
-            Ok(Some(stored)) => {
-                outcome.output = stored.pointer;
-                if !paths.contains(&stored.relative_path) {
-                    paths.push(stored.relative_path);
-                }
-            }
-            Ok(None) => {}
-            Err(error) => artifact_error = Some(error),
-        }
-    } else if action_dir.is_none() {
-        tracing::debug!(
-            task_id = %task_id,
-            agent_id = %outcome.agent_id,
-            worker_authored_paths = paths.len(),
-            "[artifact] no resolvable action_dir — skipping offload (summarizer/truncation backstop applies)"
-        );
-    } else {
-        tracing::debug!(
-            task_id = %task_id,
-            agent_id = %outcome.agent_id,
-            "[artifact] readonly autonomy tier — skipping offload (summarizer/truncation backstop applies)"
-        );
-    }
-
-    if let Some(cap) = definition.max_result_chars {
-        outcome.output = tinyagents_orchestration::subagent::ResultPolicy::new()
-            .with_max_chars(cap)
-            .apply(task_id, &outcome.output, None)
-            .await
-            .text;
-    }
-
-    for path in extract_artifact_paths(&outcome.output) {
-        if !paths.contains(&path) {
-            paths.push(path);
-        }
-    }
-    outcome.artifact_paths = paths;
-    note_artifact_handoff(
-        HANDOFF_STAGE_RECORDED,
-        &outcome.agent_id,
-        task_id,
-        &outcome.artifact_paths,
-    );
-    artifact_error
-}
-
-async fn offload_result_by_policy(
-    task_id: &str,
-    output: &str,
-    threshold_bytes: usize,
-    store: &Arc<SubagentArtifactStore>,
-) -> Result<Option<StoredSubagentArtifact>, String> {
-    let applied = tinyagents_orchestration::subagent::ResultPolicy::new()
-        .with_max_bytes(threshold_bytes)
-        .with_overflow(tinyagents_orchestration::subagent::ResultOverflow::Artifact)
-        .with_artifact_store(store.clone())
-        .apply(task_id, output, None)
-        .await;
-    if let Some(error) = applied.artifact_error {
-        return Err(error);
-    }
-    let Some(reference) = applied.artifact else {
-        return Ok(None);
-    };
-    let stored = store.take(&reference.id);
-    stored.map(Some).ok_or_else(|| {
-        tracing::warn!(
-            task_id = %task_id,
-            "[artifact] TinyAgents returned an unknown sub-agent artifact reference"
-        );
-        "TinyAgents returned an unknown OpenHuman artifact reference".to_owned()
-    })
-}
-
-struct SubagentArtifactStore {
-    policy: Option<Arc<crate::security::SecurityPolicy>>,
-    action_dir: PathBuf,
-    agent_id: String,
-    threshold_bytes: usize,
-    artifacts: Mutex<HashMap<String, StoredSubagentArtifact>>,
-}
-
-struct StoredSubagentArtifact {
-    pointer: String,
-    relative_path: String,
-}
-
-impl SubagentArtifactStore {
-    fn new(
-        policy: Option<Arc<crate::security::SecurityPolicy>>,
-        action_dir: PathBuf,
-        agent_id: String,
-        threshold_bytes: usize,
-    ) -> Self {
-        Self {
-            policy,
-            action_dir,
-            agent_id,
-            threshold_bytes,
-            artifacts: Mutex::new(HashMap::new()),
-        }
-    }
-
-    fn take(&self, id: &str) -> Option<StoredSubagentArtifact> {
-        self.artifacts
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .remove(id)
-    }
-}
-
-#[async_trait::async_trait]
-impl tinyagents_orchestration::subagent::ArtifactStore for SubagentArtifactStore {
-    async fn store(
-        &self,
-        task_id: &str,
-        content: &str,
-    ) -> Result<tinyagents_orchestration::subagent::ArtifactReference, String> {
-        let (pointer, artifact) = offload_run_result(
-            content.to_owned(),
-            self.policy.clone(),
-            self.action_dir.clone(),
-            self.agent_id.clone(),
-            task_id,
-            self.threshold_bytes,
-        )
-        .await;
-        let artifact = artifact.ok_or_else(|| "OpenHuman did not persist the result".to_owned())?;
-        let id = uuid::Uuid::new_v4().to_string();
-        self.artifacts
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .insert(
-                id.clone(),
-                StoredSubagentArtifact {
-                    pointer,
-                    relative_path: artifact.relative_path,
-                },
-            );
-        Ok(tinyagents_orchestration::subagent::ArtifactReference {
-            id,
-            media_type: Some("text/plain".into()),
-            metadata: Default::default(),
-        })
-    }
-}
-
-#[cfg(test)]
-#[path = "runner_tests.rs"]
-mod tests;
 
 fn workspace_descriptor_for_subagent(
     definition: &AgentDefinition,
