@@ -54,7 +54,7 @@ hint = "reasoning"
 # exists solely to sample the real output shape of a source tool whose live
 # listing publishes no output schema at all (verified for every GitHub
 # action), so a downstream split_out.path is never guessed. See
-# `builder_tools.rs`'s module doc.
+# `integrations/composio/builder_tools/mod.rs`'s module doc.
 # `memory` is the single memory tool (`recall` | `fetch` | `learn` |
 # `forget`). `omit_memory_context = true` stays set above, so nothing is
 # injected automatically — the agent calls `memory` with `action: "recall"`

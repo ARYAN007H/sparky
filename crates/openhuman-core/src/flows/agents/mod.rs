@@ -15,7 +15,7 @@
 //!   `create_workflow`/`duplicate_flow` (always born DISABLED) and
 //!   `save_workflow` (update-only, onto a flow that already exists) — each
 //!   gated behind the user's explicit ask; it never enables a flow. See the
-//!   module doc in `flows::builder_tools` for the full tool-by-tool table.
+//!   module doc in `integrations::composio::builder_tools` for the full tool-by-tool table.
 //! - [`flow_discovery`] — the read-only "Flow Scout" that grounds buildable
 //!   automation ideas from the user's data.
 
