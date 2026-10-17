@@ -554,7 +554,7 @@ pub(super) fn decode_driver_job_result(
     Ok(public_id)
 }
 
-async fn resolve_inline_driver_outcome(
+pub(super) async fn resolve_inline_driver_outcome(
     tool_result: tinytools::ToolResult,
     bundle: &OpenHumanDriverBundle,
     task_key: &SubagentTaskKey,
