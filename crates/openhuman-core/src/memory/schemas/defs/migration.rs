@@ -1,4 +1,4 @@
-use super::common::{out, opt};
+use super::common::{opt, out};
 use crate::core::ControllerSchema;
 
 pub(super) fn schema(function: &str) -> Option<ControllerSchema> {
@@ -14,7 +14,11 @@ pub(super) fn schema(function: &str) -> Option<ControllerSchema> {
             namespace: "memory",
             function: "migration_start",
             description: "Move memory from before the per-user layout now. takeover: true agrees to take a legacy tree other accounts on this machine may share.",
-            inputs: vec![opt("takeover", TypeSchema::Bool, "Consent to take a shared legacy tree.")],
+            inputs: vec![opt(
+                "takeover",
+                TypeSchema::Bool,
+                "Consent to take a shared legacy tree.",
+            )],
             outputs: out("{state: MigrationState, running: bool, interrupted: bool}"),
         }),
         "migration_status" => Some(ControllerSchema {

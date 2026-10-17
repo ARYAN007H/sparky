@@ -8,7 +8,7 @@ struct RawSchemaDump<'a> {
 
 #[tokio::test]
 async fn get_schema_memory_entries_match_the_pre_refactor_raw_bytes() {
-    use axum::body::{to_bytes, Body};
+    use axum::body::{Body, to_bytes};
     use axum::http::{Request, StatusCode};
     use sha2::{Digest, Sha256};
     use tower::ServiceExt;
@@ -34,7 +34,11 @@ async fn get_schema_memory_entries_match_the_pre_refactor_raw_bytes() {
             (value["namespace"] == "memory").then_some(method.get())
         })
         .collect();
-    assert_eq!(memory_methods.len(), 35, "all memory controller schemas appear");
+    assert_eq!(
+        memory_methods.len(),
+        35,
+        "all memory controller schemas appear"
+    );
 
     let mut memory_bytes = Vec::new();
     for method in &memory_methods {
@@ -53,8 +57,7 @@ async fn get_schema_memory_entries_match_the_pre_refactor_raw_bytes() {
         "memory schema methods' raw byte count"
     );
     assert_eq!(
-        memory_digest,
-        "7b1b15f7e40cc7f4e6b767ea8eb4d17e49c5a3a5c6250164a733af828ec22783",
+        memory_digest, "7b1b15f7e40cc7f4e6b767ea8eb4d17e49c5a3a5c6250164a733af828ec22783",
         "memory schema methods' raw SHA-256"
     );
 }
