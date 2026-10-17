@@ -163,3 +163,43 @@ for (const [label, scriptPath, invoke] of [
     );
   });
 }
+
+for (const helper of ["llvm_cov", "llvm_cov_package", "llvm_cov_product_facade"]) {
+  test(`${helper} selects nextest for private suites and rejects empty selections`, () => {
+    const result = withRunnerFunctions(
+      [helper],
+      [
+        'OH_COV_RUNNER=nextest',
+        'CORE_PRODUCT_FEATURES=channels',
+        'bash() { printf "%s\\n" "$*"; }',
+      ].join("\n"),
+      `${helper} --no-report -p openhuman-embed --all-targets`,
+    );
+    assert.equal(result.status, 0, result.output);
+    assert.match(result.output, /cargo llvm-cov nextest --profile ci --no-tests=fail/);
+    assert.match(result.output, /--no-report -p openhuman-embed --all-targets/);
+  });
+}
+
+test("private core coverage runs sequentially without a second target directory", () => {
+  const source = fs.readFileSync(runner, "utf8");
+  assert.doesNotMatch(source, /UNIT_PID|cov-unit|export CARGO_TARGET_DIR/);
+  assert.match(source, /suite "openhuman lib\+bins \(nextest\)" llvm_cov/);
+  assert.match(source, /suite "openhuman-embed \(default\)" llvm_cov_package/);
+  assert.match(source, /suite "openhuman-tinyhumans \(default\)" llvm_cov_package/);
+});
+
+test("coverage finalizer retains interrupted reports and the cancellation status", () => {
+  const result = withRunnerFunctions(
+    ["preserve_coverage"],
+    [
+      'OUT=interrupted.info',
+      'COVERAGE_REPORTED=0',
+      'log() { printf "%s\\n" "$*"; }',
+      'llvm_cov() { printf "REPORT %s\\n" "$*"; return 9; }',
+    ].join("\n"),
+    'trap preserve_coverage EXIT; exit 143',
+  );
+  assert.equal(result.status, 143, result.output);
+  assert.match(result.output, /REPORT report --lcov --output-path interrupted.info/);
+});
