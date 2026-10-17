@@ -126,14 +126,7 @@ call a tool. Answer instead, and you will be asked to conclude next.";
 /// of room to give — so it needs the content that type exists to remove.
 /// Widening the harness outcome record would have carried raw payloads into every
 /// learning record as a side effect.
-pub(crate) struct CheckpointToolResult {
-    /// The tool that ran.
-    pub(crate) name: String,
-    /// Whether it reported success.
-    pub(crate) success: bool,
-    /// Its raw output, truncated at the call site to [`CHECKPOINT_RESULT_CHARS`].
-    pub(crate) content: String,
-}
+pub(crate) type CheckpointToolResult = tinyagents_harness::close::CloseToolResult;
 
 /// Convert the typed boundary capture into the narrow record shape used by
 /// both the model-grounded close and deterministic fallbacks.  The harness's
@@ -142,14 +135,11 @@ pub(crate) struct CheckpointToolResult {
 pub(crate) fn results_from_tool_outcomes(
     outcomes: &[tinyagents_harness::turn_outcome::ToolCallOutcome],
 ) -> Vec<CheckpointToolResult> {
-    outcomes
-        .iter()
-        .map(|outcome| CheckpointToolResult {
-            name: outcome.name.clone(),
-            success: outcome.success,
-            content: truncate_chars(&outcome.content, CHECKPOINT_RESULT_CHARS),
-        })
-        .collect()
+    tinyagents_harness::close::results_from_tool_outcomes_with_options(
+        outcomes,
+        CHECKPOINT_RESULT_CHARS,
+        "… [truncated]",
+    )
 }
 
 /// How much of one tool result the deterministic checkpoint reproduces.
