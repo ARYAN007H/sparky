@@ -607,3 +607,7 @@ mod bus_tests;
 #[cfg(test)]
 #[path = "bus_tests_2_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "bus_tests_3_tests.rs"]
+mod profile_routing_tests;
