@@ -709,6 +709,8 @@ async fn drive_turn(
         &subagent_scope,
         pause_at_cap,
         turn_journal.as_ref(),
+        &sink,
+        defer_turn_completed_to_caller,
         compression_mw.as_ref(),
         prompt_cache_guard.as_ref(),
         turn_completed_sink,

@@ -10,8 +10,8 @@ use tinytools_agent::dialect::TranscriptEntry;
 /// post-run close/repair and classified any wind-down stop.
 #[derive(Clone)]
 pub(crate) struct DeferredTurnTerminal {
-    events: tinyagents_harness::events::EventSink,
-    journal: Option<crate::agent::tinyagents::journal::TurnJournal>,
+    pub(crate) events: tinyagents_harness::events::EventSink,
+    pub(crate) journal: Option<crate::agent::tinyagents::journal::TurnJournal>,
 }
 
 impl DeferredTurnTerminal {

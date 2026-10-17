@@ -165,6 +165,25 @@ pub(super) async fn finalize_turn_outcome(
         false,
         hit_cap,
     );
+    if let Some(stop_fact) = stop.clone() {
+        event_sink.emit(tinyagents_harness::events::AgentEvent::TurnStopped {
+            // The event uses a 1-based attempt ordinal, even when the run
+            // stopped before the first model request.
+            turn: (run.model_calls as u32).max(1),
+            stop: stop_fact,
+        });
+    }
+    let deferred_terminal = if defer_terminal_to_caller {
+        Some(crate::agent::tinyagents::turn_outcome::DeferredTurnTerminal {
+            events: event_sink.clone(),
+            journal: turn_journal.cloned(),
+        })
+    } else {
+        if let Some(journal) = turn_journal {
+            journal.finish_completed().await;
+        }
+        None
+    };
     if let Some(stop) = stop.as_ref().filter(|_| turn_completed_sink.is_some()) {
         tracing::debug!(
             model,
@@ -278,6 +297,7 @@ pub(super) async fn finalize_turn_outcome(
     }
 
     TinyagentsTurnOutcome {
+        deferred_terminal,
         text,
         resolved_route,
         history: crate::agent::message_convert::messages_to_history(&run.messages),
