@@ -57,7 +57,7 @@ use super::busy_guard::is_busy;
 use super::busy_guard::{busy, clear_busy_for_thread, TurnBusy};
 use super::completion_notice::build_undelivered_notice;
 use super::completion_owners;
-use super::delivery_drain::{run_drain, DrainFence, DrainOutcome, RECOVERY_BUSY_POLL};
+use super::delivery_drain::{DrainFence, RECOVERY_BUSY_POLL};
 use crate::core::runtime::CoreContext;
 
 /// Coalesce completions landing within this window into one delivery turn.
@@ -363,6 +363,7 @@ pub(crate) fn recover_on_open(ctx: &DispatchCtx, workspace_dir: &Path, fence: Dr
 /// (queue untouched) when the thread is busy or nothing is pending. A claimed
 /// batch stays leased until the caller settles it with `mark_delivered` /
 /// `mark_failed` / `release`.
+#[cfg(test)]
 fn claim_ready(
     ctx: &DispatchCtx,
     router: &CompletionRouter,
@@ -529,6 +530,7 @@ pub(super) async fn try_deliver_for_test(
 }
 
 /// Backoff before retrying a delivery whose record has now failed `attempts` times.
+#[cfg(test)]
 fn retry_backoff(attempts: u32) -> Duration {
     Duration::from_secs(2u64.saturating_pow(attempts.min(5)))
 }
@@ -541,6 +543,7 @@ fn retry_backoff(attempts: u32) -> Duration {
 /// it is logged at error and the chain ends; that is the one path on which a
 /// result is genuinely lost, and it requires the conversation store to be
 /// failing as well as the agent.
+#[cfg(test)]
 async fn persist_undelivered(ctx: DispatchCtx, dir: PathBuf, thread_id: String, notice: String) {
     let run_id = format!("bgdeliver-undelivered-{}", uuid::Uuid::new_v4());
     match persist_delivery_reply(&ctx, dir, &thread_id, &run_id, notice, false) {
@@ -560,6 +563,7 @@ async fn persist_undelivered(ctx: DispatchCtx, dir: PathBuf, thread_id: String, 
 /// lets tests prove a failed durable append releases the batch before any
 /// terminal announcement is observable, and that a record which exhausts its
 /// attempts is handed to `on_undeliverable` rather than dropped.
+#[cfg(test)]
 async fn try_deliver_with<F, Fut, G, GFut>(
     ctx: &DispatchCtx,
     thread_id: String,
