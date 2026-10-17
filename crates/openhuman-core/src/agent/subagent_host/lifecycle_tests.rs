@@ -1,8 +1,8 @@
+use crate::agent::subagent_host::types::SubagentCheckpointData;
 use std::{
     collections::HashMap,
     sync::{Arc, Mutex},
 };
-use crate::agent::subagent_host::types::SubagentCheckpointData;
 use tinyagents_orchestration::subagent::{
     PersistedSubagentPause, SubagentOutcome, SubagentOutcomeKind, SubagentPause,
     SubagentPausePersistenceDisposition, SubagentPersistence, SubagentResume, SubagentTaskKey,
@@ -457,9 +457,9 @@ async fn legacy_pause_migration_preserves_host_checkpoint_metadata_and_bytes() {
         task_id: key.task_id.clone(),
         agent_id: "legacy-agent".into(),
         worker_thread_id: Some("worker-thread".into()),
-        history: vec![tinyagents_session::transcript::TranscriptMessage::assistant(
-            "legacy history",
-        )],
+        history: vec![
+            tinyagents_session::transcript::TranscriptMessage::assistant("legacy history"),
+        ],
         question: "legacy question".into(),
         options: Some(vec!["yes".into(), "no".into()]),
         skill_filter_override: Some("docs".into()),
@@ -491,7 +491,10 @@ async fn legacy_pause_migration_preserves_host_checkpoint_metadata_and_bytes() {
     assert_eq!(recovered.worker_thread_id, checkpoint.worker_thread_id);
     assert_eq!(recovered.question, checkpoint.question);
     assert_eq!(recovered.options, checkpoint.options);
-    assert_eq!(recovered.skill_filter_override, checkpoint.skill_filter_override);
+    assert_eq!(
+        recovered.skill_filter_override,
+        checkpoint.skill_filter_override
+    );
     assert_eq!(recovered.model_override, checkpoint.model_override);
     assert_eq!(recovered.created_at, checkpoint.created_at);
     assert_eq!(recovered.output, checkpoint.output);
