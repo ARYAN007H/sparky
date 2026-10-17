@@ -175,7 +175,7 @@ pub fn remove_job(config: &Config, id: &str) -> Result<()> {
             job_id: id.to_string(),
         },
     )?;
-    println!("✅ Removed cron job {id}");
+    tracing::info!(job_id = %id, "removed cron job");
     Ok(())
 }
 

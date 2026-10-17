@@ -12,7 +12,7 @@ use std::collections::HashMap;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, RwLock};
 use tinybus::EventHandler;
 use tinyflows::model::TriggerKind;
 use tinyflows_catalog::Flow;
@@ -78,7 +78,7 @@ pub(super) fn matches_app_event(flow: &Flow, toolkit: &str, trigger_slug: &str) 
 /// Listens for normalized trigger events and starts runs for matching
 /// enabled flows. See the module doc for the full contract.
 pub struct FlowTriggerSubscriber {
-    config: Arc<Config>,
+    config: Arc<RwLock<Config>>,
     queues: Arc<Mutex<HashMap<DispatchKey, Arc<FlowRunQueue>>>>,
     runner: Arc<RunExecutor>,
     queue_capacity: usize,
@@ -146,6 +146,10 @@ const APP_EVENT_QUEUE_CAPACITY: usize = 32;
 
 impl FlowTriggerSubscriber {
     pub fn new(config: Arc<Config>) -> Self {
+        Self::with_config_source(Arc::new(RwLock::new((*config).clone())))
+    }
+
+    pub(crate) fn with_config_source(config: Arc<RwLock<Config>>) -> Self {
         Self::with_executor(
             config,
             APP_EVENT_QUEUE_CAPACITY,
@@ -173,7 +177,7 @@ impl FlowTriggerSubscriber {
         )
     }
 
-    fn with_executor<F, Fut>(config: Arc<Config>, queue_capacity: usize, runner: F) -> Self
+    fn with_executor<F, Fut>(config: Arc<RwLock<Config>>, queue_capacity: usize, runner: F) -> Self
     where
         F: Fn(crate::core::runtime::DispatchCtx, Arc<Config>, TriggerRunRequest) -> Fut
             + Send
@@ -195,6 +199,26 @@ impl FlowTriggerSubscriber {
 
     #[cfg(test)]
     pub(crate) fn with_runner<F, Fut>(config: Arc<Config>, queue_capacity: usize, runner: F) -> Self
+    where
+        F: Fn(crate::core::runtime::DispatchCtx, Arc<Config>, TriggerRunRequest) -> Fut
+            + Send
+            + Sync
+            + 'static,
+        Fut: Future<Output = ()> + Send + 'static,
+    {
+        Self::with_executor(
+            Arc::new(RwLock::new((*config).clone())),
+            queue_capacity,
+            runner,
+        )
+    }
+
+    #[cfg(test)]
+    pub(crate) fn with_runner_and_config_source<F, Fut>(
+        config: Arc<RwLock<Config>>,
+        queue_capacity: usize,
+        runner: F,
+    ) -> Self
     where
         F: Fn(crate::core::runtime::DispatchCtx, Arc<Config>, TriggerRunRequest) -> Fut
             + Send
@@ -435,7 +459,13 @@ impl FlowTriggerSubscriber {
 
     /// The configuration to handle an event under (`super::owner::config_for_scope`).
     pub(super) fn config_for_scope(&self, ctx: &crate::core::runtime::DispatchCtx) -> Arc<Config> {
-        super::owner::config_for_scope(ctx, &self.config)
+        let config = Arc::new(
+            self.config
+                .read()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .clone(),
+        );
+        super::owner::config_for_scope(ctx, &config)
     }
 
     /// A `flow`-type cron job fired (`cron::scheduler`'s trigger sink calls
@@ -449,7 +479,8 @@ impl FlowTriggerSubscriber {
         host: &crate::core::runtime::DispatchCtx,
         flow_id: &str,
     ) {
-        super::owner::as_owner(host, &self.config, flow_id, |ctx| {
+        let config = self.config_for_scope(host);
+        super::owner::as_owner(host, &config, flow_id, |ctx| {
             self.handle_schedule_tick(ctx, flow_id)
         })
         .await

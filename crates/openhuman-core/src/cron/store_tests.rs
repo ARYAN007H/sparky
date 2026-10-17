@@ -17,6 +17,54 @@ fn test_config(tmp: &TempDir) -> Config {
     config
 }
 
+#[test]
+fn remove_job_does_not_write_to_stdout() {
+    use std::process::Command;
+
+    const CHILD: &str = "OPENHUMAN_CRON_REMOVE_STDOUT_CHILD";
+    if let Ok(workspace) = std::env::var(CHILD) {
+        let config = Config {
+            workspace_dir: workspace.into(),
+            action_dir: std::env::temp_dir(),
+            ..Config::default()
+        };
+        println!("BEGIN_CRON_REMOVE_CAPTURE");
+        use std::io::Write;
+        std::io::stdout().flush().unwrap();
+        remove_job(
+            &config,
+            &std::env::var("OPENHUMAN_CRON_REMOVE_JOB").unwrap(),
+        )
+        .unwrap();
+        println!("END_CRON_REMOVE_CAPTURE");
+        std::io::stdout().flush().unwrap();
+        return;
+    }
+
+    let tmp = TempDir::new().unwrap();
+    let config = test_config(&tmp);
+    let job = add_job(&config, "*/5 * * * *", "echo remove").unwrap();
+    let output = Command::new(std::env::current_exe().unwrap())
+        .args([
+            "--exact",
+            "cron::store::tests::remove_job_does_not_write_to_stdout",
+            "--nocapture",
+        ])
+        .env(CHILD, &config.workspace_dir)
+        .env("OPENHUMAN_CRON_REMOVE_JOB", &job.id)
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let captured = stdout.split("BEGIN_CRON_REMOVE_CAPTURE\n").nth(1).unwrap();
+    let captured = captured.split("END_CRON_REMOVE_CAPTURE\n").next().unwrap();
+    assert!(captured.is_empty(), "unexpected stdout: {captured}");
+}
+
 #[cfg(feature = "storage-sqlite")]
 #[test]
 fn jobs_live_in_the_workspace_default_database() {

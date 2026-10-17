@@ -25,6 +25,7 @@
 //! thread that delivered the callback: an agent turn is deep and long, and the
 //! bus runtime is for serving. The binding's context is re-entered around it.
 
+use std::collections::HashSet;
 use std::future::Future;
 use std::sync::{Arc, RwLock, Weak};
 
@@ -57,6 +58,7 @@ pub(crate) struct Binding {
     runtime: Option<tokio::runtime::Handle>,
     #[cfg(feature = "flows")]
     flows: Arc<std::sync::OnceLock<crate::flows::bus::FlowTriggerSubscriber>>,
+    triggered_runs: Arc<std::sync::Mutex<HashSet<String>>>,
 }
 
 impl Binding {
@@ -70,6 +72,7 @@ impl Binding {
             runtime: tokio::runtime::Handle::try_current().ok(),
             #[cfg(feature = "flows")]
             flows: Arc::new(std::sync::OnceLock::new()),
+            triggered_runs: Arc::new(std::sync::Mutex::new(HashSet::new())),
         }
     }
 
@@ -98,6 +101,31 @@ impl Binding {
             .config
             .write()
             .unwrap_or_else(std::sync::PoisonError::into_inner) = config.clone();
+    }
+
+    /// Publish the start event once per logical scheduler run, across Execute
+    /// retries and the separate ScheduleTrigger callback path.
+    pub(crate) fn publish_triggered_once(&self, job: &CronJob, run_id: &str) {
+        let mut runs = self
+            .triggered_runs
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if runs.contains(run_id) {
+            return;
+        }
+        runs.insert(run_id.to_string());
+        crate::core::bus::BUS.publish(crate::core::events::DomainEvent::CronJobTriggered {
+            job_id: job.id.clone(),
+            job_name: job.name.clone().unwrap_or_default(),
+            job_type: format!("{:?}", job.job_type),
+        });
+    }
+
+    pub(crate) fn finish_triggered_run(&self, run_id: &str) {
+        self.triggered_runs
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .remove(run_id);
     }
 
     /// The dispatch context the bound context stands for: the bound one, or
@@ -139,8 +167,9 @@ impl Binding {
     /// holds the per-flow in-flight dedupe across ticks.
     #[cfg(feature = "flows")]
     pub(crate) fn flows(&self) -> &crate::flows::bus::FlowTriggerSubscriber {
-        self.flows
-            .get_or_init(|| crate::flows::bus::FlowTriggerSubscriber::new(Arc::new(self.config())))
+        self.flows.get_or_init(|| {
+            crate::flows::bus::FlowTriggerSubscriber::with_config_source(Arc::clone(&self.config))
+        })
     }
 }
 

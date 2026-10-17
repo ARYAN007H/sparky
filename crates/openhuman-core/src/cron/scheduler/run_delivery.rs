@@ -43,26 +43,39 @@ pub(crate) async fn deliver(
             // The job ran as its agent (when it had one); a one-shot job
             // is deleted once the run completes, so subscribers learn the
             // owner here, not from the store.
-            crate::cron::completion_owner::note(&ctx, &job.id);
-            BUS.publish(DomainEvent::CronJobCompleted {
-                job_id: job.id.clone(),
-                success,
-                output: crate::util::truncate_with_ellipsis(&attempt.output, 512),
-            });
-            BUS.publish(DomainEvent::HealthChanged {
-                component: "scheduler".to_string(),
-                healthy: success,
-                message: (!success).then(|| {
-                    if attempt.output.is_empty() {
-                        format!("job {} failed", job.id)
-                    } else {
-                        crate::util::truncate_with_ellipsis(&attempt.output, 256)
-                    }
-                }),
-            });
+            binding.finish_triggered_run(run_id);
+            publish_completion(&ctx, job, success, &attempt.output);
             result
         })
         .await
+}
+
+/// Publish the final status shared by scheduled callbacks, Run Now, and the
+/// non-delivering `cron_run` tool. Callers decide delivery and persistence
+/// before projecting this event.
+pub(crate) fn publish_completion(
+    ctx: &crate::core::runtime::DispatchCtx,
+    job: &CronJob,
+    success: bool,
+    output: &str,
+) {
+    crate::cron::completion_owner::note(ctx, &job.id);
+    BUS.publish(DomainEvent::CronJobCompleted {
+        job_id: job.id.clone(),
+        success,
+        output: crate::util::truncate_with_ellipsis(output, 512),
+    });
+    BUS.publish(DomainEvent::HealthChanged {
+        component: "scheduler".to_string(),
+        healthy: success,
+        message: (!success).then(|| {
+            if output.is_empty() {
+                format!("job {} failed", job.id)
+            } else {
+                crate::util::truncate_with_ellipsis(output, 256)
+            }
+        }),
+    });
 }
 
 /// A `flow` row standing in for a trigger whose stored row cannot be read (it
@@ -106,13 +119,6 @@ pub(crate) fn stand_in_for_test(command: &str) -> CronJob {
 pub(crate) async fn trigger(binding: &Binding, flow_id: &str, run_id: &str) -> Attempt {
     binding
         .within(async {
-            if let Some(refusal) = kind_refusal(binding, &JobType::Flow) {
-                return Attempt {
-                    success: false,
-                    output: refusal,
-                    retryable: false,
-                };
-            }
             let config = binding.config();
             let job = match crate::cron::client::store::<Option<CronJob>>(
                 &config,
@@ -129,6 +135,14 @@ pub(crate) async fn trigger(binding: &Binding, flow_id: &str, run_id: &str) -> A
                     stand_in(flow_id)
                 }
             };
+            binding.publish_triggered_once(&job, run_id);
+            if let Some(refusal) = kind_refusal(binding, &job.job_type) {
+                return Attempt {
+                    success: false,
+                    output: refusal,
+                    retryable: false,
+                };
+            }
             let Some(handler) = kind_handler(&JobType::Flow) else {
                 return Attempt {
                     success: false,

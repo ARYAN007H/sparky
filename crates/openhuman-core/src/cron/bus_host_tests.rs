@@ -291,6 +291,354 @@ async fn schedule_trigger_for_an_unknown_flow_is_answered_not_failed() {
     );
 }
 
+#[cfg(feature = "flows")]
+#[tokio::test]
+async fn refreshing_binding_config_updates_existing_flow_subscriber() {
+    use tokio::sync::{mpsc, oneshot};
+
+    let tmp = TempDir::new().unwrap();
+    let initial = config(&tmp);
+    let refreshed = Config {
+        action_dir: tmp.path().join("refreshed-action-root"),
+        ..initial.clone()
+    };
+    let binding = Binding::new(
+        &DispatchCtx::ambient(),
+        &initial,
+        Arc::new(SecurityPolicy::from_config(
+            &initial.autonomy,
+            &initial.workspace_dir,
+            &initial.action_dir,
+        )),
+    );
+    let (seen_tx, mut seen_rx) = mpsc::unbounded_channel();
+    let (started_tx, started_rx) = oneshot::channel();
+    let started_tx = Arc::new(std::sync::Mutex::new(Some(started_tx)));
+    let (release_tx, release_rx) = oneshot::channel();
+    let release_rx = Arc::new(tokio::sync::Mutex::new(Some(release_rx)));
+    let subscriber = crate::flows::bus::FlowTriggerSubscriber::with_runner_and_config_source(
+        Arc::clone(&binding.config),
+        1,
+        move |_ctx, config, _request| {
+            let seen_tx = seen_tx.clone();
+            let started_tx = Arc::clone(&started_tx);
+            let release_rx = Arc::clone(&release_rx);
+            async move {
+                if let Some(started_tx) = started_tx.lock().unwrap().take() {
+                    let _ = started_tx.send(());
+                }
+                if let Some(release) = release_rx.lock().await.take() {
+                    let _ = release.await;
+                }
+                seen_tx.send(config.action_dir.clone()).unwrap();
+            }
+        },
+    );
+    binding
+        .flows
+        .set(subscriber)
+        .ok()
+        .expect("subscriber initialized once");
+
+    let ctx = DispatchCtx::ambient();
+    binding
+        .flows()
+        .dispatch_test_app_event(&ctx, "refresh-flow", serde_json::json!({"event": "first"}))
+        .await;
+    started_rx.await.unwrap();
+    binding.set_config(&refreshed);
+    binding
+        .flows()
+        .dispatch_test_app_event(&ctx, "refresh-flow", serde_json::json!({"event": "second"}))
+        .await;
+    release_tx.send(()).unwrap();
+    assert_eq!(seen_rx.recv().await, Some(initial.action_dir.clone()));
+    assert_eq!(seen_rx.recv().await, Some(refreshed.action_dir));
+}
+
+#[tokio::test]
+async fn triggered_run_guard_keeps_a_long_lived_run_deduplicated_past_1024_starts() {
+    use crate::core::events::DomainEvent;
+    use tinybus::EventHandler;
+    use tokio::sync::mpsc;
+
+    enum Seen {
+        Trigger(String),
+        Barrier,
+    }
+    struct Events(mpsc::UnboundedSender<Seen>);
+    #[async_trait]
+    impl EventHandler<DomainEvent> for Events {
+        fn name(&self) -> &str {
+            "test::cron::trigger_guard_overflow"
+        }
+        async fn handle(&self, event: &DomainEvent) {
+            if let DomainEvent::CronJobTriggered { job_id, .. } = event {
+                if job_id == "issue57-overflow-barrier" {
+                    let _ = self.0.send(Seen::Barrier);
+                } else {
+                    let _ = self.0.send(Seen::Trigger(job_id.clone()));
+                }
+            }
+        }
+    }
+
+    crate::core::bus::init().await.unwrap();
+    let (events_tx, mut events_rx) = mpsc::unbounded_channel();
+    let _subscription = crate::core::bus::BUS
+        .subscribe(Arc::new(Events(events_tx)))
+        .unwrap();
+    let tmp = TempDir::new().unwrap();
+    let config = config(&tmp);
+    let binding = Binding::new(
+        &DispatchCtx::ambient(),
+        &config,
+        Arc::new(SecurityPolicy::from_config(
+            &config.autonomy,
+            &config.workspace_dir,
+            &config.action_dir,
+        )),
+    );
+    let now = chrono::Utc::now();
+    let job = CronJob {
+        claim_generation: 0,
+        policy: Default::default(),
+        id: "overflow-guard-job".into(),
+        expression: "* * * * *".into(),
+        schedule: Schedule::Every { every_ms: 60_000 },
+        command: "echo guard".into(),
+        prompt: None,
+        name: None,
+        job_type: JobType::Shell,
+        session_target: Default::default(),
+        model: None,
+        agent_id: None,
+        enabled: true,
+        delivery: Default::default(),
+        delete_after_run: false,
+        created_at: now,
+        next_run: now,
+        last_run: None,
+        last_status: None,
+        last_output: None,
+        origin: None,
+    };
+    binding.publish_triggered_once(&job, "long-lived-run-0");
+    assert!(matches!(
+        tokio::time::timeout(std::time::Duration::from_secs(2), events_rx.recv())
+            .await
+            .expect("first trigger is delivered")
+            .expect("subscriber remains open"),
+        Seen::Trigger(job_id) if job_id == job.id
+    ));
+    for index in 1..=1024 {
+        let mut other_job = job.clone();
+        other_job.id = format!("overflow-job-{index}");
+        binding.publish_triggered_once(&other_job, &format!("long-lived-run-{index}"));
+        assert!(matches!(
+            tokio::time::timeout(std::time::Duration::from_secs(2), events_rx.recv())
+                .await
+                .expect("overflow trigger is delivered")
+                .expect("subscriber remains open"),
+            Seen::Trigger(job_id) if job_id == other_job.id
+        ));
+    }
+    binding.publish_triggered_once(&job, "long-lived-run-0");
+    let mut barrier_job = job.clone();
+    barrier_job.id = "issue57-overflow-barrier".into();
+    binding.publish_triggered_once(&barrier_job, "issue57-overflow-barrier-run");
+    let after_retry = tokio::time::timeout(std::time::Duration::from_secs(2), events_rx.recv())
+        .await
+        .expect("retry and barrier events drain")
+        .expect("subscriber remains open");
+    assert!(
+        matches!(after_retry, Seen::Barrier),
+        "a long-lived run retry must not queue another Triggered before the barrier"
+    );
+}
+
+#[cfg(feature = "flows")]
+#[tokio::test]
+async fn a_scheduled_flow_run_publishes_a_trigger_before_completion() {
+    use crate::core::events::DomainEvent;
+    use tinybus::EventHandler;
+    use tokio::sync::mpsc;
+
+    struct CronEvents(String, mpsc::UnboundedSender<&'static str>);
+    #[async_trait]
+    impl EventHandler<DomainEvent> for CronEvents {
+        fn name(&self) -> &str {
+            "test::cron::flow_event_pair"
+        }
+        async fn handle(&self, event: &DomainEvent) {
+            let (job_id, name) = match event {
+                DomainEvent::CronJobTriggered { job_id, .. } => (job_id, "triggered"),
+                DomainEvent::CronJobCompleted { job_id, .. } => (job_id, "completed"),
+                _ => return,
+            };
+            if job_id == &self.0 {
+                let _ = self.1.send(name);
+            }
+        }
+    }
+
+    crate::core::bus::init().await.unwrap();
+    let tmp = TempDir::new().unwrap();
+    let config = config(&tmp);
+    let (_host, proxy) = host(&config, false).await;
+    let job = crate::cron::add_flow_schedule_job(
+        &config,
+        "flow-event-pair",
+        Schedule::Every {
+            every_ms: 3_600_000,
+        },
+    )
+    .unwrap();
+    let (events_tx, mut events_rx) = mpsc::unbounded_channel();
+    let _subscription = crate::core::bus::BUS
+        .subscribe(Arc::new(CronEvents(job.id.clone(), events_tx)))
+        .unwrap();
+    let run_id = format!("flow-event-{}", uuid::Uuid::new_v4());
+    let _: Attempt = proxy
+        .call(callbacks::EXECUTE, (&job, &run_id))
+        .await
+        .unwrap();
+    let _: Attempt = proxy
+        .call(callbacks::SCHEDULE_TRIGGER, ("flow-event-pair", &run_id))
+        .await
+        .unwrap();
+    let _: Attempt = proxy
+        .call(callbacks::SCHEDULE_TRIGGER, ("flow-event-pair", &run_id))
+        .await
+        .unwrap();
+    let _: String = proxy
+        .call(
+            callbacks::DELIVER,
+            (
+                &job,
+                &run_id,
+                &Attempt {
+                    success: true,
+                    output: "done".into(),
+                    retryable: false,
+                },
+            ),
+        )
+        .await
+        .unwrap();
+    let completion = tokio::time::timeout(std::time::Duration::from_secs(2), async {
+        let mut seen = Vec::new();
+        loop {
+            let event = events_rx
+                .recv()
+                .await
+                .expect("event subscriber remains open");
+            seen.push(event);
+            if event == "completed" {
+                break;
+            }
+        }
+        seen
+    })
+    .await
+    .expect("completion event arrives");
+    assert_eq!(completion, vec!["triggered", "completed"]);
+
+    let refused_job = crate::cron::add_flow_schedule_job(
+        &config,
+        "flow-event-refused",
+        Schedule::Every {
+            every_ms: 3_600_000,
+        },
+    )
+    .unwrap();
+    let (_refusing_host, refusing_proxy) = host(&config, true).await;
+    let (refused_tx, mut refused_rx) = mpsc::unbounded_channel();
+    let _refused_subscription = crate::core::bus::BUS
+        .subscribe(Arc::new(CronEvents(refused_job.id.clone(), refused_tx)))
+        .unwrap();
+    let refused_run = format!("flow-refused-{}", uuid::Uuid::new_v4());
+    let refused_attempt: Attempt = refusing_proxy
+        .call(
+            callbacks::SCHEDULE_TRIGGER,
+            ("flow-event-refused", &refused_run),
+        )
+        .await
+        .unwrap();
+    assert!(!refused_attempt.success);
+    let _: String = refusing_proxy
+        .call(
+            callbacks::DELIVER,
+            (&refused_job, &refused_run, &refused_attempt),
+        )
+        .await
+        .unwrap();
+    let refused_pair = tokio::time::timeout(std::time::Duration::from_secs(2), async {
+        let mut seen = Vec::new();
+        loop {
+            let event = refused_rx
+                .recv()
+                .await
+                .expect("refusal event subscriber remains open");
+            seen.push(event);
+            if event == "completed" {
+                break;
+            }
+        }
+        seen
+    })
+    .await
+    .expect("refused run completion event arrives");
+    assert_eq!(refused_pair, vec!["triggered", "completed"]);
+
+    let (system_tx, mut system_rx) = mpsc::unbounded_channel();
+    let system_job = crate::cron::system_jobs::ensure_system_job(
+        &config,
+        "issue57-event-pair",
+        Schedule::Every {
+            every_ms: 3_600_000,
+        },
+    )
+    .unwrap();
+    let _system_handler = crate::cron::system_job_handlers::register(
+        "issue57-event-pair",
+        Arc::new(|_| Box::pin(async { Ok(()) })),
+    );
+    let _system_subscription = crate::core::bus::BUS
+        .subscribe(Arc::new(CronEvents(system_job.id.clone(), system_tx)))
+        .unwrap();
+    let system_run = format!("flow-system-{}", uuid::Uuid::new_v4());
+    let system_attempt: Attempt = proxy
+        .call(callbacks::EXECUTE, (&system_job, &system_run))
+        .await
+        .unwrap();
+    assert!(system_attempt.success);
+    let _: String = proxy
+        .call(
+            callbacks::DELIVER,
+            (&system_job, &system_run, &system_attempt),
+        )
+        .await
+        .unwrap();
+    let system_pair = tokio::time::timeout(std::time::Duration::from_secs(2), async {
+        let mut seen = Vec::new();
+        loop {
+            let event = system_rx
+                .recv()
+                .await
+                .expect("system event subscriber remains open");
+            seen.push(event);
+            if event == "completed" {
+                break;
+            }
+        }
+        seen
+    })
+    .await
+    .expect("system completion event arrives");
+    assert_eq!(system_pair, vec!["triggered", "completed"]);
+}
+
 #[tokio::test]
 async fn dropping_the_registration_stops_serving_the_object() {
     let tmp = TempDir::new().unwrap();

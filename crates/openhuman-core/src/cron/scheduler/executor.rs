@@ -14,8 +14,6 @@ use super::failure_classification::{
     is_api_key_unset_failure, is_budget_exhausted_failure, is_insufficient_credits_failure,
     is_local_provider_unreachable_failure, is_session_expired_failure, permanent_halt_message,
 };
-use crate::core::bus::BUS;
-use crate::core::events::DomainEvent;
 use crate::cron::bus_host::{kind_refusal, Binding};
 use crate::cron::handlers::{kind_handler, JobRunContext};
 use std::collections::HashMap;
@@ -100,11 +98,7 @@ impl HostExecutor {
         let config = self.binding.config();
         if self.begin(run_id) {
             warn_if_high_frequency_agent_job(&config, job).await;
-            BUS.publish(DomainEvent::CronJobTriggered {
-                job_id: job.id.clone(),
-                job_name: job.name.clone().unwrap_or_default(),
-                job_type: format!("{:?}", job.job_type),
-            });
+            self.binding.publish_triggered_once(job, run_id);
         }
         // A hosted-profile sweep runs agent jobs only.
         if let Some(refusal) = kind_refusal(&self.binding, &job.job_type) {
@@ -244,6 +238,7 @@ impl HostExecutor {
     /// The retries-exhausted (or permanent) report, once per failed run.
     pub(crate) async fn failed(&self, job: &CronJob, run_id: &str, attempt: &Attempt) {
         let state = self.forget(run_id).unwrap_or_default();
+        self.binding.finish_triggered_run(run_id);
         if !matches!(job.job_type, JobType::Agent) {
             return;
         }
