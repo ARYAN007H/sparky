@@ -131,6 +131,59 @@ pub(crate) fn typed_dispatch_for(
     Some(dispatch)
 }
 
+/// Resolves the Jobs/Message adapter from the actual harness execution
+/// context. Live voice harnesses build their tool set before a parent turn
+/// exists, so their controls cannot capture the per-turn owner at registration.
+struct LiveSubagentControlDispatch {
+    name: String,
+    adapter: Arc<dyn Tool>,
+    tool_sets: Vec<SharedToolSet>,
+}
+
+#[async_trait]
+impl ToolDispatch<(), OpenHumanRunContext> for LiveSubagentControlDispatch {
+    fn tool(&self) -> Arc<dyn Tool> {
+        self.adapter.clone()
+    }
+
+    async fn execute(
+        &self,
+        state: &(),
+        call_id: tinyagents_harness::CallId,
+        arguments: serde_json::Value,
+        options: ToolCallOptions,
+        parent: &tinyagents_harness::context::RunContext<OpenHumanRunContext>,
+    ) -> anyhow::Result<ToolResult> {
+        let dispatches = subagent_control_dispatches(&self.tool_sets, &parent.data);
+        let Some(dispatch) = dispatches.get(&self.name) else {
+            return Ok(ToolResult::error(format!(
+                "{} requires an authenticated parent session",
+                self.name
+            )));
+        };
+        dispatch
+            .execute(state, call_id, arguments, options, parent)
+            .await
+    }
+}
+
+fn live_dispatch_selector(tool_sets: Vec<SharedToolSet>) -> DispatchSelector {
+    let fallback = dispatch_selector(tool_sets.clone());
+    Arc::new(move |name, adapter| {
+        if matches!(
+            name,
+            "list_subagents" | "wait_subagent" | "steer_subagent" | "close_subagent"
+        ) {
+            return Some(Arc::new(LiveSubagentControlDispatch {
+                name: name.to_owned(),
+                adapter,
+                tool_sets: tool_sets.clone(),
+            }));
+        }
+        fallback(name, adapter)
+    })
+}
+
 /// Names among the candidate tools that spawn or delegate to a sub-agent.
 fn candidate_spawn_tools(tool_sets: &[SharedToolSet]) -> HashSet<String> {
     tool_sets
@@ -427,7 +480,7 @@ pub(crate) fn host_tool_set_builder(
         .sets(tool_sets.iter().cloned())
         .admission(turn_admission(tool_sets, allowed, has_thread))
         .deferred(session_deferred.iter().cloned())
-        .dispatch(dispatch_selector(tool_sets.to_vec()))
+        .dispatch(live_dispatch_selector(tool_sets.to_vec()))
         .exec_scope(Arc::new(TurnOriginScope))
 }
 
