@@ -2,6 +2,8 @@
 
 #[cfg(test)]
 use crate::integrations::composio::builder_tools::ListFlowConnectionsTool;
+#[cfg(test)]
+use crate::integrations::composio::builder_tools::GetToolOutputSampleTool;
 
 #[cfg(test)]
 #[path = "builder_tools_support.rs"]
