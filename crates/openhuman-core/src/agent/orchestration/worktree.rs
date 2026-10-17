@@ -87,7 +87,6 @@ impl OpenHumanWorktreeIsolation {
         self.inner = self.inner.with_trusted_root(root);
         self
     }
-
 }
 
 struct OpenHumanWorktreeLifecycle;

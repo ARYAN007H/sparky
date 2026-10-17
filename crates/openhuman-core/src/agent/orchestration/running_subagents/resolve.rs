@@ -5,7 +5,9 @@
 
 use std::path::Path;
 
-use tinyagents_orchestration::subagent::{resolve_detached_or_durable, SubagentResumeRef, WaitError};
+use tinyagents_orchestration::subagent::{
+    SubagentResumeRef, WaitError, resolve_detached_or_durable,
+};
 
 use super::registry::{admit_workspace, owner_key, registry};
 use super::task_ledger::task_store_for_workspace;
