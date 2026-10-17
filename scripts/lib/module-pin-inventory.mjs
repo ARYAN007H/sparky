@@ -27,7 +27,15 @@ export const PIN_MAP = {
 
 /** Return each module repository needed by the pin gate, in stable order. */
 export function modulePinRepositories(pinMap = PIN_MAP) {
-  return [...new Set(Object.values(pinMap).map((entry) =>
-    entry.provider ? entry.provider.builtAgainst : (entry.submodule ?? entry.sharesWith),
-  ).filter(Boolean))].sort();
+  return [
+    ...new Set(
+      Object.values(pinMap)
+        .map((entry) =>
+          entry.provider
+            ? entry.provider.builtAgainst
+            : (entry.submodule ?? entry.sharesWith),
+        )
+        .filter(Boolean),
+    ),
+  ].sort();
 }
