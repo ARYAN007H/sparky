@@ -32,7 +32,7 @@ use crate::core::runtime::CoreContext;
 use crate::tools::delegate::DelegateToolDispatch;
 use crate::tools::implementations::threads::SpawnWorkerThreadDispatch;
 
-type RegisteredToolDispatch = Arc<dyn ToolDispatch<(), OpenHumanRunContext>>;
+pub(crate) type RegisteredToolDispatch = Arc<dyn ToolDispatch<(), OpenHumanRunContext>>;
 
 /// Keeps tools that need the live turn's execution context on their original
 /// run instead of treating them as sub-agent work. In particular, the memory
@@ -144,9 +144,18 @@ struct LiveSubagentControlDispatch {
 /// over `subagent_session_id`, while routing the selected value through the
 /// generic MessageTool's durable-session lookup. The session port then binds
 /// it to the authenticated full lifecycle key.
-struct TaskFirstSessionMessageDispatch {
+pub(crate) struct TaskFirstSessionMessageDispatch {
     inner: RegisteredToolDispatch,
     tool: Arc<dyn Tool>,
+}
+
+impl TaskFirstSessionMessageDispatch {
+    pub(crate) fn new(inner: RegisteredToolDispatch) -> Self {
+        Self {
+            tool: inner.tool(),
+            inner,
+        }
+    }
 }
 
 #[async_trait]
@@ -478,10 +487,7 @@ fn subagent_control_dispatches(
             );
         dispatches.insert(
             "steer_subagent".into(),
-            Arc::new(TaskFirstSessionMessageDispatch {
-                tool: dispatch.tool(),
-                inner: dispatch,
-            }),
+            Arc::new(TaskFirstSessionMessageDispatch::new(dispatch)),
         );
     }
     dispatches
