@@ -1,4 +1,4 @@
-use super::{journal_projection::spans_from_observations, RunType, TraceContext};
+use tinyagents_harness::observability::trace_export::TraceContext;
 use tinyagents_harness::events::AgentEvent;
 use tinyagents_harness::ids::{CallId, EventId, RunId};
 use tinyagents_harness::observability::trace_export::collector::SpanCollector as NativeSpanCollector;
@@ -43,6 +43,11 @@ fn parent_run() -> Vec<AgentObservation> {
         ),
         root_observation(
             1,
+            1_005,
+            AgentEvent::TurnStarted { turn: 1 },
+        ),
+        root_observation(
+            2,
             1_010,
             AgentEvent::ModelStarted {
                 call_id: CallId::new("same-call"),
@@ -50,7 +55,7 @@ fn parent_run() -> Vec<AgentObservation> {
             },
         ),
         root_observation(
-            2,
+            3,
             1_020,
             AgentEvent::ToolStarted {
                 parent_call_id: None,
@@ -60,23 +65,23 @@ fn parent_run() -> Vec<AgentObservation> {
             },
         ),
         root_observation(
-            3,
-            1_030,
-            AgentEvent::SubAgentStarted {
-                name: "researcher".to_string(),
-                depth: 1,
-            },
-        ),
-        root_observation(
             4,
-            1_080,
-            AgentEvent::SubAgentCompleted {
+            1_030,
+            AgentEvent::SubAgentRunStarted {
                 name: "researcher".to_string(),
                 depth: 1,
+                run_id: RunId::new("child-run"),
             },
         ),
         root_observation(
             5,
+            1_080,
+            AgentEvent::SubAgentRunCompleted {
+                run_id: RunId::new("child-run"),
+            },
+        ),
+        root_observation(
+            6,
             1_090,
             AgentEvent::ToolCompleted {
                 parent_call_id: None,
@@ -92,7 +97,7 @@ fn parent_run() -> Vec<AgentObservation> {
             },
         ),
         root_observation(
-            6,
+            7,
             1_100,
             AgentEvent::ModelCompleted {
                 call_id: CallId::new("same-call"),
@@ -103,7 +108,16 @@ fn parent_run() -> Vec<AgentObservation> {
             },
         ),
         root_observation(
-            7,
+            8,
+            1_105,
+            AgentEvent::TurnCompleted {
+                turn: 1,
+                tool_result_count: 1,
+                tool_call_ids: vec![CallId::new("tool-1")],
+            },
+        ),
+        root_observation(
+            9,
             1_110,
             AgentEvent::RunCompleted {
                 run_id: RunId::new("root-run"),
@@ -125,6 +139,11 @@ fn child_run() -> Vec<AgentObservation> {
         ),
         child_observation(
             1,
+            1_045,
+            AgentEvent::TurnStarted { turn: 1 },
+        ),
+        child_observation(
+            2,
             1_050,
             AgentEvent::ModelStarted {
                 call_id: CallId::new("same-call"),
@@ -132,7 +151,7 @@ fn child_run() -> Vec<AgentObservation> {
             },
         ),
         child_observation(
-            2,
+            3,
             1_060,
             AgentEvent::ModelCompleted {
                 call_id: CallId::new("same-call"),
@@ -143,7 +162,16 @@ fn child_run() -> Vec<AgentObservation> {
             },
         ),
         child_observation(
-            3,
+            4,
+            1_065,
+            AgentEvent::TurnCompleted {
+                turn: 1,
+                tool_result_count: 0,
+                tool_call_ids: Vec::new(),
+            },
+        ),
+        child_observation(
+            5,
             1_070,
             AgentEvent::RunCompleted {
                 run_id: RunId::new("child-run"),
@@ -176,53 +204,26 @@ fn normalized(spans: &[TraceSpan]) -> Vec<serde_json::Value> {
 
 #[test]
 fn per_run_trace_snapshots_keep_reused_call_ids_scoped_and_content_gated() {
-    let parent_ctx = TraceContext::new("trace-parent", Some("user-1".to_string()));
-    let child_ctx = TraceContext::new("trace-child", Some("user-1".to_string()))
-        .with_run_type(RunType::Subagent);
+    let parent_ctx = TraceContext::new("trace-parent", Some("user-1".to_string()))
+        .with_run_lineage(Some("root-run".into()), None, Some("root-run".into()));
     let parent_observations = parent_run();
     let child_observations = child_run();
-
-    let parent_legacy = spans_from_observations(parent_ctx.clone(), 10, &parent_observations);
-    let rooted_child = tinyagents_harness::observability::trace_export::journal_export::root_subagent_observations(&child_observations);
-    let child_legacy = spans_from_observations(child_ctx.clone(), 10, &rooted_child);
-    let mut parent_native = NativeSpanCollector::new(parent_ctx.clone());
-    for observation in &parent_observations {
-        parent_native.record(observation);
+    let observations =
+        crate::agent::tinyagents::journal::merge_run_observations(vec![parent_observations.clone(), child_observations.clone()]);
+    let mut native = NativeSpanCollector::new(parent_ctx.clone());
+    for observation in &observations {
+        native.record(observation);
     }
-    parent_native.finish(1_110);
-    let mut child_native = NativeSpanCollector::new(child_ctx.clone());
-    for observation in &rooted_child {
-        child_native.record(observation);
-    }
-    child_native.finish(1_070);
+    native.finish(1_110);
+    let snapshot = normalized(native.spans());
+    println!("NATIVE_TREE:{}", serde_json::to_string_pretty(&snapshot).unwrap());
 
-    let parent_legacy_snapshot = normalized(&parent_legacy);
-    let child_legacy_snapshot = normalized(&child_legacy);
-    let parent_native_snapshot = normalized(&parent_native.spans());
-    let child_native_snapshot = normalized(&child_native.spans());
-    println!("PARENT_LEGACY:{}", serde_json::to_string_pretty(&parent_legacy_snapshot).unwrap());
-    println!("CHILD_LEGACY:{}", serde_json::to_string_pretty(&child_legacy_snapshot).unwrap());
-    println!("PARENT_NATIVE:{}", serde_json::to_string_pretty(&parent_native_snapshot).unwrap());
-    println!("CHILD_NATIVE:{}", serde_json::to_string_pretty(&child_native_snapshot).unwrap());
-
-    assert_eq!(
-        parent_legacy.iter().find(|span| span.kind == super::SpanKind::Generation).unwrap().name,
-        "llm.gpt-4"
-    );
-    assert_eq!(
-        child_legacy.iter().find(|span| span.kind == super::SpanKind::Generation).unwrap().name,
-        "llm.gpt-4-mini"
-    );
     assert!(
-        !spans_to_ndjson(SpanEnvelope::Otel, &parent_native.spans()).contains("CONTENT_SENTINEL"),
-        "content-off export must not contain parent payloads"
-    );
-    assert!(
-        !spans_to_ndjson(SpanEnvelope::Otel, &child_native.spans()).contains("CONTENT_SENTINEL"),
-        "content-off export must not contain child payloads"
+        !spans_to_ndjson(SpanEnvelope::Otel, native.spans()).contains("CONTENT_SENTINEL"),
+        "content-off export must not contain parent or child payloads"
     );
     let mut captured = NativeSpanCollector::new(parent_ctx.with_capture_content(true));
-    for observation in &parent_observations {
+    for observation in &observations {
         captured.record(observation);
     }
     captured.finish(1_110);
@@ -231,12 +232,18 @@ fn per_run_trace_snapshots_keep_reused_call_ids_scoped_and_content_gated() {
             .contains("CONTENT_SENTINEL_PROMPT"),
         "content-on export retains opted-in prompt content"
     );
-    assert_eq!(
-        parent_legacy.iter().find(|span| span.name == "llm.gpt-4").unwrap().attributes["gen_ai.usage.input_tokens"],
-        serde_json::json!(100)
-    );
-    assert_eq!(
-        child_legacy.iter().find(|span| span.name == "llm.gpt-4-mini").unwrap().attributes["gen_ai.usage.input_tokens"],
-        serde_json::json!(7)
-    );
+    let root_generation = native
+        .spans()
+        .iter()
+        .find(|span| span.name == "llm.gpt-4")
+        .expect("root generation survives export");
+    let child_generation = native
+        .spans()
+        .iter()
+        .find(|span| span.name == "llm.gpt-4-mini")
+        .expect("child generation survives export despite reused call id");
+    assert_eq!(root_generation.attributes["gen_ai.usage.input_tokens"], serde_json::json!(100));
+    assert_eq!(child_generation.attributes["gen_ai.usage.input_tokens"], serde_json::json!(7));
+    assert!(snapshot.iter().any(|span| span["name"] == "agent.iteration"));
+    assert!(snapshot.iter().any(|span| span["name"] == "subagent.iteration"));
 }
