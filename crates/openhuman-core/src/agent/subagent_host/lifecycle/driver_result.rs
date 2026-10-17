@@ -94,6 +94,11 @@ pub(crate) async fn resolve_inline_driver_outcome(
         return Ok((host, public_job_id));
     }
 
+    if let Some(outcome) = cached.filter(|host| {
+        host.persistence_disposition == SubagentPersistenceDisposition::ObserverCancelled
+    }) {
+        return Ok((outcome, public_job_id));
+    }
     Err(SubagentRunError::Provider(anyhow::anyhow!(
         "driver-backed subagent returned without a durable host outcome"
     )))
