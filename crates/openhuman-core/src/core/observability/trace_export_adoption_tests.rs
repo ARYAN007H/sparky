@@ -333,3 +333,41 @@ fn child_native_failure_survives_parent_acknowledgement_at_same_timestamp() {
     assert_eq!(child_span.status, SpanStatus::Error);
     assert_eq!(child_span.attributes["error.message"], "child provider failed");
 }
+
+#[test]
+fn separate_child_trace_roots_observations_but_retains_parent_lineage() {
+    use tinyagents_harness::observability::trace_export::{RunType, SpanKind};
+
+    let child = child_run();
+    let rooted = tinyagents_harness::observability::trace_export::journal_export::root_subagent_observations(&child);
+    let trace_context = TraceContext::new("subagent:child-run", Some("user-1".into()))
+        .with_session_group("conversation-1")
+        .with_agent_id("researcher")
+        .with_channel_source("subagent")
+        .with_run_type(RunType::Subagent)
+        .with_capture_content(false)
+        .with_run_lineage(
+            Some("child-run".into()),
+            Some("root-run".into()),
+            Some("root-run".into()),
+        );
+    let mut collector = NativeSpanCollector::new(trace_context)
+        .with_observation_root(RunId::new("child-run"));
+    for observation in &rooted {
+        collector.record(observation);
+    }
+    collector.finish(1_070);
+
+    let root = collector
+        .spans()
+        .iter()
+        .find(|span| span.kind == SpanKind::Turn)
+        .expect("child trace has its own root turn");
+    assert_eq!(root.attributes["run_id"], "child-run");
+    assert_eq!(root.attributes["parent_run_id"], "root-run");
+    assert_eq!(root.attributes["root_run_id"], "root-run");
+    assert!(collector
+        .spans()
+        .iter()
+        .all(|span| span.trace_id == "subagent:child-run"));
+}
