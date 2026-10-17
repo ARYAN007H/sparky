@@ -201,12 +201,13 @@ async fn cancelling_a_paused_driver_through_rpc_settles_once_with_its_reason() {
     assert_eq!(paused_job.status, SubAgentJobStatus::AwaitingInput);
     assert!(pending_for(workspace.path(), "paused-cancel-rpc-thread").is_empty());
     let sessions = SubagentSessionStore::new(workspace.path().to_path_buf());
-    let before_row = sessions
-        .load()
-        .expect("paused durable session list")
+    let before_rows = sessions.load().expect("paused durable session list");
+    let before_row = before_rows
         .into_iter()
         .find(|row| row.current_task_id.as_deref() == Some(task_id.as_str()))
-        .expect("RPC selector uses the accepted durable task id");
+        .unwrap_or_else(|| {
+            panic!("RPC selector uses accepted task id {task_id}; durable rows: {before_rows:#?}")
+        });
     assert_eq!(before_row.status, DurableSubagentStatus::AwaitingUser);
     assert_eq!(before_row.parent_session, "paused-cancel-rpc-parent");
     assert_eq!(
