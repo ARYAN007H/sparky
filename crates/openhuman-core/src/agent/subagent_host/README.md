@@ -34,6 +34,7 @@ all new canonical pause and terminal writes go through TinyAgents.
 | [`ops/graph/transcript.rs`](./ops/graph/transcript.rs) | Tenant-scoped transcript/session bridge and worker mirror inputs |
 | [`ops/checkpoint.rs`](./ops/checkpoint.rs) | Host model invocation and usage capture for TinyAgents cap summarization |
 | [`ops/prompt.rs`](./ops/prompt.rs) | Product artifact-offload prompt contract appended to TinyAgents framing |
+| [`ops/runner_artifacts.rs`](./ops/runner_artifacts.rs) | Tenant-authorized artifact storage, path projection, and result cap adapter |
 | [`tool_prep.rs`](./tool_prep.rs) | Product prompt loading, deny/recovery precedence, delegation aliases, and host tool-order projection around TinyAgents restrictions |
 | [`autonomous.rs`](./autonomous.rs) | OpenHuman autonomous iteration-cap policy |
 
