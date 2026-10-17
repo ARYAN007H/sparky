@@ -1,7 +1,7 @@
 //! Registration of flow authoring, execution, discovery, and memory tools.
 
-use super::copilot_bus::CopilotToolCatalog;
 use super::builder_tools_connection_reads::FlowsConnectionProvider;
+use super::copilot_bus::CopilotToolCatalog;
 use super::memory_tools::{FlowMemoryRecallTool, FlowMemoryRememberTool};
 use crate::config::Config;
 use crate::security::SecurityPolicy;
@@ -18,7 +18,9 @@ fn push_copilot_tool(
     };
     match catalog.tool(name) {
         Ok(tool) => tools.push(Box::new(tool)),
-        Err(error) => tracing::error!(tool = name, %error, "[flows] Copilot tool missing from module catalogue"),
+        Err(error) => {
+            tracing::error!(tool = name, %error, "[flows] Copilot tool missing from module catalogue")
+        }
     }
 }
 
@@ -52,10 +54,12 @@ pub(crate) fn tools(config: Arc<Config>, security: &Arc<SecurityPolicy>) -> Vec<
         push_copilot_tool(&mut tools, copilot.as_ref(), name);
     }
 
-    tools.push(Box::new(crate::integrations::composio::builder_tools::ListFlowConnectionsTool::new(
-        config.clone(),
-        Arc::new(FlowsConnectionProvider),
-    )));
+    tools.push(Box::new(
+        crate::integrations::composio::builder_tools::ListFlowConnectionsTool::new(
+            config.clone(),
+            Arc::new(FlowsConnectionProvider),
+        ),
+    ));
     tools.push(Box::new(
         crate::integrations::composio::builder_tools::SearchToolCatalogTool::new(config.clone()),
     ));
@@ -66,9 +70,7 @@ pub(crate) fn tools(config: Arc<Config>, security: &Arc<SecurityPolicy>) -> Vec<
         crate::integrations::composio::builder_tools::GetToolOutputSampleTool::new(config.clone()),
     ));
 
-    for name in [
-        "list_agent_definitions",
-    ] {
+    for name in ["list_agent_definitions"] {
         push_copilot_tool(&mut tools, copilot.as_ref(), name);
     }
     tools.push(Box::new(

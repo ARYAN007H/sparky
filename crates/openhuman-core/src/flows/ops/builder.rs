@@ -370,9 +370,7 @@ pub(crate) async fn flows_build_with_extra_hidden_tools(
     // that makes it a hard invariant regardless of model behavior — the user
     // is NEVER left with silence or an unanswerable status note.
     let trail_off = !capped && proposal.is_none() && run_error.is_none();
-    let assistant_text = if trail_off
-        && !text_looks_like_question(config, &assistant_text).await?
-    {
+    let assistant_text = if trail_off && !text_looks_like_question(config, &assistant_text).await? {
         let runtime_history = agent.history();
         let fallback = build_trail_off_fallback(config, &runtime_history).await?;
         let combined = combine_trail_off_fallback(config, &fallback, &assistant_text).await?;
@@ -499,4 +497,3 @@ pub(crate) fn start_builder_turn_clean(agent: &mut crate::agent::OpenHumanSessio
         ..Default::default()
     });
 }
-

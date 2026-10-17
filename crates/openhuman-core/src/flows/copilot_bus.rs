@@ -60,7 +60,10 @@ impl CopilotToolCatalog {
                     descriptor.name, descriptor.permission
                 )
             })?;
-            if by_name.insert(descriptor.name.clone(), descriptor).is_some() {
+            if by_name
+                .insert(descriptor.name.clone(), descriptor)
+                .is_some()
+            {
                 return Err("TinyFlows Copilot returned duplicate tool names".into());
             }
         }

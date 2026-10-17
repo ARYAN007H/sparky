@@ -42,7 +42,7 @@ pub(crate) fn disabled_message() -> String {
 
 #[cfg(feature = "modules")]
 mod imp {
-    use super::{disabled_message, HOST_BUS_NAME, MODULE_ID};
+    use super::{HOST_BUS_NAME, MODULE_ID, disabled_message};
     use crate::config::Config;
     #[cfg(not(test))]
     use crate::modules::ops;
@@ -188,7 +188,7 @@ mod imp {
 mod fixture;
 
 #[cfg(feature = "modules")]
-    pub(crate) use imp::{copilot_proxy, proxy, run_proxy, serve, unserve};
+pub(crate) use imp::{copilot_proxy, proxy, run_proxy, serve, unserve};
 
 #[cfg(not(feature = "modules"))]
 mod imp {

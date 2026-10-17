@@ -454,8 +454,8 @@ async fn validate_required_arg_resolvability_rejects_an_explicit_nodes_reference
 }
 
 /// A required tool arg wired to a PLAIN agent node's (`no agent_ref`)
-/// `output_parser.schema` field must pass this sandbox gate: the schema-aware
-/// mock LLM (wired above via `caps.llm = SchemaAwareMockLlm`) synthesizes a
+/// `output_parser.schema` field must pass this sandbox gate: the module's
+/// schema-aware mock LLM synthesizes a
 /// schema-valid completion, so the agent's output-parser sub-port succeeds and
 /// the downstream `=nodes.<agent>.item.json.<field>` binding resolves to a typed
 /// placeholder (non-null) instead of the run aborting on a schema-validation

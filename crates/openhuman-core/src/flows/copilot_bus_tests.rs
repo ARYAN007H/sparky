@@ -10,10 +10,7 @@ async fn module_tool_descriptors_preserve_run_and_sandbox_safety_metadata() {
     let run = catalog.tool("run_flow").expect("run_flow is catalogued");
     assert_eq!(run.permission_level(), PermissionLevel::Write);
     assert!(run.external_effect());
-    assert_eq!(
-        run.parameters_schema()["required"],
-        json!(["flow_id"])
-    );
+    assert_eq!(run.parameters_schema()["required"], json!(["flow_id"]));
 
     let dry_run = catalog
         .tool("dry_run_workflow")

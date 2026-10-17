@@ -390,7 +390,9 @@ async fn combine_trail_off_fallback_returns_fallback_alone_for_genuine_silence()
     let config = Config::default();
     let fallback = build_trail_off_fallback(&config, &[]).await.unwrap();
     assert_eq!(
-        combine_trail_off_fallback(&config, &fallback, "").await.unwrap(),
+        combine_trail_off_fallback(&config, &fallback, "")
+            .await
+            .unwrap(),
         fallback
     );
     assert_eq!(

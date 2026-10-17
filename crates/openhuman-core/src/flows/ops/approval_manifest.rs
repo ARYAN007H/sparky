@@ -38,7 +38,7 @@ pub async fn compute_approval_manifest(config: &Config, graph: &WorkflowGraph) -
     use crate::security::{GateDecision, SecurityPolicy};
     use tinybox_bus::CommandClass;
     use tinyflows_catalog::approval_manifest::{
-        assemble_manifest, manifest_candidates, ManifestCandidate, ManifestClass,
+        ManifestCandidate, ManifestClass, assemble_manifest, manifest_candidates,
     };
 
     let security =

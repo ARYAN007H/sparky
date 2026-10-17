@@ -44,12 +44,9 @@ pub(super) async fn combine_trail_off_fallback(
     fallback: &str,
     original: &str,
 ) -> Result<String, String> {
-    let response: TextResponse = crate::flows::copilot_bus::call(
-        config,
-        "CombineTrailOffFallback",
-        (fallback, original),
-    )
-    .await?;
+    let response: TextResponse =
+        crate::flows::copilot_bus::call(config, "CombineTrailOffFallback", (fallback, original))
+            .await?;
     Ok(response.text)
 }
 

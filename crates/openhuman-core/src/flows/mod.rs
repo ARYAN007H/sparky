@@ -26,11 +26,11 @@
 mod agent_route;
 pub mod agents;
 pub mod builder_host;
-mod copilot_bus;
 pub(crate) mod builder_tools;
 mod builder_tools_connection_reads;
 pub mod bus;
 pub mod catalogue;
+mod copilot_bus;
 mod draft_store;
 pub mod memory_tools;
 pub mod node_contracts;
@@ -67,6 +67,6 @@ pub use {node_contracts::all_node_kind_contracts, node_contracts::node_kind_cont
 // subscriber, `flows_delete` and the tinyflows `memory` node adapter reach the
 // same helpers through these re-exports so every caller tags identically.
 pub use memory_tools::{
-    cross_flow_filter, flow_filter, flow_key_of, flow_key_tag, flow_meta, flow_tag,
-    forget_matching, remember_keyed, FLOWS_TAG,
+    FLOWS_TAG, cross_flow_filter, flow_filter, flow_key_of, flow_key_tag, flow_meta, flow_tag,
+    forget_matching, remember_keyed,
 };
