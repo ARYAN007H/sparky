@@ -258,15 +258,12 @@ async fn packed_delegate_uses_scoped_target_and_registers_shared_job() {
     let mut target = crate::agent::harness::test_support::test_inherit_echo_def();
     target.id = "scoped_only_packed_worker".into();
     target.delegate_name = Some("create_image".into());
-    let definitions = Arc::new(
-        AgentDefinitionRegistry::default().with_definitions([target]),
-    );
+    let definitions = Arc::new(AgentDefinitionRegistry::default().with_definitions([target]));
     let mut config = crate::config::Config::default();
     config.workspace_dir = workspace.path().to_path_buf();
     config.components.juice = false;
     let core = CoreContext::for_test_with_config(DomainSet::full(), config.clone()).derive_with(
-        ContextOverlay::new(config, DomainSet::full(), ToolGroups::none())
-            .definitions(definitions),
+        ContextOverlay::new(config, DomainSet::full(), ToolGroups::none()).definitions(definitions),
     );
     let mut parent_context = parent_execution_context(workspace.path());
     parent_context.allowed_subagent_ids = ["scoped_only_packed_worker".to_string()]
@@ -296,11 +293,14 @@ async fn packed_delegate_uses_scoped_target_and_registers_shared_job() {
     assert!(!result.is_error, "{}", result.output());
     assert_eq!(result.text(), "a generated image description");
     let jobs = crate::core::runtime::slot_for::<SubAgentJobRegistry>(&parent.data.dispatch_ctx());
-    assert!(jobs.list().iter().any(|job| {
-        job.agent == "scoped_only_packed_worker"
-            && job.status == SubAgentJobStatus::Completed
-            && job.output.as_deref() == Some("a generated image description")
-    }), "the packed target executes through the shared driver job registry");
+    assert!(
+        jobs.list().iter().any(|job| {
+            job.agent == "scoped_only_packed_worker"
+                && job.status == SubAgentJobStatus::Completed
+                && job.output.as_deref() == Some("a generated image description")
+        }),
+        "the packed target executes through the shared driver job registry"
+    );
 }
 
 /// The disclosure half (no `tool` named) needs no live parent at all, and

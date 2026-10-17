@@ -11,10 +11,10 @@ use serde_json::{json, Value};
 use tinyagents_orchestration::subagent::SubagentResumeRef;
 use tinytools::{PermissionLevel, Tool, ToolResult, ToolTimeout};
 
+use crate::agent::orchestration::subagent_sessions;
 use crate::agent::orchestration::subagent_sessions::{
     DurableSubagentSessionSummary, DurableSubagentStatus,
 };
-use crate::agent::orchestration::subagent_sessions;
 use tinyagents_tasks::{OrchestrationTaskRecord, OrchestrationTaskStatus};
 
 pub struct ListSubagentsTool;
@@ -125,7 +125,11 @@ impl Tool for WaitSubagentTool {
     }
 
     async fn execute(&self, args: Value) -> anyhow::Result<ToolResult> {
-        let task_id = args.get("task_id").and_then(Value::as_str).unwrap_or("").trim();
+        let task_id = args
+            .get("task_id")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .trim();
         let session_id = args
             .get("subagent_session_id")
             .and_then(Value::as_str)
@@ -173,13 +177,21 @@ impl Tool for SteerSubagentTool {
     }
 
     async fn execute(&self, args: Value) -> anyhow::Result<ToolResult> {
-        let task_id = args.get("task_id").and_then(Value::as_str).unwrap_or("").trim();
+        let task_id = args
+            .get("task_id")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .trim();
         let session_id = args
             .get("subagent_session_id")
             .and_then(Value::as_str)
             .unwrap_or("")
             .trim();
-        let message = args.get("message").and_then(Value::as_str).unwrap_or("").trim();
+        let message = args
+            .get("message")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .trim();
         if task_id.is_empty() && session_id.is_empty() {
             return Ok(ToolResult::error(
                 "steer_subagent: `subagent_session_id` or `task_id` is required",
@@ -263,22 +275,23 @@ pub(crate) fn overlay_task_store_status(
     let Some(task_id) = summary.current_task_id.clone() else {
         return;
     };
-    let record = match crate::agent::orchestration::running_subagents::task_record_for_task_in_workspace(
-        workspace_dir,
-        &task_id,
-        parent_session,
-    ) {
-        Ok(record) => record,
-        Err(tinyagents_orchestration::subagent::WaitError::Unknown) => return,
-        Err(tinyagents_orchestration::subagent::WaitError::RegistryPoisoned) => {
-            log::warn!("[subagent_reuse] task store overlay skipped task_id={} reason=registry_poisoned", task_id);
-            return;
-        }
-        Err(tinyagents_orchestration::subagent::WaitError::NotOwned) => {
-            log::warn!("[subagent_reuse] task store overlay rejected task_id={} subagent_session_id={} reason=not_owned", task_id, summary.subagent_session_id);
-            return;
-        }
-    };
+    let record =
+        match crate::agent::orchestration::running_subagents::task_record_for_task_in_workspace(
+            workspace_dir,
+            &task_id,
+            parent_session,
+        ) {
+            Ok(record) => record,
+            Err(tinyagents_orchestration::subagent::WaitError::Unknown) => return,
+            Err(tinyagents_orchestration::subagent::WaitError::RegistryPoisoned) => {
+                log::warn!("[subagent_reuse] task store overlay skipped task_id={} reason=registry_poisoned", task_id);
+                return;
+            }
+            Err(tinyagents_orchestration::subagent::WaitError::NotOwned) => {
+                log::warn!("[subagent_reuse] task store overlay rejected task_id={} subagent_session_id={} reason=not_owned", task_id, summary.subagent_session_id);
+                return;
+            }
+        };
     let previous = summary.status;
     apply_task_record_overlay(summary, record);
     if summary.status != previous {
@@ -313,7 +326,10 @@ fn apply_task_record_overlay(
             summary.status = DurableSubagentStatus::Failed;
             summary.reusable = false;
             summary.latest_error = Some(record.error.unwrap_or_else(|| {
-                format!("sub-agent reached durable task status `{}`", durable_status_label(record.status))
+                format!(
+                    "sub-agent reached durable task status `{}`",
+                    durable_status_label(record.status)
+                )
             }));
         }
     }
@@ -384,17 +400,17 @@ pub(crate) fn wait_status_payload(
 }
 
 #[cfg(test)]
+#[path = "close_subagent_tests.rs"]
+mod close_tests;
+#[cfg(test)]
 #[path = "list_subagents_tests.rs"]
 mod list_tests;
-#[cfg(test)]
-#[path = "wait_subagent_tests.rs"]
-mod wait_tests;
-#[cfg(test)]
-#[path = "steer_subagent_tests.rs"]
-mod steer_tests;
 #[cfg(test)]
 #[path = "steer_subagent_schema_tests.rs"]
 mod steer_schema_tests;
 #[cfg(test)]
-#[path = "close_subagent_tests.rs"]
-mod close_tests;
+#[path = "steer_subagent_tests.rs"]
+mod steer_tests;
+#[cfg(test)]
+#[path = "wait_subagent_tests.rs"]
+mod wait_tests;

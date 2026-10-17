@@ -30,7 +30,9 @@ enum DelegationDispatchKind {
     Collapsed {
         targets: Result<Vec<super::collapsed_delegation::DelegateTarget>, String>,
     },
-    Archetype { agent_id: String },
+    Archetype {
+        agent_id: String,
+    },
 }
 
 impl DelegationDispatch {

@@ -73,10 +73,10 @@ async fn force_fresh_cancels_old_driver_before_creating_a_new_session() {
     use crate::core::runtime::{ContextOverlay, CoreContext, DomainSet};
     use crate::tools::toolpacks::ToolGroups;
     use tinyagents_harness::context::RunContext;
+    use tinyagents_harness::tool::ToolDispatch;
     use tinyagents_orchestration::subagent::{
         SubAgentJobRegistry, SubAgentJobStatus, SubAgentJobsTool,
     };
-    use tinyagents_harness::tool::ToolDispatch;
 
     struct GatedModel {
         calls: std::sync::atomic::AtomicUsize,
@@ -143,8 +143,7 @@ async fn force_fresh_cancels_old_driver_before_creating_a_new_session() {
     config.workspace_dir = workspace.clone();
     config.components.juice = false;
     let core = CoreContext::for_test_with_config(DomainSet::full(), config.clone()).derive_with(
-        ContextOverlay::new(config, DomainSet::full(), ToolGroups::none())
-            .definitions(definitions),
+        ContextOverlay::new(config, DomainSet::full(), ToolGroups::none()).definitions(definitions),
     );
     let mut host_context = OpenHumanRunContext::new()
         .with_core(Some(Arc::clone(&core)))
@@ -264,8 +263,8 @@ async fn force_fresh_cancels_old_driver_before_creating_a_new_session() {
 
     release_first.notify_one();
     release_second.notify_one();
-    let session_port = crate::agent::orchestration::subagent_sessions::
-        OpenHumanTinySubagentSessionStore::new(
+    let session_port =
+        crate::agent::orchestration::subagent_sessions::OpenHumanTinySubagentSessionStore::new(
             workspace.clone(),
             "force-fresh-parent-session",
             Some("force-fresh-parent-thread".into()),
@@ -302,7 +301,9 @@ async fn force_fresh_cancels_old_driver_before_creating_a_new_session() {
         serde_json::from_str(&settled.output()).expect("wait returns job JSON");
     assert_eq!(old_terminal["status"], "cancelled");
     assert_eq!(
-        jobs.get(&old_job.id.to_string()).expect("old child remains registered").status,
+        jobs.get(&old_job.id.to_string())
+            .expect("old child remains registered")
+            .status,
         SubAgentJobStatus::Cancelled
     );
     let new_settled = tokio::time::timeout(
@@ -326,13 +327,13 @@ async fn force_fresh_cancels_old_driver_before_creating_a_new_session() {
     assert_eq!(new_terminal["extensions"]["task_id"], fresh_task_id);
     let new_job_id = new_terminal["id"].as_str().expect("generic job ID");
     assert_eq!(
-        jobs.get(new_job_id).expect("replacement remains registered").status,
+        jobs.get(new_job_id)
+            .expect("replacement remains registered")
+            .status,
         SubAgentJobStatus::Completed
     );
     assert_eq!(provider.calls.load(std::sync::atomic::Ordering::SeqCst), 2);
-    let after_rows = store
-        .load()
-        .expect("final durable state");
+    let after_rows = store.load().expect("final durable state");
     let old_after = after_rows
         .iter()
         .find(|session| session.subagent_session_id == before.subagent_session_id)
@@ -344,7 +345,10 @@ async fn force_fresh_cancels_old_driver_before_creating_a_new_session() {
         .find(|session| session.subagent_session_id == replacement.subagent_session_id)
         .expect("replacement durable row remains present");
     assert_eq!(new_after.status, DurableSubagentStatus::Idle);
-    assert_eq!(new_after.current_task_id.as_deref(), Some(fresh_ref["task_id"].as_str().unwrap()));
+    assert_eq!(
+        new_after.current_task_id.as_deref(),
+        Some(fresh_ref["task_id"].as_str().unwrap())
+    );
 }
 
 #[tokio::test]
@@ -369,8 +373,7 @@ async fn stopped_async_spawn_is_refused_before_progress_or_session_effects() {
     config.workspace_dir = workspace.clone();
     config.components.juice = false;
     let core = CoreContext::for_test_with_config(DomainSet::full(), config.clone()).derive_with(
-        ContextOverlay::new(config, DomainSet::full(), ToolGroups::none())
-            .definitions(definitions),
+        ContextOverlay::new(config, DomainSet::full(), ToolGroups::none()).definitions(definitions),
     );
     let thread_id = "stopped-async-parent-thread";
     let mut host_context = OpenHumanRunContext::new()
@@ -378,14 +381,12 @@ async fn stopped_async_spawn_is_refused_before_progress_or_session_effects() {
         .with_parent(parent);
     host_context.thread_id = Some(thread_id.into());
     let live = RunContext::<OpenHumanRunContext>::new(
-        tinyagents_harness::context::RunConfig::new("stopped-async-parent")
-            .with_thread(thread_id),
+        tinyagents_harness::context::RunConfig::new("stopped-async-parent").with_thread(thread_id),
         host_context,
     );
     let dispatch = live.data.dispatch_ctx();
     crate::agent::orchestration::background_completions::discard_pending_for_thread(
-        &dispatch,
-        thread_id,
+        &dispatch, thread_id,
     );
     let detached_data = live.data.detached_child();
     let detached = live
@@ -410,14 +411,30 @@ async fn stopped_async_spawn_is_refused_before_progress_or_session_effects() {
         .await
         .expect("tool execution");
 
-    assert!(result.is_error, "a stopped thread must reject new child work");
-    assert!(result.output().contains("stopped or deleted"), "{}", result.output());
-    assert!(provider.seen.lock().is_empty(), "refusal must not dispatch the model");
-    assert!(progress_rx.try_recv().is_err(), "refusal must not publish spawn progress");
+    assert!(
+        result.is_error,
+        "a stopped thread must reject new child work"
+    );
+    assert!(
+        result.output().contains("stopped or deleted"),
+        "{}",
+        result.output()
+    );
+    assert!(
+        provider.seen.lock().is_empty(),
+        "refusal must not dispatch the model"
+    );
+    assert!(
+        progress_rx.try_recv().is_err(),
+        "refusal must not publish spawn progress"
+    );
     let jobs = crate::core::runtime::slot_for::<
         tinyagents_orchestration::subagent::SubAgentJobRegistry,
     >(&dispatch);
-    assert!(jobs.list().is_empty(), "refusal must not register a shared job");
+    assert!(
+        jobs.list().is_empty(),
+        "refusal must not register a shared job"
+    );
     assert!(
         crate::agent::orchestration::subagent_sessions::SubagentSessionStore::new(
             workspace.clone()
@@ -428,8 +445,7 @@ async fn stopped_async_spawn_is_refused_before_progress_or_session_effects() {
         "refusal must not persist an accepted session"
     );
     crate::agent::orchestration::background_completions::resume_stopped_thread(
-        &dispatch,
-        thread_id,
+        &dispatch, thread_id,
     );
 }
 
@@ -458,8 +474,7 @@ async fn detached_registration_failure_finishes_the_announced_product_card() {
     config.workspace_dir = workspace.clone();
     config.components.juice = false;
     let core = CoreContext::for_test_with_config(DomainSet::full(), config.clone()).derive_with(
-        ContextOverlay::new(config, DomainSet::full(), ToolGroups::none())
-            .definitions(definitions),
+        ContextOverlay::new(config, DomainSet::full(), ToolGroups::none()).definitions(definitions),
     );
     let thread_id = "registration-failure-parent-thread";
     let mut host_context = OpenHumanRunContext::new()
@@ -499,21 +514,30 @@ async fn detached_registration_failure_finishes_the_announced_product_card() {
     assert!(result.is_error, "depth rejection is a failed registration");
     let events = std::iter::from_fn(|| progress_rx.try_recv().ok()).collect::<Vec<_>>();
     assert!(
-        matches!(events.as_slice(), [
-            crate::progress::AgentProgress::SubagentSpawned { .. },
-            crate::progress::AgentProgress::SubagentFailed { .. }
-        ]),
+        matches!(
+            events.as_slice(),
+            [
+                crate::progress::AgentProgress::SubagentSpawned { .. },
+                crate::progress::AgentProgress::SubagentFailed { .. }
+            ]
+        ),
         "the announced product card must end in failure: {events:?}"
     );
     let store = SubagentSessionStore::new(workspace.clone());
     let rows = store.load().expect("session row is durable");
     assert_eq!(rows.len(), 1);
     assert_eq!(rows[0].status, DurableSubagentStatus::Failed);
-    assert!(provider.seen.lock().is_empty(), "registration error must not dispatch the model");
+    assert!(
+        provider.seen.lock().is_empty(),
+        "registration error must not dispatch the model"
+    );
     let jobs = crate::core::runtime::slot_for::<
         tinyagents_orchestration::subagent::SubAgentJobRegistry,
     >(&live.data.dispatch_ctx());
-    assert!(jobs.list().is_empty(), "failed request construction must not register a job");
+    assert!(
+        jobs.list().is_empty(),
+        "failed request construction must not register a job"
+    );
 }
 
 /// A child the harness stops early (failure breaker / iteration cap) is not a

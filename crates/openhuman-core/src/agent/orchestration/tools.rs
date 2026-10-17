@@ -34,10 +34,10 @@ mod spawn_async_subagent;
 mod spawn_parallel_agents;
 #[path = "tools/spawn_subagent.rs"]
 mod spawn_subagent;
-#[path = "tools/subagent_control_surfaces.rs"]
-mod subagent_control_surfaces;
 #[path = "tools/subagent_abort_report.rs"]
 mod subagent_abort_report;
+#[path = "tools/subagent_control_surfaces.rs"]
+mod subagent_control_surfaces;
 #[cfg(test)]
 #[path = "tools/tools_e2e_tests.rs"]
 mod tools_e2e_tests;
