@@ -67,9 +67,7 @@ pub(crate) fn flow_connection_entries(
         .filter(|connection| connection.is_active())
         .map(|connection| {
             let toolkit = connection.normalized_toolkit();
-            let normalize = |raw: &str| {
-                keys.get(raw).cloned().unwrap_or_else(|| raw.to_string())
-            };
+            let normalize = |raw: &str| keys.get(raw).cloned().unwrap_or_else(|| raw.to_string());
             let platform_user_id = identity_lookup
                 .get(&(normalize(&toolkit), normalize(&connection.id)))
                 .and_then(|identity| identity.user_id.clone());

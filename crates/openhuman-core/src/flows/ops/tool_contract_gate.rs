@@ -61,13 +61,17 @@ pub(crate) async fn validate_tool_contracts(config: &Config, graph: &WorkflowGra
         validate_tool_contract_nodes, ToolContractNode,
     };
 
-    let nodes: Vec<_> = graph.nodes.iter()
+    let nodes: Vec<_> = graph
+        .nodes
+        .iter()
         .filter(|node| node.kind == NodeKind::ToolCall)
-        .filter_map(|node| Some(ToolContractNode {
-            id: node.id.clone(),
-            slug: node.config.get("slug")?.as_str()?.to_string(),
-            args: node.config.get("args").cloned().unwrap_or(Value::Null),
-        }))
+        .filter_map(|node| {
+            Some(ToolContractNode {
+                id: node.id.clone(),
+                slug: node.config.get("slug")?.as_str()?.to_string(),
+                args: node.config.get("args").cloned().unwrap_or(Value::Null),
+            })
+        })
         .collect();
     validate_tool_contract_nodes(config, &nodes).await
 }

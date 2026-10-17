@@ -38,7 +38,9 @@ pub(crate) async fn lookup_contract(
 ) -> Result<(ToolContract, Option<&'static str>), ContractLookupError> {
     let trimmed = slug.trim();
     let Some(toolkit) = toolkit_for_contract_slug(trimmed) else {
-        return Err(ContractLookupError::InvalidSlug { slug: slug.to_string() });
+        return Err(ContractLookupError::InvalidSlug {
+            slug: slug.to_string(),
+        });
     };
     let Some(catalog) = fetch_live_toolkit_catalog(config, &toolkit).await else {
         return Err(ContractLookupError::CatalogUnavailable { toolkit });
@@ -46,10 +48,13 @@ pub(crate) async fn lookup_contract(
     let Some(contract) = catalog.iter().find(|contract| {
         crate::integrations::composio::contract::action_slug_matches(&contract.slug, trimmed)
     }) else {
-        return Err(ContractLookupError::ActionNotFound { slug: trimmed.to_string(), toolkit });
+        return Err(ContractLookupError::ActionNotFound {
+            slug: trimmed.to_string(),
+            toolkit,
+        });
     };
-    let warning = (!contract.is_curated && has_curated_catalog(&toolkit))
-        .then_some(RUNTIME_GATE_WARNING);
+    let warning =
+        (!contract.is_curated && has_curated_catalog(&toolkit)).then_some(RUNTIME_GATE_WARNING);
     Ok((contract.clone(), warning))
 }
 

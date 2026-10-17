@@ -79,16 +79,23 @@ pub(crate) async fn flow_tool_allowed(
     }
 
     if !connected_toolkits.is_some_and(|toolkits| {
-        toolkits.iter().any(|item| item.eq_ignore_ascii_case(&toolkit))
+        toolkits
+            .iter()
+            .any(|item| item.eq_ignore_ascii_case(&toolkit))
     }) {
         tracing::debug!(target: "flows", %slug, %toolkit, "[flows] tool_call curation: reject — toolkit has no static catalog and is not connected");
         return false;
     }
-    let Some(live_catalog) = crate::integrations::composio::catalog::fetch_live_toolkit_catalog(config, &toolkit).await else {
+    let Some(live_catalog) =
+        crate::integrations::composio::catalog::fetch_live_toolkit_catalog(config, &toolkit).await
+    else {
         tracing::warn!(target: "flows", %slug, %toolkit, "[flows] tool_call curation: reject — connected but the live catalog fetch failed (fail-closed)");
         return false;
     };
-    if !live_catalog.iter().any(|item| item.slug.eq_ignore_ascii_case(slug)) {
+    if !live_catalog
+        .iter()
+        .any(|item| item.slug.eq_ignore_ascii_case(slug))
+    {
         tracing::debug!(target: "flows", %slug, %toolkit, "[flows] tool_call curation: reject — slug is not a real action in this toolkit's live catalog");
         return false;
     }
@@ -165,7 +172,9 @@ pub(crate) async fn preflight_composio_args(
         tracing::warn!(target: "flows", %slug, error = %error, "[flows] preflight: static arg rule rejected the call — failing before dispatch");
         return Err(format!("tool_call `{slug}`: {error}"));
     }
-    let Some(required) = crate::integrations::composio::catalog::composio_required_args(config, slug).await else {
+    let Some(required) =
+        crate::integrations::composio::catalog::composio_required_args(config, slug).await
+    else {
         tracing::info!(target: "flows", %slug, "[flows] preflight: no live catalog schema for action — required-arg check limited to static rules");
         return Ok(());
     };
@@ -178,7 +187,11 @@ pub(crate) async fn preflight_composio_args(
         return Ok(());
     }
     tracing::warn!(target: "flows", %slug, ?missing, "[flows] preflight: required arg(s) missing or null — failing before dispatch");
-    let list = missing.iter().map(|name| format!("`{name}`")).collect::<Vec<_>>().join(", ");
+    let list = missing
+        .iter()
+        .map(|name| format!("`{name}`"))
+        .collect::<Vec<_>>()
+        .join(", ");
     let first = missing[0];
     Err(format!("tool_call `{slug}`: required arg(s) {list} missing or resolved to null — wire each from an upstream node's output, e.g. \"{first}\": \"=nodes.<node_id>.item.json.<field>\" (drop `.json` only if `<node_id>` is a code/transform/split_out/merge/trigger node — `agent`/`tool_call`/`http_request` nodes wrap their output in a `{{json,text,raw}}` envelope). If the value comes from an agent node, give that agent an output schema (config.output_parser.schema) so its fields are addressable."))
 }
@@ -197,5 +210,7 @@ pub(crate) fn reject_unsuccessful_composio_response(
         .map(str::trim)
         .filter(|value| !value.is_empty())
         .unwrap_or("no error detail returned by the provider");
-    Err(format!("tool_call `{slug}` failed at the connected provider: {detail}"))
+    Err(format!(
+        "tool_call `{slug}` failed at the connected provider: {detail}"
+    ))
 }

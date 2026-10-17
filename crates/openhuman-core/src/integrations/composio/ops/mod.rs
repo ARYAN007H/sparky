@@ -34,13 +34,13 @@ mod triggers;
 
 // ── Public re-exports (match original ops.rs public surface) ───────────────
 
+pub(crate) use connections::identity_lookup;
+pub(crate) use connections::title_case_toolkit;
 pub use connections::{
     active_connection_ids, composio_authorize, composio_delete_connection,
     composio_list_connections, ComposioDeleteResult,
 };
-pub(crate) use connections::identity_lookup;
 pub(crate) use connections::{flow_connection_entries, FlowConnectionEntry};
-pub(crate) use connections::title_case_toolkit;
 pub use direct_mode::{composio_clear_api_key, composio_get_mode, composio_set_api_key};
 pub(crate) use error_utils::{report_composio_op_error, should_forward_tags};
 pub use execute::composio_execute;

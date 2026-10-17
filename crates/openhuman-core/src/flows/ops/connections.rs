@@ -159,11 +159,8 @@ pub(super) fn build_flow_connections(
     identities: &[crate::integrations::composio::contract::ConnectedIdentity],
     keys: &std::collections::HashMap<String, String>,
 ) -> Vec<FlowConnection> {
-    let entries = crate::integrations::composio::ops::flow_connection_entries(
-        &composio,
-        identities,
-        keys,
-    );
+    let entries =
+        crate::integrations::composio::ops::flow_connection_entries(&composio, identities, keys);
     let mut out = Vec::with_capacity(composio.len() + http.len());
     out.extend(entries.into_iter().map(|entry| FlowConnection {
         connection_ref: entry.connection_ref,

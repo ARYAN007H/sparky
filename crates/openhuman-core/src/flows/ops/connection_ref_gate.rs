@@ -81,10 +81,13 @@ pub(super) fn validate_connection_refs_against(
         })
         .collect();
     let accounts = connections.map(|items| {
-        items.iter().map(|item| ConnectedAccountRef {
-            connection_ref: item.connection_ref.clone(),
-            toolkit: item.toolkit.clone(),
-        }).collect::<Vec<_>>()
+        items
+            .iter()
+            .map(|item| ConnectedAccountRef {
+                connection_ref: item.connection_ref.clone(),
+                toolkit: item.toolkit.clone(),
+            })
+            .collect::<Vec<_>>()
     });
     validate(&nodes, accounts.as_deref())
 }
