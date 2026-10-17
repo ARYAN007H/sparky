@@ -126,7 +126,10 @@ pub(crate) fn claim_recovery_ctx(
 ) -> bool {
     state()
         .recovered_workspaces
-        .insert(super::background_completions::router_scope_for(ctx, workspace_dir))
+        .insert(super::background_completions::router_scope_for(
+            ctx,
+            workspace_dir,
+        ))
 }
 
 #[cfg(test)]
@@ -138,10 +141,7 @@ pub(crate) fn claim_recovery(workspace_dir: &Path) -> bool {
 /// and drop its cached router when nothing is using it so the next scan replays
 /// the log another holder may have appended to. A router still in use stays,
 /// so a log never has two writers.
-pub(crate) fn forget_recovery_ctx(
-    ctx: &crate::core::runtime::DispatchCtx,
-    workspace_dir: &Path,
-) {
+pub(crate) fn forget_recovery_ctx(ctx: &crate::core::runtime::DispatchCtx, workspace_dir: &Path) {
     let scope = super::background_completions::router_scope_for(ctx, workspace_dir);
     state().recovered_workspaces.remove(&scope);
     let Ok(Some(router)) = super::background_completions::router_pool().get(&scope) else {

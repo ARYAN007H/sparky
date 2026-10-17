@@ -656,8 +656,9 @@ async fn concurrent_degradation_installs_one_fallback() {
     let failing = router_for_workspace(w);
 
     // Two records saw the same failing router; both ask to degrade.
-    let first = degrade_to_memory(w, &failing);
-    let second = degrade_to_memory(w, &failing);
+    let ctx = crate::core::runtime::DispatchCtx::ambient();
+    let first = degrade_to_memory(&ctx, w, &failing);
+    let second = degrade_to_memory(&ctx, w, &failing);
 
     assert!(
         Arc::ptr_eq(&first.router, &second.router),
