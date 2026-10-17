@@ -587,7 +587,7 @@ export function buildPlan({ profile, areas, env = {}, isPullRequest = true }) {
   // retains prior instrumentation, while every suite writes its own report.
   if (ex63) {
     const coverageSuite = (args, output, manifest = "Cargo.toml") =>
-      `rc=0; cargo llvm-cov nextest --profile ci --no-fail-fast --no-tests=fail --no-clean --no-report ${args} || rc=$?; ` +
+      `rc=0; bash scripts/ci/nextest-coverage.sh ${output.replace(/^lcov-|\.info$/g, "")} cargo llvm-cov nextest --profile ci --no-fail-fast --no-tests=fail --no-clean --no-report ${args} || rc=$?; ` +
       `cargo llvm-cov report --manifest-path ${manifest} --lcov --output-path ci-out/lcov/${output} || { report_rc=$?; if [ "$rc" -eq 0 ]; then rc=$report_rc; fi; }; exit "$rc"`;
     for (const lane of lanes) {
       if (!["rust-gates-off", "storage-drivers"].includes(lane.name)) continue;

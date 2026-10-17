@@ -404,7 +404,7 @@ test("private auxiliary coverage reports after failed tests and preserves the fa
   const plan = buildPlan({ profile: "ex63", areas: ALL, env: EX63_ENV });
   const check = plan.lanes.find((l) => l.name === "storage-drivers").checks[0];
   const result = spawnSync("bash", ["-o", "pipefail", "-c", check.run], {
-    cwd: dir, env: { ...process.env, PATH: `${dir}:${process.env.PATH}`, CARGO_CALLS: calls },
+    cwd: repoRoot, env: { ...process.env, PATH: `${dir}:${process.env.PATH}`, CARGO_CALLS: calls },
   });
   assert.equal(result.status, 17);
   const commands = fs.readFileSync(calls, "utf8").trim().split("\n");
