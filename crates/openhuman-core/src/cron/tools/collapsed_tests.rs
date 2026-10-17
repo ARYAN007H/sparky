@@ -130,7 +130,7 @@ async fn run_uses_the_explicit_core_context_and_preserves_markdown_options() {
     let result = CoreContext::scope(ambient, async {
         cron.execute_with_context(
             serde_json::json!({"action": "run", "job_id": job.id}),
-            ToolCallOptions { prefer_markdown: true, ..Default::default() },
+            ToolCallOptions::prefer_markdown(),
             Some(&context),
         )
         .await
