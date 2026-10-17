@@ -230,12 +230,14 @@ impl ScheduleHost {
         let binding = self.binding.clone();
         let run_id = projection.run_id.clone();
         self.binding
-            .offload(async move {
-                run_delivery::deliver(&binding, &projection).await;
-                release_manual_host(&run_id);
-            })
+            .offload(async move { run_delivery::deliver(&binding, &projection).await })
             .await
-            .map_err(|e| bus_error("Deliver", e))
+            .map_err(|e| bus_error("Deliver", e))?;
+        tokio::spawn(async move {
+            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+            release_manual_host(&run_id);
+        });
+        Ok(())
     }
 
     /// A flow row's schedule tick (or a `system:<name>` job).
@@ -265,9 +267,14 @@ pub(crate) fn retain_manual_host(run_id: &str, host: HostRegistration) {
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner)
         .insert(run_id.to_string(), host);
+    let run_id = run_id.to_string();
+    tokio::spawn(async move {
+        tokio::time::sleep(std::time::Duration::from_secs(2 * 60 * 60)).await;
+        release_manual_host(&run_id);
+    });
 }
 
-fn release_manual_host(run_id: &str) {
+pub(crate) fn release_manual_host(run_id: &str) {
     MANUAL_HOSTS
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner)
