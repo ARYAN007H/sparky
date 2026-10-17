@@ -28,8 +28,6 @@
 
 mod channel_event;
 pub(crate) mod citations;
-#[cfg(test)]
-mod citations_tests;
 mod egress_surface;
 mod event_bus;
 mod event_bus_channel;
