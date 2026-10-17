@@ -1,4 +1,116 @@
 use super::*;
+use crate::flows::tinyflows::caps::{seed_live_catalog_cache, ToolContract};
+
+fn seeded_alias_contract() -> ToolContract {
+    ToolContract {
+        slug: "GOOGLEDRIVE_FIND_FILE".to_string(),
+        toolkit: "googledrive".to_string(),
+        description: None,
+        required_args: vec![],
+        input_schema: None,
+        output_fields: vec!["files".to_string()],
+        output_schema: Some(json!({
+            "type": "object",
+            "properties": { "files": { "type": "array" } }
+        })),
+        primary_array_path: Some("data.files".to_string()),
+        is_curated: true,
+    }
+}
+
+#[tokio::test]
+async fn flows_get_tool_contract_rpc_warns_for_runtime_gated_uncurated_action() {
+    seed_live_catalog_cache(
+        "airtable",
+        vec![ToolContract {
+            slug: "AIRTABLE_OBSCURE_RPC_ACTION".to_string(),
+            toolkit: "airtable".to_string(),
+            description: None,
+            required_args: vec![],
+            input_schema: None,
+            output_fields: vec![],
+            output_schema: None,
+            primary_array_path: None,
+            is_curated: false,
+        }],
+    );
+
+    let outcome = flows_get_tool_contract(&Config::default(), "AIRTABLE_OBSCURE_RPC_ACTION")
+        .await
+        .expect("seeded catalog lookup should succeed");
+
+    assert_eq!(
+        outcome.value["contract"]["slug"],
+        "AIRTABLE_OBSCURE_RPC_ACTION"
+    );
+    assert_eq!(outcome.value["contract"]["is_curated"], false);
+    assert!(
+        outcome.value["runtime_gate"]
+            .as_str()
+            .is_some_and(|warning| warning.contains("REJECTED on every real run")),
+        "RPC should explain the runtime rejection: {}",
+        outcome.value
+    );
+}
+
+#[tokio::test]
+async fn validate_tool_contracts_accepts_a_separated_action_slug_alias() {
+    seed_live_catalog_cache("googledrive", vec![seeded_alias_contract()]);
+    let g = graph(json!({
+        "nodes": [
+            { "id": "t", "kind": "trigger", "name": "Manual" },
+            { "id": "find", "kind": "tool_call", "name": "Find",
+              "config": { "slug": "GOOGLE_DRIVE_FIND_FILE", "args": {} } }
+        ],
+        "edges": [ { "from_node": "t", "to_node": "find" } ]
+    }));
+
+    let errors = validate_tool_contracts(&Config::default(), &g).await;
+
+    assert!(
+        errors.is_empty(),
+        "valid action alias was rejected: {errors:?}"
+    );
+}
+
+#[tokio::test]
+async fn graph_wiring_warnings_resolves_a_separated_action_slug_alias() {
+    seed_live_catalog_cache("googledrive", vec![seeded_alias_contract()]);
+    let g = graph(json!({
+        "nodes": [
+            { "id": "t", "kind": "trigger", "name": "Manual" },
+            { "id": "find", "kind": "tool_call", "name": "Find",
+              "config": { "slug": "GOOGLE_DRIVE_FIND_FILE", "args": {} } },
+            { "id": "split", "kind": "split_out", "name": "Split",
+              "config": { "path": "json.data.wrong" } },
+            { "id": "shape", "kind": "transform", "name": "Shape",
+              "config": { "set": { "file": "=nodes.find.item.json.data.wrong" } } }
+        ],
+        "edges": [
+            { "from_node": "t", "to_node": "find" },
+            { "from_node": "find", "to_node": "split" },
+            { "from_node": "find", "to_node": "shape" }
+        ]
+    }));
+
+    let warnings = graph_wiring_warnings(&Config::default(), &g).await;
+
+    assert_eq!(
+        warnings.len(),
+        2,
+        "alias should reach both wiring checks: {warnings:?}"
+    );
+    assert!(
+        warnings
+            .iter()
+            .any(|warning| warning.contains("json.data.files")),
+        "{warnings:?}"
+    );
+    assert!(
+        warnings.iter().any(|warning| warning.contains("wrong")),
+        "{warnings:?}"
+    );
+}
 
 /// (Codex feedback on this PR) `notion` ships a static curated catalog
 /// (`catalog_for_toolkit`), so at RUNTIME `flow_tool_allowed`'s Path A

@@ -88,37 +88,8 @@ impl Tool for GetToolContractTool {
         // otherwise resolve to a bogus toolkit and come back as the catalog
         // error below, which tells the model to retry a fetch that can never
         // succeed.
-        let Some(toolkit) = crate::flows::ops::toolkit_for_contract_slug(&slug) else {
-            return Ok(ToolResult::error(format!(
-                "Could not extract a toolkit from slug '{slug}' — it must look like \
-                 '<TOOLKIT>_<ACTION>' (e.g. 'GMAIL_SEND_EMAIL')."
-            )));
-        };
-
-        tracing::debug!(
-            target: "flows",
-            %slug,
-            %toolkit,
-            "[flows] get_tool_contract: fetching the live contract (read-only)"
-        );
-
-        let Some(catalog) =
-            crate::flows::tinyflows::caps::fetch_live_toolkit_catalog(&self.config, &toolkit).await
-        else {
-            return Ok(ToolResult::error(format!(
-                "Could not fetch the live Composio catalog for toolkit '{toolkit}' (no backend \
-                 session, or a transient failure) — try again, or use search_tool_catalog to \
-                 confirm the toolkit is reachable."
-            )));
-        };
-
-        // `action_slug_matches` also accepts a separated alias
-        // (`GOOGLE_DRIVE_FIND_FILE` for `GOOGLEDRIVE_FIND_FILE`).
-        match catalog
-            .iter()
-            .find(|c| crate::integrations::composio::contract::action_slug_matches(&c.slug, &slug))
-        {
-            Some(contract) => {
+        match ops::lookup_contract(&self.config, &slug).await {
+            Ok((contract, runtime_gate)) => {
                 // B12: a prior real-output probe (get_tool_output_sample) for
                 // this exact slug is ACTUAL observed data and always wins
                 // over the schema-derived hint — most relevant for an action
@@ -128,18 +99,11 @@ impl Tool for GetToolContractTool {
                 // permanently `None`.
                 let contract = contract.clone();
 
-                // WS3 — EARLY runtime-gate warning (transcript failure #2): a
-                // real-but-uncurated action of a toolkit that ships a curated
-                // catalog is a hard curated-only allowlist at RUNTIME, so it is
-                // REJECTED on every real run. The late `validate_workflow` gate
-                // catches it, but only ~15 tool calls after the agent has built
-                // and wired the node. Surface the blocker HERE, at contract-fetch
-                // time (and first in the payload), so the agent never wires it.
-                if !contract.is_curated && ops::toolkit_has_curated_catalog(&toolkit) {
+                if let Some(runtime_gate) = runtime_gate {
                     tracing::debug!(
                         target: "flows",
                         %slug,
-                        %toolkit,
+                        toolkit = %contract.toolkit,
                         "[flows] get_tool_contract: uncurated action of a curated toolkit — attaching runtime_gate warning"
                     );
                     #[derive(serde::Serialize)]
@@ -149,10 +113,7 @@ impl Tool for GetToolContractTool {
                         contract: crate::flows::tinyflows::caps::ToolContract,
                     }
                     let payload = ContractWithRuntimeGate {
-                        runtime_gate: "This action will be REJECTED on every real run — the \
-                                       runtime tool gate only allows curated actions for this \
-                                       toolkit. Pick a `featured: true` result from \
-                                       search_tool_catalog instead.",
+                        runtime_gate,
                         contract,
                     };
                     return Ok(ToolResult::success(serde_json::to_string_pretty(&payload)?));
@@ -162,10 +123,23 @@ impl Tool for GetToolContractTool {
                     &contract,
                 )?))
             }
-            None => Ok(ToolResult::error(format!(
-                "'{slug}' is not a real action in the '{toolkit}' toolkit's live catalog — use \
-                 search_tool_catalog to find a real slug."
+            Err(ops::ContractLookupError::InvalidSlug { slug }) => Ok(ToolResult::error(format!(
+                "Could not extract a toolkit from slug '{slug}' — it must look like \
+                 '<TOOLKIT>_<ACTION>' (e.g. 'GMAIL_SEND_EMAIL')."
             ))),
+            Err(ops::ContractLookupError::CatalogUnavailable { toolkit }) => {
+                Ok(ToolResult::error(format!(
+                    "Could not fetch the live Composio catalog for toolkit '{toolkit}' (no backend \
+                     session, or a transient failure) — try again, or use search_tool_catalog to \
+                     confirm the toolkit is reachable."
+                )))
+            }
+            Err(ops::ContractLookupError::ActionNotFound { slug, toolkit }) => {
+                Ok(ToolResult::error(format!(
+                    "'{slug}' is not a real action in the '{toolkit}' toolkit's live catalog — use \
+                     search_tool_catalog to find a real slug."
+                )))
+            }
         }
     }
 }

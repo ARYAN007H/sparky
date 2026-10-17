@@ -127,10 +127,9 @@ pub(super) async fn graph_output_field_warnings(
             let Some(catalog) = fetch_live_toolkit_catalog(config, &ref_toolkit).await else {
                 continue;
             };
-            let Some(contract) = catalog
-                .iter()
-                .find(|c| c.slug.eq_ignore_ascii_case(ref_slug))
-            else {
+            let Some(contract) = catalog.iter().find(|c| {
+                crate::integrations::composio::contract::action_slug_matches(&c.slug, ref_slug)
+            }) else {
                 continue;
             };
             // B12: a real-output probe (`get_tool_output_sample`) for this
@@ -268,10 +267,9 @@ async fn graph_split_out_path_warnings(config: &Config, graph: &WorkflowGraph) -
             let Some(catalog) = fetch_live_toolkit_catalog(config, &pred_toolkit).await else {
                 continue;
             };
-            let Some(contract) = catalog
-                .iter()
-                .find(|c| c.slug.eq_ignore_ascii_case(pred_slug))
-            else {
+            let Some(contract) = catalog.iter().find(|c| {
+                crate::integrations::composio::contract::action_slug_matches(&c.slug, pred_slug)
+            }) else {
                 continue;
             };
             // B12: a real-output probe overrides the schema-derived
