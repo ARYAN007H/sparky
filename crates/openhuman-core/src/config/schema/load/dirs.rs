@@ -436,8 +436,7 @@ pub(super) async fn resolve_config_dirs_ignoring_env(
     if let Some(user_id) = read_active_user_id_checked_async(default_openhuman_dir).await? {
         // The shared profile layout (`users/<id>/{config.toml,workspace}`),
         // the same one a SaaS core lays its profiles out with.
-        let profile =
-            crate::config::schema::ProfileLayout::resolve(default_openhuman_dir, &user_id);
+        let profile = crate::config::schema::ProfileLayout::resolve(default_openhuman_dir, &user_id);
         tracing::debug!(
             user_id = %user_id,
             user_dir = %profile.dir.display(),
@@ -460,8 +459,9 @@ pub(super) async fn resolve_config_dirs_ignoring_env(
         ));
     }
 
-    let profile =
-        crate::config::schema::ProfileLayout::resolve_at(pre_login_user_dir(default_openhuman_dir));
+    let profile = crate::config::schema::ProfileLayout::resolve_at(pre_login_user_dir(
+        default_openhuman_dir,
+    ));
     tracing::debug!(
         user_id = %PRE_LOGIN_USER_ID,
         user_dir = %profile.dir.display(),

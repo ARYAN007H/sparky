@@ -52,10 +52,7 @@ async fn a_fresh_pre_login_profile_resolves_to_the_v2_layout() {
     assert_eq!(config_dir, layout.dir);
     assert_eq!(workspace_dir, layout.workspace_dir);
     assert_eq!(config_dir, root.join("users").join("local"));
-    assert_eq!(
-        workspace_dir,
-        root.join("users").join("local").join("files")
-    );
+    assert_eq!(workspace_dir, root.join("users").join("local").join("files"));
     assert!(config_dir.join(".layout").is_file());
 }
 

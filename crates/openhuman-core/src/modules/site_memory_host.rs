@@ -174,7 +174,10 @@ impl SiteStore {
 /// Copies the legacy `<site>.json` files of `dir`, dated by their last change
 /// so the 30-day sweep treats them as before. An existing record wins; a file
 /// that does not parse, or a copy set aside, is skipped.
-fn import_legacy(kv: &crate::storage::state_kv::StateKv, dir: &Path) -> anyhow::Result<()> {
+fn import_legacy(
+    kv: &crate::storage::state_kv::StateKv,
+    dir: &Path,
+) -> anyhow::Result<()> {
     let entries = match std::fs::read_dir(dir) {
         Ok(entries) => entries,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),

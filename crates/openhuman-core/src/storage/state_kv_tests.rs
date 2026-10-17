@@ -74,8 +74,7 @@ fn import_file_copies_a_legacy_file_once_and_leaves_it_in_place() {
     assert!(legacy.exists(), "the legacy file is not touched");
 
     // A later change is not overwritten by a re-import, nor resurrected after a delete.
-    kv.put("jobs", &BTreeMap::from([("a".to_string(), 9u32)]))
-        .unwrap();
+    kv.put("jobs", &BTreeMap::from([("a".to_string(), 9u32)])).unwrap();
     std::fs::write(&legacy, r#"{"a": 5}"#).unwrap();
     kv.import_file("jobs", &legacy).unwrap();
     assert_eq!(
@@ -102,15 +101,13 @@ fn import_file_does_not_replace_an_existing_value() {
 fn import_file_records_a_missing_or_corrupt_file_without_failing() {
     let dir = tempfile::tempdir().unwrap();
     let kv = state(&MemoryStorage::new(), "local");
-    kv.import_file("none", &dir.path().join("missing.json"))
-        .unwrap();
+    kv.import_file("none", &dir.path().join("missing.json")).unwrap();
     let corrupt = dir.path().join("bad.json");
     std::fs::write(&corrupt, "{not json").unwrap();
     kv.import_file("bad", &corrupt).unwrap();
     assert!(kv.get::<serde_json::Value>("bad").unwrap().is_none());
     // A file that shows up after the import was recorded is not imported.
     std::fs::write(dir.path().join("missing.json"), "1").unwrap();
-    kv.import_file("none", &dir.path().join("missing.json"))
-        .unwrap();
+    kv.import_file("none", &dir.path().join("missing.json")).unwrap();
     assert!(kv.get::<u32>("none").unwrap().is_none());
 }

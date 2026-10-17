@@ -267,11 +267,7 @@ fn read_file(path: &Path) -> std::io::Result<Vec<Entry>> {
 
 fn write_file(file: &Path, entries: &[Entry]) -> std::io::Result<()> {
     let (workspace, name) = coordinates(file)?;
-    if serde_json::to_vec(entries)
-        .map_err(std::io::Error::other)?
-        .len()
-        > MAX_BYTES
-    {
+    if serde_json::to_vec(entries).map_err(std::io::Error::other)?.len() > MAX_BYTES {
         return Err(std::io::Error::other("queue too large"));
     }
     super::state_store::save(workspace, name, &entries).map_err(std::io::Error::other)
@@ -354,8 +350,8 @@ fn owner_state(config: &Config) -> &'static OwnerState {
 
 fn partitions(config: &Config) -> MemoryResult<Vec<PathBuf>> {
     let prefix = format!("{}-", owner_prefix(config));
-    let names =
-        super::state_store::names(&config.workspace_dir, &prefix).map_err(|_| unavailable())?;
+    let names = super::state_store::names(&config.workspace_dir, &prefix)
+        .map_err(|_| unavailable())?;
     if names.len() > MAX_PENDING {
         return Err(unavailable());
     }

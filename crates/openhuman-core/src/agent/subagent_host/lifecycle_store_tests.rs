@@ -48,7 +48,9 @@ fn a_legacy_lifecycle_directory_is_imported_once_and_left_in_place() {
     let record = store.record(&paused).unwrap();
     assert_eq!(record.pause.unwrap().question, "which one?");
     assert_eq!(store.index_keys("task-a").unwrap(), vec![paused.clone()]);
-    assert!(lifecycle.join(format!("{component}.pause.json")).exists());
+    assert!(lifecycle
+        .join(format!("{component}.pause.json"))
+        .exists());
 
     // A later change is not undone by reopening, which does not import again.
     store
@@ -76,10 +78,7 @@ fn a_legacy_bare_terminal_outcome_is_read_as_a_terminal_record() {
     .unwrap();
     std::fs::write(lifecycle.join("notes.txt"), "not a lifecycle file").unwrap();
 
-    let record = LifecycleStore::open(dir.path())
-        .unwrap()
-        .record(&done)
-        .unwrap();
+    let record = LifecycleStore::open(dir.path()).unwrap().record(&done).unwrap();
     let terminal = record.terminal.unwrap();
     assert_eq!(terminal.outcome.output, "finished");
     assert!(terminal.agent_id.is_empty());
@@ -92,10 +91,7 @@ fn the_default_checkpoint_directory_belongs_to_its_workspace() {
         workspace_of(&workspace.join(".openhuman/subagent_checkpoints")),
         workspace
     );
-    assert_eq!(
-        workspace_of(std::path::Path::new("/x/y")),
-        std::path::Path::new("/x/y")
-    );
+    assert_eq!(workspace_of(std::path::Path::new("/x/y")), std::path::Path::new("/x/y"));
 }
 
 #[test]
