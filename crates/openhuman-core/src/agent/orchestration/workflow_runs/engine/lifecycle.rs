@@ -82,7 +82,6 @@ fn schedule_workflow_drive(
     let drive_handle_slot = Arc::clone(&handle_slot);
     let drive_config_slot = Arc::clone(&config_slot);
     let drive_parent_slot = Arc::clone(&parent_slot);
-    let drive_ctx = task_ctx.clone();
     let drive_run_id = run_id.clone();
     let drive_definition = definition.clone();
     let root_ctx = task_ctx.clone();
@@ -112,7 +111,7 @@ fn schedule_workflow_drive(
                             drive.await;
                         },
                     )
-                    .await;
+                    .await
                     {
                         if let Some(handle) = handle_slot.get() {
                             record_failed_if_current(
@@ -136,7 +135,6 @@ fn schedule_workflow_drive(
         crate::security::turn_origin::with_inherited_origin(inherited_origin, future)
     };
     let make_future = move |cancel_token| {
-        let ctx = drive_ctx.clone();
         let run_id = drive_run_id.clone();
         let definition = drive_definition.clone();
         let handle_slot = Arc::clone(&drive_handle_slot);

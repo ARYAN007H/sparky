@@ -1,7 +1,5 @@
 //! Durable dynamic workflow run RPC surface.
 
-#[path = "../../agent/orchestration/workflow_runs/engine/cancel.rs"]
-mod cancel;
 #[path = "../../agent/orchestration/workflow_runs/host.rs"]
 mod host;
 #[path = "../../agent/orchestration/workflow_runs/engine/lifecycle.rs"]
