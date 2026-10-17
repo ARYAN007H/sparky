@@ -84,8 +84,6 @@ async fn prepared_subagent_runs_through_driver_jobs_dispatcher() {
     let provider = ScriptedProvider::new(vec![text_response("driver result")]);
     let mut parent_context = make_parent(provider.clone(), vec![]);
     parent_context.workspace_dir = workspace;
-    let mut definition = make_def_named_tools(&["blocking_close_fixture"]);
-    definition.id = "cancelled-child".into();
     let mut options = with_parent(parent_context, SubagentRunOptions::default());
     options.checkpoint_dir = Some(scratch.path().join("checkpoints"));
     options.run_context.thread_id = Some("driver-spawn-thread".into());
@@ -147,6 +145,8 @@ async fn closing_a_durable_driver_session_cancels_only_its_registered_child() {
         })],
     );
     parent_context.workspace_dir = workspace.clone();
+    let mut definition = make_def_named_tools(&["blocking_close_fixture"]);
+    definition.id = "cancelled-child".into();
     let mut options = with_parent(parent_context, SubagentRunOptions::default());
     options.task_id = Some("close-driver-task".into());
     options.thread_id = Some("close-driver-thread".into());

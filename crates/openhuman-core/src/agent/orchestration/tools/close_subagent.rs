@@ -185,11 +185,11 @@ impl CloseSubagentTool {
                     "[subagent_reuse] close subagent_session_id={} parent_session={} closed={} cancelled_running={}",
                     subagent_session_id,
                     parent.session_id,
-                    closed,
+                    true,
                     cancelled
                 );
                 Ok(ToolResult::success(format!(
-                    "Closed reusable sub-agent session `{subagent_session_id}` (closed={closed}, cancelled_running={cancelled})."
+                    "Closed reusable sub-agent session `{subagent_session_id}` (closed=true, cancelled_running={cancelled})."
                 )))
             }
         }
