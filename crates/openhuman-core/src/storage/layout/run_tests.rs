@@ -500,5 +500,8 @@ fn deleting_refuses_a_path_that_climbs_out_of_its_base() {
         remove_within(&base, &climbing),
         Err(LayoutError::Verify(_))
     ));
-    assert!(outside.is_file(), "a `..` entry must not delete outside the base");
+    assert!(
+        outside.is_file(),
+        "a `..` entry must not delete outside the base"
+    );
 }
