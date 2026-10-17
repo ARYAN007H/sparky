@@ -23,6 +23,7 @@
 //! edge into this tree. If one ever gains a real `use` of `flows::`, this
 //! family must convert to the facade+stub shape (see `voice/`).
 
+mod agent_route;
 pub mod agents;
 pub mod builder_host;
 pub(crate) mod builder_tools;
