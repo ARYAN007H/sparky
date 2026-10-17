@@ -137,7 +137,7 @@ async fn sweep_profiles_skips_profiles_not_listed() {
 async fn sweep_profiles_reaches_the_modules_scopes_for_that_profile() {
     let (now, backend) = backend_with_clock();
     let base = crate::storage::scope_for_profile("acme");
-    let module_scopes = crate::modules::expiring_blob_module_scopes_for("acme", &base);
+    let module_scopes = crate::modules::expiring_blob_module_scopes_for("acme");
     assert!(!module_scopes.is_empty(), "TinyJuice owns expiring blobs");
     put_expiring(&backend, &module_scopes[0], "tinyjuice_ccr/t", 10).await;
     now.store(2_000, Ordering::SeqCst);
