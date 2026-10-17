@@ -350,3 +350,7 @@ pub async fn cron_runs(
 #[cfg(test)]
 #[path = "ops_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "ops_delivery_tests.rs"]
+mod delivery_tests;
