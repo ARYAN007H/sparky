@@ -1,6 +1,5 @@
 use super::*;
 use serde_json::json;
-use tinytools::Tool as _;
 
 #[tokio::test]
 async fn module_tool_descriptors_preserve_run_and_sandbox_safety_metadata() {
@@ -62,7 +61,8 @@ fn tool_context(
 
 #[tokio::test]
 async fn concurrent_tool_callbacks_keep_each_explicit_profile_scope() {
-    use crate::core::runtime::{ContextOverlay, CoreContext, DispatchCtx, DomainSet, ToolGroups};
+    use crate::core::runtime::{ContextOverlay, CoreContext, DomainSet};
+    use crate::tools::toolpacks::ToolGroups;
 
     let workspace = tempfile::tempdir().expect("temporary workspace");
     let mut config = Config::default();
@@ -91,7 +91,6 @@ async fn concurrent_tool_callbacks_keep_each_explicit_profile_scope() {
         let name = name.to_string();
         CoreContext::scope(context.clone(), async move {
             crate::flows::ops::flows_create(
-                &DispatchCtx::new(context),
                 &config,
                 name,
                 graph,
@@ -154,7 +153,6 @@ async fn module_run_flow_uses_the_host_detached_runner_and_requires_a_saved_flow
     );
 
     let flow = crate::flows::ops::flows_create(
-        &crate::core::runtime::DispatchCtx::ambient(),
         &config,
         "Detached Copilot run".into(),
         json!({

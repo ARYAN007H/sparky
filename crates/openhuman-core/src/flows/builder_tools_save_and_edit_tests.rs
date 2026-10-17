@@ -408,7 +408,7 @@ async fn save_workflow_accepts_correctly_schemad_graph() {
 
 #[tokio::test]
 async fn list_node_kinds_tool_returns_every_kind() {
-    let tool = list_node_kinds_tool();
+    let tool = list_node_kinds_tool(Arc::new(Config::default()));
     let result = tool.execute(json!({})).await.unwrap();
     assert!(!result.is_error, "{}", result.output());
     let parsed: Value = serde_json::from_str(&result.output()).unwrap();
@@ -429,7 +429,7 @@ async fn list_node_kinds_tool_returns_every_kind() {
 
 #[tokio::test]
 async fn get_node_kind_contract_tool_returns_contract_and_rejects_unknown() {
-    let tool = get_node_kind_contract_tool();
+    let tool = get_node_kind_contract_tool(Arc::new(Config::default()));
 
     let ok = tool.execute(json!({ "kind": "tool_call" })).await.unwrap();
     assert!(!ok.is_error, "{}", ok.output());
