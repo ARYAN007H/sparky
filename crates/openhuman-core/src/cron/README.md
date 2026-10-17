@@ -299,11 +299,11 @@ feature) nothing loads and every cron call answers `COMPONENT_DISABLED:tinyflows
 | --- | --- |
 | [`mod.rs`](./mod.rs) | Module wiring and re-exports. Re-exports the schedule records from `tinyflows_bus::schedule` so `cron::CronJob`, `cron::Schedule` and friends resolve here (none is redeclared). |
 | [`store.rs`](./store.rs) | The synchronous job and run API the core calls. Applies the operator limits, then sends one `StoreOperation` to the module. |
-| [`client.rs`](./client.rs) | Typed calls to the module's `Schedule` object: `store_in`/`store_blocking`, and the maths and validation members (`next_run`, `validate_schedule`, `runs_closer_than`, `normalize_expression`, `parse_human_delay`, `default_delivery`, `check_origin_requirements`, ...). |
+| [`client.rs`](./client.rs) | Typed calls to the module's `Schedule` object: `store_in`/`store_blocking`, `runs_closer_than`, `parse_human_delay`, `default_delivery`, `check_origin_requirements`, and other host adapters. |
 | [`documents_port.rs`](./documents_port.rs) | The `ScheduleDocuments` callback object: the scope's document store, served to the module. |
 | [`bus_host.rs`](./bus_host.rs) | `Binding` (config, policy, context of one scope) and the `ScheduleHost` callback object (`Execute`, `Failed`, `Deliver`, `ScheduleTrigger`), served per scheduler. |
 | [`handlers.rs`](./handlers.rs) | The job-kind handler registry (`JobKindHandler`, `JobOutcome`, `register_kind`) and the system-job handlers. |
-| `ops.rs` | Business operations: `add_once`, `add_once_at`, pause/resume, `update_cron_job`, `try_acquire_run`, and the async `cron_*` RPC operations. Also re-exported as `cron::rpc`. |
+| `ops.rs` | Business operations: `add_once`, `add_once_at`, pause/resume, and the async `cron_*` RPC operations. Also re-exported as `cron::rpc`. |
 | [`schemas.rs`](./schemas.rs) | Controller schemas and handlers for the `cron` namespace. |
 | [`scheduler.rs`](./scheduler.rs) | The host loop: `run`, `tick_once`, `JobDispatcher` (one manual-tick module scheduler per scope), the live-agent pass, `execute_job_now` (Run Now, through `ExecuteJob`), the manual-run guard and the health signals. |
 | `scheduler/executor.rs` | `HostExecutor`: one shell or agent attempt through the registry, failure classification, the retries-exhausted report, the cadence warning. |
@@ -336,13 +336,13 @@ feature) nothing loads and every cron call answers `COMPONENT_DISABLED:tinyflows
 - `scheduler::run(ctx, config)`: the service entry point.
 - `scheduler::execute_job_now` and `scheduler::deliver_job`: what Run Now uses
   to execute and deliver outside the loop.
-- `add_job`, `add_shell_job`, `add_agent_job`, `add_agent_job_with_definition`,
+- `add_job`, `add_shell_job`, `add_agent_job_with_definition`,
   `add_agent_job_from_spec`, `add_flow_schedule_job`, `find_flow_schedule_job`,
-  `get_job`, `list_jobs`, `update_job`, `remove_job`, `due_jobs`, `list_runs`,
+  `get_job`, `list_jobs`, `update_job`, `remove_job`, `list_runs`,
   `record_run`, `record_run_with_delivery`: store operations in `store.rs`.
-- `client::next_run`, `normalize_expression`, `validate_schedule`,
-  `runs_closer_than`, `schedule_cron_expression`: the schedule maths, which runs
-  in the module; `TooFrequent` and `MIN_AGENT_JOB_INTERVAL` are contract types.
+- `client::runs_closer_than`: asks the module to inspect the schedule; schedule
+  parsing and validation remain in the module. `TooFrequent` and
+  `MIN_AGENT_JOB_INTERVAL` are contract types.
 - `job_builder::create_agent_job`: the creation path for agent jobs from a
   conversation.
 - `origin::current_job_origin`: the origin of the live turn, if any.
@@ -373,7 +373,9 @@ Cron publishes, through [`core/bus.rs`](../core/bus.rs), these `DomainEvent` var
 
 - `SystemStartup` and `HealthChanged` for component `scheduler`.
 - `CronJobTriggered` and `CronJobCompleted` around each scheduled execution
-  (output truncated to 512 characters).
+  (output truncated to 512 characters). The completion event carries its
+  optional tenant so notification subscribers keep the original profile and
+  agent scope after a one-shot job is removed.
 - `ProactiveMessageRequested` (`proactive` delivery), consumed by
   `channels::proactive`.
 - `CronSystemJobDue`, consumed by `memory::bus`.
