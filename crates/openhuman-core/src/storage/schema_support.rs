@@ -53,6 +53,83 @@ pub fn key_of(part: &str) -> Result<String, StorageError> {
     Key::of([part]).map(|key| key.as_str().to_owned())
 }
 
+/// `camelCase` as `snake_case`: `authorId` -> `author_id`.
+#[must_use]
+pub fn snake_case(key: &str) -> String {
+    let mut out = String::with_capacity(key.len() + 4);
+    for ch in key.chars() {
+        if ch.is_ascii_uppercase() {
+            out.push('_');
+            out.push(ch.to_ascii_lowercase());
+        } else {
+            out.push(ch);
+        }
+    }
+    out
+}
+
+/// `snake_case` as `camelCase`: `author_id` -> `authorId`.
+#[must_use]
+pub fn camel_case(key: &str) -> String {
+    let mut out = String::with_capacity(key.len());
+    let mut upper = false;
+    for ch in key.chars() {
+        if ch == '_' {
+            upper = true;
+        } else if upper {
+            out.push(ch.to_ascii_uppercase());
+            upper = false;
+        } else {
+            out.push(ch);
+        }
+    }
+    out
+}
+
+/// A copy of `value` with every object key (at any depth) in snake case.
+/// `renames` lists `(camel key, snake key)` pairs that take precedence, for
+/// fields whose v2 name is not the mechanical one (`createdAtMillis` ->
+/// `created_ms`). Array elements are converted; strings and numbers are not
+/// touched.
+#[must_use]
+pub fn snake_keys(value: &Value, renames: &[(&str, &str)]) -> Value {
+    match value {
+        Value::Object(map) => Value::Object(
+            map.iter()
+                .map(|(key, inner)| {
+                    let key = renames
+                        .iter()
+                        .find(|(camel, _)| camel == key)
+                        .map_or_else(|| snake_case(key), |(_, snake)| (*snake).to_owned());
+                    (key, snake_keys(inner, renames))
+                })
+                .collect(),
+        ),
+        Value::Array(items) => Value::Array(items.iter().map(|v| snake_keys(v, renames)).collect()),
+        other => other.clone(),
+    }
+}
+
+/// The inverse of [`snake_keys`] for the same `renames`.
+#[must_use]
+pub fn camel_keys(value: &Value, renames: &[(&str, &str)]) -> Value {
+    match value {
+        Value::Object(map) => Value::Object(
+            map.iter()
+                .map(|(key, inner)| {
+                    let key = renames
+                        .iter()
+                        .find(|(_, snake)| snake == key)
+                        .map_or_else(|| camel_case(key), |(camel, _)| (*camel).to_owned());
+                    (key, camel_keys(inner, renames))
+                })
+                .collect(),
+        ),
+        Value::Array(items) => Value::Array(items.iter().map(|v| camel_keys(v, renames)).collect()),
+        other => other.clone(),
+    }
+}
+
 /// A body object builder that drops absent values, so a v2 body never carries
 /// `null` for a field that was never set.
 #[derive(Default)]
