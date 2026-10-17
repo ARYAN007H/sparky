@@ -6,6 +6,31 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use tinyagents_harness::runtime::AgentHarness;
 use tinytools::{Tool, ToolCallOptions, ToolResult};
 
+struct BlockingLiveContextTool {
+    started: tokio::sync::mpsc::Sender<()>,
+}
+
+#[async_trait]
+impl Tool for BlockingLiveContextTool {
+    fn name(&self) -> &str {
+        "memory"
+    }
+
+    fn description(&self) -> &str {
+        "Blocks until its parent turn is cancelled."
+    }
+
+    fn parameters_schema(&self) -> serde_json::Value {
+        serde_json::json!({"type": "object"})
+    }
+
+    async fn execute(&self, _args: serde_json::Value) -> anyhow::Result<ToolResult> {
+        let _ = self.started.send(()).await;
+        std::future::pending::<()>().await;
+        unreachable!("the live-parent cancellation must win")
+    }
+}
+
 /// Register the real goal tools on a fresh harness and return the candidate
 /// names handed on to the exposure layer.
 fn candidate_names(has_thread: bool) -> Vec<String> {
@@ -71,6 +96,54 @@ async fn registered_memory_dispatch_enforces_one_budget_across_distinct_calls() 
             .unwrap();
         assert_eq!(result.is_error, index == 8, "call {index}");
     }
+}
+
+#[tokio::test]
+async fn memory_live_context_dispatch_cancels_with_parent_without_creating_a_child_job() {
+    use tinyagents_harness::context::RunConfig;
+    use tinyagents_harness::tool::ToolDispatch;
+
+    let (started_tx, mut started_rx) = tokio::sync::mpsc::channel(1);
+    let tool: Arc<dyn Tool> = Arc::new(BlockingLiveContextTool {
+        started: started_tx,
+    });
+    let dispatch = LiveToolContextDispatch::new(tool);
+    let cancellation = tinyagents_harness::CancellationToken::new();
+    let config = crate::config::Config::default();
+    let core = crate::core::runtime::CoreContext::for_test_with_config(
+        crate::core::runtime::DomainSet::full(),
+        config,
+    );
+    let parent = OpenHumanRunContext::new()
+        .with_core(Some(Arc::clone(&core)))
+        .with_cancellation(cancellation.clone())
+        .into_tinyagents(RunConfig::new("memory-live-context-cancel"));
+    let jobs = crate::core::runtime::slot_for::<
+        tinyagents_orchestration::subagent::SubAgentJobRegistry,
+    >(&parent.data.dispatch_ctx());
+    assert!(jobs.list().is_empty(), "fresh parent has no child jobs");
+
+    let execution = dispatch.execute(
+        &(),
+        tinyagents_harness::CallId::new("memory-cancel-call"),
+        serde_json::json!({}),
+        ToolCallOptions::default(),
+        &parent,
+    );
+    tokio::pin!(execution);
+    tokio::select! {
+        _ = started_rx.recv() => cancellation.cancel(),
+        result = &mut execution => panic!("blocking memory tool returned before cancellation: {result:?}"),
+    }
+    let result = execution
+        .await
+        .expect("parent cancellation returns a tool result");
+    assert!(result.is_error);
+    assert!(result.output().contains("cancelled"));
+    assert!(
+        jobs.list().is_empty(),
+        "memory remains a tool on the parent run"
+    );
 }
 
 struct OriginObservingTool(Arc<AtomicBool>);

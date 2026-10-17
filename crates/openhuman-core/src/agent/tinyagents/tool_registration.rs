@@ -62,9 +62,14 @@ impl ToolDispatch<(), OpenHumanRunContext> for LiveToolContextDispatch {
         parent: &tinyagents_harness::context::RunContext<OpenHumanRunContext>,
     ) -> anyhow::Result<ToolResult> {
         let context = ToolExecutionContext::from_run_context(parent, call_id);
-        self.tool
-            .execute_with_context(arguments, options, Some(&context))
-            .await
+        let child = parent.data.child();
+        tokio::select! {
+            _ = child.cancellation.cancelled() => Ok(ToolResult::error(format!(
+                "{}: cancelled before the tool completed",
+                self.tool.name(),
+            ))),
+            result = self.tool.execute_with_context(arguments, options, Some(&context)) => result,
+        }
     }
 }
 
