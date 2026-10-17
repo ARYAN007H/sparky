@@ -384,8 +384,7 @@ pub enum DomainEvent {
         job_id: String,
         success: bool,
         output: String,
-        /// The tenant that ran the job. A one-shot job may be deleted before
-        /// subscribers process this event, so ownership must travel with it.
+        /// Captured owner; one-shot rows may be deleted before subscribers run.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         tenant: Option<crate::core::runtime::Tenant>,
     },

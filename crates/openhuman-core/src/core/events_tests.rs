@@ -917,9 +917,6 @@ fn every_workspace_bound_variant_is_reachable_through_one_accessor() {
     }
 }
 
-/// `None` here means "not bound to a workspace", which a consumer filtering
-/// by workspace must let through rather than drop. Getting this backwards
-/// would silence cron, webhook and sub-agent notifications entirely.
 #[test]
 fn events_without_a_workspace_report_none() {
     assert_eq!(

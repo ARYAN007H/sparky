@@ -96,8 +96,7 @@ pub const EVENTS_INTERFACE: &str = "ai.tinyhumans.openhuman.Events2";
 /// ambient one.
 /// `2.0.0` removes `CronDeliveryRequested`; announce delivery now sends
 /// synchronously through the cron channel bridge.
-/// `2.1.0` adds an optional `tenant` to `CronJobCompleted` so subscribers
-/// retain the job's owner after a one-shot row is deleted.
+/// `2.1.0` adds optional `CronJobCompleted` tenant ownership.
 pub const EVENTS_VERSION: Version = Version::new(2, 1, 0);
 
 /// The bus. Initialised once by [`init`]; safe to touch before that.
