@@ -126,17 +126,14 @@ fn update_rejects_disallowed_announce_target_without_persisting_patch() {
         silent_streaming: true,
         mention_only: false,
     });
-    let job = crate::cron::add_agent_job(
-        &cfg,
-        Some("inbox".into()),
+    let mut spec = tinyflows_bus::schedule::AgentJobSpec::new(
         Schedule::Every { every_ms: 300_000 },
         "check inbox",
-        SessionTarget::Isolated,
-        None,
-        Some(DeliveryConfig::default()),
-        false,
-    )
-    .unwrap();
+    );
+    spec.name = Some("inbox".into());
+    spec.session_target = SessionTarget::Isolated;
+    spec.delivery = Some(DeliveryConfig::default());
+    let job = crate::cron::add_agent_job_from_spec(&cfg, spec).unwrap();
     let result = crate::cron::update_job(
         &cfg,
         &job.id,
