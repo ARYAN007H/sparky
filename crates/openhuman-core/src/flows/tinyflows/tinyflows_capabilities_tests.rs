@@ -281,9 +281,9 @@ async fn preflight_invoker_gates_the_mock_tool_path() {
 
     let tmp = TempDir::new().unwrap();
     let config = test_config(&tmp);
-    // Own toolkit/slug (never `"gmail"`) — see the comment in
-    // `preflight_fails_before_dispatch_naming_the_missing_field` above for
-    // why sharing the `"gmail"` cache key across parallel tests is flaky.
+    // Own toolkit/slug (never `"gmail"`) — Composio cache tests share a
+    // process-global catalog, so this adapter test uses a distinct key from
+    // the owner-side preflight tests as well as other flow tests.
     crate::integrations::composio::catalog::seed_live_catalog_cache(
         "preflightgatetest",
         vec![seeded_required_args_contract(
