@@ -224,7 +224,7 @@ impl ProfileHost {
 
     /// [`layout::profile_config`] plus the operator's cron limits, which no
     /// profile config can loosen.
-    fn forced_config(&self, layout: &ProfileLayout, id: &ProfileId) -> Config {
+    pub(super) fn forced_config(&self, layout: &ProfileLayout, id: &ProfileId) -> Config {
         let mut config = layout::profile_config(layout, id);
         let cron = &self.saas.cron;
         config.cron.agent_jobs_only = cron.agent_jobs_only;

@@ -133,6 +133,19 @@ fn active_jobs_are_capped_by_the_store_count() {
 }
 
 #[test]
+fn disabling_agent_only_limits_clears_the_store_cap() {
+    let tmp = TempDir::new().unwrap();
+    let mut config = limited(&tmp);
+    config.cron.max_active_jobs = 1;
+    create_agent_job(&config, input(600_000, None), origin()).unwrap();
+
+    config.cron.agent_jobs_only = false;
+    create_agent_job(&config, input(600_000, None), None)
+        .expect("disabling agent-only mode should clear the persisted cap");
+    assert_eq!(crate::cron::list_jobs(&config).unwrap().len(), 2);
+}
+
+#[test]
 fn concurrent_preflight_admissions_cannot_oversubscribe_the_store_cap() {
     use std::sync::{Arc, Barrier};
 
