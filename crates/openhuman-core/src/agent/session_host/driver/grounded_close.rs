@@ -465,10 +465,14 @@ async fn completion(
     temperature: f64,
     thread_id: Option<&str>,
     messages: Vec<TranscriptMessage>,
+    trace: Option<&SupplementalTrace>,
 ) -> (String, Option<BilledUsage>) {
     let Ok(model_client) = source.build_summarizer(model, temperature, thread_id) else {
         return (String::new(), None);
     };
+    let (call_id, started_at_ms) = trace
+        .map(|trace| trace.begin(model))
+        .map_or((None, None), |(call_id, started_at)| (Some(call_id), Some(started_at)));
     let request = ModelRequest::new(
         messages
             .iter()
@@ -478,7 +482,18 @@ async fn completion(
     .with_model(model)
     .with_temperature(temperature)
     .with_max_tokens(AGENT_TURN_MAX_OUTPUT_TOKENS);
+    let request = match (trace, call_id.as_ref()) {
+        (Some(trace), Some(call_id)) => request.with_correlation(ModelCallCorrelation::new(
+            trace.run_id.as_str(),
+            call_id.as_str(),
+        )),
+        _ => request,
+    };
+    let input = serde_json::to_value(&request.messages).unwrap_or(serde_json::Value::Null);
     let Ok(mut stream) = model_client.stream(&(), request).await else {
+        if let (Some(trace), Some(call_id), Some(started_at_ms)) = (trace, call_id, started_at_ms) {
+            trace.failed(call_id, model, started_at_ms);
+        }
         return (String::new(), None);
     };
     let mut buffered = String::new();
@@ -492,16 +507,25 @@ async fn completion(
                 } else {
                     buffered
                 };
+                if let (Some(trace), Some(call_id), Some(started_at_ms)) = (trace, call_id, started_at_ms) {
+                    trace.completed(call_id, model, started_at_ms, input, &response);
+                }
                 return (
                     selected,
                     crate::inference::provider::model::usage_info_from_response(&response),
                 );
             }
             ModelStreamItem::Failed(_) | ModelStreamItem::ProviderFailed(_) => {
+                if let (Some(trace), Some(call_id), Some(started_at_ms)) = (trace, call_id, started_at_ms) {
+                    trace.failed(call_id, model, started_at_ms);
+                }
                 return (String::new(), None);
             }
             _ => {}
         }
+    }
+    if let (Some(trace), Some(call_id), Some(started_at_ms)) = (trace, call_id, started_at_ms) {
+        trace.failed(call_id, model, started_at_ms);
     }
     (String::new(), None)
 }
