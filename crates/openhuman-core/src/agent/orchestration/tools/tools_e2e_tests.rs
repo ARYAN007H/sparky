@@ -532,6 +532,7 @@ async fn delegate_graph_runs_every_stage_through_shared_driver_jobs() {
     use crate::tools::toolpacks::ToolGroups;
     use tinyagents_orchestration::subagent::{SubAgentJobRegistry, SubAgentJobStatus};
 
+    let _ = AgentDefinitionRegistry::init_global_builtins();
     let workspace = tempfile::TempDir::new().expect("workspace");
     let provider = Arc::new(ScriptedModel::new(vec![
         ("Produce a short, concrete", "1. inspect the fixture"),
