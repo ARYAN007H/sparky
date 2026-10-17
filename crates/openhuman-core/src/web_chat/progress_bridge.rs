@@ -175,7 +175,7 @@ use wire_caps::{cap_wire_args, cap_wire_output};
 #[path = "progress_bridge_ledger.rs"]
 mod ledger;
 pub(super) use ledger::{
-    ledger_append_event, ledger_get_telemetry, ledger_upsert_agent_run, ledger_upsert_telemetry,
+    ledger_append_event, ledger_upsert_agent_run, ledger_upsert_telemetry,
 };
 
 /// Build the worktree-isolation slice of a `subagent_completed`
@@ -1062,13 +1062,11 @@ pub(crate) fn spawn_progress_bridge(
         // hold up terminal delivery after the progress stream closed.
         let _ = drained_tx.send(true);
         if let Some(trace_ctx) = journal_trace_ctx.take() {
-            let run_telemetry = ledger_get_telemetry(&config, &request_id);
             crate::core::observability::progress_tracing::export_run_trace_from_journal(
                 &dispatch_ctx,
                 &config,
                 &request_id,
                 trace_ctx,
-                run_telemetry.as_ref(),
             )
             .await;
         }
