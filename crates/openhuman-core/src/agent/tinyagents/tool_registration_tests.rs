@@ -6,6 +6,19 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use tinyagents_harness::runtime::AgentHarness;
 use tinytools::{Tool, ToolCallOptions, ToolResult};
 
+#[cfg(unix)]
+#[test]
+fn subagent_owner_scope_preserves_non_utf8_workspace_identity() {
+    use std::os::unix::ffi::OsStringExt;
+
+    let path_a = std::path::PathBuf::from(std::ffi::OsString::from_vec(vec![b'w', 0xff]));
+    let path_b = std::path::PathBuf::from(std::ffi::OsString::from_vec(vec![b'w', 0xfe]));
+    let owner_a = super::subagent_owner_key(&path_a, "parent", Some("thread"));
+    let owner_b = super::subagent_owner_key(&path_b, "parent", Some("thread"));
+
+    assert_ne!(owner_a, owner_b);
+}
+
 struct BlockingLiveContextTool {
     started: tokio::sync::mpsc::Sender<()>,
 }
