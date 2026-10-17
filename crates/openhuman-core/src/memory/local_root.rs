@@ -8,7 +8,8 @@
 //! (memory audit 01-scopes F2).
 //!
 //! The root is now `user:local-<install id>`: a random UUID minted once and
-//! recorded in `<workspace>/memory/local_root.json` (0600). Nothing about the
+//! recorded in the `memory`/`state`/`local_root` storage value (once
+//! `<workspace>/memory/local_root.json`). Nothing about the
 //! machine goes into it.
 //!
 //! An install whose memory already lives under the hostname-derived root
@@ -59,10 +60,13 @@ pub struct LocalRoot {
 static CACHE: LazyLock<Mutex<HashMap<PathBuf, String>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
 
-/// The record's path in `workspace_dir`.
+const STATE: &str = "local_root";
+
+/// The record's key in the memory state store; `workspace_dir` also names the
+/// legacy `memory/local_root.json` it is imported from.
 #[must_use]
 pub fn path(workspace_dir: &Path) -> PathBuf {
-    workspace_dir.join("memory").join("local_root.json")
+    super::state_store::legacy_path(workspace_dir, STATE)
 }
 
 /// The root of the local session `user_id` whose config is `config`: the
@@ -79,7 +83,7 @@ pub fn resolve(config: &Config, user_id: &str) -> Option<String> {
     {
         return Some(root.clone());
     }
-    let record = match read(&file) {
+    let record = match read(&config.workspace_dir) {
         Ok(Some(record)) => record,
         Ok(None) => {
             let fresh = if has_memory_under_legacy_root(config) {
@@ -93,7 +97,7 @@ pub fn resolve(config: &Config, user_id: &str) -> Option<String> {
                     origin: Origin::Minted,
                 }
             };
-            match record_once(&file, &fresh) {
+            match record_once(&config.workspace_dir, &fresh) {
                 Ok(landed) => {
                     tracing::info!(
                         origin = ?landed.origin,
