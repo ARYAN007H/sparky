@@ -303,7 +303,8 @@ The agent `memory` tool applies the same confinement and overwrites any
 | [`files.rs`](./files.rs) | Owner-only (0600 / 0700 on unix) writes of the local state files. |
 | [`tools.rs`](./tools.rs) | The single `memory` agent tool; citations are collected by `web_chat`. |
 | [`bus.rs`](./bus.rs) | The cron subscriber and the pending-deletions subscriber. |
-| [`schemas.rs`](./schemas.rs), [`schemas/defs.rs`](./schemas/defs.rs), [`schemas/handlers.rs`](./schemas/handlers.rs) | The `openhuman.memory_*` controller schemas and thin handlers. |
+| [`schemas.rs`](./schemas.rs), [`schemas/defs.rs`](./schemas/defs.rs), [`schemas/defs/`](./schemas/defs/) | The `openhuman.memory_*` controller schemas, split by controller group with shared field helpers. |
+| [`schemas/handlers.rs`](./schemas/handlers.rs) | Thin handlers using the shared parse, config-load, operation and result-serialization path. |
 | [`types.rs`](./types.rs) | RPC request and view shapes; contract types are re-exported from `tinymemory_api`. |
 | [`error.rs`](./error.rs) | `MemoryError` and the seven stable error codes. |
 | [`status.rs`](./status.rs) | The memory row of `subsystems.status`. |
