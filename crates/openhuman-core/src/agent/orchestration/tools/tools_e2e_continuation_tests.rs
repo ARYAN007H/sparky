@@ -200,6 +200,29 @@ async fn cancelling_a_paused_driver_through_rpc_settles_once_with_its_reason() {
         .expect("the paused child is registered in shared Jobs");
     assert_eq!(paused_job.status, SubAgentJobStatus::AwaitingInput);
     assert!(pending_for(workspace.path(), "paused-cancel-rpc-thread").is_empty());
+    let sessions = SubagentSessionStore::new(workspace.path().to_path_buf());
+    let before_row = sessions
+        .load()
+        .expect("paused durable session list")
+        .into_iter()
+        .find(|row| row.current_task_id.as_deref() == Some(task_id.as_str()))
+        .expect("RPC selector uses the accepted durable task id");
+    assert_eq!(before_row.status, DurableSubagentStatus::AwaitingUser);
+    assert_eq!(before_row.parent_session, "paused-cancel-rpc-parent");
+    assert_eq!(
+        before_row.parent_thread_id.as_deref(),
+        Some("paused-cancel-rpc-thread")
+    );
+    assert!(before_row.lifecycle_key.is_some());
+    assert_eq!(
+        live.data
+            .dispatch_ctx()
+            .resolved()
+            .expect("RPC uses the spawned parent's core")
+            .workspace_dir()
+            .expect("RPC resolves the parent's workspace"),
+        workspace.path()
+    );
 
     let controller = crate::agent_runs::subagent_control::all_registered_controllers()
         .into_iter()
