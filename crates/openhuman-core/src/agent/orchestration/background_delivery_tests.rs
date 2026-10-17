@@ -6,7 +6,7 @@ fn cx() -> crate::core::runtime::DispatchCtx {
 }
 
 use crate::agent::orchestration::background_completions::{
-    TestWorkspace, forget_workspace_for_test, pending_for, record_completion, router_for_workspace,
+    forget_workspace_for_test, pending_for, record_completion, router_for_workspace, TestWorkspace,
 };
 use std::path::Path;
 use std::sync::atomic::{AtomicU32, Ordering};
@@ -510,12 +510,10 @@ async fn every_subagent_terminal_event_schedules_a_drain_through_the_handler() {
         iterations: 0,
     })
     .await;
-    assert!(
-        scheduled_for_test()
-            .lock()
-            .expect("scheduled")
-            .contains(&("bd-term-thread".to_string(), Duration::from_millis(300)))
-    );
+    assert!(scheduled_for_test()
+        .lock()
+        .expect("scheduled")
+        .contains(&("bd-term-thread".to_string(), Duration::from_millis(300))));
     clear_busy(session);
     assert_eq!(
         drain_schedule(&DomainEvent::SubagentFailed {
@@ -680,12 +678,10 @@ async fn boot_recovery_schedules_a_delivery_for_every_thread_with_undelivered_re
     scheduled_for_test().lock().expect("scheduled").clear();
 
     assert_eq!(recover_on_boot(&cx(), w), 1);
-    assert!(
-        scheduled_for_test()
-            .lock()
-            .expect("scheduled")
-            .contains(&("thread-boot-sched".to_string(), RECOVERY_DELAY))
-    );
+    assert!(scheduled_for_test()
+        .lock()
+        .expect("scheduled")
+        .contains(&("thread-boot-sched".to_string(), RECOVERY_DELAY)));
     assert_eq!(
         recover_on_boot(&cx(), w),
         0,

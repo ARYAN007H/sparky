@@ -4,13 +4,11 @@ use crate::agent::orchestration::subagent_sessions;
 #[test]
 fn schema_has_no_required_fields() {
     let schema = ListSubagentsTool::new().parameters_schema();
-    assert!(
-        schema
-            .get("required")
-            .and_then(|v| v.as_array())
-            .expect("required")
-            .is_empty()
-    );
+    assert!(schema
+        .get("required")
+        .and_then(|v| v.as_array())
+        .expect("required")
+        .is_empty());
 }
 
 #[test]

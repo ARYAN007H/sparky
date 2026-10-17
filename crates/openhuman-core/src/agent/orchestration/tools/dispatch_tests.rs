@@ -4,7 +4,7 @@ use std::sync::Arc;
 use tinytools::Tool;
 
 use super::super::collapsed_delegation::{
-    CollapsedDelegationTool, DelegateTarget, dispatch_targets_from_schema,
+    dispatch_targets_from_schema, CollapsedDelegationTool, DelegateTarget,
 };
 use super::super::delegate_graph::DelegateGraphDispatch;
 use crate::tools::delegate::DelegateToolDispatch;
@@ -247,11 +247,9 @@ async fn config_delegate_dispatch_preserves_tool_failure_in_shared_jobs() {
         .expect("the host returns the configured tool result");
 
     assert!(result.is_error);
-    assert!(
-        result
-            .output()
-            .contains("configured policy rejected the request")
-    );
+    assert!(result
+        .output()
+        .contains("configured policy rejected the request"));
     assert!(
         jobs.list().iter().any(|job| {
             job.agent == "configured-error"

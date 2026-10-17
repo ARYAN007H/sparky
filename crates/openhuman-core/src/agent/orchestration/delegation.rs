@@ -12,7 +12,7 @@
 use std::sync::Arc;
 
 use crate::agent::subagent_host::{
-    SubagentRunOptions, SubagentRunStatus, run_subagent_via_driver_tool,
+    run_subagent_via_driver_tool, SubagentRunOptions, SubagentRunStatus,
 };
 use crate::agent::tinyagents::host::OpenHumanRunContext;
 use crate::agent_registry::host_definition::AgentDefinition;

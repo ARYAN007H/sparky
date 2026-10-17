@@ -24,8 +24,8 @@ use serde_json::Value;
 use tinystoragedrivers::{CollectionSpec, Precondition, Query, Sort};
 
 use super::types::DurableSubagentSession;
-use crate::storage::DocumentStoreExt;
 use crate::storage::documents::Repo;
+use crate::storage::DocumentStoreExt;
 
 const SESSIONS: &str = "subagent_sessions";
 /// Holds the marker document that records the one-time legacy file import, in

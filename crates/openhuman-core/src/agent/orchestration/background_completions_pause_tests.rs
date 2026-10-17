@@ -162,12 +162,10 @@ fn delivered_pause_leaves_the_task_key_free_for_a_later_delivery() {
             .unwrap(),
         1
     );
-    assert!(
-        router
-            .claim_pending("thread-sequential", usize::MAX)
-            .unwrap()
-            .is_empty()
-    );
+    assert!(router
+        .claim_pending("thread-sequential", usize::MAX)
+        .unwrap()
+        .is_empty());
 }
 
 #[test]

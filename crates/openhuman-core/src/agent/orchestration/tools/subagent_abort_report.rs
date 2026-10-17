@@ -24,8 +24,8 @@
 //! only thing that settles the card. A closed channel has no reader left to
 //! settle anything, so that case is logged and dropped.
 
-use tokio::sync::mpsc::Sender;
 use tokio::sync::mpsc::error::TrySendError;
+use tokio::sync::mpsc::Sender;
 
 use crate::progress::AgentProgress;
 

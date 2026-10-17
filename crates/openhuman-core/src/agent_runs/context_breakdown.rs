@@ -19,10 +19,10 @@ use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 
 use crate::config::Config;
-use crate::core::Outcome;
-use crate::core::agent_cli::debug::DumpPromptOptions;
 use crate::core::agent_cli::debug::prompt_size::{PromptSizeReport, SectionSize, ToolSize};
+use crate::core::agent_cli::debug::DumpPromptOptions;
 use crate::core::runtime::DispatchCtx;
+use crate::core::Outcome;
 
 /// Default agent whose prompt is measured when the caller names none — the
 /// one every main chat turn actually runs under.

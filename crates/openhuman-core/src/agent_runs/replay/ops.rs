@@ -7,8 +7,8 @@
 use std::path::Path;
 
 use tinyagents_harness::events::HarnessRunStatus;
-use tinyagents_harness::observability::StoreEventJournal;
 use tinyagents_harness::observability::replay::{self, RunEventsPage};
+use tinyagents_harness::observability::StoreEventJournal;
 
 /// Paged late-attach replay reader over the durable journal under `workspace`.
 pub(crate) async fn read_run_events_page(

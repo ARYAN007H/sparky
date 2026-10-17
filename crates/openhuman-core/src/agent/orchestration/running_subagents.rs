@@ -67,14 +67,14 @@ pub(crate) use cancel::cancel_by_task;
 #[cfg(test)]
 pub(crate) use cancel::prune;
 #[cfg(test)]
-pub(crate) use cancel::{CallerWorkspace, caller_workspace_in};
+pub(crate) use cancel::{caller_workspace_in, CallerWorkspace};
 pub(crate) use cancel::{
-    CancelledSubagent, cancel_all, cancel_by_session_in_workspace,
-    cancel_by_task_with_workspace_reason, cancel_for_thread, stop_for_thread,
+    cancel_all, cancel_by_session_in_workspace, cancel_by_task_with_workspace_reason,
+    cancel_for_thread, stop_for_thread, CancelledSubagent,
 };
 pub(crate) use registry::admit_spawn;
 #[cfg(test)]
-pub(crate) use registry::{RegistrationError, register, status_channel};
+pub(crate) use registry::{register, status_channel, RegistrationError};
 pub(crate) use roster::active_subagents_context_block;
 #[cfg(test)]
 pub(crate) use steering::steer;

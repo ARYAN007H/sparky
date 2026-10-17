@@ -5,7 +5,7 @@
 use std::path::Path;
 use std::time::Duration;
 
-use tinyagents_orchestration::subagent::{WaitError, WaitOutcome, wait_detached_or_durable};
+use tinyagents_orchestration::subagent::{wait_detached_or_durable, WaitError, WaitOutcome};
 
 use super::registry::{admit_workspace, owner_key, registry};
 

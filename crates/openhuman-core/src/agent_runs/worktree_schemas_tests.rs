@@ -1,7 +1,7 @@
 use super::*;
 use crate::core::runtime::DispatchCtx;
 use std::process::Command;
-use tinyagents_harness::workspace::{GitWorktreeBaseRef, GitWorktreeStatus, create_git_worktree};
+use tinyagents_harness::workspace::{create_git_worktree, GitWorktreeBaseRef, GitWorktreeStatus};
 
 /// `true` when `git` is invokable on this host. Tests that need real
 /// `git worktree` plumbing skip (pass trivially) when it's absent, so a

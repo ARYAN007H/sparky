@@ -6,7 +6,7 @@
 use std::path::Path;
 
 use tinyagents_orchestration::subagent::{
-    SubagentResumeRef, WaitError, resolve_detached_or_durable,
+    resolve_detached_or_durable, SubagentResumeRef, WaitError,
 };
 
 use super::registry::{admit_workspace, owner_key, registry};

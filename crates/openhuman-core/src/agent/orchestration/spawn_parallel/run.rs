@@ -14,7 +14,7 @@ use tinytools::WorkspaceDescriptor;
 use crate::agent_registry::host_definition::AgentDefinitionRegistry;
 
 use super::collect::{
-    SpawnParallelGraphOutcome, collect_spawn_parallel_results, project_spawn_parallel_result,
+    collect_spawn_parallel_results, project_spawn_parallel_result, SpawnParallelGraphOutcome,
 };
 use super::dispatch::stage_spawn_parallel_workers_from_defs;
 use super::staging::snapshot_agent_definitions;

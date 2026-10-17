@@ -5,7 +5,7 @@ async fn driver_job_controls_are_isolated_by_workspace_with_shared_runtime_state
     use crate::agent::orchestration::subagent_sessions::{
         DurableSubagentSession, DurableSubagentStatus, SubagentSessionStore,
     };
-    use crate::agent::subagent_host::{SubagentRunOptions, run_subagent_via_driver_tool};
+    use crate::agent::subagent_host::{run_subagent_via_driver_tool, SubagentRunOptions};
     use crate::core::runtime::{ContextOverlay, CoreContext, DomainSet};
     use crate::tools::toolpacks::ToolGroups;
     use tinyagents_harness::agent_loop::phases::execute_tool_batch;

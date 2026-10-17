@@ -148,8 +148,8 @@ async fn cancelling_a_paused_driver_queues_a_failed_delivery_with_reason() {
         forget_workspace_for_test, pending_for,
     };
     use crate::agent::orchestration::subagent_sessions::{
-        DriverTaskCancellation, DurableSubagentStatus, SubagentSessionSelector,
-        SubagentSessionStore, SubagentSessionUpsert, mark_finished, upsert_running,
+        mark_finished, upsert_running, DriverTaskCancellation, DurableSubagentStatus,
+        SubagentSessionSelector, SubagentSessionStore, SubagentSessionUpsert,
     };
     use tinyagents_orchestration::subagent::SubagentTaskKey;
     use tinyagents_tasks::CompletionStatus;
@@ -213,15 +213,13 @@ async fn cancelling_a_paused_driver_queues_a_failed_delivery_with_reason() {
     };
 
     forget_workspace_for_test(&workspace_dir);
-    assert!(
-        settle_paused_driver_cancel(
-            &DispatchCtx::process_default(),
-            &observed,
-            Some("user requested stop")
-        )
-        .await
-        .expect("paused cancellation settles")
-    );
+    assert!(settle_paused_driver_cancel(
+        &DispatchCtx::process_default(),
+        &observed,
+        Some("user requested stop")
+    )
+    .await
+    .expect("paused cancellation settles"));
 
     let row = store.load().unwrap().remove(0);
     assert_eq!(row.status, DurableSubagentStatus::Failed);
