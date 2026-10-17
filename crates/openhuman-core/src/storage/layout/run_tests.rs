@@ -486,3 +486,19 @@ async fn auto_migrate_is_off_by_default_and_runs_when_asked() {
     assert_migrated(&fx);
     assert!(!auto_migrate(&on).await, "already v2");
 }
+
+#[test]
+fn deleting_refuses_a_path_that_climbs_out_of_its_base() {
+    let dir = tempfile::tempdir().unwrap();
+    let base = dir.path().join("files");
+    std::fs::create_dir_all(&base).unwrap();
+    let outside = dir.path().join("keep.txt");
+    std::fs::write(&outside, b"keep").unwrap();
+
+    let climbing = plan::join(&base, "../keep.txt");
+    assert!(matches!(
+        remove_within(&base, &climbing),
+        Err(LayoutError::Verify(_))
+    ));
+    assert!(outside.is_file(), "a `..` entry must not delete outside the base");
+}
