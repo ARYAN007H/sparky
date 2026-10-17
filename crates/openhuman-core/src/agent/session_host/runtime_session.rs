@@ -9,6 +9,9 @@ mod post_commit;
 mod prelude;
 #[path = "runtime_session/prompt_surface.rs"]
 mod prompt_surface;
+#[path = "runtime_session_usage.rs"]
+mod usage;
+pub(super) use usage::{account_committed_turn_against_goal, holistic_last_turn_usage};
 #[path = "../../memory/lifecycle/session_hooks.rs"]
 mod session_hooks;
 mod tool_rules;
