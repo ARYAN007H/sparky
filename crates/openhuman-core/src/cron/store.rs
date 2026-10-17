@@ -26,13 +26,6 @@ use tinyflows_bus::schedule::{AgentJobSpec, StoreOperation};
 use super::client::store_blocking;
 use super::limits;
 
-/// The cron database tinyflows used to write, imported on first use.
-pub fn legacy_db_path(config: &Config) -> std::path::PathBuf {
-    crate::storage::import::tinyflows::legacy_jobs_db(&crate::core::runtime::agent_scope_dir(
-        config,
-    ))
-}
-
 pub fn add_job(config: &Config, expression: &str, command: &str) -> Result<CronJob> {
     let schedule = Schedule::Cron {
         expr: expression.to_string(),
@@ -63,31 +56,6 @@ pub fn add_shell_job(
             schedule,
             command: command.to_string(),
         },
-    )
-}
-
-#[allow(clippy::too_many_arguments)]
-pub fn add_agent_job(
-    config: &Config,
-    name: Option<String>,
-    schedule: Schedule,
-    prompt: &str,
-    session_target: SessionTarget,
-    model: Option<String>,
-    delivery: Option<DeliveryConfig>,
-    delete_after_run: bool,
-) -> Result<CronJob> {
-    add_agent_job_with_definition(
-        config,
-        name,
-        schedule,
-        prompt,
-        session_target,
-        model,
-        delivery,
-        delete_after_run,
-        None,
-        true,
     )
 }
 
@@ -189,10 +157,6 @@ pub fn dedup_named_jobs(config: &Config) -> Result<usize> {
     store_blocking(config, StoreOperation::Dedup)
 }
 
-pub fn due_jobs(config: &Config, now: DateTime<Utc>) -> Result<Vec<CronJob>> {
-    store_blocking(config, StoreOperation::Due { now })
-}
-
 pub fn update_job(config: &Config, job_id: &str, patch: CronJobPatch) -> Result<CronJob> {
     update_job_with_origin(config, job_id, patch, None)
 }
@@ -264,23 +228,6 @@ pub fn record_last_run(
         StoreOperation::RecordLastRun {
             job_id: job_id.to_string(),
             finished_at,
-            success,
-            output: output.to_string(),
-        },
-    )
-    .map(|_| ())
-}
-
-pub fn reschedule_after_run(
-    config: &Config,
-    job: &CronJob,
-    success: bool,
-    output: &str,
-) -> Result<()> {
-    store_blocking::<serde_json::Value>(
-        config,
-        StoreOperation::Reschedule {
-            job: job.clone(),
             success,
             output: output.to_string(),
         },

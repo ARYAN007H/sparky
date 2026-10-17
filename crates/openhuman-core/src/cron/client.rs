@@ -17,9 +17,8 @@ use chrono::{DateTime, Duration, Utc};
 use serde::{de::DeserializeOwned, Serialize};
 use serde_json::Value;
 use tinyflows_bus::schedule::{
-    members, CheckOriginRequest, CheckPatchRequest, DeliveryConfig, JobOrigin, NextRunRequest,
-    RunsCloserThanRequest, Schedule, SessionTarget, StoreBackend, StoreConfig, StoreOperation,
-    StoreRequest, TooFrequent, ValidateScheduleRequest,
+    members, CheckOriginRequest, DeliveryConfig, JobOrigin, RunsCloserThanRequest, Schedule,
+    SessionTarget, StoreBackend, StoreConfig, StoreOperation, StoreRequest, TooFrequent,
 };
 use tinyflows_bus::schedule::{CronJob, CronJobPatch};
 
@@ -129,47 +128,6 @@ pub(crate) async fn check_origin_requirements(
     call(config, members::CHECK_ORIGIN_REQUIREMENTS, (request,)).await
 }
 
-/// `CheckPatch`: refuse a patch no store may apply to `job`.
-pub(crate) async fn check_patch(
-    config: &Config,
-    job: &CronJob,
-    patch: &CronJobPatch,
-) -> Result<()> {
-    let request = CheckPatchRequest {
-        job: job.clone(),
-        patch: patch.clone(),
-    };
-    call(config, members::CHECK_PATCH, (request,)).await
-}
-
-/// `NextRun`: the first occurrence of `schedule` strictly after `from`.
-pub(crate) async fn next_run(
-    config: &Config,
-    schedule: &Schedule,
-    from: DateTime<Utc>,
-) -> Result<DateTime<Utc>> {
-    let request = NextRunRequest {
-        schedule: schedule.clone(),
-        from,
-    };
-    call(config, members::NEXT_RUN, (request,)).await
-}
-
-/// `ValidateSchedule`; `agent` adds the agent-job cadence floor.
-pub(crate) async fn validate_schedule(
-    config: &Config,
-    schedule: &Schedule,
-    now: DateTime<Utc>,
-    agent: bool,
-) -> Result<()> {
-    let request = ValidateScheduleRequest {
-        schedule: schedule.clone(),
-        now,
-        agent,
-    };
-    call(config, members::VALIDATE_SCHEDULE, (request,)).await
-}
-
 /// `RunsCloserThan`: the tightest pair of consecutive runs under `min_gap`.
 pub(crate) async fn runs_closer_than(
     config: &Config,
@@ -183,24 +141,6 @@ pub(crate) async fn runs_closer_than(
         min_gap_ms: min_gap.num_milliseconds(),
     };
     call(config, members::RUNS_CLOSER_THAN, (request,)).await
-}
-
-/// `NormalizeExpression`: POSIX weekdays into the `cron` crate's numbering.
-pub(crate) async fn normalize_expression(config: &Config, expression: &str) -> Result<String> {
-    call(config, members::NORMALIZE_EXPRESSION, (expression,)).await
-}
-
-/// `ScheduleCronExpression`: the cron expression a schedule has, if any.
-pub(crate) async fn schedule_cron_expression(
-    config: &Config,
-    schedule: &Schedule,
-) -> Result<Option<String>> {
-    call(config, members::SCHEDULE_CRON_EXPRESSION, (schedule,)).await
-}
-
-/// `TruncateCronOutput`: output bounded to `MAX_CRON_OUTPUT_BYTES`.
-pub(crate) async fn truncate_cron_output(config: &Config, output: &str) -> Result<String> {
-    call(config, members::TRUNCATE_CRON_OUTPUT, (output,)).await
 }
 
 /// [`store`] for a synchronous caller (the cron store API is synchronous). The
