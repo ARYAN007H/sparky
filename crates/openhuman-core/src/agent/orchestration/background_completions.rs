@@ -38,7 +38,8 @@ use tinyagents_orchestration::subagent::{
 };
 use tinyagents_tasks::{
     CompletionRecord, CompletionResult, CompletionRouter, CompletionState, CompletionStatus,
-    CompletionStore, DriverCompletionStore, InMemoryCompletionStore, NotifyMode, TombstoneOutcome,
+    CompletionRouterPool, CompletionRouterReplaceOutcome, CompletionStore,
+    DriverCompletionStore, InMemoryCompletionStore, NotifyMode, TombstoneOutcome,
     DEFAULT_MAX_ATTEMPTS,
 };
 
@@ -69,6 +70,28 @@ const RECORD_RETRIES: u32 = 3;
 /// Bound on the session -> thread cache; the oldest mapping is evicted first.
 const SESSION_THREADS_CAP: usize = 4096;
 
+/// Router authority is scoped to the acting profile and workspace. Threads
+/// share a router within that scope, while identical workspace paths in two
+/// SaaS profiles remain isolated.
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+pub(super) struct RouterScope {
+    profile_key: String,
+    workspace_dir: PathBuf,
+}
+
+pub(super) fn router_scope(workspace_dir: &Path) -> RouterScope {
+    let ctx = DispatchCtx::ambient();
+    let profile = crate::core::runtime::tenant::isolated_unless_tenant(
+        ctx.tenant(),
+        "background_completions",
+    )
+    .profile_only();
+    RouterScope {
+        profile_key: crate::core::runtime::tenant::profile_key_in(&profile, ""),
+        workspace_dir: workspace_dir.to_path_buf(),
+    }
+}
+
 /// A workspace's router plus the store it sits on (kept so boot recovery and
 /// purge can enumerate parents, which the router itself does not expose).
 pub(super) struct Entry {
@@ -78,8 +101,9 @@ pub(super) struct Entry {
 
 #[derive(Default)]
 pub(super) struct HostState {
-    /// One router per workspace.
-    pub(super) routers: HashMap<PathBuf, Arc<Entry>>,
+    /// Store sidecars let recovery enumerate per-scope stores without creating
+    /// another router cache beside TinyAgents' `CompletionRouterPool`.
+    pub(super) stores: HashMap<RouterScope, Arc<dyn CompletionStore>>,
     /// Which workspace holds a thread's completions. Thread-scoped operations
     /// (Stop, delete) carry no workspace, only a thread id.
     pub(super) thread_workspaces: HashMap<String, PathBuf>,
@@ -97,7 +121,7 @@ pub(super) struct HostState {
     /// after the delete sweep (the cooperative-abort race), is rejected for good.
     pub(super) deleted_threads: HashSet<String>,
     /// Workspaces whose log boot recovery has already scanned this process.
-    pub(super) recovered_workspaces: HashSet<PathBuf>,
+    pub(super) recovered_workspaces: HashSet<RouterScope>,
 }
 
 pub(super) fn state() -> std::sync::MutexGuard<'static, HostState> {
@@ -118,42 +142,38 @@ fn open_driver_store(workspace_dir: &Path) -> anyhow::Result<Arc<dyn CompletionS
     Ok(Arc::new(store))
 }
 
+fn router_pool() -> &'static CompletionRouterPool<RouterScope> {
+    static POOL: OnceLock<CompletionRouterPool<RouterScope>> = OnceLock::new();
+    POOL.get_or_init(|| {
+        CompletionRouterPool::new(|scope| {
+            let store = match open_driver_store(&scope.workspace_dir) {
+                Ok(store) => store,
+                Err(error) => {
+                    log::error!(
+                        "[background_completions] could not open the completion store for {}; using an \
+                         in-memory queue (completions will not survive a restart): {error:#}",
+                        scope.workspace_dir.display()
+                    );
+                    Arc::new(InMemoryCompletionStore::new())
+                }
+            };
+            Arc::new(new_router(store))
+        })
+    })
+}
+
 fn entry_for(workspace_dir: &Path) -> Arc<Entry> {
-    if let Some(entry) = state().routers.get(workspace_dir) {
-        return entry.clone();
-    }
-    // Opening replays the whole log, so it happens outside the state lock; this
-    // dedicated lock keeps two callers from opening two writers on one log.
-    static OPEN_LOCK: Mutex<()> = Mutex::new(());
-    let _open = OPEN_LOCK.lock().unwrap_or_else(|p| p.into_inner());
-    if let Some(entry) = state().routers.get(workspace_dir) {
-        return entry.clone();
-    }
-    let store: Arc<dyn CompletionStore> = match open_driver_store(workspace_dir) {
-        Ok(store) => store,
+    let scope = router_scope(workspace_dir);
+    let router = match router_pool().get_or_open(&scope) {
+        Ok(router) => router,
         Err(error) => {
-            // A backend that cannot be reached degrades to an in-memory
-            // queue rather than taking background delivery down.
-            log::error!(
-                "[background_completions] could not open the completion store for {}; using an \
-                 in-memory queue (completions will not survive a restart): {error:#}",
-                workspace_dir.display()
-            );
-            Arc::new(InMemoryCompletionStore::new())
+            log::error!("[background_completions] router pool lookup failed: {error}");
+            Arc::new(new_router(Arc::new(InMemoryCompletionStore::new())))
         }
     };
-    let entry = Arc::new(Entry {
-        router: Arc::new(new_router(store.clone())),
-        store,
-    });
-    state()
-        .routers
-        .insert(workspace_dir.to_path_buf(), entry.clone());
-    log::debug!(
-        "[background_completions] opened router workspace_dir={}",
-        workspace_dir.display()
-    );
-    entry
+    let store = router.store();
+    state().stores.insert(scope, store.clone());
+    Arc::new(Entry { router, store })
 }
 
 /// Replace a workspace's failing durable store with an in-memory one that starts
@@ -165,31 +185,41 @@ fn entry_for(workspace_dir: &Path) -> Arc<Entry> {
 /// installing a second one the delivery loop would never see. `failed` is the
 /// router the caller just saw fail.
 fn degrade_to_memory(workspace_dir: &Path, failed: &Arc<CompletionRouter>) -> Arc<Entry> {
-    static DEGRADE_LOCK: Mutex<()> = Mutex::new(());
-    let _serial = DEGRADE_LOCK.lock().unwrap_or_else(|p| p.into_inner());
-    let old = entry_for(workspace_dir);
-    if !Arc::ptr_eq(&old.router, failed) {
-        return old;
-    }
+    let scope = router_scope(workspace_dir);
     let store = Arc::new(InMemoryCompletionStore::new());
-    for record in old.store.list(None) {
+    for record in failed.store().list(None) {
         if let Err(error) = store.put(&record) {
             log::warn!("[background_completions] could not carry a record over: {error}");
         }
     }
     let store: Arc<dyn CompletionStore> = store;
-    let entry = Arc::new(Entry {
-        router: Arc::new(new_router(store.clone())),
-        store,
-    });
-    state()
-        .routers
-        .insert(workspace_dir.to_path_buf(), entry.clone());
-    log::error!(
-        "[background_completions] degraded to an in-memory queue workspace_dir={}",
-        workspace_dir.display()
-    );
-    entry
+    let replacement = Arc::new(new_router(store));
+    match router_pool().replace_if_current(&scope, failed, replacement) {
+        Ok(CompletionRouterReplaceOutcome::Replaced(router)) => {
+            let store = router.store();
+            state().stores.insert(scope, store.clone());
+            log::error!(
+                "[background_completions] degraded to an in-memory queue workspace_dir={}",
+                workspace_dir.display()
+            );
+            Arc::new(Entry { router, store })
+        }
+        Ok(CompletionRouterReplaceOutcome::Current(router)) => {
+            let store = router.store();
+            state().stores.insert(scope, store.clone());
+            Arc::new(Entry { router, store })
+        }
+        Ok(CompletionRouterReplaceOutcome::Missing) => {
+            // A lifecycle release removed the key while records were copied.
+            // Reopen the current scope; never reinstall the stale replacement.
+            state().stores.remove(&scope);
+            entry_for(workspace_dir)
+        }
+        Err(error) => {
+            log::error!("[background_completions] router fallback replace failed: {error}");
+            entry_for(workspace_dir)
+        }
+    }
 }
 
 pub(super) fn new_router(store: Arc<dyn CompletionStore>) -> CompletionRouter {
