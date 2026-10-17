@@ -76,10 +76,6 @@ fn capability_error_display(message: &str) -> String {
     EngineError::Capability(message.to_string()).to_string()
 }
 
-#[cfg(test)]
-#[path = "composio_tests.rs"]
-mod tests;
-
 #[async_trait]
 impl ToolBackend for ComposioToolBackend {
     fn name(&self) -> &'static str {
@@ -113,3 +109,7 @@ impl ToolBackend for ComposioToolBackend {
             .map_err(EngineError::Capability)
     }
 }
+
+#[cfg(test)]
+#[path = "composio_tests.rs"]
+mod tests;
