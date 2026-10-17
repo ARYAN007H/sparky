@@ -151,7 +151,7 @@ impl CloseSubagentTool {
             return Ok(ToolResult::error(
                 "close_subagent: sub-agent session not found for this parent thread",
             ));
-        }
+        };
         let dispatch =
             crate::agent::tinyagents::host::run_context::dispatch_ctx_for_tool(tool_context);
         let thread_id = tool_context.and_then(ToolRunContext::thread_id);
@@ -180,7 +180,7 @@ impl CloseSubagentTool {
             Err(err) => Ok(ToolResult::error(format!(
                 "close_subagent: failed to update sub-agent session: {err}"
             ))),
-            Ok(closed) => {
+            Ok(true) => {
                 log::info!(
                     "[subagent_reuse] close subagent_session_id={} parent_session={} closed={} cancelled_running={}",
                     subagent_session_id,

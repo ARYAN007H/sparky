@@ -154,21 +154,16 @@ impl SpawnAsyncSubagentTool {
                     }
                     match subagent_sessions::close_if_current(&store, &session) {
                         Ok(true) => {}
-                        Ok(false) => log::warn!(
-                            "[subagent_reuse] fresh close lost lifecycle race parent_thread_id={} subagent_session_id={} agent_id={} task_key={}",
-                            parent_thread_id.as_deref().unwrap_or("none"),
-                            session.subagent_session_id,
-                            definition.id,
-                            task_key
-                        ),
-                        Err(err) => log::warn!(
-                            "[subagent_reuse] fresh close failed parent_thread_id={} subagent_session_id={} agent_id={} task_key={} error={}",
-                            parent_thread_id.as_deref().unwrap_or("none"),
-                            session.subagent_session_id,
-                            definition.id,
-                            task_key,
-                            err
-                        ),
+                        Ok(false) => {
+                            return Ok(ToolResult::error(
+                                "spawn_async_subagent: reusable session changed during fresh start; retry with the current session",
+                            ));
+                        }
+                        Err(err) => {
+                            return Ok(ToolResult::error(format!(
+                                "spawn_async_subagent: failed to close reusable session: {err}"
+                            )));
+                        }
                     }
                 }
                 Ok(None) => {}
