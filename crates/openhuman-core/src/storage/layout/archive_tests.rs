@@ -1,5 +1,5 @@
 use super::*;
-use crate::storage::layout::test_fixtures::{tree, write};
+use crate::storage::layout::test_fixtures::{tree, write as put};
 use tempfile::TempDir;
 
 fn sources(dir: &Path) -> Vec<Source> {
@@ -11,10 +11,10 @@ fn sources(dir: &Path) -> Vec<Source> {
 
 fn source_tree() -> TempDir {
     let dir = TempDir::new().unwrap();
-    write(&dir.path().join("skills/s1/SKILL.md"), "UNIQUE-CONTENT-1234 skill body");
-    write(&dir.path().join("skills/s2/notes.txt"), "second");
+    put(&dir.path().join("skills/s1/SKILL.md"), "UNIQUE-CONTENT-1234 skill body");
+    put(&dir.path().join("skills/s2/notes.txt"), "second");
     std::fs::create_dir_all(dir.path().join("skills/empty")).unwrap();
-    write(&dir.path().join("jobs.json"), "{\"a\":1}");
+    put(&dir.path().join("jobs.json"), "{\"a\":1}");
     #[cfg(unix)]
     std::os::unix::fs::symlink("s1/SKILL.md", dir.path().join("skills/link")).unwrap();
     dir
