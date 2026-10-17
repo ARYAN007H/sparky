@@ -159,7 +159,7 @@ pub(super) fn policy_get(ctx: DispatchCtx, params: Map<String, Value>) -> Contro
 
 pub(super) fn policy_set(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     rpc::<PolicySetParams, _>(ctx, params, |_, mut config, params| async move {
-        views::apply_policy_set(&mut config, &params).map_err(String::from)?;
+        views::apply_policy_set(&mut config, &params)?;
         save(&config).await?;
         Ok(views::policy_view(&config))
     })
@@ -250,24 +250,32 @@ pub(super) fn sources_add(ctx: DispatchCtx, params: Map<String, Value>) -> Contr
 }
 
 pub(super) fn sources_remove(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
-    rpc::<SourcesRemoveParams, _>(ctx, params, |_, mut config, params| async move {
-        let Some(removed) = sources::apply_remove(&mut config, &params.id) else {
-            return Ok(SourceRemovedView { removed: false });
-        };
-        save(&config).await?;
-        sources::state::remove(&config.workspace_dir, &removed.id);
-        if params.forget_items.unwrap_or(false) {
-            sources::forget_items(&config, &removed.id).await?;
-        }
-        Ok(SourceRemovedView { removed: true })
-    })
+    rpc::<SourcesRemoveParams, _>(
+        ctx,
+        params,
+        |_, mut config, params: SourcesRemoveParams| async move {
+            let Some(removed) = sources::apply_remove(&mut config, &params.id) else {
+                return Ok(SourceRemovedView { removed: false });
+            };
+            save(&config).await?;
+            sources::state::remove(&config.workspace_dir, &removed.id);
+            if params.forget_items.unwrap_or(false) {
+                sources::forget_items(&config, &removed.id).await?;
+            }
+            Ok(SourceRemovedView { removed: true })
+        },
+    )
 }
 
 pub(super) fn sources_sync(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
-    rpc::<SourcesSyncParams, _>(ctx, params, |ctx, config, params| async move {
-        let started = sources::start_sync(&ctx, &config, params.id.as_deref())?;
-        Ok(SourcesSyncView { started })
-    })
+    rpc::<SourcesSyncParams, _>(
+        ctx,
+        params,
+        |ctx, config, params: SourcesSyncParams| async move {
+            let started = sources::start_sync(&ctx, &config, params.id.as_deref())?;
+            Ok(SourcesSyncView { started })
+        },
+    )
 }
 
 pub(super) fn import_scan(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
@@ -277,11 +285,15 @@ pub(super) fn import_scan(ctx: DispatchCtx, params: Map<String, Value>) -> Contr
 }
 
 pub(super) fn import_start(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
-    rpc::<ImportStartParams, _>(ctx, params, |ctx, config, params| async move {
-        import::start(&ctx, &config, params.consent)
-            .await
-            .map(|state| ImportStateView { state })
-    })
+    rpc::<ImportStartParams, _>(
+        ctx,
+        params,
+        |ctx, config, params: ImportStartParams| async move {
+            import::start(&ctx, &config, params.consent)
+                .await
+                .map(|state| ImportStateView { state })
+        },
+    )
 }
 
 pub(super) fn import_status(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
@@ -310,19 +322,23 @@ pub(super) fn migration_scan(ctx: DispatchCtx, params: Map<String, Value>) -> Co
 }
 
 pub(super) fn migration_start(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
-    rpc::<layout_migration::StartParams, _>(ctx, params, |ctx, config, params| async move {
-        let started = layout_migration::start(
-            &ctx,
-            config.clone(),
-            std::sync::Arc::new(layout_migration::AppHost::new(config.clone())),
-            layout_migration::Trigger::Manual {
-                takeover: params.takeover,
-            },
-            std::sync::Arc::new(import::scheduler_paused),
-        );
-        tracing::debug!(started, "[memory:layout_migration] start requested");
-        layout_migration::status(&config)
-    })
+    rpc::<layout_migration::StartParams, _>(
+        ctx,
+        params,
+        |ctx, config, params: layout_migration::StartParams| async move {
+            let started = layout_migration::start(
+                &ctx,
+                config.clone(),
+                std::sync::Arc::new(layout_migration::AppHost::new(config.clone())),
+                layout_migration::Trigger::Manual {
+                    takeover: params.takeover,
+                },
+                std::sync::Arc::new(import::scheduler_paused),
+            );
+            tracing::debug!(started, "[memory:layout_migration] start requested");
+            layout_migration::status(&config)
+        },
+    )
 }
 
 pub(super) fn migration_status(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
