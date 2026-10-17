@@ -123,7 +123,7 @@ async fn independent_host_bundles_share_and_project_the_persisted_winner() {
         crate::core::runtime::DomainSet::full(),
         test_config,
     );
-    options.run_context = options.run_context.with_core(Some(core));
+    options.run_context = options.run_context.with_core(Some(Arc::clone(&core)));
     let parent = options.run_context.clone().into_tinyagents(
         tinyagents_harness::context::RunConfig::new("cross-bundle-parent")
             .with_thread("cross-bundle-thread"),
@@ -133,15 +133,13 @@ async fn independent_host_bundles_share_and_project_the_persisted_winner() {
         &parent.data.dispatch_ctx(),
         &checkpoint_dir,
     );
-    let leader_entry = flights
-        .get(&task_key)
-        .expect("leader reserves the shared task key");
-
+    let leader_definition = definition.clone();
+    let leader_options = options.clone();
     let leader_parent = parent.clone();
     let leader = tokio::spawn(async move {
         crate::agent::subagent_host::OpenHumanSubagentHost::new(
-            definition.clone(),
-            options.clone(),
+            leader_definition,
+            leader_options,
         )
         .run(&leader_parent, "produce a report".into())
         .await
@@ -150,6 +148,9 @@ async fn independent_host_bundles_share_and_project_the_persisted_winner() {
         .await
         .expect("leader reaches the blocking child tool")
         .expect("blocking tool start notification");
+    let leader_entry = flights
+        .get(&task_key)
+        .expect("leader reserves the shared task key");
 
     let follower_parent = parent.clone();
     let follower = tokio::spawn(async move {
