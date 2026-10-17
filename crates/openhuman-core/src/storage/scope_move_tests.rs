@@ -80,7 +80,7 @@ async fn a_v1_scope_moves_its_documents_streams_and_blobs() {
 
     let report = run(&backend).await.unwrap();
     assert_eq!(report.moved, 1);
-    assert_eq!(report.documents >= 1, true);
+    assert!(report.documents >= 1);
     assert_eq!(report.entries, 2);
     assert_eq!(report.blobs, 1);
 
