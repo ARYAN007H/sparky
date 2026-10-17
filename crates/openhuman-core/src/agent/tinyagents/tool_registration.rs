@@ -77,18 +77,13 @@ impl ToolDispatch<(), OpenHumanRunContext> for LiveToolContextDispatch {
 /// absent thread from the literal `"no-thread"` and handles delimiters in any
 /// value.
 pub(crate) fn subagent_owner_key(
-    workspace: &std::path::Path,
+    _workspace: &std::path::Path,
     parent_session: &str,
     thread_id: Option<&str>,
 ) -> String {
     format!(
         "openhuman-subagent-owner:{}",
-        serde_json::to_string(&(
-            workspace.as_os_str().as_encoded_bytes(),
-            parent_session,
-            thread_id,
-        ))
-        .expect("owner scope tuple is always JSON serializable")
+        serde_json::to_string(&(parent_session, thread_id)).unwrap_or_else(|_| "null".into())
     )
 }
 
