@@ -11541,7 +11541,7 @@ async fn json_rpc_flows_full_arc_discover_build_create_run_inner() {
         "scripted suggestion should be persisted: {listed:?}"
     );
 
-    // ── 2. flows_build: the builder scripts a propose_workflow tool call ──
+    // ── 2. flows_build: the builder exercises the Copilot bus and sandbox ──
     clear_forced_chat_completions();
     with_chat_completion_requests(|requests| requests.clear());
     let demo_graph = opus_sonnet_demo_graph();

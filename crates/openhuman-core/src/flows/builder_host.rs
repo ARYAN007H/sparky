@@ -4,7 +4,7 @@ use std::future::Future;
 use std::sync::Arc;
 
 use serde::de::DeserializeOwned;
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use tinybus::Result as BusResult;
 use tinyflows_bus::copilot::{self, CopilotHost, PortOperation};
 
@@ -303,7 +303,12 @@ impl FlowsHost {
 #[tinybus::interface(name = "ai.tinyhumans.tinyflows.CapsHost")]
 impl CopilotCapsHost {
     /// Validate mock tool arguments only; sandbox results stay module-owned.
-    async fn tool_invoke(&self, slug: String, args: Value, _connection: Option<String>) -> BusResult<Value> {
+    async fn tool_invoke(
+        &self,
+        slug: String,
+        args: Value,
+        _connection: Option<String>,
+    ) -> BusResult<Value> {
         self.0
             .preflight_tool(slug, args)
             .await

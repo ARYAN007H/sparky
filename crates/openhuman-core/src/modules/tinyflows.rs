@@ -44,7 +44,7 @@ pub(crate) fn disabled_message() -> String {
 mod imp {
     #[cfg(not(test))]
     use super::MODULE_ID;
-    use super::{HOST_BUS_NAME, disabled_message};
+    use super::{disabled_message, HOST_BUS_NAME};
     use crate::config::Config;
     #[cfg(not(test))]
     use crate::modules::ops;

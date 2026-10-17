@@ -43,10 +43,10 @@ mod spawn_parallel_agents;
 mod spawn_subagent;
 #[path = "tools/spawn_worker_thread.rs"]
 pub mod spawn_worker_thread;
-#[path = "tools/structured_payload.rs"]
-pub(crate) mod structured_payload;
 #[path = "tools/steer_subagent.rs"]
 mod steer_subagent;
+#[path = "tools/structured_payload.rs"]
+pub(crate) mod structured_payload;
 #[path = "tools/subagent_abort_report.rs"]
 mod subagent_abort_report;
 #[cfg(test)]

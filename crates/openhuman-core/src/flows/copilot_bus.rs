@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use serde::{Serialize, de::DeserializeOwned};
+use serde::{de::DeserializeOwned, Serialize};
 use serde_json::Value;
 use tinyflows_bus::copilot::{ToolCatalogRequest, ToolDescriptor};
 use tinytools::{PermissionLevel, Tool, ToolResult};

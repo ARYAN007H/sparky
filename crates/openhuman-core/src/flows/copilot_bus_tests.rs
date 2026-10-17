@@ -138,8 +138,8 @@ async fn module_run_flow_uses_the_host_detached_runner_and_requires_a_saved_flow
     config.action_dir = config.workspace_dir.clone();
     config.config_path = workspace.path().join("config.toml");
     std::fs::create_dir_all(&config.workspace_dir).expect("workspace directory");
-    let catalog = CopilotToolCatalog::load(Arc::new(config.clone()))
-        .expect("module tool catalog loads");
+    let catalog =
+        CopilotToolCatalog::load(Arc::new(config.clone())).expect("module tool catalog loads");
     let tool = catalog.tool("run_flow").expect("run_flow is catalogued");
 
     let missing = tool
@@ -147,7 +147,11 @@ async fn module_run_flow_uses_the_host_detached_runner_and_requires_a_saved_flow
         .await
         .expect("missing flow is a reported tool failure");
     assert!(missing.is_error, "{}", missing.output());
-    assert!(missing.output().contains("not-saved"), "{}", missing.output());
+    assert!(
+        missing.output().contains("not-saved"),
+        "{}",
+        missing.output()
+    );
 
     let flow = crate::flows::ops::flows_create(
         &crate::core::runtime::DispatchCtx::ambient(),
@@ -182,8 +186,8 @@ async fn module_proposal_tool_uses_host_gates_without_persisting() {
     config.action_dir = config.workspace_dir.clone();
     config.config_path = workspace.path().join("config.toml");
     std::fs::create_dir_all(&config.workspace_dir).expect("workspace directory");
-    let catalog = CopilotToolCatalog::load(Arc::new(config.clone()))
-        .expect("module tool catalog loads");
+    let catalog =
+        CopilotToolCatalog::load(Arc::new(config.clone())).expect("module tool catalog loads");
     let tool = catalog
         .tool("propose_workflow")
         .expect("propose_workflow is catalogued");
