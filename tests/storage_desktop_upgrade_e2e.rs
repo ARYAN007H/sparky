@@ -408,7 +408,7 @@ async fn host_documents(backend: &dyn StorageBackend) -> usize {
             continue;
         }
         for item in &schema.items {
-            if let tinystoragedrivers::schema::Item::Collection { spec, .. } = item {
+            if let tinystoragedrivers_core::schema::Item::Collection { spec, .. } = item {
                 docs.documents().ensure_collection(spec).await.unwrap();
                 total += count(&docs, &spec.name).await;
             }
