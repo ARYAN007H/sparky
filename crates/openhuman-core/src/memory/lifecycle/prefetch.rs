@@ -93,6 +93,8 @@ fn memory_config_fingerprint(config: &Config) -> u64 {
     config.config_path.hash(&mut fingerprint);
     config.action_dir.hash(&mut fingerprint);
     config.api_url.hash(&mut fingerprint);
+    config.inference_url.hash(&mut fingerprint);
+    config.api_key.hash(&mut fingerprint);
     config.components.memory.hash(&mut fingerprint);
     config.default_model.hash(&mut fingerprint);
     config.chat_provider.hash(&mut fingerprint);
@@ -245,10 +247,12 @@ pub(crate) fn compaction(
     let cache = cache(ctx);
     let fingerprint = memory_config_fingerprint(&config);
     let key = Key::with_fingerprint(&config, fingerprint, &identity, &thread, true);
-    let pack = completed(&cache, &key)
-        .or_else(|| {
-            completed(&cache, &Key::with_fingerprint(&config, fingerprint, &identity, &thread, false))
-        });
+    let pack = completed(&cache, &key).or_else(|| {
+        completed(
+            &cache,
+            &Key::with_fingerprint(&config, fingerprint, &identity, &thread, false),
+        )
+    });
     enqueue(
         cache,
         key,
