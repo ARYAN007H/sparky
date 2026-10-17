@@ -119,3 +119,16 @@ pub fn fixture_docs(db: &Path) -> BTreeMap<String, serde_json::Value> {
     })
     .unwrap()
 }
+
+/// The imported `memory/state/jobs` value of the database file `db`.
+pub fn jobs_value(db: &Path) -> Option<serde_json::Value> {
+    let url = format!("sqlite:{}", db.display());
+    let scoped = storage::block_on(async move {
+        let backend = storage::open(&url).await?;
+        backend.for_scope(&Scope::local())
+    })
+    .unwrap();
+    crate::storage::state_kv::StateKv::over(&scoped, "memory", "state")
+        .get::<serde_json::Value>("jobs")
+        .unwrap()
+}

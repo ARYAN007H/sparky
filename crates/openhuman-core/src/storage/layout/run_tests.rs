@@ -1,7 +1,6 @@
 use super::*;
 use crate::storage::layout::state::STATE_FILE;
 use crate::storage::layout::test_fixtures::{fixture_docs, tree, v1_profile, write, Fixture};
-use crate::storage::state_kv::StateKv;
 
 fn opts() -> Options {
     Options::default()
@@ -38,13 +37,7 @@ fn assert_migrated(fx: &Fixture) {
     assert!(!exists(&profile.join(STATE_FILE)), "the progress file is removed last");
     // the database came across
     assert_eq!(fixture_docs(&fx.target.storage_db()).len(), 3);
-    let url = format!("sqlite:{}", fx.target.storage_db().display());
-    let jobs = crate::storage::block_on(async move {
-        let backend = crate::storage::open(&url).await?;
-        let scoped = backend.for_scope(&crate::storage::Scope::local())?;
-        Ok(StateKv::over(&scoped, "memory", "state").get::<serde_json::Value>("jobs").ok().flatten())
-    })
-    .unwrap();
+    let jobs = crate::storage::layout::test_fixtures::jobs_value(&fx.target.storage_db());
     assert_eq!(jobs, Some(serde_json::json!({"jobs": [1, 2, 3]})), "imported state is in the v2 database");
     // user files moved
     assert_eq!(std::fs::read_to_string(files.join("skills/s1/SKILL.md")).unwrap(), "# skill one\n");

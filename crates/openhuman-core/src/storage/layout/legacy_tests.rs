@@ -1,6 +1,5 @@
 use super::*;
 use crate::storage::layout::test_fixtures::{fixture_docs, v1_profile};
-use crate::storage::state_kv::StateKv;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn the_import_brings_legacy_files_into_the_v1_database() {
@@ -9,15 +8,7 @@ async fn the_import_brings_legacy_files_into_the_v1_database() {
     assert_eq!(summary.memory_state, vec!["jobs".to_owned()]);
     assert!(summary.domains >= 3, "approval, devices, ... ran: {summary:?}");
 
-    let url = v1_url(&fx.target);
-    let jobs = crate::storage::block_on(async move {
-        let backend = storage::open(&url).await?;
-        let scoped = backend.for_scope(&storage::Scope::local())?;
-        Ok(StateKv::over(&scoped, "memory", "state")
-            .get::<serde_json::Value>("jobs")
-            .unwrap_or_else(|e| panic!("kv get: {e:#}")))
-    })
-    .unwrap();
+    let jobs = crate::storage::layout::test_fixtures::jobs_value(&v1_db(&fx.target));
     assert_eq!(jobs, Some(serde_json::json!({"jobs": [1, 2, 3]})));
     // the sources are only read
     assert!(fx.workspace().join("memory/jobs.json").is_file());
