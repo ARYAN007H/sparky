@@ -1,4 +1,4 @@
-use super::common::{out, req, opt};
+use super::common::{opt, out, req};
 use crate::core::ControllerSchema;
 
 pub(super) fn schema(function: &str) -> Option<ControllerSchema> {
@@ -22,10 +22,22 @@ pub(super) fn schema(function: &str) -> Option<ControllerSchema> {
             function: "engine_set",
             description: "Select a memory engine, optionally setting its endpoint and API key.",
             inputs: vec![
-                    req("engine", TypeSchema::String, "Engine id: tinyhumans or cortexdb."),
-                    opt("endpoint", TypeSchema::String, "Endpoint URL; empty clears it."),
-                    opt("api_key", TypeSchema::String, "API key (cortexdb); empty removes it. Stored in the credential store, never in config."),
-                ],
+                req(
+                    "engine",
+                    TypeSchema::String,
+                    "Engine id: tinyhumans or cortexdb.",
+                ),
+                opt(
+                    "endpoint",
+                    TypeSchema::String,
+                    "Endpoint URL; empty clears it.",
+                ),
+                opt(
+                    "api_key",
+                    TypeSchema::String,
+                    "API key (cortexdb); empty removes it. Stored in the credential store, never in config.",
+                ),
+            ],
             outputs: out("Same as memory_engine_get."),
         }),
         _ => None,

@@ -1,4 +1,4 @@
-use super::common::{out, req, opt, limit};
+use super::common::{limit, opt, out, req};
 use crate::core::ControllerSchema;
 
 pub(super) fn schema(function: &str) -> Option<ControllerSchema> {
@@ -28,7 +28,11 @@ pub(super) fn schema(function: &str) -> Option<ControllerSchema> {
             inputs: vec![
                 opt("path", TypeSchema::String, "A local file to read."),
                 opt("text", TypeSchema::String, "Text to file."),
-                opt("source", TypeSchema::String, "The source to file under (default: from the format, markdown for text)."),
+                opt(
+                    "source",
+                    TypeSchema::String,
+                    "The source to file under (default: from the format, markdown for text).",
+                ),
                 opt("title", TypeSchema::String, "A title."),
             ],
             outputs: out("{id, source, replayed}"),

@@ -1,4 +1,4 @@
-use super::common::{out, opt};
+use super::common::{opt, out};
 use crate::core::ControllerSchema;
 
 pub(super) fn schema(function: &str) -> Option<ControllerSchema> {
@@ -14,7 +14,11 @@ pub(super) fn schema(function: &str) -> Option<ControllerSchema> {
             namespace: "memory",
             function: "jobs_run",
             description: "Run queued background jobs now: one by id, or every pending one.",
-            inputs: vec![opt("id", TypeSchema::String, "One job; every pending job when omitted.")],
+            inputs: vec![opt(
+                "id",
+                TypeSchema::String,
+                "One job; every pending job when omitted.",
+            )],
             outputs: out("{runs: JobRun[]}"),
         }),
         _ => None,
