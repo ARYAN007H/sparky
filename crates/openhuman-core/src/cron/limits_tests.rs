@@ -159,7 +159,7 @@ fn concurrent_preflight_admissions_cannot_oversubscribe_the_store_cap() {
                     )
                     .unwrap();
                     barrier.wait();
-                    crate::cron::client::store_blocking(
+                    crate::cron::client::store_blocking::<crate::cron::CronJob>(
                         &config,
                         tinyflows_bus::schedule::StoreOperation::AddAgent {
                             spec: tinyflows_bus::schedule::AgentJobSpec::new(
