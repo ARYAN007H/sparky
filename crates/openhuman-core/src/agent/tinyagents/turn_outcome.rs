@@ -14,6 +14,14 @@ pub(crate) struct DeferredTurnTerminal {
     pub(crate) journal: Option<crate::agent::tinyagents::journal::TurnJournal>,
 }
 
+impl std::fmt::Debug for DeferredTurnTerminal {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("DeferredTurnTerminal")
+            .finish_non_exhaustive()
+    }
+}
+
 impl DeferredTurnTerminal {
     pub(crate) async fn finish(
         self,

@@ -401,7 +401,7 @@ impl SessionDriver<OpenHumanRunContext> for OpenHumanSessionDriver {
         // second history or transcript.  The runtime only reads it from
         // `after_commit`, so a failed/cancelled turn cannot publish its usage
         // or tool outcomes as if they had become durable.
-        let (terminal_stop, terminal_turn) = {
+        let terminal_stop = {
             // Always billed: a repair that timed out after its call answered
             // still recorded that call here.
             let repair_usage = Some(&repair_usage);
