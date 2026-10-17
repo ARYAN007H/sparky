@@ -280,48 +280,60 @@ fn wildcard_delegate_visibility_admits_new_connections_and_removes_revoked_ones(
 #[tokio::test]
 async fn committed_goal_accounting_uses_direct_and_completed_child_usage() {
     let workspace = tempfile::tempdir().unwrap();
-    tinyagents_graph::goals::store::set(
-        &crate::storage::sessions::stores_or_ephemeral(workspace.path()).kv,
-        "receipt-goal",
-        "finish migration",
-        Some(20),
-    )
-    .await
-    .unwrap();
-    let mut sidecar = crate::agent::tinyagents::host::run_context::SessionTurnSidecar {
-        input_tokens: 9,
-        output_tokens: 4,
-        duration: Some(std::time::Duration::from_secs(2)),
-        ..Default::default()
-    };
-    let child = crate::agent::tinyagents::host::SubagentUsageEntry {
-        task_id: "child-goal".into(),
-        agent_id: "researcher".into(),
-        usage: crate::agent::subagent_host::SubagentUsage {
-            input_tokens: 5,
-            output_tokens: 3,
+    let core = crate::core::runtime::CoreContext::for_test(
+        crate::core::runtime::DomainSet::full(),
+        Some(workspace.path().to_path_buf()),
+    );
+    crate::core::runtime::CoreContext::scope(core, async {
+        let goal_store = crate::storage::sessions::stores_or_ephemeral(workspace.path()).kv;
+        tinyagents_graph::goals::store::set(
+            &goal_store,
+            "receipt-goal",
+            "finish migration",
+            Some(20),
+        )
+        .await
+        .unwrap();
+        assert!(
+            tinyagents_graph::goals::store::get(&goal_store, "receipt-goal")
+                .await
+                .unwrap()
+                .is_some(),
+            "the scoped goal store must contain the fixture before accounting"
+        );
+        let mut sidecar = crate::agent::tinyagents::host::run_context::SessionTurnSidecar {
+            input_tokens: 9,
+            output_tokens: 4,
+            duration: Some(std::time::Duration::from_secs(2)),
             ..Default::default()
-        },
-    };
-    sidecar.subagents.push(child.clone());
-    account_committed_turn_against_goal(workspace.path(), Some("receipt-goal"), &sidecar).await;
+        };
+        let child = crate::agent::tinyagents::host::SubagentUsageEntry {
+            task_id: "child-goal".into(),
+            agent_id: "researcher".into(),
+            usage: crate::agent::subagent_host::SubagentUsage {
+                input_tokens: 5,
+                output_tokens: 3,
+                ..Default::default()
+            },
+        };
+        sidecar.subagents.push(child);
+        account_committed_turn_against_goal(workspace.path(), Some("receipt-goal"), &sidecar).await;
 
-    let goal = tinyagents_graph::goals::store::get(
-        &crate::storage::sessions::stores_or_ephemeral(workspace.path()).kv,
-        "receipt-goal",
-    )
-    .await
-    .unwrap()
-    .unwrap();
-    assert_eq!(
-        goal.tokens_used, 21,
-        "receipt accounts direct + child usage"
-    );
-    assert_eq!(
-        goal.status,
-        tinyagents_graph::goals::ThreadGoalStatus::BudgetLimited,
-        "receipt-backed accounting advances continuation/budget state"
-    );
+        let goal = tinyagents_graph::goals::store::get(&goal_store, "receipt-goal")
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            goal.tokens_used, 21,
+            "receipt accounts direct + child usage"
+        );
+        assert_eq!(
+            goal.status,
+            tinyagents_graph::goals::ThreadGoalStatus::BudgetLimited,
+            "receipt-backed accounting advances continuation/budget state"
+        );
+    })
+    .await;
 }
 
 fn meta() -> TranscriptMeta {

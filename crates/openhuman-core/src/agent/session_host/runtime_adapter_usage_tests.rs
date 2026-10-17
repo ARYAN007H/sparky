@@ -1,4 +1,4 @@
-use super::runtime_session::{account_committed_turn_against_goal, holistic_last_turn_usage};
+use super::*;
 
 #[test]
 fn inclusive_child_usage_counts_each_public_entry_once_and_keeps_unknown_cost() {
@@ -40,7 +40,7 @@ fn inclusive_child_usage_counts_each_public_entry_once_and_keeps_unknown_cost() 
         },
     ];
 
-    let usage = holistic_last_turn_usage(&sidecar);
+    let usage = runtime_session::holistic_last_turn_usage(&sidecar);
     assert_eq!(usage.input_tokens, 37);
     assert_eq!(usage.output_tokens, 14);
     assert_eq!(usage.cached_input_tokens, 3);
@@ -55,39 +55,64 @@ fn inclusive_child_usage_counts_each_public_entry_once_and_keeps_unknown_cost() 
 #[tokio::test]
 async fn committed_goal_accounting_saturates_direct_plus_inclusive_child_tokens() {
     let workspace = tempfile::tempdir().unwrap();
-    tinyagents_graph::goals::store::set(
-        &crate::storage::sessions::stores_or_ephemeral(workspace.path()).kv,
-        "saturated-goal",
-        "complete safely",
-        Some(u64::MAX),
-    )
-    .await
-    .unwrap();
-    let mut sidecar = crate::agent::tinyagents::host::run_context::SessionTurnSidecar {
-        input_tokens: u64::MAX - 1,
-        output_tokens: u64::MAX - 2,
-        ..Default::default()
-    };
-    sidecar
-        .subagents
-        .push(crate::agent::tinyagents::host::SubagentUsageEntry {
-            task_id: "large-child".into(),
-            agent_id: "researcher".into(),
-            usage: crate::agent::subagent_host::SubagentUsage {
-                input_tokens: 10,
-                output_tokens: 10,
-                ..Default::default()
+    let core = crate::core::runtime::CoreContext::for_test(
+        crate::core::runtime::DomainSet::full(),
+        Some(workspace.path().to_path_buf()),
+    );
+    crate::core::runtime::CoreContext::scope(core, async {
+        let goal_store = crate::storage::sessions::stores_or_ephemeral(workspace.path()).kv;
+        tinyagents_graph::goals::store::set(
+            &goal_store,
+            "saturated-goal",
+            "complete safely",
+            Some(u64::MAX),
+        )
+        .await
+        .unwrap();
+        assert!(
+            tinyagents_graph::goals::store::get(&goal_store, "saturated-goal")
+                .await
+                .unwrap()
+                .is_some(),
+            "the scoped goal store must contain the fixture before accounting"
+        );
+
+        let mut sidecar = crate::agent::tinyagents::host::run_context::SessionTurnSidecar {
+            input_tokens: 1,
+            output_tokens: 2,
+            ..Default::default()
+        };
+        sidecar.subagents = vec![
+            crate::agent::tinyagents::host::SubagentUsageEntry {
+                task_id: "large-child-a".into(),
+                agent_id: "researcher".into(),
+                usage: crate::agent::subagent_host::SubagentUsage {
+                    input_tokens: u64::MAX - 2,
+                    ..Default::default()
+                },
             },
-        });
+            crate::agent::tinyagents::host::SubagentUsageEntry {
+                task_id: "large-child-b".into(),
+                agent_id: "researcher".into(),
+                usage: crate::agent::subagent_host::SubagentUsage {
+                    input_tokens: 10,
+                    ..Default::default()
+                },
+            },
+        ];
 
-    account_committed_turn_against_goal(workspace.path(), Some("saturated-goal"), &sidecar).await;
+        runtime_session::account_committed_turn_against_goal(
+            workspace.path(),
+            Some("saturated-goal"),
+            &sidecar,
+        )
+        .await;
 
-    let goal = tinyagents_graph::goals::store::get(
-        &crate::storage::sessions::stores_or_ephemeral(workspace.path()).kv,
-        "saturated-goal",
-    )
-    .await
-    .unwrap()
-    .unwrap();
-    assert_eq!(goal.tokens_used, u64::MAX);
+        let goal = tinyagents_graph::goals::store::get(&goal_store, "saturated-goal")
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(goal.tokens_used, u64::MAX);
+    })
+    .await;
 }
