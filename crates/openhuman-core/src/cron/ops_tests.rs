@@ -3,7 +3,7 @@ use crate::cron::get_job;
 use tempfile::TempDir;
 use tinyflows_bus::schedule::types::{ActiveHours, DeliveryConfig};
 
-fn test_config(tmp: &TempDir) -> Config {
+pub(super) fn test_config(tmp: &TempDir) -> Config {
     let config = Config {
         workspace_dir: tmp.path().join("workspace"),
         action_dir: tmp.path().join("workspace"),
@@ -529,7 +529,7 @@ async fn cron_run_rejects_duplicate_concurrent_execution() {
 
 // ── run_job_now / single-flight ─────────────────────────────────
 
-fn single_flight_system_job(config: &Config, name: &str) -> CronJob {
+pub(super) fn single_flight_system_job(config: &Config, name: &str) -> CronJob {
     let job = crate::cron::system_jobs::ensure_system_job(
         config,
         name,
@@ -654,7 +654,7 @@ async fn run_job_now_records_required_delivery_failure_as_error() {
         CronJobPatch {
             delivery: Some(DeliveryConfig {
                 mode: "announce".into(),
-                channel: None,
+                channel: Some(format!("missing-{}", uuid::Uuid::new_v4())),
                 to: Some("target".into()),
                 best_effort: false,
             }),

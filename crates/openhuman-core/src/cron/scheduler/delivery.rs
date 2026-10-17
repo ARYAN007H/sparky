@@ -215,7 +215,8 @@ pub(super) async fn deliver_run(
         }
 
         // Announce delivery — the cron job specifies the exact channel
-        // and target. Used for explicit channel-targeted output.
+        // and target. Send synchronously so the recorded status reflects
+        // whether the channel runtime accepted the message.
         "announce" if deliver_to_chat => {
             let channel = delivery
                 .channel
@@ -226,19 +227,37 @@ pub(super) async fn deliver_run(
                 .as_deref()
                 .ok_or_else(|| anyhow::anyhow!("delivery.to is required for announce mode"))?;
 
-            tracing::debug!(
-                job_id = %job.id,
-                channel = %channel,
-                target = %target,
-                "[cron] publishing CronDeliveryRequested event"
-            );
-            BUS.publish(DomainEvent::CronDeliveryRequested {
-                job_id: job.id.clone(),
-                channel: channel.to_string(),
-                target: target.to_string(),
-                output: output.to_string(),
-            });
-            status = DeliveryStatus::Delivered;
+            let idempotency_key = super::origin_delivery::origin_request_id(&job.id, run_id);
+            match crate::cron::channel_bridge::send_to_channel(
+                channel,
+                target,
+                None,
+                output,
+                &idempotency_key,
+            )
+            .await
+            {
+                Ok(()) => {
+                    tracing::debug!(
+                        job_id = %job.id,
+                        run_id = %run_id,
+                        channel = %channel,
+                        "[cron] announce delivery sent"
+                    );
+                    status = DeliveryStatus::Delivered;
+                }
+                Err(error) => {
+                    tracing::warn!(
+                        job_id = %job.id,
+                        run_id = %run_id,
+                        channel = %channel,
+                        target = %target,
+                        error = %error,
+                        "[cron] announce delivery failed"
+                    );
+                    status = DeliveryStatus::Failed;
+                }
+            }
         }
 
         // No delivery configured — output is stored in last_output only.

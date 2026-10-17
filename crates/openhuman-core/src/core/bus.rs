@@ -48,15 +48,14 @@ pub const EVENTS_ROOT: &str = "/ai/tinyhumans/openhuman/events";
 
 /// The interface the event catalog is published under.
 ///
-/// A breaking change to the catalog ships as a **new interface name**
-/// (`Events2`), never as a redefinition — see `tinybus`'s protocol rules.
-pub const EVENTS_INTERFACE: &str = "ai.tinyhumans.openhuman.Events";
+/// Removing a variant breaks compatibility with peers that may still publish
+/// it, so a breaking catalog change ships under a new interface name.
+pub const EVENTS_INTERFACE: &str = "ai.tinyhumans.openhuman.Events2";
 
 /// The version of the event catalog this build speaks.
 ///
-/// Bump the minor for an added variant or field; bump the major only for a
-/// change that an older subscriber cannot parse, and rename the interface when
-/// you do. Peers exchange this through [`manifest`], so a version skew between
+/// Bump the minor for an added variant or field; bump the major for a breaking
+/// change and publish it under a new interface name. Peers exchange this through [`manifest`], so a version skew between
 /// the kernel and an out-of-process integration is reported at startup with
 /// both numbers rather than as a decode failure later.
 ///
@@ -95,7 +94,9 @@ pub const EVENTS_INTERFACE: &str = "ai.tinyhumans.openhuman.Events";
 /// `ComposioConnectionCreated` and `ComposioConfigChanged` (additive): a
 /// subscriber rebuilds its dispatch context from it instead of reading an
 /// ambient one.
-pub const EVENTS_VERSION: Version = Version::new(1, 13, 0);
+/// `2.0.0` removes `CronDeliveryRequested`; announce delivery now sends
+/// synchronously through the cron channel bridge.
+pub const EVENTS_VERSION: Version = Version::new(2, 0, 0);
 
 /// The bus. Initialised once by [`init`]; safe to touch before that.
 pub static BUS: OnceBus<DomainEvent> = OnceBus::new();

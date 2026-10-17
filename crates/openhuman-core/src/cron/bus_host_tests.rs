@@ -8,7 +8,7 @@ use crate::cron::handlers::{
 use async_trait::async_trait;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use tempfile::TempDir;
-use tinyflows_bus::schedule::types::Schedule;
+use tinyflows_bus::schedule::types::{DeliveryConfig, Schedule};
 use tinyflows_bus::schedule::{callbacks, CALLBACK_INTERFACE};
 
 fn config(tmp: &TempDir) -> Config {
@@ -205,6 +205,36 @@ async fn deliver_answers_with_the_delivery_status_string() {
     assert_eq!(
         status, "not_requested",
         "delivery mode `none` sends nothing"
+    );
+    assert!(DeliveryStatus::parse(&status).is_some());
+}
+
+#[tokio::test]
+async fn scheduled_announce_returns_failed_when_its_channel_is_unavailable() {
+    let tmp = TempDir::new().unwrap();
+    let config = config(&tmp);
+    let (_host, proxy) = host(&config, false).await;
+    let mut job = shell_job(&config, "echo nothing");
+    job.delivery = DeliveryConfig {
+        mode: "announce".into(),
+        channel: Some(format!("missing-{}", uuid::Uuid::new_v4())),
+        to: Some("target".into()),
+        best_effort: false,
+    };
+    let attempt = Attempt {
+        success: true,
+        output: "result".into(),
+        retryable: true,
+    };
+
+    let status: String = proxy
+        .call(callbacks::DELIVER, (&job, "run-announce", &attempt))
+        .await
+        .unwrap();
+
+    assert_eq!(
+        status, "failed",
+        "the scheduler must receive actual send status"
     );
     assert!(DeliveryStatus::parse(&status).is_some());
 }

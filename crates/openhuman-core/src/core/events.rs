@@ -385,14 +385,6 @@ pub enum DomainEvent {
         success: bool,
         output: String,
     },
-    /// A cron job requests delivery of its output to a channel.
-    CronDeliveryRequested {
-        job_id: String,
-        channel: String,
-        target: String,
-        output: String,
-    },
-
     /// A proactive message (morning briefing, welcome, cron output, etc.)
     /// needs to be delivered to the user. The channels module routes it to
     /// the user's active channel.
@@ -1386,7 +1378,6 @@ impl DomainEvent {
 
             Self::CronJobTriggered { .. }
             | Self::CronJobCompleted { .. }
-            | Self::CronDeliveryRequested { .. }
             | Self::ProactiveMessageRequested { .. }
             | Self::CronSystemJobDue { .. }
             | Self::FlowRunProgress { .. }
@@ -1518,7 +1509,6 @@ impl DomainEvent {
             Self::ChannelDisconnected { .. } => "ChannelDisconnected",
             Self::CronJobTriggered { .. } => "CronJobTriggered",
             Self::CronJobCompleted { .. } => "CronJobCompleted",
-            Self::CronDeliveryRequested { .. } => "CronDeliveryRequested",
             Self::ProactiveMessageRequested { .. } => "ProactiveMessageRequested",
             Self::CronSystemJobDue { .. } => "CronSystemJobDue",
             Self::FlowRunProgress { .. } => "FlowRunProgress",

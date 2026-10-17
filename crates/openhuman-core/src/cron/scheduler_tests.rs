@@ -105,6 +105,8 @@ fn next_user_error(
     }
 }
 
+#[path = "scheduler_announce_delivery_tests.rs"]
+mod announce_delivery_tests;
 #[path = "scheduler_classifier_and_delivery_tests.rs"]
 mod classifier_and_delivery_tests;
 #[path = "scheduler_dispatch_tests.rs"]
