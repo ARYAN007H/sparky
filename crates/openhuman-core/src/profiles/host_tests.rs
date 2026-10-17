@@ -26,11 +26,7 @@ async fn provisioning_creates_the_layout_once() {
     let tmp = tempfile::tempdir().unwrap();
     let host = host(&tmp, 4, 60);
     let id = profile("alice");
-    let provisioned = host.provision(&id).await;
-    if let Err(error) = &provisioned {
-        eprintln!("profile provision error: {error}");
-    }
-    assert!(provisioned.unwrap());
+    assert!(host.provision(&id).await.unwrap());
     assert!(
         !host.provision(&id).await.unwrap(),
         "second provision is a no-op"
@@ -55,11 +51,7 @@ async fn an_open_profile_runs_under_its_own_scope() {
     let tmp = tempfile::tempdir().unwrap();
     let host = host(&tmp, 4, 60);
     let (a, b) = (profile("alice"), profile("bob"));
-    let provisioned = host.provision(&a).await;
-    if let Err(error) = &provisioned {
-        eprintln!("profile provision error: {error}");
-    }
-    provisioned.unwrap();
+    host.provision(&a).await.unwrap();
     host.provision(&b).await.unwrap();
     let state_a = host.open(&a).await.unwrap();
     let state_b = host.open(&b).await.unwrap();
@@ -380,11 +372,7 @@ async fn the_operators_iteration_cap_binds_every_profile_whatever_its_config_say
     saas.max_tool_iterations = Some(4);
     let host = ProfileHost::new(saas, CoreContext::for_test(DomainSet::full(), None));
     let id = profile("alice");
-    let provisioned = host.provision(&id).await;
-    if let Err(error) = &provisioned {
-        eprintln!("enforced profile provision error: {error}");
-    }
-    provisioned.unwrap();
+    host.provision(&id).await.unwrap();
     let layout = ProfileLayout::new(tmp.path(), &id);
     std::fs::write(
         &layout.config_path,

@@ -126,14 +126,14 @@ impl ProfileHost {
             return Ok(false);
         }
         let grant = self.acquire_for_lifecycle(id, "provision").await?;
-        let created = self.provision_leased(id).await;
+        let created = self.provision_leased(id, &grant).await;
         profile_lease::release_all(self, vec![(id.clone(), grant)]).await;
         let created = created?;
         log::info!("[profiles] provisioned profile={id} created={created}");
         Ok(created)
     }
 
-    async fn provision_leased(&self, id: &ProfileId) -> Result<bool, String> {
+    async fn provision_leased(&self, id: &ProfileId, grant: &LeaseGrant) -> Result<bool, String> {
         // Again under the lease: another node may have provisioned it since.
         if self.registry.get(id).await?.is_some() {
             return Ok(false);
@@ -141,7 +141,19 @@ impl ProfileHost {
         let layout = self.layout_of(id);
         create_dirs(&layout)?;
         let config = self.forced_config(&layout, id);
-        reconcile_cron_admission(&config, id).await?;
+        let fence = super::fence::for_grant(
+            Arc::clone(&self.leases),
+            &self.node,
+            id,
+            grant,
+            self.saas.lease_ttl(),
+        );
+        let anchor: Arc<dyn std::any::Any + Send + Sync> = Arc::new(());
+        fence.anchor_to(Arc::downgrade(&anchor));
+        self.fences.register(Arc::clone(&fence));
+        let reconciled = reconcile_cron_admission(&config, id).await;
+        self.fences.retire(id.as_str(), grant.epoch);
+        reconciled?;
         let meta = ProfileMeta {
             profile_id: id.clone(),
             created_at: unix_now(),

@@ -327,10 +327,6 @@ impl ProfileHost {
         let mut config = self
             .serving_config(&layout, id)
             .map_err(OpenError::Storage)?;
-        if let Err(error) = super::lifecycle::reconcile_cron_admission(&config, id).await {
-            profile_lease::release_all(self, vec![(id.clone(), grant)]).await;
-            return Err(OpenError::Storage(error));
-        }
         if let Some(capabilities) = &self.capabilities {
             capabilities.configure(&mut config);
         }
@@ -362,6 +358,11 @@ impl ProfileHost {
         let anchor: Arc<dyn std::any::Any + Send + Sync> = context.clone();
         fence.anchor_to(Arc::downgrade(&anchor));
         self.fences.register(Arc::clone(&fence));
+        if let Err(error) = super::lifecycle::reconcile_cron_admission(&config, id).await {
+            self.fences.retire(id.as_str(), grant.epoch);
+            profile_lease::release_all(self, vec![(id.clone(), grant)]).await;
+            return Err(OpenError::Storage(error));
+        }
         if grant.previous_unclean {
             log::info!(
                 "[profiles] profile={id} taken over from a holder that never released it (epoch {}); recovering",
