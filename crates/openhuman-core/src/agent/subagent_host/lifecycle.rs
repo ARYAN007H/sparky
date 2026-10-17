@@ -1159,7 +1159,7 @@ impl SubagentExecutor<crate::agent::tinyagents::host::OpenHumanRunContext> for O
                     None => invoke.await,
                 };
                 match result {
-                    Ok((tool_result, cancelled)) => {
+                    (Ok(tool_result), cancelled) => {
                         let output = tool_result.output();
                         let status = if cancelled {
                             SubagentRunStatus::Cancelled
@@ -1212,7 +1212,7 @@ impl SubagentExecutor<crate::agent::tinyagents::host::OpenHumanRunContext> for O
                             .insert(task_key, tool_result);
                         Ok(neutral)
                     }
-                    Err(error) => {
+                    (Err(error), _) => {
                         self.failures
                             .lock()
                             .unwrap_or_else(|p| p.into_inner())
