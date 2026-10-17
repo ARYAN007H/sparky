@@ -7,7 +7,7 @@
 //! envelopes only.
 
 use async_trait::async_trait;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use tinyagents_orchestration::subagent::SubagentResumeRef;
 use tinytools::{PermissionLevel, Tool, ToolResult, ToolTimeout};
 
@@ -284,18 +284,31 @@ pub(crate) fn overlay_task_store_status(
             Ok(record) => record,
             Err(tinyagents_orchestration::subagent::WaitError::Unknown) => return,
             Err(tinyagents_orchestration::subagent::WaitError::RegistryPoisoned) => {
-                log::warn!("[subagent_reuse] task store overlay skipped task_id={} reason=registry_poisoned", task_id);
+                log::warn!(
+                    "[subagent_reuse] task store overlay skipped task_id={} reason=registry_poisoned",
+                    task_id
+                );
                 return;
             }
             Err(tinyagents_orchestration::subagent::WaitError::NotOwned) => {
-                log::warn!("[subagent_reuse] task store overlay rejected task_id={} subagent_session_id={} reason=not_owned", task_id, summary.subagent_session_id);
+                log::warn!(
+                    "[subagent_reuse] task store overlay rejected task_id={} subagent_session_id={} reason=not_owned",
+                    task_id,
+                    summary.subagent_session_id
+                );
                 return;
             }
         };
     let previous = summary.status;
     apply_task_record_overlay(summary, record);
     if summary.status != previous {
-        log::debug!("[subagent_reuse] overlaid task store status subagent_session_id={} task_id={} previous={:?} status={:?}", summary.subagent_session_id, task_id, previous, summary.status);
+        log::debug!(
+            "[subagent_reuse] overlaid task store status subagent_session_id={} task_id={} previous={:?} status={:?}",
+            summary.subagent_session_id,
+            task_id,
+            previous,
+            summary.status
+        );
     }
 }
 

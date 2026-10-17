@@ -4,7 +4,7 @@ use std::sync::Arc;
 use tinytools::Tool;
 
 use super::super::collapsed_delegation::{
-    dispatch_targets_from_schema, CollapsedDelegationTool, DelegateTarget,
+    CollapsedDelegationTool, DelegateTarget, dispatch_targets_from_schema,
 };
 use super::super::delegate_graph::DelegateGraphDispatch;
 use crate::tools::delegate::DelegateToolDispatch;
@@ -130,8 +130,7 @@ fn archetype_dispatch_uses_the_registered_target_marker_not_ambient_names() {
     });
 
     assert!(
-        DelegationDispatch::for_tool(tool.clone(), Some("scoped_only_agent".to_string()))
-            .is_some(),
+        DelegationDispatch::for_tool(tool.clone(), Some("scoped_only_agent".to_string())).is_some(),
         "an explicitly registered delegation target is routable even when its name is not in the ambient catalogue"
     );
     assert!(
@@ -248,9 +247,11 @@ async fn config_delegate_dispatch_preserves_tool_failure_in_shared_jobs() {
         .expect("the host returns the configured tool result");
 
     assert!(result.is_error);
-    assert!(result
-        .output()
-        .contains("configured policy rejected the request"));
+    assert!(
+        result
+            .output()
+            .contains("configured policy rejected the request")
+    );
     assert!(
         jobs.list().iter().any(|job| {
             job.agent == "configured-error"

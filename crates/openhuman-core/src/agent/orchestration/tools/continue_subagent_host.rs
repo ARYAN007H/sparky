@@ -10,8 +10,8 @@
 
 use crate::agent::orchestration::tools::dispatch::{incomplete_stop, stopped_subagent_result};
 use crate::agent::subagent_host::{
-    continue_subagent, continue_subagent_via_driver_tool, load_subagent_checkpoint,
-    SubagentRunOptions, SubagentRunStatus,
+    SubagentRunOptions, SubagentRunStatus, continue_subagent, continue_subagent_via_driver_tool,
+    load_subagent_checkpoint,
 };
 use crate::agent_registry::host_definition::AgentDefinitionRegistry;
 use crate::progress::AgentProgress;
