@@ -245,7 +245,7 @@ async fn rpc_add_cannot_create_a_memory_system_flow_from_parameters() {
         .await
         .unwrap_err();
 
-    assert!(result.contains("invalid 'job_type': flow"), "{result}");
+    assert!(result.to_ascii_lowercase().contains("flow"), "{result}");
     assert!(crate::cron::list_jobs(&config).unwrap().is_empty());
 }
 

@@ -117,6 +117,7 @@ async fn hosted_memory_cron_sweep_child() {
         }
     })
     .await;
+    drop(opened);
     seed_host.release(&id).await.unwrap();
 
     let mut saas = SaasConfig::new(tmp.path());
