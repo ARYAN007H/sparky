@@ -425,23 +425,10 @@ async fn apply_subagent_result_policies(
     if let Some(store) = store.as_ref() {
         let threshold =
             effective_offload_threshold(DEFAULT_OFFLOAD_THRESHOLD_BYTES, definition.max_result_chars);
-        let applied = tinyagents_orchestration::subagent::ResultPolicy::new()
-            .with_max_bytes(threshold)
-            .with_overflow(tinyagents_orchestration::subagent::ResultOverflow::Artifact)
-            .with_artifact_store(store.clone())
-            .apply(task_id, &outcome.output, None)
-            .await;
-        if let Some(reference) = applied.artifact {
-            if let Some(stored) = store.take(&reference.id) {
-                outcome.output = stored.pointer;
-                if !paths.contains(&stored.relative_path) {
-                    paths.push(stored.relative_path);
-                }
-            } else {
-                tracing::warn!(
-                    task_id = %task_id,
-                    "[artifact] TinyAgents returned an unknown sub-agent artifact reference"
-                );
+        if let Some(stored) = offload_result_by_policy(task_id, &outcome.output, threshold, store).await {
+            outcome.output = stored.pointer;
+            if !paths.contains(&stored.relative_path) {
+                paths.push(stored.relative_path);
             }
         }
     } else if action_dir.is_none() {
@@ -479,6 +466,31 @@ async fn apply_subagent_result_policies(
         task_id,
         &outcome.artifact_paths,
     );
+}
+
+async fn offload_result_by_policy(
+    task_id: &str,
+    output: &str,
+    threshold_bytes: usize,
+    store: &Arc<SubagentArtifactStore>,
+) -> Option<StoredSubagentArtifact> {
+    let applied = tinyagents_orchestration::subagent::ResultPolicy::new()
+        .with_max_bytes(threshold_bytes)
+        .with_overflow(tinyagents_orchestration::subagent::ResultOverflow::Artifact)
+        .with_artifact_store(store.clone())
+        .apply(task_id, output, None)
+        .await;
+    let Some(reference) = applied.artifact else {
+        return None;
+    };
+    let stored = store.take(&reference.id);
+    if stored.is_none() {
+        tracing::warn!(
+            task_id = %task_id,
+            "[artifact] TinyAgents returned an unknown sub-agent artifact reference"
+        );
+    }
+    stored
 }
 
 struct SubagentArtifactStore {
@@ -550,6 +562,10 @@ impl tinyagents_orchestration::subagent::ArtifactStore for SubagentArtifactStore
         })
     }
 }
+
+#[cfg(test)]
+#[path = "runner_tests.rs"]
+mod tests;
 
 fn workspace_descriptor_for_subagent(
     definition: &AgentDefinition,
