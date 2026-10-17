@@ -384,13 +384,10 @@ pub enum DomainEvent {
         job_id: String,
         success: bool,
         output: String,
-        /// Captured owner; one-shot rows may be deleted before subscribers run.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         tenant: Option<crate::core::runtime::Tenant>,
     },
-    /// A proactive message (morning briefing, welcome, cron output, etc.)
-    /// needs to be delivered to the user. The channels module routes it to
-    /// the user's active channel.
+    /// A proactive message for the user's active channel.
     ProactiveMessageRequested {
         /// Identifies the source (e.g. `"cron:morning_briefing"`, `"cron:welcome"`).
         source: String,
