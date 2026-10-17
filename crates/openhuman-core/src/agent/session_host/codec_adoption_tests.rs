@@ -83,7 +83,7 @@ fn durable_turn_usage_keeps_the_root_record_exclusive_with_child_entries() {
         request_id: Some("request-exclusive".into()),
         thread_id: Some("thread-exclusive".into()),
         stream: false,
-        resume: ResumeMode::Fresh,
+        resume: ResumeMode::Never,
         context: context.clone(),
     };
     let usage = OpenHumanTranscriptCodec
