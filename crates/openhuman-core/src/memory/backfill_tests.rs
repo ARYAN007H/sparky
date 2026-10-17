@@ -116,19 +116,17 @@ async fn stores_past_chats_once_and_skips_what_live_logging_took() {
     .await;
     // The lifecycle logged live-thread's second turn (user index 2).
     let identity = MemoryIdentity::agent(MAIN_AGENT).resolve(&config);
-    crate::memory::lifecycle::hooks::pre_turn(
+    crate::memory::lifecycle::hooks::pre_turn_work(
         &crate::core::runtime::DispatchCtx::ambient(),
         &config,
         &identity,
-        crate::memory::lifecycle::hooks::PreTurnInput {
-            thread_id: "live-thread".into(),
-            turn_index: 2,
-            user_text: "After logging".into(),
-            in_prompt_from: 0,
-            at: Utc::now(),
-            resumed_after_compaction: false,
-            observed_actor: None,
-        },
+        "live-thread".into(),
+        2,
+        "After logging".into(),
+        0,
+        Utc::now(),
+        false,
+        None,
     )
     .await;
 
