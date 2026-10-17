@@ -347,6 +347,83 @@ async fn force_fresh_cancels_old_driver_before_creating_a_new_session() {
     assert_eq!(new_after.current_task_id.as_deref(), Some(fresh_ref["task_id"].as_str().unwrap()));
 }
 
+#[tokio::test]
+async fn stopped_async_spawn_is_refused_before_progress_or_session_effects() {
+    use crate::agent::tinyagents::host::OpenHumanRunContext;
+    use crate::core::runtime::{ContextOverlay, CoreContext, DomainSet};
+    use crate::tools::toolpacks::ToolGroups;
+    use tinyagents_harness::context::RunContext;
+
+    let scratch = tempfile::tempdir().expect("isolated stopped-spawn fixture");
+    let workspace = scratch.path().join("workspace");
+    std::fs::create_dir_all(&workspace).expect("create workspace");
+    let provider = Arc::new(ScriptedModel::new(vec![]));
+    let (progress_tx, mut progress_rx) = tokio::sync::mpsc::channel(8);
+    let mut parent = parent_context(workspace.as_path(), provider.clone(), vec![]);
+    parent.workspace_dir = workspace.clone();
+    parent.session_id = "stopped-async-parent-session".into();
+    parent.on_progress = Some(progress_tx);
+
+    let definitions = Arc::new(AgentDefinitionRegistry::builtins_only());
+    let mut config = crate::config::Config::default();
+    config.workspace_dir = workspace.clone();
+    config.components.juice = false;
+    let core = CoreContext::for_test_with_config(DomainSet::full(), config.clone()).derive_with(
+        ContextOverlay::new(config, DomainSet::full(), ToolGroups::none())
+            .definitions(definitions),
+    );
+    let thread_id = "stopped-async-parent-thread";
+    let mut host_context = OpenHumanRunContext::new()
+        .with_core(Some(Arc::clone(&core)))
+        .with_parent(parent);
+    host_context.thread_id = Some(thread_id.into());
+    let live = RunContext::<OpenHumanRunContext>::new(
+        tinyagents_harness::context::RunConfig::new("stopped-async-parent")
+            .with_thread(thread_id),
+        host_context,
+    );
+    let dispatch = live.data.dispatch_ctx();
+    crate::agent::orchestration::background_completions::discard_pending_for_thread(
+        &dispatch,
+        thread_id,
+    );
+
+    let result = crate::agent::orchestration::tools::SpawnAsyncSubagentTool::new()
+        .execute_with_live_parent_context(
+            json!({
+                "agent_id": "task_manager_agent",
+                "prompt": "must be refused before dispatch",
+                "model": "test-model"
+            }),
+            None,
+            live.data.child(),
+            Some(live.child(
+                tinyagents_harness::context::RunConfig::new("stopped-async-child"),
+                live.data.detached_child(),
+            ).expect("detached child context")),
+        )
+        .await
+        .expect("tool execution");
+
+    assert!(result.is_error, "a stopped thread must reject new child work");
+    assert!(result.output().contains("stopped or deleted"), "{}", result.output());
+    assert!(provider.seen.lock().is_empty(), "refusal must not dispatch the model");
+    assert!(progress_rx.try_recv().is_err(), "refusal must not publish spawn progress");
+    assert!(
+        crate::agent::orchestration::subagent_sessions::SubagentSessionStore::new(
+            workspace.clone()
+        )
+        .load()
+        .expect("read isolated session store")
+        .is_empty(),
+        "refusal must not persist an accepted session"
+    );
+    crate::agent::orchestration::background_completions::resume_stopped_thread(
+        &dispatch,
+        thread_id,
+    );
+}
+
 /// A child the harness stops early (failure breaker / iteration cap) is not a
 /// finished delegation: the parent's tool result must be a failure, so its own
 /// failure policy and its trace see it, and the `SubagentCompleted` progress
