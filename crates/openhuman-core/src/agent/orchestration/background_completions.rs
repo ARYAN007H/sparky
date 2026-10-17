@@ -146,6 +146,14 @@ fn router_pool() -> &'static CompletionRouterPool<RouterScope> {
     static POOL: OnceLock<CompletionRouterPool<RouterScope>> = OnceLock::new();
     POOL.get_or_init(|| {
         CompletionRouterPool::new(|scope| {
+            #[cfg(test)]
+            if let Some(store) = test_store_overrides()
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .remove(scope)
+            {
+                return Arc::new(new_router(store));
+            }
             let store = match open_driver_store(&scope.workspace_dir) {
                 Ok(store) => store,
                 Err(error) => {
@@ -160,6 +168,13 @@ fn router_pool() -> &'static CompletionRouterPool<RouterScope> {
             Arc::new(new_router(store))
         })
     })
+}
+
+#[cfg(test)]
+fn test_store_overrides() -> &'static Mutex<HashMap<RouterScope, Arc<dyn CompletionStore>>> {
+    static STORES: OnceLock<Mutex<HashMap<RouterScope, Arc<dyn CompletionStore>>>> =
+        OnceLock::new();
+    STORES.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
 fn entry_for(workspace_dir: &Path) -> Arc<Entry> {
@@ -469,15 +484,24 @@ pub(crate) async fn release_all() -> usize {
     let deadline = tokio::time::Instant::now() + RELEASE_DRAIN;
     let mut released = 0;
     loop {
-        let retained = {
-            let mut st = state();
-            let before = st.routers.len();
-            st.routers
-                .retain(|_, e| Arc::strong_count(e) > 1 || Arc::strong_count(&e.router) > 1);
-            released += before - st.routers.len();
-            st.routers.len()
-        };
+        let scopes: Vec<_> = state().stores.keys().cloned().collect();
+        let retained = scopes
+            .iter()
+            .filter(|scope| {
+                router_pool()
+                    .get(scope)
+                    .ok()
+                    .flatten()
+                    .is_some_and(|router| Arc::strong_count(&router) > 2)
+            })
+            .count();
         if retained == 0 {
+            let mut st = state();
+            released += st.stores.len();
+            st.stores.clear();
+            if let Err(error) = router_pool().clear() {
+                log::warn!("[background_completions] could not clear router pool: {error}");
+            }
             break;
         }
         if tokio::time::Instant::now() >= deadline {
@@ -485,7 +509,12 @@ pub(crate) async fn release_all() -> usize {
                 "[background_completions] {retained} router(s) still in use at shutdown; \
                  dropping them anyway"
             );
-            released += retained;
+            let mut st = state();
+            released += st.stores.len();
+            st.stores.clear();
+            if let Err(error) = router_pool().clear() {
+                log::warn!("[background_completions] could not clear router pool: {error}");
+            }
             break;
         }
         tokio::time::sleep(Duration::from_millis(50)).await;

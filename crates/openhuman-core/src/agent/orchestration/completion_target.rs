@@ -123,7 +123,7 @@ impl CompletionTarget {
 pub(crate) fn claim_recovery(workspace_dir: &Path) -> bool {
     state()
         .recovered_workspaces
-        .insert(workspace_dir.to_path_buf())
+        .insert(super::background_completions::router_scope(workspace_dir))
 }
 
 /// Let `workspace_dir` be recovered again (a profile re-leased after release),
@@ -131,13 +131,27 @@ pub(crate) fn claim_recovery(workspace_dir: &Path) -> bool {
 /// the log another holder may have appended to. A router still in use stays,
 /// so a log never has two writers.
 pub(crate) fn forget_recovery(workspace_dir: &Path) {
-    let mut st = state();
-    st.recovered_workspaces.remove(workspace_dir);
-    let idle = st
-        .routers
-        .get(workspace_dir)
-        .is_some_and(|e| Arc::strong_count(e) == 1 && Arc::strong_count(&e.router) == 1);
-    if idle {
-        st.routers.remove(workspace_dir);
+    let scope = super::background_completions::router_scope(workspace_dir);
+    state().recovered_workspaces.remove(&scope);
+    let Ok(Some(router)) = super::background_completions::router_pool().get(&scope) else {
+        return;
+    };
+    // The pool plus this lookup own two references; any additional reference
+    // means a delivery or a record still has the router open.
+    if Arc::strong_count(&router) != 2 {
+        return;
+    }
+    let Ok(store) = super::background_completions::open_driver_store(workspace_dir) else {
+        return;
+    };
+    let replacement = Arc::new(super::background_completions::new_router(store));
+    if let Ok(tinyagents_tasks::CompletionRouterReplaceOutcome::Replaced(router)) =
+        super::background_completions::router_pool().replace_if_current(
+            &scope,
+            &router,
+            replacement,
+        )
+    {
+        state().stores.insert(scope, router.store());
     }
 }
