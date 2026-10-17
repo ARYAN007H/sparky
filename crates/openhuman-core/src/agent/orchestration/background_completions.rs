@@ -27,7 +27,7 @@ mod store_adapter;
 mod thread_index;
 pub(crate) use store_adapter::router_for_workspace_ctx;
 pub(super) use store_adapter::{
-    degrade_to_memory, entry_for_ctx, new_router, open_driver_store, router_pool, router_scope_for,
+    degrade_to_memory, entry_for_ctx, open_driver_store, router_pool, router_scope_for,
 };
 #[cfg(test)]
 pub(super) use store_adapter::{

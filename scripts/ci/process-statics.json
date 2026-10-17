@@ -327,7 +327,7 @@
     "count": 1,
     "category": "D",
     "reason": "This process-local router cache is keyed by RouterScope (authenticated profile key plus workspace path); each router retains the matching driver's storage scope, and storage opens run under that explicit context.",
-    "verification": "background_completions_tenant_tests.rs: explicit_profiles_share_a_workspace_without_sharing_completion_routers"
+    "verification": "agent/orchestration/background_completions_tenant_tests.rs: explicit_profiles_share_a_workspace_without_sharing_completion_routers"
   },
   {
     "file": "crates/openhuman-core/src/agent/orchestration/background_completions/store_adapter.rs",
@@ -337,7 +337,7 @@
     "count": 1,
     "category": "B",
     "reason": "Test-only store overrides use the same profile-and-workspace RouterScope key as the production router cache, so test fixtures cannot cross profile or workspace boundaries.",
-    "verification": "background_completions_migration_tests.rs: reopening_a_durable_store_preserves_pending_memory_fallback_records"
+    "verification": "agent/orchestration/background_completions_migration_tests.rs: reopening_a_durable_store_preserves_pending_memory_fallback_records"
   },
   {
     "file": "crates/openhuman-core/src/agent/orchestration/background_delivery.rs",
@@ -347,7 +347,7 @@
     "count": 1,
     "category": "B",
     "reason": "Each in-flight delivery lease key combines the calling profile key with its thread id; it stores only active per-thread exclusion keys and no completion contents.",
-    "verification": "background_delivery_slots_tests.rs: one_profiles_busy_turn_does_not_block_anothers_thread"
+    "verification": "agent/orchestration/background_delivery_slots_tests.rs: one_profiles_busy_turn_does_not_block_anothers_thread"
   },
   {
     "file": "crates/openhuman-core/src/agent/orchestration/workflow_runs/engine/lifecycle.rs",
@@ -357,6 +357,6 @@
     "count": 1,
     "category": "D",
     "reason": "The process-local supervisor holds generation cancellation handles keyed by run id, not durable workflow state or tenant data. Durable run transitions remain fenced by the storage driver's revision and lease checks.",
-    "verification": "workflow_runs/engine/lifecycle_tests.rs: losing_resume_cas_keeps_the_installed_workflow_generation"
+    "verification": "agent/orchestration/workflow_runs/engine/lifecycle_tests.rs: losing_resume_cas_keeps_the_installed_workflow_generation"
   }
 ]
