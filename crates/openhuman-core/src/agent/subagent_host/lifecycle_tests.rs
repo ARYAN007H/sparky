@@ -2,6 +2,10 @@ use tinyagents_orchestration::subagent::{
     PersistedSubagentPause, SubagentOutcome, SubagentOutcomeKind, SubagentPause,
     SubagentPausePersistenceDisposition, SubagentPersistence, SubagentResume, SubagentTaskKey,
 };
+use std::{
+    collections::HashMap,
+    sync::{Arc, Mutex},
+};
 
 use super::lifecycle::{
     decode_driver_job_result, host_in_flight, load_subagent_checkpoint, merged_resume_history,
