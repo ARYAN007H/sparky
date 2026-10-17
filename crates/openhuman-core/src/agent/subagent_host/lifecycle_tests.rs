@@ -8,8 +8,8 @@ use tinyagents_orchestration::subagent::{
 };
 
 use super::lifecycle::{
-    decode_driver_job_result, host_in_flight, load_subagent_checkpoint, merged_resume_history,
-    resolve_inline_driver_outcome, HostInFlight, OpenHumanDriverBundle, OpenHumanPersistence,
+    decode_driver_job_result, load_subagent_checkpoint, merged_resume_history,
+    resolve_inline_driver_outcome, OpenHumanDriverBundle, OpenHumanPersistence,
 };
 use super::{SubagentMode, SubagentRunError, SubagentRunOutcome, SubagentRunStatus, SubagentUsage};
 
