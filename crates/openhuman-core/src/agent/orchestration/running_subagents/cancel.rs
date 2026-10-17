@@ -48,20 +48,6 @@ pub(crate) fn cancel_by_task(
         .flatten()
 }
 
-/// Cancels a child by public task id using the authenticated active workspace
-/// when a non-SaaS transport has no bound `CoreContext`. In that case
-/// `slot_for` still resolves the same host-owned unscoped Jobs registry used by
-/// the unbound turn, while the workspace identifies its durable product row.
-pub(crate) fn cancel_by_task_with_workspace(
-    ctx: &crate::core::runtime::DispatchCtx,
-    task_id: &str,
-    fallback_workspace: Option<&Path>,
-) -> Option<CancelledSubagent> {
-    cancel_by_task_with_workspace_reason(ctx, task_id, fallback_workspace, None)
-        .ok()
-        .flatten()
-}
-
 /// Cancel with an optional user-provided reason for the driver-owned
 /// completion callback. Store failures are returned so the RPC does not report
 /// an unknown task when its durable selector could not be read.
