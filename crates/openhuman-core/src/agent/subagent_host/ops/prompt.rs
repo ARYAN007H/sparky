@@ -1,7 +1,7 @@
 //! System-prompt helpers for sub-agent typed mode.
 //!
-//! Includes the role-contract suffix, its injector, and the tool-spec
-//! deduplication helper used before sending specs to the provider.
+//! Includes the artifact-offload contract and the tool-spec deduplication
+//! helper used before sending specs to the provider.
 
 use crate::agent::harness::artifact_offload::OFFLOAD_WRITE_TOOL;
 use std::collections::HashSet;
@@ -10,67 +10,10 @@ use tinyagents_harness::artifacts::{
 };
 use tinytools::ToolSpec;
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Sub-agent role contract
-// ─────────────────────────────────────────────────────────────────────────────
-
-/// Prompt suffix injected into every typed sub-agent run.
-///
-/// Purpose:
-/// - make the child explicitly aware it is acting as a sub-agent
-/// - keep delegated outputs concise so parent-context growth stays bounded
-/// - discourage verbose restatement of the delegated task/context
-pub(super) const SUBAGENT_ROLE_CONTRACT_SUFFIX: &str = "## Sub-agent Role Contract\n\n\
-You are a sub-agent working for a parent OpenHuman agent, not a direct end-user assistant.\n\
-- Stay tightly scoped to the delegated task.\n\
-- Keep tool arguments and follow-up prompts compact, include only required fields/context.\n\
-- Keep your final response concise and synthesis-ready for the parent, prefer short bullets or short paragraphs.\n\
-- Do not restate the full task/context unless strictly required for correctness.\n\
-\n\
-## Sub-agent Result Contract\n\n\
-Return a compact result with these headings:\n\
-- Answer\n\
-- Evidence used\n\
-- Actions taken\n\
-- Open uncertainties\n\
-- Failed tool calls\n\
-- Recommended next step\n\
-\n\
-Do not include facts in Answer that are not supported by Evidence used or Actions taken.\n\
-If a tool result was truncated, partial, or too large to inspect fully, say so under Open uncertainties and do not treat it as complete.\n";
-
-pub(crate) fn append_subagent_role_contract(base_prompt: String, agent_id: &str) -> String {
-    if base_prompt.contains(SUBAGENT_ROLE_CONTRACT_SUFFIX.trim()) {
-        tracing::debug!(
-            agent_id = %agent_id,
-            base_chars = base_prompt.chars().count(),
-            "[subagent_host] sub-agent role contract already present in system prompt"
-        );
-        return base_prompt;
-    }
-
-    let mut prompt = base_prompt;
-    if !prompt.ends_with('\n') {
-        prompt.push('\n');
-    }
-    prompt.push('\n');
-    prompt.push_str(SUBAGENT_ROLE_CONTRACT_SUFFIX);
-
-    tracing::debug!(
-        agent_id = %agent_id,
-        suffix_chars = SUBAGENT_ROLE_CONTRACT_SUFFIX.chars().count(),
-        final_chars = prompt.chars().count(),
-        "[subagent_host] appended sub-agent role contract to system prompt"
-    );
-
-    prompt
-}
-
 /// Append the filesystem-offload contract (#3883), but only for a sub-agent
 /// that actually holds a file-write tool.
 ///
-/// Kept separate from [`append_subagent_role_contract`] because it is **not**
-/// universal. A sub-agent's system prompt may only name tools it can really
+/// A sub-agent's system prompt may only name tools it can really
 /// call — a skill-filtered specialist sees just its own toolkit. Telling it to write a file yields
 /// hallucinated calls that fail, and two guards enforce it
 /// (`ops_tests::typed_mode_filters_tools_by_skill_filter`).
