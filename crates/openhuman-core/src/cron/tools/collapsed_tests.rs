@@ -185,7 +185,7 @@ async fn add_uses_the_explicit_channel_origin_without_ambient_turn_state() {
     assert!(!result.is_error, "{}", result.output());
     let jobs = crate::cron::list_jobs(&config).unwrap();
     assert_eq!(jobs.len(), 1);
-    assert_eq!(jobs[0].origin, Some(crate::cron::types::JobOrigin::Channel {
+    assert_eq!(jobs[0].origin, Some(crate::cron::JobOrigin::Channel {
         channel: "telegram".into(),
         reply_target: "42".into(),
         history_key: "telegram-alice-42".into(),
