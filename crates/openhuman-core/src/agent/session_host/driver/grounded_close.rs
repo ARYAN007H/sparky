@@ -6,8 +6,6 @@
 //! It deliberately uses the same explicit model source as the turn and keeps
 //! its usage in a sidecar; it never owns transcript history or persistence.
 
-use tinyagents_runtime::transcript::message_to_native_transcript as message_to_native_chat_message;
-use tinyagents_session::transcript::TranscriptMessage;
 use tinyinference_llm::model::{ChatModel, ModelRequest, ModelResponse, ModelStream};
 use tinytools_agent::dialect::ToolDialect;
 
@@ -16,8 +14,8 @@ use tinyagents_harness::middleware::wrap_harness_instruction;
 use crate::agent::{
     session_host::turn_checkpoint::{
         self, build_deterministic_checkpoint, build_deterministic_final_summary,
-        close_repair_instruction, close_verification_prompt, final_answer_instruction,
-        harness_instruction_needles, render_tool_results, results_from_tool_outcomes,
+        close_verification_prompt, final_answer_instruction, harness_instruction_needles,
+        render_tool_results, results_from_tool_outcomes,
     },
     tinyagents::{TinyagentsTurnOutcome, TurnModelSource},
 };
@@ -195,20 +193,22 @@ pub(super) async fn repair_required_output(
     .await?;
     // The main loop may already have emitted the reply. In that case send only
     // TinyAgents' returned continuation, then commit the same full text.
-    let continuation = repaired
-        .text
-        .strip_prefix(reply)
-        .unwrap_or(&repaired.text)
-        .to_owned();
-    if let Some(progress) = progress {
-        if let Err(error) = progress
-            .send(crate::progress::AgentProgress::TextDelta {
-                delta: continuation.clone(),
-                iteration,
-            })
-            .await
-        {
-            tracing::debug!(%error, "[session-runtime] required-output repair progress receiver closed");
+    if reply_already_streamed {
+        let continuation = repaired
+            .text
+            .strip_prefix(reply)
+            .unwrap_or(&repaired.text)
+            .to_owned();
+        if let Some(progress) = progress {
+            if let Err(error) = progress
+                .send(crate::progress::AgentProgress::TextDelta {
+                    delta: continuation,
+                    iteration,
+                })
+                .await
+            {
+                tracing::debug!(%error, "[session-runtime] required-output repair progress receiver closed");
+            }
         }
     }
     Some(repaired.text)
