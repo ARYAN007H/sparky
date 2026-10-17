@@ -543,7 +543,10 @@ async fn legacy_pause_migration_does_not_return_a_stale_pause_after_terminal_com
         .migrate_legacy_pause(&key, stale_pause)
         .await
         .unwrap();
-    assert_eq!(migrated.output, "terminal winner");
+    assert!(
+        migrated.is_none(),
+        "terminal CAS winner must close the stale pause"
+    );
 }
 
 #[tokio::test]
@@ -647,8 +650,7 @@ async fn observer_cancel_survives_a_leader_commit_before_host_projection() {
     let mut leader = SubagentOutcome::cancelled("task");
     leader.status = SubagentOutcomeKind::Completed;
     leader.output = "leader result".into();
-    bundle
-        .persistence
+    OpenHumanPersistence::new(directory.path().join("checkpoints"))
         .record_terminal(&key, &leader, None)
         .await
         .unwrap();
