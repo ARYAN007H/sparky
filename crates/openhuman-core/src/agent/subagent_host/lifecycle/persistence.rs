@@ -543,101 +543,30 @@ impl tinyagents_orchestration::subagent::SubagentPersistence for OpenHumanPersis
 
     async fn save_pause(
         &self,
-        pause: tinyagents_orchestration::subagent::PersistedSubagentPause,
+        mut pause: tinyagents_orchestration::subagent::PersistedSubagentPause,
     ) -> Result<SubagentPausePersistenceDisposition, SubagentError> {
-        let _key_lock = self.key_lock(&pause.key)?;
-        if self.terminal_path(&pause.key).exists() {
-            self.set_host_disposition(
-                &pause.key,
-                tinyagents_orchestration::subagent::SubagentPersistenceDisposition::TerminalExisting,
-            );
-            return Ok(SubagentPausePersistenceDisposition::TerminalExisting);
-        }
-        let paused = match &pause.outcome.status {
-            SubagentOutcomeKind::AwaitingInput(paused) => paused,
-            _ => {
-                return Err(SubagentError::Persistence(
-                    "attempted to persist a non-paused subagent outcome as a pause".into(),
-                ));
-            }
-        };
-        let metadata = &paused.resume.metadata;
-        let optional_metadata = |name: &str| {
-            metadata
-                .get(name)
-                .filter(|value| !value.is_empty())
-                .cloned()
-        };
-        let checkpoint = SubagentCheckpointData {
-            task_key: Some(pause.key.clone()),
-            task_id: pause.key.task_id.clone(),
-            agent_id: optional_metadata("agent_id").unwrap_or_default(),
-            worker_thread_id: optional_metadata("worker_thread_id"),
-            history: pause
-                .outcome
-                .history
-                .iter()
-                .filter_map(tinyagents_runtime::transcript::message_to_native_transcript)
-                .collect(),
-            question: paused.reason.clone(),
-            options: None,
-            skill_filter_override: optional_metadata("skill_filter_override"),
-            model_override: optional_metadata("model_override"),
-            created_at: chrono::Utc::now().to_rfc3339(),
-            resume_checkpoint: paused.resume.checkpoint.clone(),
-            resume_metadata: metadata.clone(),
-            output: pause.outcome.output.clone(),
-            iterations: pause.outcome.usage.calls as usize,
-            usage: SubagentUsage {
-                input_tokens: pause.outcome.usage.usage.input_tokens,
-                output_tokens: pause.outcome.usage.usage.output_tokens,
-                cached_input_tokens: pause.outcome.usage.usage.cache_read_tokens,
-                charged_amount_usd: pause
-                    .outcome
-                    .usage
-                    .usage
-                    .charged_amount
-                    .map(|amount| amount.micros as f64 / 1_000_000.0)
-                    .unwrap_or_default(),
-                cost_source: cost_source_of(pause.outcome.usage.usage.charged_amount.as_ref()),
-            },
-            artifact_paths: pause
-                .outcome
-                .artifacts
-                .iter()
-                .map(|artifact| artifact.id.clone())
-                .collect(),
-            elapsed_ms: self
-                .host_outcome
-                .lock()
-                .unwrap_or_else(|poisoned| poisoned.into_inner())
-                .get(&pause.key)
-                .map(|outcome| outcome.elapsed.as_millis() as u64)
-                .unwrap_or_default(),
-        };
-        let json = serde_json::to_vec_pretty(&checkpoint)
-            .map_err(|error| SubagentError::Persistence(error.to_string()))?;
-        let path = self.pause_path(&pause.key);
-        let existing = self.read_pause_checkpoint(&pause.key)?;
-        let disposition = match (pause.replaces.as_ref(), existing) {
-            (None, None) => {
-                // Index first: a failed data write can leave a stale index,
-                // which readers filter by the live pause record. A successful
-                // pause can never be unresumable through a missing index.
-                self.add_index_key(&pause.key)?;
-                if Self::insert_file(&path, json)? {
-                    Ok(SubagentPausePersistenceDisposition::Inserted)
-                } else {
-                    Ok(SubagentPausePersistenceDisposition::Existing)
-                }
-            }
-            (Some(expected), Some(current)) if Self::checkpoint_resume(&current) == *expected => {
-                self.add_index_key(&pause.key)?;
-                Self::replace_file(&path, json)?;
-                Ok(SubagentPausePersistenceDisposition::Replaced)
-            }
-            _ => Ok(SubagentPausePersistenceDisposition::Existing),
-        }?;
+        let elapsed_ms = self
+            .host_outcome
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .get(&pause.key)
+            .map(|outcome| outcome.elapsed.as_millis() as u64)
+            .unwrap_or_default();
+        // Product checkpoint fields absent from the neutral pause stay in a
+        // namespaced extension; reserved TinyAgents fields remain untouched.
+        pause.outcome.extensions.insert(
+            "openhuman_checkpoint".into(),
+            serde_json::json!({
+                "created_at": chrono::Utc::now().to_rfc3339(),
+                "options": pause.outcome.extensions.get("options"),
+                "elapsed_ms": elapsed_ms,
+            }),
+        );
+        let disposition = tinyagents_orchestration::subagent::SubagentPersistence::save_pause(
+            &self.file_store,
+            pause.clone(),
+        )
+        .await?;
         let host_disposition = match disposition {
             SubagentPausePersistenceDisposition::Inserted => {
                 tinyagents_orchestration::subagent::SubagentPersistenceDisposition::PauseCommitted
