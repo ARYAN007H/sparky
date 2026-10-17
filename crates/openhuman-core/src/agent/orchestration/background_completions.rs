@@ -51,6 +51,8 @@ pub(crate) use super::completion_target::tests::{
 };
 pub(crate) use super::completion_target::CompletionTarget;
 use super::completion_target::{awaiting_input_record_id, awaiting_input_record_prefix};
+pub(crate) use super::completion_target::{claim_recovery_ctx, forget_recovery_ctx};
+#[cfg(test)]
 pub(crate) use super::completion_target::{claim_recovery, forget_recovery};
 
 /// How long a settled record (delivered / gave up / tombstoned) is kept before

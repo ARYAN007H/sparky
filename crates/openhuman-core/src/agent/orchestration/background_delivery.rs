@@ -325,7 +325,7 @@ fn recover_fenced(ctx: &DispatchCtx, workspace_dir: &Path, fence: DrainFence) ->
     }
     // Once per workspace per process: the bootstrap workspace at startup, any
     // other the first time a spawn opens it.
-    if !background_completions::claim_recovery(ctx, workspace_dir) {
+    if !background_completions::claim_recovery_ctx(ctx, workspace_dir) {
         return 0;
     }
     let threads = background_completions::recover_pending_threads(ctx, workspace_dir);
@@ -353,12 +353,12 @@ fn recover_fenced(ctx: &DispatchCtx, workspace_dir: &Path, fence: DrainFence) ->
 /// that comes due after this node lost that lease is dropped, and the records
 /// stay pending for the node that holds it now.
 pub(crate) fn recover_on_open(ctx: &DispatchCtx, workspace_dir: &Path, fence: DrainFence) -> usize {
-    background_completions::forget_recovery(ctx, workspace_dir);
+    background_completions::forget_recovery_ctx(ctx, workspace_dir);
     let scheduled = recover_fenced(ctx, workspace_dir, fence);
     if scheduled == 0 {
         // Nothing pending: do not keep this profile's log handle cached for a
         // workspace that may never complete anything on this node.
-        background_completions::forget_recovery(ctx, workspace_dir);
+        background_completions::forget_recovery_ctx(ctx, workspace_dir);
     }
     scheduled
 }
