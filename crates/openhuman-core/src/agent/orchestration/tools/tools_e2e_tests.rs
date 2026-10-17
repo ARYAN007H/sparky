@@ -473,10 +473,11 @@ async fn deleted_thread_marker_survives_router_restart_and_refuses_async_spawn()
         let mut config = crate::config::Config::default();
         config.workspace_dir = workspace.path().to_path_buf();
         config.components.juice = false;
-        let core = CoreContext::for_test_with_config(DomainSet::full(), config.clone()).derive_with(
-            ContextOverlay::new(config, DomainSet::full(), ToolGroups::none())
-                .definitions(definitions),
-        );
+        let core = CoreContext::for_test_with_config(DomainSet::full(), config.clone())
+            .derive_with(
+                ContextOverlay::new(config, DomainSet::full(), ToolGroups::none())
+                    .definitions(definitions),
+            );
         let mut host_context = OpenHumanRunContext::new()
             .with_core(Some(Arc::clone(&core)))
             .with_parent(parent);
@@ -510,11 +511,7 @@ async fn deleted_thread_marker_survives_router_restart_and_refuses_async_spawn()
         1,
         "the fixture starts with a durable pending completion"
     );
-    background_completions::discard_for_thread(
-        &original_dispatch,
-        workspace.path(),
-        thread_id,
-    );
+    background_completions::discard_for_thread(&original_dispatch, workspace.path(), thread_id);
     assert!(background_completions::pending_for(workspace.path(), thread_id).is_empty());
 
     // Drop process-local router and thread gates, then reopen the same durable
@@ -547,9 +544,19 @@ async fn deleted_thread_marker_survives_router_restart_and_refuses_async_spawn()
         .expect("spawn tool execution");
 
     assert!(result.is_error, "deleted-thread spawn must be refused");
-    assert!(result.output().contains("stopped or deleted"), "{}", result.output());
-    assert!(provider.seen.lock().is_empty(), "refusal never calls the model");
-    assert!(progress_rx.try_recv().is_err(), "refusal emits no spawn card");
+    assert!(
+        result.output().contains("stopped or deleted"),
+        "{}",
+        result.output()
+    );
+    assert!(
+        provider.seen.lock().is_empty(),
+        "refusal never calls the model"
+    );
+    assert!(
+        progress_rx.try_recv().is_err(),
+        "refusal emits no spawn card"
+    );
     assert!(
         crate::agent::orchestration::subagent_sessions::SubagentSessionStore::new(
             workspace.path().to_path_buf()
