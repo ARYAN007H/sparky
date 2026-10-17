@@ -4,7 +4,7 @@ use std::sync::LazyLock;
 
 use async_trait::async_trait;
 use tinyagents_harness::context::RunContext;
-use tinyagents_harness::events::AgentEvent;
+use tinyagents_harness::events::{AgentEvent, GenerationEnrichment, GenerationPricing};
 use tinyagents_harness::middleware::{MiddlewareModelOutcome, ModelHandler, ModelMiddleware};
 use tinyagents_harness::retry::FallbackPolicy;
 use tinyagents_registry::{WorkloadRoute, WorkloadRouter};
@@ -234,7 +234,20 @@ impl ModelMiddleware<(), crate::agent::tinyagents::host::OpenHumanRunContext>
 /// terminal `ModelResponse` before middleware regains control, so this one
 /// typed boundary records primary and fallback routes identically without an
 /// OpenHuman model wrapper or task-local propagation.
-pub(super) struct ResolvedRouteMiddleware;
+pub(super) struct ResolvedRouteMiddleware {
+    /// Explicit configured fallback when a provider cannot return route metadata.
+    provider_id: String,
+    model: String,
+}
+
+impl ResolvedRouteMiddleware {
+    pub(super) fn new(provider_id: impl Into<String>, model: impl Into<String>) -> Self {
+        Self {
+            provider_id: provider_id.into(),
+            model: model.into(),
+        }
+    }
+}
 
 #[async_trait]
 impl ModelMiddleware<(), crate::agent::tinyagents::host::OpenHumanRunContext>
@@ -251,6 +264,10 @@ impl ModelMiddleware<(), crate::agent::tinyagents::host::OpenHumanRunContext>
         request: ModelRequest,
         next: ModelHandler<'_, (), crate::agent::tinyagents::host::OpenHumanRunContext>,
     ) -> tinyagents_harness::Result<MiddlewareModelOutcome> {
+        let call_id = request
+            .correlation
+            .as_ref()
+            .map(|correlation| correlation.call_id.clone());
         let outcome = next.run(ctx, state, request).await?;
         let response = outcome.into_response();
         if let Some(route) = response.resolved_route.clone() {
@@ -258,6 +275,45 @@ impl ModelMiddleware<(), crate::agent::tinyagents::host::OpenHumanRunContext>
                 .resolved_route
                 .lock()
                 .unwrap_or_else(|poisoned| poisoned.into_inner()) = Some(route);
+        }
+        if let Some(call_id) = call_id {
+            let route = response.resolved_route.as_ref();
+            let model = route
+                .map(|route| route.model.as_str())
+                .or_else(|| response.resolved_model.as_ref().map(|resolved| resolved.name.as_str()))
+                .unwrap_or(&self.model);
+            let provider_id = route
+                .map(|route| route.provider.as_str())
+                .unwrap_or(&self.provider_id);
+            let provider_id = tinyagents_harness::events::generation_enrichment::is_valid_provider_id(provider_id)
+                .then(|| provider_id.to_owned());
+            let pricing = tinyagents_registry::pricing::lookup(model).map(|price| GenerationPricing {
+                input_per_mtok_usd: Some(price.input_per_mtok_usd),
+                cached_input_per_mtok_usd: Some(price.cached_input_per_mtok_usd),
+                output_per_mtok_usd: Some(price.output_per_mtok_usd),
+            });
+            let billed = crate::inference::provider::model::usage_info_from_response(&response);
+            let estimated_cost_usd = if response.served_from_cache
+                || billed.is_some_and(|usage| usage.charge_reported && !usage.cost_is_estimate)
+            {
+                None
+            } else {
+                billed.and_then(|usage| crate::agent::cost::estimate_call_cost_usd(model, &usage))
+            };
+            let enrichment = GenerationEnrichment {
+                provider_id,
+                pricing,
+                estimated_cost_usd,
+            };
+            if enrichment.provider_id.is_some()
+                || enrichment.pricing.is_some()
+                || enrichment.estimated_cost_usd.is_some()
+            {
+                ctx.events.emit(AgentEvent::GenerationEnriched {
+                    call_id: call_id.into(),
+                    enrichment,
+                });
+            }
         }
         Ok(MiddlewareModelOutcome::from(response))
     }
