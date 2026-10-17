@@ -29,9 +29,9 @@ pub(super) async fn apply_subagent_result_policies(
     let mut paths = extract_artifact_paths(&outcome.output);
     let mut artifact_error = None;
 
-    // A worktree-isolated worker offloads into its own checkout; everyone else
-    // uses the live policy's action root, which is the same root a parent's
-    // relative read resolves the returned path against.
+    // Preserve an explicit worktree root as the action-dir fallback. With a
+    // live policy, the guarded writer materializes under that policy's action
+    // root so the parent can resolve the returned relative path.
     let policy = crate::security::live_policy::effective_in(&options.run_context.dispatch_ctx());
     let action_dir = options
         .worktree_action_dir
