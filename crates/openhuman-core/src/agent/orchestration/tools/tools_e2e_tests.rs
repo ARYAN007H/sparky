@@ -510,6 +510,10 @@ async fn detached_registration_failure_finishes_the_announced_product_card() {
     assert_eq!(rows.len(), 1);
     assert_eq!(rows[0].status, DurableSubagentStatus::Failed);
     assert!(provider.seen.lock().is_empty(), "registration error must not dispatch the model");
+    let jobs = crate::core::runtime::slot_for::<
+        tinyagents_orchestration::subagent::SubAgentJobRegistry,
+    >(&live.data.dispatch_ctx());
+    assert!(jobs.list().is_empty(), "failed request construction must not register a job");
 }
 
 /// A child the harness stops early (failure breaker / iteration cap) is not a
