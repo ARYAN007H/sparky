@@ -305,15 +305,6 @@ async fn force_fresh_cancels_old_driver_before_creating_a_new_session() {
         jobs.get(&old_job.id.to_string()).expect("old child remains registered").status,
         SubAgentJobStatus::Cancelled
     );
-    let new_job = jobs
-        .list()
-        .into_iter()
-        .find(|job| {
-            job.agent == "task_manager_agent"
-                && job.extensions.get("task_id").and_then(serde_json::Value::as_str)
-                    == Some(fresh_task_id.as_str())
-        })
-        .expect("fresh task has its own shared Job");
     let new_settled = tokio::time::timeout(
         std::time::Duration::from_secs(5),
         ToolDispatch::execute(
@@ -329,7 +320,15 @@ async fn force_fresh_cancels_old_driver_before_creating_a_new_session() {
     .expect("replacement child settles")
     .expect("replacement shared Jobs await succeeds");
     assert!(!new_settled.is_error, "{}", new_settled.output());
-    assert_eq!(new_job.status, SubAgentJobStatus::Completed);
+    let new_terminal: serde_json::Value =
+        serde_json::from_str(&new_settled.output()).expect("replacement wait returns job JSON");
+    assert_eq!(new_terminal["status"], "completed");
+    assert_eq!(new_terminal["extensions"]["task_id"], fresh_task_id);
+    let new_job_id = new_terminal["id"].as_str().expect("generic job ID");
+    assert_eq!(
+        jobs.get(new_job_id).expect("replacement remains registered").status,
+        SubAgentJobStatus::Completed
+    );
     assert_eq!(provider.calls.load(std::sync::atomic::Ordering::SeqCst), 2);
     let after_rows = store
         .load()
