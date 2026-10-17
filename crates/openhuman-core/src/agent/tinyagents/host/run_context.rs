@@ -707,13 +707,30 @@ impl OpenHumanRunContext {
         self.subagent_usage
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .push(entry);
+            .push(SubagentUsageRecord {
+                run_id: uuid::Uuid::new_v4().to_string(),
+                entry,
+            });
     }
 
     /// Record a completed child on the immediate parent's ledger. This makes
     /// completed children visible at the root without leaking siblings into one
     /// another's in-flight ledger. Direct/root callers retain their own entry.
     pub fn record_completed_subagent_usage(&self, entry: SubagentUsageEntry) {
+        self.record_completed_subagent_usage_with_run_id(
+            uuid::Uuid::new_v4().to_string(),
+            entry,
+        );
+    }
+
+    /// Records one actual child execution with its stable identity. The runner
+    /// mints this once inside the executor, so clones and failure promotion
+    /// deduplicate the same run while repeated task IDs remain distinct.
+    pub(crate) fn record_completed_subagent_usage_with_run_id(
+        &self,
+        run_id: String,
+        entry: SubagentUsageEntry,
+    ) {
         let ledger = self
             .parent_subagent_usage
             .as_ref()
@@ -721,13 +738,23 @@ impl OpenHumanRunContext {
         ledger
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .push(entry);
+            .push(SubagentUsageRecord { run_id, entry });
     }
 
     /// Snapshot child totals after the child has returned. A snapshot, rather
     /// than a task-local drain, preserves totals even when sibling futures are
     /// cancelled or one child fails after another has completed.
     pub fn subagent_usage_entries(&self) -> Vec<SubagentUsageEntry> {
+        self.subagent_usage
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .iter()
+            .map(|record| record.entry.clone())
+            .collect()
+    }
+
+    /// Internal snapshot retaining actual execution IDs for cost rollup.
+    pub(crate) fn subagent_usage_records(&self) -> Vec<SubagentUsageRecord> {
         self.subagent_usage
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
@@ -739,8 +766,8 @@ impl OpenHumanRunContext {
     /// it only from one terminal finalizer, so every completed descendant is
     /// promoted once without exposing a shared, in-flight sibling ledger.
     pub fn promote_completed_descendant_usage(&self) {
-        for entry in self.subagent_usage_entries() {
-            self.record_completed_subagent_usage(entry);
+        for record in self.subagent_usage_records() {
+            self.record_completed_subagent_usage_with_run_id(record.run_id, record.entry);
         }
     }
 
