@@ -654,7 +654,7 @@ async fn run_job_now_records_required_delivery_failure_as_error() {
         CronJobPatch {
             delivery: Some(DeliveryConfig {
                 mode: "announce".into(),
-                channel: None,
+                channel: Some(format!("missing-{}", uuid::Uuid::new_v4())),
                 to: Some("target".into()),
                 best_effort: false,
             }),

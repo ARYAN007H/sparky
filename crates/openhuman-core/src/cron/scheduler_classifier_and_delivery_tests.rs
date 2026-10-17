@@ -1,5 +1,52 @@
 use super::*;
+use async_trait::async_trait;
+use std::sync::{Arc, Mutex};
+use tinychannels_bus::{Channel, ChannelMessage, SendMessage};
 use tinyflows_bus::schedule::types::DeliveryStatus;
+use tokio::sync::mpsc;
+
+struct AnnounceMockChannel {
+    name: String,
+    sends: Arc<Mutex<Vec<(String, Option<String>)>>>,
+    fail: bool,
+}
+
+#[async_trait]
+impl Channel for AnnounceMockChannel {
+    fn name(&self) -> &str {
+        &self.name
+    }
+
+    async fn send(&self, message: &SendMessage) -> anyhow::Result<()> {
+        self.sends.lock().unwrap().push((
+            message.recipient.clone(),
+            message.idempotency_key.clone(),
+        ));
+        if self.fail {
+            anyhow::bail!("mock announce send failed");
+        }
+        Ok(())
+    }
+
+    async fn listen(&self, _tx: mpsc::Sender<ChannelMessage>) -> anyhow::Result<()> {
+        Ok(())
+    }
+}
+
+fn install_announce_mock_channel(name: String, fail: bool) -> Arc<Mutex<Vec<(String, Option<String>)>>> {
+    let sends = Arc::new(Mutex::new(Vec::new()));
+    let channel: Arc<dyn Channel> = Arc::new(AnnounceMockChannel {
+        name: name.clone(),
+        sends: Arc::clone(&sends),
+        fail,
+    });
+    crate::cron::channel_bridge::register_channel_bridge(
+        Arc::new(Mutex::new(std::collections::HashMap::new())),
+        Arc::new(std::collections::HashMap::from([(name, channel)])),
+        crate::cron::channel_bridge::MAX_HISTORY_MESSAGES,
+    );
+    sends
+}
 
 #[test]
 fn forbidden_path_argument_skips_flags_and_urls() {
@@ -96,6 +143,67 @@ async fn announce_to_unavailable_channel_is_reported_as_failed() {
         result.unwrap(),
         DeliveryStatus::Failed,
         "an announce without a registered channel must not report Delivered"
+    );
+}
+
+#[tokio::test]
+async fn announce_send_failure_is_reported_as_failed() {
+    let tmp = TempDir::new().unwrap();
+    let config = test_config(&tmp).await;
+    let channel = format!("failing-{}", uuid::Uuid::new_v4());
+    let sends = install_announce_mock_channel(channel.clone(), true);
+    let mut job = test_job("echo ok");
+    job.delivery = DeliveryConfig {
+        mode: "announce".into(),
+        channel: Some(channel),
+        to: Some("target".into()),
+        best_effort: false,
+    };
+
+    let result = deliver_run(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        &job,
+        "run-2",
+        "hello",
+        true,
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(result, DeliveryStatus::Failed);
+    assert_eq!(sends.lock().unwrap().len(), 1);
+}
+
+#[tokio::test]
+async fn announce_success_is_reported_and_uses_a_run_idempotency_key() {
+    let tmp = TempDir::new().unwrap();
+    let config = test_config(&tmp).await;
+    let channel = format!("working-{}", uuid::Uuid::new_v4());
+    let sends = install_announce_mock_channel(channel.clone(), false);
+    let mut job = test_job("echo ok");
+    job.delivery = DeliveryConfig {
+        mode: "announce".into(),
+        channel: Some(channel),
+        to: Some("target".into()),
+        best_effort: false,
+    };
+
+    let result = deliver_run(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        &job,
+        "run-3",
+        "hello",
+        true,
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(result, DeliveryStatus::Delivered);
+    assert_eq!(
+        *sends.lock().unwrap(),
+        vec![("target".into(), Some(format!("cron:{}:run-3", job.id)))]
     );
 }
 
