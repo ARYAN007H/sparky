@@ -104,6 +104,11 @@ impl DocScope {
         )
     }
 
+    /// Stable identity for the module's process-local scheduler slot.
+    pub(crate) fn scheduler_scope(&self) -> String {
+        format!("openhuman-cron:{}", self.key())
+    }
+
     fn documents(&self) -> Result<Arc<dyn DocumentStore>, StorageError> {
         let backend = match &self.backend {
             Some(backend) => Arc::clone(backend),
