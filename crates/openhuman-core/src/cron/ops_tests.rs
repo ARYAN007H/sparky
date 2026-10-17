@@ -343,7 +343,7 @@ async fn cron_run_rejects_duplicate_concurrent_execution() {
 
     // Hold the run claim directly to simulate an in-flight execution without
     // spawning a real long-running subprocess (deterministic, no timing dependency).
-    let running = try_acquire_run(&job.id).expect("the job is free");
+    let running = crate::cron::scheduler::try_acquire_run(&job.id).expect("the job is free");
     let err = cron_run(
         &crate::core::runtime::DispatchCtx::ambient(),
         &config,
@@ -420,7 +420,7 @@ async fn run_job_now_refuses_a_job_that_is_already_running() {
     let tmp = TempDir::new().unwrap();
     let config = test_config(&tmp);
     let job = single_flight_system_job(&config, "ops-run-now-busy");
-    let _running = try_acquire_run(&job.id).expect("the job is free");
+    let _running = crate::cron::scheduler::try_acquire_run(&job.id).expect("the job is free");
     let err = run_job_now(
         &crate::core::runtime::DispatchCtx::ambient(),
         &config,

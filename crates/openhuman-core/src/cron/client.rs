@@ -20,7 +20,7 @@ use tinyflows_bus::schedule::{
     members, CheckOriginRequest, DeliveryConfig, JobOrigin, RunsCloserThanRequest, Schedule,
     SessionTarget, StoreBackend, StoreConfig, StoreOperation, StoreRequest, TooFrequent,
 };
-use tinyflows_bus::schedule::{CronJob, CronJobPatch};
+use tinyflows_bus::schedule::CronJob;
 
 use super::documents_port::{self, DocScope};
 use crate::config::Config;
