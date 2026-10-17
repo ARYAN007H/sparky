@@ -88,6 +88,25 @@ async fn stale_workflow_generation_cannot_fail_its_replacement() {
     assert!(!supervisor.is_current(&old));
     assert!(supervisor.is_current(&current));
 
+    let advanced = compare_and_swap_workflow_run_lifecycle(
+        &config,
+        WorkflowRunUpsert {
+            id: seeded.id.clone(),
+            definition_id: seeded.definition_id.clone(),
+            parent_thread_id: seeded.parent_thread_id.clone(),
+            input: seeded.input.clone(),
+            phase_states: seeded.phase_states.clone(),
+            child_run_ids: seeded.child_run_ids.clone(),
+            status: WorkflowRunStatus::Running,
+            summary: Some("replacement revision".into()),
+            started_at: Some(seeded.started_at),
+            completed_at: None,
+        },
+        seeded.revision,
+    )
+    .expect("advance workflow revision")
+    .expect("the seeded revision is current");
+
     record_failed_if_current(
         &config,
         &run_id,
@@ -95,14 +114,21 @@ async fn stale_workflow_generation_cannot_fail_its_replacement() {
         seeded.revision,
         "stale sentinel".into(),
     );
+    record_failed_if_current(
+        &config,
+        &run_id,
+        &current,
+        seeded.revision,
+        "stale revision sentinel".into(),
+    );
     let unchanged = crate::storage::sessions::with_ledger(&config.workspace_dir, |ledger| {
         let id = run_id.clone();
         async move { ledger.get_workflow_run(&id).await }
     })
     .expect("read row")
     .expect("run exists");
-    assert_eq!(unchanged.revision, seeded.revision);
-    assert_ne!(unchanged.summary.as_deref(), Some("stale sentinel"));
+    assert_eq!(unchanged.revision, advanced.revision);
+    assert_eq!(unchanged.summary.as_deref(), Some("replacement revision"));
 
     let stopped = stop_workflow_run(&config, &run_id)
         .await
