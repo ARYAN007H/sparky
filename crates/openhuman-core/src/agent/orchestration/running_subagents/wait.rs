@@ -34,7 +34,7 @@ pub(crate) async fn wait(
         store.as_ref(),
         &super::super::background_completions::router_for_workspace_ctx(ctx, &workspace_dir),
         task_id,
-        &owners,
+        owners,
         timeout,
     )
     .await
@@ -56,7 +56,7 @@ pub(crate) async fn wait_in_workspace(
         store.as_ref(),
         &super::super::background_completions::router_for_workspace_ctx(ctx, workspace_dir),
         task_id,
-        &owners,
+        owners,
         timeout,
     )
     .await

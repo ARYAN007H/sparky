@@ -45,7 +45,7 @@ pub(crate) fn task_id_for_session_in_workspace(
         registry(),
         store.as_ref(),
         subagent_session_id,
-        &owners,
+        owners,
     )?;
     let task_id = resolved.task_id;
     log::debug!(
@@ -83,7 +83,7 @@ pub(crate) fn resume_ref_for_task_in_workspace(
     let store = scoped_task_store(ctx, workspace_dir)?;
     let owners = DetachedSubagentOwners::new(&owner, parent_session);
     let reference =
-        resolve_detached_or_durable_with_owners(registry(), store.as_ref(), task_id, &owners)?;
+        resolve_detached_or_durable_with_owners(registry(), store.as_ref(), task_id, owners)?;
     log::debug!(
         "[running_subagents] resolved resume ref from task store task_id={} workspace_dir={}",
         task_id,
