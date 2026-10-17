@@ -1,12 +1,12 @@
 use super::*;
 use crate::agent::orchestration::background_completions::{
-    pending_for, record_completion, router_for_workspace, TestWorkspace,
+    TestWorkspace, pending_for, record_completion, router_for_workspace,
 };
 use crate::agent::orchestration::busy_guard::TurnBusy;
 use crate::core::runtime::DispatchCtx;
-use crate::storage::fence::{system_now_ms, ScopeMatch};
-use crate::storage::lease::{DocumentLeases, LeaseStore};
 use crate::storage::MemoryStorage;
+use crate::storage::fence::{ScopeMatch, system_now_ms};
+use crate::storage::lease::{DocumentLeases, LeaseStore};
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 
 const TTL: Duration = Duration::from_secs(30);

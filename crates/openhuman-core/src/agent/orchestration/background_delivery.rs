@@ -54,7 +54,7 @@ use slot::DeliverySlot;
 use super::background_completions;
 use super::busy_guard::is_busy;
 #[cfg(test)]
-use super::busy_guard::{busy, clear_busy_for_thread, TurnBusy};
+use super::busy_guard::{TurnBusy, busy, clear_busy_for_thread};
 use super::completion_notice::build_undelivered_notice;
 use super::completion_owners;
 use super::delivery_drain::{DrainFence, RECOVERY_BUSY_POLL};
@@ -434,12 +434,13 @@ async fn try_deliver(
         }
     };
     let write_undelivered = move |records: &[CompletionRecord]| {
-        let attempts = records.iter().map(|record| record.attempts).max().unwrap_or(1);
-        let notice = build_undelivered_notice(
-            records,
-            attempts,
-            "the background delivery turn failed",
-        );
+        let attempts = records
+            .iter()
+            .map(|record| record.attempts)
+            .max()
+            .unwrap_or(1);
+        let notice =
+            build_undelivered_notice(records, attempts, "the background delivery turn failed");
         if let Some(notice) = notice {
             let run_id = format!("bgdeliver-undelivered-{}", uuid::Uuid::new_v4());
             if let Err(error) = persist_delivery_reply(
@@ -483,7 +484,9 @@ async fn try_deliver(
             .await
     };
     let retry_after = match outcome {
-        DeliveryOutcome::Failed { count, gave_up } if count > gave_up => Some(Duration::from_secs(2)),
+        DeliveryOutcome::Failed { count, gave_up } if count > gave_up => {
+            Some(Duration::from_secs(2))
+        }
         _ => None,
     };
     // A failed turn that published no `AgentError` (a session checkout failure,
