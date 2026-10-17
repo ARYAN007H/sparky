@@ -263,7 +263,7 @@ async fn live_close_alias_enforces_parent_thread_ownership() {
         .with_core(Some(Arc::clone(&core)))
         .with_parent(parent);
     live_context.thread_id = Some("voice-thread".into());
-    let mut run = live_context
+    let run = live_context
         .into_tinyagents(RunConfig::new("live-close-parent").with_thread("voice-thread"));
     let mut status = tinyagents_harness::events::HarnessRunStatus::new(
         run.run_id().clone(),

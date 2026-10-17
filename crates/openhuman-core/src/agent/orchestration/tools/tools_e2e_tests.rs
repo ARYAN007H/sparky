@@ -450,6 +450,137 @@ async fn stopped_async_spawn_is_refused_before_progress_or_session_effects() {
 }
 
 #[tokio::test]
+async fn deleted_thread_marker_survives_router_restart_and_refuses_async_spawn() {
+    use crate::agent::orchestration::background_completions::{
+        self, BackgroundAgentOutcome, TestWorkspace,
+    };
+    use crate::agent::tinyagents::host::OpenHumanRunContext;
+    use crate::core::runtime::{ContextOverlay, CoreContext, DomainSet};
+    use crate::tools::toolpacks::ToolGroups;
+    use tinyagents_harness::context::RunContext;
+
+    let workspace = TestWorkspace::new();
+    let provider = Arc::new(ScriptedModel::new(vec![]));
+    let thread_id = "deleted-async-parent-thread";
+    let parent_session = "deleted-async-parent-session";
+    let make_live = |progress| {
+        let mut parent = parent_context(workspace.path(), provider.clone(), vec![]);
+        parent.workspace_dir = workspace.path().to_path_buf();
+        parent.session_id = parent_session.into();
+        parent.on_progress = progress;
+
+        let definitions = Arc::new(AgentDefinitionRegistry::builtins_only());
+        let mut config = crate::config::Config::default();
+        config.workspace_dir = workspace.path().to_path_buf();
+        config.components.juice = false;
+        let core = CoreContext::for_test_with_config(DomainSet::full(), config.clone()).derive_with(
+            ContextOverlay::new(config, DomainSet::full(), ToolGroups::none())
+                .definitions(definitions),
+        );
+        let mut host_context = OpenHumanRunContext::new()
+            .with_core(Some(Arc::clone(&core)))
+            .with_parent(parent);
+        host_context.thread_id = Some(thread_id.into());
+        RunContext::<OpenHumanRunContext>::new(
+            tinyagents_harness::context::RunConfig::new("deleted-async-parent")
+                .with_thread(thread_id),
+            host_context,
+        )
+    };
+
+    let completion_store: Arc<dyn tinyagents_tasks::CompletionStore> =
+        Arc::new(tinyagents_tasks::InMemoryCompletionStore::new());
+    background_completions::install_store_for_test(workspace.path(), completion_store.clone());
+
+    let before_delete = make_live(None);
+    let original_dispatch = before_delete.data.dispatch_ctx();
+    background_completions::record_outcome(
+        &original_dispatch,
+        workspace.path(),
+        parent_session,
+        "pre-delete-child",
+        "task_manager_agent",
+        "completion queued before deletion",
+        Some(thread_id.into()),
+        BackgroundAgentOutcome::Completed,
+    )
+    .await;
+    assert_eq!(
+        background_completions::pending_for(workspace.path(), thread_id).len(),
+        1,
+        "the fixture starts with a durable pending completion"
+    );
+    background_completions::discard_for_thread(
+        &original_dispatch,
+        workspace.path(),
+        thread_id,
+    );
+    assert!(background_completions::pending_for(workspace.path(), thread_id).is_empty());
+
+    // Drop process-local router and thread gates, then reopen the same durable
+    // completion store as a fresh process would.
+    background_completions::forget_workspace_for_test(workspace.path());
+    background_completions::install_store_for_test(workspace.path(), completion_store);
+
+    let (progress_tx, mut progress_rx) = tokio::sync::mpsc::channel(8);
+    let restarted = make_live(Some(progress_tx));
+    let detached_data = restarted.data.detached_child();
+    let detached = restarted
+        .child(
+            tinyagents_harness::context::RunConfig::new("deleted-async-child"),
+            detached_data.clone(),
+        )
+        .expect("detached child context")
+        .with_cancellation(detached_data.cancellation.clone());
+    let result = crate::agent::orchestration::tools::SpawnAsyncSubagentTool::new()
+        .execute_with_live_parent_context(
+            json!({
+                "agent_id": "task_manager_agent",
+                "prompt": "must remain refused after restart",
+                "model": "test-model"
+            }),
+            None,
+            restarted.data.child(),
+            detached,
+        )
+        .await
+        .expect("spawn tool execution");
+
+    assert!(result.is_error, "deleted-thread spawn must be refused");
+    assert!(result.output().contains("stopped or deleted"), "{}", result.output());
+    assert!(provider.seen.lock().is_empty(), "refusal never calls the model");
+    assert!(progress_rx.try_recv().is_err(), "refusal emits no spawn card");
+    assert!(
+        crate::agent::orchestration::subagent_sessions::SubagentSessionStore::new(
+            workspace.path().to_path_buf()
+        )
+        .load()
+        .expect("session store readable")
+        .is_empty(),
+        "refusal writes no durable child session"
+    );
+    let jobs = crate::core::runtime::slot_for::<
+        tinyagents_orchestration::subagent::SubAgentJobRegistry,
+    >(&restarted.data.dispatch_ctx());
+    assert!(jobs.list().is_empty(), "refusal registers no shared job");
+
+    // A late terminal result after process-local state was forgotten is still
+    // suppressed by the durable marker alone.
+    background_completions::record_outcome(
+        &restarted.data.dispatch_ctx(),
+        workspace.path(),
+        parent_session,
+        "late-child-after-restart",
+        "task_manager_agent",
+        "must stay suppressed",
+        Some(thread_id.into()),
+        BackgroundAgentOutcome::Completed,
+    )
+    .await;
+    assert!(background_completions::pending_for(workspace.path(), thread_id).is_empty());
+}
+
+#[tokio::test]
 async fn detached_registration_failure_finishes_the_announced_product_card() {
     use crate::agent::orchestration::subagent_sessions::{
         DurableSubagentStatus, SubagentSessionStore,
