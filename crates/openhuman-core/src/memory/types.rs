@@ -7,9 +7,7 @@
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use tinymemory_api::{
-    Citation, EngineDescriptor, FetchMode, Hit, LearningKind, MemoryMeta, MetaFilter,
-};
+use tinymemory_api::{EngineDescriptor, FetchMode, LearningKind, MemoryMeta, MetaFilter};
 use tinymemory_integrations::import::ImportState;
 
 use crate::config::schema::MemorySourceKind;
@@ -390,65 +388,3 @@ pub struct ImportStateView {
     pub state: ImportState,
 }
 
-/// A recall citation attached to a chat reply so the UI can show where a
-/// memory-informed answer came from. Same JSON shape the chat surface has
-/// always rendered: `key` is the item kind, `namespace` its source kind,
-/// `timestamp` when it was observed, `snippet` a short excerpt.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct TurnCitation {
-    /// Item id.
-    pub id: String,
-    /// Item kind (`document`, `conversation`, `learning`).
-    pub key: String,
-    /// Source kind (`folder`, `agent`, …).
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub namespace: Option<String>,
-    /// Relevance, when the engine reports one.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub score: Option<f64>,
-    /// When the item was observed (RFC 3339), or empty.
-    pub timestamp: String,
-    /// Short excerpt.
-    pub snippet: String,
-}
-
-impl From<&Hit> for TurnCitation {
-    fn from(hit: &Hit) -> Self {
-        Self {
-            id: hit.id.0.clone(),
-            key: hit.kind.as_str().to_string(),
-            namespace: Some(hit.meta.source.kind.as_str().to_string()),
-            score: Some(f64::from(hit.score)).filter(|score| *score > 0.0),
-            timestamp: hit
-                .meta
-                .observed_at
-                .map(|at| at.to_rfc3339())
-                .unwrap_or_default(),
-            snippet: hit.text.chars().take(TURN_CITATION_SNIPPET_CHARS).collect(),
-        }
-    }
-}
-
-impl From<&Citation> for TurnCitation {
-    fn from(citation: &Citation) -> Self {
-        Self {
-            id: citation.id.0.clone(),
-            key: citation.kind.as_str().to_string(),
-            namespace: Some(citation.meta.source.kind.as_str().to_string()),
-            score: citation.score.map(f64::from),
-            timestamp: citation
-                .meta
-                .observed_at
-                .map(|at| at.to_rfc3339())
-                .unwrap_or_default(),
-            snippet: citation
-                .snippet
-                .chars()
-                .take(TURN_CITATION_SNIPPET_CHARS)
-                .collect(),
-        }
-    }
-}
-
-/// Longest snippet a [`TurnCitation`] carries.
-pub const TURN_CITATION_SNIPPET_CHARS: usize = 280;
