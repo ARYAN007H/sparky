@@ -117,6 +117,7 @@ pub(crate) struct NativeSubagentRunContext {
     pub config: tinyagents_harness::context::RunConfig,
     pub parent_events: EventSink,
     pub name: String,
+    pub depth: usize,
 }
 
 impl TurnSpec<'_> {
@@ -393,7 +394,7 @@ async fn drive_turn(
         native.parent_events.emit(
             tinyagents_harness::events::AgentEvent::SubAgentRunStarted {
                 name: native.name.clone(),
-                depth: run_context.spawn_depth,
+                depth: native.depth,
                 run_id: journal_run_id.clone(),
             },
         );

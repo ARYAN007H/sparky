@@ -188,6 +188,7 @@ impl SubagentExecutor<crate::agent::tinyagents::host::OpenHumanRunContext> for O
         match invocation {
             HostInvocation::Agent(definition) => {
                 let native = crate::agent::tinyagents::NativeSubagentRunContext {
+                    depth: native_run_config.lineage.depth,
                     config: native_run_config,
                     parent_events,
                     name: definition.id.clone(),
