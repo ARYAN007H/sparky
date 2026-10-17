@@ -355,12 +355,9 @@ pub(crate) async fn enrich_connections_with_identity(
             return resp;
         }
     };
-    let (identity_keys, connection_keys) = normalized.split_at(identities.len() * 2);
-    let lookup: HashMap<(String, String), _> = identities
-        .iter()
-        .zip(identity_keys.chunks(2))
-        .map(|(id, keys)| ((keys[0].clone(), keys[1].clone()), id))
-        .collect();
+    let connection_keys = normalized[identities.len() * 2..].to_vec();
+    let normalized_keys: HashMap<_, _> = raw.into_iter().zip(normalized).collect();
+    let lookup = identity_lookup(&identities, &normalized_keys);
 
     tracing::debug!(
         total = resp.connections.len(),
