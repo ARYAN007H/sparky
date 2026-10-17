@@ -154,14 +154,10 @@ pub(super) async fn repair_required_output(
 ) -> Option<String> {
     use tinyagents_harness::config as required;
 
-    if required::output_satisfies_contract(reply, contract) {
-        return None;
-    }
-
     let prompt_history: Vec<tinyinference_llm::message::Message> = history
         .iter()
         .filter_map(message_to_native_chat_message)
-        .map(crate::agent::tinyagents::chat_message_to_message)
+        .map(|message| crate::agent::tinyagents::chat_message_to_message(&message))
         .collect();
     let repair_instruction = wrap_harness_instruction(&required::repair_instruction(contract));
     let mut on_call_completed = |kind, response: Option<&ModelResponse>| {
@@ -172,7 +168,7 @@ pub(super) async fn repair_required_output(
             model: Some(model),
             temperature: Some(temperature),
             max_output_tokens: Some(AGENT_TURN_MAX_OUTPUT_TOKENS),
-            minimum_harness_phrase_chars: 24,
+            minimum_harness_phrase_chars: 1,
             on_call_completed: Some(&mut on_call_completed),
         },
         fallback_placement: tinyagents_harness::close::RequiredOutputFallbackPlacement::Prepend,
@@ -278,7 +274,7 @@ pub(super) async fn close_if_needed(
     let history: Vec<tinyinference_llm::message::Message> = base_history
         .iter()
         .filter_map(message_to_native_chat_message)
-        .map(crate::agent::tinyagents::chat_message_to_message)
+        .map(|message| crate::agent::tinyagents::chat_message_to_message(&message))
         .collect();
     let stop_reason = outcome.breaker_halt.as_deref();
     let harness_needles = harness_instruction_needles(stop_reason);

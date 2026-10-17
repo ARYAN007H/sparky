@@ -4,7 +4,7 @@ use super::*;
 
 impl OpenHumanTurnPrelude {
     #[allow(clippy::type_complexity)]
-    fn current_tool_source(
+    pub(super) fn current_tool_source(
         &self,
     ) -> (
         Arc<Vec<Box<dyn tinytools::Tool>>>,
@@ -26,7 +26,7 @@ impl OpenHumanTurnPrelude {
 
     /// The session's deferred set for this turn; see
     /// `OpenHumanRunContext::deferred_tool_names`.
-    fn current_deferred_tool_names(&self) -> std::collections::HashSet<String> {
+    pub(super) fn current_deferred_tool_names(&self) -> std::collections::HashSet<String> {
         self.tool_surface
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
@@ -34,14 +34,14 @@ impl OpenHumanTurnPrelude {
             .clone()
     }
 
-    fn replace_tool_surface(&self, surface: OpenHumanTurnToolSurface) {
+    pub(super) fn replace_tool_surface(&self, surface: OpenHumanTurnToolSurface) {
         *self
             .tool_surface
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner) = surface;
     }
 
-    async fn prepare(&self, cold: bool) -> Result<TurnPreparation> {
+    pub(super) async fn prepare(&self, cold: bool) -> Result<TurnPreparation> {
         let tools = {
             let surface = self
                 .tool_surface
@@ -91,7 +91,7 @@ impl OpenHumanTurnPrelude {
         })
     }
 
-    fn build_system_prompt_tiered(&self) -> Result<crate::agent::prompts::TieredPrompt> {
+    pub(super) fn build_system_prompt_tiered(&self) -> Result<crate::agent::prompts::TieredPrompt> {
         use crate::agent::prompts::{PromptContext, PromptTool};
         let surface = self
             .tool_surface
@@ -165,7 +165,7 @@ impl OpenHumanTurnPrelude {
         self.prompt_builder.build_tiered(&context)
     }
 
-    fn drain_host_events(&self) -> bool {
+    pub(super) fn drain_host_events(&self) -> bool {
         let mut mutable = self
             .mutable
             .lock()
@@ -213,7 +213,7 @@ impl OpenHumanTurnPrelude {
     async fn enrich_request(
         &self,
         original_user_message: &str,
-        turn: &super::types::TurnInputs,
+        turn: &super::super::types::TurnInputs,
         run_context: &mut OpenHumanRunContext,
     ) -> String {
         let mut context = String::new();
@@ -339,7 +339,10 @@ impl OpenHumanTurnPrelude {
         }
     }
 
-    async fn finalize_after_durable_commit(&self, receipt: &CommitReceipt<OpenHumanRunContext>) {
+    pub(super) async fn finalize_after_durable_commit(
+        &self,
+        receipt: &CommitReceipt<OpenHumanRunContext>,
+    ) {
         self.memory_post_turn(receipt);
     }
 }
