@@ -1,4 +1,5 @@
 use super::*;
+use tinyflows_bus::schedule::types::DeliveryStatus;
 
 #[test]
 fn forbidden_path_argument_skips_flags_and_urls() {
