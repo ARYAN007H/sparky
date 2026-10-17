@@ -431,6 +431,7 @@ async fn continue_subagent_resumes_paused_job_through_shared_driver() {
     let workspace = tempfile::TempDir::new().expect("workspace");
     let provider = Arc::new(PauseThenAnswerModel {
         calls: std::sync::atomic::AtomicUsize::new(0),
+        seen: Mutex::new(Vec::new()),
     });
     let live = super::live_parent_run_context(
         "continue-paused-e2e",
@@ -632,6 +633,16 @@ struct ScriptedModel {
 
 struct PauseThenAnswerModel {
     calls: std::sync::atomic::AtomicUsize,
+    seen: Mutex<Vec<String>>,
+}
+
+impl PauseThenAnswerModel {
+    fn saw(&self, needle: &str) -> bool {
+        self.seen
+            .lock()
+            .iter()
+            .any(|payload| payload.contains(needle))
+    }
 }
 
 #[async_trait]
@@ -649,9 +660,11 @@ impl ChatModel<()> for PauseThenAnswerModel {
     async fn invoke(
         &self,
         _state: &(),
-        _request: ModelRequest,
+        request: ModelRequest,
     ) -> tinyinference_llm::Result<ModelResponse> {
         use std::sync::atomic::Ordering;
+        let flattened = flatten_messages(&request.messages);
+        self.seen.lock().push(flattened);
         if self.calls.fetch_add(1, Ordering::SeqCst) == 0 {
             let mut response = ModelResponse::assistant("");
             response.message.tool_calls = vec![tinyinference_llm::tool::ToolCall::new(
