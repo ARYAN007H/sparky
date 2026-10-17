@@ -513,12 +513,11 @@ async fn opening_replaces_a_dropped_hosts_fence_before_cron_reconciliation() {
     let second_root = tempfile::tempdir().unwrap();
     let id = profile(&format!("cron-fence-{}", uuid::Uuid::new_v4().simple()));
     let registry = crate::storage::fence::registry();
-    let backend: Arc<dyn crate::storage::StorageBackend> = Arc::new(
-        crate::storage::fenced_backend::FencedBackend::new(
+    let backend: Arc<dyn crate::storage::StorageBackend> =
+        Arc::new(crate::storage::fenced_backend::FencedBackend::new(
             Arc::new(crate::storage::MemoryStorage::new()),
             Arc::clone(&registry),
-        ),
-    );
+        ));
     let _storage = RestoreInstalledStorage(crate::storage::install(backend));
 
     let mut first_saas = SaasConfig::new(first_root.path());
