@@ -5,10 +5,8 @@ async fn force_fresh_cancels_old_driver_before_creating_a_new_session() {
     use crate::agent::orchestration::subagent_sessions::{
         DurableSubagentStatus, SubagentSessionStore,
     };
-    use crate::agent::tinyagents::host::OpenHumanRunContext;
     use crate::core::runtime::{ContextOverlay, CoreContext, DomainSet};
     use crate::tools::toolpacks::ToolGroups;
-    use tinyagents_harness::context::RunContext;
     use tinyagents_harness::tool::ToolDispatch;
     use tinyagents_orchestration::subagent::{
         SubAgentJobRegistry, SubAgentJobStatus, SubAgentJobsTool,
@@ -351,14 +349,19 @@ async fn driver_job_controls_are_isolated_by_workspace_with_shared_runtime_state
         let mut product_parent = parent_context(workspace, model.clone(), vec![]);
         product_parent.workspace_dir = workspace.to_path_buf();
         product_parent.session_id = "same-parent-session".into();
-        let mut options = with_parent(product_parent, SubagentRunOptions::default());
+        let mut options = SubagentRunOptions::default();
+        options.run_context.parent = Some(product_parent);
         options.task_id = Some("same-raw-task-id".into());
         options.thread_id = Some("same-parent-thread".into());
         options.run_context = options
             .run_context
             .with_core(Some(Arc::clone(core)));
+        let run_id = workspace
+            .file_name()
+            .and_then(std::ffi::OsStr::to_str)
+            .unwrap_or("workspace");
         let run = options.run_context.clone().into_tinyagents(
-            tinyagents_harness::context::RunConfig::new("same-parent-run")
+            tinyagents_harness::context::RunConfig::new(format!("parent-{run_id}"))
                 .with_thread("same-parent-thread"),
         );
         (options, run)
@@ -372,9 +375,11 @@ async fn driver_job_controls_are_isolated_by_workspace_with_shared_runtime_state
         "the two workspace overlays must exercise one shared registry"
     );
 
-    let definition_a = make_def_named_tools(&[]);
-    let mut definition_b = make_def_named_tools(&[]);
-    definition_b.id = definition_a.id.clone();
+    let definition_a = AgentDefinitionRegistry::builtins_only()
+        .get("task_manager_agent")
+        .expect("task manager definition")
+        .clone();
+    let mut definition_b = definition_a.clone();
     let child_a = tokio::spawn(run_subagent_via_driver_tool(
         &parent_a,
         definition_a,
