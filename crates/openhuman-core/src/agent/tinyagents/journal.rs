@@ -271,6 +271,78 @@ pub(crate) async fn read_run_events(
         .map_err(|e| anyhow::anyhow!("[journal] read_run_events failed run_id={run_id}: {e}"))
 }
 
+/// Read a run and its lineage-linked descendants while retaining each journal
+/// stream's offset order. The stable merge uses timestamps across runs and
+/// places child terminal records before a same-timestamp parent acknowledgement.
+pub(crate) async fn read_run_tree_events(
+    ctx: &DispatchCtx,
+    root_run_id: &str,
+) -> anyhow::Result<Vec<AgentObservation>> {
+    use tinyagents_harness::observability::HarnessStatusStore as _;
+
+    let (journal_store, status_store) = journal_stores(ctx).await?;
+    let statuses = status_store
+        .list_by_root(root_run_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("[journal] list_by_root failed root_run_id={root_run_id}: {e}"))?;
+    let mut run_ids = statuses
+        .into_iter()
+        .map(|status| status.run_id.as_str().to_owned())
+        .collect::<Vec<_>>();
+    if !run_ids.iter().any(|run_id| run_id == root_run_id) {
+        run_ids.push(root_run_id.to_owned());
+    }
+    run_ids.sort();
+    run_ids.dedup();
+
+    let journal = StoreEventJournal::new(journal_store);
+    let mut streams = Vec::with_capacity(run_ids.len());
+    for run_id in run_ids {
+        let observations = journal
+            .read_from(&run_id, 0)
+            .await
+            .map_err(|e| anyhow::anyhow!("[journal] read tree events failed run_id={run_id}: {e}"))?;
+        if !observations.is_empty() {
+            streams.push(observations);
+        }
+    }
+
+    let mut cursors = vec![0usize; streams.len()];
+    let mut merged = Vec::new();
+    loop {
+        let next = streams
+            .iter()
+            .enumerate()
+            .filter_map(|(stream_index, stream)| {
+                let observation = stream.get(cursors[stream_index])?;
+                Some((
+                    stream_index,
+                    observation.ts_ms,
+                    cross_run_event_order(&observation.event),
+                    observation.offset,
+                ))
+            })
+            .min_by_key(|(_, ts_ms, event_order, offset)| (*ts_ms, *event_order, *offset));
+        let Some((stream_index, _, _, _)) = next else {
+            break;
+        };
+        merged.push(streams[stream_index][cursors[stream_index]].clone());
+        cursors[stream_index] += 1;
+    }
+    Ok(merged)
+}
+
+fn cross_run_event_order(event: &tinyagents_harness::events::AgentEvent) -> u8 {
+    use tinyagents_harness::events::AgentEvent;
+    match event {
+        AgentEvent::SubAgentRunStarted { .. } => 0,
+        AgentEvent::RunCompleted { .. } => 4,
+        AgentEvent::SubAgentRunCompleted { .. } => 3,
+        AgentEvent::RunFailed { .. } | AgentEvent::RunCancelled { .. } => 2,
+        _ => 1,
+    }
+}
+
 #[cfg(test)]
 #[path = "journal_tests.rs"]
 mod tests;
