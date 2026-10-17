@@ -352,6 +352,9 @@ impl SpawnAsyncSubagentTool {
     }
 }
 
+#[path = "spawn_async_subagent_completion.rs"]
+mod completion;
+
 include!("spawn_async_subagent_host_impl.rs");
 include!("spawn_async_subagent_request.rs");
 include!("spawn_async_subagent_projection.rs");
