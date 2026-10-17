@@ -4,7 +4,8 @@
 //! with TinyMemory's native converter; PDF, DOCX and PPTX are extracted by the
 //! configured TinyDocs module, with no host-side parser fallback. XLSX remains
 //! routed here to prevent native fallback, but the host refuses spreadsheet
-//! imports until a safe TinyMemory release is available.
+//! imports pending verified fixed Calamine dependencies in the published
+//! TinyMemory and TinyDocs artifacts (tracked by TinyMemory#293).
 
 use crate::config::Config;
 use tinymemory_integrations::documents::ConverterChain;
