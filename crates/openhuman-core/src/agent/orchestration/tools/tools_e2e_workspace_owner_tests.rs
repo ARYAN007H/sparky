@@ -83,6 +83,17 @@ async fn driver_job_controls_are_isolated_by_workspace_with_shared_runtime_state
     };
     let (options_a, parent_a) = build_parent(&workspace_a, &core_a);
     let (options_b, parent_b) = build_parent(&workspace_b, &core_b);
+    // Control aliases run in a fresh turn context, as they do after a parent
+    // turn resumes. Keep the original parents intact for their spawned child
+    // futures; RunContext is intentionally not Clone.
+    let mut run_a = options_a.run_context.clone().into_tinyagents(
+        tinyagents_harness::context::RunConfig::new("workspace-a-control")
+            .with_thread("same-parent-thread"),
+    );
+    let mut run_b = options_b.run_context.clone().into_tinyagents(
+        tinyagents_harness::context::RunConfig::new("workspace-b-control")
+            .with_thread("same-parent-thread"),
+    );
     let jobs_a = crate::core::runtime::slot_for::<SubAgentJobRegistry>(&parent_a.data.dispatch_ctx());
     let jobs_b = crate::core::runtime::slot_for::<SubAgentJobRegistry>(&parent_b.data.dispatch_ctx());
     assert!(
@@ -97,11 +108,9 @@ async fn driver_job_controls_are_isolated_by_workspace_with_shared_runtime_state
     definition_a.id = "workspace-a-worker".into();
     let mut definition_b = definition_a.clone();
     definition_b.id = "workspace-b-worker".into();
-    let child_parent_a = parent_a.clone();
-    let child_parent_b = parent_b.clone();
     let child_a = tokio::spawn(async move {
         run_subagent_via_driver_tool(
-            &child_parent_a,
+            &parent_a,
             definition_a,
             "run in workspace A".into(),
             options_a,
@@ -110,7 +119,7 @@ async fn driver_job_controls_are_isolated_by_workspace_with_shared_runtime_state
     });
     let child_b = tokio::spawn(async move {
         run_subagent_via_driver_tool(
-            &child_parent_b,
+            &parent_b,
             definition_b,
             "run in workspace B".into(),
             options_b,
@@ -200,8 +209,6 @@ async fn driver_job_controls_are_isolated_by_workspace_with_shared_runtime_state
         &std::collections::HashSet::new(),
     )
     .register(&mut harness, None);
-    let mut run_a = parent_a.clone();
-    let mut run_b = parent_b.clone();
     let mut status_a = tinyagents_harness::events::HarnessRunStatus::new(
         run_a.run_id().clone(),
         tinyagents_harness::ComponentId::new("workspace-a-control".into()),
