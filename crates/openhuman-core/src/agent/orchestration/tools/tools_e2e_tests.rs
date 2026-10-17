@@ -387,6 +387,14 @@ async fn stopped_async_spawn_is_refused_before_progress_or_session_effects() {
         &dispatch,
         thread_id,
     );
+    let detached_data = live.data.detached_child();
+    let detached = live
+        .child(
+            tinyagents_harness::context::RunConfig::new("stopped-async-child"),
+            detached_data.clone(),
+        )
+        .expect("detached child context")
+        .with_cancellation(detached_data.cancellation.clone());
 
     let result = crate::agent::orchestration::tools::SpawnAsyncSubagentTool::new()
         .execute_with_live_parent_context(
@@ -397,10 +405,7 @@ async fn stopped_async_spawn_is_refused_before_progress_or_session_effects() {
             }),
             None,
             live.data.child(),
-            Some(live.child(
-                tinyagents_harness::context::RunConfig::new("stopped-async-child"),
-                live.data.detached_child(),
-            ).expect("detached child context")),
+            detached,
         )
         .await
         .expect("tool execution");
