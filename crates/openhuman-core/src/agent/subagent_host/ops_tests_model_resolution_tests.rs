@@ -7,7 +7,7 @@ use tinyagents_harness::context::{current_run_depth, with_run_depth, RunDepth};
 
 struct BlockingSubagentCloseTool {
     started: tokio::sync::mpsc::Sender<()>,
-    release: tokio::sync::oneshot::Receiver<()>,
+    release: Arc<tokio::sync::Notify>,
 }
 
 #[async_trait::async_trait]
@@ -26,7 +26,7 @@ impl tinytools::Tool for BlockingSubagentCloseTool {
 
     async fn execute(&self, _args: serde_json::Value) -> anyhow::Result<tinytools::ToolResult> {
         let _ = self.started.send(()).await;
-        let _ = self.release.await;
+        self.release.notified().await;
         Ok(tinytools::ToolResult::success("tool released after close"))
     }
 }
@@ -135,7 +135,7 @@ async fn closing_a_durable_driver_session_cancels_only_its_registered_child() {
     let workspace = scratch.path().join("workspace");
     std::fs::create_dir_all(&workspace).expect("create isolated workspace");
     let (started_tx, mut started_rx) = tokio::sync::mpsc::channel(1);
-    let (release_tx, release_rx) = tokio::sync::oneshot::channel();
+    let release = Arc::new(tokio::sync::Notify::new());
     let provider = ScriptedProvider::new(vec![
         tool_response("blocking_close_fixture", "{}"),
         text_response("sibling completed"),
@@ -144,7 +144,7 @@ async fn closing_a_durable_driver_session_cancels_only_its_registered_child() {
         provider.clone(),
         vec![Box::new(BlockingSubagentCloseTool {
             started: started_tx,
-            release: release_rx,
+            release: release.clone(),
         })],
     );
     parent_context.workspace_dir = workspace.clone();
@@ -291,9 +291,7 @@ async fn closing_a_durable_driver_session_cancels_only_its_registered_child() {
         "raw product task ID resolves through the authenticated session port: {}",
         wait_result.output()
     );
-    release_tx
-        .send(())
-        .expect("release child for cooperative settlement");
+    release.notify_one();
     let wait_result = tinyagents_harness::tool::ToolDispatch::execute(
         &wait,
         &(),
