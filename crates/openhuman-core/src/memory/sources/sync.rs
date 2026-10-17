@@ -140,7 +140,7 @@ async fn run(config: &Config, source: &MemorySourceConfig) -> Result<u64, SyncEr
     let collected = module::read_source(
         &registered(source),
         &config.action_dir,
-        &crate::memory::convert::converter(config),
+        &crate::modules::memory_converter::converter(config),
     )
     .await?;
     let layout = super::layout_of_source(config, source);

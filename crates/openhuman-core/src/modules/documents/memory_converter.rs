@@ -93,5 +93,5 @@ pub(crate) fn converter(config: &Config) -> ConverterChain {
 }
 
 #[cfg(test)]
-#[path = "convert_tests.rs"]
+#[path = "memory_converter_tests.rs"]
 mod tests;
