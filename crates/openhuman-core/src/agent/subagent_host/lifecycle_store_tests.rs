@@ -19,7 +19,7 @@ fn pause_json(key: &SubagentTaskKey) -> serde_json::Value {
         "created_at": "2026-10-01T00:00:00Z",
         "output": "partial",
         "iterations": 2,
-        "usage": {},
+        "usage": {"input_tokens": 1, "output_tokens": 2, "cached_input_tokens": 0, "charged_amount_usd": 0.0},
         "artifact_paths": [],
         "elapsed_ms": 40
     })
