@@ -416,10 +416,10 @@ pub(super) async fn policy_reads_refuse_execution_without_consuming_a_slot(case:
         let reads = faults.calls.lock().unwrap();
         assert!(reads
             .iter()
-            .any(|(scope, id)| scope == "profile:policy-alpha" && id == &job.id));
+            .any(|(scope, id)| scope == "u:policy-alpha" && id == &job.id));
         assert!(reads
             .iter()
-            .any(|(scope, id)| scope == "profile:policy-beta" && id == &job.id));
+            .any(|(scope, id)| scope == "u:policy-beta" && id == &job.id));
     }
     faults.read.store(false, Ordering::SeqCst);
     CoreContext::scope(Arc::clone(&alpha), async {
