@@ -1,7 +1,7 @@
 use std::path::{Path, PathBuf};
 
 use super::persist_delivered_reply;
-use crate::memory::types::TurnCitation;
+use crate::web_chat::TurnCitation;
 use crate::threads::store::{self as conversations, CreateConversationThread};
 
 fn temp_ws() -> PathBuf {

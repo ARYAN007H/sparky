@@ -23,7 +23,7 @@ use std::path::Path;
 
 use serde_json::json;
 
-use crate::memory::types::TurnCitation;
+use crate::web_chat::TurnCitation;
 use crate::threads::store::{self as conversations, run_reply_message_id, ConversationMessage};
 
 /// Metadata scope stamped on a reply persisted by the web-channel delivery path.

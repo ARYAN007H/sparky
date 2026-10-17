@@ -126,7 +126,7 @@ fn turn_citations_are_capped_and_deduplicated() {
         MAX_TURN_CITATIONS
     );
     assert!(
-        drained[0].snippet.chars().count() <= crate::memory::types::TURN_CITATION_SNIPPET_CHARS
+        drained[0].snippet.chars().count() <= crate::web_chat::TURN_CITATION_SNIPPET_CHARS
     );
     assert_eq!(drained[0].key, "learning");
 }
