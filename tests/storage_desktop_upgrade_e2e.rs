@@ -516,14 +516,14 @@ async fn a_desktop_upgrade_is_lossless_and_leaves_the_legacy_files_untouched(cas
     // Connectors: preferences and each day's archive in its own stream.
     let connectors = module_storage(backend.as_ref(), "tinyconnectors");
     assert_eq!(
-        count(&connectors, "composio-user-scopes").await,
+        count(&connectors, "connectors.user_scopes").await,
         fixture.connector_prefs
     );
     for (day, records) in fixture.trigger_days {
         assert_eq!(
             connectors
                 .streams()
-                .len(&format!("triggers/{day}"))
+                .len(&format!("connectors.triggers/{day}"))
                 .await
                 .unwrap(),
             records as u64,
