@@ -146,71 +146,7 @@ pub(crate) async fn run_subagent_via_driver_tool(
         parent, definition, input, options, "inline", None, None, None,
     )
     .await?;
-    let public_job_id = decode_driver_job_result(tool_result, &bundle, &task_key)?;
-    let cached = bundle
-        .host_outcome
-        .lock()
-        .unwrap_or_else(|poisoned| poisoned.into_inner())
-        .remove(&task_key);
-    if let Some(error) = bundle
-        .failures
-        .lock()
-        .unwrap_or_else(|poisoned| poisoned.into_inner())
-        .remove(&task_key)
-    {
-        return Err(error);
-    }
-
-    // The driver's persistence CAS result is authoritative. Another
-    // invocation can win terminal/pause persistence while this executor's
-    // host-side cache still contains its local loser. Read the same scoped
-    // record the driver returned before projecting a host result.
-    if let Some(outcome) = bundle
-        .persistence
-        .load_terminal(&task_key)
-        .await
-        .map_err(map_lifecycle_error)?
-    {
-        let disposition = cached.as_ref().map_or(
-            SubagentPersistenceDisposition::TerminalExisting,
-            |host| host.persistence_disposition,
-        );
-        let host = outcome_to_host(
-            SubagentRunResult::new(outcome, disposition),
-            cached,
-            &bundle.persistence,
-            &task_key,
-            &fallback_agent_id,
-        );
-        return Ok((host, public_job_id));
-    }
-    if let Some(outcome) = bundle
-        .persistence
-        .load_pause(&task_key)
-        .await
-        .map_err(map_lifecycle_error)?
-    {
-        let disposition = cached.as_ref().map_or(
-            SubagentPersistenceDisposition::PauseExisting,
-            |host| host.persistence_disposition,
-        );
-        let host = outcome_to_host(
-            SubagentRunResult::new(outcome, disposition),
-            cached,
-            &bundle.persistence,
-            &task_key,
-            &fallback_agent_id,
-        );
-        return Ok((host, public_job_id));
-    }
-    if let Some(outcome) = cached.filter(|host| {
-        host.persistence_disposition == SubagentPersistenceDisposition::ObserverCancelled
-    }) {
-        return Ok((outcome, public_job_id));
-    }
-    Err(SubagentRunError::Provider(anyhow::anyhow!(
-        "driver-backed async spawn returned without a durable host outcome"
-    )))
+    resolve_inline_driver_outcome(tool_result, &bundle, &task_key, &fallback_agent_id).await
 }
 
 /// Runs the configured one-shot `delegate` executor inside the shared Tiny
@@ -284,26 +220,8 @@ pub(crate) async fn continue_subagent_via_driver_tool(
         Some((original_key.clone(), resume)),
     )
     .await?;
-    let public_job_id = decode_driver_job_result(tool_result, &bundle, &original_key)?;
-    if let Some(outcome) = bundle
-        .host_outcome
-        .lock()
-        .unwrap_or_else(|poisoned| poisoned.into_inner())
-        .remove(&original_key)
-    {
-        return Ok((outcome, public_job_id));
-    }
-    if let Some(error) = bundle
-        .failures
-        .lock()
-        .unwrap_or_else(|poisoned| poisoned.into_inner())
-        .remove(&original_key)
-    {
-        return Err(error);
-    }
-    Err(SubagentRunError::Provider(anyhow::anyhow!(
-        "driver-backed subagent continuation returned without a host outcome"
-    )))
+    let fallback_agent_id = definition.id.clone();
+    resolve_inline_driver_outcome(tool_result, &bundle, &original_key, &fallback_agent_id).await
 }
 
 /// Starts a detached host-prepared child through TinyAgents' registered
