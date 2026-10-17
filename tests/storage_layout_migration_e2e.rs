@@ -33,8 +33,11 @@ fn call(home: &Path, method: &str, params: &str) -> Value {
     let stdout = String::from_utf8_lossy(&output.stdout);
     let start = stdout.find('{').expect("a JSON object on stdout");
     let value: Value = serde_json::from_str(&stdout[start..]).expect("JSON result");
-    // The envelope may wrap the payload as {result: ..., logs: [...]}.
-    value.get("result").cloned().unwrap_or(value)
+    // A log envelope wraps the payload as {result: {...}, logs: [...]}.
+    match value.get("result") {
+        Some(inner) if inner.is_object() => inner.clone(),
+        _ => value,
+    }
 }
 
 /// `<home>/.openhuman/users/local` with a v1 workspace; returns the profile dir.
@@ -59,7 +62,13 @@ fn digest(root: &Path) -> Vec<(String, u64)> {
                 stack.push(path);
             } else {
                 let len = entry.metadata().unwrap().len();
-                out.push((path.strip_prefix(root).unwrap().display().to_string(), len));
+                let rel = path.strip_prefix(root).unwrap().display().to_string();
+                // The binary's own boot writes its config and the v1 database;
+                // what must not change is everything else.
+                if rel.starts_with("config.toml") || rel.starts_with("workspace/storage") {
+                    continue;
+                }
+                out.push((rel, len));
             }
         }
     }
@@ -89,6 +98,9 @@ fn migrate_dry_run_plans_a_v1_profile_and_writes_nothing() {
     assert!(plan["archive"]["bytes"].as_u64().unwrap() > 0);
     assert_eq!(digest(&profile), before, "a dry run writes nothing");
     assert!(!home.path().join(".openhuman/backups").exists());
+    for created in [".layout", ".layout.lock", ".layout.state", "storage.db", "files"] {
+        assert!(!profile.join(created).exists(), "{created} must not exist after a dry run");
+    }
 }
 
 #[test]
