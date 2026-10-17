@@ -62,21 +62,11 @@ impl OpenHumanSessionHost {
     pub(in crate::agent::session_host) fn sanitize_event_error_message(
         err: &anyhow::Error,
     ) -> String {
-        let kind = match err.downcast_ref::<AgentError>() {
-            Some(AgentError::ProviderError { .. }) => Some("provider_error"),
-            Some(AgentError::ContextLimitExceeded { .. }) => Some("context_limit_exceeded"),
-            Some(AgentError::ToolExecutionError { .. }) => Some("tool_execution_error"),
-            Some(AgentError::CostBudgetExceeded { .. }) => Some("cost_budget_exceeded"),
-            Some(AgentError::MaxIterationsExceeded { .. }) => Some("max_iterations_exceeded"),
-            Some(AgentError::EmptyProviderResponse { .. }) => Some("empty_provider_response"),
-            Some(AgentError::CompactionFailed { .. }) => Some("compaction_failed"),
-            Some(AgentError::PermissionDenied { .. }) => Some("permission_denied"),
-            Some(AgentError::RegistryValidationFailed { .. }) => Some("registry_validation_failed"),
-            Some(AgentError::Other(_)) | None => None,
-        };
-
-        if let Some(kind) = kind {
-            return kind.to_string();
+        if let Some(error) = err.downcast_ref::<AgentError>() {
+            let kind = error.kind();
+            if kind != "other" {
+                return kind.to_string();
+            }
         }
 
         let scrubbed = tinyinference_core::sanitize::sanitize_api_error(&err.to_string())
