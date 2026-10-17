@@ -508,8 +508,8 @@ async fn a_resumed_session_pack_stays_within_one_budget_and_repeats_nothing() {
     }
 
     let mut resumed = input("t-resumed", 12, "when does the Lisbon release ship?");
-    resumed.resumed_after_compaction = true;
-    resumed.in_prompt_from = 12;
+    resumed.5 = true;
+    resumed.3 = 12;
     let pack = run_pre_turn(
         &crate::core::runtime::DispatchCtx::ambient(),
         &config,
@@ -568,8 +568,8 @@ async fn a_resumed_session_without_logging_still_opens_with_the_thread() {
     config.memory.conversations.enabled = false;
     let reader = MemoryIdentity::agent("orchestrator").resolve(&config);
     let mut resumed = input("t-quiet", 2, "remind me where the offsite is");
-    resumed.resumed_after_compaction = true;
-    resumed.in_prompt_from = 2;
+    resumed.5 = true;
+    resumed.3 = 2;
     let pack = run_pre_turn(
         &crate::core::runtime::DispatchCtx::ambient(),
         &config,
@@ -614,7 +614,7 @@ async fn a_blank_turn_is_refused_without_a_pack_with_or_without_logging() {
     .await
     .is_none());
     let mut resumed = input("  ", 4, "where were we?");
-    resumed.resumed_after_compaction = true;
+    resumed.5 = true;
     assert!(run_pre_turn(
         &crate::core::runtime::DispatchCtx::ambient(),
         &config,
