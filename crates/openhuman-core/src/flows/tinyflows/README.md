@@ -25,9 +25,11 @@ security model); this README covers only the host seam.
   reuse the engine's pause/`flows_resume` fallback).
   - `ops.rs`: `build_capabilities` (assembles the `Capabilities` bundle for
     one run), `open_flow_checkpointer` (a `DriverCheckpointer` on the flow
-    catalog's storage), Composio curation/preflight
-    (`is_curated_flow_tool`, `preflight_composio_args`), and the
-    `OpenHumanTools` / `PreflightToolInvoker` tool-call adapters.
+    catalog's storage), and the `OpenHumanTools` / `PreflightToolInvoker`
+    adapters. Composio curation, tier classification, connection references,
+    and argument preflight live with the Composio owner under
+    `integrations/composio/`; these adapters translate policy outcomes into
+    the flow engine's capability errors.
   - `agent.rs`: `OpenHumanAgentRunner` (`AgentRunner`): resolves an `agent`
     node's trusted `agent_ref` and routes it to a full harness turn
     (`Agent::run_single`, a nested tinyagents graph) when a harness
@@ -85,8 +87,8 @@ The contract is spelled out in
 this module holds the outer gate. `tier.rs` consults the user's autonomy
 tier for each acting node's `CommandClass` and forces an `ApprovalGate`
 round-trip on `Prompt`, even when the saved flow's own `require_approval` is
-false. Composio `tool_call` nodes additionally pass [`caps/ops.rs`](./caps/ops.rs)'s
-deny-by-default curation check (`is_curated_flow_tool`), stricter than the
+false. Composio `tool_call` nodes additionally pass the deny-by-default
+curation check in `integrations/composio/flow_gate.rs` (`is_curated_flow_tool`), stricter than the
 agent loop's because a flow author's slug is free-form and never round-trips
 through live tool discovery; `tools/composio.rs` documents why the tier gate
 must run before curation. The inner gate (the agent definition's `ToolScope`
