@@ -250,9 +250,7 @@ impl ProfileHost {
         if self.registry.get(id).await?.is_none() {
             return Err(format!("profile {id} is not provisioned"));
         }
-        let config = self.serving_config(&self.layout_of(id), id)?;
-        super::lifecycle::reconcile_cron_admission(&config, id).await?;
-        Ok(config)
+        self.serving_config(&self.layout_of(id), id)
     }
 
     /// Profile `id`, opening it — and taking its lease — if it is provisioned

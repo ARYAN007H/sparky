@@ -62,8 +62,8 @@ fn install_capacity_limit(config: &Config) -> Result<()> {
 }
 
 /// Clear a prior operator cap when enforcement is off. Backends without
-/// transactions could never install one, so they remain compatible without
-/// attempting an unsupported `SetMaxActiveJobs(None)` write.
+/// transactions cannot clear it, so skip the unsupported write; TinyFlows'
+/// admission ledger guard refuses mutations if an earlier policy is present.
 fn clear_capacity_limit_if_supported(config: &Config) -> Result<()> {
     let scope = super::documents_port::DocScope::current(config)?;
     if !scope.supports_transactions()? {
