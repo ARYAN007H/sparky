@@ -274,7 +274,12 @@ export function buildPlan({ profile, areas, env = {}, isPullRequest = true }) {
     },
     {
       name: "frontend",
-      env: { NODE_ENV: "test" },
+      env: {
+        NODE_ENV: "test",
+        // ESLint exhausts Node's default ~2 GiB heap on the private guest.
+        // Lanes are sequential, so this budget does not overlap Rust builds.
+        ...(ex63 ? { NODE_OPTIONS: "--max-old-space-size=4096" } : {}),
+      },
       checks: [
         {
           name: "pnpm-install",

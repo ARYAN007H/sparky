@@ -847,12 +847,23 @@ test("private frontend tools have an explicit 4 GiB Node heap while hosted keeps
     const frontend = plan.lanes.find((lane) => lane.name === "frontend");
     if (plan.profile === "ex63") {
       assert.equal(frontend.env.NODE_OPTIONS, "--max-old-space-size=4096");
-      const probe = spawnSync(process.execPath, ["-e", "console.log(require('node:v8').getHeapStatistics().heap_size_limit)"], {
-        env: { ...process.env, NODE_OPTIONS: frontend.env.NODE_OPTIONS }, encoding: "utf8",
-      });
+      const probe = spawnSync(
+        process.execPath,
+        [
+          "-e",
+          "console.log(require('node:v8').getHeapStatistics().heap_size_limit)",
+        ],
+        {
+          env: { ...process.env, NODE_OPTIONS: frontend.env.NODE_OPTIONS },
+          encoding: "utf8",
+        },
+      );
       assert.equal(probe.status, 0, probe.stderr);
       const limit = Number(probe.stdout.trim());
-      assert.ok(limit >= 4096 * 1024 * 1024 && limit < 4352 * 1024 * 1024, `actual V8 heap limit ${limit}`);
+      assert.ok(
+        limit >= 4096 * 1024 * 1024 && limit < 4352 * 1024 * 1024,
+        `actual V8 heap limit ${limit}`,
+      );
     } else {
       assert.equal(frontend.env.NODE_OPTIONS, undefined);
     }
