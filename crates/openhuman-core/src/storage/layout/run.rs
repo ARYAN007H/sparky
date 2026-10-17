@@ -346,7 +346,16 @@ fn finish(target: &Target, state: &LayoutState, plan: &Plan) -> Result<(), Layou
 
 /// Removes `path`, which must lie below `base`, without following symlinks.
 fn remove_within(base: &Path, path: &Path) -> Result<(), LayoutError> {
-    if !path.starts_with(base) || path == base {
+    // `starts_with` is lexical, so `base/../x` would pass it: every component
+    // below `base` must be a plain name (a restore reads entry paths from a
+    // caller-supplied archive).
+    let below = path.strip_prefix(base).ok().filter(|rel| {
+        rel.components().next().is_some()
+            && rel
+                .components()
+                .all(|c| matches!(c, std::path::Component::Normal(_)))
+    });
+    if below.is_none() {
         return Err(LayoutError::Verify(format!(
             "refusing to delete {}",
             path.display()
