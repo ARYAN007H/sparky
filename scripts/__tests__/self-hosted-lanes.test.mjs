@@ -45,7 +45,7 @@ const NONE = Object.fromEntries(Object.keys(AREA_ENV).map((k) => [k, false]));
 const EX63_ENV = { CI_SCRATCH_DIR: "/scratch" };
 
 test("EX63 verifies preinstalled tools before cache setup and validation", () => {
-  const privateJob = ciLanes.slice(ciLanes.indexOf("  ex63:"), ciLanes.indexOf("  hosted:"));
+  const privateJob = ciLanes.slice(ciLanes.indexOf("  ex63:"), ciLanes.indexOf("  plan:"));
   const verify = privateJob.indexOf("- name: Verify private runner contract");
   const cache = privateJob.indexOf("- name: Setup Tinymold");
   const detect = privateJob.indexOf("- name: Detect changed areas");
