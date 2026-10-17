@@ -43,7 +43,9 @@ pub(crate) fn cancel_by_task(
     ctx: &crate::core::runtime::DispatchCtx,
     task_id: &str,
 ) -> Option<CancelledSubagent> {
-    cancel_by_task_with_workspace(ctx, task_id, None)
+    cancel_by_task_with_workspace_reason(ctx, task_id, None, None)
+        .ok()
+        .flatten()
 }
 
 /// Cancels a child by public task id using the authenticated active workspace
@@ -55,12 +57,28 @@ pub(crate) fn cancel_by_task_with_workspace(
     task_id: &str,
     fallback_workspace: Option<&Path>,
 ) -> Option<CancelledSubagent> {
+    cancel_by_task_with_workspace_reason(ctx, task_id, fallback_workspace, None)
+        .ok()
+        .flatten()
+}
+
+/// Cancel with an optional user-provided reason for the driver-owned
+/// completion callback. Store failures are returned so the RPC does not report
+/// an unknown task when its durable selector could not be read.
+pub(crate) fn cancel_by_task_with_workspace_reason(
+    ctx: &crate::core::runtime::DispatchCtx,
+    task_id: &str,
+    fallback_workspace: Option<&Path>,
+    reason: Option<&str>,
+) -> Result<Option<CancelledSubagent>, String> {
     let id = TaskId::new(task_id);
     if let Ok(snapshot) = registry().snapshot_trusted(&id) {
         if !control_admits(ctx, &snapshot.metadata) {
-            return None;
+            return Ok(None);
         }
-        let cancelled = registry().cancel(&id, &snapshot.owner_id).ok()?;
+        let Ok(cancelled) = registry().cancel(&id, &snapshot.owner_id) else {
+            return Ok(None);
+        };
         // `AwaitingUser` is paused, not finished: cancelling it is a real cancel.
         let already_finished = cancelled.status.finished_outcome();
         let metadata = cancelled.metadata;
@@ -76,7 +94,7 @@ pub(crate) fn cancel_by_task_with_workspace(
                 .len()
                 .expect("detached task registry lock poisoned")
         );
-        return Some(CancelledSubagent {
+        return Ok(Some(CancelledSubagent {
             agent_id: metadata.agent_id,
             parent_session: metadata.parent_session,
             subagent_session_id: metadata.subagent_session_id,
@@ -84,13 +102,16 @@ pub(crate) fn cancel_by_task_with_workspace(
             parent_thread_id: metadata.parent_thread_id,
             already_finished,
             driver_managed: false,
-        });
+        }));
     }
 
     let workspace_dir = match ctx.resolved() {
-        Some(context) => context.workspace_dir().ok()?,
-        None if !crate::core::runtime::is_saas() => fallback_workspace?.to_path_buf(),
-        None => return None,
+        Some(context) => context.workspace_dir().ok(),
+        None if !crate::core::runtime::is_saas() => fallback_workspace.map(Path::to_path_buf),
+        None => None,
+    };
+    let Some(workspace_dir) = workspace_dir else {
+        return Ok(None);
     };
     let store = crate::agent::orchestration::subagent_sessions::SubagentSessionStore::new(
         workspace_dir.clone(),
@@ -103,8 +124,9 @@ pub(crate) fn cancel_by_task_with_workspace(
         &workspace_dir.join(".openhuman/subagent_checkpoints"),
         &jobs,
         task_id,
+        reason,
     )?;
-    Some(CancelledSubagent {
+    Ok(selected.map(|selected| CancelledSubagent {
         agent_id: selected.agent_id,
         parent_session: selected.parent_session,
         subagent_session_id: Some(selected.subagent_session_id),
@@ -112,7 +134,7 @@ pub(crate) fn cancel_by_task_with_workspace(
         parent_thread_id: selected.parent_thread_id,
         already_finished: selected.already_finished,
         driver_managed: true,
-    })
+    }))
 }
 
 pub(crate) fn cancel_by_session_in_workspace(

@@ -115,7 +115,12 @@ fn handle_subagent_cancel(ctx: DispatchCtx, params: Map<String, Value>) -> Contr
         // `outcome` is set only when nothing was cancelled: how the run ended
         // if the registry still knew it, else "unknown" (never registered, or
         // already swept). The card settles on it instead of assuming success.
-        let mut cancelled_subagent = running_subagents::cancel_by_task(&ctx, &task_id);
+        let mut cancelled_subagent = running_subagents::cancel_by_task_with_workspace_reason(
+            &ctx,
+            &task_id,
+            None,
+            reason.as_deref(),
+        )?;
         if cancelled_subagent.is_none()
             && ctx.resolved().is_none()
             && !crate::core::runtime::is_saas()
@@ -123,11 +128,12 @@ fn handle_subagent_cancel(ctx: DispatchCtx, params: Map<String, Value>) -> Contr
             let config = crate::config::ops::load_config_in(&ctx)
                 .await
                 .map_err(|error| format!("subagent_cancel: failed to resolve active workspace: {error}"))?;
-            cancelled_subagent = running_subagents::cancel_by_task_with_workspace(
+            cancelled_subagent = running_subagents::cancel_by_task_with_workspace_reason(
                 &ctx,
                 &task_id,
                 Some(&config.workspace_dir),
-            );
+                reason.as_deref(),
+            )?;
         }
         let (cancelled, outcome) = match cancelled_subagent {
             // Finished before the click landed (it stays registered until the

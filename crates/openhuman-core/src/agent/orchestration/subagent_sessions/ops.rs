@@ -188,15 +188,17 @@ pub fn cancel_driver_job_by_task(
     jobs: &tinyagents_orchestration::subagent::SubAgentJobRegistry,
     task_id: &str,
     reason: Option<&str>,
-) -> Option<DriverTaskCancellation> {
+) -> Result<Option<DriverTaskCancellation>, String> {
     let mut matches = store
         .load()
-        .ok()?
+        .map_err(|error| format!("failed to load subagent sessions for cancellation: {error}"))?
         .into_iter()
         .filter(|session| session.current_task_id.as_deref() == Some(task_id));
-    let session = matches.next()?;
+    let Some(session) = matches.next() else {
+        return Ok(None);
+    };
     if matches.next().is_some() {
-        return None;
+        return Ok(None);
     }
     let already_finished = match session.status {
         DurableSubagentStatus::Idle => {
@@ -206,7 +208,7 @@ pub fn cancel_driver_job_by_task(
             Some(tinyagents_orchestration::subagent::FinishedOutcome::Failed)
         }
         DurableSubagentStatus::Running | DurableSubagentStatus::AwaitingUser => None,
-        DurableSubagentStatus::Closed => return None,
+        DurableSubagentStatus::Closed => return Ok(None),
     };
     if already_finished.is_none()
         && reason.is_some()
@@ -217,7 +219,7 @@ pub fn cancel_driver_job_by_task(
             reason.expect("checked above").trim(),
         )
     {
-        return None;
+        return Ok(None);
     }
     if already_finished.is_none()
         && !cancel_driver_job_for_observed_session(
@@ -232,16 +234,16 @@ pub fn cancel_driver_job_by_task(
         if reason.is_some() {
             clear_cancel_reason(store, &session.subagent_session_id, task_id);
         }
-        return None;
+        return Ok(None);
     }
-    Some(DriverTaskCancellation {
+    Ok(Some(DriverTaskCancellation {
         agent_id: session.agent_id,
         parent_session: session.parent_session,
         subagent_session_id: session.subagent_session_id,
         workspace_dir: store.workspace_dir.clone(),
         parent_thread_id: session.parent_thread_id,
         already_finished,
-    })
+    }))
 }
 
 /// Persist an optional RPC cancellation reason before signaling TinyAgents so
