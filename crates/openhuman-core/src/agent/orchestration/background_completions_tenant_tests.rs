@@ -34,8 +34,8 @@ async fn record(ctx: &Arc<CoreContext>, ws: &std::path::Path, task: &str) {
     .await;
 }
 
-fn pending(ws: &std::path::Path) -> Vec<String> {
-    pending_for(ws, "t1")
+fn pending(ctx: &DispatchCtx, ws: &std::path::Path) -> Vec<String> {
+    pending_for_ctx(ctx, ws, "t1")
         .into_iter()
         .map(|r| r.task_id)
         .collect()
@@ -47,6 +47,8 @@ async fn one_profiles_stop_and_delete_never_reach_anothers_thread() {
     let (ws_a, ws_b) = (TestWorkspace::new(), TestWorkspace::new());
     let alice = profile("u-alice", ws_a.path());
     let bob = profile("u-bob", ws_b.path());
+    let alice_ctx = DispatchCtx::new(Arc::clone(&alice));
+    let bob_ctx = DispatchCtx::new(Arc::clone(&bob));
 
     // Alice presses Stop on her `t1`.
     {
@@ -57,10 +59,10 @@ async fn one_profiles_stop_and_delete_never_reach_anothers_thread() {
 
     // Bob's `t1` is untouched: his results still queue.
     record(&bob, ws_b.path(), "bob-1").await;
-    assert_eq!(pending(ws_b.path()), ["bob-1"]);
+    assert_eq!(pending(&bob_ctx, ws_b.path()), ["bob-1"]);
     // Alice's late result is gated by her own Stop.
     record(&alice, ws_a.path(), "alice-1").await;
-    assert!(pending(ws_a.path()).is_empty());
+    assert!(pending(&alice_ctx, ws_a.path()).is_empty());
 
     // Bob deletes his `t1`; Alice re-engages hers and keeps working.
     {
@@ -78,10 +80,10 @@ async fn one_profiles_stop_and_delete_never_reach_anothers_thread() {
         );
     };
     record(&alice, ws_a.path(), "alice-2").await;
-    assert_eq!(pending(ws_a.path()), ["alice-2"]);
+    assert_eq!(pending(&alice_ctx, ws_a.path()), ["alice-2"]);
     record(&bob, ws_b.path(), "bob-2").await;
     assert!(
-        !pending(ws_b.path()).contains(&"bob-2".to_string()),
+        !pending(&bob_ctx, ws_b.path()).contains(&"bob-2".to_string()),
         "bob's deleted thread stays deleted"
     );
 
@@ -164,7 +166,7 @@ async fn the_explicit_context_keys_completions_without_any_ambient_scope() {
         "alice's stop withdraws her queue"
     );
     assert_eq!(
-        pending_for(ws_b.path(), "t-x")
+        pending_for_ctx(&bob, ws_b.path(), "t-x")
             .into_iter()
             .map(|r| r.task_id)
             .collect::<Vec<_>>(),
@@ -223,6 +225,10 @@ async fn an_unbound_single_user_caller_keeps_workspace_local_persistence() {
     assert!(
         ctx.resolved().is_none(),
         "the case under test has no core context"
+    );
+    assert!(
+        CoreContext::scoped().is_none(),
+        "the case under test has no ambient core scope"
     );
 
     record_completion(
