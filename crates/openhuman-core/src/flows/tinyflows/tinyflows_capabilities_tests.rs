@@ -1,5 +1,7 @@
 use super::*;
-use crate::flows::agent_route::{route_for_agent_ref, AgentRoute};
+use crate::flows::agent_route::{
+    harness_model_default_override, route_custom_entry_lookup, route_for_agent_ref, AgentRoute,
+};
 use crate::flows::tinyflows::caps::OpenHumanCode;
 
 // ── build_capabilities smoke ────────────────────────────────────────────
