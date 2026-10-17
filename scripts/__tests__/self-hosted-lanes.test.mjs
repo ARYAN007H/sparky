@@ -416,6 +416,10 @@ test("private gates-off, storage, and Tauri execute equivalent coverage suites w
   );
   assert.match(checks["gate-contract-tests-features"].run, /--test-threads=1/);
   assert.match(checks["cron-module-tests"].run, /--test-threads=1/);
+  assert.equal(checks["storage-e2e"].env.NEXTEST_EXPECTED_TARGETS, "ci-out/nextest/storage-e2e-expected-targets.txt");
+  for (const target of [...checks["storage-e2e"].run.matchAll(/--test (\S+)/g)].map((match) => match[1])) {
+    assert.ok(checks["storage-e2e"].run.includes(`'${target}'`), `expected inventory includes ${target}`);
+  }
   assert.match(
     checks["storage-lib-tests"].run,
     /not test\(cron::bus_host::tests::\)/,
@@ -444,6 +448,7 @@ test("private auxiliary coverage reports after failed tests and preserves the fa
       PATH: `${dir}:${process.env.PATH}`,
       CARGO_CALLS: calls,
       NEXTEST_REPORT_DIR: path.join(dir, "reports"),
+      NEXTEST_EXPECTED_TARGETS: path.join(dir, "expected-targets"),
     },
   });
   assert.equal(result.status, 17);
