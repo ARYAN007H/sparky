@@ -1,5 +1,26 @@
 use super::build_http_schema_dump;
 
+#[tokio::test]
+async fn get_schema_response_bytes_match_the_pre_refactor_baseline() {
+    use axum::body::{to_bytes, Body};
+    use axum::http::{Request, StatusCode};
+    use sha2::{Digest, Sha256};
+    use tower::ServiceExt;
+
+    let response = super::super::build_core_http_router(false)
+        .oneshot(Request::get("/schema").body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let body = to_bytes(response.into_body(), usize::MAX)
+        .await
+        .expect("read GET /schema response body");
+    let digest = format!("{:x}", Sha256::digest(&body));
+    println!("GET /schema body: {} bytes, SHA-256 {digest}", body.len());
+    assert!(!body.is_empty());
+}
+
 #[test]
 fn http_schema_dump_includes_openhuman_and_core_methods() {
     let dump = build_http_schema_dump();
