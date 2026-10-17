@@ -1,6 +1,6 @@
-use crate::core::runtime::DispatchCtx;
-use super::{read_required, to_json};
 use super::super::*;
+use super::{read_required, to_json};
+use crate::core::runtime::DispatchCtx;
 
 pub(super) fn handle_draft_create(
     ctx: DispatchCtx,
@@ -89,6 +89,19 @@ pub(super) fn handle_draft_promote(
         to_json(ops::flows_draft_promote(&config, id.trim(), require_approval).await?)
     })
 }
+
+/// Parses `draft_update`'s `flow_id` param (R-m7). The outer `Option`
+/// mirrors `ops::flows_draft_update`'s "present vs absent" contract — absent
+/// leaves the draft's existing link untouched; the inner `Option` is the new
+/// link (`None` unlinks).
+///
+/// A present-but-non-string `flow_id` (a number, or an object from a buggy
+/// client) is REJECTED rather than silently coerced into `Some(None)` via
+/// `Value::as_str()` returning `None` on a type mismatch — that shape used
+/// to be indistinguishable from an explicit `flow_id: null` unlink, and
+/// `update_draft` treats `Some(None)` as exactly that: unlinking the draft
+/// from its flow. A later `draft_promote` then creates a brand-new flow
+/// instead of updating the one the caller actually meant.
 
 pub(super) fn parse_draft_update_flow_id(
     params: &Map<String, Value>,
