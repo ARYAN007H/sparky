@@ -7,6 +7,7 @@ use tinyagents_harness::context::{current_run_depth, with_run_depth, RunDepth};
 
 struct BlockingSubagentCloseTool {
     started: tokio::sync::mpsc::Sender<()>,
+    release: tokio::sync::oneshot::Receiver<()>,
 }
 
 #[async_trait::async_trait]
@@ -25,8 +26,8 @@ impl tinytools::Tool for BlockingSubagentCloseTool {
 
     async fn execute(&self, _args: serde_json::Value) -> anyhow::Result<tinytools::ToolResult> {
         let _ = self.started.send(()).await;
-        std::future::pending::<()>().await;
-        unreachable!("driver cancellation must stop the blocked tool")
+        let _ = self.release.await;
+        Ok(tinytools::ToolResult::text("tool released after close"))
     }
 }
 
@@ -134,6 +135,7 @@ async fn closing_a_durable_driver_session_cancels_only_its_registered_child() {
     let workspace = scratch.path().join("workspace");
     std::fs::create_dir_all(&workspace).expect("create isolated workspace");
     let (started_tx, mut started_rx) = tokio::sync::mpsc::channel(1);
+    let (release_tx, release_rx) = tokio::sync::oneshot::channel();
     let provider = ScriptedProvider::new(vec![
         tool_response("blocking_close_fixture", "{}"),
         text_response("sibling completed"),
@@ -142,6 +144,7 @@ async fn closing_a_durable_driver_session_cancels_only_its_registered_child() {
         provider.clone(),
         vec![Box::new(BlockingSubagentCloseTool {
             started: started_tx,
+            release: release_rx,
         })],
     );
     parent_context.workspace_dir = workspace.clone();
@@ -243,12 +246,23 @@ async fn closing_a_durable_driver_session_cancels_only_its_registered_child() {
         &wait,
         &(),
         tinyagents_harness::CallId::new("wait-cancelled-close-child"),
-        serde_json::json!({"task_id":job_id,"timeout_secs":1}),
+        serde_json::json!({"task_id":"close-driver-task","timeout_secs":1}),
         tinytools::ToolCallOptions::default(),
         &parent,
     )
     .await
     .expect("Tiny await observes close cancellation");
+    release_tx.send(()).expect("release child for cooperative settlement");
+    let wait_result = tinyagents_harness::tool::ToolDispatch::execute(
+        &wait,
+        &(),
+        tinyagents_harness::CallId::new("wait-cancelled-close-child-settled"),
+        serde_json::json!({"task_id":"close-driver-task","timeout_secs":1}),
+        tinytools::ToolCallOptions::default(),
+        &parent,
+    )
+    .await
+    .expect("Tiny await observes settled cancellation");
     assert!(
         wait_result.output().contains("cancelled"),
         "shared Jobs await returns the cancelled terminal result: {}",

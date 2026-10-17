@@ -150,15 +150,39 @@ impl TinySessionStore for OpenHumanTinySubagentSessionStore {
     }
 
     async fn get(&self, id: &str) -> Result<Option<TinySession>, SubagentError> {
-        let row = self
+        let mut owned_rows = self
             .store
             .load()
             .map_err(SubagentError::Persistence)?
             .into_iter()
-            .find(|row| row.subagent_session_id == id);
-        row.filter(|row| self.is_owned(row))
-            .map(|row| self.convert(row))
-            .transpose()
+            // Filter the authenticated parent and thread before matching either
+            // public identifier. Raw task IDs can collide across owners, so a
+            // foreign row must never shadow a matching owned row.
+            .filter(|row| self.is_owned(row))
+            .collect::<Vec<_>>();
+
+        // Product callers historically pass the durable session ID, while
+        // accepted spawn results also expose `current_task_id`. Prefer the
+        // unambiguous session key when both happen to match.
+        let row = if let Some(index) = owned_rows
+            .iter()
+            .position(|row| row.subagent_session_id == id)
+        {
+            Some(owned_rows.remove(index))
+        } else {
+            let mut matches = owned_rows
+                .into_iter()
+                .filter(|row| row.current_task_id.as_deref() == Some(id));
+            let row = matches.next();
+            if matches.next().is_some() {
+                return Err(SubagentError::InvalidRequest(
+                    "subagent task id is ambiguous within the authenticated owner scope".into(),
+                ));
+            }
+            row
+        };
+
+        row.map(|row| self.convert(row)).transpose()
     }
 
     async fn upsert_running(
