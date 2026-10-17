@@ -73,7 +73,7 @@ pub(crate) fn cancel_by_task_with_workspace_reason(
         let already_finished = cancelled.status.finished_outcome();
         let metadata = cancelled.metadata;
         if already_finished.is_none() {
-            record_cancelled(&metadata.workspace_dir, task_id);
+            record_cancelled(ctx, &metadata.workspace_dir, task_id);
         }
         log::debug!(
             "[running_subagents] cancel_by_task task_id={} agent_id={} parent_thread_id={:?} live_entries={}",
@@ -157,7 +157,7 @@ pub(crate) fn cancel_for_thread(ctx: &crate::core::runtime::DispatchCtx, thread_
         })
         .expect("detached task registry lock poisoned");
     for entry in &cancelled {
-        record_cancelled(&entry.metadata.workspace_dir, entry.task_id.as_str());
+        record_cancelled(ctx, &entry.metadata.workspace_dir, entry.task_id.as_str());
     }
     let count = cancelled.len();
     log::debug!(
@@ -193,7 +193,7 @@ pub(crate) fn stop_for_thread(
     let mut task_ids = Vec::with_capacity(cancelled.len());
     for entry in cancelled {
         let task_id = entry.task_id.as_str().to_string();
-        record_cancelled(&entry.metadata.workspace_dir, &task_id);
+        record_cancelled(ctx, &entry.metadata.workspace_dir, &task_id);
         if let Some(subagent_session_id) = entry.metadata.subagent_session_id.as_deref() {
             let store = crate::agent::orchestration::subagent_sessions::SubagentSessionStore::new(
                 entry.metadata.workspace_dir.clone(),
@@ -262,7 +262,7 @@ pub(crate) fn cancel_all(ctx: &crate::core::runtime::DispatchCtx) -> Vec<String>
     let mut thread_ids: Vec<String> = Vec::new();
     let mut seen: HashSet<String> = HashSet::new();
     for entry in cancelled {
-        record_cancelled(&entry.metadata.workspace_dir, entry.task_id.as_str());
+        record_cancelled(ctx, &entry.metadata.workspace_dir, entry.task_id.as_str());
         if let Some(thread_id) = entry.metadata.parent_thread_id {
             if seen.insert(thread_id.clone()) {
                 thread_ids.push(thread_id);

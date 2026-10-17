@@ -186,7 +186,8 @@ fn project_wait_subagent(
 
     match status {
         "completed" => {
-            crate::agent::orchestration::background_completions::mark_collected(
+            crate::agent::orchestration::background_completions::mark_collected_ctx(
+                &parent.data.dispatch_ctx(),
                 &parent_ctx.workspace_dir,
                 &task_id,
             );

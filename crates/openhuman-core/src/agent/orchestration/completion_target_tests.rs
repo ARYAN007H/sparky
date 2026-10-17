@@ -1,7 +1,9 @@
 use std::path::Path;
 use std::sync::Arc;
 
-use super::super::background_completions::{new_router, state, Entry};
+use super::super::background_completions::{
+    entry_for, router_pool, router_scope, state, test_store_overrides,
+};
 use tinyagents_tasks::CompletionStore;
 
 /// A temporary workspace that forgets its router when dropped, so the
@@ -27,19 +29,36 @@ impl Drop for TestWorkspace {
 /// Register `store` as `workspace_dir`'s completion store, so a test can inject
 /// one that fails.
 pub(crate) fn install_store_for_test(workspace_dir: &Path, store: Arc<dyn CompletionStore>) {
-    let entry = Arc::new(Entry {
-        router: Arc::new(new_router(store.clone())),
-        store,
-    });
-    state().routers.insert(workspace_dir.to_path_buf(), entry);
+    let scope = router_scope(workspace_dir);
+    test_store_overrides()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .insert(scope, store);
+    router_pool()
+        .remove(&router_scope(workspace_dir))
+        .expect("remove the scoped completion router");
+    let _ = entry_for(workspace_dir);
 }
 
 /// Forget everything this process knows about `workspace_dir`, as a restart
 /// would: the router (and its open log handle) and every thread/session mapping
 /// that points at it. The on-disk log is untouched.
 pub(crate) fn forget_workspace_for_test(workspace_dir: &Path) {
+    let ambient_scope = router_scope(workspace_dir);
+    test_store_overrides()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .remove(&ambient_scope);
     let mut st = state();
-    st.routers.remove(workspace_dir);
+    let scopes: Vec<_> = st
+        .stores
+        .keys()
+        .filter(|scope| scope.workspace_dir() == workspace_dir)
+        .cloned()
+        .collect();
+    for scope in &scopes {
+        st.stores.remove(scope);
+    }
     let gone: Vec<String> = st
         .thread_workspaces
         .iter()
@@ -51,7 +70,28 @@ pub(crate) fn forget_workspace_for_test(workspace_dir: &Path) {
         st.stopped_threads.remove(&thread);
         st.deleted_threads.remove(&thread);
     }
-    st.recovered_workspaces.remove(workspace_dir);
+    st.recovered_workspaces
+        .retain(|scope| scope.workspace_dir() != workspace_dir);
     st.session_threads.clear();
     st.session_order.clear();
+    drop(st);
+    for scope in scopes {
+        let _ = router_pool().remove(&scope);
+    }
+    let _ = router_pool().remove(&ambient_scope);
+}
+
+#[test]
+fn forgetting_one_workspace_keeps_other_cached_routers() {
+    let first = TestWorkspace::new();
+    let second = TestWorkspace::new();
+    let second_router = entry_for(second.path()).router.clone();
+
+    forget_workspace_for_test(first.path());
+
+    let still_cached = router_pool()
+        .get(&router_scope(second.path()))
+        .expect("lookup second workspace router")
+        .expect("second workspace remains cached");
+    assert!(Arc::ptr_eq(&still_cached, &second_router));
 }

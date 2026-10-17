@@ -23,7 +23,16 @@
 
 use crate::core::runtime::DispatchCtx;
 use std::collections::{HashMap, HashSet, VecDeque};
+mod store_adapter;
 mod thread_index;
+pub(crate) use store_adapter::router_for_workspace_ctx;
+pub(super) use store_adapter::{
+    degrade_to_memory, entry_for_ctx, open_driver_store, router_pool, router_scope_for,
+};
+#[cfg(test)]
+pub(super) use store_adapter::{
+    entry_for, router_for_workspace, router_scope, test_store_overrides,
+};
 use thread_index::{key, note_thread_workspace};
 pub(crate) use thread_index::{
     note_session_thread, router_for_thread, thread_for_session, workspace_for_thread,
@@ -33,21 +42,25 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Duration;
 
+use tinyagents_orchestration::subagent::{
+    record_detached_completion, DetachedCompletionTarget, DetachedSubagentStatus,
+};
 use tinyagents_tasks::{
     CompletionRecord, CompletionResult, CompletionRouter, CompletionState, CompletionStatus,
-    CompletionStore, DriverCompletionStore, InMemoryCompletionStore, NotifyMode, RecordOutcome,
-    TombstoneOutcome, DEFAULT_MAX_ATTEMPTS,
+    CompletionStore, NotifyMode, TombstoneOutcome,
 };
 
 use super::completion_notice::BackgroundCompletionFormatter;
 pub(crate) use super::completion_notice::{BackgroundAgentOutcome, AWAITING_INPUT_LABEL};
+#[cfg(test)]
+pub(crate) use super::completion_target::claim_recovery;
 #[cfg(test)]
 pub(crate) use super::completion_target::tests::{
     forget_workspace_for_test, install_store_for_test, TestWorkspace,
 };
 pub(crate) use super::completion_target::CompletionTarget;
 use super::completion_target::{awaiting_input_record_id, awaiting_input_record_prefix};
-pub(crate) use super::completion_target::{claim_recovery, forget_recovery};
+pub(crate) use super::completion_target::{claim_recovery_ctx, forget_recovery_ctx};
 
 /// How long a settled record (delivered / gave up / tombstoned) is kept before
 /// compaction drops it. Dropping a settled record also drops its dedupe and its
@@ -66,6 +79,22 @@ const RECORD_RETRIES: u32 = 3;
 /// Bound on the session -> thread cache; the oldest mapping is evicted first.
 const SESSION_THREADS_CAP: usize = 4096;
 
+/// Router authority is scoped to the acting profile and workspace. Threads
+/// share a router within that scope, while identical workspace paths in two
+/// SaaS profiles remain isolated.
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+pub(super) struct RouterScope {
+    profile_key: String,
+    workspace_dir: PathBuf,
+}
+
+impl RouterScope {
+    #[cfg(test)]
+    pub(super) fn workspace_dir(&self) -> &Path {
+        &self.workspace_dir
+    }
+}
+
 /// A workspace's router plus the store it sits on (kept so boot recovery and
 /// purge can enumerate parents, which the router itself does not expose).
 pub(super) struct Entry {
@@ -75,8 +104,9 @@ pub(super) struct Entry {
 
 #[derive(Default)]
 pub(super) struct HostState {
-    /// One router per workspace.
-    pub(super) routers: HashMap<PathBuf, Arc<Entry>>,
+    /// Store sidecars let recovery enumerate per-scope stores without creating
+    /// another router cache beside TinyAgents' `CompletionRouterPool`.
+    pub(super) stores: HashMap<RouterScope, Arc<dyn CompletionStore>>,
     /// Which workspace holds a thread's completions. Thread-scoped operations
     /// (Stop, delete) carry no workspace, only a thread id.
     pub(super) thread_workspaces: HashMap<String, PathBuf>,
@@ -94,7 +124,7 @@ pub(super) struct HostState {
     /// after the delete sweep (the cooperative-abort race), is rejected for good.
     pub(super) deleted_threads: HashSet<String>,
     /// Workspaces whose log boot recovery has already scanned this process.
-    pub(super) recovered_workspaces: HashSet<PathBuf>,
+    pub(super) recovered_workspaces: HashSet<RouterScope>,
 }
 
 pub(super) fn state() -> std::sync::MutexGuard<'static, HostState> {
@@ -103,101 +133,6 @@ pub(super) fn state() -> std::sync::MutexGuard<'static, HostState> {
         .get_or_init(|| Mutex::new(HostState::default()))
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner())
-}
-
-/// The durable completion queue of `workspace_dir` in the storage backend,
-/// under the calling tenant's scope.
-fn open_driver_store(workspace_dir: &Path) -> anyhow::Result<Arc<dyn CompletionStore>> {
-    let opened = crate::storage::local::open("background_completions", workspace_dir)?;
-    let scoped = opened.scoped()?;
-    let store = DriverCompletionStore::new(Arc::clone(scoped.documents()))
-        .map_err(|error| anyhow::anyhow!("start the completion store bridge: {error}"))?;
-    Ok(Arc::new(store))
-}
-
-fn entry_for(workspace_dir: &Path) -> Arc<Entry> {
-    if let Some(entry) = state().routers.get(workspace_dir) {
-        return entry.clone();
-    }
-    // Opening replays the whole log, so it happens outside the state lock; this
-    // dedicated lock keeps two callers from opening two writers on one log.
-    static OPEN_LOCK: Mutex<()> = Mutex::new(());
-    let _open = OPEN_LOCK.lock().unwrap_or_else(|p| p.into_inner());
-    if let Some(entry) = state().routers.get(workspace_dir) {
-        return entry.clone();
-    }
-    let store: Arc<dyn CompletionStore> = match open_driver_store(workspace_dir) {
-        Ok(store) => store,
-        Err(error) => {
-            // A backend that cannot be reached degrades to an in-memory
-            // queue rather than taking background delivery down.
-            log::error!(
-                "[background_completions] could not open the completion store for {}; using an \
-                 in-memory queue (completions will not survive a restart): {error:#}",
-                workspace_dir.display()
-            );
-            Arc::new(InMemoryCompletionStore::new())
-        }
-    };
-    let entry = Arc::new(Entry {
-        router: Arc::new(new_router(store.clone())),
-        store,
-    });
-    state()
-        .routers
-        .insert(workspace_dir.to_path_buf(), entry.clone());
-    log::debug!(
-        "[background_completions] opened router workspace_dir={}",
-        workspace_dir.display()
-    );
-    entry
-}
-
-/// Replace a workspace's failing durable store with an in-memory one that starts
-/// from the same records, so delivery keeps working in this process. The log on
-/// disk is left as it is and replays on the next boot.
-///
-/// Serialized per process: when two records hit the failure together, the second
-/// finds the first's fallback already installed and uses it, rather than
-/// installing a second one the delivery loop would never see. `failed` is the
-/// router the caller just saw fail.
-fn degrade_to_memory(workspace_dir: &Path, failed: &Arc<CompletionRouter>) -> Arc<Entry> {
-    static DEGRADE_LOCK: Mutex<()> = Mutex::new(());
-    let _serial = DEGRADE_LOCK.lock().unwrap_or_else(|p| p.into_inner());
-    let old = entry_for(workspace_dir);
-    if !Arc::ptr_eq(&old.router, failed) {
-        return old;
-    }
-    let store = Arc::new(InMemoryCompletionStore::new());
-    for record in old.store.list(None) {
-        if let Err(error) = store.put(&record) {
-            log::warn!("[background_completions] could not carry a record over: {error}");
-        }
-    }
-    let store: Arc<dyn CompletionStore> = store;
-    let entry = Arc::new(Entry {
-        router: Arc::new(new_router(store.clone())),
-        store,
-    });
-    state()
-        .routers
-        .insert(workspace_dir.to_path_buf(), entry.clone());
-    log::error!(
-        "[background_completions] degraded to an in-memory queue workspace_dir={}",
-        workspace_dir.display()
-    );
-    entry
-}
-
-pub(super) fn new_router(store: Arc<dyn CompletionStore>) -> CompletionRouter {
-    CompletionRouter::new(store)
-        .with_formatter(Arc::new(BackgroundCompletionFormatter))
-        .with_max_attempts(DEFAULT_MAX_ATTEMPTS)
-}
-
-/// The router for `workspace_dir`, opening it on first use.
-pub(crate) fn router_for_workspace(workspace_dir: &Path) -> Arc<CompletionRouter> {
-    entry_for(workspace_dir).router.clone()
 }
 
 /// Record a finished background sub-agent for idle delivery, keyed by its
@@ -270,7 +205,7 @@ pub(crate) async fn record_outcome(
             return;
         }
     }
-    if is_marked_deleted(&entry_for(workspace_dir), &thread_id) {
+    if is_marked_deleted(&entry_for_ctx(ctx, workspace_dir), &thread_id) {
         log::debug!(
             "[background_completions] dropping completion task_id={task_id} for deleted \
              thread_id={thread_id}"
@@ -281,56 +216,79 @@ pub(crate) async fn record_outcome(
     note_session_thread(ctx, parent_session, &thread_id);
     super::completion_owners::note(ctx, &[&task_id, parent_session]); // owner, for off-task delivery
 
-    let record = CompletionRecord::new(
-        task_id.clone(),
-        thread_id.clone(),
-        agent_id,
-        outcome.status(),
-        CompletionResult::text(summary),
-    )
-    .with_notify_mode(NotifyMode::Followup);
-    let record = if outcome == BackgroundAgentOutcome::AwaitingInput {
-        record.with_label(AWAITING_INPUT_LABEL)
-    } else {
-        record
+    let router = router_for_workspace_ctx(ctx, workspace_dir);
+    let summary = summary.into();
+    let target = DetachedCompletionTarget::new(router.clone(), thread_id.clone(), agent_id)
+        .with_notify_mode(NotifyMode::Followup);
+    let status = match outcome {
+        BackgroundAgentOutcome::Completed => DetachedSubagentStatus::Completed {
+            output: summary,
+            iterations: 0,
+        },
+        BackgroundAgentOutcome::Failed => DetachedSubagentStatus::Failed { error: summary },
+        BackgroundAgentOutcome::AwaitingInput => {
+            // TinyAgents deliberately excludes pauses from terminal dedupe; the
+            // host gives each paused checkpoint its own record identity above.
+            let record = CompletionRecord::new(
+                task_id.clone(),
+                thread_id.clone(),
+                target.agent_id.clone(),
+                outcome.status(),
+                CompletionResult::text(summary),
+            )
+            .with_notify_mode(NotifyMode::Followup)
+            .with_label(AWAITING_INPUT_LABEL);
+            record_completion_record(ctx, workspace_dir, &router, record, &task_id, &thread_id)
+                .await;
+            return;
+        }
     };
-    let router = router_for_workspace(workspace_dir);
-    let mut outcome_of_record = router
-        .record_with_retries(record.clone(), RECORD_RETRIES)
-        .await;
-    if let Err(error) = &outcome_of_record {
+    if record_detached_completion(&target, &task_id, &status).await {
+        log::debug!(
+            "[background_completions] recorded task_id={task_id} thread_id={thread_id} outcome={outcome:?}"
+        );
+    } else {
         // The log keeps refusing writes (disk full, permissions). Keep this
         // process delivering from memory rather than losing the result; what is
         // already on disk replays on the next boot.
         log::error!(
             "[background_completions] store write failed after retries; continuing in memory \
-             task_id={task_id} thread_id={thread_id} error={error}"
+             task_id={task_id} thread_id={thread_id}"
         );
-        outcome_of_record = degrade_to_memory(workspace_dir, &router)
+        let fallback = degrade_to_memory(ctx, workspace_dir, &router);
+        let fallback_target = DetachedCompletionTarget::new(
+            fallback.router.clone(),
+            thread_id.clone(),
+            target.agent_id.clone(),
+        )
+        .with_notify_mode(NotifyMode::Followup);
+        if !record_detached_completion(&fallback_target, &task_id, &status).await {
+            log::error!(
+                "[background_completions] completion LOST — in-memory fallback failed task_id={task_id} thread_id={thread_id}"
+            );
+        }
+    }
+}
+
+async fn record_completion_record(
+    ctx: &DispatchCtx,
+    workspace_dir: &Path,
+    router: &Arc<CompletionRouter>,
+    record: CompletionRecord,
+    task_id: &str,
+    thread_id: &str,
+) {
+    if let Err(error) = router
+        .record_with_retries(record.clone(), RECORD_RETRIES)
+        .await
+    {
+        log::error!(
+            "[background_completions] store write failed after retries; continuing in memory task_id={task_id} thread_id={thread_id} error={error}"
+        );
+        let _ = degrade_to_memory(ctx, workspace_dir, router)
             .router
             .record(record)
             .await;
-    }
-    match outcome_of_record {
-        Ok(RecordOutcome::Recorded { .. }) => log::debug!(
-            "[background_completions] recorded task_id={task_id} thread_id={thread_id} \
-             outcome={outcome:?}"
-        ),
-        Ok(RecordOutcome::Duplicate) => {
-            log::debug!("[background_completions] duplicate ignored task_id={task_id}")
-        }
-        Ok(RecordOutcome::Suppressed) => log::debug!(
-            "[background_completions] dropping completion task_id={task_id} for \
-             stopped/cancelled/collected thread_id={thread_id}"
-        ),
-        Ok(RecordOutcome::IdCollision) => log::warn!(
-            "[background_completions] task id already recorded for another thread \
-             task_id={task_id} thread_id={thread_id}"
-        ),
-        Err(error) => log::error!(
-            "[background_completions] completion LOST — store write failed \
-             task_id={task_id} thread_id={thread_id} error={error}"
-        ),
     }
 }
 
@@ -415,15 +373,24 @@ pub(crate) async fn release_all() -> usize {
     let deadline = tokio::time::Instant::now() + RELEASE_DRAIN;
     let mut released = 0;
     loop {
-        let retained = {
-            let mut st = state();
-            let before = st.routers.len();
-            st.routers
-                .retain(|_, e| Arc::strong_count(e) > 1 || Arc::strong_count(&e.router) > 1);
-            released += before - st.routers.len();
-            st.routers.len()
-        };
+        let scopes: Vec<_> = state().stores.keys().cloned().collect();
+        let retained = scopes
+            .iter()
+            .filter(|scope| {
+                router_pool()
+                    .get(scope)
+                    .ok()
+                    .flatten()
+                    .is_some_and(|router| Arc::strong_count(&router) > 2)
+            })
+            .count();
         if retained == 0 {
+            let mut st = state();
+            released += st.stores.len();
+            st.stores.clear();
+            if let Err(error) = router_pool().clear() {
+                log::warn!("[background_completions] could not clear router pool: {error}");
+            }
             break;
         }
         if tokio::time::Instant::now() >= deadline {
@@ -431,7 +398,12 @@ pub(crate) async fn release_all() -> usize {
                 "[background_completions] {retained} router(s) still in use at shutdown; \
                  dropping them anyway"
             );
-            released += retained;
+            let mut st = state();
+            released += st.stores.len();
+            st.stores.clear();
+            if let Err(error) = router_pool().clear() {
+                log::warn!("[background_completions] could not clear router pool: {error}");
+            }
             break;
         }
         tokio::time::sleep(Duration::from_millis(50)).await;
@@ -457,16 +429,34 @@ pub(crate) async fn release_all() -> usize {
 
 /// Undelivered completions for `thread_id`, oldest first (read-only; includes
 /// records an in-flight delivery currently holds).
+#[cfg(test)]
 pub(crate) fn pending_for(workspace_dir: &Path, thread_id: &str) -> Vec<CompletionRecord> {
     router_for_workspace(workspace_dir).pending_for(thread_id)
+}
+
+pub(crate) fn pending_for_ctx(
+    ctx: &DispatchCtx,
+    workspace_dir: &Path,
+    thread_id: &str,
+) -> Vec<CompletionRecord> {
+    router_for_workspace_ctx(ctx, workspace_dir).pending_for(thread_id)
 }
 
 /// Mark `task_id` as collected inline by the parent (via `wait_subagent`) so its
 /// background completion is not independently delivered as a second, duplicate
 /// answer. The router withdraws an already-recorded completion and drops one
 /// that arrives later. Returns whether a pending completion was withdrawn.
+#[cfg(test)]
 pub(crate) fn mark_collected(workspace_dir: &Path, task_id: &str) -> bool {
     let entry = entry_for(workspace_dir);
+    mark_collected_in_entry(entry, task_id)
+}
+
+pub(crate) fn mark_collected_ctx(ctx: &DispatchCtx, workspace_dir: &Path, task_id: &str) -> bool {
+    mark_collected_in_entry(entry_for_ctx(ctx, workspace_dir), task_id)
+}
+
+fn mark_collected_in_entry(entry: Arc<Entry>, task_id: &str) -> bool {
     let router = &entry.router;
     let completion = router.tombstone(task_id);
     // A parent that collected the final result inline has no use for any
@@ -514,7 +504,7 @@ pub(crate) fn discard_for_thread(
         st.stopped_threads.remove(&thread_key);
         st.thread_workspaces.contains_key(&thread_key)
     };
-    let entry = entry_for(workspace_dir);
+    let entry = entry_for_ctx(ctx, workspace_dir);
     // Nothing in this process or on disk refers to the thread (an ordinary chat
     // thread that never spawned background work): the in-memory gate is enough
     // and no log line is written for it.
@@ -644,7 +634,7 @@ pub(crate) fn mark_stopped_task_if_thread_stopped(
     thread_id: &str,
     task_id: &str,
 ) -> bool {
-    let entry = entry_for(workspace_dir);
+    let entry = entry_for_ctx(ctx, workspace_dir);
     let thread_key = key(ctx, thread_id);
     let (first_sight, mut stopped) = {
         let mut st = state();
@@ -679,7 +669,7 @@ pub(crate) fn mark_stopped_task_if_thread_stopped(
 /// durably (and remembered as deleted), so stragglers are still dropped. Other
 /// workspaces are untouched. Returns the number of completions removed.
 pub(crate) fn clear_all(ctx: &DispatchCtx, workspace_dir: &Path) -> usize {
-    let entry = entry_for(workspace_dir);
+    let entry = entry_for_ctx(ctx, workspace_dir);
     let parents: HashSet<String> = entry
         .store
         .list(None)
@@ -701,7 +691,7 @@ pub(crate) fn clear_all(ctx: &DispatchCtx, workspace_dir: &Path) -> usize {
 /// process finished the work but never delivered it). Remembers each thread's
 /// workspace so the delivery loop can claim them.
 pub(crate) fn recover_pending_threads(ctx: &DispatchCtx, workspace_dir: &Path) -> Vec<String> {
-    let entry = entry_for(workspace_dir);
+    let entry = entry_for_ctx(ctx, workspace_dir);
     if let Err(error) = entry.router.compact(SETTLED_RETENTION) {
         log::warn!("[background_completions] compact failed error={error}");
     }

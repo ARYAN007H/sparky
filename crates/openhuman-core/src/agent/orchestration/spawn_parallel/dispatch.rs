@@ -151,7 +151,7 @@ pub(crate) async fn stage_spawn_parallel_workers_from_defs(
     let mut immediate_results = Vec::new();
     let mut prepared = Vec::new();
 
-    for preflight in prepare_spawn_parallel_tasks_from_defs(tasks, definitions, parent) {
+    for preflight in prepare_spawn_parallel_tasks_from_defs(tasks, definitions, parent).await {
         let (definition, prompt, task, task_id, dispatch_mode) = match preflight {
             SpawnParallelTaskPreflight::Rejected(rejection) => {
                 match rejection.kind {

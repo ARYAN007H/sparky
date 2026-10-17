@@ -48,7 +48,7 @@ struct RunLedgerFinalizeSubscriber {
 #[async_trait]
 impl EventHandler<DomainEvent> for RunLedgerFinalizeSubscriber {
     fn name(&self) -> &str {
-        "agent_orchestration::run_ledger_finalize"
+        "agent_runs::subagent_finalize"
     }
 
     async fn handle(&self, event: &DomainEvent) {
@@ -104,7 +104,7 @@ impl EventHandler<DomainEvent> for RunLedgerFinalizeSubscriber {
 /// Register the run-ledger finalizer on the global event bus. Leaks the
 /// subscription handle so it lives for the whole process (its `Drop` would
 /// cancel the subscriber). Called once from `register_domain_subscribers`.
-pub(crate) fn register_run_ledger_finalize_subscriber(config: &Config) {
+pub(crate) fn register_subagent_finalize_subscriber(config: &Config) {
     if let Some(handle) = BUS.subscribe(Arc::new(RunLedgerFinalizeSubscriber {
         config: config.clone(),
     })) {
@@ -118,5 +118,5 @@ pub(crate) fn register_run_ledger_finalize_subscriber(config: &Config) {
 }
 
 #[cfg(test)]
-#[path = "run_ledger_finalize_tests.rs"]
+#[path = "subagent_finalize_tests.rs"]
 mod tests;
