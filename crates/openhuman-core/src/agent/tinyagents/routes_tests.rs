@@ -256,10 +256,25 @@ async fn resolved_route_middleware_isolates_concurrent_run_contexts() {
     ));
     entered.wait().await;
     release.wait().await;
-    let first_observed = first_task.await.expect("first route task joins");
-    let second_observed = second_task.await.expect("second route task joins");
+    let (first_observed, first_events) = first_task.await.expect("first route task joins");
+    let (second_observed, second_events) = second_task.await.expect("second route task joins");
     assert_eq!(first_observed, first);
     assert_eq!(second_observed, second);
+    for (events, route) in [(&first_events, first), (&second_events, second)] {
+        let call_id = events
+            .iter()
+            .find_map(|event| match event {
+                AgentEvent::ModelStarted { call_id, .. } => Some(call_id),
+                _ => None,
+            })
+            .expect("model attempt has a native call id");
+        assert!(events.iter().any(|event| matches!(
+            event,
+            AgentEvent::GenerationEnriched { call_id: enriched, enrichment }
+                if enriched == call_id
+                    && enrichment.provider_id.as_deref() == Some(route.provider.as_str())
+        )));
+    }
 }
 
 /// The fallback chain for every tier must lead with the primary and carry the
