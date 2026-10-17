@@ -4,6 +4,9 @@ use crate::config::test_env::EnvVarGuard;
 #[tokio::test]
 async fn cron_completion_owner_is_event_data_and_survives_repeated_reads() {
     use tinybus::EventHandler;
+    use tinyflows_bus::schedule::types::{
+        CronJob, DeliveryConfig, JobOrigin, JobPolicy, JobType, Schedule, SessionTarget,
+    };
 
     struct Completions(tokio::sync::mpsc::UnboundedSender<DomainEvent>);
     #[async_trait::async_trait]
@@ -37,8 +40,30 @@ async fn cron_completion_owner_is_event_data_and_survives_repeated_reads() {
                 .session_agent(agent),
             )
     };
-    let mut job = crate::cron::scheduler::run_delivery::stand_in_for_test("unused");
-    job.id = "shared-completion-id".into();
+    let now = chrono::Utc::now();
+    let job = CronJob {
+        claim_generation: 0,
+        policy: JobPolicy::default(),
+        id: "shared-completion-id".into(),
+        expression: String::new(),
+        schedule: Schedule::Every { every_ms: 60_000 },
+        command: "unused".into(),
+        prompt: None,
+        name: None,
+        job_type: JobType::Flow,
+        session_target: SessionTarget::default(),
+        model: None,
+        agent_id: None,
+        enabled: true,
+        delivery: DeliveryConfig::default(),
+        delete_after_run: false,
+        created_at: now,
+        next_run: now,
+        last_run: None,
+        last_status: None,
+        last_output: None,
+        origin: Option::<JobOrigin>::None,
+    };
 
     crate::cron::scheduler::run_delivery::publish_completion(
         &crate::core::runtime::DispatchCtx::new(context_for("completion-owner-a")),

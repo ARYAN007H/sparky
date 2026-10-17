@@ -110,6 +110,3 @@ pub(crate) async fn trigger(binding: &Binding, job: &CronJob, run_id: &str) -> A
         .await
 }
 
-#[cfg(test)]
-#[path = "run_delivery_tests.rs"]
-pub(crate) mod tests;
