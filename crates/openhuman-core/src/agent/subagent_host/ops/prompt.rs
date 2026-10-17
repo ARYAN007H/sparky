@@ -10,6 +10,26 @@ use tinyagents_harness::artifacts::{
 };
 use tinytools::ToolSpec;
 
+/// Compose the leaf role framing with the host's artifact-tool prompt policy.
+pub(crate) fn compose_subagent_system_prompt(
+    base_prompt: String,
+    agent_id: &str,
+    visible_tool_names: &HashSet<String>,
+    task_prompt: &str,
+    spawn_depth: Option<usize>,
+) -> String {
+    let framed = format!(
+        "{}\n\n{}",
+        base_prompt.trim_end(),
+        tinyagents_orchestration::subagent::subagent_framing(
+            tinyagents_orchestration::subagent::SubagentRole::Leaf,
+            spawn_depth,
+            task_prompt,
+        )
+    );
+    append_artifact_offload_contract(framed, agent_id, visible_tool_names)
+}
+
 /// Append the filesystem-offload contract (#3883), but only for a sub-agent
 /// that actually holds a file-write tool.
 ///
