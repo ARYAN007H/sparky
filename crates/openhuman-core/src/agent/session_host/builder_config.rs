@@ -7,7 +7,7 @@ use crate::agent::prompts::SystemPromptBuilder;
 use crate::agent::tinyagents::TurnModelSource;
 use std::sync::Arc;
 use tinyagents_harness::host::LearningSink;
-use tinytools::{Tool, ToolPolicySession};
+use tinytools::Tool;
 use tinytools_agent::dialect::ToolDialect;
 
 /// A builder for creating `OpenHumanSessionHost` instances with custom configuration.
