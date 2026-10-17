@@ -199,7 +199,7 @@ pub(crate) fn pre_turn(
     let pack = identity.recall.then(|| completed(&cache, &key)).flatten();
     tracing::debug!(thread_id = %key.thread, agent_id = %key.identity.agent_id, cache_hit = pack.is_some(), "[memory:prefetch] pre_turn cache");
     if let Some(pack) = &pack {
-        crate::memory::tools::record_pack_citations(ctx, &thread_id, pack.citations.clone());
+        crate::web_chat::citations::record_pack_citations(ctx, &thread_id, pack.citations.clone());
     }
     let dispatch = ctx.clone();
     enqueue(

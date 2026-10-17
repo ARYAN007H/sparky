@@ -52,7 +52,7 @@ pub struct TurnPack {
     pub engine: String,
     /// The cited items, for the chat's memory chips.
     #[serde(skip)]
-    pub citations: Vec<crate::memory::types::TurnCitation>,
+    pub citations: Vec<crate::web_chat::TurnCitation>,
     /// Set when nothing was recalled because the engine refused the whole
     /// account (a `MemoryError` code such as `INSUFFICIENT_CREDITS`): the
     /// block is then a notice saying so, not recalled memory.
@@ -70,7 +70,7 @@ impl TurnPack {
             .iter()
             .flat_map(|section| section.hits.iter())
             .filter(|hit| pack.refs.contains(&hit.id))
-            .map(crate::memory::types::TurnCitation::from)
+            .map(crate::web_chat::TurnCitation::from)
             .collect();
         Some(Self {
             markdown: pack.markdown,
