@@ -8,7 +8,7 @@
 
 use tinyagents_runtime::transcript::message_to_native_transcript as message_to_native_chat_message;
 use tinyagents_session::transcript::TranscriptMessage;
-use tinyinference_llm::model::ModelResponse;
+use tinyinference_llm::model::{ChatModel, ModelRequest, ModelResponse, ModelStream};
 use tinytools_agent::dialect::ToolDialect;
 
 use tinyagents_harness::middleware::wrap_harness_instruction;
@@ -76,6 +76,42 @@ impl RepairUsage {
     }
 }
 
+/// Resolve OpenHuman's selected summarizer per close request and forward that
+/// request unchanged. TinyAgents owns streaming, validation and repair.
+struct SummarizerSourceModel<'a> {
+    source: &'a TurnModelSource,
+    model: &'a str,
+    temperature: f64,
+    thread_id: Option<&'a str>,
+}
+
+#[async_trait::async_trait]
+impl ChatModel<()> for SummarizerSourceModel<'_> {
+    async fn invoke(
+        &self,
+        state: &(),
+        request: ModelRequest,
+    ) -> tinyinference_llm::Result<ModelResponse> {
+        let model = self
+            .source
+            .build_summarizer(self.model, self.temperature, self.thread_id)
+            .map_err(|error| tinyinference_llm::Error::Model(error.to_string()))?;
+        model.invoke(state, request).await
+    }
+
+    async fn stream(
+        &self,
+        state: &(),
+        request: ModelRequest,
+    ) -> tinyinference_llm::Result<ModelStream> {
+        let model = self
+            .source
+            .build_summarizer(self.model, self.temperature, self.thread_id)
+            .map_err(|error| tinyinference_llm::Error::Model(error.to_string()))?;
+        model.stream(state, request).await
+    }
+}
+
 /// A repaired terminal reply and the extra provider usage it incurred.
 pub(super) struct GroundedClose {
     pub(super) output: String,
@@ -135,11 +171,16 @@ pub(super) async fn repair_required_output(
             minimum_harness_phrase_chars: 24,
             on_call_completed: Some(&mut on_call_completed),
         },
-        fallback_placement:
-            tinyagents_harness::close::RequiredOutputFallbackPlacement::Prepend,
+        fallback_placement: tinyagents_harness::close::RequiredOutputFallbackPlacement::Prepend,
+    };
+    let model_client = SummarizerSourceModel {
+        source,
+        model,
+        temperature,
+        thread_id,
     };
     let repaired = tinyagents_harness::close::repair_required_output_with_repair_options(
-        &*source.build_summarizer(model, temperature, thread_id).ok()?,
+        &model_client,
         &(),
         dispatcher,
         tinyagents_harness::close::RequiredOutputRepairConfig {
@@ -228,9 +269,9 @@ pub(super) async fn close_if_needed(
     let records = results_from_tool_outcomes(&outcome.tool_outcomes);
     let rendered = render_tool_results(&records, turn_checkpoint::GROUNDING_TOTAL_CHARS);
     let instruction = close_instruction(outcome, needs_cap_close, &rendered);
+    let stop_reason = outcome.breaker_halt.as_deref();
     let harness_needles = harness_instruction_needles(stop_reason);
     let harness_phrases: Vec<&str> = harness_needles.iter().map(String::as_str).collect();
-    let stop_reason = outcome.breaker_halt.as_deref();
     let fallback = || {
         if needs_cap_close {
             build_deterministic_checkpoint(&records, outcome.model_calls)
@@ -240,16 +281,11 @@ pub(super) async fn close_if_needed(
     };
 
     let mut usage = RepairUsage::for_model(model);
-    let model_client = match source.build_summarizer(model, temperature, thread_id) {
-        Ok(model_client) => model_client,
-        Err(error) => {
-            tracing::debug!(%error, "[session-runtime] close model unavailable");
-            usage.record(None, true);
-            return Some(GroundedClose {
-                output: fallback(),
-                usage,
-            });
-        }
+    let model_client = SummarizerSourceModel {
+        source,
+        model,
+        temperature,
+        thread_id,
     };
     let mut on_call_completed = |kind, response: Option<&ModelResponse>| {
         usage.record_close_call(kind, response);
@@ -262,7 +298,7 @@ pub(super) async fn close_if_needed(
         on_call_completed: Some(&mut on_call_completed),
     };
     let output = tinyagents_harness::close::grounded_close_with_options(
-        model_client.as_ref(),
+        &model_client,
         &(),
         dispatcher,
         tinyagents_harness::close::GroundedCloseConfig {
