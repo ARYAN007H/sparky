@@ -241,6 +241,10 @@ impl TinySessionStore for OpenHumanTinySubagentSessionStore {
         let Some(session) = session else {
             return Ok(false);
         };
+        if session.status == DurableSubagentStatus::Closed {
+            return super::close_if_current(&self.store, &session)
+                .map_err(SubagentError::Persistence);
+        }
         if let Some(jobs) = &self.jobs {
             let _ = super::cancel_driver_job_for_observed_session(
                 &self.store,

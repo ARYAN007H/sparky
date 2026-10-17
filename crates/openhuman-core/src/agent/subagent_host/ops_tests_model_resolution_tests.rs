@@ -266,6 +266,10 @@ async fn closing_a_durable_driver_session_cancels_only_its_registered_child() {
         .close("close-driver-session")
         .await
         .expect("Tiny close adapter cancels then closes the durable row"));
+    assert!(port
+        .close("close-driver-session")
+        .await
+        .expect("repeated close is idempotent without re-cancelling"));
     assert!(!parent_cancellation.is_cancelled(), "parent stays live");
 
     let tiny_store: std::sync::Arc<dyn TinySessionStore> = std::sync::Arc::new(port.clone());

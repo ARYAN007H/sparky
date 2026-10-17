@@ -159,20 +159,21 @@ impl CloseSubagentTool {
             tinyagents_orchestration::subagent::SubAgentJobRegistry,
         >(&dispatch);
         let store = SubagentSessionStore::new(parent.workspace_dir.clone());
-        let cancelled = subagent_sessions::cancel_driver_job_for_observed_session(
-            &store,
-            &parent.workspace_dir.join(".openhuman/subagent_checkpoints"),
-            &jobs,
-            &observed,
-            &parent.session_id,
-            thread_id,
-        ) || running_subagents::cancel_by_session_in_workspace(
-            &dispatch,
-            &subagent_session_id,
-            &parent.session_id,
-            &parent.workspace_dir,
-        )
-        .is_some();
+        let cancelled = observed.status != subagent_sessions::DurableSubagentStatus::Closed
+            && (subagent_sessions::cancel_driver_job_for_observed_session(
+                &store,
+                &parent.workspace_dir.join(".openhuman/subagent_checkpoints"),
+                &jobs,
+                &observed,
+                &parent.session_id,
+                thread_id,
+            ) || running_subagents::cancel_by_session_in_workspace(
+                &dispatch,
+                &subagent_session_id,
+                &parent.session_id,
+                &parent.workspace_dir,
+            )
+            .is_some());
         match subagent_sessions::close_if_current(&store, &observed) {
             Ok(false) => Ok(ToolResult::error(
                 "close_subagent: session changed while it was being closed; retry with its current reference",
