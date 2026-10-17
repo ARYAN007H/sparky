@@ -71,3 +71,7 @@ pub(super) fn trace_context(
     }
     Some(trace_ctx)
 }
+
+#[cfg(test)]
+#[path = "progress_bridge_trace_tests.rs"]
+mod tests;
