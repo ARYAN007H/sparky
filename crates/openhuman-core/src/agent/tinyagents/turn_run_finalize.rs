@@ -165,7 +165,7 @@ pub(super) async fn finalize_turn_outcome(
         false,
         hit_cap,
     );
-    if let Some(stop_fact) = stop.clone() {
+    if !defer_terminal_to_caller && let Some(stop_fact) = stop.clone() {
         event_sink.emit(tinyagents_harness::events::AgentEvent::TurnStopped {
             // The event uses a 1-based attempt ordinal, even when the run
             // stopped before the first model request.
