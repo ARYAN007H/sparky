@@ -142,10 +142,6 @@ impl WorkspaceIsolation for OpenHumanWorktreeIsolation {
             policy_id = %descriptor.policy_id,
             "[workspace] workspace_prepared_emit"
         );
-        let _ = BUS.publish(DomainEvent::WorkspacePrepared {
-            policy_id: descriptor.policy_id.clone(),
-            root: descriptor.root.display().to_string(),
-        });
         Ok(descriptor)
     }
 
@@ -167,10 +163,6 @@ impl WorkspaceIsolation for OpenHumanWorktreeIsolation {
                     policy_id = %descriptor.policy_id,
                     "[workspace] workspace_cleanup_emit_ok"
                 );
-                let _ = BUS.publish(DomainEvent::WorkspaceCleanup {
-                    policy_id: descriptor.policy_id.clone(),
-                    error: None,
-                });
                 Ok(())
             }
             Err(err) => {
@@ -186,10 +178,6 @@ impl WorkspaceIsolation for OpenHumanWorktreeIsolation {
                     error = %message,
                     "[workspace] workspace_cleanup_emit_err"
                 );
-                let _ = BUS.publish(DomainEvent::WorkspaceCleanup {
-                    policy_id: descriptor.policy_id.clone(),
-                    error: Some(message),
-                });
                 Err(err)
             }
         }
