@@ -200,7 +200,7 @@ async fn post_turn_logs_the_reply_and_queues_belief_builds() {
     let identity = MemoryIdentity::agent("writer").resolve(&config);
 
     let mut first = reply("t", 1, "Here is the draft.");
-    first.tool_calls.push(ToolCallSummary {
+    first.3.push(ToolCallSummary {
         name: "read_file".into(),
         id: Some("call-1".into()),
         result: Some("outline.md: three sections".into()),
