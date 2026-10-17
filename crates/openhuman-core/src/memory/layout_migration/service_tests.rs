@@ -114,16 +114,15 @@ async fn nothing_starts_while_an_import_is_unfinished() {
     let tmp = tempfile::tempdir().unwrap();
     let config = crate::memory::test_fixtures::config_in(&tmp);
     let host = Arc::new(FakeHost::with(3, &config).await);
-    let path = config
-        .workspace_dir
-        .join("memory")
-        .join("import_state.json");
-    std::fs::create_dir_all(path.parent().unwrap()).unwrap();
-    std::fs::write(
-        &path,
-        r#"{"state":{"phase":"running","total":3,"imported":1}}"#,
-    )
-    .unwrap();
+    let state = |json: &str| {
+        crate::memory::state_store::save(
+            &config.workspace_dir,
+            "import_state",
+            &serde_json::from_str::<serde_json::Value>(json).unwrap(),
+        )
+        .unwrap();
+    };
+    state(r#"{"state":{"phase":"running","total":3,"imported":1}}"#);
     assert!(crate::memory::import::in_progress(&config));
     assert!(!start(
         &crate::core::runtime::DispatchCtx::ambient(),
@@ -140,11 +139,7 @@ async fn nothing_starts_while_an_import_is_unfinished() {
     ));
     assert_eq!(count(host.tree.as_ref()).await, 0);
 
-    std::fs::write(
-        &path,
-        r#"{"state":{"phase":"done","total":3,"imported":3}}"#,
-    )
-    .unwrap();
+    state(r#"{"state":{"phase":"done","total":3,"imported":3}}"#);
     assert!(start(
         &crate::core::runtime::DispatchCtx::ambient(),
         config.clone(),

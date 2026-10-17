@@ -22,7 +22,7 @@ fn forget_cached(config: &Config) {
 }
 
 fn recorded(config: &Config) -> LocalRoot {
-    read(&path(&config.workspace_dir)).unwrap().unwrap()
+    read(&config.workspace_dir).unwrap().unwrap()
 }
 
 #[test]
