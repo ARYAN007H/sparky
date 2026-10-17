@@ -206,56 +206,56 @@ pub fn cancel_driver_job_by_task(
     }
     let lifecycle_key = match session.lifecycle_key.clone() {
         Some(key) => Some(key),
-        None
-            if session.current_task_id.is_some()
-                && matches!(
-                    session.status,
-                    DurableSubagentStatus::Idle
-                        | DurableSubagentStatus::Running
-                        | DurableSubagentStatus::AwaitingUser
-                ) =>
+        None if session.current_task_id.is_some()
+            && matches!(
+                session.status,
+                DurableSubagentStatus::Idle
+                    | DurableSubagentStatus::Running
+                    | DurableSubagentStatus::AwaitingUser
+            ) =>
         {
             Some(
-            resolve_lifecycle_key(
-                store,
-                task_id,
-                &session.parent_session,
-                session.parent_thread_id.as_deref(),
-                checkpoint_dir,
-            )
-            .map_err(|error| {
-                format!("failed to resolve subagent lifecycle for cancellation: {error}")
-            })?,
+                resolve_lifecycle_key(
+                    store,
+                    task_id,
+                    &session.parent_session,
+                    session.parent_thread_id.as_deref(),
+                    checkpoint_dir,
+                )
+                .map_err(|error| {
+                    format!("failed to resolve subagent lifecycle for cancellation: {error}")
+                })?,
             )
         }
         None => None,
     };
-    if lifecycle_key.as_ref().is_some_and(|key| {
-        key.task_id != task_id || key.thread_id != session.parent_thread_id
-    }) {
+    if lifecycle_key
+        .as_ref()
+        .is_some_and(|key| key.task_id != task_id || key.thread_id != session.parent_thread_id)
+    {
         return Ok(None);
     }
-    let typed_finished = || -> Result<Option<tinyagents_orchestration::subagent::FinishedOutcome>, String> {
-        let Some(key) = lifecycle_key.as_ref() else {
-            return Ok(None);
+    let typed_finished =
+        || -> Result<Option<tinyagents_orchestration::subagent::FinishedOutcome>, String> {
+            let Some(key) = lifecycle_key.as_ref() else {
+                return Ok(None);
+            };
+            let Some(outcome) =
+                crate::agent::subagent_host::load_terminal_outcome(&store.workspace_dir, key)?
+            else {
+                return Ok(None);
+            };
+            Ok(match outcome.status {
+                tinyagents_orchestration::subagent::SubagentOutcomeKind::Completed => {
+                    Some(tinyagents_orchestration::subagent::FinishedOutcome::Completed)
+                }
+                tinyagents_orchestration::subagent::SubagentOutcomeKind::Incomplete(_) => {
+                    Some(tinyagents_orchestration::subagent::FinishedOutcome::Failed)
+                }
+                tinyagents_orchestration::subagent::SubagentOutcomeKind::Cancelled
+                | tinyagents_orchestration::subagent::SubagentOutcomeKind::AwaitingInput(_) => None,
+            })
         };
-        let Some(outcome) = crate::agent::subagent_host::load_terminal_outcome(
-            &store.workspace_dir,
-            key,
-        )? else {
-            return Ok(None);
-        };
-        Ok(match outcome.status {
-            tinyagents_orchestration::subagent::SubagentOutcomeKind::Completed => {
-                Some(tinyagents_orchestration::subagent::FinishedOutcome::Completed)
-            }
-            tinyagents_orchestration::subagent::SubagentOutcomeKind::Incomplete(_) => {
-                Some(tinyagents_orchestration::subagent::FinishedOutcome::Failed)
-            }
-            tinyagents_orchestration::subagent::SubagentOutcomeKind::Cancelled
-            | tinyagents_orchestration::subagent::SubagentOutcomeKind::AwaitingInput(_) => None,
-        })
-    };
     let already_finished = match session.status {
         DurableSubagentStatus::Idle => {
             let finished = typed_finished()?;

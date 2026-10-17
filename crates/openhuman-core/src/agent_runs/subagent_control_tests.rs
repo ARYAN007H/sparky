@@ -148,7 +148,7 @@ async fn cancelling_a_paused_driver_queues_a_failed_delivery_with_reason() {
         forget_workspace_for_test, pending_for,
     };
     use crate::agent::orchestration::subagent_sessions::{
-        mark_finished, upsert_running, DurableSubagentStatus, DriverTaskCancellation,
+        mark_finished, upsert_running, DriverTaskCancellation, DurableSubagentStatus,
         SubagentSessionSelector, SubagentSessionStore, SubagentSessionUpsert,
     };
     use tinyagents_orchestration::subagent::SubagentTaskKey;

@@ -69,9 +69,8 @@ pub(crate) fn load_terminal_outcome(
     workspace_dir: &std::path::Path,
     key: &SubagentTaskKey,
 ) -> Result<Option<SubagentOutcome>, String> {
-    let checkpoint_dir = absolute_checkpoint_dir(
-        workspace_dir.join(".openhuman/subagent_checkpoints"),
-    );
+    let checkpoint_dir =
+        absolute_checkpoint_dir(workspace_dir.join(".openhuman/subagent_checkpoints"));
     OpenHumanPersistence::new(checkpoint_dir)
         .terminal_outcome(key)
         .map_err(|error| format!("failed to load subagent terminal outcome: {error}"))

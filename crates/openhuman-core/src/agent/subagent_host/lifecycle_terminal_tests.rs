@@ -11,9 +11,7 @@ async fn driver_cancel_uses_the_typed_terminal_for_lossy_idle_sessions() {
     let workspace = directory.path();
     let store = SubagentSessionStore::new(workspace.to_path_buf());
     let jobs = tinyagents_orchestration::subagent::SubAgentJobRegistry::default();
-    let persistence = OpenHumanPersistence::new(
-        workspace.join(".openhuman/subagent_checkpoints"),
-    );
+    let persistence = OpenHumanPersistence::new(workspace.join(".openhuman/subagent_checkpoints"));
 
     for (task_id, terminal, expected) in [
         (
@@ -58,7 +56,10 @@ async fn driver_cancel_uses_the_typed_terminal_for_lossy_idle_sessions() {
         .unwrap();
         let mut outcome = SubagentOutcome::cancelled(task_id);
         outcome.status = terminal;
-        persistence.record_terminal(&key, &outcome, None).await.unwrap();
+        persistence
+            .record_terminal(&key, &outcome, None)
+            .await
+            .unwrap();
         mark_finished(
             &store,
             &session.subagent_session_id,
@@ -78,15 +79,9 @@ async fn driver_cancel_uses_the_typed_terminal_for_lossy_idle_sessions() {
             "both typed terminal outcomes share the legacy Idle session state"
         );
 
-        let selected = cancel_driver_job_by_task(
-            &store,
-            workspace,
-            &jobs,
-            task_id,
-            None,
-        )
-        .unwrap()
-        .expect("typed terminal remains reportable");
+        let selected = cancel_driver_job_by_task(&store, workspace, &jobs, task_id, None)
+            .unwrap()
+            .expect("typed terminal remains reportable");
         assert_eq!(selected.already_finished, expected, "{task_id}");
     }
 }

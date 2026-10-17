@@ -2,10 +2,10 @@ use super::*;
 
 #[tokio::test]
 async fn driver_job_controls_are_isolated_by_workspace_with_shared_runtime_state() {
-    use crate::agent::subagent_host::{run_subagent_via_driver_tool, SubagentRunOptions};
     use crate::agent::orchestration::subagent_sessions::{
         DurableSubagentSession, DurableSubagentStatus, SubagentSessionStore,
     };
+    use crate::agent::subagent_host::{run_subagent_via_driver_tool, SubagentRunOptions};
     use crate::core::runtime::{ContextOverlay, CoreContext, DomainSet};
     use crate::tools::toolpacks::ToolGroups;
     use tinyagents_harness::agent_loop::phases::execute_tool_batch;
@@ -68,9 +68,7 @@ async fn driver_job_controls_are_isolated_by_workspace_with_shared_runtime_state
         options.task_id = Some("same-raw-task-id".into());
         options.thread_id = Some("same-parent-thread".into());
         options.run_context.thread_id = Some("same-parent-thread".into());
-        options.run_context = options
-            .run_context
-            .with_core(Some(Arc::clone(core)));
+        options.run_context = options.run_context.with_core(Some(Arc::clone(core)));
         let run_id = workspace
             .file_name()
             .and_then(std::ffi::OsStr::to_str)
@@ -96,8 +94,10 @@ async fn driver_job_controls_are_isolated_by_workspace_with_shared_runtime_state
         tinyagents_harness::context::RunConfig::new("workspace-b-control")
             .with_thread("same-parent-thread"),
     );
-    let jobs_a = crate::core::runtime::slot_for::<SubAgentJobRegistry>(&parent_a.data.dispatch_ctx());
-    let jobs_b = crate::core::runtime::slot_for::<SubAgentJobRegistry>(&parent_b.data.dispatch_ctx());
+    let jobs_a =
+        crate::core::runtime::slot_for::<SubAgentJobRegistry>(&parent_a.data.dispatch_ctx());
+    let jobs_b =
+        crate::core::runtime::slot_for::<SubAgentJobRegistry>(&parent_b.data.dispatch_ctx());
     assert!(
         Arc::ptr_eq(&jobs_a, &jobs_b),
         "the two workspace overlays must exercise one shared registry"
@@ -190,14 +190,17 @@ async fn driver_job_controls_are_isolated_by_workspace_with_shared_runtime_state
         .expect("workspace B child is registered");
     let id_a = job_a.id.as_str().to_owned();
     let id_b = job_b.id.as_str().to_owned();
-    assert_ne!(id_a, id_b, "full lifecycle scope keeps raw-ID reuse distinct");
+    assert_ne!(
+        id_a, id_b,
+        "full lifecycle scope keeps raw-ID reuse distinct"
+    );
 
     let now = chrono::Utc::now().to_rfc3339();
-    let save_running_session = |workspace: &std::path::Path,
-                                session_id: &str,
-                                task_key: tinyagents_orchestration::subagent::SubagentTaskKey| {
-        SubagentSessionStore::new(workspace.to_path_buf())
-            .save(&[DurableSubagentSession {
+    let save_running_session =
+        |workspace: &std::path::Path,
+         session_id: &str,
+         task_key: tinyagents_orchestration::subagent::SubagentTaskKey| {
+            SubagentSessionStore::new(workspace.to_path_buf()).save(&[DurableSubagentSession {
                 subagent_session_id: session_id.to_owned(),
                 parent_session: "same-parent-session".into(),
                 parent_thread_id: Some("same-parent-thread".into()),
@@ -219,7 +222,7 @@ async fn driver_job_controls_are_isolated_by_workspace_with_shared_runtime_state
                 updated_at: now.clone(),
                 last_used_at: now.clone(),
             }])
-    };
+        };
     save_running_session(&workspace_a, "workspace-a-session", key_a)
         .expect("persist A session for native close alias");
     save_running_session(&workspace_b, "workspace-b-session", key_b)
@@ -235,8 +238,7 @@ async fn driver_job_controls_are_isolated_by_workspace_with_shared_runtime_state
     let mut harness: tinyagents_harness::runtime::AgentHarness<
         (),
         crate::agent::tinyagents::host::OpenHumanRunContext,
-    > =
-        tinyagents_harness::runtime::AgentHarness::new();
+    > = tinyagents_harness::runtime::AgentHarness::new();
     crate::agent::tinyagents::tool_registration::host_tool_set_builder(
         &sets,
         &None,
@@ -271,9 +273,7 @@ async fn driver_job_controls_are_isolated_by_workspace_with_shared_runtime_state
     )
     .await
     .expect("native list alias works for A");
-    assert!(listed_a.results[0]
-        .text()
-        .contains("workspace-a-session"));
+    assert!(listed_a.results[0].text().contains("workspace-a-session"));
     assert!(
         !listed_a.results[0].text().contains("workspace-b-session"),
         "A must not see B's durable session: {}",
@@ -294,12 +294,8 @@ async fn driver_job_controls_are_isolated_by_workspace_with_shared_runtime_state
     )
     .await
     .expect("native list alias works for B");
-    assert!(listed_b.results[0]
-        .text()
-        .contains("workspace-b-session"));
-    assert!(!listed_b.results[0]
-        .text()
-        .contains("workspace-a-session"));
+    assert!(listed_b.results[0].text().contains("workspace-b-session"));
+    assert!(!listed_b.results[0].text().contains("workspace-a-session"));
 
     let foreign_wait = execute_tool_batch(
         &harness,
@@ -323,7 +319,10 @@ async fn driver_job_controls_are_isolated_by_workspace_with_shared_runtime_state
         "A must receive a selector denial for B's generic job id, got: {foreign_wait_text}"
     );
     assert_eq!(
-        jobs_b.get(&id_b).expect("B child remains registered").status,
+        jobs_b
+            .get(&id_b)
+            .expect("B child remains registered")
+            .status,
         tinyagents_orchestration::subagent::SubAgentJobStatus::Running,
         "a foreign wait must not settle or mutate B's child"
     );
@@ -345,7 +344,10 @@ async fn driver_job_controls_are_isolated_by_workspace_with_shared_runtime_state
     .expect("foreign close is a recoverable model-facing selector error");
     assert!(!foreign_close.results[0].text().contains("\"closed\":true"));
     let job_b = jobs_b.get(&id_b).expect("B's child remains registered");
-    assert_eq!(job_b.status, tinyagents_orchestration::subagent::SubAgentJobStatus::Running);
+    assert_eq!(
+        job_b.status,
+        tinyagents_orchestration::subagent::SubAgentJobStatus::Running
+    );
 
     let owned_close = execute_tool_batch(
         &harness,
@@ -389,14 +391,19 @@ async fn driver_job_controls_are_isolated_by_workspace_with_shared_runtime_state
             outcome.status,
             crate::agent::subagent_host::SubagentRunStatus::Cancelled
         )),
-        Err(error) => assert_eq!(error.to_string(), "tinyagents harness run failed: run cancelled"),
+        Err(error) => assert_eq!(
+            error.to_string(),
+            "tinyagents harness run failed: run cancelled"
+        ),
     }
     assert_eq!(
-        jobs_b.get(&id_b).expect("B driver job remains inspectable").status,
+        jobs_b
+            .get(&id_b)
+            .expect("B driver job remains inspectable")
+            .status,
         tinyagents_orchestration::subagent::SubAgentJobStatus::Cancelled,
         "the shared driver registry is authoritative for B's cancellation"
     );
     assert!(!parent_cancel_a.is_cancelled());
     assert!(!parent_cancel_b.is_cancelled());
 }
-
