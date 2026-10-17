@@ -63,6 +63,8 @@ async fn byte_policy_projects_a_parent_readable_artifact_before_the_result_cap()
             workspace_dir.clone(),
             parent_action_dir.clone(),
         );
+        assert!(options.run_context.dispatch_ctx().tenant().is_ok());
+        assert!(crate::storage::sessions::artifact_blobs_for(&workspace_dir).is_some());
         apply_subagent_result_policies(&mut outcome, &definition, &options, "task-policy-test")
             .await;
     })
