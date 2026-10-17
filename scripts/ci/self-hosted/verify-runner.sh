@@ -12,7 +12,7 @@ fi
 echo "[ci][guest] verified $image"
 [[ "${1:-}" != image ]] || exit 0
 
-for tool in rustup cargo rustc clang readelf tinymold python3 node pnpm jq; do
+for tool in rustup cargo rustc clang readelf tinymold python3 node pnpm jq git curl pkg-config pwsh diff-cover; do
   command -v "$tool" >/dev/null || { echo "::error::Missing preinstalled tool: $tool" >&2; exit 1; }
 done
 linker=/usr/local/bin/rust-mold-linker
