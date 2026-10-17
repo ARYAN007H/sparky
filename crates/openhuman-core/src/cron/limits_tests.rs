@@ -133,6 +133,25 @@ fn active_jobs_are_capped_by_the_store_count() {
 }
 
 #[test]
+fn renaming_an_enabled_job_does_not_consume_another_slot() {
+    let tmp = TempDir::new().unwrap();
+    let mut config = limited(&tmp);
+    config.cron.max_active_jobs = 1;
+    let job = create_agent_job(&config, input(600_000, None), origin()).unwrap();
+
+    let renamed = update_job(
+        &config,
+        &job.id,
+        CronJobPatch {
+            name: Some(Some("renamed".into())),
+            ..CronJobPatch::default()
+        },
+    )
+    .expect("updating the existing enabled job must not consume capacity");
+    assert_eq!(renamed.name.as_deref(), Some("renamed"));
+}
+
+#[test]
 fn stored_rows_that_break_the_limits_are_refused_at_run() {
     let tmp = TempDir::new().unwrap();
     let mut config = limited(&tmp);
