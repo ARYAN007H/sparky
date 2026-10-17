@@ -804,14 +804,15 @@ impl SubagentExecutor<crate::agent::tinyagents::host::OpenHumanRunContext> for O
         options.message_run_queue = execution.prepared.run_context.run_queue.clone();
         let dispatch = options.run_context.dispatch_ctx();
         let origin = options.run_context.origin.clone();
+        let input = execution
+            .prepared
+            .input
+            .last()
+            .map(Message::text)
+            .unwrap_or_default();
         let run = Box::pin(super::ops::run_subagent_direct(
             &definition,
-            &execution
-                .prepared
-                .input
-                .last()
-                .map(Message::text)
-                .unwrap_or_default(),
+            &input,
             options.clone(),
         ));
         let result = match dispatch.into_core() {

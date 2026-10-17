@@ -370,7 +370,10 @@ impl SpawnAsyncSubagentTool {
         );
         let completion_core = dispatch.clone().into_core();
         let completion_origin = detached_parent.data.origin.clone();
-        let completion = move |_target: String, result: Result<SubagentRunOutcome, String>, emit_lifecycle_effects: bool| {
+        let completion = move |_target: String,
+                               result: Result<SubagentRunOutcome, String>,
+                               emit_lifecycle_effects: bool|
+         -> std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send>> {
             let core = completion_core.clone();
             let origin = completion_origin.clone();
             let progress_sink = progress_sink.clone();
@@ -482,7 +485,6 @@ impl SpawnAsyncSubagentTool {
                                 );
                                 // An incomplete run may still have produced a full
                                 // proposal before stalling — preserve it durably too.
-                                let status_output = framed.clone();
                                 let framed = attach_workflow_proposal(
                                     &background_dispatch,
                                     &background_workspace_dir,
