@@ -20,7 +20,6 @@ import {
   PrioritySemaphore,
   processTable,
   treeRssMiB,
-  sccacheSummary,
   Runner,
   defaultHeavySlots,
   foldLine,
@@ -238,7 +237,7 @@ test("the complete suites run, not subsets", () => {
   assert.match(runs, /bash scripts\/ci\/rust-coverage\.sh/);
   assert.match(
     runs,
-    /cargo llvm-cov --no-rustc-wrapper --manifest-path crates\/openhuman-app\/Cargo\.toml/,
+    /cargo llvm-cov nextest .*--no-rustc-wrapper --manifest-path crates\/openhuman-app\/Cargo\.toml/,
   );
 });
 
@@ -438,27 +437,6 @@ test("private runner serializes lanes even when parallelism is requested", () =>
   assert.equal(new Runner({ ...plan, profile: "hosted" }, { out: "unused", maxParallel: 8 }).maxParallel, 8);
 });
 
-test("sccache summary reports hit rate and the store in use", () => {
-  assert.equal(sccacheSummary(null), null);
-  assert.equal(
-    sccacheSummary({
-      stats: {
-        cache_hits: { counts: { Rust: 30 } },
-        cache_misses: { counts: { Rust: 10 } },
-      },
-      cache_location: "webdav, name: , prefix: /",
-    }),
-    "sccache (shared store): 30 Rust hits, 10 misses (75%).",
-  );
-  assert.equal(
-    sccacheSummary({
-      stats: { cache_hits: { counts: {} }, cache_misses: { counts: {} } },
-      cache_location: 'Local disk: "/cache/sccache"',
-    }),
-    "sccache (slot disk): 0 Rust hits, 0 misses.",
-  );
-});
-
 test("area flags are read strictly from CI_AREA_*", () => {
   const areas = areasFromEnv({
     CI_AREA_RUST_CORE: "true",
@@ -656,7 +634,7 @@ test("runner: heavy lanes wait for a slot, light lanes never do", async () => {
   fs.mkdirSync(path.join(out, "logs"));
   const check = (name) => ({ name, run: "sleep 0.2", when: true, needs: [] });
   const plan = {
-    profile: "ex63",
+    profile: "hosted",
     lanes: [
       { name: "h1", heavy: 0, active: true, checks: [check("x")] },
       { name: "h2", heavy: 1, active: true, checks: [check("x")] },

@@ -21,7 +21,7 @@
 // Area flags come from CI_AREA_* (see AREA_ENV). Outputs, under --out:
 //   logs/<lane>.log     full output of each lane
 //   lcov/*.info         coverage written by the coverage checks
-//   ci-timings.json     per-check outcome, timings, target-dir sizes, sccache
+//   ci-timings.json     per-check outcome, timings, target-dir sizes
 // and a per-check outcome table in $GITHUB_STEP_SUMMARY.
 //
 // Exit status is non-zero when any gating check failed or was blocked by a
@@ -125,20 +125,6 @@ export function orderProblems(plan) {
   return problems;
 }
 
-/** One line on sccache's Rust hit rate and where its cache lives, or null. */
-export function sccacheSummary(sccache) {
-  const stats = sccache?.stats;
-  if (!stats) return null;
-  const hits = stats.cache_hits?.counts?.Rust ?? 0;
-  const misses = stats.cache_misses?.counts?.Rust ?? 0;
-  const total = hits + misses;
-  const rate = total ? ` (${Math.round((100 * hits) / total)}%)` : "";
-  const where = /webdav/i.test(sccache.cache_location ?? "")
-    ? "shared store"
-    : "slot disk";
-  return `sccache (${where}): ${hits} Rust hits, ${misses} misses${rate}.`;
-}
-
 /** Render the per-check outcome table for $GITHUB_STEP_SUMMARY. */
 export function renderSummary(results) {
   const rows = [
@@ -201,18 +187,6 @@ function du(path) {
   const r = spawnSync("du", ["-sb", path], { encoding: "utf8" });
   const bytes = Number.parseInt((r.stdout ?? "").split(/\s+/)[0], 10);
   return Number.isFinite(bytes) ? bytes : null;
-}
-
-function sccacheStats() {
-  const r = spawnSync("sccache", ["--show-stats", "--stats-format", "json"], {
-    encoding: "utf8",
-  });
-  if (r.status !== 0) return null;
-  try {
-    return JSON.parse(r.stdout);
-  } catch {
-    return null;
-  }
 }
 
 /**

@@ -148,7 +148,6 @@ export function buildPlan({ profile, areas, env = {}, isPullRequest = true }) {
     CARGO_INCREMENTAL: "0",
     RUSTFLAGS: "-C link-arg=-fuse-ld=mold",
   };
-  const sccache = {};
   const covEnv = {
     ...rustEnv,
     CARGO_PROFILE_DEV_DEBUG: "0",
@@ -360,7 +359,7 @@ export function buildPlan({ profile, areas, env = {}, isPullRequest = true }) {
       // First among the Rust lanes: it is the long pole, and rust-lint waits
       // on its test-modules check.
       name: "rust-cov",
-      // Compiles the core crate: holds one of the VM's heavy-compile slots
+      // Compiles the core crate; hosted runners can cap heavy-compile slots
       // (lanes.mjs). Lower number = served first.
       heavy: 0,
       targetDir: targetDir("cov"),
@@ -401,11 +400,11 @@ export function buildPlan({ profile, areas, env = {}, isPullRequest = true }) {
     },
     {
       name: "rust-lint",
-      // Compiles the core crate: holds one of the VM's heavy-compile slots
+      // Compiles the core crate; hosted runners can cap heavy-compile slots
       // (lanes.mjs). Lower number = served first.
       heavy: 1,
       targetDir: targetDir("lint"),
-      env: { ...rustEnv, ...sccache },
+      env: { ...rustEnv },
       checks: [
         // `--features` is load-bearing: `default` is the contributor set.
         {
@@ -452,11 +451,11 @@ export function buildPlan({ profile, areas, env = {}, isPullRequest = true }) {
     },
     {
       name: "rust-gates-off",
-      // Compiles the core crate: holds one of the VM's heavy-compile slots
+      // Compiles the core crate; hosted runners can cap heavy-compile slots
       // (lanes.mjs). Lower number = served first.
       heavy: 1,
       targetDir: targetDir("gatesoff"),
-      env: { ...rustEnv, ...sccache, RUST_MIN_STACK: "67108864" },
+      env: { ...rustEnv, RUST_MIN_STACK: "67108864" },
       checks: [
         {
           name: "gate-contract-tests",
@@ -500,7 +499,7 @@ export function buildPlan({ profile, areas, env = {}, isPullRequest = true }) {
     },
     {
       name: "tauri",
-      // Compiles the core crate: holds one of the VM's heavy-compile slots
+      // Compiles the core crate; hosted runners can cap heavy-compile slots
       // (lanes.mjs). Lower number = served first.
       heavy: 2,
       targetDir: targetDir("tauri"),
@@ -509,13 +508,13 @@ export function buildPlan({ profile, areas, env = {}, isPullRequest = true }) {
         {
           name: "clippy-tauri",
           when: areas.rustTauri,
-          env: sccache,
+          env: {},
           run: "cargo clippy --manifest-path crates/openhuman-app/Cargo.toml -- -D warnings",
         },
         {
           // llvm-cov's RUSTFLAGS mode with the linker flag cleared, as in
           // ci-lite. ci-lite also clears RUSTC_WRAPPER because its container
-          // config installs sccache; on ex63 covEnv sets sccache on purpose.
+          // config installs sccache; on ex63 covEnv sets no compiler wrapper.
           name: "tauri-coverage",
           when: areas.rustTauri,
           env: { ...covEnv },
@@ -539,7 +538,7 @@ export function buildPlan({ profile, areas, env = {}, isPullRequest = true }) {
       // VM's heavy-compile slots (lanes.mjs). Lower number = served first.
       heavy: 2,
       targetDir: targetDir("storage"),
-      env: { ...rustEnv, ...sccache, RUST_MIN_STACK: "16777216" },
+      env: { ...rustEnv, RUST_MIN_STACK: "16777216" },
       checks: [
         {
           name: "storage-e2e",
@@ -590,7 +589,7 @@ export function buildPlan({ profile, areas, env = {}, isPullRequest = true }) {
       if (!["rust-gates-off", "storage-drivers"].includes(lane.name)) continue;
       for (const check of lane.checks) {
         if (!check.run.startsWith("cargo test ")) continue;
-        const [cargoArgs, filters] = check.run.slice("cargo test ".length).split(" --");
+        const [cargoArgs, filters] = check.run.slice("cargo test ".length).split(" -- ");
         let args = cargoArgs.replace("--no-fail-fast ", "");
         let expression = "";
         let serial = "";
