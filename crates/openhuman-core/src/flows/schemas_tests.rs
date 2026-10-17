@@ -20,16 +20,22 @@ fn run_schema_advertises_both_input_channels() {
 
 #[test]
 fn run_detached_schema_description_has_normal_spacing_and_input_rules() {
-    let schema = schemas("run_detached");
-    let inputs = schema.inputs.iter().find(|field| field.name == "inputs").unwrap();
+    let rendered = serde_json::to_value(schemas("run_detached")).unwrap();
+    let inputs = rendered["inputs"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|field| field["name"] == "inputs")
+        .unwrap();
+    let comment = inputs["comment"].as_str().unwrap();
 
-    assert!(inputs.comment.contains("graph.inputs"), "{}", inputs.comment);
-    assert!(inputs.comment.contains("Validated synchronously"), "{}", inputs.comment);
-    assert!(inputs.comment.contains("Distinct from `input`"), "{}", inputs.comment);
+    assert!(comment.contains("graph.inputs"), "{comment}");
+    assert!(comment.contains("Validated synchronously"), "{comment}");
+    assert!(comment.contains("Distinct from `input`"), "{comment}");
     assert!(
-        !inputs.comment.contains("                               "),
+        !comment.contains("                               "),
         "the rendered schema must not contain continuation indentation: {:?}",
-        inputs.comment
+        comment
     );
 }
 
