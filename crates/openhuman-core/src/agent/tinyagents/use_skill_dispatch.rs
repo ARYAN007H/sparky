@@ -170,12 +170,9 @@ impl ToolDispatch<(), OpenHumanRunContext> for UseSkillDispatch {
             .map(str::to_string);
 
         // Re-wrap the resolved tool in the same `CanonicalSharedToolAdapter`
-        // seam the harness itself builds at registration: typed-dispatch
-        // selection keys off the tool's name and schema
-        // (`DelegationDispatch::for_tool`), not object identity, so this
-        // adapter is equivalent to the one that would have been registered
-        // had the model reached `name` directly instead of through
-        // `use_skill`.
+        // seam the harness itself builds at registration. The OpenHuman
+        // delegation target is read from the raw packed tool before wrapping,
+        // since it is a host extension rather than portable adapter metadata.
         let Some(inner_adapter) = super::tool_registration::shared_tool_adapter(vec![tools], &name)
             .map(|adapter| Arc::new(adapter) as Arc<dyn Tool>)
         else {

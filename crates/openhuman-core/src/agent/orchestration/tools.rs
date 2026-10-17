@@ -1,6 +1,4 @@
-//! Declares the LLM-callable orchestration tools kept in `tools/` (via
-//! `#[path]`, since this file lives in `orchestration/` rather than a
-//! `tools/mod.rs`).
+//! Declares OpenHuman's product orchestration surfaces over TinyAgents.
 //!
 //! Tools, by role:
 //! - **Spawn**: `spawn_subagent`, `spawn_async_subagent`,
@@ -10,14 +8,13 @@
 //! - **Delegation**: `DelegateGraphTool`, `ArchetypeDelegationTool`,
 //!   and `CollapsedDelegationTool` (`delegate_to`).
 //!
-//! `dispatch.rs` and `awaiting_user.rs` are `pub(crate)` helpers shared by the
-//! tools above (the common spawn path and awaiting-user envelope), not tools
-//! themselves. Worker-thread persistence lives in `threads`.
+//! TinyAgents owns generic control operations; the host control module keeps
+//! the product declarations and projections. Worker-thread persistence lives
+//! in `threads`.
 //!
 //! `agent::registration` assembles the delegation tools for the catalogue.
-//! Execution itself goes through
-//! `agent::subagent_host::run_subagent`; this module only owns the tool-call
-//! surface (schema, argument parsing, response formatting).
+//! Execution crosses the shared TinyAgents Jobs/Message and subagent driver
+//! ports while this module retains product-specific policies and envelopes.
 
 #[path = "tools/archetype_delegation.rs"]
 mod archetype_delegation;

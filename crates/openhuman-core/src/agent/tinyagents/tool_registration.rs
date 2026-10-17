@@ -99,10 +99,10 @@ type ToolDispatchSelector = Arc<ToolDispatchSelectorFn>;
 /// context.").
 ///
 /// `adapter` is expected to be the same `CanonicalSharedToolAdapter` seam
-/// used at registration: dispatch selection keys off `name` and the tool's
-/// own schema (via [`DelegationDispatch::for_tool`]'s fallback), not object
-/// identity, so a freshly built adapter over the resolved tool's registry
-/// slot is equivalent to the one the harness itself would have registered.
+/// used at registration. For synthesized archetype routes, the raw registered
+/// tool's `DelegationTarget` host extension is passed separately because the
+/// generic adapter intentionally does not preserve OpenHuman-specific
+/// extensions.
 pub(crate) fn typed_dispatch_for(
     name: &str,
     adapter: Arc<dyn tinytools::Tool>,
