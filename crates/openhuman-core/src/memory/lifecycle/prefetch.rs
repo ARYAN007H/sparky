@@ -91,6 +91,14 @@ fn memory_config_fingerprint(config: &Config) -> u64 {
     let mut fingerprint = std::collections::hash_map::DefaultHasher::new();
     config.memory.hash(&mut fingerprint);
     config.config_path.hash(&mut fingerprint);
+    config.action_dir.hash(&mut fingerprint);
+    config.api_url.hash(&mut fingerprint);
+    config.components.memory.hash(&mut fingerprint);
+    config.default_model.hash(&mut fingerprint);
+    config.chat_provider.hash(&mut fingerprint);
+    config.memory_provider.hash(&mut fingerprint);
+    config.model_routes.hash(&mut fingerprint);
+    config.time_zone().hash(&mut fingerprint);
     fingerprint.finish()
 }
 
