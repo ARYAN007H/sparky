@@ -49,10 +49,18 @@ fn the_policy_round_trips_and_refuses_out_of_range_values() {
             ..PolicySetParams::default()
         },
     ] {
-        assert!(matches!(
-            apply_policy_set(&mut config, &bad),
-            Err(MemoryError::InvalidRequest(_))
-        ));
+        let before = serde_json::to_value(&config).unwrap();
+        let result = apply_policy_set(&mut config, &PolicySetParams {
+            log_conversations: Some(!config.memory.conversations.enabled),
+            recall_enabled: Some(!config.memory.recall.enabled),
+            ..bad
+        });
+        assert!(matches!(result, Err(MemoryError::InvalidRequest(_))));
+        assert_eq!(
+            serde_json::to_value(&config).unwrap(),
+            before,
+            "invalid policy update must be atomic"
+        );
     }
     config.memory.agent_id = Some("employee-7".into());
     assert!(policy_view(&config).host_bound);
