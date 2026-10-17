@@ -168,6 +168,7 @@ pub(crate) async fn run_channel_turn_via_graph(
         context_window,
         // No mid-flight steering on the channel path.
         run_queue: None,
+        message_run_queue: None,
         // Same pause as the chat path: a channel turn's continuation is the
         // user's next message, so ending the turn on the question is the whole
         // mechanism. Without this the model answers its own question (see

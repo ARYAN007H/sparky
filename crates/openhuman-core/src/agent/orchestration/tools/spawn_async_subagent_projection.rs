@@ -6,8 +6,8 @@
 // never learns the result never arrived. Fail loudly instead: the caller has a
 // synchronous alternative (`spawn_subagent` with `blocking: true`, or a `delegate_*`
 // tool). Both of those self-heal to blocking dispatch in this situation rather than
-// reaching this guard — see the `has_delivery_thread` checks in `spawn_subagent.rs` and
-// `dispatch.rs::dispatch_subagent`. Only a *direct* `spawn_async_subagent` call lands
+// reaching this guard — see the `has_delivery_thread` checks in `spawn_subagent_surface.rs` and
+// `subagent_dispatch_host.rs::dispatch_subagent`. Only a *direct* `spawn_async_subagent` call lands
 // here.
 fn refuse_missing_delivery_thread(
     parent_thread_id: Option<&str>,

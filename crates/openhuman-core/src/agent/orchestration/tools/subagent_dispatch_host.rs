@@ -1,13 +1,13 @@
 //! Subagent dispatch logic shared by all agent delegation tools.
 
 use crate::agent::subagent_host::{
-    run_subagent_with_parent, SubagentRunOptions, SubagentRunStatus,
+    run_subagent_via_driver_tool, SubagentRunOptions, SubagentRunStatus,
 };
 use crate::agent_registry::host_definition::AgentDefinitionRegistry;
 use crate::progress::AgentProgress;
 use async_trait::async_trait;
 use std::sync::Arc;
-use tinyagents_harness::context::{RunConfig, RunContext};
+use tinyagents_harness::context::RunContext;
 use tinyagents_harness::tool::{ToolDispatch, ToolExecutionContext};
 use tinytools::ToolRunContext;
 use tinytools::{ToolCallOptions, ToolResult};
@@ -30,11 +30,16 @@ enum DelegationDispatchKind {
     Collapsed {
         targets: Result<Vec<super::collapsed_delegation::DelegateTarget>, String>,
     },
-    Archetype,
+    Archetype {
+        agent_id: String,
+    },
 }
 
 impl DelegationDispatch {
-    pub(crate) fn for_tool(tool: Arc<dyn tinytools::Tool>) -> Option<Self> {
+    pub(crate) fn for_tool(
+        tool: Arc<dyn tinytools::Tool>,
+        delegation_target: Option<String>,
+    ) -> Option<Self> {
         let kind = match tool.name() {
             super::collapsed_delegation::DELEGATE_TO_TOOL_NAME => {
                 DelegationDispatchKind::Collapsed {
@@ -43,22 +48,13 @@ impl DelegationDispatch {
                     ),
                 }
             }
-            // Only synthesized archetype delegate names enter this path.
-            // `delegate_graph` is a concrete durable graph tool with its own
-            // typed dispatcher, and arbitrary `delegate_*` tools must not be
-            // mistaken for an agent target merely because of their spelling.
-            name if AgentDefinitionRegistry::current().is_some_and(|registry| {
-                registry.list().into_iter().any(|definition| {
-                    definition
-                        .delegate_name
-                        .clone()
-                        .unwrap_or_else(|| format!("delegate_{}", definition.id))
-                        == name
-                })
-            }) =>
-            {
-                DelegationDispatchKind::Archetype
-            }
+            // The target is carried by the registered host extension, not
+            // inferred from an ambient registry or a tool's spelling. This
+            // keeps hidden packed delegates scoped to the catalogue that
+            // actually supplied them.
+            _ if delegation_target.is_some() => DelegationDispatchKind::Archetype {
+                agent_id: delegation_target.expect("checked above"),
+            },
             _ => return None,
         };
         Some(Self { tool, kind })
@@ -105,23 +101,9 @@ impl ToolDispatch<(), crate::agent::tinyagents::host::OpenHumanRunContext> for D
                 )
                 .await
             }
-            DelegationDispatchKind::Archetype => {
-                let Some(agent_id) = AgentDefinitionRegistry::current().and_then(|registry| {
-                    registry.list().into_iter().find_map(|definition| {
-                        let name = definition
-                            .delegate_name
-                            .clone()
-                            .unwrap_or_else(|| format!("delegate_{}", definition.id));
-                        (name == self.tool.name()).then_some(definition.id.clone())
-                    })
-                }) else {
-                    return Ok(ToolResult::error(format!(
-                        "{}: delegation target is not registered",
-                        self.tool.name()
-                    )));
-                };
+            DelegationDispatchKind::Archetype { agent_id } => {
                 super::archetype_delegation::execute_archetype_delegation_with_live_parent(
-                    &agent_id,
+                    agent_id,
                     self.tool.name(),
                     arguments,
                     Some(&tool_context),
@@ -167,16 +149,17 @@ pub(crate) async fn dispatch_subagent_with_live_parent(
     let parent_workspace_descriptor = tool_context
         .and_then(|ctx| ctx.workspace().cloned())
         .or_else(|| run_context.workspace.clone());
-    let registry = match AgentDefinitionRegistry::current() {
-        Some(reg) => reg,
-        None => {
-            return Ok(ToolResult::error(
-                "Agent registry not initialised. This usually means the \
+    let registry =
+        match AgentDefinitionRegistry::for_core_context(run_context.dispatch_ctx().into_core()) {
+            Some(reg) => reg,
+            None => {
+                return Ok(ToolResult::error(
+                    "Agent registry not initialised. This usually means the \
                  core process started without calling \
                  AgentDefinitionRegistry::init_global at startup.",
-            ));
-        }
-    };
+                ));
+            }
+        };
 
     let definition = match registry.get(agent_id) {
         Some(def) => def,
@@ -314,15 +297,10 @@ pub(crate) async fn dispatch_subagent_with_live_parent(
             // agent-turn futures) overflows the test-thread stack on deep
             // parallel-delegation flows.
             return Box::pin(async move {
-                let detached_data = live_parent.data.detached_child();
-                let detached_cancellation = detached_data.cancellation.clone();
-                let detached_parent = live_parent
-                    .child(
-                        RunConfig::new(format!("async-subagent-{}", uuid::Uuid::new_v4())),
-                        detached_data,
-                    )
-                    .map_err(|error| anyhow::anyhow!(error.to_string()))?
-                    .with_cancellation(detached_cancellation);
+                let detached_parent = crate::agent::subagent_host::detached_subagent_parent(
+                    live_parent,
+                    "async-subagent",
+                )?;
                 super::spawn_async_subagent::SpawnAsyncSubagentTool::new()
                     .execute_with_live_parent_context(
                         async_args,
@@ -363,7 +341,7 @@ pub(crate) async fn dispatch_subagent_with_live_parent(
     );
 
     // Also send to the per-request progress sink so the web channel bridge
-    // emits `subagent_spawned` to the frontend (same pattern as spawn_subagent.rs).
+    // emits `subagent_spawned` to the frontend (same pattern as spawn_subagent_surface.rs).
     if let Some(progress) = run_context.progress.clone() {
         let _ = progress
             .send(AgentProgress::SubagentSpawned {
@@ -415,10 +393,13 @@ pub(crate) async fn dispatch_subagent_with_live_parent(
         worktree_action_dir,
         workspace_descriptor: parent_workspace_descriptor,
         run_queue: None,
+        message_run_queue: None,
     };
 
     let run =
-        run_subagent_with_parent(live_parent, definition.clone(), prompt.to_owned(), options).await;
+        run_subagent_via_driver_tool(live_parent, definition.clone(), prompt.to_owned(), options)
+            .await
+            .map(|(outcome, _job_id)| outcome);
     match run {
         Ok(outcome) => {
             let emit_lifecycle_effects = outcome.should_emit_lifecycle_effects();
@@ -484,7 +465,7 @@ pub(crate) async fn dispatch_subagent_with_live_parent(
                             outcome.iterations,
                         );
                         // Also send to the per-request progress sink (mirrors
-                        // `spawn_subagent.rs`) so the web channel bridge emits
+                        // `spawn_subagent_surface.rs`) so the web channel bridge emits
                         // `subagent_done` to the frontend. Without this the delegated
                         // subagent's timeline row (created on `SubagentSpawned` above)
                         // stays "running" forever — `publish_subagent_completed` only

@@ -115,7 +115,29 @@ fn handle_subagent_cancel(ctx: DispatchCtx, params: Map<String, Value>) -> Contr
         // `outcome` is set only when nothing was cancelled: how the run ended
         // if the registry still knew it, else "unknown" (never registered, or
         // already swept). The card settles on it instead of assuming success.
-        let (cancelled, outcome) = match running_subagents::cancel_by_task(&ctx, &task_id) {
+        let mut cancelled_subagent = running_subagents::cancel_by_task_with_workspace_reason(
+            &ctx,
+            &task_id,
+            None,
+            reason.as_deref(),
+        )?;
+        if cancelled_subagent.is_none()
+            && ctx.resolved().is_none()
+            && !crate::core::runtime::is_saas()
+        {
+            let config = crate::config::ops::load_config_in(&ctx)
+                .await
+                .map_err(|error| {
+                    format!("subagent_cancel: failed to resolve active workspace: {error}")
+                })?;
+            cancelled_subagent = running_subagents::cancel_by_task_with_workspace_reason(
+                &ctx,
+                &task_id,
+                Some(&config.workspace_dir),
+                reason.as_deref(),
+            )?;
+        }
+        let (cancelled, outcome) = match cancelled_subagent {
             // Finished before the click landed (it stays registered until the
             // terminal sweep). Its outcome is already recorded and delivered;
             // announcing a cancellation would overwrite a completed session
@@ -133,42 +155,52 @@ fn handle_subagent_cancel(ctx: DispatchCtx, params: Map<String, Value>) -> Contr
                 (false, Some(finished.as_str()))
             }
             Some(meta) => {
-                let summary = match reason.as_deref().map(str::trim).filter(|r| !r.is_empty()) {
-                    Some(r) => format!(
+                if meta.driver_managed {
+                    // Active driver jobs finish through the awaited host hook.
+                    // A paused job has already returned from that hook, so this
+                    // handler settles and reports that one terminal transition.
+                    if let Some(paused) = meta.driver_pause.as_ref() {
+                        settle_paused_driver_cancel(&ctx, paused, reason.as_deref()).await?;
+                    }
+                    (true, None)
+                } else {
+                    let summary = match reason.as_deref().map(str::trim).filter(|r| !r.is_empty()) {
+                        Some(r) => format!(
                         "You cancelled this background sub-agent before it finished. Reason: {r}"
                     ),
-                    None => {
-                        "You cancelled this background sub-agent before it finished.".to_string()
-                    }
-                };
-                // The thread is still alive (unlike the delete path), so we
-                // record a completion that flows through the same idle-gated
-                // delivery and surfaces the cancellation in chat.
-                background_completions::record_completion(
-                    &ctx,
-                    &meta.workspace_dir,
-                    &meta.parent_session,
-                    &task_id,
-                    meta.agent_id.clone(),
-                    summary,
-                    meta.parent_thread_id.clone(),
-                )
-                .await;
-                if let Some(subagent_session_id) = meta.subagent_session_id {
-                    let store = subagent_sessions::SubagentSessionStore::new(meta.workspace_dir);
-                    if let Err(err) = subagent_sessions::mark_failed(
-                        &store,
-                        &subagent_session_id,
+                        None => "You cancelled this background sub-agent before it finished."
+                            .to_string(),
+                    };
+                    // The thread is still alive (unlike the delete path), so we
+                    // record a completion that flows through the same idle-gated
+                    // delivery and surfaces the cancellation in chat.
+                    background_completions::record_completion(
+                        &ctx,
+                        &meta.workspace_dir,
+                        &meta.parent_session,
                         &task_id,
-                        "cancelled by user".to_string(),
-                    ) {
-                        log::warn!(
-                            target: "subagent_control_rpc",
-                            "[subagent_control_rpc][{cid}] cancel.mark_failed_failed task_id={task_id} subagent_session_id={subagent_session_id} error={err}"
-                        );
+                        meta.agent_id.clone(),
+                        summary,
+                        meta.parent_thread_id.clone(),
+                    )
+                    .await;
+                    if let Some(subagent_session_id) = meta.subagent_session_id.as_deref() {
+                        let store =
+                            subagent_sessions::SubagentSessionStore::new(meta.workspace_dir);
+                        if let Err(err) = subagent_sessions::mark_failed(
+                            &store,
+                            subagent_session_id,
+                            &task_id,
+                            "cancelled by user".to_string(),
+                        ) {
+                            log::warn!(
+                                target: "subagent_control_rpc",
+                                "[subagent_control_rpc][{cid}] cancel.mark_failed_failed task_id={task_id} subagent_session_id={subagent_session_id} error={err}"
+                            );
+                        }
                     }
+                    (true, None)
                 }
-                (true, None)
             }
             None => (false, Some("unknown")),
         };
@@ -183,6 +215,33 @@ fn handle_subagent_cancel(ctx: DispatchCtx, params: Map<String, Value>) -> Contr
         }
         to_json(reply)
     })
+}
+
+async fn settle_paused_driver_cancel(
+    ctx: &DispatchCtx,
+    paused: &subagent_sessions::DriverTaskCancellation,
+    reason: Option<&str>,
+) -> Result<bool, String> {
+    let store = subagent_sessions::SubagentSessionStore::new(paused.workspace_dir.clone());
+    let transitioned = subagent_sessions::mark_driver_pause_cancelled(&store, paused)
+        .map_err(|error| format!("subagent_cancel: failed to settle paused child: {error}"))?;
+    if transitioned {
+        let error = match reason.map(str::trim).filter(|reason| !reason.is_empty()) {
+            Some(reason) => format!("cancelled by user. Reason: {reason}"),
+            None => "cancelled by user".to_string(),
+        };
+        background_completions::record_failure(
+            ctx,
+            &paused.workspace_dir,
+            &paused.parent_session,
+            &paused.task_id,
+            &paused.agent_id,
+            &error,
+            paused.parent_thread_id.clone(),
+        )
+        .await;
+    }
+    Ok(transitioned)
 }
 
 fn handle_subagent_steer(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {

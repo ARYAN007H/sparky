@@ -10,8 +10,8 @@
 
 use crate::agent::orchestration::tools::dispatch::{incomplete_stop, stopped_subagent_result};
 use crate::agent::subagent_host::{
-    continue_subagent, continue_subagent_with_parent, load_subagent_checkpoint, SubagentRunOptions,
-    SubagentRunStatus,
+    continue_subagent, continue_subagent_via_driver_tool, load_subagent_checkpoint,
+    SubagentRunOptions, SubagentRunStatus,
 };
 use crate::agent_registry::host_definition::AgentDefinitionRegistry;
 use crate::progress::AgentProgress;
@@ -155,18 +155,8 @@ impl ContinueSubagentTool {
                 serde_json::Value::String(model.clone()),
             );
         }
-        let detached_data = live_parent.data.detached_child();
-        let detached_cancellation = detached_data.cancellation.clone();
-        let detached_parent = live_parent
-            .child(
-                tinyagents_harness::context::RunConfig::new(format!(
-                    "async-subagent-{}",
-                    uuid::Uuid::new_v4()
-                )),
-                detached_data,
-            )
-            .map_err(|error| anyhow::anyhow!(error.to_string()))?
-            .with_cancellation(detached_cancellation);
+        let detached_parent =
+            crate::agent::subagent_host::detached_subagent_parent(live_parent, "async-subagent")?;
         super::spawn_async_subagent::SpawnAsyncSubagentTool::new()
             .execute_with_live_parent_context(
                 async_args,
@@ -355,6 +345,7 @@ impl ContinueSubagentTool {
         let original_key = checkpoint.task_key.clone().ok_or_else(|| {
             anyhow::anyhow!("continue_subagent: checkpoint omitted original task key")
         })?;
+        let checkpoint_resume = crate::agent::subagent_host::checkpoint_resume(&checkpoint);
 
         if checkpoint.agent_id != agent_id {
             return Ok(ToolResult::error(format!(
@@ -365,14 +356,16 @@ impl ContinueSubagentTool {
         }
 
         // Look up the agent definition
-        let registry = match AgentDefinitionRegistry::current() {
-            Some(reg) => reg,
-            None => {
-                return Ok(ToolResult::error(
-                    "continue_subagent: AgentDefinitionRegistry not initialised",
-                ));
-            }
-        };
+        let registry =
+            match AgentDefinitionRegistry::for_core_context(run_context.dispatch_ctx().into_core())
+            {
+                Some(reg) => reg,
+                None => {
+                    return Ok(ToolResult::error(
+                        "continue_subagent: AgentDefinitionRegistry not initialised",
+                    ));
+                }
+            };
         let definition = match registry.get(&agent_id) {
             Some(def) => def,
             None => {
@@ -452,18 +445,21 @@ impl ContinueSubagentTool {
             worktree_action_dir,
             workspace_descriptor,
             run_queue: None,
+            message_run_queue: None,
         };
 
         // Run the sub-agent from its checkpoint
         let continuation = if let Some(parent) = live_parent {
-            continue_subagent_with_parent(
+            continue_subagent_via_driver_tool(
                 parent,
                 original_key,
                 definition.clone(),
                 message.clone(),
                 options,
+                checkpoint_resume,
             )
             .await
+            .map(|(outcome, _public_job_id)| outcome)
         } else {
             continue_subagent(original_key, definition, &message, options).await
         };

@@ -94,7 +94,7 @@ async fn failed_subagent_run_keeps_its_unanswered_round_out_of_history() {
         vec![],
         allowed,
         10,
-        None,
+        (None, None),
         None,
         "researcher",
         "task-failed",

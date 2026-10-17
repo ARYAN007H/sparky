@@ -11,7 +11,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 use tinyagents_harness::context::RunContext;
-use tinyagents_harness::tool::{ToolDispatch, ToolExecutionContext};
+use tinyagents_harness::tool::ToolDispatch;
 use tinyinference_llm::message::Message;
 use tinyinference_llm::model::{ChatModel, ModelRequest};
 use tinytools::{Tool, ToolCallOptions, ToolResult, ToolRunContext};
@@ -29,12 +29,8 @@ pub struct DelegateTool {
     depth: u32,
 }
 
-/// Typed harness dispatch for the config-defined `delegate` tool.
-///
-/// The configured tool remains the canonical executor (and therefore retains
-/// its configured agents, model routing, and security policy); this wrapper
-/// supplies the live thread/workspace context and makes cancellation explicit
-/// instead of relying on a task-local carrier.
+/// Host adapter that places the config-defined one-shot executor behind the
+/// shared driver lifecycle while retaining the configured Tool instance.
 pub(crate) struct DelegateToolDispatch {
     tool: Arc<dyn Tool>,
 }
@@ -58,17 +54,24 @@ impl ToolDispatch<(), crate::agent::tinyagents::host::OpenHumanRunContext>
         _state: &(),
         _call_id: tinyagents_harness::CallId,
         arguments: serde_json::Value,
-        options: ToolCallOptions,
+        _options: ToolCallOptions,
         parent: &RunContext<crate::agent::tinyagents::host::OpenHumanRunContext>,
     ) -> anyhow::Result<ToolResult> {
-        let context = ToolExecutionContext::from_run_context(parent, _call_id.clone());
-        let child = parent.data.child();
-        tokio::select! {
-            _ = child.cancellation.cancelled() => Ok(ToolResult::error(
-                "delegate: cancelled before the configured agent completed"
-            )),
-            result = self.tool.execute_with_context(arguments, options, Some(&context)) => result,
-        }
+        let agent_id = arguments
+            .get("agent")
+            .and_then(serde_json::Value::as_str)
+            .map(str::trim)
+            .filter(|agent| !agent.is_empty())
+            .unwrap_or("delegate")
+            .to_owned();
+        crate::agent::subagent_host::run_configured_delegate_via_driver_tool(
+            parent,
+            self.tool.clone(),
+            arguments,
+            agent_id,
+        )
+        .await
+        .map_err(|error| anyhow::anyhow!("delegate: {error}"))
     }
 }
 

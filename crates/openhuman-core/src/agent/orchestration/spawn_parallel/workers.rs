@@ -90,6 +90,7 @@ async fn run_one_parallel_task(
         worktree_action_dir,
         workspace_descriptor,
         run_queue: None,
+        message_run_queue: None,
     };
     let run_result =
         run_subagent_with_parent(live_parent, definition.clone(), prompt.clone(), options).await;

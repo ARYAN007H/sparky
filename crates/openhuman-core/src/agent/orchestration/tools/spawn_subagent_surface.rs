@@ -14,7 +14,7 @@
 //!
 use crate::agent::orchestration::tools::dispatch::{incomplete_stop, stopped_subagent_result};
 use crate::agent::subagent_host::{
-    run_subagent_with_parent, SubagentRunOptions, SubagentRunOutcome, SubagentRunStatus,
+    run_subagent_via_driver_tool, SubagentRunOptions, SubagentRunOutcome, SubagentRunStatus,
 };
 use crate::agent_registry::host_definition::AgentDefinitionRegistry;
 use crate::core::runtime::DispatchCtx;
@@ -107,8 +107,8 @@ impl SpawnSubagentTool {
     }
 }
 
-include!("spawn_subagent_tool_impl.rs");
-include!("spawn_subagent_parameters.rs");
+include!("spawn_subagent_host_impl.rs");
+include!("spawn_subagent_schema.rs");
 
 /// Trim a raw prompt down to a thread-list-friendly title.
 ///

@@ -1,13 +1,17 @@
+use std::{
+    collections::HashMap,
+    sync::{Arc, Mutex},
+};
 use tinyagents_orchestration::subagent::{
     PersistedSubagentPause, SubagentOutcome, SubagentOutcomeKind, SubagentPause,
     SubagentPausePersistenceDisposition, SubagentPersistence, SubagentResume, SubagentTaskKey,
 };
 
 use super::lifecycle::{
-    host_in_flight, load_subagent_checkpoint, merged_resume_history, HostInFlight,
-    OpenHumanPersistence,
+    decode_driver_job_result, host_in_flight, load_subagent_checkpoint, merged_resume_history,
+    resolve_inline_driver_outcome, HostInFlight, OpenHumanDriverBundle, OpenHumanPersistence,
 };
-use super::{SubagentMode, SubagentRunOutcome, SubagentRunStatus, SubagentUsage};
+use super::{SubagentMode, SubagentRunError, SubagentRunOutcome, SubagentRunStatus, SubagentUsage};
 
 fn key() -> SubagentTaskKey {
     SubagentTaskKey {
@@ -16,6 +20,130 @@ fn key() -> SubagentTaskKey {
         thread_id: Some("thread".into()),
         task_id: "task".into(),
     }
+}
+
+fn cached_outcome(status: SubagentRunStatus) -> SubagentRunOutcome {
+    SubagentRunOutcome {
+        task_id: "task".into(),
+        agent_id: "researcher".into(),
+        output: "partial output".into(),
+        iterations: 1,
+        elapsed: std::time::Duration::from_millis(1),
+        mode: SubagentMode::Typed,
+        status,
+        final_history: Vec::new(),
+        usage: SubagentUsage::default(),
+        artifact_paths: Vec::new(),
+        persistence_disposition:
+            tinyagents_orchestration::subagent::SubagentPersistenceDisposition::PauseCommitted,
+    }
+}
+
+fn lifecycle_error(status: &str, task_id: &str) -> tinytools::ToolResult {
+    tinytools::ToolResult::error(
+        serde_json::json!({"task_id": task_id, "status": status}).to_string(),
+    )
+}
+
+#[test]
+fn driver_error_accepts_only_matching_nonterminal_lifecycle_snapshots() {
+    let workspace = tempfile::tempdir().unwrap();
+    let bundle = OpenHumanDriverBundle::new(workspace.path().join("checkpoints")).unwrap();
+    let task_key = key();
+    let public_id = "subagent-job-42";
+
+    for (status, host_status) in [
+        (
+            "awaiting_input",
+            SubagentRunStatus::AwaitingUser {
+                question: "Need clarification".into(),
+                options: None,
+                checkpoint: None,
+            },
+        ),
+        (
+            "incomplete",
+            SubagentRunStatus::Incomplete {
+                reason: "iteration limit".into(),
+            },
+        ),
+        ("cancelled", SubagentRunStatus::Cancelled),
+    ] {
+        bundle
+            .host_outcome
+            .lock()
+            .unwrap()
+            .insert(task_key.clone(), cached_outcome(host_status));
+        let decoded =
+            decode_driver_job_result(lifecycle_error(status, public_id), &bundle, &task_key)
+                .unwrap();
+        assert_eq!(decoded, public_id);
+    }
+}
+
+#[test]
+fn driver_error_does_not_hide_completed_mismatched_or_persistence_failures() {
+    let workspace = tempfile::tempdir().unwrap();
+    let bundle = OpenHumanDriverBundle::new(workspace.path().join("checkpoints")).unwrap();
+    let task_key = key();
+    bundle.host_outcome.lock().unwrap().insert(
+        task_key.clone(),
+        cached_outcome(SubagentRunStatus::AwaitingUser {
+            question: "Need clarification".into(),
+            options: None,
+            checkpoint: None,
+        }),
+    );
+
+    for result in [
+        lifecycle_error("cancelled", "subagent-job-42"),
+        lifecycle_error("unknown", "subagent-job-42"),
+        tinytools::ToolResult::error("provider transport failed"),
+    ] {
+        let error = decode_driver_job_result(result, &bundle, &task_key).unwrap_err();
+        assert!(error
+            .to_string()
+            .contains("driver-backed async spawn failed"));
+    }
+
+    bundle.failures.lock().unwrap().insert(
+        task_key.clone(),
+        SubagentRunError::Provider(anyhow::anyhow!("checkpoint write failed")),
+    );
+    let error = decode_driver_job_result(
+        lifecycle_error("awaiting_input", "subagent-job-42"),
+        &bundle,
+        &task_key,
+    )
+    .unwrap_err();
+    assert!(error.to_string().contains("checkpoint write failed"));
+
+    bundle.failures.lock().unwrap().remove(&task_key);
+    bundle.host_outcome.lock().unwrap().insert(
+        task_key.clone(),
+        cached_outcome(SubagentRunStatus::Completed),
+    );
+    let error = decode_driver_job_result(
+        lifecycle_error("completed", "subagent-job-42"),
+        &bundle,
+        &task_key,
+    )
+    .unwrap_err();
+    assert!(error
+        .to_string()
+        .contains("driver-backed async spawn failed"));
+
+    bundle.host_outcome.lock().unwrap().insert(
+        task_key.clone(),
+        cached_outcome(SubagentRunStatus::AwaitingUser {
+            question: "Need clarification".into(),
+            options: None,
+            checkpoint: None,
+        }),
+    );
+    let error = decode_driver_job_result(lifecycle_error("awaiting_input", ""), &bundle, &task_key)
+        .unwrap_err();
+    assert!(error.to_string().contains("omitted its registered job id"));
 }
 
 fn paused_outcome(question: &str, resume: SubagentResume) -> SubagentOutcome {
@@ -104,6 +232,116 @@ async fn persistence_hashes_an_oversized_scoped_key_for_filesystem_safety() {
 }
 
 #[tokio::test]
+async fn legacy_durable_session_resolves_its_key_only_from_owned_checkpoint() {
+    let workspace = tempfile::tempdir().unwrap();
+    let checkpoint_dir = workspace.path().join("checkpoints");
+    let key = key();
+    let store = crate::agent::orchestration::subagent_sessions::SubagentSessionStore::new(
+        workspace.path().to_path_buf(),
+    );
+    let session = crate::agent::orchestration::subagent_sessions::upsert_running(
+        &store,
+        crate::agent::orchestration::subagent_sessions::SubagentSessionUpsert {
+            selector: crate::agent::orchestration::subagent_sessions::SubagentSessionSelector {
+                parent_session: "owner-session".into(),
+                parent_thread_id: Some("thread".into()),
+                agent_id: "researcher".into(),
+                model: None,
+                sandbox_mode: "workspace".into(),
+                action_root: None,
+                task_key: "task".into(),
+            },
+            display_name: None,
+            task_title: "Task".into(),
+            worker_thread_id: None,
+            task_id: "task".into(),
+            lifecycle_key: None,
+        },
+        None,
+    )
+    .unwrap();
+    OpenHumanPersistence::new(checkpoint_dir.clone())
+        .save_pause(persisted_pause(key.clone(), "question", None))
+        .await
+        .unwrap();
+
+    let resolved = crate::agent::orchestration::subagent_sessions::resolve_lifecycle_key(
+        &store,
+        &session.subagent_session_id,
+        "owner-session",
+        Some("thread"),
+        &checkpoint_dir,
+    )
+    .unwrap();
+    assert_eq!(resolved, key);
+    assert!(
+        crate::agent::orchestration::subagent_sessions::resolve_lifecycle_key(
+            &store,
+            &session.subagent_session_id,
+            "different-owner",
+            Some("thread"),
+            &checkpoint_dir,
+        )
+        .is_err()
+    );
+}
+
+#[tokio::test]
+async fn tiny_session_port_recovers_legacy_key_from_owned_pause_and_hides_foreign_rows() {
+    use tinyagents_orchestration::subagent::SubagentSessionStore as _;
+
+    let workspace = tempfile::tempdir().unwrap();
+    let checkpoint_dir = workspace.path().join(".openhuman/subagent_checkpoints");
+    let key = key();
+    let store = crate::agent::orchestration::subagent_sessions::SubagentSessionStore::new(
+        workspace.path().to_path_buf(),
+    );
+    crate::agent::orchestration::subagent_sessions::upsert_running(
+        &store,
+        crate::agent::orchestration::subagent_sessions::SubagentSessionUpsert {
+            selector: crate::agent::orchestration::subagent_sessions::SubagentSessionSelector {
+                parent_session: "owner-session".into(),
+                parent_thread_id: Some("thread".into()),
+                agent_id: "researcher".into(),
+                model: None,
+                sandbox_mode: "workspace".into(),
+                action_root: None,
+                task_key: "task".into(),
+            },
+            display_name: None,
+            task_title: "Task".into(),
+            worker_thread_id: None,
+            task_id: "task".into(),
+            lifecycle_key: None,
+        },
+        None,
+    )
+    .unwrap();
+    OpenHumanPersistence::new(checkpoint_dir)
+        .save_pause(persisted_pause(key.clone(), "question", None))
+        .await
+        .unwrap();
+
+    let port =
+        crate::agent::orchestration::subagent_sessions::OpenHumanTinySubagentSessionStore::new(
+            workspace.path().to_path_buf(),
+            "owner-session",
+            Some("thread".into()),
+        );
+    let owned = port
+        .list_for_parent("owner-session", Some("thread"))
+        .await
+        .unwrap();
+    assert_eq!(owned.len(), 1);
+    assert_eq!(owned[0].lifecycle_key, Some(key));
+    assert!(port
+        .list_for_parent("foreign-session", Some("thread"))
+        .await
+        .unwrap()
+        .is_empty());
+}
+
+#[tokio::test]
 async fn persistence_commits_one_scoped_pause_and_recovers_its_original_key() {
     let directory = tempfile::tempdir().unwrap();
     let persistence = OpenHumanPersistence::new(directory.path().to_path_buf());
@@ -164,195 +402,76 @@ async fn persistence_inserts_one_terminal_and_returns_the_durable_winner() {
 }
 
 #[tokio::test]
-async fn continuation_replaces_only_the_pause_it_loaded_and_stale_duplicate_gets_winner() {
+async fn driver_inline_projection_returns_the_durable_winner_not_a_local_loser() {
+    use tinyagents_orchestration::subagent::SubagentPersistenceDisposition as Disposition;
+
     let directory = tempfile::tempdir().unwrap();
-    let persistence = OpenHumanPersistence::new(directory.path().to_path_buf());
     let key = key();
-    let original = SubagentResume::default();
-    assert_eq!(
-        persistence
-            .save_pause(persisted_pause(key.clone(), "first question", None))
-            .await
-            .unwrap(),
-        SubagentPausePersistenceDisposition::Inserted
-    );
+    let bundle = OpenHumanDriverBundle::new(directory.path().join("checkpoints")).unwrap();
+    let mut local_loser = cached_outcome(SubagentRunStatus::Completed);
+    local_loser.output = "local losing output".into();
+    local_loser.iterations = 2;
+    local_loser.persistence_disposition = Disposition::TerminalExisting;
+    bundle
+        .host_outcome
+        .lock()
+        .unwrap()
+        .insert(key.clone(), local_loser);
 
-    assert_eq!(
-        persistence
-            .save_pause(persisted_pause(
-                key.clone(),
-                "replacement question",
-                Some(original.clone()),
-            ))
-            .await
-            .unwrap(),
-        SubagentPausePersistenceDisposition::Replaced
+    let mut winner = SubagentOutcome::cancelled("task");
+    winner.status = SubagentOutcomeKind::Incomplete(
+        tinyagents_orchestration::subagent::SubagentIncomplete::new("winner stopped"),
     );
-    assert_eq!(
-        persistence
-            .save_pause(persisted_pause(
-                key.clone(),
-                "stale duplicate question",
-                Some(original),
-            ))
-            .await
-            .unwrap(),
-        SubagentPausePersistenceDisposition::Existing
-    );
+    winner.output = "durable winning output".into();
+    winner.history = vec![tinyinference_llm::message::Message::assistant(
+        "durable winning history",
+    )];
+    winner.usage.calls = 7;
+    winner
+        .extensions
+        .insert("agent_id".into(), serde_json::json!("winner-agent"));
+    let winning_host = SubagentRunOutcome {
+        output: winner.output.clone(),
+        agent_id: "winner-agent".into(),
+        iterations: 7,
+        ..cached_outcome(SubagentRunStatus::Incomplete {
+            reason: "winner stopped".into(),
+        })
+    };
+    let winner_cache = Arc::new(Mutex::new(HashMap::from([(key.clone(), winning_host)])));
+    let winner_persistence = OpenHumanPersistence::new(directory.path().join("checkpoints"))
+        .with_host_outcome(Arc::clone(&winner_cache));
+    winner_persistence
+        .record_terminal(&key, &winner, None)
+        .await
+        .unwrap();
 
-    let winner = persistence.load_pause(&key).await.unwrap().unwrap();
+    let result = tinytools::ToolResult::error(
+        serde_json::json!({"task_id":"public-job-42", "status":"incomplete"}).to_string(),
+    );
+    let (projected, public_job_id) =
+        resolve_inline_driver_outcome(result, &bundle, &key, "fallback-agent")
+            .await
+            .unwrap();
+
+    assert_eq!(public_job_id, "public-job-42");
+    assert_eq!(projected.output, "durable winning output");
+    assert_eq!(projected.agent_id, "winner-agent");
+    assert_eq!(projected.iterations, 7);
     assert!(matches!(
-        winner.status,
-        SubagentOutcomeKind::AwaitingInput(SubagentPause { ref reason, .. })
-            if reason == "replacement question"
+        projected.status,
+        SubagentRunStatus::Incomplete { ref reason } if reason == "winner stopped"
     ));
-}
-
-#[tokio::test]
-async fn task_id_index_retains_scoped_collisions_and_terminal_does_not_reopen_pause() {
-    let directory = tempfile::tempdir().unwrap();
-    let persistence = OpenHumanPersistence::new(directory.path().to_path_buf());
-    let first = scoped_key("root-a", "parent-a", Some("thread-a"));
-    let second = scoped_key("root-b", "parent-b", Some("thread-b"));
+    assert_eq!(projected.final_history.len(), 1);
     assert_eq!(
-        persistence
-            .save_pause(persisted_pause(first.clone(), "first", None))
-            .await
-            .unwrap(),
-        SubagentPausePersistenceDisposition::Inserted
+        projected.final_history[0].content,
+        "durable winning history"
     );
     assert_eq!(
-        persistence
-            .save_pause(persisted_pause(second.clone(), "second", None))
-            .await
-            .unwrap(),
-        SubagentPausePersistenceDisposition::Inserted
-    );
-    assert!(load_subagent_checkpoint(directory.path(), "task").is_err());
-
-    let mut terminal = SubagentOutcome::cancelled("task");
-    terminal.status = SubagentOutcomeKind::Completed;
-    assert_eq!(
-        persistence
-            .record_terminal(&first, &terminal, None)
-            .await
-            .unwrap(),
-        tinyagents_orchestration::subagent::SubagentTerminalPersistenceDisposition::PauseExisting
-    );
-    assert_eq!(
-        persistence
-            .record_terminal(&first, &terminal, Some(&SubagentResume::default()))
-            .await
-            .unwrap(),
-        tinyagents_orchestration::subagent::SubagentTerminalPersistenceDisposition::Inserted
-    );
-    assert_eq!(
-        load_subagent_checkpoint(directory.path(), "task")
-            .unwrap()
-            .task_key,
-        Some(second.clone())
-    );
-    assert!(persistence.load_pause(&first).await.unwrap().is_none());
-    assert!(persistence.load_terminal(&first).await.unwrap().is_some());
-}
-
-#[tokio::test]
-async fn terminal_and_pause_race_leave_only_one_authoritative_state() {
-    let directory = tempfile::tempdir().unwrap();
-    let persistence =
-        std::sync::Arc::new(OpenHumanPersistence::new(directory.path().to_path_buf()));
-    let key = key();
-    let mut terminal = SubagentOutcome::cancelled("task");
-    terminal.status = SubagentOutcomeKind::Completed;
-    let (pause, terminal_write) = tokio::join!(
-        persistence.save_pause(persisted_pause(key.clone(), "question", None)),
-        persistence.record_terminal(&key, &terminal, None),
-    );
-    assert!(pause.is_ok());
-    assert_eq!(
-        terminal_write.unwrap(),
-        tinyagents_orchestration::subagent::SubagentTerminalPersistenceDisposition::PauseExisting
-    );
-    assert!(persistence.load_terminal(&key).await.unwrap().is_none());
-    assert!(persistence.load_pause(&key).await.unwrap().is_some());
-    assert!(load_subagent_checkpoint(directory.path(), "task").is_ok());
-}
-
-#[tokio::test]
-async fn host_coalescer_keeps_the_leader_winner_and_cancels_only_the_observer() {
-    let entry = HostInFlight::new();
-    let key = key();
-    let cancelled = tinyagents_harness::CancellationToken::new();
-    cancelled.cancel();
-
-    let observer = entry
-        .wait(&cancelled, &key, "observer-agent")
-        .await
-        .unwrap()
-        .expect("cancelled follower reports an outcome");
-    assert!(matches!(observer.status, SubagentRunStatus::Cancelled));
-    assert_eq!(
-        observer.persistence_disposition,
-        tinyagents_orchestration::subagent::SubagentPersistenceDisposition::ObserverCancelled
-    );
-
-    let winner = SubagentRunOutcome {
-        task_id: key.task_id.clone(),
-        agent_id: "leader-agent".into(),
-        output: "durable winner".into(),
-        iterations: 3,
-        elapsed: std::time::Duration::from_millis(42),
-        mode: SubagentMode::Typed,
-        status: SubagentRunStatus::Completed,
-        final_history: Vec::new(),
-        usage: SubagentUsage::default(),
-        artifact_paths: Vec::new(),
-        persistence_disposition:
-            tinyagents_orchestration::subagent::SubagentPersistenceDisposition::TerminalInserted,
-    };
-    entry.complete(Some(winner)).await;
-
-    let active = tinyagents_harness::CancellationToken::new();
-    let follower = entry
-        .wait(&active, &key, "other-agent")
-        .await
-        .unwrap()
-        .expect("leader result remains available");
-    assert_eq!(follower.output, "durable winner");
-    assert_eq!(follower.agent_id, "leader-agent");
-    assert_eq!(follower.elapsed, std::time::Duration::from_millis(42));
-    assert_eq!(
-        follower.persistence_disposition,
-        tinyagents_orchestration::subagent::SubagentPersistenceDisposition::TerminalExisting
+        projected.persistence_disposition,
+        Disposition::TerminalExisting
     );
 }
 
-#[tokio::test]
-async fn each_agent_dedupes_its_own_in_flight_sub_agents() {
-    use crate::core::runtime::agent_scope::test_agent_context;
-    use crate::core::runtime::{context::CoreContext, DomainSet};
-    use std::sync::Arc;
-
-    let root = CoreContext::for_test(DomainSet::full(), None);
-    let alpha = test_agent_context(&root, "alpha");
-    let beta = test_agent_context(&root, "beta");
-
-    let alpha_map = {
-        let scope_ctx = crate::core::runtime::DispatchCtx::new(Arc::clone(&alpha));
-
-        host_in_flight(&scope_ctx)
-    };
-    let beta_map = {
-        let scope_ctx = crate::core::runtime::DispatchCtx::new(beta);
-
-        host_in_flight(&scope_ctx)
-    };
-    let alpha_again = {
-        let scope_ctx = crate::core::runtime::DispatchCtx::new(alpha);
-
-        host_in_flight(&scope_ctx)
-    };
-
-    assert!(!Arc::ptr_eq(&alpha_map, &beta_map));
-    assert!(Arc::ptr_eq(&alpha_map, &alpha_again));
-}
+#[path = "lifecycle_terminal_tests.rs"]
+mod terminal_tests;

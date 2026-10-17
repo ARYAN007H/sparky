@@ -9,7 +9,7 @@ use std::sync::Arc;
 use crate::agent::subagent_host::types::SubagentRunError;
 use crate::agent::tinyagents::{SubagentScope, TurnSpec};
 use crate::progress::AgentProgress;
-use tinyagents_harness::run_queue::RunQueue;
+use tinyagents_harness::run_queue::{RunQueue, RunQueueHandle};
 use tinyagents_session::transcript::TranscriptMessage;
 use tinyjuice_bus::types::AgentTokenjuiceCompression;
 use tinytools::WorkspaceDescriptor;
@@ -44,7 +44,10 @@ pub(in super::super) async fn run_subagent_via_graph(
     specs: Vec<ToolSpec>,
     allowed_names: HashSet<String>,
     max_iterations: usize,
-    run_queue: Option<Arc<RunQueue<crate::agent::queued_turn::QueuedTurn>>>,
+    queues: (
+        Option<Arc<RunQueue<crate::agent::queued_turn::QueuedTurn>>>,
+        Option<RunQueueHandle>,
+    ),
     on_progress: Option<tokio::sync::mpsc::Sender<AgentProgress>>,
     agent_id: &str,
     task_id: &str,
@@ -87,6 +90,7 @@ pub(in super::super) async fn run_subagent_via_graph(
     ),
     SubagentRunError,
 > {
+    let (run_queue, message_run_queue) = queues;
     // One resolved thread identity drives every child-facing boundary. An
     // explicit worker/task thread deliberately replaces the inherited parent;
     // otherwise a child remains in its parent's conversation. Do this before
@@ -226,6 +230,7 @@ pub(in super::super) async fn run_subagent_via_graph(
         context_window,
         // Mid-flight steering: forward queued steer messages into the run.
         run_queue,
+        message_run_queue,
         // Pause + checkpoint when the child asks the user a clarifying question.
         early_exit_tools: &["ask_user_clarification"],
         // Pause gracefully at the model-call cap so we can summarize a resumable

@@ -1,6 +1,37 @@
 use super::*;
 use crate::agent::subagent_host::run_subagent;
+use crate::agent::subagent_host::{
+    run_subagent_via_driver_tool, spawn_async_via_driver_tool_with_jobs, SubagentRunStatus,
+};
 use tinyagents_harness::context::{current_run_depth, with_run_depth, RunDepth};
+
+struct BlockingSubagentCloseTool {
+    started: tokio::sync::mpsc::Sender<()>,
+    release: Arc<tokio::sync::Notify>,
+    finished: tokio::sync::mpsc::Sender<()>,
+}
+
+#[async_trait::async_trait]
+impl tinytools::Tool for BlockingSubagentCloseTool {
+    fn name(&self) -> &str {
+        "blocking_close_fixture"
+    }
+
+    fn description(&self) -> &str {
+        "Blocks until the test releases the in-flight tool after close."
+    }
+
+    fn parameters_schema(&self) -> serde_json::Value {
+        serde_json::json!({"type": "object"})
+    }
+
+    async fn execute(&self, _args: serde_json::Value) -> anyhow::Result<tinytools::ToolResult> {
+        let _ = self.started.send(()).await;
+        self.release.notified().await;
+        let _ = self.finished.send(()).await;
+        Ok(tinytools::ToolResult::success("tool released after close"))
+    }
+}
 
 #[tokio::test]
 async fn runner_rejects_spawn_beyond_max_depth() {
@@ -649,3 +680,6 @@ fn nested_subagent_dispatch_runs_on_a_constrained_worker_stack() {
         outcome.output
     );
 }
+
+#[path = "ops_tests_driver_bridge_tests.rs"]
+mod driver_bridge_tests;

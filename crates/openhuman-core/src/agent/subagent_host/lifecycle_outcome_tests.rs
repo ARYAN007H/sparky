@@ -50,3 +50,48 @@ fn paused_outcomes_preserve_answer_choices_and_worker_resume_options() {
     assert_eq!(pause.resume.metadata["skill_filter_override"], "docs");
     assert_eq!(pause.resume.metadata["model_override"], "worker-model");
 }
+
+#[test]
+fn host_outcome_terminal_record_round_trips_through_json_bytes() {
+    let definitions =
+        crate::agent_registry::host_definition::AgentDefinitionRegistry::builtins_only();
+    let definition = definitions.get("orchestrator").unwrap();
+    let options = SubagentRunOptions {
+        worker_thread_id: Some("worker-thread".into()),
+        model_override: Some("worker-model".into()),
+        ..SubagentRunOptions::default()
+    };
+    let outcome = SubagentRunOutcome {
+        task_id: "task-123".into(),
+        agent_id: definition.id.clone(),
+        output: "durable".into(),
+        iterations: 2,
+        elapsed: std::time::Duration::from_millis(25),
+        mode: crate::agent::subagent_host::SubagentMode::Typed,
+        status: SubagentRunStatus::Completed,
+        final_history: Vec::new(),
+        usage: SubagentUsage::default(),
+        artifact_paths: vec![],
+        persistence_disposition:
+            tinyagents_orchestration::subagent::SubagentPersistenceDisposition::TerminalInserted,
+    };
+
+    let neutral = host_outcome_to_neutral(outcome, definition, &options);
+    assert_eq!(neutral.extensions["agent_id"], definition.id);
+    assert_eq!(neutral.extensions["iterations"], 2);
+    assert!(!neutral.extensions.contains_key("task_id"));
+    assert!(!neutral.extensions.contains_key("tier"));
+    assert!(!neutral.extensions.contains_key("worker_thread_id"));
+    assert!(!neutral.extensions.contains_key("model_override"));
+    let encoded = serde_json::to_vec(&neutral).unwrap();
+    let decoded: tinyagents_orchestration::subagent::SubagentOutcome =
+        serde_json::from_slice(&encoded)
+            .expect("terminal outcomes written as bytes must deserialize");
+    assert_eq!(decoded.task_id, "task-123");
+    assert_eq!(decoded.worker_thread_id.as_deref(), Some("worker-thread"));
+    assert_eq!(decoded.model_override.as_deref(), Some("worker-model"));
+    assert_eq!(
+        decoded.tier.as_deref(),
+        Some(definition.agent_tier.as_str())
+    );
+}

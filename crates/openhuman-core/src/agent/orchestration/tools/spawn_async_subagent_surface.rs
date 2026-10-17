@@ -12,9 +12,7 @@ use crate::agent::orchestration::subagent_sessions::{
     SubagentSessionUpsert,
 };
 use crate::agent::orchestration::tools::dispatch::incomplete_stop;
-use crate::agent::subagent_host::{
-    run_subagent_with_parent, SubagentRunOptions, SubagentRunStatus,
-};
+use crate::agent::subagent_host::SubagentRunOptions;
 use crate::agent_registry::host_definition::AgentDefinitionRegistry;
 use crate::core::runtime::DispatchCtx;
 use crate::progress::AgentProgress;
@@ -22,10 +20,8 @@ use crate::threads::store::{self as conversations, ConversationMessage};
 use async_trait::async_trait;
 use serde_json::json;
 use std::sync::Arc;
-use tinyagents_harness::context::{RunConfig, RunContext};
-use tinyagents_harness::run_queue::RunQueue;
+use tinyagents_harness::context::RunContext;
 use tinyagents_harness::tool::{ToolDispatch, ToolExecutionContext};
-use tinyagents_orchestration::subagent::DetachedSubagentStatus;
 use tinyagents_session::transcript::TranscriptMessage;
 use tinytools::ToolRunContext;
 use tinytools::{PermissionLevel, Tool, ToolCallOptions, ToolResult};
@@ -65,15 +61,8 @@ impl ToolDispatch<(), crate::agent::tinyagents::host::OpenHumanRunContext>
         parent: &RunContext<crate::agent::tinyagents::host::OpenHumanRunContext>,
     ) -> anyhow::Result<ToolResult> {
         let context = ToolExecutionContext::from_run_context(parent, _call_id.clone());
-        let detached_data = parent.data.detached_child();
-        let detached_cancellation = detached_data.cancellation.clone();
-        let detached_parent = parent
-            .child(
-                RunConfig::new(format!("async-subagent-{}", uuid::Uuid::new_v4())),
-                detached_data,
-            )
-            .map_err(|error| anyhow::anyhow!(error.to_string()))?
-            .with_cancellation(detached_cancellation);
+        let detached_parent =
+            crate::agent::subagent_host::detached_subagent_parent(parent, "async-subagent")?;
         SpawnAsyncSubagentTool::new()
             .execute_with_live_parent_context(
                 arguments,
@@ -108,6 +97,73 @@ impl SpawnAsyncSubagentTool {
         Self {
             advertised_ids: ids,
         }
+    }
+}
+
+/// Route reusable-session input through the same generic Message operation
+/// installed for model calls. Durable session id lookup keeps the host from
+/// steering an unrelated live task by a raw task-id string.
+async fn steer_reusable_session(
+    parent: &RunContext<crate::agent::tinyagents::host::OpenHumanRunContext>,
+    session_id: &str,
+    message: String,
+) -> Result<(), String> {
+    use tinyagents_harness::tool::ToolDispatch;
+    use tinyagents_orchestration::subagent::{SubAgentJobRegistry, SubAgentMessageTool};
+    use tinytools::{ToolCallOptions, ToolTimeout};
+
+    let context = &parent.data;
+    let product_parent = context
+        .parent
+        .as_ref()
+        .ok_or_else(|| "reusable async subagent has no durable parent".to_owned())?;
+    let thread_id = parent.thread_id().map(|id| id.as_str().to_owned());
+    let owner = crate::agent::tinyagents::tool_registration::subagent_owner_key(
+        &product_parent.workspace_dir,
+        &product_parent.session_id,
+        thread_id.as_deref(),
+    );
+    let owner_scope: Arc<dyn Fn(u64) -> String + Send + Sync> = Arc::new(move |_| owner.clone());
+    let jobs =
+        (*crate::core::runtime::slot_for::<SubAgentJobRegistry>(&context.dispatch_ctx())).clone();
+    let store: Arc<dyn tinyagents_orchestration::subagent::SubagentSessionStore> = Arc::new(
+        crate::agent::orchestration::subagent_sessions::OpenHumanTinySubagentSessionStore::new(
+            product_parent.workspace_dir.clone(),
+            product_parent.session_id.clone(),
+            thread_id.clone(),
+        ),
+    );
+    let parent_session = product_parent.session_id.clone();
+    let dispatch = SubAgentMessageTool::new(jobs)
+        .with_tool_name("steer_subagent")
+        .with_argument_fields("task_id", "subagent_session_id", "message", "__request_id")
+        .with_lane_field("mode")
+        .with_owner_scope(owner_scope)
+        .with_sessions(store, move |_| parent_session.clone())
+        .with_metadata(
+            PermissionLevel::Execute,
+            tinytools::ToolScope::All,
+            tinytools::ToolCategory::System,
+            ToolTimeout::Inherit,
+        );
+    let result = ToolDispatch::execute(
+        &dispatch,
+        &(),
+        tinyagents_harness::CallId::new(format!("reuse-steer-{session_id}")),
+        json!({
+            "subagent_session_id": session_id,
+            "message": message,
+            "mode": "steer",
+        }),
+        ToolCallOptions::default(),
+        parent,
+    )
+    .await
+    .map_err(|error| error.to_string())?;
+    if result.is_error {
+        Err(result.output())
+    } else {
+        Ok(())
     }
 }
 
@@ -267,15 +323,8 @@ impl SpawnAsyncSubagentTool {
         parent: crate::agent::harness::ParentExecutionContext,
     ) -> anyhow::Result<ToolResult> {
         let live_parent = super::live_parent_run_context("direct-async-subagent", parent);
-        let detached_data = live_parent.data.detached_child();
-        let detached_cancellation = detached_data.cancellation.clone();
-        let detached_parent = live_parent
-            .child(
-                RunConfig::new(format!("async-subagent-{}", uuid::Uuid::new_v4())),
-                detached_data,
-            )
-            .map_err(|error| anyhow::anyhow!(error.to_string()))?
-            .with_cancellation(detached_cancellation);
+        let detached_parent =
+            crate::agent::subagent_host::detached_subagent_parent(&live_parent, "async-subagent")?;
         self.execute_with_context_inner(
             args,
             options,
@@ -304,11 +353,15 @@ impl SpawnAsyncSubagentTool {
     }
 }
 
-include!("spawn_async_subagent_execute.rs");
-include!("spawn_async_subagent_args.rs");
-include!("spawn_async_subagent_results.rs");
+#[path = "spawn_async_subagent_completion.rs"]
+mod completion;
+
+include!("spawn_async_subagent_host_impl.rs");
+include!("spawn_async_subagent_request.rs");
+include!("spawn_async_subagent_projection.rs");
 
 /// Settle a late registration refusal before an accepted response is built.
+#[cfg(test)]
 fn finish_spawn_registration(
     registration: Result<(), running_subagents::RegistrationError>,
     store: &SubagentSessionStore,

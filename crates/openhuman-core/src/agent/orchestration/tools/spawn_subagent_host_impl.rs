@@ -126,16 +126,18 @@ impl SpawnSubagentTool {
         if prompt.is_empty() {
             return Ok(ToolResult::error("spawn_subagent: `prompt` is required"));
         }
-        let registry = match AgentDefinitionRegistry::current() {
-            Some(reg) => reg,
-            None => {
-                return Ok(ToolResult::error(
-                    "spawn_subagent: AgentDefinitionRegistry has not been initialised. \
+        let registry =
+            match AgentDefinitionRegistry::for_core_context(run_context.dispatch_ctx().into_core())
+            {
+                Some(reg) => reg,
+                None => {
+                    return Ok(ToolResult::error(
+                        "spawn_subagent: AgentDefinitionRegistry has not been initialised. \
                      This usually means the core process started without calling \
                      AgentDefinitionRegistry::init_global at startup.",
-                ));
-            }
-        };
+                    ));
+                }
+            };
 
         let definition = match registry.get(agent_id.as_str()) {
             Some(def) => def,
@@ -185,7 +187,7 @@ impl SpawnSubagentTool {
         // asked to delegate, and running the sub-agent inline is the one mode
         // that both executes it and returns its output. Mirrors the
         // `has_delivery_thread` fallback the `delegate_*` tools already do in
-        // `dispatch.rs::dispatch_subagent`.
+        // `subagent_dispatch_host.rs::dispatch_subagent`.
         let parent_thread_id = tool_context
             .and_then(ToolRunContext::thread_id)
             .or(run_context.thread_id.as_deref())
@@ -218,18 +220,10 @@ impl SpawnSubagentTool {
                 agent_id = %definition.id,
                 "[spawn_subagent] routing to reusable async sub-agent by default"
             );
-            let detached_data = live_parent.data.detached_child();
-            let detached_cancellation = detached_data.cancellation.clone();
-            let detached_parent = live_parent
-                .child(
-                    tinyagents_harness::context::RunConfig::new(format!(
-                        "async-subagent-{}",
-                        uuid::Uuid::new_v4()
-                    )),
-                    detached_data,
-                )
-                .map_err(|error| anyhow::anyhow!(error.to_string()))?
-                .with_cancellation(detached_cancellation);
+            let detached_parent = crate::agent::subagent_host::detached_subagent_parent(
+                live_parent,
+                "async-subagent",
+            )?;
             return super::spawn_async_subagent::SpawnAsyncSubagentTool::new()
                 .execute_with_live_parent_context(
                     async_args,
@@ -322,11 +316,13 @@ impl SpawnSubagentTool {
             worktree_action_dir,
             workspace_descriptor,
             run_queue: None,
+            message_run_queue: None,
         };
 
         let run =
-            run_subagent_with_parent(live_parent, definition.clone(), prompt.clone(), options)
-                .await;
+            run_subagent_via_driver_tool(live_parent, definition.clone(), prompt.clone(), options)
+                .await
+                .map(|(outcome, _job_id)| outcome);
         match run {
             Ok(outcome) => {
                 let emit_lifecycle_effects = outcome.should_emit_lifecycle_effects();
