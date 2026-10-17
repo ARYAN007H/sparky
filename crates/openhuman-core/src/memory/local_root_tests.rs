@@ -116,20 +116,14 @@ fn a_malformed_record_turns_memory_off_and_is_not_replaced() {
     assert!(std::fs::read_to_string(&file).unwrap().contains("../x"));
 }
 
-#[cfg(unix)]
 #[test]
-fn the_record_is_owner_only() {
-    use std::os::unix::fs::PermissionsExt;
+fn a_recorded_root_lives_in_the_state_store_not_a_file() {
     let tmp = tempfile::tempdir().unwrap();
     let config = local_config(&tmp, "a");
-    resolve(&config, HOST_ID).unwrap();
-    let file = path(&config.workspace_dir);
-    let mode = std::fs::metadata(&file).unwrap().permissions().mode() & 0o777;
-    assert_eq!(mode, 0o600);
-    let dir_mode = std::fs::metadata(file.parent().unwrap())
+    let root = resolve(&config, HOST_ID).unwrap();
+    assert!(!path(&config.workspace_dir).exists());
+    let stored: LocalRoot = crate::memory::state_store::load(&config.workspace_dir, "local_root")
         .unwrap()
-        .permissions()
-        .mode()
-        & 0o777;
-    assert_eq!(dir_mode, 0o700);
+        .unwrap();
+    assert_eq!(stored.root, root);
 }
