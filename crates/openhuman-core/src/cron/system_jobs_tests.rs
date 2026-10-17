@@ -129,7 +129,6 @@ fn ensure_memory_jobs_seeds_both_jobs_and_retires_the_context_refresh() {
     assert_eq!(system_rows(&config, SOURCES_SYNC_JOB)[0].id, sync[0].id);
 }
 
-
 #[test]
 fn memory_jobs_seed_under_agent_only_without_authorizing_generic_flows() {
     let tmp = TempDir::new().unwrap();

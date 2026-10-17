@@ -245,7 +245,6 @@ fn stored_rows_that_break_the_limits_are_refused_at_run() {
     limits::check_run(&config, &ok).unwrap();
 }
 
-
 #[test]
 fn only_reserved_memory_system_jobs_pass_the_agent_only_run_check() {
     let tmp = TempDir::new().unwrap();
