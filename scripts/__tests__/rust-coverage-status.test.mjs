@@ -348,8 +348,8 @@ test("CLI inventory sends product features only to nextest, preserving instrumen
   const script = [
     "set -euo pipefail",
     'CORE_PRODUCT_FEATURES="channels,modules"',
-    'expected_inventory=/dev/null',
-    'export CARGO_BUILD_TARGET_DIR=preserved-target',
+    "expected_inventory=/dev/null",
+    "export CARGO_BUILD_TARGET_DIR=preserved-target",
     `bash() {
       if [[ "$*" == *"llvm-cov show-env"* ]]; then
         for arg in "$@"; do
