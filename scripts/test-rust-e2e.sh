@@ -295,6 +295,15 @@ run_in_process_modules() {
   while IFS= read -r module; do
     [ -n "$module" ] || continue
     echo "[rust-e2e]   in_process module: ${module}"
+    if [ "$module" = "config_auth_app_state_connectivity_e2e" ]; then
+      # These RPC fixtures share process-global credential and listener state;
+      # serialize them so one test cannot drop another test's ephemeral server.
+      bash "$SCRIPT_DIR/ci-cancel-aware.sh" "$CARGO_BIN" test \
+        --manifest-path Cargo.toml --features "$PRODUCT_FEATURES" \
+        --test in_process_all -- "${module}::" --test-threads=1 \
+        ${EXTRA_ARGS[@]+"${EXTRA_ARGS[@]}"}
+      continue
+    fi
     if [ "$module" = "domain_modules_e2e" ]; then
       # TinyFlows and TinyMCP use process-global module runtimes. A different
       # test's RPC host teardown can leave a later module call unavailable, so
