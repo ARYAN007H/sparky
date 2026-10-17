@@ -39,12 +39,8 @@ pub(crate) fn task_id_for_session_in_workspace(
     admit_workspace(ctx, workspace_dir)?;
     let owner = owner_key(ctx, parent_session)?;
     let store = scoped_task_store(ctx, workspace_dir)?;
-    let resolved = resolve_detached_or_durable(
-        registry(),
-        store.as_ref(),
-        subagent_session_id,
-        &owner,
-    )?;
+    let resolved =
+        resolve_detached_or_durable(registry(), store.as_ref(), subagent_session_id, &owner)?;
     let task_id = resolved.task_id;
     log::debug!(
         "[running_subagents] resolved session from task store subagent_session_id={} task_id={} workspace_dir={}",
@@ -79,12 +75,7 @@ pub(crate) fn resume_ref_for_task_in_workspace(
     admit_workspace(ctx, workspace_dir)?;
     let owner = owner_key(ctx, parent_session)?;
     let store = scoped_task_store(ctx, workspace_dir)?;
-    let reference = resolve_detached_or_durable(
-        registry(),
-        store.as_ref(),
-        task_id,
-        &owner,
-    )?;
+    let reference = resolve_detached_or_durable(registry(), store.as_ref(), task_id, &owner)?;
     log::debug!(
         "[running_subagents] resolved resume ref from task store task_id={} workspace_dir={}",
         task_id,
@@ -98,9 +89,10 @@ pub(super) fn scoped_task_store(
     workspace_dir: &Path,
 ) -> Result<std::sync::Arc<dyn tinyagents_tasks::TaskStore>, WaitError> {
     if let Some(context) = ctx.resolved() {
-        return Ok(crate::core::runtime::CoreContext::sync_scope(context, || {
-            task_store_for_workspace(workspace_dir)
-        }));
+        return Ok(crate::core::runtime::CoreContext::sync_scope(
+            context,
+            || task_store_for_workspace(workspace_dir),
+        ));
     }
     if crate::core::runtime::is_saas() {
         return Err(WaitError::NotOwned);
