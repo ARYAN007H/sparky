@@ -94,7 +94,7 @@ pub async fn evaluate(
         crate::inference::provider::factory::resolves_to_managed_backend(role, config)
     });
     let needs_session = needs_backend_session
-        || (crate::inference::provider::factory::current_host_requires_session()
+        || (crate::inference::provider::factory::access_gates::current_host_requires_session()
             && nodes.iter().any(|(_, role)| {
                 let provider = crate::inference::provider::factory::provider_for_role(role, config);
                 !crate::inference::provider::factory::access_gates::provider_uses_independent_auth(
