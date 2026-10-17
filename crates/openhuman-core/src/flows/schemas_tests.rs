@@ -19,6 +19,21 @@ fn run_schema_advertises_both_input_channels() {
 }
 
 #[test]
+fn run_detached_schema_description_has_normal_spacing_and_input_rules() {
+    let schema = schemas("run_detached");
+    let inputs = schema.inputs.iter().find(|field| field.name == "inputs").unwrap();
+
+    assert!(inputs.comment.contains("graph.inputs"), "{}", inputs.comment);
+    assert!(inputs.comment.contains("Validated synchronously"), "{}", inputs.comment);
+    assert!(inputs.comment.contains("Distinct from `input`"), "{}", inputs.comment);
+    assert!(
+        !inputs.comment.contains("                               "),
+        "the rendered schema must not contain continuation indentation: {:?}",
+        inputs.comment
+    );
+}
+
+#[test]
 fn read_declared_inputs_accepts_absent_null_and_object() {
     let mut params = Map::new();
     assert!(read_declared_inputs(&params).unwrap().is_empty(), "absent");
