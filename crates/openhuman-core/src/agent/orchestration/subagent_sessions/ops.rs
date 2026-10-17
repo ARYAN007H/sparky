@@ -204,18 +204,12 @@ pub fn cancel_driver_job_by_task(
         return Ok(None);
     }
     let was_paused = session.status == DurableSubagentStatus::AwaitingUser;
-    let already_finished = match session.status {
-        DurableSubagentStatus::Idle => {
-            Some(tinyagents_orchestration::subagent::FinishedOutcome::Completed)
-        }
-        DurableSubagentStatus::Failed => {
-            Some(tinyagents_orchestration::subagent::FinishedOutcome::Failed)
-        }
-        DurableSubagentStatus::Running | DurableSubagentStatus::AwaitingUser => None,
-        DurableSubagentStatus::Closed => return Ok(None),
-    };
-    let lifecycle_key = if already_finished.is_none() {
-        Some(
+    if session.status == DurableSubagentStatus::Closed {
+        return Ok(None);
+    }
+    let lifecycle_key = match session.lifecycle_key.clone() {
+        Some(key) => Some(key),
+        None if session.current_task_id.is_some() => Some(
             resolve_lifecycle_key(
                 store,
                 task_id,
@@ -226,9 +220,41 @@ pub fn cancel_driver_job_by_task(
             .map_err(|error| {
                 format!("failed to resolve subagent lifecycle for cancellation: {error}")
             })?,
-        )
-    } else {
-        session.lifecycle_key.clone()
+        ),
+        None => None,
+    };
+    if lifecycle_key.as_ref().is_some_and(|key| {
+        key.task_id != task_id || key.thread_id != session.parent_thread_id
+    }) {
+        return Ok(None);
+    }
+    let already_finished = match session.status {
+        DurableSubagentStatus::Idle => {
+            let Some(key) = lifecycle_key.as_ref() else {
+                return Ok(None);
+            };
+            let Some(outcome) = crate::agent::subagent_host::load_terminal_outcome(
+                &store.workspace_dir,
+                key,
+            )? else {
+                return Ok(None);
+            };
+            match outcome.status {
+                tinyagents_orchestration::subagent::SubagentOutcomeKind::Completed => {
+                    Some(tinyagents_orchestration::subagent::FinishedOutcome::Completed)
+                }
+                tinyagents_orchestration::subagent::SubagentOutcomeKind::Incomplete(_)
+                | tinyagents_orchestration::subagent::SubagentOutcomeKind::Cancelled
+                | tinyagents_orchestration::subagent::SubagentOutcomeKind::AwaitingInput(_) => {
+                    Some(tinyagents_orchestration::subagent::FinishedOutcome::Failed)
+                }
+            }
+        }
+        DurableSubagentStatus::Failed => {
+            Some(tinyagents_orchestration::subagent::FinishedOutcome::Failed)
+        }
+        DurableSubagentStatus::Running | DurableSubagentStatus::AwaitingUser => None,
+        DurableSubagentStatus::Closed => unreachable!("closed handled above"),
     };
     if already_finished.is_none()
         && reason.is_some()
