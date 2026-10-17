@@ -13,7 +13,8 @@ async fn cron_completion_owner_is_event_data_and_survives_repeated_reads() {
         }
 
         async fn handle(&self, event: &DomainEvent) {
-            if matches!(event, DomainEvent::CronJobCompleted { job_id, .. } if job_id == "shared-completion-id") {
+            if matches!(event, DomainEvent::CronJobCompleted { job_id, .. } if job_id == "shared-completion-id")
+            {
                 let _ = self.0.send(event.clone());
             }
         }
@@ -26,18 +27,15 @@ async fn cron_completion_owner_is_event_data_and_survives_repeated_reads() {
         .unwrap();
 
     let context_for = |agent: &str| {
-        crate::core::runtime::CoreContext::for_test(
-            crate::core::runtime::DomainSet::full(),
-            None,
-        )
-        .derive_with(
-            crate::core::runtime::ContextOverlay::new(
-                crate::config::Config::default(),
-                crate::core::runtime::DomainSet::full(),
-                Default::default(),
+        crate::core::runtime::CoreContext::for_test(crate::core::runtime::DomainSet::full(), None)
+            .derive_with(
+                crate::core::runtime::ContextOverlay::new(
+                    crate::config::Config::default(),
+                    crate::core::runtime::DomainSet::full(),
+                    Default::default(),
+                )
+                .session_agent(agent),
             )
-            .session_agent(agent),
-        )
     };
     let mut job = crate::cron::scheduler::run_delivery::stand_in_for_test("unused");
     job.id = "shared-completion-id".into();
@@ -79,8 +77,14 @@ async fn cron_completion_owner_is_event_data_and_survives_repeated_reads() {
             ..
         } if agent == "completion-owner-b"
     ));
-    assert_eq!(event_owner(&events[0]).as_deref(), Some("completion-owner-a"));
-    assert_eq!(event_owner(&events[1]).as_deref(), Some("completion-owner-b"));
+    assert_eq!(
+        event_owner(&events[0]).as_deref(),
+        Some("completion-owner-a")
+    );
+    assert_eq!(
+        event_owner(&events[1]).as_deref(),
+        Some("completion-owner-b")
+    );
     assert_eq!(
         event_owner(&events[0]).as_deref(),
         Some("completion-owner-a"),

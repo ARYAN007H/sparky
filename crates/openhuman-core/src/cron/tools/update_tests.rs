@@ -176,10 +176,7 @@ async fn rejects_tightening_an_agent_job_below_five_minutes() {
 
     let tmp = TempDir::new().unwrap();
     let cfg = test_config(&tmp).await;
-    let mut spec = AgentJobSpec::new(
-        Schedule::Every { every_ms: 600_000 },
-        "check my inbox",
-    );
+    let mut spec = AgentJobSpec::new(Schedule::Every { every_ms: 600_000 }, "check my inbox");
     spec.name = Some("inbox".into());
     spec.session_target = SessionTarget::Isolated;
     let job = cron::add_agent_job_from_spec(&cfg, spec).unwrap();

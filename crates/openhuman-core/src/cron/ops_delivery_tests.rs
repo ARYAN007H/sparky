@@ -148,4 +148,3 @@ async fn run_job_now_pairs_trigger_and_completion_after_delivery() {
     let runs = cron::list_runs(&config, &job.id, 10).unwrap();
     assert_eq!(runs[0].delivery_status, Some(DeliveryStatus::NotRequested));
 }
-

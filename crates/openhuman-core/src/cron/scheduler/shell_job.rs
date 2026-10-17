@@ -18,12 +18,11 @@ pub(crate) async fn authorize_shell_command(
 ) -> Result<(), String> {
     #[cfg(feature = "modules")]
     {
-        let analysis = match crate::modules::tinybox::analyze_command(config, command.to_owned())
-            .await
-        {
-            Ok(analysis) => analysis,
-            Err(_) => return Err("Command analysis is unavailable.".to_owned()),
-        };
+        let analysis =
+            match crate::modules::tinybox::analyze_command(config, command.to_owned()).await {
+                Ok(analysis) => analysis,
+                Err(_) => return Err("Command analysis is unavailable.".to_owned()),
+            };
         security
             .check_gated_command_analysis(&analysis)
             .map_err(|_| "blocked by security policy: command rejected".to_owned())?;

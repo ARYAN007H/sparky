@@ -568,4 +568,3 @@ async fn deliver_if_configured_skips_non_announce_mode() {
     .await
     .is_ok());
 }
-
