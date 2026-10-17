@@ -50,9 +50,6 @@ pub(super) use crate::agent::tinyagents::budget::MAX_SPAWN_DEPTH;
 pub(super) use crate::agent_registry::host_definition::AgentDefinition;
 #[cfg(test)]
 use tinyagents_definition::PromptSource;
-#[cfg(test)]
-use tinytools::ToolSpec;
-
 // Test companion modules — path references relative to their original location.
 #[cfg(test)]
 #[path = "../ops_tests.rs"]
