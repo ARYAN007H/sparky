@@ -116,11 +116,12 @@ fi
  * neighbouring one and keeps running, so the session reads the address it
  * logs rather than trusting an HTTP probe.
  */
-function stubCore(tree, boundPort) {
+function stubCore(tree, boundPort, startupDelayMs = 0) {
   const bin = path.join(tree.root, "target", "debug", "openhuman-core");
   writeExecutable(
     bin,
     `#!/usr/bin/env bash
+sleep ${startupDelayMs / 1000}
 ${boundPort == null ? "" : `echo "[core] OpenHuman core is ready \u2014 listening on http://127.0.0.1:${boundPort} (version test)"`}
 sleep 30
 `,
@@ -515,7 +516,7 @@ test("a core that fell back to another port fails the session", async () => {
   try {
     const base = await freeBase();
     markBundle(tree, { mockPort: base, corePort: base + 1 });
-    stubCore(tree, base + 7);
+    stubCore(tree, base + 7, 3_000);
 
     const res = run(tree, "e2e-web-session.sh", { E2E_PORT_BASE: String(base) });
 
