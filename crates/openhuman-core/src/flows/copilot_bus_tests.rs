@@ -25,15 +25,8 @@ async fn model_arguments_cannot_replace_the_scoped_host_callback_address() {
     let mut config = Config::default();
     config.workspace_dir = workspace.path().to_path_buf();
     config.config_path = workspace.path().join("config.toml");
-    crate::agent::harness::host_definition::AgentDefinitionRegistry::init_global(
-        &config.workspace_dir,
-    )
-    .expect("agent registry initializes");
-
     let catalog = CopilotToolCatalog::load(Arc::new(config)).expect("module tool catalog loads");
-    let tool = catalog
-        .tool("list_agent_definitions")
-        .expect("agent listing tool is catalogued");
+    let tool = catalog.tool("list_flows").expect("list_flows is catalogued");
     let result = tool
         .execute(json!({
             "host": {
@@ -49,7 +42,7 @@ async fn model_arguments_cannot_replace_the_scoped_host_callback_address() {
         result.output()
     );
     let output: Value = serde_json::from_str(&result.output()).expect("tool JSON result");
-    assert!(output.get("agent_definitions").is_some(), "{output}");
+    assert_eq!(output["flows"], json!([]), "{output}");
 }
 
 fn tool_context(
