@@ -143,16 +143,33 @@ pub(super) fn open_driver_store(
     ctx: &DispatchCtx,
     workspace_dir: &Path,
 ) -> anyhow::Result<Arc<dyn CompletionStore>> {
-    let core_context = ctx
-        .resolved()
-        .ok_or_else(|| anyhow::anyhow!("completion store requires a resolved dispatch context"))?;
-    crate::core::runtime::CoreContext::sync_scope(core_context, || {
+    with_storage_context(ctx, || {
         let opened = crate::storage::local::open("background_completions", workspace_dir)?;
         let scoped = opened.scoped()?;
         let store = DriverCompletionStore::new(Arc::clone(scoped.documents()))
             .map_err(|error| anyhow::anyhow!("start the completion store bridge: {error}"))?;
         Ok(Arc::new(store) as Arc<dyn CompletionStore>)
     })
+}
+
+/// Scope storage access to the explicit context when one exists. A genuinely
+/// unbound non-SaaS caller with no ambient profile may still use the ordinary
+/// local-workspace backend; SaaS and foreign ambient scopes fail closed.
+fn with_storage_context<R>(
+    ctx: &DispatchCtx,
+    open: impl FnOnce() -> anyhow::Result<R>,
+) -> anyhow::Result<R> {
+    if let Some(core_context) = ctx.resolved() {
+        return crate::core::runtime::CoreContext::sync_scope(core_context, open);
+    }
+    if !crate::core::runtime::is_saas()
+        && crate::core::runtime::CoreContext::scoped().is_none()
+    {
+        return open();
+    }
+    Err(anyhow::anyhow!(
+        "completion store requires a resolved dispatch context in this scope"
+    ))
 }
 
 pub(super) fn router_pool() -> &'static CompletionRouterPool<RouterScope> {
@@ -195,20 +212,14 @@ pub(super) fn test_store_overrides(
 
 pub(super) fn entry_for_ctx(ctx: &DispatchCtx, workspace_dir: &Path) -> Arc<Entry> {
     let scope = router_scope_for(ctx, workspace_dir);
-    let router = match ctx.resolved().map(|core_context| {
-        crate::core::runtime::CoreContext::sync_scope(core_context, || {
-            router_pool().get_or_open(&scope)
-        })
+    let router = match with_storage_context(ctx, || {
+        router_pool()
+            .get_or_open(&scope)
+            .map_err(|error| anyhow::anyhow!("{error}"))
     }) {
-        Some(Ok(router)) => router,
-        Some(Err(error)) => {
+        Ok(router) => router,
+        Err(error) => {
             log::error!("[background_completions] router pool lookup failed: {error}");
-            Arc::new(new_router(Arc::new(InMemoryCompletionStore::new())))
-        }
-        None => {
-            log::error!(
-                "[background_completions] router lookup requires a resolved dispatch context"
-            );
             Arc::new(new_router(Arc::new(InMemoryCompletionStore::new())))
         }
     };
