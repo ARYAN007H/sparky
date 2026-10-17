@@ -317,5 +317,8 @@ async fn lost_engine_lease_does_not_project_failure_over_the_winning_owner() {
         .expect("run remains present");
     assert_eq!(after.status, WorkflowRunStatus::Running);
     assert_eq!(after.lease_owner.as_deref(), Some("other-process"));
-    assert_ne!(after.summary.as_deref(), Some("workflow safety admission failed"));
+    assert_ne!(
+        after.summary.as_deref(),
+        Some("workflow safety admission failed")
+    );
 }

@@ -183,7 +183,7 @@ fn schedule_workflow_drive(
     };
 
     let revision_slot = Arc::clone(&admission_revision);
-    let commit = move || {
+    let commit = move || -> Result<WorkflowRun> {
         let run = commit()?;
         let _ = revision_slot.set(run.revision);
         Ok(run)
