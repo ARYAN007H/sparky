@@ -122,7 +122,9 @@ async fn run_uses_the_explicit_core_context_and_preserves_markdown_options() {
     components.flows = false;
     let explicit = CoreContext::for_test_with_components(components);
     let ambient = CoreContext::for_test(DomainSet::full(), None);
-    let context = execution_context(OpenHumanRunContext::new().with_core(Some(explicit)));
+    let context = execution_context(
+        OpenHumanRunContext::new().with_core(Some(Arc::clone(&explicit))),
+    );
     let cron = CronTool::new(config, Arc::new(SecurityPolicy::default()));
 
     let result = CoreContext::scope(ambient, async {
@@ -136,7 +138,7 @@ async fn run_uses_the_explicit_core_context_and_preserves_markdown_options() {
     })
     .await;
 
-    assert!(result.is_error, "the explicit context disables flows: {}", result.output());
+    assert!(!result.is_error, "a disabled flow schedule is skipped: {}", result.output());
     assert!(result.output().contains("COMPONENT_DISABLED:flows"), "{}", result.output());
     assert!(result.markdown_formatted.as_deref().is_some_and(|md| md.contains("status")));
 }
@@ -197,9 +199,10 @@ async fn add_uses_the_explicit_channel_origin_without_ambient_turn_state() {
 
 #[test]
 fn description_says_conversation_jobs_reply_automatically_and_documents_overrides() {
-    let description = tool().description();
+    let cron = tool();
+    let description = cron.description();
     assert!(description.contains("automatically"));
     assert!(description.contains("proactive"));
     assert!(description.contains("none"));
-    assert!(!description.contains("copy a reply target"));
+    assert!(!description.contains("announce"));
 }
