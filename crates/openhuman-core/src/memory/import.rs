@@ -13,7 +13,8 @@ use std::sync::{Arc, LazyLock, Mutex};
 use std::time::Duration;
 
 use tinymemory_integrations::import::{
-    Begun, CheckpointStore, ImportError, ImportFile, ImportPhase, ImportState, Importer, Pacer,
+    Begun, CheckpointStore, ImportCounts as LegacyImportCounts, ImportError, ImportFile,
+    ImportPhase, ImportState, Importer, Pacer,
 };
 
 use crate::config::Config;
@@ -137,6 +138,11 @@ pub async fn scan(config: &Config) -> MemoryResult<ImportScanView> {
     })
         .await
         .map_err(|error| MemoryError::Engine(format!("import scan failed: {error}")))?;
+    let counts = counts.map(|counts: LegacyImportCounts| ImportCounts {
+        documents: counts.documents,
+        conversations: counts.conversations,
+        learnings: counts.learnings,
+    });
     Ok(ImportScanView {
         found: counts.is_some(),
         counts,

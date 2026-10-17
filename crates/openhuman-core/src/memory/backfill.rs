@@ -40,7 +40,7 @@ use crate::config::Config;
 use crate::memory::engine::{self, BoundEngine};
 use crate::memory::error::{MemoryError, MemoryResult};
 use crate::memory::scope::{MemoryIdentity, ResolvedIdentity};
-use crate::memory::types::ImportPhase;
+use tinymemory_integrations::import::ImportPhase;
 use crate::threads::store::blocking as threads;
 
 use tinymemory_tools::backfill::{first_live_turn, group_items, turn_groups, ThreadMessage};
