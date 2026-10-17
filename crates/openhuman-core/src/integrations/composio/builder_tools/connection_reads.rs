@@ -8,11 +8,61 @@ use serde_json::{json, Value};
 use crate::config::Config;
 use tinytools::{PermissionLevel, Tool, ToolCallOptions, ToolResult, ToolRunContext};
 
+/// Host supplied source for the flow editor's mixed connection picker.
+#[async_trait]
+pub trait FlowConnectionProvider: Send + Sync {
+    async fn list(
+        &self,
+        dispatch: &crate::core::runtime::DispatchCtx,
+        config: &Config,
+    ) -> Result<Vec<Value>, String>;
+}
+
 /// `list_connectable_toolkits`: read-only list of the Composio toolkits the
 /// builder can wire, each tagged connected/unconnected — so the agent can steer
 /// toolkit choice toward what's already connected (audit Phase 5, item 19).
 pub struct ListConnectableToolkitsTool {
     config: Arc<Config>,
+}
+
+/// Read-only mixed connection picker backed by a host supplied provider.
+pub struct ListFlowConnectionsTool {
+    config: Arc<Config>,
+    provider: Arc<dyn FlowConnectionProvider>,
+}
+
+impl ListFlowConnectionsTool {
+    pub fn new(config: Arc<Config>, provider: Arc<dyn FlowConnectionProvider>) -> Self {
+        Self { config, provider }
+    }
+}
+
+#[async_trait]
+impl Tool for ListFlowConnectionsTool {
+    fn name(&self) -> &str { "list_flow_connections" }
+    fn description(&self) -> &str {
+        "List the connection sources a flow node's `connection_ref` can attach to. Read-only; returns non-secret metadata only."
+    }
+    fn parameters_schema(&self) -> Value {
+        json!({ "type": "object", "properties": {}, "additionalProperties": false })
+    }
+    fn permission_level(&self) -> PermissionLevel { PermissionLevel::None }
+    fn external_effect(&self) -> bool { false }
+    async fn execute(&self, args: Value) -> anyhow::Result<ToolResult> {
+        self.execute_with_context(args, ToolCallOptions::default(), None).await
+    }
+    async fn execute_with_context(
+        &self,
+        _args: Value,
+        _options: ToolCallOptions,
+        tool_context: Option<&dyn ToolRunContext>,
+    ) -> anyhow::Result<ToolResult> {
+        let dispatch = crate::agent::tinyagents::host::run_context::dispatch_ctx_for_tool(tool_context);
+        match self.provider.list(&dispatch, &self.config).await {
+            Ok(connections) => Ok(ToolResult::success(serde_json::to_string_pretty(&json!({ "connections": connections }))?)),
+            Err(error) => Ok(ToolResult::error(format!("Failed to list flow connections: {error}"))),
+        }
+    }
 }
 
 impl ListConnectableToolkitsTool {
