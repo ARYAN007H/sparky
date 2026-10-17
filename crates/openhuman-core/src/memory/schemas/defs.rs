@@ -51,7 +51,7 @@ mod policy;
 mod retrieval;
 mod sources;
 
-use crate::core::{ControllerSchema, FieldSchema, TypeSchema};
+use crate::core::{ControllerSchema, TypeSchema};
 use common::req;
 
 /// The schema of `function`; an unknown function gets the namespace's
