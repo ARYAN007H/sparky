@@ -120,7 +120,7 @@ impl Bus {
             .call(
                 "Put",
                 (json!({
-                    "collection": "mcp_servers",
+                    "collection": "mcp.servers",
                     "document_id": id,
                     "document_json": json!({"qualified_name": id}).to_string(),
                     "precondition": {"kind": "none"},
@@ -134,7 +134,7 @@ impl Bus {
         self.object("Documents")
             .call(
                 "Get",
-                (json!({"collection": "mcp_servers", "document_id": id}),),
+                (json!({"collection": "mcp.servers", "document_id": id}),),
             )
             .await
     }

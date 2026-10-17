@@ -138,7 +138,7 @@ async fn an_inline_blob_no_frame_can_carry_fails_fast_instead_of_hanging() {
 async fn a_watch_signal_reaches_the_module_that_opened_the_watch() {
     let _turn = TURN.lock().await;
     let rig = rig("tinymcp").await;
-    let seen = rig.member("WatchPut", ("mcp_servers", "watched")).await;
+    let seen = rig.member("WatchPut", ("mcp.servers", "watched")).await;
     assert_eq!(seen["ok"], "invalidated", "{seen}");
     // A collection the grant never declared cannot be watched.
     let refused = rig
@@ -184,7 +184,7 @@ async fn a_second_module_cannot_receive_the_first_modules_watch_signals() {
         .unwrap();
     let own_id = own["watch_id"].as_str().unwrap().to_string();
     // The first module opens a watch and changes its document.
-    let first = rig.member("WatchPut", ("mcp_servers", "w1")).await;
+    let first = rig.member("WatchPut", ("mcp.servers", "w1")).await;
     assert_eq!(first["ok"], "invalidated", "{first}");
     // The second module's own change reaches the second module.
     let _: Value = documents
