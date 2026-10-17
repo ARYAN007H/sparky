@@ -50,7 +50,7 @@ jobs:
     timeout-minutes: 120
     steps:
       - name: Checkout PR merge commit
-        uses: tinyhumansai/.github/actions/checkout@c705a5471b73941c0ff0b56a6fc6adf4958c84ab
+        uses: tinyhumansai/.github/actions/checkout@35fa65b76c80d48779592b111837e55d9d0860d4
         with:
           ref: refs/pull/${{ inputs.pr-number }}/merge
           fetch-depth: 0

@@ -1,6 +1,7 @@
 # CI Fast: the lane flow and the EX63 runners
 
-CI Fast runs every pre-merge check as parallel **lanes** in fewer jobs. It is
+CI Fast groups pre-merge checks into **lanes**, scheduled sequentially on the
+private runner and across a few hosted jobs. It is
 the whole pull-request flow: the `ci-lite.yml` workflow it was originally built
 alongside was deleted on 2026-10-01. The one check to require is **CI Gate**
 (see [CI Gate](#ci-gate)).
@@ -44,28 +45,19 @@ How lanes behave:
   after one fails, merges the lcov report from what ran, and then lists every
   failure. A check whose dependency failed reports `blocked`. Only a
   cancellation stops a run.
-- **One workflow step per lane.** `Start lanes` launches every lane in the
-  background, so they still run in parallel. Each `Lane: …` step streams its
+- **One workflow step per lane.** `Start lanes` detaches the scheduler. Private lanes execute sequentially;
+  hosted jobs may execute their independent lanes in parallel. Each `Lane: …` step streams its
   own lane's log live, with one folded group per check, and passes or fails
   on that lane alone. `Lane summary` carries the overall result.
 - **Changed-line coverage** must be at least 80% through
   `scripts/ci/self-hosted/diff-cover.sh`, the same gate as `PR CI Gate`.
 
-Some checks do not run on pull requests. CI Lite runs them on every push to
-`main` that touches the Rust core:
-
-- the core doctests, and the coverage of `openhuman-tui` (each a core build of
-  its own);
-- the TinyJuice host-module regression;
-- `cargo test -p openhuman-embed` / `-p openhuman-tinyhumans` with default
-  features, since the coverage lane already runs both crates' tests with the
-  product features;
-- `cargo check -p openhuman --no-default-features`, which
-  `embed-check-no-default` already covers: it builds the core with the same
-  (empty) feature set;
-- `cargo check -p openhuman --no-default-features --features
-e2e-test-support`: `rust-gates-off` already compiles that feature set for
-  its tests, in one build together with `mcp`.
+Private coverage includes the TUI and both default and product configurations
+of embed and TinyHumans. These configurations are distinct. Core doctests and
+the TinyJuice host-module regression retain their existing full/main workflow
+routes; embed doctests, rustdoc and offline examples remain in the private lint
+lane. The no-default embed check and gates-off tests compile their respective
+feature sets separately from product coverage.
 
 ## CI Gate
 
