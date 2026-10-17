@@ -1,64 +1,79 @@
-//! The default namespace — Composio actions.
-//!
-//! Claims every slug no earlier backend did, because a Composio action slug
-//! (`GMAIL_SEND_EMAIL`) carries no distinguishing prefix. That makes this the
-//! catch-all, and the reason [`BACKENDS`](super::BACKENDS) must keep it last.
-//!
-//! # Gate order is a security property, not a style choice
-//!
-//! The autonomy-tier gate runs **before** the curation check. A read-only tier
-//! is rejected on the tier gate and never reaches curation, so it cannot use
-//! the difference between "not curated" and "curated but denied" to probe which
-//! slugs exist in the user's configured scope. These two steps move together or
-//! not at all.
-//!
-//! Full order: tier gate → curation/scope → required-arg preflight → approval
-//! gate → dispatch. Each rejects before the next does any work, so a call that
-//! cannot succeed never reaches the provider and never asks the user to approve
-//! it.
+//! Thin `tinyflows` adapter for the Composio-owned flow backend.
 
+use super::{ToolBackend, ToolCallCtx};
+use crate::config::Config;
+use crate::core::runtime::DispatchCtx;
+use crate::integrations::composio::flow_backend::{self, FlowCallPolicy, FlowToolCallCtx};
+use crate::security::approval::ApprovalTurnContext;
+use crate::security::{GateDecision, SecurityPolicy};
 use async_trait::async_trait;
 use serde_json::Value;
 use tinyflows::error::{EngineError, Result};
 
-use super::{ToolBackend, ToolCallCtx};
-use crate::config::ops as config_rpc;
-use crate::config::Config;
-use crate::integrations::composio::module_client::{self as connectors};
-use crate::integrations::composio::types::ComposioExecuteRequest;
-use crate::integrations::composio::ComposioExecuteResponse;
-use crate::security::GateDecision;
-use tinyconnectors_bus::names::methods;
-
-/// Dispatches a Composio action slug through the tier, curation, preflight and
-/// approval gates.
 pub(crate) struct ComposioToolBackend;
 
-/// Dispatches an action while preserving the workflow node's exact
-/// connected-account choice.
-///
-/// One call for both routes: the module owns the difference, so a flow no
-/// longer branches on which mode is live. `connection_id` is passed through
-/// rather than defaulted, because a workflow node that named an account meant
-/// that account — falling back to the ambient one would run the step against
-/// somebody else's inbox.
-async fn execute_for_connection(
-    config: &Config,
-    slug: &str,
-    args: Option<Value>,
-    connection_id: Option<&str>,
-) -> Result<ComposioExecuteResponse> {
-    connectors::call::<_, ComposioExecuteResponse>(
-        config,
-        methods::EXECUTE,
-        ComposioExecuteRequest {
-            tool: slug.to_string(),
-            arguments: args,
-            connection_id: connection_id.map(str::to_string),
-        },
-    )
-    .await
-    .map_err(EngineError::Capability)
+struct FlowPolicy;
+
+#[async_trait]
+impl FlowCallPolicy for FlowPolicy {
+    async fn tier_decision(
+        &self,
+        dispatch: &DispatchCtx,
+        captured: &Config,
+        live: &Config,
+        security: &SecurityPolicy,
+        class: tinybox_bus::CommandClass,
+    ) -> std::result::Result<GateDecision, String> {
+        let policy =
+            super::super::tier_policy_from_config(dispatch, captured, Some(live), security)
+                .map_err(capability_payload)?;
+        super::super::enforce_node_tier_gate(&policy, class, "tool_call")
+            .map_err(capability_payload)
+    }
+    async fn approve(
+        &self,
+        dispatch: &DispatchCtx,
+        approval: &ApprovalTurnContext,
+        decision: GateDecision,
+        slug: &str,
+        args: &Value,
+    ) -> std::result::Result<Option<String>, String> {
+        let summary = crate::security::approval::summarize_action(slug, args);
+        let redacted = crate::security::approval::redact_args(args);
+        let (outcome, audit_id) = super::super::gate_call_for_tier(
+            dispatch, approval, decision, slug, &summary, redacted,
+        )
+        .await;
+        match outcome {
+            crate::security::approval::GateOutcome::Allow => Ok(audit_id),
+            crate::security::approval::GateOutcome::Deny { reason } => Err(reason),
+        }
+    }
+    fn record(&self, audit_id: &str, result: &std::result::Result<Value, String>) {
+        if let Some(gate) = crate::security::approval::ApprovalGate::try_global() {
+            let outcome = if result.is_ok() {
+                crate::security::approval::ExecutionOutcome::Success
+            } else {
+                crate::security::approval::ExecutionOutcome::Failure
+            };
+            let display_error = result
+                .as_ref()
+                .err()
+                .map(|message| capability_error_display(message));
+            gate.record_execution(audit_id, outcome, display_error.as_deref());
+        }
+    }
+}
+
+fn capability_payload(error: EngineError) -> String {
+    match error {
+        EngineError::Capability(message) => message,
+        other => other.to_string(),
+    }
+}
+
+fn capability_error_display(message: &str) -> String {
+    EngineError::Capability(message.to_string()).to_string()
 }
 
 #[async_trait]
@@ -66,23 +81,14 @@ impl ToolBackend for ComposioToolBackend {
     fn name(&self) -> &'static str {
         "composio"
     }
-
-    /// Empty: Composio slugs carry no prefix, so this backend is the fallback.
     fn prefix(&self) -> &'static str {
         ""
     }
-
-    /// The required-arg check the real path runs, exposed so a dry run performs
-    /// it too. Previously this lived in a second, parallel `ToolInvoker` that
-    /// called the Composio preflight directly — which meant the dispatch seam
-    /// did not actually contain all Composio knowledge, and a build without
-    /// this backend would still have referenced it.
     async fn preflight(&self, config: &Config, slug: &str, args: &Value) -> Result<()> {
-        super::super::preflight_composio_args(config, slug, args).await
+        flow_backend::preflight(config, slug, args)
+            .await
+            .map_err(EngineError::Capability)
     }
-
-    /// Executes a curated Composio action after account resolution and all
-    /// workflow security gates have succeeded.
     async fn invoke(
         &self,
         ctx: &ToolCallCtx<'_>,
@@ -90,194 +96,17 @@ impl ToolBackend for ComposioToolBackend {
         args: Value,
         conn: Option<&str>,
     ) -> Result<Value> {
-        // A capability object can outlive a Settings change. Reload once and
-        // use the same snapshot for curation, contract preflight, client mode,
-        // credentials, account resolution, and direct dispatch.
-        let live_config = config_rpc::reload_config_snapshot_with_timeout(ctx.config)
-            .await
-            .map_err(|_| {
-                EngineError::Capability(format!(
-                    "{} flows autonomy and Composio settings could not be refreshed; refusing the node",
-                    tinytools::status::POLICY_BLOCKED_MARKER
-                ))
-            })?;
-        if live_config.recovered_from_corruption {
-            return Err(EngineError::Capability(format!(
-                "{} flows autonomy and Composio settings could not be refreshed; refusing the node",
-                tinytools::status::POLICY_BLOCKED_MARKER
-            )));
-        }
-        // Autonomy-tier gate (Phase 2, made effect-aware): the node's
-        // [`CommandClass`] is derived from the action's curated
-        // [`ToolScope`](crate::integrations::composio::contract::ToolScope)
-        // via [`classify_composio_action_for_tier`] — a curated Read action
-        // (e.g. `TWITTER_RECENT_SEARCH`) is `CommandClass::Read`, which every
-        // tier `Allow`s; a curated Write/Admin action, or anything not
-        // curated, is `CommandClass::Network` (same class `http_request`
-        // uses — fail-safe: only a curated Read skips the prompt). A
-        // read-only run `Block`s on a non-Read class here and never reaches
-        // curation, the preflight, or the approval gate; Supervised/Full
-        // fall through to `gate_call_for_tier` below. Runs BEFORE the
-        // curation check (unlike the pre-fix behavior) so a read-only tier
-        // can never even probe which slugs are curated.
-        let composio_class = super::super::classify_composio_action_for_tier(slug).await;
-        let tier_policy = super::super::tier_policy_from_config(
-            ctx.dispatch,
-            ctx.config,
-            Some(&live_config),
-            ctx.security,
-        )?;
-        let tier_decision =
-            super::super::enforce_node_tier_gate(&tier_policy, composio_class, "tool_call")?;
-        tracing::debug!(
-            target: "flows",
-            %slug,
-            ?composio_class,
-            ?tier_decision,
-            tier = ?tier_policy.autonomy,
-            "[flows] tool_call: composio node tier gate evaluated"
-        );
-
-        // Curation + scope gate — hard allowlist (see [`is_curated_flow_tool`]'s
-        // doc for why this differs from the general agent tool-call path).
-        // Runs before anything else — a rejected slug never reaches the
-        // composio client at all.
-        if !super::super::is_curated_flow_tool(ctx.dispatch, &live_config, slug).await {
-            tracing::warn!(
-                target: "flows",
-                %slug,
-                "[flows] tool_call: rejected — not a recognized curated toolkit action, or out \
-                 of the user's configured scope"
-            );
-            return Err(EngineError::Capability(format!(
-                "tool not permitted: {slug}"
-            )));
-        }
-
-        // Required-arg preflight — fail with an actionable, field-naming error
-        // BEFORE the approval gate and the Composio dispatch, so a mis-wired
-        // arg (`=`-expression that resolved to null) never reaches the
-        // provider or asks the user to approve a call that cannot succeed.
-        super::super::preflight_composio_args(&live_config, slug, &args).await?;
-
-        // Approval gate (see the struct doc). Mirrors `OpenHumanHttp::request`'s
-        // shape exactly: `gate_call_for_tier` is what actually performs the
-        // `Prompt` round-trip — it escalates a Supervised `Prompt` decision
-        // into a forced approval regardless of the flow's own
-        // `require_approval` toggle (Codex P1), same as the `http_request` and
-        // `code` node paths. Deny short-circuits before any composio call;
-        // Allow records an audit id to close out after the call resolves.
-        //
-        // Effect-aware short-circuit: when the tier decision is already
-        // `Allow` (a curated Read action — the only `CommandClass` this
-        // classifier maps to `Read`), skip `gate_call_for_tier`/
-        // `intercept_audited` entirely. This matters
-        // because `flows/ops.rs`'s Rule 2 force-sets `require_approval: true`
-        // on any saved flow that contains a `tool_call` node, regardless of
-        // which actions it calls — without this short-circuit, that forced
-        // `Workflow { require_approval: true }` origin would still route a
-        // curated-Read `Allow` decision through `intercept_audited`'s normal
-        // parking flow, re-introducing the "reads wait for approval" bug via
-        // a different path than the one this fix closes at the tier gate.
-        // Refining Rule 2 itself to be scope-aware is a deferred follow-up.
-        let summary = crate::security::approval::summarize_action(slug, &args);
-        let redacted = crate::security::approval::redact_args(&args);
-        let (outcome, audit_id) = if tier_decision == GateDecision::Allow {
-            (crate::security::approval::GateOutcome::Allow, None)
-        } else {
-            super::super::gate_call_for_tier(
-                ctx.dispatch,
-                ctx.approval,
-                tier_decision,
-                slug,
-                &summary,
-                redacted,
-            )
-            .await
+        let policy = FlowPolicy;
+        let owner_ctx = FlowToolCallCtx {
+            dispatch: ctx.dispatch,
+            config: ctx.config,
+            security: ctx.security,
+            approval: ctx.approval,
+            policy: &policy,
         };
-        if let crate::security::approval::GateOutcome::Deny { reason } = outcome {
-            tracing::warn!(
-                target: "flows",
-                %slug,
-                ?tier_decision,
-                "[flows] tool_call: approval gate denied before Composio dispatch"
-            );
-            return Err(EngineError::Capability(reason));
-        }
-
-        let args_opt = if args.is_null() { None } else { Some(args) };
-        let connection_id = conn.and_then(super::super::composio_connection_id);
-
-        // Resolve the connection_ref to the SPECIFIC connected account it names,
-        // so we can log which account executes and validate it against the
-        // user's live connected set. Ambient-session fallback is used ONLY when
-        // no connection_ref was supplied.
-        let resolved_account = match connection_id {
-            Some(id) => Some((
-                id,
-                super::super::resolve_composio_account(&live_config, id).await,
-            )),
-            None => None,
-        };
-
-        tracing::debug!(
-            target: "flows",
-            %slug,
-            mode = live_config.composio.mode.as_str(),
-            has_connection_ref = connection_id.is_some(),
-            "[flows] tool_call: invoking composio tool"
-        );
-
-        match &resolved_account {
-            Some((id, Some((toolkit, _label)))) => tracing::info!(
-                target: "flows",
-                %slug,
-                connection_id = %id,
-                %toolkit,
-                mode = live_config.composio.mode.as_str(),
-                "[flows] tool_call: executing against the resolved connected account"
-            ),
-            Some((id, None)) => tracing::warn!(
-                target: "flows",
-                %slug,
-                connection_id = %id,
-                mode = live_config.composio.mode.as_str(),
-                "[flows] tool_call: connection_ref connection_id not found among the user's live \
-                 connected accounts (stale cache or foreign id) — forwarding the exact id so the \
-                 provider can reject it rather than falling back to an ambient account"
-            ),
-            None => tracing::debug!(
-                target: "flows",
-                %slug,
-                mode = live_config.composio.mode.as_str(),
-                "[flows] tool_call: no connection_ref — using the ambient signed-in account"
-            ),
-        }
-        let response = execute_for_connection(&live_config, slug, args_opt, connection_id).await;
-
-        // A successful HTTP round-trip can still carry a provider-side failure
-        // (`{successful: false, error: "..."}`, e.g. a Slack 400 on
-        // `SLACK_SEND_MESSAGE`) — reject it into a real capability error, see
-        // `reject_unsuccessful_composio_response`'s doc.
-        let response = response
-            .and_then(|resp| super::super::reject_unsuccessful_composio_response(slug, resp));
-
-        if let Some(id) = audit_id {
-            if let Some(gate) = crate::security::approval::ApprovalGate::try_global() {
-                let exec = if response.is_ok() {
-                    crate::security::approval::ExecutionOutcome::Success
-                } else {
-                    crate::security::approval::ExecutionOutcome::Failure
-                };
-                gate.record_execution(
-                    &id,
-                    exec,
-                    response.as_ref().err().map(ToString::to_string).as_deref(),
-                );
-            }
-        }
-
-        serde_json::to_value(response?).map_err(|e| EngineError::Capability(e.to_string()))
+        flow_backend::invoke(&owner_ctx, slug, args, conn)
+            .await
+            .map_err(EngineError::Capability)
     }
 }
 

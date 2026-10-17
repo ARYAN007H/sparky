@@ -38,6 +38,8 @@
 //! crate::core::events::DomainEvent::ComposioTriggerReceived
 
 pub mod action_tool;
+#[cfg(any(feature = "flows", test))]
+pub(crate) mod builder_tools;
 pub mod bus;
 pub mod catalog;
 pub mod client;
@@ -48,6 +50,7 @@ pub(crate) mod direct_auth;
 pub mod execute_dispatch;
 pub(crate) mod file_store;
 mod file_store_documents;
+pub(crate) mod flow_backend;
 pub mod flow_gate;
 pub mod googlecalendar_args;
 pub mod identity;

@@ -263,7 +263,7 @@ Top level:
 | [`bus.rs`](./bus.rs), `bus/` | The three subscribers: `trigger.rs`, `run_digest.rs`, `dedup_commit.rs`. |
 | [`tools.rs`](./tools.rs) | `ProposeWorkflowTool` (`propose_workflow`) and `RunFlowTool` (`run_flow`). |
 | [`builder_host.rs`](./builder_host.rs) | `FlowsHost` and `OverlayNodeKinds`: the host implementation of the `tinyflows_copilot::tools` ports (drafts, flows, gates, agents, suggestions, node kinds). The authoring tools themselves, including `suggest_workflows`, live in `tinyflows-copilot`. |
-| [`builder_tools.rs`](./builder_tools.rs), `builder_tools/` | The Composio-bound `workflow_builder` reads: `connection_reads.rs`, `catalog_search.rs`, `tool_contract.rs`. |
+| [`crate::integrations::composio::builder_tools`](../integrations/composio/builder_tools/mod.rs) | Composio-backed workflow-builder reads and catalog ranking. The mixed connection picker is composed by the flow host through a provider. |
 | `memory_tools.rs` | `FlowMemoryRecallTool`, `FlowMemoryRememberTool`, and the flow-memory tag helpers. |
 | `agents/` | `workflow_builder/` and `flow_discovery/` built-in agent definitions and prompt builders. |
 | [`catalogue.rs`](./catalogue.rs) | `flow_entries` lists saved flows as `Workflow` entries with `WorkflowScope::Flow`, so the skill catalogue and `skill_search` show one list. |

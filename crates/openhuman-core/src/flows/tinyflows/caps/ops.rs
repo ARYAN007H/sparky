@@ -10,6 +10,9 @@
 //! All host errors are mapped to `tinyflows::error::EngineError::Capability`,
 //! per the crate's contract (`caps` traits return `tinyflows::error::Result`).
 
+#[cfg(test)]
+pub(crate) use crate::integrations::composio::flow_gate::composio_connection_id;
+
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -34,8 +37,6 @@ use tinybox_bus::CommandClass;
 
 use super::*;
 
-pub(crate) use crate::integrations::composio::flow_gate::composio_connection_id;
-
 /// Parses a `"http_cred:<name>"` `connection_ref` for [`OpenHumanHttp`],
 /// returning the trailing credential name. The host-side
 /// [`HttpCredentialsStore`] (encrypted-at-rest bearer/basic/header
@@ -50,8 +51,6 @@ pub(crate) fn http_cred_name(conn: &str) -> Option<&str> {
     let name = conn.strip_prefix("http_cred:")?.trim();
     (!name.is_empty()).then_some(name)
 }
-
-pub(crate) use crate::integrations::composio::flow_gate::resolve_composio_account;
 
 pub(crate) async fn classify_composio_action_for_tier(slug: &str) -> CommandClass {
     crate::integrations::composio::flow_gate::classify_composio_action_for_tier(slug)
