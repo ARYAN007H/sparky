@@ -95,6 +95,120 @@ async fn prepared_subagent_runs_through_driver_jobs_dispatcher() {
 }
 
 #[tokio::test]
+async fn closing_a_durable_driver_session_cancels_only_its_registered_child() {
+    use crate::agent::orchestration::subagent_sessions::{
+        DurableSubagentSession, DurableSubagentStatus, OpenHumanTinySubagentSessionStore,
+        SubagentSessionStore as HostSessionStore,
+    };
+    use tinyagents_orchestration::subagent::{
+        SubagentTaskKey, SubagentSessionStore as TinySessionStore,
+        SubAgentJobRegistry, SubAgentJobStatus,
+    };
+
+    let scratch = tempfile::tempdir().expect("isolated driver close fixture");
+    let workspace = scratch.path().join("workspace");
+    std::fs::create_dir_all(&workspace).expect("create isolated workspace");
+    let provider = ScriptedProvider::new(vec![text_response("sibling completed")]);
+    let mut parent_context = make_parent(provider.clone(), vec![]);
+    parent_context.workspace_dir = workspace.clone();
+    let mut options = with_parent(parent_context, SubagentRunOptions::default());
+    options.task_id = Some("close-driver-task".into());
+    options.thread_id = Some("close-driver-thread".into());
+    options.checkpoint_dir = Some(scratch.path().join("checkpoints"));
+    let parent = options.run_context.clone().into_tinyagents(
+        tinyagents_harness::context::RunConfig::new("close-driver-parent")
+            .with_thread("close-driver-thread"),
+    );
+    let parent_cancellation = parent.data.child().cancellation;
+    let jobs = SubAgentJobRegistry::new();
+    let task_key = SubagentTaskKey::from_context(&parent, "close-driver-task", None);
+    let now = chrono::Utc::now().to_rfc3339();
+    let sessions = HostSessionStore::new(workspace.clone());
+    sessions
+        .save(&[DurableSubagentSession {
+            subagent_session_id: "close-driver-session".into(),
+            parent_session: "test-session".into(),
+            parent_thread_id: Some("close-driver-thread".into()),
+            worker_thread_id: None,
+            agent_id: "cancelled-child".into(),
+            display_name: None,
+            model: None,
+            sandbox_mode: "workspace".into(),
+            action_root: None,
+            task_key: "close driver lifecycle".into(),
+            task_title: "Close driver lifecycle".into(),
+            current_task_id: Some("close-driver-task".into()),
+            lifecycle_key: Some(task_key),
+            status: DurableSubagentStatus::Running,
+            reusable: true,
+            latest_history: None,
+            latest_error: None,
+            created_at: now.clone(),
+            updated_at: now.clone(),
+            last_used_at: now,
+        }])
+        .expect("save the authenticated durable session");
+
+    spawn_async_via_driver_tool_with_jobs(
+        &parent,
+        {
+            let mut definition = make_def_named_tools(&[]);
+            definition.id = "cancelled-child".into();
+            definition
+        },
+        "must be cancelled before the child runs".into(),
+        options,
+        jobs.clone(),
+        |_target, _result, _emit_effects| Box::pin(async {}),
+    )
+    .await
+    .expect("background driver registers the child");
+
+    let port = OpenHumanTinySubagentSessionStore::new(
+        workspace.clone(),
+        "test-session",
+        Some("close-driver-thread".into()),
+    )
+    .with_jobs(jobs.clone());
+    assert!(port
+        .close("close-driver-session")
+        .await
+        .expect("Tiny close adapter cancels then closes the durable row"));
+    assert!(parent_cancellation.is_cancelled() == false, "parent stays live");
+
+    let cancelled = jobs
+        .list()
+        .into_iter()
+        .find(|job| job.agent == "cancelled-child")
+        .expect("driver child is visible in the shared registry");
+    assert_eq!(cancelled.status, SubAgentJobStatus::Cancelled);
+    assert_eq!(
+        sessions.load().unwrap()[0].status,
+        DurableSubagentStatus::Closed,
+        "the completion callback cannot revive a closed session"
+    );
+    assert!(provider.captured.lock().is_empty(), "cancelled child never runs");
+
+    let mut sibling_options = SubagentRunOptions::default();
+    sibling_options.task_id = Some("close-driver-sibling-task".into());
+    sibling_options.thread_id = Some("close-driver-thread".into());
+    sibling_options.checkpoint_dir = Some(scratch.path().join("checkpoints"));
+    sibling_options.run_context = parent.data.clone();
+    let mut sibling = make_def_named_tools(&[]);
+    sibling.id = "live-sibling".into();
+    let sibling = run_subagent_via_driver_tool(
+        &parent,
+        sibling,
+        "complete independently".into(),
+        sibling_options,
+    )
+    .await
+    .expect("sibling driver remains usable");
+    assert!(matches!(sibling.0.status, SubagentRunStatus::Completed));
+    assert_eq!(provider.captured.lock().len(), 1);
+}
+
+#[tokio::test]
 async fn stopped_parent_thread_rejects_a_new_driver_spawn_before_execution() {
     let scratch = tempfile::tempdir().expect("isolated stopped-thread fixture");
     let workspace = scratch.path().join("workspace");
