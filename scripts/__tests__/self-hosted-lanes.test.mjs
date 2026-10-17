@@ -237,7 +237,7 @@ test("the complete suites run, not subsets", () => {
   assert.match(runs, /bash scripts\/ci\/rust-coverage\.sh/);
   assert.match(
     runs,
-    /cargo llvm-cov nextest .*--no-rustc-wrapper --manifest-path crates\/openhuman-app\/Cargo\.toml/,
+    /cargo llvm-cov nextest .*--manifest-path crates\/openhuman-app\/Cargo\.toml/,
   );
 });
 
@@ -408,7 +408,8 @@ test("private lanes reuse checkout targets, preserve mold through RUSTFLAGS rese
   for (const lane of rust) {
     assert.match(lane.targetDir, /^target\/ci-private-/);
     assert.equal(lane.env.CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER, "/usr/local/bin/rust-mold-linker");
-    assert.equal(lane.env.RUSTC_WRAPPER, "");
+    assert.equal(lane.env.RUSTC_WRAPPER, undefined);
+    assert.equal(lane.env.RUSTC_WORKSPACE_WRAPPER, undefined);
   }
   assert.notEqual(rust.find((l) => l.name === "rust-cov").targetDir, rust.find((l) => l.name === "rust-lint").targetDir);
   assert.ok(buildPlan({ profile: "hosted", areas: ALL }).lanes.every((l) => !l.targetDir));
@@ -421,6 +422,8 @@ test("private gates-off, storage, and Tauri execute equivalent coverage suites w
       assert.match(c.run, /cargo llvm-cov nextest/);
       assert.match(c.run, /--no-tests=fail/);
       assert.match(c.run, /--lcov --output-path ci-out\/lcov\//);
+      assert.match(c.run, /--no-report .*\|\| rc=\$\?; cargo llvm-cov report/);
+      assert.match(c.run, /exit "\$rc"$/);
     }
   }
   const checks = Object.fromEntries(plan.lanes.flatMap((l) => l.checks.map((c) => [c.name, c])));

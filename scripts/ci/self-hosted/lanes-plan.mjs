@@ -141,8 +141,6 @@ export function buildPlan({ profile, areas, env = {}, isPullRequest = true }) {
     : null;
   const rustEnv = ex63 ? {
     CARGO_INCREMENTAL: "0",
-    RUSTC_WRAPPER: "",
-    RUSTC_WORKSPACE_WRAPPER: "",
     CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER: "/usr/local/bin/rust-mold-linker",
   } : {
     CARGO_INCREMENTAL: "0",
@@ -588,6 +586,9 @@ export function buildPlan({ profile, areas, env = {}, isPullRequest = true }) {
   // filters; union those filters in nextest's expression syntax. --no-clean
   // retains prior instrumentation, while every suite writes its own report.
   if (ex63) {
+    const coverageSuite = (args, output, manifest = "Cargo.toml") =>
+      `rc=0; cargo llvm-cov nextest --profile ci --no-fail-fast --no-tests=fail --no-clean --no-report ${args} || rc=$?; ` +
+      `cargo llvm-cov report --manifest-path ${manifest} --lcov --output-path ci-out/lcov/${output} || { report_rc=$?; if [ "$rc" -eq 0 ]; then rc=$report_rc; fi; }; exit "$rc"`;
     for (const lane of lanes) {
       if (!["rust-gates-off", "storage-drivers"].includes(lane.name)) continue;
       for (const check of lane.checks) {
@@ -609,12 +610,12 @@ export function buildPlan({ profile, areas, env = {}, isPullRequest = true }) {
           expression = ` -E '${terms ? `(${terms})` : "all()"}${exclude.map((f) => ` & not test(${f})`).join("")}'`;
         }
         check.env = { ...covEnv, CARGO_BUILD_TARGET_DIR: "target/ci-private-coverage" };
-        check.run = `cargo llvm-cov nextest --profile ci --no-fail-fast --no-tests=fail --no-clean ${args}${expression}${serial} --lcov --output-path ci-out/lcov/lcov-${check.name}.info`;
+        check.run = coverageSuite(`${args}${expression}${serial}`, `lcov-${check.name}.info`);
       }
     }
     const tauri = lanes.find((l) => l.name === "tauri").checks.find((c) => c.name === "tauri-coverage");
     tauri.env = { ...covEnv, CARGO_BUILD_TARGET_DIR: "target/ci-private-coverage" };
-    tauri.run = "unset RUSTFLAGS RUSTC_WRAPPER && cargo llvm-cov nextest --profile ci --no-fail-fast --no-tests=fail --no-clean --no-rustc-wrapper --manifest-path crates/openhuman-app/Cargo.toml --lcov --output-path ci-out/lcov/lcov-tauri.info";
+    tauri.run = "unset RUSTFLAGS; " + coverageSuite("--manifest-path crates/openhuman-app/Cargo.toml", "lcov-tauri.info", "crates/openhuman-app/Cargo.toml");
   }
 
   for (const lane of lanes) {
