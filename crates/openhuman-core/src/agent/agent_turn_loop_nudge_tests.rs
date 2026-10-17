@@ -226,8 +226,8 @@ fn committed_rows_mentioning_nudge(history: &[TranscriptEntry]) -> Vec<String> {
 }
 
 /// Every persisted file under the workspace, as (lossy) text. A session
-/// store database is also read row by row, because the storage layer keeps
-/// transcript entries zstd-compressed and a byte search of the file would
+/// store database is also read row by row, because TinyAgents keeps transcript
+/// entries zstd-compressed and a byte search of the file would
 /// never see them.
 fn persisted_text(root: &std::path::Path) -> Vec<(std::path::PathBuf, String)> {
     walkdir::WalkDir::new(root)
@@ -262,7 +262,11 @@ fn database_rows_text(path: &std::path::Path) -> String {
         match value {
             Value::Text(text) => out.push_str(&text),
             Value::Blob(bytes) => {
-                let decoded = zstd::decode_all(bytes.as_slice()).unwrap_or(bytes);
+                // One envelope byte (`1` = zstd), then the zstd frame.
+                let decoded = match bytes.split_first() {
+                    Some((1, frame)) => zstd::decode_all(frame).unwrap_or_else(|_| bytes.clone()),
+                    _ => bytes.clone(),
+                };
                 out.push_str(&String::from_utf8_lossy(&decoded));
             }
             _ => {}
