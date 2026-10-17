@@ -26,7 +26,7 @@ use anyhow::{anyhow, Context, Result};
 use serde_json::json;
 use tinystoragedrivers::ScopedStorage;
 
-use super::storage_grant_tinywallet::{MODULE_ID, PAYMENTS_STREAM};
+use super::storage_grant_schemas::tinywallet::{MODULE_ID, PAYMENTS_STREAM};
 use super::storage_import_support as support;
 use crate::core::runtime::DispatchCtx;
 

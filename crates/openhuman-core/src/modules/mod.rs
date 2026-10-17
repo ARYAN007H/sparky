@@ -280,7 +280,7 @@ pub async fn import_legacy_connectors(
     import_once(
         ctx,
         "connectors",
-        storage_grant_tinyconnectors::MODULE_ID,
+        storage_grant_schemas::tinyconnectors::MODULE_ID,
         state_dir,
         storage_import_tinyconnectors::import_legacy(ctx, state_dir),
     )
@@ -302,7 +302,7 @@ pub async fn import_legacy_x402(
     return import_once(
         ctx,
         "x402",
-        storage_grant_tinywallet::MODULE_ID,
+        storage_grant_schemas::tinywallet::MODULE_ID,
         workspace_dir,
         storage_import_tinywallet::import_legacy(ctx, workspace_dir),
     )
@@ -325,7 +325,7 @@ pub async fn import_legacy_tinybox(
     import_once(
         ctx,
         "tinybox",
-        storage_grant_tinybox::MODULE_ID,
+        storage_grant_schemas::tinybox::MODULE_ID,
         workspace_dir,
         storage_import_tinybox::import_legacy(ctx, workspace_dir),
     )
@@ -344,7 +344,7 @@ pub(crate) fn expiring_blob_module_scopes(
 ) -> Vec<crate::storage::Scope> {
     #[cfg(feature = "modules")]
     {
-        [storage_grant_tinyjuice::MODULE_ID]
+        [storage_grant_schemas::tinyjuice::MODULE_ID]
             .into_iter()
             .filter_map(|id| storage_host::current_module_scope(ctx, id).ok())
             .collect()
@@ -363,7 +363,7 @@ pub(crate) fn expiring_blob_module_scopes_for(
     profile: &str,
     base: &crate::storage::Scope,
 ) -> Vec<crate::storage::Scope> {
-    [storage_grant_tinyjuice::MODULE_ID]
+    [storage_grant_schemas::tinyjuice::MODULE_ID]
         .into_iter()
         .filter_map(|id| storage_host::module_scope(Some(profile), base, id).ok())
         .collect()
@@ -399,7 +399,7 @@ pub async fn import_legacy_tinyjuice(
     import_once(
         ctx,
         "tinyjuice",
-        storage_grant_tinyjuice::MODULE_ID,
+        storage_grant_schemas::tinyjuice::MODULE_ID,
         root,
         storage_import_tinyjuice::import_legacy(ctx, root, ttl),
     )
