@@ -193,12 +193,14 @@ impl SubagentExecutor<crate::agent::tinyagents::host::OpenHumanRunContext> for O
                     parent_events,
                     name: definition.id.clone(),
                 };
-                let run = Box::pin(crate::agent::subagent_host::ops::run_subagent_direct_with_native_context(
-                    &definition,
-                    &input,
-                    options.clone(),
-                    native,
-                ));
+                let run = Box::pin(
+                    crate::agent::subagent_host::ops::run_subagent_direct_with_native_context(
+                        &definition,
+                        &input,
+                        options.clone(),
+                        native,
+                    ),
+                );
                 let result = match dispatch.into_core() {
                     Some(core) => {
                         crate::core::runtime::CoreContext::scope_with_turn_origin(core, origin, run)

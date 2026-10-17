@@ -383,13 +383,13 @@ async fn drive_turn(
     // reconstructs the timeline from (05.1). The same id keys the journal + status.
     let sink = EventSink::with_stream_id(journal_run_id.as_str());
     if let Some(native) = &native_subagent {
-        native.parent_events.emit(
-            tinyagents_harness::events::AgentEvent::SubAgentRunStarted {
+        native
+            .parent_events
+            .emit(tinyagents_harness::events::AgentEvent::SubAgentRunStarted {
                 name: native.name.clone(),
                 depth: native.depth,
                 run_id: journal_run_id.clone(),
-            },
-        );
+            });
     }
     // Attach the event bridge for EVERY turn — including an unobserved
     // (`on_progress = None`) background/cron turn (#4467, item 3). The bridge's

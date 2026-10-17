@@ -5,11 +5,11 @@ use crate::config::schema::AgentTracingConfig;
 use crate::config::Config;
 
 use crate::config::schema::AgentTracingBackend;
+use std::time::Duration;
+use tinyagents_harness::observability::trace_export::otlp::otlp_requests;
 use tinyagents_harness::observability::trace_export::serialize::{spans_to_ndjson, SpanEnvelope};
 use tinyagents_harness::observability::trace_export::{TraceContext, TraceSpan};
-use tinyagents_harness::observability::trace_export::otlp::otlp_requests;
 use tinyagents_harness::observability::LangfuseClient;
-use std::time::Duration;
 
 const PUSH_TIMEOUT: Duration = Duration::from_secs(10);
 
@@ -164,19 +164,15 @@ pub(crate) async fn export_run_trace_from_journal(
         log::debug!("[agent-tracing] no durable root run registered request_id={request_id}");
         return;
     };
-    let observations = match crate::agent::tinyagents::journal::read_run_tree_events(
-        ctx,
-        &root_run_id,
-    )
-    .await
-    {
-        Ok(observations) if !observations.is_empty() => observations,
-        Ok(_) => return,
-        Err(err) => {
-            log::warn!("[agent-tracing] trace journal read failed run_id={root_run_id}: {err}");
-            return;
-        }
-    };
+    let observations =
+        match crate::agent::tinyagents::journal::read_run_tree_events(ctx, &root_run_id).await {
+            Ok(observations) if !observations.is_empty() => observations,
+            Ok(_) => return,
+            Err(err) => {
+                log::warn!("[agent-tracing] trace journal read failed run_id={root_run_id}: {err}");
+                return;
+            }
+        };
     let Some(root) = observations.iter().find(|observation| {
         observation.run_id.as_str() == root_run_id && observation.parent_run_id.is_none()
     }) else {
@@ -188,9 +184,8 @@ pub(crate) async fn export_run_trace_from_journal(
         None,
         Some(root.root_run_id.as_str().to_owned()),
     );
-    let mut collector = tinyagents_harness::observability::trace_export::collector::SpanCollector::new(
-        trace_ctx,
-    );
+    let mut collector =
+        tinyagents_harness::observability::trace_export::collector::SpanCollector::new(trace_ctx);
     for observation in &observations {
         collector.record(observation);
     }
