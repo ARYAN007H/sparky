@@ -4,23 +4,125 @@
 use crate::core::runtime::DispatchCtx;
 use anyhow::{anyhow, Context, Result};
 use serde_json::Value;
-use std::sync::Arc;
-use tinyagents_orchestration::workflow::{reset_running_phases, WorkflowEngine};
+use std::sync::{Arc, OnceLock};
+use tinyagents_orchestration::workflow::{
+    reset_running_phases, WorkflowEngine, WorkflowRunHandle, WorkflowRunSupervisor,
+};
 
 use crate::agent::harness::ParentExecutionContext;
 use crate::agent::orchestration::parent_context::with_root_parent;
 use crate::config::Config;
 use tinyagents_session::run_ledger::{WorkflowRun, WorkflowRunStatus, WorkflowRunUpsert};
 
-use super::cancel::{
-    cancel_signal_if_current, clear_cancel_signal, is_current_cancel_signal, lookup_cancel_signal,
-    register_cancel_signal, replace_cancel_signal, WorkflowCancelSignal,
-};
 use super::ops::{
     compare_and_swap_workflow_run_lifecycle, definition_by_id, get_workflow_run, workflow_store,
 };
 use super::LOG_TARGET;
 use tinyagents_orchestration::workflow::WorkflowDefinition;
+
+fn workflow_supervisor() -> &'static WorkflowRunSupervisor {
+    static SUPERVISOR: OnceLock<WorkflowRunSupervisor> = OnceLock::new();
+    SUPERVISOR.get_or_init(WorkflowRunSupervisor::default)
+}
+
+/// Install the owner generation, then build OpenHuman's root context and
+/// origin around the scheduled drive. The host retains the callback handle
+/// only so failure projection can reject a stale generation.
+fn schedule_workflow_drive(
+    ctx: &DispatchCtx,
+    run_id: String,
+    definition: WorkflowDefinition,
+    resume: bool,
+) -> WorkflowRunHandle {
+    let supervisor = workflow_supervisor().clone();
+    let task_ctx = ctx.clone();
+    let handle_slot = Arc::new(OnceLock::<WorkflowRunHandle>::new());
+    let config_slot = Arc::new(OnceLock::<Config>::new());
+    let parent_slot = Arc::new(OnceLock::<ParentExecutionContext>::new());
+    let drive_handle_slot = Arc::clone(&handle_slot);
+    let drive_config_slot = Arc::clone(&config_slot);
+    let drive_parent_slot = Arc::clone(&parent_slot);
+    let drive_ctx = task_ctx.clone();
+    let drive_run_id = run_id.clone();
+    let drive_definition = definition.clone();
+    let root_ctx = task_ctx.clone();
+    let root_config_slot = Arc::clone(&config_slot);
+    let root_parent_slot = Arc::clone(&parent_slot);
+    let root_run_id = run_id.clone();
+    let root_parent = move |drive| {
+        let task_ctx = root_ctx.clone();
+        let config_slot = Arc::clone(&root_config_slot);
+        let parent_slot = Arc::clone(&root_parent_slot);
+        let run_id = root_run_id.clone();
+        async move {
+            match crate::config::ops::load_current_or_init(&task_ctx).await {
+                Ok(task_config) => {
+                    let _ = config_slot.set(task_config.clone());
+                    let _ = with_root_parent(
+                        &task_ctx,
+                        None,
+                        &task_config,
+                        "workflow_engine",
+                        "workflow",
+                        "workflow",
+                        |parent| async move {
+                            let _ = parent_slot.set(parent);
+                            drive.await;
+                        },
+                    )
+                    .await;
+                }
+                Err(error) => log::error!(
+                    target: LOG_TARGET,
+                    "[workflow_run_engine] drive.config_load_failed run={run_id} err={error}"
+                ),
+            }
+        }
+    };
+    let inherited_origin = crate::security::turn_origin::capture();
+    let origin = move |future| {
+        crate::security::turn_origin::with_inherited_origin(inherited_origin, future)
+    };
+    let make_future = move |cancel_token| {
+        let ctx = drive_ctx.clone();
+        let run_id = drive_run_id.clone();
+        let definition = drive_definition.clone();
+        let handle_slot = Arc::clone(&drive_handle_slot);
+        let config_slot = Arc::clone(&drive_config_slot);
+        let parent_slot = Arc::clone(&drive_parent_slot);
+        async move {
+            let (Some(handle), Some(config), Some(parent)) = (
+                handle_slot.get().cloned(),
+                config_slot.get().cloned(),
+                parent_slot.get().cloned(),
+            ) else {
+                return;
+            };
+            run_engine_loop(
+                &ctx,
+                &config,
+                &run_id,
+                definition,
+                handle,
+                cancel_token,
+                Some(parent),
+            )
+            .await;
+        }
+    };
+    let spawn_ctx = task_ctx;
+    let spawn_handle_slot = Arc::clone(&handle_slot);
+    let spawn = move |handle, future| {
+        let _ = spawn_handle_slot.set(handle);
+        spawn_ctx.spawn(future);
+    };
+
+    if resume {
+        supervisor.resume_scoped_with_handle(run_id, make_future, root_parent, origin, spawn)
+    } else {
+        supervisor.start_scoped_with_handle(run_id, make_future, root_parent, origin, spawn)
+    }
+}
 
 /// Start a new workflow run and return immediately.
 ///
@@ -58,43 +160,7 @@ pub async fn start_workflow_run(
         .initialise(run_id.clone(), &definition, input.clone(), parent_thread_id)
         .context("persist initial workflow run")?;
 
-    let cancel = register_cancel_signal(&run_id);
-
-    // Spawn the engine loop. Clone what the task needs (the engine reloads
-    // config inside the task so it can build a real Agent without holding a
-    // borrow across the spawn boundary).
-    let task_run_id = run_id.clone();
-    // Task-locals don't cross `tokio::spawn`, so capture the starting turn's
-    // origin here and re-scope it around the engine loop — the phases spawn
-    // sub-agents whose tool calls the approval gate judges by that label.
-    // Inherit-only: `None` leaves the loop unlabelled and failing closed.
-    let inherited_origin = crate::security::turn_origin::capture();
-    let task_ctx = ctx.clone();
-    ctx.spawn(async move {
-        match crate::config::ops::load_current_or_init(&task_ctx).await {
-            Ok(task_config) => {
-                crate::security::turn_origin::with_inherited_origin(
-                    inherited_origin,
-                    run_engine_loop(
-                        &task_ctx,
-                        &task_config,
-                        &task_run_id,
-                        definition,
-                        cancel,
-                        None,
-                    ),
-                )
-                .await;
-            }
-            Err(err) => {
-                log::error!(
-                    target: LOG_TARGET,
-                    "[workflow_run_engine] start.config_load_failed run={task_run_id} err={err}"
-                );
-                clear_cancel_signal(&task_run_id, &cancel);
-            }
-        }
-    });
+    let _handle = schedule_workflow_drive(ctx, run_id.clone(), definition, false);
 
     log::debug!(
         target: LOG_TARGET,
@@ -132,7 +198,8 @@ pub async fn stop_workflow_run(config: &Config, id: &str) -> Result<Option<Workf
     // Capture the exact live generation before fencing its durable row. If a
     // concurrent resume wins instead, this stop's CAS fails and it must not
     // cancel that successor's fresh token.
-    let cancel = lookup_cancel_signal(id);
+    let supervisor = workflow_supervisor();
+    let handle = supervisor.current_handle(id);
 
     let mut phase_states = run.phase_states.clone();
     reset_running_phases(
@@ -159,8 +226,8 @@ pub async fn stop_workflow_run(config: &Config, id: &str) -> Result<Option<Workf
     let updated = updated.ok_or_else(|| {
         anyhow!("workflow run {id} changed while stop was being applied; reload and retry")
     })?;
-    if let Some(cancel) = cancel.as_ref() {
-        let _ = cancel_signal_if_current(id, cancel);
+    if let Some(handle) = handle.as_ref() {
+        let _ = supervisor.stop_generation(handle);
     }
 
     log::debug!(target: LOG_TARGET, "[workflow_run_engine] stop.marked_interrupted run={id}");
