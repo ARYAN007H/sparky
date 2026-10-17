@@ -67,6 +67,7 @@ async fn driver_job_controls_are_isolated_by_workspace_with_shared_runtime_state
         options.run_context.parent = Some(product_parent);
         options.task_id = Some("same-raw-task-id".into());
         options.thread_id = Some("same-parent-thread".into());
+        options.run_context.thread_id = Some("same-parent-thread".into());
         options.run_context = options
             .run_context
             .with_core(Some(Arc::clone(core)));
