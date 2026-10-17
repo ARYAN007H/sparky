@@ -212,11 +212,22 @@ pub(super) fn test_store_overrides(
 
 pub(super) fn entry_for_ctx(ctx: &DispatchCtx, workspace_dir: &Path) -> Arc<Entry> {
     let scope = router_scope_for(ctx, workspace_dir);
-    let router = match with_storage_context(ctx, || {
+    let unbound_saas_without_foreign_scope = crate::core::runtime::is_saas()
+        && ctx.resolved().is_none()
+        && crate::core::runtime::CoreContext::scoped().is_none();
+    let lookup = || {
         router_pool()
             .get_or_open(&scope)
             .map_err(|error| anyhow::anyhow!("{error}"))
-    }) {
+    };
+    let opened = if unbound_saas_without_foreign_scope {
+        // The pool opener will fail closed in storage::local and cache its
+        // in-memory fallback, rather than borrowing any other profile.
+        lookup()
+    } else {
+        with_storage_context(ctx, lookup)
+    };
+    let router = match opened {
         Ok(router) => router,
         Err(error) => {
             log::error!("[background_completions] router pool lookup failed: {error}");
