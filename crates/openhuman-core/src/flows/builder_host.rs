@@ -48,49 +48,56 @@ impl FlowsHost {
         let context = self.context.clone();
         self.in_context(async move {
             let payload = request.payload;
+            macro_rules! wire {
+                ($value:expr) => {
+                    serde_json::to_value($value).map_err(|error| error.to_string())?
+                };
+            }
             let value = match request.operation {
                 PortOperation::DraftGet => {
-                    ops::flows_draft_get(&config, &required::<String>(&payload, "id")?)?.value
+                    wire!(ops::flows_draft_get(&config, &required::<String>(&payload, "id")?)?.value)
                 }
                 PortOperation::DraftCreate => {
-                    let origin = decode::<tinyflows_catalog::DraftOrigin>(field(&payload, "origin")?)?;
-                    ops::flows_draft_create(
+                    let origin = decode::<tinyflows_catalog::DraftOrigin>(
+                        required::<Value>(&payload, "origin")?,
+                    )?;
+                    wire!(ops::flows_draft_create(
                         &config,
                         optional_field(&payload, "flow_id")?,
                         required(&payload, "name")?,
                         required(&payload, "graph")?,
                         origin,
                     )?
-                    .value
+                    .value)
                 }
                 PortOperation::DraftUpdate => {
-                    ops::flows_draft_update(
+                    wire!(ops::flows_draft_update(
                         &config,
                         &required::<String>(&payload, "id")?,
                         optional_field(&payload, "name")?,
                         optional_field(&payload, "graph")?,
                         None,
                     )?
-                    .value
+                    .value)
                 }
                 PortOperation::FlowsGet => {
-                    ops::flows_get(&config, &required::<String>(&payload, "id")?)
+                    wire!(ops::flows_get(&config, &required::<String>(&payload, "id")?)
                         .await?
-                        .value
+                        .value)
                 }
-                PortOperation::FlowsList => ops::flows_list(&config).await?.value,
+                PortOperation::FlowsList => wire!(ops::flows_list(&config).await?.value),
                 PortOperation::FlowsLoadGraph => {
-                    ops::load_flow_graph(&config, &required::<String>(&payload, "id")?)?
+                    wire!(ops::load_flow_graph(&config, &required::<String>(&payload, "id")?)?)
                 }
                 PortOperation::FlowsCreate => {
-                    ops::flows_create(
+                    wire!(ops::flows_create(
                         &config,
                         required(&payload, "name")?,
                         required(&payload, "graph")?,
                         optional_field::<bool>(&payload, "require_approval")?.unwrap_or(true),
                     )
                     .await?
-                    .value
+                    .value)
                 }
                 PortOperation::FlowsUpdate => {
                     let outcome = ops::flows_update(
@@ -105,39 +112,39 @@ impl FlowsHost {
                     json!({"value": outcome.value, "logs": outcome.logs})
                 }
                 PortOperation::FlowsSetEnabled => {
-                    ops::flows_set_enabled(
+                    wire!(ops::flows_set_enabled(
                         &config,
                         &required::<String>(&payload, "id")?,
                         required(&payload, "enabled")?,
                     )
                     .await?
-                    .value
+                    .value)
                 }
                 PortOperation::FlowsDuplicate => {
-                    ops::flows_duplicate(&config, &required::<String>(&payload, "id")?)
+                    wire!(ops::flows_duplicate(&config, &required::<String>(&payload, "id")?)
                         .await?
-                        .value
+                        .value)
                 }
-                PortOperation::FlowsHistory => ops::flows_get_history(
+                PortOperation::FlowsHistory => wire!(ops::flows_get_history(
                     &config,
                     &required::<String>(&payload, "id")?,
                     optional_field::<usize>(&payload, "limit")?.unwrap_or(20),
                 )?
-                .value,
-                PortOperation::FlowsListRuns => ops::flows_list_runs(
+                .value),
+                PortOperation::FlowsListRuns => wire!(ops::flows_list_runs(
                     &config,
                     &required::<String>(&payload, "flow_id")?,
                     optional_field::<usize>(&payload, "limit")?.unwrap_or(20),
                 )
                 .await?
-                .value,
+                .value),
                 PortOperation::FlowsGetRun => {
-                    ops::flows_get_run(&config, &required::<String>(&payload, "run_id")?)
+                    wire!(ops::flows_get_run(&config, &required::<String>(&payload, "run_id")?)
                         .await?
-                        .value
+                        .value)
                 }
                 PortOperation::FlowsResume => {
-                    ops::flows_resume(
+                    wire!(ops::flows_resume(
                         &context,
                         &config,
                         &required::<String>(&payload, "flow_id")?,
@@ -146,18 +153,18 @@ impl FlowsHost {
                         optional_field(&payload, "reject")?.unwrap_or_default(),
                     )
                     .await?
-                    .value
+                    .value)
                 }
                 PortOperation::FlowsCancelRun => {
-                    ops::flows_cancel_run(&config, &required::<String>(&payload, "run_id")?)
+                    wire!(ops::flows_cancel_run(&config, &required::<String>(&payload, "run_id")?)
                         .await?
-                        .value
+                        .value)
                 }
                 PortOperation::AgentsList => {
                     let agents = crate::agent::registry::list_agents(&context, false)
                         .await
                         .map_err(|error| error.to_string())?;
-                    agents
+                    wire!(agents
                         .iter()
                         .map(|agent| {
                             json!({
@@ -169,34 +176,34 @@ impl FlowsHost {
                                 "tags": serde_json::to_value(&agent.tags).unwrap_or(Value::Null),
                             })
                         })
-                        .collect::<Vec<_>>()
+                        .collect::<Vec<_>>())
                 }
                 PortOperation::SuggestionsUpsert => {
                     let suggestions = decode::<Vec<tinyflows_catalog::FlowSuggestion>>(
                         payload.clone(),
                     )?;
-                    crate::flows::store::upsert_suggestions(&config, &suggestions)
-                        .map_err(|error| error.to_string())?
+                    json!(crate::flows::store::upsert_suggestions(&config, &suggestions)
+                        .map_err(|error| error.to_string())?)
                 }
-                PortOperation::GatesValidate => ops::flows_validate(payload).value,
+                PortOperation::GatesValidate => wire!(ops::flows_validate(payload).value),
                 PortOperation::GatesRun => {
-                    ops::run_builder_gates_json(&context, &config, payload).await?
+                    wire!(ops::run_builder_gates_json(&context, &config, payload).await?)
                 }
                 PortOperation::GatesStrict => {
                     ops::strict_gate(&context, &config, &payload).await?;
-                    true
+                    json!(true)
                 }
                 PortOperation::GatesEngineCompatibility => {
-                    ops::engine_compatibility_errors_json(&config, payload)?
+                    wire!(ops::engine_compatibility_errors_json(&config, payload)?)
                 }
                 PortOperation::GatesWiringWarnings => {
-                    ops::wiring_warnings_json(&config, payload).await?
+                    wire!(ops::wiring_warnings_json(&config, payload).await?)
                 }
                 PortOperation::GatesApprovalManifest => {
-                    ops::approval_manifest_json(&config, payload).await?
+                    wire!(ops::approval_manifest_json(&config, payload).await?)
                 }
             };
-            encode(value)
+            Ok(value)
         })
         .await
     }
@@ -256,16 +263,8 @@ fn optional_field<T: DeserializeOwned>(value: &Value, key: &str) -> Result<Optio
     }
 }
 
-fn field<T: DeserializeOwned>(value: &Value, key: &str) -> Result<Option<T>, String> {
-    optional_field(value, key)
-}
-
 fn decode<T: DeserializeOwned>(value: Value) -> Result<T, String> {
     serde_json::from_value(value).map_err(|error| error.to_string())
-}
-
-fn encode(value: impl Serialize) -> Result<Value, String> {
-    serde_json::to_value(value).map_err(|error| error.to_string())
 }
 
 fn bus_error(member: &str, error: impl std::fmt::Display) -> tinybus::Error {
