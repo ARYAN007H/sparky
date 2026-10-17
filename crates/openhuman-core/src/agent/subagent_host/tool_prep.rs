@@ -199,8 +199,11 @@ pub(super) fn retain_parent_visible_tool_indices(
         None,
         None,
     );
-    let names: std::collections::HashSet<_> =
-        narrowed.specs().iter().map(|spec| spec.name.as_str()).collect();
+    let names: std::collections::HashSet<_> = narrowed
+        .specs()
+        .iter()
+        .map(|spec| spec.name.as_str())
+        .collect();
     indices.retain(|&index| names.contains(parent_tools[index].name()));
 }
 

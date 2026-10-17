@@ -473,7 +473,8 @@ async fn legacy_pause_migration_preserves_host_checkpoint_metadata_and_bytes() {
             input_tokens: 13,
             output_tokens: 7,
             cached_input_tokens: 2,
-            ..SubagentUsage::default()
+            charged_amount_usd: 0.75,
+            cost_source: tinyagents_harness::cost::CostSource::Estimated,
         },
         artifact_paths: vec!["artifacts/report.md".into()],
         elapsed_ms: 321,
@@ -506,6 +507,46 @@ async fn legacy_pause_migration_preserves_host_checkpoint_metadata_and_bytes() {
 }
 
 #[tokio::test]
+async fn legacy_pause_migration_does_not_return_a_stale_pause_after_terminal_commit() {
+    let directory = tempfile::tempdir().unwrap();
+    let key = key();
+    let persistence = OpenHumanPersistence::new(directory.path().to_path_buf());
+    let mut terminal = SubagentOutcome::cancelled("task");
+    terminal.status = SubagentOutcomeKind::Completed;
+    terminal.output = "terminal winner".into();
+    persistence
+        .record_terminal(&key, &terminal, None)
+        .await
+        .unwrap();
+
+    let stale_pause = SubagentCheckpointData {
+        task_key: Some(key.clone()),
+        task_id: key.task_id.clone(),
+        agent_id: "legacy-agent".into(),
+        worker_thread_id: None,
+        history: Vec::new(),
+        question: "stale pause".into(),
+        options: None,
+        skill_filter_override: None,
+        model_override: None,
+        created_at: "2026-10-01T00:00:00Z".into(),
+        resume_checkpoint: None,
+        resume_metadata: Default::default(),
+        output: "stale output".into(),
+        iterations: 1,
+        usage: SubagentUsage::default(),
+        artifact_paths: Vec::new(),
+        elapsed_ms: 1,
+    };
+
+    let migrated = persistence
+        .migrate_legacy_pause(&key, stale_pause)
+        .await
+        .unwrap();
+    assert_eq!(migrated.output, "terminal winner");
+}
+
+#[tokio::test]
 async fn driver_inline_projection_returns_the_durable_winner_not_a_local_loser() {
     use tinyagents_orchestration::subagent::SubagentPersistenceDisposition as Disposition;
 
@@ -527,10 +568,14 @@ async fn driver_inline_projection_returns_the_durable_winner_not_a_local_loser()
         tinyagents_orchestration::subagent::SubagentIncomplete::new("winner stopped"),
     );
     winner.output = "durable winning output".into();
+    winner.cost_usd = Some(0.75);
+    winner.cost_source = Some(tinyagents_harness::cost::CostSource::Estimated);
     winner.history = vec![tinyinference_llm::message::Message::assistant(
         "durable winning history",
     )];
     winner.usage.calls = 7;
+    winner.usage.usage.charged_amount =
+        Some(tinyinference_llm::usage::ChargedAmount::usd_micros(750_000));
     winner
         .extensions
         .insert("agent_id".into(), serde_json::json!("winner-agent"));
@@ -562,6 +607,11 @@ async fn driver_inline_projection_returns_the_durable_winner_not_a_local_loser()
     assert_eq!(projected.output, "durable winning output");
     assert_eq!(projected.agent_id, "winner-agent");
     assert_eq!(projected.iterations, 7);
+    assert_eq!(
+        projected.usage.cost_source,
+        tinyagents_harness::cost::CostSource::Estimated
+    );
+    assert_eq!(projected.usage.charged_amount_usd, 0.75);
     assert!(matches!(
         projected.status,
         SubagentRunStatus::Incomplete { ref reason } if reason == "winner stopped"

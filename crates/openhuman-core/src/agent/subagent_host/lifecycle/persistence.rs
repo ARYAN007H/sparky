@@ -381,7 +381,7 @@ impl OpenHumanPersistence {
         outcome
     }
 
-    async fn migrate_legacy_pause(
+    pub(in crate::agent::subagent_host) async fn migrate_legacy_pause(
         &self,
         key: &SubagentTaskKey,
         checkpoint: SubagentCheckpointData,
