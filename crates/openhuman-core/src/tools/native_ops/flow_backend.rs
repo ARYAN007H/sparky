@@ -11,6 +11,8 @@ use tinytools::ToolResult;
 
 use crate::{config::Config, security::SecurityPolicy};
 
+pub(crate) const NATIVE_TOOL_PREFIX: &str = "oh:";
+
 /// Flow-specific policy and approval operations supplied by the host adapter.
 #[async_trait]
 pub(crate) trait FlowPolicyHooks: Send + Sync {
@@ -35,7 +37,7 @@ pub(crate) async fn invoke(
     args: Value,
     hooks: &dyn FlowPolicyHooks,
 ) -> Result<Value, String> {
-    let tool_name = slug.strip_prefix("oh:").unwrap_or(slug).trim();
+    let tool_name = slug.strip_prefix(NATIVE_TOOL_PREFIX).unwrap_or(slug).trim();
     if tool_name.is_empty() {
         return Err("tool_call node: native tool slug is empty (expected `oh:<tool_name>`)".into());
     }
@@ -46,7 +48,6 @@ pub(crate) async fn invoke(
     tracing::debug!(target: "flows", %tool_name, ?class, "[flows] dispatching NATIVE OpenHuman tool");
     let result = super::execute_tool_with_security(config, policy, tool_name, args, false)
         .await
-        .map_err(|error| format!("{error}"))
         .and_then(|outcome| {
             reject_failed_native_tool_result(slug, &outcome.result)
                 .map(|()| native_tool_payload(&outcome.result))

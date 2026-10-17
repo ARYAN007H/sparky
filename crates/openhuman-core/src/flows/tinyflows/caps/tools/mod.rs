@@ -40,7 +40,8 @@ pub(crate) use native::NativeToolBackend;
 /// `oh:web_search`. Native tools run through the same agent tool registry the
 /// assistant uses (`tools::native_ops::execute_tool`), so a flow can call
 /// search / media generation / file / shell / etc. — the full toolset.
-pub(crate) const NATIVE_TOOL_PREFIX: &str = "oh:";
+pub(crate) const NATIVE_TOOL_PREFIX: &str =
+    crate::tools::native_ops::flow_backend::NATIVE_TOOL_PREFIX;
 
 /// What a backend needs to service one call.
 ///
