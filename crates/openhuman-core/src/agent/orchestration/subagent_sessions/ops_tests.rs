@@ -225,6 +225,10 @@ fn stale_close_and_reuse_snapshots_cannot_change_a_newer_lifecycle() {
 
     assert!(close_if_current(&store, &second).unwrap());
     assert!(
+        close_if_current(&store, &second).unwrap(),
+        "closing the same already-closed durable session remains idempotent"
+    );
+    assert!(
         upsert_running(
             &store,
             SubagentSessionUpsert {

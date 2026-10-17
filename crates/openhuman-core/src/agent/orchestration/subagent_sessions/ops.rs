@@ -417,13 +417,15 @@ pub fn close_if_current(
     else {
         return Ok(false);
     };
-    if session.status == DurableSubagentStatus::Closed
-        || session.parent_session != observed.parent_session
+    if session.parent_session != observed.parent_session
         || session.parent_thread_id != observed.parent_thread_id
         || session.current_task_id != observed.current_task_id
         || session.lifecycle_key != observed.lifecycle_key
     {
         return Ok(false);
+    }
+    if session.status == DurableSubagentStatus::Closed {
+        return Ok(true);
     }
     session.status = DurableSubagentStatus::Closed;
     session.reusable = false;
