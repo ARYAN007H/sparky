@@ -180,6 +180,137 @@ async fn static_live_harness_builder_resolves_control_aliases_from_the_execution
 }
 
 #[tokio::test]
+async fn live_close_alias_enforces_parent_thread_ownership() {
+    use crate::agent::harness::fork_context::ParentExecutionContext;
+    use crate::agent::orchestration::subagent_sessions::{
+        DurableSubagentSession, DurableSubagentStatus, SubagentSessionStore,
+    };
+    use tinyagents_harness::{
+        agent_loop::phases::execute_tool_batch, context::RunConfig, ComponentId,
+    };
+
+    let workspace = tempfile::tempdir().expect("live harness workspace");
+    let config = crate::config::Config::default();
+    let core = crate::core::runtime::CoreContext::for_test_with_config(
+        crate::core::runtime::DomainSet::full(),
+        config,
+    );
+    let model: Arc<dyn tinyinference_llm::model::ChatModel<()>> =
+        Arc::new(tinyagents_harness::testkit::ScriptedModel::new(Vec::new()));
+    let parent = ParentExecutionContext {
+        agent_definition_id: "live-orchestrator".into(),
+        allowed_subagent_ids: HashSet::new(),
+        turn_model_source: crate::agent::tinyagents::TurnModelSource::from_model(model),
+        all_tools: Arc::new(Vec::new()),
+        all_tool_specs: Arc::new(Vec::new()),
+        visible_tool_names: HashSet::new(),
+        visible_tool_specs: Arc::new(Vec::new()),
+        subagent_tool_ceiling_names: HashSet::new(),
+        model_name: "test-model".into(),
+        temperature: 0.0,
+        workspace_dir: workspace.path().to_path_buf(),
+        workspace_descriptor: None,
+        agent_config: Default::default(),
+        workflows: Arc::new(Vec::new()),
+        memory_context: Arc::new(None),
+        session_id: "live-close-parent-session".into(),
+        channel: "voice-live-test".into(),
+        connected_integrations: Vec::new(),
+        tool_call_format: tinytools_agent::dialect::ToolCallFormat::Native,
+        session_key: "live-close-parent-session".into(),
+        session_parent_prefix: None,
+        on_progress: None,
+        run_queue: None,
+        host_env: Default::default(),
+    };
+    let sessions = SubagentSessionStore::new(workspace.path().to_path_buf());
+    let row = |id: &str, thread: &str| DurableSubagentSession {
+        subagent_session_id: id.into(),
+        parent_session: "live-close-parent-session".into(),
+        parent_thread_id: Some(thread.into()),
+        worker_thread_id: None,
+        agent_id: "researcher".into(),
+        display_name: None,
+        model: None,
+        sandbox_mode: "workspace".into(),
+        action_root: None,
+        task_key: id.into(),
+        task_title: "Research task".into(),
+        current_task_id: Some(format!("task-{id}")),
+        lifecycle_key: None,
+        status: DurableSubagentStatus::Idle,
+        reusable: true,
+        latest_history: None,
+        latest_error: None,
+        created_at: "2026-01-01T00:00:00Z".into(),
+        updated_at: "2026-01-01T00:00:00Z".into(),
+        last_used_at: "2026-01-01T00:00:00Z".into(),
+    };
+    sessions
+        .save(&[row("owned-session", "voice-thread"), row("foreign-session", "other-thread")])
+        .expect("seed scoped rows");
+
+    let tools: SharedToolSet = Arc::new(vec![Box::new(
+        crate::agent::orchestration::tools::CloseSubagentTool::new(),
+    )]);
+    let sets = vec![tools];
+    let mut harness: AgentHarness<(), OpenHumanRunContext> = AgentHarness::new();
+    host_tool_set_builder(&sets, &None, true, &HashSet::new()).register(&mut harness, None);
+    let mut live_context = OpenHumanRunContext::new()
+        .with_core(Some(Arc::clone(&core)))
+        .with_parent(parent);
+    live_context.thread_id = Some("voice-thread".into());
+    let mut run = live_context
+        .into_tinyagents(RunConfig::new("live-close-parent").with_thread("voice-thread"));
+    let mut status = tinyagents_harness::events::HarnessRunStatus::new(
+        run.run_id().clone(),
+        ComponentId::new("live-close-test".to_owned()),
+    );
+    let mut agent_run = tinyagents_harness::middleware::AgentRun::new();
+    let mut messages = Vec::new();
+
+    let foreign = execute_tool_batch(
+        &harness,
+        &(),
+        &mut run,
+        &mut agent_run,
+        &mut status,
+        &mut messages,
+        vec![tinyinference_llm::tool::ToolCall::new(
+            "close-foreign-call",
+            "close_subagent",
+            serde_json::json!({"subagent_session_id":"foreign-session"}),
+        )],
+    )
+    .await
+    .expect("foreign close dispatch");
+    assert!(foreign.results[0].is_error);
+    assert!(sessions.load().unwrap().iter().any(|row| {
+        row.subagent_session_id == "foreign-session" && row.status == DurableSubagentStatus::Idle
+    }));
+
+    let owned = execute_tool_batch(
+        &harness,
+        &(),
+        &mut run,
+        &mut agent_run,
+        &mut status,
+        &mut messages,
+        vec![tinyinference_llm::tool::ToolCall::new(
+            "close-owned-call",
+            "close_subagent",
+            serde_json::json!({"subagent_session_id":"owned-session"}),
+        )],
+    )
+    .await
+    .expect("owned close dispatch");
+    assert!(!owned.results[0].is_error, "{}", owned.results[0].output());
+    assert!(sessions.load().unwrap().iter().any(|row| {
+        row.subagent_session_id == "owned-session" && row.status == DurableSubagentStatus::Closed
+    }));
+}
+
+#[tokio::test]
 async fn registered_memory_dispatch_enforces_one_budget_across_distinct_calls() {
     use crate::memory::test_fixtures::{bind_reference, config_in};
     use tinyagents_harness::{context::RunConfig, CallId};
