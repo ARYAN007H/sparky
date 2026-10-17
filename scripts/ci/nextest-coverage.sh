@@ -11,10 +11,24 @@ config="${report_dir}/${suite}.toml"
 report="${report_dir}/${suite}.xml"
 # Absolute paths keep reports out of the compiler target tree and survive its
 # cleanup. A fresh config retains the repository's timeouts/resource groups.
-node - "$config" "$report" <<'JS'
+node - "$config" "$report" "$@" <<'JS'
 const fs = require('node:fs');
-const [config, report] = process.argv.slice(2);
-fs.writeFileSync(config, fs.readFileSync('.config/nextest.toml', 'utf8') + '\n[profile.ci.junit]\npath = ' + JSON.stringify(report) + '\n');
+const { execFileSync } = require('node:child_process');
+const [config, report, ...command] = process.argv.slice(2);
+const manifest = command.indexOf('--manifest-path');
+const metadataArgs = ['metadata', '--no-deps', '--format-version', '1'];
+if (manifest >= 0) metadataArgs.push('--manifest-path', command[manifest + 1]);
+const metadata = JSON.parse(execFileSync('cargo', metadataArgs, { encoding: 'utf8' }));
+const targets = new Set(metadata.packages.flatMap(pkg => pkg.targets.map(target => target.name)));
+// Nextest validates binary predicates against the selected workspace, even
+// regex predicates. A standalone Tauri workspace has none of the root CLI's
+// resource-sensitive binaries, so omit only those inapplicable overrides.
+const source = fs.readFileSync('.config/nextest.toml', 'utf8');
+const configText = source.replace(/\n\[\[profile\.ci\.overrides\]\]\n[\s\S]*?(?=\n\[|$)/g, block => {
+  const binary = block.match(/binary\(\/\^([a-zA-Z0-9_-]+)\$\/\)/) ?? block.match(/binary\(=([a-zA-Z0-9_-]+)\)/);
+  return binary && !targets.has(binary[1]) ? '' : block;
+});
+fs.writeFileSync(config, configText + '\n[profile.ci.junit]\npath = ' + JSON.stringify(report) + '\n');
 JS
 rm -f "$report" "${report_dir}/${suite}.json"
 args=()

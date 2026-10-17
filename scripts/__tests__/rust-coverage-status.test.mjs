@@ -251,6 +251,7 @@ case "$*" in *"-p openhuman --lib --bins"*) [ "${exitCode}" = 0 ] || exit "${exi
 node - "$@" <<'JS'
 const fs = require('node:fs');
 const args = process.argv.slice(2);
+if (args[0] === 'metadata') console.log(JSON.stringify({ packages: [] }));
 if (args[0] === 'nextest' && args[1] === 'list') {
   console.log(JSON.stringify({ 'rust-suites': { active: { 'binary-name': 'active', testcases: { active: { ignored: false, 'filter-match': { status: 'matches' } } } } } }));
 }

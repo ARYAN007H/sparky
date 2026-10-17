@@ -432,7 +432,7 @@ test("private auxiliary coverage reports after failed tests and preserves the fa
   const calls = path.join(dir, "calls");
   fs.writeFileSync(
     cargo,
-    '#!/bin/sh\necho "$*" >> "$CARGO_CALLS"\nif [ "$2" = nextest ]; then exit 17; fi\nexit 0\n',
+    '#!/bin/sh\necho "$*" >> "$CARGO_CALLS"\nif [ "$1" = metadata ]; then echo \"{\\\"packages\\\":[]}\"; fi\nif [ "$2" = nextest ]; then exit 17; fi\nexit 0\n',
     { mode: 0o755 },
   );
   const plan = buildPlan({ profile: "ex63", areas: ALL, env: EX63_ENV });
@@ -448,9 +448,10 @@ test("private auxiliary coverage reports after failed tests and preserves the fa
   });
   assert.equal(result.status, 17);
   const commands = fs.readFileSync(calls, "utf8").trim().split("\n");
-  assert.equal(commands.length, 2);
-  assert.match(commands[0], /^llvm-cov nextest /);
-  assert.match(commands[1], /^llvm-cov report /);
+  assert.equal(commands.length, 3);
+  assert.match(commands[0], /^metadata /);
+  assert.match(commands[1], /^llvm-cov nextest /);
+  assert.match(commands[2], /^llvm-cov report /);
   const tauri = plan.lanes.find((l) => l.name === "tauri");
   assert.match(
     tauri.checks.find((c) => c.name === "build-tauri").run,
