@@ -15,17 +15,13 @@ async fn readonly_tier_refusal_keeps_one_capability_envelope_before_curation() {
     config.autonomy.level = AutonomyLevel::ReadOnly;
     config.save().await.unwrap();
 
-    let dispatch = crate::core::runtime::DispatchCtx::new(
-        crate::core::runtime::CoreContext::for_test(
+    let dispatch =
+        crate::core::runtime::DispatchCtx::new(crate::core::runtime::CoreContext::for_test(
             crate::core::runtime::DomainSet::full(),
             Some(config.workspace_dir.clone()),
-        ),
-    );
-    let security = SecurityPolicy::from_config(
-        &config.autonomy,
-        &config.workspace_dir,
-        &config.action_dir,
-    );
+        ));
+    let security =
+        SecurityPolicy::from_config(&config.autonomy, &config.workspace_dir, &config.action_dir);
     let approval = ApprovalTurnContext::default();
     let call = ToolCallCtx {
         dispatch: &dispatch,
@@ -39,9 +35,19 @@ async fn readonly_tier_refusal_keeps_one_capability_envelope_before_curation() {
         .unwrap_err();
     let rendered = error.to_string();
     assert!(rendered.contains("ReadOnly"), "{rendered}");
-    assert!(rendered.contains("Network-class actions are blocked"), "{rendered}");
-    assert!(!rendered.contains("tool not permitted"), "tier gate must precede curation");
-    assert_eq!(rendered.matches("capability error:").count(), 1, "{rendered}");
+    assert!(
+        rendered.contains("Network-class actions are blocked"),
+        "{rendered}"
+    );
+    assert!(
+        !rendered.contains("tool not permitted"),
+        "tier gate must precede curation"
+    );
+    assert_eq!(
+        rendered.matches("capability error:").count(),
+        1,
+        "{rendered}"
+    );
 }
 
 #[test]
