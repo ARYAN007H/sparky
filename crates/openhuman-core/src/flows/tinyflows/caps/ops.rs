@@ -32,20 +32,6 @@ use crate::security::GateDecision;
 use crate::security::SecurityPolicy;
 use tinybox_bus::CommandClass;
 
-// The live Composio catalog and probe moved to `composio::catalog` -- the domain
-// that owns Composio's vocabulary. This import is the edge pointing the right
-// way round: the feature-gated seam depends on the always-compiled domain, not
-// the reverse. See that module's docs.
-#[cfg(test)]
-pub(crate) use crate::integrations::composio::catalog::ProbedOutputSample;
-pub(crate) use crate::integrations::composio::catalog::{
-    composio_required_args, fetch_live_toolkit_catalog, probe_tool_output_sample, ToolContract,
-};
-#[cfg(test)]
-pub(crate) use crate::integrations::composio::catalog::{
-    seed_live_catalog_cache, seed_live_catalog_cache_expired, seed_probe_cache,
-};
-
 use super::*;
 
 pub(crate) use crate::integrations::composio::flow_gate::composio_connection_id;

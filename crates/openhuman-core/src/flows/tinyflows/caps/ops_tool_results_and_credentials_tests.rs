@@ -1,4 +1,7 @@
 use super::*;
+use crate::integrations::composio::catalog::{
+    seed_live_catalog_cache, seed_live_catalog_cache_expired, ToolContract,
+};
 
 // ── native `oh:` tool result handling ──────────────────────────────────
 
