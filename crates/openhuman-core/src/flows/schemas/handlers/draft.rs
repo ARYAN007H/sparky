@@ -1,3 +1,5 @@
+use crate::core::runtime::DispatchCtx;
+use super::{read_required, to_json};
 use super::super::*;
 
 pub(super) fn handle_draft_create(
@@ -88,33 +90,6 @@ pub(super) fn handle_draft_promote(
     })
 }
 
-pub(super) fn read_required<T: DeserializeOwned>(
-    params: &Map<String, Value>,
-    key: &str,
-) -> Result<T, String> {
-    let value = params
-        .get(key)
-        .cloned()
-        .ok_or_else(|| format!("missing required param '{key}'"))?;
-    serde_json::from_value(value).map_err(|e| format!("invalid '{key}': {e}"))
-}
-
-fn to_json<T: serde::Serialize>(outcome: Outcome<T>) -> Result<Value, String> {
-    outcome.into_cli_compatible_json()
-}
-
-/// Parses `draft_update`'s `flow_id` param (R-m7). The outer `Option`
-/// mirrors `ops::flows_draft_update`'s "present vs absent" contract — absent
-/// leaves the draft's existing link untouched; the inner `Option` is the new
-/// link (`None` unlinks).
-///
-/// A present-but-non-string `flow_id` (a number, or an object from a buggy
-/// client) is REJECTED rather than silently coerced into `Some(None)` via
-/// `Value::as_str()` returning `None` on a type mismatch — that shape used
-/// to be indistinguishable from an explicit `flow_id: null` unlink, and
-/// `update_draft` treats `Some(None)` as exactly that: unlinking the draft
-/// from its flow. A later `draft_promote` then creates a brand-new flow
-/// instead of updating the one the caller actually meant.
 pub(super) fn parse_draft_update_flow_id(
     params: &Map<String, Value>,
 ) -> Result<Option<Option<String>>, String> {

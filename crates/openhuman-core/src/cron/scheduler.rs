@@ -107,4 +107,4 @@ pub(crate) use dispatcher::{execute_job_now, tick_once, JobDispatcher};
 pub use live_agents::run_live_agent_pass;
 pub(crate) use live_agents::LiveAgentSchedulers;
 pub use manual_run::is_running;
-pub(crate) use manual_run::{try_acquire_run, RunGuard, ALREADY_RUNNING};
+pub(crate) use manual_run::{scheduler_config, try_acquire_run, RunGuard, ALREADY_RUNNING};

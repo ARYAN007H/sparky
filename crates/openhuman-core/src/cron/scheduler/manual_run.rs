@@ -58,3 +58,13 @@ pub(crate) fn try_acquire_run(job_id: &str) -> Option<RunGuard> {
         .insert(job_id.to_string())
         .then(|| RunGuard(job_id.to_string()))
 }
+
+/// The module's retry settings from the operator's reliability config.
+pub(crate) fn scheduler_config(config: &crate::config::Config) -> serde_json::Value {
+    serde_json::json!({
+        "poll_secs": config.reliability.scheduler_poll_secs,
+        "max_concurrent": config.scheduler.max_concurrent,
+        "retries": config.reliability.scheduler_retries,
+        "backoff_ms": config.reliability.provider_backoff_ms,
+    })
+}
