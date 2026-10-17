@@ -25,7 +25,7 @@
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use tinystoragedrivers::schema::Migrations;
 use tinystoragedrivers::{
     Capability, DocumentStore, DocumentStoreExt, Leases, Query, ScopedStorage, StorageError,
@@ -182,7 +182,7 @@ pub fn with_claim_at<T>(
                 .await
         })?
     };
-    let Some(mut held) = acquired else {
+    let Some(held) = acquired else {
         tracing::debug!(
             target: "openhuman::storage_import",
             owner,
@@ -214,7 +214,7 @@ pub fn with_claim_at<T>(
                         .await
                 });
                 match renewed {
-                    Ok(Some(next)) => held = next,
+                    Ok(Some(_)) => {}
                     Ok(None) | Err(_) => {
                         tracing::warn!(
                             target: "openhuman::storage_import",
@@ -224,12 +224,11 @@ pub fn with_claim_at<T>(
                     }
                 }
             }
-            held.epoch
         })
     };
     let result = body();
     let _ = stop_tx.send(());
-    let epoch = heartbeat.join().unwrap_or(epoch);
+    let _ = heartbeat.join();
     let released = {
         let key = lease_key(&claim_owner, &claim_key);
         repo.run(move |docs| async move {
@@ -293,11 +292,6 @@ pub async fn migrate_legacy_markers(scoped: &ScopedStorage) -> Result<usize, Sto
         );
     }
     Ok(moved)
-}
-
-/// A claim failure as an `anyhow` error naming the step.
-pub fn claim_error(step: &str, error: impl std::fmt::Display) -> anyhow::Error {
-    anyhow!("{LOG_PREFIX} claim {step}: {error}")
 }
 
 #[cfg(test)]

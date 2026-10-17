@@ -79,6 +79,7 @@ struct Origin {
 /// One domain's document store under one storage scope.
 #[derive(Clone)]
 pub struct Repo {
+    scoped: ScopedStorage,
     docs: Arc<dyn DocumentStore>,
     domain: &'static str,
     collections: fn() -> Vec<CollectionSpec>,
@@ -152,11 +153,18 @@ impl Repo {
         collections: fn() -> Vec<CollectionSpec>,
     ) -> Self {
         Self {
+            scoped: scoped.clone(),
             docs: Arc::clone(scoped.documents()),
             domain,
             collections,
             origin: None,
         }
+    }
+
+    /// The scoped storage this repo was opened on, for the primitives that
+    /// bind to a whole scope (`tsd.migrations`).
+    pub fn scoped(&self) -> &ScopedStorage {
+        &self.scoped
     }
 
     /// Runs `f` once per process for this repo's backend instance, scope and
