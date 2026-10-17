@@ -194,7 +194,7 @@ pub(in crate::agent::orchestration) fn new_router(
 }
 
 /// The router for `workspace_dir`, opening it on first use.
-pub(in crate::agent::orchestration) fn router_for_workspace_ctx(
+pub(crate) fn router_for_workspace_ctx(
     ctx: &DispatchCtx,
     workspace_dir: &Path,
 ) -> Arc<CompletionRouter> {
