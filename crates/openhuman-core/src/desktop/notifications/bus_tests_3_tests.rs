@@ -4,6 +4,28 @@ use crate::profiles::{ProfileHost, ProfileId, ProfileIdMode};
 
 #[tokio::test]
 async fn cron_completion_stays_in_each_profile_when_agent_ids_match() {
+    const CHILD: &str = "OPENHUMAN_PROFILE_CRON_ROUTING_CHILD";
+    if std::env::var_os(CHILD).is_none() {
+        let output = std::process::Command::new(std::env::current_exe().unwrap())
+            .args([
+                "--exact",
+                "desktop::notifications::bus::profile_routing_tests::cron_completion_stays_in_each_profile_when_agent_ids_match",
+                "--nocapture",
+                "--test-threads=1",
+            ])
+            .env(CHILD, "1")
+            .output()
+            .unwrap();
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert!(output.status.success(), "{stdout}\n{stderr}");
+        assert!(
+            stdout.contains("PROFILE_ROUTING_CHILD_COMPLETE"),
+            "child did not run the profile routing assertions:\n{stdout}\n{stderr}"
+        );
+        return;
+    }
+
     use std::sync::Arc;
 
     let root = tempfile::tempdir().unwrap();
@@ -63,4 +85,5 @@ async fn cron_completion_stays_in_each_profile_when_agent_ids_match() {
         }),
     };
     assert!(event_dispatch(&missing_tenant).is_none());
+    println!("PROFILE_ROUTING_CHILD_COMPLETE");
 }
