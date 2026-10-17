@@ -3,11 +3,24 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use serde_json::{Value, json};
+use serde::{Serialize, de::DeserializeOwned};
+use serde_json::Value;
 use tinyflows_bus::copilot::{ToolCatalogRequest, ToolDescriptor};
 use tinytools::{PermissionLevel, Tool, ToolResult};
 
 use crate::config::Config;
+
+pub(crate) async fn call<R, A>(config: &Config, member: &'static str, args: A) -> Result<R, String>
+where
+    R: DeserializeOwned,
+    A: Serialize,
+{
+    let proxy = crate::modules::tinyflows::copilot_proxy(config).await?;
+    proxy
+        .call(member, args)
+        .await
+        .map_err(|error| error.wire_message())
+}
 
 /// The module's tool metadata plus the host-only node-kind overlay for calls.
 pub(crate) struct CopilotToolCatalog {

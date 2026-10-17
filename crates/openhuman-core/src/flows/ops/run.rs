@@ -158,6 +158,17 @@ pub async fn flows_run_detached(
     ))
 }
 
+/// Start the Copilot's confirmed test run as a detached RPC-origin flow run.
+pub(crate) async fn flows_run_copilot(
+    ctx: &crate::core::runtime::DispatchCtx,
+    config: &Config,
+    flow_id: &str,
+    input: Value,
+    inputs: serde_json::Map<String, Value>,
+) -> Result<Outcome<Value>, String> {
+    flows_run_detached(ctx, config, flow_id, input, inputs, FlowRunTrigger::Rpc).await
+}
+
 /// A validated, ready-to-execute flow run: the loaded [`Flow`], the freshly
 /// minted `thread_id` (== run id / checkpointer key), and whether the graph has
 /// no actionable nodes. Produced by [`prepare_flow_run`] and consumed by both

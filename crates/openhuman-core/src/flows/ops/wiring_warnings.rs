@@ -55,6 +55,15 @@ pub(crate) async fn graph_wiring_warnings(config: &Config, graph: &WorkflowGraph
     warnings
 }
 
+/// Best-effort wiring diagnostics for a portable Copilot graph payload.
+pub(crate) async fn wiring_warnings_json(
+    config: &Config,
+    graph: Value,
+) -> Result<Vec<String>, String> {
+    let graph = tinyflows::migrate::deserialize_graph(graph)?;
+    Ok(graph_wiring_warnings(config, &graph).await)
+}
+
 /// Author-time WARN (systemic tool-contract fix, Part 2c): any
 /// `=nodes.<id>.item.json.data.<field>` binding — anywhere in the graph, not
 /// just `tool_call` args — whose `<id>` names a `tool_call` node calling a

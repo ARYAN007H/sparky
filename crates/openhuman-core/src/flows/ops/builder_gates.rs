@@ -295,6 +295,47 @@ pub(crate) async fn build_builder_proposal(
     Ok(payload)
 }
 
+/// Decode the Copilot bus's portable graph payload and run the host-owned
+/// proposal gates without exposing engine types through the callback adapter.
+#[allow(clippy::too_many_arguments)]
+pub(crate) async fn build_builder_proposal_json(
+    ctx: &DispatchCtx,
+    config: &Config,
+    retry_tool: String,
+    name: String,
+    graph: Value,
+    require_approval: bool,
+    revision: bool,
+    instruction: Option<String>,
+    draft_id: Option<String>,
+    flow_id: Option<String>,
+) -> Result<Value, String> {
+    let graph = tinyflows::migrate::deserialize_graph(graph)?;
+    build_builder_proposal(
+        ctx,
+        config,
+        &retry_tool,
+        &name,
+        &graph,
+        require_approval,
+        revision,
+        instruction,
+        draft_id,
+        flow_id,
+    )
+    .await
+}
+
+/// Run the configured builder gates on the Copilot bus's portable graph payload.
+pub(crate) async fn run_builder_gates_json(
+    ctx: &DispatchCtx,
+    config: &Config,
+    graph: Value,
+) -> Result<Vec<String>, String> {
+    let graph = tinyflows::migrate::deserialize_graph(graph)?;
+    Ok(run_builder_gates(ctx, config, &graph).await)
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Agent-ref resolvability gate: an `agent` node's `agent_ref` must name a
 // real agent, not the runtime's `RegistryFallback` "unknown agent_ref" case

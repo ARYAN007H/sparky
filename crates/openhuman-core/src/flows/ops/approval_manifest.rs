@@ -96,6 +96,15 @@ pub async fn compute_approval_manifest(config: &Config, graph: &WorkflowGraph) -
     entries
 }
 
+/// Approval manifest for a portable graph payload from the Copilot bus.
+pub(crate) async fn approval_manifest_json(
+    config: &Config,
+    graph: Value,
+) -> Result<Vec<Value>, String> {
+    let graph = tinyflows::migrate::deserialize_graph(graph)?;
+    Ok(compute_approval_manifest(config, &graph).await)
+}
+
 /// RPC: the approval manifest for a saved flow (by `id`) or a candidate
 /// `graph`, joined against the flow's existing `flow_tool_trust` grants so
 /// the save+enable card can ask only for what's missing.
