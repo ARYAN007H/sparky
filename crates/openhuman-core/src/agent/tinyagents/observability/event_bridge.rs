@@ -15,6 +15,7 @@ use tinytools::humanize_tool_name;
 
 use super::bridge_types::{ProviderUsageCarry, SubagentScope, ToolFailureMap, ToolNameMap};
 use tinyagents_harness::events::{CallDedupe, IterationCursor, OrderedSender};
+use tinyagents_harness::events::{AgentEvent, EventSink};
 
 #[derive(Default)]
 pub(super) struct BridgeState {
@@ -64,6 +65,13 @@ pub(crate) struct OpenhumanEventBridge {
     /// Shared with the model adapter so thinking deltas line up with the
     /// model call (iteration) they belong to.
     pub(super) cursor: IterationCursor,
+    /// Original run-local event source, used to append content-free host
+    /// enrichment while the corresponding native generation is still open.
+    pub(super) native_events: Mutex<Option<EventSink>>,
+    /// Current model-call identity by native 1-based attempt ordinal. Usage
+    /// events do not carry call IDs, but are emitted between ModelStarted and
+    /// ModelCompleted on this run-local sink.
+    pub(super) call_ids: Mutex<std::collections::HashMap<u32, tinyagents_harness::ids::CallId>>,
     /// Shared `call_id → tool_name` map written by the model adapter's
     /// `ThinkingForwarder` on tool-call start; read here to label the
     /// incremental tool-argument fragments projected off the crate stream.
@@ -170,6 +178,8 @@ impl OpenhumanEventBridge {
             scope,
             definition: std::sync::OnceLock::new(),
             cursor,
+            native_events: Mutex::new(None),
+            call_ids: Mutex::new(std::collections::HashMap::new()),
             tool_names,
             failure_map,
             usage_carry,
@@ -188,6 +198,31 @@ impl OpenhumanEventBridge {
     pub(crate) fn set_definition(&self, definition: Option<&str>) {
         if let Some(definition) = definition.filter(|definition| !definition.is_empty()) {
             let _ = self.definition.set(definition.to_owned());
+        }
+    }
+
+    pub(crate) fn set_native_events(&self, events: EventSink) {
+        *self
+            .native_events
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(events);
+    }
+
+    pub(super) fn emit_generation_enrichment(
+        &self,
+        call_id: tinyagents_harness::ids::CallId,
+        enrichment: tinyagents_harness::events::GenerationEnrichment,
+    ) {
+        if let Some(events) = self
+            .native_events
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .as_ref()
+        {
+            events.emit(AgentEvent::GenerationEnriched {
+                call_id,
+                enrichment,
+            });
         }
     }
 
