@@ -211,11 +211,11 @@ async fn driver_job_controls_are_isolated_by_workspace_with_shared_runtime_state
     .register(&mut harness, None);
     let mut status_a = tinyagents_harness::events::HarnessRunStatus::new(
         run_a.run_id().clone(),
-        tinyagents_harness::ComponentId::new("workspace-a-control".into()),
+        tinyagents_harness::ComponentId::new("workspace-a-control"),
     );
     let mut status_b = tinyagents_harness::events::HarnessRunStatus::new(
         run_b.run_id().clone(),
-        tinyagents_harness::ComponentId::new("workspace-b-control".into()),
+        tinyagents_harness::ComponentId::new("workspace-b-control"),
     );
     let mut agent_run_a = tinyagents_harness::middleware::AgentRun::new();
     let mut agent_run_b = tinyagents_harness::middleware::AgentRun::new();
