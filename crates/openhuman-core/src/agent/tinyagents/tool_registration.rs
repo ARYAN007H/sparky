@@ -244,7 +244,8 @@ fn subagent_control_dispatches(
             parent.workspace_dir.clone(),
             parent.session_id.clone(),
             run_context.thread_id.clone(),
-        ),
+        )
+        .with_jobs(jobs.clone()),
     );
     let owner = subagent_owner_key(&parent.session_id, run_context.thread_id.as_deref());
     let parent_session = parent.session_id.clone();
