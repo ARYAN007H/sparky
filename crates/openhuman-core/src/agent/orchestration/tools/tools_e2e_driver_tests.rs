@@ -213,6 +213,7 @@ async fn force_fresh_cancels_old_driver_before_creating_a_new_session() {
         })
         .with_owner_scope(Arc::new({
             let owner = crate::agent::tinyagents::tool_registration::subagent_owner_key(
+                &workspace,
                 "force-fresh-parent-session",
                 Some("force-fresh-parent-thread"),
             );

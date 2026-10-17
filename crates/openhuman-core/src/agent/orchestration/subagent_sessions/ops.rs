@@ -60,6 +60,7 @@ pub fn cancel_driver_jobs_for_thread(
             continue;
         };
         let owner = crate::agent::tinyagents::tool_registration::subagent_owner_key(
+            workspace_dir,
             &session.parent_session,
             Some(thread_id),
         );
@@ -114,6 +115,7 @@ pub fn cancel_driver_job_for_session(
         return false;
     };
     let owner = crate::agent::tinyagents::tool_registration::subagent_owner_key(
+        store.workspace_dir(),
         parent_session,
         parent_thread_id,
     );
@@ -158,6 +160,7 @@ pub fn cancel_driver_job_for_observed_session(
         return false;
     };
     let owner = crate::agent::tinyagents::tool_registration::subagent_owner_key(
+        store.workspace_dir(),
         parent_session,
         parent_thread_id,
     );

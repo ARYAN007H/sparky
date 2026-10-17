@@ -119,6 +119,7 @@ async fn steer_reusable_session(
         .ok_or_else(|| "reusable async subagent has no durable parent".to_owned())?;
     let thread_id = parent.thread_id().map(|id| id.as_str().to_owned());
     let owner = crate::agent::tinyagents::tool_registration::subagent_owner_key(
+        &product_parent.workspace_dir,
         &product_parent.session_id,
         thread_id.as_deref(),
     );

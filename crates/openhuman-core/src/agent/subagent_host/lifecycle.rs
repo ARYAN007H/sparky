@@ -469,6 +469,12 @@ async fn invoke_driver_tool_with_request(
         .unwrap_or_default();
     let thread_id = parent.thread_id().map(|id| id.as_str().to_owned());
     let owner = crate::agent::tinyagents::tool_registration::subagent_owner_key(
+        &parent
+            .data
+            .parent
+            .as_ref()
+            .map(|context| context.workspace_dir.as_path())
+            .unwrap_or_else(|| std::path::Path::new("")),
         &parent_session,
         thread_id.as_deref(),
     );

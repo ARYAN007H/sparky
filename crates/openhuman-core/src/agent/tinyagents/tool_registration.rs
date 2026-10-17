@@ -72,13 +72,19 @@ impl ToolDispatch<(), OpenHumanRunContext> for LiveToolContextDispatch {
     }
 }
 
-/// Collision-free stable scope for controls over a host-owned parent session
-/// and optional chat thread. JSON tuple encoding distinguishes absent thread
-/// from the literal `"no-thread"` and handles delimiters in either value.
-pub(crate) fn subagent_owner_key(parent_session: &str, thread_id: Option<&str>) -> String {
+/// Collision-free stable scope for controls over a host-owned parent session,
+/// workspace, and optional chat thread. JSON tuple encoding distinguishes
+/// absent thread from the literal `"no-thread"` and handles delimiters in any
+/// value.
+pub(crate) fn subagent_owner_key(
+    workspace: &std::path::Path,
+    parent_session: &str,
+    thread_id: Option<&str>,
+) -> String {
     format!(
         "openhuman-subagent-owner:{}",
-        serde_json::to_string(&(parent_session, thread_id)).unwrap_or_else(|_| "null".into())
+        serde_json::to_string(&(workspace, parent_session, thread_id))
+            .unwrap_or_else(|_| "null".into())
     )
 }
 
@@ -377,7 +383,11 @@ fn subagent_control_dispatches(
         )
         .with_jobs(jobs.clone()),
     );
-    let owner = subagent_owner_key(&parent.session_id, run_context.thread_id.as_deref());
+    let owner = subagent_owner_key(
+        &parent.workspace_dir,
+        &parent.session_id,
+        run_context.thread_id.as_deref(),
+    );
     let parent_session = parent.session_id.clone();
     let owner_scope: Arc<dyn Fn(u64) -> String + Send + Sync> = Arc::new(move |_| owner.clone());
 

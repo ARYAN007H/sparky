@@ -160,6 +160,7 @@ async fn closing_a_durable_driver_session_cancels_only_its_registered_child() {
     )
     .with_jobs(jobs.clone());
     let owner = crate::agent::tinyagents::tool_registration::subagent_owner_key(
+        &workspace,
         "test-session",
         Some("close-driver-thread"),
     );
