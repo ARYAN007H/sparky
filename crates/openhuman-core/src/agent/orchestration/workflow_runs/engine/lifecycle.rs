@@ -29,20 +29,19 @@ fn record_failed_if_current(
     config: &Config,
     run_id: &str,
     handle: &WorkflowRunHandle,
+    expected_revision: u64,
     summary: String,
 ) {
     let supervisor = workflow_supervisor();
-    if !supervisor.is_current(handle) {
-        return;
-    }
-    if let Ok(Some(run)) = get_workflow_run(config, run_id) {
+    let _ = supervisor.with_current(handle, || {
+        if let Ok(Some(run)) = get_workflow_run(config, run_id) {
         if matches!(
             run.status,
             WorkflowRunStatus::Completed
                 | WorkflowRunStatus::Failed
                 | WorkflowRunStatus::Cancelled
                 | WorkflowRunStatus::Interrupted
-        ) || !supervisor.is_current(handle)
+        ) || run.revision != expected_revision
         {
             return;
         }
@@ -60,9 +59,10 @@ fn record_failed_if_current(
                 started_at: Some(run.started_at),
                 completed_at: Some(chrono::Utc::now()),
             },
-            run.revision,
+            expected_revision,
         );
-    }
+        }
+    });
 }
 
 /// Install the owner generation, then build OpenHuman's root context and
