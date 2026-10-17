@@ -173,7 +173,7 @@ fn with_storage_context<R>(
 pub(super) fn router_pool() -> &'static CompletionRouterPool<RouterScope> {
     static POOL: OnceLock<CompletionRouterPool<RouterScope>> = OnceLock::new();
     POOL.get_or_init(|| {
-        CompletionRouterPool::new(|scope| {
+        CompletionRouterPool::new(|scope: &RouterScope| {
             #[cfg(test)]
             if let Some(store) = test_store_overrides()
                 .lock()
