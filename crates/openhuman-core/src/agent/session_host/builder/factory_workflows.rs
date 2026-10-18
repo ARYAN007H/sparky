@@ -11,6 +11,8 @@ pub(super) fn session_workflows(
     if host_only {
         return Vec::new();
     }
+    #[cfg(all(feature = "flows", feature = "skills"))]
+    crate::skills::bundled::flow_authoring::schedule_prewarm(ctx, config, None);
     let catalogue = crate::skills::load_workflow_metadata_for(ctx, config);
     #[cfg(feature = "flows")]
     let catalogue = {
