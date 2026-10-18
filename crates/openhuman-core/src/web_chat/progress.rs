@@ -97,7 +97,7 @@ pub(crate) struct ProgressProjection {
 }
 
 impl ProgressProjection {
-    pub(crate) fn new(
+    pub(crate) async fn new(
         ctx: &DispatchCtx,
         ids: TurnIds,
         metadata: ChatRequestMetadata,
@@ -123,7 +123,7 @@ impl ProgressProjection {
         )
         .unzip();
         Self {
-            surface: Surface::new(ctx, ids.clone()),
+            surface: Surface::new(ctx, ids.clone(), config.clone()).await,
             turn_state: Some(TurnStateMirror::new(
                 turn_states,
                 ids.thread_id.clone(),
@@ -507,7 +507,7 @@ pub(crate) fn spawn_progress_bridge(
             request_id,
         };
         let mut projection =
-            ProgressProjection::new(&dispatch_ctx, ids, metadata, config, turn_state_store);
+            ProgressProjection::new(&dispatch_ctx, ids, metadata, config, turn_state_store).await;
         let mut beat =
             tokio::time::interval(std::time::Duration::from_secs(INFERENCE_HEARTBEAT_SECS));
         beat.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);

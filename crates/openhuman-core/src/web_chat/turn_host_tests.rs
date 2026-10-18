@@ -141,7 +141,8 @@ async fn the_heartbeat_beats_only_for_a_live_turn() {
         Default::default(),
         crate::config::Config::default(),
         std::sync::Arc::new(tinyagents_session::port::InMemoryTurnStates::default()),
-    )));
+    )
+    .await));
     let beat = AbortOnDrop(spawn_heartbeat(&DispatchCtx::ambient(), projection.clone()));
 
     // Before `TurnStarted` the turn is not live: no beat, however long it waits.

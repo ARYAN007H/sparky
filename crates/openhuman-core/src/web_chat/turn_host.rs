@@ -168,7 +168,8 @@ impl WebHost {
             metadata,
             config.clone(),
             crate::agent::session_store::turn_states_for(&config.workspace_dir),
-        );
+        )
+        .await;
         self.shared.with(id, |slot| {
             slot.session = Some(checked);
             slot.fork = policy == CheckoutPolicy::Fork;
