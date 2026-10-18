@@ -182,3 +182,28 @@ async fn the_dry_run_lists_only_the_files_the_run_would_import() {
     assert!(listed.contains(&"@profile/http-credentials.json"));
     assert!(!listed.contains(&"@profile/auth-profiles.json"));
 }
+
+#[tokio::test(flavor = "current_thread")]
+async fn a_resumed_dry_run_lists_what_the_finished_import_recorded() {
+    install_master_key_source(Arc::new(FixedKey));
+    let fx = with_credentials();
+    let mut state = crate::storage::layout::state::LayoutState::new("u1", 0);
+    state.credentials = vec![PROFILES_FILENAME.to_owned()];
+    state.done.push(crate::storage::layout::Step::Import);
+    state.save(&fx.target.profile_dir).unwrap();
+    let options = Options {
+        dry_run: true,
+        ..Options::default()
+    };
+    let Outcome::DryRun(plan) = migrate(&fx.target, &fx.config, &options).await.unwrap() else {
+        panic!("expected a dry run");
+    };
+    clear_master_key_source();
+    let listed: Vec<_> = plan
+        .delete_entries
+        .iter()
+        .map(|e| e.path.as_str())
+        .collect();
+    assert!(listed.contains(&"@profile/auth-profiles.json"));
+    assert!(!listed.contains(&"@profile/http-credentials.json"));
+}
