@@ -56,6 +56,20 @@ impl TurnPack {
     }
 }
 
+impl std::ops::Deref for TurnPack {
+    type Target = NativeTurnPack;
+
+    fn deref(&self) -> &Self::Target {
+        &self.native
+    }
+}
+
+impl std::ops::DerefMut for TurnPack {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.native
+    }
+}
+
 /// One turn's memory, carried on its run context.
 #[derive(Debug, Clone)]
 pub struct MemoryTurn {

@@ -1,10 +1,10 @@
 use super::*;
 
 use tinymemory_api::{Hit, ItemId, ItemKind, MemoryMeta};
-use tinymemory_tools::recall::{ContextPack, SectionHits};
+use tinymemory_tools::lifecycle::turn::TurnPack as NativeTurnPack;
 
 #[test]
-fn host_pack_citations_follow_references_and_exclude_unshown_hits() {
+fn native_pack_hits_convert_to_the_web_chat_citation_view() {
     let hit = |id: &str| Hit {
         id: ItemId(id.to_string()),
         kind: ItemKind::Learning,
@@ -13,20 +13,16 @@ fn host_pack_citations_follow_references_and_exclude_unshown_hits() {
         score: 1.0,
         confidence: None,
     };
-    let pack = ContextPack {
+    let native = NativeTurnPack {
         markdown: "shown memory".into(),
         tokens: 2,
         refs: vec![ItemId::from("first"), ItemId::from("second")],
-        sections: vec![SectionHits {
-            heading: "Learnings".into(),
-            answer: None,
-            hits: vec![hit("first"), hit("unshown"), hit("second")],
-        }],
-        skipped: Vec::new(),
         engine: "test".into(),
+        citations: vec![hit("first"), hit("second")],
+        refusal: None,
     };
 
-    let turn_pack = TurnPack::from_pack(pack).expect("nonempty pack");
+    let turn_pack = TurnPack::from_native(native);
     assert_eq!(turn_pack.refs, ["first", "second"]);
     assert_eq!(
         turn_pack
