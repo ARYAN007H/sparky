@@ -86,8 +86,6 @@ pub mod tinyhumans_boot;
 #[path = "support/env_guard.rs"]
 pub mod env_guard;
 /// The RPC bearer and JSON-RPC helpers some suites share (see `support/`).
-#[path = "support/mcp_stub_jail.rs"]
-pub mod mcp_stub_jail;
 #[path = "support/rpc_auth.rs"]
 pub mod rpc_auth;
 #[path = "support/rpc_harness.rs"]

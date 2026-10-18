@@ -4200,11 +4200,6 @@ async fn orchestrator_calls_an_operator_trusted_mcp_tool_directly_inner() {
     let _ttl = EnvVarGuard::set("OPENHUMAN_APPROVAL_TTL_SECS", "120");
     ensure_approval_gate().await;
     let _approval_bridge = register_approval_bridge();
-    let (registry_addr, registry_join) = serve_mcp_registry_fixture().await;
-    let _registry = EnvVarGuard::set(
-        "MCP_OFFICIAL_REGISTRY_BASE",
-        format!("http://{registry_addr}"),
-    );
     reset_script(Vec::new());
     let stack = boot_stack_with_config(&mcp_stub_trusted::trusted_stub_toml(
         "echo",
@@ -4299,7 +4294,6 @@ async fn orchestrator_calls_an_operator_trusted_mcp_tool_directly_inner() {
         "the direct MCP call failed: {result}"
     );
 
-    registry_join.abort();
     stack.shutdown();
 }
 

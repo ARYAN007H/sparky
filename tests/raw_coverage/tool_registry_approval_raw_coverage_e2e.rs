@@ -407,13 +407,13 @@ async fn tool_registry_entries_fall_back_on_current_thread_runtime() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[ignore = "Temporary: registry-installed servers are never operator-trusted, so the jail must start the stub; it cannot until tinymcp lets the host choose the enforcement level (https://github.com/tinyhumansai/tinymcp/pull/126) and TinyBox has a Linux backend with real process isolation."]
 async fn tool_registry_entries_include_connected_mcp_client_tools() {
     let tmp = tempdir().expect("tempdir");
-    let mut config = Config {
+    let config = Config {
         workspace_dir: tmp.path().to_path_buf(),
         ..Config::default()
     };
-    crate::mcp_stub_jail::grant_stub(&mut config, env!("CARGO_BIN_EXE_test-mcp-stub"));
     let server = install_test_mcp_server(&config, &test_mcp_server()).await;
     openhuman_core::mcp::registry::ops::mcp_clients_set_enabled(
         &config,
@@ -431,11 +431,10 @@ async fn tool_registry_entries_include_connected_mcp_client_tools() {
     // test. With one workspace open, `registry_entries()` and the config-scoped
     // form agree, and this case would keep passing if the forwarding regressed.
     let other_tmp = tempdir().expect("second tempdir");
-    let mut other_config = Config {
+    let other_config = Config {
         workspace_dir: other_tmp.path().to_path_buf(),
         ..Config::default()
     };
-    crate::mcp_stub_jail::grant_stub(&mut other_config, env!("CARGO_BIN_EXE_test-mcp-stub"));
     let other_server = install_test_mcp_server(&other_config, &test_mcp_server()).await;
     openhuman_core::mcp::registry::ops::mcp_clients_set_enabled(
         &other_config,
