@@ -8560,13 +8560,10 @@ async fn public_paths_accessible_without_token() {
     // headers, etc.). The invariant here is that the auth middleware does NOT
     // reject them with 401.
     //
-    // NOTE: `/events` and `/ws/dictation` enforce their own credential inside
-    // the handler (bind token / bearer / `?token=`), so an unauthenticated GET
-    // to those returns 401 from the HANDLER (not the middleware). `/events`
-    // requires a `client_id` query param, so an empty request is rejected by
-    // Axum's extractor (400) before the handler's own auth runs — it stays in
-    // this `!= 401` group. `/ws/dictation` is asserted separately below now
-    // that it is authenticated at the upgrade boundary (C4 / issue #1924).
+    // NOTE: `/events` enforces its own credential inside the handler, so an
+    // unauthenticated GET returns 401 from the HANDLER (not the middleware).
+    // It requires a `client_id` query param, so an empty request is rejected
+    // by Axum's extractor (400) before the handler's own auth runs.
     for path in ["/events"] {
         let resp = client
             .get(format!("{base}{path}"))
@@ -8581,9 +8578,7 @@ async fn public_paths_accessible_without_token() {
         );
     }
 
-    // `/ws/dictation` is now authenticated at the upgrade boundary (C4 /
-    // issue #1924): an unauthenticated request (no bearer header, no
-    // `?token=`) must be rejected with 401 by the handler before any upgrade.
+    // The removed dictation socket must fall through to the normal 404.
     let resp = client
         .get(format!("{base}/ws/dictation"))
         .send()
@@ -8591,8 +8586,8 @@ async fn public_paths_accessible_without_token() {
         .unwrap_or_else(|e| panic!("GET /ws/dictation: {e}"));
     assert_eq!(
         resp.status(),
-        StatusCode::UNAUTHORIZED,
-        "/ws/dictation must reject unauthenticated upgrades with 401 (got {})",
+        StatusCode::NOT_FOUND,
+        "removed /ws/dictation endpoint must return 404 (got {})",
         resp.status()
     );
 

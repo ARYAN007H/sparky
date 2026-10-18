@@ -174,26 +174,6 @@ pub mod dictation_listener {
     pub async fn stop() {}
 }
 
-// ---------------------------------------------------------------------------
-// streaming::handle_dictation_ws (provided by the real voice host adapter)
-// ---------------------------------------------------------------------------
-
-// axum-only, and its sole caller (`openhuman_rpc::server::http::dictation::dictation_ws_handler`) is
-// gated the same way, so the stub's dictation-WS surface is exclusive to the
-// `http-server` feature too (#5048): voice-OFF + http-server-OFF needs no
-// `voice::streaming` at all.
-#[cfg(feature = "http-server")]
-pub mod streaming {
-    use std::sync::Arc;
-
-    use axum::extract::ws::WebSocket;
-
-    use crate::config::Config;
-
-    /// Drop the upgraded socket immediately — there is nothing to transcribe.
-    pub async fn handle_dictation_ws(_socket: WebSocket, _config: Arc<Config>) {}
-}
-
 // `live::ws::handle_live_voice_ws`: with voice off there are no live
 // providers, so the upgraded socket is dropped immediately.
 #[cfg(feature = "http-server")]

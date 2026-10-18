@@ -113,7 +113,6 @@ fn every_member_this_client_calls_is_one_the_contract_declares() {
     use tinyvoice_bus::names::methods;
     let called = [
         methods::IS_HALLUCINATED,
-        methods::ENCODE_WAV_PCM16,
         methods::PREPARE_CAPTURE,
         methods::RESERVE_CAPTURE,
         methods::LIST_INPUT_DEVICES,

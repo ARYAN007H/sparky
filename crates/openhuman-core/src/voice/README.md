@@ -207,16 +207,6 @@ turn of a hosted ElevenLabs session down the socket as `voice:harness`, and
 one chat and the meet bot use, then streams the reply back as
 `voice:harness:delta`, `voice:harness:done` or `voice:harness:error`.
 
-### Streaming dictation WebSocket
-
-[`streaming.rs`](./streaming.rs) handles `/ws/dictation` (mounted and authenticated by
-`crates/openhuman-rpc/src/server/http/dictation.rs`). The client sends PCM16
-16 kHz mono binary frames and a `{"type":"stop"}` text frame; the core
-accumulates the audio, encodes WAV through the `tinyvoice` module, and returns
-`{"type":"final","text","raw_text"}` or `{"type":"error"}`. The `partial` frame
-type is still in the protocol but is never sent, because a hosted round trip
-per tick would multiply request count for text the client discards.
-
 ## Layout
 
 | Path | What it does |
@@ -229,7 +219,6 @@ per tick would multiply request count for text the client discards.
 | [`cloud_transcribe.rs`](./cloud_transcribe.rs) | Auth adapter for hosted STT: resolves the backend credential and calls `tinyinference_voice::cloud` against `/openai/v1/audio/transcriptions`. |
 | [`local_speech.rs`](./local_speech.rs) | Config adapter for Piper: resolves the binary and voice through the local runtime and calls `tinyinference-voice`. |
 | [`postprocess.rs`](./postprocess.rs) | Config adapter for LLM transcript cleanup (`cleanup_transcription`). |
-| [`streaming.rs`](./streaming.rs) | `/ws/dictation` handler (`handle_dictation_ws`). Compiled only with both `voice` and `http-server`. |
 | [`reply_speech.rs`](./reply_speech.rs) | Agent reply synthesis through the backend speech endpoint (`synthesize_reply`, `ReplySpeechOptions`). |
 | [`server.rs`](./server.rs), [`server/`](./server/) | The `VoiceServer` dictation runtime: hotkey loop, recording lifecycle, gates, delivery, global singleton. [README](server/README.md). |
 | [`audio_capture.rs`](./audio_capture.rs) | Microphone recording to 16 kHz mono WAV (`start_recording`, `RecordingHandle`, `RecordingResult`, `list_input_devices`) with peak RMS and the host microphone-permission policy. The `cpal` stream is `tinyvoice::capture`. |
@@ -259,8 +248,8 @@ per tick would multiply request count for text the client discards.
   `start_if_enabled` and `run_standalone` ([`server/singleton.rs`](./server/singleton.rs)).
 - `synthesize_reply` ([`reply_speech.rs`](./reply_speech.rs)) and `transcribe_cloud`
   ([`cloud_transcribe.rs`](./cloud_transcribe.rs)) are the direct hosted-backend entry points.
-- `handle_live_voice_ws` ([`live/ws.rs`](./live/ws.rs)) and `handle_dictation_ws`
-  (`streaming.rs`) are the WebSocket handlers the RPC crate mounts.
+- `handle_live_voice_ws` ([`live/ws.rs`](./live/ws.rs)) is the WebSocket handler
+  the RPC crate mounts.
 - `handle_voice_harness_turn` (`realtime_harness/`) runs one realtime harness
   turn.
 
@@ -326,8 +315,8 @@ count, rolling recent-transcript buffer) behind a `OnceCell` singleton.
   and requires a physical release before the next press can rearm it.
 - `tinyliveagents` owns live provider wire protocols and `tinyagents-live` owns
   live tool execution. The tool middleware is `agent::tinyagents::live_harness`.
-- `crates/openhuman-rpc` mounts and authenticates `/ws/dictation` and
-  `/ws/live-voice` (bearer header or `?token=`, plus the origin allowlist) and
+- `crates/openhuman-rpc` mounts and authenticates `/ws/live-voice` (bearer
+  header or `?token=`, plus the origin allowlist) and
   forwards the broadcast channels over Socket.IO. Do not add auth checks inside
   the handlers here.
 - Backend credentials come from
