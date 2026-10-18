@@ -1,6 +1,7 @@
 //! JSON-RPC / CLI controller surface for persisted config and runtime flags.
 
 mod agent;
+mod agent_paths;
 mod loader;
 mod model;
 mod privacy;
@@ -31,14 +32,16 @@ pub(crate) fn config_save_error(error: anyhow::Error) -> String {
 
 // ── Public re-exports (preserving the flat external API) ─────────────────────
 
-pub use agent::redact_home;
+pub use agent_paths::{
+    ensure_agent_dirs, ensure_usable_cwd, expand_tilde, get_agent_paths,
+    load_and_apply_agent_paths_settings, redact_home, apply_agent_paths_settings,
+};
 pub use agent::{
-    add_auto_approve_tool, apply_agent_paths_settings, apply_agent_settings,
-    apply_autonomy_settings, ensure_agent_dirs, ensure_usable_cwd, expand_tilde, get_agent_paths,
-    get_agent_settings, get_autonomy_settings, load_and_apply_agent_paths_settings,
-    load_and_apply_agent_settings, load_and_apply_autonomy_settings, AgentPathsPatch,
+    add_auto_approve_tool, apply_agent_settings, apply_autonomy_settings, get_agent_settings,
+    get_autonomy_settings, load_and_apply_agent_settings, load_and_apply_autonomy_settings,
     AgentSettingsPatch, AutonomySettingsPatch,
 };
+pub use agent_paths::AgentPathsPatch;
 
 pub use loader::{
     agent_server_status, client_config_json, core_rpc_url_from_env, get_config_snapshot,
