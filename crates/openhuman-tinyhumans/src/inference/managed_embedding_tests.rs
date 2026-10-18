@@ -545,12 +545,16 @@ async fn expired_session_publishes_session_expired_before_embedding_request() {
         .expect_err("an expired session must fail before the request");
     assert!(err.to_string().contains("SESSION_EXPIRED"), "{err}");
     assert_eq!(requests.load(Ordering::SeqCst), 0);
-    let mut saw_expired = false;
+    let mut published = None;
     while let Ok(event) = rx.try_recv() {
-        if matches!(event, DomainEvent::SessionExpired { .. }) {
-            saw_expired = true;
-            break;
+        if let DomainEvent::SessionExpired { source, reason } = event {
+            if source == "managed_embedding.resolve_bearer" {
+                published = Some((source, reason));
+                break;
+            }
         }
     }
-    assert!(saw_expired, "expired embedding credentials publish SessionExpired");
+    let (source, reason) = published.expect("expired embedding credentials publish SessionExpired");
+    assert_eq!(source, "managed_embedding.resolve_bearer");
+    assert!(reason.contains("token expired locally"), "{reason}");
 }
