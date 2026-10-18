@@ -152,8 +152,11 @@ fn build_use_skill_dispatch_with_target(
     let durable: Arc<Vec<Box<dyn Tool>>> = Arc::new(vec![use_skill_tool, create_image_tool]);
     handle.bind(Arc::downgrade(&durable));
 
-    let adapter = shared_tool_adapter(vec![durable], tinyagents_harness::tool::packs::USE_SKILL)
-        .expect("use_skill resolves in the durable registry it was just placed in");
+    let adapter = shared_tool_adapter(
+        vec![durable.clone()],
+        tinyagents_harness::tool::packs::USE_SKILL,
+    )
+    .expect("use_skill resolves in the durable registry it was just placed in");
     let dispatch = dispatch_selector(vec![durable])(USE_SKILL, Arc::new(adapter) as Arc<dyn Tool>)
         .expect("use_skill receives TinyAgents' bound owner dispatch");
     (dispatch, handle)
