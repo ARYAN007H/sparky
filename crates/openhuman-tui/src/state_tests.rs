@@ -25,29 +25,25 @@ fn viewport_journal_is_bounded_and_identifies_non_tail_changes_and_resets() {
 
 const CLIENT: &str = "tui-abc123";
 
-fn ev(event: &str) -> WebChannelEvent {
-    WebChannelEvent {
-        event: event.to_string(),
-        client_id: CLIENT.to_string(),
-        thread_id: "thread-1".to_string(),
-        ..Default::default()
-    }
+fn ev(event: &str, fields: serde_json::Value) -> WebChannelEvent {
+    let mut value = serde_json::json!({
+        "event": event,
+        "client_id": CLIENT,
+        "thread_id": "thread-1",
+        "request_id": "request-1"
+    });
+    value.as_object_mut().unwrap().extend(
+        fields.as_object().unwrap().clone(),
+    );
+    serde_json::from_value(value).expect("test event matches the owner contract")
 }
 
 fn text_delta(delta: &str) -> WebChannelEvent {
-    WebChannelEvent {
-        delta: Some(delta.to_string()),
-        delta_kind: Some("text".to_string()),
-        ..ev("text_delta")
-    }
+    ev("text_delta", serde_json::json!({"delta":delta,"delta_kind":"text"}))
 }
 
 fn thinking_delta(delta: &str) -> WebChannelEvent {
-    WebChannelEvent {
-        delta: Some(delta.to_string()),
-        delta_kind: Some("thinking".to_string()),
-        ..ev("thinking_delta")
-    }
+    ev("thinking_delta", serde_json::json!({"delta":delta,"delta_kind":"thinking"}))
 }
 
 #[test]
@@ -110,10 +106,7 @@ fn chat_done_replaces_streamed_text_with_full_response() {
     let mut s = TranscriptState::new(CLIENT);
     s.begin_user_turn("hi");
     s.apply_event(&text_delta("Hel")); // partial / laggy stream
-    let done = WebChannelEvent {
-        full_response: Some("Hello, world!".to_string()),
-        ..ev("chat_done")
-    };
+    let done = ev("chat_done", serde_json::json!({"full_response":"Hello, world!"}));
     s.apply_event(&done);
 
     let assistant: Vec<_> = s
@@ -133,10 +126,7 @@ fn chat_done_replaces_streamed_text_with_full_response() {
 fn chat_done_without_prior_deltas_still_shows_full_response() {
     let mut s = TranscriptState::new(CLIENT);
     s.begin_user_turn("hi");
-    let done = WebChannelEvent {
-        full_response: Some("Direct answer".to_string()),
-        ..ev("chat_done")
-    };
+    let done = ev("chat_done", serde_json::json!({"full_response":"Direct answer"}));
     s.apply_event(&done);
     let assistant = s
         .entries()
@@ -151,11 +141,7 @@ fn chat_done_without_prior_deltas_still_shows_full_response() {
 fn chat_error_pushes_error_entry_and_ends_stream() {
     let mut s = TranscriptState::new(CLIENT);
     s.begin_user_turn("hi");
-    let err = WebChannelEvent {
-        message: Some("rate limited".to_string()),
-        error_type: Some("rate_limit".to_string()),
-        ..ev("chat_error")
-    };
+    let err = ev("chat_error", serde_json::json!({"message":"rate limited","error_type":"rate_limit"}));
     s.apply_event(&err);
     let error = s
         .entries()
@@ -170,12 +156,9 @@ fn chat_error_pushes_error_entry_and_ends_stream() {
 fn retryable_error_includes_retry_timing() {
     let mut state = TranscriptState::new(CLIENT);
     state.begin_user_turn("try");
-    state.apply_event(&WebChannelEvent {
-        message: Some("rate limited".into()),
-        error_retryable: Some(true),
-        error_retry_after_ms: Some(2_100),
-        ..ev("chat_error")
-    });
+    state.apply_event(&ev("chat_error", serde_json::json!({
+        "message":"rate limited","error_retryable":true,"error_retry_after_ms":2100
+    })));
     assert_eq!(
         state.entries().last().unwrap().text,
         "rate limited · retryable after 3s"
@@ -188,10 +171,7 @@ fn last_assistant_excludes_an_in_flight_partial_answer() {
     state.begin_user_turn("question");
     state.apply_event(&text_delta("partial"));
     assert_eq!(state.last_assistant(), None);
-    state.apply_event(&WebChannelEvent {
-        full_response: Some("complete".into()),
-        ..ev("chat_done")
-    });
+    state.apply_event(&ev("chat_done", serde_json::json!({"full_response":"complete"})));
     assert_eq!(state.last_assistant(), Some("complete"));
 }
 
@@ -200,14 +180,10 @@ fn events_for_other_client_id_are_ignored() {
     let mut s = TranscriptState::new(CLIENT);
     s.begin_user_turn("hi");
     let before = s.entries().len();
-    let foreign = WebChannelEvent {
-        client_id: "tui-someone-else".to_string(),
-        delta: Some("not mine".to_string()),
-        ..WebChannelEvent {
-            event: "text_delta".to_string(),
-            thread_id: "thread-1".to_string(),
-            ..Default::default()
-        }
+    let foreign = {
+        let mut event = serde_json::to_value(ev("text_delta", serde_json::json!({"delta":"not mine"}))).unwrap();
+        event["client_id"] = "tui-someone-else".into();
+        serde_json::from_value(event).unwrap()
     };
     s.apply_event(&foreign);
     assert_eq!(
@@ -221,9 +197,10 @@ fn events_for_other_client_id_are_ignored() {
 fn events_for_an_inactive_thread_are_ignored() {
     let mut state = TranscriptState::new(CLIENT);
     state.set_thread("thread-1");
-    let event = WebChannelEvent {
-        thread_id: "thread-2".into(),
-        ..text_delta("not this conversation")
+    let event = {
+        let mut event = serde_json::to_value(text_delta("not this conversation")).unwrap();
+        event["thread_id"] = "thread-2".into();
+        serde_json::from_value(event).unwrap()
     };
     state.apply_event(&event);
     assert!(state.entries().is_empty());
