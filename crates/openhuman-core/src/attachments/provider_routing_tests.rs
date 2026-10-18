@@ -31,7 +31,14 @@ impl ChatModel<()> for CaptureModel {
     fn supports_input(&self, modality: InputModality, mime: &str, source: InputSource) -> bool {
         source == InputSource::Base64
             && self.transport_inputs.contains(&modality)
-            && matches!(mime, "audio/wav" | "application/pdf" | "image/jpeg")
+            && matches!(
+                mime,
+                "audio/wav"
+                    | "application/pdf"
+                    | "text/plain"
+                    | "text/markdown"
+                    | "image/jpeg"
+            )
     }
     async fn invoke(
         &self,
@@ -89,6 +96,49 @@ fn local_media(modality: InputModality, path: &str, mime: &str) -> ContentBlock 
         InputModality::Document => ContentBlock::Document(media),
         _ => panic!("fixture supports audio and documents"),
     }
+}
+
+#[tokio::test]
+async fn typed_document_mime_hints_are_per_block_and_markers_use_source_detection() {
+    let temp = tempfile::tempdir().unwrap();
+    let config = offline_config(temp.path());
+    tokio::fs::write(temp.path().join("shared.bin"), b"plain attachment bytes")
+        .await
+        .unwrap();
+    let transport = Arc::new(CaptureModel::new(vec![InputModality::Document]));
+    let model = controlled_wrapper(
+        transport.clone(),
+        config,
+        &[InputModality::Document],
+    );
+
+    model
+        .invoke(
+            &(),
+            user_request(vec![
+                local_media(InputModality::Document, "shared.bin", "application/pdf"),
+                local_media(InputModality::Document, "shared.bin", "text/markdown"),
+                ContentBlock::Text("[FILE:shared.bin]".into()),
+            ]),
+        )
+        .await
+        .unwrap();
+
+    let captured = transport.requests.lock().unwrap();
+    let Message::User(user) = &captured[0].1.messages[0] else {
+        panic!("expected user message")
+    };
+    let mimes: Vec<_> = user
+        .content
+        .iter()
+        .filter_map(|block| match block {
+            ContentBlock::Document(MediaRef::Base64 { media_type, .. }) => {
+                Some(media_type.as_str())
+            }
+            _ => None,
+        })
+        .collect();
+    assert_eq!(mimes, ["application/pdf", "text/markdown", "text/plain"]);
 }
 
 #[tokio::test]
