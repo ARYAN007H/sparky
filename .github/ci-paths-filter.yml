@@ -57,6 +57,7 @@ docs:
   - 'EMBED.md'
   - 'package.json'
 rust-core:
+  - '.config/nextest.toml'
   - '.github/workflows/ci-*.yml'
   - '.github/ci-paths-filter.yml'
   - 'scripts/ci/self-hosted/**'
@@ -122,6 +123,7 @@ rust-core:
   - '.gitmodules'
   - 'vendor/**'
 rust-tauri:
+  - '.config/nextest.toml'
   - '.github/workflows/ci-*.yml'
   - '.github/ci-paths-filter.yml'
   - 'scripts/ci/self-hosted/**'
@@ -142,6 +144,7 @@ rust-tauri:
 # own socket-auth tests never ran in CI) — arm the scripts
 # self-test job on any mock/script change.
 scripts:
+  - '.config/nextest.toml'
   - '.github/workflows/ci-*.yml'
   - '.github/ci-paths-filter.yml'
   - 'scripts/ci/self-hosted/**'
@@ -229,6 +232,7 @@ install_ps1:
 # like `rust-core`: the ports and drivers are vendored, and a pointer bump
 # anywhere can change what the driver features compile.
 storage:
+  - '.config/nextest.toml'
   - '.github/workflows/ci-*.yml'
   - '.github/workflows/storage-mongodb.yml'
   - '.github/ci-paths-filter.yml'
