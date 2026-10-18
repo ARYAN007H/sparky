@@ -30,10 +30,10 @@ pub(super) async fn load_flow_prompt(
 }
 
 /// Synchronously render a typed prompt with the already scoped module text.
-pub(super) fn load_typed_prompt_source(
+pub(super) fn load_typed_prompt_source<'a>(
     definition: &AgentDefinition,
-    mut prompt_context: PromptContext<'_>,
-    flow_archetype_text: Option<&str>,
+    mut prompt_context: PromptContext<'a>,
+    flow_archetype_text: Option<&'a str>,
 ) -> Result<String, SubagentRunError> {
     prompt_context.flow_archetype_text = flow_archetype_text;
     load_prompt_source(definition, &prompt_context)

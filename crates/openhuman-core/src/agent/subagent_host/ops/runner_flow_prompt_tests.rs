@@ -42,9 +42,11 @@ async fn typed_subagent_prompts_use_scoped_bus_text_for_both_flow_builtins() {
         let definition = registry.get(agent_id).expect("flow builtin");
         let context = prompt_context(temp.path(), agent_id);
         let loaded_config = Ok(std::sync::Arc::clone(&config));
-        let body = load_typed_prompt_source(definition, &loaded_config, context)
+        let archetype = load_flow_prompt(definition, &loaded_config)
             .await
             .unwrap_or_else(|error| panic!("loading {agent_id} prompt: {error}"));
+        let body = load_typed_prompt_source(definition, context, archetype.as_deref())
+            .unwrap_or_else(|error| panic!("rendering {agent_id} prompt: {error}"));
         assert!(
             body.contains(expected_tool),
             "{agent_id} prompt missing its tool"
@@ -63,7 +65,7 @@ async fn typed_flow_builtin_requires_its_loaded_config() {
     let temp = tempfile::tempdir().expect("workspace");
     let context = prompt_context(temp.path(), "workflow_builder");
     let loaded_config = Err("config unavailable".into());
-    let error = load_typed_prompt_source(definition, &loaded_config, context)
+    let error = load_flow_prompt(definition, &loaded_config)
         .await
         .expect_err("bus-backed prompt must not use ambient config");
     assert!(error.to_string().contains("scoped runtime config"));
@@ -85,8 +87,10 @@ async fn typed_static_prompt_override_skips_tinyflows_even_when_disabled() {
     let context = prompt_context(temp.path(), "workflow_builder");
 
     let loaded_config = Ok(config);
-    let body = load_typed_prompt_source(&definition, &loaded_config, context)
+    let archetype = load_flow_prompt(&definition, &loaded_config)
         .await
         .expect("static prompt override does not access the module");
+    let body = load_typed_prompt_source(&definition, context, archetype.as_deref())
+        .expect("static prompt renders synchronously");
     assert_eq!(body, "session-owned prompt");
 }
