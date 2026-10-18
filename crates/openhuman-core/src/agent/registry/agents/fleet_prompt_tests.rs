@@ -98,7 +98,10 @@ async fn flow_prompt_texts(definitions: &[AgentDefinition]) -> HashMap<String, S
         };
         let mut prompts = HashMap::new();
         for agent_id in ["workflow_builder", "flow_discovery"] {
-            if definitions.iter().any(|definition| definition.id == agent_id) {
+            if definitions
+                .iter()
+                .any(|definition| definition.id == agent_id)
+            {
                 let text = crate::agent::prompts::flow_archetype::fetch_prompt(&config, agent_id)
                     .await
                     .unwrap_or_else(|error| panic!("fetching `{agent_id}` prompt: {error}"));
@@ -245,7 +248,6 @@ pub(super) fn names_presented_as_callable<'a>(
 /// prompt really gives the route. Pin both, so a tool promoted onto the belt,
 /// or a prompt that drops the `tool_search` hint, fails here instead of
 /// leaving a stale excuse in [`KNOWN_UNCALLABLE`].
-#[test]
 #[tokio::test]
 async fn deferred_rows_name_deferred_tools_the_prompt_routes_through_tool_search() {
     let tools = registered_tools();
