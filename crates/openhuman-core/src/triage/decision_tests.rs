@@ -1,53 +1,5 @@
 use super::*;
 
-// ── extract / cleanup helpers ───────────────────────────────────────
-
-#[test]
-fn fenced_block_is_preferred_over_raw_braces() {
-    let text = "preamble { \"other\": 1 } middle\n```json\n{\n  \"action\": \"drop\",\n  \"reason\": \"test\"\n}\n```\ntrailing notes";
-    let slice = extract_json_slice(text).unwrap();
-    assert!(slice.contains("\"action\""));
-    assert!(slice.contains("\"reason\": \"test\""));
-    assert!(!slice.contains("middle"));
-}
-
-#[test]
-fn bare_brace_object_is_extracted_when_no_fence() {
-    let text = "Here is my verdict: { \"action\": \"drop\", \"reason\": \"test\" } — thanks!";
-    let slice = extract_json_slice(text).unwrap();
-    assert!(slice.contains("\"action\""));
-}
-
-#[test]
-fn last_of_multiple_braces_wins() {
-    let text = "{ \"action\": \"escalate\", \"reason\": \"first\" } and then { \"action\": \"drop\", \"reason\": \"second\" }";
-    let slice = extract_json_slice(text).unwrap();
-    assert!(slice.contains("\"second\""));
-    assert!(!slice.contains("\"first\""));
-}
-
-#[test]
-fn brace_inside_string_does_not_break_matching() {
-    let text = "{ \"action\": \"drop\", \"reason\": \"has } and { chars\" }";
-    let slice = extract_json_slice(text).unwrap();
-    assert!(slice.contains("has } and { chars"));
-}
-
-#[test]
-fn action_value_is_lowercased() {
-    let src = "{\"action\": \"Drop\", \"reason\": \"x\"}";
-    let out = lowercase_action_value(src);
-    assert!(out.contains("\"action\": \"drop\""));
-}
-
-#[test]
-fn other_string_values_are_not_lowercased() {
-    let src = "{\"action\": \"DROP\", \"reason\": \"X Y Z\"}";
-    let out = lowercase_action_value(src);
-    assert!(out.contains("\"action\": \"drop\""));
-    assert!(out.contains("\"reason\": \"X Y Z\""));
-}
-
 // ── full parse_triage_decision ──────────────────────────────────────
 
 #[test]
@@ -125,4 +77,12 @@ fn prefers_last_fenced_block() {
     let d = parse_triage_decision(reply).unwrap();
     assert_eq!(d.action, TriageAction::Drop);
     assert_eq!(d.reason, "never mind");
+}
+
+#[test]
+fn owner_relaxed_json_recovery_preserves_action_normalization() {
+    let reply = "{action: \"DROP\", reason: \"recovered\",}";
+    let decision = parse_triage_decision(reply).unwrap();
+    assert_eq!(decision.action, TriageAction::Drop);
+    assert_eq!(decision.reason, "recovered");
 }

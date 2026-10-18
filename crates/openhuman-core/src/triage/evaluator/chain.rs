@@ -1,14 +1,17 @@
 //! The tiered cloud → retry → local fallback orchestration.
 
 use crate::core::runtime::DispatchCtx;
-use std::collections::HashMap;
 use std::future::Future;
-use std::sync::{Mutex, OnceLock};
-use std::time::Duration;
+use std::sync::OnceLock;
+use std::time::{Duration, Instant};
 
 use anyhow::Context;
 
 use crate::cron::scheduler_gate::LlmPermit;
+use tinyagents_harness::retry::{
+    decide, BreakerRejection, FailoverDecision, FailoverReason, FailoverState,
+    PersistentFailoverAttempt, PersistentFailoverBreaker, PersistentFailoverBreakerConfig,
+};
 
 use super::super::envelope::TriggerEnvelope;
 use super::super::events;
@@ -29,41 +32,29 @@ const RETRY_AFTER_CAP: Duration = Duration::from_millis(30_000);
 const TRANSIENT_BACKOFF: Duration = Duration::from_millis(500);
 
 const OUTAGE_BACKOFF_BASE_MS: i64 = 30_000;
-const OUTAGE_BACKOFF_CAP_MS: i64 = 15 * 60_000;
-const OUTAGE_FAILURE_LIMIT: u32 = 8;
+static TRIAGE_MONOTONIC_START: OnceLock<Instant> = OnceLock::new();
+pub(crate) type RetryState = PersistentFailoverBreaker<String>;
 
-#[derive(Debug, Default)]
-pub(crate) struct OutageState {
-    pub(crate) consecutive_failures: u32,
-    pub(crate) next_attempt_ms: i64,
-    pub(crate) in_flight: bool,
-    pub(crate) generation: u64,
-}
-
-pub(crate) type RetryState = Mutex<HashMap<String, OutageState>>;
-
-struct OutageAttempt<'a> {
-    state: &'a RetryState,
-    key: &'a str,
-    generation: u64,
-}
-
-impl Drop for OutageAttempt<'_> {
-    fn drop(&mut self) {
-        if let Ok(mut states) = self.state.lock() {
-            if let Some(outage) = states.get_mut(self.key) {
-                if outage.generation == self.generation {
-                    outage.in_flight = false;
-                }
-            }
-        }
-    }
+pub(crate) fn new_retry_state() -> RetryState {
+    PersistentFailoverBreaker::new(PersistentFailoverBreakerConfig {
+        base_backoff_ms: OUTAGE_BACKOFF_BASE_MS as u64,
+        max_backoff_ms: (15 * 60_000) as u64,
+        failure_limit: 8,
+    })
 }
 
 static TRIAGE_RETRY_STATE: OnceLock<RetryState> = OnceLock::new();
 
 fn retry_state() -> &'static RetryState {
-    TRIAGE_RETRY_STATE.get_or_init(RetryState::default)
+    TRIAGE_RETRY_STATE.get_or_init(new_retry_state)
+}
+
+fn monotonic_ms() -> u64 {
+    TRIAGE_MONOTONIC_START
+        .get_or_init(Instant::now)
+        .elapsed()
+        .as_millis()
+        .min(u64::MAX as u128) as u64
 }
 
 /// Run the triage classifier with the full tiered fallback chain.
@@ -139,19 +130,14 @@ where
     Fut: Future<Output = Option<LlmPermit>>,
 {
     let retry_key = format!("{}:{}", cloud.provider_name, cloud.model);
-    let retry_generation = if local.is_none() {
+    let mut outage_attempt = if local.is_none() {
         if let Some(state) = retry_state {
-            match begin_outage_attempt(Some(state), &retry_key) {
-                Some(generation) => Some(generation),
-                None => {
-                    let defer_until_ms = state
-                        .lock()
-                        .expect("triage retry state lock poisoned")
-                        .get(&retry_key)
-                        .map(|outage| outage.next_attempt_ms.max(now_ms() + 1_000))
-                        .unwrap_or_else(|| now_ms() + OUTAGE_BACKOFF_BASE_MS);
+            match state.try_acquire(retry_key.clone(), monotonic_ms()) {
+                Ok(attempt) => Some(attempt),
+                Err(rejection) => {
+                    let delta_ms = rejection_delay_ms(rejection, monotonic_ms());
                     return Ok(TriageOutcome::Deferred {
-                        defer_until_ms,
+                        defer_until_ms: now_ms().saturating_add(delta_ms as i64),
                         reason: "managed backend paused; retry window not reached".to_string(),
                     });
                 }
@@ -162,13 +148,6 @@ where
     } else {
         None
     };
-    let _outage_attempt = retry_state.and_then(|state| {
-        retry_generation.map(|generation| OutageAttempt {
-            state,
-            key: &retry_key,
-            generation,
-        })
-    });
 
     // Track whether the cloud arm bailed because of user budget so the
     // eventual Deferred reason explains *why* we're sitting idle rather
@@ -184,11 +163,11 @@ where
     // ── Cloud arm ──────────────────────────────────────────────────
     match try_arm(&cloud, envelope, TriageResolutionPath::Cloud).await {
         Ok(run) => {
-            clear_outage(retry_state, &retry_key, retry_generation);
+            clear_outage(outage_attempt.as_mut());
             return Ok(TriageOutcome::Decision(run));
         }
         Err(ArmError::Fatal(err)) => {
-            clear_outage(retry_state, &retry_key, retry_generation);
+            clear_outage(outage_attempt.as_mut());
             return Err(err);
         }
         Err(ArmError::BudgetExhausted(err)) => {
@@ -215,60 +194,81 @@ where
             );
             cloud_safety_flagged = Some(err);
         }
-        Err(ArmError::Retryable { retry_after_ms, .. }) => {
-            // Sleep before the cloud retry. Honour Retry-After when
-            // present; otherwise use a short backoff so the second
-            // attempt has a real chance of finding the upstream
-            // recovered.
-            let sleep_ms = retry_after_ms
-                .map(|ms| Duration::from_millis(ms).min(RETRY_AFTER_CAP))
-                .unwrap_or(TRANSIENT_BACKOFF);
-            tracing::info!(
-                sleep_ms = sleep_ms.as_millis() as u64,
-                had_retry_after = retry_after_ms.is_some(),
-                "[triage::evaluator] cloud retry pending after retryable failure"
+        Err(ArmError::Retryable {
+            retry_after_ms,
+            source,
+        }) => {
+            let reason = FailoverReason::classify(
+                &tinyagents_harness::error::TinyAgentsError::Model(format!("{source:#}")),
             );
-            tokio::time::sleep(sleep_ms).await;
+            let decision = decide(
+                reason,
+                FailoverState {
+                    retryable: true,
+                    attempts_remaining: true,
+                    larger_window_available: false,
+                },
+            );
+            if decision != FailoverDecision::RetrySame {
+                tracing::info!(
+                    failover_reason = reason.as_str(),
+                    "owner failover policy skipped a same-provider retry"
+                );
+            } else {
+                // Sleep before the cloud retry. Honour Retry-After when
+                // present; otherwise use a short backoff so the second
+                // attempt has a real chance of finding the upstream
+                // recovered.
+                let sleep_ms = retry_after_ms
+                    .map(|ms| Duration::from_millis(ms).min(RETRY_AFTER_CAP))
+                    .unwrap_or(TRANSIENT_BACKOFF);
+                tracing::info!(
+                    sleep_ms = sleep_ms.as_millis() as u64,
+                    had_retry_after = retry_after_ms.is_some(),
+                    "[triage::evaluator] cloud retry pending after retryable failure"
+                );
+                tokio::time::sleep(sleep_ms).await;
 
-            match try_arm(&cloud, envelope, TriageResolutionPath::CloudAfterRetry).await {
-                Ok(run) => {
-                    clear_outage(retry_state, &retry_key, retry_generation);
-                    return Ok(TriageOutcome::Decision(run));
-                }
-                Err(ArmError::Fatal(err)) => {
-                    clear_outage(retry_state, &retry_key, retry_generation);
-                    return Err(err);
-                }
-                Err(ArmError::BudgetExhausted(err)) => {
-                    tracing::warn!(
-                        source = %envelope.source.slug(),
-                        label = %envelope.display_label,
-                        external_id = %envelope.external_id,
-                        path = TriageResolutionPath::CloudAfterRetry.as_str(),
-                        error = %err,
-                        "[triage::evaluator] cloud rejected for budget on retry; \
-                         falling back to local arm"
-                    );
-                    cloud_budget_exhausted = Some(err);
-                }
-                Err(ArmError::SafetyFlagged(err)) => {
-                    tracing::warn!(
-                        source = %envelope.source.slug(),
-                        label = %envelope.display_label,
-                        external_id = %envelope.external_id,
-                        path = TriageResolutionPath::CloudAfterRetry.as_str(),
-                        error = %err,
-                        "[triage::evaluator] cloud rejected by prompt-guard on retry; \
-                         falling back to local arm"
-                    );
-                    cloud_safety_flagged = Some(err);
-                }
-                Err(ArmError::Retryable { .. }) => {
-                    // Exhausted cloud budget — fall through to local.
-                    tracing::warn!(
-                        "[triage::evaluator] cloud retry budget exhausted; \
+                match try_arm(&cloud, envelope, TriageResolutionPath::CloudAfterRetry).await {
+                    Ok(run) => {
+                        clear_outage(outage_attempt.as_mut());
+                        return Ok(TriageOutcome::Decision(run));
+                    }
+                    Err(ArmError::Fatal(err)) => {
+                        clear_outage(outage_attempt.as_mut());
+                        return Err(err);
+                    }
+                    Err(ArmError::BudgetExhausted(err)) => {
+                        tracing::warn!(
+                            source = %envelope.source.slug(),
+                            label = %envelope.display_label,
+                            external_id = %envelope.external_id,
+                            path = TriageResolutionPath::CloudAfterRetry.as_str(),
+                            error = %err,
+                            "[triage::evaluator] cloud rejected for budget on retry; \
+                             falling back to local arm"
+                        );
+                        cloud_budget_exhausted = Some(err);
+                    }
+                    Err(ArmError::SafetyFlagged(err)) => {
+                        tracing::warn!(
+                            source = %envelope.source.slug(),
+                            label = %envelope.display_label,
+                            external_id = %envelope.external_id,
+                            path = TriageResolutionPath::CloudAfterRetry.as_str(),
+                            error = %err,
+                            "[triage::evaluator] cloud rejected by prompt-guard on retry; \
+                             falling back to local arm"
+                        );
+                        cloud_safety_flagged = Some(err);
+                    }
+                    Err(ArmError::Retryable { .. }) => {
+                        // Exhausted cloud budget — fall through to local.
+                        tracing::warn!(
+                            "[triage::evaluator] cloud retry budget exhausted; \
                          evaluating fallback"
-                    );
+                        );
+                    }
                 }
             }
         }
@@ -308,11 +308,11 @@ where
             "cloud retry exhausted; local arm unavailable".to_string()
         };
         if cloud_budget_exhausted.is_some() || cloud_safety_flagged.is_some() {
-            clear_outage(retry_state, &retry_key, retry_generation);
+            clear_outage(outage_attempt.as_mut());
             return Ok(TriageOutcome::Terminal { reason });
         }
 
-        return match record_outage(retry_state, &retry_key, retry_generation) {
+        return match record_outage(outage_attempt.as_mut()) {
             Some(TriageOutcome::Terminal { reason }) => Ok(TriageOutcome::Terminal { reason }),
             Some(TriageOutcome::Deferred {
                 defer_until_ms,
@@ -332,7 +332,7 @@ where
 
     match try_arm(&local, envelope, TriageResolutionPath::LocalFallback).await {
         Ok(run) => {
-            clear_outage(retry_state, &retry_key, retry_generation);
+            clear_outage(outage_attempt.as_mut());
             Ok(TriageOutcome::Decision(run))
         }
         Err(ArmError::Fatal(err))
@@ -381,66 +381,54 @@ fn now_ms() -> i64 {
     chrono::Utc::now().timestamp_millis()
 }
 
-fn clear_outage(state: Option<&RetryState>, key: &str, generation: Option<u64>) {
-    if let Some(state) = state {
-        let mut states = state.lock().expect("triage retry state lock poisoned");
-        if states
-            .get(key)
-            .is_some_and(|outage| Some(outage.generation) == generation)
-        {
-            states.remove(key);
-        }
+fn clear_outage(attempt: Option<&mut PersistentFailoverAttempt<String>>) {
+    if let Some(attempt) = attempt {
+        attempt.record_success();
     }
 }
 
-pub(crate) fn begin_outage_attempt(state: Option<&RetryState>, key: &str) -> Option<u64> {
-    let state = state?;
-    let mut states = state.lock().expect("triage retry state lock poisoned");
-    let outage = states.entry(key.to_string()).or_default();
-    if outage.in_flight || (outage.consecutive_failures > 0 && outage.next_attempt_ms > now_ms()) {
-        return None;
+fn rejection_delay_ms(rejection: BreakerRejection, now_ms: u64) -> u64 {
+    match rejection {
+        BreakerRejection::Backoff {
+            next_attempt_ms, ..
+        } => next_attempt_ms.saturating_sub(now_ms).max(1_000),
+        BreakerRejection::InFlight => 1_000,
     }
-    outage.in_flight = true;
-    outage.generation = outage.generation.wrapping_add(1).max(1);
-    Some(outage.generation)
+}
+
+#[cfg(test)]
+pub(crate) fn begin_outage_attempt(
+    state: Option<&RetryState>,
+    key: &str,
+) -> Option<PersistentFailoverAttempt<String>> {
+    state?.try_acquire(key.to_string(), monotonic_ms()).ok()
 }
 
 pub(crate) fn record_outage(
-    state: Option<&RetryState>,
-    key: &str,
-    generation: Option<u64>,
+    attempt: Option<&mut PersistentFailoverAttempt<String>>,
 ) -> Option<TriageOutcome> {
-    let state = state?;
-    let mut states = state.lock().expect("triage retry state lock poisoned");
-    let Some(outage) = states.get_mut(key) else {
-        return (generation.is_some()).then(|| TriageOutcome::Deferred {
+    let attempt = attempt?;
+    let recorded_at_ms = monotonic_ms();
+    let Some(failure) = attempt.record_failure(recorded_at_ms) else {
+        return Some(TriageOutcome::Deferred {
             defer_until_ms: now_ms().saturating_add(OUTAGE_BACKOFF_BASE_MS),
             reason: "managed backend recovered during another attempt".to_string(),
         });
     };
-    if !outage.in_flight || Some(outage.generation) != generation {
-        return Some(TriageOutcome::Deferred {
-            defer_until_ms: now_ms().saturating_add(OUTAGE_BACKOFF_BASE_MS),
-            reason: "managed backend outage; another attempt is being recorded".to_string(),
-        });
-    }
-    outage.in_flight = false;
-    outage.consecutive_failures = outage.consecutive_failures.saturating_add(1);
-    if outage.consecutive_failures >= OUTAGE_FAILURE_LIMIT {
-        let failures = outage.consecutive_failures;
-        outage.next_attempt_ms = now_ms().saturating_add(OUTAGE_BACKOFF_CAP_MS);
+    let delay_ms = failure
+        .next_attempt_ms
+        .saturating_sub(recorded_at_ms)
+        .min(i64::MAX as u64) as i64;
+    if failure.failure_limit_reached {
         return Some(TriageOutcome::Terminal {
-            reason: format!("managed backend outage reached retry limit ({failures})"),
+            reason: format!(
+                "managed backend outage reached retry limit ({})",
+                failure.failure_count
+            ),
         });
     }
-
-    let exponent = outage.consecutive_failures.saturating_sub(1).min(10);
-    let delay_ms = OUTAGE_BACKOFF_BASE_MS
-        .saturating_mul(1_i64 << exponent)
-        .min(OUTAGE_BACKOFF_CAP_MS);
-    outage.next_attempt_ms = now_ms().saturating_add(delay_ms);
     Some(TriageOutcome::Deferred {
-        defer_until_ms: outage.next_attempt_ms,
+        defer_until_ms: now_ms().saturating_add(delay_ms),
         reason: format!("managed backend outage; retry {delay_ms}ms backoff"),
     })
 }

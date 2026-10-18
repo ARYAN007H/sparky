@@ -11,9 +11,8 @@ use crate::agent::bus::{AgentTurnRequest, AgentTurnResponse, AGENT_RUN_TURN_METH
 use crate::agent_registry::host_definition::AgentDefinitionRegistry;
 use crate::config::MultimodalConfig;
 use crate::core::bus::BUS;
-use crate::inference::provider::error_classify::{
-    is_rate_limited, is_upstream_unhealthy, parse_retry_after_ms,
-};
+use crate::inference::provider::error_classify::parse_retry_after_ms;
+use tinyagents_harness::retry::{decide, FailoverDecision, FailoverReason, FailoverState};
 use tinyagents_session::transcript::TranscriptMessage;
 use tinybus::NativeRequestError;
 use tinyinference_providers::{is_budget_message, BudgetMatch};
@@ -229,20 +228,8 @@ pub(super) async fn try_arm(
 /// either a retryable (sleep + try again) or fatal (give up) error.
 pub(crate) fn classify_error(message: String) -> ArmError {
     let err = anyhow!("{message}");
-    if is_rate_limited(&err) {
-        return ArmError::Retryable {
-            retry_after_ms: parse_retry_after_ms(&err),
-            source: err,
-        };
-    }
-    if is_upstream_unhealthy(&err) || is_transient_string(&message) {
-        return ArmError::Retryable {
-            retry_after_ms: None,
-            source: err,
-        };
-    }
     // Budget-exceeded is technically a 400 (not 5xx/429), so the
-    // generic transient checks above won't catch it — but it is a
+    // generic owner classifier below won't catch it — but it is a
     // user-actionable upstream blocker, not a code bug, so we route
     // it through `BudgetExhausted` to avoid Sentry pages.
     if is_inference_budget_exceeded(&message) {
@@ -258,7 +245,23 @@ pub(crate) fn classify_error(message: String) -> ArmError {
     if is_prompt_guard_rejection(&message) {
         return ArmError::SafetyFlagged(err);
     }
-    ArmError::Fatal(err)
+    let reason = FailoverReason::classify_unstructured(&message);
+    match decide(
+        reason,
+        FailoverState {
+            retryable: reason != FailoverReason::Unknown,
+            attempts_remaining: true,
+            larger_window_available: false,
+        },
+    ) {
+        FailoverDecision::RetrySame => ArmError::Retryable {
+            retry_after_ms: (reason == FailoverReason::RateLimit)
+                .then(|| parse_retry_after_ms(&err))
+                .flatten(),
+            source: err,
+        },
+        FailoverDecision::Fallback | FailoverDecision::Surface => ArmError::Fatal(err),
+    }
 }
 
 /// Returns `true` when `message` is the verbatim string our prompt-injection
@@ -294,34 +297,4 @@ fn is_prompt_guard_rejection(message: &str) -> bool {
 /// `BudgetMatch::Managed`.
 fn is_inference_budget_exceeded(message: &str) -> bool {
     is_budget_message(message, BudgetMatch::Strict)
-}
-
-/// Heuristic for transient cloud failures the provider stack didn't
-/// already classify — connection resets, timeouts, generic 5xx text.
-/// Mirrors the conservative match shape used by `is_upstream_unhealthy`.
-fn is_transient_string(msg: &str) -> bool {
-    let lower = msg.to_lowercase();
-    let hints = [
-        "timed out",
-        "timeout",
-        "connection",
-        "connect error",
-        "broken pipe",
-        "reset by peer",
-        "deadline exceeded",
-        "temporarily unavailable",
-    ];
-    if hints.iter().any(|h| lower.contains(h)) {
-        return true;
-    }
-    // Bare 5xx in the message body. Be careful not to match arbitrary
-    // numerals — only treat 5xx as transient.
-    for token in lower.split(|c: char| !c.is_ascii_digit()) {
-        if let Ok(code) = token.parse::<u16>() {
-            if (500..600).contains(&code) {
-                return true;
-            }
-        }
-    }
-    false
 }
