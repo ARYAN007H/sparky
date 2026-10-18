@@ -115,6 +115,10 @@ fn one_runtime_hosts_independently_configured_agents() {
             let skills = skills_fixture();
             let beta_action = tempfile::tempdir().expect("beta action dir");
 
+            // The core carries no hosted provider; supply the managed one the
+            // way the TinyHumans layer does, pointed at the mock.
+            common::PointedInference::install(&format!("{}/openai/v1", backend.uri()));
+
             let runtime = std::sync::Arc::new(
                 Runtime::builder()
                     .config(offline_config())
