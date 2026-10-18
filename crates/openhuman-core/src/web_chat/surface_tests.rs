@@ -1,5 +1,6 @@
 use super::*;
 use crate::core::runtime::DispatchCtx;
+use std::sync::Arc;
 
 fn ids(request_id: &str) -> TurnIds {
     TurnIds {
@@ -128,15 +129,31 @@ async fn dropping_a_surface_ends_its_module_owned_turn() {
             iteration: Some(1),
         })
         .await;
-    let (module, handle) = {
+    let (module, handle, cleanup_done) = {
         let state = surface.state.lock().await;
         (
             state.module.as_ref().unwrap().clone(),
             state.handle.as_ref().unwrap().handle.clone(),
+            Arc::clone(&state.cleanup_done),
         )
     };
-    let cleanup_done = Arc::clone(&surface.cleanup_done);
+    let left = surface.clone();
+    let right = surface.clone();
     drop(surface);
+    let barrier = Arc::new(tokio::sync::Barrier::new(3));
+    let left_barrier = Arc::clone(&barrier);
+    let right_barrier = Arc::clone(&barrier);
+    let left_drop = tokio::spawn(async move {
+        left_barrier.wait().await;
+        drop(left);
+    });
+    let right_drop = tokio::spawn(async move {
+        right_barrier.wait().await;
+        drop(right);
+    });
+    barrier.wait().await;
+    left_drop.await.unwrap();
+    right_drop.await.unwrap();
     tokio::time::timeout(std::time::Duration::from_secs(5), cleanup_done.notified())
         .await
         .expect("drop cleanup completes");
