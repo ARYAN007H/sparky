@@ -125,6 +125,12 @@ async fn owner_snapshot_spend_is_not_counted_twice_and_cache_replay_stays_free()
         .after_model(&mut context, &(), &mut answered)
         .await
         .expect("snapshot first answer");
+    {
+        let snapshot = sink.lock().expect("host snapshot lock");
+        assert_eq!(snapshot.input_tokens, 12);
+        assert_eq!(snapshot.output_tokens, 4);
+        assert_eq!(snapshot.cached_input_tokens, 3);
+    }
 
     let mut second = ModelRequest {
         messages: vec![Message::user("question"), Message::assistant("answer one")],
@@ -134,11 +140,41 @@ async fn owner_snapshot_spend_is_not_counted_twice_and_cache_replay_stays_free()
         .before_model_dispatch(&mut context, &(), &mut second)
         .await
         .expect("snapshot replay request");
-    let mut replay = tinyinference_llm::model::ModelResponse::assistant("answer two")
+    let mut answered_again = tinyinference_llm::model::ModelResponse::assistant("answer two")
         .with_usage(tinyinference_llm::usage::Usage {
-            input_tokens: 12,
-            output_tokens: 5,
-            cache_read_tokens: 12,
+            input_tokens: 8,
+            output_tokens: 2,
+            cache_read_tokens: 1,
+            ..Default::default()
+        });
+    middleware
+        .after_model(&mut context, &(), &mut answered_again)
+        .await
+        .expect("snapshot second non-cache answer");
+    {
+        let snapshot = sink.lock().expect("host snapshot lock");
+        assert_eq!(snapshot.input_tokens, 20);
+        assert_eq!(snapshot.output_tokens, 6);
+        assert_eq!(snapshot.cached_input_tokens, 4);
+    }
+
+    let mut replay_request = ModelRequest {
+        messages: vec![
+            Message::user("question"),
+            Message::assistant("answer one"),
+            Message::assistant("answer two"),
+        ],
+        ..ModelRequest::default()
+    };
+    middleware
+        .before_model_dispatch(&mut context, &(), &mut replay_request)
+        .await
+        .expect("snapshot cache replay request");
+    let mut replay = tinyinference_llm::model::ModelResponse::assistant("answer three")
+        .with_usage(tinyinference_llm::usage::Usage {
+            input_tokens: 7,
+            output_tokens: 3,
+            cache_read_tokens: 7,
             ..Default::default()
         });
     replay.served_from_cache = true;
@@ -148,12 +184,12 @@ async fn owner_snapshot_spend_is_not_counted_twice_and_cache_replay_stays_free()
         .expect("snapshot replay answer");
 
     let snapshot = sink.lock().expect("host snapshot lock");
-    assert_eq!(snapshot.model_calls, 2);
-    assert_eq!(snapshot.input_tokens, 12);
-    assert_eq!(snapshot.output_tokens, 4);
-    assert_eq!(snapshot.cached_input_tokens, 3);
-    assert_eq!(snapshot.last_call_input_tokens, 12);
-    assert_eq!(snapshot.last_call_output_tokens, 5);
+    assert_eq!(snapshot.model_calls, 3);
+    assert_eq!(snapshot.input_tokens, 20);
+    assert_eq!(snapshot.output_tokens, 6);
+    assert_eq!(snapshot.cached_input_tokens, 4);
+    assert_eq!(snapshot.last_call_input_tokens, 7);
+    assert_eq!(snapshot.last_call_output_tokens, 3);
 }
 
 #[tokio::test]
