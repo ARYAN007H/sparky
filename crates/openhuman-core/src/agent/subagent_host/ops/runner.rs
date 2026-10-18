@@ -546,6 +546,27 @@ fn workspace_descriptor_for_subagent(
 /// move into TinyAgents, and a generic runtime has no config file to load.
 type LoadedConfig = Result<std::sync::Arc<crate::config::Config>, String>;
 
+/// Load and render a typed sub-agent prompt using the exact config snapshot
+/// supplied to this spawn. TinyFlows-backed builtins fetch their archetype
+/// over the module bus before the synchronous registry builder runs.
+async fn load_typed_prompt_source(
+    definition: &AgentDefinition,
+    config: &LoadedConfig,
+    mut prompt_context: PromptContext<'_>,
+) -> Result<String, SubagentRunError> {
+    #[cfg(feature = "flows")]
+    let flow_archetype_text = crate::agent::prompts::flow_archetype::load_for_definition(
+        config.as_ref().ok().map(AsRef::as_ref),
+        definition,
+    )
+    .await?;
+    #[cfg(not(feature = "flows"))]
+    let flow_archetype_text: Option<String> = None;
+
+    prompt_context.flow_archetype_text = flow_archetype_text.as_deref();
+    load_prompt_source(definition, &prompt_context)
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Typed mode — narrow prompt, filtered tools, cheaper model
 // ─────────────────────────────────────────────────────────────────────────────
@@ -766,6 +787,7 @@ async fn run_typed_mode(
         workspace_dir: &parent.workspace_dir,
         model_name: &model,
         agent_id: &definition.id,
+        flow_archetype_text: None,
         tools: &prompt_tools,
         workflows: &parent.workflows,
         dispatcher_instructions: &dispatcher_instructions,
@@ -779,13 +801,12 @@ async fn run_typed_mode(
         agents_md_local: agents_md.local.clone(),
     };
 
+    let archetype_prompt_body =
+        load_typed_prompt_source(definition, config, prompt_ctx).await?;
     let system_prompt = match &definition.system_prompt {
         // The whole prompt, with no sub-agent sections around it.
-        PromptSource::Dynamic(_) | PromptSource::Verbatim(_) => {
-            load_prompt_source(definition, &prompt_ctx)?
-        }
+        PromptSource::Dynamic(_) | PromptSource::Verbatim(_) => archetype_prompt_body,
         PromptSource::Inline(_) | PromptSource::File { .. } => {
-            let archetype_prompt_body = load_prompt_source(definition, &prompt_ctx)?;
             render_subagent_system_prompt_with_format(
                 &parent.workspace_dir,
                 &model,
@@ -1043,3 +1064,7 @@ async fn run_typed_mode(
 #[cfg(test)]
 #[path = "runner_result_cap_tests.rs"]
 mod result_cap_tests;
+
+#[cfg(test)]
+#[path = "runner_flow_prompt_tests.rs"]
+mod flow_prompt_tests;
