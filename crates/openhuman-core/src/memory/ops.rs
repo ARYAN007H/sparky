@@ -414,15 +414,15 @@ pub async fn forget(config: &Config, params: ForgetParams) -> Result<ForgetView>
 /// after one release.
 pub async fn forget_channel(config: &Config, channel: &str) -> Result<usize> {
     let channel = channel.trim().to_ascii_lowercase();
+    if channel.is_empty() {
+        return Ok(0);
+    }
     let legacy_threads = legacy_channel_threads(&config.workspace_dir, &channel);
     let bound = match engine::resolve(config).engine() {
         Ok(bound) => Some(bound),
         Err(Error::Off(_)) => None,
         Err(error) => return Err(error),
     };
-    if channel.is_empty() {
-        return Ok(0);
-    }
 
     // Capture the request's tenant/profile before the thread-store wrappers
     // move their I/O to the blocking pool.
