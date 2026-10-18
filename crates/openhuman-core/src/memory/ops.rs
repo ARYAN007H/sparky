@@ -537,3 +537,7 @@ pub(crate) fn confine_filter(config: &Config, filter: MetaFilter) -> Result<Meta
 #[cfg(test)]
 #[path = "ops_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "ops_saas_tests.rs"]
+mod saas_tests;
