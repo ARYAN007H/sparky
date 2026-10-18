@@ -20,8 +20,8 @@ use tinymemory_integrations::sources::SourceKind;
 use crate::config::schema::{MemorySourceConfig, MemorySourceKind};
 use crate::config::Config;
 use crate::memory::engine;
-use tinymemory_api::{Error, Result};
 use crate::memory::types::SourceStatus;
+use tinymemory_api::{Error, Result};
 
 use super::state;
 
@@ -46,9 +46,7 @@ fn registered(source: &MemorySourceConfig) -> RegisteredSource {
 fn host_error(error: SyncError) -> Error {
     match error {
         SyncError::Invalid(message) => Error::InvalidRequest((message).into()),
-        SyncError::Read(message) => {
-            Error::Engine(format!("reading the source failed: {message}"))
-        }
+        SyncError::Read(message) => Error::Engine(format!("reading the source failed: {message}")),
         SyncError::Engine(error) => error,
     }
 }

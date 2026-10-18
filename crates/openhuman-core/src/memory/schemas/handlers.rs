@@ -7,7 +7,6 @@ use crate::config::Config;
 use crate::core::all::ControllerFuture;
 use crate::core::runtime::DispatchCtx;
 use crate::core::{Outcome, StructuredRpcError};
-use tinymemory_api::{Error, Result};
 use crate::memory::explore::{ExploreParams, ItemsGetParams};
 use crate::memory::lifecycle::views::{self, JobsRunParams, PackPreviewParams, PolicySetParams};
 use crate::memory::scope::MemoryIdentity;
@@ -21,6 +20,7 @@ use crate::memory::{backfill, brain, confine, engine, import, layout_migration, 
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use serde_json::{json, Map, Value};
+use tinymemory_api::{Error, Result};
 
 /// The operation run after the common request parsing and config load.
 trait RpcOperation<P, R>: Send + 'static {
@@ -59,11 +59,9 @@ where
 }
 
 fn parse<T: DeserializeOwned>(params: Map<String, Value>) -> std::result::Result<T, String> {
-    serde_json::from_value(Value::Object(params))
-        .map_err(|error| {
-            StructuredRpcError::from(Error::InvalidRequest(format!("invalid params: {error}")))
-                .encode()
-        })
+    serde_json::from_value(Value::Object(params)).map_err(|error| {
+        StructuredRpcError::from(Error::InvalidRequest(format!("invalid params: {error}"))).encode()
+    })
 }
 
 fn to_json<T: Serialize>(value: T) -> std::result::Result<Value, String> {

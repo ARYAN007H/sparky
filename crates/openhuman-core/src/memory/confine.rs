@@ -21,7 +21,6 @@ use tinymemory_api::{ExplorePage, MemoryMeta, MetaFilter, Namespace, Reach};
 
 use crate::config::Config;
 
-use tinymemory_api::{Error, Result};
 use super::explore::{self, ExploreParams, ItemsGetParams, ItemsGetView};
 use super::ops;
 use super::scope::MemoryIdentity;
@@ -29,6 +28,7 @@ use super::types::{
     FetchParams, FetchView, ForgetParams, ForgetView, ItemsListParams, ItemsListView, LearnParams,
     LearnView, RecallParams, RecallView,
 };
+use tinymemory_api::{Error, Result};
 
 /// What `identity` under `config` may read and forget: the subtree of its
 /// layout root.

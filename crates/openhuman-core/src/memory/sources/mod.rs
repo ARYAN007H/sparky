@@ -16,8 +16,8 @@ use crate::config::schema::{MemorySourceConfig, MemorySourceKind};
 use crate::config::Config;
 
 use super::engine;
-use tinymemory_api::{Error, Result};
 use super::types::{SourceView, SourcesAddParams};
+use tinymemory_api::{Error, Result};
 
 pub use sync::{start_sync, sync_due, sync_one};
 
@@ -72,9 +72,9 @@ pub fn normalize_target(kind: MemorySourceKind, target: &str) -> Result<String> 
                 (Some(owner), Some(repo), None) if !owner.is_empty() && !repo.is_empty() => {
                     Ok(format!("https://github.com/{owner}/{repo}"))
                 }
-                _ => Err(Error::InvalidRequest((
-                    "a GitHub target is `owner/repo` or a repository URL"
-                ).into())),
+                _ => Err(Error::InvalidRequest(
+                    ("a GitHub target is `owner/repo` or a repository URL").into(),
+                )),
             }
         }
         MemorySourceKind::Link | MemorySourceKind::Rss => http_url(target),
@@ -82,19 +82,19 @@ pub fn normalize_target(kind: MemorySourceKind, target: &str) -> Result<String> 
 }
 
 fn http_url(target: &str) -> Result<String> {
-    let url = url::Url::parse(target).map_err(|_| Error::InvalidRequest(("target is not a URL").into()))?;
+    let url = url::Url::parse(target)
+        .map_err(|_| Error::InvalidRequest(("target is not a URL").into()))?;
     if !matches!(url.scheme(), "http" | "https") || url.host_str().is_none() {
-        return Err(Error::InvalidRequest(("target must be an http(s) URL").into()));
+        return Err(Error::InvalidRequest(
+            ("target must be an http(s) URL").into(),
+        ));
     }
     Ok(url.to_string())
 }
 
 /// Builds a new source from `memory_sources_add` params and appends it to
 /// `config`; the caller persists `config`.
-pub fn apply_add(
-    config: &mut Config,
-    params: &SourcesAddParams,
-) -> Result<MemorySourceConfig> {
+pub fn apply_add(config: &mut Config, params: &SourcesAddParams) -> Result<MemorySourceConfig> {
     let kind = MemorySourceKind::parse(&params.kind).ok_or_else(|| {
         Error::InvalidRequest(format!(
             "unknown source kind `{}` (folder, file, link, github, rss)",
@@ -115,7 +115,9 @@ pub fn apply_add(
         .iter()
         .any(|source| source.kind == kind && source.target == target)
     {
-        return Err(Error::InvalidRequest(("that source is already added").into()));
+        return Err(Error::InvalidRequest(
+            ("that source is already added").into(),
+        ));
     }
     let label = params
         .label

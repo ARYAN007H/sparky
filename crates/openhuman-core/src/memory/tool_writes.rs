@@ -26,10 +26,10 @@ use tinymemory_tools::pending::{
     WriteGate, WriteOperation,
 };
 
-use tinymemory_api::{Error, Result};
 use super::tools::CallFacts;
 use super::types::{ForgetParams, LearnParams};
 use crate::config::Config;
+use tinymemory_api::{Error, Result};
 
 const MAX_PENDING: usize = 256;
 const MAX_BYTES: usize = 2 * 1024 * 1024;
@@ -148,9 +148,7 @@ fn queue_path(config: &Config, root: &Namespace) -> PathBuf {
 }
 
 fn unavailable() -> Error {
-    Error::Unavailable(
-        "memory write queue unavailable; durable queueing was not confirmed".into(),
-    )
+    Error::Unavailable("memory write queue unavailable; durable queueing was not confirmed".into())
 }
 
 /// Accepts a validated, scrubbed write locally. The acknowledgement means only
@@ -180,9 +178,9 @@ pub(super) fn enqueue(
                 super::user_scope::clamp_item(&mut item, &root);
             }
             if !super::user_scope::within(&item.meta().namespace, &reach.at) || reach.inherit {
-                return Err(Error::InvalidRequest((
-                    "learning namespace is outside the trusted reach"
-                ).into()));
+                return Err(Error::InvalidRequest(
+                    ("learning namespace is outside the trusted reach").into(),
+                ));
             }
             WriteOperation::Learn {
                 item: super::guard::scrub(item),
@@ -200,7 +198,9 @@ pub(super) fn enqueue(
             ids.sort();
             ids.dedup();
             if ids.is_empty() {
-                return Err(Error::InvalidRequest(("forget needs at least one id").into()));
+                return Err(Error::InvalidRequest(
+                    ("forget needs at least one id").into(),
+                ));
             }
             WriteOperation::Forget { ids, reach }
         }

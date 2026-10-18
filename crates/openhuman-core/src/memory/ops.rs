@@ -18,12 +18,12 @@ use crate::config::Config;
 use super::engine::{
     self, Binding, BoundEngine, CORTEXDB_ENGINE, DISABLED_ENGINE, TINYHUMANS_ENGINE,
 };
-use tinymemory_api::{Error, Result};
 use super::types::{
     clamp_limit, EngineSetParams, EngineStatus, EngineView, EnginesListView, EraseAllParams,
     EraseAllView, FetchParams, FetchView, ForgetParams, ForgetView, ItemsListParams, ItemsListView,
     LearnParams, LearnView, RecallParams, RecallView, RefersTo,
 };
+use tinymemory_api::{Error, Result};
 
 /// Default confidence of a learning stored without one.
 pub const DEFAULT_LEARNING_CONFIDENCE: f32 = 0.8;
@@ -92,9 +92,9 @@ pub fn apply_engine_set(config: &mut Config, params: &EngineSetParams) -> Result
         // Turning memory off keeps every engine's endpoint and key, so
         // switching back needs no re-entry.
         if params.endpoint.is_some() || params.api_key.is_some() {
-            return Err(Error::InvalidRequest((
-                "disabling memory takes no endpoint or API key"
-            ).into()));
+            return Err(Error::InvalidRequest(
+                ("disabling memory takes no endpoint or API key").into(),
+            ));
         }
         config.memory.engine = DISABLED_ENGINE.to_string();
         tracing::info!("[memory:ops] memory disabled");
@@ -129,11 +129,15 @@ pub fn apply_engine_set(config: &mut Config, params: &EngineSetParams) -> Result
             }
             CORTEXDB_ENGINE => engine::store_cortexdb_key(config, key)?,
             TINYHUMANS_ENGINE => {
-                return Err(Error::InvalidRequest((
-                    "the tinyhumans engine uses your sign-in, not an API key"
-                ).into()))
+                return Err(Error::InvalidRequest(
+                    ("the tinyhumans engine uses your sign-in, not an API key").into(),
+                ))
             }
-            _ => return Err(Error::InvalidRequest(("this engine takes no API key").into())),
+            _ => {
+                return Err(Error::InvalidRequest(
+                    ("this engine takes no API key").into(),
+                ))
+            }
         }
     }
     config.memory.engine = engine_id.to_string();
@@ -145,9 +149,9 @@ fn validate_endpoint(endpoint: &str) -> Result<()> {
     let parsed = url::Url::parse(endpoint)
         .map_err(|_| Error::InvalidRequest(("the endpoint is not a valid URL").into()))?;
     if !matches!(parsed.scheme(), "http" | "https") || parsed.host_str().is_none() {
-        return Err(Error::InvalidRequest((
-            "the endpoint must be an http(s) URL with a host"
-        ).into()));
+        return Err(Error::InvalidRequest(
+            ("the endpoint must be an http(s) URL with a host").into(),
+        ));
     }
     Ok(())
 }
@@ -162,9 +166,7 @@ fn time_hint(config: &Config, refers_to: Option<RefersTo>) -> Result<Option<Time
     let Some(RefersTo { from, to }) = refers_to else {
         return Ok(None);
     };
-    TimeHint::new(from, to.unwrap_or(from), Some(config.time_zone()))
-        .map(Some)
-        
+    TimeHint::new(from, to.unwrap_or(from), Some(config.time_zone())).map(Some)
 }
 
 /// `memory_recall`.
@@ -254,13 +256,12 @@ pub async fn fetch_with(
 /// Builds the learning `memory_learn` (and the `memory` tool's `learn`)
 /// stores. `host_meta` wins over the caller's `meta` field by field, so a
 /// caller cannot overwrite what the host knows (thread, agent, tool call).
-pub fn learning_item(
-    params: LearnParams,
-    host_meta: Option<MemoryMeta>,
-) -> Result<StoreItem> {
+pub fn learning_item(params: LearnParams, host_meta: Option<MemoryMeta>) -> Result<StoreItem> {
     let confidence = params.confidence.unwrap_or(DEFAULT_LEARNING_CONFIDENCE);
     if !(0.0..=1.0).contains(&confidence) {
-        return Err(Error::InvalidRequest(("confidence must be between 0 and 1").into()));
+        return Err(Error::InvalidRequest(
+            ("confidence must be between 0 and 1").into(),
+        ));
     }
     let mut meta = params.meta.unwrap_or_default();
     if let Some(host) = host_meta {
@@ -376,7 +377,9 @@ pub async fn forget(config: &Config, params: ForgetParams) -> Result<ForgetView>
         .map(ItemId)
         .collect();
     if ids.is_empty() {
-        return Err(Error::InvalidRequest(("forget needs at least one id").into()));
+        return Err(Error::InvalidRequest(
+            ("forget needs at least one id").into(),
+        ));
     }
     let bound = bound(config)?;
     // A SaaS user forgets only what lies in their own tree.
@@ -421,9 +424,9 @@ pub async fn erase_all(
     params: EraseAllParams,
 ) -> Result<EraseAllView> {
     if !params.confirm {
-        return Err(Error::InvalidRequest((
-            "erasing all memory needs confirm: true; nothing erased comes back"
-        ).into()));
+        return Err(Error::InvalidRequest(
+            ("erasing all memory needs confirm: true; nothing erased comes back").into(),
+        ));
     }
     let bound = bound(config)?;
     // Earlier durable tool writes must finish or be discarded before the

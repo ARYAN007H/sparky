@@ -59,9 +59,8 @@ fn detail(error: Error) -> String {
 pub fn load(workspace_dir: &Path) -> Result<MigrationState> {
     let file = path(workspace_dir);
     match std::fs::read(&file) {
-        Ok(bytes) => serde_json::from_slice(&bytes).map_err(|error| {
-            Error::Engine(format!("layout migration state unreadable: {error}"))
-        }),
+        Ok(bytes) => serde_json::from_slice(&bytes)
+            .map_err(|error| Error::Engine(format!("layout migration state unreadable: {error}"))),
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(MigrationState::default()),
         Err(error) => Err(Error::Engine(format!(
             "layout migration state unreadable: {error}"
@@ -87,8 +86,7 @@ pub fn save(workspace_dir: &Path, state: &MigrationState) -> Result<()> {
         out.sync_all()?;
         std::fs::rename(&temp, &file)
     };
-    write()
-        .map_err(|error| Error::Engine(format!("layout migration state not saved: {error}")))
+    write().map_err(|error| Error::Engine(format!("layout migration state not saved: {error}")))
 }
 
 #[cfg(test)]

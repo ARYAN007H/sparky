@@ -47,13 +47,13 @@ use crate::flows::{
     FLOWS_TAG,
 };
 use crate::memory::types::{FetchParams, RecallParams};
-use tinymemory_api::Error;
 use crate::security::approval::{
     redact_args, summarize_action, ApprovalGate, ExecutionOutcome, GateOutcome,
 };
 use crate::security::SecurityPolicy;
 use tinybox_bus::CommandClass;
 use tinymemory_api::wrap_untrusted_for_agent;
+use tinymemory_api::Error;
 use tinymemory_api::{Hit, LearningKind, MemoryMeta, MetaFilter, SourceKind};
 
 use super::caps::{enforce_node_tier_gate, gate_call_for_tier};

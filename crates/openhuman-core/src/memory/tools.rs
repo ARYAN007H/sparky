@@ -32,10 +32,10 @@ use crate::core::bus::BUS;
 use crate::core::events::DomainEvent;
 use crate::core::runtime::DispatchCtx;
 
-use tinymemory_api::Error;
 use super::ops;
 pub use super::tool_budget::is_budget_refusal;
 use super::types::{FetchParams, ForgetParams, LearnParams, RecallParams, RecallView};
+use tinymemory_api::Error;
 
 /// How many matches one `fetch` returns; the model pages on with `cursor`.
 const FETCH_TOP: usize = 5;
@@ -503,9 +503,7 @@ impl Tool for MemoryTool {
                 .await;
             return Ok(
                 match queued.unwrap_or_else(|_| {
-                    Err(Error::Unavailable(
-                        "memory write queue unavailable".into(),
-                    ))
+                    Err(Error::Unavailable("memory write queue unavailable".into()))
                 }) {
                     Ok(value) => {
                         super::tool_writes::schedule(&dispatch, self.config.clone(), &queued_root);

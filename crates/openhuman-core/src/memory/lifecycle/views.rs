@@ -7,8 +7,8 @@ use tinymemory_tools::{ContextPack, SessionStart};
 
 use crate::config::schema::MemoryRecallConfig;
 use crate::config::Config;
-use tinymemory_api::{Error, Result};
 use crate::memory::scope::{self, MemoryIdentity};
+use tinymemory_api::{Error, Result};
 
 use super::jobs;
 use tinymemory_tools::queue::{JobRun, QueueState, Selection};
@@ -168,9 +168,9 @@ fn validate_build_delay_secs(value: Option<u64>) -> Result<Option<u64>> {
         .and_then(|delay| chrono::Utc::now().checked_sub_signed(delay))
         .is_none()
     {
-        return Err(Error::InvalidRequest((
-            "build_delay_secs must fit within the supported date range"
-        ).into()));
+        return Err(Error::InvalidRequest(
+            ("build_delay_secs must fit within the supported date range").into(),
+        ));
     }
     Ok(Some(seconds))
 }

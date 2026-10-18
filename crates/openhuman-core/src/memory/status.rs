@@ -37,7 +37,9 @@ fn subsystem_status_for_engine(
     let health = match status.health {
         tinymemory_api::EngineStatusHealth::Ready => "ready",
         tinymemory_api::EngineStatusHealth::Degraded => "degraded",
-        tinymemory_api::EngineStatusHealth::Down | tinymemory_api::EngineStatusHealth::Off => "down",
+        tinymemory_api::EngineStatusHealth::Down | tinymemory_api::EngineStatusHealth::Off => {
+            "down"
+        }
     };
     SubsystemStatus {
         slot: "memory".to_string(),
@@ -46,7 +48,11 @@ fn subsystem_status_for_engine(
         health: health.to_string(),
         health_reason: status.reason,
         contract_version: status.contract_version.to_string(),
-        capabilities: status.capabilities.into_iter().map(str::to_string).collect(),
+        capabilities: status
+            .capabilities
+            .into_iter()
+            .map(str::to_string)
+            .collect(),
         fell_back_from: None,
         last_error: None,
     }

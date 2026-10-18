@@ -54,7 +54,11 @@ fn object(value: Value) -> Map<String, Value> {
 
 /// Runs `function`'s handler against `config` (as the embedder-supplied
 /// config, so no on-disk config is read).
-async fn call(config: &Config, function: &str, params: Value) -> std::result::Result<Value, String> {
+async fn call(
+    config: &Config,
+    function: &str,
+    params: Value,
+) -> std::result::Result<Value, String> {
     let handler = handler_for(function).expect("test function has a handler");
     let ctx = CoreContext::for_test_with_config(DomainSet::full(), config.clone());
     CoreContext::scope(ctx.clone(), async move {
