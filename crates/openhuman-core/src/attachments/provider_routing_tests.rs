@@ -64,18 +64,17 @@ fn controlled_wrapper(
     inner: Arc<CaptureModel>,
     config: Arc<Config>,
     model_inputs: &[InputModality],
-) -> AttachmentModel {
+) -> Arc<dyn ChatModel<()>> {
     let mut profile = ModelProfile::default();
     profile.modalities.image_in = model_inputs.contains(&InputModality::Image);
     profile.modalities.audio_in = model_inputs.contains(&InputModality::Audio);
     profile.modalities.document_in = model_inputs.contains(&InputModality::Document);
-    AttachmentModel {
+    owner::wrap(
+        &crate::core::runtime::DispatchCtx::default(),
         inner,
         config,
         profile,
-        fallback_cache: Mutex::new(Default::default()),
-        core: None,
-    }
+    )
 }
 fn user_request(blocks: Vec<ContentBlock>) -> ModelRequest {
     ModelRequest::new(vec![Message::User(UserMessage { content: blocks })])
