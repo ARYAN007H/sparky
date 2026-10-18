@@ -21,6 +21,8 @@ async fn persists_inbound_and_processed_turns_into_workspace_thread() {
     let subscriber = ConversationPersistenceSubscriber::new(temp.path().to_path_buf());
     let mut inbound_envelope =
         tinychannels_runtime::channel::inbound_envelope_from_legacy_message(&ChannelMessage {
+            reply_to_id: None,
+            topic_id: None,
             channel: "slack".into(),
             id: "m1".into(),
             sender: "alice".into(),

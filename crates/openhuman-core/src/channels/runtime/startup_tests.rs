@@ -97,7 +97,7 @@ async fn relay_inbound_handler_forwards_envelopes_to_dispatch_bus() {
     assert_eq!(msg.reply_target, "chat-1");
     assert_eq!(msg.sender, "alice");
     assert_eq!(msg.content, "hello from relay");
-    assert_eq!(msg.thread_ts.as_deref(), Some("topic-1"));
+    assert_eq!(msg.topic_id.as_deref(), Some("topic-1"));
     let forwarded = runtime_msg
         .inbound_envelope
         .expect("relay envelope should stay attached for dispatch");

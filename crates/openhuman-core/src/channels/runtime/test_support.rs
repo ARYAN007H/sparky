@@ -438,6 +438,8 @@ pub async fn run_dispatch_harness(options: DispatchHarnessOptions) -> DispatchHa
     let expected_event_channel = options.channel_name.clone();
 
     let message = ChannelMessage {
+        reply_to_id: None,
+        topic_id: None,
         id: "m1".to_string(),
         sender: "alice".to_string(),
         reply_target: "reply".to_string(),

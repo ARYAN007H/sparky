@@ -138,6 +138,8 @@ impl RelayInboundParams {
     /// The message as the channel dispatch pipeline takes it.
     pub(crate) fn to_channel_message(&self) -> ChannelMessage {
         ChannelMessage {
+            reply_to_id: None,
+            topic_id: None,
             id: self.message_id.clone(),
             sender: self.sender_id.clone(),
             reply_target: self.chat_id.clone(),

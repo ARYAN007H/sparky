@@ -150,6 +150,8 @@ async fn discord_inbound_dispatches_through_full_pipeline() {
     process_channel_message(
         ctx,
         traits::ChannelMessage {
+            reply_to_id: None,
+            topic_id: None,
             id: "discord_msg_1".to_string(),
             sender: "user-123".to_string(),
             reply_target: "channel-456".to_string(),
@@ -201,6 +203,8 @@ async fn discord_threaded_message_does_not_emit_reaction_ack() {
     process_channel_message(
         ctx,
         traits::ChannelMessage {
+            reply_to_id: None,
+            topic_id: None,
             id: "discord_msg_2".to_string(),
             sender: "user-123".to_string(),
             reply_target: "channel-456".to_string(),
@@ -250,6 +254,8 @@ async fn discord_thread_ts_splits_conversation_history_end_to_end() {
     let ctx = make_discord_ctx(channel, provider);
 
     let first = traits::ChannelMessage {
+        reply_to_id: None,
+        topic_id: None,
         id: "discord_msg_a".to_string(),
         sender: "user-123".to_string(),
         reply_target: "channel-456".to_string(),

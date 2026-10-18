@@ -376,6 +376,8 @@ async fn persist_channel_turn(
                     session_policy: Default::default(),
                     source: tinychannels_bus::module_inbound::ChannelInboundSource::Legacy {
                         message: ChannelMessage {
+                            reply_to_id: None,
+                            topic_id: None,
                             id: descriptor.message_id.into(),
                             sender: descriptor.sender.into(),
                             reply_target: descriptor.reply_target.into(),
@@ -477,6 +479,8 @@ fn persisted_channel_thread_id(
     thread_ts: Option<&str>,
 ) -> String {
     let key = conversation_history_key(&ChannelMessage {
+        reply_to_id: None,
+        topic_id: None,
         id: String::new(),
         sender: sender.to_string(),
         reply_target: reply_target.to_string(),
@@ -499,7 +503,8 @@ fn channel_thread_title(
         // Providers whose thread_ts is only a reply target (Telegram topics)
         // share one conversation, so the title leaves it out too.
         Some(thread_ts)
-            if !tinychannels_bus::capabilities_for(channel).history_key_ignores_thread =>
+            if !crate::channels::capabilities::capabilities_for(channel)
+                .history_key_ignores_thread =>
         {
             format!("{channel} · {sender} · {reply_target} · thread {thread_ts}")
         }

@@ -29,7 +29,10 @@ impl tinychannels::relay::RelayInboundHandler for RelayInboundMessageHandler {
                     "invalid inbound envelope: {error}"
                 ))
             })?;
-        let msg = tinychannels::legacy_message_from_inbound_envelope(&envelope, 0);
+        // Non-text content (voice notes, media) has no legacy projection; the
+        // processor prepares it from the envelope instead.
+        let msg =
+            tinychannels::legacy_message_from_inbound_envelope(&envelope, 0).unwrap_or_default();
         self.tx
             .send(RuntimeChannelMessage::with_inbound_envelope(msg, envelope))
             .await

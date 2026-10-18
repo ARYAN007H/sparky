@@ -20,6 +20,7 @@ mod cron;
 mod dashboard;
 mod desktop;
 pub use desktop::DesktopConfig;
+mod channel_voice;
 mod defaults;
 mod dictation;
 mod hooks;
@@ -80,6 +81,7 @@ pub use agent::{
 };
 pub use autonomy::AutonomyConfig;
 pub use capability_providers::{CapabilityProviderConfig, CapabilityProviderTrustState};
+pub use channel_voice::{ChannelVoiceConfig, ChannelVoiceOverride, VoiceReplyMode};
 pub use channels::{
     AuditConfig, ChannelsConfig, DingTalkConfig, DiscordConfig, EmailConfig, IMessageConfig,
     IrcConfig, LarkConfig, LarkReceiveMode, LinqConfig, MatrixConfig, MattermostConfig, QQConfig,

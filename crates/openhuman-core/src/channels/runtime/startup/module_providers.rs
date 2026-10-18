@@ -39,6 +39,20 @@ struct ModuleChannel {
     relay_fronted: bool,
 }
 
+/// Project the module's configured-instance descriptor onto the pre-v2
+/// facts the host's `Channel` adapter still reads.
+fn legacy_interaction(
+    info: &tinychannels_bus::ChannelInteractionInfoV2,
+) -> tinychannels_bus::ChannelInteractionInfo {
+    let caps = &info.capabilities;
+    tinychannels_bus::ChannelInteractionInfo {
+        capabilities: tinychannels_bus::LegacyChannelCapabilities::from(caps),
+        proactive_target: caps.account.proactive_target.clone(),
+        supports_reactions: caps.reactions,
+        supports_draft_updates: caps.progressive_edits,
+    }
+}
+
 impl ModuleChannelRuntime {
     pub(super) async fn prepare(
         dispatch_ctx: &crate::core::runtime::DispatchCtx,
@@ -121,7 +135,7 @@ impl ModuleChannelRuntime {
                 let channel = ModuleChannel {
                     name: info.name.clone(),
                     object: lease.object().clone(),
-                    interaction: info.interaction.clone(),
+                    interaction: legacy_interaction(&info.interaction),
                     relay: relay.clone(),
                     relay_fronted: relay_fronts(&info.name),
                 };
@@ -378,7 +392,13 @@ impl Channel for ModuleChannel {
     }
 
     fn capabilities(&self) -> tinychannels_bus::ChannelCapabilities {
-        self.interaction.capabilities
+        let legacy = self.interaction.capabilities;
+        let mut capabilities = tinychannels_bus::ChannelCapabilities::unknown();
+        capabilities.remote_control = legacy.remote_control;
+        capabilities.chat_approvals = legacy.chat_approvals;
+        capabilities.progressive_edits = legacy.progressive_edits;
+        capabilities.history_key_ignores_thread = legacy.history_key_ignores_thread;
+        capabilities
     }
 
     fn supports_reactions(&self) -> bool {
