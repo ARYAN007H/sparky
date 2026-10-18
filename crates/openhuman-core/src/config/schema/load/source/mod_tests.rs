@@ -105,6 +105,71 @@ async fn a_save_keeps_hand_edits_but_not_comments() {
     assert!(!saved.contains("keep me?"), "comments are not preserved");
 }
 
+#[tokio::test]
+async fn non_config_rpc_handlers_preserve_document_conflicts() {
+    use crate::core::runtime::{context::CoreContext, DispatchCtx, DomainSet};
+    use serde_json::json;
+
+    let tmp = tempfile::tempdir().unwrap();
+    let storage = MemoryStorage::new();
+    let _forced = ForcedDocumentSource::new(
+        scoped(&storage, "tenant-rpc"),
+        Scope::new("tenant-rpc").unwrap(),
+        keys(9),
+    );
+    let seed = config_at(tmp.path(), "initial");
+    seed.save().await.unwrap();
+    let stale = Config::load_from_config_path(&seed.config_path, &seed.workspace_dir)
+        .await
+        .unwrap();
+    let mut winner = Config::load_from_config_path(&seed.config_path, &seed.workspace_dir)
+        .await
+        .unwrap();
+    winner.default_model = Some("winner".into());
+    winner.save().await.unwrap();
+
+    let voice = crate::core::all::all_registered_controllers()
+        .into_iter()
+        .find(|controller| controller.rpc_method_name() == "openhuman.voice_live_settings_set")
+        .expect("voice settings RPC is registered");
+    let ctx = CoreContext::for_test_with_config(DomainSet::full(), stale.clone());
+    let error = CoreContext::scope(ctx.clone(), async move {
+        (voice.handler)(
+            DispatchCtx::new(ctx),
+            json!({"gemini": {"voice": "Aoede"}})
+                .as_object()
+                .unwrap()
+                .clone(),
+        )
+        .await
+        .unwrap_err()
+    })
+    .await;
+    let structured = crate::core::StructuredRpcError::decode(&error)
+        .expect("voice RPC preserves the structured config conflict");
+    assert_eq!(structured.data.as_ref().unwrap()["kind"], "ConfigConflict");
+    assert_eq!(structured.data.as_ref().unwrap()["retryable"], true);
+
+    let memory = crate::core::all::all_registered_controllers()
+        .into_iter()
+        .find(|controller| controller.rpc_method_name() == "openhuman.memory_engine_set")
+        .expect("memory engine RPC is registered");
+    let ctx = CoreContext::for_test_with_config(DomainSet::full(), stale);
+    let error = CoreContext::scope(ctx.clone(), async move {
+        (memory.handler)(
+            DispatchCtx::new(ctx),
+            json!({"engine": "disabled"}).as_object().unwrap().clone(),
+        )
+        .await
+        .unwrap_err()
+    })
+    .await;
+    let structured = crate::core::StructuredRpcError::decode(&error)
+        .expect("memory RPC preserves the structured config conflict");
+    assert_eq!(structured.data.as_ref().unwrap()["kind"], "ConfigConflict");
+    assert_eq!(structured.data.as_ref().unwrap()["retryable"], false);
+}
+
 // ── Document source ──────────────────────────────────────────────────────────
 
 #[tokio::test]
