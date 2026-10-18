@@ -270,7 +270,10 @@ async fn concurrent_first_config_writes_use_insert_preconditions() {
         .await
         .unwrap()
         .contents;
-    assert!(saved.contains("first") ^ saved.contains("second"), "{saved}");
+    assert!(
+        saved.contains("first") ^ saved.contains("second"),
+        "{saved}"
+    );
 }
 
 // ── Through Config ───────────────────────────────────────────────────────────
@@ -335,7 +338,10 @@ async fn stale_document_config_snapshot_returns_conflict_instead_of_overwriting(
         .chain()
         .find_map(|cause| cause.downcast_ref::<tinystoragedrivers::StorageError>())
         .expect("CAS failure retains the typed storage error");
-    assert_eq!(storage_error.kind(), tinystoragedrivers::ErrorKind::Conflict);
+    assert_eq!(
+        storage_error.kind(),
+        tinystoragedrivers::ErrorKind::Conflict
+    );
     let rpc_error = crate::config::ops::config_save_error(error);
     let rpc_error = crate::core::StructuredRpcError::decode(&rpc_error)
         .expect("config RPC boundary exposes a structured conflict");

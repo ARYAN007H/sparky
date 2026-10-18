@@ -94,7 +94,9 @@ impl DocumentConfigSource {
     }
 
     /// The decrypted stored body, or `None` when the scope has no document.
-    async fn stored_body(&self) -> Result<Option<(zeroize::Zeroizing<String>, tinystoragedrivers::Version)>> {
+    async fn stored_body(
+        &self,
+    ) -> Result<Option<(zeroize::Zeroizing<String>, tinystoragedrivers::Version)>> {
         self.docs
             .ensure_collection(&CollectionSpec::new(CONFIG_COLLECTION))
             .await
@@ -186,7 +188,11 @@ impl ConfigSource for DocumentConfigSource {
         Ok(())
     }
 
-    async fn write_versioned(&self, toml: &str, expected: Option<tinystoragedrivers::Version>) -> Result<Option<tinystoragedrivers::Version>> {
+    async fn write_versioned(
+        &self,
+        toml: &str,
+        expected: Option<tinystoragedrivers::Version>,
+    ) -> Result<Option<tinystoragedrivers::Version>> {
         let body = zeroize::Zeroizing::new(
             strip_bootstrap(toml).context("strip bootstrap tables from the config")?,
         );
@@ -199,7 +205,8 @@ impl ConfigSource for DocumentConfigSource {
             .context("declare the config collection")?;
         let id = document_id(self.scope.as_str())?;
         let precondition = expected.map_or(Precondition::Absent, Precondition::Version);
-        let version = self.docs
+        let version = self
+            .docs
             .put(
                 CONFIG_COLLECTION,
                 &id,
