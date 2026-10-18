@@ -53,6 +53,7 @@ fn the_local_check_refuses_inside_the_skew_margin_and_after_renewal_admits_again
     let grant = LeaseGrant {
         key: "alice".into(),
         epoch: 3,
+        version: tinystoragedrivers::Version(1),
         expires_at_ms: 30_000,
         previous_unclean: false,
     };
