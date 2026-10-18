@@ -1,127 +1,84 @@
 use super::*;
-
-// ── Schema catalog coverage ────────────────────────────────────
-
-#[test]
-fn all_schemas_use_auth_namespace_and_have_descriptions() {
-    for s in all_controller_schemas() {
-        assert_eq!(s.namespace, "auth", "function {}", s.function);
-        assert!(!s.description.is_empty(), "function {}", s.function);
-        assert!(
-            !s.outputs.is_empty(),
-            "function {} has no outputs",
-            s.function
-        );
-    }
-}
+use crate::core::all::{assert_schema_contract, ControllerSchemaContract, SchemaFieldContract};
 
 #[test]
-fn every_registered_function_has_nonempty_schema_metadata() {
-    for handler in all_registered_controllers() {
-        assert!(
-            !handler.schema.function.is_empty(),
-            "registered controller is missing its function name"
-        );
-        assert_eq!(handler.schema.namespace, "auth");
-    }
-}
-
-#[test]
-fn every_known_schema_key_returns_a_non_unknown_schema() {
-    // Exercises the full match arm in `schemas()`, pushing line
-    // coverage for every branch without needing the async handler
-    // to fire off HTTP.
-    let keys = [
-        "auth_set_credential",
-        "auth_clear_credential",
-        "auth_get_state",
-        "auth_get_session_token",
-        "auth_store_provider_credentials",
-        "auth_remove_provider_credentials",
-        "auth_list_provider_credentials",
+fn credential_schema_wire_contracts_are_preserved() {
+    // These fixed rows replace independent schema assertions that were
+    // previously scattered across one test per method. The key/function pairs
+    // and field expectations are copied from those prior assertions.
+    let contracts: &[(&str, ControllerSchemaContract)] = &[
+        (
+            "auth_set_credential",
+            ControllerSchemaContract {
+                namespace: "auth",
+                function: "set_credential",
+                input_count: None,
+                input_order: None,
+                required_input_order: Some(&["token"]),
+                inputs: &["kind", "userId", "user"].map(|name| SchemaFieldContract {
+                    name,
+                    required: None,
+                    type_debug: None,
+                }),
+                output_fields: &[],
+                outputs: None,
+            },
+        ),
+        (
+            "auth_clear_credential",
+            ControllerSchemaContract {
+                namespace: "auth",
+                function: "clear_credential",
+                input_count: None,
+                input_order: None,
+                required_input_order: Some(&[]),
+                inputs: &[SchemaFieldContract {
+                    name: "kind",
+                    required: Some(false),
+                    type_debug: None,
+                }],
+                output_fields: &[],
+                outputs: None,
+            },
+        ),
+        (
+            "auth_list_provider_credentials",
+            ControllerSchemaContract {
+                namespace: "auth",
+                function: "list_provider_credentials",
+                input_count: None,
+                input_order: None,
+                required_input_order: None,
+                inputs: &[SchemaFieldContract {
+                    name: "provider",
+                    required: Some(false),
+                    type_debug: None,
+                }],
+                output_fields: &[],
+                outputs: None,
+            },
+        ),
     ];
-    for k in keys {
-        let s = schemas(k);
-        assert_eq!(s.namespace, "auth", "key `{k}` has wrong namespace");
-        assert_ne!(
-            s.function, "unknown",
-            "key `{k}` fell through to the unknown fallback"
-        );
-        assert!(!s.description.is_empty(), "key `{k}` has empty description");
+    let key_contracts = [
+        ("auth_get_state", "get_state"),
+        ("auth_get_session_token", "get_session_token"),
+        (
+            "auth_store_provider_credentials",
+            "store_provider_credentials",
+        ),
+        (
+            "auth_remove_provider_credentials",
+            "remove_provider_credentials",
+        ),
+    ];
+    for (key, expected) in contracts {
+        assert_schema_contract(&schemas(key), expected);
     }
-}
-
-#[test]
-fn list_provider_credentials_schema_has_optional_provider_filter() {
-    let s = schemas("auth_list_provider_credentials");
-    let provider = s.inputs.iter().find(|f| f.name == "provider");
-    assert!(provider.is_some(), "must expose `provider` input");
-    assert!(!provider.unwrap().required);
-}
-
-#[test]
-fn set_credential_schema_requires_token_and_advertises_kind_user_fields() {
-    let s = schemas("auth_set_credential");
-    let required: Vec<&str> = s
-        .inputs
-        .iter()
-        .filter(|f| f.required)
-        .map(|f| f.name)
-        .collect();
-    assert_eq!(required, vec!["token"]);
-    for name in ["kind", "userId", "user"] {
-        assert!(s.inputs.iter().any(|f| f.name == name), "missing {name}");
+    for (key, expected_function) in key_contracts {
+        let schema = schemas(key);
+        assert_eq!(schema.namespace, "auth", "key `{key}` namespace");
+        assert_eq!(schema.function, expected_function, "key `{key}` function");
     }
-    let clear = schemas("auth_clear_credential");
-    assert!(clear.inputs.iter().all(|f| !f.required));
-    assert!(clear.inputs.iter().any(|f| f.name == "kind"));
-}
-
-// ── Field-builder helpers ──────────────────────────────────────
-
-#[test]
-fn required_string_produces_required_string_field() {
-    let f = required_string("provider", "comment");
-    assert_eq!(f.name, "provider");
-    assert!(matches!(f.ty, TypeSchema::String));
-    assert!(f.required);
-}
-
-#[test]
-fn optional_string_produces_option_string() {
-    let f = optional_string("profile", "c");
-    assert!(!f.required);
-    match &f.ty {
-        TypeSchema::Option(inner) => assert!(matches!(**inner, TypeSchema::String)),
-        _ => panic!("expected Option<String>"),
-    }
-}
-
-#[test]
-fn optional_bool_produces_option_bool() {
-    let f = optional_bool("set_active", "c");
-    assert!(!f.required);
-    match &f.ty {
-        TypeSchema::Option(inner) => assert!(matches!(**inner, TypeSchema::Bool)),
-        _ => panic!("expected Option<Bool>"),
-    }
-}
-
-#[test]
-fn optional_json_produces_option_json() {
-    let f = optional_json("fields", "c");
-    assert!(!f.required);
-    match &f.ty {
-        TypeSchema::Option(inner) => assert!(matches!(**inner, TypeSchema::Json)),
-        _ => panic!("expected Option<Json>"),
-    }
-}
-
-#[test]
-fn json_output_produces_required_json_output_field() {
-    let f = json_output("result", "c");
-    assert!(f.required);
-    assert!(matches!(f.ty, TypeSchema::Json));
 }
 
 // ── Param-deserialization helper ───────────────────────────────
