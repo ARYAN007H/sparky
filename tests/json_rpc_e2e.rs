@@ -9234,6 +9234,7 @@ async fn mcp_clients_lifecycle() {
 /// is how a user adds any server now — the registry is browse-only.
 #[tokio::test]
 async fn mcp_clients_declare_connect_tool_call_happy_path() {
+    let _ = tracing_subscriber::fmt().with_env_filter("warn,openhuman_core::modules=debug,openhuman_core::mcp=debug,tinybus=debug").try_init(); // TMPDBG
     let _env_lock = json_rpc_e2e_env_lock_async().await;
     let tmp = tempdir().expect("tempdir");
     let home = tmp.path();
