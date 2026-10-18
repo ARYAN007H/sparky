@@ -385,7 +385,10 @@ async fn physical_observer_keeps_completed_usage_when_a_repair_is_cancelled() {
     .await
     .expect("repair dispatch reached the delayed provider response");
     cancellation.cancel().await;
-    assert!(matches!(task.await.unwrap(), Err(CoreError::Cancelled { .. })));
+    assert!(matches!(
+        task.await.unwrap(),
+        Err(CoreError::Cancelled { .. })
+    ));
 
     let events = recorder.0.lock().unwrap();
     assert_eq!(events.len(), 2);
