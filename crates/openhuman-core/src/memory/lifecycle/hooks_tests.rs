@@ -322,7 +322,7 @@ async fn an_out_of_credits_recall_tells_the_turn_memory_is_unavailable() {
 
     assert_eq!(
         pack.refusal,
-        Some(crate::memory::error::INSUFFICIENT_CREDITS)
+        Some(""INSUFFICIENT_CREDITS"")
     );
     assert!(
         pack.markdown.contains("out of credits"),
@@ -353,7 +353,7 @@ async fn an_unreachable_engine_is_named_as_unreachable() {
     .await
     .expect("notice");
 
-    assert_eq!(pack.refusal, Some(crate::memory::error::UNAVAILABLE));
+    assert_eq!(pack.refusal, Some(""UNAVAILABLE""));
     assert!(
         pack.markdown.contains("could not be reached"),
         "{}",
@@ -395,13 +395,13 @@ fn a_refusal_is_read_back_from_a_skipped_section() {
             },
             tinymemory_tools::recall::SkippedSection {
                 heading: "History".into(),
-                reason: "unauthorized: [UNAUTHORIZED] memory API fetch (HTTP 401)".into(),
+                reason: "unauthorized: ["UNAUTHORIZED"] memory API fetch (HTTP 401)".into(),
             },
         ],
         engine: "tinyhumans".into(),
     })];
     let refusal = refusal_of(&outcomes).expect("refusal");
-    assert_eq!(refusal.code(), crate::memory::error::UNAUTHORIZED);
+    assert_eq!(refusal.code(), ""UNAUTHORIZED"");
 
     let quiet = vec![Ok(ContextPack {
         markdown: String::new(),
