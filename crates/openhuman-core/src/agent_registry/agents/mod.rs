@@ -51,4 +51,4 @@ pub mod video_agent;
 #[path = "vision_agent/prompt.rs"]
 pub mod vision_agent;
 
-pub use loader::{load_builtins, BuiltinAgent, BUILTINS};
+pub use loader::{BUILTINS, BuiltinAgent, load_builtins};
