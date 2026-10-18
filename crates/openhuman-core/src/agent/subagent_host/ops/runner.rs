@@ -41,6 +41,10 @@ use super::prompt::{
 };
 use super::provider::{resolve_subagent_source, user_is_signed_in_to_composio};
 
+#[path = "runner_prompt.rs"]
+mod runner_prompt;
+use runner_prompt::{load_typed_prompt_source, LoadedConfig};
+
 /// Runtime spawn-hierarchy gate decision for one delegation hop.
 ///
 /// `parent_def` is the resolved parent agent definition (looked up from the
@@ -527,44 +531,6 @@ fn workspace_descriptor_for_subagent(
             .with_policy_id(format!("openhuman.worktree:{task_id}"))
             .with_sandbox(sandbox),
     )
-}
-
-/// One spawn's snapshot of the host config, loaded once by [`run_subagent`].
-///
-/// `Config::load_or_init()` is **not cached** — it re-resolves the config dirs
-/// and re-reads `config.toml` on every call. `run_typed_mode` needed it in six
-/// places, so a single sub-agent spawn used to hit the disk six times and could
-/// observe six *different* configs if the file changed mid-spawn. One snapshot
-/// is both cheaper and more coherent.
-///
-/// The error is captured as a `String` rather than dropped to `Option` so the
-/// sites that log it can say why the config was unavailable; every site
-/// degrades without it.
-///
-/// Threading this in as a parameter (rather than loading it inside the runtime)
-/// is `docs/specs/plan-agents.md` Phase 3: the sub-agent runner is slated to
-/// move into TinyAgents, and a generic runtime has no config file to load.
-type LoadedConfig = Result<std::sync::Arc<crate::config::Config>, String>;
-
-/// Load and render a typed sub-agent prompt using the exact config snapshot
-/// supplied to this spawn. TinyFlows-backed builtins fetch their archetype
-/// over the module bus before the synchronous registry builder runs.
-async fn load_typed_prompt_source(
-    definition: &AgentDefinition,
-    config: &LoadedConfig,
-    mut prompt_context: PromptContext<'_>,
-) -> Result<String, SubagentRunError> {
-    #[cfg(feature = "flows")]
-    let flow_archetype_text = crate::agent::prompts::flow_archetype::load_for_definition(
-        config.as_ref().ok().map(|config| config.as_ref()),
-        definition,
-    )
-    .await?;
-    #[cfg(not(feature = "flows"))]
-    let flow_archetype_text: Option<String> = None;
-
-    prompt_context.flow_archetype_text = flow_archetype_text.as_deref();
-    load_prompt_source(definition, &prompt_context)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
