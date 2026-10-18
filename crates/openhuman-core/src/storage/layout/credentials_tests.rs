@@ -8,7 +8,8 @@ use std::sync::Arc;
 use tinystoragedrivers::secrets::{DerivedKeys, SecretStore as _};
 use zeroize::Zeroizing;
 
-const PROFILES: &str = r#"{"schema_version":1,"profiles":{"openai:default":{"token":"enc2:abcdef"}}}"#;
+const PROFILES: &str =
+    r#"{"schema_version":1,"profiles":{"openai:default":{"token":"enc2:abcdef"}}}"#;
 const HTTP: &str = r#"{"credentials":{"gh":{"token":"enc2:012345"}}}"#;
 
 /// A host key source holding one fixed key, so no key is ever minted.
@@ -57,7 +58,11 @@ async fn a_migration_moves_the_credential_files_into_encrypted_secrets() {
             "{file} is deleted once archived"
         );
         assert!(report.deleted.contains(&format!("{PROFILE_PREFIX}{file}")));
-        let expected = if file == PROFILES_FILENAME { PROFILES } else { HTTP };
+        let expected = if file == PROFILES_FILENAME {
+            PROFILES
+        } else {
+            HTTP
+        };
         assert_eq!(stored(&fx, secret).await.unwrap(), expected.as_bytes());
     }
     // storage.db never holds the plaintext

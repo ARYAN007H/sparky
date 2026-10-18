@@ -198,8 +198,10 @@ fn dry_run(target: &Target, resuming: bool) -> Result<DryRun, LayoutError> {
         None => {
             let mut plan = plan::scan(&target.workspace())?;
             // What the import step would copy into encrypted secrets.
-            let candidates: Vec<String> =
-                super::credentials::FILES.iter().map(|(f, _)| (*f).to_owned()).collect();
+            let candidates: Vec<String> = super::credentials::FILES
+                .iter()
+                .map(|(f, _)| (*f).to_owned())
+                .collect();
             plan.entries
                 .extend(plan::scan_credentials(&target.profile_dir, &candidates));
             plan.entries.sort_by(|a, b| a.path.cmp(&b.path));

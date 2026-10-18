@@ -92,9 +92,10 @@ pub async fn import(target: &Target) -> Result<Vec<String>, LayoutError> {
                 .set(secret, &bytes)
                 .await
                 .map_err(|e| LayoutError::Other(anyhow::anyhow!("store {file}: {e}")))?;
-            let back = secrets.get(secret).await.map_err(|e| {
-                LayoutError::Verify(format!("read back {file}: {e}"))
-            })?;
+            let back = secrets
+                .get(secret)
+                .await
+                .map_err(|e| LayoutError::Verify(format!("read back {file}: {e}")))?;
             if back.as_deref().map(|b| b.as_slice()) != Some(bytes.as_slice()) {
                 return Err(LayoutError::Verify(format!(
                     "{file} did not read back identically; refusing to delete it"

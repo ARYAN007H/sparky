@@ -166,9 +166,8 @@ pub(crate) fn storage_master_key() -> Result<[u8; KEY_LEN], String> {
 /// credential files only imports them when this holds, because a key minted
 /// by an offline tool would not match the one the desktop later loads.
 pub(crate) fn storage_master_key_resolvable() -> bool {
-    let env_set = |name: &str| {
-        std::env::var_os(name).is_some_and(|v| !v.to_string_lossy().trim().is_empty())
-    };
+    let env_set =
+        |name: &str| std::env::var_os(name).is_some_and(|v| !v.to_string_lossy().trim().is_empty());
     let dir = crate::security::secret_storage::store::workspace_dir_for_file_backend();
     resolvable(
         matches!(MASTER_KEY.get(), Some(Ok(Some(_)))),
