@@ -2798,13 +2798,21 @@ async fn json_rpc_cron_manual_worker_survives_caller_cancel_on_published_tinyflo
     let docs = CoreContext::scope(Arc::clone(&default_context), async {
         let opened = openhuman_core::storage::local::open("published TinyFlows E2E", &workspace)
             .expect("open the core's installed local storage backend");
+        assert_eq!(opened.scope.as_str(), "local");
         let scoped = opened.scoped().expect("scope E2E storage");
         let docs = Arc::clone(scoped.documents());
-        for collection in ["cron_jobs", "cron_runs", "cron_counters"] {
+        for collection in ["cron_jobs", "cron_runs", "cron_counters", "tsd.migrations"] {
             docs.ensure_collection(&CollectionSpec::new(collection))
                 .await
                 .unwrap();
         }
+        assert!(
+            docs.get("tsd.migrations", "cron/cron.jobs/jobs_v2")
+                .await
+                .unwrap()
+                .is_none(),
+            "the module has not migrated this backend before the v1 fixture is seeded"
+        );
         docs.put(
             "cron_jobs",
             "legacy-migration-proof",
@@ -2859,16 +2867,7 @@ async fn json_rpc_cron_manual_worker_survives_caller_cancel_on_published_tinyflo
     .await;
     let (rpc_addr, rpc_join) = serve_on_ephemeral(build_core_http_router(false)).await;
     let rpc_base = format!("http://{rpc_addr}");
-    let store_session = post_json_rpc(
-        &rpc_base,
-        80_001,
-        "openhuman.auth_store_session",
-        json!({ "token": "e2e-test-jwt", "user_id": "e2e-user" }),
-    )
-    .await;
-    assert_no_jsonrpc_error(&store_session, "store_session");
-
-    let jobs = post_json_rpc(&rpc_base, 80_002, "openhuman.cron_list", json!({})).await;
+    let jobs = post_json_rpc(&rpc_base, 80_001, "openhuman.cron_list", json!({})).await;
     let jobs = assert_no_jsonrpc_error(&jobs, "cron_list");
     assert!(
         jobs.to_string().contains("legacy-migration-proof"),
