@@ -377,6 +377,7 @@ pub(in super::super) async fn run_subagent_via_graph(
         let strategy = checkpoint::SubagentCheckpoint {
             chat_model: summary_model.clone(),
             agent_id: agent_id.to_string(),
+            model: model.to_string(),
             // The checkpoint summary call's output cap. #4469 item 5: honour this
             // sub-agent definition's own per-call output budget (the same
             // `max_output_tokens` bounding every task model call above) instead of
@@ -384,6 +385,19 @@ pub(in super::super) async fn run_subagent_via_graph(
             // definition that raised or lowered its output cap is respected by the
             // cap-summary call too.
             max_output_tokens,
+            trace: native_subagent.as_ref().and_then(|native| {
+                native
+                    .child_events
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .clone()
+                    .map(|events| {
+                        crate::agent::tinyagents::SupplementalTrace::new(
+                            events,
+                            native.config.run_id.clone(),
+                        )
+                    })
+            }),
         };
         match strategy.summarize_cap_hit(&results, max_iterations).await {
             Ok(co) => {

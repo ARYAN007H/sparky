@@ -4,6 +4,7 @@ use crate::inference::provider::BilledUsage;
 use std::sync::{Arc, Mutex};
 use tinyagents_harness::summarization::CapToolResult;
 use tinyagents_orchestration::subagent::{summarize_at_cap, CapSummaryModel};
+use tinyagents_harness::ids::CallId;
 use tinyinference_llm::message::Message;
 use tinyinference_llm::model::{ChatModel, ModelRequest};
 
@@ -19,7 +20,9 @@ pub(super) struct SubagentCheckpointOutcome {
 pub(super) struct SubagentCheckpoint {
     pub(super) chat_model: Arc<dyn ChatModel<()>>,
     pub(super) agent_id: String,
+    pub(super) model: String,
     pub(super) max_output_tokens: u32,
+    pub(super) trace: Option<Arc<crate::agent::tinyagents::SupplementalTrace>>,
 }
 
 impl SubagentCheckpoint {
@@ -60,8 +63,23 @@ impl CapSummaryModel for HostCapSummaryModel<'_> {
         ))];
         let request =
             ModelRequest::new(summary_input).with_max_tokens(self.checkpoint.max_output_tokens);
+        let trace_input = serde_json::to_value(&request.messages).unwrap_or(serde_json::Value::Null);
+        let trace_call = self
+            .checkpoint
+            .trace
+            .as_ref()
+            .map(|trace| (trace.clone(), trace.begin(&self.checkpoint.model)));
         match self.checkpoint.chat_model.invoke(&(), request).await {
             Ok(response) => {
+                if let Some((trace, (call_id, started_at_ms))) = trace_call {
+                    trace.completed(
+                        call_id,
+                        &self.checkpoint.model,
+                        started_at_ms,
+                        trace_input,
+                        &response,
+                    );
+                }
                 let usage = crate::inference::provider::model::usage_info_from_response(&response);
                 *self
                     .usage
@@ -71,6 +89,9 @@ impl CapSummaryModel for HostCapSummaryModel<'_> {
                 Ok(prose)
             }
             Err(error) => {
+                if let Some((trace, (call_id, started_at_ms))) = trace_call {
+                    trace.failed(call_id, &self.checkpoint.model, started_at_ms);
+                }
                 tracing::warn!(
                     agent_id = %self.checkpoint.agent_id,
                     max_calls,
