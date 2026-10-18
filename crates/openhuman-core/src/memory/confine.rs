@@ -53,7 +53,7 @@ pub fn confine_reach(reach: Option<Reach>, allowed: &Reach) -> Result<Reach> {
                 allowed = %allowed.at,
                 "[memory:confine] refused a reach outside the caller's root"
             );
-            Err(Error::invalid(format!(
+            Err(Error::InvalidRequest(format!(
                 "the reach `{}` is outside this caller's memory (`{}`)",
                 reach.at, allowed.at
             )))
@@ -98,7 +98,7 @@ pub fn confine_learn_meta(
             allowed = %allowed.at,
             "[memory:confine] refused a learning outside the caller's root"
         );
-        return Err(Error::invalid(format!(
+        return Err(Error::InvalidRequest(format!(
             "the namespace `{}` is outside this caller's memory (`{}`)",
             meta.namespace, allowed.at
         )));

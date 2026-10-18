@@ -60,7 +60,7 @@ where
 
 fn parse<T: DeserializeOwned>(params: Map<String, Value>) -> Result<T, String> {
     serde_json::from_value(Value::Object(params))
-        .map_err(|error| Error::invalid(format!("invalid params: {error}")).into())
+        .map_err(|error| Error::InvalidRequest(format!("invalid params: {error}")).into())
 }
 
 fn to_json<T: Serialize>(value: T) -> Result<Value, String> {

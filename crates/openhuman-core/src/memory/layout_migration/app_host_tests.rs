@@ -178,7 +178,7 @@ fn errors_keep_their_wire_codes_across_the_module_boundary() {
     for error in [
         Error::Off("x".into()),
         Error::Unsupported("x".into()),
-        Error::invalid("x"),
+        Error::InvalidRequest(("x").into()),
         Error::Unauthorized("x".into()),
         Error::Unavailable("x".into()),
         Error::InsufficientCredits("[USER_INSUFFICIENT_CREDITS] x".into()),

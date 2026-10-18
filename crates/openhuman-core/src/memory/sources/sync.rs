@@ -45,7 +45,7 @@ fn registered(source: &MemorySourceConfig) -> RegisteredSource {
 
 fn host_error(error: SyncError) -> Error {
     match error {
-        SyncError::Invalid(message) => Error::invalid(message),
+        SyncError::Invalid(message) => Error::InvalidRequest((message).into()),
         SyncError::Read(message) => {
             Error::Engine(format!("reading the source failed: {message}"))
         }

@@ -173,16 +173,16 @@ pub(super) fn enqueue(
     let operation = match args.get("action").and_then(serde_json::Value::as_str) {
         Some("learn") => {
             let mut params: LearnParams = serde_json::from_value(args.clone())
-                .map_err(|_| Error::invalid("invalid learning arguments"))?;
+                .map_err(|_| Error::InvalidRequest(("invalid learning arguments").into()))?;
             params.meta = None;
             let mut item = super::ops::learning_item(params, Some(facts.learn_meta()))?;
             if let Some(root) = confinement {
                 super::user_scope::clamp_item(&mut item, &root);
             }
             if !super::user_scope::within(&item.meta().namespace, &reach.at) || reach.inherit {
-                return Err(Error::invalid(
+                return Err(Error::InvalidRequest((
                     "learning namespace is outside the trusted reach",
-                ));
+                ).into()));
             }
             WriteOperation::Learn {
                 item: super::guard::scrub(item),
@@ -190,7 +190,7 @@ pub(super) fn enqueue(
         }
         Some("forget") => {
             let params: ForgetParams = serde_json::from_value(args.clone())
-                .map_err(|_| Error::invalid("invalid forgetting arguments"))?;
+                .map_err(|_| Error::InvalidRequest(("invalid forgetting arguments").into()))?;
             let mut ids: Vec<_> = params
                 .ids
                 .into_iter()
@@ -200,11 +200,11 @@ pub(super) fn enqueue(
             ids.sort();
             ids.dedup();
             if ids.is_empty() {
-                return Err(Error::invalid("forget needs at least one id"));
+                return Err(Error::InvalidRequest(("forget needs at least one id").into()));
             }
             WriteOperation::Forget { ids, reach }
         }
-        _ => return Err(Error::invalid("expected a memory write")),
+        _ => return Err(Error::InvalidRequest(("expected a memory write").into())),
     };
     let _guard = LOCK
         .lock()

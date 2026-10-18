@@ -92,9 +92,9 @@ pub fn apply_engine_set(config: &mut Config, params: &EngineSetParams) -> Result
         // Turning memory off keeps every engine's endpoint and key, so
         // switching back needs no re-entry.
         if params.endpoint.is_some() || params.api_key.is_some() {
-            return Err(Error::invalid(
+            return Err(Error::InvalidRequest((
                 "disabling memory takes no endpoint or API key",
-            ));
+            ).into()));
         }
         config.memory.engine = DISABLED_ENGINE.to_string();
         tracing::info!("[memory:ops] memory disabled");
@@ -104,7 +104,7 @@ pub fn apply_engine_set(config: &mut Config, params: &EngineSetParams) -> Result
         .iter()
         .any(|descriptor| descriptor.id == engine_id)
     {
-        return Err(Error::invalid(format!(
+        return Err(Error::InvalidRequest(format!(
             "unknown memory engine `{engine_id}`"
         )));
     }
@@ -129,11 +129,11 @@ pub fn apply_engine_set(config: &mut Config, params: &EngineSetParams) -> Result
             }
             CORTEXDB_ENGINE => engine::store_cortexdb_key(config, key)?,
             TINYHUMANS_ENGINE => {
-                return Err(Error::invalid(
+                return Err(Error::InvalidRequest((
                     "the tinyhumans engine uses your sign-in, not an API key",
-                ))
+                ).into()))
             }
-            _ => return Err(Error::invalid("this engine takes no API key")),
+            _ => return Err(Error::InvalidRequest(("this engine takes no API key").into())),
         }
     }
     config.memory.engine = engine_id.to_string();
@@ -143,11 +143,11 @@ pub fn apply_engine_set(config: &mut Config, params: &EngineSetParams) -> Result
 
 fn validate_endpoint(endpoint: &str) -> Result<()> {
     let parsed = url::Url::parse(endpoint)
-        .map_err(|_| Error::invalid("the endpoint is not a valid URL"))?;
+        .map_err(|_| Error::InvalidRequest(("the endpoint is not a valid URL").into()))?;
     if !matches!(parsed.scheme(), "http" | "https") || parsed.host_str().is_none() {
-        return Err(Error::invalid(
+        return Err(Error::InvalidRequest((
             "the endpoint must be an http(s) URL with a host",
-        ));
+        ).into()));
     }
     Ok(())
 }
@@ -260,7 +260,7 @@ pub fn learning_item(
 ) -> Result<StoreItem> {
     let confidence = params.confidence.unwrap_or(DEFAULT_LEARNING_CONFIDENCE);
     if !(0.0..=1.0).contains(&confidence) {
-        return Err(Error::invalid("confidence must be between 0 and 1"));
+        return Err(Error::InvalidRequest(("confidence must be between 0 and 1").into()));
     }
     let mut meta = params.meta.unwrap_or_default();
     if let Some(host) = host_meta {
@@ -376,7 +376,7 @@ pub async fn forget(config: &Config, params: ForgetParams) -> Result<ForgetView>
         .map(ItemId)
         .collect();
     if ids.is_empty() {
-        return Err(Error::invalid("forget needs at least one id"));
+        return Err(Error::InvalidRequest(("forget needs at least one id").into()));
     }
     let bound = bound(config)?;
     // A SaaS user forgets only what lies in their own tree.
@@ -421,9 +421,9 @@ pub async fn erase_all(
     params: EraseAllParams,
 ) -> Result<EraseAllView> {
     if !params.confirm {
-        return Err(Error::invalid(
+        return Err(Error::InvalidRequest((
             "erasing all memory needs confirm: true; nothing erased comes back",
-        ));
+        ).into()));
     }
     let bound = bound(config)?;
     // Earlier durable tool writes must finish or be discarded before the

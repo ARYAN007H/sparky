@@ -103,7 +103,7 @@ pub fn named_agent_memory(
     }
     let memory = agent_memory(config, &identity).map_err(|error| match error {
         Error::InvalidRequest(message) => {
-            Error::invalid(format!("agent `{}`: {message}", identity.agent_id))
+            Error::InvalidRequest(format!("agent `{}`: {message}", identity.agent_id))
         }
         other => other,
     })?;
