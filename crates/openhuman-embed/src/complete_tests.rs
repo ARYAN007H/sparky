@@ -169,6 +169,38 @@ async fn observer_fires_once_per_call_on_success_and_error() {
     );
 }
 
+#[tokio::test]
+async fn logical_and_physical_observers_compose_across_completer_clones() {
+    let server = server_replying(body("hi", "stop")).await;
+    let logical = Arc::new(Recorder::default());
+    let physical = Arc::new(PhysicalRecorder::default());
+    let base = completer(&server).observer(logical.clone());
+    let with_physical = base.clone().physical_observer(physical.clone());
+
+    base.complete(CompletionRequest::new(
+        "base-model",
+        vec![ChatMessage::user("base")],
+    ))
+    .await
+    .unwrap();
+    with_physical
+        .complete(CompletionRequest::new(
+            "derived-model",
+            vec![ChatMessage::user("derived")],
+        ))
+        .await
+        .unwrap();
+
+    assert_eq!(
+        *logical.0.lock().unwrap(),
+        vec![
+            (true, "base-model".to_string()),
+            (true, "derived-model".to_string()),
+        ]
+    );
+    assert_eq!(physical.0.lock().unwrap().len(), 1);
+}
+
 #[derive(Default)]
 struct PhysicalRecorder(
     Arc<
