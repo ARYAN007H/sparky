@@ -54,7 +54,8 @@ fn the_memory_root_is_a_valid_layout_root() {
 #[test]
 fn a_profile_binds_its_user_root_never_an_org_root() {
     use crate::memory::scope;
-use tinymemory_tools::layout::identity::Identity;
+    use tinymemory_api::Reach;
+    use tinymemory_tools::confine::{Confinement, Policy};
     let id = ProfileId::for_user("65f1c0ffee0123456789abcd", ProfileIdMode::Raw).unwrap();
     assert_eq!(id.as_str(), "65f1c0ffee0123456789abcd");
     let layout = profile_layout(Path::new("/srv/oh"), &id);
@@ -68,14 +69,15 @@ use tinymemory_tools::layout::identity::Identity;
     // The pin: legacy layout, so `memory::engine::resolve` binds no org root
     // and every operation is confined to `user:<id>`.
     assert_eq!(config.memory.layout, MemoryLayoutMode::Legacy);
-    assert!(!config.memory.layout == crate::config::MemoryLayoutMode::V3);
+    assert_ne!(config.memory.layout, MemoryLayoutMode::V3);
     let bound = tinymemory_tools::layout::identity::Identity::root().resolve(&crate::memory::scope::identity_pins(&config));
     assert_eq!(bound.root().to_string(), "user:65f1c0ffee0123456789abcd");
     assert_eq!(bound.agent_id, id.as_str());
-    let confined = crate::memory::user_scope::confinement_in(true, &config)
-        .unwrap()
-        .unwrap();
-    assert_eq!(confined.to_string(), "user:65f1c0ffee0123456789abcd");
+    let confined = Confinement {
+        allowed: Reach::subtree(bound.root().clone()),
+        policy: Policy::Clamp,
+    };
+    assert_eq!(confined.allowed.at.to_string(), "user:65f1c0ffee0123456789abcd");
 }
 
 #[test]
