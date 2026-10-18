@@ -273,6 +273,57 @@ async fn supplemental_close_call_emits_native_start_and_actual_completion() {
         && output.to_string().contains("supplemental answer")));
 }
 
+#[test]
+fn supplemental_cached_response_is_marked_before_usage_without_provider_charge() {
+    use std::sync::{Arc, Mutex};
+    use tinyagents_harness::events::{AgentEvent, EventListener, EventSink};
+    use tinyagents_harness::ids::RunId;
+
+    #[derive(Default)]
+    struct Recorder(Mutex<Vec<AgentEvent>>);
+    impl EventListener for Recorder {
+        fn on_event(&self, record: &tinyagents_harness::events::EventRecord) {
+            self.0.lock().unwrap().push(record.event.clone());
+        }
+    }
+
+    let run_id = RunId::new("host-supplemental-cache-fixture");
+    let sink = EventSink::with_stream_id(run_id.as_str());
+    let recorder = Arc::new(Recorder::default());
+    sink.subscribe(recorder.clone());
+    let trace = SupplementalTrace::new(sink, run_id);
+    let (call_id, started_at_ms) = trace.begin("gpt-4.1");
+    let usage = tinyinference_llm::usage::Usage {
+        input_tokens: 14,
+        output_tokens: 3,
+        total_tokens: 17,
+        charged_amount: Some(tinyinference_llm::usage::ChargedAmount::usd_micros(900)),
+        ..Default::default()
+    };
+    let mut response = tinyinference_llm::model::ModelResponse::assistant("cached answer");
+    response.served_from_cache = true;
+    response.usage = Some(usage);
+    response.message.usage = Some(usage);
+    trace.completed(
+        call_id,
+        "gpt-4.1",
+        started_at_ms,
+        serde_json::json!(["cached prompt"]),
+        &response,
+    );
+
+    let records = recorder.0.lock().unwrap();
+    assert!(matches!(records.as_slice(), [
+        AgentEvent::ModelStarted { .. },
+        AgentEvent::ModelResponseCached { .. },
+        AgentEvent::UsageRecorded { usage },
+        AgentEvent::ModelCompleted { usage: Some(completed), .. },
+        AgentEvent::GenerationEnriched { enrichment, .. },
+    ] if usage.charged_amount.is_none()
+        && completed.charged_amount.is_none()
+        && enrichment.estimated_cost_usd.is_none()));
+}
+
 /// #6951: a turn that ended because the model ran out of output tokens while
 /// reasoning is closed with that cause named, not with "you have finished
 /// using tools" — which told the model its unfinished work was done.
