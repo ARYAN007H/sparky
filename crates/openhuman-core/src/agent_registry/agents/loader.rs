@@ -3,8 +3,8 @@
 //! Every built-in agent lives in its own subfolder here, with these files:
 //!
 //! * `agent.toml`  — id, when_to_use, model, tool allowlist, sandbox,
-//!   iteration cap, and the `omit_*` flags. Parsed
-//!   parsed into [`AgentDefinition`] through the portable definition loader.
+//!   iteration cap, and the `omit_*` flags. Parsed into [`AgentDefinition`]
+//!   through the portable definition loader.
 //! * `prompt.rs`   — a Rust module exporting `pub fn build(ctx: &PromptContext)
 //!   -> anyhow::Result<String>` that returns the sub-agent's system
 //!   prompt body. Dynamic: may branch on available tools, user profile,
@@ -218,7 +218,7 @@ fn parse_builtin(b: &BuiltinAgent) -> Result<AgentDefinition> {
     let mut def: AgentDefinition = parse_str(b.toml, DefinitionSource::Builtin)
         .with_context(|| format!("parsing built-in agent `{}` TOML", b.id))?;
 
-    // Install the function-driven prompt builder and stamp the source.
+    // Install the host-owned function-driven prompt builder.
     def.system_prompt = PromptSource::Dynamic(());
     def.extensions.prompt_builder = Some(b.prompt_fn);
 
