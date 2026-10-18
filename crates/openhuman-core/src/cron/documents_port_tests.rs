@@ -51,7 +51,7 @@ async fn schedule_store_migration_moves_legacy_jobs_runs_and_counter_before_read
     use tinystoragedrivers::Precondition;
 
     let config = Config::default();
-    let (port, callback, backend) = port_with_backend().await;
+    let (_port, callback, backend) = port_with_backend().await;
     let scoped = backend.for_scope(&Scope::local()).unwrap();
     let docs = scoped.documents();
     for collection in ["cron_jobs", "cron_runs", "cron_counters"] {
@@ -120,12 +120,15 @@ async fn schedule_store_migration_moves_legacy_jobs_runs_and_counter_before_read
         storage: storage.clone(),
         operation: serde_json::to_value(StoreOperation::Migrate).unwrap(),
     };
-    let migrated: Value = module::proxy(&config)
+    let migrated: Value = match module::proxy(&config)
         .await
         .unwrap()
         .call(members::SCHEDULE_STORE, (request,))
         .await
-        .unwrap();
+    {
+        Ok(value) => value,
+        Err(error) => panic!("module-owned schedule migration should run: {error}"),
+    };
     assert!(migrated.get("report").is_some(), "{migrated}");
     assert_eq!(migrated["counter_imported"], true, "{migrated}");
 
@@ -180,10 +183,10 @@ async fn schedule_store_migration_moves_legacy_jobs_runs_and_counter_before_read
     }
     assert_eq!(
         tinystoragedrivers::primitives::Counters::new(&docs)
-            .peek("cron", "runs")
+            .next("cron", "runs")
             .await
             .unwrap(),
-        7
+        8
     );
     for progress in [
         "cron/cron.jobs/jobs_v2",
@@ -305,6 +308,14 @@ async fn document_port_preserves_schedule_record_metadata_options() {
         assert_eq!(stored.meta.schema, schema as u32, "{id}");
         assert_eq!(stored.meta.created_ms, created_ms, "{id}");
         assert_eq!(stored.meta.expires_ms, Some(9999999999999_i64), "{id}");
+        let read_back = ask(
+            &proxy,
+            json!({"op":"get","collection":"cron.jobs","id":id}),
+        )
+        .await;
+        assert_eq!(read_back["value"]["meta"]["schema"], schema, "{id}: {read_back}");
+        assert_eq!(read_back["value"]["meta"]["created_ms"], created_ms, "{id}: {read_back}");
+        assert_eq!(read_back["value"]["meta"]["expires_ms"], 9999999999999_i64, "{id}: {read_back}");
     }
 }
 
