@@ -872,7 +872,9 @@ impl OpenHumanSessionHost {
                     let state = state.clone();
                     Box::pin(async move {
                         let sidecar = post_commit::take_terminal_sidecar(&state, terminal.clone());
-                        let _ = sidecar; // Disabled temporarily for the regression RED run.
+                        if let Some(sidecar) = sidecar {
+                            post_commit::finalize_deferred_terminal(&sidecar, &terminal).await;
+                        }
                         Ok(())
                     })
                 }
