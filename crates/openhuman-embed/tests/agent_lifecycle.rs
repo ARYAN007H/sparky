@@ -14,8 +14,8 @@ use openhuman_core::core::events::DomainEvent;
 use openhuman_core::core::runtime::AgentContextRegistry;
 use openhuman_core::security::AutonomyLevel;
 use openhuman_embed::{
-    Access, Agent, AgentDefinitionSpec, AgentError, AgentSpec, AgentTurnOrigin, CoreError, Runtime,
-    ToolScopeSpec, TrustedAccess, Workspace,
+    Access, Agent, AgentDefinitionSpec, AgentError, AgentSpec, AgentTurnOrigin, CoreError,
+    HostTurnTools, Runtime, Tool, ToolScopeSpec, TrustedAccess, Workspace,
 };
 
 fn supervised(scratch: &std::path::Path) -> Access {
@@ -30,26 +30,50 @@ fn supervised(scratch: &std::path::Path) -> Access {
         .trust(scratch.display().to_string(), TrustedAccess::ReadWrite)
 }
 
+/// The lifecycle test needs an acting tool that parks at the real approval
+/// gate, independently of native TinyBox shell analysis and artifact loading.
+struct WriteMarker(std::path::PathBuf);
+
+#[async_trait::async_trait]
+impl Tool for WriteMarker {
+    fn name(&self) -> &str {
+        "write_marker"
+    }
+    fn description(&self) -> &str {
+        "Write the fixture marker after approval"
+    }
+    fn parameters_schema(&self) -> serde_json::Value {
+        serde_json::json!({"type": "object", "properties": {}})
+    }
+    fn permission_level(&self) -> tinytools::PermissionLevel {
+        tinytools::PermissionLevel::Write
+    }
+    fn external_effect(&self) -> bool {
+        true
+    }
+    async fn execute(&self, _: serde_json::Value) -> anyhow::Result<tinytools::ToolResult> {
+        std::fs::write(&self.0, "approved")?;
+        Ok(tinytools::ToolResult::success("marker written"))
+    }
+}
+
 async fn parking_agent(
     runtime: &Runtime,
     id: &str,
     scratch: &std::path::Path,
 ) -> (Agent, wiremock::MockServer) {
     let file = scratch.join(format!("{id}-wrote"));
-    let call = tool_call_completion(
-        "shell",
-        &serde_json::json!({ "command": format!("touch {}", file.display()) }).to_string(),
-    );
+    let call = tool_call_completion("write_marker", "{}");
     let provider = scripted_provider(vec![call], &format!("{id}-done")).await;
     let agent = runtime
         .agent(
             AgentSpec::new(id)
                 .provider(route(&provider, &format!("{id}-model")))
                 .access(supervised(scratch))
-                .definition(
-                    AgentDefinitionSpec::new()
-                        .tools(ToolScopeSpec::Named(vec!["shell".to_string()])),
-                ),
+                .definition(AgentDefinitionSpec::new().tools(ToolScopeSpec::HostOnly))
+                .tools(move |_| {
+                    HostTurnTools::advertised(vec![Box::new(WriteMarker(file.clone()))])
+                }),
         )
         .expect("agent instantiates");
     (agent, provider)
@@ -110,7 +134,6 @@ fn removing_an_agent_releases_everything_it_held() {
                 let closing = closing.clone();
                 tokio::spawn(async move { closing.turn("write the marker").send().await })
             };
-            eprintln!("[agent_lifecycle] waiting for closing_request");
             let closing_request = eventually("closing agent to park", || {
                 closing.approvals().pending().ok()?.into_iter().next()
             })
@@ -174,7 +197,6 @@ fn removing_an_agent_releases_everything_it_held() {
                 let replacement = replacement.clone();
                 tokio::spawn(async move { replacement.turn("write the marker").send().await })
             };
-            eprintln!("[agent_lifecycle] waiting for replacement_request");
             let replacement_request = eventually("replacement to park", || {
                 replacement.approvals().pending().ok()?.into_iter().next()
             })
@@ -209,7 +231,6 @@ fn removing_an_agent_releases_everything_it_held() {
                 let parker = parker.clone();
                 tokio::spawn(async move { parker.turn("write the marker").send().await })
             };
-            eprintln!("[agent_lifecycle] waiting for request");
             let request = eventually("parker to park", || {
                 parker
                     .approvals()
@@ -241,7 +262,7 @@ fn removing_an_agent_releases_everything_it_held() {
                             request_id: None,
                         },
                         gate.intercept_forced(
-                            "shell",
+                            "write_marker",
                             "late removal registration",
                             serde_json::json!({}),
                         ),
