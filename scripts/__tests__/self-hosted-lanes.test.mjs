@@ -930,6 +930,7 @@ test("nextest validation helpers arm Rust validation and script regressions on t
       `${area} covers guest verifier, linkage verifier and image pin changes`,
     );
     for (const file of [
+      ".config/nextest.toml",
       "scripts/ci/nextest-coverage.sh",
       "scripts/ci/nextest-report.mjs",
     ]) {
