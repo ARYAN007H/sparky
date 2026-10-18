@@ -29,8 +29,6 @@ pub mod compile_status;
 pub use compile_status::VOICE_COMPILED_IN;
 
 #[cfg(feature = "voice")]
-pub mod always_on;
-#[cfg(feature = "voice")]
 pub mod audio_capture;
 #[cfg(feature = "voice")]
 pub mod bus;

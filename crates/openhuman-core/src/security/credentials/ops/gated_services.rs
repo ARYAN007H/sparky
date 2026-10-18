@@ -147,28 +147,6 @@ pub async fn start_credential_gated_services(
         ));
     }
 
-    // 3b. Always-on listening (Phase 2): continuous mic + VAD → STT → agent.
-    //     Its cold WASAPI init (`always_on::spawn_capture_thread`) is the
-    //     Windows-specific blocker; it now runs the blocking capture-readiness
-    //     handshake on the blocking pool (see `always_on::start_if_enabled`), so
-    //     on its own task it neither stalls an async worker nor the hotkey /
-    //     command registration above.
-    {
-        let config = config.clone();
-        let ctx = ctx.clone();
-        tasks.push((
-            "always_on",
-            tokio::spawn(async move {
-                let step = std::time::Instant::now();
-                crate::voice::always_on::start_if_enabled(&ctx, &config).await;
-                log::debug!(
-                    "[services] always-on listening started ({} ms)",
-                    step.elapsed().as_millis()
-                );
-            }),
-        ));
-    }
-
     let total = tasks.len();
     let mut failed = 0usize;
     for (name, task) in tasks {
@@ -217,7 +195,6 @@ pub async fn stop_credential_gated_services(
     crate::voice::dictation_listener::stop().await;
 
     // 6. Disable delivery and release module-owned microphone/output leases.
-    crate::voice::always_on::shutdown().await;
     #[cfg(feature = "voice")]
     if let Err(error) = crate::voice::capture_lease::close_all().await {
         log::warn!("[services] voice capture cleanup pending: {error}");

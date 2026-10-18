@@ -175,23 +175,6 @@ pub mod dictation_listener {
 }
 
 // ---------------------------------------------------------------------------
-// always_on::{start_if_enabled, stop}
-// ---------------------------------------------------------------------------
-
-pub mod always_on {
-    use crate::config::Config;
-
-    /// No-op: always-on listening does not exist when voice is disabled.
-    pub async fn start_if_enabled(_ctx: &crate::core::runtime::DispatchCtx, _config: &Config) {}
-
-    /// No-op: nothing to stop.
-    pub fn stop() {}
-
-    /// No-op: no module capture leases exist when voice is disabled.
-    pub async fn shutdown() {}
-}
-
-// ---------------------------------------------------------------------------
 // streaming::handle_dictation_ws (provided by the real voice host adapter)
 // ---------------------------------------------------------------------------
 

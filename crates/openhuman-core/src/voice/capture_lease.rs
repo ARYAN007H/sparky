@@ -22,7 +22,6 @@ const MODULE: &str = "tinyvoice";
 const READ_BYTES: usize = 256 * 1024;
 const MAX_OUTPUT_BYTES: usize = 32 * 1024 * 1024;
 static RECORDING_GENERATION: AtomicU64 = AtomicU64::new(0);
-static STREAM_GENERATION: AtomicU64 = AtomicU64::new(0);
 static NEXT_ID: AtomicU64 = AtomicU64::new(1);
 static LEASES: LazyLock<Mutex<HashMap<u64, Arc<State>>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
@@ -30,13 +29,11 @@ static HOOK: AtomicBool = AtomicBool::new(false);
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(super) enum Kind {
     Recording,
-    Stream,
 }
 impl Kind {
     fn generation(self) -> &'static AtomicU64 {
         match self {
             Self::Recording => &RECORDING_GENERATION,
-            Self::Stream => &STREAM_GENERATION,
         }
     }
 }
@@ -346,15 +343,8 @@ fn cleanup_result(result: CaptureResult<()>) -> Result<(), String> {
 pub(crate) async fn close_all() -> Result<(), String> {
     close_kind(None).await
 }
-pub(super) async fn close_streams() -> Result<(), String> {
-    close_kind(Some(Kind::Stream)).await
-}
 async fn close_kind(kind: Option<Kind>) -> Result<(), String> {
-    for candidate in [Kind::Recording, Kind::Stream] {
-        if kind.is_none_or(|kind| kind == candidate) {
-            candidate.generation().fetch_add(1, Ordering::SeqCst);
-        }
-    }
+    RECORDING_GENERATION.fetch_add(1, Ordering::SeqCst);
     let states: Vec<_> = LEASES
         .lock()
         .expect("capture lease registry poisoned")
