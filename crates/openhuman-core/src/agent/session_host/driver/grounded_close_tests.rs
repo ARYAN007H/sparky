@@ -354,11 +354,17 @@ fn supplemental_free_route_uses_zero_catalog_rates() {
     );
 
     let records = recorder.0.lock().unwrap();
-    let enrichment = records.iter().find_map(|event| match event {
-        AgentEvent::GenerationEnriched { enrichment, .. } => Some(enrichment),
-        _ => None,
-    }).expect("supplemental generation carries catalog enrichment");
-    let pricing = enrichment.pricing.as_ref().expect("free routes have known zero rates");
+    let enrichment = records
+        .iter()
+        .find_map(|event| match event {
+            AgentEvent::GenerationEnriched { enrichment, .. } => Some(enrichment),
+            _ => None,
+        })
+        .expect("supplemental generation carries catalog enrichment");
+    let pricing = enrichment
+        .pricing
+        .as_ref()
+        .expect("free routes have known zero rates");
     assert_eq!(pricing.input_per_mtok_usd, Some(0.0));
     assert_eq!(pricing.cached_input_per_mtok_usd, Some(0.0));
     assert_eq!(pricing.output_per_mtok_usd, Some(0.0));
