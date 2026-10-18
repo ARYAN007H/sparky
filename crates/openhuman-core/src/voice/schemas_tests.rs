@@ -195,7 +195,10 @@ fn voice_schema_wire_contracts_are_preserved() {
         .map(|controller| controller.schema.function)
         .collect();
     for expected in ["stt_dispatch", "tts_dispatch", "set_providers"] {
-        assert!(registered.contains(&expected), "voice.{expected} not registered");
+        assert!(
+            registered.contains(&expected),
+            "voice.{expected} not registered"
+        );
     }
     assert_eq!(
         all_voice_controller_schemas().len(),

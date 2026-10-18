@@ -1,8 +1,10 @@
 use super::*;
 
+use crate::core::all::{
+    assert_schema_contract, ControllerSchemaContract as Contract, SchemaFieldContract as Field,
+};
 use crate::tools::schemas::registry::tools_schemas;
 use serde_json::{json, Map};
-use crate::core::all::{assert_schema_contract, ControllerSchemaContract as Contract, SchemaFieldContract as Field};
 const BASE_CONTROLLERS: usize = 5;
 
 #[test]
@@ -31,11 +33,65 @@ fn apify_linkedin_scrape_controller_is_retired() {
 #[test]
 fn tools_schema_wire_contracts_are_preserved() {
     let contracts: &[(&str, &[Field], &[&str])] = &[
-        ("composio_execute", &[Field { name: "action", required: Some(true), type_debug: None }], &[]),
-        ("web_answer", &[Field { name: "query", required: Some(true), type_debug: None }, Field { name: "depth", required: None, type_debug: None }], &["citations"]),
-        ("web_contents", &[Field { name: "urls", required: Some(true), type_debug: None }], &[]),
-        ("searxng_search", &[Field { name: "query", required: Some(true), type_debug: None }, Field { name: "max_results", required: None, type_debug: None }], &[]),
-        ("web_search", &[Field { name: "query", required: Some(true), type_debug: None }], &["provider"]),
+        (
+            "composio_execute",
+            &[Field {
+                name: "action",
+                required: Some(true),
+                type_debug: None,
+            }],
+            &[],
+        ),
+        (
+            "web_answer",
+            &[
+                Field {
+                    name: "query",
+                    required: Some(true),
+                    type_debug: None,
+                },
+                Field {
+                    name: "depth",
+                    required: None,
+                    type_debug: None,
+                },
+            ],
+            &["citations"],
+        ),
+        (
+            "web_contents",
+            &[Field {
+                name: "urls",
+                required: Some(true),
+                type_debug: None,
+            }],
+            &[],
+        ),
+        (
+            "searxng_search",
+            &[
+                Field {
+                    name: "query",
+                    required: Some(true),
+                    type_debug: None,
+                },
+                Field {
+                    name: "max_results",
+                    required: None,
+                    type_debug: None,
+                },
+            ],
+            &[],
+        ),
+        (
+            "web_search",
+            &[Field {
+                name: "query",
+                required: Some(true),
+                type_debug: None,
+            }],
+            &["provider"],
+        ),
     ];
     for (function, inputs, outputs) in contracts {
         let contract = Contract {
@@ -61,4 +117,3 @@ fn optional_string_array_trims_and_drops_blank_entries() {
 
     assert_eq!(values, vec!["web", "news"]);
 }
-

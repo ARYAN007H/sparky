@@ -1,5 +1,7 @@
 use super::*;
-use crate::core::all::{assert_schema_contract, ControllerSchemaContract as Contract, SchemaFieldContract as Field};
+use crate::core::all::{
+    assert_schema_contract, ControllerSchemaContract as Contract, SchemaFieldContract as Field,
+};
 use crate::core::runtime::DispatchCtx;
 
 #[test]
@@ -11,8 +13,16 @@ fn mcp_ui_schema_contracts_are_preserved() {
         input_order: None,
         required_input_order: Some(&["server_id", "tool_name"]),
         inputs: &[
-            Field { name: "server_id", required: Some(true), type_debug: None },
-            Field { name: "tool_name", required: Some(true), type_debug: None },
+            Field {
+                name: "server_id",
+                required: Some(true),
+                type_debug: None,
+            },
+            Field {
+                name: "tool_name",
+                required: Some(true),
+                type_debug: None,
+            },
         ],
         output_fields: &[],
         outputs: None,

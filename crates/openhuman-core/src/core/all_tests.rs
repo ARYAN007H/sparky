@@ -132,7 +132,10 @@ fn registered_controller_schemas_are_consistent_and_serializable() {
                 .iter()
                 .find(|field| field["name"] == input.name);
             let matching = matching.unwrap_or_else(|| {
-                panic!("{method} input `{}` is missing from serialized schema", input.name)
+                panic!(
+                    "{method} input `{}` is missing from serialized schema",
+                    input.name
+                )
             });
             assert_eq!(
                 matching["required"], input.required,
