@@ -13,7 +13,6 @@ pub fn read_workflow_resource(
         workspace_dir,
         skill_id,
         relative_path,
-        &ctx,
         DiscoveryGate::from_dispatch(&ctx),
         super::api::discovery_home_dir(),
     )
@@ -37,7 +36,6 @@ pub fn read_workflow_resource_for(
         &config.workspace_dir,
         skill_id,
         relative_path,
-        ctx,
         DiscoveryGate::from_config(ctx, config, None),
         home,
     )
@@ -47,7 +45,6 @@ fn read_workflow_resource_with_gate(
     workspace_dir: &Path,
     skill_id: &str,
     relative_path: &Path,
-    ctx: &crate::core::runtime::DispatchCtx,
     gate: DiscoveryGate,
     home: Option<std::path::PathBuf>,
 ) -> Result<String, String> {
@@ -72,6 +69,5 @@ fn read_workflow_resource_with_gate(
             relative_path,
         );
     }
-    let _ = ctx;
     tinyskills::read_resource(&skill, relative_path).map_err(|error| error.to_string())
 }
