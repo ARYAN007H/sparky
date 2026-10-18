@@ -558,7 +558,10 @@ pub(crate) async fn dispatch_subagent_with_live_parent(
                                     worktree_path: None,
                                     changed_files: Vec::new(),
                                     dirty_status: None,
-                                    stop: incomplete_stop(reason),
+                                    stop: incomplete_stop(
+                                        reason,
+                                        outcome.failure_cause.clone(),
+                                    ),
                                 })
                                 .await;
                         }
@@ -576,6 +579,7 @@ pub(crate) async fn dispatch_subagent_with_live_parent(
                         &outcome.agent_id,
                         &outcome.task_id,
                         reason,
+                        outcome.failure_cause.clone(),
                         incomplete_envelope(tool_name, reason, &outcome.output, mode),
                     ))
                 }
