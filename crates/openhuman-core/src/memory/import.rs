@@ -3,7 +3,7 @@
 //! The driver (batching, checkpoints, backoff, failed-item list, retry) is
 //! `tinymemory_integrations::import::Importer`. This file is the host
 //! adapter around it: the consent gate, the one-run-per-workspace registry,
-//! the atomic state file `<workspace>/memory/import_state.json`, the tokio
+//! the durable state value `import_state`, the tokio
 //! clock, the scheduler pause, the credits resume policy, and what follows a
 //! finished import (organizing the tree).
 
@@ -52,9 +52,9 @@ fn release(workspace_dir: &Path) {
         .remove(workspace_dir);
 }
 
-/// The state file, written atomically (staged, synced, renamed): a crash
-/// mid-write leaves the previous state, never a torn file that reads back as
-/// a fresh start and re-sends everything.
+/// The `import_state` value in the memory state KV store. The first read
+/// imports a legacy workspace file; later reads and writes use the storage
+/// port, so a crash cannot turn a partial file write into a fresh start.
 pub(crate) struct StateKvCheckpointStore {
     workspace_dir: PathBuf,
 }

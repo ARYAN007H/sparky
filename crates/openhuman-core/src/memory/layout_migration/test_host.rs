@@ -17,7 +17,7 @@ use super::state::StateKvMigrationStore;
 use crate::config::Config;
 
 /// Two in-memory engines and the switches a real host keeps, with the real
-/// file-backed state of the config's workspace.
+/// state KV value of the config's workspace.
 pub(crate) struct FakeHost {
     pub(crate) legacy: Arc<ReferenceEngine>,
     pub(crate) tree: Arc<ReferenceEngine>,

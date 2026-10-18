@@ -1,5 +1,5 @@
-//! The migration's state, the `memory`/`state`/`layout_migration` storage
-//! value (once `<workspace>/memory/layout_migration.json`).
+//! The migration's `layout_migration` value in the memory state KV store.
+//! The first read imports the legacy `<workspace>/memory/layout_migration.json`.
 //!
 //! Written whole after every page, so a crash leaves the previous state or
 //! the new one, never a torn value.
@@ -28,6 +28,10 @@ pub fn exists(workspace_dir: &Path) -> bool {
 pub struct StateKvMigrationStore {
     workspace_dir: PathBuf,
 }
+
+/// Backwards-compatible name for [`StateKvMigrationStore`].
+#[deprecated(note = "use StateKvMigrationStore; it persists through the memory state KV port")]
+pub type FileStateStore = StateKvMigrationStore;
 
 impl StateKvMigrationStore {
     /// The store of `workspace_dir`.
