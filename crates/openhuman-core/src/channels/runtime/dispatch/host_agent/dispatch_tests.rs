@@ -7,12 +7,13 @@ use crate::agent::bus::{mock_agent_run_turn, AgentTurnRequest, AgentTurnResponse
 use crate::agent::host_agents::{self, HostAgent, HostAgentResolver};
 use crate::channels::context::{ChannelRuntimeContext, CHANNEL_MESSAGE_TIMEOUT_SECS};
 use crate::channels::runtime::process_channel_message;
-use crate::channels::{traits, Channel, SendMessage};
+use crate::channels::{Channel, SendMessage};
 use crate::core::runtime::{CoreContext, DomainSet};
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
+use tinychannels_bus as traits;
 use tinytools::{PermissionLevel, Tool, ToolResult};
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
@@ -63,6 +64,7 @@ fn context(channel: Arc<Telegram>, config: Config) -> Arc<ChannelRuntimeContext>
         multimodal: crate::config::MultimodalConfig::default(),
         multimodal_files: crate::config::MultimodalFileConfig::default(),
         config: Some(Arc::new(config)),
+        core: None,
     })
 }
 
@@ -202,15 +204,15 @@ impl HostAgentResolver for OneHostAgent {
             return None;
         }
         let mut definition =
-            crate::agent::harness::definition::AgentDefinitionRegistry::builtins_only()
+            crate::agent::harness::host_definition::AgentDefinitionRegistry::builtins_only()
                 .get("orchestrator")
                 .cloned()
                 .unwrap();
         definition.id = agent_id.to_string();
         definition.subagents.clear();
         definition.system_prompt =
-            crate::agent::harness::definition::PromptSource::Inline("TEENY_CHAT_PROMPT".into());
-        definition.tools = crate::agent::harness::definition::ToolScope::Named(vec![
+            tinyagents_definition::PromptSource::Inline("TEENY_CHAT_PROMPT".into());
+        definition.tools = tinyagents_definition::ToolScope::Named(vec![
             "teeny_read".into(),
             "teeny_write".into(),
         ]);
@@ -318,7 +320,8 @@ async fn bound_channel_runs_its_host_agent() {
     let tmp = tempfile::tempdir().unwrap();
     // Every host boots the definition registry; a session's hosted authority
     // is built from it.
-    crate::agent::harness::AgentDefinitionRegistry::init_global_builtins().unwrap();
+    crate::agent::harness::host_definition::AgentDefinitionRegistry::init_global_builtins()
+        .unwrap();
     let mut agent_config = config(&tmp, None);
     agent_config.default_model = Some("fixture".into());
     let route = crate::config::schema::EphemeralRoute::from_params(

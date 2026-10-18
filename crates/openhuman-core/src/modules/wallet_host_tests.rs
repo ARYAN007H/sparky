@@ -23,19 +23,29 @@ fn x402_approval_is_bound_to_the_exact_chat_owner_and_payment_facts() {
             client_id: "client-1".into(),
         }),
     };
-    let context = crate::security::approval::ApprovalChatContext {
-        thread_id: "thread-1".into(),
-        client_id: "client-1".into(),
+    let origin = |thread: &str, client: &str| crate::agent::turn_origin::AgentTurnOrigin::WebChat {
+        thread_id: thread.into(),
+        client_id: client.into(),
         request_id: Some("request-1".into()),
     };
-    assert!(x402_request_owner_matches(&request, &context));
-
-    let mut other_client = context.clone();
-    other_client.client_id = "client-2".into();
-    assert!(!x402_request_owner_matches(&request, &other_client));
-    let mut other_thread = context.clone();
-    other_thread.thread_id = "thread-2".into();
-    assert!(!x402_request_owner_matches(&request, &other_thread));
+    assert!(x402_request_owner_matches(
+        &request,
+        Some(&origin("thread-1", "client-1"))
+    ));
+    assert!(!x402_request_owner_matches(
+        &request,
+        Some(&origin("thread-1", "client-2"))
+    ));
+    assert!(!x402_request_owner_matches(
+        &request,
+        Some(&origin("thread-2", "client-1"))
+    ));
+    // Only a WebChat turn can own an x402 payment: another origin, or none, never matches.
+    assert!(!x402_request_owner_matches(
+        &request,
+        Some(&crate::agent::turn_origin::AgentTurnOrigin::Cli)
+    ));
+    assert!(!x402_request_owner_matches(&request, None));
 
     assert_eq!(
         x402_approval_facts(&request),
@@ -201,6 +211,95 @@ fn module_selected_rpc_endpoints_are_public_http_urls_without_credentials() {
             "accepted unsafe endpoint {unsafe_url}"
         );
     }
+}
+
+#[test]
+fn native_solana_approval_accepts_the_exact_typed_transfer_for_its_quote() {
+    let quote = PreparedTransaction {
+        quote_id: "solana-native-quote".into(),
+        kind: PreparedKind::NativeTransfer,
+        chain: WalletChain::Solana,
+        evm_network: None,
+        from_address: "sender".into(),
+        to_address: "recipient".into(),
+        asset_symbol: "SOL".into(),
+        amount_raw: "1000".into(),
+        amount_formatted: "0.000001".into(),
+        receive_symbol: None,
+        min_receive_raw: None,
+        calldata: None,
+        token_address: None,
+        estimated_fee_raw: "5000".into(),
+        status: PreparedStatus::AwaitingConfirmation,
+        created_at_ms: 1,
+        expires_at_ms: u64::MAX,
+        notes: vec![],
+    };
+    let permit = ApprovalPermit::new(
+        ApprovalKind::Native,
+        &quote.quote_id,
+        Some(quote.clone()),
+        None,
+    );
+    let request = AuthorizeNativeWalletExecutionRequest {
+        quote_id: quote.quote_id.clone(),
+        operation: "transfer".into(),
+        quote: quote.clone(),
+        intent: NativeWalletExecutionIntent::Transaction {
+            transaction: TransactionSpec::Solana {
+                from: quote.from_address.clone(),
+                to: quote.to_address.clone(),
+                lamports: 1000,
+                recent_blockhash: "recent-blockhash".into(),
+            },
+        },
+    };
+
+    assert!(native_approval_matches_request(&quote, &request));
+    assert!(!consume_approval(ApprovalKind::Native, &quote.quote_id));
+    drop(permit);
+}
+
+#[test]
+fn native_solana_approval_rejects_an_unverified_signed_message() {
+    let quote = PreparedTransaction {
+        quote_id: "solana-native-opaque-quote".into(),
+        kind: PreparedKind::NativeTransfer,
+        chain: WalletChain::Solana,
+        evm_network: None,
+        from_address: "sender".into(),
+        to_address: "recipient".into(),
+        asset_symbol: "SOL".into(),
+        amount_raw: "1000".into(),
+        amount_formatted: "0.000001".into(),
+        receive_symbol: None,
+        min_receive_raw: None,
+        calldata: None,
+        token_address: None,
+        estimated_fee_raw: "5000".into(),
+        status: PreparedStatus::AwaitingConfirmation,
+        created_at_ms: 1,
+        expires_at_ms: u64::MAX,
+        notes: vec![],
+    };
+    let permit = ApprovalPermit::new(
+        ApprovalKind::Native,
+        &quote.quote_id,
+        Some(quote.clone()),
+        None,
+    );
+    let request = AuthorizeNativeWalletExecutionRequest {
+        quote_id: quote.quote_id.clone(),
+        operation: "transfer".into(),
+        quote: quote.clone(),
+        intent: NativeWalletExecutionIntent::SolanaMessage {
+            message_hex: "010203".into(),
+        },
+    };
+
+    assert!(!native_approval_matches_request(&quote, &request));
+    assert!(!consume_approval(ApprovalKind::Native, &quote.quote_id));
+    drop(permit);
 }
 
 fn native_quote(quote_id: &str) -> PreparedTransaction {

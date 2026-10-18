@@ -2,24 +2,29 @@
 
 The process's storage backend on the
 [tinystoragedrivers](https://github.com/tinyhumansai/tinystoragedrivers)
-ports, vendored through `vendor/tinyagents/vendor/tinystoragedrivers`.
+ports, vendored at `vendor/tinystoragedrivers` (v0.11.0). The host and every module declare it by git tag and the root and app `[patch]` tables redirect them all onto that checkout, so the build holds one copy (`scripts/ci/check-storage-owner.mjs` enforces it).
 
 One URL picks it: `OPENHUMAN_STORAGE_URL`, else `[storage] url` in
 `config.toml` (`config::StorageConfig`), else the default,
-`sqlite:<workspace_dir>` (`storage::config`).
+`sqlite:<workspace_dir>/storage` (`storage::config`). Every host opens that URL
+at startup and installs it (`install_for_url`), and every store, the session
+store included, reads from it. There is no second layout: what older installs
+wrote (the per-domain `.db` files, JSONL transcripts and turn-state JSON) is
+imported once, read-only, by `import/`. The `classic` opt-out is retired; the
+value is read as unset, with a warning.
 
-The default installs no process-wide backend. The large relational stores
-(`sessions.db`, `flows.db`, `jobs.db`, `graph_checkpoints.db`) keep serving
-their own SQLite files as they always have, so nothing is migrated or
-duplicated. The small stores (approvals, devices, notifications, task
-sources) keep their rows as document tables inside their existing `.db` file
-(`approval/approval.db`, `devices/devices.db`, `notifications/notifications.db`,
-`task_sources/sources.db`): the first call in a process opens it with the
-SQLite driver and `storage::local` imports the rows of the old tables, then
-renames them to `_legacy_<name>` and keeps them for one release. The legacy
-code paths stay for reading old data during that import, for builds without
-`storage-sqlite`, for SaaS, and for the opt-out: `OPENHUMAN_STORAGE_URL=classic`
-(or `[storage] url = "classic"`) keeps the pure legacy tables untouched.
+The default belongs to the **workspace**, so a different workspace is a
+different database. When a different user signs in, `rebind::rebind` (called
+first by `rebind_after_credential_change`) re-resolves the URL for the new
+workspace, opens its backend, points the session store (`ReboundSessionStores`)
+and the process slot at it together, then runs the importers over the new
+workspace. An explicit URL names one backend for every user and is never
+replaced; a failed reopen is an error and leaves the previous backend in place.
+
+With no backend installed (a unit test, an embedder that skipped the host
+boot, a SaaS core with no URL) a store opens the **same default** for its own
+workspace on first use (`local::backend_for`), once per workspace for the life
+of the process, so no store has a file-shaped implementation of its own.
 
 | URL | Driver | Cargo feature |
 | --- | --- | --- |
@@ -33,13 +38,61 @@ A URL for a driver the build lacks fails at `open`, naming the feature.
 always compiled in; `storage-mongodb` is in neither, a cloud build turns it
 on.
 
+## Legacy import
+
+`import/` copies the legacy files into an installed backend once, read-only
+(see the module doc and the architecture page): the four small stores'
+SQLite files, the tinyflows stores, and the sessions. The
+core calls `import::run` from `bootstrap_core_runtime` before any domain store
+opens, and `rebind::rebind` calls `run_all` for a newly bound workspace;
+`run_with` takes an explicit backend for tests. The tinyflows stores (cron
+jobs with their runs and policies, the flow catalog with its drafts, and flow
+checkpoints) are copied by `import::tinyflows` with `tinyflows-import`, which
+keeps ids, writes only what is absent and reads copies of the files; a build
+without the `flows` gate imports no cron jobs. Sessions (`import::sessions`) go
+through TinyAgents' `legacy` importer, which owns those formats: the run ledger
+from a `VACUUM INTO` snapshot of `session_db/sessions.db`, each
+`session_raw` transcript into the scope of the agent its stem names (matched
+against the known definitions, else the default agent), and the turn-state
+JSON into the default agent. Each importer records a `tsd.migrations` entry per workspace, so a
+record deleted afterwards is not resurrected from the untouched legacy file.
+
+## Runtime state values
+
+Small pieces of runtime state that used to be one JSON file each live in
+`tsd.kv` through `state_kv::StateKv` (one `(owner, namespace)` per domain, one
+entry per value, in the acting scope): the memory domain's `jobs`,
+`channel_threads`, `pending_deletions`, `sources_state`, `import_state`,
+`conversations_backfill`, `layout_migration`, `local_root` and tool-write
+outbox partitions (`memory::state_store`), the sub-agent lifecycle records
+(`agent::subagent_host::lifecycle_store`) and the computer site memory
+(`modules::site_memory_host`). The first read in a backend copies the legacy
+file once (`StateKv::import_file` / `import_once`: an existing entry wins, a
+`tsd.migrations` entry stops a re-import from resurrecting a deleted value, the
+file stays in place for the legacy archive step). A value a damaged file must
+not reset (`layout_migration`, `local_root`, the tool-write outbox) uses the
+strict import, which fails closed on an unparsable file.
+
+## Layout migration
+
+`layout/` moves a layout-v1 profile (`users/<id>/workspace/`) to v2
+(`users/<id>/storage.db` + `files/`): lock, import the legacy files, migrate
+the schema, `VACUUM INTO` the database (counts verified), move user files into
+`files/`, write and verify `<root>/backups/<user>-<ts>.tar.zst`, then write the
+`.layout` marker and delete only the archived originals. Progress is in
+`users/<id>/.layout.state`; every step is idempotent, so a crash resumes.
+Controllers: `storage.migrate {dry_run}`, `storage.status`,
+`storage.restore {archive}`. `[storage] auto_migrate_layout = true` runs it at
+boot. No-op for SaaS, an explicit storage URL (including MongoDB) and v2. Run
+it with the core stopped.
+
 ## Entry points
 
 - `configured_url(&Config)` / `url_from(env, &Config)`: the URL in effect.
 - `open(url)`: parse and open a backend (credentials are redacted in logs).
 - `install(backend)` / `installed()` / `clear()`: the process slot domains
   read the backend from.
-- `scope_for_agent(agent_id)`: the storage scope an agent's records live
+- `scope_for_agent(agent_id)`: the storage scope (`local/agent:<id>`) an agent's records live
   under, the same mapping TinyAgents' `DriverSessionStores` uses, so every
   domain agrees.
 - `driver_is_shared(driver)` / `installed_is_shared()`: whether other
@@ -49,10 +102,17 @@ on.
   that driver is atomic across processes (MongoDB, SQLite), which a
   clustered node's leases need. Memory and file drivers coordinate only
   within one process.
+- `blob_sweep`: reclaims expired blobs (`StorageBackend::sweep_expired_blobs`)
+  for `local`, each known agent scope and each provisioned SaaS profile
+  (`u:<id>` plus the blob-owning modules' scopes for it) every hour,
+  spawned with the cron `ServiceSet` switch (`core::runtime::services`; not
+  gated on `[cron] enabled`, since it reclaims storage rather than running
+  jobs). Each scope's sweep is bounded by `SCOPE_SWEEP_TIMEOUT`; a timeout
+  counts as a failed sweep and is retried on the next tick.
 - `fence` / `fenced_backend`: lease-epoch write fencing (see
   [Write fencing](#write-fencing)).
 - `scope_for_profile(profile_id)`: the scope a SaaS profile's records live
-  under (`profile:<id>`, hashed when that is not a valid scope).
+  under (`u:<id>`; tsd hashes the segment when it is not valid).
 - `current_scope()` / `current_scoped()`: the tenant's scope — its profile's
   when it serves one, else the acting agent's, else `local` on a single-user
   host; an error in SaaS mode without a profile — and the installed backend
@@ -61,8 +121,40 @@ on.
   one shared runtime thread.
 - `documents::Repo` and `documents::compare_and_swap`: the base the domain
   stores build on. A `Repo` holds one domain's scoped document handle,
-  declares its collections and runs each call; `compare_and_swap` is the
-  guarded-`UPDATE` loop.
+  declares its collections and runs each call on the blocking bridge;
+  `compare_and_swap` is tsd's `Repo::update` with its default `RetryPolicy`,
+  so the host keeps no retry loop of its own.
+- `import_state`: where a one-time importer records that it finished
+  (`tsd.migrations`, `Migrations::mark_done`) and the claim that serialises
+  two processes (`Leases` on `tsd.leases`). `migrate_legacy_markers` turns the
+  marker rows older builds wrote (`storage_import`, `threads_import`,
+  `subagent_sessions_import`, `composio_state_import`, `*_host_import`) into
+  the same entries at boot, so an installed profile is not imported again.
+- `schema_support`: owner, time and id helpers the host domains' v1 -> v2
+  steps share. Each host domain declares its own `storage_schema()` (owners
+  `approvals`, `devices`, `notifications`, `task_sources`, `artifacts`, `cost`,
+  `config`, `profiles`, `threads`, `subagents`, `agents`), composed in
+  `schema.rs`. `host_importers` moves the v1 data whose v2 home is another
+  owner's collection (`composio_state` into `tsd.kv`).
+
+## Storage for loadable modules
+
+A loaded module does not hold storage handles. It calls the bus interface
+`ai.tinyhumans.tinystorage.Storage` (`modules::storage_host`), which answers
+from the installed backend:
+
+- the scope is derived by the host from the broker-authenticated caller (module
+  id) and the host's current scope, never taken from the request (the wire types
+  reject unknown fields, so a forged `scope` is a decode failure);
+- the module's grant (`modules::storage_grants::StorageGrant`: collections with
+  their schema, stream, blob and secret-name prefixes, read-only or writable)
+  is enforced on every call, and only the host runs `ensure_collection`;
+- the backend is the fenced one (`open` wraps it), and a profile's module scope
+  sits under the profile's session-key prefix so its lease fence covers it;
+- each call produces one audit line without a payload.
+
+No module declares a grant yet, so none has storage. Bus streams for large
+blobs and watch signals are not served yet.
 
 ## Leases
 
@@ -173,8 +265,8 @@ without fencing).
 - The session store: `openhuman_rpc::session_store::install_for_host` opens
   the configured backend before boot and installs `DriverSessionStores`
   over it. See that module's README.
-- Domain stores that switch to the document port when a backend is
-  installed, each in a `store_documents.rs` beside its SQLite `store.rs`:
+- Domain stores on the document port, each in a `store_documents.rs` (the
+  legacy SQLite reader lives in its `store_import.rs`):
   approvals (`security::approval`), paired devices (`security::devices`),
   notifications (`desktop::notifications`) and task sources
   (`integrations::task_sources`).
@@ -240,3 +332,11 @@ the session store over them is `tinyagents-session`. This domain only
 resolves the URL, opens the backend, and holds it for the process. The
 `[storage]` section is bootstrap configuration and is never read from
 storage itself.
+
+## Schema, scopes and boot
+
+- `scope.rs`: the one scope grammar (`tenant_scope`, `scope_for_profile`, `scope_for_agent`, `scope_for_module`), built on tsd's `Scope::tenant/local/agent/module`.
+- `schema.rs`: `owner_schemas()` and the composed `registry()`; `module_items(owner)` feeds the generated module grants.
+- `boot.rs`: `prepare_and_migrate`, called by `open`: prepare, scope move, then per scope the importers and `Registry::migrate`.
+- `scope_move.rs`: the resumable copy of v1 scopes (`profile:`, `<profile>~<agent>`, raw agent ids, `module:<id>@<base>`, the `*-sha256:` fallbacks) into the v2 scopes.
+- The generated reference is `docs/storage-schema.md`; `node scripts/ci/check-storage-schema.mjs` lints it.

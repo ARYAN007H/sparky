@@ -12,13 +12,8 @@ pub struct AgentMcpCleanup {
 /// Retire the existing configured client for this exact agent directory.
 /// An absent entry requires no cleanup and leaves the module loader untouched.
 pub fn take_agent_cleanup(workspace: &std::path::Path, agent_id: &str) -> Option<AgentMcpCleanup> {
-    let directory = workspace.join("agents").join(agent_id);
-    let clients = CLIENTS
-        .get()?
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner);
-    let client = Arc::clone(clients.get(&directory)?);
-    client.retiring.store(true, Ordering::Release);
+    let directory = super::lifecycle::client_key(&workspace.join("agents").join(agent_id));
+    let client = super::lifecycle::table().retire(&directory)?;
     Some(AgentMcpCleanup { directory, client })
 }
 
@@ -41,7 +36,7 @@ impl AgentMcpCleanup {
         let Ok(state) = self.client.state.try_lock() else {
             return false;
         };
-        if !matches!(*state, State::Closed) {
+        if !state.is_closed() {
             return false;
         }
         self.evict();
@@ -49,17 +44,6 @@ impl AgentMcpCleanup {
     }
 
     fn evict(&self) {
-        let Some(clients) = CLIENTS.get() else {
-            return;
-        };
-        let mut clients = clients
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
-        if clients
-            .get(&self.directory)
-            .is_some_and(|current| Arc::ptr_eq(current, &self.client))
-        {
-            clients.remove(&self.directory);
-        }
+        super::lifecycle::table().evict(&self.directory, &self.client);
     }
 }

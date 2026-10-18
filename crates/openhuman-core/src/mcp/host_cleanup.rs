@@ -1,33 +1,56 @@
 //! Process-local host cleanup fencing, also used when MCP is compiled out.
-use crate::modules::client::ModuleCallError;
 use std::{
-    collections::HashMap,
     path::PathBuf,
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc, Mutex, OnceLock,
-    },
+    sync::{Arc, OnceLock},
 };
+use tinybus::module::ModuleCallError;
+use tinymcp_bus::client_lifecycle::{CleanupReservation, ClientTable};
 
-pub(super) type CleanupAction = Arc<dyn Fn() -> bool + Send + Sync>;
-
-#[derive(Default)]
-pub(super) struct CleanupReservation {
-    pub(super) after_close: Mutex<Option<CleanupAction>>,
-    pub(super) host_completion_pending: AtomicBool,
+#[cfg(feature = "mcp")]
+type CleanupClient = super::module_client::McpConfiguredClient;
+#[cfg(not(feature = "mcp"))]
+pub(super) struct CleanupClient;
+#[cfg(not(feature = "mcp"))]
+impl tinymcp_bus::client_lifecycle::Retire for CleanupClient {
+    fn mark_retiring(&self) {}
+    fn is_retiring(&self) -> bool {
+        false
+    }
+}
+static CLIENTS: OnceLock<ClientTable<CleanupClient>> = OnceLock::new();
+pub(super) fn table() -> &'static ClientTable<CleanupClient> {
+    CLIENTS.get_or_init(ClientTable::new)
 }
 
-pub(super) static CLEANUP_RESERVATIONS: OnceLock<Mutex<HashMap<PathBuf, Arc<CleanupReservation>>>> =
-    OnceLock::new();
+pub(super) fn directory_key(directory: &std::path::Path) -> PathBuf {
+    #[cfg(feature = "mcp")]
+    {
+        super::module_client::lifecycle::client_key(directory)
+    }
+    #[cfg(not(feature = "mcp"))]
+    {
+        let mut missing = Vec::new();
+        let mut ancestor = directory;
+        loop {
+            if let Ok(real) = ancestor.canonicalize() {
+                return missing
+                    .iter()
+                    .rev()
+                    .fold(real, |path, part| path.join(part));
+            }
+            match (ancestor.parent(), ancestor.file_name()) {
+                (Some(parent), Some(name)) => {
+                    missing.push(name.to_owned());
+                    ancestor = parent;
+                }
+                _ => return directory.to_path_buf(),
+            }
+        }
+    }
+}
 
-#[cfg(not(feature = "mcp"))]
 pub(super) fn directory_pending(workspace: &std::path::Path, agent_id: &str) -> bool {
-    CLEANUP_RESERVATIONS.get().is_some_and(|reservations| {
-        reservations
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .contains_key(&workspace.join("agents").join(agent_id))
-    })
+    table().close_pending(&directory_key(&workspace.join("agents").join(agent_id)))
 }
 
 /// Run captured cleanup on the process module executor when modules are enabled.
@@ -42,7 +65,7 @@ where
 {
     #[cfg(feature = "modules")]
     {
-        crate::modules::host::spawn_cleanup(future).map_err(|_| ModuleCallError::TransportFailed)
+        crate::modules::runtime::spawn_cleanup(future).map_err(|_| ModuleCallError::TransportFailed)
     }
     #[cfg(not(feature = "modules"))]
     {
@@ -66,19 +89,8 @@ pub fn reserve_agent_directory(
     workspace: &std::path::Path,
     agent_id: &str,
 ) -> AgentDirectoryCleanup {
-    let directory = workspace.join("agents").join(agent_id);
-    let mut reservations = CLEANUP_RESERVATIONS
-        .get_or_init(|| Mutex::new(HashMap::new()))
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner);
-    let reservation = Arc::clone(
-        reservations
-            .entry(directory.clone())
-            .or_insert_with(|| Arc::new(CleanupReservation::default())),
-    );
-    reservation
-        .host_completion_pending
-        .store(true, Ordering::Release);
+    let directory = directory_key(&workspace.join("agents").join(agent_id));
+    let reservation = table().reserve_host_completion(&directory);
     AgentDirectoryCleanup {
         directory,
         reservation,
@@ -89,26 +101,7 @@ impl AgentDirectoryCleanup {
     /// Release this exact reservation after module close and host purge succeed.
     /// An independently registered canonical callback keeps its own reservation.
     pub fn complete(&self) {
-        let after_close = self
-            .reservation
-            .after_close
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
-        let mut reservations = CLEANUP_RESERVATIONS
-            .get_or_init(|| Mutex::new(HashMap::new()))
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
-        if reservations
-            .get(&self.directory)
-            .is_some_and(|current| Arc::ptr_eq(current, &self.reservation))
-        {
-            self.reservation
-                .host_completion_pending
-                .store(false, Ordering::Release);
-            if after_close.is_none() {
-                reservations.remove(&self.directory);
-            }
-        }
+        table().complete_host_cleanup(&self.directory, &self.reservation);
     }
 }
 

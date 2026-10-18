@@ -60,7 +60,7 @@ async fn failed_agent_cleanup_retains_the_retired_owner_and_can_retry() {
         .await
         .unwrap();
     service.request_name(names::INTERFACE).await.unwrap();
-    let port = TinyMcpPort::new(ModuleClient::fixture(
+    let port = TinyMcpPort::new(crate::modules::ops::fixture_client(
         caller
             .proxy(names::INTERFACE, names::OBJECT_PATH, names::INTERFACE)
             .unwrap(),
@@ -70,31 +70,18 @@ async fn failed_agent_cleanup_retains_the_retired_owner_and_can_retry() {
         directory.to_str().unwrap().into(),
         Box::new(port),
     ));
-    *client.state.lock().await = State::Open(OpenObject {
+    *client.state.lock().await = opened_state(tinymcp_bus::client_lifecycle::OpenObject {
         config: McpClientConfig::default(),
         object_path: "/test/original-child".into(),
     });
-    CLIENTS
-        .get_or_init(|| Mutex::new(HashMap::new()))
-        .lock()
-        .unwrap()
-        .insert(directory.clone(), Arc::clone(&client));
+    lifecycle::table().insert(directory.clone(), Arc::clone(&client));
     let cleanup = agent_cleanup::take_agent_cleanup(scratch.path(), "worker").unwrap();
     fixture.fail_close.store(true, Ordering::SeqCst);
     assert_eq!(cleanup.finish().await, Err(ModuleCallError::ModuleFault));
-    assert!(Arc::ptr_eq(
-        CLIENTS
-            .get()
-            .unwrap()
-            .lock()
-            .unwrap()
-            .get(&directory)
-            .unwrap(),
-        &client
-    ));
+    assert!(Arc::ptr_eq(cached(&directory).as_ref().unwrap(), &client));
     assert!(matches!(
-        &*client.state.lock().await,
-        State::StartingClose(_)
+        client.state.lock().await.close_step(),
+        Step::CallClose
     ));
     assert_eq!(
         client
@@ -104,42 +91,23 @@ async fn failed_agent_cleanup_retains_the_retired_owner_and_can_retry() {
     );
     fixture.fail_close.store(false, Ordering::SeqCst);
     cleanup.finish().await.unwrap();
-    assert!(!CLIENTS
-        .get()
-        .unwrap()
-        .lock()
-        .unwrap()
-        .contains_key(&directory));
+    assert!(!cached(&directory).is_some());
     // Retrying the old completed handle cannot evict a later owner.
     let successor = Arc::new(McpConfiguredClient::new(&directory, &Config::default()).unwrap());
-    CLIENTS
-        .get()
-        .unwrap()
-        .lock()
-        .unwrap()
-        .insert(directory.clone(), Arc::clone(&successor));
+    lifecycle::table().insert(directory.clone(), Arc::clone(&successor));
     assert!(cleanup.finish_if_idle());
     assert!(Arc::ptr_eq(
-        CLIENTS
-            .get()
-            .unwrap()
-            .lock()
-            .unwrap()
-            .get(&directory)
-            .unwrap(),
+        cached(&directory).as_ref().unwrap(),
         &successor
     ));
-    CLIENTS.get().unwrap().lock().unwrap().remove(&directory);
+    lifecycle::table().evict(&directory, cached(&directory).as_ref().unwrap());
 }
 
 #[test]
 fn an_absent_agent_cleanup_does_not_create_a_configured_client() {
     let scratch = tempfile::tempdir().unwrap();
     assert!(agent_cleanup::take_agent_cleanup(scratch.path(), "never-opened").is_none());
-    assert!(CLIENTS.get().is_none_or(|clients| !clients
-        .lock()
-        .unwrap()
-        .contains_key(&scratch.path().join("agents/never-opened"))));
+    assert!(cached(&scratch.path().join("agents/never-opened")).is_none());
 }
 
 #[tokio::test]
@@ -167,9 +135,7 @@ async fn an_old_closed_context_cannot_create_the_reused_agents_first_client() {
     })
     .await;
     let directory = config.workspace_dir.join("agents/worker");
-    assert!(CLIENTS
-        .get()
-        .is_none_or(|clients| !clients.lock().unwrap().contains_key(&directory)));
+    assert!(cached(&directory).is_none());
     let mut new_overlay =
         ContextOverlay::new(config.clone(), DomainSet::full(), ToolGroups::none())
             .session_agent("worker");
@@ -214,7 +180,7 @@ async fn cancelled_close_retries_its_receipt_on_the_original_owner() {
             .unwrap();
     }
     original.request_name(names::INTERFACE).await.unwrap();
-    let port = TinyMcpPort::new(ModuleClient::fixture(
+    let port = TinyMcpPort::new(crate::modules::ops::fixture_client(
         caller
             .proxy(names::INTERFACE, names::OBJECT_PATH, names::INTERFACE)
             .unwrap(),
@@ -227,7 +193,7 @@ async fn cancelled_close_retries_its_receipt_on_the_original_owner() {
         "/test/agent".into(),
         Box::new(port),
     ));
-    *client.state.lock().await = State::Open(OpenObject {
+    *client.state.lock().await = opened_state(tinymcp_bus::client_lifecycle::OpenObject {
         config: McpClientConfig::default(),
         object_path: "/test/original-child".into(),
     });
@@ -247,8 +213,9 @@ async fn cancelled_close_retries_its_receipt_on_the_original_owner() {
     closing.abort();
     assert!(closing.await.unwrap_err().is_cancelled());
     original_fixture.release_close_poll.notify_one();
-    assert!(
-        matches!(&*client.state.lock().await, State::Closing { transition_id, .. } if transition_id == "original-close")
+    assert_eq!(
+        client.state.lock().await.close_step(),
+        Step::PollClose("original-close".into())
     );
     original.release_name(names::INTERFACE).await.unwrap();
     replacement.request_name(names::INTERFACE).await.unwrap();
@@ -288,7 +255,7 @@ async fn cleanup_receipts_stay_with_the_original_module_after_alias_replacement(
             .unwrap();
     }
     original.request_name(names::INTERFACE).await.unwrap();
-    let root = ModuleClient::fixture(
+    let root = crate::modules::ops::fixture_client(
         caller
             .proxy(names::INTERFACE, names::OBJECT_PATH, names::INTERFACE)
             .unwrap(),
@@ -301,7 +268,7 @@ async fn cleanup_receipts_stay_with_the_original_module_after_alias_replacement(
         Ok(TransitionStatus::Complete)
     );
     let client = McpConfiguredClient::with_port("/test/agent".into(), Box::new(port));
-    *client.state.lock().await = State::Open(OpenObject {
+    *client.state.lock().await = opened_state(tinymcp_bus::client_lifecycle::OpenObject {
         config: McpClientConfig::default(),
         object_path: "/test/original-child".into(),
     });
@@ -345,7 +312,7 @@ async fn a_blocked_close_has_an_overall_cleanup_deadline_and_keeps_the_owner_for
         .unwrap();
     service.request_name(names::INTERFACE).await.unwrap();
     let port = TinyMcpPort::new(
-        ModuleClient::fixture(
+        crate::modules::ops::fixture_client(
             caller
                 .proxy(names::INTERFACE, names::OBJECT_PATH, names::INTERFACE)
                 .unwrap(),
@@ -358,15 +325,11 @@ async fn a_blocked_close_has_an_overall_cleanup_deadline_and_keeps_the_owner_for
         Box::new(port),
     ));
     // The acknowledged object isolates lifecycle routing from module admission.
-    *client.state.lock().await = State::Open(OpenObject {
+    *client.state.lock().await = opened_state(tinymcp_bus::client_lifecycle::OpenObject {
         config: McpClientConfig::default(),
         object_path: "/test/original-child".into(),
     });
-    CLIENTS
-        .get_or_init(|| Mutex::new(HashMap::new()))
-        .lock()
-        .unwrap()
-        .insert(directory.clone(), Arc::clone(&client));
+    lifecycle::table().insert(directory.clone(), Arc::clone(&client));
     let cleanup = agent_cleanup::take_agent_cleanup(scratch.path(), "blocked-close").unwrap();
     fixture.block_close.store(true, Ordering::SeqCst);
     let attempt = cleanup.clone();
@@ -377,36 +340,22 @@ async fn a_blocked_close_has_an_overall_cleanup_deadline_and_keeps_the_owner_for
         task.abort();
         let _ = task.await;
         fixture.release_close.notify_one();
-        CLIENTS.get().unwrap().lock().unwrap().remove(&directory);
+        lifecycle::table().evict(&directory, cached(&directory).as_ref().unwrap());
     }
     let result = outcome.expect("cleanup must return within 30 seconds even when Close has a 120-second operation timeout")
         .expect("cleanup task must complete normally");
     assert_eq!(result, Err(ModuleCallError::TransportFailed));
     assert!(matches!(
-        &*client.state.lock().await,
-        State::StartingClose(_)
+        client.state.lock().await.close_step(),
+        Step::CallClose
     ));
-    assert!(Arc::ptr_eq(
-        CLIENTS
-            .get()
-            .unwrap()
-            .lock()
-            .unwrap()
-            .get(&directory)
-            .unwrap(),
-        &client
-    ));
+    assert!(Arc::ptr_eq(cached(&directory).as_ref().unwrap(), &client));
     assert!(client.retiring.load(Ordering::Acquire));
     // Retry the captured owner; timing out must not evict its close intent.
     fixture.release_close.notify_one();
     cleanup.finish().await.unwrap();
     assert_eq!(fixture.closes.load(Ordering::SeqCst), 2);
-    assert!(!CLIENTS
-        .get()
-        .unwrap()
-        .lock()
-        .unwrap()
-        .contains_key(&directory));
+    assert!(!cached(&directory).is_some());
 }
 
 #[test]
@@ -414,15 +363,29 @@ fn orphaned_shutdown_cleanup_keeps_a_host_directory_reservation_until_confirmed(
     let scratch = tempfile::tempdir().unwrap();
     let directory = scratch.path().join("agents/purge-pending");
     let token = crate::mcp::host::reserve_agent_directory(scratch.path(), "purge-pending");
-    McpConfiguredClient::retry_orphaned_cleanups();
+    lifecycle::table().retry_orphaned();
     assert!(McpConfiguredClient::agent_close_pending(&directory));
-    let reservation = McpConfiguredClient::reservation_for(&directory);
-    assert!(!McpConfiguredClient::finish_cleanup(
-        &directory,
-        None,
-        reservation
-    ));
+    let reservation = lifecycle::table().reservation_for(&directory);
+    assert!(!lifecycle::table().finish_cleanup(&directory, None, &reservation));
     assert!(McpConfiguredClient::agent_close_pending(&directory));
     token.complete();
     assert!(!McpConfiguredClient::agent_close_pending(&directory));
+}
+
+fn cached(directory: &std::path::Path) -> Option<Arc<McpConfiguredClient>> {
+    lifecycle::table()
+        .snapshot()
+        .into_iter()
+        .find(|(path, _)| path == directory)
+        .map(|(_, client)| client)
+}
+fn opened_state(object: tinymcp_bus::client_lifecycle::OpenObject) -> ConfiguredLifecycle {
+    let mut state = ConfiguredLifecycle::new();
+    state.open_step(&object.config);
+    state.open_replied(Ok(OpenConfiguredResponse {
+        object_path: object.object_path,
+        transition_id: "fixture-open".into(),
+    }));
+    state.open_polled(TransitionStatus::Complete);
+    state
 }

@@ -41,7 +41,7 @@
 //! [`ServiceSet`], the compiled-and-registered [`DomainSet`] and the API key.
 //! An agent owns everything the core reads through its ambient context:
 //! its `Config` (provider route and model, MCP servers, autonomy tier,
-//! `action_dir`), its [`AgentDefinition`](openhuman_core::agent::harness::definition::AgentDefinition)
+//! `action_dir`), its [`AgentDefinition`](openhuman_core::agent::harness::host_definition::AgentDefinition)
 //! (system prompt, tool scope, sandbox mode), its profile (allowlists,
 //! dedicated memory and transcripts), its skills root, its narrowed
 //! `DomainSet` and [`ToolGroups`], its approval settings, sub-agents, MCP
@@ -205,6 +205,9 @@ pub(crate) struct CoreGuard {
     /// Handlers registered with [`Runtime::on_system_job`], by job name.
     system_jobs:
         Mutex<HashMap<String, openhuman_core::cron::system_job_handlers::SystemJobRegistration>>,
+    /// Job-kind handlers registered with [`Runtime::register_job_handler`] or
+    /// [`RuntimeBuilder::cron_job_handler`]; dropping restores the defaults.
+    kind_handlers: Mutex<Vec<openhuman_core::cron::handlers::KindRegistration>>,
     /// Process-global seams this runtime installed; dropping restores the
     /// restorable ones (see [`seams`]).
     seams: Mutex<Option<seams::InstalledSeams>>,
@@ -229,6 +232,12 @@ impl Drop for CoreGuard {
             .get_mut()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .clear();
+        // Newest first, so each registration restores what it replaced.
+        let handlers = self
+            .kind_handlers
+            .get_mut()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        while handlers.pop().is_some() {}
         // Drop the core while the process slot is still claimed. Releasing it
         // first lets another builder initialize process-scoped state while
         // this runtime's keyring, bearer, event bus and subscribers are live.
@@ -245,40 +254,15 @@ impl Drop for CoreGuard {
                 .unwrap_or_else(std::sync::PoisonError::into_inner)
                 .take(),
         );
-        // For an ephemeral workspace, take ownership of the temp path and
-        // remove it with a short retry. The core's memory/session writers keep
-        // running a moment after a turn returns and can recreate workspace
-        // subdirectories while `TempDir`'s own drop-time removal is racing
-        // them, leaving an empty directory behind. A bounded retry lets those
-        // writes settle before giving up.
-        if let Some(temp) = self.workspace._temp.take() {
-            let root = temp.keep();
-            if self
-                .preserve_ephemeral_workspace
-                .load(std::sync::atomic::Ordering::Acquire)
-            {
-                log::warn!(
-                    "[embed][runtime] unresolved cleanup; preserved ephemeral workspace at {}",
-                    root.display()
-                );
-            } else {
-                let mut quiet_passes = 0;
-                for _ in 0..20 {
-                    match std::fs::remove_dir_all(&root) {
-                        Ok(()) => quiet_passes += 1,
-                        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-                            quiet_passes += 1;
-                        }
-                        Err(_) => quiet_passes = 0,
-                    }
-                    if quiet_passes >= 5 {
-                        break;
-                    }
-                    std::thread::sleep(std::time::Duration::from_millis(50));
-                }
-                let _ = std::fs::remove_dir_all(&root);
+        if self
+            .preserve_ephemeral_workspace
+            .load(std::sync::atomic::Ordering::Acquire)
+        {
+            if let Some(root) = &self.workspace._temp {
+                root.preserve();
             }
         }
+        drop(self.workspace._temp.take());
         RUNTIME_LIVE.store(false, std::sync::atomic::Ordering::Release);
         log::debug!("[embed][runtime] released");
     }
@@ -415,7 +399,10 @@ impl Runtime {
 
     /// The runtime's scheduled jobs. See [`crate::cron`].
     pub fn cron(&self) -> crate::cron::Cron<'_> {
-        crate::cron::Cron::new(&self.base_config)
+        crate::cron::Cron::new(
+            &self.base_config,
+            openhuman_core::core::runtime::DispatchCtx::new(self.core_runtime().context().clone()),
+        )
     }
 
     /// Run `handler` whenever system job `name` comes due (see
@@ -449,6 +436,30 @@ impl Runtime {
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .insert(name, registration);
         Ok(())
+    }
+
+    /// Run every job of `kind` through `handler` instead of the built-in one,
+    /// for the life of this runtime (dropping the runtime restores what it
+    /// replaced). A job's kind decides which handler runs it: `shell` and
+    /// `agent` rows reach it as one attempt of the run (the core still applies
+    /// its operator limits and classifies a failure as retryable or
+    /// permanent); a `flow` row reaches it as a schedule tick. A later
+    /// registration of the same kind replaces this one.
+    pub fn register_job_handler(
+        &self,
+        kind: crate::cron::JobKind,
+        handler: std::sync::Arc<dyn crate::cron::JobKindHandler>,
+    ) {
+        log::debug!(
+            "[embed][runtime] job kind handler registered kind={}",
+            kind.as_str()
+        );
+        let registration = openhuman_core::cron::handlers::register_kind(kind, handler);
+        self.guard
+            .kind_handlers
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .push(registration);
     }
 
     /// Start the background services this runtime's [`ServiceSet`] selects
@@ -634,6 +645,7 @@ impl Runtime {
                 previous_session_store,
                 host_agents: resolver,
                 system_jobs: Mutex::new(HashMap::new()),
+                kind_handlers: Mutex::new(Vec::new()),
                 seams: Mutex::new(seams),
             }),
             base_config,

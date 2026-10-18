@@ -77,7 +77,7 @@ use tinywallet_bus::wire::{
 };
 use zeroize::Zeroize;
 
-use super::{host, ops, registry};
+use super::{ops, registry};
 use crate::config::Config;
 
 /// Registry id of the module these calls go to.
@@ -378,102 +378,96 @@ async fn attested_proxy(config: &Config) -> Result<tinybus::Proxy, WalletCallErr
 }
 
 // Embedded library checksums verified from all 17 archives in the
-// registry-pinned TinyWallet v0.19.0 release. Each library is trusted only
+// registry-pinned TinyWallet v0.23.3 release. Each library is trusted only
 // while its archive checksum remains pinned in the supplied ModuleRecord.
 const PINNED_WALLET_LIBRARIES: &[(&str, &str)] = &[
     // archlinux-arm64
     (
-        "59863d52205fabe486a16dfbf573a007d19c3237236cee3a8ff236281cdf6ba9",
-        "33929ad0096de1ea9e7a2cb03eeecba27ff35e44f8d10bc74941c65481c03683",
+        "e2adef42c2fcc9794cad1eefd0d5676cf2961a7772d0d3d5ca03890094f89924",
+        "806b2245fdadcb9b853fb3e85faad800b1d254083ca05fa2c03336ed4d6c7fe5",
     ),
     // archlinux-x86_64
     (
-        "645679737effe617f566af7349dc7153f29dac21fa7a377a610ccf72054e7454",
-        "7770801d0ddc7c659391b3d1f06b3aa757cc086094c9bd9b40306de77e8b28c2",
+        "2a35c9b79cfc15e1917e7e1957588511ffc0ec21b2ad167cbf9e53213ca4511c",
+        "9df89e1c55ec497ebd8d0fd962576b1bceba33d17e86928f72c8273a943488a1",
     ),
     // fedora-43-arm64
     (
-        "c05ff2da4101246b7a50a37a44632a8502a5747f5e7cc416258fb728782d91b6",
-        "3d23139debe5d9d0d69c9feefcbe2372449cda547f81eae590dfb82f7842e2e3",
+        "4038195b53b79eda71a7716ab3e64b63904911915b7f44a967ceff274074a947",
+        "e55fd146a0e708d5e475ee0eab3940c5579cec6ac9ac396fc36c4d8c256d7a26",
     ),
     // fedora-43-x86_64
     (
-        "c4399bbb1c9d3c42545fb78474f548337cfc4a96ebb49ce50912ca4c85dd3aa4",
-        "2ddd77bf0645ad8dce6b8e4ab6554ac913d5f0e9ee21ab6b234c8d572d0d763e",
+        "419a9a57d9ef245a852c49b32be4c07f61d58dd6315ae8c23d27ba1493615368",
+        "fd523fa8c621df4463556976c5abec5bdd97e9c2418a378d1816c6727cb11f8d",
     ),
     // fedora-44-arm64
     (
-        "d17075dd175d0bd3bebe31350a3bcc58320c698f4c54f69691f85dd54297fdb9",
-        "d00d9630dff068c0980e9b81c6184eba0af11fd3168ea2bcdc57ebad713eb91a",
+        "0a84fb19f6c1386b35b71677b52f30bf5524f0689a9afc9e79d17b1889d24ad7",
+        "371367b74b8ade02c9589646f9ab9146e81bf16f9a2192122f7033dbe8b146a4",
     ),
     // fedora-44-x86_64
     (
-        "ef64e56e536a2661ae0ddcd799632819c02f391a5e7f98431adc184f7df45adb",
-        "71df95081c6b0da69e52bb4ae461c841763436332eae5e19b269730a5bf1688e",
+        "4a4b8e13468ade4ef23303af53e9f5121cd3547faa9cf8accb086c0290ab98fb",
+        "c3c7f8b42d9a76ed3998be4e65f69fa2a36335dddf2f4733714a3ad18b776beb",
     ),
     // macos-15-arm64
     (
-        "15397175e39dffbfe372bb40a4dccd6e03440ed5925043d41df058a335e1427d",
-        "e1e95043354060e98a604ef7a2c4ec0407bf22c906f4240b1438e303c4283bbd",
+        "aee3d767944171ed68cab981092d4ae5fa0678dc6d85f3e450bc618c42682af9",
+        "0deff74f29b806b9296dc0d94486c2fd4c74d2a666139db9473861e2f5613aa3",
     ),
     // macos-15-x86_64
     (
-        "389e68114a4d1243afe04e8143e7f6ebd321c1cc24b54be2d768c7ee8643c7b1",
-        "deb320a1e0214105e1621f83fbb43c3e884ed7923d5303ae56b113b4f31eef2e",
+        "cc617f3443a15c69e1c3a2b3f94b1129262a4c2dbc76d3e76ae07b1153024bab",
+        "6cc84afe2487822b6ff77c8a2c1f0730761e1be1f062b0138ba345bbba9edbbd",
     ),
     // macos-26-arm64
     (
-        "bff93e7c33fcf663c0b69117add0e249c461233a58eb5ba2f1b753a9a8944350",
-        "4aaaec17daa9c3aca68c02342761138aa100a10886a3845a1e3068c755665091",
+        "a3e16793b25abafbb2a26ed6b2223ce499f3f16da66bc01898307ca6fc049581",
+        "db120765be9d4c35d7954e947587257d708b23d60cb1380c07e3f8313c7c096e",
     ),
     // macos-26-x86_64
     (
-        "72e1ef5c1047c0ac848abb9cd1cf69e6639ac4e8527496979406922852a4d2d3",
-        "3655a3efb340c1959704b71e67056499e47b0dde719b9139e8d3a4d5608c7d57",
+        "f2dc9871afcffdf7bac9f8fcbf9f4e13776e992ad94833855fd9d7944acc132d",
+        "6b54b6d7604d51e517cbaf5bfbdfc6d8b440f73d2ed4666f45ff465b5bb033dd",
     ),
     // ubuntu-22.04-arm64
     (
-        "d981e334615d4a4d2ea003a4c3d59ee8f631d6f52532cfa70dc97143e97a6fe8",
-        "6a30e85422cfeb919efcf70ece5e503ba9fd6145eac1e6229caff326d7c438e7",
+        "58e0105f0c151bbe3aa44aa0e29539d6762a71be73bff9875f8e1d389c13500b",
+        "5592f3c56098a8f438ca642ad17c2ac8415102a9206707b5de0f430c99882e6b",
     ),
     // ubuntu-22.04-x86_64
     (
-        "4511bf4a03f9163f5493472c1b294eccd8087e44efbde6b7e50c2ee4867b707c",
-        "04ed808e5c32234b9879a1468da6034c8bdc214beaf6da4f6303b1a9efb83f9b",
+        "4d9d732760e95e9b8bb614a3282746053b4b7e2f3c599a395215836505c15c91",
+        "ebca03bdeae1aad3bb478a78dd4658988bccbe5784a41e3818e727e03a990fe6",
     ),
     // ubuntu-24.04-arm64
     (
-        "aa79e84f60892f2ff624f42619f928b2699bdbea613f7bc2a0595f769c7f1d68",
-        "27ec59b039fff01ebf01ba065a061fa84c67552f3486e1e9757a1210a52304fd",
+        "cec6a9eb6ca864140187463e29f65a7f374cb192d75edfcbead8a101b7bb7fff",
+        "9e51d737c08814b2f46d347d563ee44966c01b30c9d7089141f7ad833dbd0bfb",
     ),
     // ubuntu-24.04-x86_64
     (
-        "55c27a4c85631aee0509e9c74ae1eceb5f3fb3aa43540294bdd4991eac5500af",
-        "5d0a3ae5881f91966249858cd155e5b9c244bd419d06698d808f972a8d23afc9",
+        "f2ae10459327d55d837b2016fff448fb855cf57eeb139d7e9a173066c9b00921",
+        "9459eaaf5b147bdc7f0f33f8fd1828bb50fe359002ebc7fa7efeccacbb0e70bc",
     ),
     // windows-11-arm64
     (
-        "f91ef12a88c324a4c890be0ff8114239d835770541ce8cfd6059f015d3720764",
-        "0b702e879f7514f0204bc867c3c6e01e429fcba993ef1817be65110097c6b0bd",
+        "21d7c857b98359d27715c70ed9983ae4dd4138648b1aa55fa7a726c5896dc528",
+        "4f0d31d0507d858626a45a80a1645439ebff0f8eabb2f6ef16533c85720915d0",
     ),
     // windows-2022-x86_64
     (
-        "398bce97e33fa44faa3e92eb20cdd448089882233858a952b7710ad4d1806546",
-        "83aaed32e29ead292066e123efb91f1ebd21545ea0d8a3b3ca20fdd7cd99e644",
+        "ba0c2b7c3ba8e7dbe51c854643616d27c6a9433600265f7e7d0a6cf9a03a7a7a",
+        "b1e69005b11ed6d58e53bb189d6c241f4788a8812c609a2d2e53728d823f0fda",
     ),
     // windows-2025-x86_64
     (
-        "17856ed57fb14840c3a4c5cde9167a68d9a8d578ee63728852b894d3d1e8fec1",
-        "34d33e8534cb36acaf771cfd8a73a2dc6149ecdd4d143cc1af76088457795d8b",
+        "ce3748d7d885356040d2121357ad5b8945f28d05bde1ec65540c06524a9c328b",
+        "62b0937ec62f878135a9a13d37d32933520cd57a06ec8a04c6ce4163854df29f",
     ),
 ];
 
-/// Whether the attested archive or library belongs to a currently pinned release.
-///
-/// The release loader attests the verified archive; local discovery attests the
-/// library from modules.toml. Library checksums therefore require their paired
-/// archive to remain in this record, so retiring a release also retires its
-/// libraries. Check every platform because the attestation carries no host key.
 fn digest_is_pinned(record: &super::ModuleRecord, sha256: &str) -> bool {
     record.assets.iter().any(|asset| {
         asset.sha256.eq_ignore_ascii_case(sha256)
@@ -503,13 +497,19 @@ pub async fn ensure_ready(config: &Config) -> Result<(), WalletCallError> {
 /// Ensure the module is serving and hand back what a call needs.
 async fn ready(
     config: &Config,
-) -> Result<(&'static host::ModuleRuntime, &'static super::ModuleRecord), WalletCallError> {
+) -> Result<
+    (
+        &'static tinybus::module::ModuleRuntime,
+        &'static super::ModuleRecord,
+    ),
+    WalletCallError,
+> {
     ops::ensure_loaded(config, MODULE_ID)
         .await
         .map_err(WalletCallError::Unavailable)?;
     let record = registry::find(MODULE_ID)
         .ok_or_else(|| WalletCallError::Unavailable(format!("unknown module '{MODULE_ID}'")))?;
-    let runtime = host::runtime()
+    let runtime = super::runtime::runtime()
         .await
         .map_err(|_| WalletCallError::Unavailable("the module bus is not running".to_string()))?;
     Ok((runtime, record))
@@ -517,7 +517,7 @@ async fn ready(
 
 /// A proxy for the module's object.
 fn proxy(
-    runtime: &'static host::ModuleRuntime,
+    runtime: &'static tinybus::module::ModuleRuntime,
     record: &super::ModuleRecord,
 ) -> Result<tinybus::Proxy, WalletCallError> {
     runtime

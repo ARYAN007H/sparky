@@ -8,7 +8,7 @@ use std::time::Duration;
 
 use common::{
     chat_completion, chat_requests, runtime_without_master_key, tool_call_completion, tool_names,
-    PointedTransport,
+    PointedInference,
 };
 use openhuman_embed::memory::api::conformance::ReferenceEngine;
 use openhuman_embed::memory::api::{LearningKind, MemoryEngine, MemoryMeta, StoreItem};
@@ -188,7 +188,7 @@ async fn scenario() {
         .with_priority(10)
         .mount(&inference)
         .await;
-    PointedTransport::install(&inference.uri());
+    PointedInference::install(&inference.uri());
     let root = tempfile::tempdir().unwrap();
     let calls = Arc::new(Mutex::new(Vec::new()));
     let factory_calls = calls.clone();
@@ -283,7 +283,12 @@ async fn scenario() {
             Some(format!("user:{user}").as_str())
         );
         let profile = handle
-            .scope(async { openhuman_core::profiles::host::current().unwrap() })
+            .scope(async {
+                openhuman_core::profiles::host::current(
+                    &openhuman_core::core::runtime::DispatchCtx::ambient(),
+                )
+                .unwrap()
+            })
             .await;
         profile.lease_fence().renewed(0);
         assert!(
@@ -317,7 +322,7 @@ async fn scenario() {
                 "chat",
                 "sender",
                 "message",
-                &format!("{}: call tenant_probe", handle.id()),
+                format!("{}: call tenant_probe", handle.id()),
             ))
             .await
             .unwrap();
@@ -420,7 +425,12 @@ async fn scenario() {
         ),
     );
     let alice_profile = handles[0]
-        .scope(async { openhuman_core::profiles::current().unwrap() })
+        .scope(async {
+            openhuman_core::profiles::current(
+                    &openhuman_core::core::runtime::DispatchCtx::ambient(),
+                )
+                .unwrap()
+        })
         .await;
     let closed_hook = no_callback.hook(handles[0].id(), alice_profile.lease_fence().clone());
     assert!(handles[0]
@@ -500,7 +510,12 @@ async fn scenario() {
     }
     handles.insert(0, reopened);
     let alice_profile = handles[0]
-        .scope(async { openhuman_core::profiles::current().unwrap() })
+        .scope(async {
+            openhuman_core::profiles::current(
+                    &openhuman_core::core::runtime::DispatchCtx::ambient(),
+                )
+                .unwrap()
+        })
         .await;
     let alice_hook = handles[0]
         .context()

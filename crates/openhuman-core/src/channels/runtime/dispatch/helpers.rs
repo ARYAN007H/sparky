@@ -1,7 +1,7 @@
 //! OpenHuman-specific dispatch prompt context plus TinyChannels helpers.
 
 use crate::channels::context::CHANNEL_TYPING_REFRESH_INTERVAL_SECS;
-use crate::channels::traits;
+use tinychannels_bus as traits;
 
 /// Maximum characters shown in the debug reply println.
 pub(super) const REPLY_LOG_TRUNCATE_CHARS: usize = 200;
@@ -11,12 +11,13 @@ pub(super) use tinychannels::runtime::select_acknowledgment_reaction;
 
 pub(super) fn log_worker_join_result(result: Result<(), tokio::task::JoinError>) {
     if let Err(error) = result {
-        tracing::warn!("channel worker failed: {error}");
+        tracing::warn!("{}", traits::context::worker_crash_message(&error));
     }
 }
 
 /// Start the portable typing lifecycle with OpenHuman's configured interval.
-pub(super) fn spawn_scoped_typing_task(
+pub(super) fn spawn_typing_task(
+    dispatch: &crate::core::runtime::DispatchCtx,
     channel: std::sync::Arc<dyn crate::channels::Channel>,
     recipient: String,
     cancellation_token: tokio_util::sync::CancellationToken,
@@ -24,7 +25,7 @@ pub(super) fn spawn_scoped_typing_task(
     let (finished_tx, finished_rx) = tokio::sync::oneshot::channel();
     // The worker retains ownership across cancellation of the caller while
     // StartTypingRefresh is in flight, then closes the returned module handle.
-    tokio::spawn(async move {
+    dispatch.spawn(async move {
         match channel
             .begin_typing_refresh(&recipient, CHANNEL_TYPING_REFRESH_INTERVAL_SECS)
             .await
@@ -43,7 +44,7 @@ pub(super) fn spawn_scoped_typing_task(
         }
         let _ = finished_tx.send(());
     });
-    tokio::spawn(async move {
+    dispatch.spawn(async move {
         let _ = finished_rx.await;
     })
 }

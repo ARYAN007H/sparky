@@ -153,7 +153,7 @@ fn exhausted_cleanup_releases_runtime_admission_but_preserves_the_ephemeral_work
                     attempts.fetch_add(1, Ordering::SeqCst);
                     async {
                         Err(AgentError::McpCleanup(
-                            openhuman_core::modules::client::ModuleCallError::ModuleFault,
+                            tinybus::module::ModuleCallError::ModuleFault,
                         ))
                     }
                 },

@@ -1,7 +1,7 @@
 //! Bus adapter pinned to the module instance that starts its lifecycle.
 use super::*;
 #[cfg(feature = "modules")]
-use crate::modules::client::ModuleObjectClient;
+use tinybus::module::ModuleObjectClient;
 
 pub(super) struct TinyMcpPort {
     root: ModuleClient,

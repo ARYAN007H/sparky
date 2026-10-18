@@ -53,7 +53,7 @@ pub enum HarnessError {
 
     /// Removing an agent failed to confirm cleanup of its captured MCP owner.
     #[error("MCP cleanup remains pending: {0}")]
-    McpCleanup(#[source] openhuman_core::modules::client::ModuleCallError),
+    McpCleanup(#[source] tinybus::module::ModuleCallError),
 
     /// A builder input could not be honoured.
     #[error("{0}")]

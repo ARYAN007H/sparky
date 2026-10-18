@@ -14,7 +14,7 @@ use tinytools_std::filesystem::{
     ApplyPatchTool, CsvExportTool, EditFileTool, FileReadTool, FileWriteTool, GitOperationsTool,
     GlobTool, GrepTool, ImageInfoTool, ListFilesTool, ReadDiffTool, RunLinterTool, RunTestsTool,
 };
-use tinytools_std::network::{CurlTool, PushoverTool};
+use tinytools_std::network::PushoverTool;
 
 /// Create the default tool registry
 pub fn default_tools(security: Arc<SecurityPolicy>) -> Vec<Box<dyn Tool>> {
@@ -121,14 +121,6 @@ pub fn all_tools_with_runtime(
     ));
     tools.append(&mut vec![
         Box::new(CurrentTimeTool::new()),
-        // Reversibility for native tool-output compaction (Stage 1a): when a
-        // large result is compacted with a `retrieve_tool_output("<hash>")`
-        // marker, this hands the original back from the CCR store on demand.
-        Box::new(retrieve_tool_output_tool()),
-        // TokenJuice 2.0 content-router retrieval: fetches the original (full or
-        // by byte/line range) for a `⟦tj:<hash>⟧` marker from the CCR cache.
-        // Supersedes `retrieve_tool_output`; both are kept live during migration.
-        Box::new(crate::inference::tokenjuice::TokenjuiceRetrieveTool::new()),
         // Deterministic time-expression → timestamp resolver. `current_time`
         // only returns *now*, leaving the model to do epoch arithmetic by hand
         // (a real incident had an agent compute "24h ago" ~10 months off, then
@@ -171,13 +163,16 @@ pub fn all_tools_with_runtime(
     tools.append(&mut vec![
         // Task & productivity tools (issue: agent-tool expansion).
         // Read/observe + bounded-write tools are registered here; the
-        // destructive/overextending siblings (artifact_delete,
+        // destructive/overextending siblings (delete_artifact,
         // task_source_add/update/remove) are registered too but ship
         // default-OFF via `tools::user_filter` (their toggle IDs default off
         // in onboarding). The per-call permission ladder still gates them.
     ]);
-    tools.extend(crate::agent::artifacts::tools::registered_tools(
-        config.clone(),
+    tools.extend(crate::agent::artifacts::tiny_store::registered_tools(
+        &config.workspace_dir,
+        crate::agent::artifacts::FileRoots::from_config(&config),
+        action_dir,
+        crate::agent::artifacts::artifact_publisher(&config),
     ));
     tools.extend(crate::integrations::task_sources::tools::registered_tools(
         config.clone(),
@@ -197,10 +192,13 @@ pub fn all_tools_with_runtime(
     tools.extend(crate::desktop::dashboard::tools::registered_tools(
         config.clone(),
     ));
+    // `[components] computer = false` unregisters the desktop and browser tools.
     #[cfg(feature = "modules")]
-    tools.extend(crate::desktop::control::tools::registered_tools(
-        config.clone(),
-    ));
+    if config.components.computer {
+        tools.extend(crate::desktop::control::tools::registered_tools(
+            config.clone(),
+        ));
+    }
     tools.extend(crate::security::tools::registered_tools(config.clone()));
     tools.extend(crate::platform::service::tools::registered_tools(
         config.clone(),
@@ -248,6 +246,19 @@ pub fn all_tools_with_runtime(
         tracing::debug!("[tools::ops] memory off; memory tool not registered");
     }
 
+    // Recovery tools for compacted output (`retrieve_tool_output` for the
+    // Stage 1a marker, `juice_retrieve` for `⟦tj:<hash>⟧`; both live during
+    // migration): only while `[components] juice` is on, since with it off
+    // nothing is compacted and nothing can hand out a marker.
+    if crate::inference::tokenjuice::enabled(root_config) {
+        tools.push(Box::new(retrieve_tool_output_tool()));
+        tools.push(Box::new(
+            crate::inference::tokenjuice::TokenjuiceRetrieveTool::new(),
+        ));
+    } else {
+        tracing::debug!("[tools::ops] juice component off; recovery tools not registered");
+    }
+
     // `juice_find` / `juice_extract` / `juice_summarize`: only while a handle can name them.
     tools.extend(crate::inference::tokenjuice::repl_tools_for(root_config));
 
@@ -277,7 +288,7 @@ pub fn all_tools_with_runtime(
     tools.extend(crate::agent::goals::goal_tools(&root_config.workspace_dir));
 
     #[cfg(feature = "modules")]
-    if browser_config.enabled {
+    if browser_config.enabled && config.components.computer {
         // BrowserClient enforces the shared `http_request.allowed_domains`
         // policy for both browser tools.
         let browser_client = Arc::new(crate::modules::browser::BrowserClient::new(config.clone()));
@@ -296,7 +307,7 @@ pub fn all_tools_with_runtime(
     // + `security` still gate which hosts are reachable; there is no
     // enable flag because every session needs basic HTTP as a baseline
     // capability.
-    tools.push(Box::new(http_request_tool(
+    tools.push(Box::new(routed_http_request_tool(
         security.clone(),
         http_config.allowed_domains.clone(),
         http_config.max_response_size,
@@ -319,7 +330,7 @@ pub fn all_tools_with_runtime(
     // GET-and-read primitive that reuses the same allowed-domains gate
     // as `http_request`. Use this for docs/READMEs; reach for
     // `http_request` only when you need richer HTTP semantics.
-    tools.push(Box::new(web_fetch_tool(
+    tools.push(Box::new(routed_web_fetch_tool(
         security.clone(),
         http_config.allowed_domains.clone(),
         Some(http_config.max_response_size),
@@ -329,7 +340,7 @@ pub fn all_tools_with_runtime(
     // curl — always registered. Shares `http_request.allowed_domains`,
     // adds streaming-to-disk with a hard byte ceiling. Writes land
     // under `<workspace>/<curl.dest_subdir>`.
-    tools.push(Box::new(CurlTool::new(
+    tools.push(Box::new(routed_curl_tool(
         security.clone(),
         http_config.allowed_domains.clone(),
         action_dir.to_path_buf(),
@@ -377,6 +388,8 @@ pub fn all_tools_with_runtime(
     // `mcp::registry` domain gated above. Both are compiled out by the `mcp`
     // feature; see the static-vs-dynamic note in AGENTS.md.
     #[cfg(feature = "mcp")]
+    tools.push(crate::mcp::ui::show_ui_tool(root_config));
+    #[cfg(feature = "mcp")]
     if root_config.mcp_client.enabled && !root_config.mcp_client.servers.is_empty() {
         // Catalog retrieval runs in the async turn prelude. This synchronous
         // baseline contributes only the generic bridge; per-tool executors
@@ -384,26 +397,46 @@ pub fn all_tools_with_runtime(
         let mcp_config = Arc::new(root_config.clone());
         tools.push(Box::new(McpListServersTool::new(Arc::clone(&mcp_config))));
         tools.push(Box::new(McpListToolsTool::new(Arc::clone(&mcp_config))));
-        tools.push(Box::new(mcp_call_tool(mcp_config, security.clone())));
+        let call = Box::new(mcp_call_tool(Arc::clone(&mcp_config), security.clone()));
+        tools.push(crate::mcp::ui::ui_aware_call(call, &mcp_config));
     }
 
     tools.extend(crate::search::build_search_tools(root_config));
 
-    // Media generation (image/video via GMI through the backend). Skipped when
-    // no integration client is configured; artifacts land under `action_dir`.
-    // Gated by the `media` compile-time feature (#4804); absent from slim
-    // builds. Runtime `DomainSet::media` (#4796) still gates it when compiled.
+    // Media generation roots. The `media_generate_*` tools themselves come from
+    // a host's registered tool source (the core ships no media generators);
+    // this records the files roots their reference policy reads, ahead of
+    // every source so one that reads them while it builds sees them. Gated by the
+    // `media` compile-time feature (#4804); absent from slim builds. Runtime
+    // `DomainSet::media` (#4796) still gates the tools when compiled.
     #[cfg(feature = "media")]
-    tools.extend(crate::media::generation::build_media_tools(
-        root_config,
-        action_dir,
-    ));
+    {
+        *security
+            .media_files_roots
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) =
+            Some(crate::agent::artifacts::FileRoots::from_config(root_config));
+    }
 
-    // Managed cloud file storage (S3 via the backend). Skipped when no
-    // integration client is configured; downloads land under `action_dir`.
-    tools.extend(crate::integrations::file_storage::build_file_storage_tools(
+    // What every registered tool source can see (`tools::sources`).
+    let source_ctx = crate::tools::sources::ToolSourceCtx {
+        config: &config,
         root_config,
+        security,
+        runtime: &runtime,
+        audit: &audit,
+        browser_config,
+        http_config,
         action_dir,
+        agents,
+        approval_workspace_root,
+    };
+
+    // Sources placed after the search tools (a host's media and file-storage
+    // tools), where the catalogue has always listed them.
+    tools.extend(crate::tools::sources::build_registered_tool_sources(
+        &source_ctx,
+        Some(crate::tools::sources::ANCHOR_AFTER_SEARCH),
     ));
 
     // Hosting tools — deploy a workspace directory through the compiled
@@ -459,49 +492,12 @@ pub fn all_tools_with_runtime(
         )));
     }
 
-    // ── Agent integration tools (backend-proxied) ─────────────────
-    if let Some(client) = crate::integrations::build_client(root_config) {
-        tracing::debug!("[integrations] client built successfully");
-        if root_config.integrations.google_places.is_active() {
-            tools.push(Box::new(
-                crate::integrations::tools::GooglePlacesSearchTool::new(Arc::clone(&client)),
-            ));
-            tools.push(Box::new(
-                crate::integrations::tools::GooglePlacesDetailsTool::new(Arc::clone(&client)),
-            ));
-            tracing::debug!("[integrations] registered google_places tools");
-        } else {
-            tracing::debug!("[integrations] google_places disabled — skipping");
-        }
-        // Web search providers (Exa, Gemini, TinyFish, ...) register through
-        // the TinySearch module above, so `[search] enabled = false`
-        // suppresses them too. `integrations.parallel` is parsed for old
-        // config files and no longer does anything.
-        if root_config.integrations.stock_prices.is_active() {
-            tools.push(Box::new(crate::integrations::tools::StockQuoteTool::new(
-                Arc::clone(&client),
-            )));
-            tools.push(Box::new(
-                crate::integrations::tools::StockExchangeRateTool::new(Arc::clone(&client)),
-            ));
-            tools.push(Box::new(crate::integrations::tools::StockOptionsTool::new(
-                Arc::clone(&client),
-            )));
-            tools.push(Box::new(
-                crate::integrations::tools::StockCryptoSeriesTool::new(Arc::clone(&client)),
-            ));
-            tools.push(Box::new(
-                crate::integrations::tools::StockCommodityTool::new(Arc::clone(&client)),
-            ));
-            tracing::debug!("[integrations] registered stock_prices tools");
-        } else {
-            tracing::debug!("[integrations] stock_prices disabled — skipping");
-        }
-    } else {
-        tracing::debug!(
-            "[integrations] build_client returned None — integration tools not registered"
-        );
-    }
+    // Sources placed after the delegation tool (a host's place and market-data
+    // tools), ahead of the Composio tools.
+    tools.extend(crate::tools::sources::build_registered_tool_sources(
+        &source_ctx,
+        Some(crate::tools::sources::ANCHOR_AFTER_DELEGATE),
+    ));
 
     let composio_tools = crate::integrations::composio::all_composio_agent_tools(root_config);
     if composio_tools.is_empty() {
@@ -524,6 +520,15 @@ pub fn all_tools_with_runtime(
     } else {
         tracing::debug!("[lsp] capability gate off (set OPENHUMAN_LSP_ENABLED=1 to register)");
     }
+
+    // Registered tool sources placed at the end of the catalogue
+    // (`tools::sources`), after every built-in and before the filters below,
+    // so they are gated exactly like built-ins. Nothing registered => nothing
+    // appended.
+    tools.extend(crate::tools::sources::build_registered_tool_sources(
+        &source_ctx,
+        None,
+    ));
 
     // Post-filters over the assembled list:
     //

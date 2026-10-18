@@ -5,6 +5,7 @@
 //! transport, authenticated wallet-backend transport, and a confirmation
 //! decision bound to an in-flight confirmed execution request.
 
+use crate::core::runtime::DispatchCtx;
 use std::collections::{HashMap, HashSet};
 use std::future::Future;
 use std::sync::{Mutex, OnceLock};
@@ -14,7 +15,8 @@ use tinywallet_bus::wire::HostEndpointReference;
 use tinywallet_bus::wire::{
     AuthorizationResult, AuthorizeNativeWalletExecutionRequest, AuthorizeWeb3ExecutionRequest,
     AuthorizeX402PaymentRequest, ChainTransportRequest, ChainTransportResult, HostResponse,
-    WalletAccountInfo, WalletAccountsResponse, WalletBackendRequest, WalletBackendResponse,
+    RpcEndpointKey, WalletAccountInfo, WalletAccountsResponse, WalletBackendRequest,
+    WalletBackendResponse,
 };
 
 #[path = "wallet_host_transport.rs"]
@@ -51,8 +53,7 @@ static ENDPOINT_REFERENCES: OnceLock<Mutex<HashMap<String, EndpointReference>>> 
 #[derive(Debug, Clone)]
 struct EndpointReference {
     service: String,
-    key: tinywallet_bus::wire::RpcEndpointKey,
-    url: String,
+    key: RpcEndpointKey,
 }
 
 fn approvals() -> &'static Mutex<HashSet<ApprovalKey>> {
@@ -73,13 +74,28 @@ fn endpoint_references() -> &'static Mutex<HashMap<String, EndpointReference>> {
     ENDPOINT_REFERENCES.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
+/// Whether the payment was quoted for the chat the acting turn is in.
+///
+/// An x402 payment is approved with a forced approval, which only a `WebChat`
+/// turn can raise, and that origin carries the same thread and client the turn's
+/// chat context does. The origin is therefore the chat to compare against; the
+/// callback arrives over the bus with no run context of its own.
 fn x402_request_owner_matches(
     request: &AuthorizeX402PaymentRequest,
-    context: &crate::security::approval::ApprovalChatContext,
+    origin: Option<&crate::agent::turn_origin::AgentTurnOrigin>,
 ) -> bool {
-    request.owner.as_ref().is_some_and(|owner| {
-        owner.thread_id == context.thread_id && owner.client_id == context.client_id
-    })
+    let Some(crate::agent::turn_origin::AgentTurnOrigin::WebChat {
+        thread_id,
+        client_id,
+        ..
+    }) = origin
+    else {
+        return false;
+    };
+    request
+        .owner
+        .as_ref()
+        .is_some_and(|owner| &owner.thread_id == thread_id && &owner.client_id == client_id)
 }
 
 fn x402_approval_facts(request: &AuthorizeX402PaymentRequest) -> serde_json::Value {
@@ -100,9 +116,11 @@ pub(crate) fn bind_endpoint_references(
 ) -> Result<(), String> {
     let mut resolved = HashMap::new();
     for endpoint in references {
-        let url = crate::web3::wallet::endpoints::override_for_endpoint(endpoint.key).ok_or_else(
-            || "wallet module referenced an endpoint without a host override".to_string(),
-        )?;
+        // Validate admission here, but resolve the URL again on each callback:
+        // the host may rotate an endpoint override without changing its opaque
+        // module reference.
+        configured_endpoint_url(endpoint.key)
+            .map_err(|_| "wallet module referenced an endpoint without a host override")?;
         if endpoint.reference.trim().is_empty()
             || resolved
                 .insert(
@@ -110,7 +128,6 @@ pub(crate) fn bind_endpoint_references(
                     EndpointReference {
                         service: service.to_owned(),
                         key: endpoint.key,
-                        url,
                     },
                 )
                 .is_some()
@@ -123,6 +140,12 @@ pub(crate) fn bind_endpoint_references(
         .map_err(|_| "wallet endpoint reference store is unavailable".to_string())?
         .extend(resolved);
     Ok(())
+}
+
+fn configured_endpoint_url(key: RpcEndpointKey) -> Result<String, String> {
+    let url = crate::web3::wallet::endpoints::override_for_endpoint(key)
+        .ok_or_else(|| "wallet endpoint override is no longer configured".to_string())?;
+    validate_module_endpoint_url(&url)
 }
 
 pub(crate) fn clear_endpoint_references(service: &str) {
@@ -139,8 +162,9 @@ pub(super) fn has_endpoint_reference_for_test(reference: &str) -> bool {
 }
 
 pub(crate) async fn wallet_accounts_snapshot(
+    ctx: &DispatchCtx,
 ) -> Result<tinywallet_bus::wire::WalletAccountsResponse, String> {
-    let status = crate::web3::wallet::status()
+    let status = crate::web3::wallet::status(ctx)
         .await
         .map_err(|error| error.to_string())?
         .value;
@@ -493,7 +517,9 @@ impl WalletHost {
     /// the host's custody store through this callback.
     async fn wallet_accounts(&self) -> tinybus::Result<HostResponse> {
         Ok(HostResponse::WalletAccounts(
-            wallet_accounts_snapshot().await.map_err(callback_error)?,
+            wallet_accounts_snapshot(&DispatchCtx::host_default())
+                .await
+                .map_err(callback_error)?,
         ))
     }
 
@@ -544,7 +570,14 @@ impl WalletHost {
                         },
                     ));
                 }
-                endpoint.url
+                match configured_endpoint_url(endpoint.key) {
+                    Ok(url) => url,
+                    Err(message) => {
+                        return Ok(HostResponse::ChainTransport(
+                            ChainTransportResult::RpcError { message },
+                        ));
+                    }
+                }
             }
             (None, Some(url)) => match validate_module_endpoint_url(url) {
                 Ok(url) => url,
@@ -604,17 +637,13 @@ impl WalletHost {
 
     /// Perform only the named authenticated wallet-backend request.
     async fn wallet_backend(&self, request: WalletBackendRequest) -> tinybus::Result<HostResponse> {
-        let config = crate::config::rpc::load_config_with_timeout()
+        let config = DispatchCtx::host_default()
+            .load_config()
             .await
             .map_err(callback_error)?;
-        let client =
-            crate::web3::client::CryptoClient::from_config(&config).map_err(callback_error)?;
-        let data = match request {
-            WalletBackendRequest::Routes => client.routes().await,
-            WalletBackendRequest::SwapTransaction { body } => client.swap_tx(&body).await,
-            WalletBackendRequest::BridgeTransaction { body } => client.bridge_tx(&body).await,
-        }
-        .map_err(callback_error)?;
+        let data = super::wallet_backend::call_wallet_backend(config, request.into())
+            .await
+            .map_err(callback_error)?;
         Ok(HostResponse::WalletBackend(WalletBackendResponse { data }))
     }
 
@@ -663,9 +692,8 @@ impl WalletHost {
         &self,
         request: AuthorizeX402PaymentRequest,
     ) -> tinybus::Result<HostResponse> {
-        let owner_matches = crate::security::approval::APPROVAL_CHAT_CONTEXT
-            .try_with(|context| x402_request_owner_matches(&request, context))
-            .unwrap_or(false);
+        let origin = crate::core::runtime::DispatchCtx::ambient_turn().turn_origin();
+        let owner_matches = x402_request_owner_matches(&request, origin.as_ref());
         let approved = if owner_matches {
             if let Some(gate) = crate::security::approval::ApprovalGate::try_global() {
                 matches!(

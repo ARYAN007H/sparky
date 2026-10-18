@@ -5,27 +5,26 @@
 //! turns are ingested from the `ConversationTurnCommitted` bus event.
 
 use crate::agent::tinyagents::TurnModelSource;
-use crate::util::truncate_with_ellipsis;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
-use tinyagents_session::transcript::TranscriptMessage;
 use tinytools::Tool;
 
 pub(crate) use tinychannels_bus::context::{
-    ChannelRouteSelection, CHANNEL_HISTORY_COMPACT_CONTENT_CHARS,
-    CHANNEL_HISTORY_COMPACT_KEEP_MESSAGES, CHANNEL_MESSAGE_TIMEOUT_SECS,
-    CHANNEL_TYPING_REFRESH_INTERVAL_SECS, DEFAULT_CHANNEL_INITIAL_BACKOFF_SECS,
-    DEFAULT_CHANNEL_MAX_BACKOFF_SECS, MAX_CHANNEL_HISTORY,
+    clear_sender_history, compact_sender_history, ChannelRouteSelection, ConversationHistoryMap,
+    CHANNEL_MESSAGE_TIMEOUT_SECS, CHANNEL_TYPING_REFRESH_INTERVAL_SECS,
+    DEFAULT_CHANNEL_INITIAL_BACKOFF_SECS, DEFAULT_CHANNEL_MAX_BACKOFF_SECS, MAX_CHANNEL_HISTORY,
+};
+
+#[cfg(test)]
+pub(crate) use tinychannels_bus::context::{
+    CHANNEL_HISTORY_COMPACT_CONTENT_CHARS, CHANNEL_HISTORY_COMPACT_KEEP_MESSAGES,
 };
 
 #[cfg(test)]
 pub(crate) use tinychannels::context::{
     effective_channel_message_timeout_secs, MIN_CHANNEL_MESSAGE_TIMEOUT_SECS,
 };
-
-/// Per-sender conversation history for channel messages.
-pub(crate) type ConversationHistoryMap = Arc<Mutex<HashMap<String, Vec<TranscriptMessage>>>>;
 
 pub(crate) type TurnModelSourceCacheMap = Arc<Mutex<HashMap<String, TurnModelSource>>>;
 pub(crate) type RouteSelectionMap = Arc<Mutex<HashMap<String, ChannelRouteSelection>>>;
@@ -62,65 +61,37 @@ pub(crate) struct ChannelRuntimeContext {
     /// Full config for building crate-native turn models (Phase 3 P3-B). `Some` in
     /// production; `None` lets tests inject a model source directly.
     pub(crate) config: Option<Arc<crate::config::Config>>,
+    /// The core context this channel runtime was built under. Held weakly: a
+    /// channel runtime outlives no tenant. `None` in tests and bespoke hosts
+    /// that never bound one.
+    pub(crate) core: Option<std::sync::Weak<crate::core::runtime::CoreContext>>,
+}
+
+impl ChannelRuntimeContext {
+    /// The dispatch context this runtime's work runs under.
+    pub(crate) fn dispatch_ctx(&self) -> crate::core::runtime::DispatchCtx {
+        crate::core::runtime::DispatchCtx::from_weak(self.core.as_ref())
+    }
 }
 
 /// Resolve the configured module client; unit tests use an attested bus fixture.
-pub(crate) async fn module_client(
-    ctx: &ChannelRuntimeContext,
-) -> crate::modules::client::ModuleClient {
+pub(crate) async fn module_client(ctx: &ChannelRuntimeContext) -> tinybus::module::ModuleClient {
     #[cfg(test)]
     if ctx.config.is_none() {
         return super::module_fixture::client().await;
     }
-    crate::modules::client::ModuleClient::new(ctx.config.as_deref().cloned().unwrap_or_default())
+    crate::modules::client(ctx.config.as_deref().cloned().unwrap_or_default())
 }
 
 #[cfg(test)]
-pub(crate) fn conversation_history_key(msg: &super::traits::ChannelMessage) -> String {
+pub(crate) fn conversation_history_key(msg: &tinychannels_bus::ChannelMessage) -> String {
     tinychannels::context::conversation_history_key(msg)
-}
-
-pub(crate) fn clear_sender_history(ctx: &ChannelRuntimeContext, sender_key: &str) {
-    ctx.conversation_histories
-        .lock()
-        .unwrap_or_else(|e| e.into_inner())
-        .remove(sender_key);
-}
-
-pub(crate) fn compact_sender_history(ctx: &ChannelRuntimeContext, sender_key: &str) -> bool {
-    let mut histories = ctx
-        .conversation_histories
-        .lock()
-        .unwrap_or_else(|e| e.into_inner());
-
-    let Some(turns) = histories.get_mut(sender_key) else {
-        return false;
-    };
-
-    if turns.is_empty() {
-        return false;
-    }
-
-    let keep_from = turns
-        .len()
-        .saturating_sub(CHANNEL_HISTORY_COMPACT_KEEP_MESSAGES);
-    let mut compacted = turns[keep_from..].to_vec();
-
-    for turn in &mut compacted {
-        if turn.content.chars().count() > CHANNEL_HISTORY_COMPACT_CONTENT_CHARS {
-            turn.content =
-                truncate_with_ellipsis(&turn.content, CHANNEL_HISTORY_COMPACT_CONTENT_CHARS);
-        }
-    }
-
-    *turns = compacted;
-    true
 }
 
 pub(crate) async fn is_context_window_overflow_error(
     ctx: &ChannelRuntimeContext,
     err: &anyhow::Error,
-) -> Result<bool, crate::modules::client::ModuleCallError> {
+) -> Result<bool, tinybus::module::ModuleCallError> {
     use tinychannels_bus::module_control::{ChannelControlRequest, ChannelControlResult};
     match module_client(ctx)
         .await
@@ -135,8 +106,8 @@ pub(crate) async fn is_context_window_overflow_error(
     {
         ChannelControlResult::Overflow(overflow) => Ok(overflow),
         _ => {
-            crate::modules::client::ModuleClient::report_malformed_reply("tinychannels");
-            Err(crate::modules::client::ModuleCallError::ModuleFault)
+            crate::modules::report::malformed_reply("tinychannels");
+            Err(tinybus::module::ModuleCallError::ModuleFault)
         }
     }
 }

@@ -25,11 +25,11 @@ plus the `LocalOnly` enforcement chokepoint built on top of it.
   `::network_fetch`, rather than the struct literal.
 - `emit_external_transfer(descriptor)`: the one call every external-egress
   point makes right before a transfer leaves the device. It drops non-external
-  transfers, attaches best-effort chat routing from
-  `security::approval::APPROVAL_CHAT_CONTEXT`, and fire-and-forget publishes
+  transfers, attaches best-effort chat routing from the
+  turn's `ApprovalChatContext` (an argument, or carried by the `EgressLedger`), and fire-and-forget publishes
   `DomainEvent::ExternalTransferPending` on `crate::core::bus::BUS`. This
   never blocks or fails the caller.
-- `dedup_turn_scope(f)`: runs `f` with a per-turn dedup ledger so a single
+- `EgressLedger::per_turn()` / `emit_external_transfer_in(&ledger, d)`: an explicit per-turn dedup ledger, passed down the provider factory chain, so a single
   managed chat turn's multi-model fan-out (primary + workload-tier + summarizer
   builds) collapses repeated disclosures of the same destination into one
   event; every other call path emits unconditionally.
@@ -80,6 +80,6 @@ Both `enforce_egress` and `local_only_tool_block` read the live mode via
 ## Further reading
 
 - [Parent module (`security`)](../README.md)
-- [Privacy mode](../../../../../gitbooks/features/privacy-mode.md)
-- [Privacy and security](../../../../../gitbooks/features/privacy-and-security.md)
-- [Security architecture](../../../../../gitbooks/developing/architecture/security.md)
+- [Privacy mode](../../../../../docs/gitbooks/en/features/privacy-mode.md)
+- [Privacy and security](../../../../../docs/gitbooks/en/features/privacy-and-security.md)
+- [Security architecture](../../../../../docs/gitbooks/en/developing/architecture/security.md)

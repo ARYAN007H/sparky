@@ -1,4 +1,5 @@
 use super::*;
+use crate::core::runtime::DispatchCtx;
 
 #[test]
 fn the_controller_is_channel_relay_inbound() {
@@ -24,18 +25,16 @@ fn the_controller_is_channel_relay_inbound() {
 
 #[test]
 fn the_controller_is_registered() {
-    assert!(
-        crate::core::all::all_registered_controllers()
-            .iter()
-            .any(|c| c.rpc_method_name() == "openhuman.channel_relay_inbound")
-    );
+    assert!(crate::core::all::all_registered_controllers()
+        .iter()
+        .any(|c| c.rpc_method_name() == "openhuman.channel_relay_inbound"));
 }
 
 #[tokio::test]
 async fn malformed_params_are_refused_before_any_work() {
     let mut params = Map::new();
     params.insert("channel".into(), Value::String("telegram".into()));
-    let err = handle_relay_inbound(params)
+    let err = handle_relay_inbound(DispatchCtx::process_default(), params)
         .await
         .expect_err("missing fields");
     assert!(err.contains("invalid params"), "{err}");

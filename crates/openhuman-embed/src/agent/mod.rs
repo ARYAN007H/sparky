@@ -5,7 +5,7 @@
 //! [`Runtime::agent`](crate::Runtime::agent) assembled from an
 //! [`AgentSpec`]: its own `Config` (provider route and model, MCP servers,
 //! autonomy tier, `action_dir`), its
-//! [`AgentDefinition`](openhuman_core::agent::harness::definition::AgentDefinition)
+//! [`AgentDefinition`](openhuman_core::agent::harness::host_definition::AgentDefinition)
 //! (system prompt, tool scope, sandbox mode), its
 //! derived
 //! [`CoreContext`](openhuman_core::core::runtime::CoreContext) every turn
@@ -34,7 +34,7 @@ pub use spec::{AgentSpec, MemoryBinding};
 use std::path::Path;
 use std::sync::Arc;
 
-use openhuman_core::agent::harness::definition::AgentDefinition;
+use openhuman_core::agent::harness::host_definition::AgentDefinition;
 use openhuman_core::config::Config;
 use openhuman_core::core::runtime::{CoreContext, CoreRuntime};
 
@@ -111,7 +111,7 @@ pub enum AgentError {
     /// The agent is removed, but its original MCP owner still needs cleanup.
     /// Its id and home remain reserved while detached cleanup retries.
     #[error("agent MCP cleanup is still pending: {0}")]
-    McpCleanup(#[source] openhuman_core::modules::client::ModuleCallError),
+    McpCleanup(#[source] tinybus::module::ModuleCallError),
 }
 
 /// The assembled state behind an [`Agent`], shared by every clone of it and
@@ -181,7 +181,11 @@ impl AgentInner {
         let Some(gate) = openhuman_core::security::approval::ApprovalGate::try_global() else {
             return;
         };
-        match gate.deny_all_for_agent(&self.id, resolution) {
+        match gate.deny_all_for_agent(
+            &openhuman_core::core::runtime::DispatchCtx::new(Arc::clone(&self.ctx)),
+            &self.id,
+            resolution,
+        ) {
             Ok(denied) => log::debug!(
                 "[embed][agent] id={} denied_approvals={denied} resolution={resolution}",
                 self.id
@@ -271,6 +275,7 @@ impl Agent {
             handler,
             self.inner.lifecycle.removed(),
             self.inner.lifecycle.approval_state(),
+            Some(Arc::downgrade(&self.inner.ctx)),
         )
     }
 
@@ -291,6 +296,7 @@ impl Agent {
             &self.inner.id,
             self.inner.lifecycle.removed(),
             self.inner.lifecycle.approval_state(),
+            Some(Arc::downgrade(&self.inner.ctx)),
         )
     }
 
