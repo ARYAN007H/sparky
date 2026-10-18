@@ -60,7 +60,6 @@ async fn cancelled_finish_releases_the_known_recording_and_output() {
     assert!(calls.contains(&methods::RELEASE_AUDIO_OUTPUT));
 }
 
-#[tokio::test]
 #[derive(Default)]
 struct Fixture {
     calls: std::sync::Mutex<Vec<&'static str>>,
