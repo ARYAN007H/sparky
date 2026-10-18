@@ -296,7 +296,7 @@ async fn offline_snapshot_scans_every_thread_and_message_page() {
         "old-channel-message",
         "hello from discord",
     );
-    let target_thread = params.thread_id();
+    let target_thread = "zz-legacy-channel-thread".to_owned();
     crate::threads::store::blocking::ensure_thread(
         ctx.clone(),
         workspace.clone(),
@@ -400,6 +400,10 @@ async fn offline_snapshot_scans_every_thread_and_message_page() {
         .all(|message| message.extra_metadata.get("channel").is_none()));
     assert_eq!(messages[64].extra_metadata["channel"], "discord");
     assert!(messages[65].extra_metadata.get("channel").is_none());
+    assert!(
+        !workspace.join("memory/channel_threads.json").exists(),
+        "the historical fallback fixture must not depend on the legacy map"
+    );
 
     assert_eq!(clear_channel_memory(&config, "discord").await.unwrap(), 0);
     assert_eq!(
