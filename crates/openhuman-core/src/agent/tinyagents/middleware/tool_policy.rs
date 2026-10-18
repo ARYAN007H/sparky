@@ -116,6 +116,41 @@ impl ToolPolicyMiddleware {
             }));
         Self { gate, host }
     }
+
+    // Keep focused host-adapter tests on the concrete disclosure callbacks
+    // after execution gating moves to TinyAgents. Production calls reach these
+    // callbacks through `with_post_gate` and the session-ceiling policy above.
+    #[cfg(test)]
+    pub(crate) fn render_skill_for_session(&self, call: &TaToolCall) -> Option<TaToolResult> {
+        self.host.render_skill_for_session(call)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn channel_permission_block(
+        &self,
+        call: &TaToolCall,
+        desktop_approval_disabled: bool,
+    ) -> Option<String> {
+        self.host
+            .channel_permission_block(call, desktop_approval_disabled)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn route_for_pack(
+        &self,
+        pack: &tinyagents_harness::tool::packs::ToolPack,
+    ) -> String {
+        self.host.route_for_pack(pack)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn no_such_pack_tool<'a>(
+        &self,
+        pack: &'static tinyagents_harness::tool::packs::ToolPack,
+        tool: &'a str,
+    ) -> tinyagents_harness::tool::packs::NoSuchPackTool<'a> {
+        self.host.no_such_pack_tool(pack, tool)
+    }
 }
 
 impl ToolPolicyHostState {
