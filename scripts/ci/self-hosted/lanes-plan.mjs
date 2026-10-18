@@ -55,8 +55,8 @@ export const HOSTED_GROUPS = [
   },
   { group: "rust-cov", lanes: ["rust-cov"], maxParallel: 1, container: true },
   { group: "tauri", lanes: ["tauri"], maxParallel: 1, container: true },
-  // The storage drivers build the core with features no other lane enables,
-  // so they get a runner (and a `target/`) of their own.
+  // Storage keeps the eleven SQLite e2e targets and feature-combination
+  // compile check on an isolated runner with its own `target/`.
   {
     group: "storage",
     lanes: ["storage-drivers"],
@@ -72,7 +72,7 @@ const CORE_PRODUCT = '"$(bash scripts/ci/product-features.sh --core)"';
 // The storage-drivers lane: the drivers it turns on, the root e2e targets that
 // run once per driver (tests/support/storage_drivers.rs), and the lib-test
 // filters of the domains that sit on the storage ports.
-const STORAGE_DRIVERS = "storage-sqlite,storage-file";
+const STORAGE_DRIVERS = "storage-sqlite";
 const STORAGE_E2E_TARGETS = [
   "storage_approvals_e2e",
   "storage_domains_e2e",
@@ -556,12 +556,11 @@ export function buildPlan({ profile, areas, env = {}, isPullRequest = true }) {
       ],
     },
     {
-      // The sqlite and file storage drivers, which no other lane compiles in:
-      // every `storage_*_e2e` target runs once per driver (memory, sqlite,
-      // file) and the stores that sit on the storage ports run their lib
-      // tests with the drivers on. The MongoDB driver needs a replica set and
-      // has its own workflow (storage-mongodb.yml). Armed by the `storage`
-      // area (.github/ci-paths-filter.yml).
+      // Every storage target runs on memory and SQLite; the dedicated runner
+      // also compiles the optional MongoDB and file feature combination.
+      // Keeping the lane separate retains isolated capacity for eleven
+      // integration targets plus the storage-port tests. Armed by the
+      // `storage` area (.github/ci-paths-filter.yml).
       name: "storage-drivers",
       // Compiles the core crate with its own feature set: holds one of the
       // VM's heavy-compile slots (lanes.mjs). Lower number = served first.
@@ -575,6 +574,11 @@ export function buildPlan({ profile, areas, env = {}, isPullRequest = true }) {
           run:
             `cargo test --no-fail-fast -p openhuman-cli --features ${STORAGE_DRIVERS}` +
             STORAGE_E2E_TARGETS.map((t) => ` --test ${t}`).join(""),
+        },
+        {
+          name: "storage-feature-compile",
+          when: areas.storage,
+          run: "cargo check -p openhuman-cli --features storage-mongodb,storage-file",
         },
         {
           name: "storage-lib-tests",
