@@ -51,13 +51,17 @@ pub(super) fn deliver_voice_result_to_chat(
         "[voice-harness] delivering deferred result to chat correlation={correlation_id} chars={} speak_back={allow_speak_back}",
         spoken.chars().count()
     );
-    crate::web_chat::publish_web_channel_event(crate::web_chat::WebChannelEvent {
-        event: "proactive_message".to_string(),
-        client_id: VOICE_CHAT_CLIENT_ID.to_string(),
-        thread_id: VOICE_CHAT_THREAD_ID.to_string(),
+    crate::web_chat::publish_web_channel_event(crate::web_chat::WebChannelEvent::ProactiveMessage {
+        context: crate::web_chat::channel_event::event_context(
+            VOICE_CHAT_CLIENT_ID,
+            VOICE_CHAT_THREAD_ID,
+            "",
+        ),
         full_response: Some(spoken.to_string()),
+        message: None,
         success: Some(true),
-        ..Default::default()
+        persisted_message_id: None,
+        parts: None,
     });
 
     // Speak-back: push the finished answer to the renderer's LIVE voice session so
@@ -66,12 +70,14 @@ pub(super) fn deliver_voice_result_to_chat(
     // session (a fast read-back turn). Skipped for read-back turns themselves to
     // avoid a loop; harmless if the call already ended (nobody is subscribed).
     if allow_speak_back {
-        crate::web_chat::publish_web_channel_event(crate::web_chat::WebChannelEvent {
-            event: "voice_speak".to_string(),
-            client_id: VOICE_CHAT_CLIENT_ID.to_string(),
+        crate::web_chat::publish_web_channel_event(crate::web_chat::WebChannelEvent::VoiceSpeak {
+            context: crate::web_chat::channel_event::event_context(
+                VOICE_CHAT_CLIENT_ID,
+                "",
+                "",
+            ),
             full_response: Some(spoken.to_string()),
             success: Some(true),
-            ..Default::default()
         });
     }
 }
@@ -91,15 +97,19 @@ pub(super) fn deliver_voice_failure_to_chat(correlation_id: &str) {
     info!(
         "[voice-harness] delivering deferred failure notice to chat correlation={correlation_id}"
     );
-    crate::web_chat::publish_web_channel_event(crate::web_chat::WebChannelEvent {
-        event: "proactive_message".to_string(),
-        client_id: VOICE_CHAT_CLIENT_ID.to_string(),
-        thread_id: VOICE_CHAT_THREAD_ID.to_string(),
+    crate::web_chat::publish_web_channel_event(crate::web_chat::WebChannelEvent::ProactiveMessage {
+        context: crate::web_chat::channel_event::event_context(
+            VOICE_CHAT_CLIENT_ID,
+            VOICE_CHAT_THREAD_ID,
+            "",
+        ),
         full_response: Some(
             "Sorry — I couldn't finish that request just now. Please try again.".to_string(),
         ),
+        message: None,
         success: Some(false),
-        ..Default::default()
+        persisted_message_id: None,
+        parts: None,
     });
 }
 
