@@ -15,6 +15,8 @@ use std::path::{Path, PathBuf};
 use serde_json::{json, Value};
 
 const LOG_PREFIX: &str = "[web_channel][voice_note]";
+/// `source` the composer stamps on a turn that began as a voice note.
+pub(crate) const VOICE_NOTE_SOURCE: &str = "voice_note";
 const DIR: &str = "voice_notes";
 /// Largest note the store accepts (decoded bytes).
 pub(crate) const MAX_NOTE_BYTES: usize = 25 * 1024 * 1024;
@@ -118,6 +120,54 @@ pub(crate) fn reply_note_metadata(workspace: &Path, request_id: &str) -> Option<
             .is_file()
             .then(|| json!({ "noteId": id, "mime": mime }))
     })
+}
+
+/// Whether this turn's reply is also spoken: an explicit `speak_reply` always
+/// wins, otherwise the `[channel_voice]` policy for the `web` channel decides
+/// (`always`, or `mirror` when the user sent a voice note).
+pub(crate) fn should_speak_reply(
+    config: &crate::config::Config,
+    thread_id: &str,
+    speak_reply: Option<bool>,
+    source: Option<&str>,
+) -> bool {
+    use crate::config::schema::VoiceReplyMode;
+    if speak_reply == Some(true) {
+        return true;
+    }
+    match config.channel_voice.resolve_mode("web", thread_id) {
+        VoiceReplyMode::Always => true,
+        VoiceReplyMode::Mirror => source == Some(VOICE_NOTE_SOURCE),
+        VoiceReplyMode::Never | VoiceReplyMode::SpeakReply => false,
+    }
+}
+
+/// Decodes and stores the audio a turn synthesized. `false` when the backend
+/// returned no audio (or it could not be stored); the reply then stays text.
+pub(crate) fn store_synthesized_reply(
+    workspace: &Path,
+    request_id: &str,
+    audio_base64: &str,
+    audio_mime: &str,
+) -> bool {
+    use base64::Engine as _;
+    if audio_base64.is_empty() {
+        return false;
+    }
+    let bytes = match base64::engine::general_purpose::STANDARD.decode(audio_base64) {
+        Ok(b) => b,
+        Err(err) => {
+            log::warn!("{LOG_PREFIX} reply audio is not base64 request_id={request_id}: {err}");
+            return false;
+        }
+    };
+    match store_note(workspace, &reply_note_id(request_id), audio_mime, &bytes) {
+        Ok(_) => true,
+        Err(err) => {
+            log::warn!("{LOG_PREFIX} could not store reply audio request_id={request_id}: {err}");
+            false
+        }
+    }
 }
 
 #[cfg(test)]

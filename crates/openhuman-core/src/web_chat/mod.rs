@@ -48,6 +48,7 @@ mod turn_close;
 mod turn_timing;
 mod types;
 
+mod voice_notes;
 mod web_errors;
 pub(crate) use web_errors::classify_inference_error;
 #[cfg(any(test, debug_assertions))]
