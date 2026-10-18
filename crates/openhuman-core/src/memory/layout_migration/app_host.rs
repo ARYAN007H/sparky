@@ -41,11 +41,13 @@ pub(super) fn to_module(error: Error) -> lm::Error {
     match error {
         Error::Off(message) => lm::Error::Off(message),
         Error::InvalidRequest(message) => lm::Error::InvalidRequest(message),
+        Error::NotFound(message) | Error::Config(message) => lm::Error::InvalidRequest(message),
+        Error::Conflict(message) => EngineError::Conflict(message).into(),
         Error::Unsupported(message) => EngineError::Unsupported(message).into(),
         Error::Unauthorized(message) => EngineError::Unauthorized(message).into(),
         Error::Unavailable(message) => EngineError::Unavailable(message).into(),
-        // The backend's `[CODE] ` prefix stays on the message, which is how
-        // the module tells an exhausted balance.
+        // Temporarily mirrors the old adapter behavior; the focused regression
+        // run will pin the typed-credit loss before this arm is corrected.
         Error::InsufficientCredits(message) | Error::Engine(message) => {
             EngineError::Engine(message).into()
         }
