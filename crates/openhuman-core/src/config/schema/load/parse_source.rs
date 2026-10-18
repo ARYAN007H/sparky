@@ -1,3 +1,9 @@
+///
+/// A file keeps its recovery: a body that does not parse falls back to the
+/// `.bak` next to it, then to defaults. A document is parsed strictly and a
+/// body that does not parse is an error: the file recovery would consume the
+/// node-local bootstrap `config.toml.bak`, rename the bootstrap file, and save
+/// stale defaults over the shared document.
 pub(super) async fn parse_source_contents(
     read: &super::source::ConfigRead,
     config_path: &Path,
