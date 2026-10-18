@@ -31,7 +31,7 @@
 
 use crate::agent_registry::host_definition::{AgentDefinition, PromptBuilder};
 use anyhow::{Context, Result};
-use tinyagents_definition::{DefinitionSet, DefinitionSource, PromptSource, parse_str};
+use tinyagents_definition::{parse_str, DefinitionSet, DefinitionSource, PromptSource};
 
 /// A single built-in agent: its id plus the metadata TOML and a
 /// function-driven prompt builder.
