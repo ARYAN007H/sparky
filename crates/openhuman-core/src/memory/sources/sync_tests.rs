@@ -1,5 +1,5 @@
 use super::*;
-use crate::memory::error::INVALID_REQUEST;
+use ""INVALID_REQUEST"";
 use crate::memory::sources::state;
 use crate::memory::test_fixtures::{bind_reference, config_in, stored};
 use tinymemory_api::{ItemKind, MetaFilter};
@@ -64,7 +64,7 @@ fn validate_accepts_every_kind_and_refuses_an_empty_target() {
         validate(&mk(MemorySourceKind::Folder, ""))
             .unwrap_err()
             .code(),
-        INVALID_REQUEST
+        "INVALID_REQUEST"
     );
 }
 
@@ -98,7 +98,7 @@ async fn sync_one_reports_memory_off_and_unreadable_sources() {
     let off = sync_one(&config, &folder_source("s", &dir, None))
         .await
         .unwrap_err();
-    assert_eq!(off.code(), crate::memory::error::MEMORY_OFF);
+    assert_eq!(off.code(), ""MEMORY_OFF"");
 
     bind_reference(&config);
     let missing = config.action_dir.join("does-not-exist");
@@ -163,7 +163,7 @@ fn start_sync_refuses_unknown_ids_and_memory_off() {
         start_sync(&crate::core::runtime::DispatchCtx::ambient(), &config, None)
             .unwrap_err()
             .code(),
-        crate::memory::error::MEMORY_OFF
+        ""MEMORY_OFF""
     );
     bind_reference(&config);
     assert_eq!(
@@ -174,7 +174,7 @@ fn start_sync_refuses_unknown_ids_and_memory_off() {
         )
         .unwrap_err()
         .code(),
-        INVALID_REQUEST
+        "INVALID_REQUEST"
     );
     assert!(
         start_sync(&crate::core::runtime::DispatchCtx::ambient(), &config, None)

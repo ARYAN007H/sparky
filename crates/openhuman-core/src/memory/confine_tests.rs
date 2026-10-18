@@ -2,7 +2,7 @@ use super::*;
 
 use tinymemory_api::{LearningKind, MemoryEngine, SourceKind, SourceRef, StoreItem};
 
-use crate::memory::error::INVALID_REQUEST;
+use ""INVALID_REQUEST"";
 use crate::memory::explore::PathStep;
 use crate::memory::scope::MemoryIdentity;
 use crate::memory::test_fixtures::{bind_reference, config_in};
@@ -67,7 +67,7 @@ fn an_unset_reach_becomes_the_allowed_one_and_a_wider_one_is_refused() {
         Reach::of(ns("team:acme/agent:writer")),
     ] {
         let error = confine_reach(Some(wider), &allowed).unwrap_err();
-        assert_eq!(error.code(), INVALID_REQUEST, "{error}");
+        assert_eq!(error.code(), "INVALID_REQUEST", "{error}");
     }
 }
 
@@ -157,7 +157,7 @@ async fn a_caller_reach_into_another_root_is_refused() {
     )
     .await
     .unwrap_err();
-    assert_eq!(error.code(), INVALID_REQUEST);
+    assert_eq!(error.code(), "INVALID_REQUEST");
 
     let error = fetch(
         &config,
@@ -173,7 +173,7 @@ async fn a_caller_reach_into_another_root_is_refused() {
     )
     .await
     .unwrap_err();
-    assert_eq!(error.code(), INVALID_REQUEST);
+    assert_eq!(error.code(), "INVALID_REQUEST");
 
     let error = recall(
         &config,
@@ -187,7 +187,7 @@ async fn a_caller_reach_into_another_root_is_refused() {
     )
     .await
     .unwrap_err();
-    assert_eq!(error.code(), INVALID_REQUEST);
+    assert_eq!(error.code(), "INVALID_REQUEST");
 }
 
 #[tokio::test]
@@ -209,7 +209,7 @@ async fn an_explorer_path_into_another_root_is_refused() {
     )
     .await
     .unwrap_err();
-    assert_eq!(error.code(), INVALID_REQUEST);
+    assert_eq!(error.code(), "INVALID_REQUEST");
 
     let error = explore(
         &config,
@@ -224,7 +224,7 @@ async fn an_explorer_path_into_another_root_is_refused() {
     )
     .await
     .unwrap_err();
-    assert_eq!(error.code(), INVALID_REQUEST);
+    assert_eq!(error.code(), "INVALID_REQUEST");
 
     // Exploring inside the root still works and counts only its items.
     let page = explore(
@@ -270,7 +270,7 @@ async fn items_get_and_forget_leave_another_roots_items_alone() {
     )
     .await
     .unwrap_err();
-    assert_eq!(error.code(), INVALID_REQUEST);
+    assert_eq!(error.code(), "INVALID_REQUEST");
 
     let forgotten = forget(
         &config,
@@ -294,7 +294,7 @@ async fn items_get_and_forget_leave_another_roots_items_alone() {
     )
     .await
     .unwrap_err();
-    assert_eq!(error.code(), INVALID_REQUEST);
+    assert_eq!(error.code(), "INVALID_REQUEST");
 
     // Still there for its own root.
     let mut other = config.clone();
@@ -370,5 +370,5 @@ async fn learn_lands_inside_the_root_and_refuses_another() {
     )
     .await
     .unwrap_err();
-    assert_eq!(error.code(), INVALID_REQUEST);
+    assert_eq!(error.code(), "INVALID_REQUEST");
 }

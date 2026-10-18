@@ -1,5 +1,5 @@
 use super::*;
-use crate::memory::error::INVALID_REQUEST;
+use ""INVALID_REQUEST"";
 use crate::memory::test_fixtures::{bind_reference, config_in, stored};
 use crate::memory::types::SourceStatus;
 use chrono::Utc;
@@ -67,7 +67,7 @@ fn normalize_target_rejects_malformed_targets() {
     ] {
         assert_eq!(
             normalize_target(kind, target).unwrap_err().code(),
-            INVALID_REQUEST,
+            "INVALID_REQUEST",
             "{kind:?} {target}"
         );
     }
@@ -108,7 +108,7 @@ fn add_list_and_remove_round_trip_through_config() {
 
     // The same kind and target cannot be added twice.
     let duplicate = apply_add(&mut config, &add_params("folder", "/home/me/notes")).unwrap_err();
-    assert_eq!(duplicate.code(), INVALID_REQUEST);
+    assert_eq!(duplicate.code(), "INVALID_REQUEST");
 
     let removed = apply_remove(&mut config, &added.id).expect("removed");
     assert_eq!(removed.id, added.id);
@@ -124,7 +124,7 @@ fn add_validates_kind_schedule_and_target() {
         apply_add(&mut config, &add_params("twitter", "x"))
             .unwrap_err()
             .code(),
-        INVALID_REQUEST
+        "INVALID_REQUEST"
     );
     assert_eq!(
         apply_add(
@@ -137,13 +137,13 @@ fn add_validates_kind_schedule_and_target() {
         )
         .unwrap_err()
         .code(),
-        INVALID_REQUEST
+        "INVALID_REQUEST"
     );
     assert_eq!(
         apply_add(&mut config, &add_params("link", "nope"))
             .unwrap_err()
             .code(),
-        INVALID_REQUEST
+        "INVALID_REQUEST"
     );
     assert!(
         config.memory.sources.is_empty(),
@@ -155,7 +155,7 @@ fn add_validates_kind_schedule_and_target() {
 fn the_removed_composio_kind_is_rejected_and_every_other_kind_is_accepted() {
     let mut config = Config::default();
     let error = apply_add(&mut config, &add_params("composio", "gmail")).unwrap_err();
-    assert_eq!(error.code(), INVALID_REQUEST);
+    assert_eq!(error.code(), "INVALID_REQUEST");
     assert!(config.memory.sources.is_empty());
     for (kind, target) in [
         ("folder", "/notes"),
@@ -250,7 +250,7 @@ fn a_source_can_store_at_an_agent_node() {
     bad.namespace = Some("nope".into());
     assert_eq!(
         apply_add(&mut config, &bad).unwrap_err().code(),
-        INVALID_REQUEST
+        "INVALID_REQUEST"
     );
 
     let mut hand_edited = source("x", None);

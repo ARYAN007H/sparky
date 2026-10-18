@@ -4,7 +4,6 @@ use std::time::Duration;
 
 use tinymemory_api::{ItemKind, MetaFilter};
 
-use crate::memory::error::{INVALID_REQUEST, MEMORY_OFF};
 use crate::memory::test_fixtures::{bind_reference, config_in, stored};
 use crate::threads::store::{ConversationMessage, CreateConversationThread};
 
@@ -74,7 +73,7 @@ async fn refuses_without_consent_and_with_memory_off() {
     )
     .await
     .unwrap_err();
-    assert_eq!(error.code(), INVALID_REQUEST);
+    assert_eq!(error.code(), "INVALID_REQUEST");
     let error = start(
         &DispatchCtx::ambient(),
         &config,
@@ -82,7 +81,7 @@ async fn refuses_without_consent_and_with_memory_off() {
     )
     .await
     .unwrap_err();
-    assert_eq!(error.code(), MEMORY_OFF);
+    assert_eq!(error.code(), "MEMORY_OFF");
 }
 
 #[tokio::test]

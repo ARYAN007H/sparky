@@ -1,5 +1,4 @@
 use super::*;
-use crate::memory::error::{INVALID_REQUEST, MEMORY_OFF, UNSUPPORTED};
 use crate::memory::test_fixtures::{bind_reference, config_in, stored};
 use crate::memory::types::EngineStatus;
 use tinymemory_api::{FetchMode, ItemKind, MetaFilter, SourceKind, SourceRef, ToolCallRef};
@@ -29,7 +28,7 @@ async fn every_engine_operation_reports_memory_off_without_an_engine() {
     )
     .await
     .unwrap_err();
-    assert_eq!(recall_error.code(), MEMORY_OFF);
+    assert_eq!(recall_error.code(), "MEMORY_OFF");
 
     let fetch_error = fetch(
         &config,
@@ -44,12 +43,12 @@ async fn every_engine_operation_reports_memory_off_without_an_engine() {
     )
     .await
     .unwrap_err();
-    assert_eq!(fetch_error.code(), MEMORY_OFF);
+    assert_eq!(fetch_error.code(), "MEMORY_OFF");
 
     let learn_error = learn(&config, learn_params("a fact"), None)
         .await
         .unwrap_err();
-    assert_eq!(learn_error.code(), MEMORY_OFF);
+    assert_eq!(learn_error.code(), "MEMORY_OFF");
 
     let forget_error = forget(
         &config,
@@ -60,12 +59,12 @@ async fn every_engine_operation_reports_memory_off_without_an_engine() {
     )
     .await
     .unwrap_err();
-    assert_eq!(forget_error.code(), MEMORY_OFF);
+    assert_eq!(forget_error.code(), "MEMORY_OFF");
 
     let list_error = items_list(&config, ItemsListParams::default())
         .await
         .unwrap_err();
-    assert_eq!(list_error.code(), MEMORY_OFF);
+    assert_eq!(list_error.code(), "MEMORY_OFF");
 
     assert_eq!(engines_list(&config).active, None);
     assert!(!engines_list(&config).engines.is_empty());
@@ -178,7 +177,7 @@ async fn forget_needs_an_id() {
     )
     .await
     .unwrap_err();
-    assert_eq!(error.code(), INVALID_REQUEST);
+    assert_eq!(error.code(), "INVALID_REQUEST");
 }
 
 #[test]
@@ -245,11 +244,11 @@ fn learning_confidence_must_be_a_probability() {
     params.confidence = Some(1.5);
     assert_eq!(
         learning_item(params, None).unwrap_err().code(),
-        INVALID_REQUEST
+        "INVALID_REQUEST"
     );
     assert_eq!(
         learning_item(learn_params("   "), None).unwrap_err().code(),
-        INVALID_REQUEST
+        "INVALID_REQUEST"
     );
 }
 
@@ -284,7 +283,7 @@ fn engine_set_validates_and_rebinds() {
     };
     assert_eq!(
         apply_engine_set(&mut config, &unknown).unwrap_err().code(),
-        INVALID_REQUEST
+        "INVALID_REQUEST"
     );
 
     for endpoint in ["not a url", "ftp://host", "file:///etc"] {
@@ -295,7 +294,7 @@ fn engine_set_validates_and_rebinds() {
         };
         assert_eq!(
             apply_engine_set(&mut config, &params).unwrap_err().code(),
-            INVALID_REQUEST,
+            "INVALID_REQUEST",
             "{endpoint}"
         );
     }
@@ -309,7 +308,7 @@ fn engine_set_validates_and_rebinds() {
         apply_engine_set(&mut config, &keyed_tinyhumans)
             .unwrap_err()
             .code(),
-        INVALID_REQUEST
+        "INVALID_REQUEST"
     );
 
     assert!(!engine::is_on(&config));
@@ -360,7 +359,7 @@ async fn disabling_memory_turns_it_off_and_keeps_the_engine_settings() {
     };
     assert_eq!(
         apply_engine_set(&mut config, &keyed).unwrap_err().code(),
-        INVALID_REQUEST
+        "INVALID_REQUEST"
     );
     assert!(engine::is_on(&config), "a refused disable changes nothing");
 
@@ -423,7 +422,7 @@ async fn fetch_refuses_a_mode_the_engine_does_not_declare() {
     )
     .await
     .unwrap_err();
-    assert_eq!(error.code(), UNSUPPORTED);
+    assert_eq!(error.code(), "UNSUPPORTED");
 }
 
 #[tokio::test]
@@ -439,7 +438,7 @@ async fn erase_all_needs_its_confirmation() {
     )
     .await
     .unwrap_err();
-    assert_eq!(error.code(), INVALID_REQUEST);
+    assert_eq!(error.code(), "INVALID_REQUEST");
     assert_eq!(stored(&engine, MetaFilter::default()).await.len(), 1);
 }
 
@@ -474,7 +473,7 @@ async fn erase_all_reports_memory_off_without_an_engine() {
     )
     .await
     .unwrap_err();
-    assert_eq!(error.code(), MEMORY_OFF);
+    assert_eq!(error.code(), "MEMORY_OFF");
 }
 
 #[tokio::test]
