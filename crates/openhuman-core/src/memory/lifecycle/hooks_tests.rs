@@ -1,8 +1,10 @@
 use super::*;
 
 use tinymemory_api::{
-    ItemKind, LearningKind, MemoryEngine, MemoryMeta, MetaFilter, Role, StoreItem,
+    Error as MemoryApiError, ItemKind, LearningKind, MemoryEngine, MemoryMeta, MetaFilter, Role,
+    StoreItem,
 };
+use tinymemory_tools::recall::SkipReason;
 
 use crate::memory::scope::MemoryIdentity;
 use crate::memory::test_fixtures::{bind_reference, config_in, stored};
@@ -74,6 +76,22 @@ async fn run_post_turn(
 fn turn_indices_follow_the_committed_transcript() {
     assert_eq!(user_turn_index(0), 0);
     assert_eq!(user_turn_index(3), 6);
+}
+
+#[test]
+fn typed_skip_reasons_expose_only_account_wide_errors() {
+    let unavailable = MemoryApiError::Unavailable("connection refused".into());
+    let invalid = MemoryApiError::InvalidRequest("bad scope".into());
+
+    assert_eq!(
+        account_wide_skip_reason(&SkipReason::Engine(unavailable.clone())),
+        Some(&unavailable)
+    );
+    assert_eq!(
+        account_wide_skip_reason(&SkipReason::Engine(invalid)),
+        None
+    );
+    assert_eq!(account_wide_skip_reason(&SkipReason::Empty), None);
 }
 
 #[test]
