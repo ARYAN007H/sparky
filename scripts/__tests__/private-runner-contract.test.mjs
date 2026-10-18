@@ -184,7 +184,6 @@ test("private validation and cache save have measured budgets without suppressin
   assert.doesNotMatch(upload, /tinymold\.outcome|success\(\)/);
 });
 
-
 test("private LLVM preflight rejects missing tools before publishing environment", () => {
   const source = readFileSync(helper, "utf8");
   const definition = source.match(/^verify_llvm_tools\(\) \{\n[\s\S]*?^\}/m)?.[0];
@@ -201,7 +200,7 @@ test("private LLVM preflight rejects missing tools before publishing environment
       `#!/usr/bin/env bash
 printf "%s\\n" "$*" >> "$RUSTUP_LOG"
 [[ "$*" == "run pinned-fixture rustc --print target-libdir" ]] || exit 91
-[[ "${LOOKUP_FAIL:-0}" != 1 ]] || exit 92
+[[ "$LOOKUP_FAIL" != 1 ]] || exit 92
 printf "%s\\n" "$FIXTURE_LIBDIR"
 `,
       { mode: 0o755 },
