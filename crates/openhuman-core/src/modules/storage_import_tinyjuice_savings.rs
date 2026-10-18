@@ -24,7 +24,7 @@ use anyhow::{Context, Result};
 use tinyjuice_bus::savings::SavingsAggregate;
 use tinystoragedrivers::ScopedStorage;
 
-use super::storage_grant_tinyjuice::MODULE_ID;
+use super::storage_grant_schemas::tinyjuice::MODULE_ID;
 use super::storage_import_support as support;
 use super::storage_import_tinyjuice::read_regular;
 use crate::core::runtime::DispatchCtx;
