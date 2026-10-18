@@ -282,8 +282,8 @@ impl TranscriptState {
                     self.append_thinking(delta);
                 }
             }
-            "tool_call" | "tool_result" | "tool_args_delta" => self.apply_activity(&ev, false),
-            event if event.starts_with("subagent_") => self.apply_activity(&ev, true),
+            "tool_call" | "tool_result" | "tool_args_delta" => self.apply_activity(ev, false),
+            event if event.starts_with("subagent_") => self.apply_activity(ev, true),
             "artifact_pending" | "artifact_ready" | "artifact_failed" => {
                 self.viewport_changed(self.entries.len());
                 let status = ev.event.trim_start_matches("artifact_");

@@ -167,6 +167,7 @@ impl Surface {
     }
 
     fn publish(&self, mut event: bus_web::WebChannelEvent, interim_round: Option<u32>) {
+        event.normalize_projected_wire_fields();
         if let bus_web::WebChannelEvent::ChatInterim { round, .. } = &mut event {
             if round.is_none() {
                 *round = interim_round.filter(|round| *round > 0);
