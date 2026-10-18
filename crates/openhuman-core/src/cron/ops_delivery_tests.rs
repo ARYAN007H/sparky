@@ -528,10 +528,8 @@ async fn manual_owner_reconciles_a_lost_committed_ack_before_releasing_context()
         tests::single_flight_system_job(&config, &name)
     })
     .await;
-    let _handler = crate::cron::system_job_handlers::register(
-        &name,
-        Arc::new(|_| Box::pin(async { Ok(()) })),
-    );
+    let _handler =
+        crate::cron::system_job_handlers::register(&name, Arc::new(|_| Box::pin(async { Ok(()) })));
     let (ack_committed, allow_lost_reply) =
         crate::cron::scheduler::lose_next_ack_reply_after_commit_for_test(
             config.workspace_dir.clone(),

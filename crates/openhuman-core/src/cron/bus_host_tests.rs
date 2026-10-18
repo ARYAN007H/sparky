@@ -135,7 +135,10 @@ async fn an_expired_bound_callback_fails_closed_under_another_ambient_context() 
             DomainSet::full(),
             crate::tools::toolpacks::ToolGroups::none(),
         )
-        .session_agent(format!("expired-callback-{}", uuid::Uuid::new_v4().simple())),
+        .session_agent(format!(
+            "expired-callback-{}",
+            uuid::Uuid::new_v4().simple()
+        )),
     );
     let expired_weak = Arc::downgrade(&expired);
     let dispatch = DispatchCtx::new(Arc::clone(&expired));
@@ -151,7 +154,10 @@ async fn an_expired_bound_callback_fails_closed_under_another_ambient_context() 
     };
     drop(dispatch);
     drop(expired);
-    assert!(expired_weak.upgrade().is_none(), "the bound context is truly expired before the callback");
+    assert!(
+        expired_weak.upgrade().is_none(),
+        "the bound context is truly expired before the callback"
+    );
 
     let other = CoreContext::for_test_with_config(DomainSet::full(), config.clone()).derive_with(
         ContextOverlay::new(

@@ -311,7 +311,10 @@ static MANUAL_CLAIM_TEST_GATES: LazyLock<
 #[cfg(test)]
 pub(crate) fn pause_manual_claim_for_test(
     job_id: &str,
-) -> (tokio::sync::oneshot::Receiver<()>, tokio::sync::oneshot::Sender<()>) {
+) -> (
+    tokio::sync::oneshot::Receiver<()>,
+    tokio::sync::oneshot::Sender<()>,
+) {
     let (entered_tx, entered_rx) = tokio::sync::oneshot::channel();
     let (release_tx, release_rx) = tokio::sync::oneshot::channel();
     MANUAL_CLAIM_TEST_GATES
