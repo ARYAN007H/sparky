@@ -228,8 +228,8 @@ impl MediaFallbackCache<AttachmentAccessScope> for AttachmentModel {
 }
 
 impl MediaHistoryFallback<AttachmentAccessScope> for AttachmentModel {
-    fn omitted(&self, scope: &AttachmentAccessScope, _modality: InputModality, source: &str) -> String {
-        let block = ContentBlock::Document(MediaRef::Path { path: source.to_owned(), media_type: None });
+    fn omitted(&self, scope: &AttachmentAccessScope, modality: InputModality, source: &str) -> String {
+        let block = history_source_block(modality, source);
         let hint = super::historical_source_hint(&block, scope);
         format!("[Earlier attachment omitted by history budget; workspace path: {hint}]")
     }
@@ -248,14 +248,40 @@ impl MediaHistoryFallback<AttachmentAccessScope> for AttachmentModel {
         {
             return None;
         }
-        let block = match modality {
-            InputModality::Image => ContentBlock::Image(ImageRef { url: source.to_owned(), mime_type: None }),
-            InputModality::Audio => ContentBlock::Audio(MediaRef::Path { path: source.to_owned(), media_type: None }),
-            InputModality::Video => ContentBlock::Video(MediaRef::Path { path: source.to_owned(), media_type: None }),
-            InputModality::Document => ContentBlock::Document(MediaRef::Path { path: source.to_owned(), media_type: None }),
-        };
+        let block = history_source_block(modality, source);
         let hint = super::historical_source_hint(&block, scope);
         Some(format!("[Earlier attachment unavailable or omitted at workspace path: {hint}]") )
+    }
+}
+
+fn history_source_block(modality: InputModality, source: &str) -> ContentBlock {
+    match modality {
+        InputModality::Image => ContentBlock::Image(ImageRef {
+            url: source.to_owned(),
+            mime_type: None,
+        }),
+        modality => {
+            let media = if source.starts_with("data:")
+                || source.starts_with("http://")
+                || source.starts_with("https://")
+            {
+                MediaRef::Url {
+                    url: source.to_owned(),
+                    media_type: None,
+                }
+            } else {
+                MediaRef::Path {
+                    path: source.to_owned(),
+                    media_type: None,
+                }
+            };
+            match modality {
+                InputModality::Audio => ContentBlock::Audio(media),
+                InputModality::Video => ContentBlock::Video(media),
+                InputModality::Document => ContentBlock::Document(media),
+                InputModality::Image => unreachable!(),
+            }
+        }
     }
 }
 
