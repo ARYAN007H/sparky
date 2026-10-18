@@ -397,9 +397,8 @@ impl FailureScopePolicy<OpenHumanRunContext> for HostFailurePolicy {
     fn record_guard_refusal(
         &self,
         _ctx: &RunContext<OpenHumanRunContext>,
-    ) -> Option<tinyagents_harness::no_progress::ClassifiedStopCause> {
+    ) {
         self.stop.record_refusal();
-        self.stop.current_classified_cause()
     }
 
     fn record_progress(
@@ -407,12 +406,18 @@ impl FailureScopePolicy<OpenHumanRunContext> for HostFailurePolicy {
         ctx: &RunContext<OpenHumanRunContext>,
         _call: &TaToolCall,
         _scope: &FailureScope,
-    ) -> Option<tinyagents_harness::no_progress::ClassifiedStopCause> {
+    ) {
         self.stop.record_success();
         self.last_exit_report
             .lock()
             .unwrap_or_else(|p| p.into_inner())
             .remove(&ctx.instance_id());
+    }
+
+    fn current_halt_cause(
+        &self,
+        _ctx: &RunContext<OpenHumanRunContext>,
+    ) -> Option<tinyagents_harness::no_progress::ClassifiedStopCause> {
         self.stop.current_classified_cause()
     }
 
@@ -462,12 +467,11 @@ impl FailureScopePolicy<OpenHumanRunContext> for HostFailurePolicy {
         call: &TaToolCall,
         repeated: bool,
         error: &str,
-    ) -> Option<tinyagents_harness::no_progress::ClassifiedStopCause> {
+    ) {
         self.stop
             .record_classified_halt(summary.to_owned(), class, &call.name, repeated, || {
                 first_error_line(error)
             });
-        self.stop.current_classified_cause()
     }
 
     fn finish_run(&self, ctx: &RunContext<OpenHumanRunContext>) {
