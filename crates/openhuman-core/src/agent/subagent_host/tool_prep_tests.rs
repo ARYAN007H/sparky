@@ -78,11 +78,13 @@ fn dynamic_child_prompt_lists_text_dialect_catalogue_once() {
     let integrations = [];
     let visible = ["unique_probe_tool".to_owned()].into_iter().collect();
 
-    for format in [
+    let formats = [
         ToolCallFormat::PFormat,
         ToolCallFormat::Python,
         ToolCallFormat::TypeScript,
-    ] {
+    ];
+    let mut catalogue_counts = Vec::with_capacity(formats.len());
+    for format in formats {
         let specs = [tinytools::ToolSpec {
             name: "unique_probe_tool".into(),
             description: "catalogue sentinel for one visible probe".into(),
@@ -111,12 +113,9 @@ fn dynamic_child_prompt_lists_text_dialect_catalogue_once() {
         definition.extensions.prompt_builder = Some(dynamic_subagent_prompt);
 
         let prompt = load_prompt_source(&definition, &context).unwrap();
-        assert_eq!(
-            prompt.matches("catalogue sentinel for one visible probe").count(),
-            1,
-            "dynamic {format:?} prompt should render its tool catalogue once"
-        );
+        catalogue_counts.push(prompt.matches("catalogue sentinel for one visible probe").count());
     }
+    assert_eq!(catalogue_counts, [1, 1, 1], "dynamic PFormat/Python/TypeScript prompts should each list the tool catalogue once");
 }
 
 struct NamedTool(&'static str);
