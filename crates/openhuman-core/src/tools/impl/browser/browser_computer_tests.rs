@@ -224,7 +224,7 @@ async fn task_without_allowed_websites_is_refused_before_the_module() {
     }
 }
 
-#[tokio::test(start_paused = true)]
+#[tokio::test]
 async fn a_second_turn_reuses_the_thread_session_and_close_removes_it() {
     let client = Arc::new(BrowserClient::new(Arc::new(
         crate::config::Config::default(),

@@ -84,7 +84,7 @@ fn config_fingerprint_is_stable_for_identical_config() {
     assert_eq!(config_fingerprint(&a), config_fingerprint(&b));
 }
 
-#[tokio::test(start_paused = true)]
+#[tokio::test]
 async fn history_section_is_none_for_an_unknown_thread() {
     // No transcripts exist for this id, so `token_usage` should report
     // `has_usage: false` (or the RPC itself fails) and this must degrade to
