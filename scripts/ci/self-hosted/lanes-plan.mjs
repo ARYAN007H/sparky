@@ -69,9 +69,9 @@ export const HOSTED_GROUPS = [
 
 const CORE_PRODUCT = '"$(bash scripts/ci/product-features.sh --core)"';
 
-// The storage-drivers lane: the drivers it turns on, the root e2e targets that
-// run once per driver (tests/support/storage_drivers.rs), and the lib-test
-// filters of the domains that sit on the storage ports.
+// The storage-drivers lane: the driver it turns on, the root e2e targets that
+// exercise the memory/SQLite host matrix, and the lib-test filters of the
+// domains that sit on the storage ports.
 const STORAGE_DRIVERS = "storage-sqlite";
 const STORAGE_E2E_TARGETS = [
   "storage_approvals_e2e",

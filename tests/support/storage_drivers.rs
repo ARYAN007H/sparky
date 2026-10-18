@@ -14,10 +14,9 @@
 //! time (they share [`Case`]'s lock) and the slot is emptied when a case ends,
 //! pass or fail.
 //!
-//! Include with `#[macro_use] mod storage_drivers;` and declare the body with
-//! `driver_cases!(sync body)` (or `async body`), where `body` is
-//! `fn(Case)` (or `async fn(Case)`); `driver_cases!(url body)` takes a
-//! `fn(UrlCase)` for suites that spawn `openhuman-core` against the URL.
+//! Include with `#[macro_use] mod storage_drivers;` and declare in-process
+//! bodies with `driver_cases!(sync body)` (or `async body`). Suites that spawn
+//! `openhuman-core` can call `run_url` for the driver they need.
 
 #![allow(dead_code)]
 
@@ -137,7 +136,7 @@ pub struct UrlCase {
     pub data_dir: tempfile::TempDir,
 }
 
-/// Runs a body that only needs the driver's URL (`driver_cases!(url body)`).
+/// Runs a body that only needs the driver's URL.
 pub fn run_url(driver: Driver, body: fn(UrlCase)) {
     // Same lock as the in-process cases: the spawned cores and this process
     // share the process-wide test setup.
@@ -191,9 +190,6 @@ macro_rules! driver_cases {
     };
     (async $($body:ident),+ $(,)?) => {
         driver_cases!(@each run_async $($body),+);
-    };
-    (url $($body:ident),+ $(,)?) => {
-        driver_cases!(@each run_url $($body),+);
     };
     (@each $runner:ident $($body:ident),+) => {
         mod memory {
