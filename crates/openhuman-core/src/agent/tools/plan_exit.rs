@@ -51,11 +51,11 @@ impl Default for PlanExitTool {
 #[async_trait]
 impl Tool for PlanExitTool {
     fn name(&self) -> &str {
-        owner_tool().name()
+        tinyagents_harness::tool::plan_exit::PlanExitTool::NAME
     }
 
     fn description(&self) -> &str {
-        owner_tool().description()
+        tinyagents_harness::tool::plan_exit::PlanExitTool::DESCRIPTION
     }
 
     fn parameters_schema(&self) -> Value {
