@@ -142,12 +142,15 @@ async fn sent_texts(server: &MockServer) -> Vec<String> {
 
 #[test]
 fn a_telegram_message_is_answered_by_the_bound_runtime_agent() {
-    let _ = env_logger::builder().is_test(true).try_init();
     runtime().block_on(async {
         tokio::spawn(async {
             let backend = stub_backend().await;
             let bot_api = telegram().await;
             let provider = provider().await;
+            // `start_channels` resolves the managed provider up front, and the
+            // core carries none of its own; supply it as the TinyHumans layer
+            // would, pointed at the mock backend.
+            common::PointedInference::install(&format!("{}/openai/v1", backend.uri()));
             // The Bot API base is read when the channel is built.
             std::env::set_var("OPENHUMAN_TELEGRAM_BOT_API_BASE", bot_api.uri());
 
