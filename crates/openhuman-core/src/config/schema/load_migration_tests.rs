@@ -17,7 +17,7 @@ vad_max_utterance_secs = 30.0
     )
     .unwrap();
 
-    let mut config = load_or_init_for_workspace(tmp.path()).await;
+    let config = load_or_init_for_workspace(tmp.path()).await;
     config.save().await.unwrap();
 
     let saved = std::fs::read_to_string(config_path).unwrap();
