@@ -78,17 +78,14 @@ async fn session_pre_and_post_turn_use_the_external_channel_origin_not_event_lab
             .memory_pre_turn(&[], 0, None, origin)
             .await
             .expect("memory turn");
-        assert_eq!(
-            prelude
-                .mutable
-                .lock()
-                .expect("prelude state")
-                .pending_memory_turn
-                .as_ref()
-                .and_then(|pending| pending.channel.as_deref()),
-            expected_channel,
-            "assistant logging retains the same normalized origin"
-        );
+        let pending_channel = prelude
+            .mutable
+            .lock()
+            .expect("prelude state")
+            .pending_memory_turn
+            .as_ref()
+            .and_then(|pending| pending.channel.clone());
+        assert_eq!(pending_channel.as_deref(), expected_channel);
 
         let receipt = CommitReceipt {
             outcome: SessionTurnOutcome {
@@ -119,9 +116,16 @@ async fn session_pre_and_post_turn_use_the_external_channel_origin_not_event_lab
                 .await;
                 if items.len() >= 2 {
                     assert_eq!(items.len(), 2);
-                    assert!(items
+                    let user_turn = items
                         .iter()
-                        .all(|item| item.meta.channel.as_deref() == expected_channel));
+                        .find(|item| item.text.contains(&format!("question for {thread_id}")))
+                        .expect("logged user turn");
+                    let assistant_turn = items
+                        .iter()
+                        .find(|item| item.text.contains(&format!("answer for {thread_id}")))
+                        .expect("logged assistant turn");
+                    assert_eq!(user_turn.meta.channel.as_deref(), expected_channel);
+                    assert_eq!(assistant_turn.meta.channel.as_deref(), expected_channel);
                     break;
                 }
                 tokio::task::yield_now().await;
