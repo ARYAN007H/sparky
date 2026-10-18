@@ -661,6 +661,24 @@ test('still credits a file gated on a real feature', (t) => {
   );
 });
 
+// Test ownership can move a controller smoke to a differently named root
+// target. Deleting a `*_e2e.rs` padding file must not drop coverage when any
+// other Rust target under tests/ still names the RPC method.
+test('counts coverage from a non-e2e root Rust test target', (t) => {
+  const root = fixture(t);
+  write(root, 'crates/openhuman-core/src/widgets/schemas.rs', controller('widgets', 'list'));
+  write(root, 'tests/in_process/widgets_smoke.rs', 'let m = "openhuman.widgets_list";');
+
+  const result = runGate(root);
+
+  assert.equal(result.status, 0, `a non-e2e root target must cover the controller; got:\n${result.stderr}`);
+  assert.match(
+    result.stdout,
+    /\| widgets \| widgets \| 1\/1 \| 100\.0% \|/,
+    `the target's controller must count as covered; got:\n${result.stdout}`,
+  );
+});
+
 // A namespace that outgrows one file splits the same way every time: the
 // `const NAMESPACE` stays with the aggregate and the `ControllerSchema`
 // literals move into siblings reaching it through `use super::*`. Per-file
