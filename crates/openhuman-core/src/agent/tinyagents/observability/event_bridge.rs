@@ -9,8 +9,8 @@ use tokio::sync::mpsc::Sender;
 
 use tinyinference_llm::usage::Usage;
 
-use tinyagents_harness::progress::AgentProgress;
 use crate::inference::provider::BilledUsage;
+use tinyagents_harness::progress::AgentProgress;
 use tinytools::humanize_tool_name;
 
 use super::bridge_types::{ProviderUsageCarry, SubagentScope, ToolFailureMap, ToolNameMap};

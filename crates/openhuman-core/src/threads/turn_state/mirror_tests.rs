@@ -1,8 +1,8 @@
 //! Unit tests for [`super::TurnStateMirror`].
 
 use super::*;
-use tinyagents_harness::progress::AgentProgress;
 use tempfile::tempdir;
+use tinyagents_harness::progress::AgentProgress;
 
 fn fresh(thread_id: &str) -> (tempfile::TempDir, TurnStateMirror) {
     let dir = tempdir().expect("tempdir");

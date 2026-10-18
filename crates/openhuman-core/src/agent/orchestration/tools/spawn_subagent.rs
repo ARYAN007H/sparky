@@ -14,7 +14,6 @@
 //!
 use crate::agent::harness::host_definition::AgentDefinitionRegistry;
 use crate::agent::orchestration::tools::dispatch::{incomplete_stop, stopped_subagent_result};
-use tinyagents_harness::progress::AgentProgress;
 use crate::agent::subagent_host::{
     run_subagent_with_parent, SubagentRunOptions, SubagentRunOutcome, SubagentRunStatus,
 };
@@ -25,6 +24,7 @@ use serde_json::json;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tinyagents_harness::context::RunContext;
+use tinyagents_harness::progress::AgentProgress;
 use tinyagents_harness::tool::{ToolDispatch, ToolExecutionContext};
 use tinytools::ToolRunContext;
 use tinytools::{PermissionLevel, Tool, ToolCallOptions, ToolResult};

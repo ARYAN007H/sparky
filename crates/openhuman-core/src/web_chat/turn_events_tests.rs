@@ -86,7 +86,9 @@ async fn a_completed_turn_announces_one_chat_done_with_its_timing() {
     let mut rx = crate::web_chat::subscribe_web_channel_events();
     let (shared, sink) = events();
     let req = request("events-done", QueueDisposition::Parallel);
-    shared.with("events-done", |slot| slot.result = Some(done_result("all done")));
+    shared.with("events-done", |slot| {
+        slot.result = Some(done_result("all done"))
+    });
     sink.terminal(
         &req,
         TerminalEvent::Completed {
@@ -139,8 +141,13 @@ async fn a_stopped_turn_announces_cancelled_to_the_client_that_stopped_it() {
             superseded_by: None,
         },
     );
-    sink.terminal(&req, TerminalEvent::Cancelled { request_id: "events-stop".into() })
-        .await;
+    sink.terminal(
+        &req,
+        TerminalEvent::Cancelled {
+            request_id: "events-stop".into(),
+        },
+    )
+    .await;
     let seen = events_for(&mut rx, "events-stop", 2).await;
     assert_eq!(seen[0].event, "chat_error");
     assert_eq!(seen[0].error_type.as_deref(), Some("cancelled"));
@@ -163,10 +170,18 @@ async fn a_superseded_turn_names_its_replacement() {
             ..CancelNote::default()
         },
     );
-    sink.terminal(&req, TerminalEvent::Cancelled { request_id: "events-old".into() })
-        .await;
+    sink.terminal(
+        &req,
+        TerminalEvent::Cancelled {
+            request_id: "events-old".into(),
+        },
+    )
+    .await;
     let seen = events_for(&mut rx, "events-old", 2).await;
-    assert_eq!(seen[0].message.as_deref(), Some("Cancelled by newer request"));
+    assert_eq!(
+        seen[0].message.as_deref(),
+        Some("Cancelled by newer request")
+    );
     assert_eq!(seen[1].cancel_reason.as_deref(), Some("superseded"));
     assert_eq!(seen[1].superseded_by.as_deref(), Some("events-new"));
     assert_eq!(seen[1].client_id, "interrupter");
@@ -178,12 +193,22 @@ async fn a_queued_message_dropped_before_it_started_is_silent() {
     let (shared, sink) = events();
     let queued = request("events-queued", QueueDisposition::Followup);
     shared.mark_queued("events-queued");
-    sink.terminal(&queued, TerminalEvent::Cancelled { request_id: "events-queued".into() })
-        .await;
+    sink.terminal(
+        &queued,
+        TerminalEvent::Cancelled {
+            request_id: "events-queued".into(),
+        },
+    )
+    .await;
     // A later terminal for a sibling proves the queued one published nothing.
     let sibling = request("events-sibling", QueueDisposition::Interrupt);
-    sink.terminal(&sibling, TerminalEvent::Cancelled { request_id: "events-sibling".into() })
-        .await;
+    sink.terminal(
+        &sibling,
+        TerminalEvent::Cancelled {
+            request_id: "events-sibling".into(),
+        },
+    )
+    .await;
     let first = tokio::time::timeout(Duration::from_secs(5), async {
         loop {
             match rx.recv().await {
@@ -212,7 +237,10 @@ async fn the_reply_store_has_nothing_to_write_for_a_turn_without_a_result() {
         reply: "x".into(),
         data: serde_json::Value::Null,
     };
-    store.persist(&req, "reply", &result).await.expect("a no-op");
+    store
+        .persist(&req, "reply", &result)
+        .await
+        .expect("a no-op");
 }
 
 #[tokio::test]
@@ -220,7 +248,10 @@ async fn a_turn_stopped_before_its_config_resolved_cannot_be_closed() {
     let shared = Arc::new(Shared::default());
     let summarizer = WebSummarizer::new(shared.clone());
     let req = request("close-none", QueueDisposition::Interrupt);
-    assert!(summarizer.grounded_close(&req, RUNNER_DEADLINE).await.is_none());
+    assert!(summarizer
+        .grounded_close(&req, RUNNER_DEADLINE)
+        .await
+        .is_none());
     assert!(summarizer.grounded_close(&req, RUNNER_IDLE).await.is_none());
 }
 
@@ -244,7 +275,11 @@ async fn a_closed_turn_keeps_the_reply_for_the_store_and_the_terminal() {
         .grounded_close(&req, RUNNER_IDLE)
         .await
         .expect("a turn with a config is closed");
-    assert!(closed.reply.contains("stopped this turn"), "{}", closed.reply);
+    assert!(
+        closed.reply.contains("stopped this turn"),
+        "{}",
+        closed.reply
+    );
     let kept = shared
         .with("close-ok", |slot| slot.result.clone())
         .expect("reply kept for the terminal");

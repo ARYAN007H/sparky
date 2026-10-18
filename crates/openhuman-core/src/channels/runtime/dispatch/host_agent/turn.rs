@@ -5,8 +5,8 @@ use tokio::sync::mpsc;
 use super::posture;
 use crate::agent::bus::AgentTurnResponse;
 use crate::agent::host_agents::HostAgent;
-use tinyagents_harness::progress::AgentProgress;
 use crate::agent::turn_origin::AgentTurnOrigin;
+use tinyagents_harness::progress::AgentProgress;
 use tinyagents_session::transcript::TranscriptMessage;
 
 /// One channel message, as a host agent's turn needs it.

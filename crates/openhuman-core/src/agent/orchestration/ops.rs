@@ -27,7 +27,6 @@ use super::types::{
 };
 use crate::agent::harness::fork_context::ParentExecutionContext;
 use crate::agent::harness::host_definition::{AgentDefinition, AgentDefinitionRegistry};
-use tinyagents_harness::progress::AgentProgress;
 use crate::agent::subagent_host::{
     run_subagent, SubagentRunError, SubagentRunOptions, SubagentRunOutcome, SubagentRunStatus,
 };
@@ -38,6 +37,7 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 use thiserror::Error;
 use tinyagents_harness::ids::TaskId;
+use tinyagents_harness::progress::AgentProgress;
 use tinyagents_harness::CancellationToken;
 use tinyagents_tasks::{
     DetachedTaskRegistry, DetachedTaskRegistryError, DetachedTaskWaitOutcome,

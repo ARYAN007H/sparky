@@ -3,8 +3,8 @@
 
 use tinyagents_harness::terminal::{TerminalClass, TerminalOutcome};
 
-use tinyagents_harness::progress::AgentProgress;
 use crate::agent::progress_tracing::TurnOutcome;
+use tinyagents_harness::progress::AgentProgress;
 
 /// One step applied to the [`super::SpanCollector`] while replaying a journal.
 ///

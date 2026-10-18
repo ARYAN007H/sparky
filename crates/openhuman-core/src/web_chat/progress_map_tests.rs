@@ -11,7 +11,10 @@ fn expect_subagent(event: ChannelOutputEvent) -> SubagentOutput {
 
 #[test]
 fn lifecycle_events_name_the_stage_and_the_round() {
-    let ChannelOutputEvent::Lifecycle { stage, iteration, .. } = inference_start() else {
+    let ChannelOutputEvent::Lifecycle {
+        stage, iteration, ..
+    } = inference_start()
+    else {
         panic!("lifecycle")
     };
     assert_eq!((stage.as_str(), iteration), ("inference_start", None));
@@ -115,7 +118,10 @@ fn a_cost_update_is_a_charged_usage_readout() {
         panic!("usage")
     };
     assert_eq!(model.as_deref(), Some("m"));
-    assert_eq!((iteration, input_tokens, total_usd), (Some(3), 10, Some(0.25)));
+    assert_eq!(
+        (iteration, input_tokens, total_usd),
+        (Some(3), 10, Some(0.25))
+    );
 }
 
 #[test]
@@ -132,7 +138,10 @@ fn a_spawned_subagent_is_attributed_to_the_parents_round_and_call() {
         Some("call-9".into()),
     ));
     assert_eq!(out.state, "spawned");
-    assert_eq!(out.message.as_deref(), Some("Sub-agent 'Researcher' spawned"));
+    assert_eq!(
+        out.message.as_deref(),
+        Some("Sub-agent 'Researcher' spawned")
+    );
     assert_eq!(out.tool_name.as_deref(), Some("researcher"));
     assert_eq!((out.iteration, out.prompt_chars), (Some(4), Some(120)));
     assert_eq!(out.parent_call_id.as_deref(), Some("call-9"));
@@ -164,16 +173,32 @@ fn a_finished_subagent_carries_its_iterations_result_spend_and_worktree() {
     ));
     assert_eq!(out.state, "completed");
     assert_eq!(out.iteration, Some(3), "the child's own iteration total");
-    assert_eq!(out.message.as_deref(), Some("Sub-agent 'researcher' completed in 1500ms"));
+    assert_eq!(
+        out.message.as_deref(),
+        Some("Sub-agent 'researcher' completed in 1500ms")
+    );
     assert_eq!(out.output.as_deref(), Some("done"));
     assert_eq!(out.success, Some(true));
     let spend = out.usage.expect("spend");
     assert_eq!((spend.input_tokens, spend.charged_amount_usd), (5, 0.5));
     assert_eq!(out.worktree_path.as_deref(), Some("/w"));
-    assert_eq!((out.changed_files, out.dirty_status), (vec!["a.rs".to_string()], Some(true)));
+    assert_eq!(
+        (out.changed_files, out.dirty_status),
+        (vec!["a.rs".to_string()], Some(true))
+    );
 
     let none = expect_subagent(sub_completed(
-        "r", "t", 1, 1, 0, String::new(), None, None, Vec::new(), None, None,
+        "r",
+        "t",
+        1,
+        1,
+        0,
+        String::new(),
+        None,
+        None,
+        Vec::new(),
+        None,
+        None,
     ));
     assert!(none.usage.is_none());
 }
@@ -185,7 +210,17 @@ fn an_unknown_cost_reads_as_zero_spend_not_missing_tokens() {
         ..Default::default()
     };
     let out = expect_subagent(sub_completed(
-        "r", "t", 1, 1, 0, String::new(), Some(&usage), None, Vec::new(), None, None,
+        "r",
+        "t",
+        1,
+        1,
+        0,
+        String::new(),
+        Some(&usage),
+        None,
+        Vec::new(),
+        None,
+        None,
     ));
     let spend = out.usage.expect("tokens survive an unknown cost");
     assert_eq!((spend.input_tokens, spend.charged_amount_usd), (9, 0.0));
@@ -195,7 +230,10 @@ fn an_unknown_cost_reads_as_zero_spend_not_missing_tokens() {
 fn failed_and_waiting_subagents_say_why() {
     let failed = expect_subagent(sub_failed("r", "t", 2, "boom".into(), Some("p".into())));
     assert_eq!(failed.state, "failed");
-    assert_eq!((failed.success, failed.message.as_deref()), (Some(false), Some("boom")));
+    assert_eq!(
+        (failed.success, failed.message.as_deref()),
+        (Some(false), Some("boom"))
+    );
     assert_eq!(failed.parent_call_id.as_deref(), Some("p"));
 
     let waiting = expect_subagent(sub_awaiting_user(
@@ -214,7 +252,10 @@ fn failed_and_waiting_subagents_say_why() {
 #[test]
 fn a_subagent_iteration_hides_its_cap_under_the_extended_policy() {
     let capped = expect_subagent(sub_iteration("r", "t", 2, 8, false));
-    assert_eq!(capped.message.as_deref(), Some("Sub-agent 'r' iteration 2/8"));
+    assert_eq!(
+        capped.message.as_deref(),
+        Some("Sub-agent 'r' iteration 2/8")
+    );
     assert_eq!(capped.max_iterations, Some(8));
     let extended = expect_subagent(sub_iteration("r", "t", 2, 8, true));
     assert_eq!(extended.message.as_deref(), Some("Sub-agent 'r' step 2"));
@@ -257,7 +298,9 @@ fn subagent_tool_calls_carry_their_arguments_and_capped_results() {
         .expect("a completed sub-agent call"),
     );
     assert_eq!(completed.state, "tool_result");
-    assert!(completed.output.is_some_and(|out| out.contains("truncated")));
+    assert!(completed
+        .output
+        .is_some_and(|out| out.contains("truncated")));
     assert_eq!(completed.structured, Some(json!({ "kind": "web_search" })));
     assert!(sub_tool_completed(AgentProgress::TurnStarted).is_none());
 }
@@ -265,7 +308,10 @@ fn subagent_tool_calls_carry_their_arguments_and_capped_results() {
 #[test]
 fn subagent_deltas_are_text_or_thinking() {
     let text = expect_subagent(sub_delta("r", "t", false, "hi".into(), 2));
-    assert_eq!((text.state.as_str(), text.message.as_deref()), ("text_delta", Some("hi")));
+    assert_eq!(
+        (text.state.as_str(), text.message.as_deref()),
+        ("text_delta", Some("hi"))
+    );
     let thinking = expect_subagent(sub_delta("r", "t", true, "hm".into(), 2));
     assert_eq!(thinking.state, "thinking_delta");
     assert_eq!(thinking.iteration, Some(2));

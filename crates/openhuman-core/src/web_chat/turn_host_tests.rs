@@ -48,14 +48,21 @@ async fn the_tap_forwards_in_order_brackets_open_work_and_signals_the_drain() {
     let activity = TurnActivity::default();
     let _tap = tap_progress(agent_rx, runner_tx, activity.clone(), drained_tx);
 
-    for event in [iteration(), model_replied(), AgentProgress::turn_completed(1)] {
+    for event in [
+        iteration(),
+        model_replied(),
+        AgentProgress::turn_completed(1),
+    ] {
         agent_tx.send(event).await.expect("tap listens");
     }
     let mut seen = Vec::new();
     while seen.last() != Some(&"completed") {
         seen.push(kind(&runner_rx.recv().await.expect("signal")));
     }
-    assert_eq!(seen, ["started", "iteration", "finished", "model", "completed"]);
+    assert_eq!(
+        seen,
+        ["started", "iteration", "finished", "model", "completed"]
+    );
 
     tokio::time::timeout(Duration::from_secs(5), drained_rx.wait_for(|done| *done))
         .await

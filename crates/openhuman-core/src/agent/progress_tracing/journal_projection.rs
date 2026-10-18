@@ -59,8 +59,8 @@ use tinyagents_harness::events::AgentEvent;
 use tinyagents_harness::observability::AgentObservation;
 
 use super::SpanCollector;
-use tinyagents_harness::progress::AgentProgress;
 use replay::{json_content_text, turn_outcome_for_failure, user_message_text, Replay};
+use tinyagents_harness::progress::AgentProgress;
 
 #[path = "journal_replay.rs"]
 mod replay;

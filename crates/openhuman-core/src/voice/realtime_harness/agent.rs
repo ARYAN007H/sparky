@@ -8,9 +8,9 @@ use std::time::Duration;
 use log::{info, warn};
 use serde_json::Value;
 
-use tinyagents_harness::progress::AgentProgress;
 use crate::agent::session_host::OpenHumanSessionHost;
 use crate::agent::turn_origin::{with_origin, AgentTurnOrigin};
+use tinyagents_harness::progress::AgentProgress;
 
 use super::chat_delivery::{VOICE_CHAT_CLIENT_ID, VOICE_CHAT_THREAD_ID};
 use super::prompt::messages_to_history_pairs;

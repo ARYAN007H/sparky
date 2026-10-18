@@ -98,7 +98,9 @@ async fn spawn_subagent_reports_a_stopped_child_as_a_failed_tool_result() {
 
     let mut stop = None;
     while let Ok(event) = progress_rx.try_recv() {
-        if let tinyagents_harness::progress::AgentProgress::SubagentCompleted { stop: s, .. } = event {
+        if let tinyagents_harness::progress::AgentProgress::SubagentCompleted { stop: s, .. } =
+            event
+        {
             stop = Some(s);
         }
     }

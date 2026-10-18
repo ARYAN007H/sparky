@@ -573,7 +573,8 @@ pub async fn agent_chat_reply_for(
         // turn fell back to unary `invoke`, so time-to-first-token equalled the
         // full completion latency. Attach a drain-only sink so the call streams;
         // the task ends when the agent drops its sender.
-        let (tx, mut rx) = tokio::sync::mpsc::channel::<tinyagents_harness::progress::AgentProgress>(256);
+        let (tx, mut rx) =
+            tokio::sync::mpsc::channel::<tinyagents_harness::progress::AgentProgress>(256);
         tokio::spawn(async move { while rx.recv().await.is_some() {} });
         agent.set_on_progress(Some(tx));
         log::debug!(

@@ -1,8 +1,8 @@
 use super::*;
-use tinyagents_harness::progress::AgentProgress;
 use crate::config::Config;
 use crate::web_chat::WebChannelEvent;
 use std::time::Duration;
+use tinyagents_harness::progress::AgentProgress;
 use tokio::sync::broadcast::error::TryRecvError;
 
 #[test]
@@ -105,20 +105,22 @@ async fn tool_call_completed_forwards_real_output_on_tool_result() {
         crate::core::runtime::DispatchCtx::ambient(),
     );
 
-    tx.send(tinyagents_harness::progress::AgentProgress::ToolCallCompleted {
-        call_id: "call-1".into(),
-        tool_name: "web_search".into(),
-        success: true,
-        output_chars: 12,
-        output: "real payload".into(),
-        arguments: None,
-        elapsed_ms: 42,
-        iteration: 1,
-        failure: None,
-        display_label: None,
-        display_detail: None,
-        structured: None,
-    })
+    tx.send(
+        tinyagents_harness::progress::AgentProgress::ToolCallCompleted {
+            call_id: "call-1".into(),
+            tool_name: "web_search".into(),
+            success: true,
+            output_chars: 12,
+            output: "real payload".into(),
+            arguments: None,
+            elapsed_ms: 42,
+            iteration: 1,
+            failure: None,
+            display_label: None,
+            display_detail: None,
+            structured: None,
+        },
+    )
     .await
     .expect("send progress");
 

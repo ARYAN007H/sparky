@@ -44,8 +44,7 @@ pub mod plan_review;
 /// and [`crate::sandbox::ops`] so all three shell-spawning sites
 /// agree on `cmd.exe` (Windows) vs `bash`/`sh` (Unix). Fixes #4705 where
 /// the sandbox paths hardcoded `sh` and failed at spawn on Windows.
-pub mod progress;
-/// Task-local [`progress::AgentProgress`] sink — how an in-process embedder
+/// Task-local [`tinyagents_harness::progress::AgentProgress`] sink — how an in-process embedder
 /// observes a turn driven through an RPC that returns only a final string.
 /// Same shape as [`turn_origin`]; read by entry points that build the
 /// [`Agent`] internally (`inference::host_runtime::ops::agent_chat`).

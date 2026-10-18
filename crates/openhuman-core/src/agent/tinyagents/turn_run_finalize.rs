@@ -12,10 +12,10 @@ use tinyagents_harness::middleware::AgentRun;
 use tinyagents_harness::middleware::{ContextCompressionMiddleware, PromptCacheGuardMiddleware};
 use tokio::sync::mpsc::Sender;
 
-use tinyagents_harness::progress::AgentProgress;
 use crate::agent::tinyagents::journal::TurnJournal;
 use crate::agent::tinyagents::observability::{self, OpenhumanEventBridge, SubagentScope};
 use crate::agent::tinyagents::turn_outcome::TinyagentsTurnOutcome;
+use tinyagents_harness::progress::AgentProgress;
 use tinyagents_harness::turn_outcome::{HaltSummarySlot, ToolOutcomeSink};
 use tinyagents_harness::turn_run_finalize::{
     classify_turn_end, log_compaction_provenance, select_turn_text, system_segment_bytes, TurnEnd,

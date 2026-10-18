@@ -36,11 +36,11 @@ use super::types::WebChatTaskResult;
 use super::web_errors::{
     inference_budget_exceeded_user_message, is_inference_budget_exceeded_error,
 };
-use tinyagents_harness::progress::AgentProgress;
 use crate::agent::queued_turn::QueuedPayload;
 use crate::agent::turn_origin::{with_origin, AgentTurnOrigin};
 use crate::core::events::DomainEvent;
 use crate::core::runtime::DispatchCtx;
+use tinyagents_harness::progress::AgentProgress;
 
 /// How long a finished turn waits for its progress tap to forward every event
 /// the turn queued before the terminal `chat_done`/`chat_error` is published.

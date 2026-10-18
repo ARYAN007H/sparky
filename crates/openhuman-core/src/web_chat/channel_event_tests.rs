@@ -30,7 +30,11 @@ fn a_typed_event_becomes_the_flat_form_with_the_same_wire_fields() {
     });
     assert_eq!(flat.event, "chat_done");
     assert_eq!(
-        (flat.client_id.as_str(), flat.thread_id.as_str(), flat.request_id.as_str()),
+        (
+            flat.client_id.as_str(),
+            flat.thread_id.as_str(),
+            flat.request_id.as_str()
+        ),
         ("c1", "t1", "r1")
     );
     assert_eq!((flat.seq, flat.ts), (Some(4), Some(99)));
