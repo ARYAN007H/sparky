@@ -86,6 +86,7 @@ pub(crate) fn export_brand() -> ExportBrand<'static> {
 
 pub(crate) use export::export_subagent_journal_trace;
 pub(crate) use export::{export_run_trace, export_run_trace_from_journal};
+#[cfg(feature = "flows")]
 pub(crate) use flow_export::export_graph_run_trace;
 
 #[cfg(test)]

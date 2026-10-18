@@ -259,7 +259,7 @@ impl OpenHumanTurnPrelude {
             )
             .map_err(|error| anyhow::anyhow!(error.to_string()))?
         };
-        let flow_archetype_text = if cold {
+        let flow_archetype_text: Option<String> = if cold {
             #[cfg(feature = "flows")]
             {
                 match self.definition.as_deref() {

@@ -12,12 +12,12 @@ pub(super) type LoadedConfig = Result<std::sync::Arc<crate::config::Config>, Str
 /// Load and render a typed sub-agent prompt using this spawn's config snapshot.
 pub(super) async fn load_typed_prompt_source(
     definition: &AgentDefinition,
-    config: &LoadedConfig,
+    _config: &LoadedConfig,
     mut prompt_context: PromptContext<'_>,
 ) -> Result<String, SubagentRunError> {
     #[cfg(feature = "flows")]
     let flow_archetype_text = crate::agent::prompts::flow_archetype::load_for_definition(
-        config.as_ref().ok().map(|config| config.as_ref()),
+        _config.as_ref().ok().map(|config| config.as_ref()),
         definition,
     )
     .await?;

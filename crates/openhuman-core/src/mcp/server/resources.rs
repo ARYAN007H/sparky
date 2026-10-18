@@ -135,7 +135,7 @@ const RESOURCE_CATALOG: &[PromptResource] = &[
 
 /// The catalog as `resources/list` advertises it.
 pub fn resource_specs() -> Vec<ResourceSpec> {
-    let mut resources = RESOURCE_CATALOG
+    let resources = RESOURCE_CATALOG
         .iter()
         .map(|r| {
             ResourceSpec::new(r.uri, r.name)
@@ -144,24 +144,28 @@ pub fn resource_specs() -> Vec<ResourceSpec> {
         })
         .collect::<Vec<_>>();
     #[cfg(feature = "flows")]
-    resources.extend([
-        ResourceSpec::new(
-            "openhuman://prompts/agents/flow_discovery",
-            "flow_discovery",
-        )
-        .with_description(
-            "Flow Scout — read-only workflow discovery agent that suggests automations from memory, threads, and integrations.",
-        )
-        .with_mime_type(MIME_TYPE),
-        ResourceSpec::new(
-            "openhuman://prompts/agents/workflow_builder",
-            "workflow_builder",
-        )
-        .with_description(
-            "Workflow authoring specialist that builds tinyflows automation graphs and returns proposals for review.",
-        )
-        .with_mime_type(MIME_TYPE),
-    ]);
+    let resources = {
+        let mut resources = resources;
+        resources.extend([
+            ResourceSpec::new(
+                "openhuman://prompts/agents/flow_discovery",
+                "flow_discovery",
+            )
+            .with_description(
+                "Flow Scout — read-only workflow discovery agent that suggests automations from memory, threads, and integrations.",
+            )
+            .with_mime_type(MIME_TYPE),
+            ResourceSpec::new(
+                "openhuman://prompts/agents/workflow_builder",
+                "workflow_builder",
+            )
+            .with_description(
+                "Workflow authoring specialist that builds tinyflows automation graphs and returns proposals for review.",
+            )
+            .with_mime_type(MIME_TYPE),
+        ]);
+        resources
+    };
     log::debug!("[mcp_server] resources/list count={}", resources.len());
     resources
 }
@@ -170,12 +174,12 @@ pub fn resource_specs() -> Vec<ResourceSpec> {
 /// [`ToolCallError::ResourceNotFound`] (`-32002`) when the catalog has no such
 /// entry. TinyMCP has already rejected a missing or blank `uri`.
 pub async fn read_resource(
-    ctx: &crate::core::runtime::DispatchCtx,
+    _ctx: &crate::core::runtime::DispatchCtx,
     uri: &str,
 ) -> Result<Value, ToolCallError> {
     #[cfg(feature = "flows")]
     if let Some(agent_id) = flow_prompt_agent_id(uri) {
-        let config = ctx.load_config().await.map_err(|_| {
+        let config = _ctx.load_config().await.map_err(|_| {
             ToolCallError::Internal("TinyFlows prompt config is unavailable".into())
         })?;
         return read_flow_prompt(&config, uri, agent_id).await;
