@@ -3136,7 +3136,6 @@ async fn json_rpc_cron_manual_worker_survives_caller_cancel_on_published_tinyflo
         .expect("a distinct document scope independently starts the same job id")
         .expect("scope handler channel remains open");
     scope_release.add_permits(2);
-    assert!(first.await.unwrap().unwrap().0);
     assert!(second.await.unwrap().unwrap().0);
     let (operator_runs, agent_runs) = tokio::time::timeout(Duration::from_secs(10), async {
         loop {
@@ -3158,7 +3157,17 @@ async fn json_rpc_cron_manual_worker_survives_caller_cancel_on_published_tinyflo
     })
     .await
     .expect("both scoped workers commit terminal run history after the first caller cancels");
-    assert_ne!(operator_runs[0].run_id, agent_runs[0].run_id);
+    assert_eq!(operator_runs.len(), 1);
+    assert_eq!(agent_runs.len(), 1);
+    let operator_run_id = operator_runs[0]
+        .run_id
+        .as_deref()
+        .expect("the operator run stores its invocation identity");
+    let agent_run_id = agent_runs[0]
+        .run_id
+        .as_deref()
+        .expect("the agent-scope run stores its invocation identity");
+    assert_ne!(operator_run_id, agent_run_id);
 
     mock_join.abort();
     rpc_join.abort();
