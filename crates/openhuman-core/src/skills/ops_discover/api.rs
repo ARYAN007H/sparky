@@ -13,12 +13,14 @@ use super::scan::{discover_filtered, ALL_ROOT_KINDS, WORKFLOW_ROOT_KINDS};
 
 /// The visibility state that the metadata cache must keep separate even when
 /// callers share one workspace directory.
-#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq, serde::Serialize)]
 pub(crate) struct DiscoveryGate {
     tenant: Option<crate::core::runtime::Tenant>,
     skills_component: bool,
     flows_component: bool,
     tinyflows_component: bool,
+    modules_enabled: bool,
+    module_selection: Option<[u8; 32]>,
     skills_domain: Option<bool>,
     flows_domain: Option<bool>,
 }
@@ -32,6 +34,13 @@ impl DiscoveryGate {
             skills_component: components.skills,
             flows_component: components.flows,
             tinyflows_component: components.tinyflows,
+            modules_enabled: ctx
+                .embedder_config()
+                .is_some_and(|config| config.modules.enabled),
+            module_selection: ctx
+                .embedder_config()
+                .as_ref()
+                .map(module_selection_fingerprint),
             skills_domain: domains.map(|domains| domains.skills),
             flows_domain: domains.map(|domains| domains.flows),
         }
@@ -42,12 +51,27 @@ impl DiscoveryGate {
         config: &crate::config::Config,
         domains: Option<crate::core::runtime::DomainSet>,
     ) -> Self {
-        let domains = domains.or_else(|| ctx.domains());
+        let context_components = ctx.components();
+        let domains = match (domains, ctx.domains()) {
+            (Some(requested), Some(context)) => Some(context.intersect(&requested)),
+            (Some(requested), None) => Some(requested),
+            (None, context) => context,
+        };
+        let parent_config = ctx.embedder_config();
+        let module_selection = module_selection_fingerprint(&config.modules);
+        let module_selection = parent_config
+            .as_ref()
+            .filter(|parent| module_selection_fingerprint(&parent.modules) != module_selection)
+            .map(|_| None)
+            .unwrap_or(Some(module_selection));
         Self {
             tenant: ctx.tenant().ok(),
-            skills_component: config.components.skills,
-            flows_component: config.components.flows,
-            tinyflows_component: config.components.tinyflows,
+            skills_component: config.components.skills && context_components.skills,
+            flows_component: config.components.flows && context_components.flows,
+            tinyflows_component: config.components.tinyflows && context_components.tinyflows,
+            modules_enabled: config.modules.enabled
+                && parent_config.is_none_or(|parent| parent.modules.enabled),
+            module_selection,
             skills_domain: domains.map(|domains| domains.skills),
             flows_domain: domains.map(|domains| domains.flows),
         }
@@ -66,6 +90,8 @@ impl DiscoveryGate {
             && self.skills_component
             && self.flows_component
             && self.tinyflows_component
+            && self.modules_enabled
+            && self.module_selection.is_some()
             && self.skills_domain.unwrap_or(true)
             && self.flows_domain.unwrap_or(true)
             && self.tenant.is_some()
