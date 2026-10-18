@@ -1,14 +1,9 @@
 use super::*;
 use crate::cron::client::testing as cron_store;
 use crate::storage::{MemoryStorage, Scope};
-use serde_json::json;
 use serde_json::Value;
-use sha2::Digest;
-use std::collections::BTreeMap;
 use tempfile::TempDir;
-use tinyflows::engine::Checkpointer;
 use tinyflows_drivers::catalog::FlowCatalogDocuments;
-use tinyflows_drivers::DriverCheckpointer;
 
 fn fixtures() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("src/storage/import/fixtures/tinyflows")
@@ -46,41 +41,11 @@ fn backend() -> Arc<dyn StorageBackend> {
     Arc::new(MemoryStorage::new())
 }
 
-/// Every file under `root` with a digest of its bytes. SQLite's `-shm` index
-/// and an empty `-wal` are connection bookkeeping a read-only open may create.
-fn tree(root: &Path) -> BTreeMap<String, String> {
-    fn walk(dir: &Path, root: &Path, out: &mut BTreeMap<String, String>) {
-        for entry in std::fs::read_dir(dir).unwrap() {
-            let path = entry.unwrap().path();
-            if path.is_dir() {
-                walk(&path, root, out);
-            } else {
-                let bytes = std::fs::read(&path).unwrap();
-                let name = path.to_string_lossy();
-                if name.ends_with("-shm") || (name.ends_with("-wal") && bytes.is_empty()) {
-                    continue;
-                }
-                out.insert(
-                    path.strip_prefix(root).unwrap().display().to_string(),
-                    hex::encode(sha2::Sha256::digest(bytes)),
-                );
-            }
-        }
-    }
-    let mut out = BTreeMap::new();
-    walk(root, root, &mut out);
-    out
-}
-
 fn documents(
     backend: &Arc<dyn StorageBackend>,
     scope: &Scope,
 ) -> Arc<dyn tinystoragedrivers::DocumentStore> {
     Arc::clone(backend.for_scope(scope).unwrap().documents())
-}
-
-fn json<T: serde::Serialize>(value: &T) -> Value {
-    serde_json::to_value(value).unwrap()
 }
 
 fn written(outcome: Outcome) -> usize {
