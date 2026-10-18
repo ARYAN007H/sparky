@@ -16,6 +16,22 @@ fn only_dynamic_builtin_flow_definitions_use_the_bus_prompt() {
     }
 }
 
+#[test]
+fn renamed_dynamic_flow_builtin_keeps_its_prompt_owner() {
+    let registry = crate::agent::harness::host_definition::AgentDefinitionRegistry::builtins_only();
+    let mut definition = registry
+        .get("workflow_builder")
+        .expect("workflow_builder builtin")
+        .clone();
+    definition.id = "library_workflow_builder".into();
+
+    assert!(
+        is_bus_backed_builtin(&definition),
+        "a library actor id must not erase the resolved builtin prompt owner"
+    );
+    assert_eq!(prompt_owner(&definition), Some("workflow_builder"));
+}
+
 #[tokio::test]
 async fn flow_prompt_requires_the_scoped_config_and_respects_component_disable() {
     let registry = crate::agent::harness::host_definition::AgentDefinitionRegistry::builtins_only();
