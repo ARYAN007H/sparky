@@ -14,7 +14,7 @@ fn the_offline_local_session_cannot_authenticate_managed_inference() {
         SessionTokenCheck::Live("header.payload.local".to_string()),
         "openhuman_backend_model.resolve_bearer",
     )
-        .expect_err("a local session has no managed bearer");
+    .expect_err("a local session has no managed bearer");
 
     assert_eq!(
         error.to_string(),
@@ -30,7 +30,7 @@ fn the_refusal_does_not_read_as_an_expired_session() {
         SessionTokenCheck::Live("header.payload.local".to_string()),
         "openhuman_backend_model.resolve_bearer",
     )
-        .expect_err("a local session has no managed bearer");
+    .expect_err("a local session has no managed bearer");
 
     // The whole point of the fix: this must not reach the sign-out path that
     // the backend's 401 envelope used to trigger.
@@ -45,9 +45,10 @@ fn the_refusal_does_not_read_as_an_expired_session() {
 fn a_signed_in_session_still_authenticates_managed_inference() {
     use openhuman_embed::__host::security::credentials::session_support::SessionTokenCheck;
 
-    let bearer = managed_bearer(SessionTokenCheck::Live(
-        "header.payload.signature".to_string(),
-    ), "openhuman_backend_model.resolve_bearer")
+    let bearer = managed_bearer(
+        SessionTokenCheck::Live("header.payload.signature".to_string()),
+        "openhuman_backend_model.resolve_bearer",
+    )
     .expect("a hosted session is the bearer");
 
     assert_eq!(bearer, "header.payload.signature");

@@ -439,8 +439,11 @@ async fn embedding_without_a_session_reports_no_backend_session() {
 /// embeddings must reject it before the HTTP transport sends a request.
 #[tokio::test]
 async fn offline_local_session_is_refused_before_embedding_request() {
-    use std::sync::{Arc, atomic::{AtomicUsize, Ordering}};
     use axum::{routing::post, Json, Router};
+    use std::sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    };
 
     let requests = Arc::new(AtomicUsize::new(0));
     let app = Router::new().route(
@@ -492,13 +495,21 @@ async fn offline_local_session_is_refused_before_embedding_request() {
 /// SessionExpired event as managed chat, so the host can begin re-auth.
 #[tokio::test]
 async fn expired_session_publishes_session_expired_before_embedding_request() {
+    use axum::{routing::post, Json, Router};
     use openhuman_embed::__host::core::events::DomainEvent;
     use openhuman_embed::__host::security::credentials::session_support::SESSION_EXPIRES_AT_META;
-    use std::sync::{Arc, atomic::{AtomicUsize, Ordering}};
-    use axum::{routing::post, Json, Router};
+    use std::sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    };
 
-    openhuman_embed::__host::core::bus::init().await.expect("bus init");
-    let mut rx = openhuman_embed::__host::core::bus::BUS.get().unwrap().receiver();
+    openhuman_embed::__host::core::bus::init()
+        .await
+        .expect("bus init");
+    let mut rx = openhuman_embed::__host::core::bus::BUS
+        .get()
+        .unwrap()
+        .receiver();
     let requests = Arc::new(AtomicUsize::new(0));
     let app = Router::new().route(
         "/openai/v1/embeddings",
@@ -520,7 +531,10 @@ async fn expired_session_publishes_session_expired_before_embedding_request() {
 
     let tmp = tempfile::tempdir().unwrap();
     let mut metadata = HashMap::new();
-    metadata.insert(SESSION_EXPIRES_AT_META.to_string(), "2000-01-01T00:00:00Z".to_string());
+    metadata.insert(
+        SESSION_EXPIRES_AT_META.to_string(),
+        "2000-01-01T00:00:00Z".to_string(),
+    );
     AuthService::new(tmp.path(), false)
         .store_provider_token(
             openhuman_embed::__host::security::credentials::APP_SESSION_PROVIDER,
