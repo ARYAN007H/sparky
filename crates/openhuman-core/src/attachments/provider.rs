@@ -5,9 +5,7 @@ use base64::{engine::general_purpose::STANDARD, Engine};
 use std::sync::Arc;
 use tinyinference_llm::{
     message::{ContentBlock, ImageRef, MediaRef, Message},
-    model::{
-        ChatModel, InputModality, InputSource, ModelProfile, ModelRequest,
-    },
+    model::{ChatModel, InputModality, InputSource, ModelProfile, ModelRequest},
 };
 
 #[cfg(test)]

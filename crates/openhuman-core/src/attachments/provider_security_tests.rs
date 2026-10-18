@@ -217,7 +217,9 @@ async fn oversized_local_file_marker_fails_before_primary_or_materialization() {
     )]);
 
     let error = wrapped.invoke(&(), request).await.unwrap_err();
-    assert!(error.to_string().contains("attachment exceeds configured file limit"));
+    assert!(error
+        .to_string()
+        .contains("attachment exceeds configured file limit"));
     assert_eq!(primary.0.load(Ordering::SeqCst), 0);
     assert!(!uploads.join("legacy-media").exists());
 }
