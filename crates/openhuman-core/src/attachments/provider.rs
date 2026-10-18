@@ -1,16 +1,19 @@
 //! Ephemeral provider request preparation for durable workspace attachments.
 use super::AttachmentAccessScope;
 use crate::config::Config;
-use async_trait::async_trait;
 use base64::{engine::general_purpose::STANDARD, Engine};
 use std::sync::Arc;
 use tinyinference_llm::{
     message::{ContentBlock, ImageRef, MediaRef, Message},
     model::{
-        ChatModel, InputModality, InputSource, ModelProfile, ModelRequest, ModelResponse,
-        ModelStream,
+        ChatModel, InputModality, InputSource, ModelProfile, ModelRequest,
     },
 };
+
+#[cfg(test)]
+use async_trait::async_trait;
+#[cfg(test)]
+use tinyinference_llm::model::{ModelResponse, ModelStream};
 
 pub(crate) fn wrap(
     ctx: &crate::core::runtime::DispatchCtx,
