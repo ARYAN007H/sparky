@@ -385,7 +385,9 @@ test("private gates-off and Tauri execute equivalent coverage suites with nextes
   for (const name of ["rust-gates-off", "tauri"]) {
     for (const c of plan.lanes
       .find((l) => l.name === name)
-      .checks.filter((c) => /cargo (test|llvm-cov)/.test(c.run))) {
+      .checks.filter(
+        (c) => /cargo (test|llvm-cov)/.test(c.run) && !/llvm-cov report/.test(c.run),
+      )) {
       assert.match(c.run, /cargo llvm-cov nextest/);
       assert.match(c.run, /--no-tests=fail/);
       // Pinned cargo-llvm-cov 0.9.1 rejects combining these two flags;
