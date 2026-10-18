@@ -51,13 +51,11 @@ impl WebEventView {
             ..Self::default()
         };
         use WebChannelEvent as E;
-        let subagent_view = |detail| {
-            SubagentView {
-                task_id: Some(detail.task_id.clone()),
-                display_name: detail.display_name.clone(),
-                elapsed_ms: detail.elapsed_ms,
-                output: detail.output.clone(),
-            }
+        let subagent_view = |detail| SubagentView {
+            task_id: Some(detail.task_id.clone()),
+            display_name: detail.display_name.clone(),
+            elapsed_ms: detail.elapsed_ms,
+            output: detail.output.clone(),
         };
         match event {
             E::ChatDone { full_response, .. }

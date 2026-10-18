@@ -55,9 +55,18 @@ async fn output_events_keep_the_turns_ids_and_one_increasing_seq() {
     assert_eq!(first.event_name(), "text_delta");
     assert_eq!(first.context().client_id, "surface-client");
     assert_eq!(first.context().thread_id, "surface-thread-surface-seq");
-    assert_eq!((first_wire["delta"].as_str(), first_wire["round"].as_u64()), (Some("a"), Some(2)));
-    assert_eq!((first.context().seq, second.context().seq), (Some(1), Some(2)));
-    assert!(first.context().ts.is_some(), "every event carries a wall-clock stamp");
+    assert_eq!(
+        (first_wire["delta"].as_str(), first_wire["round"].as_u64()),
+        (Some("a"), Some(2))
+    );
+    assert_eq!(
+        (first.context().seq, second.context().seq),
+        (Some(1), Some(2))
+    );
+    assert!(
+        first.context().ts.is_some(),
+        "every event carries a wall-clock stamp"
+    );
 }
 
 #[tokio::test]

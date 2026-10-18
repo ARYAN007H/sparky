@@ -13,8 +13,8 @@
 //! subscriber (see `logging::init_for_tui`); nothing is ever `println!`'d.
 
 use std::io::Write;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
 use base64::Engine as _;
@@ -22,9 +22,9 @@ use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifier
 use serde_json::json;
 use tokio::sync::broadcast;
 
+use openhuman_rpc::embed::CoreRuntime;
 use openhuman_rpc::embed::chat_surface as web_chat;
 use openhuman_rpc::embed::chat_surface::ScopedWebEvent;
-use openhuman_rpc::embed::CoreRuntime;
 
 use super::actions::Action;
 use super::cockpit::{Overlay, OverlayKind, OverlayRow, PendingApproval, PendingPlanReview};
@@ -392,7 +392,7 @@ async fn dispatch_action(
     }
     match action {
         Action::Command(command) => {
-            return execute_command(command, runtime, client_id, state, ui).await
+            return execute_command(command, runtime, client_id, state, ui).await;
         }
         Action::View(tab) => {
             ui.active_tab = tab;
