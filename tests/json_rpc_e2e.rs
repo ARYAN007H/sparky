@@ -2712,7 +2712,12 @@ fn json_rpc_cron_manual_worker_survives_caller_cancel_on_published_tinyflows() {
 async fn json_rpc_cron_manual_worker_survives_caller_cancel_on_published_tinyflows_inner() {
     use openhuman_core::storage::{CollectionSpec, DocumentStore, Precondition};
     use openhuman_core::{
-        config::Config, core::events::DomainEvent, core::runtime::DispatchCtx,
+        config::Config,
+        core::{
+            events::DomainEvent,
+            runtime::{ContextOverlay, CoreContext, DispatchCtx, DomainSet, TokenSource},
+            types::HostKind,
+        },
         cron::system_job_handlers,
     };
     use tinybus::EventHandler;
@@ -2793,7 +2798,7 @@ async fn json_rpc_cron_manual_worker_survives_caller_cancel_on_published_tinyflo
             "schedule": "{\"kind\":\"every\",\"every_ms\":3600000}",
             "job_type": "shell",
             "session_target": "isolated",
-            "enabled": true,
+            "enabled": false,
             "delivery": "{\"mode\":\"none\",\"channel\":null,\"to\":null,\"best_effort\":true}",
             "delete_after_run": false,
             "created_at": "2026-03-04T05:06:07.123Z",
@@ -2834,6 +2839,16 @@ async fn json_rpc_cron_manual_worker_survives_caller_cancel_on_published_tinyflo
     .unwrap();
 
     openhuman_core::core::bus::init().await.unwrap();
+    let (default_context, _, _) = CoreContext::init_with_config(
+        HostKind::Library,
+        &TokenSource::Fixed(Arc::new(TEST_RPC_TOKEN.to_string())),
+        DomainSet::full(),
+        openhuman_core::tools::toolpacks::ToolGroups::none(),
+        Some(config.clone()),
+        None,
+    )
+    .await
+    .expect("initialize the isolated core context for the native host scenario");
     let (rpc_addr, rpc_join) = serve_on_ephemeral(build_core_http_router(false)).await;
     let rpc_base = format!("http://{rpc_addr}");
     let store_session = post_json_rpc(
@@ -3040,38 +3055,42 @@ async fn json_rpc_cron_manual_worker_survives_caller_cancel_on_published_tinyflo
             })
         }),
     );
-    let mut first_scope = config.clone();
-    first_scope.workspace_dir = home.join("manual-scope-a");
-    first_scope.action_dir = first_scope.workspace_dir.clone();
-    first_scope.config_path = home.join("manual-scope-a.toml");
-    let mut second_scope = config.clone();
-    second_scope.workspace_dir = home.join("manual-scope-b");
-    second_scope.action_dir = second_scope.workspace_dir.clone();
-    second_scope.config_path = home.join("manual-scope-b.toml");
-    std::fs::create_dir_all(&first_scope.workspace_dir).unwrap();
-    std::fs::create_dir_all(&second_scope.workspace_dir).unwrap();
-    let first_job = openhuman_core::cron::system_jobs::ensure_system_job(
-        &first_scope,
-        &scoped_name,
-        openhuman_core::cron::Schedule::Every {
-            every_ms: 3_600_000,
-        },
-    )
+    let agent_context = default_context.derive_with(
+        ContextOverlay::new(
+            config.clone(),
+            DomainSet::full(),
+            openhuman_core::tools::toolpacks::ToolGroups::none(),
+        )
+        .session_agent("published-cron-live-agent"),
+    );
+    let first_job = CoreContext::scope(Arc::clone(&default_context), async {
+        openhuman_core::cron::system_jobs::ensure_system_job(
+            &config,
+            &scoped_name,
+            openhuman_core::cron::Schedule::Every {
+                every_ms: 3_600_000,
+            },
+        )
+    })
+    .await
     .unwrap();
-    let second_job = openhuman_core::cron::system_jobs::ensure_system_job(
-        &second_scope,
-        &scoped_name,
-        openhuman_core::cron::Schedule::Every {
-            every_ms: 3_600_000,
-        },
-    )
+    let second_job = CoreContext::scope(Arc::clone(&agent_context), async {
+        openhuman_core::cron::system_jobs::ensure_system_job(
+            &config,
+            &scoped_name,
+            openhuman_core::cron::Schedule::Every {
+                every_ms: 3_600_000,
+            },
+        )
+    })
+    .await
     .unwrap();
     assert_eq!(first_job.id, second_job.id);
 
-    let first_config = first_scope.clone();
+    let first_config = config.clone();
     let first_job_id = first_job.id.clone();
     let first = tokio::spawn(async move {
-        let dispatch = DispatchCtx::ambient();
+        let dispatch = DispatchCtx::new(Arc::clone(&default_context));
         openhuman_core::cron::ops::run_job_now(&dispatch, &first_config, &first_job_id).await
     });
     tokio::time::timeout(Duration::from_secs(10), scope_started_rx.recv())
@@ -3080,8 +3099,8 @@ async fn json_rpc_cron_manual_worker_survives_caller_cancel_on_published_tinyflo
         .expect("scope handler channel remains open");
 
     let duplicate = openhuman_core::cron::ops::run_job_now(
-        &DispatchCtx::ambient(),
-        &first_scope,
+        &DispatchCtx::new(Arc::clone(&default_context)),
+        &config,
         &first_job.id,
     )
     .await;
@@ -3093,10 +3112,10 @@ async fn json_rpc_cron_manual_worker_survives_caller_cancel_on_published_tinyflo
         "the same scope refuses the active job: {duplicate:?}"
     );
 
-    let second_config = second_scope.clone();
+    let second_config = config.clone();
     let second_job_id = second_job.id.clone();
     let second = tokio::spawn(async move {
-        let dispatch = DispatchCtx::ambient();
+        let dispatch = DispatchCtx::new(Arc::clone(&agent_context));
         openhuman_core::cron::ops::run_job_now(&dispatch, &second_config, &second_job_id).await
     });
     tokio::time::timeout(Duration::from_secs(10), scope_started_rx.recv())
