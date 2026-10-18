@@ -963,7 +963,8 @@ describe('ChatRuntimeProvider — dedupe, proactive resolution, mid-turn invaria
       await waitFor(() =>
         expect(threadApi.appendMessage).toHaveBeenCalledWith(
           't-fup',
-          expect.objectContaining({ content: 'queued follow-up text', sender: 'user' })
+          expect.objectContaining({ content: 'queued follow-up text', sender: 'user' }),
+          []
         )
       );
       expect(store.getState().queue.pendingFollowupsByThread['t-fup']).toBeUndefined();

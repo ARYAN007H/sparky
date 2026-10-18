@@ -347,8 +347,18 @@ describe('the agent-process-source command follows the panel that hosts it', () 
     await waitFor(() => expect(screen.getByText('photo.png')).toBeInTheDocument());
     fireEvent.click(screen.getByTestId('send-message-button'));
     await waitFor(() => expect(chatSend).toHaveBeenCalled());
-    const uploaded = vi.mocked(threadApi.appendMessage).mock.calls.at(-1)![1];
-    expect(uploaded.content).toContain('[IMAGE:data:image/png;name=photo.png;base64,AQID]');
+    const [, uploaded, uploadedParts] = vi.mocked(threadApi.appendMessage).mock.calls.at(-1)!;
+    // The original rides as a typed part; the text carries no marker.
+    expect(uploaded.content).not.toContain('[IMAGE:');
+    expect(uploadedParts).toEqual([
+      expect.objectContaining({
+        kind: 'image',
+        media: expect.objectContaining({
+          url: 'data:image/png;name=photo.png;base64,AQID',
+          fileName: 'photo.png',
+        }),
+      }),
+    ]);
     expect(JSON.stringify(uploaded.extraMetadata)).not.toContain('base64');
     expect(uploaded.extraMetadata).not.toHaveProperty('attachmentDataUris');
     expect(chatSend).toHaveBeenLastCalledWith(
@@ -374,12 +384,22 @@ describe('the agent-process-source command follows the panel that hosts it', () 
     expect(chatSend).toHaveBeenLastCalledWith(
       expect.objectContaining({
         queueMode: 'followup',
-        message: '[FILE:data:application/zip;name=archive.zip;base64,AQID]',
+        message: '',
+        attachments: [
+          expect.objectContaining({
+            kind: 'file',
+            media: expect.objectContaining({
+              url: 'data:application/zip;name=archive.zip;base64,AQID',
+            }),
+          }),
+        ],
       })
     );
     expect(threadApi.appendMessage).not.toHaveBeenCalled();
-    const pending = store.getState().queue.pendingFollowupsByThread[THREAD_ID][0].message;
-    expect(pending.content).toBe('[FILE:data:application/zip;name=archive.zip;base64,AQID]');
+    const queued = store.getState().queue.pendingFollowupsByThread[THREAD_ID][0];
+    const pending = queued.message;
+    expect(queued.attachments).toHaveLength(1);
+    expect(pending.content).toBe('');
     expect(pending.extraMetadata).toEqual({
       attachmentCount: 1,
       attachmentNames: ['archive.zip'],
