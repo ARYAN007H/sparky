@@ -27,7 +27,7 @@ use openhuman_core::storage::{rusqlite, DocumentStoreExt, Scope, ScopedStorage, 
 use sha2::Digest;
 use tinyagents_session::transcript::{session_stem, SessionRef, TranscriptMessage, TranscriptMeta};
 use tinyagents_session::turn_state::TurnState;
-use tinystoragedrivers_core::{Capability, Query};
+use tinystoragedrivers_core::Query;
 
 // The classic-transcript fixture writer, shared with the core's unit tests.
 #[path = "../crates/openhuman-core/src/util/classic_transcript_fixture.rs"]

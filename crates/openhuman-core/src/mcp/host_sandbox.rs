@@ -143,8 +143,13 @@ fn admit_all(raw: &[String], home: Option<&Path>) -> Vec<String> {
         if !expanded.is_absolute() || !expanded.exists() {
             continue;
         }
-        let path = expanded.canonicalize().unwrap_or(expanded);
-        if SecurityPolicy::is_always_forbidden(&path) || exposes_credentials(&path, home) {
+        // Check the spelled path as well as the resolved one: on macOS `/etc`
+        // resolves to `/private/etc`, which the prefix floor does not name.
+        let path = expanded.canonicalize().unwrap_or_else(|_| expanded.clone());
+        if SecurityPolicy::is_always_forbidden(&expanded)
+            || SecurityPolicy::is_always_forbidden(&path)
+            || exposes_credentials(&path, home)
+        {
             tracing::warn!("[mcp] refused a stdio sandbox grant: host floor forbids it");
             continue;
         }
