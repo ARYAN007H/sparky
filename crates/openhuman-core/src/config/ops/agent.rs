@@ -1,7 +1,6 @@
 //! Agent, autonomy, paths, and memory-sync config operations.
 
 use crate::core::runtime::DispatchCtx;
-use serde_json::json;
 
 use crate::config::Config;
 use crate::core::Outcome;
