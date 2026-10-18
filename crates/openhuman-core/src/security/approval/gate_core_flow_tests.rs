@@ -474,7 +474,8 @@ async fn timeout_returns_deny() {
     let mut tries = 0;
     while gate.list_pending().unwrap().is_empty() {
         tries += 1;
-        assert!(tries < 50, "audit row never appeared for timeout test");
+        // A hang guard (10 s), not a latency budget: a loaded machine can delay the park.
+        assert!(tries < 1000, "audit row never appeared for timeout test");
         tokio::time::sleep(Duration::from_millis(10)).await;
     }
     drop(env);

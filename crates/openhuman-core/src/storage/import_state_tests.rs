@@ -232,14 +232,16 @@ fn a_waiting_process_runs_once_the_holder_releases() {
 fn a_long_import_keeps_its_claim_alive() {
     let repo = repo();
     let now = chrono::Utc::now().timestamp_millis();
-    // 90ms lease, body runs 400ms: without renewal a rival would take over.
+    // 600ms lease, body runs 1.6s: without renewal a rival would take over. The
+    // lease is long enough that a loaded machine starving the renewal thread for
+    // a few hundred ms does not read as a lapse.
     let rival_repo = repo.clone();
-    let rival_ran = with_claim_at(&repo, OWNER, "m", now, 90, || {
+    let rival_ran = with_claim_at(&repo, OWNER, "m", now, 600, || {
         let mut took_over = false;
         for _ in 0..8 {
-            std::thread::sleep(std::time::Duration::from_millis(50));
+            std::thread::sleep(std::time::Duration::from_millis(200));
             let at = chrono::Utc::now().timestamp_millis();
-            took_over |= with_claim_at(&rival_repo, OWNER, "m", at, 90, || Ok(()))
+            took_over |= with_claim_at(&rival_repo, OWNER, "m", at, 600, || Ok(()))
                 .unwrap()
                 .is_some();
         }
