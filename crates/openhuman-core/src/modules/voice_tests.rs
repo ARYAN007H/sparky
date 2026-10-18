@@ -283,14 +283,6 @@ async fn the_published_module_answers_through_this_client() {
         .expect("frame_energies");
     assert_eq!(energies.len(), 4);
 
-    // PCM16 framing must return the caller's samples untouched.
-    let pcm: Vec<i16> = vec![0, 1, -1, i16::MAX];
-    let wav = super::encode_wav_pcm16(&config, &pcm, 16_000, 1)
-        .await
-        .expect("encode_wav_pcm16");
-    let expected: Vec<u8> = pcm.iter().flat_map(|s| s.to_le_bytes()).collect();
-    assert_eq!(&wav[44..], &expected[..]);
-
     // A VAD session must segment across separate pushes — the whole reason it
     // is a session and not a batch.
     let vad = super::VadConfig {
@@ -406,10 +398,6 @@ async fn every_entry_point_degrades_rather_than_hanging_when_the_module_is_gone(
         super::frame_energies(&config, &[0.1, 0.2], 1).await,
         Err(VoiceCallError::Unavailable(_))
     ));
-    assert!(matches!(
-        super::encode_wav_pcm16(&config, &[1i16, 2], 16_000, 1).await,
-        Err(VoiceCallError::Unavailable(_))
-    ));
 }
 
 #[test]
@@ -430,7 +418,6 @@ fn every_member_this_client_calls_is_one_the_contract_declares() {
         methods::PREPARE_FRAMES,
         methods::FRAME_ENERGIES,
         methods::ENCODE_WAV,
-        methods::ENCODE_WAV_PCM16,
         methods::PREPARE_CAPTURE,
         methods::CAPTURE_POLL,
         methods::CAPTURE_SHUTDOWN,

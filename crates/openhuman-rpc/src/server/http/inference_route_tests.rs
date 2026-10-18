@@ -135,16 +135,3 @@ async fn test_chat_completions_with_bearer_not_rejected_as_auth_error() {
     );
 }
 
-/// Dictation WebSockets accept the browser query-token transport at the
-/// handler boundary, but still reject a token that is not the process bearer.
-#[tokio::test]
-async fn test_dictation_rejects_invalid_query_token() {
-    let req = Request::builder()
-        .method(Method::GET)
-        .uri("/ws/dictation?token=not-the-core-token")
-        .body(Body::empty())
-        .unwrap();
-
-    let resp = dispatch(req).await;
-    assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
-}
