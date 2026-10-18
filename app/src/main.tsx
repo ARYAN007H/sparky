@@ -10,7 +10,6 @@ import { installAutoHideScrollbars } from './lib/autoHideScrollbars';
 import { getCoreStateSnapshot } from './lib/coreState/store';
 import MascotWindowApp from './mascot/MascotWindowApp';
 import NotchApp from './notch/NotchApp';
-import OverlayApp from './overlay/OverlayApp';
 import './polyfills';
 import { initGA, initSentry, startUiInteractionTracking, trackEvent } from './services/analytics';
 import { setStoreForApiClient } from './services/apiClient';
@@ -50,8 +49,7 @@ const currentWindowLabel = isMascotWindow
     : tauriRuntimeAvailable()
       ? getCurrentWindow().label
       : 'main';
-const isOverlayWindow = currentWindowLabel === 'overlay';
-const isStandaloneWindow = isOverlayWindow || isMascotWindow || isNotchWindow;
+const isStandaloneWindow = isMascotWindow || isNotchWindow;
 
 const ensureDefaultHashRoute = () => {
   const hash = window.location.hash;
@@ -94,20 +92,12 @@ if (!isStandaloneWindow) {
 function bootRender() {
   // Reveal scrollbars only while a pane is actually scrolling. Installed here
   // rather than in a component so it covers every window entry (main, mascot,
-  // notch, overlay) with one document-level capture listener, and so panes
+  // notch) with one document-level capture listener, and so panes
   // mounted later need no wiring. Lives for the document's lifetime.
   installAutoHideScrollbars();
 
   const root = ReactDOM.createRoot(document.getElementById('root') as HTMLElement);
-  const tree = isMascotWindow ? (
-    <MascotWindowApp />
-  ) : isNotchWindow ? (
-    <NotchApp />
-  ) : isOverlayWindow ? (
-    <OverlayApp />
-  ) : (
-    <App />
-  );
+  const tree = isMascotWindow ? <MascotWindowApp /> : isNotchWindow ? <NotchApp /> : <App />;
   root.render(<React.StrictMode>{tree}</React.StrictMode>);
 }
 

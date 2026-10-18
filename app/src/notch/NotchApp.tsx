@@ -11,8 +11,8 @@
  *   `notch:core-url` CustomEvent            (for late mounts)
  *
  * This component connects to the core over Socket.IO — identical to
- * `OverlayApp` — and renders a pill that expands from the notch area when
- * voice is active or the agent is performing an action.
+ * and renders a pill that expands from the notch area when voice is active or
+ * the agent is performing an action.
  *
  * Events handled:
  *   dictation:toggle          voice recording started / stopped
