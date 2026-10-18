@@ -4240,7 +4240,7 @@ async fn json_rpc_agent_team_coordination_roundtrip() {
 
     // Mark A done directly via the run ledger, then B claims fine.
     let task_a = openhuman_core::storage::sessions::with_ledger(&config.workspace_dir, |ledger| {
-        let ledger_arg_0 = (&task_a_id).to_string();
+        let ledger_arg_0 = task_a_id.to_string();
         async move { ledger.get_agent_team_task(&ledger_arg_0).await }
     })
     .expect("get task A")
