@@ -1,5 +1,6 @@
 use super::*;
 use crate::web_chat::runner::runtime;
+use crate::web_chat::track_parallel_turn_for_test;
 use crate::core::runtime::{context::CoreContext, ContextOverlay, DomainSet};
 use crate::tools::toolpacks::ToolGroups;
 

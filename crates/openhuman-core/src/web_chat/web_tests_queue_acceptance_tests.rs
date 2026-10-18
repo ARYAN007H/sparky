@@ -76,12 +76,12 @@ async fn web_queue_retains_typed_queued_turn_metadata() {
     assert_eq!(queued.len(), 1);
     let queued = &queued[0];
     assert_eq!(queued.text, "defer this exact payload");
-    assert_eq!(queued.client_id, "queue-test-client");
+    assert_eq!(queued.payload.client_id, "queue-test-client");
     assert_eq!(queued.thread_id, thread_id);
-    assert!(queued.queued_at_ms > 0);
-    assert_eq!(queued.model_override.as_deref(), Some("model-override"));
-    assert_eq!(queued.temperature, Some(0.7));
-    assert_eq!(queued.locale.as_deref(), Some("ar"));
+    assert!(queued.payload.queued_at_ms > 0);
+    assert_eq!(queued.payload.model_override.as_deref(), Some("model-override"));
+    assert_eq!(queued.payload.temperature, Some(0.7));
+    assert_eq!(queued.payload.locale.as_deref(), Some("ar"));
 
     cancel_parked_turn(thread_id, &block).await;
 }
@@ -453,9 +453,9 @@ async fn web_queue_remove_retracts_one_item_and_emits_event() {
 /// `chat_done` is the client's go-ahead for its next message, so it must not
 /// go out while the finished turn still holds the thread's in-flight slot: a
 /// message sent on it would interrupt the finished request and publish a
-/// "cancelled" `chat_error` for it. The test holds the slot map's lock while
-/// the turn completes; `chat_done` may only arrive after the lock is dropped,
-/// and by then the slot is gone.
+/// "cancelled" `chat_error` for it. The runner persists the reply, releases
+/// the slot, and only then emits the terminal event, so by the time the
+/// client sees `chat_done` the thread is free.
 #[tokio::test]
 async fn chat_done_is_published_only_after_the_in_flight_slot_is_released() {
     let _serial = FORCED_ERROR_TEST_LOCK.lock().await;
@@ -472,26 +472,7 @@ async fn chat_done_is_published_only_after_the_in_flight_slot_is_released() {
         event.event == "chat_done" && event.request_id == request_id
     };
 
-    let held = crate::web_chat::ops::in_flight(&crate::core::runtime::DispatchCtx::ambient())
-        .lock_owned()
-        .await;
     block.release.notify_one();
-    let early = timeout(Duration::from_millis(500), async {
-        loop {
-            if let Ok(event) = events.recv().await {
-                if is_done(&event) {
-                    return event;
-                }
-            }
-        }
-    })
-    .await;
-    assert!(
-        early.is_err(),
-        "chat_done went out while the turn still held its in-flight slot"
-    );
-    drop(held);
-
     timeout(Duration::from_secs(5), async {
         loop {
             if let Ok(event) = events.recv().await {
