@@ -169,10 +169,10 @@ so the rules never read the wall clock:
   (`retry_after_ms`) when to retry. Epochs start at 1 and every acquisition
   except a re-entrant one (the same store instance re-acquiring the epoch it
   holds) writes `epoch + 1`.
-- `renew(grant, now_ms)` extends the grant by CAS on its record version; any
-  write since (a takeover, a release) makes it `LeaseError::Lost`.
-- `release(grant)` writes `released = true` under the same CAS and keeps the
-  record.
+- `renew(grant, now_ms)` extends the latest grant its holder was issued at
+  that epoch; a takeover, a release or a newer grant makes it
+  `LeaseError::Lost`.
+- `release(grant)` marks the record `released` and keeps it.
 - `holder(key)` returns the stored record, live or not (`is_live(now_ms)`).
 
 A grant's `previous_unclean` is set exactly when the acquisition replaced a
@@ -183,7 +183,7 @@ unique among live processes.
 
 | Store | Where | Use |
 | --- | --- | --- |
-| `DocumentLeases` | one document per key, scope `cluster`, collection `leases`; every write carries `Precondition::Absent` or `Version` | clustered nodes on a driver with cross-process CAS |
+| `DocumentLeases` | a thin adapter over tinystoragedrivers' `Leases` (`tsd.leases`, owner `profiles`, scope `cluster`); the record, CAS loop, epoch rules and fence are tsd's | clustered nodes on a driver with cross-process CAS |
 | `LocalLeases` | an exclusive `fs2` flock on `<root>/<sha256(key) hex>/.lease`, record in `.lease.json` beside it; no expiry, the OS drops the lock when the process dies | hosts without a backend |
 
 Keys are 1 to 200 bytes of ASCII letters, digits and `- _ . @`, not starting
