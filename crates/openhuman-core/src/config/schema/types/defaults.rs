@@ -115,6 +115,7 @@ impl Default for Config {
             integrations: IntegrationsConfig::default(),
             update: UpdateConfig::default(),
             dictation: DictationConfig::default(),
+            channel_voice: ChannelVoiceConfig::default(),
             onboarding_completed: false,
             chat_onboarding_completed: false,
             model_registry: Vec::new(),

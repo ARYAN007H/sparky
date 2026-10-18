@@ -26,6 +26,7 @@ is mounted as a submodule of [`load/dirs.rs`](./load/dirs.rs) via `#[path]`.
 | `[context]` | [`context.rs`](./context.rs) | `ContextConfig` |
 | `[cost]` | [`identity_cost.rs`](./identity_cost.rs) | `CostConfig`, `ModelPricing` |
 | `[dashboard]` | [`dashboard.rs`](./dashboard.rs) | `DashboardConfig`, `DiagramViewerConfig`, `EventStreamConfig`, `ModelHealthConfig` |
+| `[channel_voice]` | [`channel_voice.rs`](./channel_voice.rs) | `ChannelVoiceConfig`, `ChannelVoiceOverride`, `VoiceReplyMode` |
 | `[dictation]` | [`dictation.rs`](./dictation.rs) | `DictationConfig`, `DictationActivationMode` |
 | `[ephemeral_route]` | [`ephemeral_route.rs`](./ephemeral_route.rs) | `EphemeralRoute` |
 | `[cron]` | [`cron.rs`](./cron.rs) | `CronConfig` |

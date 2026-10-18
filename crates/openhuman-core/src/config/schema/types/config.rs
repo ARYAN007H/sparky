@@ -484,6 +484,10 @@ pub struct Config {
     #[serde(default)]
     pub dictation: DictationConfig,
 
+    /// Spoken-reply policy for channels (`[channel_voice]`).
+    #[serde(default)]
+    pub channel_voice: ChannelVoiceConfig,
+
     /// Whether the user has completed the **React UI** onboarding flow.
     ///
     /// Set by `OnboardingOverlay.tsx::handleDone` and the multi-step

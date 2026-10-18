@@ -21,6 +21,7 @@ mod dashboard;
 mod desktop;
 pub use desktop::DesktopConfig;
 mod defaults;
+mod channel_voice;
 mod dictation;
 mod hooks;
 pub use hooks::HooksConfig;
@@ -90,6 +91,7 @@ pub(crate) use cli_overrides::set_cli_inference_overrides;
 pub use context::{CompactionSettings, CompactionStrategy, ContextConfig};
 pub use cron::CronConfig;
 pub use dashboard::{DashboardConfig, DiagramViewerConfig, EventStreamConfig, ModelHealthConfig};
+pub use channel_voice::{ChannelVoiceConfig, ChannelVoiceOverride, VoiceReplyMode};
 pub use dictation::{DictationActivationMode, DictationConfig};
 pub use identity_cost::{
     BudgetAction, BudgetPeriod, BudgetPolicy, BudgetScope, CostConfig, ModelPricing,
