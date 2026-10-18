@@ -9,6 +9,26 @@ mod search;
 mod tool_dispatcher;
 mod ui;
 
+pub(super) fn config_save_error(error: anyhow::Error) -> String {
+    let conflict = error.chain().any(|cause| {
+        cause
+            .downcast_ref::<tinystoragedrivers::StorageError>()
+            .is_some_and(|error| error.kind() == tinystoragedrivers::ErrorKind::Conflict)
+    });
+    if conflict {
+        return crate::core::StructuredRpcError {
+            message: "Configuration changed on another instance; reload it and retry".into(),
+            data: Some(serde_json::json!({
+                "kind": "ConfigConflict",
+                "retryable": true,
+            })),
+            expected_user_state: true,
+        }
+        .encode();
+    }
+    error.to_string()
+}
+
 // ── Public re-exports (preserving the flat external API) ─────────────────────
 
 pub use agent::redact_home;

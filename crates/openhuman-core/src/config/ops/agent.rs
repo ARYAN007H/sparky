@@ -133,7 +133,7 @@ pub async fn apply_autonomy_settings(
         config.autonomy.auto_approve_all = auto_approve_all;
     }
 
-    config.save().await.map_err(|e| e.to_string())?;
+    config.save().await.map_err(super::config_save_error)?;
 
     crate::security::live_policy::reload_from(&config.autonomy);
     crate::core::bus::BUS.publish(crate::core::events::DomainEvent::AutonomyConfigChanged);
@@ -248,7 +248,7 @@ pub async fn apply_agent_settings(
         );
     }
 
-    config.save().await.map_err(|e| e.to_string())?;
+    config.save().await.map_err(super::config_save_error)?;
 
     let effective = crate::tools::timeout::set_tool_timeout_secs(config.agent.agent_timeout_secs);
     log::debug!(
@@ -611,7 +611,7 @@ pub async fn apply_agent_paths_settings(
 
         config.action_dir = crate::config::resolve_action_dir(&config.action_dir_override);
 
-        config.save().await.map_err(|e| e.to_string())?;
+        config.save().await.map_err(super::config_save_error)?;
 
         crate::security::live_policy::set_action_dir(config.action_dir.clone());
         crate::core::bus::BUS.publish(crate::core::events::DomainEvent::AgentPathsChanged);
@@ -643,7 +643,7 @@ pub async fn apply_agent_paths_settings(
         if previous != config.files_dir() && !config.files_dir_history.contains(&previous) {
             config.files_dir_history.push(previous);
         }
-        config.save().await.map_err(|e| e.to_string())?;
+        config.save().await.map_err(super::config_save_error)?;
         crate::core::bus::BUS.publish(crate::core::events::DomainEvent::AgentPathsChanged);
         log::debug!(
             "[config][agent_paths] files_dir now '{}'",
