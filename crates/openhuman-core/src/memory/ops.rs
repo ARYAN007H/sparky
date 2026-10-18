@@ -12,10 +12,12 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
 use chrono::Utc;
+#[cfg(feature = "channels")]
+use tinymemory_api::ItemKind;
 use tinymemory_api::{
-    EraseRequest, FetchRequest, ForgetTarget, ItemId, ItemKind, LearningKind, ListRequest,
-    MemoryMeta, MetaFilter, Namespace, Reach, RecallMode, RecallRequest, StoreItem, StoreReceipt,
-    ThreadWindow, TimeHint, WriteOptions,
+    EraseRequest, FetchRequest, ForgetTarget, ItemId, LearningKind, ListRequest, MemoryMeta,
+    MetaFilter, Namespace, Reach, RecallMode, RecallRequest, StoreItem, StoreReceipt, ThreadWindow,
+    TimeHint, WriteOptions,
 };
 use tinymemory_tools::confine::{Confinement, Policy};
 
@@ -604,6 +606,7 @@ async fn channel_thread_snapshot(
     Ok(owned)
 }
 
+#[cfg(feature = "channels")]
 async fn forget_channel_thread(bound: &BoundEngine, thread_id: &str) -> Result<usize> {
     let filter = MetaFilter {
         thread_id: Some(thread_id.to_string()),
