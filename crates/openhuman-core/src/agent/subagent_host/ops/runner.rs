@@ -413,8 +413,7 @@ fn workspace_descriptor_for_subagent(
 /// `Config::load_or_init()` is **not cached** — it re-resolves the config dirs
 /// and re-reads `config.toml` on every call. `run_typed_mode` needed it in six
 /// places, so a single sub-agent spawn used to hit the disk six times and could
-/// observe six *different* configs if the file changed mid-spawn. One snapshot
-/// is both cheaper and more coherent.
+/// observe six *different* configs if the file changed mid-spawn.
 ///
 /// The error is captured as a `String` rather than dropped to `Option` so the
 /// sites that log it can say why the config was unavailable; every site
