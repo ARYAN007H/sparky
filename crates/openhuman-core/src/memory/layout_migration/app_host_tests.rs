@@ -55,7 +55,7 @@ async fn binds_the_legacy_tree_and_the_users_own() {
 fn places_into_the_v3_layout_before_the_switch() {
     let tmp = tempfile::tempdir().unwrap();
     let config = signed_in(&tmp);
-    assert!(!crate::memory::config.memory.layout == crate::config::MemoryLayoutMode::V3);
+    assert!(config.memory.layout != crate::config::MemoryLayoutMode::V3);
     let mut v3 = config.clone();
     v3.memory.layout = crate::config::MemoryLayoutMode::V3;
     let legacy = tinymemory_tools::layout::identity::Identity::root()

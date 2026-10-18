@@ -1,7 +1,127 @@
 use super::*;
 use crate::memory::test_fixtures::{bind_reference, config_in, stored};
 use crate::memory::types::EngineStatus;
-use tinymemory_api::{FetchMode, ItemKind, MetaFilter, SourceKind, SourceRef, ToolCallRef};
+use std::sync::{
+    atomic::{AtomicUsize, Ordering},
+    Arc,
+};
+use tinymemory_api::conformance::ReferenceEngine;
+use tinymemory_api::{
+    EngineDescriptor, FetchMode, FetchRequest, ForgetReport, ForgetTarget, ItemKind, ListRequest,
+    MemoryEngine, MemoryMeta, MetaFilter, RecallRequest, SourceKind, SourceRef, StoreItem,
+    StoreReceipt, ToolCallRef,
+};
+
+#[test]
+fn invalid_saas_root_is_refused_before_store_reaches_the_engine() {
+    const CHILD: &str = "OPENHUMAN_TEST_SAAS_MEMORY_STORE_GUARD";
+    const TEST_NAME: &str = "memory::ops::tests::invalid_saas_root_is_refused_before_store_reaches_the_engine";
+
+    if std::env::var_os(CHILD).is_none() {
+        let output = std::process::Command::new(std::env::current_exe().unwrap())
+            .args(["--exact", TEST_NAME, "--nocapture"])
+            .env(CHILD, "1")
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success()
+                && String::from_utf8_lossy(&output.stdout)
+                    .contains("SAAS_MEMORY_STORE_GUARD_CHILD_PASSED"),
+            "isolated SaaS test process failed or ran zero tests:\n{}\n{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+        return;
+    }
+
+    crate::core::runtime::mode::lock_mode(crate::core::runtime::Mode::Saas).unwrap();
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+    for root in [None, Some("not a namespace!"), Some("root")] {
+        let tmp = tempfile::tempdir().unwrap();
+        let mut config = config_in(&tmp);
+        config.memory.root = root.map(str::to_string);
+        let calls = Arc::new(AtomicUsize::new(0));
+        crate::memory::engine::install_test_engine(
+            &config.workspace_dir,
+            Arc::new(CountingEngine {
+                inner: ReferenceEngine::new(),
+                calls: calls.clone(),
+            }),
+        );
+        let item = StoreItem::learning(
+            "should not be stored",
+            tinymemory_api::LearningKind::Fact,
+            0.9,
+            MemoryMeta::default(),
+        );
+        let error = runtime.block_on(store_item(&config, item)).unwrap_err();
+
+        assert!(matches!(
+            error,
+            Error::InvalidRequest(message)
+                if message == "memory is unavailable: this agent has no valid memory root"
+        ));
+        assert_eq!(calls.load(Ordering::SeqCst), 0, "root: {root:?}");
+    }
+    println!("SAAS_MEMORY_STORE_GUARD_CHILD_PASSED");
+}
+
+struct CountingEngine {
+    inner: ReferenceEngine,
+    calls: Arc<AtomicUsize>,
+}
+
+#[async_trait::async_trait]
+impl MemoryEngine for CountingEngine {
+    fn descriptor(&self) -> &EngineDescriptor {
+        self.inner.descriptor()
+    }
+
+    async fn health(&self) -> tinymemory_api::EngineHealth {
+        self.calls.fetch_add(1, Ordering::SeqCst);
+        self.inner.health().await
+    }
+
+    async fn recall(
+        &self,
+        request: RecallRequest,
+    ) -> tinymemory_api::Result<tinymemory_api::RecallAnswer> {
+        self.calls.fetch_add(1, Ordering::SeqCst);
+        self.inner.recall(request).await
+    }
+
+    async fn fetch(
+        &self,
+        request: FetchRequest,
+    ) -> tinymemory_api::Result<tinymemory_api::FetchPage> {
+        self.calls.fetch_add(1, Ordering::SeqCst);
+        self.inner.fetch(request).await
+    }
+
+    async fn store(&self, item: StoreItem) -> tinymemory_api::Result<StoreReceipt> {
+        self.calls.fetch_add(1, Ordering::SeqCst);
+        self.inner.store(item).await
+    }
+
+    async fn forget(
+        &self,
+        target: ForgetTarget,
+    ) -> tinymemory_api::Result<ForgetReport> {
+        self.calls.fetch_add(1, Ordering::SeqCst);
+        self.inner.forget(target).await
+    }
+
+    async fn list(
+        &self,
+        request: ListRequest,
+    ) -> tinymemory_api::Result<tinymemory_api::ListPage> {
+        self.calls.fetch_add(1, Ordering::SeqCst);
+        self.inner.list(request).await
+    }
+}
 
 fn learn_params(text: &str) -> LearnParams {
     LearnParams {
