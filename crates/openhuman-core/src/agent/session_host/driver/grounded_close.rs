@@ -103,6 +103,9 @@ impl SupplementalTrace {
     ) {
         let mut native_usage = response.usage.or(response.message.usage);
         if response.served_from_cache {
+            self.events.emit(AgentEvent::ModelResponseCached {
+                call_id: call_id.clone(),
+            });
             if let Some(usage) = &mut native_usage {
                 usage.charged_amount = None;
             }
