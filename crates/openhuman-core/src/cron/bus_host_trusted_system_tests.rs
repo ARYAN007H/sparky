@@ -1,7 +1,7 @@
 use super::*;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use tempfile::TempDir;
-use tinyflows_bus::schedule::{callbacks, Attempt, CALLBACK_INTERFACE};
+use tinyflows_bus::schedule::{Attempt, CALLBACK_INTERFACE, callbacks};
 
 fn config(tmp: &TempDir) -> Config {
     let config = Config {

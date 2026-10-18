@@ -356,6 +356,10 @@ pub(crate) fn kind_refusal(binding: &Binding, job: &CronJob) -> Option<String> {
 #[path = "bus_host_tests.rs"]
 mod tests;
 
+#[cfg(all(test, feature = "modules"))]
+#[path = "bus_host_context_tests.rs"]
+mod context_tests;
+
 #[cfg(test)]
 #[path = "bus_host_trusted_system_tests.rs"]
 mod trusted_system_tests;
