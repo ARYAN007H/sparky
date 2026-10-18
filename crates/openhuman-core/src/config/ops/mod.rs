@@ -39,9 +39,8 @@ pub use agent_paths::{
 pub use agent::{
     add_auto_approve_tool, apply_agent_settings, apply_autonomy_settings, get_agent_settings,
     get_autonomy_settings, load_and_apply_agent_settings, load_and_apply_autonomy_settings,
-    AgentSettingsPatch, AutonomySettingsPatch,
+    AgentPathsPatch, AgentSettingsPatch, AutonomySettingsPatch,
 };
-pub use agent_paths::AgentPathsPatch;
 
 pub use loader::{
     agent_server_status, client_config_json, core_rpc_url_from_env, get_config_snapshot,
