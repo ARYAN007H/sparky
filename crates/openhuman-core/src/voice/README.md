@@ -263,8 +263,8 @@ one chat and the meet bot use, then streams the reply back as
   voice-server settings are saved.
 - `synthesize_reply` ([`reply_speech.rs`](./reply_speech.rs)) and `transcribe_cloud`
   ([`cloud_transcribe.rs`](./cloud_transcribe.rs)) are the direct hosted-backend entry points.
-- `handle_live_voice_ws` ([`live/ws.rs`](./live/ws.rs)) and `handle_dictation_ws`
-  (`streaming.rs`) are the WebSocket handlers the RPC crate mounts.
+- `handle_live_voice_ws` ([`live/ws.rs`](./live/ws.rs)) is the WebSocket handler
+  the RPC crate mounts.
 - `handle_voice_harness_turn` (`realtime_harness/`) runs one realtime harness
   turn.
 
