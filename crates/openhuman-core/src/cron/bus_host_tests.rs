@@ -9,7 +9,7 @@ use async_trait::async_trait;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use tempfile::TempDir;
 use tinyflows_bus::schedule::types::{DeliveryConfig, DeliveryStatus, Schedule};
-use tinyflows_bus::schedule::{callbacks, CALLBACK_INTERFACE, DeliveryProjection};
+use tinyflows_bus::schedule::{callbacks, DeliveryProjection, CALLBACK_INTERFACE};
 
 fn config(tmp: &TempDir) -> Config {
     let config = Config {
@@ -64,7 +64,9 @@ fn flow_job(config: &Config, flow_id: &str) -> CronJob {
     crate::cron::add_flow_schedule_job(
         config,
         flow_id,
-        Schedule::Every { every_ms: 3_600_000 },
+        Schedule::Every {
+            every_ms: 3_600_000,
+        },
     )
     .unwrap()
 }
@@ -294,7 +296,9 @@ async fn schedule_trigger_runs_a_system_job_and_records_the_handler_result() {
     let row = crate::cron::system_jobs::ensure_system_job(
         &config,
         "bus-host-system",
-        Schedule::Every { every_ms: 3_600_000 },
+        Schedule::Every {
+            every_ms: 3_600_000,
+        },
     )
     .unwrap();
     let attempt: Attempt = proxy
@@ -542,7 +546,10 @@ async fn captured_deleted_flow_job_publishes_trigger_and_completion_identity() {
             job_name: String,
             job_type: String,
         },
-        Completed { job_id: String, success: bool },
+        Completed {
+            job_id: String,
+            success: bool,
+        },
     }
 
     struct CronEvents(String, mpsc::UnboundedSender<Seen>);
@@ -628,7 +635,10 @@ async fn captured_deleted_flow_job_publishes_trigger_and_completion_identity() {
     let events = tokio::time::timeout(std::time::Duration::from_secs(2), async {
         vec![
             events_rx.recv().await.expect("trigger event remains open"),
-            events_rx.recv().await.expect("completion event remains open"),
+            events_rx
+                .recv()
+                .await
+                .expect("completion event remains open"),
         ]
     })
     .await

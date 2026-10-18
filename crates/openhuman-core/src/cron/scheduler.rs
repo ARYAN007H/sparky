@@ -56,8 +56,7 @@ use anyhow::{anyhow, Result};
 use std::sync::Arc;
 use tinyflows_bus::schedule::types::CronJob;
 use tinyflows_bus::schedule::{
-    members, ManualDelivery, RunJobReply, StartScheduler, StoreBackend,
-    StoreConfig,
+    members, ManualDelivery, RunJobReply, StartScheduler, StoreBackend, StoreConfig,
 };
 use tokio::time::{self, Duration};
 

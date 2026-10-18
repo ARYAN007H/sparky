@@ -157,8 +157,15 @@ async fn manual_run_projects_its_captured_job_after_the_saved_job_is_deleted() {
 
     #[derive(Debug, PartialEq, Eq)]
     enum Seen {
-        Triggered { id: String, name: String, kind: String },
-        Completed { id: String, success: bool },
+        Triggered {
+            id: String,
+            name: String,
+            kind: String,
+        },
+        Completed {
+            id: String,
+            success: bool,
+        },
     }
     struct Events(String, mpsc::UnboundedSender<Seen>);
     #[async_trait]
@@ -279,7 +286,10 @@ async fn manual_run_projects_its_captured_job_after_the_saved_job_is_deleted() {
         }
     );
     let reply = running.await.unwrap().unwrap();
-    assert!(matches!(reply, tinyflows_bus::schedule::RunJobReply::Completed { success: true, .. }));
+    assert!(matches!(
+        reply,
+        tinyflows_bus::schedule::RunJobReply::Completed { success: true, .. }
+    ));
     let runs = cron::list_runs(&config, &job.id, 10).unwrap();
     assert_eq!(runs.len(), 1);
     assert_eq!(runs[0].run_id.as_deref(), Some(run_id.as_str()));
@@ -349,6 +359,144 @@ async fn detached_manual_run_returns_only_after_the_worker_is_running() {
         tinyflows_bus::schedule::RunJobReply::Accepted { run_id: ref id } if id == &run_id
     ));
     let _ = release_tx.send(());
+}
+
+#[tokio::test]
+async fn manual_run_claims_are_shared_within_a_scope_and_isolated_between_agents() {
+    use crate::core::runtime::{ContextOverlay, CoreContext, DispatchCtx, DomainSet};
+    use tokio::sync::Semaphore;
+
+    crate::core::bus::init().await.unwrap();
+    let tmp = TempDir::new().unwrap();
+    let config = tests::test_config(&tmp);
+    let alpha = CoreContext::for_test_with_config(DomainSet::full(), config.clone()).derive_with(
+        ContextOverlay::new(
+            config.clone(),
+            DomainSet::full(),
+            crate::tools::toolpacks::ToolGroups::none(),
+        )
+        .session_agent("cron-alpha"),
+    );
+    let beta = CoreContext::for_test_with_config(DomainSet::full(), config.clone()).derive_with(
+        ContextOverlay::new(
+            config.clone(),
+            DomainSet::full(),
+            crate::tools::toolpacks::ToolGroups::none(),
+        )
+        .session_agent("cron-beta"),
+    );
+    let name = format!("scoped-claims-{}", uuid::Uuid::new_v4().simple());
+    let alpha_job = CoreContext::scope(Arc::clone(&alpha), async {
+        tests::single_flight_system_job(&config, &name)
+    })
+    .await;
+    let beta_job = CoreContext::scope(Arc::clone(&beta), async {
+        tests::single_flight_system_job(&config, &name)
+    })
+    .await;
+    assert_eq!(alpha_job.id, beta_job.id);
+
+    let (started_tx, mut started_rx) = mpsc::unbounded_channel();
+    let started_tx = Arc::new(started_tx);
+    let release = Arc::new(Semaphore::new(0));
+    let release_handler = Arc::clone(&release);
+    let handler_started = Arc::clone(&started_tx);
+    let _handler = crate::cron::system_job_handlers::register(
+        &name,
+        Arc::new(move |_| {
+            let release = Arc::clone(&release_handler);
+            let started = Arc::clone(&handler_started);
+            Box::pin(async move {
+                let _ = started.send(());
+                release
+                    .acquire()
+                    .await
+                    .map_err(|error| error.to_string())?
+                    .forget();
+                Ok(())
+            })
+        }),
+    );
+    let alpha_dispatch = DispatchCtx::new(Arc::clone(&alpha));
+    let first_ctx = alpha_dispatch.clone();
+    let first_config = config.clone();
+    let first_job = alpha_job.clone();
+    let first_id = format!("same-scope-{}", uuid::Uuid::new_v4());
+    let first_run = first_id.clone();
+    let first = tokio::spawn(async move {
+        crate::cron::scheduler::run_job_now(
+            &first_ctx,
+            &first_config,
+            first_job,
+            first_run,
+            true,
+            tinyflows_bus::schedule::ManualDelivery::NotRequested,
+        )
+        .await
+    });
+    tokio::time::timeout(std::time::Duration::from_secs(3), started_rx.recv())
+        .await
+        .expect("first scope's manual worker starts")
+        .expect("handler start channel remains open");
+
+    let duplicate = crate::cron::scheduler::run_job_now(
+        &alpha_dispatch,
+        &config,
+        alpha_job.clone(),
+        format!("duplicate-{}", uuid::Uuid::new_v4()),
+        true,
+        tinyflows_bus::schedule::ManualDelivery::NotRequested,
+    )
+    .await
+    .expect("a duplicate claim is a refusal, not a transport error");
+    assert!(matches!(
+        duplicate,
+        tinyflows_bus::schedule::RunJobReply::Refused {
+            reason: tinyflows_bus::schedule::RunJobRefusal::AlreadyRunning
+        }
+    ));
+
+    let beta_dispatch = DispatchCtx::new(Arc::clone(&beta));
+    let beta_ctx = beta_dispatch.clone();
+    let beta_config = config.clone();
+    let beta_job_for_run = beta_job.clone();
+    let beta_id = format!("other-scope-{}", uuid::Uuid::new_v4());
+    let beta_run_id = beta_id.clone();
+    let second = tokio::spawn(async move {
+        crate::cron::scheduler::run_job_now(
+            &beta_ctx,
+            &beta_config,
+            beta_job_for_run,
+            beta_run_id,
+            true,
+            tinyflows_bus::schedule::ManualDelivery::NotRequested,
+        )
+        .await
+    });
+    tokio::time::timeout(std::time::Duration::from_secs(3), started_rx.recv())
+        .await
+        .expect("another agent scope can start the same job identity")
+        .expect("handler start channel remains open");
+
+    release.add_permits(2);
+    assert!(matches!(
+        first.await.unwrap().unwrap(),
+        tinyflows_bus::schedule::RunJobReply::Completed { success: true, .. }
+    ));
+    assert!(matches!(
+        second.await.unwrap().unwrap(),
+        tinyflows_bus::schedule::RunJobReply::Completed { success: true, .. }
+    ));
+    let alpha_runs = CoreContext::scope(Arc::clone(&alpha), async {
+        cron::list_runs(&config, &alpha_job.id, 10).unwrap()
+    })
+    .await;
+    let beta_runs = CoreContext::scope(Arc::clone(&beta), async {
+        cron::list_runs(&config, &beta_job.id, 10).unwrap()
+    })
+    .await;
+    assert_eq!(alpha_runs[0].run_id.as_deref(), Some(first_id.as_str()));
+    assert_eq!(beta_runs[0].run_id.as_deref(), Some(beta_id.as_str()));
 }
 
 #[tokio::test]
@@ -448,8 +596,7 @@ async fn cancelled_waiting_caller_keeps_manual_run_callback_served_until_complet
     assert!(waiting_call.await.unwrap_err().is_cancelled());
     let _ = release_tx.send(());
 
-    let completed = tokio::time::timeout(std::time::Duration::from_secs(3), events_rx.recv())
-    .await;
+    let completed = tokio::time::timeout(std::time::Duration::from_secs(3), events_rx.recv()).await;
     assert_eq!(
         completed,
         Ok(Some(true)),

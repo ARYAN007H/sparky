@@ -96,13 +96,11 @@ impl HostExecutor {
 
     /// Whether a failed attempt may be retried, and the output to record.
     fn classify_failure(job: &CronJob, output: String, agent_error: Option<&str>) -> Attempt {
-        let permanent = |output: String| {
-            Attempt {
-                success: false,
-                output,
-                retryable: false,
-                raw_detail: agent_error.map(str::to_string),
-            }
+        let permanent = |output: String| Attempt {
+            success: false,
+            output,
+            retryable: false,
+            raw_detail: agent_error.map(str::to_string),
         };
         if output.starts_with("blocked by security policy:") {
             // Deterministic policy violations are not retryable.
@@ -162,7 +160,10 @@ impl HostExecutor {
         if !matches!(job.job_type, JobType::Agent) || !attempt.retryable {
             return;
         }
-        let message = attempt.raw_detail.as_deref().unwrap_or(attempt.output.as_str());
+        let message = attempt
+            .raw_detail
+            .as_deref()
+            .unwrap_or(attempt.output.as_str());
         crate::core::observability::report_error(
             message,
             "cron",
@@ -170,7 +171,10 @@ impl HostExecutor {
             &[
                 ("job_id", job.id.as_str()),
                 ("agent_id", job.agent_id.as_deref().unwrap_or("none")),
-                ("session_target", agent_session_target_tag(&job.session_target)),
+                (
+                    "session_target",
+                    agent_session_target_tag(&job.session_target),
+                ),
                 ("failure", "retries_exhausted"),
             ],
         );

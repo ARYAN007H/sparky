@@ -258,9 +258,7 @@ impl DocumentsPort {
                 let id = text(&request, "id")?;
                 allowed_record(collection, id)?;
                 let precondition: Precondition = field(&request, "precondition")?;
-                encode(
-                    documents.delete(collection, id, precondition).await?,
-                )
+                encode(documents.delete(collection, id, precondition).await?)
             }
             "query" => {
                 let collection = text(&request, "collection")?;

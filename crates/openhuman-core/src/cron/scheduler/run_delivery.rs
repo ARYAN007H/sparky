@@ -109,4 +109,3 @@ pub(crate) async fn trigger(binding: &Binding, job: &CronJob, run_id: &str) -> A
         })
         .await
 }
-

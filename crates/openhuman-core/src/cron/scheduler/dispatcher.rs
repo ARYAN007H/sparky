@@ -53,8 +53,7 @@ pub(crate) async fn run_job_now(
     let config = config.clone();
     tokio::spawn(async move {
         let mut reply_tx = Some(reply_tx);
-        let result =
-            own_manual_run(ctx, config, job, run_id, wait, delivery, &mut reply_tx).await;
+        let result = own_manual_run(ctx, config, job, run_id, wait, delivery, &mut reply_tx).await;
         if let Err(error) = result {
             if let Some(reply_tx) = reply_tx.take() {
                 let _ = reply_tx.send(Err(error.to_string()));
@@ -86,7 +85,9 @@ async fn own_manual_run(
         &config.action_dir,
     ));
     let binding = Binding::new(&ctx, &config, security);
-    let host = bus_host::register(binding.clone()).await.map_err(|e| anyhow!(e))?;
+    let host = bus_host::register(binding.clone())
+        .await
+        .map_err(|e| anyhow!(e))?;
     let scope = binding.within(async { DocScope::current(&config) }).await?;
     let storage = StoreConfig {
         backend: StoreBackend::Documents {
@@ -144,7 +145,10 @@ async fn own_manual_run(
     let terminal = loop {
         let state = if !started {
             match module::proxy(&config).await {
-                Ok(proxy) => match proxy.call::<ManualRunState>(members::START_MANUAL_RUN, (&start,)).await {
+                Ok(proxy) => match proxy
+                    .call::<ManualRunState>(members::START_MANUAL_RUN, (&start,))
+                    .await
+                {
                     Ok(state) => state,
                     Err(error) => {
                         tracing::debug!(error = %error.wire_message(), "[cron:scheduler] retrying identical StartManualRun");
@@ -185,7 +189,8 @@ async fn own_manual_run(
                     Ok(None) => {
                         if let Some(reply_tx) = reply_tx.take() {
                             let _ = reply_tx.send(Err(
-                                "cron manual worker disappeared before a terminal result".to_string(),
+                                "cron manual worker disappeared before a terminal result"
+                                    .to_string(),
                             ));
                         }
                         tracing::debug!("[cron:scheduler] manual handle absent without observed terminal state; retaining callback while reconciling");
@@ -254,7 +259,11 @@ async fn own_manual_run(
     let mut retry_delay = Duration::from_millis(20);
     loop {
         let result = match module::proxy(&config).await {
-            Ok(proxy) => proxy.call::<bool>(members::ACKNOWLEDGE_MANUAL_RUN, (&ack,)).await,
+            Ok(proxy) => {
+                proxy
+                    .call::<bool>(members::ACKNOWLEDGE_MANUAL_RUN, (&ack,))
+                    .await
+            }
             Err(error) => {
                 tracing::debug!(%error, "[cron:scheduler] retrying AcknowledgeManualRun");
                 tokio::time::sleep(retry_delay).await;
@@ -287,7 +296,9 @@ async fn own_manual_run(
                     Err(error) => tracing::debug!(%error, "[cron:scheduler] reconciling manual acknowledgement"),
                 }
             }
-            Err(error) => tracing::debug!(error = %error.wire_message(), "[cron:scheduler] retrying ambiguous AcknowledgeManualRun"),
+            Err(error) => {
+                tracing::debug!(error = %error.wire_message(), "[cron:scheduler] retrying ambiguous AcknowledgeManualRun")
+            }
         }
         tokio::time::sleep(retry_delay).await;
         retry_delay = (retry_delay * 2).min(Duration::from_secs(1));

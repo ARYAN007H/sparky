@@ -209,7 +209,9 @@ async fn module_scheduler_slot_is_per_store_scope_and_refuses_a_duplicate() {
         .await
         .expect_err("the same document scope has one module scheduler");
     assert!(
-        error.to_string().contains("scheduler already owns this scope"),
+        error
+            .to_string()
+            .contains("scheduler already owns this scope"),
         "unexpected duplicate-scope refusal: {error}"
     );
 

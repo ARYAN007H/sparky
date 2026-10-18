@@ -8,11 +8,7 @@ async fn port() -> (tinybus::Proxy, CallbackAddress) {
     (proxy, address)
 }
 
-async fn port_with_backend() -> (
-    tinybus::Proxy,
-    CallbackAddress,
-    Arc<dyn StorageBackend>,
-) {
+async fn port_with_backend() -> (tinybus::Proxy, CallbackAddress, Arc<dyn StorageBackend>) {
     let config = Config::default();
     // Start the module runtime and attach the module before touching the bus.
     module::proxy(&config).await.expect("module attaches");
@@ -45,9 +41,7 @@ async fn the_port_serves_the_contracts_document_interface_and_reports_capabiliti
 
 #[tokio::test]
 async fn schedule_store_migration_moves_legacy_jobs_runs_and_counter_before_reads() {
-    use tinyflows_bus::schedule::{
-        StoreOperation,
-    };
+    use tinyflows_bus::schedule::StoreOperation;
     use tinystoragedrivers::Precondition;
 
     let config = Config::default();
@@ -110,18 +104,18 @@ async fn schedule_store_migration_moves_legacy_jobs_runs_and_counter_before_read
     .unwrap();
 
     let scope = DocScope::on_backend(&config, Arc::clone(&backend), Scope::local());
-    let listed: Vec<tinyflows_bus::schedule::types::CronJob> = crate::cron::client::store_in(
-        &config,
-        &scope,
-        StoreOperation::List,
-    )
-    .await
-    .expect("the first store read migrates the legacy schedule schema");
+    let listed: Vec<tinyflows_bus::schedule::types::CronJob> =
+        crate::cron::client::store_in(&config, &scope, StoreOperation::List)
+            .await
+            .expect("the first store read migrates the legacy schedule schema");
     assert_eq!(listed.len(), 1);
     assert_eq!(listed[0].id, "legacy-job");
-    assert_eq!(listed[0].schedule, tinyflows_bus::schedule::types::Schedule::Every {
-        every_ms: 3_600_000
-    });
+    assert_eq!(
+        listed[0].schedule,
+        tinyflows_bus::schedule::types::Schedule::Every {
+            every_ms: 3_600_000
+        }
+    );
 
     let runs: Vec<tinyflows_bus::schedule::types::CronRun> = crate::cron::client::store_in(
         &config,
@@ -193,7 +187,11 @@ async fn shared_schedule_records_are_owner_scoped_and_never_scanned() {
     )
     .await;
     assert!(record.get("error").is_none(), "{record}");
-    assert!(docs.get("tsd.counters", "cron/runs").await.unwrap().is_some());
+    assert!(docs
+        .get("tsd.counters", "cron/runs")
+        .await
+        .unwrap()
+        .is_some());
 
     let requests = [
         json!({"op":"get","collection":"tsd.counters","id":"other/runs"}),
@@ -244,7 +242,10 @@ async fn shared_schedule_records_are_owner_scoped_and_never_scanned() {
     )
     .await;
     assert!(exact_progress.get("error").is_none(), "{exact_progress}");
-    assert!(unexpected.is_empty(), "shared schedule port violations: {unexpected:#?}");
+    assert!(
+        unexpected.is_empty(),
+        "shared schedule port violations: {unexpected:#?}"
+    );
 }
 
 #[tokio::test]
@@ -275,14 +276,19 @@ async fn document_port_preserves_schedule_record_metadata_options() {
         assert_eq!(stored.meta.schema, schema as u32, "{id}");
         assert_eq!(stored.meta.created_ms, created_ms, "{id}");
         assert_eq!(stored.meta.expires_ms, Some(9999999999999_i64), "{id}");
-        let read_back = ask(
-            &proxy,
-            json!({"op":"get","collection":"cron.jobs","id":id}),
-        )
-        .await;
-        assert_eq!(read_back["value"]["meta"]["schema"], schema, "{id}: {read_back}");
-        assert_eq!(read_back["value"]["meta"]["created_ms"], created_ms, "{id}: {read_back}");
-        assert_eq!(read_back["value"]["meta"]["expires_ms"], 9999999999999_i64, "{id}: {read_back}");
+        let read_back = ask(&proxy, json!({"op":"get","collection":"cron.jobs","id":id})).await;
+        assert_eq!(
+            read_back["value"]["meta"]["schema"], schema,
+            "{id}: {read_back}"
+        );
+        assert_eq!(
+            read_back["value"]["meta"]["created_ms"], created_ms,
+            "{id}: {read_back}"
+        );
+        assert_eq!(
+            read_back["value"]["meta"]["expires_ms"], 9999999999999_i64,
+            "{id}: {read_back}"
+        );
     }
 }
 
