@@ -112,4 +112,3 @@ export async function setWindowTitle(title: string): Promise<void> {
 
   await getCurrentWindow().setTitle(title);
 }
-
