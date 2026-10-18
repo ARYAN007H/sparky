@@ -5558,6 +5558,7 @@ dependencies = [
  "tinyinference-local",
  "tinyinference-voice",
  "tinymcp-bus",
+ "tinymemory-tools",
  "tinysearch-bus",
  "tinystoragedrivers-core",
  "tinytools",
