@@ -21,7 +21,10 @@ fn cause(
     }
 }
 
-fn neutral_outcome(status: SubagentOutcomeKind) -> SubagentOutcome {
+fn neutral_outcome(
+    status: SubagentOutcomeKind,
+    cause: &tinyagents_harness::no_progress::ClassifiedStopCause,
+) -> SubagentOutcome {
     let mut outcome = SubagentOutcome::cancelled("task");
     outcome.status = status;
     outcome.output = "durable winner".into();
@@ -33,11 +36,7 @@ fn neutral_outcome(status: SubagentOutcomeKind) -> SubagentOutcome {
         .insert("elapsed_ms".into(), serde_json::json!(0));
     outcome.extensions.insert(
         "failure_cause".into(),
-        serde_json::json!({
-            "class": "not_found",
-            "operation": "file_read",
-            "summary": "path was not found",
-        }),
+        serde_json::json!({"class": cause.class, "operation": cause.operation, "summary": cause.summary}),
     );
     serde_json::from_slice(&serde_json::to_vec(&outcome).unwrap()).unwrap()
 }
@@ -81,9 +80,11 @@ fn project(
 fn durable_winner_cause_is_restored_without_a_host_cache() {
     let directory = tempfile::tempdir().unwrap();
     let persistence = OpenHumanPersistence::new(directory.path().join("checkpoints"));
-    let outcome = neutral_outcome(SubagentOutcomeKind::Incomplete(SubagentIncomplete::new(
-        "path was not found",
-    )));
+    let winner_cause = cause("not_found", "file_read", "path was not found");
+    let outcome = neutral_outcome(
+        SubagentOutcomeKind::Incomplete(SubagentIncomplete::new("path was not found")),
+        &winner_cause,
+    );
 
     let projected = project(
         outcome,
@@ -94,7 +95,7 @@ fn durable_winner_cause_is_restored_without_a_host_cache() {
 
     assert_eq!(
         projected.failure_cause,
-        Some(cause("not_found", "file_read", "path was not found"))
+        Some(winner_cause)
     );
     assert_eq!(projected.output, "durable winner");
 }
@@ -103,9 +104,11 @@ fn durable_winner_cause_is_restored_without_a_host_cache() {
 fn a_losing_cached_cause_cannot_replace_the_durable_winner_cause() {
     let directory = tempfile::tempdir().unwrap();
     let persistence = OpenHumanPersistence::new(directory.path().join("checkpoints"));
-    let outcome = neutral_outcome(SubagentOutcomeKind::Incomplete(SubagentIncomplete::new(
-        "path was not found",
-    )));
+    let winner_cause = cause("not_found", "file_read", "path was not found");
+    let outcome = neutral_outcome(
+        SubagentOutcomeKind::Incomplete(SubagentIncomplete::new("path was not found")),
+        &winner_cause,
+    );
     let loser = host_outcome(
         Some(cause("permission", "shell", "loser was denied")),
         SubagentRunStatus::Incomplete {
@@ -122,7 +125,7 @@ fn a_losing_cached_cause_cannot_replace_the_durable_winner_cause() {
 
     assert_eq!(
         projected.failure_cause,
-        Some(cause("not_found", "file_read", "path was not found"))
+        Some(winner_cause)
     );
     assert_eq!(projected.output, "durable winner");
 }
@@ -132,9 +135,10 @@ fn ordinary_host_projection_keeps_the_winning_cause() {
     let directory = tempfile::tempdir().unwrap();
     let persistence = OpenHumanPersistence::new(directory.path().join("checkpoints"));
     let winner_cause = cause("permission", "shell", "permission denied");
-    let outcome = neutral_outcome(SubagentOutcomeKind::Incomplete(SubagentIncomplete::new(
-        "permission denied",
-    )));
+    let outcome = neutral_outcome(
+        SubagentOutcomeKind::Incomplete(SubagentIncomplete::new("permission denied")),
+        &winner_cause,
+    );
     let host = host_outcome(
         Some(winner_cause.clone()),
         SubagentRunStatus::Incomplete {
@@ -156,22 +160,43 @@ fn ordinary_host_projection_keeps_the_winning_cause() {
 fn non_incomplete_winners_discard_stale_typed_causes() {
     let directory = tempfile::tempdir().unwrap();
     let persistence = OpenHumanPersistence::new(directory.path().join("checkpoints"));
+    let stale = cause("not_found", "file_read", "stale cause");
     let statuses = [
-        SubagentOutcomeKind::Completed,
-        SubagentOutcomeKind::AwaitingInput(SubagentPause {
-            reason: "question".into(),
-            resume: SubagentResume::default(),
-        }),
-        SubagentOutcomeKind::Cancelled,
+        (
+            SubagentOutcomeKind::Completed,
+            SubagentRunStatus::Completed,
+        ),
+        (
+            SubagentOutcomeKind::AwaitingInput(SubagentPause {
+                reason: "question".into(),
+                resume: SubagentResume::default(),
+            }),
+            SubagentRunStatus::AwaitingUser {
+                question: "question".into(),
+                options: None,
+                checkpoint: None,
+            },
+        ),
+        (SubagentOutcomeKind::Cancelled, SubagentRunStatus::Cancelled),
     ];
 
-    for status in statuses {
-        let projected = project(
-            neutral_outcome(status),
+    for (neutral_status, host_status) in statuses {
+        let outcome = neutral_outcome(neutral_status, &stale);
+        let no_cache = project(
+            outcome.clone(),
             None,
             SubagentPersistenceDisposition::TerminalExisting,
             &persistence,
         );
-        assert_eq!(projected.failure_cause, None);
+        assert_eq!(no_cache.failure_cause, None);
+
+        let stale_host = host_outcome(Some(stale.clone()), host_status);
+        let cached = project(
+            outcome,
+            Some(stale_host),
+            SubagentPersistenceDisposition::TerminalInserted,
+            &persistence,
+        );
+        assert_eq!(cached.failure_cause, None);
     }
 }
