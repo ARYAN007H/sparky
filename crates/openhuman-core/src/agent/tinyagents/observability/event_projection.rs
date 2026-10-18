@@ -17,7 +17,8 @@ impl EventListener for OpenhumanEventBridge {
             AgentEvent::ModelStarted { call_id, .. }
                 if call_id.as_str().contains("-host-supplemental-") =>
             {
-                self.supplemental_call_active.store(true, std::sync::atomic::Ordering::SeqCst);
+                self.supplemental_call_active
+                    .store(true, std::sync::atomic::Ordering::SeqCst);
             }
             AgentEvent::ModelStarted { .. } => {
                 let iteration = tinyagents_harness::events::advance_iteration(&self.cursor);
@@ -148,11 +149,11 @@ impl EventListener for OpenhumanEventBridge {
             // child call carries its owning `subagent_task_id` so the trace
             // exporter nests the generation under the subagent span (this is
             // what makes the Context Scout's model calls visible in Langfuse).
-            AgentEvent::ModelCompleted {
-                call_id,
-                ..
-            } if call_id.as_str().contains("-host-supplemental-") => {
-                self.supplemental_call_active.store(false, std::sync::atomic::Ordering::SeqCst);
+            AgentEvent::ModelCompleted { call_id, .. }
+                if call_id.as_str().contains("-host-supplemental-") =>
+            {
+                self.supplemental_call_active
+                    .store(false, std::sync::atomic::Ordering::SeqCst);
             }
             AgentEvent::ModelCompleted {
                 usage,
@@ -219,7 +220,8 @@ impl EventListener for OpenhumanEventBridge {
             AgentEvent::ModelFailed { call_id, .. }
                 if call_id.as_str().contains("-host-supplemental-") =>
             {
-                self.supplemental_call_active.store(false, std::sync::atomic::Ordering::SeqCst);
+                self.supplemental_call_active
+                    .store(false, std::sync::atomic::Ordering::SeqCst);
             }
             AgentEvent::CostRecorded { cost } => {
                 tracing::debug!(

@@ -27,13 +27,12 @@ struct GatedRepairModel {
 #[async_trait]
 impl ChatModel<()> for GatedRepairModel {
     fn profile(&self) -> Option<&ModelProfile> {
-        static PROFILE: std::sync::LazyLock<ModelProfile> = std::sync::LazyLock::new(|| {
-            ModelProfile {
+        static PROFILE: std::sync::LazyLock<ModelProfile> =
+            std::sync::LazyLock::new(|| ModelProfile {
                 provider: Some("openai".into()),
                 tool_calling: true,
                 ..ModelProfile::default()
-            }
-        });
+            });
         Some(&PROFILE)
     }
 
@@ -43,7 +42,9 @@ impl ChatModel<()> for GatedRepairModel {
         _request: ModelRequest,
     ) -> tinyinference_llm::Result<ModelResponse> {
         if self.calls.fetch_add(1, std::sync::atomic::Ordering::SeqCst) == 0 {
-            return Ok(ModelResponse::assistant("The answer omits its required block."));
+            return Ok(ModelResponse::assistant(
+                "The answer omits its required block.",
+            ));
         }
         self.repair_started.notify_one();
         std::future::pending().await
@@ -56,9 +57,9 @@ impl ChatModel<()> for GatedRepairModel {
 /// its recoverable partial.
 #[tokio::test]
 async fn cancellation_during_required_output_repair_finalizes_native_run() {
+    use crate::storage::sessions::ExecutionStatus;
     use tinyagents_harness::events::AgentEvent;
     use tinyagents_harness::terminal::TerminalReason;
-    use crate::storage::sessions::ExecutionStatus;
 
     let scratch = tempfile::tempdir().expect("isolated workspace");
     let workspace = scratch.path().join("workspace");
@@ -102,33 +103,49 @@ async fn cancellation_during_required_output_repair_finalizes_native_run() {
         client_id: "trace-terminal-test".into(),
         request_id: Some(request_id.clone()),
     };
-    let turn = tokio::spawn(async move {
-        host.run_single_with_origin("hello", Some(origin)).await
-    });
+    let turn =
+        tokio::spawn(async move { host.run_single_with_origin("hello", Some(origin)).await });
     model.repair_started.notified().await;
     cancellation.cancel();
     assert!(turn.await.expect("turn task").is_err());
 
     let dispatch = crate::core::runtime::DispatchCtx::new(Arc::clone(&core));
-    let run_id = crate::agent::tinyagents::journal::take_request_journal_run(&dispatch, &request_id)
-        .expect("the web-chat request maps to its actual native run");
+    let run_id =
+        crate::agent::tinyagents::journal::take_request_journal_run(&dispatch, &request_id)
+            .expect("the web-chat request maps to its actual native run");
     let observations = crate::agent::tinyagents::journal::read_run_events(&dispatch, &run_id, 0)
         .await
         .expect("durable native event stream");
-    let failure = observations.iter().position(|record| matches!(
-        &record.event,
-        AgentEvent::RunFailed { run_id: failed, outcome: Some(outcome), .. }
-            if failed.as_str() == run_id && outcome.reason == TerminalReason::Cancelled
-    )).expect("the durable run keeps its actual cancellation outcome");
-    let finalized = observations.iter().position(|record| matches!(
-        &record.event,
-        AgentEvent::RunFinalized { run_id: finalized } if finalized.as_str() == run_id
-    )).expect("the native run is finalized");
-    assert!(finalized > failure, "finalization follows the cancellation fact");
-    assert!(observations.iter().any(|record| matches!(
-        &record.event,
-        AgentEvent::RunCompleted { run_id: completed, .. } if completed.as_str() == run_id
-    )), "the original harness completion is preserved before the host cancellation");
+    let failure = observations
+        .iter()
+        .position(|record| {
+            matches!(
+                &record.event,
+                AgentEvent::RunFailed { run_id: failed, outcome: Some(outcome), .. }
+                    if failed.as_str() == run_id && outcome.reason == TerminalReason::Cancelled
+            )
+        })
+        .expect("the durable run keeps its actual cancellation outcome");
+    let finalized = observations
+        .iter()
+        .position(|record| {
+            matches!(
+                &record.event,
+                AgentEvent::RunFinalized { run_id: finalized } if finalized.as_str() == run_id
+            )
+        })
+        .expect("the native run is finalized");
+    assert!(
+        finalized > failure,
+        "finalization follows the cancellation fact"
+    );
+    assert!(
+        observations.iter().any(|record| matches!(
+            &record.event,
+            AgentEvent::RunCompleted { run_id: completed, .. } if completed.as_str() == run_id
+        )),
+        "the original harness completion is preserved before the host cancellation"
+    );
     let status = crate::storage::sessions::status_store_for(&workspace)
         .get_status(&run_id)
         .await

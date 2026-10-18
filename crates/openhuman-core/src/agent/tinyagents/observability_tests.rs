@@ -112,8 +112,7 @@ async fn host_supplemental_generation_is_journaled_without_loop_progress_or_bill
     let bridge = OpenhumanEventBridge::new(Some(tx), "mock-model", 10);
     let sink = EventSink::new();
     sink.subscribe(bridge.clone());
-    let supplemental: tinyagents_harness::ids::CallId =
-        "run-1-host-supplemental-1".into();
+    let supplemental: tinyagents_harness::ids::CallId = "run-1-host-supplemental-1".into();
     sink.emit(AgentEvent::ModelStarted {
         call_id: supplemental.clone(),
         model: "mock-model".into(),
