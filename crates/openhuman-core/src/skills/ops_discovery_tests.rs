@@ -321,6 +321,31 @@ async fn skills_component_off_yields_no_catalogue_and_skips_bundled_install() {
     assert!(!installed, "disabled skills materialize no bundled skills");
 }
 
+#[cfg(feature = "flows")]
+#[tokio::test]
+async fn flow_authoring_is_hidden_when_tinyflows_component_is_disabled() {
+    use crate::core::runtime::{ComponentSet, CoreContext};
+
+    let workspace = tempfile::tempdir().unwrap();
+    // Install the compiled bundles as a normal boot would. The pre-fix
+    // discovery path gates only `skills`, so it incorrectly exposes the
+    // flow-authoring bundle when the module that owns its resources is off.
+    crate::skills::bundled::install(workspace.path());
+
+    let mut components = ComponentSet::all();
+    components.tinyflows = false;
+    let ctx = CoreContext::for_test_with_components(components);
+    let skills = CoreContext::scope(ctx, async {
+        load_workflow_metadata(workspace.path())
+    })
+    .await;
+
+    assert!(
+        !skills.iter().any(|skill| skill.id() == "flow-authoring"),
+        "a disabled TinyFlows component must not expose flow-authoring"
+    );
+}
+
 #[test]
 fn skills_component_enabled_without_context_is_on() {
     assert!(crate::skills::skills_component_enabled());
