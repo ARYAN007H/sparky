@@ -6,6 +6,9 @@ use tinymemory_api::{
 };
 use tinymemory_tools::recall::SkipReason;
 
+#[path = "adapter_tests.rs"]
+mod adapter_tests;
+
 use crate::memory::test_fixtures::{bind_reference, config_in, stored};
 
 type PreTurnArgs = (
