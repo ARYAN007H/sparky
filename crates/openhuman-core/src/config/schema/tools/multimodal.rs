@@ -114,8 +114,8 @@ impl MultimodalFileConfig {
     /// an LLM call. Also forbids remote fetch.
     ///
     /// `max_files: 0` is a sentinel: TinyAgents' media request wrapper
-    /// short-circuits before the host resolver reads any source, with
-    /// `TooManyFiles` before any disk or network read happens. This
+    /// short-circuits before the host resolver reads any source and returns
+    /// an attachments-disabled model error before any disk or network read. This
     /// holds regardless of the per-operator
     /// `[tools.multimodal_files]` block in `config.toml`.
     ///
