@@ -174,20 +174,20 @@ fn the_flows_record_serves_the_schedule_object() {
     assert_ne!(record.object_path, schedule::OBJECT_PATH);
     assert_ne!(schedule::INTERFACE, schedule::CALLBACK_INTERFACE);
     assert_ne!(schedule::INTERFACE, schedule::DOCUMENT_INTERFACE);
-    assert_eq!(schedule::CONTRACT_VERSION, 3, "the host speaks contract v3");
+    assert_eq!(schedule::CONTRACT_VERSION, 6, "the host speaks contract v6");
     assert_eq!(component_for("tinyflows"), Some("tinyflows"));
 }
 
-/// The pins are the published v0.8.23 `checksum.toml` (the first release with
-/// schedule contract v3).
+/// The pins are the published v0.8.25 `checksum.toml` (the first release with
+/// schedule contract v6).
 #[test]
 fn the_flows_record_pins_every_host_of_one_release() {
     let record = find("tinyflows").unwrap();
-    assert_eq!(record.version, "0.8.23");
+    assert_eq!(record.version, "0.8.25");
     assert_eq!(record.assets.len(), 11);
     for asset in record.assets {
         assert!(
-            asset.archive.starts_with("tinyflows-module-0.8.23-"),
+            asset.archive.starts_with("tinyflows-module-0.8.25-"),
             "{}",
             asset.archive
         );

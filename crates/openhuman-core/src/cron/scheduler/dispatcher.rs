@@ -156,34 +156,41 @@ async fn own_manual_run(
                 }
             }
         } else {
-            let proxy = module::proxy(&config).await.map_err(|error| anyhow!(error))?;
-            match proxy
-                .call::<Option<ManualRunState>>(
-                    members::WAIT_MANUAL_RUN,
-                    (WaitManualRun {
-                        handle: handle.clone(),
-                    },),
-                )
-                .await
-            {
-                Ok(Some(state)) => state,
-                // The released contract defines absence as no retained worker
-                // in this module generation. It is quiescent, but does not
-                // prove admission or success.
-                Ok(None) => {
-                    if let Some(reply_tx) = reply_tx.take() {
-                        let _ = reply_tx.send(Err(
-                            "cron manual worker disappeared before a terminal result".to_string(),
-                        ));
-                    }
-                    return Ok(());
-                }
+            match module::proxy(&config).await {
                 Err(error) => {
-                    tracing::debug!(error = %error.wire_message(), "[cron:scheduler] retrying WaitManualRun");
+                    tracing::debug!(%error, "[cron:scheduler] retrying WaitManualRun");
                     tokio::time::sleep(retry_delay).await;
                     retry_delay = (retry_delay * 2).min(Duration::from_secs(1));
                     continue;
                 }
+                Ok(proxy) => match proxy
+                    .call::<Option<ManualRunState>>(
+                        members::WAIT_MANUAL_RUN,
+                        (WaitManualRun {
+                            handle: handle.clone(),
+                        },),
+                    )
+                    .await
+                {
+                    Ok(Some(state)) => state,
+                    // The released contract defines absence as no retained worker
+                    // in this module generation. It is quiescent, but does not
+                    // prove admission or success.
+                    Ok(None) => {
+                        if let Some(reply_tx) = reply_tx.take() {
+                            let _ = reply_tx.send(Err(
+                                "cron manual worker disappeared before a terminal result".to_string(),
+                            ));
+                        }
+                        return Ok(());
+                    }
+                    Err(error) => {
+                        tracing::debug!(error = %error.wire_message(), "[cron:scheduler] retrying WaitManualRun");
+                        tokio::time::sleep(retry_delay).await;
+                        retry_delay = (retry_delay * 2).min(Duration::from_secs(1));
+                        continue;
+                    }
+                },
             }
         };
 

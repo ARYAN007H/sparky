@@ -13,7 +13,7 @@ scheduler runtime (poll pass, process-wide run claims, retry with backoff,
 completion and rescheduling), the cron job and run store, and the schedule
 maths (cron expressions, one-shot instants, intervals, active hours, the
 agent-job cadence floor). Core reaches it only through the `tinyflows-bus`
-contract (`tinyflows_bus::schedule`, v3), and keeps what is policy and what is
+contract (`tinyflows_bus::schedule`, v6), and keeps what is policy and what is
 pluggable: the callbacks the module runs jobs through, the document port it
 persists through, the job-kind handler registry, delivery, the operator limits
 and the RPC and tool surface. Core links neither `tinyflows-schedule` nor
@@ -67,14 +67,14 @@ jobs, the turn's message id.
 
 ### Run claims
 
-The module keeps process-wide run claims per `(scope, job id)`; the host uses
-the scope `openhuman` for every scheduler so the poll loop of any agent and
-Run Now refuse to start a job another of them is running. `cron.run` also
-takes a host-side guard (`scheduler::try_acquire_run`) so a second concurrent
-Run Now is rejected at once; a Run Now that loses to a scheduled run is
-refused by the module's `ExecuteJob` ("job is already running"), and the host
-records nothing for it. A claim releases on drop, so a scheduled run and a manual run
-never overlap.
+The module keeps process-wide occurrence claims per scheduler scope and job
+id. Each host scheduler and manual run uses the stable `DocScope` identity, so
+jobs in one document scope cannot overlap while distinct workspaces or agent
+scopes remain independent. Run Now reserves an inert module handle, starts
+the worker, and observes its state until the module confirms admission or a
+terminal result. The owner task keeps that invocation's callback and context
+alive through terminal acknowledgement, even if the RPC or tool caller goes
+away.
 
 ### Executing a job
 
