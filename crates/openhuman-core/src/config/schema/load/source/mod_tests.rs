@@ -224,6 +224,29 @@ async fn document_source_write_uses_its_last_read_revision() {
     );
 }
 
+#[tokio::test]
+async fn an_unobserved_document_source_write_is_create_only() {
+    let tmp = tempfile::tempdir().unwrap();
+    let storage = MemoryStorage::new();
+    let path = tmp.path().join("config.toml");
+    let seed = document_source(&storage, "tenant-source-create-only", &path);
+    let blind = document_source(&storage, "tenant-source-create-only", &path);
+
+    seed.write("default_model = \"seed\"\n").await.unwrap();
+    let error = blind
+        .write("default_model = \"blind-write\"\n")
+        .await
+        .expect_err("a new source handle must not replace an existing document");
+    let storage_error = error
+        .chain()
+        .find_map(|cause| cause.downcast_ref::<tinystoragedrivers::StorageError>())
+        .expect("CAS failure retains the typed storage error");
+    assert_eq!(
+        storage_error.kind(),
+        tinystoragedrivers::ErrorKind::Conflict
+    );
+}
+
 // ── Document source ──────────────────────────────────────────────────────────
 
 #[tokio::test]
