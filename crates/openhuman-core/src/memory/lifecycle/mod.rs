@@ -83,7 +83,7 @@ pub fn agent_memory(config: &Config, identity: &ResolvedIdentity) -> Result<Agen
 /// The memory of `identity` (the default agent for the root identity).
 pub fn current_agent_memory(
     config: &Config,
-    identity: &super::tinymemory_tools::layout::identity::Identity,
+    identity: &tinymemory_tools::layout::identity::Identity,
 ) -> Result<(AgentMemory, ResolvedIdentity)> {
     let identity = identity.resolve(&crate::memory::scope::identity_pins(config));
     let memory = agent_memory(config, &identity)?;
@@ -94,7 +94,7 @@ pub fn current_agent_memory(
 /// itself when none is named.
 pub fn named_agent_memory(
     config: &Config,
-    identity: &super::tinymemory_tools::layout::identity::Identity,
+    identity: &tinymemory_tools::layout::identity::Identity,
     agent_id: Option<&str>,
 ) -> Result<(AgentMemory, ResolvedIdentity)> {
     let mut identity = identity.resolve(&crate::memory::scope::identity_pins(config));

@@ -96,7 +96,7 @@ impl lm::LayoutHost for AppHost {
     }
 
     fn is_switched(&self) -> bool {
-        scope::layout_is_v3(&self.config)
+        self.config.memory.layout == MemoryLayoutMode::V3
     }
 
     async fn switch(&self) -> lm::Result<()> {

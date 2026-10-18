@@ -31,7 +31,7 @@ fn gather_acts_as_the_identity_the_run_carries() {
     let bare = CallFacts::gather(&config, None);
     assert_eq!(
         bare.agent_id.as_deref(),
-        Some(super::super::scope::DEFAULT_AGENT_ID)
+        Some(tinymemory_tools::layout::identity::DEFAULT_AGENT_ID)
     );
     assert!(bare.reach.at.is_root());
 }
