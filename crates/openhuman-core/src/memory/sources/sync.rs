@@ -133,7 +133,7 @@ pub async fn sync_one(config: &Config, source: &MemorySourceConfig) -> Result<u6
     run(config, source).await.map_err(host_error)
 }
 
-async fn run(config: &Config, source: &MemorySourceConfig) -> Result<u64, SyncError> {
+async fn run(config: &Config, source: &MemorySourceConfig) -> std::result::Result<u64, SyncError> {
     let bound = engine::resolve(config)
         .engine()
         .map_err(|error| SyncError::Invalid(error.to_string()))?;
@@ -163,7 +163,7 @@ pub(crate) async fn place_and_store(
     items: Vec<tinymemory_api::StoreItem>,
     (kind, source_id): (MemorySourceKind, &str),
     layout: &tinymemory_tools::MemoryLayout,
-) -> Result<u64, SyncError> {
+) -> std::result::Result<u64, SyncError> {
     let brain_source = crate::memory::brain::brain_source(kind);
     // Placing an item under its brain node is pure, so every one is placed up
     // front: the module stores `(node, item)` pairs and reports the nodes hit.

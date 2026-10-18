@@ -77,7 +77,7 @@ impl CheckpointStore for FileCheckpointStore {
             .unwrap_or_default()
     }
 
-    fn save(&self, file: &ImportFile) -> Result<(), String> {
+    fn save(&self, file: &ImportFile) -> std::result::Result<(), String> {
         let json = serde_json::to_vec_pretty(file).map_err(|error| error.to_string())?;
         write_atomic(&self.path, &json).map_err(|error| error.to_string())
     }

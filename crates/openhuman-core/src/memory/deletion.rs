@@ -54,7 +54,7 @@ impl ListStore<PendingDeletion> for FileStore {
         }))
     }
 
-    fn save(&self, all: &[PendingDeletion]) -> Result<(), StoreError> {
+    fn save(&self, all: &[PendingDeletion]) -> std::result::Result<(), StoreError> {
         if all.is_empty() {
             return match std::fs::remove_file(&self.file) {
                 Ok(()) => Ok(()),
@@ -122,7 +122,7 @@ impl DeletionExecutor for Executor<'_> {
         engine::resolve(self.config).is_on()
     }
 
-    async fn run(&self, deletion: &PendingDeletion) -> Result<usize, String> {
+    async fn run(&self, deletion: &PendingDeletion) -> std::result::Result<usize, String> {
         let result = match deletion {
             PendingDeletion::Thread { thread_id } => {
                 forget_thread_now(self.config, thread_id).await
