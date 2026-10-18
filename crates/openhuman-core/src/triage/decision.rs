@@ -106,8 +106,7 @@ pub enum ParseError {
 /// keeps the triage-specific casing normalization and action-field validation:
 /// React / Escalate must include a non-empty target and prompt.
 pub fn parse_triage_decision(llm_text: &str) -> Result<TriageDecision, ParseError> {
-    let fenced = llm_text.split("```").nth(1).and_then(|block| block.split_once('\n').map(|(_, body)| body.split("```").next().unwrap_or(body)));
-    let (value, _) = parse_lenient_last_object(fenced.unwrap_or(llm_text)).ok_or(ParseError::NoJsonObject)?;
+    let (value, _) = parse_lenient_last_object(llm_text).ok_or(ParseError::NoJsonObject)?;
     let normalized = lowercase_action_value(&value.to_string());
     let decision: TriageDecision =
         serde_json::from_str(&normalized).map_err(ParseError::InvalidJson)?;
