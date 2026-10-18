@@ -89,9 +89,9 @@ export type ChatDoneEvent = Omit<WireEvent<'chat_done', 'full_response'>, 'citat
   citations?: ChatCitation[] | null;
 };
 
-export type ChatSegmentEvent = Omit<
-  WireEvent<'chat_segment', 'full_response' | 'segment_index' | 'segment_total'>,
-  never
+export type ChatSegmentEvent = WireEvent<
+  'chat_segment',
+  'full_response' | 'segment_index' | 'segment_total'
 > & { citations?: ChatCitation[] | null };
 
 export type ChatInterimEvent = WireEvent<'chat_interim', 'full_response' | 'round'>;
