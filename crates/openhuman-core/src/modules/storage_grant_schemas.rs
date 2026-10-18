@@ -20,7 +20,6 @@
 
 use super::storage_grants::StorageGrant;
 use crate::storage::schema::module_items;
-use tinystoragedrivers::CollectionSpec;
 
 /// One module's row: its registry id, the schema owner that declares its
 /// storage, and secret prefixes the schema cannot name.
@@ -98,19 +97,9 @@ pub(super) fn grant_for(module_id: &str) -> Option<StorageGrant> {
     let items = module_items(row.owner);
     let mut secret_prefixes: Vec<String> = row.secrets.iter().map(|s| (*s).to_owned()).collect();
     secret_prefixes.extend(items.secrets);
-    let mut collections = items.collections;
-    let mut stream_prefixes = items.streams;
-    if module_id == tinyconnectors::MODULE_ID {
-        // The registry pins a released module that predates the v2 names, so
-        // it still writes its v1 collection and stream family. Grant those
-        // beside the schema's v2 names until the pin moves to a release that
-        // carries the v2 schema; a v2 module never touches them.
-        collections.push(CollectionSpec::new(tinyconnectors::PREFS_COLLECTION));
-        stream_prefixes.push(tinyconnectors::TRIGGER_STREAM_PREFIX.to_owned());
-    }
     Some(StorageGrant {
-        collections,
-        stream_prefixes,
+        collections: items.collections,
+        stream_prefixes: items.streams,
         blob_prefixes: items.blobs,
         secret_prefixes,
         writable: true,
