@@ -176,7 +176,7 @@ pub(crate) async fn track_parallel_turn_for_test(
         tokio::time::sleep(std::time::Duration::from_millis(5)).await;
     }
     set_test_run_chat_task_block(None).await;
-    tokio::spawn(async move {
+    ctx.clone().spawn(async move {
         while !block.dropped.load(std::sync::atomic::Ordering::SeqCst) {
             tokio::time::sleep(std::time::Duration::from_millis(5)).await;
         }

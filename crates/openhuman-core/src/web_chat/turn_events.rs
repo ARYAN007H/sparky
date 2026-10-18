@@ -477,30 +477,30 @@ impl EventSink<QueuedPayload> for WebEvents {
             request.thread_id
         );
         let shared = self.shared.clone();
-        ctx.clone().spawn(async move {
-                for item in items {
-                    shared.forget_queued(&item.request_id);
-                    if let Err(err) = super::ops::start_chat(
-                        &ctx,
-                        &item.payload.client_id,
-                        &item.thread_id,
-                        &item.text,
-                        item.payload.model_override.clone(),
-                        item.payload.temperature,
-                        item.payload.locale.clone(),
-                        Some("followup".to_owned()),
-                        item.payload.metadata.clone(),
-                    )
-                    .await
-                    {
-                        log::warn!(
-                            "[web-channel] failed to dispatch collected message thread_id={} err={err}",
-                            item.thread_id
-                        );
-                    }
+        let spawner = ctx.clone();
+        spawner.spawn(async move {
+            for item in items {
+                shared.forget_queued(&item.request_id);
+                if let Err(err) = super::ops::start_chat(
+                    &ctx,
+                    &item.payload.client_id,
+                    &item.thread_id,
+                    &item.text,
+                    item.payload.model_override.clone(),
+                    item.payload.temperature,
+                    item.payload.locale.clone(),
+                    Some("followup".to_owned()),
+                    item.payload.metadata.clone(),
+                )
+                .await
+                {
+                    log::warn!(
+                        "[web-channel] failed to dispatch collected message thread_id={} err={err}",
+                        item.thread_id
+                    );
                 }
-            },
-        ));
+            }
+        });
     }
 }
 

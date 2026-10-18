@@ -227,9 +227,9 @@ impl WebHost {
             output: None,
         });
         let (drained_tx, mut drained_rx) = watch::channel(false);
-        let tap = tap_progress(progress_rx, progress, activity, drained_tx);
+        let tap = tap_progress(&ctx, progress_rx, progress, activity, drained_tx);
         let _tap = AbortOnDrop(tap);
-        let _beat = AbortOnDrop(spawn_heartbeat(projection.clone()));
+        let _beat = AbortOnDrop(spawn_heartbeat(&ctx, projection.clone()));
 
         agent.set_on_progress(Some(progress_tx));
         agent.set_run_queue(Some(queue));
@@ -525,12 +525,13 @@ fn settle_turn_snapshot(
 /// idle record and the work tracker on the way. Signals `drained` once the
 /// parent's `TurnCompleted` was forwarded or the stream ended.
 fn tap_progress(
+    ctx: &DispatchCtx,
     mut rx: mpsc::Receiver<AgentProgress>,
     progress: mpsc::Sender<TurnSignal>,
     activity: TurnActivity,
     drained: watch::Sender<bool>,
 ) -> tokio::task::JoinHandle<()> {
-    tokio::spawn(async move {
+    ctx.spawn(async move {
         let mut work = WorkTracker::default();
         while let Some(event) = rx.recv().await {
             activity.observe(&event);

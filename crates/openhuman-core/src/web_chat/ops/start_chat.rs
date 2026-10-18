@@ -288,28 +288,28 @@ async fn start_chat_inner(
     let (runner, shared) = (rt.runner.clone(), rt.shared.clone());
     let id = request_id.clone();
     ctx.spawn(async move {
-            let outcome = runner.run(request).await;
-            // The first answer wins: a turn that started already told its
-            // submitter, and the refusals told theirs at the door.
-            match &outcome {
-                Err(TurnRunnerError::Queued) => {
-                    shared.admit(&id, Admission::Queued);
-                    shared.mark_queued(&id);
-                }
-                Err(TurnRunnerError::Rejected(reason) | TurnRunnerError::Failed(reason)) => {
-                    shared.admit(
-                        &id,
-                        Admission::Rejected(StartChatError::Other(reason.clone())),
-                    );
-                }
-                Err(TurnRunnerError::Consumed | TurnRunnerError::Cancelled) | Ok(_) => {
-                    shared.admit(&id, Admission::Started);
-                }
+        let outcome = runner.run(request).await;
+        // The first answer wins: a turn that started already told its
+        // submitter, and the refusals told theirs at the door.
+        match &outcome {
+            Err(TurnRunnerError::Queued) => {
+                shared.admit(&id, Admission::Queued);
+                shared.mark_queued(&id);
             }
-            log::debug!(
-                "[web-channel] turn finished request_id={id} ok={}",
-                outcome.is_ok()
-            );
+            Err(TurnRunnerError::Rejected(reason) | TurnRunnerError::Failed(reason)) => {
+                shared.admit(
+                    &id,
+                    Admission::Rejected(StartChatError::Other(reason.clone())),
+                );
+            }
+            Err(TurnRunnerError::Consumed | TurnRunnerError::Cancelled) | Ok(_) => {
+                shared.admit(&id, Admission::Started);
+            }
+        }
+        log::debug!(
+            "[web-channel] turn finished request_id={id} ok={}",
+            outcome.is_ok()
+        );
     });
 
     match admission_rx.await.unwrap_or(Admission::Started) {

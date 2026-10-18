@@ -46,7 +46,13 @@ async fn the_tap_forwards_in_order_brackets_open_work_and_signals_the_drain() {
     let (runner_tx, mut runner_rx) = mpsc::channel(16);
     let (drained_tx, mut drained_rx) = watch::channel(false);
     let activity = TurnActivity::default();
-    let _tap = tap_progress(agent_rx, runner_tx, activity.clone(), drained_tx);
+    let _tap = tap_progress(
+        &DispatchCtx::ambient(),
+        agent_rx,
+        runner_tx,
+        activity.clone(),
+        drained_tx,
+    );
 
     for event in [
         iteration(),
@@ -82,7 +88,13 @@ async fn the_drain_is_released_when_the_stream_ends_without_a_completion() {
     let (agent_tx, agent_rx) = mpsc::channel(8);
     let (runner_tx, mut runner_rx) = mpsc::channel(16);
     let (drained_tx, mut drained_rx) = watch::channel(false);
-    let _tap = tap_progress(agent_rx, runner_tx, TurnActivity::default(), drained_tx);
+    let _tap = tap_progress(
+        &DispatchCtx::ambient(),
+        agent_rx,
+        runner_tx,
+        TurnActivity::default(),
+        drained_tx,
+    );
     agent_tx.send(AgentProgress::TurnStarted).await.unwrap();
     assert_eq!(kind(&runner_rx.recv().await.unwrap()), "other");
     assert!(!*drained_rx.borrow());
@@ -98,7 +110,13 @@ async fn a_dropped_runner_stops_the_tap() {
     let (agent_tx, agent_rx) = mpsc::channel(8);
     let (runner_tx, runner_rx) = mpsc::channel(1);
     let (drained_tx, drained_rx) = watch::channel(false);
-    let tap = tap_progress(agent_rx, runner_tx, TurnActivity::default(), drained_tx);
+    let tap = tap_progress(
+        &DispatchCtx::ambient(),
+        agent_rx,
+        runner_tx,
+        TurnActivity::default(),
+        drained_tx,
+    );
     drop(runner_rx);
     agent_tx.send(AgentProgress::TurnStarted).await.unwrap();
     tokio::time::timeout(Duration::from_secs(5), tap)
@@ -124,7 +142,7 @@ async fn the_heartbeat_beats_only_for_a_live_turn() {
         crate::config::Config::default(),
         std::sync::Arc::new(tinyagents_session::port::InMemoryTurnStates::default()),
     )));
-    let beat = AbortOnDrop(spawn_heartbeat(projection.clone()));
+    let beat = AbortOnDrop(spawn_heartbeat(&DispatchCtx::ambient(), projection.clone()));
 
     // Before `TurnStarted` the turn is not live: no beat, however long it waits.
     tokio::time::sleep(Duration::from_secs(INFERENCE_HEARTBEAT_SECS * 3)).await;
