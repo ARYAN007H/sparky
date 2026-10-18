@@ -25,7 +25,7 @@ pub use tinymemory_tools::deletion::PendingDeletion;
 use crate::config::Config;
 
 use super::engine;
-use super::error::{MemoryError, MemoryResult};
+use tinymemory_api::{Error, Result};
 
 fn path(workspace_dir: &Path) -> PathBuf {
     workspace_dir.join("memory").join("pending_deletions.json")
@@ -39,7 +39,7 @@ struct FileStore {
 }
 
 impl ListStore<PendingDeletion> for FileStore {
-    fn load(&self) -> Result<Vec<PendingDeletion>, StoreError> {
+    fn load(&self) -> std::result::Result<Vec<PendingDeletion>, StoreError> {
         let Ok(text) = std::fs::read_to_string(&self.file) else {
             return Ok(Vec::new());
         };
@@ -54,7 +54,7 @@ impl ListStore<PendingDeletion> for FileStore {
         }))
     }
 
-    fn save(&self, all: &[PendingDeletion]) -> Result<(), StoreError> {
+    fn save(&self, all: &[PendingDeletion]) -> std::result::Result<(), StoreError> {
         if all.is_empty() {
             return match std::fs::remove_file(&self.file) {
                 Ok(()) => Ok(()),
@@ -122,7 +122,7 @@ impl DeletionExecutor for Executor<'_> {
         engine::resolve(self.config).is_on()
     }
 
-    async fn run(&self, deletion: &PendingDeletion) -> Result<usize, String> {
+    async fn run(&self, deletion: &PendingDeletion) -> std::result::Result<usize, String> {
         let result = match deletion {
             PendingDeletion::Thread { thread_id } => {
                 forget_thread_now(self.config, thread_id).await
@@ -152,7 +152,7 @@ pub async fn drain_due(config: &Config) -> usize {
 }
 
 /// Forgets every conversation item of `thread_id` now.
-async fn forget_thread_now(config: &Config, thread_id: &str) -> MemoryResult<usize> {
+async fn forget_thread_now(config: &Config, thread_id: &str) -> Result<usize> {
     let bound = engine::resolve(config).engine()?;
     let filter = MetaFilter {
         thread_id: Some(thread_id.to_string()),
@@ -179,7 +179,7 @@ pub async fn forget_thread(config: &Config, thread_id: &str) -> usize {
     };
     match forget_thread_now(config, thread_id).await {
         Ok(forgotten) => forgotten,
-        Err(MemoryError::Off(_)) => {
+        Err(Error::Off(_)) => {
             enqueue(&config.workspace_dir, deletion);
             0
         }

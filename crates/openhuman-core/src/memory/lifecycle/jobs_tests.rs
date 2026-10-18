@@ -111,7 +111,7 @@ async fn one_job_runs_by_id_and_an_unknown_id_is_refused() {
     assert_eq!(snapshot(&config).await.pending.len(), 1);
     assert!(matches!(
         run(&config, Selection::One("nope".into())).await,
-        Err(MemoryError::InvalidRequest(_))
+        Err(Error::InvalidRequest(_))
     ));
     assert_eq!(
         snapshot(&config).await.pending.len(),
@@ -127,7 +127,7 @@ async fn a_run_needs_an_engine() {
     enqueue(&config, &Namespace::ROOT, vec![build("a")]).await;
     assert!(matches!(
         run(&config, Selection::All).await,
-        Err(MemoryError::Off(_))
+        Err(Error::Off(_))
     ));
     run_due(&config).await;
     assert_eq!(snapshot(&config).await.pending.len(), 1);

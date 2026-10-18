@@ -38,9 +38,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::config::Config;
 use crate::memory::engine::{self, BoundEngine};
-use crate::memory::error::{MemoryError, MemoryResult};
 use crate::memory::scope::{MemoryIdentity, ResolvedIdentity};
 use crate::threads::store::blocking as threads;
+use tinymemory_api::{Error, Result};
 use tinymemory_integrations::import::ImportPhase;
 
 use tinymemory_tools::backfill::{first_live_turn, group_items, turn_groups, ThreadMessage};
@@ -140,10 +140,10 @@ async fn plan(
     workspace_dir: &Path,
     bound: Option<&BoundEngine>,
     stored: &BTreeMap<String, u32>,
-) -> MemoryResult<Vec<ThreadPlan>> {
+) -> Result<Vec<ThreadPlan>> {
     let listed = threads::list_threads(ctx.clone(), workspace_dir.to_path_buf())
         .await
-        .map_err(|error| MemoryError::Engine(format!("reading chat threads failed: {error}")))?;
+        .map_err(|error| Error::Engine(format!("reading chat threads failed: {error}")))?;
     let mut plans = Vec::new();
     for thread in listed {
         let messages = match threads::get_messages(
@@ -192,7 +192,7 @@ fn is_running(workspace_dir: &Path) -> bool {
 }
 
 /// `memory_conversations_backfill_status`.
-pub async fn status(ctx: &DispatchCtx, config: &Config) -> MemoryResult<BackfillView> {
+pub async fn status(ctx: &DispatchCtx, config: &Config) -> Result<BackfillView> {
     let workspace_dir = &config.workspace_dir;
     let file = read_file(workspace_dir);
     let mut state = file.state;
@@ -214,10 +214,10 @@ pub async fn start(
     ctx: &DispatchCtx,
     config: &Config,
     params: BackfillStartParams,
-) -> MemoryResult<BackfillView> {
+) -> Result<BackfillView> {
     if !params.consent {
-        return Err(MemoryError::invalid(
-            "storing past chats uploads them to the selected engine; pass consent: true",
+        return Err(Error::InvalidRequest(
+            ("storing past chats uploads them to the selected engine; pass consent: true").into(),
         ));
     }
     let bound = engine::resolve(config).engine()?;
@@ -299,18 +299,14 @@ async fn run(
                 } else {
                     tinymemory_api::WriteOptions::accepted()
                 };
-                let stored = bound
-                    .engine
-                    .store_many_with(items, options)
-                    .await
-                    .map_err(MemoryError::from);
+                let stored = bound.engine.store_many_with(items, options).await;
                 if let Err(error) = stored {
                     tracing::warn!(
                         code = error.code(),
                         "[memory:backfill] storing a batch failed; stopping"
                     );
                     file.state.phase = ImportPhase::Error;
-                    file.state.error = Some(String::from(error));
+                    file.state.error = Some(error.to_string());
                     file.state.finished_at = Some(Utc::now());
                     write_file(workspace_dir, &file);
                     return;

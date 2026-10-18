@@ -18,12 +18,12 @@ use crate::config::Config;
 use super::engine::{
     self, Binding, BoundEngine, CORTEXDB_ENGINE, DISABLED_ENGINE, TINYHUMANS_ENGINE,
 };
-use super::error::{MemoryError, MemoryResult};
 use super::types::{
     clamp_limit, EngineSetParams, EngineStatus, EngineView, EnginesListView, EraseAllParams,
     EraseAllView, FetchParams, FetchView, ForgetParams, ForgetView, ItemsListParams, ItemsListView,
     LearnParams, LearnView, RecallParams, RecallView, RefersTo,
 };
+use tinymemory_api::{Error, Result};
 
 /// Default confidence of a learning stored without one.
 pub const DEFAULT_LEARNING_CONFIDENCE: f32 = 0.8;
@@ -86,14 +86,14 @@ pub async fn engine_get(config: &Config) -> EngineView {
 
 /// Applies `memory_engine_set` to `config` in memory (and to the credential
 /// store for a key). The caller persists `config`.
-pub fn apply_engine_set(config: &mut Config, params: &EngineSetParams) -> MemoryResult<()> {
+pub fn apply_engine_set(config: &mut Config, params: &EngineSetParams) -> Result<()> {
     let engine_id = params.engine.trim();
     if engine_id == DISABLED_ENGINE {
         // Turning memory off keeps every engine's endpoint and key, so
         // switching back needs no re-entry.
         if params.endpoint.is_some() || params.api_key.is_some() {
-            return Err(MemoryError::invalid(
-                "disabling memory takes no endpoint or API key",
+            return Err(Error::InvalidRequest(
+                ("disabling memory takes no endpoint or API key").into(),
             ));
         }
         config.memory.engine = DISABLED_ENGINE.to_string();
@@ -104,7 +104,7 @@ pub fn apply_engine_set(config: &mut Config, params: &EngineSetParams) -> Memory
         .iter()
         .any(|descriptor| descriptor.id == engine_id)
     {
-        return Err(MemoryError::invalid(format!(
+        return Err(Error::InvalidRequest(format!(
             "unknown memory engine `{engine_id}`"
         )));
     }
@@ -129,11 +129,15 @@ pub fn apply_engine_set(config: &mut Config, params: &EngineSetParams) -> Memory
             }
             CORTEXDB_ENGINE => engine::store_cortexdb_key(config, key)?,
             TINYHUMANS_ENGINE => {
-                return Err(MemoryError::invalid(
-                    "the tinyhumans engine uses your sign-in, not an API key",
+                return Err(Error::InvalidRequest(
+                    ("the tinyhumans engine uses your sign-in, not an API key").into(),
                 ))
             }
-            _ => return Err(MemoryError::invalid("this engine takes no API key")),
+            _ => {
+                return Err(Error::InvalidRequest(
+                    ("this engine takes no API key").into(),
+                ))
+            }
         }
     }
     config.memory.engine = engine_id.to_string();
@@ -141,34 +145,32 @@ pub fn apply_engine_set(config: &mut Config, params: &EngineSetParams) -> Memory
     Ok(())
 }
 
-fn validate_endpoint(endpoint: &str) -> MemoryResult<()> {
+fn validate_endpoint(endpoint: &str) -> Result<()> {
     let parsed = url::Url::parse(endpoint)
-        .map_err(|_| MemoryError::invalid("the endpoint is not a valid URL"))?;
+        .map_err(|_| Error::InvalidRequest("the endpoint is not a valid URL".into()))?;
     if !matches!(parsed.scheme(), "http" | "https") || parsed.host_str().is_none() {
-        return Err(MemoryError::invalid(
-            "the endpoint must be an http(s) URL with a host",
+        return Err(Error::InvalidRequest(
+            ("the endpoint must be an http(s) URL with a host").into(),
         ));
     }
     Ok(())
 }
 
-fn bound(config: &Config) -> MemoryResult<BoundEngine> {
+fn bound(config: &Config) -> Result<BoundEngine> {
     engine::resolve(config).engine()
 }
 
 /// The [`TimeHint`] for `refers_to`, in the user's time zone
 /// ([`Config::time_zone`]).
-fn time_hint(config: &Config, refers_to: Option<RefersTo>) -> MemoryResult<Option<TimeHint>> {
+fn time_hint(config: &Config, refers_to: Option<RefersTo>) -> Result<Option<TimeHint>> {
     let Some(RefersTo { from, to }) = refers_to else {
         return Ok(None);
     };
-    TimeHint::new(from, to.unwrap_or(from), Some(config.time_zone()))
-        .map(Some)
-        .map_err(MemoryError::from)
+    TimeHint::new(from, to.unwrap_or(from), Some(config.time_zone())).map(Some)
 }
 
 /// `memory_recall`.
-pub async fn recall(config: &Config, params: RecallParams) -> MemoryResult<RecallView> {
+pub async fn recall(config: &Config, params: RecallParams) -> Result<RecallView> {
     recall_with(config, params, RecallMode::Answer, None).await
 }
 
@@ -181,7 +183,7 @@ pub async fn recall_with(
     params: RecallParams,
     mode: RecallMode,
     exclude_thread: Option<ThreadWindow>,
-) -> MemoryResult<RecallView> {
+) -> Result<RecallView> {
     let bound = bound(config)?;
     let request = RecallRequest {
         question: params.question,
@@ -209,7 +211,7 @@ pub async fn recall_with(
 
 /// `memory_fetch`. An unset mode uses the engine's first declared mode; a
 /// mode the engine does not declare is `UNSUPPORTED`.
-pub async fn fetch(config: &Config, params: FetchParams) -> MemoryResult<FetchView> {
+pub async fn fetch(config: &Config, params: FetchParams) -> Result<FetchView> {
     fetch_with(config, params, None).await
 }
 
@@ -218,7 +220,7 @@ pub async fn fetch_with(
     config: &Config,
     params: FetchParams,
     exclude_thread: Option<ThreadWindow>,
-) -> MemoryResult<FetchView> {
+) -> Result<FetchView> {
     let bound = bound(config)?;
     let descriptor = bound.engine.descriptor();
     let mode = match params.mode {
@@ -229,7 +231,7 @@ pub async fn fetch_with(
         None => *descriptor
             .fetch_modes
             .first()
-            .ok_or_else(|| MemoryError::Unsupported("the engine offers no fetch mode".into()))?,
+            .ok_or_else(|| Error::Unsupported("the engine offers no fetch mode".into()))?,
     };
     let request = FetchRequest {
         query: params.query,
@@ -254,13 +256,12 @@ pub async fn fetch_with(
 /// Builds the learning `memory_learn` (and the `memory` tool's `learn`)
 /// stores. `host_meta` wins over the caller's `meta` field by field, so a
 /// caller cannot overwrite what the host knows (thread, agent, tool call).
-pub fn learning_item(
-    params: LearnParams,
-    host_meta: Option<MemoryMeta>,
-) -> MemoryResult<StoreItem> {
+pub fn learning_item(params: LearnParams, host_meta: Option<MemoryMeta>) -> Result<StoreItem> {
     let confidence = params.confidence.unwrap_or(DEFAULT_LEARNING_CONFIDENCE);
     if !(0.0..=1.0).contains(&confidence) {
-        return Err(MemoryError::invalid("confidence must be between 0 and 1"));
+        return Err(Error::InvalidRequest(
+            ("confidence must be between 0 and 1").into(),
+        ));
     }
     let mut meta = params.meta.unwrap_or_default();
     if let Some(host) = host_meta {
@@ -319,7 +320,7 @@ pub async fn learn(
     config: &Config,
     params: LearnParams,
     host_meta: Option<MemoryMeta>,
-) -> MemoryResult<LearnView> {
+) -> Result<LearnView> {
     learn_with(config, params, host_meta, WriteOptions::visible()).await
 }
 
@@ -331,7 +332,7 @@ pub async fn learn_with(
     params: LearnParams,
     host_meta: Option<MemoryMeta>,
     options: WriteOptions,
-) -> MemoryResult<LearnView> {
+) -> Result<LearnView> {
     let mut item = learning_item(params, host_meta)?;
     // The same confinement as `store_item`: a SaaS user's learning lands in
     // their own tree whatever namespace it names.
@@ -345,7 +346,7 @@ pub async fn learn_with(
 }
 
 /// Scrubs `item` and stores it on the bound engine.
-pub async fn store_item(config: &Config, item: StoreItem) -> MemoryResult<StoreReceipt> {
+pub async fn store_item(config: &Config, item: StoreItem) -> Result<StoreReceipt> {
     store_item_with(config, item, WriteOptions::visible()).await
 }
 
@@ -356,7 +357,7 @@ pub async fn store_item_with(
     config: &Config,
     mut item: StoreItem,
     options: WriteOptions,
-) -> MemoryResult<StoreReceipt> {
+) -> Result<StoreReceipt> {
     if let Some(root) = super::user_scope::confinement(config)? {
         super::user_scope::clamp_item(&mut item, &root);
     }
@@ -367,7 +368,7 @@ pub async fn store_item_with(
 }
 
 /// `memory_forget`.
-pub async fn forget(config: &Config, params: ForgetParams) -> MemoryResult<ForgetView> {
+pub async fn forget(config: &Config, params: ForgetParams) -> Result<ForgetView> {
     let ids: Vec<ItemId> = params
         .ids
         .into_iter()
@@ -376,7 +377,9 @@ pub async fn forget(config: &Config, params: ForgetParams) -> MemoryResult<Forge
         .map(ItemId)
         .collect();
     if ids.is_empty() {
-        return Err(MemoryError::invalid("forget needs at least one id"));
+        return Err(Error::InvalidRequest(
+            ("forget needs at least one id").into(),
+        ));
     }
     let bound = bound(config)?;
     // A SaaS user forgets only what lies in their own tree.
@@ -419,10 +422,10 @@ pub async fn erase_all(
     ctx: &crate::core::runtime::DispatchCtx,
     config: &Config,
     params: EraseAllParams,
-) -> MemoryResult<EraseAllView> {
+) -> Result<EraseAllView> {
     if !params.confirm {
-        return Err(MemoryError::invalid(
-            "erasing all memory needs confirm: true; nothing erased comes back",
+        return Err(Error::InvalidRequest(
+            ("erasing all memory needs confirm: true; nothing erased comes back").into(),
         ));
     }
     let bound = bound(config)?;
@@ -437,7 +440,7 @@ pub async fn erase_all(
     tracing::info!(engine = %bound.id, "[memory:ops] erase_all: erasing the whole memory");
     let report = bound.engine.erase(request).await.map_err(|error| {
         tracing::warn!(engine = %bound.id, error = %error, "[memory:ops] erase_all failed");
-        MemoryError::from(error)
+        error
     })?;
     tracing::info!(
         engine = %bound.id,
@@ -456,7 +459,7 @@ async fn within_reach(
     bound: &BoundEngine,
     ids: Vec<ItemId>,
     reach: tinymemory_api::Reach,
-) -> MemoryResult<Vec<ItemId>> {
+) -> Result<Vec<ItemId>> {
     let mut kept = Vec::new();
     for chunk in ids.chunks(tinymemory_api::explore::MAX_GET_IDS) {
         let found = bound
@@ -472,7 +475,7 @@ async fn within_reach(
 }
 
 /// `memory_items_list`.
-pub async fn items_list(config: &Config, params: ItemsListParams) -> MemoryResult<ItemsListView> {
+pub async fn items_list(config: &Config, params: ItemsListParams) -> Result<ItemsListView> {
     let bound = bound(config)?;
     let request = ListRequest {
         filter: confine_filter(
@@ -496,7 +499,7 @@ pub async fn items_list(config: &Config, params: ItemsListParams) -> MemoryResul
 
 /// `filter`, confined to the SaaS user's tree when `config` has one
 /// ([`super::user_scope`]).
-pub(crate) fn confine_filter(config: &Config, filter: MetaFilter) -> MemoryResult<MetaFilter> {
+pub(crate) fn confine_filter(config: &Config, filter: MetaFilter) -> Result<MetaFilter> {
     Ok(match super::user_scope::confinement(config)? {
         Some(root) => super::user_scope::clamp_filter(filter, &root),
         None => filter,
