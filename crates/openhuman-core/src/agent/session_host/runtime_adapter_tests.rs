@@ -9,7 +9,6 @@ use tinyagents_runtime::{
 use tinyagents_session::port::{InMemorySessionStores, SessionStoreProvider};
 use tinyagents_session::transcript::TranscriptMeta;
 use tinyinference_llm::message::Message;
-use tinyinference_llm::model::{ChatModel, ModelProfile, ModelRequest, ModelResponse};
 
 use super::runtime_session::tool_surface::reconcile_synthesized_visibility;
 use super::runtime_session::{account_committed_turn_against_goal, holistic_last_turn_usage};

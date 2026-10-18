@@ -3,8 +3,6 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use tinyinference_llm::model::{ChatModel, ModelProfile, ModelRequest, ModelResponse};
 
-use super::*;
-
 struct GatedRepairModel {
     calls: std::sync::atomic::AtomicUsize,
     repair_started: tokio::sync::Notify,
@@ -41,8 +39,8 @@ impl ChatModel<()> for GatedRepairModel {
 /// cancelled once Tiny has saved the partial transcript.
 #[tokio::test]
 async fn cancellation_during_required_output_repair_finalizes_native_run() {
-    use crate::storage::sessions::ExecutionStatus;
-    use tinyagents_harness::events::AgentEvent;
+    use tinyagents_harness::events::{AgentEvent, HarnessStatusStore};
+    use tinyagents_harness::ids::ExecutionStatus;
     use tinyagents_harness::terminal::TerminalReason;
 
     let scratch = tempfile::tempdir().expect("isolated workspace");
