@@ -118,9 +118,10 @@ async fn pre_turn_logs_channel_metadata_without_writing_legacy_thread_map() {
     .is_none());
     drain(&cache, &key).await;
 
-    let turns = stored(&engine, tinymemory_api::MetaFilter::kinds([
-        tinymemory_api::ItemKind::Conversation,
-    ]))
+    let turns = stored(
+        &engine,
+        tinymemory_api::MetaFilter::kinds([tinymemory_api::ItemKind::Conversation]),
+    )
     .await;
     assert_eq!(turns.len(), 1);
     assert_eq!(turns[0].meta.channel.as_deref(), Some("telegram"));
