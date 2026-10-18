@@ -103,3 +103,7 @@ impl CapSummaryModel for HostCapSummaryModel<'_> {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "checkpoint_tests.rs"]
+mod tests;
