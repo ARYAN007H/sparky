@@ -288,23 +288,17 @@ async fn a_turn_with_an_unavailable_local_provider_ends_in_one_classified_chat_e
         }),
         "all inference retries must target the configured model: {inference_requests:?}"
     );
-    assert_eq!(
-        error.error_type.as_deref(),
-        Some("provider_unavailable"),
-        "{error:?}"
-    );
-    assert_eq!(error.client_id, "real-client");
-    assert_eq!(
-        error.copy_key.as_deref(),
-        Some("chat_error.provider_unavailable"),
-        "{error:?}"
-    );
-    assert_eq!(
-        error.error_source.as_deref(),
-        Some("provider_error"),
-        "{error:?}"
-    );
-    assert_eq!(error.error_retryable, Some(true), "{error:?}");
+    assert!(matches!(error.wire_event(), crate::web_chat::WebChannelEvent::ChatError {
+        context,
+        error_type: Some(error_type),
+        copy_key: Some(copy_key),
+        error_source: Some(source),
+        error_retryable: Some(true),
+        ..
+    } if error_type == "provider_unavailable"
+        && context.client_id == "real-client"
+        && copy_key == "chat_error.provider_unavailable"
+        && source == "provider_error"), "{error:?}");
 
     let runtime = crate::web_chat::runner::runtime(&ctx);
     assert!(

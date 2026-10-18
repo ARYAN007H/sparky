@@ -132,10 +132,9 @@ async fn a_failed_turn_announces_a_classified_chat_error() {
     )
     .await;
     let error = events_for(&mut rx, "events-failed", 1).await.remove(0);
-    assert_eq!(error.event, "chat_error");
-    assert_eq!(error.error_type.as_deref(), Some("turn_timeout"));
-    assert_eq!(error.error_retryable, Some(true));
-    assert!(error.copy_key.is_some());
+    assert!(matches!(error.wire_event(), WebChannelEvent::ChatError {
+        error_type: Some(error_type), error_retryable: Some(true), copy_key: Some(_), ..
+    } if error_type == "turn_timeout"));
 }
 
 #[tokio::test]
@@ -159,11 +158,12 @@ async fn a_stopped_turn_announces_cancelled_to_the_client_that_stopped_it() {
     )
     .await;
     let seen = events_for(&mut rx, "events-stop", 2).await;
-    assert_eq!(seen[0].event, "chat_error");
-    assert_eq!(seen[0].error_type.as_deref(), Some("cancelled"));
-    assert_eq!(seen[0].message.as_deref(), Some("Cancelled"));
-    assert_eq!(seen[1].event, "chat_cancelled");
-    assert_eq!(seen[1].cancel_reason.as_deref(), Some("user_stop"));
+    assert!(matches!(seen[0].wire_event(), WebChannelEvent::ChatError {
+        error_type: Some(error_type), message: Some(message), ..
+    } if error_type == "cancelled" && message == "Cancelled"));
+    assert!(matches!(seen[1].wire_event(), WebChannelEvent::ChatCancelled {
+        cancel_reason: Some(reason), ..
+    } if reason == "user_stop"));
     assert!(
         seen.iter()
             .all(|event| event.context().client_id == "stopper")
@@ -191,13 +191,12 @@ async fn a_superseded_turn_names_its_replacement() {
     )
     .await;
     let seen = events_for(&mut rx, "events-old", 2).await;
-    assert_eq!(
-        seen[0].message.as_deref(),
-        Some("Cancelled by newer request")
-    );
-    assert_eq!(seen[1].cancel_reason.as_deref(), Some("superseded"));
-    assert_eq!(seen[1].superseded_by.as_deref(), Some("events-new"));
-    assert_eq!(seen[1].client_id, "interrupter");
+    assert!(matches!(seen[0].wire_event(), WebChannelEvent::ChatError {
+        message: Some(message), ..
+    } if message == "Cancelled by newer request"));
+    assert!(matches!(seen[1].wire_event(), WebChannelEvent::ChatCancelled {
+        context, cancel_reason: Some(reason), superseded_by: Some(replacement), ..
+    } if reason == "superseded" && replacement == "events-new" && context.client_id == "interrupter"));
 }
 
 #[tokio::test]
