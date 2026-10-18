@@ -169,6 +169,53 @@ async fn observer_fires_once_per_call_on_success_and_error() {
     );
 }
 
+#[derive(Default)]
+struct PhysicalRecorder(Arc<Mutex<Vec<(tinyagents_harness::observability::PhysicalDispatchMetadata, tinyagents_harness::observability::PhysicalDispatchOutcome)>>>);
+
+struct PhysicalTerminal {
+    recorder: Arc<Mutex<Vec<(tinyagents_harness::observability::PhysicalDispatchMetadata, tinyagents_harness::observability::PhysicalDispatchOutcome)>>>,
+    metadata: tinyagents_harness::observability::PhysicalDispatchMetadata,
+}
+
+impl tinyagents_harness::observability::PhysicalDispatchTerminal for PhysicalTerminal {
+    fn on_terminal(
+        self: Box<Self>,
+        outcome: tinyagents_harness::observability::PhysicalDispatchOutcome,
+    ) {
+        self.recorder.lock().unwrap().push((self.metadata.clone(), outcome));
+    }
+}
+
+impl tinyagents_harness::observability::PhysicalDispatchObserver for PhysicalRecorder {
+    fn on_start(
+        &self,
+        metadata: &tinyagents_harness::observability::PhysicalDispatchMetadata,
+    ) -> Box<dyn tinyagents_harness::observability::PhysicalDispatchTerminal> {
+        Box::new(PhysicalTerminal {
+            recorder: Arc::clone(&self.0),
+            metadata: metadata.clone(),
+        })
+    }
+}
+
+#[tokio::test]
+async fn physical_observer_reports_content_free_provider_outcome() {
+    let server = server_replying(body("hi", "stop")).await;
+    let recorder = Arc::new(PhysicalRecorder::default());
+    completer(&server)
+        .physical_observer(recorder.clone())
+        .complete(CompletionRequest::new("requested-model", vec![ChatMessage::user("private")]))
+        .await
+        .unwrap();
+
+    let events = recorder.0.lock().unwrap();
+    assert_eq!(events.len(), 1);
+    assert_eq!(events[0].0.requested_model.as_deref(), Some("requested-model"));
+    assert_eq!(events[0].1.status, tinyagents_harness::observability::PhysicalDispatchStatus::Succeeded);
+    assert_eq!(events[0].1.usage.as_ref().unwrap().input_tokens, 100);
+    assert_eq!(events[0].1.answered_model.as_deref(), Some("vendor/answered"));
+}
+
 #[test]
 fn json_reply_tolerates_one_code_fence() {
     assert_eq!(
