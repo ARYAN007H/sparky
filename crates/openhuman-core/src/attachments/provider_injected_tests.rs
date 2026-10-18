@@ -122,8 +122,7 @@ async fn pdf_attachment_degrades_to_a_note_when_documents_component_is_off() {
         fallback_cache: Mutex::new(Default::default()),
     };
     let (text, cacheable) = model
-        .fallback(
-            InputModality::Document,
+        .document_fallback(
             "uploads/t/id/brief.pdf",
             "application/pdf",
             b"%PDF-1.4",
