@@ -336,7 +336,7 @@ pub(crate) async fn run_subagent_direct(
                     &parent_for_subagent,
                     &task_id,
                     &loaded_config,
-                    flow_archetype_text,
+                    flow_archetype_text.as_deref(),
                 ))
                 .await
             })
@@ -551,7 +551,7 @@ async fn run_typed_mode(
     parent: &ParentExecutionContext,
     task_id: &str,
     config: &LoadedConfig,
-    flow_archetype_text: Option<String>,
+    flow_archetype_text: Option<&str>,
 ) -> Result<SubagentRunOutcome, SubagentRunError> {
     let started = Instant::now();
 
@@ -770,11 +770,8 @@ async fn run_typed_mode(
         agents_md_local: agents_md.local.clone(),
     };
 
-    let archetype_prompt_body = load_typed_prompt_source(
-        definition,
-        prompt_ctx,
-        flow_archetype_text.as_deref(),
-    )?;
+    let archetype_prompt_body =
+        load_typed_prompt_source(definition, prompt_ctx, flow_archetype_text)?;
     let system_prompt = match &definition.system_prompt {
         // The whole prompt, with no sub-agent sections around it.
         PromptSource::Dynamic(_) | PromptSource::Verbatim(_) => archetype_prompt_body,
