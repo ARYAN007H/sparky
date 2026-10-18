@@ -347,6 +347,18 @@ async fn single_user_reads_writes_and_forgets_ancestor_and_service_memory() {
         .items
         .iter()
         .any(|item| item.id.0 == service_id));
+    let service_item = stored(
+        &engine,
+        MetaFilter {
+            reach: Some(tinymemory_api::Reach::exact(service_namespace.clone())),
+            ..MetaFilter::default()
+        },
+    )
+    .await
+    .into_iter()
+    .find(|item| item.id.0 == service_id)
+    .expect("the explicit service reach reads the stored item");
+    assert_eq!(service_item.meta.namespace, service_namespace);
 
     let forgotten = forget(
         &config,
@@ -358,10 +370,16 @@ async fn single_user_reads_writes_and_forgets_ancestor_and_service_memory() {
     .await
     .unwrap();
     assert_eq!(forgotten.forgotten, 1);
-    assert!(!stored(&engine, MetaFilter::default())
-        .await
-        .iter()
-        .any(|item| item.id.0 == service_id));
+    assert!(stored(
+        &engine,
+        MetaFilter {
+            reach: Some(tinymemory_api::Reach::exact(service_item.meta.namespace)),
+            ..MetaFilter::default()
+        },
+    )
+    .await
+    .iter()
+    .all(|item| item.id.0 != service_id));
 }
 
 #[test]

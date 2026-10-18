@@ -181,9 +181,10 @@ fn valid_saas_identity_clamps_memory_operations_in_an_isolated_process() {
                 .id
                 .0;
 
-            for (namespace, text) in [
-                ("team:acme", "explore acme item"),
-                ("team:other", "explore foreign item"),
+            for (namespace, text, repo) in [
+                ("team:acme", "explore acme item", "org/alpha"),
+                ("team:acme", "explore acme sibling", "org/beta"),
+                ("team:other", "explore foreign item", "org/foreign"),
             ] {
                 engine
                     .store(StoreItem::learning(
@@ -192,7 +193,7 @@ fn valid_saas_identity_clamps_memory_operations_in_an_isolated_process() {
                         0.9,
                         MemoryMeta {
                             namespace: namespace.parse().unwrap(),
-                            repo: Some("org/repo".into()),
+                            repo: Some(repo.into()),
                             tags: vec!["selected".into()],
                             ..MemoryMeta::default()
                         },
@@ -200,31 +201,56 @@ fn valid_saas_identity_clamps_memory_operations_in_an_isolated_process() {
                     .await
                     .unwrap();
             }
+            engine
+                .store(StoreItem::document(
+                    "selected document",
+                    MemoryMeta {
+                        namespace: "team:acme".parse().unwrap(),
+                        repo: Some("org/document".into()),
+                        tags: vec!["selected".into()],
+                        ..MemoryMeta::default()
+                    },
+                ))
+                .await
+                .unwrap();
 
+            let explore_params = |scan_limit| crate::memory::explore::ExploreParams {
+                facet: tinymemory_api::Facet::Repo,
+                path: vec![crate::memory::explore::PathStep {
+                    facet: tinymemory_api::Facet::Kind,
+                    value: "learning".into(),
+                }],
+                filter: Some(MetaFilter {
+                    tags_any: vec!["selected".into()],
+                    ..MetaFilter::default()
+                }),
+                limit: Some(5),
+                scan_limit,
+            };
             let explored = crate::memory::explore::explore(
                 &config,
-                crate::memory::explore::ExploreParams {
-                    facet: tinymemory_api::Facet::Repo,
-                    path: vec![crate::memory::explore::PathStep {
-                        facet: tinymemory_api::Facet::Kind,
-                        value: "learning".into(),
-                    }],
-                    filter: Some(MetaFilter {
-                        tags_any: vec!["selected".into()],
-                        ..MetaFilter::default()
-                    }),
-                    limit: Some(5),
-                    scan_limit: Some(1),
-                },
+                explore_params(Some(100)),
             )
             .await
             .unwrap();
-            assert_eq!(explored.total, 1);
-            assert_eq!(explored.buckets.len(), 1);
-            assert_eq!(explored.buckets[0].value, "org/repo");
+            assert_eq!(explored.total, 2);
+            assert!(!explored.truncated);
+            assert_eq!(
+                explored
+                    .buckets
+                    .iter()
+                    .map(|bucket| bucket.value.as_str())
+                    .collect::<Vec<_>>(),
+                ["org/alpha", "org/beta"]
+            );
+            let limited = crate::memory::explore::explore(&config, explore_params(Some(1)))
+                .await
+                .unwrap();
+            assert_eq!(limited.total, 1);
+            assert!(limited.truncated);
 
             let listed = items_list(&config, Default::default()).await.unwrap();
-            assert_eq!(listed.items.len(), 2);
+            assert_eq!(listed.items.len(), 3);
             assert!(listed.items.iter().any(|item| item.id.0 == own));
             assert!(!listed.items.iter().any(|item| item.id.0 == foreign));
 
