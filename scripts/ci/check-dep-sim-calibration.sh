@@ -113,7 +113,7 @@ cd "$(dirname "$0")/../.."
 # 316 -> 317: storage-file adds the first-party file driver.
 # 317 -> 318: pre-core registry vocabulary adds the pure tinycomputer-bus.
 
-# This matches the current `flows:321:301:2` entry in
+# This matches the current `flows:332:309:3` entry in
 # scripts/kernel-floor.limits; its preceding entries are historical.
 # 318 -> 313: connector implementation cut (-8) and explicit flows loader (+3).
 # 313 -> 304: current-main runtime removal and combined released module cuts.
@@ -128,7 +128,10 @@ cd "$(dirname "$0")/../.."
 # 304 names / 2 native on Linux). See kernel-floor.limits.
 # 303 -> 301 on 2026-10-16: CI after the upstream/main merge at ba83482245
 # measures the flows profile at 321 packages / 301 names / 2 native.
+# 301 -> 309 on 2026-10-18: configurable storage backends make
+# `tinystoragedrivers-core` (and its zstd closure) always-on; see the
+# 332/309/3 entry in `kernel-floor.limits`.
 # See kernel-floor.limits.
-EXPECTED_NAMES=301
+EXPECTED_NAMES=309
 
 exec python3 scripts/dep-sim.py --cut-nothing --expect-names "${EXPECTED_NAMES}"

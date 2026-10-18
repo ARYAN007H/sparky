@@ -13,6 +13,15 @@
 # Simulate with: scripts/dep-sim.py --cut <crates>
 #
 # History
+#   332/309/3  2026-10-18  Configurable storage backend selection (epic #7973)
+#                      makes tinystoragedrivers-core an always-on dependency of
+#                      the tinyagents session stores and the flows graph. Its
+#                      sealed-stream codec (StreamSeal, zstd-compressed JSON) adds
+#                      the zstd closure (zstd, zstd-safe, zstd-sys) and the core's
+#                      own `zstd` dependency now resolves through it, so the flows
+#                      profile gains a third native build (zstd-sys alongside
+#                      libsqlite3-sys and ring). Measured on CI (Linux):
+#                      332 packages / 309 names / 3 native.
 #   337/316/3  2026-10-04  Merge upstream/main file-intake and module updates.
 #                      The merged flows profile measures 337 packages / 316
 #                      names / 3 native builds (including libdeflate-sys).
@@ -727,4 +736,4 @@
 # 321/301/2 2026-10-16 Re-measure after the upstream/main merge at ba83482245.
 #                      CI (Linux, EX63) reports five fewer packages and two
 #                      fewer unique crate names; native builds remain at two.
-flows:321:301:2
+flows:332:309:3
