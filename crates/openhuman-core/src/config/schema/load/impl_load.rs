@@ -140,4 +140,3 @@ pub(super) async fn read_config_with_recovery_or_default(
     }
 }
 
-/// Parse the text a [`ConfigSource`](super::source::ConfigSource) returned.

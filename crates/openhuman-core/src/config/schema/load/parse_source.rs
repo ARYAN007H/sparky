@@ -1,3 +1,9 @@
+use anyhow::Result;
+use std::path::Path;
+
+use super::super::Config;
+
+/// Parse the text a [`ConfigSource`](super::source::ConfigSource) returned.
 ///
 /// A file keeps its recovery: a body that does not parse falls back to the
 /// `.bak` next to it, then to defaults. A document is parsed strictly and a
