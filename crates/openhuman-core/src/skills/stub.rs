@@ -119,6 +119,15 @@ pub mod bus {
     pub fn ensure_triggered_workflow_subscriber(_workspace: &std::path::Path) {
         log::debug!("[skills-stub] ensure_triggered_workflow_subscriber skipped (skills disabled)");
     }
+
+    /// No-op with skills compiled out.
+    pub fn ensure_triggered_workflow_subscriber_for(
+        _ctx: &crate::core::runtime::DispatchCtx,
+        _config: &crate::config::Config,
+        _domains: Option<crate::core::runtime::DomainSet>,
+    ) {
+        log::debug!("[skills-stub] scoped triggered-workflow subscriber skipped (skills disabled)");
+    }
 }
 
 // NOTE: no `tools` module here. The `pub use skills::tools::*` glob in

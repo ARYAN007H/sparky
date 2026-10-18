@@ -34,6 +34,12 @@ pub(crate) async fn bootstrap_core_runtime(
     };
     let workspace_dir = cfg.workspace_dir.clone();
 
+    // The workflow metadata loader is synchronous. Resolve the module-owned
+    // flow-authoring files before any subscriber or session can snapshot it;
+    // this optional prewarm is bounded and fails open for ordinary chat.
+    #[cfg(all(feature = "flows", feature = "skills"))]
+    crate::skills::bundled::flow_authoring::prewarm(ctx, &cfg, Some(domains)).await;
+
     // --- Legacy store import ---------------------------------------------
     // With a storage backend installed, bring the workspace's per-domain
     // SQLite files (approvals, devices, notifications, task sources) into it
@@ -249,7 +255,11 @@ pub(crate) async fn bootstrap_core_runtime(
     // Gated on the Skills domain (#4808 review): under `harness()`/`none()` the
     // skills controllers are absent, so their trigger subscriber must not install.
     if domains.allows(crate::core::all::DomainGroup::Skills) {
-        crate::skills::bus::ensure_triggered_workflow_subscriber(&workspace_dir);
+        crate::skills::bus::ensure_triggered_workflow_subscriber_for(
+            ctx,
+            &cfg,
+            Some(domains),
+        );
     } else {
         log::debug!("[boot] triggered-workflow subscriber SKIPPED — Skills domain disabled");
     }
