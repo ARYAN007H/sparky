@@ -1,6 +1,6 @@
 //! OpenHuman's tenant-aware adapter for the harness-owned `plan_exit` tool.
 
-use std::sync::{Arc, OnceLock};
+use std::sync::Arc;
 
 use async_trait::async_trait;
 use serde_json::Value;
@@ -25,12 +25,8 @@ fn mode_lookup(context: &dyn ToolRunContext) -> Option<RunModeHandle> {
     ))
 }
 
-static OWNER_TOOL: OnceLock<tinyagents_harness::tool::plan_exit::PlanExitTool> = OnceLock::new();
-
-fn owner_tool() -> &'static tinyagents_harness::tool::plan_exit::PlanExitTool {
-    OWNER_TOOL.get_or_init(|| {
-        tinyagents_harness::tool::plan_exit::PlanExitTool::new(Arc::new(mode_lookup))
-    })
+fn owner_tool() -> tinyagents_harness::tool::plan_exit::PlanExitTool {
+    tinyagents_harness::tool::plan_exit::PlanExitTool::new(Arc::new(mode_lookup))
 }
 
 /// Public unit-shaped compatibility adapter around TinyAgents' tool engine.
