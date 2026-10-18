@@ -147,7 +147,7 @@ impl OpenHumanBackendModel {
             );
             return Ok(key);
         }
-        if openhuman_embed::__host::cron::scheduler_gate::is_signed_out() {
+        if openhuman_embed::__host::platform::llm_gate::is_signed_out() {
             anyhow::bail!(
                 "SESSION_EXPIRED: backend session not active — sign in to resume LLM work"
             );

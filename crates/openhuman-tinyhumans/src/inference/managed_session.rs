@@ -52,7 +52,7 @@ pub(super) fn managed_bearer(
 /// re-auths exactly as it would on a real backend 401. Deduped via the
 /// scheduler gate so N parallel managed turns in one tick don't emit N events.
 fn maybe_publish_local_session_expiry() {
-    if openhuman_embed::__host::cron::scheduler_gate::is_signed_out() {
+    if openhuman_embed::__host::platform::llm_gate::is_signed_out() {
         return;
     }
     log::warn!(

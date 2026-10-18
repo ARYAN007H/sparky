@@ -83,6 +83,7 @@ const STORAGE_E2E_TARGETS = [
   "storage_delegation_e2e",
   "storage_default_import_e2e",
   "storage_desktop_upgrade_e2e",
+  "storage_layout_migration_e2e",
   "cli_storage_url_e2e",
 ];
 const STORAGE_LIB_FILTERS = [
@@ -160,7 +161,7 @@ export function buildPlan({ profile, areas, env = {}, isPullRequest = true }) {
   };
   const modulesDir = ex63
     ? `${scratch}/test-modules`
-    : "/opt/openhuman-test-modules/${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}";
+    : "/tmp/openhuman-test-modules-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}";
   const modulesEnvFile = "ci-out/test-modules.env";
   const withModules = (cmd) =>
     `set -a && . ${modulesEnvFile} && set +a && ${cmd}`;
@@ -185,11 +186,29 @@ export function buildPlan({ profile, areas, env = {}, isPullRequest = true }) {
     {
       name: "static",
       checks: [
-        { name: "rust-fmt", when: rust, run: "cargo fmt --manifest-path Cargo.toml --package openhuman --package openhuman-cli --package openhuman-embed --package openhuman-modules-linked --package openhuman-rpc --package openhuman-tinyhumans --package openhuman-tui -- --check" },
+        {
+          name: "rust-fmt",
+          when: rust,
+          run: "cargo fmt --manifest-path Cargo.toml --package openhuman --package openhuman-cli --package openhuman-embed --package openhuman-modules-linked --package openhuman-rpc --package openhuman-tinyhumans --package openhuman-tui -- --check",
+        },
         {
           name: "rust-layout",
           when: core,
           run: "node scripts/ci/check-openhuman-rust-layout.mjs",
+        },
+        {
+          // tinystoragedrivers owns every storage backend; reads cargo
+          // metadata for the root workspace and the app crate.
+          name: "storage-owner",
+          when: rust,
+          run: "node scripts/ci/check-storage-owner.mjs",
+        },
+        {
+          // The composed storage schema: names, casing, single ownership and
+          // the generated docs/storage-schema.md.
+          name: "storage-schema",
+          when: rust,
+          run: "node scripts/ci/check-storage-schema.mjs",
         },
         {
           name: "agent-runtime-boundary",
@@ -482,7 +501,8 @@ export function buildPlan({ profile, areas, env = {}, isPullRequest = true }) {
             " --features modules,mcp,e2e-test-support --lib --" +
             " modules::runtime:: modules::registry:: modules::storage_grant_tinywallet::" +
             " modules::storage_grant_tinyconnectors::" +
-            " mcp::server::resources:: test_support::introspect::",
+            " cron::bus_host::tests:: cron::documents_port::tests::" +
+            " mcp::server::resources:: test_support::introspect:: --test-threads=1",
         },
         {
           name: "kernel-floor",
@@ -551,7 +571,18 @@ export function buildPlan({ profile, areas, env = {}, isPullRequest = true }) {
           when: areas.storage,
           run:
             `cargo test -p openhuman --features ${STORAGE_DRIVERS} --lib --` +
-            STORAGE_LIB_FILTERS.map((f) => ` ${f}`).join(""),
+            STORAGE_LIB_FILTERS.map((f) => ` ${f}`).join("") +
+            " --skip cron::bus_host::tests:: --skip cron::documents_port::tests::",
+        },
+        {
+          // TinyFlows owns a process-global module host during these tests.
+          // Keep them out of the broad storage test process, where unrelated
+          // cron tests can replace handlers while a callback is executing.
+          name: "cron-module-tests",
+          when: areas.storage,
+          run:
+            `cargo test -p openhuman --features ${STORAGE_DRIVERS} --lib --` +
+            " cron::bus_host::tests:: cron::documents_port::tests:: --test-threads=1",
         },
         {
           name: "storage-session-store-tests",

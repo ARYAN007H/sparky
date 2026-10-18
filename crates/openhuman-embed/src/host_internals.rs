@@ -139,13 +139,6 @@ pub mod config {
     }
 }
 
-/// tinyhumans (managed inference): the signed-out gate.
-pub mod cron {
-    pub mod scheduler_gate {
-        pub use openhuman_core::cron::scheduler_gate::is_signed_out;
-    }
-}
-
 /// tinyhumans: the Jev tool ranker and the jev route.
 pub mod agent {
     pub mod tinyagents {
@@ -435,6 +428,11 @@ pub mod mcp {
 }
 
 pub mod platform {
+    /// tinyhumans (managed inference): the signed-out gate.
+    pub mod llm_gate {
+        pub use openhuman_core::platform::llm_gate::is_signed_out;
+    }
+
     pub mod connectivity {
         pub mod rpc {
             pub use openhuman_core::platform::connectivity::rpc::{
@@ -452,6 +450,12 @@ pub mod storage {
         block_on, block_on_anyhow, clear, configured_url, driver_is_shared, install,
         install_for_url, installed, open, url_from, StorageBackend, STORAGE_URL_VAR,
     };
+
+    /// The layout v1 -> v2 migration the host runs at boot when
+    /// `[storage] auto_migrate_layout` is set.
+    pub mod layout {
+        pub use openhuman_core::storage::layout::auto_migrate;
+    }
 }
 
 pub mod profiles {
