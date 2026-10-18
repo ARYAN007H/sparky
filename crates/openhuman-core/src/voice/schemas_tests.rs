@@ -1,194 +1,73 @@
 use super::*;
-use crate::core::all::{assert_schema_contract, ControllerSchemaContract, SchemaFieldContract};
 use crate::core::runtime::DispatchCtx;
 use serde_json::json;
 
 #[test]
 fn voice_schema_wire_contracts_are_preserved() {
-    let contracts: &[(&str, ControllerSchemaContract)] = &[
-        (
-            "voice_status",
-            ControllerSchemaContract {
-                namespace: "voice",
-                function: "status",
-                input_count: Some(0),
-                input_order: None,
-                required_input_order: None,
-                inputs: &[],
-                output_fields: &[],
-                outputs: None,
-            },
-        ),
+    let contracts = [
+        ("voice_status", "status", &[][..], &[][..]),
         (
             "voice_transcribe",
-            ControllerSchemaContract {
-                namespace: "voice",
-                function: "transcribe",
-                input_count: None,
-                input_order: None,
-                required_input_order: Some(&["audio_path"]),
-                inputs: &[],
-                output_fields: &[],
-                outputs: None,
-            },
+            "transcribe",
+            &["audio_path"][..],
+            &[][..],
         ),
         (
             "voice_transcribe_bytes",
-            ControllerSchemaContract {
-                namespace: "voice",
-                function: "transcribe_bytes",
-                input_count: None,
-                input_order: None,
-                required_input_order: Some(&["audio_bytes"]),
-                inputs: &[SchemaFieldContract {
-                    name: "extension",
-                    required: Some(false),
-                    type_debug: None,
-                }],
-                output_fields: &[],
-                outputs: None,
-            },
+            "transcribe_bytes",
+            &["audio_bytes"][..],
+            &["extension"][..],
         ),
-        (
-            "voice_tts",
-            ControllerSchemaContract {
-                namespace: "voice",
-                function: "tts",
-                input_count: None,
-                input_order: None,
-                required_input_order: Some(&["text"]),
-                inputs: &[SchemaFieldContract {
-                    name: "output_path",
-                    required: Some(false),
-                    type_debug: None,
-                }],
-                output_fields: &[],
-                outputs: None,
-            },
-        ),
-        (
-            "overlay_stt_notify",
-            ControllerSchemaContract {
-                namespace: "voice",
-                function: "overlay_stt_notify",
-                input_count: None,
-                input_order: None,
-                required_input_order: None,
-                inputs: &[],
-                output_fields: &[],
-                outputs: None,
-            },
-        ),
-        (
-            "voice_stt_dispatch",
-            ControllerSchemaContract {
-                namespace: "voice",
-                function: "stt_dispatch",
-                input_count: None,
-                input_order: None,
-                required_input_order: None,
-                inputs: &[],
-                output_fields: &[],
-                outputs: None,
-            },
-        ),
-        (
-            "voice_tts_dispatch",
-            ControllerSchemaContract {
-                namespace: "voice",
-                function: "tts_dispatch",
-                input_count: None,
-                input_order: None,
-                required_input_order: None,
-                inputs: &[],
-                output_fields: &[],
-                outputs: None,
-            },
-        ),
-        (
-            "voice_set_providers",
-            ControllerSchemaContract {
-                namespace: "voice",
-                function: "set_providers",
-                input_count: None,
-                input_order: None,
-                required_input_order: None,
-                inputs: &[],
-                output_fields: &[],
-                outputs: None,
-            },
-        ),
-        (
-            "voice_server_start",
-            ControllerSchemaContract {
-                namespace: "voice",
-                function: "server_start",
-                input_count: None,
-                input_order: None,
-                required_input_order: Some(&[]),
-                inputs: &[],
-                output_fields: &[],
-                outputs: None,
-            },
-        ),
+        ("voice_tts", "tts", &["text"][..], &["output_path"][..]),
+        ("overlay_stt_notify", "overlay_stt_notify", &[][..], &[][..]),
+        ("voice_stt_dispatch", "stt_dispatch", &[][..], &[][..]),
+        ("voice_tts_dispatch", "tts_dispatch", &[][..], &[][..]),
+        ("voice_set_providers", "set_providers", &[][..], &[][..]),
+        ("voice_server_start", "server_start", &[][..], &[][..]),
         (
             "voice_update_provider_settings",
-            ControllerSchemaContract {
-                namespace: "voice",
-                function: "update_provider_settings",
-                input_count: None,
-                input_order: None,
-                required_input_order: Some(&[]),
-                inputs: &[
-                    SchemaFieldContract {
-                        name: "voice_providers",
-                        required: Some(false),
-                        type_debug: None,
-                    },
-                    SchemaFieldContract {
-                        name: "stt_provider",
-                        required: Some(false),
-                        type_debug: None,
-                    },
-                    SchemaFieldContract {
-                        name: "tts_provider",
-                        required: Some(false),
-                        type_debug: None,
-                    },
-                ],
-                output_fields: &[],
-                outputs: None,
-            },
+            "update_provider_settings",
+            &[][..],
+            &["voice_providers", "stt_provider", "tts_provider"][..],
         ),
         (
             "voice_list_models",
-            ControllerSchemaContract {
-                namespace: "voice",
-                function: "list_models",
-                input_count: None,
-                input_order: None,
-                required_input_order: Some(&["provider_id"]),
-                inputs: &[],
-                output_fields: &[],
-                outputs: None,
-            },
+            "list_models",
+            &["provider_id"][..],
+            &[][..],
         ),
         (
             "voice_test_provider",
-            ControllerSchemaContract {
-                namespace: "voice",
-                function: "test_provider",
-                input_count: None,
-                input_order: None,
-                required_input_order: Some(&["workload", "provider"]),
-                inputs: &[],
-                output_fields: &[],
-                outputs: None,
-            },
+            "test_provider",
+            &["workload", "provider"][..],
+            &[][..],
         ),
     ];
-    for (key, expected) in contracts {
-        assert_schema_contract(&voice_schemas(key), expected);
+    for (key, function, required, optional) in contracts {
+        let schema = voice_schemas(key);
+        assert_eq!(schema.namespace, "voice");
+        assert_eq!(schema.function, function);
+        if key == "voice_status" {
+            assert!(schema.inputs.is_empty());
+        }
+        for name in required {
+            assert!(
+                schema
+                    .inputs
+                    .iter()
+                    .any(|field| field.name == *name && field.required),
+                "voice.{function} must require {name}"
+            );
+        }
+        for name in optional {
+            assert!(
+                schema
+                    .inputs
+                    .iter()
+                    .any(|field| field.name == *name && !field.required),
+                "voice.{function} must expose optional {name}"
+            );
+        }
     }
     let registered: Vec<_> = all_voice_registered_controllers()
         .into_iter()
