@@ -347,6 +347,9 @@ async fn flow_authoring_is_hidden_when_tinyflows_component_is_disabled() {
     };
 
     let (enabled_ctx, enabled_config, enabled_domains) = profile("enabled", true);
+    crate::modules::tinyflows::copilot_proxy(&enabled_config)
+        .await
+        .expect("linked TinyFlows fixture is admitted and serving");
     let visible = CoreContext::scope(enabled_ctx, async {
         let dispatch = crate::core::runtime::DispatchCtx::ambient();
         crate::skills::bundled::flow_authoring::prewarm(
@@ -431,7 +434,11 @@ async fn module_builtin_gate_only_narrows_context_and_explicit_config() {
     );
     let context_domain_hidden = CoreContext::scope(context_domain_context, async {
         let dispatch = crate::core::runtime::DispatchCtx::ambient();
-        crate::skills::load_workflow_metadata_for(&dispatch, &enabled_config)
+        crate::skills::ops_discover::load_workflow_metadata_for_domains(
+            &dispatch,
+            &enabled_config,
+            Some(DomainSet::full()),
+        )
     })
     .await;
     assert!(
@@ -498,6 +505,72 @@ async fn module_builtin_gate_only_narrows_context_and_explicit_config() {
             .any(|skill| skill.id() == "flow-authoring"),
         "an all-enabled Config cannot widen a context with Skills disabled"
     );
+
+    // Separate tenants can share one workspace. Tampering with and clearing
+    // one tenant's snapshot must not evict or authorize the other's bytes.
+    let tenant_snapshot = |profile_id: &'static str| {
+        let config = enabled_config.clone();
+        let ctx = CoreContext::for_test_with_components(all).derive_with(
+            ContextOverlay::new(config.clone(), DomainSet::full(), ToolGroups::none())
+                .profile(profile_id),
+        );
+        (ctx, config)
+    };
+    let (tenant_a_ctx, tenant_a_config) = tenant_snapshot("tenant-a");
+    let tenant_a = CoreContext::scope(tenant_a_ctx, async {
+        let dispatch = crate::core::runtime::DispatchCtx::ambient();
+        crate::skills::bundled::flow_authoring::prewarm(&dispatch, &tenant_a_config, None).await;
+        crate::skills::load_workflow_metadata_for(&dispatch, &tenant_a_config)
+    })
+    .await;
+    let (tenant_b_ctx, tenant_b_config) = tenant_snapshot("tenant-b");
+    let tenant_b = CoreContext::scope(tenant_b_ctx, async {
+        let dispatch = crate::core::runtime::DispatchCtx::ambient();
+        crate::skills::bundled::flow_authoring::prewarm(&dispatch, &tenant_b_config, None).await;
+        crate::skills::load_workflow_metadata_for(&dispatch, &tenant_b_config)
+    })
+    .await;
+    let flow_a = tenant_a
+        .iter()
+        .find(|skill| skill.id() == "flow-authoring")
+        .expect("tenant A has its own warmed snapshot");
+    let flow_b = tenant_b
+        .iter()
+        .find(|skill| skill.id() == "flow-authoring")
+        .expect("tenant B has its own warmed snapshot");
+    let flow_a_file = flow_a
+        .location
+        .as_deref()
+        .expect("tenant A skill document")
+        .parent()
+        .expect("tenant A skill directory")
+        .join(&flow_a.resources[0]);
+    std::fs::write(&flow_a_file, "tampered tenant A snapshot").unwrap();
+    let tenant_a_after_tamper = CoreContext::scope(tenant_a_ctx, async {
+        let dispatch = crate::core::runtime::DispatchCtx::ambient();
+        crate::skills::load_workflow_metadata_for(&dispatch, &tenant_a_config)
+    })
+    .await;
+    assert!(!tenant_a_after_tamper
+        .iter()
+        .any(|skill| skill.id() == "flow-authoring"));
+    let tenant_b_after_tamper = CoreContext::scope(tenant_b_ctx, async {
+        let dispatch = crate::core::runtime::DispatchCtx::ambient();
+        let latest = crate::skills::load_workflow_metadata_for(&dispatch, &tenant_b_config);
+        let skill = latest
+            .iter()
+            .find(|skill| skill.id() == "flow-authoring")
+            .expect("tenant B snapshot remains visible");
+        crate::skills::read_workflow_resource_for(
+            &dispatch,
+            &tenant_b_config,
+            "flow-authoring",
+            &skill.resources[0],
+        )
+    })
+    .await;
+    assert!(tenant_b_after_tamper.is_ok(), "tenant A tampering must not evict tenant B");
+    let _ = flow_b;
 }
 
 #[test]
