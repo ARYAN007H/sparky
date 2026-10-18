@@ -62,13 +62,12 @@ pub(crate) fn wrap(
     }
     profile.modalities.image_in |=
         crate::inference::model_context::model_vision_enabled(model, &config);
-    Arc::new(AttachmentModel {
+    owner::wrap(
+        ctx,
         inner,
         config,
-        core: ctx.downgrade(),
         profile,
-        fallback_cache: std::sync::Mutex::new(std::collections::HashMap::new()),
-    })
+    )
 }
 
 /// Injected models supply their own selected-model facts through ModelProfile.
@@ -79,13 +78,7 @@ pub(crate) fn wrap_injected(
     config: Arc<Config>,
 ) -> Arc<dyn ChatModel<()>> {
     let profile = inner.profile().cloned().unwrap_or_default();
-    Arc::new(AttachmentModel {
-        inner,
-        config,
-        core: ctx.downgrade(),
-        profile,
-        fallback_cache: std::sync::Mutex::new(std::collections::HashMap::new()),
-    })
+    owner::wrap(ctx, inner, config, profile)
 }
 
 struct AttachmentModel {
@@ -401,6 +394,9 @@ fn historical_source_hint(block: &ContentBlock, scope: &AttachmentAccessScope) -
     };
     source.chars().take(180).collect()
 }
+
+#[path = "provider_owner.rs"]
+mod owner;
 
 fn is_local_reference(source: &str) -> bool {
     let bytes = source.as_bytes();
