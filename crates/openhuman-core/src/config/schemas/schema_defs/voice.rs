@@ -75,14 +75,6 @@ pub(super) fn lookup(function: &str) -> Option<ControllerSchema> {
                     comment: "Custom vocabulary words to bias the STT engine toward.",
                     required: false,
                 },
-                optional_bool(
-                    "always_on_enabled",
-                    "Continuous always-on listening (no hotkey). Opt-in.",
-                ),
-                optional_string(
-                    "wake_word",
-                    "Always-on wake word; utterances must contain it (default 'Hey Tiny').",
-                ),
                 optional_string(
                     "stt_engine",
                     "Hosted speech-to-text engine: backend, elevenlabs, or openai.",

@@ -185,8 +185,6 @@ pub(super) struct VoiceServerSettingsUpdate {
     pub(super) min_duration_secs: Option<f32>,
     pub(super) silence_threshold: Option<f32>,
     pub(super) custom_dictionary: Option<Vec<String>>,
-    pub(super) always_on_enabled: Option<bool>,
-    pub(super) wake_word: Option<String>,
     pub(super) stt_engine: Option<String>,
 }
 
