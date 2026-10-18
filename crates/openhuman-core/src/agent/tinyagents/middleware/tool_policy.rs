@@ -375,21 +375,15 @@ impl ToolCallPolicy<OpenHumanRunContext> for SessionCeilingPolicy {
     ) -> PolicyDecision {
         #[cfg(feature = "modules")]
         let approvals_disabled = if let Some(tool) = self.host.resolve_tool(&call.name) {
-            crate::desktop::control::approvals_disabled_for(
-                &ctx.data.dispatch_ctx(),
-                tool.as_ref(),
-            )
-            .await
+            crate::desktop::control::approvals_disabled_for(&ctx.data.dispatch_ctx(), tool.as_ref())
+                .await
         } else {
             false
         };
         #[cfg(not(feature = "modules"))]
         let approvals_disabled = false;
 
-        match self
-            .host
-            .channel_permission_block(call, approvals_disabled)
-        {
+        match self.host.channel_permission_block(call, approvals_disabled) {
             Some(reason) => PolicyDecision::deny(reason),
             None => PolicyDecision::Allow,
         }

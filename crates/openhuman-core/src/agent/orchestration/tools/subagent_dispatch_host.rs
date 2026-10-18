@@ -558,10 +558,7 @@ pub(crate) async fn dispatch_subagent_with_live_parent(
                                     worktree_path: None,
                                     changed_files: Vec::new(),
                                     dirty_status: None,
-                                    stop: incomplete_stop(
-                                        reason,
-                                        outcome.failure_cause.clone(),
-                                    ),
+                                    stop: incomplete_stop(reason, outcome.failure_cause.clone()),
                                 })
                                 .await;
                         }

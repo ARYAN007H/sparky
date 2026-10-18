@@ -394,10 +394,7 @@ impl FailureScopePolicy<OpenHumanRunContext> for HostFailurePolicy {
         repeat_guard_marker(result).is_some()
     }
 
-    fn record_guard_refusal(
-        &self,
-        _ctx: &RunContext<OpenHumanRunContext>,
-    ) {
+    fn record_guard_refusal(&self, _ctx: &RunContext<OpenHumanRunContext>) {
         self.stop.record_refusal();
     }
 
