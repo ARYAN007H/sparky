@@ -29,6 +29,8 @@ use crate::core::runtime::DispatchCtx;
 use crate::threads::turn_state::mirror::ObserveProgress;
 use tinyagents_harness::progress::AgentProgress;
 
+#[path = "progress_subagent.rs"]
+mod subagent;
 #[path = "progress_trace.rs"]
 mod trace;
 

@@ -3,10 +3,11 @@
 
 use serde_json::json;
 
-use super::progress::ProgressProjection;
-use super::progress_ledger::ChildDone;
-use super::progress_map as map;
 use tinyagents_harness::progress::AgentProgress;
+
+use super::super::progress_ledger::ChildDone;
+use super::super::progress_map as map;
+use super::ProgressProjection;
 
 impl ProgressProjection {
     pub(super) async fn on_subagent_event(&mut self, event: AgentProgress) {
