@@ -12,7 +12,6 @@ use crate::agent_registry::host_definition::AgentDefinitionRegistry;
 use crate::config::MultimodalConfig;
 use crate::core::bus::BUS;
 use crate::inference::provider::error_classify::parse_retry_after_ms;
-use tinyagents_harness::error::TinyAgentsError;
 use tinyagents_harness::retry::{decide, FailoverDecision, FailoverReason, FailoverState};
 use tinyagents_session::transcript::TranscriptMessage;
 use tinybus::NativeRequestError;
@@ -246,7 +245,7 @@ pub(crate) fn classify_error(message: String) -> ArmError {
     if is_prompt_guard_rejection(&message) {
         return ArmError::SafetyFlagged(err);
     }
-    let reason = FailoverReason::classify(&TinyAgentsError::Model(message));
+    let reason = FailoverReason::classify_unstructured(&message);
     match decide(
         reason,
         FailoverState {
