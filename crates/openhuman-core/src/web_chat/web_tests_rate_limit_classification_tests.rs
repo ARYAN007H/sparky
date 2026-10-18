@@ -320,7 +320,10 @@ async fn start_chat_emits_structured_rate_limit_metadata_on_chat_error_event() {
         "upstream 429 wire classification and countdown changed: {recv:?}"
     );
     assert_eq!(
-        recv.error_provider.as_deref(),
+        match recv.wire_event() {
+            crate::web_chat::WebChannelEvent::ChatError { error_provider, .. } => error_provider.as_deref(),
+            _ => None,
+        },
         Some("openrouter"),
         "provider name must reach the wire so the FE can show \"openrouter is throttling\": \
          {recv:?}"

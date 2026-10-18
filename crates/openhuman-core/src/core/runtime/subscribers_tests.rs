@@ -256,7 +256,7 @@ fn proactive_message_reaches_web_on_channelless_core_boot() {
                             event.wire_event(),
                             crate::web_chat::WebChannelEvent::ProactiveMessage {
                                 full_response, ..
-                            } if full_response == "Your morning briefing is ready."
+                            } if full_response.as_deref() == Some("Your morning briefing is ready.")
                         ) {
                             break event;
                         }
@@ -351,7 +351,7 @@ fn proactive_message_is_scoped_to_originating_saas_profile() {
                             event.wire_event(),
                             crate::web_chat::WebChannelEvent::ProactiveMessage {
                                 full_response, ..
-                            } if full_response == "Your morning briefing is ready."
+                            } if full_response.as_deref() == Some("Your morning briefing is ready.")
                         ) {
                             break event;
                         }

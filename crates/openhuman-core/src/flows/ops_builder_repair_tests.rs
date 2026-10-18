@@ -114,7 +114,7 @@ fn repair_backend_failure_returns_no_proposal_before_starting_the_builder() {
             done.wire_event(),
             crate::web_chat::WebChannelEvent::ChatDone {
                 full_response, ..
-            } if full_response.contains("workflow was not changed")
+            } if full_response.as_deref().is_some_and(|text| text.contains("workflow was not changed"))
         ));
     });
 }

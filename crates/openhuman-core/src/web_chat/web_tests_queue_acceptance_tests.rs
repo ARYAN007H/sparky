@@ -484,7 +484,7 @@ async fn chat_done_is_published_only_after_the_in_flight_slot_is_released() {
     let thread_id = "chat-done-after-slot-release";
     let request_id = start_parked_turn(thread_id, &block).await;
     let mut events = crate::web_chat::subscribe_web_channel_events();
-    let is_done = |event: &crate::web_chat::WebChannelEvent| {
+    let is_done = |event: &crate::web_chat::ScopedWebEvent| {
         event.event_name() == "chat_done" && event.context().request_id == request_id
     };
 
