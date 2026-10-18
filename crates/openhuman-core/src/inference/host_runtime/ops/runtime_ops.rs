@@ -3,6 +3,7 @@
 //! starts the runtime; it only probes and talks to the configured endpoint.
 
 use chrono::Utc;
+use std::sync::Arc;
 
 use crate::config::Config;
 use crate::core::Outcome;
@@ -18,21 +19,27 @@ use super::turn_guards::enforce_user_prompt_or_reject;
 pub async fn local_ai_status(config: &Config) -> Result<Outcome<LocalAiStatus>, String> {
     let service = local_ai::global(config);
     let runtime = crate::inference::local_runtime_config(config);
-    let status = service.status();
+    let (snapshot, _bootstrap_task) = local_ai_status_snapshot(service, runtime);
+    Ok(Outcome::single_log(snapshot, "local ai status fetched"))
+}
+
+fn local_ai_status_snapshot(
+    service: Arc<tinyinference_local::service::LocalAiService>,
+    runtime: tinyinference_local::service::RuntimeConfig,
+) -> (LocalAiStatus, Option<tokio::task::JoinHandle<()>>) {
+    let mut snapshot = service.status();
     // `unreachable` is re-probed on every status poll so a runtime the user
     // starts later is picked up. The probe is read-only (`GET /api/tags` or
     // `GET /v1/models`); it never spawns a runtime or pulls a model.
-    if matches!(status.state.as_str(), "idle" | "degraded" | "unreachable") {
+    let bootstrap_task = if matches!(snapshot.state.as_str(), "idle" | "degraded" | "unreachable") {
         tracing::debug!(
-            state = %status.state,
+            state = %snapshot.state,
             "[local_ai] status: scheduling endpoint probe"
         );
-        let service_clone = service.clone();
-        let config_clone = runtime.clone();
-        tokio::spawn(async move {
-            service_clone.bootstrap(&config_clone).await;
-        });
-    }
+        service.schedule_bootstrap(runtime.clone())
+    } else {
+        None
+    };
     // `LocalAiService` is a process-wide singleton whose cached `provider`
     // field was set at first init from whichever config it saw. After an
     // `inference_update_local_settings` call that swaps providers
