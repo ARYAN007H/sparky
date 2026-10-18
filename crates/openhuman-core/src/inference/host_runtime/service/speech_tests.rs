@@ -121,7 +121,10 @@ async fn tts_output_path_rejects_final_component_symlink() {
 #[tokio::test]
 async fn tts_output_path_keeps_always_forbidden_paths_blocked() {
     let tmp = tempfile::tempdir().unwrap();
-    let config = enabled_config(&tmp);
+    let mut config = Config::default();
+    config.workspace_dir = std::path::PathBuf::from("/etc");
+    config.config_path = tmp.path().join("config.toml");
+    config.local_ai.runtime_enabled = true;
     let runtime = crate::inference::local_runtime_config(&config);
 
     let error = validated_tts_output_path(&config, &runtime, Some("/etc/openhuman-tts-test.wav"))
