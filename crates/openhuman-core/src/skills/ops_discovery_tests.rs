@@ -328,42 +328,50 @@ async fn flow_authoring_is_hidden_when_tinyflows_component_is_disabled() {
     use crate::tools::toolpacks::ToolGroups;
 
     let workspace = tempfile::tempdir().unwrap();
-    // Install the compiled bundles as a normal boot would. The pre-fix
-    // discovery path gates only `skills`, so it incorrectly exposes the
-    // flow-authoring bundle when the module that owns its resources is off.
-    crate::skills::bundled::install(workspace.path());
-
     let profile = |profile_id: &str, enabled: bool| {
         let mut components = ComponentSet::all();
         let mut domains = DomainSet::full();
+        let mut config = crate::config::Config::default();
+        config.workspace_dir = workspace.path().to_path_buf();
         if !enabled {
             components.flows = false;
             components.tinyflows = false;
+            config.components.flows = false;
+            config.components.tinyflows = false;
             domains.flows = false;
         }
-        let mut config = crate::config::Config::default();
-        config.workspace_dir = workspace.path().to_path_buf();
-        CoreContext::for_test_with_components(components).derive_with(
-            ContextOverlay::new(config, domains, ToolGroups::none()).profile(profile_id),
-        )
+        let context = CoreContext::for_test_with_components(components).derive_with(
+            ContextOverlay::new(config.clone(), domains, ToolGroups::none()).profile(profile_id),
+        );
+        (context, config, domains)
     };
 
-    let visible = CoreContext::scope(profile("enabled", true), async {
-        load_workflow_metadata(workspace.path())
+    let (enabled_ctx, enabled_config, enabled_domains) = profile("enabled", true);
+    let visible = CoreContext::scope(enabled_ctx, async {
+        let dispatch = crate::core::runtime::DispatchCtx::ambient();
+        crate::skills::bundled::flow_authoring::prewarm(
+            &dispatch,
+            &enabled_config,
+            Some(enabled_domains),
+        )
+        .await;
+        crate::skills::load_workflow_metadata_for(&dispatch, &enabled_config)
     })
     .await;
-    let hidden = CoreContext::scope(profile("disabled", false), async {
-        load_workflow_metadata(workspace.path())
+    let (disabled_ctx, disabled_config, _) = profile("disabled", false);
+    let hidden = CoreContext::scope(disabled_ctx, async {
+        let dispatch = crate::core::runtime::DispatchCtx::ambient();
+        crate::skills::load_workflow_metadata_for(&dispatch, &disabled_config)
     })
     .await;
 
     assert!(
         visible.iter().any(|skill| skill.id() == "flow-authoring"),
-        "the enabled profile sees its flow-authoring bundle"
+        "the enabled profile sees its module-backed flow-authoring skill"
     );
     assert!(
         !hidden.iter().any(|skill| skill.id() == "flow-authoring"),
-        "a profile with flows, TinyFlows, and the Flows domain disabled must not inherit the shared flow-authoring bundle"
+        "a profile with flows, TinyFlows, and the Flows domain disabled must not inherit another profile's flow-authoring builtin"
     );
 }
 

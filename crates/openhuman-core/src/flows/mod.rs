@@ -39,7 +39,6 @@ mod schemas;
 /// Skills this domain ships inside the binary. Needs BOTH gates: the pages
 /// teach flows authoring, and `BundledSkill` is part of the skills subsystem.
 #[cfg(feature = "skills")]
-pub mod skills;
 mod store;
 /// The tinyflows engine seam (formerly `crate::tinyflows`).
 pub mod tinyflows;

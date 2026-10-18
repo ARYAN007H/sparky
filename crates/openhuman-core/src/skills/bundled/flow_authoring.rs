@@ -425,8 +425,10 @@ fn scope_directory(gate: &DiscoveryGate) -> String {
 }
 
 fn clear_snapshot(key: &SnapshotKey) {
-    if let Ok(mut snapshots) = SNAPSHOTS.write() {
-        snapshots.remove(key);
+    let removed = SNAPSHOTS
+        .write()
+        .is_ok_and(|mut snapshots| snapshots.remove(key).is_some());
+    if removed {
+        crate::skills::ops_discover::invalidate_workflow_metadata_cache();
     }
-    crate::skills::ops_discover::invalidate_workflow_metadata_cache();
 }
