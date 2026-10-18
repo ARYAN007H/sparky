@@ -1199,25 +1199,6 @@ pub fn all_http_method_schemas() -> Vec<HttpMethodSchemaDefinition> {
 /// controller no longer breaks the count, but a schema/handler desync or a
 /// dropped op still fails.
 #[cfg(test)]
-pub(crate) struct SchemaFieldContract {
-    pub name: &'static str,
-    pub required: Option<bool>,
-    pub type_debug: Option<&'static str>,
-}
-
-#[cfg(test)]
-pub(crate) struct ControllerSchemaContract {
-    pub namespace: &'static str,
-    pub function: &'static str,
-    pub input_count: Option<usize>,
-    pub input_order: Option<&'static [&'static str]>,
-    pub required_input_order: Option<&'static [&'static str]>,
-    pub inputs: &'static [SchemaFieldContract],
-    pub output_fields: &'static [&'static str],
-    pub outputs: Option<&'static [&'static str]>,
-}
-
-#[cfg(test)]
 pub(crate) fn expect_schema_identity(schema: &ControllerSchema, namespace: &str, function: &str) {
     assert_eq!(schema.namespace, namespace);
     assert_eq!(schema.function, function);
@@ -1268,99 +1249,6 @@ pub(crate) fn expect_schema_output_fields(schema: &ControllerSchema, outputs: &[
             "{}.{} is missing output `{name}`",
             schema.namespace,
             schema.function
-        );
-    }
-}
-
-/// Check one controller against a fixed wire contract copied from its
-/// independently asserted domain schema tests.
-#[cfg(test)]
-pub(crate) fn assert_schema_contract(
-    schema: &ControllerSchema,
-    expected: &ControllerSchemaContract,
-) {
-    assert_eq!(
-        schema.namespace, expected.namespace,
-        "{} namespace",
-        expected.function
-    );
-    assert_eq!(schema.function, expected.function, "schema function");
-    if let Some(count) = expected.input_count {
-        assert_eq!(
-            schema.inputs.len(),
-            count,
-            "{}.{} input count",
-            expected.namespace,
-            expected.function
-        );
-    }
-    if let Some(order) = expected.input_order {
-        let actual: Vec<_> = schema.inputs.iter().map(|field| field.name).collect();
-        assert_eq!(
-            actual, order,
-            "{}.{} input order",
-            expected.namespace, expected.function
-        );
-    }
-    if let Some(order) = expected.required_input_order {
-        let actual: Vec<_> = schema
-            .inputs
-            .iter()
-            .filter(|field| field.required)
-            .map(|field| field.name)
-            .collect();
-        assert_eq!(
-            actual, order,
-            "{}.{} required input order",
-            expected.namespace, expected.function
-        );
-    }
-    for expected in expected.inputs {
-        let field = schema
-            .inputs
-            .iter()
-            .find(|field| field.name == expected.name)
-            .unwrap_or_else(|| {
-                panic!(
-                    "{}.{} is missing input `{}`",
-                    expected.namespace, expected.function, expected.name
-                )
-            });
-        if let Some(required) = expected.required {
-            assert_eq!(
-                field.required, required,
-                "{}.{} input `{}` requiredness",
-                expected.namespace, expected.function, expected.name
-            );
-        }
-        if let Some(type_debug) = expected.type_debug {
-            assert_eq!(
-                format!("{:?}", field.ty),
-                type_debug,
-                "{}.{} input `{}` type",
-                expected.namespace,
-                expected.function,
-                expected.name
-            );
-        }
-    }
-    for output_name in expected.output_fields {
-        assert!(
-            schema
-                .outputs
-                .iter()
-                .any(|field| field.name == *output_name),
-            "{}.{} is missing output `{output_name}`",
-            expected.namespace,
-            expected.function
-        );
-    }
-    if let Some(outputs) = expected.outputs {
-        let actual: Vec<_> = schema.outputs.iter().map(|field| field.name).collect();
-        assert_eq!(
-            actual, outputs,
-            "{}.{} output names",
-            expected.namespace, expected.function
         );
     }
 }
