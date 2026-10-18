@@ -12,7 +12,7 @@ alone can supply:
 | Engine | Owns | Where |
 | --- | --- | --- |
 | TinyAgents' turn runner | The lifecycle of a turn: ingress order, per-thread serialization, the five queue modes, cancellation generations, the idle and wall-clock guards, reply persistence, exactly one terminal event | `vendor/tinyagents/crates/tinyagents-harness/src/turn_runner/` |
-| The `tinychannels` web adapter | The projection of canonical output events onto the web wire, with per-turn `seq` | `vendor/tinychannels/crates/tinychannels-runtime/src/adapters/web/` and `tinychannels-bus` (`web.rs`, the wire types) |
+| TinyChannels' compiled web projection module | The projection of canonical output events onto typed web events, with per-turn `seq` | `vendor/tinychannels/crates/tinychannels-module/`, called through `tinychannels-bus` |
 
 External messaging providers (Telegram, Discord and so on) live in
 `channels/`, but their inbound messages are dispatched through this module's
@@ -43,7 +43,7 @@ subscriber all listen to.
         | checkout   (turn_host.rs, session.rs)               |
         | run        agent.run_single_with_approval           |
         |   progress  --tap--> runner --> ProgressProjection  |
-        |                       --> web adapter --> bus       |
+        |                       --> compiled module --> bus  |
         | persist    (turn_events.rs WebReplies)              |
         | terminal   (turn_events.rs WebEvents)               |
         +-----------------------------------------------------+
@@ -116,7 +116,7 @@ subscriber all listen to.
    hands it to the runner, which calls `WebEvents::progress` in order. That is
    `ProgressProjection::on_event` (`progress.rs`), the one consumer: it maps the
    event to the canonical output vocabulary (`progress_map.rs`), publishes it
-   through the web adapter (`surface.rs`), and does the host's side effects in
+   through the compiled TinyChannels module over TinyBus (`surface.rs`), and does the host's side effects in
    the same pass: the run ledger (`progress_ledger.rs`), the `TurnStates`
    mirror, the tracing export (`progress_trace.rs`, `journal_shadow.rs`),
    first-token timing and the throttled live `turn_cost`. An
@@ -268,7 +268,7 @@ and artifact bridges itself (`openhuman-tui/src/runner.rs`).
 | [`progress_map.rs`](./progress_map.rs) | `AgentProgress` to the canonical `ChannelOutputEvent`, with payload caps. |
 | [`progress_ledger.rs`](./progress_ledger.rs) | The run-ledger rows and telemetry a turn's progress writes. |
 | [`progress_trace.rs`](./progress_trace.rs), [`journal_shadow.rs`](./journal_shadow.rs) | Tracing export and the live-versus-journal span comparison. |
-| [`surface.rs`](./surface.rs) | The host side of the web adapter: `Surface` (one adapter per turn) and the sink onto the broadcast bus. |
+| [`surface.rs`](./surface.rs) | The host adapter for TinyChannels' compiled projection module: `Surface` owns per-turn module handles, stamps host routing, and publishes projected events onto the broadcast bus. |
 | [`ops.rs`](./ops.rs) | Thin shell over [`ops/`](./ops/); re-exports the request surface and state. |
 | [`ops/start_chat.rs`](./ops/start_chat.rs) | `start_chat`, `StartChatError`, and the backstop resolution. |
 | [`ops/channel_ops.rs`](./ops/channel_ops.rs) | `cancel_chat_scoped`, `cancel_all_turns`, and the `channel_web_*` RPC handlers. |
@@ -280,7 +280,7 @@ and artifact bridges itself (`openhuman-tui/src/runner.rs`).
 | [`presentation.rs`](./presentation.rs) | The terminal `chat_done` event, `deliver_response` (persist, then one `chat_done`) for the Flow Canvas, and `deliver_response_single_bubble` for core-initiated turns. |
 | [`reply_persistence.rs`](./reply_persistence.rs) | `persist_delivered_reply`: durable reply row under the deterministic reply id. |
 | [`suggestions.rs`](./suggestions.rs) | Post-turn follow-up suggestions (`chat_suggestions`). |
-| [`channel_event.rs`](./channel_event.rs) | The flat in-process `WebChannelEvent` every consumer reads, re-exports of the wire payloads, and the conversion from the typed wire enum. |
+| [`channel_event.rs`](./channel_event.rs) | The host's flat in-process event with private routing stamps; wire payload types are owned by `tinychannels-bus`. |
 | [`event_bus.rs`](./event_bus.rs) | The broadcast channel and the `DomainEvent` surface subscribers. |
 | [`egress_surface.rs`](./egress_surface.rs) | The `external_transfer_pending` bridge. |
 | [`web_errors.rs`](./web_errors.rs) | Thin shell over [`web_errors/`](./web_errors/): `classify.rs` (the classification ladder and `ClassifiedError`), `backend_error_code.rs`, `budget.rs`, `retry.rs`, `timeout.rs`. The class to copy table is in `inference/failure_copy/`. |
@@ -336,9 +336,10 @@ because the in-app chat is core product surface (#5002).
 ## Boundaries
 
 - The turn lifecycle belongs to TinyAgents (`turn_runner`), the agent loop, run
-  queue, sessions and transcripts too (`vendor/tinyagents`). The wire types,
-  the output projection and the web adapter belong to TinyChannels
-  (`tinychannels-bus` `web`, `tinychannels-runtime` `adapters::web`). A change
+  queue, sessions and transcripts too (`vendor/tinyagents`). The wire types
+  belong to `tinychannels-bus`; canonical output projection belongs to the
+  compiled TinyChannels module and is called through TinyBus. The host stamps
+  routing from its `DispatchCtx` and owns the process event bus. A change
   to either goes upstream first; this module keeps only the host ports.
 - The Socket.IO transport and the `/events` SSE endpoint live in
   `openhuman-rpc` (`src/server/socketio.rs`, `src/server/http/events.rs`).
@@ -370,7 +371,7 @@ because the in-app chat is core product surface (#5002).
   interrupted by user messages. Callers gate on idleness themselves.
 - The terminal event comes last. `WebEvents::terminal` removes the request's
   state, so nothing may read a turn's slot after its terminal event.
-- The web adapter's output events carry the round of a `chat_interim` only
+- The module's output events carry the round of a `chat_interim` only
   through the host (`Surface::interim`): the canonical `Clarification` output
   has none.
 - Debug/test hooks (`set_test_forced_run_chat_task_error`,
