@@ -52,7 +52,9 @@ async fn bound_turn(tmp: &tempfile::TempDir) -> Arc<MemoryTurn> {
         identity,
         thread_id: "t".into(),
         pack: None,
-        in_prompt_from: Arc::new(tinymemory_tools::lifecycle::window::InPromptFrom::new(0, 20)),
+        in_prompt_from: Arc::new(tinymemory_tools::lifecycle::window::InPromptFrom::new(
+            0, 20,
+        )),
         core: None,
     })
 }
@@ -259,7 +261,9 @@ async fn a_held_memory_engine_does_not_delay_transcript_compaction() {
         identity,
         thread_id: "held".into(),
         pack: None,
-        in_prompt_from: Arc::new(tinymemory_tools::lifecycle::window::InPromptFrom::new(0, 20)),
+        in_prompt_from: Arc::new(tinymemory_tools::lifecycle::window::InPromptFrom::new(
+            0, 20,
+        )),
         core: None,
     });
     let summarizer = MemoryRecallSummarizer::wrap(Box::new(ConcatSummarizer), Some(turn));

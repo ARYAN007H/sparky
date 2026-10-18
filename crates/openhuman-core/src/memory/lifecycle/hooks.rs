@@ -19,16 +19,10 @@ use crate::config::Config;
 use crate::core::runtime::{CoreContext, DispatchCtx};
 use crate::memory::engine;
 
-pub use native_turn::{CLOSE_TAG, MAX_TOOL_LINE_CHARS, OPEN_TAG};
-
-/// The user message's index for a turn that follows `committed_turns`.
-#[must_use]
-pub fn user_turn_index(committed_turns: usize) -> u32 {
-    native_turn::user_turn_index(committed_turns)
-}
+pub use native_turn::{CLOSE_TAG, MAX_TOOL_LINE_CHARS, OPEN_TAG, user_turn_index};
 
 /// A native turn pack with the citation view used by OpenHuman's chat UI.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct TurnPack {
     /// TinyMemory's authoritative pack and refusal state.
     #[serde(flatten)]
