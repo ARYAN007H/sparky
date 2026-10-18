@@ -14,6 +14,7 @@ use crate::security::SecurityPolicy;
 
 pub(crate) mod host;
 pub(crate) mod legacy;
+pub(crate) mod parts;
 pub(crate) mod provider;
 
 /// Per-model-call attachment authority copied from the live agent context.
