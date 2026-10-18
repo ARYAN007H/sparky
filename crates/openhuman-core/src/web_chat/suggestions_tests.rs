@@ -104,8 +104,7 @@ async fn drain_suggestions_event(
     loop {
         match tokio::time::timeout(Duration::from_secs(2), rx.recv()).await {
             Ok(Ok(ev))
-                if ev.event_name() == "chat_suggestions"
-                    && ev.context().thread_id == thread_id =>
+                if ev.event_name() == "chat_suggestions" && ev.context().thread_id == thread_id =>
             {
                 return Some(ev);
             }

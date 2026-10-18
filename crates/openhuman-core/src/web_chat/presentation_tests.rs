@@ -98,7 +98,8 @@ async fn chat_done_carries_timing_when_a_snapshot_is_supplied() {
     };
 
     let crate::web_chat::WebChannelEvent::ChatDone {
-        timing: Some(payload), ..
+        timing: Some(payload),
+        ..
     } = done.wire_event()
     else {
         panic!("chat_done.timing must be Some");

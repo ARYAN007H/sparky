@@ -344,8 +344,8 @@ async fn agent_surface_bridges_queue_item_queued() {
     });
 
     let ev = find_agent_web_event(&mut web_rx, "queue_item_queued", thread_id).await;
-    let item: QueueItemPayload = serde_json::from_value(wire(&ev)["queue_item"].clone())
-        .expect("queue_item");
+    let item: QueueItemPayload =
+        serde_json::from_value(wire(&ev)["queue_item"].clone()).expect("queue_item");
     assert_eq!(item.id, "item-1");
     assert_eq!(item.text_preview, Some("hello".to_string()));
 }
@@ -393,8 +393,8 @@ async fn agent_surface_bridges_queue_item_delivered_with_lane() {
     });
 
     let ev = find_agent_web_event(&mut web_rx, "queue_item_delivered", thread_id).await;
-    let item: QueueItemPayload = serde_json::from_value(wire(&ev)["queue_item"].clone())
-        .expect("queue_item");
+    let item: QueueItemPayload =
+        serde_json::from_value(wire(&ev)["queue_item"].clone()).expect("queue_item");
     assert_eq!(item.id, "item-2");
     assert_eq!(item.lane, Some("collect".to_string()));
 }
@@ -567,12 +567,7 @@ async fn publish_web_channel_event_preserves_an_explicit_ts() {
         parts: None,
     });
 
-    let ev = find_agent_web_event(
-        &mut web_rx,
-        "chat_done",
-        "thread-ts-stamp-probe-explicit",
-    )
-    .await;
+    let ev = find_agent_web_event(&mut web_rx, "chat_done", "thread-ts-stamp-probe-explicit").await;
     assert_eq!(ev.context().ts, Some(123));
 }
 

@@ -297,7 +297,8 @@ async fn no_heartbeat_before_turn_started() {
     loop {
         match events.try_recv() {
             Ok(ev) => assert_ne!(
-                ev.context().thread_id, thread_id,
+                ev.context().thread_id,
+                thread_id,
                 "unexpected pre-turn event {} for {thread_id}",
                 ev.event_name()
             ),
