@@ -2849,7 +2849,11 @@ async fn json_rpc_cron_manual_worker_survives_caller_cancel_on_published_tinyflo
     )
     .await
     .expect("initialize the isolated core context for the native host scenario");
-    assert_eq!(default_context.workspace_dir(), workspace);
+    assert_eq!(
+        default_context.workspace_dir().unwrap(),
+        workspace,
+        "the RPC host and pre-seeded migration rows share the same workspace"
+    );
     let (rpc_addr, rpc_join) = serve_on_ephemeral(build_core_http_router(false)).await;
     let rpc_base = format!("http://{rpc_addr}");
     let store_session = post_json_rpc(
