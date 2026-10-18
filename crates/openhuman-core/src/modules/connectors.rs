@@ -298,6 +298,10 @@ async fn ensure_routed(config: &Config, proxy: &Proxy) -> Result<(), String> {
         return Ok(());
     }
 
+    #[cfg(test)]
+    if crate::integrations::composio::module_client::MODULE_LOCK.try_lock().is_ok() {
+        eprintln!("UNGUARDED-ROUTE-CHANGE {}", std::thread::current().name().unwrap_or("?"));
+    }
     proxy
         .call_confidential::<serde_json::Value>(methods::CONFIGURE, (route,))
         .await
