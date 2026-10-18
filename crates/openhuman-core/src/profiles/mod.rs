@@ -37,6 +37,8 @@ pub mod lifecycle;
 pub mod ops;
 mod recovery;
 pub mod registry;
+mod storage_schema;
+pub use storage_schema::storage_schema;
 pub mod schemas;
 pub mod surface;
 pub mod tools;
