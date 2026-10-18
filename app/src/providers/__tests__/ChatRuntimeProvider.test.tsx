@@ -726,11 +726,7 @@ describe('ChatRuntimeProvider — dedupe, proactive resolution, mid-turn invaria
       const listeners = renderProvider();
 
       act(() => {
-        listeners.onDone?.({
-          thread_id: 't-user',
-          request_id: 'r-user',
-          full_response: 'hi',
-        });
+        listeners.onDone?.({ thread_id: 't-user', request_id: 'r-user', full_response: 'hi' });
       });
 
       // The core stores an unsegmented reply before announcing it, so this

@@ -1,6 +1,5 @@
 import debug from 'debug';
 
-import type { ContentPart } from '../chatWire';
 import type {
   DerivedTranscriptGetOptions,
   DerivedTranscriptPage,
@@ -26,6 +25,7 @@ import type {
   RunEventListResponse,
 } from '../../types/turnState';
 import type { ChatThreadTodoItem, ThreadGoal } from '../chatService';
+import type { ContentPart } from '../chatWire';
 import { callCoreRpc } from '../coreRpcClient';
 import { attachArtifactRows } from './artifactRows';
 

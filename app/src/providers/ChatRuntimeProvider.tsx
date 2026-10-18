@@ -649,11 +649,7 @@ const ChatRuntimeProvider = ({ children }: { children: React.ReactNode }) => {
       for (const item of queued) {
         try {
           await dispatch(
-            addMessageLocal({
-              threadId,
-              message: item.message,
-              attachments: item.attachments,
-            })
+            addMessageLocal({ threadId, message: item.message, attachments: item.attachments })
           ).unwrap();
         } catch (error) {
           rtLog('flush_followup_append_failed', {

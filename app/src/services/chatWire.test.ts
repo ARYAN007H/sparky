@@ -12,7 +12,11 @@ import type { WebChannelEvent } from './chatWire.generated';
 
 describe('chatWire', () => {
   it('decodeRunModeChanged lifts the wire message into a mode', () => {
-    const wire: WireEvent<'run_mode_changed'> = { thread_id: 't', request_id: '', message: 'build' };
+    const wire: WireEvent<'run_mode_changed'> = {
+      thread_id: 't',
+      request_id: '',
+      message: 'build',
+    };
     expect(decodeRunModeChanged(wire)).toEqual({ thread_id: 't', request_id: '', mode: 'build' });
   });
 

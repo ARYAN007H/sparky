@@ -8,8 +8,8 @@
  */
 import debug from 'debug';
 
-import type {
-  ArtifactFailedEvent,
+import {
+  type ArtifactFailedEvent,
   ArtifactKind,
   ArtifactPendingEvent,
   ArtifactReadyEvent,
@@ -43,13 +43,15 @@ import type {
   ChatToolCallEvent,
   ChatToolResultEvent,
   ContentPart,
+  decodeApprovalDecided,
+  decodeRunModeChanged,
   ExternalTransferPendingEvent,
+  externalTransferProvider,
   ProactiveMessageEvent,
   QueueItemEvent,
   QueueItemPayload,
   WireEvent,
 } from './chatWire';
-import { decodeApprovalDecided, decodeRunModeChanged, externalTransferProvider } from './chatWire';
 import { callCoreRpc } from './coreRpcClient';
 import { socketService } from './socketService';
 
