@@ -419,7 +419,10 @@ export function buildPlan({ profile, areas, env = {}, isPullRequest = true }) {
         {
           name: "embed-offline-examples",
           when: core,
-          run: "node scripts/run-embed-examples.mjs",
+          // Dev profile: the release-declared linux_fleet measurement then
+          // shares the plain dev build instead of a thin-LTO one nothing else
+          // can reuse (and that would need cleaning afterwards).
+          run: "node scripts/run-embed-examples.mjs --profile dev",
         },
         {
           name: "tinyhumans-clippy",
@@ -519,23 +522,14 @@ export function buildPlan({ profile, areas, env = {}, isPullRequest = true }) {
   // Coverage replaces each existing plain suite only for the private profile.
   // Preserve the original package, features, target list, and libtest substring
   // filters; union those filters in nextest's expression syntax. --no-report
-  // retains prior instrumentation implicitly; each suite then writes its report.
+  // retains prior instrumentation implicitly. A suite writes no report of its
+  // own: every `cargo llvm-cov report` re-merges ALL profiles in the shared
+  // coverage target (rust-cov's included), so each lane ends with one report
+  // check per workspace instead of one per suite. A report check has no
+  // `needs`, so it still reports after a failed suite; the suite keeps its
+  // own failure status.
   // Do not also pass --no-clean: the pinned cargo-llvm-cov rejects that pair.
   if (ex63) {
-    const lintLane = lanes.find((lane) => lane.name === "rust-lint");
-    const examplesIndex = lintLane.checks.findIndex(
-      (check) => check.name === "embed-offline-examples",
-    );
-    // linux_fleet alone builds release artifacts. Once the complete examples
-    // group succeeds, later checks need only debug and coverage products.
-    // Cargo scopes this cleanup to the ordinary release profile, preserving
-    // those other targets and the independent Tinymold compiler store.
-    lintLane.checks.splice(examplesIndex + 1, 0, {
-      name: "release-example-cleanup",
-      when: core,
-      needs: ["embed-offline-examples"],
-      run: "bash scripts/ci-cancel-aware.sh cargo clean --profile release --target-dir target/ci-private-build",
-    });
     // This target has cfg(not(coverage)): instrumentation makes its large
     // binary fail to link and would remove its deliberately small-stack test.
     // Run that distinct regression once in the ordinary build target, keeping
@@ -547,9 +541,16 @@ export function buildPlan({ profile, areas, env = {}, isPullRequest = true }) {
         when: core,
         run: `bash scripts/ci/nextest-coverage.sh composio-stack-uninstrumented cargo nextest run --profile ci --no-tests=fail --no-fail-fast -p openhuman-cli --features ${CORE_PRODUCT} --test composio_list_tools_stack_overflow_regression`,
       });
-    const coverageSuite = (args, output, manifest = "Cargo.toml") =>
-      `rc=0; bash scripts/ci/nextest-coverage.sh ${output.replace(/^lcov-|\.info$/g, "")} cargo llvm-cov nextest --profile ci --no-fail-fast --no-tests=fail --no-report ${args} || rc=$?; ` +
-      `cargo llvm-cov report --manifest-path ${manifest} --lcov --output-path ci-out/lcov/${output} || { report_rc=$?; if [ "$rc" -eq 0 ]; then rc=$report_rc; fi; }; exit "$rc"`;
+    const coverageSuite = (args, suite) =>
+      `bash scripts/ci/nextest-coverage.sh ${suite} cargo llvm-cov nextest --profile ci --no-fail-fast --no-tests=fail --no-report ${args}`;
+    const coverageReport = (name, output, when, manifest) => ({
+      name,
+      when,
+      env: { ...covEnv, CARGO_BUILD_TARGET_DIR: "target/ci-private-coverage" },
+      run:
+        "unset RUSTFLAGS; " +
+        `cargo llvm-cov report --manifest-path ${manifest} --lcov --output-path ci-out/lcov/${output}`,
+    });
     for (const lane of lanes) {
       if (lane.name !== "rust-gates-off") continue;
       for (const check of lane.checks) {
@@ -577,11 +578,17 @@ export function buildPlan({ profile, areas, env = {}, isPullRequest = true }) {
           ...covEnv,
           CARGO_BUILD_TARGET_DIR: "target/ci-private-coverage",
         };
-        check.run = coverageSuite(
-          `${args}${expression}${serial}`,
-          `lcov-${check.name}.info`,
-        );
+        check.run = coverageSuite(`${args}${expression}${serial}`, check.name);
       }
+      // One merge of the shared profiles for every gates-off suite above.
+      lane.checks.push(
+        coverageReport(
+          "gates-off-coverage-report",
+          "lcov-gates-off.info",
+          gateSmoke,
+          "Cargo.toml",
+        ),
+      );
     }
     const tauriLane = lanes.find((l) => l.name === "tauri");
     // Clippy emits metadata only; a real uninstrumented link proves that
@@ -600,9 +607,17 @@ export function buildPlan({ profile, areas, env = {}, isPullRequest = true }) {
       "unset RUSTFLAGS; " +
       coverageSuite(
         "--manifest-path crates/openhuman-app/Cargo.toml",
-        "lcov-tauri.info",
-        "crates/openhuman-app/Cargo.toml",
+        "tauri-coverage",
       );
+    // The app is a separate workspace, so its report is a second merge.
+    tauriLane.checks.push(
+      coverageReport(
+        "tauri-coverage-report",
+        "lcov-tauri.info",
+        areas.rustTauri,
+        "crates/openhuman-app/Cargo.toml",
+      ),
+    );
   }
 
   for (const lane of lanes) {
