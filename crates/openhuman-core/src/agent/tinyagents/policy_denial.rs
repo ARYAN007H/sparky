@@ -19,11 +19,11 @@
 //! It is a mitigation, not a guarantee — detecting fabrication needs the
 //! tool-call record carried out to the caller.
 
-use tinytools::status::POLICY_BLOCKED_MARKER;
-use tinytools::PermissionLevel;
 use tinyagents_harness::middleware::library::{
     StructuredDenialParts, StructuredDenialRenderOptions,
 };
+use tinytools::status::POLICY_BLOCKED_MARKER;
+use tinytools::PermissionLevel;
 
 /// Generic workaround for a raw security-policy / autonomy block. These denials
 /// originate deep in the tools / `SecurityPolicy` layer (autonomy tier, command
@@ -172,12 +172,11 @@ impl PolicyDenial<'_> {
             ),
         };
 
-        StructuredDenialParts::new(blocked, reason, workaround, RELAY_INSTRUCTION).render_with_options(
-            &StructuredDenialRenderOptions {
+        StructuredDenialParts::new(blocked, reason, workaround, RELAY_INSTRUCTION)
+            .render_with_options(&StructuredDenialRenderOptions {
                 reason_label: "Reason",
                 relay_separator: " ",
-            },
-        )
+            })
     }
 }
 
