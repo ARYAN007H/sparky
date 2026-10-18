@@ -63,45 +63,57 @@ fn invalid_saas_root_is_refused_before_store_reaches_the_engine() {
     const TEST_NAME: &str = "memory::user_scope::tests::invalid_saas_root_is_refused_before_store_reaches_the_engine";
 
     if std::env::var_os(CHILD).is_none() {
-        let status = std::process::Command::new(std::env::current_exe().unwrap())
-            .args(["--exact", TEST_NAME])
+        let output = std::process::Command::new(std::env::current_exe().unwrap())
+            .args(["--exact", TEST_NAME, "--nocapture"])
             .env(CHILD, "1")
-            .status()
+            .output()
             .unwrap();
-        assert!(status.success(), "isolated SaaS test process failed");
+        assert!(
+            output.status.success()
+                && String::from_utf8_lossy(&output.stdout)
+                    .contains("SAAS_MEMORY_STORE_GUARD_CHILD_PASSED"),
+            "isolated SaaS test process failed or ran zero tests:\n{}\n{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
         return;
     }
 
     crate::core::runtime::mode::lock_mode(crate::core::runtime::Mode::Saas).unwrap();
-    let tmp = tempfile::tempdir().unwrap();
-    let config = crate::memory::test_fixtures::config_in(&tmp);
-    let calls = Arc::new(AtomicUsize::new(0));
-    crate::memory::engine::install_test_engine(
-        &config.workspace_dir,
-        Arc::new(CountingEngine {
-            inner: ReferenceEngine::new(),
-            calls: calls.clone(),
-        }),
-    );
-    let item = StoreItem::learning(
-        "should not be stored",
-        LearningKind::Fact,
-        0.9,
-        MemoryMeta::default(),
-    );
-    let error = tokio::runtime::Builder::new_current_thread()
+    let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
-        .unwrap()
-        .block_on(crate::memory::ops::store_item(&config, item))
-        .unwrap_err();
+        .unwrap();
+    for root in [None, Some("not a namespace!"), Some("root")] {
+        let tmp = tempfile::tempdir().unwrap();
+        let mut config = crate::memory::test_fixtures::config_in(&tmp);
+        config.memory.root = root.map(str::to_string);
+        let calls = Arc::new(AtomicUsize::new(0));
+        crate::memory::engine::install_test_engine(
+            &config.workspace_dir,
+            Arc::new(CountingEngine {
+                inner: ReferenceEngine::new(),
+                calls: calls.clone(),
+            }),
+        );
+        let item = StoreItem::learning(
+            "should not be stored",
+            LearningKind::Fact,
+            0.9,
+            MemoryMeta::default(),
+        );
+        let error = runtime
+            .block_on(crate::memory::ops::store_item(&config, item))
+            .unwrap_err();
 
-    assert!(matches!(
-        error,
-        Error::InvalidRequest(message)
-            if message == "memory is unavailable: this agent has no valid memory root"
-    ));
-    assert_eq!(calls.load(Ordering::SeqCst), 0);
+        assert!(matches!(
+            error,
+            Error::InvalidRequest(message)
+                if message == "memory is unavailable: this agent has no valid memory root"
+        ));
+        assert_eq!(calls.load(Ordering::SeqCst), 0, "root: {root:?}");
+    }
+    println!("SAAS_MEMORY_STORE_GUARD_CHILD_PASSED");
 }
 
 struct CountingEngine {
