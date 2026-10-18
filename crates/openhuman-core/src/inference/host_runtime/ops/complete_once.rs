@@ -62,6 +62,16 @@ pub async fn complete_once(
     request: ModelRequest,
     budget: Option<&crate::agent::tinyagents::budget::ModelBudget>,
 ) -> Result<ModelResponse, String> {
+    complete_once_observed(endpoint, request, budget, None).await
+}
+
+/// Run one completion and observe the admitted provider invocation without content.
+pub async fn complete_once_observed(
+    endpoint: &CompletionEndpoint,
+    request: ModelRequest,
+    budget: Option<&crate::agent::tinyagents::budget::ModelBudget>,
+    observer: Option<std::sync::Arc<dyn tinyagents_harness::observability::PhysicalDispatchObserver>>,
+) -> Result<ModelResponse, String> {
     if !request.tools.is_empty() {
         return Err(
             "complete_once: tools are not supported on a stateless completion; use an agent turn"
@@ -100,6 +110,14 @@ pub async fn complete_once(
     );
 
     let model: std::sync::Arc<dyn ChatModel<()>> = std::sync::Arc::new(model);
+    let model: std::sync::Arc<dyn ChatModel<()>> = match observer {
+        Some(observer) => std::sync::Arc::new(
+            tinyagents_harness::observability::physical_dispatch::ObservedChatModel::new(
+                model, observer,
+            ),
+        ),
+        None => model,
+    };
     let model = match budget {
         Some(budget) => budget.wrap(model),
         None => model,
