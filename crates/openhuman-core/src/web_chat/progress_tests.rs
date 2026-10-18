@@ -129,7 +129,10 @@ async fn tool_call_completed_forwards_real_output_on_tool_result() {
     let event = tokio::time::timeout(std::time::Duration::from_secs(5), async {
         loop {
             match bus.recv().await {
-                Ok(ev) if ev.thread_id == "thread-out" && ev.event == "tool_result" => {
+                Ok(ev)
+                    if ev.context().thread_id == "thread-out"
+                        && ev.event_name() == "tool_result" =>
+                {
                     return ev;
                 }
                 Ok(_) => continue,
@@ -140,9 +143,15 @@ async fn tool_call_completed_forwards_real_output_on_tool_result() {
     .await
     .expect("tool_result within timeout");
 
-    assert_eq!(event.output.as_deref(), Some("real payload"));
-    assert_eq!(event.success, Some(true));
-    assert_eq!(event.tool_call_id.as_deref(), Some("call-1"));
+    assert!(matches!(
+        event.wire_event(),
+        crate::web_chat::WebChannelEvent::ToolResult {
+            output: Some(output),
+            success: Some(true),
+            tool_call_id: Some(call_id),
+            ..
+        } if output == "real payload" && call_id == "call-1"
+    ));
 }
 
 fn drain_test_config(tmp: &tempfile::TempDir) -> Config {
