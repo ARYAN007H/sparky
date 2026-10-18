@@ -58,13 +58,16 @@ parts.
 
 ## Provider preparation
 
-The provider decorator prepares a request copy. It selects native media only
-when the actual selected model is known to accept the modality **and** the
-underlying transport supports its MIME type and source representation. Unknown
-model capabilities do not imply multimodal support. Uploaded local references
-are read under policy and encoded for that request; the durable reference and
-original file remain unchanged. A native PDF follows this path without calling
-TinyDocs.
+TinyAgents' `MediaRequestModel` prepares a disposable request copy and owns
+generic media counting, bounded history selection, native conversion, and the
+default text/archive fallback. OpenHuman supplies the policy-authorized source
+resolver, host configuration and caches, image readout, and TinyDocs document
+extraction. It selects native media only when the actual selected model is
+known to accept the modality **and** the underlying transport supports its MIME
+type and source representation. Unknown model capabilities do not imply
+multimodal support. Uploaded local references are read under policy and encoded
+for that request; the durable reference and original file remain unchanged. A
+native PDF follows this path without calling TinyDocs.
 
 Factory-created models receive the scoped runtime configuration. Callers that
 inject a model use `SessionHostBuilder::chat_model_with_config` to bind the same
@@ -72,8 +75,9 @@ explicit configuration to staging, provider preparation and acting policy;
 builder workspace/action overrides apply to that configuration. Bare
 `chat_model` does not silently load operator configuration.
 
-For native PNG input, TinyAgents may provide a smaller losslessly recompressed
-derivative. Only IDAT compression/filtering can change: pixel format, hidden RGB
+When built with its optional PNG optimization feature, TinyAgents may provide a
+smaller losslessly recompressed derivative for native PNG input. Only IDAT
+compression/filtering can change: pixel format, hidden RGB
 under transparency, interlacing, and every other chunk must remain unchanged.
 Animated, malformed, oversized, or unprofitable PNGs retain their original
 bytes. Other formats are not recompressed by this helper.
