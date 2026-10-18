@@ -306,6 +306,7 @@ async fn reserved_channel_thread_id_survives_metadata_edit_without_prefix_collis
     config.workspace_dir = tmp.path().to_path_buf();
     config.memory.engine.clear();
     use_linked_channel_module(&mut config).await;
+    use_linked_channel_module(&mut config).await;
     let ctx = DispatchCtx::ambient();
     let target = store_channel_thread(
         ctx.clone(),
@@ -359,6 +360,7 @@ async fn offline_snapshot_scans_every_thread_and_message_page() {
     let mut config = Config::default();
     config.workspace_dir = tmp.path().to_path_buf();
     config.memory.engine.clear();
+    use_linked_channel_module(&mut config).await;
     use_linked_channel_module(&mut config).await;
     let workspace = config.workspace_dir.clone();
     let ctx = DispatchCtx::ambient();
@@ -559,5 +561,6 @@ async fn memory_off_clears_nothing() {
     let mut config = Config::default();
     config.workspace_dir = tmp.path().to_path_buf();
     config.memory.engine = String::new();
+    use_linked_channel_module(&mut config).await;
     assert_eq!(clear_channel_memory(&config, "discord").await.unwrap(), 0);
 }

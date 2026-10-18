@@ -43,7 +43,10 @@ async fn reserved_thread_matching_uses_module_identity_boundaries() {
 
     assert!(is_channel_thread_id(&base, &base));
     assert!(is_channel_thread_id(&format!("{base}/thread-1"), &base));
-    assert!(is_channel_thread_id(&format!("{base}#thread:1700.001"), &base));
+    assert!(is_channel_thread_id(
+        &format!("{base}#thread:1700.001"),
+        &base
+    ));
     assert!(!is_channel_thread_id(&format!("{base}suffix"), &base));
     assert!(!is_channel_thread_id(&neighboring_channel, &base));
     assert!(!is_channel_thread_id(&format!("prefix-{base}"), &base));
