@@ -310,8 +310,7 @@ async fn start_chat_inner(
                 "[web-channel] turn finished request_id={id} ok={}",
                 outcome.is_ok()
             );
-        },
-    ));
+    });
 
     match admission_rx.await.unwrap_or(Admission::Started) {
         Admission::Started => Ok(request_id),

@@ -477,8 +477,7 @@ impl EventSink<QueuedPayload> for WebEvents {
             request.thread_id
         );
         let shared = self.shared.clone();
-        tokio::spawn(crate::core::runtime::context::CoreContext::propagate(
-            async move {
+        ctx.clone().spawn(async move {
                 for item in items {
                     shared.forget_queued(&item.request_id);
                     if let Err(err) = super::ops::start_chat(
