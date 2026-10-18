@@ -59,6 +59,22 @@ impl DocumentConfigSource {
             .map_err(|error| anyhow!("no data key for the config document: {error}"))
     }
 
+    /// Read the current document revision for callers that intentionally
+    /// replace the latest value rather than saving a previously loaded config
+    /// snapshot. `Config::save` uses the revision captured at load time.
+    async fn current_version(&self) -> Result<Option<tinystoragedrivers::Version>> {
+        self.docs
+            .ensure_collection(&CollectionSpec::new(CONFIG_COLLECTION))
+            .await
+            .context("declare the config collection")?;
+        let stored = self
+            .docs
+            .get(CONFIG_COLLECTION, &document_id(self.scope.as_str())?)
+            .await
+            .context("read the config document")?;
+        Ok(stored.map(|versioned| versioned.version))
+    }
+
     /// The local file's text for its bootstrap tables.
     ///
     /// When the file read had to recover (non-UTF-8 content renamed aside, the
@@ -184,7 +200,8 @@ impl ConfigSource for DocumentConfigSource {
     }
 
     async fn write(&self, toml: &str) -> Result<()> {
-        self.write_versioned(toml, None).await?;
+        let current_version = self.current_version().await?;
+        self.write_versioned(toml, current_version).await?;
         Ok(())
     }
 
