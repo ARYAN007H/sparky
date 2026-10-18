@@ -3160,8 +3160,11 @@ async fn json_rpc_cron_manual_worker_survives_caller_cancel_on_published_tinyflo
     let first_job_id = first_job.id.clone();
     let first_context = Arc::clone(&default_context);
     let first = tokio::spawn(async move {
-        let dispatch = DispatchCtx::new(first_context);
-        openhuman_core::cron::ops::run_job_now(&dispatch, &first_config, &first_job_id).await
+        let dispatch = DispatchCtx::new(Arc::clone(&first_context));
+        CoreContext::scope(first_context, async move {
+            openhuman_core::cron::ops::run_job_now(&dispatch, &first_config, &first_job_id).await
+        })
+        .await
     });
     tokio::time::timeout(Duration::from_secs(10), scope_started_rx.recv())
         .await
@@ -3173,11 +3176,16 @@ async fn json_rpc_cron_manual_worker_survives_caller_cancel_on_published_tinyflo
         "cancel the core's synchronous Run Now waiter while its module worker remains active"
     );
 
-    let duplicate = openhuman_core::cron::ops::run_job_now(
-        &DispatchCtx::new(Arc::clone(&default_context)),
-        &config,
-        &first_job.id,
-    )
+    let duplicate_context = Arc::clone(&default_context);
+    let duplicate_job_id = first_job.id.clone();
+    let duplicate = CoreContext::scope(Arc::clone(&duplicate_context), async move {
+        openhuman_core::cron::ops::run_job_now(
+            &DispatchCtx::new(Arc::clone(&duplicate_context)),
+            &config,
+            &duplicate_job_id,
+        )
+        .await
+    })
     .await;
     let refusal = match duplicate {
         Err(error) => error,
@@ -3193,8 +3201,11 @@ async fn json_rpc_cron_manual_worker_survives_caller_cancel_on_published_tinyflo
     let second_job_id = second_job.id.clone();
     let second_context = Arc::clone(&agent_context);
     let mut second = tokio::spawn(async move {
-        let dispatch = DispatchCtx::new(second_context);
-        openhuman_core::cron::ops::run_job_now(&dispatch, &second_config, &second_job_id).await
+        let dispatch = DispatchCtx::new(Arc::clone(&second_context));
+        CoreContext::scope(second_context, async move {
+            openhuman_core::cron::ops::run_job_now(&dispatch, &second_config, &second_job_id).await
+        })
+        .await
     });
     tokio::select! {
         result = &mut second => panic!(
