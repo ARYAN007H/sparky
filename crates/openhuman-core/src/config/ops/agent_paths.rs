@@ -1,3 +1,13 @@
+//! Agent filesystem path configuration and directory helpers.
+
+use std::path::{Path, PathBuf};
+
+use crate::config::Config;
+use crate::core::Outcome;
+use crate::core::runtime::DispatchCtx;
+
+use super::agent::AgentPathsPatch;
+
 /// expand_tilde` delegates here so policy and config stay byte-for-byte
 /// consistent.
 pub fn expand_tilde(path: &str) -> String {
