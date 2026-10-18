@@ -78,6 +78,7 @@ impl ToolPolicyMiddleware {
             policy,
             tool_sets: host.tool_sets.clone(),
         });
+        let session_ceiling = Arc::new(SessionCeilingPolicy { host: host.clone() });
         let denial: DenialRenderer = Arc::new(|call, policy, decision| {
             let (action, reason) = match decision {
                 PolicyDecision::RequireApproval { reason } => {
@@ -87,6 +88,9 @@ impl ToolPolicyMiddleware {
                 PolicyDecision::Allow => ("allowed", ""),
             };
             tinytools::registry::denials::record(call.name.as_str(), policy, action, reason);
+            if policy == "openhuman_session_ceiling" {
+                return reason.to_owned();
+            }
             match decision {
                 PolicyDecision::RequireApproval { reason } => PolicyDenial::ApprovalRequired {
                     tool: &call.name,
@@ -105,6 +109,7 @@ impl ToolPolicyMiddleware {
         });
         let post_host = host.clone();
         let gate = ToolPolicyGateMiddleware::new(desktop_policy)
+            .with_session_ceiling(session_ceiling)
             .with_denial_renderer(denial)
             .with_post_gate(Arc::new(move |_ctx, call| {
                 post_host.render_skill_for_session(call)
@@ -350,6 +355,44 @@ impl ToolPolicyHostState {
             );
         }
         None
+    }
+}
+
+struct SessionCeilingPolicy {
+    host: Arc<ToolPolicyHostState>,
+}
+
+#[async_trait]
+impl ToolCallPolicy<OpenHumanRunContext> for SessionCeilingPolicy {
+    fn name(&self) -> &str {
+        "openhuman_session_ceiling"
+    }
+
+    async fn check(
+        &self,
+        ctx: &RunContext<OpenHumanRunContext>,
+        call: &TaToolCall,
+    ) -> PolicyDecision {
+        #[cfg(feature = "modules")]
+        let approvals_disabled = if let Some(tool) = self.host.resolve_tool(&call.name) {
+            crate::desktop::control::approvals_disabled_for(
+                &ctx.data.dispatch_ctx(),
+                tool.as_ref(),
+            )
+            .await
+        } else {
+            false
+        };
+        #[cfg(not(feature = "modules"))]
+        let approvals_disabled = false;
+
+        match self
+            .host
+            .channel_permission_block(call, approvals_disabled)
+        {
+            Some(reason) => PolicyDecision::deny(reason),
+            None => PolicyDecision::Allow,
+        }
     }
 }
 
