@@ -17,6 +17,8 @@ mod env_guard;
 mod linked_modules;
 #[path = "support/scripted_stack.rs"]
 mod scripted_stack;
+#[path = "support/tinyhumans_boot.rs"]
+mod tinyhumans_boot;
 use env_guard::EnvVarGuard;
 use scripted_stack::{
     assert_no_jsonrpc_error, current_user, lock_or_recover, text_completion, tool_calls_completion,
@@ -701,6 +703,10 @@ async fn boot_stack_with_config(extra_config: &str) -> Stack {
     // delegation tools and every `analyze_image`/`spawn_subagent` call becomes
     // "Unknown tool: …", making delegation tests vacuous.
     init_agent_def_registry();
+    // The managed `openhuman` chat provider (and the other hosted registries)
+    // are installed by the TinyHumans layer, not built into the core; without
+    // it every turn fails with `chat_error.inference`.
+    tinyhumans_boot::boot();
 
     let tmp = tempdir().expect("tempdir");
     let home = tmp.path().to_path_buf();
