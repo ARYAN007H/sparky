@@ -1,8 +1,9 @@
 //! Langfuse export for durable graph runs.
 //!
-//! The graph observations and flow trigger are serde-only bus contracts. The
-//! host that owns engine observations adapts them before calling this module;
-//! this exporter owns the graph trace identity, metadata, and OTLP projection.
+//! This exporter consumes generic TinyAgents graph observations plus the
+//! serde-only TinyFlows bus trigger value. The host that owns engine
+//! observations adapts them before calling this module; this exporter owns the
+//! graph trace identity, metadata, and OTLP projection.
 
 use std::time::Duration;
 

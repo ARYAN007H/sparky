@@ -3,6 +3,8 @@ use tinyagents_graph::observability::GraphObservation;
 use tinyagents_graph::stream::GraphEvent;
 use tinyagents_harness::ids::{EventId, GraphId, NodeId, RunId, ThreadId};
 use tinyflows_bus::runs::FlowRunTrigger;
+use wiremock::matchers::{body_json, header, method, path};
+use wiremock::{Mock, MockServer, ResponseTemplate};
 
 fn sample_observations(thread_id: &str) -> Vec<GraphObservation> {
     let node = NodeId::new("fetch");
@@ -262,4 +264,76 @@ async fn flow_export_skips_api_key_credentials() {
             .is_err(),
         "API-key credentials must not send a Langfuse export request"
     );
+}
+
+#[tokio::test]
+async fn shared_otlp_transport_posts_rendered_graph_json_with_attribution() {
+    let thread_id = "flow:flow-1:uuid-1";
+    let requests = graph_otlp_requests(
+        "Daily digest",
+        "flow-1",
+        thread_id,
+        "completed",
+        FlowRunTrigger::Rpc,
+        &sample_observations(thread_id),
+    )
+    .expect("render graph OTLP JSON");
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/otel/v1/traces"))
+        .and(header("authorization", "Bearer session-token"))
+        .and(header(
+            crate::backend::transport::plain::TEST_PRODUCT_HEADER,
+            crate::backend::transport::plain::TEST_PRODUCT_IDENTITY,
+        ))
+        .and(body_json(requests[0].clone()))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({})))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    let url = format!("{}/otel/v1/traces", server.uri());
+    super::super::otlp::push_otlp_json_requests(&url, "session-token", &requests)
+        .await
+        .expect("send graph request through shared authenticated transport");
+}
+
+#[tokio::test]
+async fn shared_otlp_transport_reports_http_and_partial_rejections() {
+    let thread_id = "flow:flow-1:uuid-1";
+    let requests = graph_otlp_requests(
+        "Daily digest",
+        "flow-1",
+        thread_id,
+        "completed",
+        FlowRunTrigger::Rpc,
+        &sample_observations(thread_id),
+    )
+    .expect("render graph OTLP JSON");
+
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/otel/v1/traces"))
+        .respond_with(ResponseTemplate::new(503))
+        .mount(&server)
+        .await;
+    let url = format!("{}/otel/v1/traces", server.uri());
+    let error = super::super::otlp::push_otlp_json_requests(&url, "token", &requests)
+        .await
+        .expect_err("HTTP failure must be reported");
+    assert!(error.contains("503"), "{error}");
+
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/otel/v1/traces"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "partialSuccess": { "rejectedSpans": 1, "errorMessage": "invalid span" }
+        })))
+        .mount(&server)
+        .await;
+    let url = format!("{}/otel/v1/traces", server.uri());
+    let error = super::super::otlp::push_otlp_json_requests(&url, "token", &requests)
+        .await
+        .expect_err("partial rejection must be reported");
+    assert!(error.contains("partially rejected"), "{error}");
 }
