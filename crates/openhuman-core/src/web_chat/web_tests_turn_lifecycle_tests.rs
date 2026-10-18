@@ -167,55 +167,26 @@ async fn a_refused_message_publishes_no_turn_events() {
 async fn a_turn_with_an_unavailable_local_provider_ends_in_one_classified_chat_error() {
     use crate::core::runtime::{context::CoreContext, DomainSet};
     let _serial = FORCED_ERROR_TEST_LOCK.lock().await;
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
-        .await
-        .expect("local inference endpoint");
-    let address = listener.local_addr().expect("local endpoint address");
-    let (request_tx, request_rx) = tokio::sync::oneshot::channel();
-    tokio::spawn(async move {
-        use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+    use wiremock::{Mock, MockServer, ResponseTemplate, matchers::{method, path}};
 
-        // Ollama's model warm-up is part of provider setup. Answer it so the
-        // actual chat-completions call reaches the mock and can fail there.
-        let (warmup, _) = listener.accept().await.expect("Ollama warm-up");
-        let mut warmup = BufReader::new(warmup);
-        let mut warmup_line = String::new();
-        warmup
-            .read_line(&mut warmup_line)
-            .await
-            .expect("read Ollama warm-up");
-        assert!(warmup_line.starts_with("POST /api/chat "), "{warmup_line}");
-        warmup
-            .get_mut()
-            .write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")
-            .await
-            .expect("answer Ollama warm-up");
-        drop(warmup);
-
-        let (inference, _) = listener.accept().await.expect("inference request");
-        let mut inference = BufReader::new(inference);
-        let mut request_line = String::new();
-        inference
-            .read_line(&mut request_line)
-            .await
-            .expect("read inference request");
-        let _ = request_tx.send(request_line);
-        let body = br#"{"error":{"message":"model is currently unavailable"}}"#;
-        let response = format!(
-            "HTTP/1.1 503 Service Unavailable\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
-            body.len()
-        );
-        inference
-            .get_mut()
-            .write_all(response.as_bytes())
-            .await
-            .expect("write inference error headers");
-        inference
-            .get_mut()
-            .write_all(body)
-            .await
-            .expect("write inference error body");
-    });
+    let server = MockServer::start().await;
+    // Ollama's model warm-up is part of provider setup. Keep it distinct from
+    // the OpenAI-compatible inference request so the test proves the latter
+    // reaches the configured provider before it receives a classified error.
+    Mock::given(method("POST"))
+        .and(path("/api/chat"))
+        .respond_with(ResponseTemplate::new(200))
+        .expect(1)
+        .mount(&server)
+        .await;
+    Mock::given(method("POST"))
+        .and(path("/v1/chat/completions"))
+        .respond_with(ResponseTemplate::new(503).set_body_json(serde_json::json!({
+            "error": { "message": "model is currently unavailable" }
+        })))
+        .expect_at_least(1)
+        .mount(&server)
+        .await;
     let tmp = tempfile::tempdir().expect("workspace");
     let mut config = crate::config::Config {
         workspace_dir: tmp.path().join("workspace"),
@@ -225,9 +196,9 @@ async fn a_turn_with_an_unavailable_local_provider_ends_in_one_classified_chat_e
     };
     // The managed default needs a host backend transport, which this
     // in-process test intentionally does not install. Route the turn to the
-    // local mock listener instead so it exercises an actual provider failure.
+    // local mock server instead so it exercises an actual provider failure.
     config.chat_provider = Some("ollama:qwen3:4b-instruct".to_owned());
-    config.local_ai.base_url = Some(format!("http://{address}"));
+    config.local_ai.base_url = Some(server.uri());
     std::fs::create_dir_all(&config.workspace_dir).expect("workspace dir");
     let ctx = DispatchCtx::new(CoreContext::for_test_with_config(DomainSet::full(), config));
     let thread_id = "lifecycle-real-turn";
@@ -247,15 +218,21 @@ async fn a_turn_with_an_unavailable_local_provider_ends_in_one_classified_chat_e
     .await
     .expect("the message is accepted");
 
-    let request = timeout(Duration::from_secs(1), request_rx)
-        .await
-        .expect("the local provider received the inference request")
-        .expect("inference request capture");
-    assert!(
-        request.starts_with("POST /v1/chat/completions "),
-        "{request}"
-    );
     let error = wait_for_event(&mut rx, &request_id, "chat_error").await;
+    let requests = server.received_requests().await.expect("captured requests");
+    assert!(
+        requests.iter().any(|request| {
+            request.method == "POST"
+                && request.url.path() == "/v1/chat/completions"
+                && serde_json::from_slice::<serde_json::Value>(&request.body)
+                    .ok()
+                    .and_then(|body| body.get("model").cloned())
+                    .and_then(|model| model.as_str().map(str::to_owned))
+                    .as_deref()
+                    == Some("qwen3:4b-instruct")
+        }),
+        "the intended local inference request was not observed: {requests:?}"
+    );
     assert_eq!(
         error.error_type.as_deref(),
         Some("provider_unavailable"),
