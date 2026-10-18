@@ -643,7 +643,7 @@ async fn unsupported_media_urls_and_oversized_inline_sources_fail_before_inferen
 
     // A valid base64 body just over the decoded byte limit must also fail
     // before legacy materialization or inference.
-    let decoded_oversize_len = ((1024 * 1024 + 1 + 2) / 3) * 4;
+    let decoded_oversize_len = (1024_usize * 1024 + 1).div_ceil(3) * 4;
     let decoded_oversized = user_request(vec![ContentBlock::Document(MediaRef::Base64 {
         data: "A".repeat(decoded_oversize_len),
         media_type: "text/plain".into(),

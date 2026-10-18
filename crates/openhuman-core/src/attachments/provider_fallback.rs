@@ -36,9 +36,9 @@ impl AttachmentModel {
                     "[attachments] document extraction skipped: component 'documents' disabled"
                 );
                 cacheable = false;
-                text.push_str(&format!(
-                        "Document extraction is disabled ([components] documents = false); original remains available."
-                    ));
+                text.push_str(
+                    "Document extraction is disabled ([components] documents = false); original remains available.",
+                );
             } else if let Some(format) = format {
                 let (_, _, limit) = self.config.multimodal_files.effective_limits();
                 let mut spec = tinydocs_bus::ExtractDocumentSpec::new(format);
