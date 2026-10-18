@@ -55,8 +55,7 @@ impl Driver {
     }
 
     /// The storage URL for this driver, using `dir` for the on-disk drivers.
-    /// `None` when the driver cannot run here: not compiled in, or MongoDB
-    /// without [`MONGO_URL_VAR`].
+    /// `None` when the driver is not compiled in.
     pub fn url(self, dir: &std::path::Path) -> Option<String> {
         if !self.compiled_in() {
             return None;
@@ -66,17 +65,6 @@ impl Driver {
             Driver::Sqlite => Some(format!("sqlite:{}", dir.join("sqlite").display())),
         }
     }
-}
-
-/// A short unique token for database and scope names.
-fn uuid_like() -> String {
-    use std::time::{SystemTime, UNIX_EPOCH};
-    static COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
-    let nanos = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_or(0, |d| d.as_nanos());
-    let n = COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-    format!("{nanos:x}_{}_{n}", std::process::id())
 }
 
 /// The slot is process-wide, so cases of one binary take turns.
@@ -106,11 +94,7 @@ impl Case {
             eprintln!(
                 "skipped {}: {}",
                 driver.name(),
-                if driver.compiled_in() {
-                    format!("{MONGO_URL_VAR} is not set")
-                } else {
-                    "driver not compiled in".to_string()
-                }
+                "driver not compiled in"
             );
             return None;
         };
@@ -156,13 +140,13 @@ pub struct UrlCase {
 /// Runs a body that only needs the driver's URL (`driver_cases!(url body)`).
 pub fn run_url(driver: Driver, body: fn(UrlCase)) {
     // Same lock as the in-process cases: the spawned cores and this process
-    // share the environment and, for MongoDB, one server.
+    // share the process-wide test setup.
     let _lock = SLOT_LOCK
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner);
     let data_dir = tempfile::tempdir().expect("temp dir");
     let Some(url) = driver.url(data_dir.path()) else {
-        eprintln!("skipped {}: {MONGO_URL_VAR} is not set", driver.name());
+        eprintln!("skipped {}: driver not compiled in", driver.name());
         return;
     };
     body(UrlCase {
@@ -198,9 +182,8 @@ where
 }
 
 /// Declares one test case per driver for each `body`, in a module named after
-/// the driver (`memory::body`, `sqlite::body`, ...). Drivers the build lacks
-/// are not declared at all; MongoDB is declared when compiled in and skips
-/// itself without `TSD_MONGO_URL`.
+/// the driver (`memory`, `sqlite`). SQLite is declared only when its feature
+/// is compiled in.
 #[allow(unused_macros)]
 macro_rules! driver_cases {
     (sync $($body:ident),+ $(,)?) => {
@@ -231,30 +214,6 @@ macro_rules! driver_cases {
                 fn $body() {
                     $crate::storage_drivers::$runner(
                         $crate::storage_drivers::Driver::Sqlite,
-                        super::$body,
-                    );
-                }
-            )+
-        }
-        #[cfg(feature = "storage-file")]
-        mod file {
-            $(
-                #[test]
-                fn $body() {
-                    $crate::storage_drivers::$runner(
-                        $crate::storage_drivers::Driver::File,
-                        super::$body,
-                    );
-                }
-            )+
-        }
-        #[cfg(feature = "storage-mongodb")]
-        mod mongodb {
-            $(
-                #[test]
-                fn $body() {
-                    $crate::storage_drivers::$runner(
-                        $crate::storage_drivers::Driver::Mongo,
                         super::$body,
                     );
                 }
