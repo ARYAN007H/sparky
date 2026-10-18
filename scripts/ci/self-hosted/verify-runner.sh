@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 # Fail closed on stale guests. Never install or silently select another compiler.
+# `image` checks only the pinned digest against CI_IMAGE_BUILD_INFO (default
+# /etc/ohci/build-info). With no argument, also check preinstalled tools and
+# signed-cache settings, then append masked configuration to required GITHUB_ENV.
 set -euo pipefail
 root="$(cd "$(dirname "$0")/../../.." && pwd)"
 image="$(cat "$root/scripts/ci/self-hosted/guest-image.txt")"

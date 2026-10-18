@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
 # One durable JUnit report and count inventory per instrumented configuration.
+# Usage: bash scripts/ci/nextest-coverage.sh <suite> <cargo command...>
+# Run from the repository root. The command must contain a `nextest` argument.
+# NEXTEST_REPORT_DIR selects durable <suite>.toml/.xml/.json outputs. Optional
+# NEXTEST_EXPECTED_TARGETS and NEXTEST_EXPECTED_INVENTORY name the target-list
+# and nextest-list JSON inputs accepted by nextest-report.mjs.
 set -euo pipefail
 suite="$1"
 shift

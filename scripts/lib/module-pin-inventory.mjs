@@ -25,7 +25,10 @@ export const PIN_MAP = {
   tinyflows: { submodule: "vendor/tinyflows" },
 };
 
-/** Return each module repository needed by the pin gate, in stable order. */
+/**
+ * Return sorted, unique repository paths needed by the pin gate. Providers use
+ * builtAgainst; other records use submodule or sharesWith. Omit absent paths.
+ */
 export function modulePinRepositories(pinMap = PIN_MAP) {
   return [
     ...new Set(

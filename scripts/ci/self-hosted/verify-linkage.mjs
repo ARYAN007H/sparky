@@ -1,10 +1,14 @@
 #!/usr/bin/env node
 // Inspect real lane outputs, rather than assuming a linker flag took effect.
+// CLI: run from the repository root with an optional JSON output path (default
+// ci-out/linkage.json). Require one ordinary and one coverage ELF in the private
+// target trees; this samples real artifacts rather than auditing every binary.
 import { execFileSync } from "node:child_process";
 import { readdirSync, statSync, mkdirSync, writeFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { pathToFileURL } from "node:url";
 
+/** Classify readelf section-table and .comment output using lane proof markers. */
 export function classifyElf(sections, comments) {
   return {
     executable: /\s\.interp\s/.test(sections),
@@ -13,6 +17,11 @@ export function classifyElf(sections, comments) {
   };
 }
 
+/**
+ * Find the first readable debug deps/example ELF of the requested coverage kind.
+ * Skip unreadable/non-ELF candidates; throw if a matching ELF lacks mold metadata
+ * or no candidate exists. Directory traversal errors also propagate.
+ */
 export function findProof(root, instrumented) {
   const visit = (directory) => {
     for (const entry of readdirSync(directory, { withFileTypes: true })) {

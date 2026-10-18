@@ -1,5 +1,10 @@
 #!/usr/bin/env node
 // Consume nextest's JUnit vocabulary; retain counts before checking inventory.
+// Usage: node scripts/ci/nextest-report.mjs <junit.xml> <counts.json>
+//        [newline-delimited-targets.txt] [nextest-list.json]
+// NEXTEST_ELAPSED_SECONDS supplies the recorded command duration. Exit 1 means
+// missing/empty reporting or an unmet inventory expectation; test failures are
+// recorded here, while the calling wrapper preserves the test runner's status.
 import fs from "node:fs";
 
 const [report, output, expectedFile, inventoryFile] = process.argv.slice(2);
