@@ -351,7 +351,7 @@ fn valid_saas_identity_clamps_memory_operations_in_an_isolated_process() {
             let service_namespace: tinymemory_api::Namespace =
                 "team:acme/service:newsletter".parse().unwrap();
             let source_id = "src-profile-cleanup";
-            for namespace in ["team:acme", "team:acme/service:newsletter"] {
+            for namespace in ["team:acme", "team:other", "team:acme/service:newsletter"] {
                 engine
                     .store(StoreItem::Document {
                         title: Some("source cleanup fixture".into()),
@@ -388,10 +388,12 @@ fn valid_saas_identity_clamps_memory_operations_in_an_isolated_process() {
                 .await
                 .unwrap()
                 .items;
-            assert!(service_source_items.is_empty());
+            // No explicit reach uses the engine's ordinary root subtree,
+            // which leaves the service sandbox intact.
+            assert_eq!(service_source_items.len(), 1);
 
             let thread_id = "thread-profile-cleanup";
-            for namespace in ["team:acme", "team:acme/service:newsletter"] {
+            for namespace in ["team:acme", "team:other", "team:acme/service:newsletter"] {
                 engine
                     .store(StoreItem::Conversation {
                         turns: vec![Turn::new(Role::User, "thread cleanup fixture")],
@@ -422,7 +424,8 @@ fn valid_saas_identity_clamps_memory_operations_in_an_isolated_process() {
                 .await
                 .unwrap()
                 .items;
-            assert!(service_thread_items.is_empty());
+            // Thread cleanup retains the same root-subtree boundary.
+            assert_eq!(service_thread_items.len(), 1);
         });
     println!("SAAS_MEMORY_CLAMP_CHILD_PASSED");
 }
