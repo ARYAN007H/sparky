@@ -6,8 +6,9 @@ use std::sync::{
 };
 use tinymemory_api::conformance::ReferenceEngine;
 use tinymemory_api::{
-    EngineDescriptor, FetchRequest, ForgetReport, ForgetTarget, ListRequest, MemoryEngine,
-    MemoryMeta, MetaFilter, Reach, RecallRequest, StoreItem, StoreReceipt,
+    DocumentBody, EngineDescriptor, FetchRequest, ForgetReport, ForgetTarget, ItemKind,
+    ListRequest, MemoryEngine, MemoryMeta, MetaFilter, Reach, RecallRequest, Role, SourceKind,
+    SourceRef, StoreItem, StoreReceipt, Turn,
 };
 
 fn learn_params(text: &str) -> LearnParams {
@@ -346,6 +347,82 @@ fn valid_saas_identity_clamps_memory_operations_in_an_isolated_process() {
                 .unwrap()
                 .items;
             assert!(foreign_items.iter().any(|item| item.id.0 == foreign));
+
+            let service_namespace: tinymemory_api::Namespace =
+                "team:acme/service:newsletter".parse().unwrap();
+            let source_id = "src-profile-cleanup";
+            for namespace in ["team:acme", "team:acme/service:newsletter"] {
+                engine
+                    .store(StoreItem::Document {
+                        title: Some("source cleanup fixture".into()),
+                        body: DocumentBody::Text("source cleanup fixture".into()),
+                        mime: None,
+                        meta: MemoryMeta {
+                            namespace: namespace.parse().unwrap(),
+                            source: SourceRef {
+                                kind: SourceKind::Folder,
+                                id: Some(source_id.into()),
+                            },
+                            ..MemoryMeta::default()
+                        },
+                    })
+                    .await
+                    .unwrap();
+            }
+            assert_eq!(
+                crate::memory::sources::forget_items(&config, source_id)
+                    .await
+                    .unwrap(),
+                2
+            );
+            let service_source_items = engine
+                .list(ListRequest {
+                    filter: MetaFilter {
+                        reach: Some(Reach::exact(service_namespace.clone())),
+                        source_id: Some(source_id.into()),
+                        ..MetaFilter::default()
+                    },
+                    limit: 20,
+                    cursor: None,
+                })
+                .await
+                .unwrap()
+                .items;
+            assert!(service_source_items.is_empty());
+
+            let thread_id = "thread-profile-cleanup";
+            for namespace in ["team:acme", "team:acme/service:newsletter"] {
+                engine
+                    .store(StoreItem::Conversation {
+                        turns: vec![Turn::new(Role::User, "thread cleanup fixture")],
+                        meta: MemoryMeta {
+                            namespace: namespace.parse().unwrap(),
+                            thread_id: Some(thread_id.into()),
+                            ..MemoryMeta::default()
+                        },
+                    })
+                    .await
+                    .unwrap();
+            }
+            assert_eq!(
+                crate::memory::deletion::forget_thread(&config, thread_id).await,
+                2
+            );
+            let service_thread_items = engine
+                .list(ListRequest {
+                    filter: MetaFilter {
+                        reach: Some(Reach::exact(service_namespace)),
+                        thread_id: Some(thread_id.into()),
+                        kinds: vec![ItemKind::Conversation],
+                        ..MetaFilter::default()
+                    },
+                    limit: 20,
+                    cursor: None,
+                })
+                .await
+                .unwrap()
+                .items;
+            assert!(service_thread_items.is_empty());
         });
     println!("SAAS_MEMORY_CLAMP_CHILD_PASSED");
 }
