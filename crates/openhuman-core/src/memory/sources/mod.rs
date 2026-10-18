@@ -178,7 +178,7 @@ pub async fn forget_items(config: &Config, id: &str) -> Result<usize> {
         Ok(report) => report,
         Err(error) => {
             crate::memory::deletion::enqueue(&config.workspace_dir, pending());
-            return Err(error.into());
+            return Err(error);
         }
     };
     tracing::debug!(id = %id, forgotten = report.forgotten, "[memory:sources] items forgotten");

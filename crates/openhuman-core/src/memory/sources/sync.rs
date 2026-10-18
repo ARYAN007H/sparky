@@ -49,7 +49,7 @@ fn host_error(error: SyncError) -> Error {
         SyncError::Read(message) => {
             Error::Engine(format!("reading the source failed: {message}"))
         }
-        SyncError::Engine(error) => error.into(),
+        SyncError::Engine(error) => error,
     }
 }
 
