@@ -20,7 +20,7 @@ use tinymemory_api::{
 };
 use tinymemory_tools::confine::{Confinement, Policy};
 use tinymemory_tools::ops::{
-    ExploreOptions, FetchOptions, LearningOptions, ListOptions, MemoryOps, RecallOptions,
+    FetchOptions, LearningOptions, ListOptions, MemoryOps, RecallOptions,
 };
 
 use crate::config::Config;
