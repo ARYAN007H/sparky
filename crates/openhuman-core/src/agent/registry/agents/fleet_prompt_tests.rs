@@ -73,7 +73,6 @@ fn render(def: &AgentDefinition, definitions: &[AgentDefinition]) -> String {
         personality_roster: vec![],
         agents_md_global: None,
         agents_md_local: None,
-        flow_archetype_text: None,
     };
     let body = build(&ctx).unwrap_or_else(|e| panic!("`{}` prompt failed to build: {e}", def.id));
     assert!(
