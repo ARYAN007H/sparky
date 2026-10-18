@@ -1001,13 +1001,6 @@
     "occurrence": 1
   },
   {
-    "rule": "bare-spawn",
-    "path": "crates/openhuman-core/src/voice/always_on/lock_watcher.rs",
-    "line": 15,
-    "text": "tokio::spawn(async move {",
-    "occurrence": 1
-  },
-  {
     "rule": "ambient-config",
     "path": "crates/openhuman-core/src/voice/cli.rs",
     "line": 79,
