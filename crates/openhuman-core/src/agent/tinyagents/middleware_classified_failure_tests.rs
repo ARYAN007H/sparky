@@ -230,13 +230,15 @@ async fn shell_timeout_nudges_once_then_halts_on_second() {
     let handle = SteeringHandle::allow_all();
     let slot = std::sync::Arc::new(std::sync::Mutex::new(None));
     let mw = RepeatedToolFailureMiddleware::new(handle.clone(), 3, slot.clone());
+    let mut context = ctx();
     let run = |id: &'static str, command: &'static str| {
         let mw = &mw;
+        let context = &mut context;
         async move {
             let mut call = TaToolCall::new(id, "shell", serde_json::json!({ "command": command }));
-            mw.before_tool(&mut ctx(), &(), &mut call).await.unwrap();
+            mw.before_tool(context, &(), &mut call).await.unwrap();
             let mut result = failing_result("shell", "Command timed out after 60s and was killed");
-            mw.after_tool(&mut ctx(), &(), &invocation(id, "shell"), &mut result)
+            mw.after_tool(context, &(), &invocation(id, "shell"), &mut result)
                 .await
                 .unwrap();
         }
@@ -245,7 +247,7 @@ async fn shell_timeout_nudges_once_then_halts_on_second() {
     run("sh-1", "for d in a.io b.io c.io; do whois $d; done").await;
     assert_eq!(drain_pause_count(&handle), 0, "first timeout must not halt");
     assert!(slot.lock().unwrap().is_none());
-    let nudges = mw.take_pending_nudges();
+    let nudges = drain_nudge_messages(&mw, &mut context).await;
     assert_eq!(nudges.len(), 1, "{nudges:?}");
     assert!(nudges[0].contains("timed out"), "{nudges:?}");
     assert!(nudges[0].contains("smaller, bounded"), "{nudges:?}");
@@ -270,18 +272,20 @@ async fn a_refused_integration_steers_the_model_off_it_instead_of_ending_the_run
     let slot = std::sync::Arc::new(std::sync::Mutex::new(None));
     let mw = RepeatedToolFailureMiddleware::new(handle.clone(), 3, slot.clone());
     let refused = "Web search failed: search ExecuteTool failed: ai.tinyhumans.tinybus.Error.Failed: provider request failed: provider returned HTTP 401";
+    let mut context = ctx();
     let run = |id: &'static str, query: &'static str| {
         let mw = &mw;
+        let context = &mut context;
         async move {
             let mut call = TaToolCall::new(
                 id,
                 "web_search_tool",
                 serde_json::json!({ "query": query, "max_results": 10 }),
             );
-            mw.before_tool(&mut ctx(), &(), &mut call).await.unwrap();
+            mw.before_tool(context, &(), &mut call).await.unwrap();
             let mut result = failing_result("web_search_tool", refused);
             mw.after_tool(
-                &mut ctx(),
+                context,
                 &(),
                 &invocation(id, "web_search_tool"),
                 &mut result,
@@ -298,7 +302,7 @@ async fn a_refused_integration_steers_the_model_off_it_instead_of_ending_the_run
         "a refused connector must not halt"
     );
     assert!(slot.lock().unwrap().is_none(), "no halt summary");
-    let nudges = mw.take_pending_nudges();
+    let nudges = drain_nudge_messages(&mw, &mut context).await;
     assert_eq!(nudges.len(), 1, "{nudges:?}");
     assert!(
         nudges[0].contains("`web_search_tool` tool cannot be used"),
