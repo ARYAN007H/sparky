@@ -168,12 +168,18 @@ async fn a_turn_whose_provider_is_unreachable_ends_in_one_classified_chat_error(
     use crate::core::runtime::{context::CoreContext, DomainSet};
     let _serial = FORCED_ERROR_TEST_LOCK.lock().await;
     let tmp = tempfile::tempdir().expect("workspace");
-    let config = crate::config::Config {
+    let mut config = crate::config::Config {
         workspace_dir: tmp.path().join("workspace"),
         action_dir: tmp.path().join("workspace"),
         config_path: tmp.path().join("config.toml"),
         ..Default::default()
     };
+    // Fail against a deterministic local endpoint. The managed default needs
+    // a host backend transport, which this in-process test intentionally does
+    // not install.
+    config.chat_provider = Some("openhuman".to_owned());
+    config.default_model = Some("ollama:qwen3:4b-instruct".to_owned());
+    config.local_ai.base_url = Some("http://127.0.0.1:1".to_owned());
     std::fs::create_dir_all(&config.workspace_dir).expect("workspace dir");
     let ctx = DispatchCtx::new(CoreContext::for_test_with_config(
         DomainSet::full(),
