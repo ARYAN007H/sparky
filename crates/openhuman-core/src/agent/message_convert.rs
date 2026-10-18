@@ -19,14 +19,13 @@
 use tinyinference_llm::message::{ContentBlock, ImageRef, MediaRef, Message, UserMessage};
 use tinyinference_llm::tool::ToolCall as TaToolCall;
 use tinytools_agent::dialect::{
-    DialectMessage, DialectRole, ToolDialect, ToolResultEntry, TranscriptEntry,
+    DialectMessage, DialectRole, ToolDialect, TranscriptEntry,
 };
-
-use tinyagents_runtime::transcript::reasoning_from_content;
 #[cfg(test)]
 use tinyagents_runtime::transcript::{
     message_to_display_transcript as message_to_chat_message,
-    message_to_native_transcript as message_to_native_chat_message, REASONING_EXT_KEY,
+    message_to_native_transcript as message_to_native_chat_message, reasoning_from_content,
+    REASONING_EXT_KEY,
 };
 use tinyagents_session::transcript::TranscriptMessage;
 
@@ -297,12 +296,6 @@ pub(crate) fn messages_to_history(messages: &[Message]) -> Vec<TranscriptMessage
         .collect()
 }
 
-// The product dialect stores provider reasoning in passthrough metadata.
-fn reasoning_extra_metadata(content: &[ContentBlock]) -> Option<serde_json::Value> {
-    reasoning_from_content(content)
-        .map(|reasoning| serde_json::json!({ tinyagents_runtime::transcript::REASONING_EXT_KEY: reasoning }))
-}
-
 /// Convert a harness transcript into typed dialect entries, preserving
 /// assistant tool-call structure (`AssistantToolCalls`) and tool results
 /// (`ToolResults`) instead of flattening tool calls to text.
@@ -311,66 +304,7 @@ fn reasoning_extra_metadata(content: &[ContentBlock]) -> Option<serde_json::Valu
 /// shape a single assistant tool-call round produces), matching the legacy
 /// `turn_engine_adapter` persistence.
 pub(crate) fn messages_to_conversation(messages: &[Message]) -> Vec<TranscriptEntry> {
-    let mut out: Vec<TranscriptEntry> = Vec::new();
-    let mut pending: Vec<ToolResultEntry> = Vec::new();
-
-    fn flush(out: &mut Vec<TranscriptEntry>, pending: &mut Vec<ToolResultEntry>) {
-        if !pending.is_empty() {
-            out.push(TranscriptEntry::ToolResults(std::mem::take(pending)));
-        }
-    }
-    fn chat(
-        role: DialectRole,
-        content: String,
-        extra_metadata: Option<serde_json::Value>,
-    ) -> TranscriptEntry {
-        TranscriptEntry::Chat(DialectMessage::new(role, content).with_metadata(extra_metadata))
-    }
-
-    for msg in messages {
-        match msg {
-            Message::Tool(t) => {
-                pending.push(ToolResultEntry {
-                    tool_call_id: t.tool_call_id.clone(),
-                    content: msg.text(),
-                    trusted_verbatim: false,
-                });
-            }
-            Message::System(_) => {
-                flush(&mut out, &mut pending);
-                out.push(chat(DialectRole::System, msg.text(), None));
-            }
-            Message::User(_) => {
-                flush(&mut out, &mut pending);
-                out.push(chat(DialectRole::User, msg.text(), None));
-            }
-            Message::Assistant(a) => {
-                flush(&mut out, &mut pending);
-                if a.tool_calls.is_empty() {
-                    out.push(chat(
-                        DialectRole::Assistant,
-                        msg.text(),
-                        reasoning_extra_metadata(&a.content),
-                    ));
-                } else {
-                    let text = msg.text();
-                    out.push(TranscriptEntry::AssistantToolCalls {
-                        text: (!text.is_empty()).then_some(text),
-                        tool_calls: a.tool_calls.iter().map(ta_call_to_oh_call).collect(),
-                        reasoning_content: reasoning_from_content(&a.content),
-                        extra_metadata: reasoning_extra_metadata(&a.content),
-                    });
-                }
-            }
-            // Host-side out-of-band record; not part of the persisted
-            // conversation and never provider input.
-            Message::Custom(c) => {
-                log::trace!("[message_convert] dropping custom message kind={}", c.kind);
-            }
-        }
-    }
-    flush(&mut out, &mut pending);
-    out
+    tinyagents_runtime::transcript::messages_to_conversation(messages)
 }
 
 /// Presentation projection of a runtime session's messages, as returned by
