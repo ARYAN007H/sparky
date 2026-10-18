@@ -70,13 +70,14 @@ fn trace_context_keeps_request_session_group_and_transport_client_distinct() {
             },
         },
     ];
-    let mut collector = tinyagents_harness::observability::trace_export::collector::SpanCollector::new(
-        context.with_run_lineage(
-            Some(run_id.as_str().into()),
-            None,
-            Some(run_id.as_str().into()),
-        ),
-    );
+    let mut collector =
+        tinyagents_harness::observability::trace_export::collector::SpanCollector::new(
+            context.with_run_lineage(
+                Some(run_id.as_str().into()),
+                None,
+                Some(run_id.as_str().into()),
+            ),
+        );
     for observation in &observations {
         collector.record(observation);
     }
@@ -100,9 +101,13 @@ fn trace_context_keeps_request_session_group_and_transport_client_distinct() {
         tinyagents_harness::observability::trace_export::serialize::SpanEnvelope::Otel,
         collector.spans(),
     );
-    let serialized_root: serde_json::Value = serde_json::from_str(serialized.lines().next().unwrap())
-        .expect("host-built context serializes as valid trace output");
-    assert_eq!(serialized_root["attributes"]["client.id"], "socket-client-7");
+    let serialized_root: serde_json::Value =
+        serde_json::from_str(serialized.lines().next().unwrap())
+            .expect("host-built context serializes as valid trace output");
+    assert_eq!(
+        serialized_root["attributes"]["client.id"],
+        "socket-client-7"
+    );
     assert_eq!(serialized_root["attributes"]["agent.id"], "writer");
     assert_eq!(serialized_root["attributes"]["run.type"], "autonomous_task");
 }

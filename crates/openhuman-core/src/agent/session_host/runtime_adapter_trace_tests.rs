@@ -52,8 +52,8 @@ impl ChatModel<()> for GatedRepairModel {
 async fn cancellation_during_required_output_repair_finalizes_native_run() {
     use tinyagents_harness::events::AgentEvent;
     use tinyagents_harness::ids::ExecutionStatus;
-    use tinyagents_harness::HarnessStatusStore;
     use tinyagents_harness::terminal::TerminalReason;
+    use tinyagents_harness::HarnessStatusStore;
 
     let scratch = tempfile::tempdir().expect("isolated workspace");
     let workspace = scratch.path().join("workspace");

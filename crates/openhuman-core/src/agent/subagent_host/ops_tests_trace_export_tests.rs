@@ -236,11 +236,12 @@ async fn prepared_child_run_is_exported_from_its_native_journal_lineage() {
     );
     let child_root = child_spans
         .iter()
-        .find(|span| {
-            span.kind == tinyagents_harness::observability::trace_export::SpanKind::Turn
-        })
+        .find(|span| span.kind == tinyagents_harness::observability::trace_export::SpanKind::Turn)
         .expect("the real durable child journal builds a distinct child root trace");
-    assert_eq!(child_root.trace_id, format!("subagent:{}", child_run_id.as_str()));
+    assert_eq!(
+        child_root.trace_id,
+        format!("subagent:{}", child_run_id.as_str())
+    );
     assert_eq!(child_root.attributes["thread.id"], "native-trace-thread");
     assert_eq!(child_root.attributes["agent.id"], "writer");
     assert_eq!(child_root.attributes["channel.source"], "subagent");

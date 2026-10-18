@@ -6,10 +6,10 @@ use crate::config::Config;
 
 use crate::config::schema::AgentTracingBackend;
 use std::time::Duration;
-use tinyagents_harness::observability::AgentObservation;
 use tinyagents_harness::observability::trace_export::otlp::otlp_requests;
 use tinyagents_harness::observability::trace_export::serialize::{spans_to_ndjson, SpanEnvelope};
 use tinyagents_harness::observability::trace_export::{TraceContext, TraceSpan};
+use tinyagents_harness::observability::AgentObservation;
 use tinyagents_harness::observability::LangfuseClient;
 
 const PUSH_TIMEOUT: Duration = Duration::from_secs(10);

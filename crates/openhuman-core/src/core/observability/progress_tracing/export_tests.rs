@@ -60,10 +60,12 @@ fn local_export_appends_valid_selected_ndjson_envelopes() {
         .map(|line| serde_json::from_str::<serde_json::Value>(line).expect("valid NDJSON"))
         .collect();
     assert_eq!(lines.len(), 2, "each call appends exactly one span line");
-    assert_eq!(lines[0]["trace_id"], "writer-trace", "OTel envelope selected");
     assert_eq!(
-        lines[1]["body"]["trace_id"],
-        "writer-trace",
+        lines[0]["trace_id"], "writer-trace",
+        "OTel envelope selected"
+    );
+    assert_eq!(
+        lines[1]["body"]["trace_id"], "writer-trace",
         "Langfuse envelope selected"
     );
 }
@@ -78,7 +80,10 @@ fn disabled_local_export_and_log_only_export_are_safe() {
         ..Default::default()
     };
     export_spans(&config, &[file_fixture_span()]);
-    assert!(!path.exists(), "disabled local tracing has no filesystem effect");
+    assert!(
+        !path.exists(),
+        "disabled local tracing has no filesystem effect"
+    );
 
     let config = AgentTracingConfig {
         enabled: true,
@@ -124,7 +129,9 @@ async fn child_export_obeys_sharing_and_readiness_gates_before_reading() {
 
     config.observability.share_usage_data = true;
     config.api_url = Some("https://external.invalid/api".into());
-    assert!(!crate::backend::telemetry::langfuse::journal_push_ready(&config));
+    assert!(!crate::backend::telemetry::langfuse::journal_push_ready(
+        &config
+    ));
     crate::core::observability::progress_tracing::export_subagent_journal_trace(
         &dispatch,
         &config,
