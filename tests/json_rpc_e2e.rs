@@ -2670,6 +2670,448 @@ async fn json_rpc_cron_add_run_list_round_trip_over_the_tinyflows_module_inner()
 }
 
 #[test]
+fn json_rpc_cron_manual_worker_survives_caller_cancel_on_published_tinyflows() {
+    const CHILD_ENV: &str = "OPENHUMAN_CRON_PUBLISHED_MODULE_E2E_CHILD";
+    if std::env::var_os(CHILD_ENV).is_none() {
+        let output = std::process::Command::new(std::env::current_exe().expect("test executable"))
+            .args([
+                "--exact",
+                "json_rpc_cron_manual_worker_survives_caller_cancel_on_published_tinyflows",
+                "--nocapture",
+                "--test-threads=1",
+            ])
+            .env(CHILD_ENV, "1")
+            .output()
+            .expect("run isolated published TinyFlows host E2E child");
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        print!("{stdout}");
+        eprint!("{stderr}");
+        let child_output = format!("{stdout}{stderr}");
+        assert!(
+            output.status.success(),
+            "published TinyFlows host E2E child failed:\n{child_output}"
+        );
+        assert!(
+            child_output.contains("running 1 test")
+                && child_output.contains(
+                    "test json_rpc_cron_manual_worker_survives_caller_cancel_on_published_tinyflows ... ok"
+                )
+                && child_output.contains("1 passed; 0 failed"),
+            "the child must prove exactly one test ran and passed:\n{child_output}"
+        );
+        return;
+    }
+
+    run_json_rpc_e2e_on_agent_stack(
+        "json_rpc_cron_manual_worker_survives_caller_cancel_on_published_tinyflows",
+        json_rpc_cron_manual_worker_survives_caller_cancel_on_published_tinyflows_inner,
+    );
+}
+
+async fn json_rpc_cron_manual_worker_survives_caller_cancel_on_published_tinyflows_inner() {
+    use openhuman_core::storage::{CollectionSpec, DocumentStore, Precondition};
+    use openhuman_core::{
+        config::Config, core::events::DomainEvent, core::runtime::DispatchCtx,
+        cron::system_job_handlers,
+    };
+    use tinybus::EventHandler;
+    use tokio::sync::{mpsc, oneshot, Semaphore};
+
+    let _env_lock = json_rpc_e2e_env_lock_async().await;
+    let tmp = tempdir().expect("tempdir");
+    let home = tmp.path();
+    let openhuman_home = home.join(".openhuman");
+    let workspace = home.join("cron-workspace");
+    std::fs::create_dir_all(&workspace).expect("create E2E workspace");
+
+    let _home_guard = EnvVarGuard::set_to_path("HOME", home);
+    let _workspace_guard = EnvVarGuard::set_to_path("OPENHUMAN_WORKSPACE", &workspace);
+    let _backend_url_guard = EnvVarGuard::unset("BACKEND_URL");
+    let _storage_url_guard = EnvVarGuard::unset("OPENHUMAN_STORAGE_URL");
+    let _vite_backend_guard = EnvVarGuard::unset("VITE_BACKEND_URL");
+    let _source_guard = EnvVarGuard::unset("OPENHUMAN_MODULE_SOURCE");
+    let _source_dir_guard = EnvVarGuard::unset("OPENHUMAN_MODULE_SOURCE_DIR");
+    clear_forced_chat_completions();
+
+    let artifact = openhuman_core::modules::local_artifact("tinyflows")
+        .expect("stage the published TinyFlows v0.8.25 module on OPENHUMAN_MODULE_PATH");
+    let artifact_digest = hex::encode(Sha256::digest(
+        std::fs::read(&artifact).expect("read staged TinyFlows native artifact"),
+    ));
+    const PUBLISHED_V0_8_25_MODULE_HASHES: &[&str] = &[
+        "2f9cbed474ae426f8611230d2fdb1fa7431ce51f67d6d3c4f4b71565046db461",
+        "3d994ecd4620ecf3267101253911f60bd52d961f6b848a637033223b32c64d7e",
+        "37df0b3abe79b3e94c023760a0a3ec4143e82186bdbf87a22c9b292d8959a99e",
+        "c07885d70a755ca9e24194b19ec64015f68737bf47c2cb55979c06f4ce061eef",
+        "7d58db053de739827db5992370a9666284bdb4053cb93ed6ab2d3e71486dff03",
+        "14a34bd6dfad6345ee4d1ba11e6b5a12505e97930ac5f2588bdfdd7325df389b",
+        "a1884f2323f820905d2cf3a7d3340fded047ed6764ef01f209853c697bed8e12",
+        "da6d81e8a3117edd25dfb4f3df65ebacda83e1d20ae6e67cc4d5b795b9f12a32",
+        "33b6c5dfcf93e4ba2742356c50340586c31def29829fe4008dab74aa504e41fc",
+        "6e06c308b75c8f3dc95c82af98188d004b1873791b4aba53ed24e5c74ef49234",
+        "9b8dbb87156114128010b0659ae4709892e211bc3d43f191204139e53671d8fa",
+    ];
+    assert!(
+        PUBLISHED_V0_8_25_MODULE_HASHES.contains(&artifact_digest.as_str()),
+        "the staged TinyFlows cdylib is not a published v0.8.25 module: {} sha256={artifact_digest}",
+        artifact.display()
+    );
+    let module_path = artifact.parent().expect("native artifact directory");
+    let _module_path_guard = EnvVarGuard::set_to_path("OPENHUMAN_MODULE_PATH", module_path);
+
+    let (mock_addr, mock_join) = serve_on_ephemeral(mock_upstream_router()).await;
+    let mock_origin = format!("http://{mock_addr}");
+    write_min_config(&openhuman_home, &mock_origin);
+    write_min_config(&openhuman_home.join("users").join("e2e-user"), &mock_origin);
+
+    let config = Config {
+        workspace_dir: workspace.clone(),
+        action_dir: workspace.clone(),
+        config_path: openhuman_home.join("config.toml"),
+        ..Config::default()
+    };
+
+    // Seed the exact v1 document collections before any Cron controller or
+    // scheduler can ask TinyFlows to migrate them.
+    let opened = openhuman_core::storage::local::open("published TinyFlows E2E", &workspace)
+        .expect("open the same local storage scope the core will use");
+    let scoped = opened.scoped().expect("scope E2E storage");
+    let docs = Arc::clone(scoped.documents());
+    for collection in ["cron_jobs", "cron_runs", "cron_counters"] {
+        docs.ensure_collection(&CollectionSpec::new(collection))
+            .await
+            .unwrap();
+    }
+    docs.put(
+        "cron_jobs",
+        "legacy-migration-proof",
+        json!({
+            "claim_generation": 1,
+            "expression": "0 9 * * *",
+            "command": "echo migrated",
+            "schedule": "{\"kind\":\"every\",\"every_ms\":3600000}",
+            "job_type": "shell",
+            "session_target": "isolated",
+            "enabled": true,
+            "delivery": "{\"mode\":\"none\",\"channel\":null,\"to\":null,\"best_effort\":true}",
+            "delete_after_run": false,
+            "created_at": "2026-03-04T05:06:07.123Z",
+            "created_ms": 1772600767123_i64,
+            "next_run": "2026-03-05T09:00:00Z",
+            "next_run_ms": 1772701200000_i64,
+            "next_run_ns": 1772701200000000000_i64,
+            "name": "legacy-migration-proof"
+        }),
+        Precondition::None,
+    )
+    .await
+    .unwrap();
+    docs.put(
+        "cron_runs",
+        "00000000000000000007",
+        json!({
+            "seq": 7,
+            "job_id": "legacy-migration-proof",
+            "started_at": "2026-03-04T09:00:00Z",
+            "started_ns": 1772614800000000000_i64,
+            "finished_at": "2026-03-04T09:00:02Z",
+            "status": "success",
+            "duration_ms": 2000,
+            "output": "legacy run preserved"
+        }),
+        Precondition::None,
+    )
+    .await
+    .unwrap();
+    docs.put(
+        "cron_counters",
+        "runs",
+        json!({ "next": 8 }),
+        Precondition::None,
+    )
+    .await
+    .unwrap();
+
+    openhuman_core::core::bus::init().await.unwrap();
+    let (rpc_addr, rpc_join) = serve_on_ephemeral(build_core_http_router(false)).await;
+    let rpc_base = format!("http://{rpc_addr}");
+    let store_session = post_json_rpc(
+        &rpc_base,
+        80_001,
+        "openhuman.auth_store_session",
+        json!({ "token": "e2e-test-jwt", "user_id": "e2e-user" }),
+    )
+    .await;
+    assert_no_jsonrpc_error(&store_session, "store_session");
+
+    let jobs = post_json_rpc(&rpc_base, 80_002, "openhuman.cron_list", json!({})).await;
+    let jobs = assert_no_jsonrpc_error(&jobs, "cron_list");
+    assert!(
+        jobs.to_string().contains("legacy-migration-proof"),
+        "the first public Cron read runs the module migration: {jobs}"
+    );
+    let migrated = docs
+        .get("cron.jobs", "legacy-migration-proof")
+        .await
+        .unwrap()
+        .expect("the released module wrote the v2 job through the host callback");
+    assert_eq!(migrated.meta.created_ms, 1772600767123_i64);
+    for (collection, id) in [
+        ("cron_jobs", "legacy-migration-proof"),
+        ("cron_runs", "00000000000000000007"),
+        ("cron_counters", "runs"),
+    ] {
+        assert!(
+            docs.get(collection, id).await.unwrap().is_none(),
+            "the v25 module retired migrated legacy record {collection}/{id}"
+        );
+    }
+    for progress in [
+        "cron/cron.jobs/jobs_v2",
+        "cron/cron.runs/runs_v2",
+        "cron/cron.admission/admission_v2",
+        "cron/counters_import",
+    ] {
+        assert!(
+            docs.get("tsd.migrations", progress)
+                .await
+                .unwrap()
+                .is_some(),
+            "the module persisted migration progress {progress}"
+        );
+    }
+
+    let module_list = post_json_rpc(&rpc_base, 80_003, "openhuman.modules_list", json!({})).await;
+    let module_list = peel_logs_envelope(assert_no_jsonrpc_error(&module_list, "modules_list"));
+    let tinyflows = module_list["modules"]
+        .as_array()
+        .and_then(|modules| modules.iter().find(|module| module["id"] == "tinyflows"))
+        .unwrap_or_else(|| {
+            panic!("TinyFlows is listed after the released cdylib loaded: {module_list}")
+        });
+    assert_eq!(tinyflows["version"], "0.8.25");
+    assert_eq!(tinyflows["state"], "ready");
+
+    let name = format!("published-manual-{}", uuid::Uuid::new_v4().simple());
+    let job = openhuman_core::cron::system_jobs::ensure_system_job(
+        &config,
+        &name,
+        openhuman_core::cron::Schedule::Every {
+            every_ms: 3_600_000,
+        },
+    )
+    .expect("seed a same-scope manual-worker job");
+    let (started_tx, started_rx) = oneshot::channel();
+    let (release_tx, release_rx) = oneshot::channel();
+    let started_tx = Arc::new(Mutex::new(Some(started_tx)));
+    let release_rx = Arc::new(Mutex::new(Some(release_rx)));
+    let _handler = system_job_handlers::register(
+        &name,
+        Arc::new(move |_| {
+            let started = started_tx.lock().unwrap().take();
+            let release = release_rx.lock().unwrap().take();
+            Box::pin(async move {
+                if let Some(started) = started {
+                    let _ = started.send(());
+                }
+                if let Some(release) = release {
+                    release.await.map_err(|error| error.to_string())?;
+                }
+                Ok(())
+            })
+        }),
+    );
+    struct CronEvents {
+        job_id: String,
+        tx: mpsc::UnboundedSender<(&'static str, bool)>,
+    }
+    #[async_trait::async_trait]
+    impl EventHandler<DomainEvent> for CronEvents {
+        fn name(&self) -> &str {
+            "test::json_rpc_e2e::published_cron_manual_lifecycle"
+        }
+        async fn handle(&self, event: &DomainEvent) {
+            let event = match event {
+                DomainEvent::CronJobTriggered { job_id, .. } if job_id == &self.job_id => {
+                    Some(("triggered", true))
+                }
+                DomainEvent::CronJobCompleted {
+                    job_id, success, ..
+                } if job_id == &self.job_id => Some(("completed", *success)),
+                _ => None,
+            };
+            if let Some(event) = event {
+                let _ = self.tx.send(event);
+            }
+        }
+    }
+    let (events_tx, mut events_rx) = mpsc::unbounded_channel();
+    let subscription = openhuman_core::core::bus::BUS
+        .subscribe(Arc::new(CronEvents {
+            job_id: job.id.clone(),
+            tx: events_tx,
+        }))
+        .expect("subscribe to the production Cron domain events");
+
+    let rpc_base = rpc_base.clone();
+    let job_id = job.id.clone();
+    let caller = tokio::spawn(async move {
+        post_json_rpc(
+            &rpc_base,
+            80_004,
+            "openhuman.cron_run",
+            json!({ "job_id": job_id }),
+        )
+        .await
+    });
+    tokio::time::timeout(Duration::from_secs(10), started_rx)
+        .await
+        .expect("the published module admitted the run and entered the host callback")
+        .expect("manual host handler start signal remains open");
+    caller.abort();
+    assert!(caller.await.unwrap_err().is_cancelled());
+    let _ = release_tx.send(());
+
+    let mut seen_events = Vec::new();
+    tokio::time::timeout(Duration::from_secs(10), async {
+        while seen_events.len() < 2 {
+            seen_events.push(
+                events_rx
+                    .recv()
+                    .await
+                    .expect("Cron event subscription remains open"),
+            );
+        }
+    })
+    .await
+    .expect("the retained native worker emits trigger and terminal completion");
+    assert_eq!(seen_events[0].0, "triggered");
+    assert_eq!(seen_events[1], ("completed", true));
+
+    let mut manual_history = String::new();
+    for _ in 0..100 {
+        let runs = post_json_rpc(
+            &rpc_base,
+            80_005,
+            "openhuman.cron_runs",
+            json!({ "job_id": job.id }),
+        )
+        .await;
+        manual_history = assert_no_jsonrpc_error(&runs, "cron_runs").to_string();
+        if manual_history.contains("system job") && manual_history.contains("\"status\":\"ok\"") {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    }
+    assert!(
+        manual_history.contains("system job") && manual_history.contains("\"status\":\"ok\""),
+        "the released worker committed its terminal history after the caller disconnected: {manual_history}"
+    );
+    assert!(
+        manual_history.contains("\"id\":8"),
+        "the first post-migration run continues at imported counter value 8: {manual_history}"
+    );
+    assert!(
+        manual_history.contains("\"run_id\":\""),
+        "the module persisted this manual invocation's identity: {manual_history}"
+    );
+    drop(subscription);
+
+    let (scope_started_tx, mut scope_started_rx) = mpsc::unbounded_channel();
+    let scope_started_tx = Arc::new(scope_started_tx);
+    let scope_release = Arc::new(Semaphore::new(0));
+    let handler_started = Arc::clone(&scope_started_tx);
+    let handler_release = Arc::clone(&scope_release);
+    let scoped_name = format!("published-scope-{}", uuid::Uuid::new_v4().simple());
+    let _scope_handler = system_job_handlers::register(
+        &scoped_name,
+        Arc::new(move |_| {
+            let started = Arc::clone(&handler_started);
+            let release = Arc::clone(&handler_release);
+            Box::pin(async move {
+                let _ = started.send(());
+                release
+                    .acquire()
+                    .await
+                    .map_err(|error| error.to_string())?
+                    .forget();
+                Ok(())
+            })
+        }),
+    );
+    let mut first_scope = config.clone();
+    first_scope.workspace_dir = home.join("manual-scope-a");
+    first_scope.action_dir = first_scope.workspace_dir.clone();
+    first_scope.config_path = home.join("manual-scope-a.toml");
+    let mut second_scope = config.clone();
+    second_scope.workspace_dir = home.join("manual-scope-b");
+    second_scope.action_dir = second_scope.workspace_dir.clone();
+    second_scope.config_path = home.join("manual-scope-b.toml");
+    std::fs::create_dir_all(&first_scope.workspace_dir).unwrap();
+    std::fs::create_dir_all(&second_scope.workspace_dir).unwrap();
+    let first_job = openhuman_core::cron::system_jobs::ensure_system_job(
+        &first_scope,
+        &scoped_name,
+        openhuman_core::cron::Schedule::Every {
+            every_ms: 3_600_000,
+        },
+    )
+    .unwrap();
+    let second_job = openhuman_core::cron::system_jobs::ensure_system_job(
+        &second_scope,
+        &scoped_name,
+        openhuman_core::cron::Schedule::Every {
+            every_ms: 3_600_000,
+        },
+    )
+    .unwrap();
+    assert_eq!(first_job.id, second_job.id);
+
+    let first_config = first_scope.clone();
+    let first_job_id = first_job.id.clone();
+    let first = tokio::spawn(async move {
+        let dispatch = DispatchCtx::ambient();
+        openhuman_core::cron::ops::run_job_now(&dispatch, &first_config, &first_job_id).await
+    });
+    tokio::time::timeout(Duration::from_secs(10), scope_started_rx.recv())
+        .await
+        .expect("the first document scope starts its manual worker")
+        .expect("scope handler channel remains open");
+
+    let duplicate = openhuman_core::cron::ops::run_job_now(
+        &DispatchCtx::ambient(),
+        &first_scope,
+        &first_job.id,
+    )
+    .await;
+    assert!(
+        duplicate
+            .as_ref()
+            .err()
+            .is_some_and(|error| error.contains("AlreadyRunning")),
+        "the same scope refuses the active job: {duplicate:?}"
+    );
+
+    let second_config = second_scope.clone();
+    let second_job_id = second_job.id.clone();
+    let second = tokio::spawn(async move {
+        let dispatch = DispatchCtx::ambient();
+        openhuman_core::cron::ops::run_job_now(&dispatch, &second_config, &second_job_id).await
+    });
+    tokio::time::timeout(Duration::from_secs(10), scope_started_rx.recv())
+        .await
+        .expect("a distinct document scope independently starts the same job id")
+        .expect("scope handler channel remains open");
+    scope_release.add_permits(2);
+    assert!(first.await.unwrap().unwrap().0);
+    assert!(second.await.unwrap().unwrap().0);
+
+    mock_join.abort();
+    rpc_join.abort();
+}
+
+#[test]
 fn json_rpc_protocol_auth_and_agent_hello() {
     run_json_rpc_e2e_on_agent_stack(
         "json_rpc_protocol_auth_and_agent_hello",
@@ -11471,9 +11913,8 @@ fn json_rpc_flows_full_arc_discover_build_create_run() {
         );
         assert!(
             child_output.contains("running 1 test")
-                && child_output.contains(
-                    "test json_rpc_flows_full_arc_discover_build_create_run ... ok"
-                )
+                && child_output
+                    .contains("test json_rpc_flows_full_arc_discover_build_create_run ... ok")
                 && child_output.contains("1 passed; 0 failed"),
             "child must prove exactly one test ran and passed:\n{child_output}"
         );
