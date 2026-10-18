@@ -1,12 +1,41 @@
 //! Host budget policy, handed to the turn once at admission and carried
 //! explicitly to children (`HostTurnEnv::model_budget` -> `OpenHumanRunContext`).
 
+use std::sync::Arc;
+
+use tinyinference_llm::model::ChatModel;
+
 /// Product recursion ceiling shared by native and MCP delegation.
 pub(crate) const MAX_SPAWN_DEPTH: usize = 3;
-pub use tinyagents_harness::cost::ModelBudget;
 pub use tinyinference_llm::model::budget::{
     Budget, BudgetExceeded, BudgetSnapshot, CallBudget, Spend, SpendLimits,
 };
+
+/// OpenHuman's source-compatible carrier for the shared ledger and physical
+/// call reservation bounds. The owner harness performs the wrapping engine.
+#[derive(Debug, Clone)]
+pub struct ModelBudget {
+    /// Run/turn ledger. Children of a turn share it.
+    pub ledger: Budget,
+    /// Per-call input, output and charge upper bounds for all allowed routes.
+    pub call: CallBudget,
+}
+
+impl ModelBudget {
+    /// Wait for live reservations when settled spend still affords admission.
+    /// Clones and child turns inherit this opt-in; internal retries stay fail-fast.
+    pub fn wait_for_capacity(mut self) -> Self {
+        self.ledger = self.ledger.wait_for_capacity();
+        self
+    }
+
+    /// Wrap the model with TinyAgents' shared physical-call budget engine.
+    pub(crate) fn wrap(&self, model: Arc<dyn ChatModel<()>>) -> Arc<dyn ChatModel<()>> {
+        tinyagents_harness::cost::ModelBudget::new(self.ledger.clone(), self.call)
+            .wrap_model(model)
+    }
+}
+
 /// Effective host depth ceiling, never wider than product policy.
 pub(crate) fn depth(context: &super::host::OpenHumanRunContext) -> usize {
     context
@@ -31,10 +60,10 @@ impl crate::inference::turn_models::TurnModels {
         let Some(budget) = budget else {
             return self;
         };
-        self.primary = budget.wrap_model(self.primary);
-        self.summarizer = budget.wrap_model(self.summarizer);
+        self.primary = budget.wrap(self.primary);
+        self.summarizer = budget.wrap(self.summarizer);
         for (_, route) in &mut self.routes {
-            *route = budget.wrap_model(route.clone());
+            *route = budget.wrap(route.clone());
         }
         self
     }
