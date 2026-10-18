@@ -394,7 +394,7 @@ fn repeated_lines(markdown: &str) -> Vec<String> {
         .collect()
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn a_turn_pack_stays_within_its_budget_against_a_large_store() {
     let tmp = tempfile::tempdir().unwrap();
     let config = config_in(&tmp);
@@ -433,7 +433,7 @@ async fn a_turn_pack_stays_within_its_budget_against_a_large_store() {
     assert!(repeated_lines(&pack.markdown).is_empty());
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn a_resumed_session_pack_stays_within_one_budget_and_repeats_nothing() {
     let tmp = tempfile::tempdir().unwrap();
     let config = config_in(&tmp);

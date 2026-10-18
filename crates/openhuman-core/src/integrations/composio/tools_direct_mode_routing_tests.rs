@@ -123,7 +123,7 @@ async fn list_tools_in_direct_mode_returns_empty_without_hitting_backend() {
     );
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn execute_tool_per_call_factory_means_no_baked_client() {
     // Regression check for the structural fix: `ComposioExecuteTool::new`
     // takes `Arc<Config>` rather than `ComposioClient`, so a user

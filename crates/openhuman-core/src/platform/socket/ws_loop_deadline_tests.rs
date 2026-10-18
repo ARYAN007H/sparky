@@ -240,7 +240,7 @@ async fn spawn_mock_server_that_goes_silent(
 /// goes silent without closing is ended by the client's own ping deadline,
 /// the loop reports the loss and reconnects on the next attempt, and the
 /// deadline warning plus the `Reconnected after …` line execute on the way.
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn ws_loop_reconnects_after_ping_deadline_on_a_silent_server() {
     let (fwd_tx, mut fwd_rx) = mpsc::unbounded_channel::<String>();
     let (release_tx, release_rx) = tokio::sync::oneshot::channel::<()>();

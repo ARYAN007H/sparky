@@ -224,7 +224,7 @@ async fn task_without_allowed_websites_is_refused_before_the_module() {
     }
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn a_second_turn_reuses_the_thread_session_and_close_removes_it() {
     let client = Arc::new(BrowserClient::new(Arc::new(
         crate::config::Config::default(),
@@ -301,7 +301,7 @@ async fn stale_tool_close_preserves_a_newer_thread_session() {
     thread_sessions().lock().await.remove(&key);
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn changed_browser_policy_retires_cached_session_for_same_thread() {
     let mut old_config = crate::config::Config::default();
     old_config.http_request.allowed_domains = vec!["example.com".into(), "other.test".into()];
