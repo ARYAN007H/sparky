@@ -39,7 +39,7 @@ const MAX_RPC_BODY_BYTES: usize = 64 * 1024 * 1024;
 ///
 /// Middleware order (outermost → innermost):
 /// 1. `cors_middleware`       — handles `OPTIONS` preflight and adds CORS headers
-/// 2. `rpc_auth_middleware`   — validates `Authorization: Bearer <token>` on protected paths
+/// 2. `rpc_auth_middleware`   — validates `Authorization: Bearer <token>` on matched protected routes
 /// 3. `http_request_log_middleware` — logs non-RPC HTTP requests with timing
 pub fn build_core_http_router(socketio_enabled: bool) -> Router {
     crate::http_host::ensure_registered();
@@ -85,7 +85,7 @@ pub fn build_core_http_router(socketio_enabled: bool) -> Router {
     let router = router
         .fallback(not_found_handler)
         .layer(middleware::from_fn(http_request_log_middleware))
-        .layer(middleware::from_fn(
+        .route_layer(middleware::from_fn(
             crate::server::auth::rpc_auth_middleware,
         ));
     // Socket.IO is off (`--jsonrpc-only`): answer its path before the bearer
