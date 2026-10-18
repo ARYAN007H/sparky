@@ -173,16 +173,34 @@ async fn a_turn_whose_provider_is_unreachable_ends_in_one_classified_chat_error(
     let address = listener.local_addr().expect("local endpoint address");
     let (request_tx, request_rx) = tokio::sync::oneshot::channel();
     tokio::spawn(async move {
-        use tokio::io::AsyncReadExt;
+        use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 
-        let (mut socket, _) = listener.accept().await.expect("inference request");
-        let mut request = [0_u8; 2048];
-        let length = socket
-            .read(&mut request)
+        // Ollama's model warm-up is part of provider setup. Answer it so the
+        // actual chat-completions call reaches the mock and can fail there.
+        let (warmup, _) = listener.accept().await.expect("Ollama warm-up");
+        let mut warmup = BufReader::new(warmup);
+        let mut warmup_line = String::new();
+        warmup
+            .read_line(&mut warmup_line)
+            .await
+            .expect("read Ollama warm-up");
+        assert!(warmup_line.starts_with("POST /api/chat "), "{warmup_line}");
+        warmup
+            .get_mut()
+            .write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")
+            .await
+            .expect("answer Ollama warm-up");
+        drop(warmup);
+
+        let (inference, _) = listener.accept().await.expect("inference request");
+        let mut inference = BufReader::new(inference);
+        let mut request_line = String::new();
+        inference
+            .read_line(&mut request_line)
             .await
             .expect("read inference request");
-        let _ = request_tx.send(String::from_utf8_lossy(&request[..length]).into_owned());
-        // Dropping the connection produces a deterministic transport failure.
+        let _ = request_tx.send(request_line);
+        // Dropping the inference connection produces a deterministic failure.
     });
     let tmp = tempfile::tempdir().expect("workspace");
     let mut config = crate::config::Config {
@@ -223,7 +241,10 @@ async fn a_turn_whose_provider_is_unreachable_ends_in_one_classified_chat_error(
         .await
         .expect("the local provider received the inference request")
         .expect("inference request capture");
-    assert!(request.starts_with("POST /api/chat "), "{request}");
+    assert!(
+        request.starts_with("POST /v1/chat/completions "),
+        "{request}"
+    );
 
     let runtime = super::runner::runtime(&ctx);
     assert!(
