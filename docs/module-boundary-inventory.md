@@ -506,8 +506,10 @@ Tool names, descriptions, parameter schemas, permissions and the
 `agent_prompt::resolve_completion_model` are upstream; the dedup exactly-once
 settle contract was already `tinyflows::nodes::control_flow::dedup_settle`, so
 only the per-flow lock and the run-finished subscriber remain in
-`flows/bus/dedup_commit.rs`. `observability.rs` and `langfuse_export.rs` call
-`tinyflows::observe::{step_status_str, to_exporter_observations}`.
+`flows/bus/dedup_commit.rs`. `observability.rs` calls
+`tinyflows::observe::step_status_str`; `flows/ops/execution.rs` converts the
+engine observation journal for the generic exporter in
+`agent/progress_tracing/flow_export.rs`.
 
 Stays host: `search_tool_catalog`, `get_tool_contract`,
 `get_tool_output_sample`, `list_connectable_toolkits` and

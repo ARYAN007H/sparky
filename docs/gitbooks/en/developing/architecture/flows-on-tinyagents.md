@@ -66,8 +66,9 @@ flowchart LR
    run state and pausing at approval gates.
 4. outcome: a `RunOutcome { output, pending_approvals, cancelled }`; the host
    persists live steps through the `FlowRunObserver` and exports the durable
-   graph observations to Langfuse
-   ([`tinyflows/langfuse_export.rs`](https://github.com/tinyhumansai/openhuman/blob/main/crates/openhuman-core/src/flows/tinyflows/langfuse_export.rs)).
+   graph observations to Langfuse through the generic exporter
+   ([`agent/progress_tracing/flow_export.rs`](https://github.com/tinyhumansai/openhuman/blob/main/crates/openhuman-core/src/agent/progress_tracing/flow_export.rs));
+   `flows/ops/execution.rs` adapts the engine journal.
 
 Because the engine keys persisted state by a caller-supplied `thread_id`,
 durable human-in-the-loop resume is `engine::resume_with_checkpointer` over the same
@@ -301,9 +302,10 @@ pattern the flow's own `agent` nodes use:
 | Executor          | (the engine)       | `flows_run` / `flows_resume`                                                                                              | the capability seam above                                                                                                                                                                                                                                                                    |
 
 Both agents live under
-[`crates/openhuman-core/src/flows/agents/`](https://github.com/tinyhumansai/openhuman/tree/main/crates/openhuman-core/src/flows/agents) as
-first-class registry agents (`agent.toml` + `prompt.md`), on the reasoning tier
-with narrow, safety-reviewed tool belts. The builder is tool-assisted
+[`crates/openhuman-core/src/agent/registry/agents/`](https://github.com/tinyhumansai/openhuman/tree/main/crates/openhuman-core/src/agent/registry/agents)
+as first-class registry agents (`agent.toml` + a host `prompt.rs` builder).
+Their archetype text comes from TinyFlows Copilot over the module bus. They run
+on the reasoning tier with narrow, safety-reviewed tool belts. The builder is tool-assisted
 end-to-end: it proposes graphs (validate-only), dry-runs them against mock
 capabilities as a self-test loop, and only then saves a real flow and test-runs it with confirmation first. The full discover → build → save → run lifecycle:
 
@@ -339,8 +341,8 @@ sequenceDiagram
 | [`crates/openhuman-core/src/flows/ops.rs`](https://github.com/tinyhumansai/openhuman/blob/main/crates/openhuman-core/src/flows/ops.rs)                                             | `flows_run` / `flows_resume` / `flows_build` / `flows_discover` and CRUD.                      |
 | [`crates/openhuman-core/src/flows/bus.rs`](https://github.com/tinyhumansai/openhuman/blob/main/crates/openhuman-core/src/flows/bus.rs)                                             | `FlowTriggerSubscriber`: the host-side multi-trigger bridge.                                   |
 | [`crates/openhuman-core/src/flows/builder_tools.rs`](https://github.com/tinyhumansai/openhuman/blob/main/crates/openhuman-core/src/flows/builder_tools.rs)                         | The Composio-bound builder reads; the authoring tools are `tinyflows_copilot::tools`, bound by `flows/builder_host.rs`. |
-| [`crates/openhuman-core/src/flows/agents/`](https://github.com/tinyhumansai/openhuman/tree/main/crates/openhuman-core/src/flows/agents)                                            | `workflow_builder` + `flow_discovery` agent definitions.                                       |
-| [`crates/openhuman-core/src/flows/tinyflows/langfuse_export.rs`](https://github.com/tinyhumansai/openhuman/blob/main/crates/openhuman-core/src/flows/tinyflows/langfuse_export.rs) | Post-run export of the durable graph observations.                                             |
+| [`crates/openhuman-core/src/agent/registry/agents/`](https://github.com/tinyhumansai/openhuman/tree/main/crates/openhuman-core/src/agent/registry/agents)                         | `workflow_builder` + `flow_discovery` definitions and host renderers.                           |
+| [`crates/openhuman-core/src/agent/progress_tracing/flow_export.rs`](https://github.com/tinyhumansai/openhuman/blob/main/crates/openhuman-core/src/agent/progress_tracing/flow_export.rs) | Generic post-run graph observation export to Langfuse.                                           |
 
 ## See also
 
