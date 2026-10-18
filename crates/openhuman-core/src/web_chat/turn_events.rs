@@ -232,11 +232,20 @@ impl WebEvents {
     ) -> Option<Surface> {
         match projection {
             Some(projection) => Some(projection.lock().await.surface()),
-            None => request
-                .payload
-                .ctx
-                .as_ref()
-                .map(|ctx| Surface::new(ctx, ids_of(request))),
+            None => {
+                let ctx = request.payload.ctx.as_ref()?;
+                let config = match ctx.load_config().await {
+                    Ok(config) => config,
+                    Err(error) => {
+                        log::warn!(
+                            "[web-channel] unable to load config for terminal event request_id={}: {error}",
+                            request.request_id
+                        );
+                        return None;
+                    }
+                };
+                Some(Surface::new(ctx, ids_of(request), config).await)
+            }
         }
     }
 

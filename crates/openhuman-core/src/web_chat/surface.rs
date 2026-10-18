@@ -26,6 +26,7 @@ pub(crate) struct TurnIds {
 struct SurfaceState {
     module: tinybus::module::ModuleClient,
     handle: Option<WebTurnHandle>,
+    closed: bool,
 }
 
 /// One module-owned projection turn plus its host broadcast destination.
@@ -67,6 +68,7 @@ impl Surface {
             state: Arc::new(tokio::sync::Mutex::new(SurfaceState {
                 module,
                 handle: None,
+                closed: false,
             })),
             ctx: ctx.clone(),
             scope_key,
@@ -76,6 +78,9 @@ impl Surface {
     }
 
     async fn begin_if_needed(&self, state: &mut SurfaceState) -> Result<String, String> {
+        if state.closed {
+            return Err("web projection turn is already closed".to_owned());
+        }
         if let Some(handle) = &state.handle {
             return Ok(handle.handle.clone());
         }
@@ -97,6 +102,7 @@ impl Surface {
     }
 
     async fn end_if_needed(&self, state: &mut SurfaceState) {
+        state.closed = true;
         let Some(handle) = state.handle.take() else {
             return;
         };
@@ -131,6 +137,13 @@ impl Surface {
     /// the projection locally.
     pub(crate) async fn output(&self, event: ChannelOutputEvent) {
         let mut state = self.state.lock().await;
+        if state.closed {
+            log::debug!(
+                "[web-channel] dropping output after terminal request_id={}",
+                self.ids.request_id
+            );
+            return;
+        }
         let handle = match self.begin_if_needed(&mut state).await {
             Ok(handle) => handle,
             Err(error) => {
