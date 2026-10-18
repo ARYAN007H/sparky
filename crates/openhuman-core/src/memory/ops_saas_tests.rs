@@ -181,9 +181,52 @@ fn valid_saas_identity_clamps_memory_operations_in_an_isolated_process() {
                 .id
                 .0;
 
+            for (namespace, text) in [
+                ("team:acme", "explore acme item"),
+                ("team:other", "explore foreign item"),
+            ] {
+                engine
+                    .store(StoreItem::learning(
+                        text,
+                        tinymemory_api::LearningKind::Fact,
+                        0.9,
+                        MemoryMeta {
+                            namespace: namespace.parse().unwrap(),
+                            repo: Some("org/repo".into()),
+                            tags: vec!["selected".into()],
+                            ..MemoryMeta::default()
+                        },
+                    ))
+                    .await
+                    .unwrap();
+            }
+
+            let explored = crate::memory::explore::explore(
+                &config,
+                crate::memory::explore::ExploreParams {
+                    facet: tinymemory_api::Facet::Repo,
+                    path: vec![crate::memory::explore::PathStep {
+                        facet: tinymemory_api::Facet::Kind,
+                        value: "learning".into(),
+                    }],
+                    filter: Some(MetaFilter {
+                        tags_any: vec!["selected".into()],
+                        ..MetaFilter::default()
+                    }),
+                    limit: Some(5),
+                    scan_limit: Some(1),
+                },
+            )
+            .await
+            .unwrap();
+            assert_eq!(explored.total, 1);
+            assert_eq!(explored.buckets.len(), 1);
+            assert_eq!(explored.buckets[0].value, "org/repo");
+
             let listed = items_list(&config, Default::default()).await.unwrap();
-            assert_eq!(listed.items.len(), 1);
-            assert_eq!(listed.items[0].id.0, own);
+            assert_eq!(listed.items.len(), 2);
+            assert!(listed.items.iter().any(|item| item.id.0 == own));
+            assert!(!listed.items.iter().any(|item| item.id.0 == foreign));
 
             let fetched = fetch(
                 &config,
