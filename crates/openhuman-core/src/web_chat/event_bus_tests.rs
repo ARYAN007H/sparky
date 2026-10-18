@@ -527,17 +527,18 @@ async fn publish_web_channel_event_stamps_ts_when_unset() {
     let mut web_rx = subscribe_web_channel_events();
     let before = crate::web_chat::progress::unix_epoch_ms();
 
-    publish_web_channel_event(WebChannelEvent {
-        event: "ts_stamp_probe".to_string(),
-        thread_id: "thread-ts-stamp-probe".to_string(),
-        ..Default::default()
+    publish_web_channel_event(WebChannelEvent::UserError {
+        context: WebEventContext {
+            thread_id: "thread-ts-stamp-probe".into(),
+            ..WebEventContext::default()
+        },
+        error_type: Some("ts_stamp_probe".into()),
+        error_source: None,
     });
 
-    let ev = find_agent_web_event(&mut web_rx, "ts_stamp_probe", "thread-ts-stamp-probe").await;
+    let ev = find_agent_web_event(&mut web_rx, "user_error", "thread-ts-stamp-probe").await;
     let after = crate::web_chat::progress::unix_epoch_ms();
-    let ts = ev
-        .ts
-        .expect("publish_web_channel_event must stamp ts when unset");
+    let ts = ev.context().ts.expect("publisher stamps timestamp");
     assert!(
         ts >= before && ts <= after,
         "stamped ts ({ts}) must fall within [{before}, {after}]"
