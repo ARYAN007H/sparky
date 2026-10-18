@@ -135,14 +135,16 @@ async fn the_heartbeat_beats_only_for_a_live_turn() {
         thread_id: "host-hb-thread".into(),
         request_id: "host-hb-request".into(),
     };
-    let projection = Arc::new(AsyncMutex::new(ProgressProjection::new(
-        &DispatchCtx::ambient(),
-        ids,
-        Default::default(),
-        crate::config::Config::default(),
-        std::sync::Arc::new(tinyagents_session::port::InMemoryTurnStates::default()),
-    )
-    .await));
+    let projection = Arc::new(AsyncMutex::new(
+        ProgressProjection::new(
+            &DispatchCtx::ambient(),
+            ids,
+            Default::default(),
+            crate::config::Config::default(),
+            std::sync::Arc::new(tinyagents_session::port::InMemoryTurnStates::default()),
+        )
+        .await,
+    ));
     let beat = AbortOnDrop(spawn_heartbeat(&DispatchCtx::ambient(), projection.clone()));
 
     // Before `TurnStarted` the turn is not live: no beat, however long it waits.

@@ -7,8 +7,10 @@ use std::sync::Arc;
 
 use sha2::Digest as _;
 use tinychannels_bus::module_progressive::ChannelOutputEvent;
+use tinychannels_bus::module_web_output::{
+    BeginWebTurn, EndWebTurn, ProjectWebOutput, WebTurnHandle,
+};
 use tinychannels_bus::web as bus_web;
-use tinychannels_bus::module_web_output::{BeginWebTurn, EndWebTurn, ProjectWebOutput, WebTurnHandle};
 
 use super::event_bus_channel::publish_web_channel_event_in;
 use super::WebChannelEvent;
@@ -55,14 +57,13 @@ impl Surface {
         let module = crate::modules::client(config);
 
         let tenant = super::ops::tenant_of(ctx);
-        let scope_bytes = serde_json::to_vec(&(
-            tenant,
-            &ids.client_id,
-            &ids.thread_id,
-            &ids.request_id,
-        ))
-        .expect("web turn scope tuple is serializable");
-        let scope_key = format!("web-chat:{}", hex::encode(sha2::Sha256::digest(scope_bytes)));
+        let scope_bytes =
+            serde_json::to_vec(&(tenant, &ids.client_id, &ids.thread_id, &ids.request_id))
+                .expect("web turn scope tuple is serializable");
+        let scope_key = format!(
+            "web-chat:{}",
+            hex::encode(sha2::Sha256::digest(scope_bytes))
+        );
 
         Self {
             state: Arc::new(tokio::sync::Mutex::new(SurfaceState {
