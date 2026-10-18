@@ -88,3 +88,7 @@ impl Serialize for ScopedWebEvent {
     }
 }
 
+#[cfg(test)]
+#[path = "channel_event_tests.rs"]
+mod tests;
+

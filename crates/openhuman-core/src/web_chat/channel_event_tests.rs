@@ -1,11 +1,11 @@
 use super::*;
-use tinychannels_bus::channel::{ContentPart, OutboundContentPart};
+use tinychannels_bus::web::{WebChannelEvent as Event, WebEventContext};
 
-fn context() -> bus_web::WebEventContext {
-    bus_web::WebEventContext {
-        client_id: "c1".into(),
-        thread_id: "t1".into(),
-        request_id: "r1".into(),
+fn context() -> WebEventContext {
+    WebEventContext {
+        client_id: "client".into(),
+        thread_id: "thread".into(),
+        request_id: "request".into(),
         seq: Some(4),
         ts: Some(99),
         ..Default::default()
@@ -13,99 +13,46 @@ fn context() -> bus_web::WebEventContext {
 }
 
 #[test]
-fn a_typed_event_becomes_the_flat_form_with_the_same_wire_fields() {
-    let flat = WebChannelEvent::from(bus_web::WebChannelEvent::ChatDone {
+fn scoped_event_serializes_the_owner_wire_shape_without_host_routing_stamps() {
+    let event = ScopedWebEvent::new(Event::ChatDone {
         context: context(),
         full_response: Some("hello".into()),
-        citations: Some(serde_json::json!([{ "id": 1 }])),
-        usage: Some(TurnUsagePayload {
-            input_tokens: 3,
-            ..Default::default()
-        }),
-        timing: Some(TurnTimingPayload {
-            total_ms: Some(10),
-            ..Default::default()
-        }),
+        citations: None,
+        usage: None,
+        timing: None,
         parts: None,
     });
-    assert_eq!(flat.event, "chat_done");
-    assert_eq!(
-        (
-            flat.client_id.as_str(),
-            flat.thread_id.as_str(),
-            flat.request_id.as_str()
-        ),
-        ("c1", "t1", "r1")
-    );
-    assert_eq!((flat.seq, flat.ts), (Some(4), Some(99)));
-    assert_eq!(flat.full_response.as_deref(), Some("hello"));
-    assert_eq!(flat.usage.expect("usage").input_tokens, 3);
-    assert_eq!(flat.timing.expect("timing").total_ms, Some(10));
-    assert!(flat.citations.is_some());
-    // Tenant stamps are the host's, never the wire's.
-    assert!(flat.agent.is_none() && flat.profile.is_none());
+    let wire = serde_json::to_value(&event).expect("event serializes");
+    assert_eq!(wire["event"], "chat_done");
+    assert_eq!(wire["client_id"], "client");
+    assert_eq!(wire["thread_id"], "thread");
+    assert_eq!(wire["request_id"], "request");
+    assert_eq!(wire["seq"], 4);
+    assert_eq!(wire["ts"], 99);
+    assert_eq!(wire["full_response"], "hello");
+    assert!(wire.get("agent").is_none());
+    assert!(wire.get("profile").is_none());
+    assert_eq!(event.event_name(), "chat_done");
 }
 
 #[test]
-fn a_null_argument_payload_and_an_unnamed_tool_are_absent_not_empty() {
-    let call = WebChannelEvent::from(bus_web::WebChannelEvent::ToolCall {
+fn host_tenant_stamps_route_without_changing_the_typed_event_payload() {
+    let mut event = ScopedWebEvent::new(Event::ChatCancelled {
         context: context(),
-        tool_name: Some("shell".into()),
-        skill_id: None,
-        args: Some(serde_json::Value::Null),
-        round: Some(1),
-        tool_call_id: Some("call".into()),
-        tool_display_label: None,
-        tool_display_detail: None,
+        cancel_reason: Some("user".into()),
+        superseded_by: None,
     });
-    assert_eq!(call.event, "tool_call");
-    assert!(call.args.is_none());
-    assert_eq!(call.tool_name.as_deref(), Some("shell"));
-
-    let delta = WebChannelEvent::from(bus_web::WebChannelEvent::ToolArgsDelta {
-        context: context(),
-        delta: Some("{".into()),
-        delta_kind: Some("tool_args".into()),
-        tool_call_id: Some("call".into()),
-        tool_name: Some(String::new()),
-        skill_id: None,
-        round: Some(1),
-    });
-    assert_eq!(delta.event, "tool_args_delta");
-    assert!(delta.tool_name.is_none());
-    assert_eq!(delta.tool_call_id.as_deref(), Some("call"));
-}
-
-#[test]
-fn typed_content_parts_ride_the_flat_form_to_the_wire() {
-    let flat = WebChannelEvent::from(bus_web::WebChannelEvent::ChatMessage {
-        context: context(),
-        message: None,
-        full_response: Some("look".into()),
-        parts: Some(vec![OutboundContentPart::Content {
-            part: ContentPart::Text {
-                text: "look".into(),
-                markdown_dialect: None,
-            },
-        }]),
-    });
-    assert_eq!(flat.event, "chat_message");
-    let wire = serde_json::to_value(&flat).expect("serializes");
-    assert_eq!(wire["parts"][0]["part"]["text"], "look");
-}
-
-#[test]
-fn tenant_stamps_route_but_never_serialize() {
-    let mut event = WebChannelEvent {
-        event: "chat_done".into(),
-        ..Default::default()
-    };
     event.stamp_tenant(Some(crate::core::runtime::Tenant {
-        profile: Some("p".into()),
-        agent: Some("a".into()),
+        profile: Some("profile".into()),
+        agent: Some("agent".into()),
     }));
-    assert!(event.belongs_to("a") && event.belongs_to_profile("p"));
-    assert!(!event.belongs_to("other"));
-    let wire = serde_json::to_value(&event).expect("serializes");
-    assert!(wire.get("agent").is_none() && wire.get("profile").is_none());
+
+    assert!(event.belongs_to("agent"));
+    assert!(event.belongs_to_profile("profile"));
+    assert!(!event.belongs_to("another-agent"));
+    let wire = serde_json::to_value(&event).expect("event serializes");
+    assert_eq!(wire["event"], "chat_cancelled");
+    assert_eq!(wire["cancel_reason"], "user");
+    assert!(wire.get("agent").is_none());
+    assert!(wire.get("profile").is_none());
 }
