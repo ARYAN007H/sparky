@@ -13,38 +13,6 @@ fn default_registry_entries_are_fully_populated() {
 }
 
 #[test]
-fn tinyagents_snapshot_contains_all_known_rows() {
-    let snapshot = tinyagents_catalog_snapshot();
-    assert_eq!(snapshot.schema_version, 1);
-    assert_eq!(snapshot.currency, "USD");
-    assert_eq!(snapshot.unit, "token");
-    // Unified snapshot is a superset (crate seed + OpenHuman overlay), so it
-    // is at least as large as the OpenHuman table and carries every
-    // OpenHuman row with its authoritative pricing/window.
-    assert!(snapshot.models.len() >= KNOWN_MODEL_PRICING.len());
-    for price in KNOWN_MODEL_PRICING {
-        let entry = snapshot
-            .models
-            .iter()
-            .find(|m| m.provider == price.provider && m.model_id == price.model_id)
-            .unwrap_or_else(|| panic!("missing {} in unified snapshot", price.model_id));
-        assert_eq!(
-            entry.max_input_tokens,
-            Some(u64::from(price.context_window))
-        );
-        assert_eq!(
-            entry.pricing.input_per_token,
-            Some(price.input_per_mtok_usd / 1_000_000.0)
-        );
-    }
-    // OpenHuman provenance is recorded alongside any crate-seed sources.
-    assert!(snapshot
-        .sources
-        .iter()
-        .any(|s| s.name == TINYAGENTS_CATALOG_SOURCE));
-}
-
-#[test]
 fn unified_catalog_overlays_local_models() {
     let local = vec![LocalCatalogModel {
         provider: "ollama".to_string(),

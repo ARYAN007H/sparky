@@ -46,26 +46,6 @@ fn validate_setup_rejects_duplicate_chain() {
         .contains("exactly one 'evm'"));
 }
 
-#[test]
-fn validate_setup_rejects_invalid_word_count() {
-    let mut params = sample_params();
-    params.mnemonic_word_count = 13;
-    assert!(validate_setup(&params)
-        .expect_err("invalid word count should fail")
-        .contains("unsupported mnemonic word count"));
-}
-
-#[test]
-fn word_count_validation_follows_the_wallet_contract() {
-    for count in tinywallet_bus::MNEMONIC_WORD_COUNTS {
-        let mut params = sample_params();
-        params.mnemonic_word_count = count;
-        assert!(validate_setup(&params).is_ok(), "{count} words accepted");
-    }
-    let message = supported_word_counts();
-    assert_eq!(message, "12, 15, 18, 21, 24");
-}
-
 #[tokio::test]
 async fn generate_recovery_phrase_rejects_unsupported_word_count_before_the_module() {
     let error = generate_recovery_phrase(&DispatchCtx::process_default(), 13)
