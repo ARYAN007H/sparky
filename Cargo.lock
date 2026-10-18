@@ -5560,6 +5560,7 @@ dependencies = [
  "tinyinference-voice",
  "tinymcp-bus",
  "tinysearch-bus",
+ "tinystoragedrivers",
  "tinystoragedrivers-core",
  "tinytools",
  "tinytools-agent",
