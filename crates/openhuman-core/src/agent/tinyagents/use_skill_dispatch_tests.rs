@@ -22,7 +22,7 @@ use serde_json::json;
 use std::path::Path;
 use std::sync::Arc;
 use tinyagents_harness::context::RunConfig;
-use tinyagents_harness::tool::packs::{PackRegistryHandle, UseSkillTool};
+use tinyagents_harness::tool::packs::{PackRegistryHandle, UseSkillTool, USE_SKILL};
 use tinyagents_harness::CallId;
 use tinyinference_llm::message::Message;
 use tinyinference_llm::model::{ChatModel, ModelProfile, ModelRequest, ModelResponse};
@@ -133,13 +133,13 @@ fn parent_execution_context(workspace_dir: &Path) -> ParentExecutionContext {
 /// real `UseSkillTool` plus one packed archetype-delegate stub, a
 /// `PackRegistryHandle` bound to it, and the `CanonicalSharedToolAdapter`
 /// wrapping `use_skill` that the harness would have registered.
-fn build_use_skill_dispatch_with_handle() -> (UseSkillDispatch, PackRegistryHandle) {
+fn build_use_skill_dispatch_with_handle() -> (RegisteredToolDispatch, PackRegistryHandle) {
     build_use_skill_dispatch_with_target(None)
 }
 
 fn build_use_skill_dispatch_with_target(
     target_id: Option<&str>,
-) -> (UseSkillDispatch, PackRegistryHandle) {
+) -> (RegisteredToolDispatch, PackRegistryHandle) {
     let handle = PackRegistryHandle::default();
     let use_skill_tool: Box<dyn Tool> = Box::new(UseSkillTool::new(
         handle.clone(),
@@ -152,15 +152,17 @@ fn build_use_skill_dispatch_with_target(
     let durable: Arc<Vec<Box<dyn Tool>>> = Arc::new(vec![use_skill_tool, create_image_tool]);
     handle.bind(Arc::downgrade(&durable));
 
-    let adapter = shared_tool_adapter(vec![durable], tinyagents_harness::tool::packs::USE_SKILL)
-        .expect("use_skill resolves in the durable registry it was just placed in");
-    (
-        UseSkillDispatch::new(Arc::new(adapter), handle.clone()),
-        handle,
+    let adapter = shared_tool_adapter(
+        vec![durable.clone()],
+        tinyagents_harness::tool::packs::USE_SKILL,
     )
+    .expect("use_skill resolves in the durable registry it was just placed in");
+    let dispatch = dispatch_selector(vec![durable])(USE_SKILL, Arc::new(adapter) as Arc<dyn Tool>)
+        .expect("use_skill receives TinyAgents' bound owner dispatch");
+    (dispatch, handle)
 }
 
-fn build_use_skill_dispatch() -> UseSkillDispatch {
+fn build_use_skill_dispatch() -> RegisteredToolDispatch {
     build_use_skill_dispatch_with_handle().0
 }
 

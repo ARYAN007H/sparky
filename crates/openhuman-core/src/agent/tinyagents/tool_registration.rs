@@ -8,7 +8,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use tinyagents_graph::goals::GoalToolKind;
-use tinyagents_harness::tool::packs::USE_SKILL;
+use tinyagents_harness::tool::packs::{PackSelection, UseSkillDispatch, USE_SKILL};
 use tinyagents_harness::tool::{
     CanonicalSharedToolAdapter, ToolDispatch, ToolExecScope, ToolExecution, ToolExecutionContext,
 };
@@ -25,7 +25,6 @@ use crate::agent::orchestration::tools::{
 use crate::agent::tinyagents::host::run_context::HostOperationContext;
 use crate::agent::tinyagents::host::OpenHumanRunContext;
 use crate::agent::tinyagents::turn_policy::is_subagent_spawn_or_delegate_tool;
-use crate::agent::tinyagents::use_skill_dispatch::UseSkillDispatch;
 use crate::agent::tools::TodoToolDispatch;
 use crate::core::runtime::CoreContext;
 use crate::tools::delegate::DelegateToolDispatch;
@@ -353,16 +352,26 @@ fn dispatch_selector(tool_sets: Vec<SharedToolSet>) -> DispatchSelector {
                 .map(str::to_string);
             return typed_dispatch_for(name, adapter, delegation_target);
         }
-        // The pack-registry handle comes off the raw registered tool, not the
-        // adapter.
-        let handle = tool_sets
-            .iter()
-            .flat_map(|set| set.iter())
-            .find(|tool| tool.name() == name)
-            .and_then(|tool| crate::tools::host_extensions::pack_registry_handle(tool.as_ref()))
-            .cloned()?;
-        Some(Arc::new(UseSkillDispatch::new(adapter, handle)))
+        let selector: Arc<
+            tinyagents_harness::tool::packs::PackDispatchSelector<(), OpenHumanRunContext>,
+        > = Arc::new(select_packed_tool_dispatch);
+        Some(Arc::new(UseSkillDispatch::new(adapter, selector)))
     })
+}
+
+/// Build the host's usual typed dispatch for the exact pack selection pinned
+/// by TinyAgents before authorization. Only tool-specific dispatch selection
+/// remains host-owned; the owner binds and executes the packed target.
+fn select_packed_tool_dispatch(selection: PackSelection) -> Option<RegisteredToolDispatch> {
+    let name = selection.tool_name().to_owned();
+    let registry = selection.registry();
+    let delegation_target = registry
+        .iter()
+        .find(|tool| tool.name() == name)
+        .and_then(|tool| crate::tools::host_extensions::delegation_target(tool.as_ref()))
+        .map(str::to_string);
+    let adapter = shared_tool_adapter(vec![registry], &name)?;
+    typed_dispatch_for(&name, Arc::new(adapter), delegation_target)
 }
 
 fn subagent_control_dispatches(
@@ -662,3 +671,7 @@ pub(crate) fn capability_diagnostics(
 #[cfg(test)]
 #[path = "tool_registration_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "use_skill_dispatch_tests.rs"]
+mod use_skill_dispatch_tests;

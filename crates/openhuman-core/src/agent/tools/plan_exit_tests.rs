@@ -1,5 +1,7 @@
-use super::*;
+use crate::agent::tools::{PlanExitTool, PLAN_EXIT_MARKER};
 use crate::plan_review::PlanReviewResolution;
+use serde_json::json;
+use tinytools::{PermissionLevel, Tool, ToolCallOptions, ToolRunContext};
 
 struct ThreadContext(&'static str);
 impl ToolRunContext for ThreadContext {
@@ -112,7 +114,7 @@ async fn plan_exit_rejects_empty() {
 
 #[test]
 fn plan_exit_metadata() {
-    let tool = PlanExitTool::new();
+    let tool = PlanExitTool;
     assert_eq!(tool.name(), "plan_exit");
     assert_eq!(tool.permission_level(), PermissionLevel::None);
 }

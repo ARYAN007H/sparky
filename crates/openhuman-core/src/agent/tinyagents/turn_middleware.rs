@@ -177,9 +177,19 @@ pub(super) fn install_turn_middleware(
     // response, instead of every `native model adapter` pushing it. Installed
     // unconditionally — usage flows on every turn — and shares the same carry the
     // bridge drains on `UsageRecorded`.
-    harness.push_model_middleware(Arc::new(routes::UsageCarryMiddleware::new(
-        provider_usage_carry.clone(),
-    )));
+    let usage_carry = provider_usage_carry.clone();
+    harness.push_model_middleware(Arc::new(
+        tinyagents_harness::middleware::library::UsageCarryMiddleware::new(move |response| {
+            if let Some(usage) =
+                crate::inference::provider::model::usage_info_from_response(response)
+            {
+                usage_carry
+                    .lock()
+                    .unwrap_or_else(|poisoned| poisoned.into_inner())
+                    .push_back(usage);
+            }
+        }),
+    ));
 
     // Route audit capture is a typed run-context concern. The canonical
     // TinyInference decorator attached in `turn_models` stamps the successful
@@ -196,9 +206,9 @@ pub(super) fn install_turn_middleware(
     // model is rejected pre-dispatch (and, once 02.2 lands, a capable fallback is
     // selected) instead of failing at the provider.
     if let Some(required) = required_capabilities {
-        harness.push_model_middleware(Arc::new(routes::RequiredCapabilitiesMiddleware::new(
-            required,
-        )));
+        harness.push_model_middleware(Arc::new(
+            tinyagents_harness::middleware::library::RequiredCapabilitiesMiddleware::new(required),
+        ));
     }
 
     // Fallback event parity (issue #4249, Workstream 02.2): the crate's
@@ -210,7 +220,9 @@ pub(super) fn install_turn_middleware(
     // `[fallback]`). Installed only when a fallback chain exists; it never re-issues
     // the call, so it adds no provider dispatch (no double-fallback).
     if has_route_fallback {
-        harness.push_model_middleware(Arc::new(routes::FallbackObserverMiddleware::new(model)));
+        harness.push_model_middleware(Arc::new(
+            tinyagents_harness::middleware::library::FallbackObserverMiddleware::new(model),
+        ));
     }
 
     // Capture context settings before `install` consumes `context_mw`.
