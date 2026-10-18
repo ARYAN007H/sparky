@@ -11,6 +11,7 @@ use openhuman_core::threads::{
     AppendConversationMessageRequest, ConversationMessagesRequest, ConversationMessagesResponse,
     ConversationThreadsListResponse,
 };
+use openhuman_core::web_chat::WebChannelEvent;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use tokio::sync::broadcast;
@@ -236,7 +237,7 @@ impl ProfileHandle {
                 continue;
             }
             match event.wire_event() {
-                openhuman_core::web_chat::WebChannelEvent::ChatDone { full_response, .. } => {
+                WebChannelEvent::ChatDone { full_response, .. } => {
                     log::debug!(
                         "[embed][profiles] chat done profile={} request_id={request_id}",
                         self.profile.id
@@ -247,9 +248,7 @@ impl ProfileHandle {
                         text: full_response.clone(),
                     });
                 }
-                openhuman_core::web_chat::WebChannelEvent::ChatError {
-                    message, error_type, ..
-                } => {
+                WebChannelEvent::ChatError { message, error_type, .. } => {
                     log::debug!(
                         "[embed][profiles] chat failed profile={} request_id={request_id} error_type={:?}",
                         self.profile.id,
@@ -260,7 +259,7 @@ impl ProfileHandle {
                         error_type: error_type.clone(),
                     });
                 }
-                openhuman_core::web_chat::WebChannelEvent::ChatCancelled { .. } => {
+                WebChannelEvent::ChatCancelled { .. } => {
                     return Err(ProfileError::Cancelled);
                 }
                 _ => {}
