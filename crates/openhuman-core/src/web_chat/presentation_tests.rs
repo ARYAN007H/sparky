@@ -80,7 +80,10 @@ async fn chat_done_carries_timing_when_a_snapshot_is_supplied() {
 
     let done = loop {
         match rx.try_recv() {
-            Ok(event) if event.context().request_id == request_id && event.event_name() == "chat_done" => {
+            Ok(event)
+                if event.context().request_id == request_id
+                    && event.event_name() == "chat_done" =>
+            {
                 break event;
             }
             Ok(_) => continue,
@@ -121,7 +124,10 @@ async fn chat_done_omits_timing_when_no_snapshot_is_supplied() {
 
     let done = loop {
         match rx.try_recv() {
-            Ok(event) if event.context().request_id == request_id && event.event_name() == "chat_done" => {
+            Ok(event)
+                if event.context().request_id == request_id
+                    && event.event_name() == "chat_done" =>
+            {
                 break event;
             }
             Ok(_) => continue,

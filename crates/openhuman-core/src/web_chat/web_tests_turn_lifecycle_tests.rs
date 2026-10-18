@@ -29,7 +29,9 @@ async fn wait_for_event(
     timeout(Duration::from_secs(10), async {
         loop {
             match rx.recv().await {
-                Ok(event) if event.context().request_id == request_id && event.event_name() == name => {
+                Ok(event)
+                    if event.context().request_id == request_id && event.event_name() == name =>
+                {
                     return event;
                 }
                 Ok(_) | Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue,
@@ -157,7 +159,12 @@ async fn a_refused_message_publishes_no_turn_events() {
             .any(|(k, _)| k == "lifecycle-refused")
     );
     while let Ok(event) = rx.try_recv() {
-        assert_ne!(event.context().thread_id, "lifecycle-refused", "{}", event.event_name());
+        assert_ne!(
+            event.context().thread_id,
+            "lifecycle-refused",
+            "{}",
+            event.event_name()
+        );
     }
 }
 
@@ -222,7 +229,10 @@ async fn a_turn_with_an_unavailable_local_provider_ends_in_one_classified_chat_e
     let error = match timeout(Duration::from_secs(75), async {
         loop {
             match rx.recv().await {
-                Ok(event) if event.context().request_id == request_id && event.event_name() == "chat_error" => {
+                Ok(event)
+                    if event.context().request_id == request_id
+                        && event.event_name() == "chat_error" =>
+                {
                     return event;
                 }
                 Ok(_) | Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue,

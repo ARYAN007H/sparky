@@ -101,9 +101,10 @@ async fn a_user_cancel_under_the_fence_placeholder_id_keeps_the_callers_client()
         loop {
             match events.recv().await {
                 Ok(event)
-                    if event.event_name() == "chat_cancelled" && event.context().thread_id == "fence-thread" =>
+                    if event.event_name() == "chat_cancelled"
+                        && event.context().thread_id == "fence-thread" =>
                 {
-                    return event.context().client_id;
+                    return event.context().client_id.clone();
                 }
                 Ok(_) | Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue,
                 Err(error) => panic!("event stream closed: {error}"),
