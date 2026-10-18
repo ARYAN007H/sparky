@@ -3,13 +3,13 @@ use super::*;
 // the contract's `ScheduleHost` interface, against the real (linked) module.
 
 use crate::cron::handlers::{
-    JobKindHandler, JobOutcome, JobRunContext, kind_handler, register_kind,
+    kind_handler, register_kind, JobKindHandler, JobOutcome, JobRunContext,
 };
 use async_trait::async_trait;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use tempfile::TempDir;
 use tinyflows_bus::schedule::types::{DeliveryConfig, DeliveryStatus, Schedule};
-use tinyflows_bus::schedule::{CALLBACK_INTERFACE, DeliveryProjection, callbacks};
+use tinyflows_bus::schedule::{callbacks, DeliveryProjection, CALLBACK_INTERFACE};
 
 pub(super) fn config(tmp: &TempDir) -> Config {
     let config = Config {
