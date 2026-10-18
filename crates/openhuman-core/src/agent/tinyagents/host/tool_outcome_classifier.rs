@@ -10,7 +10,6 @@ use std::sync::Arc;
 use tinyagents_harness::host::{OutcomeClass, ToolOutcomeClassifier, ToolStatusClassifier};
 use tinytools::ToolResult;
 
-
 /// OpenHuman's [`ToolOutcomeClassifier`], backed by
 /// [`tinytools::status::classify`].
 ///
@@ -59,7 +58,6 @@ impl OpenHumanToolOutcomeClassifier {
         self.retry_safe_tools = Some(tools);
         self
     }
-
 }
 
 impl ToolOutcomeClassifier for OpenHumanToolOutcomeClassifier {
