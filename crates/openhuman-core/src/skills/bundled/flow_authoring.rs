@@ -60,28 +60,37 @@ pub(crate) fn schedule_prewarm(
     config: &Config,
     domains: Option<DomainSet>,
 ) {
+    let owned_ctx = ctx.clone();
+    let owned_config = config.clone();
+    schedule_prewarm_operation(ctx, config, domains, async move {
+        prewarm(&owned_ctx, &owned_config, domains).await;
+    });
+}
+
+fn schedule_prewarm_operation(
+    ctx: &DispatchCtx,
+    config: &Config,
+    domains: Option<DomainSet>,
+    operation: impl std::future::Future<Output = ()> + Send + 'static,
+) -> bool {
     let gate = DiscoveryGate::from_config(ctx, config, domains);
     if !gate.flow_authoring_enabled() {
-        return;
+        return false;
     }
     let workspace = config.workspace_dir.clone();
     let key = snapshot_key(&workspace, &gate);
     if generation_if_current(&workspace, &gate).is_some() {
-        return;
+        return false;
     }
     let state = crate::modules::ops::state_of(crate::modules::tinyflows::MODULE_ID);
     if state == crate::modules::types::ModuleState::Failed
         || (state == crate::modules::types::ModuleState::Ready
             && !crate::modules::runtime::is_module_serving(crate::modules::tinyflows::MODULE_ID))
     {
-        return;
+        return false;
     }
 
-    let owned_ctx = ctx.clone();
-    let owned_config = config.clone();
-    spawn_background(key, async move {
-        prewarm(&owned_ctx, &owned_config, domains).await;
-    });
+    spawn_background(key, operation)
 }
 
 fn spawn_background(

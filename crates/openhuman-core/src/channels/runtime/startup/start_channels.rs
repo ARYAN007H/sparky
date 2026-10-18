@@ -128,7 +128,6 @@ async fn start_channels_inner(mut config: Config, session: CancellationToken) ->
     crate::skills::schedule_flow_authoring_prewarm(&dispatch, &config, None);
     let parts = build_channel_turn_parts(&dispatch, &config, &security, PromptToolDescs::Fixed)?;
     let model = parts.model.clone();
-    let workspace = config.workspace_dir.clone();
     let skills = parts.skills.clone();
 
     // Install the triggered-workflow subscriber now that workflows are

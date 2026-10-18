@@ -27,21 +27,31 @@ fn resources(reference: &str) -> Vec<ResourceFile> {
 #[tokio::test]
 async fn optional_warmup_returns_while_the_loader_is_blocked_and_deduplicates() {
     let workspace = tempfile::tempdir().expect("workspace");
-    let key = snapshot_key(workspace.path(), &gate_for(workspace.path()));
+    let mut config = Config::default();
+    config.workspace_dir = workspace.path().to_path_buf();
+    crate::modules::tinyflows::copilot_proxy(&config)
+        .await
+        .expect("linked TinyFlows fixture is admitted and serving");
+    let ctx = DispatchCtx::host_default();
     let (started_tx, started_rx) = tokio::sync::oneshot::channel();
     let (release_tx, release_rx) = tokio::sync::oneshot::channel::<()>();
     let (finished_tx, finished_rx) = tokio::sync::oneshot::channel();
 
-    assert!(spawn_background(key.clone(), async move {
-        let _ = started_tx.send(());
-        let _ = release_rx.await;
-        let _ = finished_tx.send(());
-    }));
+    assert!(schedule_prewarm_operation(
+        &ctx,
+        &config,
+        Some(DomainSet::full()),
+        async move {
+            let _ = started_tx.send(());
+            let _ = release_rx.await;
+            let _ = finished_tx.send(());
+        },
+    ));
     // The scheduled operation is now blocked on `release_rx`. Reaching this
     // point proves the caller that scheduled it did not wait for the loader.
     started_rx.await.expect("background task started");
     assert!(
-        !spawn_background(key, async {}),
+        !schedule_prewarm_operation(&ctx, &config, Some(DomainSet::full()), async {}),
         "a second warmup for the same explicit scope is coalesced"
     );
     release_tx.send(()).expect("release background task");
