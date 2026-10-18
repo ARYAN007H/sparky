@@ -55,56 +55,11 @@ export const HOSTED_GROUPS = [
   },
   { group: "rust-cov", lanes: ["rust-cov"], maxParallel: 1, container: true },
   { group: "tauri", lanes: ["tauri"], maxParallel: 1, container: true },
-  // The storage drivers build the core with features no other lane enables,
-  // so they get a runner (and a `target/`) of their own.
-  {
-    group: "storage",
-    lanes: ["storage-drivers"],
-    maxParallel: 1,
-    container: true,
-  },
   // pwsh ships on the bare ubuntu-latest image, not in the CI container.
   { group: "pester", lanes: ["pester"], maxParallel: 1, container: false },
 ];
 
 const CORE_PRODUCT = '"$(bash scripts/ci/product-features.sh --core)"';
-
-// The storage-drivers lane: the drivers it turns on, the root e2e targets that
-// run once per driver (tests/support/storage_drivers.rs), and the lib-test
-// filters of the domains that sit on the storage ports.
-const STORAGE_DRIVERS = "storage-sqlite,storage-file";
-const STORAGE_E2E_TARGETS = [
-  "storage_approvals_e2e",
-  "storage_domains_e2e",
-  "storage_flows_e2e",
-  "storage_secrets_e2e",
-  "storage_scope_e2e",
-  "storage_agent_scopes_e2e",
-  "storage_delegation_e2e",
-  "storage_default_import_e2e",
-  "storage_desktop_upgrade_e2e",
-  "storage_layout_migration_e2e",
-  "cli_storage_url_e2e",
-];
-const STORAGE_LIB_FILTERS = [
-  "storage::",
-  "cron::",
-  "flows::",
-  "security::approval::",
-  "security::devices::",
-  "security::secret_storage::",
-  "security::credentials::",
-  "desktop::notifications::",
-  "integrations::task_sources::",
-  "integrations::composio::file_store",
-  "agent::orchestration::",
-  "config::workspace::",
-  "desktop::app_state::",
-  "desktop::control::",
-  "platform::cost::",
-  "inference::tokenjuice::",
-  "config::schema::load::source::",
-];
 
 /**
  * Build the lane plan.
@@ -398,12 +353,12 @@ export function buildPlan({ profile, areas, env = {}, isPullRequest = true }) {
         },
         {
           name: "test-modules",
-          when: core,
+          when: core || areas.storage,
           run: `bash scripts/ci/self-hosted/install-test-modules.sh "${modulesDir}" ${modulesEnvFile}`,
         },
         {
           name: "rust-core-coverage",
-          when: core,
+          when: core || areas.storage,
           needs: [
             "test-modules",
             ex63 ? "frontend:pnpm-install" : "pnpm-install",
@@ -550,52 +505,6 @@ export function buildPlan({ profile, areas, env = {}, isPullRequest = true }) {
       ],
     },
     {
-      // The sqlite and file storage drivers, which no other lane compiles in:
-      // every `storage_*_e2e` target runs once per driver (memory, sqlite,
-      // file) and the stores that sit on the storage ports run their lib
-      // tests with the drivers on. The MongoDB driver needs a replica set and
-      // has its own workflow (storage-mongodb.yml). Armed by the `storage`
-      // area (.github/ci-paths-filter.yml).
-      name: "storage-drivers",
-      // Compiles the core crate with its own feature set: holds one of the
-      // VM's heavy-compile slots (lanes.mjs). Lower number = served first.
-      heavy: 2,
-      targetDir: targetDir("storage"),
-      env: { ...rustEnv, RUST_MIN_STACK: "16777216" },
-      checks: [
-        {
-          name: "storage-e2e",
-          when: areas.storage,
-          run:
-            `cargo test --no-fail-fast -p openhuman-cli --features ${STORAGE_DRIVERS}` +
-            STORAGE_E2E_TARGETS.map((t) => ` --test ${t}`).join(""),
-        },
-        {
-          name: "storage-lib-tests",
-          when: areas.storage,
-          run:
-            `cargo test -p openhuman --features ${STORAGE_DRIVERS} --lib --` +
-            STORAGE_LIB_FILTERS.map((f) => ` ${f}`).join("") +
-            " --skip cron::bus_host::tests:: --skip cron::documents_port::tests::",
-        },
-        {
-          // TinyFlows owns a process-global module host during these tests.
-          // Keep them out of the broad storage test process, where unrelated
-          // cron tests can replace handlers while a callback is executing.
-          name: "cron-module-tests",
-          when: areas.storage,
-          run:
-            `cargo test -p openhuman --features ${STORAGE_DRIVERS} --lib --` +
-            " cron::bus_host::tests:: cron::documents_port::tests:: --test-threads=1",
-        },
-        {
-          name: "storage-session-store-tests",
-          when: areas.storage,
-          run: `cargo test -p openhuman-rpc --features session-store,${STORAGE_DRIVERS} --lib -- session_store::`,
-        },
-      ],
-    },
-    {
       name: "pester",
       checks: [
         {
@@ -642,7 +551,7 @@ export function buildPlan({ profile, areas, env = {}, isPullRequest = true }) {
       `rc=0; bash scripts/ci/nextest-coverage.sh ${output.replace(/^lcov-|\.info$/g, "")} cargo llvm-cov nextest --profile ci --no-fail-fast --no-tests=fail --no-report ${args} || rc=$?; ` +
       `cargo llvm-cov report --manifest-path ${manifest} --lcov --output-path ci-out/lcov/${output} || { report_rc=$?; if [ "$rc" -eq 0 ]; then rc=$report_rc; fi; }; exit "$rc"`;
     for (const lane of lanes) {
-      if (!["rust-gates-off", "storage-drivers"].includes(lane.name)) continue;
+      if (lane.name !== "rust-gates-off") continue;
       for (const check of lane.checks) {
         if (!check.run.startsWith("cargo test ")) continue;
         const [cargoArgs, filters] = check.run
@@ -672,16 +581,6 @@ export function buildPlan({ profile, areas, env = {}, isPullRequest = true }) {
           `${args}${expression}${serial}`,
           `lcov-${check.name}.info`,
         );
-        if (check.name === "storage-e2e") {
-          // Every explicitly selected storage target must report tests; a
-          // nonempty aggregate alone would hide an accidentally empty target.
-          check.env.NEXTEST_EXPECTED_TARGETS =
-            "ci-out/nextest/storage-e2e-expected-targets.txt";
-          check.run =
-            'mkdir -p "$(dirname "$NEXTEST_EXPECTED_TARGETS")" || exit $?; ' +
-            `printf '%s\\n' ${STORAGE_E2E_TARGETS.map((target) => `'${target}'`).join(" ")} > "$NEXTEST_EXPECTED_TARGETS" || exit $?; ` +
-            check.run;
-        }
       }
     }
     const tauriLane = lanes.find((l) => l.name === "tauri");
