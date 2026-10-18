@@ -53,6 +53,44 @@ async fn a_storage_url_installs_the_driver_backed_store() {
     crate::core_host::agent::session_store::restore(previous);
 }
 
+/// A SQLite storage URL installs the driver-backed store, and two agents on
+/// the same backend keep their turn states apart.
+async fn driver_backed_store_keeps_agents_apart(url: String, driver: &str) {
+    let _turn = SLOTS.lock().await;
+    let previous = crate::core_host::agent::session_store::installed();
+    let previous_backend = crate::core_host::storage::installed();
+    install_for_url(Some(url)).await.unwrap();
+
+    assert_eq!(
+        crate::core_host::storage::installed().map(|backend| backend.driver()),
+        Some(driver)
+    );
+    let provider = crate::core_host::agent::session_store::installed().unwrap();
+    let alice = provider.for_agent("alice");
+    alice
+        .turn_states
+        .put(&TurnState::started("t", "r", 8, "2026-01-01T00:00:00Z"))
+        .unwrap();
+    assert!(alice.turn_states.get("t").unwrap().is_some());
+    assert!(provider
+        .for_agent("bob")
+        .turn_states
+        .get("t")
+        .unwrap()
+        .is_none());
+
+    restore_backend(previous_backend);
+    crate::core_host::agent::session_store::restore(previous);
+}
+
+#[cfg(feature = "storage-sqlite")]
+#[tokio::test(flavor = "multi_thread")]
+async fn the_sqlite_backend_keeps_agents_apart() {
+    let dir = tempfile::tempdir().unwrap();
+    let url = format!("sqlite:{}", dir.path().join("sessions").display());
+    driver_backed_store_keeps_agents_apart(url, "sqlite").await;
+}
+
 #[tokio::test]
 async fn an_unusable_url_fails_the_boot() {
     let _turn = SLOTS.lock().await;

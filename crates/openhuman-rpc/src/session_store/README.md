@@ -48,4 +48,4 @@ database.
 | File | Contents |
 | --- | --- |
 | [`mod.rs`](mod.rs) | `install_for_host`, `provider_for_host`, `install_for_url`, `provider_for_url`, `install_for_saas`, and the URL resolution. |
-| [`mod_tests.rs`](mod_tests.rs) | Storage URL installation, environment URL resolution, an unusable URL, and the no-URL SaaS case. TinyAgents owns driver conformance tests. |
+| [`mod_tests.rs`](mod_tests.rs) | Storage URL installation, SQLite agent isolation, environment URL resolution, an unusable URL, and the no-URL SaaS case. TinyAgents owns driver conformance tests. |
