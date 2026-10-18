@@ -6,8 +6,13 @@ impl AttachmentModel {
         mime: &str,
         bytes: &[u8],
     ) -> tinyinference_llm::Result<(String, bool)> {
+        #[cfg(feature = "documents")]
         let mut cacheable = true;
+        #[cfg(not(feature = "documents"))]
+        let cacheable = false;
         let mut text = String::new();
+        #[cfg(not(feature = "documents"))]
+        let _ = (path, mime, bytes);
         #[cfg(feature = "documents")]
         {
                 use tinydocs_bus::DocumentFormat;

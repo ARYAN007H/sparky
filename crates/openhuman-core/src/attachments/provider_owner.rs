@@ -173,17 +173,15 @@ impl MediaFallbackRenderer<AttachmentAccessScope> for AttachmentModel {
             if let Some(text) = self.cached_fallback(&attachment.name, &key, _scope).await {
                 return Ok(Some(text));
             }
-            let (text, cacheable) = self.fallback(
-                modality,
+            let (text, cacheable) = self.document_fallback(
                 &attachment.name,
                 &attachment.mime,
                 &attachment.bytes,
             ).await.map_err(|error| error.to_string())?;
-            let body = text.split_once('\n').map(|(_, body)| body.to_owned()).unwrap_or(text);
             if cacheable {
-                self.save_fallback(&attachment.name, &key, &body, _scope).await;
+                self.save_fallback(&attachment.name, &key, &text, _scope).await;
             }
-            return Ok(Some(body));
+            return Ok(Some(text));
         }
         Ok(None)
     }
