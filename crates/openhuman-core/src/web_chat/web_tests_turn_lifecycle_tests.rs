@@ -177,8 +177,7 @@ async fn a_turn_whose_provider_is_unreachable_ends_in_one_classified_chat_error(
     // Fail against a deterministic local endpoint. The managed default needs
     // a host backend transport, which this in-process test intentionally does
     // not install.
-    config.chat_provider = Some("openhuman".to_owned());
-    config.default_model = Some("ollama:qwen3:4b-instruct".to_owned());
+    config.chat_provider = Some("ollama:qwen3:4b-instruct".to_owned());
     config.local_ai.base_url = Some("http://127.0.0.1:1".to_owned());
     std::fs::create_dir_all(&config.workspace_dir).expect("workspace dir");
     let ctx = DispatchCtx::new(CoreContext::for_test_with_config(
