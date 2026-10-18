@@ -252,6 +252,7 @@ async fn start_chat_inner(
 
     let mode = parse_mode(queue_mode.as_deref());
     let request_id = Uuid::new_v4().to_string();
+    let preview = crate::agent::queued_turn::text_preview(&message);
     let scope = scope_of(ctx);
     let queued_at_ms = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -329,7 +330,7 @@ async fn start_chat_inner(
                 mode: mode.to_string(),
                 queue_depth,
                 item_id: Some(request_id.clone()),
-                text_preview: None,
+                text_preview: Some(preview),
             });
             Ok(json!({
                 "queued": true,
