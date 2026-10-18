@@ -170,8 +170,8 @@ export function buildPlan({ profile, areas, env = {}, isPullRequest = true }) {
 
   // Not run on pull requests: the core doctests (an uninstrumented core build
   // of their own) and the TinyJuice host-module regression (one test against
-  // the downloaded module). CI Lite runs both on every push to `main` that
-  // touches the Rust core (rust-coverage.sh and its rust-core-coverage job).
+  // the downloaded module). CI Lite, which ran both on pushes to `main`, is
+  // gone; today only the release pretest runs them (test-reusable.yml).
   // openhuman-tui's tests DO run on pull requests: the rust-core path filter
   // arms this job for any change under core, embed, tinyhumans, rpc, cli or
   // tui, which is every crate the TUI depends on.
