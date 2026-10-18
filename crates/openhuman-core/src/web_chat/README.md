@@ -361,3 +361,16 @@ pnpm debug rust web_chat
 - [Chat](../../../../docs/gitbooks/en/features/chat.md)
 - [Agent harness architecture](../../../../docs/gitbooks/en/developing/architecture/agent-harness.md)
 - [Frontend architecture](../../../../docs/gitbooks/en/developing/architecture/frontend.md)
+
+## Voice notes
+
+`voice_notes.rs` stores the audio behind in-app voice notes under
+`<workspace>/voice_notes/<note_id>.<ext>`; thread rows carry only
+`extraMetadata.voiceNote = { noteId, mime, durationMs?, waveform? }`.
+
+- `channel.web_voice_note_store` / `channel.web_voice_note_read` move audio between
+  the composer/player and the store (base64 over JSON-RPC).
+- A turn that is spoken (`speak_reply`, or `[channel_voice]` mode `always`, or
+  `mirror` when the turn's `source` is `voice_note`) stores its synthesized reply as
+  `reply-<request_id>`; `persist_delivered_reply` then stamps `voiceNote` on the
+  reply row, so the reply is replayable after a reload.
