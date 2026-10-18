@@ -117,13 +117,21 @@ async fn host_supplemental_generation_is_journaled_without_loop_progress_or_bill
         call_id: supplemental.clone(),
         model: "mock-model".into(),
     });
+    let mut cached_usage = Usage::new(50, 12);
+    cached_usage.charged_amount = Some(tinyinference_llm::usage::ChargedAmount::usd_micros(8_000));
+    sink.emit(AgentEvent::ModelResponseCached {
+        call_id: supplemental.clone(),
+    });
     sink.emit(AgentEvent::UsageRecorded {
-        usage: Usage::new(50, 12),
+        usage: cached_usage,
     });
     sink.emit(AgentEvent::ModelCompleted {
         call_id: supplemental,
         started_at_ms: Some(1),
-        usage: Some(Usage::new(50, 12)),
+        usage: Some(Usage {
+            charged_amount: Some(tinyinference_llm::usage::ChargedAmount::usd_micros(8_000)),
+            ..Usage::new(50, 12)
+        }),
         input: Some(serde_json::json!(["private prompt"])),
         output: Some(serde_json::json!("private response")),
     });

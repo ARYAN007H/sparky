@@ -196,7 +196,7 @@ async fn prepared_child_run_is_exported_from_its_native_journal_lineage() {
         .iter()
         .find(|span| {
             span.attributes
-                .get("run_id")
+                .get("run.id")
                 .is_some_and(|id| id == child_run_id.as_str())
         })
         .expect("native collector projects the actual linked child");

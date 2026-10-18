@@ -324,6 +324,47 @@ fn supplemental_cached_response_is_marked_before_usage_without_provider_charge()
         && enrichment.estimated_cost_usd.is_none()));
 }
 
+#[test]
+fn supplemental_free_route_uses_zero_catalog_rates() {
+    use std::sync::{Arc, Mutex};
+    use tinyagents_harness::events::{AgentEvent, EventListener, EventSink};
+    use tinyagents_harness::ids::RunId;
+
+    #[derive(Default)]
+    struct Recorder(Mutex<Vec<AgentEvent>>);
+    impl EventListener for Recorder {
+        fn on_event(&self, record: &tinyagents_harness::events::EventRecord) {
+            self.0.lock().unwrap().push(record.event.clone());
+        }
+    }
+
+    let run_id = RunId::new("host-supplemental-free-fixture");
+    let sink = EventSink::with_stream_id(run_id.as_str());
+    let recorder = Arc::new(Recorder::default());
+    sink.subscribe(recorder.clone());
+    let trace = SupplementalTrace::new(sink, run_id);
+    let (call_id, started_at_ms) = trace.begin("openrouter/test-model:free");
+    let response = tinyinference_llm::model::ModelResponse::assistant("free answer");
+    trace.completed(
+        call_id,
+        "openrouter/test-model:free",
+        started_at_ms,
+        serde_json::json!(["free prompt"]),
+        &response,
+    );
+
+    let records = recorder.0.lock().unwrap();
+    let enrichment = records.iter().find_map(|event| match event {
+        AgentEvent::GenerationEnriched { enrichment, .. } => Some(enrichment),
+        _ => None,
+    }).expect("supplemental generation carries catalog enrichment");
+    let pricing = enrichment.pricing.as_ref().expect("free routes have known zero rates");
+    assert_eq!(pricing.input_per_mtok_usd, Some(0.0));
+    assert_eq!(pricing.cached_input_per_mtok_usd, Some(0.0));
+    assert_eq!(pricing.output_per_mtok_usd, Some(0.0));
+    assert_eq!(enrichment.estimated_cost_usd, None);
+}
+
 /// #6951: a turn that ended because the model ran out of output tokens while
 /// reasoning is closed with that cause named, not with "you have finished
 /// using tools" — which told the model its unfinished work was done.
