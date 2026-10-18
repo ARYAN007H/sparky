@@ -1,6 +1,6 @@
-//! Concrete [`PromptSection`] implementations.
+//! OpenHuman-owned prompt content sections.
 //!
-//! Each unit struct renders one logical block of the system prompt.
+//! Each unit struct renders one logical block of OpenHuman's system prompt.
 //! The rendering logic delegates to the free helpers in
 //! workspace-file helpers re-exported by [`super`] for workspace-file injection and
 //! sub-agent plumbing.
@@ -30,7 +30,7 @@ impl ArchetypePromptSection {
     }
 }
 
-impl PromptSection for ArchetypePromptSection {
+impl ArchetypePromptSection {
     fn name(&self) -> &str {
         "archetype_prompt"
     }
@@ -59,23 +59,14 @@ impl DynamicPromptSection {
     }
 }
 
-impl PromptSection for DynamicPromptSection {
+impl tinyagents_harness::prompt::DynamicPromptSection<PromptContext<'_>> for DynamicPromptSection {
     fn name(&self) -> &str {
         "dynamic_prompt"
     }
 
-    fn tier(&self) -> PromptTier {
-        // A builder that declares no tiers is treated as all-volatile, the
-        // conservative reading: nothing stable is placed behind it by mistake.
-        PromptTier::Volatile
-    }
-
-    fn build(&self, ctx: &PromptContext<'_>) -> Result<String> {
-        (self.builder)(ctx)
-    }
-
-    fn build_parts(&self, ctx: &PromptContext<'_>) -> Result<Vec<(PromptTier, String)>> {
-        let body = (self.builder)(ctx)?;
+    fn render(&self, ctx: &PromptContext<'_>) -> tinyagents_harness::Result<Vec<TieredPromptPart>> {
+        let body = (self.builder)(ctx)
+            .map_err(|error| tinyagents_harness::TinyAgentsError::Model(error.to_string()))?;
         let has_marker =
             body.contains(PROMPT_TIER_CONTEXT_MARKER) || body.contains(PROMPT_TIER_VOLATILE_MARKER);
         // A builder that marks its tiers starts in `Stable`; one that does not
@@ -139,7 +130,7 @@ pub struct PersonalityRosterSection;
 // PromptSection implementations
 // ─────────────────────────────────────────────────────────────────────────────
 
-impl PromptSection for PersonalityRosterSection {
+impl PersonalityRosterSection {
     fn tier(&self) -> PromptTier {
         // Carries each personality's recent context, which the session rewrites.
         PromptTier::Volatile
@@ -179,7 +170,7 @@ impl PromptSection for PersonalityRosterSection {
     }
 }
 
-impl PromptSection for IdentitySection {
+impl IdentitySection {
     fn name(&self) -> &str {
         "identity"
     }
@@ -215,7 +206,7 @@ impl PromptSection for IdentitySection {
     }
 }
 
-impl PromptSection for AgentsInstructionsSection {
+impl AgentsInstructionsSection {
     fn tier(&self) -> PromptTier {
         // AGENTS.md layers: per project and per install, stable within a session.
         PromptTier::Context
@@ -236,7 +227,7 @@ impl PromptSection for AgentsInstructionsSection {
     }
 }
 
-impl PromptSection for ToolsSection {
+impl ToolsSection {
     fn name(&self) -> &str {
         "tools"
     }
@@ -314,7 +305,7 @@ impl PromptSection for ToolsSection {
     }
 }
 
-impl PromptSection for SafetySection {
+impl SafetySection {
     fn name(&self) -> &str {
         "safety"
     }
@@ -364,7 +355,7 @@ pub const GROUNDING_BODY: &str = "## Grounding and tool use\n\n\
     - Never delete state, data or services the solution needs at runtime, including during cleanup. Before finishing, verify the final state the way a fresh consumer would see it.\n\
     - Skills run only via `run_workflow`, and only the skills listed as installed exist. Do not invent skill ids.";
 
-impl PromptSection for GroundingSection {
+impl GroundingSection {
     fn name(&self) -> &str {
         "grounding"
     }
@@ -374,7 +365,7 @@ impl PromptSection for GroundingSection {
     }
 }
 
-impl PromptSection for WorkspaceSection {
+impl WorkspaceSection {
     fn tier(&self) -> PromptTier {
         // Names the resolved workspace; per install, not per build.
         PromptTier::Context
@@ -420,7 +411,7 @@ impl PromptSection for WorkspaceSection {
     }
 }
 
-impl PromptSection for RuntimeSection {
+impl RuntimeSection {
     fn tier(&self) -> PromptTier {
         // Host runtime facts; per install, not per build.
         PromptTier::Context
@@ -446,7 +437,7 @@ impl PromptSection for RuntimeSection {
     }
 }
 
-impl PromptSection for DateTimeSection {
+impl DateTimeSection {
     fn tier(&self) -> PromptTier {
         // The live clock is carried in the user message. This section is static.
         PromptTier::Stable
@@ -488,7 +479,7 @@ impl PromptSection for DateTimeSection {
     }
 }
 
-impl PromptSection for UserIdentitySection {
+impl UserIdentitySection {
     fn tier(&self) -> PromptTier {
         // The signed-in user, which changes on login and on logout.
         PromptTier::Volatile
