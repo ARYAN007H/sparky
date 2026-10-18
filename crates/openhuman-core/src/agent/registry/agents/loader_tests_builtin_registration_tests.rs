@@ -179,6 +179,7 @@ fn every_builtin_has_a_prompt_body() {
                     personality_roster: vec![],
                     agents_md_global: None,
                     agents_md_local: None,
+                    flow_archetype_text: None,
                 };
                 let body =
                     build(&ctx).unwrap_or_else(|e| panic!("{} prompt build failed: {e}", def.id));

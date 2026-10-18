@@ -103,6 +103,7 @@ pub fn render_subagent_system_prompt_with_format(
     _connected_integrations: &[ConnectedIntegration],
     agents_md_global: Option<&str>,
     agents_md_local: Option<&str>,
+    flow_archetype_text: None,
 ) -> String {
     let mut out = String::new();
 
