@@ -7,7 +7,7 @@ use tinytools::ToolSpec;
 
 #[tokio::test]
 async fn committed_progress_uses_each_turns_receipt_sender() {
-    use crate::agent::progress::AgentProgress;
+    use tinyagents_harness::progress::AgentProgress;
     use tinyagents_runtime::{
         CommitReceipt, ResumeMode, SessionTurnOutcome, TranscriptTurnOptions,
     };
@@ -61,7 +61,7 @@ async fn committed_progress_uses_each_turns_receipt_sender() {
 /// completion and nobody can find it.
 #[tokio::test]
 async fn committed_progress_carries_the_sidecar_stop_on_turn_completed() {
-    use crate::agent::progress::AgentProgress;
+    use tinyagents_harness::progress::AgentProgress;
     use tinyagents_harness::turn_stop::TurnStopKind;
     use tinyagents_runtime::{
         CommitReceipt, ResumeMode, SessionTurnOutcome, TranscriptTurnOptions,
@@ -136,7 +136,7 @@ fn clearing_progress_releases_warm_prelude_sender() {
 /// an event that was dropped.
 #[tokio::test]
 async fn committed_turn_completion_waits_for_a_full_progress_channel() {
-    use crate::agent::progress::AgentProgress;
+    use tinyagents_harness::progress::AgentProgress;
 
     let (tx, mut rx) = tokio::sync::mpsc::channel(1);
     tx.send(AgentProgress::TurnStarted).await.unwrap();
@@ -173,7 +173,7 @@ async fn committed_turn_completion_waits_for_a_full_progress_channel() {
 /// deadline passes, the committed chat response must still be able to return.
 #[tokio::test(start_paused = true)]
 async fn committed_turn_completion_is_bounded_when_progress_stalls() {
-    use crate::agent::progress::AgentProgress;
+    use tinyagents_harness::progress::AgentProgress;
 
     let (tx, mut rx) = tokio::sync::mpsc::channel(1);
     tx.send(AgentProgress::TurnStarted).await.unwrap();

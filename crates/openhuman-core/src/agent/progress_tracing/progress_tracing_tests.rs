@@ -1,7 +1,7 @@
 //! Unit tests for the structured tracing export (issue #3886).
 
 use super::*;
-use crate::agent::progress::AgentProgress;
+use tinyagents_harness::progress::AgentProgress;
 use crate::config::schema::{AgentTracingBackend, AgentTracingConfig, ObservabilityConfig};
 
 fn ctx() -> TraceContext {

@@ -113,7 +113,7 @@ pub enum TurnOutcome {
     },
 }
 
-/// Pure state machine that folds an [`crate::agent::progress::AgentProgress`]
+/// Pure state machine that folds an [`tinyagents_harness::progress::AgentProgress`]
 /// stream into spans.
 ///
 /// Call [`record`](Self::record) for each event (with a millisecond

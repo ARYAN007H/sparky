@@ -1,5 +1,5 @@
 use super::*;
-use crate::agent::progress::AgentProgress;
+use tinyagents_harness::progress::AgentProgress;
 
 fn user(text: &str) -> Message {
     Message::user(text)

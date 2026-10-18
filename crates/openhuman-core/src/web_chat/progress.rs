@@ -23,7 +23,7 @@ use tinychannels_bus::web::{
 use super::progress_ledger::{ChildDone, Ledger};
 use super::progress_map as map;
 use super::surface::{Surface, TurnIds};
-use crate::agent::progress::AgentProgress;
+use tinyagents_harness::progress::AgentProgress;
 use crate::agent::progress_tracing::SpanCollector;
 use crate::config::Config;
 use crate::core::runtime::DispatchCtx;

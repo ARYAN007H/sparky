@@ -35,7 +35,7 @@ async fn clearing_progress_after_a_turn_closes_the_receiver() {
         while let Some(event) = rx.recv().await {
             saw_completed |= matches!(
                 event,
-                crate::agent::progress::AgentProgress::TurnCompleted { .. }
+                tinyagents_harness::progress::AgentProgress::TurnCompleted { .. }
             );
         }
         assert!(saw_completed, "turn must still report TurnCompleted");

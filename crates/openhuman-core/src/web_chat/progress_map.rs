@@ -5,7 +5,6 @@
 //! file builds no `WebChannelEvent`. Payload caps are applied here, before the
 //! projection, so a multi-megabyte tool result never reaches the socket.
 
-use crate::agent::subagent_host::SubagentUsageExt as _;
 use serde::Serialize;
 use serde_json::Value;
 use tinychannels_bus::module_progressive::{
@@ -13,7 +12,7 @@ use tinychannels_bus::module_progressive::{
 };
 use tinychannels_bus::web::{cap_web_args, cap_web_output};
 
-use crate::agent::progress::AgentProgress;
+use tinyagents_harness::progress::AgentProgress;
 
 type Failure = tinytools::status::ClassifiedFailure;
 
@@ -213,7 +212,7 @@ pub(super) fn sub_completed(
     iterations: u32,
     output_chars: usize,
     output: String,
-    usage: Option<&crate::agent::subagent_host::SubagentUsage>,
+    usage: Option<&tinyagents_harness::progress::SubagentUsage>,
     worktree_path: Option<String>,
     changed_files: Vec<String>,
     dirty_status: Option<bool>,

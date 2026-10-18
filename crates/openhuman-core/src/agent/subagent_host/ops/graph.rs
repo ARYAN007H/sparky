@@ -53,7 +53,7 @@ pub(super) use dispatch::AggregatedUsage;
 // of the original flat imports now live with the code that uses them, in
 // `dispatch.rs` / `transcript.rs` / `worker_mirror.rs`).
 #[cfg(test)]
-use crate::agent::progress::AgentProgress;
+use tinyagents_harness::progress::AgentProgress;
 #[cfg(test)]
 use std::collections::HashSet;
 #[cfg(test)]

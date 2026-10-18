@@ -5,7 +5,7 @@ use tokio::sync::mpsc;
 use super::posture;
 use crate::agent::bus::AgentTurnResponse;
 use crate::agent::host_agents::HostAgent;
-use crate::agent::progress::AgentProgress;
+use tinyagents_harness::progress::AgentProgress;
 use crate::agent::turn_origin::AgentTurnOrigin;
 use tinyagents_session::transcript::TranscriptMessage;
 

@@ -3,7 +3,7 @@
 //! delivering the draft/final reply.
 
 use crate::agent::bus::AgentTurnResponse;
-use crate::agent::progress::AgentProgress;
+use tinyagents_harness::progress::AgentProgress;
 use crate::channels::context::{
     compact_sender_history, is_context_window_overflow_error, ChannelRuntimeContext,
 };

@@ -8,7 +8,7 @@
 
 use crate::agent::context::ContextManager;
 use crate::agent::hooks::PostTurnHook;
-use crate::agent::progress::AgentProgress;
+use tinyagents_harness::progress::AgentProgress;
 use crate::agent::prompts::SystemPromptBuilder;
 use crate::agent::tinyagents::TurnModelSource;
 use std::sync::Arc;

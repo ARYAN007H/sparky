@@ -84,7 +84,7 @@ async fn typed_mode_model_override_pins_exact_model_for_spawn() {
 /// `subagent_tool_result` socket events the parent thread renders.
 #[tokio::test]
 async fn typed_mode_emits_child_progress_events_when_sink_attached() {
-    use crate::agent::progress::AgentProgress;
+    use tinyagents_harness::progress::AgentProgress;
 
     let provider = ScriptedProvider::new(vec![
         tool_response("file_read", "{\"path\":\"x\"}"),
@@ -167,7 +167,7 @@ async fn typed_mode_emits_child_progress_events_when_sink_attached() {
 /// `subagent_thinking_delta` socket events the parent thread renders live.
 #[tokio::test]
 async fn typed_mode_forwards_child_text_and_thinking_deltas() {
-    use crate::agent::progress::AgentProgress;
+    use tinyagents_harness::progress::AgentProgress;
 
     let provider = ScriptedProvider::new(vec![text_response_with_reasoning(
         "the final answer",

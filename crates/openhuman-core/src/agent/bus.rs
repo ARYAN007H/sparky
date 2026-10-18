@@ -20,7 +20,7 @@ use std::sync::Arc;
 
 use tokio::sync::mpsc;
 
-use crate::agent::progress::AgentProgress;
+use tinyagents_harness::progress::AgentProgress;
 use crate::agent::turn_origin::{self, AgentTurnOrigin};
 use crate::config::MultimodalConfig;
 use crate::core::bus::BUS;

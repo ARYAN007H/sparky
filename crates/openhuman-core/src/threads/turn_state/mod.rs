@@ -7,7 +7,7 @@
 //! unclean shutdown at cold boot.
 //! `tinyagents_session::turn_state::TurnStateMirror` is the writer — it is driven by
 //! [`mirror::ObserveProgress`], which translates
-//! [`crate::agent::progress::AgentProgress`] events into [`types::TurnState`]
+//! [`tinyagents_harness::progress::AgentProgress`] events into [`types::TurnState`]
 //! mutations and flushes to the store at iteration / tool boundaries (not on
 //! every streaming delta), keeping `Completed` snapshots so the UI can replay
 //! a finished turn.

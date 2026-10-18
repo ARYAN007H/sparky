@@ -42,7 +42,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use super::error::CoreError;
-use openhuman_core::agent::progress::AgentProgress;
+use openhuman_core::tinyagents_harness::progress::AgentProgress;
 use openhuman_core::agent::turn_origin::AgentTurnOrigin;
 use openhuman_core::core::runtime::CoreRuntime;
 use openhuman_core::inference::INFERENCE_AGENT_CHAT as AGENT_CHAT;

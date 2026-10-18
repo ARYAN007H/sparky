@@ -189,7 +189,7 @@ impl SubagentRunOutcome {
 /// outcome so the parent turn can fold sub-agent spend into the session-level
 /// token/cost meters surfaced in the UI footer. The type is TinyAgents'
 /// (`AgentProgress::SubagentCompleted` carries it).
-pub use tinyagents_harness::progress::SubagentUsage;
+use tinyagents_harness::progress::SubagentUsage;
 
 /// The run's cost as a tally, for folding into a parent's.
 pub trait SubagentUsageExt {

@@ -1,5 +1,5 @@
 use super::*;
-use crate::agent::progress::AgentProgress;
+use tinyagents_harness::progress::AgentProgress;
 use crate::config::Config;
 use crate::web_chat::WebChannelEvent;
 use std::time::Duration;
@@ -105,7 +105,7 @@ async fn tool_call_completed_forwards_real_output_on_tool_result() {
         crate::core::runtime::DispatchCtx::ambient(),
     );
 
-    tx.send(crate::agent::progress::AgentProgress::ToolCallCompleted {
+    tx.send(tinyagents_harness::progress::AgentProgress::ToolCallCompleted {
         call_id: "call-1".into(),
         tool_name: "web_search".into(),
         success: true,

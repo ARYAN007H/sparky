@@ -7,7 +7,7 @@
 use std::sync::{Arc, Mutex};
 
 /// Attribution for child (sub-agent) progress. When present, the bridge routes
-/// events to the `Subagent*` [`AgentProgress`](crate::agent::progress::AgentProgress)
+/// events to the `Subagent*` [`AgentProgress`](tinyagents_harness::progress::AgentProgress)
 /// variants (so the parent thread can nest child activity under a live
 /// subagent row) instead of the top-level ones. Absent = a parent/top-level
 /// turn.

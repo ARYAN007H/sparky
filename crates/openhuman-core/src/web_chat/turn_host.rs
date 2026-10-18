@@ -36,7 +36,7 @@ use super::types::WebChatTaskResult;
 use super::web_errors::{
     inference_budget_exceeded_user_message, is_inference_budget_exceeded_error,
 };
-use crate::agent::progress::AgentProgress;
+use tinyagents_harness::progress::AgentProgress;
 use crate::agent::queued_turn::QueuedPayload;
 use crate::agent::turn_origin::{with_origin, AgentTurnOrigin};
 use crate::core::events::DomainEvent;

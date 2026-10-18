@@ -97,7 +97,7 @@ struct OpenHumanTurnPrelude {
     workspace_descriptor: Option<tinytools::WorkspaceDescriptor>,
     session_key: String,
     session_parent_prefix: Option<String>,
-    on_progress: Option<tokio::sync::mpsc::Sender<crate::agent::progress::AgentProgress>>,
+    on_progress: Option<tokio::sync::mpsc::Sender<tinyagents_harness::progress::AgentProgress>>,
     run_queue:
         Option<Arc<tinyagents_harness::run_queue::RunQueue<crate::agent::queued_turn::QueuedTurn>>>,
     host_env: crate::agent::turn_env::HostTurnEnv,
@@ -542,7 +542,7 @@ pub(super) use usage::{account_committed_turn_against_goal, holistic_last_turn_u
 impl OpenHumanSessionHost {
     pub(super) fn update_runtime_prelude_progress(
         &mut self,
-        tx: Option<tokio::sync::mpsc::Sender<crate::agent::progress::AgentProgress>>,
+        tx: Option<tokio::sync::mpsc::Sender<tinyagents_harness::progress::AgentProgress>>,
     ) {
         if let Some(prelude) = self
             .runtime_state

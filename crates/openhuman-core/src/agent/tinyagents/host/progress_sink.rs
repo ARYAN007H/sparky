@@ -109,7 +109,7 @@ use tokio::sync::mpsc::Sender;
 
 use tinyagents_harness::host::{ProgressEvent, ProgressSink};
 
-use crate::agent::progress::AgentProgress;
+use tinyagents_harness::progress::AgentProgress;
 
 /// How long a **lifecycle** event may wait for room on a full channel.
 ///

@@ -22,7 +22,7 @@ use std::sync::{Arc, Mutex};
 
 use tinyagents_harness::turn_runner::TurnSignal;
 
-use crate::agent::progress::AgentProgress;
+use tinyagents_harness::progress::AgentProgress;
 
 /// Default idle window for a web-chat turn, in seconds.
 pub(crate) const DEFAULT_TURN_IDLE_SECS: u64 = 900;

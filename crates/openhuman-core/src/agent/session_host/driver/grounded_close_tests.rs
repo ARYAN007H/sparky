@@ -301,7 +301,7 @@ async fn timed_out_close_keeps_the_usage_of_finished_calls() {
 /// accumulator still holds the call.
 #[tokio::test(start_paused = true)]
 async fn timed_out_repair_keeps_the_usage_of_its_answered_call() {
-    use crate::agent::progress::AgentProgress;
+    use tinyagents_harness::progress::AgentProgress;
     let source = crate::agent::tinyagents::TurnModelSource::from_model(std::sync::Arc::new(
         tinyagents_harness::testkit::ScriptedModel::replies(vec!["no block"]),
     ));

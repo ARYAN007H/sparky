@@ -142,7 +142,7 @@ fn a_spawned_subagent_is_attributed_to_the_parents_round_and_call() {
 
 #[test]
 fn a_finished_subagent_carries_its_iterations_result_spend_and_worktree() {
-    let usage = crate::agent::subagent_host::SubagentUsage {
+    let usage = tinyagents_harness::progress::SubagentUsage {
         input_tokens: 5,
         output_tokens: 6,
         cached_input_tokens: 1,
@@ -180,7 +180,7 @@ fn a_finished_subagent_carries_its_iterations_result_spend_and_worktree() {
 
 #[test]
 fn an_unknown_cost_reads_as_zero_spend_not_missing_tokens() {
-    let usage = crate::agent::subagent_host::SubagentUsage {
+    let usage = tinyagents_harness::progress::SubagentUsage {
         input_tokens: 9,
         ..Default::default()
     };

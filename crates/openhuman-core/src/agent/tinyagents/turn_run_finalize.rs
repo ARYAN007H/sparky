@@ -12,7 +12,7 @@ use tinyagents_harness::middleware::AgentRun;
 use tinyagents_harness::middleware::{ContextCompressionMiddleware, PromptCacheGuardMiddleware};
 use tokio::sync::mpsc::Sender;
 
-use crate::agent::progress::AgentProgress;
+use tinyagents_harness::progress::AgentProgress;
 use crate::agent::tinyagents::journal::TurnJournal;
 use crate::agent::tinyagents::observability::{self, OpenhumanEventBridge, SubagentScope};
 use crate::agent::tinyagents::turn_outcome::TinyagentsTurnOutcome;

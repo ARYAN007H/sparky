@@ -8,7 +8,7 @@ use std::time::Duration;
 use log::{info, warn};
 use serde_json::Value;
 
-use crate::agent::progress::AgentProgress;
+use tinyagents_harness::progress::AgentProgress;
 use crate::agent::session_host::OpenHumanSessionHost;
 use crate::agent::turn_origin::{with_origin, AgentTurnOrigin};
 

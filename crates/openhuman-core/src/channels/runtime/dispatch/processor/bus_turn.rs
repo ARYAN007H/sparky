@@ -2,7 +2,7 @@
 //! to the `agent.run_turn` handler, with the orchestrator's tool scoping.
 
 use crate::agent::bus::{AgentTurnRequest, AgentTurnResponse, AGENT_RUN_TURN_METHOD};
-use crate::agent::progress::AgentProgress;
+use tinyagents_harness::progress::AgentProgress;
 use crate::agent::turn_origin::AgentTurnOrigin;
 use crate::channels::context::{ChannelRouteSelection, ChannelRuntimeContext};
 use crate::core::bus::BUS;

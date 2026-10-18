@@ -9,7 +9,7 @@ use tokio::sync::mpsc::Sender;
 
 use tinyinference_llm::usage::Usage;
 
-use crate::agent::progress::AgentProgress;
+use tinyagents_harness::progress::AgentProgress;
 use crate::inference::provider::BilledUsage;
 use tinytools::humanize_tool_name;
 
