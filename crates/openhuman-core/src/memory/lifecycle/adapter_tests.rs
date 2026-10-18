@@ -16,7 +16,7 @@ fn native_pack_hits_convert_to_the_web_chat_citation_view() {
     let native = NativeTurnPack {
         markdown: "shown memory".into(),
         tokens: 2,
-        refs: vec![ItemId::from("first"), ItemId::from("second")],
+        refs: vec!["first".into(), "second".into()],
         engine: "test".into(),
         citations: vec![hit("first"), hit("second")],
         refusal: None,
@@ -119,11 +119,18 @@ async fn replaying_a_committed_reply_does_not_queue_its_build_twice() {
     let committed = reply("replayed-thread", 1, "The reply is committed.");
 
     run_post_turn(&config, &identity, committed.clone()).await;
-    let first = jobs::snapshot(&config).await.pending;
+    let first = crate::memory::lifecycle::jobs::snapshot(&config)
+        .await
+        .pending;
     assert_eq!(first.len(), 1);
 
     run_post_turn(&config, &identity, committed).await;
-    assert_eq!(jobs::snapshot(&config).await.pending, first);
+    assert_eq!(
+        crate::memory::lifecycle::jobs::snapshot(&config)
+            .await
+            .pending,
+        first
+    );
 }
 
 #[test]
