@@ -342,7 +342,16 @@ async fn stale_document_config_snapshot_returns_conflict_instead_of_overwriting(
         storage_error.kind(),
         tinystoragedrivers::ErrorKind::Conflict
     );
-    let rpc_error = crate::config::ops::config_save_error(error);
+    let _ = error;
+    let rpc_error = crate::config::ops::apply_autonomy_settings(
+        &mut stale,
+        crate::config::ops::AutonomySettingsPatch {
+            enabled: Some(true),
+            ..Default::default()
+        },
+    )
+    .await
+    .unwrap_err();
     let rpc_error = crate::core::StructuredRpcError::decode(&rpc_error)
         .expect("config RPC boundary exposes a structured conflict");
     assert_eq!(rpc_error.data.unwrap()["kind"], "ConfigConflict");
