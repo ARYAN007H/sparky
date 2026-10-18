@@ -20,6 +20,72 @@ fn thread(id: &str) -> PendingDeletion {
     }
 }
 
+#[test]
+fn offline_conversation_purge_queues_exact_thread_ids_in_its_workspace() {
+    use crate::threads::store::{ensure_thread, purge_threads, CreateConversationThread};
+
+    let tmp = tempfile::tempdir().unwrap();
+    let workspace = tmp.path().join("pre-login-workspace");
+    let other_workspace = tmp.path().join("other-workspace");
+    let ctx = crate::core::runtime::DispatchCtx::unbound();
+    let create = |id: &str| CreateConversationThread {
+        id: id.to_string(),
+        title: format!("Title {id}"),
+        created_at: "2026-10-18T00:00:00Z".to_string(),
+        parent_thread_id: None,
+        labels: None,
+        personality_id: None,
+        working_dir: None,
+    };
+
+    ensure_thread(&ctx, workspace.clone(), create("channel-thread-a")).unwrap();
+    ensure_thread(&ctx, workspace.clone(), create("channel-thread-b")).unwrap();
+    enqueue(&other_workspace, thread("other-workspace-thread"));
+
+    let stats = purge_threads(&ctx, workspace.clone()).unwrap();
+
+    assert_eq!(stats.thread_count, 2);
+    assert_eq!(
+        pending(&workspace),
+        vec![thread("channel-thread-a"), thread("channel-thread-b")]
+    );
+    assert_eq!(pending(&other_workspace), vec![thread("other-workspace-thread")]);
+}
+
+#[tokio::test]
+async fn draining_purged_thread_deletions_keeps_learning_beliefs() {
+    use tinymemory_api::LearningKind;
+
+    let tmp = tempfile::tempdir().unwrap();
+    let config = config_in(&tmp);
+    enqueue(&config.workspace_dir, thread("purged-channel-thread"));
+    let engine = bind_reference(&config);
+    engine
+        .store(conversation("purged-channel-thread", "temporary transcript"))
+        .await
+        .unwrap();
+    engine
+        .store(StoreItem::learning(
+            "durable preference",
+            LearningKind::Preference,
+            0.9,
+            MemoryMeta {
+                thread_id: Some("purged-channel-thread".to_string()),
+                ..MemoryMeta::default()
+            },
+        ))
+        .await
+        .unwrap();
+
+    assert_eq!(drain(&config).await, 1);
+
+    let left = stored(&engine, MetaFilter::default()).await;
+    assert_eq!(left.len(), 1);
+    assert_eq!(left[0].kind, ItemKind::Learning);
+    assert_eq!(left[0].text.as_deref(), Some("durable preference"));
+    assert!(pending(&config.workspace_dir).is_empty());
+}
+
 #[tokio::test]
 async fn a_deleted_threads_conversation_is_forgotten_for_good() {
     let tmp = tempfile::tempdir().unwrap();
