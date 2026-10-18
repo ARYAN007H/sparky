@@ -41,10 +41,9 @@ use crate::core_host::security::credentials::AuthService;
 /// clients (browser `EventSource`, browser `WebSocket`) cannot set
 /// `Authorization` headers via standard APIs. `/events` is not unauthenticated
 /// — it is exempt from the *middleware* header check but enforces its own
-/// bind-token credential inside the handler. `/ws/dictation` is NOT public: it
-/// is bearer-gated by this middleware via [`QUERY_TOKEN_PATHS`] (header or
-/// `?token=`) so an unauthenticated upgrade is rejected with 401 before the
-/// WebSocket handshake; the handler adds an origin check on top (finding C4).
+/// bind-token credential inside the handler. The retired dictation socket is
+/// exempt so requests reach the router fallback and return 404, whether or not
+/// the caller supplies a bearer.
 const PUBLIC_PATHS: &[&str] = &[
     "/",
     "/health",
@@ -58,6 +57,7 @@ const PUBLIC_PATHS: &[&str] = &[
     "/dev/connect",
     "/schema",
     "/events",
+    "/ws/dictation",
 ];
 
 /// Public path prefixes — match when the request path begins with any entry.
