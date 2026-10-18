@@ -35,7 +35,6 @@ import SecurityBanner from './components/SecurityBanner';
 import { Toaster } from './components/ui/Toast';
 import AppWalkthrough from './components/walkthrough/AppWalkthrough';
 import { useDevSkipOnboarding } from './hooks/useDevSkipOnboarding';
-import { useNotchBootSync } from './hooks/useNotchBootSync';
 import { I18nProvider } from './lib/i18n/I18nContext';
 import {
   startNativeNotificationsService,

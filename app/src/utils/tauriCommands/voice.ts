@@ -57,7 +57,6 @@ export interface VoiceServerSettings {
   silence_threshold: number;
   /** Custom vocabulary words to bias the STT engine toward (names, technical terms). */
   custom_dictionary: string[];
-  /** Phase 2: continuous always-on listening (no hotkey). Opt-in. */
   /** Hosted speech-to-text engine. There is no local option — the bundled
    *  whisper.cpp engine was removed. */
   stt_engine: SttEngine;
