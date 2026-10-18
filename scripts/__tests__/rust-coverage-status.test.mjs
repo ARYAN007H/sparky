@@ -303,10 +303,9 @@ test("private coverage executes every package configuration once and reports aft
   );
   // The product-feature suites differ only in their nextest filter, so Cargo
   // resolves (and builds) the core and its dependencies once for all of them.
-  console.error(selections[0]);
   const unified = selections.filter((line) =>
     line.includes(
-      "--features channels,storage-file -p openhuman -p openhuman-embed -p openhuman-tinyhumans -p openhuman-cli --all-targets -E ",
+      "--features channels,storage-file --no-report --no-fail-fast -p openhuman -p openhuman-embed -p openhuman-tinyhumans -p openhuman-cli --all-targets -E ",
     ),
   );
   assert.equal(unified.length, 4);
