@@ -11,8 +11,8 @@
 //! a false positive here — the lock IS the serialization mechanism.
 #![allow(clippy::await_holding_lock)]
 
-#[path = "support/mcp_stub_jail.rs"]
-mod mcp_stub_jail;
+#[path = "support/mcp_stub_trusted.rs"]
+mod mcp_stub_trusted;
 #[path = "support/env_guard.rs"]
 mod env_guard;
 #[path = "support/linked_modules.rs"]
@@ -515,8 +515,6 @@ encrypt = false
 {extra_config}
 "#
     );
-    // The jail the MCP stub runs in must be able to read the stub binary.
-    let cfg = cfg + &mcp_stub_jail::local_jail_toml(env!("CARGO_BIN_EXE_test-mcp-stub"));
     fn write_config_file(config_dir: &Path, cfg: &str) {
         std::fs::create_dir_all(config_dir).expect("mkdir openhuman");
         std::fs::write(config_dir.join("config.toml"), cfg).expect("write config");
@@ -3953,6 +3951,7 @@ fn peel_logs_envelope(v: &Value) -> &Value {
 /// through the orchestrator's direct registry tools; its answer reaches the model.
 #[cfg(feature = "mcp")]
 #[test]
+#[ignore = "Temporary: registry-installed servers are never operator-trusted, so the jail must start the stub; it cannot until tinymcp lets the host choose the enforcement level (https://github.com/tinyhumansai/tinymcp/pull/126) and TinyBox has a Linux backend with real process isolation."]
 fn agent_calls_a_tool_on_an_mcp_server_installed_from_the_registry() {
     run_on_agent_stack(
         "agent_calls_a_tool_on_an_mcp_server_installed_from_the_registry",
@@ -4182,19 +4181,21 @@ async fn orchestrator_defers_its_mcp_registry_tools_without_a_hand_off_inner() {
     stack.shutdown();
 }
 
-/// Search discovers a connected MCP action with its schema, then the model
-/// calls that action by its own name on the same orchestrator turn.
+/// Search discovers an operator-declared MCP action with its schema, then the
+/// model calls that action by its own name on the same orchestrator turn. The
+/// stub is declared in `config.toml` as an operator-trusted stdio server (see
+/// `support/mcp_stub_trusted.rs` for why this is temporary).
 #[cfg(feature = "mcp")]
 #[test]
-fn orchestrator_calls_a_connected_mcp_tool_directly() {
+fn orchestrator_calls_an_operator_trusted_mcp_tool_directly() {
     run_on_agent_stack(
-        "orchestrator_calls_a_connected_mcp_tool_directly",
-        orchestrator_calls_a_connected_mcp_tool_directly_inner,
+        "orchestrator_calls_an_operator_trusted_mcp_tool_directly",
+        orchestrator_calls_an_operator_trusted_mcp_tool_directly_inner,
     );
 }
 
 #[cfg(feature = "mcp")]
-async fn orchestrator_calls_a_connected_mcp_tool_directly_inner() {
+async fn orchestrator_calls_an_operator_trusted_mcp_tool_directly_inner() {
     let _lock = env_lock();
     let _ttl = EnvVarGuard::set("OPENHUMAN_APPROVAL_TTL_SECS", "120");
     ensure_approval_gate().await;
@@ -4205,9 +4206,11 @@ async fn orchestrator_calls_a_connected_mcp_tool_directly_inner() {
         format!("http://{registry_addr}"),
     );
     reset_script(Vec::new());
-    let stack = boot_stack().await;
-    // Connecting also writes the tool cache the orchestrator's surface reads.
-    declare_and_connect_registry_echo_server(&stack.rpc_base, 940).await;
+    let stack = boot_stack_with_config(&mcp_stub_trusted::trusted_stub_toml(
+        "echo",
+        env!("CARGO_BIN_EXE_test-mcp-stub"),
+    ))
+    .await;
 
     reset_script(vec![
         tool_call_completion(
