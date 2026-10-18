@@ -491,7 +491,7 @@ minutes and another node may then run the interrupted occurrence again.
 
 ## One turn at a time per profile
 
-Chat turns (`web_chat turn run (`turn_host`)`), relayed-message turns
+Chat turns (`web_chat::run_chat_task`), relayed-message turns
 (`run_relay_turn`) and the cron sweep's runs of one profile take that
 profile's gate ([`turn_gate`](turn_gate.rs)) for the whole turn, so they
 queue instead of overlapping. A due cron occurrence waits behind an in-flight

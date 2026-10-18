@@ -25,7 +25,7 @@
 //!   ← subagent_runner::run_inner_loop / run_typed_mode / run_subagent
 //!   ← SkillDelegationTool::execute   (delegate_to_integrations_agent, since removed)
 //!   ← Agent::execute_tool_call / execute_tools / turn
-//!   ← web_chat turn run (`turn_host`)
+//!   ← web_chat::run_chat_task
 //! ```
 //!
 //! The crash trigger is `composio_list_tools` reloading the config from
