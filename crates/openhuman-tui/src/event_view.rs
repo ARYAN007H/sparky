@@ -52,7 +52,7 @@ impl WebEventView {
         };
         use WebChannelEvent as E;
         let subagent_view = |detail: &SubagentProgressDetail| SubagentView {
-            task_id: Some(detail.task_id.clone()),
+            task_id: detail.task_id.clone(),
             display_name: detail.display_name.clone(),
             elapsed_ms: detail.elapsed_ms,
             output: detail.output.clone(),
