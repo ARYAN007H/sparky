@@ -8823,6 +8823,7 @@ dependencies = [
  "tinybus-module",
  "tinychannels",
  "tinychannels-bus",
+ "tinychannels-runtime",
  "tinystoragedrivers-bus",
  "tinystoragedrivers-busproxy",
  "tinystoragedrivers-client",
