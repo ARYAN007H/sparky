@@ -222,12 +222,12 @@ async fn emits_inference_heartbeat_while_turn_in_flight() {
     // inference_start first, then a heartbeat after the interval elapses
     // (the paused clock auto-advances while the test awaits the bus).
     let start = recv_for_thread(&mut events, thread_id).await;
-    assert_eq!(start.event, "inference_start");
+    assert_eq!(start.event_name(), "inference_start");
 
     let beat = recv_for_thread(&mut events, thread_id).await;
-    assert_eq!(beat.event, "inference_heartbeat");
-    assert_eq!(beat.thread_id, thread_id);
-    assert_eq!(beat.request_id, request_id);
+    assert_eq!(beat.event_name(), "inference_heartbeat");
+    assert_eq!(beat.context().thread_id, thread_id);
+    assert_eq!(beat.context().request_id, request_id);
 
     drop(tx);
 }
@@ -245,7 +245,7 @@ async fn stops_heartbeat_after_turn_completed() {
     tx.send(AgentProgress::TurnStarted).await.unwrap();
     // Drain through the first heartbeat to prove the turn was beating.
     loop {
-        if recv_for_thread(&mut events, thread_id).await.event == "inference_heartbeat" {
+        if recv_for_thread(&mut events, thread_id).await.event_name() == "inference_heartbeat" {
             break;
         }
     }
@@ -557,7 +557,7 @@ mod subagent_tests {
         .await
         .unwrap();
         let spawned = recv_for_thread(&mut events, thread_id).await;
-        assert_eq!(spawned.event, "subagent_spawned");
+        assert_eq!(spawned.event_name(), "subagent_spawned");
 
         tx.send(AgentProgress::SubagentCompleted {
             agent_id: "researcher".into(),
@@ -576,8 +576,10 @@ mod subagent_tests {
         .unwrap();
 
         let completed = recv_for_thread(&mut events, thread_id).await;
-        assert_eq!(completed.event, "subagent_completed");
-        let subagent = completed.subagent.expect("subagent detail present");
+        assert_eq!(completed.event_name(), "subagent_completed");
+        let WebChannelEvent::SubagentCompleted { subagent: Some(subagent), .. } = completed.wire_event() else {
+            panic!("subagent detail present")
+        };
         assert_eq!(subagent.parent_call_id.as_deref(), Some("call-parent-2"));
         assert_eq!(subagent.output.as_deref(), Some("final answer"));
     }
@@ -602,7 +604,7 @@ mod subagent_tests {
         .await
         .unwrap();
         let spawned = recv_for_thread(&mut events, thread_id).await;
-        assert_eq!(spawned.event, "subagent_spawned");
+        assert_eq!(spawned.event_name(), "subagent_spawned");
 
         tx.send(AgentProgress::SubagentFailed {
             agent_id: "researcher".into(),
@@ -613,8 +615,10 @@ mod subagent_tests {
         .unwrap();
 
         let failed = recv_for_thread(&mut events, thread_id).await;
-        assert_eq!(failed.event, "subagent_failed");
-        let subagent = failed.subagent.expect("subagent detail present");
+        assert_eq!(failed.event_name(), "subagent_failed");
+        let WebChannelEvent::SubagentFailed { subagent: Some(subagent), .. } = failed.wire_event() else {
+            panic!("subagent detail present")
+        };
         assert_eq!(subagent.parent_call_id.as_deref(), Some("call-parent-3"));
     }
 }
