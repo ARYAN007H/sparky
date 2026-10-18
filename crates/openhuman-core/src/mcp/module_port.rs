@@ -78,7 +78,8 @@ impl McpModulePort for TinyMcpPort {
         if let (Some(host), Some(sandbox)) = (&self.host_config, client.stdio_sandbox.as_mut()) {
             crate::mcp::host_sandbox::with_toolchain_grants(host, sandbox).await;
         }
-        self.root_call(
+        eprintln!("DBGSB sandbox={:?}", client.stdio_sandbox);
+        let r = self.root_call(
             names::methods::OPEN_CONFIGURED,
             (OpenConfiguredRequest {
                 data_dir: data_dir.to_owned(),

@@ -94,10 +94,10 @@ pub(super) async fn with_toolchain_grants(config: &Config, sandbox: &mut StdioSa
                 "[mcp] stdio sandbox grants resolved"
             );
         }
-        Err(error) => tracing::warn!(
+        Err(error) => {eprintln!("DBGSB grants error: {error}"); tracing::warn!(
             %error,
             "[mcp] toolchain grants unavailable; stdio sandbox keeps configured grants only"
-        ),
+        )},
     }
 }
 
