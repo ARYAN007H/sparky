@@ -213,10 +213,11 @@ pub async fn recall_with(
     mode: RecallMode,
     exclude_thread: Option<ThreadWindow>,
 ) -> Result<RecallView> {
+    let filter = confine_filter(config, params.filter.unwrap_or_default())?;
     let bound = bound(config)?;
     let request = RecallRequest {
         question: params.question,
-        filter: confine_filter(config, params.filter.unwrap_or_default())?,
+        filter,
         limit: clamp_limit(params.limit),
         instructions: None,
         refers_to: time_hint(config, params.refers_to)?,
@@ -250,6 +251,7 @@ pub async fn fetch_with(
     params: FetchParams,
     exclude_thread: Option<ThreadWindow>,
 ) -> Result<FetchView> {
+    let filter = confine_filter(config, params.filter.unwrap_or_default())?;
     let bound = bound(config)?;
     let descriptor = bound.engine.descriptor();
     let mode = match params.mode {
@@ -265,7 +267,7 @@ pub async fn fetch_with(
     let request = FetchRequest {
         query: params.query,
         mode,
-        filter: confine_filter(config, params.filter.unwrap_or_default())?,
+        filter,
         limit: clamp_limit(params.limit),
         cursor: params.cursor,
         beliefs: 0,

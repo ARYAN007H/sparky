@@ -13,10 +13,10 @@ use tinymemory_api::{
 };
 
 #[test]
-fn invalid_saas_root_is_refused_before_store_reaches_the_engine() {
+fn invalid_saas_root_is_refused_before_engine_operations() {
     const CHILD: &str = "OPENHUMAN_TEST_SAAS_MEMORY_STORE_GUARD";
     const TEST_NAME: &str =
-        "memory::ops::tests::invalid_saas_root_is_refused_before_store_reaches_the_engine";
+        "memory::ops::tests::invalid_saas_root_is_refused_before_engine_operations";
 
     if std::env::var_os(CHILD).is_none() {
         let output = std::process::Command::new(std::env::current_exe().unwrap())
@@ -52,19 +52,61 @@ fn invalid_saas_root_is_refused_before_store_reaches_the_engine() {
                 calls: calls.clone(),
             }),
         );
+        let expected = "memory is unavailable: this agent has no valid memory root";
+        let check = |error: Error| {
+            assert!(matches!(error, Error::InvalidRequest(message) if message == expected));
+        };
         let item = StoreItem::learning(
             "should not be stored",
             tinymemory_api::LearningKind::Fact,
             0.9,
             MemoryMeta::default(),
         );
-        let error = runtime.block_on(store_item(&config, item)).unwrap_err();
-
-        assert!(matches!(
-            error,
-            Error::InvalidRequest(message)
-                if message == "memory is unavailable: this agent has no valid memory root"
-        ));
+        check(runtime.block_on(store_item(&config, item)).unwrap_err());
+        check(
+            runtime
+                .block_on(recall(
+                    &config,
+                    RecallParams {
+                        refers_to: None,
+                        question: "anything".into(),
+                        filter: None,
+                        limit: None,
+                    },
+                ))
+                .unwrap_err(),
+        );
+        check(
+            runtime
+                .block_on(fetch(
+                    &config,
+                    FetchParams {
+                        refers_to: None,
+                        query: "anything".into(),
+                        mode: None,
+                        filter: None,
+                        limit: None,
+                        cursor: None,
+                    },
+                ))
+                .unwrap_err(),
+        );
+        check(
+            runtime
+                .block_on(items_list(&config, ItemsListParams::default()))
+                .unwrap_err(),
+        );
+        check(
+            runtime
+                .block_on(forget(
+                    &config,
+                    ForgetParams {
+                        ids: vec!["not-present".into()],
+                        reach: None,
+                    },
+                ))
+                .unwrap_err(),
+        );
         assert_eq!(calls.load(Ordering::SeqCst), 0, "root: {root:?}");
     }
     println!("SAAS_MEMORY_STORE_GUARD_CHILD_PASSED");
