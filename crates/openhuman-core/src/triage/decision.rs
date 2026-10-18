@@ -1,6 +1,5 @@
-//! Structured decision emitted by the `trigger_triage` agent, plus a
-//! deliberately-tolerant parser that accepts whatever shape a small
-//! local model is likely to produce.
+//! Structured decision emitted by the `trigger_triage` agent, plus host
+//! action normalization and validation around TinyAgents' lenient parser.
 //!
 //! The contract is described in
 //! `crates/openhuman-core/src/agent_registry/agents/trigger_triage/prompt.md` — the triage
@@ -27,7 +26,7 @@
 
 use serde::Deserialize;
 use thiserror::Error;
-use tinytools_agent::repair::json::strip_trailing_commas;
+use tinyagents_harness::structured::parse_lenient_last_object;
 
 /// The four outcomes the triage agent is allowed to choose.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
@@ -103,20 +102,12 @@ pub enum ParseError {
 
 /// Parse the triage agent's raw reply text into a [`TriageDecision`].
 ///
-/// Algorithm (keep in sync with the prompt's output contract):
-///
-/// 1. Try to extract the **last** fenced ```json block — small models
-///    often add commentary *after* the JSON and we want the JSON.
-/// 2. If no fence, brace-match the **last** balanced `{ … }` object in
-///    the text. This handles "Here's my decision: { … }" and
-///    "{ … } (hope that helps)".
-/// 3. Strip trailing commas before the parse (`,}` → `}`, `,]` → `]`).
-/// 4. Parse as JSON, lowercasing the `action` string in flight.
-/// 5. Reject if React / Escalate but `target_agent`/`prompt` missing.
+/// TinyAgents selects and repairs the last complete JSON object. OpenHuman
+/// keeps the triage-specific casing normalization and action-field validation:
+/// React / Escalate must include a non-empty target and prompt.
 pub fn parse_triage_decision(llm_text: &str) -> Result<TriageDecision, ParseError> {
-    let slice = extract_json_slice(llm_text).ok_or(ParseError::NoJsonObject)?;
-    let cleaned = strip_trailing_commas(&slice);
-    let normalized = lowercase_action_value(&cleaned);
+    let (value, _) = parse_lenient_last_object(llm_text).ok_or(ParseError::NoJsonObject)?;
+    let normalized = lowercase_action_value(&value.to_string());
     let decision: TriageDecision =
         serde_json::from_str(&normalized).map_err(ParseError::InvalidJson)?;
 
@@ -137,93 +128,6 @@ pub fn parse_triage_decision(llm_text: &str) -> Result<TriageDecision, ParseErro
     }
 
     Ok(decision)
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Extraction helpers — all private, all exhaustively unit-tested below.
-// ─────────────────────────────────────────────────────────────────────────────
-
-/// Return the content of the **last** JSON object in `text`, preferring
-/// fenced blocks over raw braces so we don't accidentally pick up a
-/// half-written object inside a code fence's preamble.
-fn extract_json_slice(text: &str) -> Option<String> {
-    if let Some(fenced) = last_fenced_json_block(text) {
-        return Some(fenced);
-    }
-    last_balanced_brace_object(text)
-}
-
-/// Find the last ```json … ``` fenced block in `text`, if any.
-/// Accepts `` ```json ``, `` ```JSON ``, and plain `` ``` `` fences
-/// since small models are inconsistent about the language tag.
-fn last_fenced_json_block(text: &str) -> Option<String> {
-    // Walk fence starts from the end so we naturally find the last one.
-    let mut last: Option<String> = None;
-    let mut search_from = 0;
-    while let Some(rel) = text[search_from..].find("```") {
-        let start = search_from + rel + 3;
-        // Skip an optional language tag on the same line.
-        let body_start = match text[start..].find('\n') {
-            Some(nl) => {
-                let tag = &text[start..start + nl];
-                // Accept "json", "JSON", or empty tags. If the tag is
-                // something else (e.g. "python") we still try to parse
-                // the block — small models mislabel fences all the
-                // time and the content may still be JSON.
-                let _ = tag;
-                start + nl + 1
-            }
-            None => return last,
-        };
-        let close = text[body_start..].find("```")?;
-        let body = &text[body_start..body_start + close];
-        last = Some(body.trim().to_string());
-        search_from = body_start + close + 3;
-    }
-    last
-}
-
-/// Brace-match the last balanced `{ … }` object in `text`, ignoring
-/// braces inside string literals. Returns the substring including the
-/// outer braces. O(n) single pass.
-fn last_balanced_brace_object(text: &str) -> Option<String> {
-    let bytes = text.as_bytes();
-    let mut best: Option<(usize, usize)> = None;
-    let mut depth = 0usize;
-    let mut start: Option<usize> = None;
-    let mut in_string = false;
-    let mut escape = false;
-    for (i, &b) in bytes.iter().enumerate() {
-        if in_string {
-            if escape {
-                escape = false;
-            } else if b == b'\\' {
-                escape = true;
-            } else if b == b'"' {
-                in_string = false;
-            }
-            continue;
-        }
-        match b {
-            b'"' => in_string = true,
-            b'{' => {
-                if depth == 0 {
-                    start = Some(i);
-                }
-                depth += 1;
-            }
-            b'}' if depth > 0 => {
-                depth -= 1;
-                if depth == 0 {
-                    if let Some(s) = start.take() {
-                        best = Some((s, i + 1));
-                    }
-                }
-            }
-            _ => {}
-        }
-    }
-    best.map(|(s, e)| text[s..e].to_string())
 }
 
 /// Rewrite `"action": "Drop"` / `"action": "ESCALATE"` as
