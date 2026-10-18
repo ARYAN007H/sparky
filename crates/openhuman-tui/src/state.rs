@@ -243,6 +243,10 @@ impl TranscriptState {
     /// [`Self::is_streaming`] afterwards.
     pub fn apply_event(&mut self, ev: &WebChannelEvent) {
         let ev = WebEventView::from_event(ev);
+        self.apply_event_view(&ev);
+    }
+
+    pub(crate) fn apply_event_view(&mut self, ev: &WebEventView) {
         if ev.client_id != self.client_id
             || (!self.thread_id.is_empty() && ev.thread_id != self.thread_id)
         {
