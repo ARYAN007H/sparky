@@ -101,6 +101,55 @@ fn validate_registry_accepts_valid_registry() {
 }
 
 #[test]
+fn registered_controller_schemas_are_consistent_and_serializable() {
+    use std::collections::BTreeSet;
+
+    let controllers = all_registered_controllers();
+    assert!(!controllers.is_empty(), "the controller registry is empty");
+    let mut methods = BTreeSet::new();
+
+    for controller in controllers {
+        let schema = &controller.schema;
+        let method = schema.method_name();
+        assert!(methods.insert(method.clone()), "duplicate method {method}");
+        assert!(
+            !schema.description.trim().is_empty(),
+            "{method} has no description"
+        );
+
+        let serialized = serde_json::to_value(schema).expect("controller schema serializes");
+        let serialized_inputs = serialized["inputs"]
+            .as_array()
+            .unwrap_or_else(|| panic!("{method} inputs are not serialized as an array"));
+        let mut required = BTreeSet::new();
+        let mut params = Map::new();
+        for input in &schema.inputs {
+            let matching = serialized_inputs
+                .iter()
+                .find(|field| field["name"] == input.name);
+            let matching = matching.unwrap_or_else(|| {
+                panic!("{method} input `{}` is missing from serialized schema", input.name)
+            });
+            assert_eq!(
+                matching["required"], input.required,
+                "{method} input `{}` requiredness differs in serialized schema",
+                input.name
+            );
+            if input.required {
+                assert!(required.insert(input.name), "duplicate required input in {method}");
+                // `validate_params` accepts null for every declared type, so this
+                // safely checks required-key acceptance without executing a handler.
+                params.insert(input.name.to_owned(), Value::Null);
+            }
+        }
+        assert!(
+            validate_params(schema, &params).is_ok(),
+            "{method} rejects a map containing all required schema inputs"
+        );
+    }
+}
+
+#[test]
 fn rpc_method_name_formats_correctly() {
     let s = schema("memory", "doc_put", vec![]);
     assert_eq!(rpc_method_name(&s), "openhuman.memory_doc_put");
