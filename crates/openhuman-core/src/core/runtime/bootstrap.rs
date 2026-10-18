@@ -38,7 +38,7 @@ pub(crate) async fn bootstrap_core_runtime(
     // acquisition before any subscriber or session snapshots it, but keep the
     // optional download outside the critical bootstrap path.
     #[cfg(all(feature = "flows", feature = "skills"))]
-    crate::skills::bundled::flow_authoring::schedule_prewarm(ctx, &cfg, Some(domains));
+    crate::skills::schedule_flow_authoring_prewarm(ctx, &cfg, Some(domains));
 
     // --- Legacy store import ---------------------------------------------
     // With a storage backend installed, bring the workspace's per-domain

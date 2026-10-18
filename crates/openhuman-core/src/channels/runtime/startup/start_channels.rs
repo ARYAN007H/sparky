@@ -125,7 +125,7 @@ async fn start_channels_inner(mut config: Config, session: CancellationToken) ->
     // Model, tools and the identity-refreshing system prompt (`turn_parts`),
     // shared with the hosted-channel relay.
     #[cfg(all(feature = "flows", feature = "skills"))]
-    crate::skills::bundled::flow_authoring::schedule_prewarm(&dispatch, &config, None);
+    crate::skills::schedule_flow_authoring_prewarm(&dispatch, &config, None);
     let parts = build_channel_turn_parts(&dispatch, &config, &security, PromptToolDescs::Fixed)?;
     let model = parts.model.clone();
     let workspace = config.workspace_dir.clone();
