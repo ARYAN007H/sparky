@@ -352,8 +352,22 @@ async fn flow_authoring_is_hidden_when_tinyflows_component_is_disabled() {
     crate::modules::tinyflows::copilot_proxy(&enabled_config)
         .await
         .expect("linked TinyFlows fixture is admitted and serving");
+    let state = crate::modules::ops::state_of(crate::modules::tinyflows::MODULE_ID);
+    assert_eq!(state, crate::modules::types::ModuleState::Ready);
+    assert!(crate::modules::runtime::is_module_serving(
+        crate::modules::tinyflows::MODULE_ID
+    ));
     let visible = CoreContext::scope(enabled_ctx, async {
         let dispatch = crate::core::runtime::DispatchCtx::ambient();
+        let gate = crate::skills::ops_discover::DiscoveryGate::from_config(
+            &dispatch,
+            &enabled_config,
+            Some(enabled_domains),
+        );
+        assert!(
+            gate.flow_authoring_enabled(),
+            "unexpected flow gate: {gate:?}"
+        );
         crate::skills::bundled::flow_authoring::prewarm(
             &dispatch,
             &enabled_config,

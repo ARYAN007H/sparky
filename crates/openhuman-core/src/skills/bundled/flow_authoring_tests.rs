@@ -32,30 +32,42 @@ async fn optional_warmup_returns_while_the_loader_is_blocked_and_deduplicates() 
     crate::modules::tinyflows::copilot_proxy(&config)
         .await
         .expect("linked TinyFlows fixture is admitted and serving");
-    let ctx = DispatchCtx::host_default();
+    let context = crate::core::runtime::CoreContext::for_test(DomainSet::full(), None).derive_with(
+        crate::core::runtime::ContextOverlay::new(
+            config.clone(),
+            DomainSet::full(),
+            crate::tools::toolpacks::ToolGroups::none(),
+        )
+        .profile("blocked-prewarm")
+        .without_user_skill_roots(),
+    );
     let (started_tx, started_rx) = tokio::sync::oneshot::channel();
     let (release_tx, release_rx) = tokio::sync::oneshot::channel::<()>();
     let (finished_tx, finished_rx) = tokio::sync::oneshot::channel();
 
-    assert!(schedule_prewarm_operation(
-        &ctx,
-        &config,
-        Some(DomainSet::full()),
-        async move {
-            let _ = started_tx.send(());
-            let _ = release_rx.await;
-            let _ = finished_tx.send(());
-        },
-    ));
-    // The scheduled operation is now blocked on `release_rx`. Reaching this
-    // point proves the caller that scheduled it did not wait for the loader.
-    started_rx.await.expect("background task started");
-    assert!(
-        !schedule_prewarm_operation(&ctx, &config, Some(DomainSet::full()), async {}),
-        "a second warmup for the same explicit scope is coalesced"
-    );
-    release_tx.send(()).expect("release background task");
-    finished_rx.await.expect("background task finished");
+    crate::core::runtime::CoreContext::scope(context, async {
+        let ctx = DispatchCtx::ambient();
+        assert!(schedule_prewarm_operation(
+            &ctx,
+            &config,
+            Some(DomainSet::full()),
+            async move {
+                let _ = started_tx.send(());
+                let _ = release_rx.await;
+                let _ = finished_tx.send(());
+            },
+        ));
+        // The scheduled operation is now blocked on `release_rx`. Reaching
+        // this point proves the caller did not wait for the loader.
+        started_rx.await.expect("background task started");
+        assert!(
+            !schedule_prewarm_operation(&ctx, &config, Some(DomainSet::full()), async {}),
+            "a second warmup for the same explicit scope is coalesced"
+        );
+        release_tx.send(()).expect("release background task");
+        finished_rx.await.expect("background task finished");
+    })
+    .await;
 }
 
 #[test]
