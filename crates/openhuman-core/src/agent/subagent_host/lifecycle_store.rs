@@ -323,7 +323,15 @@ fn import_legacy(kv: &StateKv, dir: &Path) -> anyhow::Result<()> {
         } else if let Some(component) = file.strip_suffix(".terminal.json") {
             match serde_json::from_slice::<CompatibleTerminalRecord>(&bytes) {
                 Ok(terminal) => {
-                    let terminal = TerminalRecord::from(terminal);
+                    let mut terminal = TerminalRecord::from(terminal);
+                    if let Some(key) = terminal.key.as_ref() {
+                        if let Some(outcome) = super::persistence::legacy_terminal::owner_terminal(
+                            dir.parent().unwrap_or(dir),
+                            key,
+                        )? {
+                            terminal.outcome = outcome;
+                        }
+                    }
                     kv.update::<LifecycleRecord, ()>(&format!("record/{component}"), move |r| {
                         if r.terminal.is_none() {
                             r.terminal = Some(terminal.clone());

@@ -49,6 +49,10 @@ async fn production_lifecycle_persistence_follows_the_explicit_actor_scope_on_re
     CoreContext::scope(alice.clone(), async {
         let adapter = super::super::persistence::OpenHumanPersistence::new(checkpoints.clone());
         adapter.save_pause(paused(&key)).await.unwrap();
+        assert!(
+            !checkpoints.join("lifecycle").exists(),
+            "native storage creates no file-era persistence"
+        );
         assert_eq!(
             adapter.checkpoint_for_task(&key.task_id).unwrap().output,
             "durable partial"
@@ -293,6 +297,7 @@ async fn assert_legacy_owner_terminal(format: &str) {
     let stale_bytes = serde_json::to_vec(&stale).unwrap();
     std::fs::write(&stale_path, &stale_bytes).unwrap();
 
+    assert!(super::super::load_subagent_checkpoint(workspace.path(), &key.task_id).is_err());
     let terminal = adapter
         .load_terminal(&key)
         .await
