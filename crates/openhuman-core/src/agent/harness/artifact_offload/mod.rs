@@ -116,7 +116,7 @@ pub async fn offload_oversized_result(
     offload: &ArtifactOffload,
     threshold_bytes: usize,
     materialize_root: &Path,
-    policy: Option<&SecurityPolicy>,
+    _policy: Option<&SecurityPolicy>,
 ) -> (String, Option<OffloadedArtifact>) {
     // The owner's filesystem-aware offload validates the eventual target
     // before storing bytes, then writes and materializes through its policy.

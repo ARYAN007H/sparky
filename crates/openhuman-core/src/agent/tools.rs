@@ -20,7 +20,7 @@
 //!
 //! `agent::registration` assembles the dialogue tools; `tools::ops` composes
 //! domain registrations and applies the runtime capability filters.
-mod plan_exit;
+pub(crate) mod plan_exit;
 // Pure `skill_runtime` client (spawn + await a workflow run) — compiled out
 // with the `skills` gate so the tool list OMITS these rather than degrading
 // them to a disabled-error.

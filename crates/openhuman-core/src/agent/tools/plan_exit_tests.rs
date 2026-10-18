@@ -1,5 +1,8 @@
 use super::*;
+use crate::agent::tools::{PlanExitTool, PLAN_EXIT_MARKER};
 use crate::plan_review::PlanReviewResolution;
+use tinytools::{PermissionLevel, Tool, ToolCallOptions, ToolRunContext};
+use serde_json::json;
 
 struct ThreadContext(&'static str);
 impl ToolRunContext for ThreadContext {
