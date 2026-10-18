@@ -1,11 +1,13 @@
 //! Runtime event projection and pending decisions.
 use super::*;
+use crate::event_view::WebEventView;
 
 pub(super) fn handle_web_event(
-    ev: &WebChannelEvent,
+    scoped: &ScopedWebEvent,
     state: &mut TranscriptState,
     ui: &mut UiState,
 ) {
+    let ev = WebEventView::from_event(scoped.wire_event());
     if ui.thread_id.is_empty() || ev.client_id != state.client_id() || ev.thread_id != ui.thread_id
     {
         return;
@@ -78,6 +80,6 @@ pub(super) fn handle_web_event(
                 present_pending_plan_review(ui);
             }
         }
-        _ => state.apply_event(ev),
+        _ => state.apply_event(scoped.wire_event()),
     }
 }

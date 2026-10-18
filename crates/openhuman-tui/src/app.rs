@@ -23,7 +23,7 @@ use serde_json::json;
 use tokio::sync::broadcast;
 
 use openhuman_rpc::embed::chat_surface as web_chat;
-use openhuman_rpc::embed::chat_surface::WebChannelEvent;
+use openhuman_rpc::embed::chat_surface::ScopedWebEvent;
 use openhuman_rpc::embed::CoreRuntime;
 
 use super::actions::Action;
@@ -60,7 +60,7 @@ pub async fn run(
     runtime: Arc<CoreRuntime>,
     client_id: String,
     thread_id: String,
-    mut web_rx: broadcast::Receiver<WebChannelEvent>,
+    mut web_rx: broadcast::Receiver<ScopedWebEvent>,
     options: LaunchOptions,
 ) -> anyhow::Result<()> {
     let mut state = TranscriptState::new(client_id.clone());
