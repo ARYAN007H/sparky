@@ -1,6 +1,6 @@
-use crate::config::SttEngine;
-
 use super::*;
+
+use crate::config::SttEngine;
 
 #[tokio::test]
 async fn legacy_always_on_voice_fields_are_ignored_and_dropped_on_save() {
