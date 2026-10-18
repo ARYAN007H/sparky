@@ -10,7 +10,7 @@ use tinyagents_harness::context::RunContext;
 use tinyagents_harness::error::Result as TaResult;
 use tinyagents_harness::middleware::{
     DenialRenderer, MiddlewareToolOutcome, PolicyDecision, ToolCallPolicy, ToolHandler,
-    ToolMiddleware, ToolPolicyGate,
+    ToolMiddleware, ToolPolicyGateMiddleware,
 };
 use tinyinference_llm::tool::ToolCall as TaToolCall;
 use tinytools::ToolResult as TaToolResult;
@@ -28,12 +28,13 @@ use tinytools::Tool;
 /// same `"Tool '<name>' <denied|requires approval> by policy '<policy>': <reason>"`
 /// wording the engine produced.
 pub(crate) struct ToolPolicyMiddleware {
-    /// The builder policy behind the harness gate.
-    gate: ToolPolicyGate<OpenHumanRunContext>,
-    /// Host-authored denial copy plugged into the owner policy boundary.
-    render_denial: DenialRenderer,
-    /// The session's channel-permission snapshot — enforces the per-channel deny
-    /// + per-call permission-level ceiling the engine ran in `agent_tool_exec`.
+    /// TinyAgents owns evaluation and denial short-circuiting.
+    gate: ToolPolicyGateMiddleware<OpenHumanRunContext>,
+    /// OpenHuman's concrete channel ceiling and disclosure snapshot.
+    host: Arc<ToolPolicyHostState>,
+}
+
+struct ToolPolicyHostState {
     session: tinytools::ToolPolicySession,
     /// Shared tool sets (same `Arc`s the runner registers) so a call's OpenHuman
     /// `Tool` can be resolved for its generated-tool runtime context and its
@@ -68,9 +69,16 @@ impl ToolPolicyMiddleware {
         tool_sets: Vec<Arc<Vec<Box<dyn Tool>>>>,
         channel: String,
     ) -> Self {
-        Self {
-            gate: ToolPolicyGate::new(policy),
-            render_denial: Arc::new(|call, policy, decision| match decision {
+        let host = Arc::new(ToolPolicyHostState {
+            session,
+            tool_sets,
+            channel,
+        });
+        let desktop_policy = Arc::new(DesktopApprovalPolicy {
+            policy,
+            tool_sets: host.tool_sets.clone(),
+        });
+        let denial: DenialRenderer = Arc::new(|call, policy, decision| match decision {
                 PolicyDecision::RequireApproval { reason } => PolicyDenial::ApprovalRequired {
                     tool: &call.name,
                     policy,
@@ -84,12 +92,18 @@ impl ToolPolicyMiddleware {
                 }
                 .render(),
                 PolicyDecision::Allow => String::new(),
-            }),
-            session,
-            tool_sets,
-            channel,
-        }
+            });
+        let post_host = host.clone();
+        let gate = ToolPolicyGateMiddleware::new(desktop_policy)
+            .with_denial_renderer(denial)
+            .with_post_gate(Arc::new(move |_ctx, call| {
+                post_host.render_skill_for_session(call)
+            }));
+        Self { gate, host }
     }
+}
+
+impl ToolPolicyHostState {
 
     fn resolve_tool(&self, name: &str) -> Option<&Box<dyn Tool>> {
         self.tool_sets
@@ -327,6 +341,51 @@ impl ToolPolicyMiddleware {
             );
         }
         None
+    }
+}
+
+struct DesktopApprovalPolicy {
+    policy: Arc<dyn ToolCallPolicy<OpenHumanRunContext>>,
+    tool_sets: Vec<Arc<Vec<Box<dyn Tool>>>>,
+}
+
+#[async_trait]
+impl ToolCallPolicy<OpenHumanRunContext> for DesktopApprovalPolicy {
+    fn name(&self) -> &str {
+        self.policy.name()
+    }
+
+    async fn check(
+        &self,
+        ctx: &RunContext<OpenHumanRunContext>,
+        call: &TaToolCall,
+    ) -> PolicyDecision {
+        let decision = self.policy.check(ctx, call).await;
+        if !matches!(decision, PolicyDecision::RequireApproval { .. }) {
+            return decision;
+        }
+        #[cfg(feature = "modules")]
+        let approvals_disabled = if let Some(tool) = self
+            .tool_sets
+            .iter()
+            .flat_map(|set| set.iter())
+            .find(|tool| tool.name() == call.name)
+        {
+            crate::desktop::control::approvals_disabled_for(
+                &ctx.data.dispatch_ctx(),
+                tool.as_ref(),
+            )
+            .await
+        } else {
+            false
+        };
+        #[cfg(not(feature = "modules"))]
+        let approvals_disabled = false;
+        if approvals_disabled {
+            PolicyDecision::Allow
+        } else {
+            decision
+        }
     }
 }
 
