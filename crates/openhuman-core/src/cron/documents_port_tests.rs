@@ -48,7 +48,7 @@ async fn schedule_store_migration_moves_legacy_jobs_runs_and_counter_before_read
     use tinyflows_bus::schedule::{
         members, StoreBackend, StoreConfig, StoreOperation, StoreRequest,
     };
-    use tinystoragedrivers::{DocumentStore, Precondition};
+    use tinystoragedrivers::Precondition;
 
     let config = Config::default();
     let (port, callback, backend) = port_with_backend().await;
@@ -127,6 +127,7 @@ async fn schedule_store_migration_moves_legacy_jobs_runs_and_counter_before_read
         .await
         .unwrap();
     assert!(migrated.get("report").is_some(), "{migrated}");
+    assert_eq!(migrated["counter_imported"], true, "{migrated}");
 
     let list_request = StoreRequest {
         storage: storage.clone(),
@@ -163,17 +164,49 @@ async fn schedule_store_migration_moves_legacy_jobs_runs_and_counter_before_read
     let runs: Vec<tinyflows_bus::schedule::types::CronRun> =
         serde_json::from_value(runs).unwrap();
     assert_eq!(runs.len(), 1);
-    assert_eq!(runs[0].output, "legacy output");
+    assert_eq!(runs[0].output.as_deref(), Some("legacy output"));
+
+    let migrated_job = docs.get("cron.jobs", "legacy-job").await.unwrap().unwrap();
+    assert_eq!(migrated_job.meta.created_ms, 1772600767123_i64);
+    for (collection, id) in [
+        ("cron_jobs", "legacy-job"),
+        ("cron_runs", "00000000000000000007"),
+        ("cron_counters", "runs"),
+    ] {
+        assert!(
+            docs.get(collection, id).await.unwrap().is_none(),
+            "successful migration retires {collection}/{id}"
+        );
+    }
+    assert_eq!(
+        tinystoragedrivers::primitives::Counters::new(&docs)
+            .peek("cron", "runs")
+            .await
+            .unwrap(),
+        7
+    );
+    for progress in [
+        "cron/cron.jobs/jobs_v2",
+        "cron/cron.runs/runs_v2",
+        "cron/cron.admission/admission_v2",
+        "cron/counters_import",
+    ] {
+        assert!(
+            docs.get("tsd.migrations", progress)
+                .await
+                .unwrap()
+                .is_some(),
+            "the module records migration progress at {progress}"
+        );
+    }
 }
 
 #[tokio::test]
 async fn shared_schedule_records_are_owner_scoped_and_never_scanned() {
-    use tinystoragedrivers::DocumentStore;
-
     let (proxy, _, backend) = port_with_backend().await;
     let scoped = backend.for_scope(&Scope::local()).unwrap();
     let docs = scoped.documents();
-    for collection in ["tsd.counters", "tsd.leases", "tsd.migrations", "tsd.kv"] {
+    for collection in ["tsd.counters", "tsd.leases", "tsd.migrations"] {
         let ensured = ask(&proxy, json!({"op":"ensure","spec":{"name":collection}})).await;
         assert!(ensured.get("error").is_none(), "{collection}: {ensured}");
     }
@@ -192,7 +225,7 @@ async fn shared_schedule_records_are_owner_scoped_and_never_scanned() {
     assert!(record.get("error").is_none(), "{record}");
     assert!(docs.get("tsd.counters", "cron/runs").await.unwrap().is_some());
 
-    for request in [
+    let requests = [
         json!({"op":"get","collection":"tsd.counters","id":"other/runs"}),
         json!({"op":"put","collection":"tsd.leases","id":"other/lease","doc":{},"precondition":{"kind":"none"}}),
         json!({"op":"get","collection":"tsd.migrations","id":"cron/unrelated/step"}),
@@ -201,9 +234,38 @@ async fn shared_schedule_records_are_owner_scoped_and_never_scanned() {
         json!({"op":"delete_where","collection":"tsd.migrations","filter":{"op":"all"}}),
         json!({"op":"get","collection":"tsd.kv","id":"cron/anything"}),
         json!({"op":"atomic_batch","ops":[{"op":"delete","collection":"tsd.counters","id":"other/runs","precondition":{"kind":"none"}}]}),
-    ] {
+    ];
+    let mut unexpected = Vec::new();
+    for request in requests {
         let reply = ask(&proxy, request.clone()).await;
-        assert_eq!(reply["error"]["kind"], "invalid_input", "{request}: {reply}");
+        if reply["error"]["kind"] != "invalid_input" {
+            unexpected.push(format!("{request}: {reply}"));
+        }
+    }
+
+    let denied_batch = ask(
+        &proxy,
+        json!({"op":"atomic_batch","ops":[
+            {"op":"put","collection":"tsd.counters","id":"cron/allowed","doc":{"next":1},"precondition":{"kind":"none"}},
+            {"op":"put","collection":"tsd.counters","id":"other/protected","doc":{"next":2},"precondition":{"kind":"none"}}
+        ]}),
+    )
+    .await;
+    if denied_batch["error"]["kind"] != "invalid_input" {
+        unexpected.push(format!("atomic shared write batch: {denied_batch}"));
+    }
+    if docs
+        .get("tsd.counters", "cron/allowed")
+        .await
+        .unwrap()
+        .is_some()
+    {
+        unexpected.push("rejected shared atomic batch was partially applied".into());
+    }
+
+    let kv_ensure = ask(&proxy, json!({"op":"ensure","spec":{"name":"tsd.kv"}})).await;
+    if kv_ensure.get("error").is_some() {
+        unexpected.push(format!("tsd.kv ensure-only: {kv_ensure}"));
     }
 
     let exact_progress = ask(
@@ -212,12 +274,11 @@ async fn shared_schedule_records_are_owner_scoped_and_never_scanned() {
     )
     .await;
     assert!(exact_progress.get("error").is_none(), "{exact_progress}");
+    assert!(unexpected.is_empty(), "shared schedule port violations: {unexpected:#?}");
 }
 
 #[tokio::test]
 async fn document_port_preserves_schedule_record_metadata_options() {
-    use tinystoragedrivers::DocumentStore;
-
     let (proxy, _, backend) = port_with_backend().await;
     let scoped = backend.for_scope(&Scope::local()).unwrap();
     let docs = scoped.documents();
