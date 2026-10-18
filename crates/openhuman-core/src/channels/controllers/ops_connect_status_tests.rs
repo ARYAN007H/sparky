@@ -691,3 +691,6 @@ async fn unavailable_module_cannot_persist_yuanbao_credentials() {
         }
     }
 }
+
+#[path = "ops_connect_memory_tests.rs"]
+mod memory_tests;
