@@ -140,6 +140,11 @@ cleanup() {
   trap - EXIT INT TERM HUP
 
   if [ -n "$WATCHDOG_PID" ]; then
+    # Kill the watchdog's in-flight `sleep`/`curl` too. Killing only the
+    # subshell orphans them, and the orphan keeps the inherited stderr open:
+    # a caller capturing this script's output then waits up to a full poll
+    # interval for EOF after the command has already exited.
+    pkill -TERM -P "$WATCHDOG_PID" 2>/dev/null || true
     kill "$WATCHDOG_PID" 2>/dev/null || true
   fi
 
