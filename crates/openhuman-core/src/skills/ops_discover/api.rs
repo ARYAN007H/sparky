@@ -200,11 +200,7 @@ pub(super) fn load_workflow_metadata_with_gate(
         return Vec::new();
     }
     let trusted = is_workspace_trusted(workspace_dir);
-    let flow_generation = if gate.flow_authoring_enabled() {
-        crate::skills::bundled::flow_authoring::generation_if_current(workspace_dir)
-    } else {
-        None
-    };
+    let flow_generation = flow_generation_for(workspace_dir, &gate);
     let key = MetadataCacheKey {
         workspace: workspace_dir.to_path_buf(),
         home: home.clone(),
@@ -251,9 +247,7 @@ pub fn discover_workflows(
     #[cfg(test)]
     DISCOVERY_CALLS.with(|c| c.set(c.get() + 1));
     let gate = DiscoveryGate::from_dispatch(&crate::core::runtime::DispatchCtx::ambient());
-    let generation = workspace_dir
-        .filter(|_| gate.flow_authoring_enabled())
-        .and_then(crate::skills::bundled::flow_authoring::generation_if_current);
+    let generation = workspace_dir.and_then(|workspace| flow_generation_for(workspace, &gate));
     discover_workflows_inner_with_gate(home_dir, workspace_dir, trusted, &gate, generation)
 }
 
@@ -280,10 +274,22 @@ pub(crate) fn discover_workflows_inner(
     trusted: bool,
 ) -> Vec<Workflow> {
     let gate = DiscoveryGate::from_dispatch(&crate::core::runtime::DispatchCtx::ambient());
-    let generation = workspace_dir
-        .filter(|_| gate.flow_authoring_enabled())
-        .and_then(crate::skills::bundled::flow_authoring::generation_if_current);
+    let generation = workspace_dir.and_then(|workspace| flow_generation_for(workspace, &gate));
     discover_workflows_inner_with_gate(home_dir, workspace_dir, trusted, &gate, generation)
+}
+
+fn flow_generation_for(workspace: &Path, gate: &DiscoveryGate) -> Option<u64> {
+    #[cfg(feature = "flows")]
+    {
+        gate.flow_authoring_enabled()
+            .then(|| crate::skills::bundled::flow_authoring::generation_if_current(workspace))
+            .flatten()
+    }
+    #[cfg(not(feature = "flows"))]
+    {
+        let _ = (workspace, gate);
+        None
+    }
 }
 
 pub(crate) fn discover_workflows_inner_with_gate(
