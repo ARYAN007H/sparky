@@ -76,7 +76,8 @@ async fn unavailable_channel_module_reports_error_and_queues_known_legacy_thread
         },
     )
     .await
-    .expect_err("explicitly disabled module must stay unavailable");
+    .err()
+    .expect("explicitly disabled module must stay unavailable");
     assert_eq!(unavailable, tinybus::module::ModuleCallError::Unavailable);
 
     let error = forget_channel(&config, "discord")
