@@ -167,6 +167,20 @@ async fn a_refused_message_publishes_no_turn_events() {
 async fn a_turn_whose_provider_is_unreachable_ends_in_one_classified_chat_error() {
     use crate::core::runtime::{context::CoreContext, DomainSet};
     let _serial = FORCED_ERROR_TEST_LOCK.lock().await;
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+        .await
+        .expect("local inference endpoint");
+    let address = listener.local_addr().expect("local endpoint address");
+    let (request_tx, request_rx) = tokio::sync::oneshot::channel();
+    tokio::spawn(async move {
+        use tokio::io::AsyncReadExt;
+
+        let (mut socket, _) = listener.accept().await.expect("inference request");
+        let mut request = [0_u8; 2048];
+        let length = socket.read(&mut request).await.expect("read inference request");
+        let _ = request_tx.send(String::from_utf8_lossy(&request[..length]).into_owned());
+        // Dropping the connection produces a deterministic transport failure.
+    });
     let tmp = tempfile::tempdir().expect("workspace");
     let mut config = crate::config::Config {
         workspace_dir: tmp.path().join("workspace"),
@@ -178,7 +192,7 @@ async fn a_turn_whose_provider_is_unreachable_ends_in_one_classified_chat_error(
     // a host backend transport, which this in-process test intentionally does
     // not install.
     config.chat_provider = Some("ollama:qwen3:4b-instruct".to_owned());
-    config.local_ai.base_url = Some("http://127.0.0.1:1".to_owned());
+    config.local_ai.base_url = Some(format!("http://{address}"));
     std::fs::create_dir_all(&config.workspace_dir).expect("workspace dir");
     let ctx = DispatchCtx::new(CoreContext::for_test_with_config(
         DomainSet::full(),
@@ -202,9 +216,27 @@ async fn a_turn_whose_provider_is_unreachable_ends_in_one_classified_chat_error(
     .expect("the message is accepted");
 
     let error = wait_for_event(&mut rx, &request_id, "chat_error").await;
-    assert!(error.error_type.as_deref().is_some_and(|kind| !kind.is_empty()));
+    assert_eq!(error.error_type.as_deref(), Some("network"));
     assert_eq!(error.client_id, "real-client");
-    assert!(error.copy_key.is_some(), "the failure carries its copy key");
+    assert_eq!(error.copy_key.as_deref(), Some("chat_error.network"));
+    let request = timeout(Duration::from_secs(1), request_rx)
+        .await
+        .expect("the local provider received the inference request")
+        .expect("inference request capture");
+    assert!(request.starts_with("POST /api/chat "), "{request}");
+
+    let runtime = super::runner::runtime(&ctx);
+    assert!(!runtime
+        .runner
+        .is_in_flight(&super::runner::scope_of(&ctx), thread_id)
+        .await);
+    let extra_terminal_events = std::iter::from_fn(|| rx.try_recv().ok())
+        .filter(|event| {
+            event.request_id == request_id
+                && matches!(event.event.as_str(), "chat_done" | "chat_error" | "chat_cancelled")
+        })
+        .count();
+    assert_eq!(extra_terminal_events, 0, "one terminal event was already received");
 
     // The terminal event is the go-ahead for the next message: the thread is
     // free, and the failed turn left no cached agent behind.
