@@ -223,18 +223,13 @@ fn projected_transcript_is_restored_in_chronological_order() {
 fn tool_result_updates_the_originating_activity() {
     let mut s = TranscriptState::new(CLIENT);
     s.begin_user_turn("do it");
-    let call = WebChannelEvent {
-        tool_name: Some("web_search".to_string()),
-        args: Some(serde_json::json!({"query": "rust ratatui"})),
-        ..ev("tool_call")
-    };
+    let call = ev("tool_call", serde_json::json!({
+        "tool_name":"web_search","args":{"query":"rust ratatui"}
+    }));
     s.apply_event(&call);
-    let result = WebChannelEvent {
-        tool_name: Some("web_search".to_string()),
-        success: Some(true),
-        output: Some("3 results".to_string()),
-        ..ev("tool_result")
-    };
+    let result = ev("tool_result", serde_json::json!({
+        "tool_name":"web_search","success":true,"output":"3 results"
+    }));
     s.apply_event(&result);
 
     let tools: Vec<_> = s
@@ -253,12 +248,9 @@ fn tool_result_updates_the_originating_activity() {
 fn failed_tool_result_uses_cross_marker() {
     let mut s = TranscriptState::new(CLIENT);
     s.begin_user_turn("do it");
-    let result = WebChannelEvent {
-        tool_name: Some("run_shell".to_string()),
-        success: Some(false),
-        output: Some("exit code 1".to_string()),
-        ..ev("tool_result")
-    };
+    let result = ev("tool_result", serde_json::json!({
+        "tool_name":"run_shell","success":false,"output":"exit code 1"
+    }));
     s.apply_event(&result);
     let tool = s
         .entries()
@@ -273,10 +265,7 @@ fn second_turn_opens_fresh_assistant_entry() {
     let mut s = TranscriptState::new(CLIENT);
     s.begin_user_turn("first");
     s.apply_event(&text_delta("one"));
-    s.apply_event(&WebChannelEvent {
-        full_response: Some("one".to_string()),
-        ..ev("chat_done")
-    });
+    s.apply_event(&ev("chat_done", serde_json::json!({"full_response":"one"})));
     s.begin_user_turn("second");
     s.apply_event(&text_delta("two"));
 
@@ -303,21 +292,14 @@ fn concurrent_same_named_tools_match_results_by_call_identity() {
     let mut state = TranscriptState::new(CLIENT);
     state.set_thread("thread-1");
     for id in ["a", "b"] {
-        state.apply_event(&WebChannelEvent {
-            tool_call_id: Some(id.into()),
-            tool_name: Some("read".into()),
-            request_id: "turn".into(),
-            ..ev("tool_call")
-        });
+        state.apply_event(&ev("tool_call", serde_json::json!({
+            "tool_call_id":id,"tool_name":"read","request_id":"turn"
+        })));
     }
-    state.apply_event(&WebChannelEvent {
-        tool_call_id: Some("b".into()),
-        tool_name: Some("read".into()),
-        request_id: "turn".into(),
-        success: Some(false),
-        output: Some("failure".into()),
-        ..ev("tool_result")
-    });
+    state.apply_event(&ev("tool_result", serde_json::json!({
+        "tool_call_id":"b","tool_name":"read","request_id":"turn",
+        "success":false,"output":"failure"
+    })));
     assert_eq!(
         state.entries()[0].activity.as_ref().unwrap().status,
         Status::Running
@@ -326,12 +308,9 @@ fn concurrent_same_named_tools_match_results_by_call_identity() {
         state.entries()[1].activity.as_ref().unwrap().status,
         Status::Error
     );
-    state.apply_event(&WebChannelEvent {
-        tool_call_id: Some("b".into()),
-        request_id: "turn".into(),
-        success: Some(false),
-        ..ev("tool_result")
-    });
+    state.apply_event(&ev("tool_result", serde_json::json!({
+        "tool_call_id":"b","request_id":"turn","success":false
+    })));
     assert_eq!(state.entries().len(), 2);
 }
 
@@ -343,13 +322,9 @@ fn child_activity_accumulates_output_and_failed_status_in_one_record() {
         ("subagent_text_delta", Some("partial")),
         ("subagent_failed", None),
     ] {
-        state.apply_event(&WebChannelEvent {
-            skill_id: Some("task".into()),
-            request_id: "turn".into(),
-            delta: delta.map(str::to_string),
-            message: Some("Timed out".into()),
-            ..ev(event)
-        });
+        state.apply_event(&ev(event, serde_json::json!({
+            "skill_id":"task","request_id":"turn","delta":delta,"message":"Timed out"
+        })));
     }
     assert_eq!(state.entries().len(), 1);
     let child = state.entries()[0].activity.as_ref().unwrap();
@@ -362,11 +337,7 @@ fn child_activity_accumulates_output_and_failed_status_in_one_record() {
 #[test]
 fn sequence_duplicates_do_not_duplicate_streamed_text() {
     let mut state = TranscriptState::new(CLIENT);
-    let event = WebChannelEvent {
-        request_id: "turn".into(),
-        seq: Some(0),
-        ..text_delta("one")
-    };
+    let event = ev("text_delta", serde_json::json!({"request_id":"turn","seq":0,"delta":"one","delta_kind":"text"}));
     state.apply_event(&event);
     state.apply_event(&event);
     assert_eq!(state.entries()[0].text, "one");
