@@ -80,13 +80,6 @@ impl WebEventView {
                 view.delta.clone_from(delta);
             }
             E::IterationStart { message, .. }
-            | E::ToolProgress { message, .. }
-            | E::SubagentSpawned { message, .. }
-            | E::SubagentCompleted { message, .. }
-            | E::SubagentFailed { message, .. }
-            | E::SubagentAwaitingUser { message, .. }
-            | E::SubagentIterationStart { message, .. }
-            | E::PlanReviewDecided { message, .. }
             | E::RunModeChanged { message, .. }
             | E::UserError { error_source: message, .. } => {
                 view.message.clone_from(message);
@@ -130,13 +123,18 @@ impl WebEventView {
                 view.skill_id.clone_from(skill_id);
                 view.tool_call_id.clone_from(tool_call_id);
             }
-            E::SubagentSpawned { tool_name, skill_id, subagent, .. }
-            | E::SubagentCompleted { tool_name, skill_id, subagent, .. }
-            | E::SubagentFailed { tool_name, skill_id, subagent, .. }
-            | E::SubagentAwaitingUser { tool_name, skill_id, subagent, .. }
-            | E::SubagentIterationStart { tool_name, skill_id, subagent, .. } => {
+            E::ToolProgress { tool_call_id, message, .. } => {
+                view.tool_call_id.clone_from(tool_call_id);
+                view.message.clone_from(message);
+            }
+            E::SubagentSpawned { tool_name, skill_id, subagent, message, .. }
+            | E::SubagentCompleted { tool_name, skill_id, subagent, message, .. }
+            | E::SubagentFailed { tool_name, skill_id, subagent, message, .. }
+            | E::SubagentAwaitingUser { tool_name, skill_id, subagent, message, .. }
+            | E::SubagentIterationStart { tool_name, skill_id, subagent, message, .. } => {
                 view.tool_name.clone_from(tool_name);
                 view.skill_id.clone_from(skill_id);
+                view.message.clone_from(message);
                 view.subagent = subagent.as_ref().map(|detail| SubagentView {
                     task_id: Some(detail.task_id.clone()),
                     display_name: detail.display_name.clone(),
