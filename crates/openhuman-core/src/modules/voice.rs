@@ -12,7 +12,7 @@
 //! this address space — a call is a channel send and a JSON hop, not IPC.
 //!
 //! So there is no per-call budget to protect and nothing here is too hot to go
-//! over the bus, including the voice server session state machine.
+//! over the bus, including the hotkey-driven recording session state machine.
 //!
 //! **What stays on this side is decided by the audio callback, not by cost.**
 //! `cpal` delivers on a realtime thread where blocking is a dropout, so the
@@ -189,7 +189,7 @@ pub async fn prepare_capture(
 /// generation guard, setup / stop-intent buffering). The host reports facts as
 /// [`SessionInput`]s and performs the one [`SessionAction`] each answer names.
 ///
-/// Not `Drop`-based, for the same reason as [`VadSession`]: call
+/// Not `Drop`-based: call
 /// [`close`](Self::close) when the server stops.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct RecorderSession {
@@ -255,7 +255,7 @@ impl RecorderSession {
 
 /// Frame 16-bit PCM samples as a WAV file, without touching the samples.
 ///
-/// Distinct from [`encode_wav`] because a caller holding `i16` should not have
+/// A caller holding `i16` should not have
 /// to widen to `f32` and let the module narrow back: that round trip is lossy
 /// by one LSB for no reason. This path is exact.
 ///

@@ -25,10 +25,10 @@ Each one meets the frontend in one of two ways:
                v                         |
  +--------------------------+   +-------------------------------+
  | controllers (core/all.rs)|   | in-process broadcast channels |
- |  app_state_*             |   |  notifications::subscribe_
- |  notification_*          |   |    _events                    |
- |  dashboard_*             |   |  notifications::subscribe_    |
- |  provider_surfaces_*     |   |    core_notifications         |
+ |  app_state_*             |   |  notifications::subscribe_    |
+ |  notification_*          |   |    core_notifications         |
+ |  dashboard_*             |   |                               |
+ |  provider_surfaces_*     |   |                               |
  |  desktop_* (internal)    |   +-------------------------------+
  +--------------------------+               ^
                |                            | publish
@@ -120,8 +120,6 @@ Method names are `openhuman.<namespace>_<function>`.
   module; this folder calls it through `tinycomputer-bus`.
 - The live current user belongs to the host's session owner
   (`openhuman_tinyhumans::session`), not to `app_state`.
-- Dictation overlay activation is driven by `voice::dictation_listener`, not
-  by `overlay`.
 
 ## Gotchas
 
@@ -134,8 +132,8 @@ Method names are `openhuman.<namespace>_<function>`.
 - `control` checks loopback on every tool call and every confirmation, not
   just at enable time. A core bound to a non-loopback address reports
   `supported: false`.
-- The overlay and notification channels drop events when no one is
-  subscribed. They are notifications, not a queue.
+- The notification channel drops events when no one is subscribed. It is not
+  a queue.
 - `provider_surfaces` keeps its queue in process memory, so it is empty after
   a restart.
 
