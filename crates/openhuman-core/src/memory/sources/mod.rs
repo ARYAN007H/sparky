@@ -10,7 +10,8 @@
 pub mod state;
 mod sync;
 
-use tinymemory_api::{ForgetTarget, MetaFilter};
+use tinymemory_api::MetaFilter;
+use tinymemory_tools::ops::MemoryOps;
 
 use crate::config::schema::{MemorySourceConfig, MemorySourceKind};
 use crate::config::Config;
@@ -161,30 +162,23 @@ pub fn apply_remove(config: &mut Config, id: &str) -> Option<MemorySourceConfig>
 /// the deletion is queued ([`crate::memory::deletion`]) and runs on the next
 /// sign-in. A failure is queued the same way, and returned.
 pub async fn forget_items(config: &Config, id: &str) -> Result<usize> {
-    let pending = || crate::memory::deletion::PendingDeletion::Source {
-        source_id: id.to_string(),
-    };
     let bound = match engine::resolve(config).engine() {
-        Ok(bound) => bound,
-        Err(Error::Off(_)) => {
-            crate::memory::deletion::enqueue(&config.workspace_dir, pending());
-            return Ok(0);
-        }
+        Ok(bound) => Some(bound),
+        Err(Error::Off(_)) => None,
         Err(error) => return Err(error),
     };
-    let filter = MetaFilter {
-        source_id: Some(id.to_string()),
-        ..MetaFilter::default()
+    let ops = match bound {
+        Some(_) => super::ops::memory_ops(config)?,
+        None => MemoryOps::unconfined(),
     };
-    let report = match bound.engine.forget(ForgetTarget::Filter(filter)).await {
-        Ok(report) => report,
-        Err(error) => {
-            crate::memory::deletion::enqueue(&config.workspace_dir, pending());
-            return Err(error);
-        }
-    };
-    tracing::debug!(id = %id, forgotten = report.forgotten, "[memory:sources] items forgotten");
-    Ok(report.forgotten)
+    let engine = bound.as_ref().map(|bound| bound.engine.as_ref());
+    let forgotten = ops
+        .forget_source(engine, id, |deletion| {
+            crate::memory::deletion::enqueue(&config.workspace_dir, deletion);
+        })
+        .await?;
+    tracing::debug!(id = %id, forgotten, "[memory:sources] items forgotten");
+    Ok(forgotten)
 }
 
 /// The layout source `source` files into: its own `namespace` (a layout
