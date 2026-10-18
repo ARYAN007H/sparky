@@ -220,8 +220,35 @@ async fn a_turn_with_an_unavailable_local_provider_ends_in_one_classified_chat_e
     .await
     .expect("the message is accepted");
 
-    let error = wait_for_event(&mut rx, &request_id, "chat_error").await;
     let requests = server.received_requests().await.expect("captured requests");
+    let error = match timeout(Duration::from_secs(10), async {
+        loop {
+            match rx.recv().await {
+                Ok(event) if event.request_id == request_id && event.event == "chat_error" => {
+                    return event;
+                }
+                Ok(_) | Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue,
+                Err(error) => panic!("event stream closed: {error}"),
+            }
+        }
+    })
+    .await
+    {
+        Ok(error) => error,
+        Err(_) => {
+            let in_flight = crate::web_chat::runner::runtime(&ctx)
+                .runner
+                .is_in_flight(&crate::web_chat::runner::scope_of(&ctx), thread_id)
+                .await;
+            panic!(
+                "no chat_error for {request_id}; provider requests={requests:?}; in_flight={in_flight}"
+            );
+        }
+    };
+    let requests = server
+        .received_requests()
+        .await
+        .expect("captured requests after terminal event");
     assert!(
         requests.iter().any(|request| {
             request.method == "POST"
