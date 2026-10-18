@@ -231,11 +231,12 @@ impl ProfileHandle {
             let Some(event) = events.recv().await else {
                 return Err(ProfileError::EventsClosed);
             };
-            if event.thread_id != thread_id || event.request_id != request_id {
+            let context = event.context();
+            if context.thread_id != thread_id || context.request_id != request_id {
                 continue;
             }
-            match event.event.as_str() {
-                "chat_done" => {
+            match event.wire_event() {
+                openhuman_core::web_chat::WebChannelEvent::ChatDone { full_response, .. } => {
                     log::debug!(
                         "[embed][profiles] chat done profile={} request_id={request_id}",
                         self.profile.id
@@ -243,21 +244,25 @@ impl ProfileHandle {
                     return Ok(ChatReply {
                         thread_id: thread_id.to_string(),
                         request_id,
-                        text: event.full_response.unwrap_or_default(),
+                        text: full_response.clone(),
                     });
                 }
-                "chat_error" => {
+                openhuman_core::web_chat::WebChannelEvent::ChatError {
+                    message, error_type, ..
+                } => {
                     log::debug!(
                         "[embed][profiles] chat failed profile={} request_id={request_id} error_type={:?}",
                         self.profile.id,
-                        event.error_type
+                        error_type
                     );
                     return Err(ProfileError::Turn {
-                        message: event.message.unwrap_or_default(),
-                        error_type: event.error_type,
+                        message: message.clone(),
+                        error_type: error_type.clone(),
                     });
                 }
-                "chat_cancelled" => return Err(ProfileError::Cancelled),
+                openhuman_core::web_chat::WebChannelEvent::ChatCancelled { .. } => {
+                    return Err(ProfileError::Cancelled);
+                }
                 _ => {}
             }
         }
