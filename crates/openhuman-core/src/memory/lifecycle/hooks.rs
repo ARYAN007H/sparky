@@ -21,7 +21,7 @@ use tinymemory_tools::{Compaction, ContextPack, PostTurn, PreTurn, SessionStart}
 
 use crate::config::Config;
 use crate::memory::engine;
-use crate::memory::scope::ResolvedIdentity;
+use tinymemory_tools::layout::identity::ResolvedIdentity;
 
 use super::{agent_memory_on, jobs, log_only};
 

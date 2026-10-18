@@ -5,7 +5,7 @@
 //! | --- | --- |
 //! | [`engine`] | Binds the `[memory]` engine (`tinyhumans` over the host's backend credential, or `cortexdb` with a stored key); memory is **off** without one |
 //! | [`guard`] | Scrubs secrets and PII from every write, whichever path it takes |
-//! | [`scope`] | Who is acting: the layout root and memory agent id a turn runs as |
+//! | [`scope`] | Config-to-identity pins and the account layout migration hooks |
 //! | [`lifecycle`] | The turn hooks (pre-turn pack, post-turn log, compaction recall) and the background job queue |
 //! | [`ops`] | Engine selection, recall, fetch, learn, forget, list, the pack preview |
 //! | [`brain`] | The shared brain: documents by source type |
@@ -24,7 +24,6 @@ pub mod billing;
 pub mod brain;
 pub mod bus;
 pub mod channels;
-pub mod confine;
 pub mod deletion;
 pub mod engine;
 pub mod error;
@@ -44,10 +43,13 @@ mod tool_budget;
 pub(crate) mod tool_writes;
 pub mod tools;
 pub mod types;
-pub mod user_scope;
 
 #[cfg(test)]
 pub(crate) mod test_fixtures;
+
+#[cfg(test)]
+#[path = "confinement_tests.rs"]
+mod confinement_tests;
 
 pub use bus::register_memory_subscribers;
 pub use engine::is_on as memory_is_on;

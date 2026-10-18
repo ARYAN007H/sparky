@@ -12,7 +12,7 @@ use tinymemory_tools::prefetch::{Limits, PrefetchRuntime, Prefetcher, WorkerPool
 
 use crate::config::Config;
 use crate::core::runtime::{slot_for, DispatchCtx};
-use crate::memory::scope::ResolvedIdentity;
+use tinymemory_tools::layout::identity::ResolvedIdentity;
 
 use super::hooks::{self, TurnPack};
 

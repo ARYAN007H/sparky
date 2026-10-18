@@ -21,7 +21,6 @@ use crate::config::Config;
 
 use super::engine;
 use super::lifecycle::jobs;
-use super::scope::MemoryIdentity;
 use tinymemory_api::{Error, Result};
 
 /// Largest file `memory_brain_ingest` reads, in bytes.
@@ -52,11 +51,19 @@ pub fn brain_node(
 }
 
 /// The layout the brain RPCs act on: `identity`'s.
-fn layout(config: &Config, identity: &MemoryIdentity) -> MemoryLayout {
-    identity.resolve(config).layout
+fn layout(
+    config: &Config,
+    identity: &tinymemory_tools::layout::identity::Identity,
+) -> MemoryLayout {
+    identity
+        .resolve(&crate::memory::scope::identity_pins(config))
+        .layout
 }
 
-fn brain(config: &Config, identity: &MemoryIdentity) -> Result<Brain> {
+fn brain(
+    config: &Config,
+    identity: &tinymemory_tools::layout::identity::Identity,
+) -> Result<Brain> {
     let bound = engine::resolve(config).engine()?;
     Ok(Brain::new(bound.engine, layout(config, identity)))
 }
@@ -87,7 +94,10 @@ pub struct BrainSourcesView {
 }
 
 /// `memory_brain_sources`: the brain's sources and their sizes.
-pub async fn sources(config: &Config, identity: &MemoryIdentity) -> Result<BrainSourcesView> {
+pub async fn sources(
+    config: &Config,
+    identity: &tinymemory_tools::layout::identity::Identity,
+) -> Result<BrainSourcesView> {
     let bound = engine::resolve(config).engine()?;
     let layout = layout(config, identity);
     let page = bound
@@ -149,7 +159,7 @@ pub struct BrainSearchView {
 /// `memory_brain_search`.
 pub async fn search(
     config: &Config,
-    identity: &MemoryIdentity,
+    identity: &tinymemory_tools::layout::identity::Identity,
     params: BrainSearchParams,
 ) -> Result<BrainSearchView> {
     let query = params.query.trim();
@@ -218,7 +228,7 @@ async fn ingest_path(config: &Config, path: &str) -> Result<std::path::PathBuf> 
 /// source's belief build. The write waits only for the engine to accept it.
 pub async fn ingest(
     config: &Config,
-    identity: &MemoryIdentity,
+    identity: &tinymemory_tools::layout::identity::Identity,
     params: BrainIngestParams,
 ) -> Result<BrainIngestView> {
     let source = params.source.as_deref().map(parse_source).transpose()?;
@@ -299,7 +309,7 @@ pub struct BrainForgetView {
 /// `memory_brain_forget`: forgets every document of one source.
 pub async fn forget(
     config: &Config,
-    identity: &MemoryIdentity,
+    identity: &tinymemory_tools::layout::identity::Identity,
     params: BrainForgetParams,
 ) -> Result<BrainForgetView> {
     let source = parse_source(&params.source)?;

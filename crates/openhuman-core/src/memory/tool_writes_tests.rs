@@ -1,12 +1,14 @@
 use super::*;
-use crate::memory::scope::MemoryIdentity;
 use crate::memory::test_fixtures::{bind_reference, config_in, stored, RefusingEngine};
 use serde_json::json;
 use tinymemory_api::Reach;
 use tinymemory_api::{MetaFilter, Namespace};
 
 fn facts(config: &Config) -> CallFacts {
-    CallFacts::of(config, &MemoryIdentity::agent("outbox-agent"))
+    CallFacts::of(
+        config,
+        &tinymemory_tools::layout::identity::Identity::agent("outbox-agent"),
+    )
 }
 
 #[test]
@@ -375,7 +377,10 @@ async fn model_supplied_forget_reach_cannot_remove_another_identitys_item() {
     let tmp = tempfile::tempdir().unwrap();
     let config = config_in(&tmp);
     let engine = bind_reference(&config);
-    let other_facts = CallFacts::of(&config, &MemoryIdentity::agent("different-agent"));
+    let other_facts = CallFacts::of(
+        &config,
+        &tinymemory_tools::layout::identity::Identity::agent("different-agent"),
+    );
     let item = StoreItem::learning(
         "Other identity's learning",
         LearningKind::Fact,

@@ -367,7 +367,7 @@ async fn switching_to_v3_persists_and_rebinds_the_persons_own_config() {
         .await
         .unwrap();
     assert!(
-        super::super::scope::layout_is_v3(&saved),
+        saved.memory.layout == crate::config::MemoryLayoutMode::V3,
         "v3 written to this person's file"
     );
     let v3 = resolve(&saved).engine().expect("v3 bound");
@@ -376,7 +376,7 @@ async fn switching_to_v3_persists_and_rebinds_the_persons_own_config() {
         "the switch rebinds"
     );
     assert!(
-        !super::super::scope::layout_is_v3(&config),
+        config.memory.layout != crate::config::MemoryLayoutMode::V3,
         "the caller's copy is not the source of truth"
     );
 }

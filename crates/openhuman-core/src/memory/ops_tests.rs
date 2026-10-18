@@ -1,7 +1,10 @@
 use super::*;
 use crate::memory::test_fixtures::{bind_reference, config_in, stored};
 use crate::memory::types::EngineStatus;
-use tinymemory_api::{FetchMode, ItemKind, MetaFilter, SourceKind, SourceRef, ToolCallRef};
+use tinymemory_api::{
+    FetchMode, ItemKind, ListRequest, MemoryMeta, MetaFilter, SourceKind, SourceRef, StoreItem,
+    ToolCallRef,
+};
 
 fn learn_params(text: &str) -> LearnParams {
     LearnParams {
@@ -483,7 +486,7 @@ async fn erasing_memory_cancels_queued_learning_so_restart_cannot_restore_it() {
     let engine = bind_reference(&config);
     let facts = crate::memory::tools::CallFacts::of(
         &config,
-        &crate::memory::scope::MemoryIdentity::agent("orchestrator"),
+        &tinymemory_tools::layout::identity::Identity::agent("orchestrator"),
     );
     let queued = crate::memory::tool_writes::enqueue(
         &config,

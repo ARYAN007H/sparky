@@ -258,7 +258,7 @@ pub fn resolve(config: &Config) -> Binding {
         }
         tracing::warn!("[memory:engine] ignoring the host engine in SaaS mode");
     }
-    let root = if super::scope::layout_is_v3(config) {
+    let root = if config.memory.layout == crate::config::MemoryLayoutMode::V3 {
         match super::scope::user_root(config) {
             Some(root) => Some(root),
             None => return off(None, None, "sign in to use memory in its own layout"),
@@ -415,7 +415,7 @@ fn rooted(
     let Some(root) = root else {
         return (settings, "|root=legacy".to_string());
     };
-    let actor = super::scope::actor_of_root(root);
+    let actor = tinymemory_tools::layout::identity::actor_of_root(root);
     let retired = legacy_read.then(|| actor.clone());
     let fingerprint = format!(
         "|root={root}|tenant={tenant}|retired={}",

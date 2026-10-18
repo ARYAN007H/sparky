@@ -4,7 +4,6 @@ use chrono::Utc;
 use tinymemory_api::{LearningKind, MemoryEngine, MemoryMeta, StoreItem};
 
 use crate::memory::lifecycle::hooks::pre_turn_work;
-use crate::memory::scope::MemoryIdentity;
 use crate::memory::test_fixtures::{bind_reference, config_in};
 
 #[test]
@@ -22,7 +21,10 @@ fn the_policy_round_trips_and_refuses_out_of_range_values() {
     let mut config = Config::default();
     let view = policy_view(&config);
     assert!(view.log_conversations);
-    assert_eq!(view.agent_id, scope::DEFAULT_AGENT_ID);
+    assert_eq!(
+        view.agent_id,
+        tinymemory_tools::layout::identity::DEFAULT_AGENT_ID
+    );
     assert_eq!(view.root, "root");
     assert!(!view.host_bound);
 
@@ -121,7 +123,8 @@ async fn the_preview_reads_without_logging_and_agents_are_listed() {
         ))
         .await
         .unwrap();
-    let writer = scope::MemoryIdentity::agent("writer").resolve(&config);
+    let writer = tinymemory_tools::layout::identity::Identity::agent("writer")
+        .resolve(&crate::memory::scope::identity_pins(&config));
     pre_turn_work(
         &crate::core::runtime::DispatchCtx::ambient(),
         &config,
@@ -138,7 +141,7 @@ async fn the_preview_reads_without_logging_and_agents_are_listed() {
 
     let turn = pack_preview(
         &config,
-        &MemoryIdentity::root(),
+        &tinymemory_tools::layout::identity::Identity::root(),
         PackPreviewParams {
             query: Some("when do invoices go out?".into()),
             agent_id: Some("writer".into()),
@@ -153,14 +156,19 @@ async fn the_preview_reads_without_logging_and_agents_are_listed() {
 
     let session = pack_preview(
         &config,
-        &MemoryIdentity::root(),
+        &tinymemory_tools::layout::identity::Identity::root(),
         PackPreviewParams::default(),
     )
     .await
     .unwrap();
     assert_eq!(session.mode, "session");
 
-    let agents = agents_list(&config, &MemoryIdentity::root()).await.unwrap();
+    let agents = agents_list(
+        &config,
+        &tinymemory_tools::layout::identity::Identity::root(),
+    )
+    .await
+    .unwrap();
     assert_eq!(
         agents.agents,
         [AgentCount {

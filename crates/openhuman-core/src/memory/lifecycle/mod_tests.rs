@@ -1,6 +1,5 @@
 use super::*;
 
-use crate::memory::scope::MemoryIdentity;
 use crate::memory::test_fixtures::{bind_reference, config_in};
 
 #[test]
@@ -41,7 +40,8 @@ fn the_policy_mirrors_the_recall_config() {
 async fn agent_memory_needs_an_engine_and_follows_the_identity() {
     let tmp = tempfile::tempdir().unwrap();
     let config = config_in(&tmp);
-    let identity = MemoryIdentity::team_member("acme", "writer").resolve(&config);
+    let identity = tinymemory_tools::layout::identity::Identity::team_member("acme", "writer")
+        .resolve(&crate::memory::scope::identity_pins(&config));
     assert!(matches!(
         agent_memory(&config, &identity),
         Err(Error::Off(_))
@@ -52,10 +52,18 @@ async fn agent_memory_needs_an_engine_and_follows_the_identity() {
     assert_eq!(memory.agent_id(), "writer");
     assert_eq!(memory.namespace().to_string(), "team:acme/agent:writer");
 
-    let (named, _) = named_agent_memory(&config, &MemoryIdentity::root(), Some("auditor")).unwrap();
+    let (named, _) = named_agent_memory(
+        &config,
+        &tinymemory_tools::layout::identity::Identity::root(),
+        Some("auditor"),
+    )
+    .unwrap();
     assert_eq!(named.namespace().to_string(), "agent:auditor");
-    let (current, resolved) =
-        current_agent_memory(&config, &MemoryIdentity::root().child("planner")).unwrap();
+    let (current, resolved) = current_agent_memory(
+        &config,
+        &tinymemory_tools::layout::identity::Identity::root().child("planner"),
+    )
+    .unwrap();
     assert_eq!(current.agent_id(), "planner");
     assert_eq!(resolved.agent_id, "planner");
 }

@@ -19,7 +19,8 @@ use std::time::Duration;
 use async_trait::async_trait;
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
-use tinymemory_api::{Namespace, StoreItem, WriteOptions};
+use tinymemory_api::{Namespace, Reach, StoreItem, WriteOptions};
+use tinymemory_tools::confine::Policy;
 use tinymemory_tools::list_store::{ListStore, StoreError};
 use tinymemory_tools::pending::{
     Ack, Binding, Entry, Epoch, FenceToken, Limits, PendingError, PendingWrites, WriteExecutor,
@@ -107,7 +108,7 @@ fn binding_of(root: Option<String>, layout_v3: bool) -> Binding {
 fn binding(config: &Config) -> Binding {
     binding_of(
         super::scope::user_root(config),
-        super::scope::layout_is_v3(config),
+        config.memory.layout == crate::config::MemoryLayoutMode::V3,
     )
 }
 
@@ -136,7 +137,7 @@ fn owner_prefix(config: &Config) -> String {
 fn queue_path(config: &Config, root: &Namespace) -> PathBuf {
     let partition = serde_json::to_vec(&(
         &config.memory.root,
-        super::scope::layout_is_v3(config),
+        config.memory.layout == crate::config::MemoryLayoutMode::V3,
         root,
     ))
     .expect("partition fields serialize");
@@ -161,9 +162,9 @@ pub(super) fn enqueue(
     if super::engine::switched_off(config) {
         return Err(Error::Off("memory is disabled".into()));
     }
-    let confinement = super::user_scope::confinement(config)?;
+    let confinement = super::ops::saas_confinement(config, Policy::Clamp)?;
     let reach = match confinement {
-        Some(ref root) => super::user_scope::clamp_reach(Some(facts.reach.clone()), root),
+        Some(ref confinement) => confinement.reach(Some(facts.reach.clone()))?,
         None => facts.reach.clone(),
     };
     let scope_root = reach.at.clone();
@@ -174,10 +175,10 @@ pub(super) fn enqueue(
                 .map_err(|_| Error::InvalidRequest("invalid learning arguments".into()))?;
             params.meta = None;
             let mut item = super::ops::learning_item(params, Some(facts.learn_meta()))?;
-            if let Some(root) = confinement {
-                super::user_scope::clamp_item(&mut item, &root);
+            if let Some(ref confinement) = confinement {
+                confinement.item(&mut item)?;
             }
-            if !super::user_scope::within(&item.meta().namespace, &reach.at) || reach.inherit {
+            if !Reach::subtree(reach.at.clone()).admits(&item.meta().namespace) || reach.inherit {
                 return Err(Error::InvalidRequest(
                     ("learning namespace is outside the trusted reach").into(),
                 ));
@@ -557,7 +558,9 @@ fn schedule_partition(ctx: &crate::core::runtime::DispatchCtx, config: Arc<Confi
 pub(crate) async fn drain(config: &Config) -> usize {
     let file = queue_path(
         config,
-        super::scope::MemoryIdentity::root().resolve(config).root(),
+        tinymemory_tools::layout::identity::Identity::root()
+            .resolve(&crate::memory::scope::identity_pins(config))
+            .root(),
     );
     let owner = owner_state(config);
     let _owner = owner.barrier.read().await;

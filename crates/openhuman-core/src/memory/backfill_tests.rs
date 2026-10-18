@@ -114,7 +114,8 @@ async fn stores_past_chats_once_and_skips_what_live_logging_took() {
     )
     .await;
     // The lifecycle logged live-thread's second turn (user index 2).
-    let identity = MemoryIdentity::agent(MAIN_AGENT).resolve(&config);
+    let identity = tinymemory_tools::layout::identity::Identity::agent(MAIN_AGENT)
+        .resolve(&crate::memory::scope::identity_pins(&config));
     crate::memory::lifecycle::hooks::pre_turn_work(
         &crate::core::runtime::DispatchCtx::ambient(),
         &config,

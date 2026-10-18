@@ -7,7 +7,6 @@ use tinymemory_tools::{ContextPack, SessionStart};
 
 use crate::config::schema::MemoryRecallConfig;
 use crate::config::Config;
-use crate::memory::scope::{self, MemoryIdentity};
 use tinymemory_api::{Error, Result};
 
 use super::jobs;
@@ -31,7 +30,8 @@ pub struct PolicyView {
 /// `memory_policy_get`.
 #[must_use]
 pub fn policy_view(config: &Config) -> PolicyView {
-    let resolved = scope::MemoryIdentity::root().resolve(config);
+    let resolved = tinymemory_tools::layout::identity::Identity::root()
+        .resolve(&crate::memory::scope::identity_pins(config));
     PolicyView {
         log_conversations: config.memory.conversations.enabled,
         recall: config.memory.recall.clone(),
@@ -206,7 +206,7 @@ pub struct PackPreviewView {
 /// (without one) would be given. Reads only; nothing is logged.
 pub async fn pack_preview(
     config: &Config,
-    identity: &MemoryIdentity,
+    identity: &tinymemory_tools::layout::identity::Identity,
     params: PackPreviewParams,
 ) -> Result<PackPreviewView> {
     let (memory, identity) =
@@ -252,7 +252,10 @@ pub struct AgentsView {
 }
 
 /// `memory_agents_list`: the agents with conversations under the root.
-pub async fn agents_list(config: &Config, identity: &MemoryIdentity) -> Result<AgentsView> {
+pub async fn agents_list(
+    config: &Config,
+    identity: &tinymemory_tools::layout::identity::Identity,
+) -> Result<AgentsView> {
     let (memory, identity) = super::current_agent_memory(config, identity)?;
     let page = memory
         .engine()

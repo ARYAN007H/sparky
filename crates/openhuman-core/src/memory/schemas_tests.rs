@@ -5,6 +5,7 @@ use crate::core::runtime::DispatchCtx;
 use crate::core::runtime::DomainSet;
 use crate::memory::test_fixtures::{bind_reference, config_in};
 use serde_json::{json, Map, Value};
+use tinymemory_api::MemoryEngine;
 
 /// Every method of the spec's RPC table (`docs/specs/memory-v2.md`), exactly.
 const SPEC_METHODS: [&str; 35] = [
@@ -329,6 +330,89 @@ async fn read_handlers_answer_over_a_bound_engine() {
 }
 
 #[tokio::test]
+async fn rpc_memory_handlers_apply_the_refuse_boundary_before_operations() {
+    let tmp = tempfile::tempdir().unwrap();
+    let mut config = config_in(&tmp);
+    config.memory.root = Some("team:acme".into());
+    bind_reference(&config);
+    let outside = serde_json::to_value(tinymemory_api::Reach::subtree(
+        "team:other".parse().unwrap(),
+    ))
+    .unwrap();
+
+    for (function, params) in [
+        (
+            "recall",
+            json!({"question": "x", "filter": {"reach": outside.clone()}}),
+        ),
+        (
+            "fetch",
+            json!({"query": "x", "filter": {"reach": outside.clone()}}),
+        ),
+        (
+            "learn",
+            json!({"text": "outside", "meta": {"namespace": "team:other"}}),
+        ),
+        (
+            "forget",
+            json!({"ids": ["not-present"], "reach": outside.clone()}),
+        ),
+        ("items_list", json!({"filter": {"reach": outside.clone()}})),
+        (
+            "explore",
+            json!({
+                "facet": "kind",
+                "path": [{"facet": "namespace", "value": "team:other"}]
+            }),
+        ),
+        (
+            "items_get",
+            json!({"ids": ["not-present"], "reach": outside.clone()}),
+        ),
+    ] {
+        let error = call(&config, function, params).await.unwrap_err();
+        assert!(error.contains("INVALID_REQUEST"), "{function}: {error}");
+        assert!(
+            error.contains("outside this caller's memory")
+                && error.contains("team:other")
+                && error.contains("team:acme"),
+            "{function}: unexpected boundary error: {error}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn rpc_default_reads_stay_within_the_configured_identity_root() {
+    let tmp = tempfile::tempdir().unwrap();
+    let mut config = config_in(&tmp);
+    config.memory.root = Some("team:acme".into());
+    let engine = bind_reference(&config);
+    for (text, root) in [
+        ("acme memory", "team:acme"),
+        ("other team secret", "team:other"),
+    ] {
+        engine
+            .store(tinymemory_api::StoreItem::learning(
+                text,
+                tinymemory_api::LearningKind::Fact,
+                0.9,
+                tinymemory_api::MemoryMeta {
+                    namespace: root.parse().unwrap(),
+                    ..tinymemory_api::MemoryMeta::default()
+                },
+            ))
+            .await
+            .unwrap();
+    }
+
+    let listed = call(&config, "items_list", json!({})).await.unwrap();
+    let listed = listed.get("result").unwrap_or(&listed);
+    let items = listed["items"].as_array().unwrap();
+    assert_eq!(items.len(), 1);
+    assert_eq!(items[0]["meta"]["namespace"], "team:acme");
+}
+
+#[tokio::test]
 async fn policy_handlers_validate_persist_and_report() {
     let tmp = tempfile::tempdir().unwrap();
     let config = config_in(&tmp);
@@ -452,7 +536,8 @@ async fn rpc_learn_invalidates_a_cached_prefetch_pack() {
 
     let ctx = CoreContext::for_test_with_config(DomainSet::full(), config.clone());
     let dispatch = DispatchCtx::new(ctx.clone());
-    let identity = crate::memory::scope::MemoryIdentity::root().resolve(&config);
+    let identity = tinymemory_tools::layout::identity::Identity::root()
+        .resolve(&crate::memory::scope::identity_pins(&config));
     let thread = "rpc-learn-invalidates-prefetch";
     let input = || {
         (

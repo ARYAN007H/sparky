@@ -9,13 +9,13 @@ use tinyagents_harness::context::RunConfig;
 use tinyinference_llm::message::Message;
 
 use crate::memory::lifecycle::hooks::{MemoryTurn, TurnPack, OPEN_TAG};
-use crate::memory::scope::MemoryIdentity;
 
 fn context(pack: Option<TurnPack>) -> RunContext<OpenHumanRunContext> {
     let config = crate::config::Config::default();
     let mut data = OpenHumanRunContext::new();
     data.memory_turn = Some(Arc::new(MemoryTurn {
-        identity: MemoryIdentity::agent("a").resolve(&config),
+        identity: tinymemory_tools::layout::identity::Identity::agent("a")
+            .resolve(&crate::memory::scope::identity_pins(&config)),
         config: Arc::new(config),
         thread_id: "t".into(),
         pack,

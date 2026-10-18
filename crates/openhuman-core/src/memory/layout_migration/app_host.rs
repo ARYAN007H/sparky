@@ -12,7 +12,7 @@ use super::claim::ClaimKey;
 use super::state::FileStateStore;
 use crate::config::{Config, MemoryLayoutMode};
 use crate::memory::engine::{self, CORTEXDB_ENGINE};
-use crate::memory::scope::{self, MemoryIdentity};
+use crate::memory::scope;
 use tinymemory_api::{Error, Result};
 
 /// The app's [`lm::LayoutHost`], bound to one account's config.
@@ -84,8 +84,10 @@ impl lm::LayoutHost for AppHost {
         // switch.
         let mut v3 = self.config.clone();
         v3.memory.layout = MemoryLayoutMode::V3;
-        let layout = MemoryIdentity::root().resolve(&v3).layout;
-        let chat_node = scope::chat_node(&layout);
+        let layout = tinymemory_tools::layout::identity::Identity::root()
+            .resolve(&crate::memory::scope::identity_pins(&v3))
+            .layout;
+        let chat_node = tinymemory_tools::layout::identity::chat_node(&layout);
         Ok(Placement {
             layout,
             chat_node,
@@ -95,7 +97,7 @@ impl lm::LayoutHost for AppHost {
     }
 
     fn is_switched(&self) -> bool {
-        scope::layout_is_v3(&self.config)
+        self.config.memory.layout == MemoryLayoutMode::V3
     }
 
     async fn switch(&self) -> lm::Result<()> {
@@ -133,7 +135,7 @@ pub(super) fn claim_key(config: &Config) -> Result<Option<ClaimKey>> {
     }
     // The account, by its actor (`user:<id>`): a claim made before
     // `org:` roots named the same string, so it stays this account's.
-    let owner = scope::actor_of_root(&signed_in_root(config)?);
+    let owner = tinymemory_tools::layout::identity::actor_of_root(&signed_in_root(config)?);
     // `<app>/users/<id>/config.toml`: the app directory every account shares.
     let app_dir = config
         .config_path
