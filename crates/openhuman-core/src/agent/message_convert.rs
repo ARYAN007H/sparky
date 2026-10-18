@@ -127,44 +127,7 @@ pub(crate) fn user_message_from_text(text: &str) -> Message {
         return Message::User(UserMessage { content });
     }
 
-    const PREFIX: &str = "[IMAGE:";
-    if !text.contains(PREFIX) {
-        return Message::user(text);
-    }
-    let mut blocks: Vec<ContentBlock> = Vec::new();
-    let mut pending = String::new();
-    let mut rest = text;
-    let mut images = 0usize;
-    while let Some(start) = rest.find(PREFIX) {
-        let after = &rest[start + PREFIX.len()..];
-        let Some(end) = after.find(']') else {
-            break;
-        };
-        let payload = after[..end].trim();
-        if is_provider_ready_image_reference(payload) {
-            pending.push_str(&rest[..start]);
-            if !pending.is_empty() {
-                blocks.push(ContentBlock::Text(std::mem::take(&mut pending)));
-            }
-            blocks.push(ContentBlock::Image(ImageRef {
-                url: payload.to_string(),
-                mime_type: data_uri_mime(payload),
-            }));
-            images += 1;
-        } else {
-            pending.push_str(&rest[..start + PREFIX.len() + end + 1]);
-        }
-        rest = &after[end + 1..];
-    }
-    if images == 0 {
-        return Message::user(text);
-    }
-    pending.push_str(rest);
-    if !pending.is_empty() {
-        blocks.push(ContentBlock::Text(pending));
-    }
-    log::debug!("[agent][message_convert] stored {images} image attachment(s) as typed parts");
-    Message::User(UserMessage { content: blocks })
+    tinyagents_runtime::transcript::user_message_from_text(text)
 }
 
 /// The inverse of [`user_message_from_text`]: a user message's text with each
