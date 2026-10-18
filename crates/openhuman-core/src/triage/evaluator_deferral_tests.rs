@@ -273,14 +273,9 @@ async fn in_flight_breaker_defers_before_dispatch_for_one_second() {
         .expect("held attempt");
     let before = now_ms();
 
-    let outcome = run_triage_with_arms_for_test_with_state(
-        cloud_arm(),
-        None,
-        &envelope(),
-        &state,
-    )
-    .await
-    .expect("deferred outcome");
+    let outcome = run_triage_with_arms_for_test_with_state(cloud_arm(), None, &envelope(), &state)
+        .await
+        .expect("deferred outcome");
 
     match outcome {
         TriageOutcome::Deferred { defer_until_ms, .. } => {

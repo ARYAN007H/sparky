@@ -9,16 +9,16 @@ use anyhow::Context;
 
 use crate::cron::scheduler_gate::LlmPermit;
 use tinyagents_harness::retry::{
-    BreakerRejection, FailoverDecision, FailoverReason, FailoverState, PersistentFailoverAttempt,
-    PersistentFailoverBreaker, PersistentFailoverBreakerConfig, decide,
+    decide, BreakerRejection, FailoverDecision, FailoverReason, FailoverState,
+    PersistentFailoverAttempt, PersistentFailoverBreaker, PersistentFailoverBreakerConfig,
 };
 
 use super::super::envelope::TriggerEnvelope;
 use super::super::events;
 use super::super::routing::{
-    ResolvedProvider, build_local_provider_with_config, resolve_provider_with_config,
+    build_local_provider_with_config, resolve_provider_with_config, ResolvedProvider,
 };
-use super::arm::{ArmError, try_arm};
+use super::arm::{try_arm, ArmError};
 use super::outcome::{TriageOutcome, TriageResolutionPath};
 
 /// Cap on how long to wait for a server-supplied `Retry-After` before
