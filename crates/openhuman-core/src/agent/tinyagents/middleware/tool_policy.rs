@@ -404,10 +404,10 @@ impl ToolMiddleware<(), crate::agent::tinyagents::host::OpenHumanRunContext>
         call: TaToolCall,
         next: ToolHandler<'_, (), crate::agent::tinyagents::host::OpenHumanRunContext>,
     ) -> TaResult<MiddlewareToolOutcome> {
-        // Channel-permission ceiling first (session deny + per-call permission
-        // level), mirroring the engine order in `agent_tool_exec`.
+        // OpenHuman's concrete channel permission ceiling runs before the
+        // owner policy gate and cannot be waived by the builder policy.
         #[cfg(feature = "modules")]
-        let desktop_approval_disabled = match self.resolve_tool(&call.name) {
+        let desktop_approval_disabled = match self.host.resolve_tool(&call.name) {
             Some(tool) => {
                 crate::desktop::control::approvals_disabled_for(
                     &ctx.data.dispatch_ctx(),
@@ -419,56 +419,17 @@ impl ToolMiddleware<(), crate::agent::tinyagents::host::OpenHumanRunContext>
         };
         #[cfg(not(feature = "modules"))]
         let desktop_approval_disabled = false;
-        if let Some(message) = self.channel_permission_block(&call, desktop_approval_disabled) {
+        if let Some(message) = self
+            .host
+            .channel_permission_block(&call, desktop_approval_disabled)
+        {
             tracing::debug!(
                 tool = call.name.as_str(),
-                channel = self.channel.as_str(),
+                channel = self.host.channel.as_str(),
                 "[tinyagents::mw] tool blocked by channel permission ceiling"
             );
             return Ok(MiddlewareToolOutcome::Result(TaToolResult::error(message)));
         }
-
-        let decision = self.gate.check(ctx, &call, desktop_approval_disabled).await;
-        let policy_name = self.gate.policy_name();
-        if let Some(reason) = decision.blocking_reason() {
-            let blocked_action = match &decision {
-                PolicyDecision::RequireApproval { .. } => "requires approval",
-                PolicyDecision::Deny { .. } => "denied",
-                PolicyDecision::Allow => "allowed",
-            };
-            tinytools::registry::denials::record(
-                call.name.as_str(),
-                policy_name,
-                blocked_action,
-                reason,
-            );
-            tracing::debug!(
-                tool = call.name.as_str(),
-                policy = policy_name,
-                action = blocked_action,
-                reason = %reason,
-                "[tinyagents::mw] tool blocked by policy"
-            );
-            let content = (self.render_denial)(&call, policy_name, &decision);
-            return Ok(MiddlewareToolOutcome::Result(TaToolResult::error(content)));
-        }
-
-        // `use_skill`'s disclosure half (a `skill` with no `tool`) renders its
-        // listing here, not in its own `execute`, because only the middleware
-        // holds the session — and a listing that disagrees with the session is
-        // a menu the model cannot order from. The execution half falls through:
-        // `render_skill_for_session` answers `None` for it.
-        //
-        // Placed AFTER both gates on purpose. Rendering before them would let a
-        // `use_skill` that the session forbids, or that the policy denies or
-        // holds for approval, still hand back a full pack listing — the gates
-        // would be advisory for this one tool.
-        if call.name == tinyagents_harness::tool::packs::USE_SKILL {
-            if let Some(result) = self.render_skill_for_session(&call) {
-                return Ok(MiddlewareToolOutcome::Result(result));
-            }
-        }
-
-        next.run(ctx, state, call).await
+        self.gate.wrap_tool(ctx, state, call, next).await
     }
 }
