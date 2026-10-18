@@ -72,10 +72,10 @@ use std::borrow::Cow;
 use std::collections::HashSet;
 use std::sync::Arc;
 
-use tinyagents_harness::host::{OutcomeClass, ToolOutcomeClassifier};
+use tinyagents_harness::host::{OutcomeClass, ToolOutcomeClassifier, ToolStatusClassifier};
 use tinytools::ToolResult;
 
-use tinytools::status::{classify, ToolFailureClass};
+use tinytools::status::ToolFailureClass;
 
 /// OpenHuman's [`ToolOutcomeClassifier`], backed by
 /// [`tinytools::status::classify`].
@@ -138,108 +138,20 @@ impl OpenHumanToolOutcomeClassifier {
             .is_some_and(|safe| safe.contains(name))
     }
 
-    /// Projects one OpenHuman failure class onto the crate's coarse
-    /// [`OutcomeClass`].
-    ///
-    /// Exhaustive on purpose — no `_` arm. A new [`ToolFailureClass`] must not
-    /// silently inherit some neighbour's retry verdict; adding one should break
-    /// this build and force the author to decide whether repeating the call is
-    /// safe.
-    ///
-    /// * `ServiceUnavailable` and `ModelConnection` →
-    ///   [`OutcomeClass::RetryableFailure`]. Both mean the request did not reach
-    ///   a handler, so repeating it cannot duplicate an effect.
-    /// * `Timeout` → retryable **only** when `retry_safe`. A timeout is the one
-    ///   class where failure and "succeeded, but the reply was lost" look
-    ///   identical: an email send, a payment, or a shell command may already
-    ///   have committed. Repeating that duplicates a side effect the user never
-    ///   asked for twice, so the verdict defers to the host's
-    ///   `Tool::external_effect()` declaration and stays permanent whenever it
-    ///   is unavailable.
-    /// * Everything else → [`OutcomeClass::PermanentFailure`]. Missing
-    ///   permissions, a missing app, and bad credentials need a human to act, so
-    ///   an identical re-dispatch just burns an iteration; `BlockedByPolicy`,
-    ///   `Denied`, and `ApprovalExpired` are refusals that auto-retrying would
-    ///   actively subvert (#4459); `NotFound` and `Unsupported` fail identically
-    ///   on every repeat (#6277); and `Unknown` is the case where OpenHuman has
-    ///   no basis to promise a repeat is safe.
-    fn class_of(failure: ToolFailureClass, retry_safe: bool) -> OutcomeClass {
-        match failure {
-            ToolFailureClass::Timeout if retry_safe => OutcomeClass::RetryableFailure,
-            ToolFailureClass::Timeout => OutcomeClass::PermanentFailure,
-
-            ToolFailureClass::ServiceUnavailable | ToolFailureClass::ModelConnection => {
-                OutcomeClass::RetryableFailure
-            }
-
-            ToolFailureClass::MissingPermission
-            | ToolFailureClass::MissingApp
-            | ToolFailureClass::BadCredentials
-            | ToolFailureClass::BlockedByPolicy
-            | ToolFailureClass::Denied
-            | ToolFailureClass::ApprovalExpired
-            | ToolFailureClass::NotFound
-            | ToolFailureClass::Unsupported
-            | ToolFailureClass::InvalidArguments
-            | ToolFailureClass::CommandFailed
-            | ToolFailureClass::Unknown => OutcomeClass::PermanentFailure,
-        }
-    }
-
-    /// Renders canonical content into the text the heuristic reads.
-    ///
-    /// Mirrors `TinyAgentsToolStatusMiddleware::after_tool` exactly (#4459): the
-    /// classifier historically read distinct legacy error/content fields, and
-    /// the two disagreeing was the bug that canonical content fixed.
-    /// Borrows wherever possible so the common single-source case allocates
-    /// nothing on the hot path.
-    fn failure_text(result: &ToolResult) -> Cow<'static, str> {
-        Cow::Owned(result.output())
-    }
 }
 
 impl ToolOutcomeClassifier for OpenHumanToolOutcomeClassifier {
     fn classify(&self, name: &str, result: &ToolResult) -> OutcomeClass {
-        // `is_error` is the canonical reported-failure signal. Content is never
-        // parsed as an error signal: a successful tool may legitimately render
-        // text containing the word "error".
-        if !result.is_error {
-            return OutcomeClass::Success;
-        }
-
-        let text = Self::failure_text(result);
-        // No executor deadline flag reaches the runtime, so derive it the way
-        // the middleware does. `classify` short-circuits the policy markers
-        // ahead of this flag, so a TTL-expired approval whose reason literally
-        // contains "timed out" still classifies as `ApprovalExpired`, never a
-        // retryable `Timeout` (#4459).
-        let timed_out = text.contains("timed out");
-        let failure = classify(&text, timed_out);
-        let retry_safe = self.timeout_is_retry_safe(name);
-        let outcome = Self::class_of(failure.class, retry_safe);
-
-        tracing::debug!(
-            target: "tinyagents",
-            tool = %name,
-            class = ?failure.class,
-            retry_safe,
-            ?outcome,
-            "[tinyagents::host] classified tool outcome"
-        );
-        outcome
+        let retry_safe_tools = self.retry_safe_tools.clone();
+        ToolStatusClassifier
+            .with_retry_safe_timeouts(move |tool| {
+                retry_safe_tools
+                    .as_deref()
+                    .is_some_and(|safe| safe.contains(tool))
+            })
+            .classify(name, result)
     }
 }
-
-// TODO(phase4): rate limits (`429`, "rate limit", "too many requests",
-// "retry after") and DNS blips ("dns error", "failed to resolve") currently fall
-// through `tool_status::classify` to `Unknown` and therefore land on
-// `PermanentFailure` here, even though they are textbook retryable. The phrase
-// list that does recognise them is `is_recoverable_tool_failure`, a private fn in
-// `crates/openhuman-core/src/tinyagents/middleware.rs`. Copying it into this adapter would
-// fork the heuristic; the fix is to move those needles into
-// `tool_status::ops::classify_class` (a `RateLimited` class, or extending
-// `ServiceUnavailable`) and let both callers read one list. Not done here because
-// Phase 4 must not edit existing files.
 
 #[cfg(test)]
 #[path = "tool_outcome_classifier_tests.rs"]
