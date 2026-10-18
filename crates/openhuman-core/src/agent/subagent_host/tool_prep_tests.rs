@@ -56,6 +56,69 @@ fn child_keeps_the_parents_protocol() {
     }
 }
 
+fn dynamic_subagent_prompt(ctx: &crate::agent::prompts::PromptContext<'_>) -> anyhow::Result<String> {
+    crate::prompts::SystemPromptBuilder::for_subagent("child prompt".into(), true, true)
+        .build(ctx)
+}
+
+#[test]
+fn dynamic_child_prompt_lists_text_dialect_catalogue_once() {
+    use crate::agent::prompts::{PromptContext, PromptTool};
+    use tinyagents_definition::PromptSource;
+    use tinytools_agent::dialect::ToolCallFormat;
+
+    let workspace = tempfile::TempDir::new().unwrap();
+    let schema = r#"{"type":"object","properties":{"path":{"type":"string"}}}"#;
+    let tools = [PromptTool {
+        name: std::borrow::Cow::Borrowed("unique_probe_tool"),
+        description: std::borrow::Cow::Borrowed("A single visible probe."),
+        parameters_schema: Some(schema.to_owned()),
+    }];
+    let workflows = [];
+    let integrations = [];
+    let visible = ["unique_probe_tool".to_owned()].into_iter().collect();
+
+    for format in [
+        ToolCallFormat::PFormat,
+        ToolCallFormat::Python,
+        ToolCallFormat::TypeScript,
+    ] {
+        let specs = [tinytools::ToolSpec {
+            name: "unique_probe_tool".into(),
+            description: "A single visible probe.".into(),
+            parameters: serde_json::from_str(schema).unwrap(),
+        }];
+        let (_, dispatcher_instructions) = subagent_prompt_protocol(format, &specs);
+        let context = PromptContext {
+            workspace_dir: workspace.path(),
+            model_name: "test-model",
+            agent_id: "dynamic-child",
+            tools: &tools,
+            workflows: &workflows,
+            dispatcher_instructions: &dispatcher_instructions,
+            visible_tool_names: &visible,
+            tool_call_format: format,
+            connected_integrations: &integrations,
+            connected_identities_md: String::new(),
+            user_identity: None,
+            personality_roster: vec![],
+            agents_md_global: None,
+            agents_md_local: None,
+        };
+        let mut definition = AgentDefinition::default();
+        definition.id = "dynamic-child".into();
+        definition.system_prompt = PromptSource::Dynamic(());
+        definition.extensions.prompt_builder = Some(dynamic_subagent_prompt);
+
+        let prompt = load_prompt_source(&definition, &context).unwrap();
+        assert_eq!(
+            prompt.matches("unique_probe_tool(").count(),
+            1,
+            "dynamic {format:?} prompt should render its tool catalogue once"
+        );
+    }
+}
+
 struct NamedTool(&'static str);
 
 #[async_trait::async_trait]
