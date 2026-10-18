@@ -35,7 +35,7 @@ use tinyinference_llm::message::Message;
 use tinyinference_llm::model::ModelRequest;
 
 use crate::inference::provider;
-use crate::web_chat::channel_event::event_context;
+use crate::web_chat::event_context;
 use crate::web_chat::{ChatSuggestion, WebChannelEvent};
 
 use super::publish_web_channel_event_in;

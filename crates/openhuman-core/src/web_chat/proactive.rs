@@ -6,7 +6,7 @@
 
 use crate::core::events::DomainEvent;
 use crate::core::runtime::DispatchCtx;
-use crate::web_chat::channel_event::event_context;
+use crate::web_chat::event_context;
 use crate::web_chat::{WebChannelEvent, publish_web_channel_event_in};
 use async_trait::async_trait;
 use std::sync::Arc;

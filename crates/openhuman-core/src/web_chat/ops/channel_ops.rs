@@ -8,7 +8,7 @@ use serde_json::{Value, json};
 use crate::core::Outcome;
 use crate::core::runtime::DispatchCtx;
 use crate::web_chat::WebChannelEvent;
-use crate::web_chat::channel_event::event_context;
+use crate::web_chat::event_context;
 
 use super::super::event_bus::publish_web_channel_event_in;
 use super::super::runner::{CancelNote, runtime, scope_of};

@@ -52,7 +52,7 @@ pub(super) fn deliver_voice_result_to_chat(
         spoken.chars().count()
     );
     crate::web_chat::publish_web_channel_event(crate::web_chat::WebChannelEvent::ProactiveMessage {
-        context: crate::web_chat::channel_event::event_context(
+        context: crate::web_chat::event_context(
             VOICE_CHAT_CLIENT_ID,
             VOICE_CHAT_THREAD_ID,
             "",
@@ -71,7 +71,7 @@ pub(super) fn deliver_voice_result_to_chat(
     // avoid a loop; harmless if the call already ended (nobody is subscribed).
     if allow_speak_back {
         crate::web_chat::publish_web_channel_event(crate::web_chat::WebChannelEvent::VoiceSpeak {
-            context: crate::web_chat::channel_event::event_context(
+            context: crate::web_chat::event_context(
                 VOICE_CHAT_CLIENT_ID,
                 "",
                 "",
@@ -98,7 +98,7 @@ pub(super) fn deliver_voice_failure_to_chat(correlation_id: &str) {
         "[voice-harness] delivering deferred failure notice to chat correlation={correlation_id}"
     );
     crate::web_chat::publish_web_channel_event(crate::web_chat::WebChannelEvent::ProactiveMessage {
-        context: crate::web_chat::channel_event::event_context(
+        context: crate::web_chat::event_context(
             VOICE_CHAT_CLIENT_ID,
             VOICE_CHAT_THREAD_ID,
             "",
