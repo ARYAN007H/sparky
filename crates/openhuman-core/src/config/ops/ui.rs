@@ -217,7 +217,7 @@ pub async fn apply_user_timezone(
     };
     if let Err(error) = config.save().await {
         config.user_timezone = previous;
-        return Err(error.to_string());
+        return Err(super::config_save_error(error));
     }
     let chosen = config.user_timezone.as_deref().unwrap_or("device");
     log::info!("[config] user time zone set: {chosen}");
