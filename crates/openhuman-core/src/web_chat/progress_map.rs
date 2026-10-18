@@ -5,7 +5,6 @@
 //! file builds no `WebChannelEvent`. Payload caps are applied here, before the
 //! projection, so a multi-megabyte tool result never reaches the socket.
 
-use crate::agent::subagent_host::SubagentUsageExt as _;
 use serde::Serialize;
 use serde_json::Value;
 use tinychannels_bus::module_progressive::{
