@@ -109,6 +109,9 @@ async fn module_owned_flow_skill_is_findable_after_scoped_prewarm() {
         ..Default::default()
     };
     let ctx = crate::core::runtime::DispatchCtx::host_default();
+    crate::modules::tinyflows::copilot_proxy(&config)
+        .await
+        .expect("linked TinyFlows fixture is admitted and serving");
     crate::skills::bundled::flow_authoring::prewarm(&ctx, &config, None).await;
 
     let tool = SkillSearchTool::new(Arc::new(config));
