@@ -7,7 +7,7 @@ use crate::config::Config;
 use crate::core::all::ControllerFuture;
 use crate::core::runtime::DispatchCtx;
 use crate::core::Outcome;
-use crate::memory::error::{Error, Result};
+use tinymemory_api::{Error, Result};
 use crate::memory::explore::{ExploreParams, ItemsGetParams};
 use crate::memory::lifecycle::views::{self, JobsRunParams, PackPreviewParams, PolicySetParams};
 use crate::memory::scope::MemoryIdentity;

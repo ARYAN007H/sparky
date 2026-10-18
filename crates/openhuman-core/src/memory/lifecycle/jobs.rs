@@ -29,7 +29,7 @@ use tinymemory_tools::queue::{JobRun, Selection};
 
 use crate::config::Config;
 use crate::memory::engine;
-use crate::memory::error::{Error, Result};
+use tinymemory_api::{Error, Result};
 
 /// The cron job that runs the queue.
 pub const BACKGROUND_JOB: &str = "memory_background";

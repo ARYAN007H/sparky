@@ -16,7 +16,7 @@ use crate::config::schema::{MemorySourceConfig, MemorySourceKind};
 use crate::config::Config;
 
 use super::engine;
-use super::error::{Error, Result};
+use tinymemory_api::{Error, Result};
 use super::types::{SourceView, SourcesAddParams};
 
 pub use sync::{start_sync, sync_due, sync_one};

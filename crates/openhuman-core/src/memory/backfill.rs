@@ -38,7 +38,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::config::Config;
 use crate::memory::engine::{self, BoundEngine};
-use crate::memory::error::{Error, Result};
+use tinymemory_api::{Error, Result};
 use crate::memory::scope::{MemoryIdentity, ResolvedIdentity};
 use crate::threads::store::blocking as threads;
 use tinymemory_integrations::import::ImportPhase;

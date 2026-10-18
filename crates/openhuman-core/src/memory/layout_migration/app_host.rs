@@ -12,7 +12,7 @@ use super::claim::ClaimKey;
 use super::state::FileStateStore;
 use crate::config::{Config, MemoryLayoutMode};
 use crate::memory::engine::{self, CORTEXDB_ENGINE};
-use crate::memory::error::{Error, Result};
+use tinymemory_api::{Error, Result};
 use crate::memory::scope::{self, MemoryIdentity};
 
 /// The app's [`lm::LayoutHost`], bound to one account's config.

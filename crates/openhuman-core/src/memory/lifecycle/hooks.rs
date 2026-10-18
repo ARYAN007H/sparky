@@ -20,7 +20,7 @@ use tinymemory_tools::{Compaction, ContextPack, PostTurn, PreTurn, SessionStart}
 
 use crate::config::Config;
 use crate::memory::engine;
-use crate::memory::error::Error;
+use tinymemory_api::Error;
 use crate::memory::scope::ResolvedIdentity;
 
 use super::{agent_memory_on, jobs, log_only};

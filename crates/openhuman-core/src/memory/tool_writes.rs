@@ -26,7 +26,7 @@ use tinymemory_tools::pending::{
     WriteGate, WriteOperation,
 };
 
-use super::error::{Error, Result};
+use tinymemory_api::{Error, Result};
 use super::tools::CallFacts;
 use super::types::{ForgetParams, LearnParams};
 use crate::config::Config;

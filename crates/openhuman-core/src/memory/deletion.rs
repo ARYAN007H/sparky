@@ -25,7 +25,7 @@ pub use tinymemory_tools::deletion::PendingDeletion;
 use crate::config::Config;
 
 use super::engine;
-use super::error::{Error, Result};
+use tinymemory_api::{Error, Result};
 
 fn path(workspace_dir: &Path) -> PathBuf {
     workspace_dir.join("memory").join("pending_deletions.json")

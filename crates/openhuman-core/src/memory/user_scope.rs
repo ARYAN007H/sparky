@@ -22,7 +22,7 @@
 
 use tinymemory_api::{MetaFilter, Namespace, Reach, StoreItem};
 
-use super::error::{Error, Result};
+use tinymemory_api::{Error, Result};
 use crate::config::Config;
 
 /// The root `config`'s memory is confined to, in SaaS mode (`None` in single

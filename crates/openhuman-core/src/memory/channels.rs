@@ -15,7 +15,7 @@ use tinymemory_api::{ForgetTarget, ItemKind, MetaFilter};
 use crate::config::Config;
 
 use super::engine;
-use super::error::{Error, Result};
+use tinymemory_api::{Error, Result};
 
 /// Serialises read-modify-writes of the file in this process.
 static LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));

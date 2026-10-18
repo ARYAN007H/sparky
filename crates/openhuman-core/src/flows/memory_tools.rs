@@ -35,7 +35,7 @@ use tinytools::{PermissionLevel, Tool, ToolResult};
 use crate::agent::turn_origin::{AgentTurnOrigin, TrustedAutomationSource};
 use crate::config::Config;
 use crate::memory::types::{LearnParams, RecallParams};
-use crate::memory::{Error, Result};
+use tinymemory_api::{Error, Result};
 use crate::security::policy::ToolOperation;
 use crate::security::SecurityPolicy;
 

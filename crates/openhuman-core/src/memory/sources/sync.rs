@@ -20,7 +20,7 @@ use tinymemory_integrations::sources::SourceKind;
 use crate::config::schema::{MemorySourceConfig, MemorySourceKind};
 use crate::config::Config;
 use crate::memory::engine;
-use crate::memory::error::{Error, Result};
+use tinymemory_api::{Error, Result};
 use crate::memory::types::SourceStatus;
 
 use super::state;

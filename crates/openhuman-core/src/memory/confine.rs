@@ -21,7 +21,7 @@ use tinymemory_api::{ExplorePage, MemoryMeta, MetaFilter, Namespace, Reach};
 
 use crate::config::Config;
 
-use super::error::{Error, Result};
+use tinymemory_api::{Error, Result};
 use super::explore::{self, ExploreParams, ItemsGetParams, ItemsGetView};
 use super::ops;
 use super::scope::MemoryIdentity;

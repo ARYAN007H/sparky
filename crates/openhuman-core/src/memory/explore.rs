@@ -18,7 +18,7 @@ use tinymemory_api::{ExplorePage, ExploreRequest, Facet, GetRequest, Hit, ItemId
 use crate::config::Config;
 
 use super::engine;
-use super::error::{Error, Result};
+use tinymemory_api::{Error, Result};
 
 /// Default bucket count of `memory_explore`.
 pub const DEFAULT_BUCKETS: usize = 50;

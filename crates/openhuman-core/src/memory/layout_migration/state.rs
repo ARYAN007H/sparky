@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 use tinymemory_tools::layout_migration::{Error, Result};
 
 use super::{MigrationState, MigrationStateStore};
-use crate::memory::error::{Error, Result};
+use tinymemory_api::{Error, Result};
 
 /// The state file of `workspace_dir`.
 #[must_use]
