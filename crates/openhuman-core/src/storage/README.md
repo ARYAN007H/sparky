@@ -186,6 +186,10 @@ unique among live processes.
 | `DocumentLeases` | a thin adapter over tinystoragedrivers' `Leases` (`tsd.leases`, owner `profiles`, scope `cluster`); the record, CAS loop, epoch rules and fence are tsd's | clustered nodes on a driver with cross-process CAS |
 | `LocalLeases` | an exclusive `fs2` flock on `<root>/<sha256(key) hex>/.lease`, record in `.lease.json` beside it; no expiry, the OS drops the lock when the process dies | hosts without a backend |
 
+The move from the v1 `leases` collection runs once per cluster scope
+(`profiles::storage_schema::migrate_legacy_leases`) and is a stop-the-world
+cutover like the rest of schema v2: every node must run this version.
+
 Keys are 1 to 200 bytes of ASCII letters, digits and `- _ . @`, not starting
 with `.`, so they are safe as directory names and document ids. The scope
 `cluster` is shared by every node; an agent whose id is literally `cluster`
@@ -217,8 +221,8 @@ change. A scope with one runs `LeaseFence::check` first:
 
 A write the host check admits then goes to the driver through
 `StorageBackend::for_scope_fenced` with `LeaseFence::driver_fence`: the lease
-record (`cluster` scope, `leases` collection, id = the profile) must still
-match `epoch`, `owner` = this node and `released = false`. The driver checks
+record (`cluster` scope, `tsd.leases` collection, id = `Key::of(["profiles", <profile>])`)
+must still match `epoch`, `holder` = this node and no `released` field. The driver checks
 it in the same statement or transaction as the write (tinystoragedrivers
 v0.5.0, `Capability::Fencing`), so a holder paused between its check and
 its write cannot land the write after a takeover. The driver answers
