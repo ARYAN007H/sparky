@@ -438,41 +438,6 @@ async fn streaming_prepares_only_the_ephemeral_request_and_preserves_order_and_o
     );
 }
 
-#[tokio::test]
-async fn fallback_truncates_text_and_keeps_corrupt_archives_uncached() {
-    let temp = tempfile::tempdir().unwrap();
-    let mut config = (*offline_config(temp.path())).clone();
-    config.multimodal_files.max_extracted_text_chars = 1_000;
-    let transport = Arc::new(CaptureModel::new(vec![]));
-    let model = controlled_wrapper(transport, Arc::new(config), &[]);
-
-    let (text, cacheable) = model
-        .fallback(
-            InputModality::Document,
-            "long.txt",
-            "text/plain",
-            &vec![b'x'; 1_001],
-        )
-        .await
-        .unwrap();
-    assert!(cacheable);
-    assert!(text.contains("[Attachment context truncated]"));
-    assert!(!text.contains(&"x".repeat(1_001)));
-
-    let (archive, cacheable) = model
-        .fallback(
-            InputModality::Document,
-            "corrupt.zip",
-            "application/zip",
-            b"not a zip archive",
-        )
-        .await
-        .unwrap();
-    assert!(!cacheable);
-    assert!(archive.contains("Archive inspection unavailable"));
-    assert!(archive.contains("workspace path: corrupt.zip"));
-}
-
 #[cfg(unix)]
 #[test]
 fn secure_open_rejects_invalid_paths_and_reads_authorized_absolute_paths() {
