@@ -1028,6 +1028,28 @@ test("private coverage pools profiles for every Rust configuration without chang
   }
 });
 
+test("private storage-schema dump builds in the plain target with the product features of the plain cli build", () => {
+  const ex63 = buildPlan({ profile: "ex63", areas: ALL, env: EX63_ENV });
+  const check = ex63.lanes
+    .find((l) => l.name === "static")
+    .checks.find((c) => c.name === "storage-schema");
+  assert.equal(check.run, "node scripts/ci/check-storage-schema.mjs");
+  assert.equal(check.env.CARGO_BUILD_TARGET_DIR, "target/ci-private-build");
+  assert.equal(check.env.STORAGE_SCHEMA_FEATURES, "core-product");
+  const build = ex63.lanes.find((l) => l.name === "rust-lint");
+  assert.equal(check.env.CARGO_INCREMENTAL, "0");
+  assert.equal(check.env.CARGO_PROFILE_DEV_DEBUG, build.env.CARGO_PROFILE_DEV_DEBUG);
+  assert.equal(
+    check.env.CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER,
+    build.env.CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER,
+  );
+  const hosted = buildPlan({ profile: "hosted", areas: ALL });
+  assert.equal(
+    hosted.lanes.find((l) => l.name === "static").checks.find((c) => c.name === "storage-schema").env,
+    undefined,
+  );
+});
+
 test("offline examples build in the dev profile so no release artifacts need cleaning", () => {
   for (const plan of plans()) {
     const lint = plan.lanes.find((lane) => lane.name === "rust-lint");

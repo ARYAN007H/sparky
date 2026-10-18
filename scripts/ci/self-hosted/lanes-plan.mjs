@@ -169,7 +169,7 @@ export function buildPlan({ profile, areas, env = {}, isPullRequest = true }) {
                 env: {
                   ...rustEnv,
                   CARGO_BUILD_TARGET_DIR: targetDir("build"),
-                  STORAGE_SCHEMA_FEATURES: "web3,flows,skills,modules,tinymemes",
+                  STORAGE_SCHEMA_FEATURES: "core-product",
                 },
               }
             : {}),
