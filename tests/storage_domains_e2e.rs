@@ -14,11 +14,10 @@ use openhuman_core::integrations::task_sources::store as task_sources;
 use openhuman_core::integrations::task_sources::types::{FilterSpec, ProviderSlug, SourceTarget};
 use openhuman_core::security::devices::store as devices;
 
-#[macro_use]
-#[path = "support/storage_drivers.rs"]
-mod storage_drivers;
+#[path = "support/storage_case.rs"]
+mod storage_case;
 
-use storage_drivers::Case;
+use storage_case::Case;
 
 fn notification(id: &str) -> IntegrationNotification {
     IntegrationNotification {
@@ -37,7 +36,9 @@ fn notification(id: &str) -> IntegrationNotification {
     }
 }
 
-fn a_configured_backend_holds_devices_notifications_and_task_sources(case: Case) {
+#[test]
+fn a_configured_backend_holds_devices_notifications_and_task_sources() {
+    let case = Case::open();
     let workspace = tempfile::tempdir().unwrap();
     let config = Config {
         workspace_dir: workspace.path().to_path_buf(),
@@ -99,4 +100,3 @@ fn a_configured_backend_holds_devices_notifications_and_task_sources(case: Case)
     assert!(workspace.path().join("storage/storage.db").exists());
 }
 
-driver_cases!(sync a_configured_backend_holds_devices_notifications_and_task_sources);

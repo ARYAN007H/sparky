@@ -11,13 +11,14 @@ use openhuman_core::flows;
 use openhuman_core::flows::tinyflows::state::FlowState;
 use serde_json::json;
 
-#[macro_use]
-#[path = "support/storage_drivers.rs"]
-mod storage_drivers;
+#[path = "support/storage_case.rs"]
+mod storage_case;
 
-use storage_drivers::Case;
+use storage_case::Case;
 
-async fn a_configured_backend_holds_cron_flows_and_flow_state(case: Case) {
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_configured_backend_holds_cron_flows_and_flow_state() {
+    let case = Case::open();
     let workspace = tempfile::tempdir().unwrap();
     let config = Config {
         workspace_dir: workspace.path().to_path_buf(),
@@ -159,7 +160,9 @@ async fn a_configured_backend_holds_cron_flows_and_flow_state(case: Case) {
 /// The stores tinyflows used to write (`jobs.db`, `flows.db`, `checkpoints.db`,
 /// `drafts/`) are copied into a configured backend by the boot-time import,
 /// read-only: the legacy files are byte-identical afterwards.
-async fn legacy_tinyflows_files_are_imported_into_a_configured_backend(case: Case) {
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn legacy_tinyflows_files_are_imported_into_a_configured_backend() {
+    let case = Case::open();
     let workspace = tempfile::tempdir().unwrap();
     let fixtures = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../openhuman-core/src/storage/import/fixtures/tinyflows/workspace");
@@ -224,7 +227,3 @@ fn copy_tree(from: &std::path::Path, to: &std::path::Path) {
     }
 }
 
-driver_cases!(
-    async a_configured_backend_holds_cron_flows_and_flow_state,
-    legacy_tinyflows_files_are_imported_into_a_configured_backend
-);

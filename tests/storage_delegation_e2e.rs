@@ -21,11 +21,10 @@ use tinyagents_graph::delegation::DelegationState;
 #[path = "support/tinyhumans_boot.rs"]
 mod tinyhumans_boot;
 
-#[macro_use]
-#[path = "support/storage_drivers.rs"]
-mod storage_drivers;
+#[path = "support/storage_case.rs"]
+mod storage_case;
 
-use storage_drivers::Case;
+use storage_case::Case;
 
 fn state(plan: &str) -> DelegationState {
     DelegationState {
@@ -51,7 +50,9 @@ async fn plan_of(
         .and_then(|checkpoint| checkpoint.state.plan)
 }
 
-async fn the_delegation_checkpointer_resumes_and_keeps_scopes_apart(case: Case) {
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn the_delegation_checkpointer_resumes_and_keeps_scopes_apart() {
+    let case = Case::open();
     let workspace = tempfile::tempdir().unwrap();
     let config = Config {
         workspace_dir: workspace.path().join("workspace"),
@@ -164,4 +165,3 @@ async fn the_delegation_checkpointer_resumes_and_keeps_scopes_apart(case: Case) 
     assert!(AgentContextRegistry::deregister("agent-beta", &beta));
 }
 
-driver_cases!(async the_delegation_checkpointer_resumes_and_keeps_scopes_apart);

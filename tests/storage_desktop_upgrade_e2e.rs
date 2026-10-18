@@ -35,11 +35,10 @@ use tinystoragedrivers_core::{Capability, Query};
 #[path = "../crates/openhuman-core/src/util/classic_transcript_fixture.rs"]
 mod classic_transcript_fixture;
 
-#[macro_use]
-#[path = "support/storage_drivers.rs"]
-mod storage_drivers;
+#[path = "support/storage_case.rs"]
+mod storage_case;
 
-use storage_drivers::Case;
+use storage_case::Case;
 
 /// The committed tinyflows workspace (written by the retired tinyflows-sqlite
 /// writers): flows, revisions, runs, drafts, checkpoints and cron jobs.
@@ -436,7 +435,9 @@ async fn import_modules(workspace: &Path) {
     .await;
 }
 
-async fn a_desktop_upgrade_is_lossless_and_leaves_the_legacy_files_untouched(case: Case) {
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_desktop_upgrade_is_lossless_and_leaves_the_legacy_files_untouched() {
+    let case = Case::open();
     // TinyAgents' run ledger imports `sessions.db` (and appends to it) with
     // checked batches, which a driver without `ValidatedBatch` refuses.
     let local = case.backend().for_scope(&Scope::local()).unwrap();
@@ -605,4 +606,3 @@ async fn a_desktop_upgrade_is_lossless_and_leaves_the_legacy_files_untouched(cas
     assert_eq!(tree(workspace), before, "the legacy files changed");
 }
 
-driver_cases!(async a_desktop_upgrade_is_lossless_and_leaves_the_legacy_files_untouched);

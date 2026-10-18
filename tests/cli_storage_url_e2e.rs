@@ -5,11 +5,10 @@
 
 use std::process::Command;
 
-#[macro_use]
-#[path = "support/storage_drivers.rs"]
-mod storage_drivers;
+#[path = "support/storage_case.rs"]
+mod storage_case;
 
-use storage_drivers::UrlCase;
+use storage_case::UrlCase;
 
 fn core(workspace: &std::path::Path, url: Option<&str>, args: &[&str]) -> std::process::Output {
     let mut cmd = Command::new(env!("CARGO_BIN_EXE_openhuman-core"));
@@ -71,7 +70,9 @@ fn one_shot(url: &str, args: &[&str]) -> (std::process::Output, tempfile::TempDi
 /// Every driver is asked the same thing: write a job in one process, list in
 /// another. A durable driver shows it to the second process; `memory` keeps
 /// nothing between processes, so it must not.
-fn a_second_process_reads_what_a_one_shot_wrote_to_the_backend(case: UrlCase) {
+#[test]
+fn a_second_process_reads_what_a_one_shot_wrote_to_the_backend() {
+    let case = UrlCase::open();
     let args = [
         "cron",
         "add",
@@ -124,4 +125,3 @@ fn a_second_process_reads_what_a_one_shot_wrote_to_the_backend(case: UrlCase) {
     );
 }
 
-driver_cases!(url a_second_process_reads_what_a_one_shot_wrote_to_the_backend);
