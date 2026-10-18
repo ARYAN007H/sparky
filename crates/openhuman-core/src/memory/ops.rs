@@ -18,7 +18,7 @@ use crate::config::Config;
 use super::engine::{
     self, Binding, BoundEngine, CORTEXDB_ENGINE, DISABLED_ENGINE, TINYHUMANS_ENGINE,
 };
-use super::error::{Error, Result};
+use tinymemory_api::{Error, Result};
 use super::types::{
     clamp_limit, EngineSetParams, EngineStatus, EngineView, EnginesListView, EraseAllParams,
     EraseAllView, FetchParams, FetchView, ForgetParams, ForgetView, ItemsListParams, ItemsListView,

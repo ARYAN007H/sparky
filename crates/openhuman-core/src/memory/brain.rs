@@ -20,7 +20,7 @@ use crate::config::schema::MemorySourceKind;
 use crate::config::Config;
 
 use super::engine;
-use super::error::{Error, Result};
+use tinymemory_api::{Error, Result};
 use super::lifecycle::jobs;
 use super::scope::MemoryIdentity;
 

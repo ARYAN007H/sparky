@@ -7,7 +7,7 @@ use tinymemory_tools::{ContextPack, SessionStart};
 
 use crate::config::schema::MemoryRecallConfig;
 use crate::config::Config;
-use crate::memory::error::{Error, Result};
+use tinymemory_api::{Error, Result};
 use crate::memory::scope::{self, MemoryIdentity};
 
 use super::jobs;

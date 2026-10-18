@@ -32,7 +32,7 @@ use crate::core::bus::BUS;
 use crate::core::events::DomainEvent;
 use crate::core::runtime::DispatchCtx;
 
-use super::error::Error;
+use tinymemory_api::Error;
 use super::ops;
 pub use super::tool_budget::is_budget_refusal;
 use super::types::{FetchParams, ForgetParams, LearnParams, RecallParams, RecallView};

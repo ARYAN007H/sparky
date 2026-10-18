@@ -21,7 +21,7 @@ use crate::config::Config;
 use crate::security::secret_storage::file_store::write_atomic;
 
 use super::engine;
-use super::error::{Error, Result};
+use tinymemory_api::{Error, Result};
 use super::types::{ImportCounts, ImportScanView};
 
 /// Whether background work is paused right now. An automatic resume asks

@@ -44,7 +44,7 @@ use tinymemory_api::{Namespace, Segment, SegmentKind};
 use tinymemory_tools::MemoryLayout;
 
 use crate::config::{Config, MemoryLayoutMode};
-use crate::memory::error::{Error, Result};
+use tinymemory_api::{Error, Result};
 
 /// The memory agent id of work no agent is running (RPC, sync jobs, the UI).
 pub const DEFAULT_AGENT_ID: &str = "assistant";

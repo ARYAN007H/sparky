@@ -47,7 +47,7 @@ use crate::flows::{
     FLOWS_TAG,
 };
 use crate::memory::types::{FetchParams, RecallParams};
-use crate::memory::Error;
+use tinymemory_api::Error;
 use crate::security::approval::{
     redact_args, summarize_action, ApprovalGate, ExecutionOutcome, GateOutcome,
 };

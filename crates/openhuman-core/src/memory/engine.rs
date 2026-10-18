@@ -46,7 +46,7 @@ use crate::config::Config;
 use crate::security::credentials::session_support::resolve_backend_credential;
 use crate::security::credentials::{AuthService, DEFAULT_AUTH_PROFILE_NAME};
 
-use super::error::{Error, Result};
+use tinymemory_api::{Error, Result};
 
 /// Engine id of CortexDB behind the TinyHumans backend.
 pub const TINYHUMANS_ENGINE: &str = tinymemory_integrations::cortex::TINYHUMANS_ENGINE_ID;

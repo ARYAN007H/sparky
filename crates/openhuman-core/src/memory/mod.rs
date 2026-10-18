@@ -51,7 +51,6 @@ pub(crate) mod test_fixtures;
 
 pub use bus::register_memory_subscribers;
 pub use engine::is_on as memory_is_on;
-pub use error::{Error, Result};
 pub use schemas::{
     all_controller_schemas as all_memory_controller_schemas,
     all_registered_controllers as all_memory_registered_controllers,

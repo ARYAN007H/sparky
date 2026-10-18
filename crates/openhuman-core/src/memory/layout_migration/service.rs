@@ -23,7 +23,7 @@ use tinymemory_tools::layout_migration as lm;
 use super::app_host::{from_module, AppHost};
 use super::{LayoutHost, MigrationState, MigrationStatus, ScanView, Trigger};
 use crate::config::Config;
-use crate::memory::error::Result;
+use tinymemory_api::Result;
 
 /// Workspaces with a migration running now.
 static RUNNING: LazyLock<Mutex<HashSet<PathBuf>>> = LazyLock::new(|| Mutex::new(HashSet::new()));

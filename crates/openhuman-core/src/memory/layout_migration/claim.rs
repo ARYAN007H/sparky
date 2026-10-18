@@ -16,7 +16,7 @@ use sha2::Digest;
 use tinymemory_tools::layout_migration::{LegacyClaim, Result as ModuleResult};
 
 use super::app_host::to_module;
-use crate::memory::error::{Error, Result};
+use tinymemory_api::{Error, Result};
 
 /// Where a legacy tree's marker lives and who would own it.
 #[derive(Debug, Clone, PartialEq, Eq)]
