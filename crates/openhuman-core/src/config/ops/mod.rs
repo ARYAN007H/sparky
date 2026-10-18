@@ -14,10 +14,7 @@ pub(crate) fn config_save_error(error: anyhow::Error) -> String {
     config_save_error_with_retryability(error, true)
 }
 
-pub(crate) fn config_save_error_with_retryability(
-    error: anyhow::Error,
-    retryable: bool,
-) -> String {
+pub(crate) fn config_save_error_with_retryability(error: anyhow::Error, retryable: bool) -> String {
     if let Some(conflict) = config_save_conflict(&error, retryable) {
         return conflict.encode();
     }

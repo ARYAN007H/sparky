@@ -45,7 +45,9 @@ async fn save(config: &Config) -> MemoryResult<()> {
             if let Some(conflict) = crate::config::ops::config_save_conflict(&error, false) {
                 return Err(MemoryError::ConfigConflict(conflict));
             }
-            Err(MemoryError::Engine(format!("saving config failed: {error:#}")))
+            Err(MemoryError::Engine(format!(
+                "saving config failed: {error:#}"
+            )))
         }
     }
 }

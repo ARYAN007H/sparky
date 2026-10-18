@@ -55,14 +55,9 @@ pub async fn upsert_custom_agent(
         Some(existing) => *existing = entry.clone(),
         None => config.agent_registry.entries.push(entry.clone()),
     }
-    config
-        .save()
-        .await
-        .map_err(|error| crate::config::ops::config_save_error_with_context(
-            error,
-            "failed to save config",
-            true,
-        ))?;
+    config.save().await.map_err(|error| {
+        crate::config::ops::config_save_error_with_context(error, "failed to save config", true)
+    })?;
     Ok(entry)
 }
 
@@ -104,14 +99,9 @@ pub async fn update_agent(
     entry.validate()?;
     ensure_orchestrator_enabled(entry)?;
     let updated = entry.clone();
-    config
-        .save()
-        .await
-        .map_err(|error| crate::config::ops::config_save_error_with_context(
-            error,
-            "failed to save config",
-            true,
-        ))?;
+    config.save().await.map_err(|error| {
+        crate::config::ops::config_save_error_with_context(error, "failed to save config", true)
+    })?;
     Ok(updated)
 }
 
@@ -142,14 +132,9 @@ pub async fn remove_agent(ctx: &DispatchCtx, id: &str) -> Result<bool, String> {
     config.agent_registry.entries.retain(|agent| agent.id != id);
     let removed = config.agent_registry.entries.len() < before;
     if removed {
-        config
-            .save()
-            .await
-            .map_err(|error| crate::config::ops::config_save_error_with_context(
-                error,
-                "failed to save config",
-                true,
-            ))?;
+        config.save().await.map_err(|error| {
+            crate::config::ops::config_save_error_with_context(error, "failed to save config", true)
+        })?;
     }
     Ok(removed)
 }
