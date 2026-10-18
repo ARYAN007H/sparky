@@ -21,6 +21,7 @@ use tinyinference_llm::tool::ToolCall as TaToolCall;
 use tinytools::ToolResult as TaToolResult;
 
 use super::fetched_site::{fetch_host_scope, heuristic_text};
+use crate::agent::tinyagents::host::OpenHumanRunContext;
 pub(crate) use crate::inference::failure_copy::user_actionable_escalation;
 use crate::inference::failure_copy::{
     recoverable_identical_halt_summary, recoverable_no_progress_halt_summary,
