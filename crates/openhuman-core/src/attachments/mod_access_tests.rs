@@ -199,7 +199,6 @@ async fn thread_folder_upload_is_staged_where_the_turn_reads_it() {
         &AttachmentAccessScope {
             external_channel: false,
             workspace: Some(root),
-            ..Default::default()
         },
     )
     .await

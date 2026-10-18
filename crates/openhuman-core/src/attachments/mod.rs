@@ -23,9 +23,6 @@ pub(crate) mod provider;
 pub(crate) struct AttachmentAccessScope {
     pub(crate) external_channel: bool,
     pub(crate) workspace: Option<PathBuf>,
-    /// MIME hints captured from typed transcript blocks before the owner
-    /// request adapter resolves their source strings.
-    pub(crate) mime_hints: std::collections::HashMap<String, String>,
 }
 
 const REQUEST_SCOPE_KEY: &str = "__openhuman_attachment_access_scope";
@@ -65,7 +62,6 @@ pub(crate) fn take_request_scope(metadata: &mut serde_json::Value) -> Attachment
             .get("workspace")
             .and_then(serde_json::Value::as_str)
             .map(PathBuf::from),
-        mime_hints: Default::default(),
     }
 }
 
@@ -475,7 +471,6 @@ pub(crate) async fn delegation_prompt(
     let scope = AttachmentAccessScope {
         external_channel: false,
         workspace: workspace.map(|workspace| workspace.root.clone()),
-        mime_hints: Default::default(),
     };
     stage(&prompt, "delegation", &config, &scope).await
 }
@@ -514,7 +509,6 @@ pub(crate) async fn has_resolvable_image(
     let scope = AttachmentAccessScope {
         external_channel: false,
         workspace: workspace.map(|workspace| workspace.root.clone()),
-        mime_hints: Default::default(),
     };
     for path in paths {
         let path = legacy::migrate_path(&config, &path, &scope)
@@ -612,7 +606,6 @@ pub(crate) async fn stage_turn(
             Some(crate::security::turn_origin::AgentTurnOrigin::ExternalChannel { .. })
         ),
         workspace: workspace.map(|workspace| workspace.root.clone()),
-        mime_hints: Default::default(),
     };
     stage(message, thread.unwrap_or("direct"), &config, &scope).await
 }

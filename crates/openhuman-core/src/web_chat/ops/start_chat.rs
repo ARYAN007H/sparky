@@ -214,7 +214,6 @@ async fn start_chat_inner(
             &crate::attachments::AttachmentAccessScope {
                 external_channel: false,
                 workspace: Some(workspace),
-                ..Default::default()
             },
         )
         .await

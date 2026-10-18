@@ -39,12 +39,7 @@ pub(super) fn wrap(
     let model = MediaRequestModel::new(
         inner,
         request_config,
-        |_, request| {
-            let mime_hints = typed_mime_hints(request);
-            let mut scope = super::super::take_request_scope(&mut request.metadata);
-            scope.mime_hints = mime_hints;
-            Ok(scope)
-        },
+        |_, request| Ok(super::super::take_request_scope(&mut request.metadata)),
         host.clone(),
         extractor,
     )
@@ -99,19 +94,15 @@ impl MediaSourceResolver<AttachmentAccessScope> for AttachmentModel {
                 .or_else(|| tinyagents_harness::multimodal::mime::detect_image_mime(
                     Some(std::path::Path::new(&path)),
                     &bytes,
-                    scope.mime_hints.get(source).map(String::as_str),
+                    None,
                 ))
                 .ok_or_else(|| "image attachment type cannot be determined".to_string())?;
         } else if mime == "application/octet-stream" {
-            mime = scope
-                .mime_hints
-                .get(source)
-                .cloned()
-                .or_else(|| tinyagents_harness::multimodal::mime::detect_file_mime(
+            mime = tinyagents_harness::multimodal::mime::detect_file_mime(
                     Some(std::path::Path::new(&path)),
                     &bytes,
                     None,
-                ))
+                )
                 .unwrap_or(mime);
         }
         let mut resolved = ResolvedMedia::new(ResolvedAttachment {
@@ -250,37 +241,6 @@ impl MediaHistoryFallback<AttachmentAccessScope> for AttachmentModel {
         let hint = super::historical_source_hint(&block, scope);
         Some(format!("[Earlier attachment unavailable or omitted at workspace path: {hint}]") )
     }
-}
-
-fn typed_mime_hints(request: &ModelRequest) -> std::collections::HashMap<String, String> {
-    let mut hints = std::collections::HashMap::new();
-    for message in &request.messages {
-        let Message::User(user) = message else { continue };
-        for block in &user.content {
-            match block {
-                ContentBlock::Image(image) => {
-                    if let Some(mime) = &image.mime_type {
-                        hints.insert(image.url.clone(), mime.clone());
-                    }
-                }
-                ContentBlock::Audio(media)
-                | ContentBlock::Video(media)
-                | ContentBlock::Document(media) => {
-                    let (source, mime) = match media {
-                        MediaRef::Path { path, media_type } => (path.clone(), media_type.clone()),
-                        MediaRef::Url { url, media_type } => (url.clone(), media_type.clone()),
-                        MediaRef::Base64 { data, media_type } => (
-                            format!("data:{media_type};base64,{data}"),
-                            Some(media_type.clone()),
-                        ),
-                    };
-                    if let Some(mime) = mime { hints.insert(source, mime); }
-                }
-                _ => ()
-            }
-        }
-    }
-    hints
 }
 
 struct OwnedDocumentsExtractor {
