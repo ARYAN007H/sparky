@@ -3,7 +3,9 @@ use std::sync::Arc;
 use tinymemory_api::conformance::ReferenceEngine;
 use tinymemory_api::{MemoryEngine, MemoryMeta, Role, SourceKind, StoreItem, Turn};
 use crate::core::runtime::{ContextOverlay, CoreContext, DispatchCtx, DomainSet};
-use crate::threads::store::{ConversationMessage, CreateConversationThread};
+use crate::threads::store::{
+    ConversationMessage, ConversationMessagePatch, CreateConversationThread,
+};
 use serde_json::json;
 
 fn conversation(thread: &str, channel: Option<&str>) -> StoreItem {
@@ -223,6 +225,59 @@ async fn memory_off_queues_channel_threads_from_the_canonical_thread_store() {
     assert_eq!(
         crate::memory::deletion::pending(&config.workspace_dir),
         vec![crate::memory::deletion::PendingDeletion::Thread { thread_id }]
+    );
+}
+
+#[tokio::test]
+async fn reserved_channel_thread_id_survives_metadata_edit_without_prefix_collision() {
+    let tmp = tempfile::TempDir::new().unwrap();
+    let mut config = Config::default();
+    config.workspace_dir = tmp.path().to_path_buf();
+    config.memory.engine.clear();
+    let ctx = DispatchCtx::ambient();
+    let target = store_channel_thread(
+        ctx.clone(),
+        &config.workspace_dir,
+        "discord",
+        "stripped-channel-meta",
+    )
+    .await;
+    let collision = store_channel_thread(
+        ctx.clone(),
+        &config.workspace_dir,
+        "discordish",
+        "prefix-collision",
+    )
+    .await;
+    for (thread_id, message_id) in [
+        (&target, "user:stripped-channel-meta"),
+        (&collision, "user:prefix-collision"),
+    ] {
+        crate::threads::store::blocking::update_message(
+            ctx.clone(),
+            config.workspace_dir.clone(),
+            thread_id.clone(),
+            message_id.into(),
+            ConversationMessagePatch {
+                extra_metadata: Some(json!({"scope": "web"})),
+            },
+        )
+        .await
+        .unwrap();
+    }
+    let messages = crate::threads::store::blocking::get_messages(
+        ctx,
+        config.workspace_dir.clone(),
+        target.clone(),
+    )
+    .await
+    .unwrap();
+    assert!(messages[0].extra_metadata.get("channel").is_none());
+
+    assert_eq!(clear_channel_memory(&config, "discord").await.unwrap(), 0);
+    assert_eq!(
+        crate::memory::deletion::pending(&config.workspace_dir),
+        vec![crate::memory::deletion::PendingDeletion::Thread { thread_id: target }]
     );
 }
 
