@@ -1,4 +1,5 @@
 use super::*;
+use crate::web_chat::WebChannelEvent;
 use crate::agent::progress::AgentProgress;
 use crate::config::Config;
 use std::time::Duration;
@@ -143,12 +144,16 @@ async fn tool_call_completed_forwards_real_output_on_tool_result() {
     assert_eq!(event.tool_call_id.as_deref(), Some("call-1"));
 }
 
-// ── #4270 inference heartbeat ────────────────────────────────────────────
+fn drain_test_config(tmp: &tempfile::TempDir) -> Config {
+    Config {
+        workspace_dir: tmp.path().join("workspace"),
+        action_dir: tmp.path().join("workspace"),
+        config_path: tmp.path().join("config.toml"),
+        ..Default::default()
+    }
+}
 
-use crate::agent::progress::AgentProgress;
-use crate::config::Config;
-use std::time::Duration;
-use tokio::sync::broadcast::error::TryRecvError;
+// ── #4270 inference heartbeat ────────────────────────────────────────────
 
 /// Await the next web-channel event published for `thread_id`, skipping
 /// events for other threads (the bus is a process-global broadcast) and
