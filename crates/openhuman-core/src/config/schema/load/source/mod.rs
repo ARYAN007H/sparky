@@ -85,6 +85,9 @@ pub(crate) trait ConfigSource: Send + Sync {
     /// still the live one, so callers may roll back in-memory state on `Err`.
     async fn write(&self, toml: &str) -> Result<()>;
 
+    /// Persist a config snapshot against the revision it was loaded from.
+    /// Document sources use `None` for a create-only write; file sources have
+    /// no revisions and use this default implementation.
     async fn write_versioned(
         &self,
         toml: &str,
