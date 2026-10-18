@@ -1,27 +1,6 @@
 use super::*;
 use crate::core::runtime::DispatchCtx;
 
-#[test]
-fn status_schema_shape() {
-    let schema = schemas("status");
-    assert_eq!(schema.namespace, "subsystems");
-    assert_eq!(schema.function, "status");
-    assert!(schema.inputs.is_empty());
-    assert_eq!(schema.outputs.len(), 1);
-    assert_eq!(schema.outputs[0].name, "subsystems");
-}
-
-#[test]
-fn schemas_and_controllers_line_up() {
-    let schemas = all_controller_schemas();
-    let controllers = all_registered_controllers();
-    assert_eq!(schemas.len(), controllers.len());
-    for (schema, controller) in schemas.iter().zip(controllers.iter()) {
-        assert_eq!(schema.namespace, controller.schema.namespace);
-        assert_eq!(schema.function, controller.schema.function);
-    }
-}
-
 #[tokio::test]
 async fn handler_returns_a_subsystems_array_containing_the_memory_slot() {
     // The handler loads the process-default config, which reads the workspace

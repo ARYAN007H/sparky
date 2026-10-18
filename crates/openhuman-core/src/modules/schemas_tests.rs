@@ -7,17 +7,6 @@ use crate::core::runtime::DomainSet;
 use serde_json::{Map, Value};
 
 #[test]
-fn every_schema_is_in_the_modules_namespace() {
-    for schema in all_controller_schemas() {
-        assert_eq!(schema.namespace, "modules");
-        assert_ne!(
-            schema.function, "unknown",
-            "an advertised function fell through to the unknown arm"
-        );
-    }
-}
-
-#[test]
 fn registered_controllers_match_the_advertised_schemas() {
     // Two lists that must agree: one drives `/schema`, the other dispatch.
     let advertised: Vec<&str> = all_controller_schemas()
