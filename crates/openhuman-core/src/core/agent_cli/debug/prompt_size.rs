@@ -41,8 +41,8 @@ pub const EST_BYTES_PER_TOKEN: usize = 4;
 /// One markdown section of the rendered system prompt.
 ///
 /// Sections are derived by scanning `#` / `##` / `###` headings in the rendered
-/// text rather than by asking the builder, because the builder joins its
-/// [`crate::agent::prompts::PromptSection`]s into one string and a
+/// text rather than by asking the builder, because product prompt adapter composes its
+/// content through TinyAgents into one string and a
 /// single section routinely emits several headings (the orchestrator archetype
 /// alone contributes a dozen). Heading-derived attribution is what a reader
 /// editing a prompt actually wants: it points at the block of text to cut.

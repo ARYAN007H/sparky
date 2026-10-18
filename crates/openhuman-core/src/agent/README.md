@@ -236,8 +236,8 @@ display-safe `AgentDefinitionDisplay` for the UI.
 
 `prompts/` holds the bundled identity files (`SOUL.md`, `IDENTITY.md`,
 `ROLE.md`, `STYLE.md`, `USER.md`) and `SystemPromptBuilder`, which renders
-ordered `PromptSection`s into the system prompt, optionally as a
-`TieredPrompt` with cache breakpoints. `context/` keeps per-session
+selects OpenHuman product content and delegates tier assembly to TinyAgents,
+optionally returning a `TieredPrompt` with cache breakpoints. `context/` keeps per-session
 `ContextManager` state and the byte-stable channel prompt builder. `debug/`
 renders the exact prompt a live session would send, by building a real
 session host and calling `build_system_prompt`.

@@ -127,7 +127,7 @@ pub struct UserIdentitySection;
 pub struct PersonalityRosterSection;
 
 // ─────────────────────────────────────────────────────────────────────────────
-// PromptSection implementations
+// OpenHuman content renderers adapted to the TinyAgents section contract
 // ─────────────────────────────────────────────────────────────────────────────
 
 impl PersonalityRosterSection {

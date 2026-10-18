@@ -3,10 +3,10 @@
 //! This module is the single home for everything that shapes what an LLM
 //! sees during a conversation:
 //!
-//! 1. **System prompt assembly** — [`prompt::SystemPromptBuilder`] and its
-//!    composable [`prompt::PromptSection`] trait. Main agents, sub-agents,
-//!    and channels all build their opening system prompts through this
-//!    module; there is no parallel implementation elsewhere in the crate.
+//! 1. **System prompt composition** — OpenHuman selects product content through
+//!    [`prompt::SystemPromptBuilder`], while TinyAgents owns portable section
+//!    and tier assembly. Main agents, sub-agents, and channels all build their
+//!    opening system prompts through this module.
 //!
 //! 2. **Middleware configuration** — `ContextConfig` configures the TinyAgents
 //!    turn middleware stack.
