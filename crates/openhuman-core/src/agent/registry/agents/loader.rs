@@ -272,6 +272,10 @@ fn parse_builtin(b: &BuiltinAgent) -> Result<AgentDefinition> {
     // Install the function-driven prompt builder and stamp the source.
     def.system_prompt = PromptSource::Dynamic(());
     def.extensions.prompt_builder = Some(b.prompt_fn);
+    def.extensions.tinyflows_prompt_owner = match b.id {
+        "workflow_builder" | "flow_discovery" => Some(b.id.to_owned()),
+        _ => None,
+    };
     def.source = DefinitionSource::Builtin;
 
     // Sanity check: file layout id must match declared TOML id. This

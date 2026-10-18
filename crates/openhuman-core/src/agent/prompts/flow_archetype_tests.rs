@@ -29,6 +29,7 @@ fn renamed_dynamic_flow_builtin_keeps_its_prompt_owner() {
         is_bus_backed_builtin(&definition),
         "a library actor id must not erase the resolved builtin prompt owner"
     );
+    assert_eq!(prompt_owner(&definition), Some("workflow_builder"));
 }
 
 #[tokio::test]

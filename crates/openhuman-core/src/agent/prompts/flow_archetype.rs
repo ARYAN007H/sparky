@@ -1,7 +1,7 @@
 //! Scoped TinyFlows archetype prompt loading for the two flow builtins.
 
 use anyhow::{anyhow, ensure, Result};
-use tinyagents_definition::{DefinitionSource, PromptSource};
+use tinyagents_definition::PromptSource;
 
 use crate::{agent::harness::host_definition::AgentDefinition, config::Config};
 
@@ -10,12 +10,17 @@ use crate::{agent::harness::host_definition::AgentDefinition, config::Config};
 /// User definitions and static/session prompt overrides keep their own source
 /// and never cause a TinyFlows module lookup, even when they reuse a builtin id.
 pub(crate) fn is_bus_backed_builtin(definition: &AgentDefinition) -> bool {
-    matches!(&definition.source, DefinitionSource::Builtin)
-        && matches!(&definition.system_prompt, PromptSource::Dynamic(()))
-        && matches!(
-            definition.id.as_str(),
-            "workflow_builder" | "flow_discovery"
-        )
+    prompt_owner(definition).is_some()
+}
+
+/// Prompt owner stamped by the builtin loader and preserved by cloned specs.
+/// Actor identity may change for embedded agents, so it is not a prompt key.
+pub(crate) fn prompt_owner(definition: &AgentDefinition) -> Option<&str> {
+    if !matches!(&definition.system_prompt, PromptSource::Dynamic(())) {
+        return None;
+    }
+    let owner = definition.extensions.tinyflows_prompt_owner.as_deref()?;
+    matches!(owner, "workflow_builder" | "flow_discovery").then_some(owner)
 }
 
 /// Fetch the archetype for a resolved definition through the module bus.
@@ -30,13 +35,14 @@ pub(crate) async fn load_for_definition(
         return Ok(None);
     }
 
+    let owner = prompt_owner(definition).expect("bus-backed definitions have an owner");
     let config = config.ok_or_else(|| {
         anyhow!(
             "cannot render TinyFlows builtin `{}` without its scoped runtime config",
-            definition.id
+            owner
         )
     })?;
-    fetch_prompt(config, &definition.id).await.map(Some)
+    fetch_prompt(config, owner).await.map(Some)
 }
 
 /// Fetch one of the two builtin flow archetypes through TinyFlows Copilot.
