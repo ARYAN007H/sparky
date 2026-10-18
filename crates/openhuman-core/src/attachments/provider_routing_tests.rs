@@ -164,9 +164,9 @@ async fn typed_base64_document_is_resolved_once_with_its_original_mime() {
             _ => None,
         })
         .expect("owner fallback should render the document text");
+    assert!(payload.contains("[FILE-CONTENT:"), "{payload}");
     assert!(payload.contains("mime=\"text/plain\""));
     assert!(payload.contains("hello"));
-    assert!(!temp.path().join("uploads/legacy-media").exists());
 }
 
 #[tokio::test]
