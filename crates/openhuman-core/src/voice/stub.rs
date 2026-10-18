@@ -2,7 +2,7 @@
 //!
 //! Compiled only when the `voice` Cargo feature is OFF (see the gate in
 //! [`super`]). It mirrors the subset of the real `voice` public surface that
-//! always-on / other-gated callers depend on, with no-op / disabled-error
+//! other-gated callers depend on, with no-op / disabled-error
 //! bodies so the crate still compiles, boots, and serves `/rpc` without the
 //! voice domain.
 //!

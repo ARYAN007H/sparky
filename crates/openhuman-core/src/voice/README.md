@@ -3,8 +3,7 @@
 The voice domain is everything in the core that turns speech into text or text
 into speech. It owns the `voice` RPC namespace (transcription, synthesis,
 provider settings, availability), the hotkey dictation server that records,
-transcribes and pastes text into the focused app, opt-in always-on listening,
-agent reply speech with mascot lip-sync visemes, and live two-way voice
+transcribes and pastes text into the focused app, agent reply speech with mascot lip-sync visemes, and live two-way voice
 sessions with the agent. The frontend, the Tauri shell, channels and web chat
 all call into it.
 

@@ -641,8 +641,8 @@ pub fn spawn_web_channel_bridge(io: SocketIo) {
 
     // 4. Core notification events → broadcast to all connected clients so
     //    the in-app notification center picks them up regardless of which
-    //    chat session is active. Pattern mirrors the overlay attention
-    //    bridge above — fire-and-forget, no per-client routing.
+    //    chat session is active. This is a fire-and-forget broadcast with no
+    //    per-client routing.
     tokio::spawn(async move {
         let mut rx = crate::core_host::desktop::notifications::subscribe_core_notifications();
         loop {

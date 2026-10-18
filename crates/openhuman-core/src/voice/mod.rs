@@ -14,7 +14,7 @@
 //! implementation (the submodules below)
 //! is gated behind the default-ON `voice` Cargo feature. When the feature is
 //! off, [`stub`] takes its place and exposes the same public surface that
-//! always-on / other-gated callers depend on (`server`, `dictation_listener`,
+//! other-gated callers depend on (`server`, `dictation_listener`,
 //! `streaming`, `create_stt_provider`,
 //! `effective_stt_provider`, `publish_ptt_transcript_committed`) with
 //! no-op / disabled-error bodies. Keeping the two surfaces in lockstep is
