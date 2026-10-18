@@ -12,8 +12,8 @@ use tinybus::module::ModuleClient;
 use tinyvoice_bus::{
     capture::{
         AudioOutput, CaptureError, CaptureHandle, CaptureResult, MicrophonePermission,
-        ReadAudioRequest, RecordingFinishRequest,
-        RecordingStartRequest, RecordingSummary, RecordingSummaryRequest,
+        ReadAudioRequest, RecordingFinishRequest, RecordingStartRequest, RecordingSummary,
+        RecordingSummaryRequest,
     },
     names::methods,
 };

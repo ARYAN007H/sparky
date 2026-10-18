@@ -4,10 +4,7 @@ use super::*;
 async fn missing_module_never_starts_a_local_microphone() {
     let mut config = Config::default();
     config.modules.enabled = false;
-    let error = CaptureLease::reserve(&config)
-        .await
-        .err()
-        .unwrap();
+    let error = CaptureLease::reserve(&config).await.err().unwrap();
     assert!(error.contains("MODULE_CALL_REPORTED"));
 }
 
@@ -199,8 +196,7 @@ async fn a_reservation_finishing_after_sign_out_is_closed_before_start() {
     let port = Arc::new(Fixture::default());
     port.block_reserve.store(true, Ordering::SeqCst);
     let task_port = port.clone();
-    let task =
-        tokio::spawn(async move { CaptureLease::reserve_with_port(task_port).await });
+    let task = tokio::spawn(async move { CaptureLease::reserve_with_port(task_port).await });
     port.entered.notified().await;
     RECORDING_GENERATION.fetch_add(1, Ordering::SeqCst);
     port.release_reserve.notify_one();

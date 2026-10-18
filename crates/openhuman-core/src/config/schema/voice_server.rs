@@ -118,7 +118,6 @@ pub struct VoiceServerConfig {
     /// recognition of names, technical terms, and domain-specific vocabulary.
     #[serde(default)]
     pub custom_dictionary: Vec<String>,
-
 }
 
 fn default_hotkey() -> String {
