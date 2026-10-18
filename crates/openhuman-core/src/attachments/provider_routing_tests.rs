@@ -325,6 +325,42 @@ async fn disabled_tinydocs_fallback_runs_through_the_owner_wrapper_without_cachi
         .exists());
 }
 
+#[cfg(not(feature = "documents"))]
+#[tokio::test]
+async fn pdf_metadata_fallback_is_cacheable_without_the_documents_feature() {
+    let temp = tempfile::tempdir().unwrap();
+    let relative = "uploads/thread/id/brief.pdf";
+    let path = temp.path().join(relative);
+    tokio::fs::create_dir_all(path.parent().unwrap())
+        .await
+        .unwrap();
+    tokio::fs::write(&path, b"%PDF-1.4 original bytes")
+        .await
+        .unwrap();
+    let config = offline_config(temp.path());
+    let transport = Arc::new(CaptureModel::new(vec![]));
+    let model = controlled_wrapper(transport.clone(), config, &[]);
+    let request = user_request(vec![local_media(
+        InputModality::Document,
+        relative,
+        "application/pdf",
+    )]);
+
+    model.invoke(&(), request.clone()).await.unwrap();
+    model.invoke(&(), request).await.unwrap();
+
+    let calls = transport.requests.lock().unwrap();
+    assert_eq!(calls.len(), 2);
+    assert!(calls.iter().all(|(_, call)| call.messages[0]
+        .text()
+        .contains("[FILE-ATTACHED: name=\"brief.pdf\"")));
+    assert!(path
+        .parent()
+        .unwrap()
+        .join(".openhuman-derived/readout.txt")
+        .exists());
+}
+
 #[tokio::test]
 async fn paid_vision_readout_is_reused_across_recreated_wrappers_and_invalidated_by_source_changes()
 {
@@ -561,7 +597,9 @@ async fn unsupported_media_urls_and_oversized_inline_sources_fail_before_inferen
         media_type: "application/octet-stream".into(),
     })]);
     let error = model.invoke(&(), oversized).await.unwrap_err();
-    assert!(error.to_string().contains("attachment exceeds configured file limit"));
+    assert!(error
+        .to_string()
+        .contains("attachment exceeds configured file limit"));
 
     // A valid base64 body just over the decoded byte limit must also fail
     // before legacy materialization or inference.

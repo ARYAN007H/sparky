@@ -274,6 +274,7 @@ impl MediaHistoryFallback<AttachmentAccessScope> for AttachmentModel {
         if !error.contains(super::super::SOURCE_MISSING_MARKER)
             && !error.contains("attachments are disabled for this origin")
             && !error.contains("remote attachment fetch is disabled")
+            && !error.contains("unsupported media URL scheme")
         {
             return None;
         }
@@ -292,8 +293,7 @@ fn history_source_block(modality: InputModality, source: &str) -> ContentBlock {
             mime_type: None,
         }),
         modality => {
-            let media = if source.starts_with("data:") || source.contains("://")
-            {
+            let media = if source.starts_with("data:") || source.contains("://") {
                 MediaRef::Url {
                     url: source.to_owned(),
                     media_type: None,
@@ -320,8 +320,14 @@ struct OwnedDocumentsExtractor {
 
 #[async_trait]
 impl TextExtractor for OwnedDocumentsExtractor {
+    #[cfg(feature = "documents")]
     fn handles(&self, mime: &str) -> bool {
         mime == "application/pdf"
+    }
+
+    #[cfg(not(feature = "documents"))]
+    fn handles(&self, _: &str) -> bool {
+        false
     }
 
     async fn extract(&self, mime: &str, bytes: &[u8]) -> Result<String, String> {
