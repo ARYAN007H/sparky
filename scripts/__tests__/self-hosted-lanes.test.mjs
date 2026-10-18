@@ -265,7 +265,7 @@ test("untouched areas leave only the always-on gates", () => {
   );
 });
 
-test("the storage area arms only the storage-drivers lane, with the sqlite and file drivers on", () => {
+test("the storage area arms the core coverage lane, which covers every storage driver", () => {
   for (const profile of ["hosted", "ex63"]) {
     const plan = buildPlan({
       profile,
@@ -275,77 +275,60 @@ test("the storage area arms only the storage-drivers lane, with the sqlite and f
     const on = plan.lanes.flatMap((l) =>
       l.checks.filter((c) => c.when).map((c) => `${l.name}:${c.name}`),
     );
-    // Only the always-on gates plus this lane: the storage area arms no
-    // frontend, Rust or other area lane.
+    // The storage area arms the core coverage suite and nothing else outside
+    // the always-on gates: there is no separate driver build of the core.
     assert.deepEqual(
-      on.filter((id) => !id.startsWith("static:")),
-      [
-        "storage-drivers:storage-e2e",
-        "storage-drivers:storage-lib-tests",
-        "storage-drivers:cron-module-tests",
-        "storage-drivers:storage-session-store-tests",
-      ],
+      on.filter((id) => !id.startsWith("static:") && !id.endsWith("pnpm-install")),
+      ["rust-cov:test-modules", "rust-cov:rust-core-coverage"],
       profile,
     );
-    assert.deepEqual(
-      on.filter((id) => id.startsWith("static:")),
-      [
-        "static:orch-ip-gate",
-        "static:feature-forwarding",
-        "static:crate-chain",
-        "static:process-statics",
-        "static:module-source",
-        "static:storage-bypass",
-        "static:module-pins",
-        "static:submodule-monotonic",
-      ],
+    assert.equal(
+      plan.lanes.some((l) => l.name === "storage-drivers"),
+      false,
       profile,
-    );
-    const lane = plan.lanes.find((l) => l.name === "storage-drivers");
-    assert.equal(lane.active, true, profile);
-    for (const check of lane.checks) {
-      assert.match(
-        check.run,
-        /--features (?:session-store,)?storage-sqlite,storage-file(?:\s|$)/,
-      );
-    }
-    // Every root storage target runs in the lane, so a new one cannot be
-    // forgotten: the targets on disk are exactly the targets in the command.
-    const e2e = lane.checks.find((c) => c.name === "storage-e2e").run;
-    const onDisk = fs
-      .readdirSync(path.join(repoRoot, "tests"))
-      .filter((f) => /^(storage_.*_e2e|cli_storage_url_e2e)\.rs$/.test(f))
-      .map((f) => f.replace(/\.rs$/, ""))
-      .sort();
-    const inLane = [...e2e.matchAll(/--test (\S+)/g)].map((m) => m[1]).sort();
-    assert.deepEqual(inLane, onDisk, profile);
-    // MongoDB runs the shared storage targets that support its feature set.
-    // SQLite-only targets belong to the driver lane above, not MongoDB.
-    const mongo = fs.readFileSync(
-      path.join(repoRoot, ".github/workflows/storage-mongodb.yml"),
-      "utf8",
-    );
-    const inMongo = [...mongo.matchAll(/--test (\S+)/g)]
-      .map((m) => m[1])
-      .sort();
-    assert.deepEqual(
-      inMongo,
-      onDisk.filter((target) => target !== "storage_default_import_e2e"),
-      "storage-mongodb.yml",
     );
     if (profile === "hosted") {
       assert.deepEqual(
         hostedMatrix(plan).map((g) => g.group),
-        ["checks", "storage"],
+        ["checks", "rust-cov"],
       );
     }
   }
-  // Without the area the lane stays off.
-  const off = buildPlan({ profile: "hosted", areas: NONE });
-  assert.equal(
-    off.lanes.find((l) => l.name === "storage-drivers").active,
-    false,
+  // The coverage suites run the per-driver storage targets (memory, sqlite and
+  // file cases) and the session-store driver tests in their one build.
+  const coverage = fs.readFileSync(
+    path.join(repoRoot, "scripts/ci/rust-coverage.sh"),
+    "utf8",
   );
+  assert.match(
+    coverage,
+    /^CORE_PRODUCT_FEATURES="\$\(bash scripts\/ci\/product-features\.sh --core\),storage-file"$/m,
+  );
+  assert.match(
+    coverage,
+    /-p openhuman-rpc --all-targets \\\n\s+--features storage-sqlite,storage-file/,
+  );
+  // MongoDB runs the shared storage targets that support its feature set.
+  const onDisk = fs
+    .readdirSync(path.join(repoRoot, "tests"))
+    .filter((f) => /^(storage_.*_e2e|cli_storage_url_e2e)\.rs$/.test(f))
+    .map((f) => f.replace(/\.rs$/, ""))
+    .sort();
+  const mongo = fs.readFileSync(
+    path.join(repoRoot, ".github/workflows/storage-mongodb.yml"),
+    "utf8",
+  );
+  const inMongo = [...mongo.matchAll(/--test (\S+)/g)]
+    .map((m) => m[1])
+    .sort();
+  assert.deepEqual(
+    inMongo,
+    onDisk.filter((target) => target !== "storage_default_import_e2e"),
+    "storage-mongodb.yml",
+  );
+  // Without the area (or a core change) the coverage lane stays off.
+  const off = buildPlan({ profile: "hosted", areas: NONE });
+  assert.equal(off.lanes.find((l) => l.name === "rust-cov").active, false);
 });
 
 test("hosted matrix only spins up groups with active lanes", () => {
@@ -397,9 +380,9 @@ test("private lanes reuse checkout targets, preserve mold through RUSTFLAGS rese
   );
 });
 
-test("private gates-off, storage, and Tauri execute equivalent coverage suites with nextest", () => {
+test("private gates-off and Tauri execute equivalent coverage suites with nextest", () => {
   const plan = buildPlan({ profile: "ex63", areas: ALL, env: EX63_ENV });
-  for (const name of ["rust-gates-off", "storage-drivers", "tauri"]) {
+  for (const name of ["rust-gates-off", "tauri"]) {
     for (const c of plan.lanes
       .find((l) => l.name === name)
       .checks.filter((c) => /cargo (test|llvm-cov)/.test(c.run))) {
@@ -421,23 +404,6 @@ test("private gates-off, storage, and Tauri execute equivalent coverage suites w
     /--features modules,mcp,e2e-test-support/,
   );
   assert.match(checks["gate-contract-tests-features"].run, /--test-threads=1/);
-  assert.match(checks["cron-module-tests"].run, /--test-threads=1/);
-  assert.equal(
-    checks["storage-e2e"].env.NEXTEST_EXPECTED_TARGETS,
-    "ci-out/nextest/storage-e2e-expected-targets.txt",
-  );
-  for (const target of [
-    ...checks["storage-e2e"].run.matchAll(/--test (\S+)/g),
-  ].map((match) => match[1])) {
-    assert.ok(
-      checks["storage-e2e"].run.includes(`'${target}'`),
-      `expected inventory includes ${target}`,
-    );
-  }
-  assert.match(
-    checks["storage-lib-tests"].run,
-    /not test\(cron::bus_host::tests::\)/,
-  );
   assert.equal(
     checks["tauri-coverage"].env.CARGO_BUILD_TARGET_DIR,
     "target/ci-private-coverage",
@@ -454,7 +420,9 @@ test("private auxiliary coverage reports after failed tests and preserves the fa
     { mode: 0o755 },
   );
   const plan = buildPlan({ profile: "ex63", areas: ALL, env: EX63_ENV });
-  const check = plan.lanes.find((l) => l.name === "storage-drivers").checks[0];
+  const check = plan.lanes
+    .find((l) => l.name === "rust-gates-off")
+    .checks.find((c) => c.name === "gate-contract-tests");
   const result = spawnSync("bash", ["-o", "pipefail", "-c", check.run], {
     cwd: repoRoot,
     env: {
@@ -466,13 +434,6 @@ test("private auxiliary coverage reports after failed tests and preserves the fa
     },
   });
   assert.equal(result.status, 17);
-  assert.equal(
-    fs
-      .readFileSync(path.join(dir, "expected-targets"), "utf8")
-      .trim()
-      .split("\n").length,
-    11,
-  );
   const commands = fs.readFileSync(calls, "utf8").trim().split("\n");
   assert.equal(commands.length, 3);
   assert.match(commands[0], /^metadata /);
@@ -1000,7 +961,7 @@ test("private coverage pools profiles for every Rust configuration without chang
           );
         }
       }
-    if (plan.profile === "ex63") assert.equal(coverage.length, 8);
+    if (plan.profile === "ex63") assert.equal(coverage.length, 4);
   }
 });
 
