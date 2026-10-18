@@ -36,7 +36,7 @@ const OUTAGE_BACKOFF_BASE_MS: i64 = 30_000;
 static TRIAGE_MONOTONIC_START: OnceLock<Instant> = OnceLock::new();
 pub(crate) type RetryState = PersistentFailoverBreaker<String>;
 
-fn new_retry_state() -> RetryState {
+pub(crate) fn new_retry_state() -> RetryState {
     PersistentFailoverBreaker::new(PersistentFailoverBreakerConfig {
         base_backoff_ms: OUTAGE_BACKOFF_BASE_MS as u64,
         max_backoff_ms: (15 * 60_000) as u64,

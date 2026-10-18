@@ -38,6 +38,8 @@ pub use arm::TRIGGER_TRIAGE_AGENT_ID;
 pub(crate) use chain::begin_outage_attempt;
 #[cfg(test)]
 pub(crate) use chain::record_outage;
+#[cfg(test)]
+pub(crate) use chain::new_retry_state;
 pub use chain::run_triage;
 #[cfg(test)]
 pub(crate) use chain::run_triage_with_arms_for_test_with_state;
