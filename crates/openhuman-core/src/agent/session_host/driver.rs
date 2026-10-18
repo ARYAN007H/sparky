@@ -463,7 +463,7 @@ impl SessionDriver<OpenHumanRunContext> for OpenHumanSessionDriver {
             (
                 observed.last_call_input_tokens,
                 observed.last_call_output_tokens,
-            ) = final_call_tokens(
+            ) = grounded_close::final_call_tokens(
                 loop_last_call,
                 close.as_ref().map(|close| &close.usage),
                 repair_usage,
@@ -506,26 +506,6 @@ impl SessionDriver<OpenHumanRunContext> for OpenHumanSessionDriver {
             outcome: None,
         })
     }
-}
-
-/// Input and output tokens of the turn's final model call.
-///
-/// The grounded close and the required-output repair both run after the
-/// harness loop, in that order, so the newest of them that reached the
-/// provider made the final call; without either, the loop's last answered
-/// call did.
-fn final_call_tokens(
-    loop_last_call: Option<(u64, u64)>,
-    close: Option<&grounded_close::RepairUsage>,
-    repair: Option<&grounded_close::RepairUsage>,
-) -> (u64, u64) {
-    [repair, close]
-        .into_iter()
-        .flatten()
-        .find(|usage| usage.last_call_input_tokens > 0 || usage.last_call_output_tokens > 0)
-        .map(|usage| (usage.last_call_input_tokens, usage.last_call_output_tokens))
-        .or(loop_last_call)
-        .unwrap_or_default()
 }
 
 fn system_prefix_len(history: &[Message]) -> usize {

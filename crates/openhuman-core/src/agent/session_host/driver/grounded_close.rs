@@ -92,6 +92,25 @@ impl RepairUsage {
     }
 }
 
+/// Input and output tokens of the turn's final model call.
+///
+/// The grounded close and required-output repair run after the harness loop,
+/// in that order, so the newest of them that reached the provider made the
+/// final call; without either, the loop's last answered call did.
+pub(super) fn final_call_tokens(
+    loop_last_call: Option<(u64, u64)>,
+    close: Option<&RepairUsage>,
+    repair: Option<&RepairUsage>,
+) -> (u64, u64) {
+    [repair, close]
+        .into_iter()
+        .flatten()
+        .find(|usage| usage.last_call_input_tokens > 0 || usage.last_call_output_tokens > 0)
+        .map(|usage| (usage.last_call_input_tokens, usage.last_call_output_tokens))
+        .or(loop_last_call)
+        .unwrap_or_default()
+}
+
 /// Resolve OpenHuman's selected summarizer per close request and forward that
 /// request unchanged. TinyAgents owns streaming, validation and repair.
 struct SummarizerSourceModel<'a> {
