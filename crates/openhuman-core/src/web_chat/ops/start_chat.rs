@@ -287,8 +287,7 @@ async fn start_chat_inner(
     }
     let (runner, shared) = (rt.runner.clone(), rt.shared.clone());
     let id = request_id.clone();
-    tokio::spawn(crate::core::runtime::context::CoreContext::propagate(
-        async move {
+    ctx.spawn(async move {
             let outcome = runner.run(request).await;
             // The first answer wins: a turn that started already told its
             // submitter, and the refusals told theirs at the door.
