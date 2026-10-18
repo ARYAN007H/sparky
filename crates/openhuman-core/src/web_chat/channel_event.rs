@@ -63,11 +63,8 @@ impl ScopedWebEvent {
     }
 
     /// Historical Socket.IO discriminator for this canonical event.
-    pub fn event_name(&self) -> String {
-        serde_json::to_value(&self.event)
-            .ok()
-            .and_then(|value| value.get("event").and_then(serde_json::Value::as_str).map(str::to_owned))
-            .expect("typed web events always serialize an event discriminator")
+    pub fn event_name(&self) -> &'static str {
+        self.event.event_name()
     }
 
     /// Stamp routing metadata from the host execution context.
