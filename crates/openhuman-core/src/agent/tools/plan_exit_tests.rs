@@ -114,7 +114,7 @@ async fn plan_exit_rejects_empty() {
 
 #[test]
 fn plan_exit_metadata() {
-    let tool = PlanExitTool::new();
+    let tool = PlanExitTool;
     assert_eq!(tool.name(), "plan_exit");
     assert_eq!(tool.permission_level(), PermissionLevel::None);
 }
