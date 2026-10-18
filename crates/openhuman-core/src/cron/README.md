@@ -278,8 +278,11 @@ on the storage ports via the host's document port
 ([`documents_port.rs`](./documents_port.rs)): one `ScheduleDocuments` object per
 `(workspace, storage scope)`, which relays `get`/`put`/`query`/`atomic_batch`
 and friends mechanically, preserves the `conflict` error kind and refuses any
-collection other than the four schedule ones. The configured history cap and
-due-job batch size ride on every request. tinyflows has no SQLite store of its
+collection or shared TSD key outside the schedule module's owner namespace.
+The module owns the v1-to-v2 schedule migration, including its exact progress
+keys and legacy source retirement. Core calls its `Migrate` operation before
+store CRUD, scheduler start and manual-run preparation. The configured history
+cap and due-job batch size ride on every request. tinyflows has no SQLite store of its
 own, so there is one path whatever the storage URL says: the installed backend
 when there is one, else the workspace default (`sqlite:<workspace>/storage`).
 The `jobs.db` tinyflows used to write (with its policy side table) is decoded
@@ -301,7 +304,7 @@ feature) nothing loads and every cron call answers `COMPONENT_DISABLED:tinyflows
 | [`store.rs`](./store.rs) | The synchronous job and run API the core calls. Applies the operator limits, then sends one `StoreOperation` to the module. |
 | [`client.rs`](./client.rs) | Typed calls to the module's `Schedule` object: `store_in`/`store_blocking`, `runs_closer_than`, `parse_human_delay`, `default_delivery`, `check_origin_requirements`, and other host adapters. |
 | [`documents_port.rs`](./documents_port.rs) | The `ScheduleDocuments` callback object: the scope's document store, served to the module. |
-| [`bus_host.rs`](./bus_host.rs) | `Binding` (config, policy, context of one scope) and the `ScheduleHost` callback object (`Execute`, `Failed`, `Deliver`, `ScheduleTrigger`), served per scheduler. |
+| [`bus_host.rs`](./bus_host.rs) | `Binding` (config, policy, context of one scope) and `ScheduleHost` callbacks (`Execute`, `Failed`, `Send`, `Deliver`, `ScheduleTrigger`), served per scheduler or manual invocation. |
 | [`handlers.rs`](./handlers.rs) | The job-kind handler registry (`JobKindHandler`, `JobOutcome`, `register_kind`) and the system-job handlers. |
 | `ops.rs` | Business operations: `add_once`, `add_once_at`, pause/resume, and the async `cron_*` RPC operations. Also re-exported as `cron::rpc`. |
 | [`schemas.rs`](./schemas.rs) | Controller schemas and handlers for the `cron` namespace. |
