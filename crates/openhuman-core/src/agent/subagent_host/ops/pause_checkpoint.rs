@@ -1,4 +1,8 @@
-//! Validation for model-provided sub-agent checkpoint identifiers.
+//! The task-id guard for paused sub-agents.
+//!
+//! The pause itself is a lifecycle record on the storage port
+//! (`subagent_host::lifecycle`); a model-authored `task_id` still has to pass
+//! [`is_safe_task_id`] before it names one.
 
 /// Whether `task_id` is usable as a single filename component.
 ///

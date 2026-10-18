@@ -3,7 +3,6 @@ use crate::agent::subagent_host::types::SubagentCheckpointData;
 
 pub(in crate::agent::subagent_host) struct OpenHumanPersistence {
     checkpoint_dir: std::path::PathBuf,
-    file_store: tinyagents_orchestration::subagent::FileSubagentPersistence,
     host_outcome: Arc<Mutex<HashMap<SubagentTaskKey, SubagentRunOutcome>>>,
 }
 
@@ -26,9 +25,6 @@ enum CompatibleTerminalRecord {
 impl OpenHumanPersistence {
     pub(in crate::agent::subagent_host) fn new(checkpoint_dir: std::path::PathBuf) -> Self {
         Self {
-            file_store: tinyagents_orchestration::subagent::FileSubagentPersistence::new(
-                checkpoint_dir.clone(),
-            ),
             checkpoint_dir,
             host_outcome: Arc::new(Mutex::new(HashMap::new())),
         }
@@ -85,10 +81,17 @@ impl OpenHumanPersistence {
         }
     }
 
+    fn store(
+        &self,
+    ) -> Result<tinyagents_orchestration::subagent::DocumentSubagentPersistence, SubagentError>
+    {
+        super::store::LifecycleStore::open(&self.checkpoint_dir)?.neutral_store()
+    }
+
     pub(super) fn pause_path(&self, key: &SubagentTaskKey) -> std::path::PathBuf {
-        self.file_store
-            .pause_path(key)
-            .expect("valid subagent pause key has a persistence path")
+        // A public checkpoint name, retained for compatibility. Durable data
+        // lives in the acting scope's document store, never at this path.
+        self.legacy_pause_path(key)
     }
 
     pub(in crate::agent::subagent_host) fn legacy_pause_path(
@@ -134,7 +137,7 @@ impl OpenHumanPersistence {
         let value: serde_json::Value = serde_json::from_str(&raw)
             .map_err(|error| SubagentError::Persistence(error.to_string()))?;
         // Accept both legacy index shapes during read-only migration. New
-        // writes and indexes are owned by FileSubagentPersistence.
+        // writes and task lookup are owned by DocumentSubagentPersistence.
         let keys = value
             .get("keys")
             .cloned()
@@ -156,6 +159,20 @@ impl OpenHumanPersistence {
         &self,
         key: &SubagentTaskKey,
     ) -> Result<Option<SubagentCheckpointData>, SubagentError> {
+        let store = self.store()?;
+        if store.terminal_outcome(key)?.is_some() {
+            return Ok(None);
+        }
+        if let Some(outcome) = store.pause_outcome(key)? {
+            return Self::checkpoint_from_persisted_pause(
+                tinyagents_orchestration::subagent::PersistedSubagentPause {
+                    key: key.clone(),
+                    outcome,
+                    replaces: None,
+                },
+            )
+            .map(Some);
+        }
         let raw = match std::fs::read_to_string(self.pause_path(key)) {
             Ok(raw) => raw,
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
@@ -183,7 +200,7 @@ impl OpenHumanPersistence {
         Ok(Some(checkpoint))
     }
 
-    fn checkpoint_from_persisted_pause(
+    pub(in crate::agent::subagent_host) fn checkpoint_from_persisted_pause(
         persisted: tinyagents_orchestration::subagent::PersistedSubagentPause,
     ) -> Result<SubagentCheckpointData, SubagentError> {
         let host = persisted
@@ -307,7 +324,7 @@ impl OpenHumanPersistence {
         &self,
         key: &SubagentTaskKey,
     ) -> Result<Option<SubagentOutcome>, SubagentError> {
-        if let Some(outcome) = self.file_store.terminal_outcome(key)? {
+        if let Some(outcome) = self.store()?.terminal_outcome(key)? {
             return Ok(Some(outcome));
         }
         Ok(self.read_terminal_record(key)?.map(|record| record.outcome))
@@ -317,7 +334,7 @@ impl OpenHumanPersistence {
         &self,
         key: &SubagentTaskKey,
     ) -> Result<Option<(String, u64)>, SubagentError> {
-        if let Some(outcome) = self.file_store.terminal_outcome(key)? {
+        if let Some(outcome) = self.store()?.terminal_outcome(key)? {
             let agent_id = outcome
                 .extensions
                 .get("agent_id")
@@ -355,7 +372,9 @@ impl OpenHumanPersistence {
         }
     }
 
-    fn checkpoint_outcome(checkpoint: SubagentCheckpointData) -> SubagentOutcome {
+    pub(in crate::agent::subagent_host) fn checkpoint_outcome(
+        checkpoint: SubagentCheckpointData,
+    ) -> SubagentOutcome {
         let resume = Self::checkpoint_resume(&checkpoint);
         let host_checkpoint = serde_json::json!({
             "agent_id": checkpoint.agent_id.clone(),
@@ -423,7 +442,7 @@ impl OpenHumanPersistence {
     ) -> Result<Option<SubagentOutcome>, SubagentError> {
         let outcome = Self::checkpoint_outcome(checkpoint);
         let disposition = tinyagents_orchestration::subagent::SubagentPersistence::save_pause(
-            &self.file_store,
+            &self.store()?,
             tinyagents_orchestration::subagent::PersistedSubagentPause {
                 key: key.clone(),
                 outcome: outcome.clone(),
@@ -435,11 +454,11 @@ impl OpenHumanPersistence {
         match disposition {
             Pause::Inserted | Pause::Replaced => Ok(Some(outcome)),
             Pause::Existing => {
-                if self.file_store.terminal_outcome(key)?.is_some() {
+                if self.store()?.terminal_outcome(key)?.is_some() {
                     return Ok(None);
                 }
                 tinyagents_orchestration::subagent::SubagentPersistence::load_pause(
-                    &self.file_store,
+                    &self.store()?,
                     key,
                 )
                 .await
@@ -452,7 +471,7 @@ impl OpenHumanPersistence {
         &self,
         key: &SubagentTaskKey,
     ) -> Result<Option<SubagentCheckpointData>, SubagentError> {
-        if self.file_store.terminal_outcome(key)?.is_some() {
+        if self.store()?.terminal_outcome(key)?.is_some() {
             return Ok(None);
         }
         if self.terminal_path(key).exists() {
@@ -471,8 +490,8 @@ impl OpenHumanPersistence {
             )));
         }
         let mut keys = self
-            .file_store
-            .keys_for_task(task_id)
+            .store()
+            .and_then(|store| store.keys_for_task(task_id))
             .map_err(map_lifecycle_error)?;
         let legacy_keys = self.read_index_keys(task_id).map_err(map_lifecycle_error)?;
         for key in legacy_keys {
@@ -515,7 +534,7 @@ impl tinyagents_orchestration::subagent::SubagentPersistence for OpenHumanPersis
         &self,
         key: &SubagentTaskKey,
     ) -> Result<Option<SubagentOutcome>, SubagentError> {
-        if let Some(outcome) = self.file_store.terminal_outcome(key)? {
+        if let Some(outcome) = self.store()?.terminal_outcome(key)? {
             return Ok(Some(outcome));
         }
         Ok(self.read_terminal_record(key)?.map(|record| record.outcome))
@@ -525,7 +544,7 @@ impl tinyagents_orchestration::subagent::SubagentPersistence for OpenHumanPersis
             return Ok(None);
         }
         if let Some(resume) =
-            tinyagents_orchestration::subagent::SubagentPersistence::load(&self.file_store, key)
+            tinyagents_orchestration::subagent::SubagentPersistence::load(&self.store()?, key)
                 .await?
         {
             return Ok(Some(resume));
@@ -551,11 +570,9 @@ impl tinyagents_orchestration::subagent::SubagentPersistence for OpenHumanPersis
         if self.load_terminal(key).await?.is_some() {
             return Ok(None);
         }
-        if let Some(outcome) = tinyagents_orchestration::subagent::SubagentPersistence::load_pause(
-            &self.file_store,
-            key,
-        )
-        .await?
+        if let Some(outcome) =
+            tinyagents_orchestration::subagent::SubagentPersistence::load_pause(&self.store()?, key)
+                .await?
         {
             return Ok(Some(outcome));
         }
@@ -590,7 +607,7 @@ impl tinyagents_orchestration::subagent::SubagentPersistence for OpenHumanPersis
             .entry("openhuman_checkpoint".into())
             .or_insert(host_checkpoint);
         let disposition = tinyagents_orchestration::subagent::SubagentPersistence::save_pause(
-            &self.file_store,
+            &self.store()?,
             pause.clone(),
         )
         .await?;
@@ -640,7 +657,8 @@ impl tinyagents_orchestration::subagent::SubagentPersistence for OpenHumanPersis
             );
         }
         let disposition = tinyagents_orchestration::subagent::SubagentPersistence::record_terminal(
-            &self.file_store,
+            &super::store::LifecycleStore::before_terminal(&self.checkpoint_dir)?
+                .neutral_store()?,
             key,
             &durable_outcome,
             replaces,

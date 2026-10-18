@@ -306,7 +306,7 @@ async fn run_member_loop_drives_member_under_an_explicit_parent() {
     assert!(evidence[0].contains("teamrun-y"));
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn owner_releases_task_when_host_worker_fails() {
     AgentDefinitionRegistry::init_global_builtins().unwrap();
     let (_dir, config) = test_config();

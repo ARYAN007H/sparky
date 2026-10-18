@@ -26,7 +26,7 @@ impl HookIdentity for OpenHumanRunContext {
     fn agent_id(&self) -> Option<String> {
         self.dispatch_ctx()
             .core()
-            .and_then(|context| context.session_agent().map(str::to_owned))
+            .and_then(|context| crate::core::runtime::Tenant::of(context).agent)
     }
 
     fn cwd(&self) -> Option<std::path::PathBuf> {

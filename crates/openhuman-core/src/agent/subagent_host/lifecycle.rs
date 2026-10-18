@@ -1,6 +1,7 @@
 //! OpenHuman supplies plans, execution, persistence, and DTO projection;
 //! TinyAgents owns subagent lifecycle coordination.
-
+use async_trait::async_trait;
+use sha2::{Digest, Sha256};
 use std::{
     collections::HashMap,
     future::Future,
@@ -8,9 +9,6 @@ use std::{
     pin::Pin,
     sync::{Arc, Mutex},
 };
-
-use async_trait::async_trait;
-use sha2::{Digest, Sha256};
 use tinyagents_harness::context::{RunConfig, RunContext};
 use tinyagents_orchestration::subagent::{
     ArtifactReference, PreparedSubagent, SubagentCapabilities, SubagentDriver, SubagentError,
@@ -736,6 +734,8 @@ mod driver_adapter;
 /// second generic driver).
 #[path = "lifecycle/persistence.rs"]
 mod persistence;
+#[path = "lifecycle_store.rs"]
+mod store;
 
 pub(super) use driver_adapter::{HostRequest, OpenHumanDriverBundle};
 

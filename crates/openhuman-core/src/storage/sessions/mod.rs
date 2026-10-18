@@ -20,14 +20,16 @@ use std::sync::{Arc, LazyLock, Mutex, PoisonError, RwLock};
 use tinyagents_session::port::{AgentStores, SessionStoreProvider};
 
 mod rebound;
+mod tenant_router;
 mod workspace;
 
 pub use rebound::{rebind_all, ReboundSessionStores, StoreRegistry};
+pub use tenant_router::TenantSessionStores;
 pub use workspace::{
     artifact_blobs_for, attachment_stash_for, current_documents_for, default_turn_states_for,
     ledger_for, provider_for_workspace, release_workspace, release_workspace_defaults,
-    require_ledger, status_store_for, stores_for, stores_or_ephemeral, turn_states_for,
-    with_ledger, with_ledger_async, WorkspaceSessionStores,
+    require_ledger, session_scope, status_store_for, stores_for, stores_or_ephemeral,
+    turn_states_for, with_ledger, with_ledger_async, WorkspaceSessionStores,
 };
 
 static PROVIDER: LazyLock<RwLock<Option<Arc<dyn SessionStoreProvider>>>> =
@@ -313,7 +315,6 @@ pub fn context_workspace_dir() -> std::path::PathBuf {
 /// together, as the shared workspace always did.
 pub const DEFAULT_AGENT: &str = "default";
 
-#[cfg(test)]
 #[cfg(test)]
 #[path = "splice_fixture_tests.rs"]
 pub(crate) mod splice_fixture_tests;

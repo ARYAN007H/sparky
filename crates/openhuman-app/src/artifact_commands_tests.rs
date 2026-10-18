@@ -1,4 +1,5 @@
 use super::*;
+use crate::test_env::env_lock;
 use openhuman_rpc::embed::artifacts::FileRoots;
 
 #[test]
@@ -42,6 +43,10 @@ async fn ready_artifact(workspace: &Path, files_dir: &Path) -> String {
 
 #[tokio::test]
 async fn resolve_source_returns_the_file_in_the_files_folder() {
+    // Core-process tests can install a process-global storage backend while
+    // the artifact API resolves the record. Keep both operations on the same
+    // stable host context, as in the other workspace-bound shell tests.
+    let _env_lock = env_lock();
     let temp = tempfile::tempdir().unwrap();
     let files_dir = temp.path().join("Files");
     let id = ready_artifact(temp.path(), &files_dir).await;

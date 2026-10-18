@@ -1,4 +1,4 @@
-//! Regression tests for checkpoint task identifiers and legacy payloads.
+//! The pause task-id guard and the checkpoint shape (#5928).
 
 use crate::agent::subagent_host::types::SubagentCheckpointData;
 

@@ -103,7 +103,7 @@ pub struct Turn {
         tinyagents_harness::cost::TurnCost,
     >,
     tools: Option<openhuman_core::agent::HostTools>,
-    tool_env: Option<tinytools_std::timeout::CommandEnvironment>,
+    tool_env: Option<Arc<std::collections::BTreeMap<String, String>>>,
 }
 
 impl Turn {
@@ -188,7 +188,7 @@ impl Turn {
     /// Interpreter pools are bypassed so a pooled process cannot carry another
     /// turn's environment. Independently spawned host tasks must carry the scope.
     pub fn tool_env(mut self, env: impl IntoIterator<Item = (String, String)>) -> Self {
-        self.tool_env = Some(tinytools_std::timeout::CommandEnvironment::new(env));
+        self.tool_env = Some(Arc::new(env.into_iter().collect()));
         self
     }
 

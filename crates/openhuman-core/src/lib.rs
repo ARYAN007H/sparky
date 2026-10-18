@@ -57,7 +57,6 @@ pub mod agent_registry;
 pub mod agent_runs;
 pub mod artifacts;
 pub mod attachments;
-pub mod backend;
 pub mod channels;
 pub mod commands;
 pub mod config;

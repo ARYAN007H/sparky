@@ -76,10 +76,6 @@ pub use openhuman_core::security::turn_origin::{AgentTurnOrigin, TrustedAutomati
 pub fn current_turn_origin() -> Option<AgentTurnOrigin> {
     openhuman_core::core::runtime::CoreContext::current_turn_origin()
 }
-pub use openhuman_core::backend::{
-    install_backend_transport, installed_backend_transport, BackendRequest, BackendTransport,
-    BackendTransportError, BaseUrlPurpose, TransportProfile,
-};
 pub use openhuman_core::config::ComposioHostCredential;
 pub use openhuman_core::config::Config as RuntimeConfig;
 pub use openhuman_core::config::{SearchHostCredential, UnknownKeyedSearchProvider};
@@ -178,8 +174,8 @@ pub use channels::{ChannelError, ChannelListener, Channels, StreamMode, Telegram
 pub use config::{Config, RuntimeFlags};
 pub use core_agent::CoreAgent;
 pub use cron::{
-    Cron, CronError, JobRun, JobRunRecord, JobSchedule, JobSpec, JobTarget, ScheduledJob,
-    SystemJobContext,
+    Cron, CronError, JobKind, JobKindHandler, JobOutcome, JobRun, JobRunContext, JobRunRecord,
+    JobSchedule, JobSpec, JobTarget, ScheduledJob, SystemJobContext,
 };
 pub use error::CoreError;
 pub use harness::{

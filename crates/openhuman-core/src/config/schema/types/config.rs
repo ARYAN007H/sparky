@@ -211,7 +211,7 @@ pub struct Config {
     /// Background-AI scheduler gate — throttles embeddings and other
     /// LLM-bound background work based on power
     /// state, CPU pressure, and deployment mode. See
-    /// [`crate::cron::scheduler_gate`].
+    /// [`crate::platform::llm_gate`].
     #[serde(default)]
     pub scheduler_gate: SchedulerGateConfig,
 
@@ -382,6 +382,14 @@ pub struct Config {
     #[serde(skip)]
     #[schemars(skip)]
     pub ephemeral_route: Option<crate::config::schema::ephemeral_route::EphemeralRoute>,
+
+    /// Runtime only — service endpoints and identity a host's config enricher
+    /// resolved ([`crate::config::register_enricher`]). Empty until one runs;
+    /// never serialized. See
+    /// [`resolved_endpoints`](crate::config::schema::resolved_endpoints).
+    #[serde(skip)]
+    #[schemars(skip)]
+    pub resolved_endpoints: crate::config::schema::resolved_endpoints::ResolvedEndpoints,
 
     /// Provider string for direct conversational chat (simple back-and-forth).
     #[serde(default)]

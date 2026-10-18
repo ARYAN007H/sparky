@@ -183,27 +183,6 @@
   },
   {
     "rule": "json-write",
-    "path": "crates/openhuman-core/src/memory/local_root.rs",
-    "line": 168,
-    "text": "let temp = tempfile::NamedTempFile::new_in(dir)?;",
-    "occurrence": 1
-  },
-  {
-    "rule": "json-write",
-    "path": "crates/openhuman-core/src/modules/browser_task_report.rs",
-    "line": 304,
-    "text": "let mut options = tokio::fs::OpenOptions::new();",
-    "occurrence": 1
-  },
-  {
-    "rule": "json-write",
-    "path": "crates/openhuman-core/src/modules/site_memory_host.rs",
-    "line": 159,
-    "text": "let mut options = tokio::fs::OpenOptions::new();",
-    "occurrence": 1
-  },
-  {
-    "rule": "json-write",
     "path": "crates/openhuman-core/src/platform/doctor/core/workspace_checks.rs",
     "line": 30,
     "text": "match std::fs::OpenOptions::new()",
@@ -268,7 +247,7 @@
   {
     "rule": "json-write",
     "path": "crates/openhuman-core/src/profiles/registry.rs",
-    "line": 141,
+    "line": 181,
     "text": "std::fs::write(&layout.meta_path, raw)",
     "occurrence": 1
   },

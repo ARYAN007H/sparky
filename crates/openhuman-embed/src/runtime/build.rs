@@ -190,9 +190,11 @@ impl RuntimeBuilder {
         };
         if self.session_store.is_none() {
             if let Some(backend) = &storage_backend {
-                let stores = tinyagents_session::DriverSessionStores::new(backend.clone())
-                    .map_err(|e| RuntimeError::Build(e.into()))?
-                    .recover_on_open(!openhuman_core::storage::driver_is_shared(backend.driver()));
+                let stores = openhuman_core::storage::sessions::TenantSessionStores::new(
+                    backend.clone(),
+                    !openhuman_core::storage::driver_is_shared(backend.driver()),
+                )
+                .map_err(|e| RuntimeError::Build(e.into()))?;
                 self.session_store = Some(Arc::new(stores));
             }
         }
@@ -270,9 +272,6 @@ impl RuntimeBuilder {
         if let Some(port) = self.listen_port {
             builder = builder.port(port);
         }
-        if let Some(transport) = self.backend_transport.take() {
-            builder = builder.backend_transport(transport);
-        }
         let runtime = builder.build().await.map_err(|error| {
             log::warn!("[embed][runtime] core build failed: {error:#}");
             RuntimeError::Build(error)
@@ -348,6 +347,9 @@ impl RuntimeBuilder {
             storage_info,
             storage_backend,
         );
+        for (kind, handler) in self.cron_job_handlers {
+            runtime.register_job_handler(kind, handler);
+        }
         if starts_services_on_build(services, self.defer_services) {
             log::debug!("[embed][runtime] starting background services {services:?}");
             runtime.start_services().await;
@@ -513,6 +515,7 @@ fn map_ws(err: crate::HarnessError) -> RuntimeError {
         crate::HarnessError::Workspace { what, source } => RuntimeError::Workspace { what, source },
         crate::HarnessError::Invalid(msg) => RuntimeError::Invalid(msg),
         crate::HarnessError::Build(e) => RuntimeError::Build(e),
+        crate::HarnessError::McpCleanup(e) => RuntimeError::Build(e.into()),
         crate::HarnessError::Call(e) => RuntimeError::Call(e),
         crate::HarnessError::AlreadyRunning => RuntimeError::AlreadyRunning,
     }

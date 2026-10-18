@@ -7,7 +7,7 @@ use std::time::{Duration, Instant};
 
 use anyhow::Context;
 
-use crate::cron::scheduler_gate::LlmPermit;
+use crate::platform::llm_gate::LlmPermit;
 use tinyagents_harness::retry::{
     decide, BreakerRejection, FailoverDecision, FailoverReason, FailoverState,
     PersistentFailoverAttempt, PersistentFailoverBreaker, PersistentFailoverBreakerConfig,
@@ -80,7 +80,7 @@ pub async fn run_triage(
     let local = build_local_provider_with_config(ctx, &config);
 
     let outcome = run_triage_with_arms_inner(cloud, local, envelope, Some(retry_state()), || {
-        crate::cron::scheduler_gate::wait_for_capacity()
+        crate::platform::llm_gate::wait_for_capacity()
     })
     .await;
     if let Err(err) = &outcome {
@@ -90,7 +90,7 @@ pub async fn run_triage(
 }
 
 /// Test-only entry point: skip the global LLM permit acquisition so the
-/// triage tests don't contend with `scheduler_gate`'s process-wide
+/// triage tests don't contend with `llm_gate`'s process-wide
 /// 1-slot semaphore or get trapped by a stale `Paused` policy left in
 /// `STATE` by another test's `init_global` call.
 #[cfg(test)]
@@ -116,7 +116,7 @@ pub(crate) async fn run_triage_with_arms_for_test_with_state(
 ///
 /// `acquire_permit` is called exactly once, on the local-fallback arm,
 /// to obtain the global LLM permit. Production callers pass
-/// `scheduler_gate::wait_for_capacity`; tests pass `|| async { None }`
+/// `llm_gate::wait_for_capacity`; tests pass `|| async { None }`
 /// to skip the shared semaphore.
 async fn run_triage_with_arms_inner<F, Fut>(
     cloud: ResolvedProvider,
