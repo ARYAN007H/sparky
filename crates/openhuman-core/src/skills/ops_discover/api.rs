@@ -24,7 +24,7 @@ pub(crate) struct DiscoveryGate {
 }
 
 impl DiscoveryGate {
-    fn from_dispatch(ctx: &crate::core::runtime::DispatchCtx) -> Self {
+    pub(crate) fn from_dispatch(ctx: &crate::core::runtime::DispatchCtx) -> Self {
         let components = ctx.components();
         let domains = ctx.domains();
         Self {
@@ -37,7 +37,7 @@ impl DiscoveryGate {
         }
     }
 
-    fn from_config(
+    pub(crate) fn from_config(
         ctx: &crate::core::runtime::DispatchCtx,
         config: &crate::config::Config,
         domains: Option<crate::core::runtime::DomainSet>,
@@ -178,10 +178,11 @@ pub(crate) fn load_workflow_metadata_for_domains(
     config: &crate::config::Config,
     domains: Option<crate::core::runtime::DomainSet>,
 ) -> Vec<Workflow> {
-    let home = ctx
-        .resolved()
-        .filter(|core| core.user_skill_roots())
-        .and_then(|_| dirs::home_dir());
+    let home = match ctx.resolved() {
+        Some(core) if core.user_skill_roots() => dirs::home_dir(),
+        Some(_) => None,
+        None => discovery_home_dir(),
+    };
     load_workflow_metadata_with_gate(
         &config.workspace_dir,
         home,
@@ -189,7 +190,7 @@ pub(crate) fn load_workflow_metadata_for_domains(
     )
 }
 
-fn load_workflow_metadata_with_gate(
+pub(super) fn load_workflow_metadata_with_gate(
     workspace_dir: &Path,
     home: Option<PathBuf>,
     gate: DiscoveryGate,
@@ -217,7 +218,7 @@ fn load_workflow_metadata_with_gate(
         }
     }
     let generation = METADATA_GENERATION.load(Ordering::SeqCst);
-    let workflows = discover_workflows_inner(
+    let workflows = discover_workflows_inner_with_gate(
         home.as_deref(),
         Some(workspace_dir),
         trusted,
@@ -253,7 +254,7 @@ pub fn discover_workflows(
     let generation = workspace_dir
         .filter(|_| gate.flow_authoring_enabled())
         .and_then(crate::skills::bundled::flow_authoring::generation_if_current);
-    discover_workflows_inner(home_dir, workspace_dir, trusted, &gate, generation)
+    discover_workflows_inner_with_gate(home_dir, workspace_dir, trusted, &gate, generation)
 }
 
 #[cfg(test)]
@@ -274,6 +275,18 @@ pub fn is_workspace_trusted(workspace_dir: &Path) -> bool {
 }
 
 pub(crate) fn discover_workflows_inner(
+    home_dir: Option<&Path>,
+    workspace_dir: Option<&Path>,
+    trusted: bool,
+) -> Vec<Workflow> {
+    let gate = DiscoveryGate::from_dispatch(&crate::core::runtime::DispatchCtx::ambient());
+    let generation = workspace_dir
+        .filter(|_| gate.flow_authoring_enabled())
+        .and_then(crate::skills::bundled::flow_authoring::generation_if_current);
+    discover_workflows_inner_with_gate(home_dir, workspace_dir, trusted, &gate, generation)
+}
+
+pub(crate) fn discover_workflows_inner_with_gate(
     home_dir: Option<&Path>,
     workspace_dir: Option<&Path>,
     trusted: bool,
@@ -308,5 +321,13 @@ pub fn discover_automations(
         has_workspace = workspace_dir.is_some(),
         "[workflows] discover:automations:enter"
     );
-    discover_filtered(home_dir, workspace_dir, trusted, WORKFLOW_ROOT_KINDS)
+    let gate = DiscoveryGate::from_dispatch(&crate::core::runtime::DispatchCtx::ambient());
+    discover_filtered(
+        home_dir,
+        workspace_dir,
+        trusted,
+        WORKFLOW_ROOT_KINDS,
+        &gate,
+        None,
+    )
 }

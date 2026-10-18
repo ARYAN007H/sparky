@@ -9,6 +9,8 @@ use std::path::Path;
 
 use tinyskills::{discover_layout, LayoutQuery, RootKind};
 
+use super::api::DiscoveryGate;
+
 pub(super) use tinyskills::{ALL_ROOT_KINDS, WORKFLOW_ROOT_KINDS};
 
 use {tinyskills::Skill as Workflow, tinyskills::SkillScope as WorkflowScope};
@@ -22,7 +24,11 @@ pub(super) fn discover_filtered(
     workspace_dir: Option<&Path>,
     trusted: bool,
     kinds: &[RootKind],
+    gate: &DiscoveryGate,
+    flow_generation: Option<u64>,
 ) -> Vec<Workflow> {
+    #[cfg(not(feature = "flows"))]
+    let _ = (gate, flow_generation);
     tracing::debug!(
         trusted,
         has_home = home_dir.is_some(),
@@ -36,12 +42,21 @@ pub(super) fn discover_filtered(
     // first and at the lowest precedence. No trust marker is consulted: the
     // directory is core-managed and its contents were written from constants
     // compiled into this binary. See `skills::bundled`.
-    let builtin = match workspace_dir {
+    let mut builtin = match workspace_dir {
         Some(ws) if kinds.contains(&RootKind::Skill) => {
             scan_bundled_root(&crate::skills::bundled::builtin_root(ws))
         }
         _ => Vec::new(),
     };
+    #[cfg(feature = "flows")]
+    if gate.flow_authoring_enabled()
+        && kinds.contains(&RootKind::Skill)
+        && let (Some(workspace), Some(generation)) = (workspace_dir, flow_generation)
+        && let Some(flow_authoring) =
+            crate::skills::bundled::flow_authoring::materialized_skill(workspace, generation)
+    {
+        builtin.push(flow_authoring);
+    }
 
     let extra_user_roots = workspace_dir
         .and_then(crate::skills::write_root::agent_skill_home)
