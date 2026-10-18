@@ -57,6 +57,8 @@ fn runtime_context() -> ChannelRuntimeContext {
 
 fn channel_message(channel: &str) -> traits::ChannelMessage {
     traits::ChannelMessage {
+        reply_to_id: None,
+        topic_id: None,
         channel: channel.into(),
         sender: "alice".into(),
         content: "hello".into(),

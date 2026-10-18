@@ -1,4 +1,5 @@
 //! Host-owned approval routing and turn events over the channel module.
+use crate::channels::capabilities::capabilities_for;
 use crate::channels::{Channel, ChannelSendExt, SendMessage};
 use crate::core::events::DomainEvent;
 use async_trait::async_trait;
@@ -7,7 +8,6 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use tinybus::module::ModuleClient;
 use tinybus::EventHandler;
-use crate::channels::capabilities::capabilities_for;
 use tinychannels_bus::ChannelMessage;
 
 #[derive(Clone)]
@@ -92,6 +92,8 @@ impl EventHandler<DomainEvent> for ChannelApprovalSurfaceSubscriber {
                         session_policy: Default::default(),
                         source: tinychannels_bus::module_inbound::ChannelInboundSource::Legacy {
                             message: ChannelMessage {
+                                reply_to_id: None,
+                                topic_id: None,
                                 id: message_id.clone(),
                                 channel: channel.clone(),
                                 sender: sender.clone(),

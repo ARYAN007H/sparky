@@ -101,6 +101,8 @@ async fn module_route_help_response(
     let request = ChannelControlRequest::Route {
         workspace_dir: workspace_dir.to_string_lossy().into_owned(),
         message: Box::new(ChannelMessage {
+            reply_to_id: None,
+            topic_id: None,
             id: "help-fixture".into(),
             sender: "operator".into(),
             reply_target: "chat".into(),
@@ -224,6 +226,8 @@ async fn cached_models_and_help_responses_render_expected_text() {
 #[test]
 fn model_command_messages_use_thread_aware_history_keys() {
     let msg = ChannelMessage {
+        reply_to_id: None,
+        topic_id: None,
         id: "1".into(),
         sender: "alice".into(),
         reply_target: "room".into(),
@@ -310,6 +314,8 @@ async fn handle_runtime_command_unknown_provider_sends_helpful_error() {
     let channel_impl = Arc::new(RecordingChannel::default());
     let channel: Arc<dyn Channel> = channel_impl.clone();
     let msg = ChannelMessage {
+        reply_to_id: None,
+        topic_id: None,
         id: "1".into(),
         sender: "alice".into(),
         reply_target: "room".into(),
@@ -348,6 +354,8 @@ async fn handle_runtime_command_set_model_clears_sender_history_and_persists_rou
     let channel_impl = Arc::new(RecordingChannel::default());
     let channel: Arc<dyn Channel> = channel_impl.clone();
     let msg = ChannelMessage {
+        reply_to_id: None,
+        topic_id: None,
         id: "1".into(),
         sender: "alice".into(),
         reply_target: "room".into(),
@@ -392,6 +400,8 @@ async fn handle_runtime_command_telegram_status_replies_without_agent() {
     let channel_impl = Arc::new(RecordingChannel::default());
     let channel: Arc<dyn Channel> = channel_impl.clone();
     let msg = ChannelMessage {
+        reply_to_id: None,
+        topic_id: None,
         id: "1".into(),
         sender: "alice".into(),
         reply_target: "chat-remote".into(),
@@ -425,6 +435,8 @@ async fn handle_runtime_command_telegram_status_replies_without_agent() {
 async fn handle_runtime_command_without_target_channel_still_consumes_command() {
     let ctx = runtime_context(PathBuf::from("/tmp"));
     let msg = ChannelMessage {
+        reply_to_id: None,
+        topic_id: None,
         id: "1".into(),
         sender: "alice".into(),
         reply_target: "chat-remote".into(),
@@ -446,6 +458,8 @@ async fn handle_runtime_command_telegram_help_replies_with_remote_command_list()
     let channel_impl = Arc::new(RecordingChannel::default());
     let channel: Arc<dyn Channel> = channel_impl.clone();
     let msg = ChannelMessage {
+        reply_to_id: None,
+        topic_id: None,
         id: "1".into(),
         sender: "alice".into(),
         reply_target: "chat-remote".into(),
@@ -483,6 +497,8 @@ async fn handle_runtime_command_telegram_sessions_reports_empty_store() {
     let channel_impl = Arc::new(RecordingChannel::default());
     let channel: Arc<dyn Channel> = channel_impl.clone();
     let msg = ChannelMessage {
+        reply_to_id: None,
+        topic_id: None,
         id: "1".into(),
         sender: "alice".into(),
         reply_target: "chat-remote".into(),
@@ -525,6 +541,8 @@ async fn handle_runtime_command_telegram_new_status_and_sessions_round_trip() {
     );
 
     let new_msg = ChannelMessage {
+        reply_to_id: None,
+        topic_id: None,
         id: "1".into(),
         sender: "alice".into(),
         reply_target: "chat-remote".into(),
@@ -578,6 +596,8 @@ async fn handle_runtime_command_telegram_new_status_and_sessions_round_trip() {
         .await;
 
     let status_msg = ChannelMessage {
+        reply_to_id: None,
+        topic_id: None,
         id: "3".into(),
         sender: "alice".into(),
         reply_target: "chat-remote".into(),
@@ -598,6 +618,8 @@ async fn handle_runtime_command_telegram_new_status_and_sessions_round_trip() {
     );
 
     let sessions_msg = ChannelMessage {
+        reply_to_id: None,
+        topic_id: None,
         id: "4".into(),
         sender: "alice".into(),
         reply_target: "chat-remote".into(),
@@ -652,6 +674,8 @@ async fn handle_runtime_command_telegram_new_reports_unavailable_storage() {
     );
 
     let msg = ChannelMessage {
+        reply_to_id: None,
+        topic_id: None,
         id: "1".into(),
         sender: "alice".into(),
         reply_target: "chat-remote".into(),

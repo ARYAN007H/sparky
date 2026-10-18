@@ -139,9 +139,9 @@ impl ManagedTransport {
         let ChannelBackendRequest::ProgressiveTransport(request) = request else {
             return Err(tinybus::Error::failed("callback capability unavailable"));
         };
-        Ok(ChannelBackendResult::ProgressiveTransport(
-            Box::new(self.execute(*request).await),
-        ))
+        Ok(ChannelBackendResult::ProgressiveTransport(Box::new(
+            self.execute(*request).await,
+        )))
     }
 }
 

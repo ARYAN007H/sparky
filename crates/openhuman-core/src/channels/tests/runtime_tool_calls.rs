@@ -54,6 +54,8 @@ async fn process_channel_message_executes_native_tool_calls() {
     process_channel_message(
         runtime_ctx,
         traits::ChannelMessage {
+            reply_to_id: None,
+            topic_id: None,
             id: "msg-2".to_string(),
             sender: "bob".to_string(),
             reply_target: "chat-84".to_string(),
@@ -125,6 +127,8 @@ async fn process_channel_message_handles_models_command_without_llm_call() {
     });
 
     let cmd_msg = traits::ChannelMessage {
+        reply_to_id: None,
+        topic_id: None,
         id: "msg-cmd-1".to_string(),
         sender: "alice".to_string(),
         reply_target: "chat-1".to_string(),
@@ -180,6 +184,8 @@ async fn process_channel_message_uses_route_override_provider_and_model() {
     );
 
     let routed_msg = traits::ChannelMessage {
+        reply_to_id: None,
+        topic_id: None,
         id: "msg-routed-1".to_string(),
         sender: "alice".to_string(),
         reply_target: "chat-1".to_string(),
@@ -281,6 +287,8 @@ async fn process_channel_message_respects_configured_max_tool_iterations_above_d
     process_channel_message(
         runtime_ctx,
         traits::ChannelMessage {
+            reply_to_id: None,
+            topic_id: None,
             id: "msg-iter-success".to_string(),
             sender: "alice".to_string(),
             reply_target: "chat-iter-success".to_string(),
@@ -341,6 +349,8 @@ async fn process_channel_message_reports_configured_max_tool_iterations_limit() 
     process_channel_message(
         runtime_ctx,
         traits::ChannelMessage {
+            reply_to_id: None,
+            topic_id: None,
             id: "msg-iter-fail".to_string(),
             sender: "bob".to_string(),
             reply_target: "chat-iter-fail".to_string(),

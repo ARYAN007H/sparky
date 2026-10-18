@@ -18,6 +18,9 @@ fn chat_providers_support_approvals_and_remote_control() {
 #[test]
 fn unknown_and_oneway_providers_have_no_capabilities() {
     for provider in ["email", "webhook", "cli", "brand-new"] {
-        assert_eq!(capabilities_for(provider), HostChannelCapabilities::default());
+        assert_eq!(
+            capabilities_for(provider),
+            HostChannelCapabilities::default()
+        );
     }
 }

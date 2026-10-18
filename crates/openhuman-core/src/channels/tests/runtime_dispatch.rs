@@ -151,6 +151,8 @@ async fn message_dispatch_processes_messages_in_parallel() {
     let (parallel_channel, parallel_ctx) = build_runtime();
     let (tx, rx) = tokio::sync::mpsc::channel::<RuntimeChannelMessage>(4);
     tx.send(RuntimeChannelMessage::from(traits::ChannelMessage {
+        reply_to_id: None,
+        topic_id: None,
         id: "1".to_string(),
         sender: "alice".to_string(),
         reply_target: "alice".to_string(),
@@ -163,6 +165,8 @@ async fn message_dispatch_processes_messages_in_parallel() {
     .await
     .unwrap();
     tx.send(RuntimeChannelMessage::from(traits::ChannelMessage {
+        reply_to_id: None,
+        topic_id: None,
         id: "2".to_string(),
         sender: "bob".to_string(),
         reply_target: "bob".to_string(),
@@ -224,6 +228,8 @@ async fn process_channel_message_cancels_scoped_typing_task() {
     process_channel_message(
         runtime_ctx,
         traits::ChannelMessage {
+            reply_to_id: None,
+            topic_id: None,
             id: "typing-msg".to_string(),
             sender: "alice".to_string(),
             reply_target: "chat-typing".to_string(),
@@ -314,6 +320,8 @@ async fn dispatch_routes_through_agent_run_turn_bus_handler() {
     process_channel_message(
         runtime_ctx,
         traits::ChannelMessage {
+            reply_to_id: None,
+            topic_id: None,
             id: "bus-stub-msg".to_string(),
             sender: "alice".to_string(),
             reply_target: "alice".to_string(),
@@ -449,6 +457,8 @@ async fn run_resolved_route_message(message_id: &str, noise_after: usize) {
     process_channel_message(
         resolved_route_ctx().await,
         traits::ChannelMessage {
+            reply_to_id: None,
+            topic_id: None,
             id: message_id.to_string(),
             sender: "alice".to_string(),
             reply_target: "alice".to_string(),
@@ -571,6 +581,8 @@ async fn process_channel_message_hardens_multimodal_files_against_smuggled_marke
     process_channel_message(
         runtime_ctx,
         traits::ChannelMessage {
+            reply_to_id: None,
+            topic_id: None,
             id: "smuggle-attempt".to_string(),
             sender: "remote_attacker".to_string(),
             reply_target: "remote_attacker".to_string(),
@@ -654,6 +666,8 @@ async fn process_channel_message_hardens_against_relative_path_markers() {
     process_channel_message(
         runtime_ctx,
         traits::ChannelMessage {
+            reply_to_id: None,
+            topic_id: None,
             id: "smuggle-attempt-relative".to_string(),
             sender: "remote_attacker".to_string(),
             reply_target: "remote_attacker".to_string(),

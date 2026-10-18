@@ -70,6 +70,8 @@ fn context(channel: Arc<Telegram>, config: Config) -> Arc<ChannelRuntimeContext>
 
 fn message(text: &str) -> traits::ChannelMessage {
     traits::ChannelMessage {
+        reply_to_id: None,
+        topic_id: None,
         id: "m1".into(),
         sender: "alice".into(),
         sender_name: None,

@@ -121,6 +121,8 @@ async fn inbound_thread_ts_is_forwarded_to_channel_send() {
     process_channel_message(
         ctx,
         traits::ChannelMessage {
+            reply_to_id: None,
+            topic_id: None,
             id: "tg_100_99".to_string(),
             sender: "alice".to_string(),
             reply_target: "100".to_string(),
@@ -159,6 +161,8 @@ async fn no_thread_ts_on_inbound_message_results_in_none_on_send() {
     process_channel_message(
         ctx,
         traits::ChannelMessage {
+            reply_to_id: None,
+            topic_id: None,
             id: "tg_100_55".to_string(),
             sender: "alice".to_string(),
             reply_target: "100".to_string(),
@@ -197,6 +201,8 @@ async fn reaction_marker_in_llm_response_is_passed_to_channel_send() {
     process_channel_message(
         ctx,
         traits::ChannelMessage {
+            reply_to_id: None,
+            topic_id: None,
             id: "tg_100_42".to_string(),
             sender: "alice".to_string(),
             reply_target: "100".to_string(),
@@ -249,6 +255,8 @@ async fn typing_indicator_starts_and_stops_once_per_message() {
     process_channel_message(
         ctx,
         traits::ChannelMessage {
+            reply_to_id: None,
+            topic_id: None,
             id: "typing-test".to_string(),
             sender: "alice".to_string(),
             reply_target: "chat-123".to_string(),
@@ -279,6 +287,8 @@ async fn typing_indicator_starts_and_stops_once_per_message() {
 #[test]
 fn telegram_channel_history_key_ignores_thread_ts() {
     let base_msg = traits::ChannelMessage {
+        reply_to_id: None,
+        topic_id: None,
         id: "tg_100_1".to_string(),
         sender: "alice".to_string(),
         reply_target: "100".to_string(),
@@ -373,6 +383,8 @@ async fn telegram_threaded_inbound_emits_ack_reaction_then_reply() {
     process_channel_message(
         ctx,
         traits::ChannelMessage {
+            reply_to_id: None,
+            topic_id: None,
             id: "tg_200_77".to_string(),
             sender: "alice".to_string(),
             reply_target: "200".to_string(),
@@ -439,6 +451,8 @@ async fn telegram_threaded_inbound_emits_ack_reaction_then_reply() {
 #[test]
 fn non_telegram_channel_history_key_includes_thread_ts() {
     let base_msg = traits::ChannelMessage {
+        reply_to_id: None,
+        topic_id: None,
         id: "slack_C01_1".to_string(),
         sender: "alice".to_string(),
         reply_target: "C01".to_string(),
