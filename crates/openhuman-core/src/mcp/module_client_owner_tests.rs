@@ -42,7 +42,11 @@ impl LifecycleFixture {
 #[tokio::test]
 async fn failed_agent_cleanup_retains_the_retired_owner_and_can_retry() {
     let scratch = tempfile::tempdir().unwrap();
-    let directory = scratch.path().join("agents/worker");
+    let scratch_dir = scratch
+        .path()
+        .canonicalize()
+        .expect("canonical fixture root");
+    let directory = scratch_dir.as_path().join("agents/worker");
     let bus = MemoryBus::new();
     Broker::new().spawn(bus.clone());
     let service = Connection::connect(bus.connect().await.unwrap())
@@ -75,7 +79,7 @@ async fn failed_agent_cleanup_retains_the_retired_owner_and_can_retry() {
         object_path: "/test/original-child".into(),
     });
     lifecycle::table().insert(directory.clone(), Arc::clone(&client));
-    let cleanup = agent_cleanup::take_agent_cleanup(scratch.path(), "worker").unwrap();
+    let cleanup = agent_cleanup::take_agent_cleanup(scratch_dir.as_path(), "worker").unwrap();
     fixture.fail_close.store(true, Ordering::SeqCst);
     assert_eq!(cleanup.finish().await, Err(ModuleCallError::ModuleFault));
     assert!(Arc::ptr_eq(cached(&directory).as_ref().unwrap(), &client));
@@ -106,8 +110,12 @@ async fn failed_agent_cleanup_retains_the_retired_owner_and_can_retry() {
 #[test]
 fn an_absent_agent_cleanup_does_not_create_a_configured_client() {
     let scratch = tempfile::tempdir().unwrap();
-    assert!(agent_cleanup::take_agent_cleanup(scratch.path(), "never-opened").is_none());
-    assert!(cached(&scratch.path().join("agents/never-opened")).is_none());
+    let scratch_dir = scratch
+        .path()
+        .canonicalize()
+        .expect("canonical fixture root");
+    assert!(agent_cleanup::take_agent_cleanup(scratch_dir.as_path(), "never-opened").is_none());
+    assert!(cached(&scratch_dir.as_path().join("agents/never-opened")).is_none());
 }
 
 #[tokio::test]
@@ -115,8 +123,12 @@ async fn an_old_closed_context_cannot_create_the_reused_agents_first_client() {
     use crate::core::runtime::{ContextOverlay, CoreContext, DomainSet};
     use crate::tools::toolpacks::ToolGroups;
     let scratch = tempfile::tempdir().unwrap();
+    let scratch_dir = scratch
+        .path()
+        .canonicalize()
+        .expect("canonical fixture root");
     let mut config = Config::default();
-    config.workspace_dir = scratch.path().into();
+    config.workspace_dir = scratch_dir.as_path().into();
     let parent = CoreContext::for_test(DomainSet::full(), Some(config.workspace_dir.clone()));
     let old_scope = Arc::new(crate::security::approval::ApprovalScope::default());
     let mut old_overrides = crate::agent::host_overrides::HostOverrides::default();
@@ -293,7 +305,11 @@ async fn cleanup_receipts_stay_with_the_original_module_after_alias_replacement(
 #[tokio::test(start_paused = true)]
 async fn a_blocked_close_has_an_overall_cleanup_deadline_and_keeps_the_owner_for_retry() {
     let scratch = tempfile::tempdir().unwrap();
-    let directory = scratch.path().join("agents/blocked-close");
+    let scratch_dir = scratch
+        .path()
+        .canonicalize()
+        .expect("canonical fixture root");
+    let directory = scratch_dir.as_path().join("agents/blocked-close");
     let bus = MemoryBus::new();
     Broker::new().spawn(bus.clone());
     let service = Connection::connect(bus.connect().await.unwrap())
@@ -330,7 +346,8 @@ async fn a_blocked_close_has_an_overall_cleanup_deadline_and_keeps_the_owner_for
         object_path: "/test/original-child".into(),
     });
     lifecycle::table().insert(directory.clone(), Arc::clone(&client));
-    let cleanup = agent_cleanup::take_agent_cleanup(scratch.path(), "blocked-close").unwrap();
+    let cleanup =
+        agent_cleanup::take_agent_cleanup(scratch_dir.as_path(), "blocked-close").unwrap();
     fixture.block_close.store(true, Ordering::SeqCst);
     let attempt = cleanup.clone();
     let mut task = tokio::spawn(async move { attempt.finish().await });
@@ -361,8 +378,12 @@ async fn a_blocked_close_has_an_overall_cleanup_deadline_and_keeps_the_owner_for
 #[test]
 fn orphaned_shutdown_cleanup_keeps_a_host_directory_reservation_until_confirmed() {
     let scratch = tempfile::tempdir().unwrap();
-    let directory = scratch.path().join("agents/purge-pending");
-    let token = crate::mcp::host::reserve_agent_directory(scratch.path(), "purge-pending");
+    let scratch_dir = scratch
+        .path()
+        .canonicalize()
+        .expect("canonical fixture root");
+    let directory = scratch_dir.as_path().join("agents/purge-pending");
+    let token = crate::mcp::host::reserve_agent_directory(scratch_dir.as_path(), "purge-pending");
     lifecycle::table().retry_orphaned();
     assert!(McpConfiguredClient::agent_close_pending(&directory));
     let reservation = lifecycle::table().reservation_for(&directory);
