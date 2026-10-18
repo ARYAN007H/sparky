@@ -1,8 +1,8 @@
 use super::*;
-use tinychannels::providers::yuanbao::YuanbaoConfig;
 use crate::security::credentials::AuthService;
 use std::collections::HashMap;
 use tempfile::tempdir;
+use tinychannels::providers::yuanbao::YuanbaoConfig;
 
 fn isolated_config() -> (tempfile::TempDir, Config) {
     let tmp = tempdir().expect("tempdir");

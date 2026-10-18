@@ -94,7 +94,9 @@ fn clear_and_compact_sender_history_update_cached_messages() {
     let mut history = Vec::new();
     history.push(tinychannels_runtime::context::ChatMessage::user("short"));
     history.extend(
-        (0..20).map(|idx| tinychannels_runtime::context::ChatMessage::assistant("x".repeat(700 + idx))),
+        (0..20).map(|idx| {
+            tinychannels_runtime::context::ChatMessage::assistant("x".repeat(700 + idx))
+        }),
     );
     ctx.conversation_histories
         .lock()
