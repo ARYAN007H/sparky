@@ -65,7 +65,7 @@ use crate::security::SecurityPolicy;
 pub const OFFLOAD_WRITE_TOOL: &str = "file_write";
 
 pub use policy::{SanitizingRedactor, WorkspaceGuard};
-use tinyagents_harness::artifacts::OffloadedArtifact;
+use tinyagents_harness::artifacts::{ArtifactKind, OffloadedArtifact};
 
 /// Tool OpenHuman tells a parent to open an offloaded artifact with.
 ///
@@ -116,8 +116,22 @@ pub async fn offload_oversized_result(
     offload: &ArtifactOffload,
     threshold_bytes: usize,
     materialize_root: &Path,
-    _policy: Option<&SecurityPolicy>,
+    policy: Option<&SecurityPolicy>,
 ) -> (String, Option<OffloadedArtifact>) {
+    // Public callers may pair this explicit policy with an ArtifactOffload
+    // configured under a different policy (or no path policy at all). Keep
+    // OpenHuman's workspace-internal floor before the owner writes any blob.
+    if let Some(policy) = policy {
+        if let Ok(key) = offload.resolve(ArtifactKind::Output, &offload.default_result_name()) {
+            let target = materialize_root.join(key);
+            if policy.is_workspace_internal_path(&target) || target.starts_with(&policy.workspace_dir)
+            {
+                tracing::warn!(path = %target.display(), "[artifact] materialized target reaches workspace state; keeping the inline result");
+                return (output, None);
+            }
+        }
+    }
+
     // The owner's filesystem-aware offload validates the eventual target
     // before storing bytes, then writes and materializes through its policy.
     let (pointer, artifact) = tinyagents_harness::artifacts::offload_oversized_result_to_fs(
