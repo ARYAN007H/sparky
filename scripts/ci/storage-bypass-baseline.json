@@ -135,7 +135,7 @@
   {
     "rule": "json-write",
     "path": "crates/openhuman-core/src/core/observability/progress_tracing/export.rs",
-    "line": 88,
+    "line": 33,
     "text": "let opened = std::fs::OpenOptions::new()",
     "occurrence": 1
   },
