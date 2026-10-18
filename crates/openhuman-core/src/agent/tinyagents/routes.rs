@@ -5,13 +5,13 @@ use std::sync::LazyLock;
 use async_trait::async_trait;
 use tinyagents_harness::context::RunContext;
 use tinyagents_harness::events::{AgentEvent, GenerationEnrichment, GenerationPricing};
+pub(super) use tinyagents_harness::middleware::library::{
+    FallbackObserverMiddleware, RequiredCapabilitiesMiddleware,
+};
 use tinyagents_harness::middleware::{MiddlewareModelOutcome, ModelHandler, ModelMiddleware};
 use tinyagents_harness::retry::FallbackPolicy;
 use tinyagents_registry::WorkloadRouter;
 use tinyinference_llm::model::{CapabilitySet, ModelRequest};
-pub(super) use tinyagents_harness::middleware::library::{
-    FallbackObserverMiddleware, RequiredCapabilitiesMiddleware,
-};
 
 /// The workload routing table (fallback chains and the vision `image_in` gate)
 /// projected into the crate [`WorkloadRouter`] from the upstream declarative
