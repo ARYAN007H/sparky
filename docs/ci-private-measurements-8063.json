@@ -136,6 +136,8 @@
     "focused_tests_passed": 7,
     "script_tests_passed": 772,
     "script_tests_skipped": 3,
-    "script_test_failures": 0
+    "script_test_failures": 0,
+    "verify_runner_hash_scope": "introduced_revision; subsequent source comments only",
+    "subsequent_documentation_revision": "8909a95d2f5f306e83a1ac13be9c0fa011426f64"
   }
 }
