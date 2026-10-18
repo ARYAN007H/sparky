@@ -106,7 +106,7 @@ async fn a_save_keeps_hand_edits_but_not_comments() {
 }
 
 #[tokio::test]
-async fn voice_settings_rpc_preserves_document_conflicts() {
+async fn agent_registry_rpc_preserves_document_conflicts() {
     use crate::core::runtime::{context::CoreContext, DispatchCtx, DomainSet};
     use serde_json::json;
 
@@ -130,13 +130,13 @@ async fn voice_settings_rpc_preserves_document_conflicts() {
 
     let voice = crate::core::all::all_registered_controllers()
         .into_iter()
-        .find(|controller| controller.rpc_method_name() == "openhuman.voice_live_settings_set")
-        .expect("voice settings RPC is registered");
+        .find(|controller| controller.rpc_method_name() == "openhuman.agent_registry_update")
+        .expect("agent registry RPC is registered");
     let ctx = CoreContext::for_test_with_config(DomainSet::full(), stale.clone());
     let error = CoreContext::scope(ctx.clone(), async move {
         (voice.handler)(
             DispatchCtx::new(ctx),
-            json!({"gemini": {"voice": "Aoede"}})
+            json!({"id": "orchestrator", "enabled": true})
                 .as_object()
                 .unwrap()
                 .clone(),
@@ -146,10 +146,9 @@ async fn voice_settings_rpc_preserves_document_conflicts() {
     })
     .await;
     let structured = crate::core::StructuredRpcError::decode(&error)
-        .expect("voice RPC preserves the structured config conflict");
+        .expect("agent registry RPC preserves the structured config conflict");
     assert_eq!(structured.data.as_ref().unwrap()["kind"], "ConfigConflict");
     assert_eq!(structured.data.as_ref().unwrap()["retryable"], true);
-
 }
 
 #[tokio::test]
