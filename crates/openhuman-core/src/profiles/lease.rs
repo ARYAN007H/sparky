@@ -88,6 +88,12 @@ pub(crate) fn store_for(
                 backend.driver(),
                 ttl.as_millis()
             );
+            if !crate::storage::backend_has_cross_process_cas(backend.as_ref()) {
+                log::warn!(
+                    "[profiles][lease] driver={} does not claim SharedAcrossProcesses: its leases exclude only this process",
+                    backend.driver()
+                );
+            }
             DocumentLeases::cluster(backend.as_ref(), node, endpoint, ttl)
                 .map(|leases| Arc::new(leases) as Arc<dyn LeaseStore>)
                 .map_err(|e| format!("profile leases: {e}"))

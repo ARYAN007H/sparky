@@ -324,12 +324,12 @@ pub fn driver_is_shared(driver: &str) -> bool {
 /// Whether an opened backend makes a compare-and-swap
 /// (`Precondition::Version` / `Absent`) atomic across processes, which a
 /// [`lease::DocumentLeases`] needs to exclude other nodes. The driver says so
-/// itself with [`Capability::SharedAcrossProcesses`], and
+/// itself with [`tinystoragedrivers::Capability::SharedAcrossProcesses`], and
 /// tinystoragedrivers' `conformance::run_shared` proves the claim per driver.
 pub fn backend_has_cross_process_cas(backend: &dyn StorageBackend) -> bool {
     backend
         .capabilities()
-        .contains(Capability::SharedAcrossProcesses)
+        .contains(tinystoragedrivers::Capability::SharedAcrossProcesses)
 }
 
 /// The same answer from a driver name alone, for the boot guard, which judges
