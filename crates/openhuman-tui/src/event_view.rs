@@ -3,7 +3,7 @@
 //! The wire contract remains TinyChannels' tagged `WebChannelEvent`; this is a
 //! consumer projection rather than another wire DTO.
 
-use openhuman_rpc::embed::chat_surface::WebChannelEvent;
+use openhuman_rpc::embed::chat_surface::{SubagentProgressDetail, WebChannelEvent};
 use serde_json::Value;
 
 #[derive(Debug, Clone, Default)]
@@ -51,7 +51,7 @@ impl WebEventView {
             ..Self::default()
         };
         use WebChannelEvent as E;
-        let subagent_view = |detail| SubagentView {
+        let subagent_view = |detail: &SubagentProgressDetail| SubagentView {
             task_id: Some(detail.task_id.clone()),
             display_name: detail.display_name.clone(),
             elapsed_ms: detail.elapsed_ms,
@@ -275,6 +275,7 @@ impl WebEventView {
                 view.tool_call_id.clone_from(tool_call_id);
                 view.args.clone_from(args);
             }
+            // Other owner variants carry no fields consumed by the terminal transcript.
             _ => {}
         }
         view
