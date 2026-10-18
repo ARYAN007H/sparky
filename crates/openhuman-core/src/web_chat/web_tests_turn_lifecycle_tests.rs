@@ -196,6 +196,17 @@ async fn a_turn_whose_provider_is_unreachable_ends_in_one_classified_chat_error(
     .await
     .expect("the message is accepted");
 
+    let dump = tokio::time::timeout(Duration::from_secs(8), async {
+        loop {
+            if let Ok(event) = rx.recv().await {
+                if event.request_id == request_id {
+                    eprintln!("DBG {} {:?} {:?}", event.event, event.error_type, event.message);
+                    if event.event == "chat_error" || event.event == "chat_done" { break; }
+                }
+            }
+        }
+    }).await;
+    eprintln!("DBG dump={dump:?}");
     let error = wait_for_event(&mut rx, &request_id, "chat_error").await;
     assert!(error.error_type.as_deref().is_some_and(|kind| !kind.is_empty()));
     assert_eq!(error.client_id, "real-client");
@@ -211,4 +222,31 @@ async fn a_turn_whose_provider_is_unreachable_ends_in_one_classified_chat_error(
         .lock()
         .await
         .contains_key(&key_for(&ctx, thread_id)));
+}
+
+#[tokio::test]
+async fn zz_debug_stages() {
+    use crate::core::runtime::{context::CoreContext, DomainSet};
+    let tmp = tempfile::tempdir().expect("workspace");
+    let config = crate::config::Config {
+        workspace_dir: tmp.path().join("workspace"),
+        action_dir: tmp.path().join("workspace"),
+        config_path: tmp.path().join("config.toml"),
+        ..Default::default()
+    };
+    std::fs::create_dir_all(&config.workspace_dir).unwrap();
+    let ctx = DispatchCtx::new(CoreContext::for_test_with_config(DomainSet::full(), config));
+    let t = std::time::Instant::now();
+    let cfg = timeout(Duration::from_secs(5), ctx.load_config()).await;
+    eprintln!("DBG load_config {:?} {:?}", t.elapsed(), cfg.as_ref().map(|c| c.is_ok()));
+    let cfg = cfg.unwrap().unwrap();
+    let t = std::time::Instant::now();
+    let dir = timeout(Duration::from_secs(5), crate::threads::ops::thread_working_dir(&ctx, cfg.workspace_dir.clone(), "dbg-thread")).await;
+    eprintln!("DBG thread_dir {:?} {:?}", t.elapsed(), dir.as_ref().map(|c| c.is_ok()));
+    let t = std::time::Instant::now();
+    let r = timeout(Duration::from_secs(20), super::super::session::checkout_session_agent(&ctx, &cfg, "c", "dbg-thread", None, None, None, super::super::session::CheckoutPolicy::Exact)).await;
+    eprintln!("DBG checkout {:?} {:?}", t.elapsed(), r.as_ref().map(|c| c.as_ref().map(|_| ()).map_err(|e| e.clone())));
+    let t = std::time::Instant::now();
+    let r = timeout(Duration::from_secs(5), crate::profiles::turn_gate::acquire(&ctx)).await;
+    eprintln!("DBG gate {:?} {:?}", t.elapsed(), r.is_ok());
 }
