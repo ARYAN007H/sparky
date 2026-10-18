@@ -22,7 +22,10 @@ fn failed_attempt_after_concurrent_recovery_does_not_become_terminal() {
     let state = new_retry_state();
     let mut attempt = begin_outage_attempt(Some(&state), "stub-cloud").expect("attempt");
 
-    clear_outage(Some(&state), "stub-cloud");
+    clear_outage(Some(&mut attempt));
 
-    assert!(matches!(record_outage(Some(&mut attempt)), None));
+    assert!(matches!(
+        record_outage(Some(&mut attempt)),
+        Some(TriageOutcome::Deferred { .. })
+    ));
 }
