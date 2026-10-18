@@ -78,6 +78,9 @@ where
     if support::already_imported(scoped, MARKER_KIND, &marker).await? {
         return Ok(Outcome::AlreadyDone);
     }
+    if std::fs::symlink_metadata(file).is_err() {
+        return Ok(Outcome::NoSource);
+    }
     let path = file.to_owned();
     let bytes = tokio::task::spawn_blocking(move || read_regular(&path))
         .await
