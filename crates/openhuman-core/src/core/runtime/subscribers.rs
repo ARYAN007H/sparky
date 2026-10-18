@@ -163,6 +163,12 @@ pub(super) fn register_domain_subscribers(
     // (`SubscriptionHandle::drop` aborts the task).
     static INFRA: Once = Once::new();
     INFRA.call_once(|| {
+        // Debug-log every domain event; the handle lives for the process.
+        if let Some(handle) =
+            crate::core::bus::BUS.subscribe(Arc::new(crate::core::bus::TracingSubscriber))
+        {
+            std::mem::forget(handle);
+        }
         crate::platform::health::bus::register_health_subscriber();
 
         // Initialise the scheduler gate before any background AI workers start
