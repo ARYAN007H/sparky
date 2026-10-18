@@ -10,6 +10,7 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{LazyLock, RwLock};
 use std::time::Duration;
+use sha2::Digest;
 
 use crate::config::Config;
 use crate::core::runtime::{DispatchCtx, DomainSet};
@@ -28,13 +29,23 @@ struct Snapshot {
     files: Vec<ResourceFile>,
 }
 
-static SNAPSHOTS: LazyLock<RwLock<HashMap<PathBuf, Snapshot>>> =
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+struct SnapshotKey {
+    workspace: PathBuf,
+    gate: DiscoveryGate,
+}
+
+static SNAPSHOTS: LazyLock<RwLock<HashMap<SnapshotKey, Snapshot>>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
 static NEXT_GENERATION: AtomicU64 = AtomicU64::new(1);
 
-/// Product-owned root for the dynamic skill, separate from static bundles.
-pub(crate) fn root(workspace: &Path) -> PathBuf {
-    workspace.join(".openhuman").join(FLOW_ROOT_NAME)
+/// Product-owned root for one explicit workspace/config/tenant snapshot,
+/// separate from static bundles and other profiles sharing the workspace.
+pub(crate) fn root(workspace: &Path, gate: &DiscoveryGate) -> PathBuf {
+    workspace
+        .join(".openhuman")
+        .join(FLOW_ROOT_NAME)
+        .join(scope_directory(gate))
 }
 
 /// Fetch and materialize Copilot resources when every owning capability is
@@ -57,6 +68,7 @@ pub(crate) async fn prewarm(
     }
 
     let workspace = config.workspace_dir.as_path();
+    let key = snapshot_key(workspace, &gate);
     let fetched = tokio::time::timeout(COPILOT_RESOURCE_DEADLINE, async {
         let proxy = crate::modules::tinyflows::copilot_proxy(config).await?;
         let member = tinyflows_bus::copilot::METHODS
@@ -75,7 +87,7 @@ pub(crate) async fn prewarm(
         Ok(Ok(files)) => files,
         Ok(Err(error)) => {
             tracing::warn!(%error, "[skills][bundled] flow-authoring resources unavailable; hiding builtin");
-            clear_snapshot(workspace);
+            clear_snapshot(&key);
             return;
         }
         Err(_) => {
@@ -83,30 +95,30 @@ pub(crate) async fn prewarm(
                 timeout_seconds = COPILOT_RESOURCE_DEADLINE.as_secs(),
                 "[skills][bundled] flow-authoring resource prewarm timed out; hiding builtin"
             );
-            clear_snapshot(workspace);
+            clear_snapshot(&key);
             return;
         }
     };
 
     if !valid_resource_manifest(&resources) {
         tracing::warn!("[skills][bundled] TinyFlows returned an invalid resource manifest; hiding builtin");
-        clear_snapshot(workspace);
+        clear_snapshot(&key);
         return;
     }
     if !module_is_serving() {
         tracing::warn!("[skills][bundled] TinyFlows module is not serving after ListResources; hiding builtin");
-        clear_snapshot(workspace);
+        clear_snapshot(&key);
         return;
     }
 
     let previous = SNAPSHOTS
         .read()
         .ok()
-        .and_then(|snapshots| snapshots.get(workspace).cloned());
+        .and_then(|snapshots| snapshots.get(&key).cloned());
     if let Some(previous) = &previous {
-        if !materialization_matches(workspace, previous) {
+        if !materialization_matches(workspace, &gate, previous) {
             tracing::warn!("[skills][bundled] flow-authoring disk tree changed; hiding builtin");
-            clear_snapshot(workspace);
+            clear_snapshot(&key);
             return;
         }
         if previous.files == resources {
@@ -115,14 +127,14 @@ pub(crate) async fn prewarm(
     }
 
     let generation = NEXT_GENERATION.fetch_add(1, Ordering::SeqCst);
-    if let Err(error) = materialize(workspace, &resources) {
+    if let Err(error) = materialize(workspace, &gate, &resources) {
         tracing::warn!(%error, "[skills][bundled] flow-authoring materialization failed; hiding builtin");
-        clear_snapshot(workspace);
+        clear_snapshot(&key);
         return;
     }
     if let Ok(mut snapshots) = SNAPSHOTS.write() {
         snapshots.insert(
-            workspace.to_path_buf(),
+            key,
             Snapshot {
                 generation,
                 files: resources,
@@ -134,18 +146,19 @@ pub(crate) async fn prewarm(
 
 /// Return the current resource generation only while the owning module and
 /// TinySkills-validated on-disk tree still agree.
-pub(crate) fn generation_if_current(workspace: &Path) -> Option<u64> {
+pub(crate) fn generation_if_current(workspace: &Path, gate: &DiscoveryGate) -> Option<u64> {
+    let key = snapshot_key(workspace, gate);
     if !module_is_serving() {
-        clear_snapshot(workspace);
+        clear_snapshot(&key);
         return None;
     }
     let snapshot = SNAPSHOTS
         .read()
         .ok()
-        .and_then(|snapshots| snapshots.get(workspace).cloned())?;
-    if !materialization_matches(workspace, &snapshot) {
+        .and_then(|snapshots| snapshots.get(&key).cloned())?;
+    if !materialization_matches(workspace, gate, &snapshot) {
         tracing::warn!("[skills][bundled] cached flow-authoring materialization changed; hiding builtin");
-        clear_snapshot(workspace);
+        clear_snapshot(&key);
         return None;
     }
     Some(snapshot.generation)
@@ -153,16 +166,18 @@ pub(crate) fn generation_if_current(workspace: &Path) -> Option<u64> {
 
 /// Load the dynamic skill for synchronous discovery after the metadata path
 /// has checked the expected snapshot generation.
-pub(crate) fn materialized_skill(workspace: &Path, generation: u64) -> Option<Skill> {
-    let snapshot = snapshot_for(workspace, generation)?;
-    if !module_is_serving() || !materialization_matches(workspace, &snapshot) {
-        clear_snapshot(workspace);
+pub(crate) fn materialized_skill(
+    workspace: &Path,
+    gate: &DiscoveryGate,
+    generation: u64,
+) -> Option<Skill> {
+    let key = snapshot_key(workspace, gate);
+    let snapshot = snapshot_for(&key, generation)?;
+    if !module_is_serving() || !materialization_matches(workspace, gate, &snapshot) {
+        clear_snapshot(&key);
         return None;
     }
-    let skill = tinyskills::load_skill_dir(
-        &root(workspace).join(FLOW_SKILL_ID),
-        SkillScope::Builtin,
-    )?;
+    let skill = tinyskills::load_skill_dir(&root(workspace, gate).join(FLOW_SKILL_ID), SkillScope::Builtin)?;
     (skill.id() == FLOW_SKILL_ID).then_some(skill)
 }
 
@@ -170,14 +185,16 @@ pub(crate) fn materialized_skill(workspace: &Path, generation: u64) -> Option<Sk
 /// inventory, and returned bytes all still match the retained bus snapshot.
 pub(crate) fn read_resource(
     workspace: &Path,
+    gate: &DiscoveryGate,
     generation: u64,
     skill: &Skill,
     relative_path: &Path,
 ) -> Result<String, String> {
-    let snapshot = snapshot_for(workspace, generation)
+    let key = snapshot_key(workspace, gate);
+    let snapshot = snapshot_for(&key, generation)
         .ok_or_else(|| "flow-authoring resources are unavailable".to_string())?;
-    if !module_is_serving() || !materialization_matches(workspace, &snapshot) {
-        clear_snapshot(workspace);
+    if !module_is_serving() || !materialization_matches(workspace, gate, &snapshot) {
+        clear_snapshot(&key);
         return Err("flow-authoring resources are stale or changed".to_string());
     }
     let requested = relative_path
@@ -192,17 +209,17 @@ pub(crate) fn read_resource(
     let content = tinyskills::read_resource(skill, relative_path)
         .map_err(|error| error.to_string())?;
     if content != expected {
-        clear_snapshot(workspace);
+        clear_snapshot(&key);
         return Err("flow-authoring resource bytes changed".to_string());
     }
     Ok(content)
 }
 
-fn snapshot_for(workspace: &Path, generation: u64) -> Option<Snapshot> {
+fn snapshot_for(key: &SnapshotKey, generation: u64) -> Option<Snapshot> {
     SNAPSHOTS
         .read()
         .ok()?
-        .get(workspace)
+        .get(key)
         .filter(|snapshot| snapshot.generation == generation)
         .cloned()
 }
@@ -226,8 +243,12 @@ fn valid_resource_manifest(files: &[ResourceFile]) -> bool {
     })
 }
 
-fn materialize(workspace: &Path, resources: &[ResourceFile]) -> Result<(), String> {
-    let parent_path = workspace.join(".openhuman");
+fn materialize(
+    workspace: &Path,
+    gate: &DiscoveryGate,
+    resources: &[ResourceFile],
+) -> Result<(), String> {
+    let parent_path = workspace.join(".openhuman").join(FLOW_ROOT_NAME);
     std::fs::create_dir_all(&parent_path)
         .map_err(|error| format!("creating builtin skill parent failed: {error}"))?;
     let parent = tinyskills::cap_std::fs::Dir::open_ambient_dir(
@@ -243,13 +264,13 @@ fn materialize(workspace: &Path, resources: &[ResourceFile]) -> Result<(), Strin
         dir_name: FLOW_SKILL_ID.to_string(),
         source: MaterializeSource::Files(files),
     };
-    tinyskills::materialize_tree(&parent, FLOW_ROOT_NAME, &[entry])
+    tinyskills::materialize_tree(&parent, &scope_directory(gate), &[entry])
         .map(|_| ())
         .map_err(|error| error.to_string())
 }
 
-fn materialization_matches(workspace: &Path, snapshot: &Snapshot) -> bool {
-    let directory = root(workspace).join(FLOW_SKILL_ID);
+fn materialization_matches(workspace: &Path, gate: &DiscoveryGate, snapshot: &Snapshot) -> bool {
+    let directory = root(workspace, gate).join(FLOW_SKILL_ID);
     let Some(skill) = tinyskills::load_skill_dir(&directory, SkillScope::Builtin) else {
         return false;
     };
@@ -293,9 +314,21 @@ fn materialization_matches(workspace: &Path, snapshot: &Snapshot) -> bool {
     })
 }
 
-fn clear_snapshot(workspace: &Path) {
+fn snapshot_key(workspace: &Path, gate: &DiscoveryGate) -> SnapshotKey {
+    SnapshotKey {
+        workspace: workspace.to_path_buf(),
+        gate: gate.clone(),
+    }
+}
+
+fn scope_directory(gate: &DiscoveryGate) -> String {
+    let encoded = serde_json::to_vec(gate).unwrap_or_default();
+    hex::encode(sha2::Sha256::digest(encoded))
+}
+
+fn clear_snapshot(key: &SnapshotKey) {
     if let Ok(mut snapshots) = SNAPSHOTS.write() {
-        snapshots.remove(workspace);
+        snapshots.remove(key);
     }
     crate::skills::ops_discover::invalidate_workflow_metadata_cache();
 }

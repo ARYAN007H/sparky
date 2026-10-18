@@ -29,18 +29,18 @@ impl DiscoveryGate {
     pub(crate) fn from_dispatch(ctx: &crate::core::runtime::DispatchCtx) -> Self {
         let components = ctx.components();
         let domains = ctx.domains();
+        let embedder_config = ctx.embedder_config();
         Self {
             tenant: ctx.tenant().ok(),
             skills_component: components.skills,
             flows_component: components.flows,
             tinyflows_component: components.tinyflows,
-            modules_enabled: ctx
-                .embedder_config()
-                .is_some_and(|config| config.modules.enabled),
-            module_selection: ctx
-                .embedder_config()
+            modules_enabled: embedder_config
                 .as_ref()
-                .map(module_selection_fingerprint),
+                .is_some_and(|config| config.modules.enabled),
+            module_selection: embedder_config
+                .as_ref()
+                .map(|config| module_selection_fingerprint(&config.modules)),
             skills_domain: domains.map(|domains| domains.skills),
             flows_domain: domains.map(|domains| domains.flows),
         }
@@ -59,11 +59,14 @@ impl DiscoveryGate {
         };
         let parent_config = ctx.embedder_config();
         let module_selection = module_selection_fingerprint(&config.modules);
-        let module_selection = parent_config
-            .as_ref()
-            .filter(|parent| module_selection_fingerprint(&parent.modules) != module_selection)
-            .map(|_| None)
-            .unwrap_or(Some(module_selection));
+        let module_selection = match parent_config.as_ref() {
+            Some(parent)
+                if module_selection_fingerprint(&parent.modules) != module_selection =>
+            {
+                None
+            }
+            _ => Some(module_selection),
+        };
         Self {
             tenant: ctx.tenant().ok(),
             skills_component: config.components.skills && context_components.skills,
@@ -96,6 +99,12 @@ impl DiscoveryGate {
             && self.flows_domain.unwrap_or(true)
             && self.tenant.is_some()
     }
+}
+
+fn module_selection_fingerprint(config: &crate::config::schema::ModulesConfig) -> [u8; 32] {
+    use sha2::Digest;
+    let encoded = serde_json::to_vec(config).unwrap_or_default();
+    sha2::Sha256::digest(encoded).into()
 }
 
 /// Workspace, home, trust, and the exact tenant and narrowing gates that
