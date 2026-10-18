@@ -65,8 +65,7 @@ pub async fn start_credential_gated_services(
     // panic in one service is logged on join and never aborts the others.
 
     // Unit tests must not launch the real login-gated background services: they
-    // include detached, long-lived continuous audio capture that outlives the
-    // test that spawned it and interleaves with the
+    // include detached listeners that outlive the test that spawned them and interleave with the
     // shared process state (HOME / active_user.toml) of the parallel `cargo
     // test` run. Once startup became concurrent (#3490) that interleaving made
     // the session-isolation tests order-dependent. `cfg!(test)` is compiled out

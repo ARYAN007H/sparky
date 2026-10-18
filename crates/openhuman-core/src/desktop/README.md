@@ -1,7 +1,7 @@
 # desktop
 
 Core-side logic that exists to serve the desktop client: the app-state
-snapshot the shell polls, the notification center, overlay attention bubbles,
+snapshot the shell polls, the notification center,
 the model-health dashboard, the provider respond queue, and opt-in native
 desktop control. A headless or embedded host has little use for any of it,
 which is why these domains are grouped here and tagged `DomainGroup::Desktop`.
@@ -25,7 +25,7 @@ Each one meets the frontend in one of two ways:
                v                         |
  +--------------------------+   +-------------------------------+
  | controllers (core/all.rs)|   | in-process broadcast channels |
- |  app_state_*             |   |  overlay::subscribe_attention |
+ |  app_state_*             |   |  notifications::subscribe_
  |  notification_*          |   |    _events                    |
  |  dashboard_*             |   |  notifications::subscribe_    |
  |  provider_surfaces_*     |   |    core_notifications         |
@@ -34,7 +34,7 @@ Each one meets the frontend in one of two ways:
                |                            | publish
                v                            |
       peer domains (config, auth,   DomainEvent bus -> notifications::bridge
-      local AI, service, keyring)   any caller -> overlay::publish_attention
+      local AI, service, keyring)
 ```
 
 Request and response flows (the app-state snapshot, the notification list,
@@ -44,8 +44,7 @@ process-global `tokio::sync::broadcast` channels that the Socket.IO server in
 [`crates/openhuman-rpc`](../../../openhuman-rpc/) subscribes to and forwards. Notifications get onto
 their channel through `NotificationBridgeSubscriber` (`notifications::bridge`),
 which translates selected `DomainEvent`s; it is registered at startup from
-[`core/runtime/subscribers.rs`](../core/runtime/subscribers.rs). Overlay attention events are published
-directly by any caller.
+[`core/runtime/subscribers.rs`](../core/runtime/subscribers.rs). 
 
 ### Desktop control
 
@@ -81,7 +80,6 @@ action budget still apply. The agent-facing instructions are in
 | `control/` | Opt-in native desktop control: enablement and status (`ops.rs`), pending-action decisions (`confirmation.rs`), the `desktop_*` agent tools (`tools.rs`), and internal-only controllers (`schemas.rs`). `modules` feature only. Agent guidance in `WORKFLOW.md`. |
 | [`dashboard/`](dashboard/README.md) | Read-only per-model health table for Settings, built from `model_registry` and the `dashboard.model_health` thresholds. Also the `dashboard_model_health` agent tool. |
 | [`notifications/`](notifications/README.md) | Two pipelines: the event bridge that turns `DomainEvent`s into `CoreNotificationEvent`s, and the integration-notification store (SQLite) with background triage and per-provider settings. |
-| [`overlay/`](overlay/README.md) | One broadcast channel for short attention messages shown in the notch or overlay window. No RPC, no persistence. |
 | [`provider_surfaces/`](provider_surfaces/README.md) | An early scaffold: a normalized `ProviderEvent` model and an in-memory respond queue (soft cap 500) over embedded provider webviews. |
 
 ## Key types and entry points
@@ -92,8 +90,6 @@ action budget still apply. The agent-facing instructions are in
 - `notifications::register_notification_bridge_subscriber(config)` and
   `notifications::publish_core_notification` / `subscribe_core_notifications`
   ([`notifications/bus.rs`](./notifications/bus.rs)) are the push path for the notification center.
-- `overlay::publish_attention(OverlayAttentionEvent)` returns how many
-  subscribers received the event (zero means it was dropped).
 - `control::status`, `control::set_enabled`, and `control::probe`
   ([`control/ops.rs`](./control/ops.rs)) back the Connections page.
 - `DesktopTool` and `DesktopToolKind` ([`control/tools.rs`](./control/tools.rs)) are the desktop
