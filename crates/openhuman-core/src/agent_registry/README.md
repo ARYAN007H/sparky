@@ -68,13 +68,13 @@ runtime-dependent sections (rendered tool list, workspace) to it.
 Every archetype uses the shared sub-agent turn graph.
 
 [`agents/loader.rs`](agents/loader.rs) owns the `BUILTINS` slice and
-`load_builtins`, which parses each `agent.toml`, installs
-`PromptSource::Dynamic(prompt_fn)`, stamps
-`DefinitionSource::Builtin`, checks that the folder id matches the TOML id,
-and then runs `validate_tier_hierarchy`: a `worker` may not list any agent-id
-subagent, and `chat -> chat` / `reasoning -> reasoning` delegation is
-rejected (the pair rule is `validate_tier_transition` in the harness; unknown
-subagent ids are tolerated here as a separate integrity concern).
+`load_builtins`, which parses each `agent.toml`, sets the dynamic-prompt marker
+and stores its prompt callback in `AgentDefinition.extensions.prompt_builder`,
+stamps `DefinitionSource::Builtin`, and checks that the folder id matches the
+TOML id. It then calls `DefinitionSet::validate_tier_hierarchy`: a `worker`
+may not list any agent-id subagent, and `chat -> chat` / `reasoning -> reasoning`
+delegation is rejected (the pair rule is `validate_tier_transition` in the
+owner definition crate; unknown subagent ids are tolerated here).
 `BUILTINS` is also the registration point for archetypes that live with
 other domains: `skill_setup`
 ([`skills/catalog/agent/`](../../skills/catalog/agent/), feature `skills`), and
@@ -82,7 +82,7 @@ other domains: `skill_setup`
 Workspace-level overrides (`<workspace_dir>/agents/*.toml`, with a
 `~/.openhuman/agents/` fallback) are loaded separately by
 `tinyagents_definition::DefinitionSet::load_dirs` and replace built-ins on id collision;
-`AgentDefinitionRegistry::load` re-runs `validate_tier_hierarchy` after that
+`AgentDefinitionRegistry::load` re-runs the owner validation after that
 merge.
 
 The 12 archetypes in this directory:

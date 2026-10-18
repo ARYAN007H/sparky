@@ -229,7 +229,7 @@ fn compaction_enabled_mw() -> ToolOutputMiddleware {
 
 /// A `workflow_proposal` payload with `node_count` nodes, each padded with
 /// a 500-byte `note`, so the caller can force the serialized size past the
-/// ~16 KiB shared byte-budget backstop (`DEFAULT_TOOL_RESULT_BUDGET_BYTES`)
+/// ~16 KiB configured byte-budget backstop
 /// — the size class a real ≥10-node graph proposal routinely reaches, and
 /// exactly what used to get UTF-8-boundary-truncated into unparseable JSON
 /// before the truncation exemption existed.
@@ -256,8 +256,8 @@ fn oversized_workflow_proposal_json(node_count: usize) -> String {
 }
 
 /// Middleware config isolating the byte-cap stages (3+4): tokenjuice off,
-/// no tool-declared char cap, the real `DEFAULT_TOOL_RESULT_BUDGET_BYTES`
-/// (~16 KiB) as the shared backstop, and no artifact store (so an
+/// no tool-declared char cap, the configured default (~16 KiB) as the shared
+/// backstop, and no artifact store (so an
 /// over-budget non-exempt tool falls straight to inline truncation instead
 /// of being persisted — deterministic to assert on).
 fn truncation_probe_mw() -> ToolOutputMiddleware {

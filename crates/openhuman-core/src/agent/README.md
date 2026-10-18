@@ -96,8 +96,8 @@ In order:
 
 1. The caller builds a session host. `from_config_for_agent` resolves the
    `AgentDefinition` for the agent id, picks its model and provider role,
-   assembles the tool registry, and wires the `ContextManager`,
-   `ToolPolicy`, run queue and progress sender. Web chat caches one host per
+   assembles the tool registry, and wires `ToolPolicy`, the run queue,
+   progress sender, and TinyAgents context middleware settings. Web chat caches one host per
    thread ([`web_chat/session.rs`](../web_chat/session.rs)); cron builds one per job.
 2. The caller scopes an `AgentTurnOrigin` ([`turn_origin.rs`](./turn_origin.rs)) and calls
    `run_single_with_origin`. The origin (`WebChat`, `ExternalChannel`,
@@ -237,8 +237,8 @@ display-safe `AgentDefinitionDisplay` for the UI.
 `prompts/` holds the bundled identity files (`SOUL.md`, `IDENTITY.md`,
 `ROLE.md`, `STYLE.md`, `USER.md`) and `SystemPromptBuilder`, which selects
 OpenHuman product content and delegates tier assembly to TinyAgents,
-optionally returning a `TieredPrompt` with cache breakpoints. `context/` keeps per-session
-`ContextManager` state and the byte-stable channel prompt builder. `debug/`
+optionally returning a `TieredPrompt` with cache breakpoints. `context/` holds
+the shared default for TinyAgents microcompact configuration. `debug/`
 renders the exact prompt a live session would send, by building a real
 session host and calling `build_system_prompt`.
 
@@ -306,7 +306,7 @@ Definitions, prompts and context:
 | --- | --- |
 | [`../agent_registry/`](../agent_registry/) | `agent_registry` RPC; built-in archetypes under [`agents/`](../agent_registry/agents/) ([README](../agent_registry/README.md)) |
 | `prompts/` | Bundled identity files, `SystemPromptBuilder`, prompt sections ([README](prompts/README.md)) |
-| `context/` | `ContextManager` per session and the channel prompt builder ([README](context/README.md)) |
+| `context/` | Shared TinyAgents context defaults ([README](context/README.md)) |
 | [`context_breakdown.rs`](./context_breakdown.rs) | `agent.context_breakdown`: system/tools/history split of prompt size for the UI |
 | `debug/` | Dumps the exact system prompt and prompt-size report for an agent |
 | [`../agent_registry/library/`](../agent_registry/library/) | Display-safe projection of definitions (`AgentDefinitionDisplay`) |

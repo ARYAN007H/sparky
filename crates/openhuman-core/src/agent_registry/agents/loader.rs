@@ -19,14 +19,15 @@
 //!
 //! 1. [`load_builtins`] walks [`BUILTINS`].
 //! 2. For each entry, parses `agent.toml` into an [`AgentDefinition`].
-//! 3. Replaces the (unset) `system_prompt` with `PromptSource::Dynamic(prompt_fn)`
+//! 3. Sets the `PromptSource::Dynamic(())` marker and stores the callback in
+//!    the host-only `extensions.prompt_builder` field.
 //! 4. Stamps `source = DefinitionSource::Builtin` and checks the folder id
 //!    matches the TOML `id`.
 //! 5. Returns the full `Vec<AgentDefinition>`, in the order listed in [`BUILTINS`].
 //!
 //! Workspace-level overrides (`$OPENHUMAN_WORKSPACE/agents/*.toml`) are
-//! handled separately by [`crate::agent::harness::definition_loader`] and merged
-//! into the global registry, where they replace built-ins on `id`
+//! handled separately by [`crate::agent_registry::host_definition::AgentDefinitionRegistry`]
+//! and merged into the global registry, where they replace built-ins on id
 //! collision.
 
 use crate::agent_registry::host_definition::{AgentDefinition, PromptBuilder};
@@ -189,27 +190,6 @@ fn builtin_enabled(_b: &BuiltinAgent) -> bool {
     true
 }
 
-/// Validate the cross-agent spawn-hierarchy contract documented on
-/// [`AgentTier`].
-///
-/// Rules enforced here:
-///
-/// * `Chat` agents MUST NOT list another `Chat` agent in `subagents`.
-/// * `Reasoning` agents MUST NOT list another `Reasoning` agent in
-///   `subagents`.
-/// * `Worker` agents MUST NOT list any [`SubagentEntry::AgentId`]
-///   entries. (Skills wildcards are allowed: they expand to the connected
-///   integrations' actions as searchable tools on the agent's own belt,
-///   not to a spawn.)
-///
-/// Skills-wildcard entries (`{ skills = "*" }`) are intentionally
-/// untouched: they name no agent, so there is no tier pair to check.
-///
-/// Called from [`load_builtins`] for the bundled archetype set and from
-/// [`crate::agent_registry::host_definition::AgentDefinitionRegistry::load`]
-/// after workspace-local TOML overrides are merged, so custom user
-/// agents that violate the contract fail the boot rather than crashing
-/// at spawn time.
 /// Parse a single [`BuiltinAgent`] triple into a finished [`AgentDefinition`].
 fn parse_builtin(b: &BuiltinAgent) -> Result<AgentDefinition> {
     // The TOML ships without `system_prompt` — serde falls back to

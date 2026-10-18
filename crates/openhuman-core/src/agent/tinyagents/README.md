@@ -73,7 +73,7 @@ Most of the module is `pub(crate)` or private. The `pub` items, per `mod.rs`:
 - `config::*`: the host half of the generic-harness config seam.
 - `payload_summarizer::*`: `pub` since issue #6014 so an embedder can pass its own `Arc<dyn PayloadSummarizer>` to `AgentBuilder::payload_summarizer` (the default dispatches a sub-agent, which some embedders cannot do).
 - `routes::ResolvedRouteMiddleware`: records canonical response metadata in the explicit run context; `TinyagentsTurnOutcome` carries it to the bus.
-- `todos::*`, `host::*` (all ten `OpenHuman*` adapter structs), and `TurnModelSource`.
+- `host::*` (the `OpenHuman*` adapter structs) and `TurnModelSource`.
 
 Within the crate the entry point is `TurnSpec::run` (`pub(crate)`); `run_turn_via_tinyagents` is `#[cfg(test)]` only.
 
@@ -100,13 +100,13 @@ Responses project the crate's own `AgentObservation` and `HarnessRunStatus` serd
 
 ## Used by
 
-- [`agent/session_host/turn/graph.rs`](../session_host/turn/graph.rs): the chat-turn route into `TurnSpec::run`.
+- [`agent/session_host/runtime_session/`](../session_host/runtime_session/): the chat-turn route into `TurnSpec::run`.
 - [`agent/harness/graph.rs`](../harness/graph.rs): the channel/CLI bus turn route.
 - [`agent/subagent_host/`](../subagent_host/): the sub-agent spawn route. It and the session route both build their context-window summarizer through `TurnModelSource::build_summarizer`.
 - [`agent/session_host/builder/setters.rs`](../session_host/builder/setters.rs), `agent/subagent_host/ops/{provider,runner}.rs`, `channels/`: construct `TurnModelSource`.
 - [`agent/bus.rs`](../bus.rs): reads `TinyagentsTurnOutcome::resolved_route` after a turn.
 - `core/all.rs` (replay controllers) and [`core/runtime/builder.rs`](../../core/runtime/builder.rs) (`reaper::reap_orphaned_runs`).
-- [`agent/todos/`](../todos/): `todos::*` stores.
+- [`agent/tools/todo.rs`](../tools/todo.rs): the host adapter for TinyAgents' todo tool, which selects the thread scope and emits `ThreadTodosChanged`.
 - `flows/tinyflows/caps/{llm,prompt}.rs`: the message-conversion re-exports and `model::usage_info_from_response`.
 - [`tools/README.md`](../../tools/README.md) names `CanonicalSharedToolAdapter` and `ToolPolicyMiddleware` as the primary tinyagents-side tool consumers.
 

@@ -478,7 +478,7 @@ Why the rules.
 
 Enforcement. Two layers:
 
-1. Loader-time (static). [`agents::loader::validate_tier_hierarchy`](https://github.com/senamakel/openhuman/blob/d1fc357e7bf633fb1f92f7601312ce0286b39427/crates/openhuman-core/src/agent_registry/agents/loader.rs) runs over the merged registry (built-ins + workspace TOMLs) and refuses to boot a registry that lists a same-tier or worker-with-subagents entry. Built-in archetypes are checked at compile-test time; user-shipped TOMLs are checked at workspace load.
+1. Loader-time (static). `tinyagents_definition::DefinitionSet::validate_tier_hierarchy` runs over the merged registry (built-ins + workspace TOMLs) and refuses to boot a registry that lists a same-tier or worker-with-subagents entry. Built-in archetypes are checked during loading; user-shipped TOMLs are checked at workspace load.
 2. Runtime depth gate (dynamic). Independent of tier, the sub-agent runner caps total spawn chain depth at `MAX_SPAWN_DEPTH = 3` via a task-local counter incremented across `run_subagent`, surfaced as a `SpawnDepthExceeded` agent error. This makes a user-shipped TOML that drops the tier annotation still unable to recurse past three hops.
 
 > Status: the loader-time tier check, `agent_tier` field, and runtime depth-counter task-local are live. Depth is bounded by both the static loader contract and the runtime `MAX_SPAWN_DEPTH = 3` guard.
