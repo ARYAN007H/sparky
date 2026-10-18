@@ -120,7 +120,7 @@ fn identity_section_creates_missing_workspace_files() {
     let tools: Vec<Box<dyn Tool>> = vec![];
     let prompt_tools = PromptTool::from_tools(&tools);
     let ctx = PromptContext {
-        workspace_dir: workspace.path(),
+        workspace_dir: &workspace,
         model_name: "test-model",
         agent_id: "",
         tools: &prompt_tools,
