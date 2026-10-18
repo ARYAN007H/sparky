@@ -274,7 +274,6 @@ impl MediaHistoryFallback<AttachmentAccessScope> for AttachmentModel {
         if !error.contains(super::super::SOURCE_MISSING_MARKER)
             && !error.contains("attachments are disabled for this origin")
             && !error.contains("remote attachment fetch is disabled")
-            && !error.contains("unsupported media URL scheme")
         {
             return None;
         }
@@ -293,7 +292,7 @@ fn history_source_block(modality: InputModality, source: &str) -> ContentBlock {
             mime_type: None,
         }),
         modality => {
-            let media = if source.starts_with("data:") || source.contains("://") {
+            let media = if !super::is_local_reference(source) {
                 MediaRef::Url {
                     url: source.to_owned(),
                     media_type: None,

@@ -635,3 +635,26 @@ async fn data_uri_payload_containing_a_url_is_not_treated_as_a_remote_source() {
         .text()
         .contains("https://files.invalid/reference"));
 }
+
+#[tokio::test]
+async fn selected_historical_unsupported_media_url_still_fails_before_inference() {
+    let temp = tempfile::tempdir().unwrap();
+    let config = offline_config(temp.path());
+    let transport = Arc::new(CaptureModel::new(vec![]));
+    let model = controlled_wrapper(transport.clone(), config, &[]);
+    let request = ModelRequest::new(vec![
+        Message::User(UserMessage {
+            content: vec![ContentBlock::Document(MediaRef::Url {
+                url: "ftp://docs.example.test/current.pdf?signature=private".into(),
+                media_type: Some("application/pdf".into()),
+            })],
+        }),
+        Message::User(UserMessage {
+            content: vec![ContentBlock::Text("continue".into())],
+        }),
+    ]);
+
+    let error = model.invoke(&(), request).await.unwrap_err();
+    assert!(error.to_string().contains("unsupported media URL scheme"));
+    assert!(transport.requests.lock().unwrap().is_empty());
+}
