@@ -55,6 +55,11 @@ use tinyinference_llm::model::{ModelRequest, ModelResponse};
 use crate::error::CoreError;
 use crate::turn::{is_safe_endpoint_for_bearer, sanitize_url_for_display, Route};
 
+pub use tinyagents_harness::observability::{
+    PhysicalDispatchMetadata, PhysicalDispatchObserver, PhysicalDispatchOutcome,
+    PhysicalDispatchStatus, PhysicalDispatchTerminal, PhysicalDispatchUsage,
+};
+
 /// Method label carried by every [`CoreError`] this module returns.
 pub const COMPLETE: &str = "openhuman.complete";
 
@@ -433,7 +438,7 @@ pub struct Completer {
     headers: Vec<(String, String)>,
     timeout: Option<Duration>,
     observer: Option<Arc<dyn CompletionObserver>>,
-    physical_observer: Option<Arc<dyn tinyagents_harness::observability::PhysicalDispatchObserver>>,
+    physical_observer: Option<Arc<dyn PhysicalDispatchObserver>>,
     cancellation: crate::cancellation::Cancellation,
     budget: Option<crate::budget::ModelBudget>,
 }
@@ -498,9 +503,13 @@ impl Completer {
     }
 
     /// Observe each admitted provider dispatch without request or response content.
+    ///
+    /// With a budget, the observer receives charge-normalized usage after
+    /// admission, matching the amount settled by the ledger. A refusal before
+    /// provider dispatch does not produce a physical-dispatch event.
     pub fn physical_observer(
         mut self,
-        observer: Arc<dyn tinyagents_harness::observability::PhysicalDispatchObserver>,
+        observer: Arc<dyn PhysicalDispatchObserver>,
     ) -> Self {
         self.physical_observer = Some(observer);
         self
