@@ -52,6 +52,7 @@ impl ConfigSource for FileConfigSource {
             contents,
             recovered,
             from_document: false,
+            document_version: None,
         })
     }
 
