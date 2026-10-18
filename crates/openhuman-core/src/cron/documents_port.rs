@@ -8,12 +8,12 @@
 //! `delete`, `query`, `count`, `delete_where`, `atomic_batch`) and answers
 //! `{"value": ..}` or `{"error": {"kind", "message"}}`.
 //!
-//! This file is that object and nothing more. It holds no cron policy: every
-//! request is delegated mechanically to the scope's [`DocumentStore`] and the
-//! reply preserves the error kind so the module's compare-and-swap loops still
-//! see `conflict`. The only host rule is the allowlist: the port serves the
-//! four schedule collections and refuses any other, so a module bug cannot
-//! reach another domain's records.
+//! This file is that object and nothing more. It holds no cron schema or
+//! migration logic: every request is delegated mechanically to the scope's
+//! [`DocumentStore`] and the reply preserves the error kind so the module's
+//! compare-and-swap loops still see `conflict`. Its narrow collection and
+//! shared-key checks prevent the module from reaching another domain's
+//! records.
 //!
 //! One object is served per `(workspace, storage scope)`, lazily, and lives for
 //! the process. The backend is resolved per request, not captured, so a data
@@ -35,13 +35,9 @@ use tinystoragedrivers::{
 use crate::config::Config;
 use crate::modules::tinyflows as module;
 
-/// The collections the schedule store owns.
-///
-/// The v2 names (`cron.*`, `tsd.*`) are the current module's. The v1 names stay
-/// admitted so a tinyflows module release that predates the schema (the pinned
-/// artifact is re-pinned only after the epic is released) keeps working against
-/// a fresh database; its v1 collections are not migrated by the owner's steps.
-const COLLECTIONS: [&str; 10] = [
+/// Schedule-owned collections, including the v1 sources read and retired by
+/// the module's v1-to-v2 migration.
+const COLLECTIONS: [&str; 11] = [
     "cron.jobs",
     "cron.runs",
     "cron.admission",
@@ -49,9 +45,22 @@ const COLLECTIONS: [&str; 10] = [
     "tsd.counters",
     "tsd.leases",
     "tsd.migrations",
+    "tsd.kv",
     "cron_jobs",
     "cron_runs",
     "cron_counters",
+];
+
+/// Shared TSD collections whose records must remain owner-qualified.
+const SHARED_COLLECTIONS: [&str; 3] = ["tsd.counters", "tsd.leases", "tsd.migrations"];
+/// Prefix emitted by `Key::of(["cron", ..])` for cron-owned records.
+const CRON_RECORD_PREFIX: &str = "cron/";
+/// Exact TSD migration progress ids owned by the cron schema.
+const CRON_MIGRATION_IDS: [&str; 4] = [
+    "cron/cron.jobs/jobs_v2",
+    "cron/cron.runs/runs_v2",
+    "cron/cron.admission/admission_v2",
+    "cron/counters_import",
 ];
 
 /// Where one scope's cron documents live: the workspace whose default backend
@@ -157,6 +166,36 @@ fn allowed(collection: &str) -> Result<(), StorageError> {
     ))
 }
 
+fn allowed_record(collection: &str, id: &str) -> Result<(), StorageError> {
+    allowed(collection)?;
+    if collection == "tsd.kv" {
+        return Err(StorageError::invalid_input(
+            "the schedule port may only ensure tsd.kv for primitive preparation",
+        ));
+    }
+    if collection == "tsd.migrations" && !CRON_MIGRATION_IDS.contains(&id) {
+        return Err(StorageError::invalid_input(
+            "record is outside the schedule migration progress keys",
+        ));
+    }
+    if SHARED_COLLECTIONS.contains(&collection) && !id.starts_with(CRON_RECORD_PREFIX) {
+        return Err(StorageError::invalid_input(
+            "record is outside the schedule owner's keys",
+        ));
+    }
+    Ok(())
+}
+
+fn allowed_set(collection: &str) -> Result<(), StorageError> {
+    allowed(collection)?;
+    if SHARED_COLLECTIONS.contains(&collection) || collection == "tsd.kv" {
+        return Err(StorageError::invalid_input(
+            "set operations are outside the schedule port for shared collections",
+        ));
+    }
+    Ok(())
+}
+
 fn field<T: serde::de::DeserializeOwned>(request: &Value, name: &str) -> Result<T, StorageError> {
     serde_json::from_value(request.get(name).cloned().unwrap_or(Value::Null))
         .map_err(|error| StorageError::invalid_input(format!("bad `{name}`: {error}")))
@@ -179,9 +218,13 @@ impl DocumentsPort {
         let op = text(&request, "op")?.to_string();
         tracing::trace!(%op, "[cron:documents] request");
         match op.as_str() {
-            "capabilities" => Ok(
-                json!({"transactions": documents.capabilities().contains(Capability::Transactions)}),
-            ),
+            "capabilities" => {
+                let capabilities = documents.capabilities();
+                Ok(json!({
+                    "transactions": capabilities.contains(Capability::Transactions),
+                    "record_metadata": capabilities.contains(Capability::RecordMetadata),
+                }))
+            }
             "ensure" => {
                 let spec: CollectionSpec = field(&request, "spec")?;
                 allowed(&spec.name)?;
@@ -190,45 +233,50 @@ impl DocumentsPort {
             }
             "get" => {
                 let collection = text(&request, "collection")?;
-                allowed(collection)?;
-                encode(documents.get(collection, text(&request, "id")?).await?)
+                let id = text(&request, "id")?;
+                allowed_record(collection, id)?;
+                encode(documents.get(collection, id).await?)
             }
             "put" => {
                 let collection = text(&request, "collection")?;
-                allowed(collection)?;
+                let id = text(&request, "id")?;
+                allowed_record(collection, id)?;
                 let precondition: Precondition = field(&request, "precondition")?;
                 let doc: Value = field(&request, "doc")?;
+                let options: tinystoragedrivers::WriteOptions =
+                    serde_json::from_value(request.clone()).map_err(|error| {
+                        StorageError::invalid_input(format!("bad write options: {error}"))
+                    })?;
                 encode(
                     documents
-                        .put(collection, text(&request, "id")?, doc, precondition)
+                        .put_with(collection, id, doc, precondition, options)
                         .await?,
                 )
             }
             "delete" => {
                 let collection = text(&request, "collection")?;
-                allowed(collection)?;
+                let id = text(&request, "id")?;
+                allowed_record(collection, id)?;
                 let precondition: Precondition = field(&request, "precondition")?;
                 encode(
-                    documents
-                        .delete(collection, text(&request, "id")?, precondition)
-                        .await?,
+                    documents.delete(collection, id, precondition).await?,
                 )
             }
             "query" => {
                 let collection = text(&request, "collection")?;
-                allowed(collection)?;
+                allowed_set(collection)?;
                 let query: Query = field(&request, "query")?;
                 encode(documents.query(collection, &query).await?)
             }
             "count" => {
                 let collection = text(&request, "collection")?;
-                allowed(collection)?;
+                allowed_set(collection)?;
                 let filter: Filter = field(&request, "filter")?;
                 encode(documents.count(collection, &filter).await?)
             }
             "delete_where" => {
                 let collection = text(&request, "collection")?;
-                allowed(collection)?;
+                allowed_set(collection)?;
                 let filter: Filter = field(&request, "filter")?;
                 encode(documents.delete_where(collection, &filter).await?)
             }
@@ -236,8 +284,9 @@ impl DocumentsPort {
                 let ops: Vec<WriteOp> = field(&request, "ops")?;
                 for operation in &ops {
                     match operation {
-                        WriteOp::Put { collection, .. } | WriteOp::Delete { collection, .. } => {
-                            allowed(collection)?;
+                        WriteOp::Put { collection, id, .. }
+                        | WriteOp::Delete { collection, id, .. } => {
+                            allowed_record(collection, id)?;
                         }
                     }
                 }

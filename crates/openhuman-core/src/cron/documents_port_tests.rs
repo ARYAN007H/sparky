@@ -46,12 +46,12 @@ async fn the_port_serves_the_contracts_document_interface_and_reports_capabiliti
 #[tokio::test]
 async fn schedule_store_migration_moves_legacy_jobs_runs_and_counter_before_reads() {
     use tinyflows_bus::schedule::{
-        members, StoreBackend, StoreConfig, StoreOperation, StoreRequest,
+        StoreOperation,
     };
     use tinystoragedrivers::Precondition;
 
     let config = Config::default();
-    let (_port, callback, backend) = port_with_backend().await;
+    let (_port, _callback, backend) = port_with_backend().await;
     let scoped = backend.for_scope(&Scope::local()).unwrap();
     let docs = scoped.documents();
     for collection in ["cron_jobs", "cron_runs", "cron_counters"] {
@@ -109,63 +109,30 @@ async fn schedule_store_migration_moves_legacy_jobs_runs_and_counter_before_read
     .await
     .unwrap();
 
-    let storage = StoreConfig {
-        backend: StoreBackend::Documents {
-            callback: callback.clone(),
-        },
-        max_run_history: config.cron.max_run_history,
-        max_tasks: config.scheduler.max_tasks,
-    };
-    let request = StoreRequest {
-        storage: storage.clone(),
-        operation: serde_json::to_value(StoreOperation::Migrate).unwrap(),
-    };
-    let migrated: Value = match module::proxy(&config)
-        .await
-        .unwrap()
-        .call(members::SCHEDULE_STORE, (request,))
-        .await
-    {
-        Ok(value) => value,
-        Err(error) => panic!("module-owned schedule migration should run: {error}"),
-    };
-    assert!(migrated.get("report").is_some(), "{migrated}");
-    assert_eq!(migrated["counter_imported"], true, "{migrated}");
-
-    let list_request = StoreRequest {
-        storage: storage.clone(),
-        operation: serde_json::to_value(StoreOperation::List).unwrap(),
-    };
-    let listed: Value = module::proxy(&config)
-        .await
-        .unwrap()
-        .call(members::SCHEDULE_STORE, (list_request,))
-        .await
-        .unwrap();
-    let listed: Vec<tinyflows_bus::schedule::types::CronJob> =
-        serde_json::from_value(listed).unwrap();
+    let scope = DocScope::on_backend(&config, Arc::clone(&backend), Scope::local());
+    let listed: Vec<tinyflows_bus::schedule::types::CronJob> = crate::cron::client::store_in(
+        &config,
+        &scope,
+        StoreOperation::List,
+    )
+    .await
+    .expect("the first store read migrates the legacy schedule schema");
     assert_eq!(listed.len(), 1);
     assert_eq!(listed[0].id, "legacy-job");
     assert_eq!(listed[0].schedule, tinyflows_bus::schedule::types::Schedule::Every {
         every_ms: 3_600_000
     });
 
-    let runs_request = StoreRequest {
-        storage,
-        operation: serde_json::to_value(StoreOperation::ListRuns {
+    let runs: Vec<tinyflows_bus::schedule::types::CronRun> = crate::cron::client::store_in(
+        &config,
+        &scope,
+        StoreOperation::ListRuns {
             job_id: "legacy-job".into(),
             limit: 10,
-        })
-        .unwrap(),
-    };
-    let runs: Value = module::proxy(&config)
-        .await
-        .unwrap()
-        .call(members::SCHEDULE_STORE, (runs_request,))
-        .await
-        .unwrap();
-    let runs: Vec<tinyflows_bus::schedule::types::CronRun> =
-        serde_json::from_value(runs).unwrap();
+        },
+    )
+    .await
+    .expect("the migrated run remains readable through the module store");
     assert_eq!(runs.len(), 1);
     assert_eq!(runs[0].output.as_deref(), Some("legacy output"));
 
