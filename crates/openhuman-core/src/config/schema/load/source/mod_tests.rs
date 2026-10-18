@@ -327,6 +327,8 @@ async fn stale_document_config_snapshot_returns_conflict_instead_of_overwriting(
     first.default_model = Some("first".into());
     stale.output_language = Some("fr".into());
     first.save().await.unwrap();
+    first.default_temperature = 0.25;
+    first.save().await.unwrap();
 
     let error = stale.save().await.unwrap_err();
     let storage_error = error
@@ -342,6 +344,7 @@ async fn stale_document_config_snapshot_returns_conflict_instead_of_overwriting(
         .await
         .unwrap();
     assert_eq!(loaded.default_model.as_deref(), Some("first"));
+    assert_eq!(loaded.default_temperature, 0.25);
     assert_ne!(loaded.output_language.as_deref(), Some("fr"));
 }
 
