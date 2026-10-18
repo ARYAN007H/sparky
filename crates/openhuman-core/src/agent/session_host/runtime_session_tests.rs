@@ -5,6 +5,10 @@ use std::sync::Arc;
 use tinyagents_runtime::ToolSnapshot;
 use tinytools::ToolSpec;
 
+#[cfg(feature = "flows")]
+#[path = "runtime_session_flow_prompt_tests.rs"]
+mod flow_prompt_tests;
+
 #[tokio::test]
 async fn committed_progress_uses_each_turns_receipt_sender() {
     use crate::agent::progress::AgentProgress;

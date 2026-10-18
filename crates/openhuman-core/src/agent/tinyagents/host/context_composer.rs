@@ -228,6 +228,7 @@ impl ContextComposer for OpenHumanContextComposer {
             personality_roster: Vec::new(),
             agents_md_global: agents_md.global,
             agents_md_local: agents_md.local,
+            flow_archetype_text: None,
         };
 
         self.builder.build(&ctx).map_err(|e| {

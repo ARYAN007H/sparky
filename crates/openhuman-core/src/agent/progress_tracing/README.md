@@ -57,10 +57,11 @@ Tests live in this directory as `*_tests.rs` files, e.g.
   `spans_from_observations` over the run journal, then calls
   `export_run_trace_from_journal` (journal available) or `export_run_trace`.
 
-[`flows/tinyflows/langfuse_export.rs`](../../flows/tinyflows/langfuse_export.rs) is the separate flow-run exporter. It
-builds the graph trace with `tinyagents_graph::GraphLangfuseExporter` and sends
-it to the same OTLP proxy route as Langfuse v4 spans
-(`build_otlp_requests`), so no trace goes to the legacy batch path.
+[`flow_export.rs`](./flow_export.rs) owns the graph trace exporter and sends it
+through the same authenticated OTLP JSON transport as agent spans. The legacy
+flow-run adapter in [`flows/ops/execution.rs`](../../flows/ops/execution.rs)
+reads the TinyFlows observation journal, converts it to `GraphObservation`, and
+calls that exporter.
 
 ## Related docs
 

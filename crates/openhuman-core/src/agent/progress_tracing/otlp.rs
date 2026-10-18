@@ -13,6 +13,56 @@ use crate::config::Config;
 use crate::security::credentials::jwt::bearer_authorization_value;
 use crate::security::credentials::session_support::direct_backend_credential;
 
+/// Pushes already-rendered OTLP/HTTP JSON requests through the authenticated
+/// backend client used by agent and graph exports.
+pub(super) async fn push_otlp_json_requests(
+    url: &str,
+    token: &str,
+    requests: &[Value],
+) -> Result<(), String> {
+    let transport = crate::backend::resolve_backend_transport()
+        .map_err(|err| format!("Langfuse OTLP push has no backend transport: {err}"))?;
+    let client = transport.http_client(crate::backend::TransportProfile::Api);
+    push_otlp_json_requests_via(&client, url, token, requests).await
+}
+
+pub(super) async fn push_otlp_json_requests_via(
+    client: &reqwest::Client,
+    url: &str,
+    token: &str,
+    requests: &[Value],
+) -> Result<(), String> {
+    for payload in requests {
+        let response = client
+            .post(url)
+            .header(
+                reqwest::header::AUTHORIZATION,
+                bearer_authorization_value(token),
+            )
+            .timeout(std::time::Duration::from_secs(10))
+            .json(payload)
+            .send()
+            .await
+            .map_err(|err| format!("Langfuse OTLP transport failed: {err}"))?;
+        let status = response.status();
+        if !status.is_success() {
+            return Err(format!("Langfuse OTLP proxy returned {status}"));
+        }
+        let body: Value = response.json().await.unwrap_or(Value::Null);
+        if body["partialSuccess"]["rejectedSpans"]
+            .as_u64()
+            .unwrap_or(0)
+            > 0
+            || body["partialSuccess"]["errorMessage"]
+                .as_str()
+                .is_some_and(|message| !message.is_empty())
+        {
+            return Err("Langfuse OTLP proxy partially rejected spans".to_string());
+        }
+    }
+    Ok(())
+}
+
 pub(super) async fn push_spans(config: &Config, spans: &[TraceSpan]) -> Result<(), String> {
     if spans.is_empty() {
         return Ok(());
@@ -35,40 +85,8 @@ pub(super) async fn push_spans(config: &Config, spans: &[TraceSpan]) -> Result<(
         }
         _ => return Ok(()),
     };
-    // Backend traffic: the transport's client carries the host's attribution
-    // headers (product identity, versions).
-    let client = crate::backend::resolve_backend_transport()
-        .map_err(|err| format!("Langfuse OTLP push has no backend transport: {err}"))?
-        .http_client(crate::backend::TransportProfile::Api);
-    for payload in otlp_requests(spans, environment, &super::export_brand()) {
-        let response = client
-            .post(&url)
-            .header(
-                reqwest::header::AUTHORIZATION,
-                bearer_authorization_value(&token),
-            )
-            .timeout(std::time::Duration::from_secs(10))
-            .json(&payload)
-            .send()
-            .await
-            .map_err(|err| format!("Langfuse OTLP transport failed: {err}"))?;
-        let status = response.status();
-        if !status.is_success() {
-            return Err(format!("Langfuse OTLP proxy returned {status}"));
-        }
-        let body: Value = response.json().await.unwrap_or(Value::Null);
-        if body["partialSuccess"]["rejectedSpans"]
-            .as_u64()
-            .unwrap_or(0)
-            > 0
-            || body["partialSuccess"]["errorMessage"]
-                .as_str()
-                .is_some_and(|message| !message.is_empty())
-        {
-            return Err("Langfuse OTLP proxy partially rejected spans".to_string());
-        }
-    }
-    Ok(())
+    let requests = otlp_requests(spans, environment, &super::export_brand());
+    push_otlp_json_requests(&url, &token, &requests).await
 }
 
 #[cfg(test)]

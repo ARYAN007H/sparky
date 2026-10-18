@@ -76,9 +76,10 @@ security model); this README covers only the host seam.
   steps via `flows::upsert_flow_run_step` and publishes
   `DomainEvent::FlowRunProgress` twice per non-trigger node so the frontend
   can render a run live.
-- [`langfuse_export.rs`](./langfuse_export.rs): after a run settles, exports its durable
-  `GraphObservation` slice as one Langfuse trace via `tinyagents`'
-  `GraphLangfuseExporter`, tagged with the Langfuse Agent Graph view keys.
+- [`../ops/execution.rs`](../ops/execution.rs): after a run settles, reads the
+  durable TinyFlows observation journal, adapts it to the bus-owned graph
+  observation type, and calls the generic exporter in
+  [`../../agent/progress_tracing/flow_export.rs`](../../agent/progress_tracing/flow_export.rs).
 
 ## Security model
 
@@ -99,7 +100,7 @@ new origin wrapper.
 
 `crates/openhuman-core/src/flows/ops*.rs` calls `build_capabilities` and
 `open_flow_checkpointer` to run or resume a flow, and
-`langfuse_export::export_flow_run_trace` once a run settles.
+the flow-run adapter in `ops/execution.rs` once a run settles.
 
 ## Tests
 

@@ -2,7 +2,9 @@
 //!
 //! The authoritative list of built-in agents lives in
 //! [`crate::agent::registry::agents`] — each agent is a subfolder
-//! containing `agent.toml` + `prompt.md`. This module is a thin
+//! containing `agent.toml` and a prompt builder. Most builders embed a
+//! sibling `prompt.md`; the flow builders fetch their archetypes from
+//! TinyFlows Copilot through the module bus. This module is a thin
 //! wrapper that loads that set.
 //!
 //! Custom TOML definitions loaded later by

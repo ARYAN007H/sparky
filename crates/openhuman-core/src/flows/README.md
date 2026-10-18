@@ -191,8 +191,10 @@ above.
 
 ### Authoring and discovery agents
 
-Two built-in sub-agents live under `agents/`, each with an `agent.toml` and a
-`prompt::build`, registered by path from the `BUILTINS` slice in
+Two built-in sub-agents live under `../agent/registry/agents/`, each with an
+`agent.toml` and a synchronous `prompt::build`. Their archetype text is fetched
+from the TinyFlows Copilot bus by async host entrypoints, then supplied to the
+renderer. Both are registered by path from the `BUILTINS` slice in
 [`agent/registry/agents/loader.rs`](../agent/registry/agents/loader.rs):
 
 - `workflow_builder` is the authoring copilot. `flows_build` (in
@@ -265,7 +267,7 @@ Top level:
 | [`builder_host.rs`](./builder_host.rs) | Scope-bound `CopilotHost` callback over TinyBus. The compiled module owns the authoring tools; the callback binds their draft, flow, gate, agent, and suggestion ports to OpenHuman operations for one invocation. |
 | [`crate::integrations::composio::builder_tools`](../integrations/composio/builder_tools/mod.rs) | Composio-backed workflow-builder reads and catalog ranking. The mixed connection picker is composed by the flow host through a provider. |
 | `memory_tools.rs` | `FlowMemoryRecallTool`, `FlowMemoryRememberTool`, and the flow-memory tag helpers. |
-| `agents/` | `workflow_builder/` and `flow_discovery/` built-in agent definitions and prompt builders. |
+| `../agent/registry/agents/` | `workflow_builder/` and `flow_discovery/` built-in definitions and prompt builders. |
 | [`catalogue.rs`](./catalogue.rs) | `flow_entries` lists saved flows as `Workflow` entries with `WorkflowScope::Flow`, so the skill catalogue and `skill_search` show one list. |
 | [`node_contracts.rs`](./node_contracts.rs) | Host overlay on `tinyflows::catalog`'s node-kind contracts (which `tool_call` slugs resolve to Composio or native `oh:` tools, which trigger kinds dispatch here). |
 | `skills/` | Registers the bundled `flow-authoring` skill. |

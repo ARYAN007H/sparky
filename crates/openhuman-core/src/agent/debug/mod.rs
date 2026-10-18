@@ -191,8 +191,22 @@ async fn render_via_session(config: &Config, agent_id: &str) -> Result<DumpedPro
     // Composio toolkits now that we know what's actually authorised.
     agent.refresh_delegation_tools();
 
+    #[cfg(feature = "flows")]
+    let flow_archetype_text = match agent.resolved_definition() {
+        Some(definition) => {
+            crate::agent::prompts::flow_archetype::load_for_definition(
+                Some(config),
+                definition.as_ref(),
+            )
+            .await?
+        }
+        None => None,
+    };
+    #[cfg(not(feature = "flows"))]
+    let flow_archetype_text: Option<String> = None;
+
     let text = agent
-        .build_system_prompt()
+        .build_system_prompt_with_flow_archetype(flow_archetype_text.as_deref())
         .with_context(|| format!("rendering system prompt for `{agent_id}`"))?;
 
     Ok(session_dump(&agent, agent_id, text))
@@ -228,3 +242,7 @@ fn session_dump(agent: &OpenHumanSessionHost, agent_id: &str, text: String) -> D
         tool_specs,
     }
 }
+
+#[cfg(test)]
+#[path = "mod_tests.rs"]
+mod tests;

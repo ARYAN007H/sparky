@@ -461,9 +461,9 @@ impl OpenHumanAgentRunner {
             .map_err(EngineError::Capability)?
             .ok_or_else(|| {
                 EngineError::Capability(format!(
-                "agent node: unknown agent_ref '{agent_ref}' (neither a harness definition nor \
+                    "agent node: unknown agent_ref '{agent_ref}' (neither a harness definition nor \
                      a custom agent registry entry)"
-            ))
+                ))
             })?;
         if !entry.enabled {
             return Err(EngineError::Capability(format!(

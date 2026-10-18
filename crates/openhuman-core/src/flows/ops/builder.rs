@@ -364,10 +364,10 @@ pub(crate) async fn flows_build_with_extra_hidden_tools(
     // "naturally" (no more tool calls, not capped, no run error) yet still
     // produce neither a proposal nor a real question — the model ran out of
     // steam mid-build and left a status dump ("Done so far: checked
-    // connections…") as its final reply. `prompt.md` tells the model to
-    // always end a building turn in a proposal or a question, but a prompt
-    // rule can be silently ignored; this is the fail-closed backend backstop
-    // that makes it a hard invariant regardless of model behavior — the user
+    // connections…") as its final reply. The TinyFlows Copilot archetype tells
+    // the model to always end a building turn in a proposal or a question, but
+    // a prompt rule can be silently ignored; this is the fail-closed backend
+    // backstop that makes it a hard invariant regardless of model behavior — the user
     // is NEVER left with silence or an unanswerable status note.
     let trail_off = !capped && proposal.is_none() && run_error.is_none();
     let assistant_text = if trail_off && !text_looks_like_question(config, &assistant_text).await? {

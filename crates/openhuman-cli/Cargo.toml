@@ -91,6 +91,13 @@ path = "../../tests/tinysearch_module_e2e.rs"
 required-features = ["modules"]
 
 [[test]]
+# Manually runs the normal host prompt path against a caller-supplied published
+# TinyFlows native module library; see the test's module-level instructions.
+name = "tinyflows_published_prompt_e2e"
+path = "../../tests/tinyflows_published_prompt_e2e.rs"
+required-features = ["flows"]
+
+[[test]]
 # Reproduction of the removed spend cap: needs its own process because the
 # global CostTracker is a `OnceCell`, so a shared `--lib` process makes the
 # spend state order-dependent.
