@@ -52,7 +52,7 @@ async fn flow_prompt_requires_the_scoped_config_and_respects_component_disable()
     let error = load_for_definition(Some(&config), definition)
         .await
         .expect_err("disabled module must fail closed");
-    assert!(error.to_string().contains("COMPONENT_DISABLED:tinyflows"));
+    assert!(format!("{error:#}").contains("COMPONENT_DISABLED:tinyflows"));
 }
 
 #[tokio::test]
