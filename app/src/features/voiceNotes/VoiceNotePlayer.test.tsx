@@ -1,0 +1,111 @@
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+const api = vi.hoisted(() => ({ readVoiceNote: vi.fn() }));
+const analytics = vi.hoisted(() => ({ trackAnalyticsEvent: vi.fn() }));
+vi.mock('./voiceNoteApi', async importOriginal => ({
+  ...(await importOriginal<typeof import('./voiceNoteApi')>()),
+  readVoiceNote: api.readVoiceNote,
+}));
+vi.mock('../../components/analytics', () => analytics);
+
+import { VoiceNotePlayer } from './VoiceNotePlayer';
+
+class FakeAudio {
+  static last: FakeAudio | null = null;
+  paused = true;
+  currentTime = 0;
+  duration = 12;
+  listeners = new Map<string, Array<() => void>>();
+  constructor(public src: string) {
+    FakeAudio.last = this;
+  }
+  addEventListener(name: string, cb: () => void) {
+    this.listeners.set(name, [...(this.listeners.get(name) ?? []), cb]);
+  }
+  emit(name: string) {
+    for (const cb of this.listeners.get(name) ?? []) cb();
+  }
+  play() {
+    this.paused = false;
+    this.emit('play');
+    return Promise.resolve();
+  }
+  pause() {
+    this.paused = true;
+    this.emit('pause');
+  }
+}
+
+describe('VoiceNotePlayer', () => {
+  beforeEach(() => {
+    FakeAudio.last = null;
+    api.readVoiceNote.mockReset();
+    analytics.trackAnalyticsEvent.mockReset();
+    vi.stubGlobal('Audio', FakeAudio);
+    URL.createObjectURL = vi.fn(() => 'blob:note');
+    URL.revokeObjectURL = vi.fn();
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('fetches the audio only on first play, then toggles play and pause', async () => {
+    api.readVoiceNote.mockResolvedValue(new Blob([new Uint8Array([1])], { type: 'audio/mpeg' }));
+    render(<VoiceNotePlayer noteId="reply-1" durationMs={12000} />);
+    expect(api.readVoiceNote).not.toHaveBeenCalled();
+    expect(screen.getByTestId('voice-note-time')).toHaveTextContent('0:12');
+
+    fireEvent.click(screen.getByTestId('voice-note-toggle'));
+    await waitFor(() => expect(screen.getByLabelText('Pause voice note')).toBeInTheDocument());
+    expect(api.readVoiceNote).toHaveBeenCalledWith('reply-1');
+    expect(FakeAudio.last?.src).toBe('blob:note');
+    expect(analytics.trackAnalyticsEvent).toHaveBeenCalledWith('voice_note_played', {});
+
+    fireEvent.click(screen.getByTestId('voice-note-toggle'));
+    await waitFor(() => expect(screen.getByLabelText('Play voice note')).toBeInTheDocument());
+    expect(api.readVoiceNote).toHaveBeenCalledTimes(1);
+  });
+
+  it('plays a draft straight from its src without asking the core', async () => {
+    render(<VoiceNotePlayer src="blob:draft" durationMs={3000} />);
+    fireEvent.click(screen.getByTestId('voice-note-toggle'));
+    await waitFor(() => expect(FakeAudio.last?.src).toBe('blob:draft'));
+    expect(api.readVoiceNote).not.toHaveBeenCalled();
+  });
+
+  it('follows playback position and resets when the clip ends', async () => {
+    render(<VoiceNotePlayer src="blob:draft" durationMs={10000} />);
+    fireEvent.click(screen.getByTestId('voice-note-toggle'));
+    await waitFor(() => expect(FakeAudio.last).not.toBeNull());
+    const audio = FakeAudio.last!;
+    audio.currentTime = 4;
+    audio.emit('timeupdate');
+    await waitFor(() => expect(screen.getByTestId('voice-note-time')).toHaveTextContent('0:04'));
+    audio.emit('ended');
+    await waitFor(() => expect(screen.getByTestId('voice-note-time')).toHaveTextContent('0:10'));
+    audio.emit('loadedmetadata');
+    await waitFor(() => expect(screen.getByTestId('voice-note-time')).toHaveTextContent('0:12'));
+  });
+
+  it('shows an error when the core has no audio for the note', async () => {
+    api.readVoiceNote.mockResolvedValue(null);
+    render(<VoiceNotePlayer noteId="missing" />);
+    fireEvent.click(screen.getByTestId('voice-note-toggle'));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not load this voice note.');
+  });
+
+  it('discloses the transcript on request and says so when it is empty', () => {
+    const { rerender } = render(<VoiceNotePlayer src="blob:x" transcript="meet at noon" />);
+    expect(screen.queryByTestId('voice-note-transcript')).toBeNull();
+    fireEvent.click(screen.getByTestId('voice-note-transcript-toggle'));
+    expect(screen.getByTestId('voice-note-transcript')).toHaveTextContent('meet at noon');
+    rerender(<VoiceNotePlayer src="blob:x" transcript="  " />);
+    expect(screen.getByTestId('voice-note-transcript')).toHaveTextContent(
+      'No transcript available'
+    );
+  });
+
+  it('draws one bar per waveform sample', () => {
+    render(<VoiceNotePlayer src="blob:x" waveform={[0.1, 0.5, 1]} />);
+    expect(screen.getByTestId('voice-note-waveform').children).toHaveLength(3);
+  });
+});
