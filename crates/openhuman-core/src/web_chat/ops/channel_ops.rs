@@ -8,6 +8,7 @@ use serde_json::{json, Value};
 use crate::core::runtime::DispatchCtx;
 use crate::core::Outcome;
 use crate::web_chat::WebChannelEvent;
+use crate::web_chat::channel_event::event_context;
 
 use super::super::event_bus::publish_web_channel_event_in;
 use super::super::runner::{runtime, scope_of, CancelNote};
@@ -341,16 +342,13 @@ pub async fn channel_web_queue_remove(
         log::info!("[web-channel] removed queued item thread_id={thread_id} item_id={item_id}");
         publish_web_channel_event_in(
             ctx,
-            WebChannelEvent {
-                event: "queue_item_removed".to_string(),
-                client_id: client_id.to_string(),
-                thread_id: thread_id.to_string(),
+            WebChannelEvent::QueueItemRemoved {
+                context: event_context(client_id, thread_id, ""),
                 queue_item: Some(crate::web_chat::QueueItemPayload {
                     id: item_id.to_string(),
                     lane: None,
                     text_preview: None,
                 }),
-                ..Default::default()
             },
         );
     }
