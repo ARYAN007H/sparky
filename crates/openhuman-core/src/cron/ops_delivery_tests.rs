@@ -572,6 +572,103 @@ async fn manual_owner_reconciles_a_lost_committed_ack_before_releasing_context()
 }
 
 #[tokio::test]
+async fn manual_runs_use_each_invocations_config_and_security_snapshot() {
+    const CHILD: &str = "OPENHUMAN_CRON_MANUAL_CONFIG_CHILD";
+    if std::env::var_os(CHILD).is_none() {
+        let output = std::process::Command::new(std::env::current_exe().unwrap())
+            .args([
+                "--exact",
+                "cron::ops::delivery_tests::manual_runs_use_each_invocations_config_and_security_snapshot",
+                "--nocapture",
+            ])
+            .env(CHILD, "1")
+            .output()
+            .unwrap();
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        assert!(
+            output.status.success(),
+            "isolated config/scope child failed:\n{stdout}\n{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert!(stdout.contains("running 1 test"), "child selected no test: {stdout}");
+        assert!(
+            stdout.contains("test cron::ops::delivery_tests::manual_runs_use_each_invocations_config_and_security_snapshot ... ok"),
+            "the expected child test did not pass: {stdout}"
+        );
+        return;
+    }
+
+    use crate::cron::handlers::{register_kind, JobKindHandler, JobOutcome, JobRunContext};
+    use tinyflows_bus::schedule::types::{JobType, Schedule};
+
+    crate::core::bus::init().await.unwrap();
+    let tmp = TempDir::new().unwrap();
+    let mut first_config = tests::test_config(&tmp);
+    first_config.autonomy.enabled = true;
+    first_config.autonomy.level = crate::security::AutonomyLevel::ReadOnly;
+    let mut second_config = first_config.clone();
+    second_config.autonomy.enabled = false;
+    second_config.action_dir = tmp.path().join("second-action-root");
+
+    struct ConfigSecurityProbe;
+    #[async_trait]
+    impl JobKindHandler for ConfigSecurityProbe {
+        async fn run(&self, cx: &JobRunContext, _job: &CronJob, _run_id: &str) -> JobOutcome {
+            JobOutcome::ok(
+                serde_json::json!({
+                    "can_act": cx.security().can_act(),
+                    "action_dir": cx.config().action_dir,
+                })
+                .to_string(),
+            )
+        }
+    }
+    let _handler = register_kind(JobType::Shell, Arc::new(ConfigSecurityProbe));
+    let job = cron::add_shell_job(
+        &first_config,
+        None,
+        Schedule::Every { every_ms: 3_600_000 },
+        "unused by the test handler",
+    )
+    .unwrap();
+
+    let first = crate::cron::scheduler::run_job_now(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &first_config,
+        job.clone(),
+        format!("first-config-{}", uuid::Uuid::new_v4()),
+        true,
+        tinyflows_bus::schedule::ManualDelivery::NotRequested,
+    )
+    .await
+    .unwrap();
+    let second = crate::cron::scheduler::run_job_now(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &second_config,
+        job,
+        format!("second-config-{}", uuid::Uuid::new_v4()),
+        true,
+        tinyflows_bus::schedule::ManualDelivery::NotRequested,
+    )
+    .await
+    .unwrap();
+    let output = |reply| match reply {
+        tinyflows_bus::schedule::RunJobReply::Completed {
+            success: true,
+            attempt,
+            ..
+        } => serde_json::from_str::<serde_json::Value>(&attempt.output).unwrap(),
+        other => panic!("manual run did not complete successfully: {other:?}"),
+    };
+    let first = output(first);
+    let second = output(second);
+    assert_eq!(first["can_act"], false);
+    assert_eq!(first["action_dir"], first_config.action_dir.display().to_string());
+    assert_eq!(second["can_act"], true);
+    assert_eq!(second["action_dir"], second_config.action_dir.display().to_string());
+}
+
+#[tokio::test]
 async fn cancelled_waiting_caller_keeps_manual_run_callback_served_until_completion() {
     use crate::core::events::DomainEvent;
     use tinybus::EventHandler;
