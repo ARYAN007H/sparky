@@ -159,6 +159,7 @@ pub(crate) async fn load_or_default(
             pref
         }
         Err(error) => {
+            eprintln!("DBGX {error}");
             tracing::warn!(toolkit = %key, %error, "{LOG} pref unavailable, using default");
             UserScopePref::default()
         }
