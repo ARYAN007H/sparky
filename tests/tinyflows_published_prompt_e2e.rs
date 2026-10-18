@@ -60,4 +60,42 @@ async fn published_module_prompts_render_through_the_normal_host_path() {
         );
         assert!(prompt.text.contains("## Workspace"));
     }
+
+    // This is the actual published module path: the host must materialize the
+    // bus-owned skill under its own flow-resource root, then the normal
+    // TinySkills discovery and resource reader must expose that Builtin.
+    let flow_root = workspace
+        .join(".openhuman")
+        .join("builtin-flow-skills")
+        .join("flow-authoring");
+    assert!(
+        flow_root.join("SKILL.md").is_file(),
+        "published Copilot ListResources was not materialized under the flow root"
+    );
+    assert!(
+        !workspace
+            .join(".openhuman")
+            .join("builtin-skills")
+            .join("flow-authoring")
+            .exists(),
+        "dynamic TinyFlows resources must not share the static builtin root"
+    );
+
+    let discovered = openhuman_core::skills::load_workflow_metadata(&workspace);
+    let flow = discovered
+        .iter()
+        .find(|skill| skill.id() == "flow-authoring")
+        .expect("the published module's flow-authoring skill is discoverable");
+    assert_eq!(flow.scope, tinyskills::SkillScope::Builtin);
+    for resource in &flow.resources {
+        let body = openhuman_core::skills::read_workflow_resource(
+            &workspace,
+            "flow-authoring",
+            resource,
+        )
+        .unwrap_or_else(|error| {
+            panic!("reading published flow-authoring resource {resource:?}: {error}")
+        });
+        assert!(!body.is_empty(), "published resource {resource:?} is empty");
+    }
 }

@@ -324,7 +324,8 @@ async fn skills_component_off_yields_no_catalogue_and_skips_bundled_install() {
 #[cfg(feature = "flows")]
 #[tokio::test]
 async fn flow_authoring_is_hidden_when_tinyflows_component_is_disabled() {
-    use crate::core::runtime::{ComponentSet, CoreContext};
+    use crate::core::runtime::{ComponentSet, ContextOverlay, CoreContext, DomainSet};
+    use crate::tools::toolpacks::ToolGroups;
 
     let workspace = tempfile::tempdir().unwrap();
     // Install the compiled bundles as a normal boot would. The pre-fix
@@ -332,17 +333,37 @@ async fn flow_authoring_is_hidden_when_tinyflows_component_is_disabled() {
     // flow-authoring bundle when the module that owns its resources is off.
     crate::skills::bundled::install(workspace.path());
 
-    let mut components = ComponentSet::all();
-    components.tinyflows = false;
-    let ctx = CoreContext::for_test_with_components(components);
-    let skills = CoreContext::scope(ctx, async {
+    let profile = |profile_id: &str, enabled: bool| {
+        let mut components = ComponentSet::all();
+        let mut domains = DomainSet::full();
+        if !enabled {
+            components.flows = false;
+            components.tinyflows = false;
+            domains.flows = false;
+        }
+        let mut config = crate::config::Config::default();
+        config.workspace_dir = workspace.path().to_path_buf();
+        CoreContext::for_test_with_components(components).derive_with(
+            ContextOverlay::new(config, domains, ToolGroups::none()).profile(profile_id),
+        )
+    };
+
+    let visible = CoreContext::scope(profile("enabled", true), async {
+        load_workflow_metadata(workspace.path())
+    })
+    .await;
+    let hidden = CoreContext::scope(profile("disabled", false), async {
         load_workflow_metadata(workspace.path())
     })
     .await;
 
     assert!(
-        !skills.iter().any(|skill| skill.id() == "flow-authoring"),
-        "a disabled TinyFlows component must not expose flow-authoring"
+        visible.iter().any(|skill| skill.id() == "flow-authoring"),
+        "the enabled profile sees its flow-authoring bundle"
+    );
+    assert!(
+        !hidden.iter().any(|skill| skill.id() == "flow-authoring"),
+        "a profile with flows, TinyFlows, and the Flows domain disabled must not inherit the shared flow-authoring bundle"
     );
 }
 
