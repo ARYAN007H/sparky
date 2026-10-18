@@ -2,7 +2,6 @@
 //! and fetch leave the calling thread out.
 
 use super::*;
-use tinymemory_tools::layout::identity::Identity;
 use crate::memory::test_fixtures::{bind_reference, config_in};
 use tinymemory_api::MemoryEngine;
 

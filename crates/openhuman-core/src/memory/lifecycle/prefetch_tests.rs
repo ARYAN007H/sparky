@@ -1,6 +1,5 @@
 use super::*;
 
-use tinymemory_tools::layout::identity::Identity;
 use crate::memory::test_fixtures::config_in;
 
 const MAX_PENDING: usize = 16;

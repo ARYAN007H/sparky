@@ -5,6 +5,7 @@ use crate::core::runtime::DispatchCtx;
 use crate::core::runtime::DomainSet;
 use crate::memory::test_fixtures::{bind_reference, config_in};
 use serde_json::{json, Map, Value};
+use tinymemory_api::MemoryEngine;
 
 /// Every method of the spec's RPC table (`docs/specs/memory-v2.md`), exactly.
 const SPEC_METHODS: [&str; 35] = [

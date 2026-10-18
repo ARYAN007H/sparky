@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use tinymemory_api::conformance::ReferenceEngine;
 use tinymemory_api::{
     Error, LearningKind, MemoryEngine, MemoryMeta, MetaFilter, Namespace, Reach, SourceKind,
     SourceRef, StoreItem,

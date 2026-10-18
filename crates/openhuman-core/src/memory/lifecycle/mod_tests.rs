@@ -1,6 +1,5 @@
 use super::*;
 
-use tinymemory_tools::layout::identity::Identity;
 use crate::memory::test_fixtures::{bind_reference, config_in};
 
 #[test]

@@ -4,7 +4,6 @@ use chrono::Utc;
 use tinymemory_api::{LearningKind, MemoryEngine, MemoryMeta, StoreItem};
 
 use crate::memory::lifecycle::hooks::pre_turn_work;
-use tinymemory_tools::layout::identity::Identity;
 use crate::memory::test_fixtures::{bind_reference, config_in};
 
 #[test]

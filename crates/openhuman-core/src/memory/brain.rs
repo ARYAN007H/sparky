@@ -21,7 +21,6 @@ use crate::config::Config;
 
 use super::engine;
 use super::lifecycle::jobs;
-use tinymemory_tools::layout::identity::Identity;
 use tinymemory_api::{Error, Result};
 
 /// Largest file `memory_brain_ingest` reads, in bytes.

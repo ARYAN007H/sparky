@@ -1,6 +1,5 @@
 use super::*;
 
-use tinymemory_tools::layout::identity::Identity;
 use tinymemory_tools::layout::placement::file_into;
 
 use tinymemory_api::{ItemKind, MemoryMeta, MetaFilter};

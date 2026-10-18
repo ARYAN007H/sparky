@@ -4,7 +4,6 @@ use chrono::Utc;
 use tinyagents_harness::summarization::ConcatSummarizer;
 
 use crate::memory::lifecycle::hooks::{post_turn, pre_turn_work};
-use tinymemory_tools::layout::identity::Identity;
 use crate::memory::test_fixtures::{bind_reference, config_in};
 
 struct Failing;
