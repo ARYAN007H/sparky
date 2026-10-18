@@ -62,6 +62,18 @@ pub(crate) async fn store_in<R: DeserializeOwned>(
     scope: &DocScope,
     operation: StoreOperation,
 ) -> Result<R> {
+    if !matches!(&operation, StoreOperation::Migrate) {
+        let _: Value = store_raw(config, scope, StoreOperation::Migrate).await?;
+    }
+    store_raw(config, scope, operation).await
+}
+
+/// Send one operation without adding another migration request.
+async fn store_raw<R: DeserializeOwned>(
+    config: &Config,
+    scope: &DocScope,
+    operation: StoreOperation,
+) -> Result<R> {
     let request = StoreRequest {
         storage: store_config(config, scope).await?,
         operation: serde_json::to_value(&operation)?,
