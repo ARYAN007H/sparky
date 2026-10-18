@@ -231,7 +231,7 @@ async fn shell_timeout_nudges_once_then_halts_on_second() {
     let slot = std::sync::Arc::new(std::sync::Mutex::new(None));
     let mw = RepeatedToolFailureMiddleware::new(handle.clone(), 3, slot.clone());
     let mut context = ctx();
-    let run = |id: &'static str, command: &'static str| {
+    let mut run = |id: &'static str, command: &'static str| {
         let mw = &mw;
         let context = &mut context;
         async move {
@@ -273,7 +273,7 @@ async fn a_refused_integration_steers_the_model_off_it_instead_of_ending_the_run
     let mw = RepeatedToolFailureMiddleware::new(handle.clone(), 3, slot.clone());
     let refused = "Web search failed: search ExecuteTool failed: ai.tinyhumans.tinybus.Error.Failed: provider request failed: provider returned HTTP 401";
     let mut context = ctx();
-    let run = |id: &'static str, query: &'static str| {
+    let mut run = |id: &'static str, query: &'static str| {
         let mw = &mw;
         let context = &mut context;
         async move {
@@ -668,34 +668,39 @@ async fn a_success_clears_the_invalid_arguments_count_and_a_rejection_is_nudged(
     let handle = SteeringHandle::allow_all();
     let slot = std::sync::Arc::new(std::sync::Mutex::new(None));
     let mw = RepeatedToolFailureMiddleware::new(handle.clone(), 8, slot.clone());
-    async fn reject(mw: &RepeatedToolFailureMiddleware, id: &str) {
+    let mut context = ctx();
+    async fn reject(
+        mw: &RepeatedToolFailureMiddleware,
+        context: &mut RunContext<crate::agent::tinyagents::host::OpenHumanRunContext>,
+        id: &str,
+    ) {
         let mut call = TaToolCall::new(id, "search", serde_json::json!({"query": 1}));
-        mw.before_tool(&mut ctx(), &(), &mut call).await.unwrap();
+        mw.before_tool(context, &(), &mut call).await.unwrap();
         let mut result =
             failing_result("search", "schema validation failed: query must be a string");
-        mw.after_tool(&mut ctx(), &(), &invocation(id, "search"), &mut result)
+        mw.after_tool(context, &(), &invocation(id, "search"), &mut result)
             .await
             .unwrap();
     }
-    reject(&mw, "r-1").await;
-    let nudges = mw.take_pending_nudges();
+    reject(&mw, &mut context, "r-1").await;
+    let nudges = drain_nudge_messages(&mw, &mut context).await;
     assert!(
         nudges
             .iter()
             .any(|n| n.contains("`search` call was rejected") && n.contains("schema")),
         "a rejection is nudged with the tool's name and the rejection: {nudges:?}"
     );
-    reject(&mw, "r-2").await;
-    reject(&mw, "r-3").await;
+    reject(&mw, &mut context, "r-2").await;
+    reject(&mw, &mut context, "r-3").await;
     let mut ok = TaToolCall::new("ok", "search", serde_json::json!({"query": "fine"}));
-    mw.before_tool(&mut ctx(), &(), &mut ok).await.unwrap();
+    mw.before_tool(&mut context, &(), &mut ok).await.unwrap();
     let mut success = TaToolResult::success("hits");
-    mw.after_tool(&mut ctx(), &(), &invocation("ok", "search"), &mut success)
+    mw.after_tool(&mut context, &(), &invocation("ok", "search"), &mut success)
         .await
         .unwrap();
-    reject(&mw, "r-4").await;
-    reject(&mw, "r-5").await;
-    reject(&mw, "r-6").await;
+    reject(&mw, &mut context, "r-4").await;
+    reject(&mw, &mut context, "r-5").await;
+    reject(&mw, &mut context, "r-6").await;
     assert_eq!(
         drain_pause_count(&handle),
         0,
