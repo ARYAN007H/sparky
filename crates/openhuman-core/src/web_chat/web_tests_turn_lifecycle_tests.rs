@@ -60,13 +60,17 @@ async fn an_interrupting_message_supersedes_the_running_turn() {
     assert_ne!(first, second);
 
     let error = wait_for_event(&mut rx, &first, "chat_error").await;
-    assert!(matches!(error.wire_event(), crate::web_chat::WebChannelEvent::ChatError {
+    assert!(
+        matches!(error.wire_event(), crate::web_chat::WebChannelEvent::ChatError {
         error_type: Some(error_type), message: Some(message), ..
-    } if error_type == "cancelled" && message == "Cancelled by newer request"));
+    } if error_type == "cancelled" && message == "Cancelled by newer request")
+    );
     let cancelled = wait_for_event(&mut rx, &first, "chat_cancelled").await;
-    assert!(matches!(cancelled.wire_event(), crate::web_chat::WebChannelEvent::ChatCancelled {
+    assert!(
+        matches!(cancelled.wire_event(), crate::web_chat::WebChannelEvent::ChatCancelled {
         context, cancel_reason: Some(reason), superseded_by: Some(replacement), ..
-    } if reason == "superseded" && replacement == &second && context.client_id == "second-client"));
+    } if reason == "superseded" && replacement == &second && context.client_id == "second-client")
+    );
 
     cancel_chat_scoped(&DispatchCtx::ambient(), "second-client", thread_id, None)
         .await
@@ -94,13 +98,17 @@ async fn a_stop_is_announced_once_to_the_client_that_pressed_it() {
     assert_eq!(outcome.value["request_id"], request_id);
 
     let error = wait_for_event(&mut rx, &request_id, "chat_error").await;
-    assert!(matches!(error.wire_event(), crate::web_chat::WebChannelEvent::ChatError {
+    assert!(
+        matches!(error.wire_event(), crate::web_chat::WebChannelEvent::ChatError {
         context, message: Some(message), ..
-    } if message == "Cancelled" && context.client_id == "stopper"));
+    } if message == "Cancelled" && context.client_id == "stopper")
+    );
     let cancelled = wait_for_event(&mut rx, &request_id, "chat_cancelled").await;
-    assert!(matches!(cancelled.wire_event(), crate::web_chat::WebChannelEvent::ChatCancelled {
+    assert!(
+        matches!(cancelled.wire_event(), crate::web_chat::WebChannelEvent::ChatCancelled {
         cancel_reason: Some(reason), superseded_by: None, ..
-    } if reason == "user_stop"));
+    } if reason == "user_stop")
+    );
     wait_for_in_flight(|e| !e.iter().any(|(k, _)| k == thread_id)).await;
     set_test_run_chat_task_block(None).await;
 }
@@ -288,7 +296,8 @@ async fn a_turn_with_an_unavailable_local_provider_ends_in_one_classified_chat_e
         }),
         "all inference retries must target the configured model: {inference_requests:?}"
     );
-    assert!(matches!(error.wire_event(), crate::web_chat::WebChannelEvent::ChatError {
+    assert!(
+        matches!(error.wire_event(), crate::web_chat::WebChannelEvent::ChatError {
         context,
         error_type: Some(error_type),
         copy_key: Some(copy_key),
@@ -298,7 +307,9 @@ async fn a_turn_with_an_unavailable_local_provider_ends_in_one_classified_chat_e
     } if error_type == "provider_unavailable"
         && context.client_id == "real-client"
         && copy_key == "chat_error.provider_unavailable"
-        && source == "provider_error"), "{error:?}");
+        && source == "provider_error"),
+        "{error:?}"
+    );
 
     let runtime = crate::web_chat::runner::runtime(&ctx);
     assert!(

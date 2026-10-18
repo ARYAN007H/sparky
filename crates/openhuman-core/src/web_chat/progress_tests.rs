@@ -577,7 +577,11 @@ mod subagent_tests {
 
         let completed = recv_for_thread(&mut events, thread_id).await;
         assert_eq!(completed.event_name(), "subagent_completed");
-        let WebChannelEvent::SubagentCompleted { subagent: Some(subagent), .. } = completed.wire_event() else {
+        let WebChannelEvent::SubagentCompleted {
+            subagent: Some(subagent),
+            ..
+        } = completed.wire_event()
+        else {
             panic!("subagent detail present")
         };
         assert_eq!(subagent.parent_call_id.as_deref(), Some("call-parent-2"));
@@ -616,7 +620,11 @@ mod subagent_tests {
 
         let failed = recv_for_thread(&mut events, thread_id).await;
         assert_eq!(failed.event_name(), "subagent_failed");
-        let WebChannelEvent::SubagentFailed { subagent: Some(subagent), .. } = failed.wire_event() else {
+        let WebChannelEvent::SubagentFailed {
+            subagent: Some(subagent),
+            ..
+        } = failed.wire_event()
+        else {
             panic!("subagent detail present")
         };
         assert_eq!(subagent.parent_call_id.as_deref(), Some("call-parent-3"));

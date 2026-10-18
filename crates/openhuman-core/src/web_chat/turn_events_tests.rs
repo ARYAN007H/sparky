@@ -161,9 +161,11 @@ async fn a_stopped_turn_announces_cancelled_to_the_client_that_stopped_it() {
     assert!(matches!(seen[0].wire_event(), WebChannelEvent::ChatError {
         error_type: Some(error_type), message: Some(message), ..
     } if error_type == "cancelled" && message == "Cancelled"));
-    assert!(matches!(seen[1].wire_event(), WebChannelEvent::ChatCancelled {
+    assert!(
+        matches!(seen[1].wire_event(), WebChannelEvent::ChatCancelled {
         cancel_reason: Some(reason), ..
-    } if reason == "user_stop"));
+    } if reason == "user_stop")
+    );
     assert!(
         seen.iter()
             .all(|event| event.context().client_id == "stopper")
@@ -194,9 +196,11 @@ async fn a_superseded_turn_names_its_replacement() {
     assert!(matches!(seen[0].wire_event(), WebChannelEvent::ChatError {
         message: Some(message), ..
     } if message == "Cancelled by newer request"));
-    assert!(matches!(seen[1].wire_event(), WebChannelEvent::ChatCancelled {
+    assert!(
+        matches!(seen[1].wire_event(), WebChannelEvent::ChatCancelled {
         context, cancel_reason: Some(reason), superseded_by: Some(replacement), ..
-    } if reason == "superseded" && replacement == "events-new" && context.client_id == "interrupter"));
+    } if reason == "superseded" && replacement == "events-new" && context.client_id == "interrupter")
+    );
 }
 
 #[tokio::test]

@@ -242,9 +242,13 @@ async fn start_chat_chat_error_event_serializes_structured_fields_to_json_wire()
 
     // Pin the additive contract: serializing a default (no error)
     // event must NOT introduce any of the new keys.
-    let empty = crate::web_chat::WebChannelEvent {
-        event: "chat_done".to_string(),
-        ..Default::default()
+    let empty = crate::web_chat::WebChannelEvent::ChatDone {
+        context: Default::default(),
+        full_response: None,
+        citations: None,
+        usage: None,
+        timing: None,
+        parts: None,
     };
     let empty_json = serde_json::to_value(&empty).expect("Default WebChannelEvent serializes");
     for key in [
@@ -308,11 +312,13 @@ async fn start_chat_emits_structured_rate_limit_metadata_on_chat_error_event() {
     .await
     .expect("expected chat_error event for started chat request");
 
-    assert!(matches!(recv.wire_event(), crate::web_chat::WebChannelEvent::ChatError {
+    assert!(
+        matches!(recv.wire_event(), crate::web_chat::WebChannelEvent::ChatError {
         error_type: Some(error_type), error_source: Some(source),
         error_retryable: Some(true), error_retry_after_ms: Some(30_000), ..
     } if error_type == "rate_limited" && source == "provider"),
-    "upstream 429 wire classification and countdown changed: {recv:?}");
+        "upstream 429 wire classification and countdown changed: {recv:?}"
+    );
     assert_eq!(
         recv.error_provider.as_deref(),
         Some("openrouter"),
