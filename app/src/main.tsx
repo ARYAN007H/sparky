@@ -10,7 +10,6 @@ import { installAutoHideScrollbars } from './lib/autoHideScrollbars';
 import { getCoreStateSnapshot } from './lib/coreState/store';
 import MascotWindowApp from './mascot/MascotWindowApp';
 import NotchApp from './notch/NotchApp';
-import OverlayApp from './overlay/OverlayApp';
 import './polyfills';
 import { initGA, initSentry, startUiInteractionTracking, trackEvent } from './services/analytics';
 import { setStoreForApiClient } from './services/apiClient';
@@ -50,8 +49,7 @@ const currentWindowLabel = isMascotWindow
     : tauriRuntimeAvailable()
       ? getCurrentWindow().label
       : 'main';
-const isOverlayWindow = currentWindowLabel === 'overlay';
-const isStandaloneWindow = isOverlayWindow || isMascotWindow || isNotchWindow;
+const isStandaloneWindow = isMascotWindow || isNotchWindow;
 
 const ensureDefaultHashRoute = () => {
   const hash = window.location.hash;
@@ -103,8 +101,6 @@ function bootRender() {
     <MascotWindowApp />
   ) : isNotchWindow ? (
     <NotchApp />
-  ) : isOverlayWindow ? (
-    <OverlayApp />
   ) : (
     <App />
   );
