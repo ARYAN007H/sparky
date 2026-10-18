@@ -73,6 +73,12 @@ export const ALLOW = new Map(
       "test-only fixture (compiled under cfg(test)) that writes a retired-layout `session_raw/*.jsonl` file for the importer and rewrite tests; no store reads it back",
     ],
     [
+      "web_chat/voice_notes.rs",
+      "json-write",
+      'std::fs::write(root.join(format!("{id}.{ext}")), bytes)',
+      "stores a recorded or synthesized voice-note audio blob as a file; the thread row (a record, in the document store) only references it by id, and the storage port has no blob store",
+    ],
+    [
       "security/approval/store_import.rs",
       "sqlite-open",
       "let conn = Connection::open(&db_path).with_context(|| {",

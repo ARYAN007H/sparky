@@ -225,3 +225,16 @@ pub(super) struct WebCancelParams {
     #[serde(default)]
     pub(super) request_id: Option<String>,
 }
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct VoiceNoteStoreParams {
+    pub(super) note_id: String,
+    pub(super) audio_base64: String,
+    #[serde(default)]
+    pub(super) mime: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct VoiceNoteReadParams {
+    pub(super) note_id: String,
+}

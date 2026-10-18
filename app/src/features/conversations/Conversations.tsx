@@ -34,6 +34,14 @@ import {
   useChatMascotSendBinding,
 } from '../../features/human/chatMascot';
 import MicComposer from '../../features/human/MicComposer';
+import type { VoiceNoteDraft } from '../../features/voiceNotes/useVoiceNoteRecorder';
+import {
+  storeVoiceNote,
+  transcribeVoiceNote,
+  VOICE_NOTE_SOURCE,
+  type VoiceNoteMeta,
+} from '../../features/voiceNotes/voiceNoteApi';
+import { VoiceNoteComposer } from '../../features/voiceNotes/VoiceNoteComposer';
 import { useFlowApprovalRequests } from '../../hooks/useFlowApprovalRequests';
 import { useUnroutedApprovals } from '../../hooks/useUnroutedApprovals';
 import { useUsageState } from '../../hooks/useUsageState';
@@ -1245,7 +1253,7 @@ const Conversations = ({
     return run;
   };
 
-  const handleSendMessage = async (text?: string) => {
+  const handleSendMessage = async (text?: string, opts?: { voiceNote?: VoiceNoteMeta }) => {
     // Guard double-submit to the SAME thread only; a send to another thread
     // may proceed concurrently.
     if (selectedThreadId && pendingSendsRef.current.has(selectedThreadId)) return;
@@ -1306,7 +1314,10 @@ const Conversations = ({
       id: `msg_${globalThis.crypto.randomUUID()}`,
       content: messageText,
       type: 'text',
-      extraMetadata: attachmentMetadata(pendingAttachments),
+      extraMetadata: {
+        ...attachmentMetadata(pendingAttachments),
+        ...(opts?.voiceNote ? { voiceNote: opts.voiceNote } : {}),
+      },
       sender: 'user',
       createdAt: new Date().toISOString(),
     };
@@ -1416,9 +1427,10 @@ const Conversations = ({
         ...(modelOverride !== undefined ? { model: modelOverride } : {}),
         locale: uiLocale,
         reasoningEffort: composerReasoningEffort,
+        ...(opts?.voiceNote ? { source: VOICE_NOTE_SOURCE } : {}),
       });
       trackAnalyticsEvent('chat_message_sent', {
-        send_mode: 'standard',
+        send_mode: opts?.voiceNote ? 'voice_note' : 'standard',
         has_attachments: pendingAttachments.length > 0,
       });
       // Backend accepted the send; lifecycle ('started' → 'streaming') now
@@ -1474,6 +1486,19 @@ const Conversations = ({
   };
 
   handleSendMessageRef.current = handleSendMessage;
+
+  // Voice note: transcribe (the text the agent reads), keep the audio in the
+  // core, then send the transcript as a normal turn whose row points at the
+  // audio. A failure throws so the composer keeps the draft for another try.
+  const handleSendVoiceNote = async (draft: VoiceNoteDraft) => {
+    const transcript = await transcribeVoiceNote(draft.blob);
+    if (!transcript) throw new Error(t('voiceNote.transcribeFailed'));
+    const noteId = `vn_${globalThis.crypto.randomUUID().replace(/-/g, '')}`;
+    const { mime } = await storeVoiceNote(noteId, draft.blob);
+    await handleSendMessage(transcript, {
+      voiceNote: { noteId, mime, durationMs: draft.durationMs, waveform: draft.waveform },
+    });
+  };
 
   // Queue a FOLLOW-UP on the selected thread while a turn is streaming
   // (queue_mode 'followup'): the backend sends it as a fresh turn once the
@@ -2249,6 +2274,11 @@ const Conversations = ({
         value={composerReasoningEffort}
         onChange={applyComposerReasoningEffort}
         modelLabel={reasoningModel}
+      />
+      <VoiceNoteComposer
+        disabled={composerInteractionBlocked || isSending || !selectedThreadId}
+        onSend={handleSendVoiceNote}
+        onError={message => setSendError(chatSendError('voice_transcription', message))}
       />
     </>
   );

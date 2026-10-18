@@ -289,10 +289,21 @@ pub(crate) async fn run_chat_task(
     let turn_elapsed = turn_started.elapsed();
 
     if let Ok(ref task_result) = result {
-        let speak_reply = matches!(metadata.speak_reply, Some(true));
+        let speak_reply = super::voice_notes::should_speak_reply(
+            &config,
+            thread_id,
+            metadata.speak_reply,
+            metadata.source.as_deref(),
+        );
         let trimmed_response = task_result.full_response.trim();
         if speak_reply && !trimmed_response.is_empty() {
-            let opts = crate::voice::reply_speech::ReplySpeechOptions::default();
+            let opts = crate::voice::reply_speech::ReplySpeechOptions {
+                voice_id: config
+                    .channel_voice
+                    .resolve_voice("web")
+                    .map(str::to_string),
+                ..Default::default()
+            };
             match crate::voice::reply_speech::synthesize_reply(
                 &config,
                 &task_result.full_response,
@@ -300,13 +311,22 @@ pub(crate) async fn run_chat_task(
             )
             .await
             {
-                Ok(_) => log::debug!(
-                    "[web_channel] reply_speech dispatched chars={} client_id={} thread_id={} request_id={}",
-                    task_result.full_response.len(),
-                    client_id,
-                    thread_id,
-                    request_id,
-                ),
+                Ok(outcome) => {
+                    let stored = super::voice_notes::store_synthesized_reply(
+                        &config.workspace_dir,
+                        request_id,
+                        &outcome.value.audio_base64,
+                        &outcome.value.audio_mime,
+                    );
+                    log::debug!(
+                        "[web_channel] reply_speech dispatched chars={} stored={} client_id={} thread_id={} request_id={}",
+                        task_result.full_response.len(),
+                        stored,
+                        client_id,
+                        thread_id,
+                        request_id,
+                    );
+                }
                 Err(err) => log::warn!(
                     "[web_channel] reply_speech failed: {err} client_id={} thread_id={} request_id={}",
                     client_id,

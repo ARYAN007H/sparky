@@ -34,6 +34,7 @@ import {
 import { onComposerPrefill } from '@/features/conversations/tools/mcpUi/composerPrefill';
 import { McpWidgetStrip } from '@/features/conversations/tools/mcpUi/McpWidgetStrip';
 import { collectMessageWidgets } from '@/features/conversations/tools/mcpUi/messageWidgets';
+import { MessageVoiceNote, useMessageVoiceNote } from '@/features/voiceNotes/MessageVoiceNote';
 import { useT } from '@/lib/i18n/I18nContext';
 import { CHAT_ERROR_METADATA_KEY } from '@/store/threadSlice';
 import { fullTimestamp, relativeTime } from '@/utils/relativeTime';
@@ -1170,6 +1171,7 @@ const StoppedRunSlot: FC = () => {
 };
 
 const AssistantMessage: FC = () => {
+  const voiceNote = useMessageVoiceNote();
   const {
     ToolFallback: ToolFallbackComponent = ToolFallback,
     ActivityGroup = DefaultActivityGroup,
@@ -1298,6 +1300,11 @@ const AssistantMessage: FC = () => {
             <MessageArtifacts />
           </div>
         )}
+        {voiceNote ? (
+          <div data-slot="aui_assistant-message-voice-note" className="mt-2">
+            <MessageVoiceNote note={voiceNote} withTranscript={false} />
+          </div>
+        ) : null}
       </div>
 
       <div
@@ -1485,6 +1492,7 @@ const UserImagePart: ImageMessagePartComponent = part => (
 );
 
 const UserMessage: FC = () => {
+  const voiceNote = useMessageVoiceNote();
   return (
     <MessagePrimitive.Root
       data-slot="aui_user-message-root"
@@ -1504,9 +1512,13 @@ const UserMessage: FC = () => {
               `Text` component here that renders as raw syntax and is sent to the
               model verbatim. Assistant text is unaffected: it renders through
               `MarkdownText` on the part switch below, a different slot. */}
-          <MessagePrimitive.Parts
-            components={{ Text: DirectiveText, File: UserFilePart, Image: UserImagePart }}
-          />
+          {voiceNote ? (
+            <MessageVoiceNote note={voiceNote} withTranscript />
+          ) : (
+            <MessagePrimitive.Parts
+              components={{ Text: DirectiveText, File: UserFilePart, Image: UserImagePart }}
+            />
+          )}
         </div>
         <div className="aui-user-action-bar-wrapper absolute start-0 top-1/2 -translate-x-full -translate-y-1/2 pe-2 peer-empty:hidden rtl:translate-x-full">
           <UserActionBar />
