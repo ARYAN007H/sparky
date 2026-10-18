@@ -145,7 +145,7 @@ impl<'a> Channels<'a> {
             context,
             async move {
                 if let Err(error) = openhuman_core::channels::start_channels(config).await {
-                    log::error!("[embed][channels] telegram listener ended: {error:#}");
+                    log::error!("[embed][channels] telegram listener ended: {error:#}"); eprintln!("DBG ended: {error:#}");
                 }
             },
         ));
