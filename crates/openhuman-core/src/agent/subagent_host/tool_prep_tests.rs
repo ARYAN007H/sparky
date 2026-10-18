@@ -56,9 +56,10 @@ fn child_keeps_the_parents_protocol() {
     }
 }
 
-fn dynamic_subagent_prompt(ctx: &crate::agent::prompts::PromptContext<'_>) -> anyhow::Result<String> {
-    crate::prompts::SystemPromptBuilder::for_subagent("child prompt".into(), true, true)
-        .build(ctx)
+fn dynamic_subagent_prompt(
+    ctx: &crate::agent::prompts::PromptContext<'_>,
+) -> anyhow::Result<String> {
+    crate::prompts::SystemPromptBuilder::for_subagent("child prompt".into(), true, true).build(ctx)
 }
 
 #[test]
@@ -113,9 +114,17 @@ fn dynamic_child_prompt_lists_text_dialect_catalogue_once() {
         definition.extensions.prompt_builder = Some(dynamic_subagent_prompt);
 
         let prompt = load_prompt_source(&definition, &context).unwrap();
-        catalogue_counts.push(prompt.matches("catalogue sentinel for one visible probe").count());
+        catalogue_counts.push(
+            prompt
+                .matches("catalogue sentinel for one visible probe")
+                .count(),
+        );
     }
-    assert_eq!(catalogue_counts, [1, 1, 1], "dynamic PFormat/Python/TypeScript prompts should each list the tool catalogue once");
+    assert_eq!(
+        catalogue_counts,
+        [1, 1, 1],
+        "dynamic PFormat/Python/TypeScript prompts should each list the tool catalogue once"
+    );
 }
 
 struct NamedTool(&'static str);
