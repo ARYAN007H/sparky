@@ -206,7 +206,7 @@ async fn a_relayed_turn_runs_as_an_external_channel_and_keeps_its_thread() {
 
     let mut outbound = Vec::new();
     while let Ok(event) = events.try_recv() {
-        if event.client_id == "gw-ops-test" {
+        if event.context().client_id == "gw-ops-test" {
             outbound.push(event);
         }
     }

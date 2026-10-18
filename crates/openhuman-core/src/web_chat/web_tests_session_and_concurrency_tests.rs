@@ -670,9 +670,9 @@ async fn unscoped_cancel_stops_the_threads_detached_subagents() {
 
 /// The terminal event (`chat_done` or `chat_error`) for `request_id`.
 async fn terminal_event(
-    rx: &mut tokio::sync::broadcast::Receiver<crate::web_chat::WebChannelEvent>,
+    rx: &mut tokio::sync::broadcast::Receiver<crate::web_chat::ScopedWebEvent>,
     request_id: &str,
-) -> crate::web_chat::WebChannelEvent {
+) -> crate::web_chat::ScopedWebEvent {
     loop {
         let event = rx.recv().await.expect("event stream should stay open");
         if event.context().request_id == request_id
@@ -684,11 +684,20 @@ async fn terminal_event(
 }
 
 /// A graceful, retryable `turn_timeout` whose user copy hides the marker.
-fn assert_turn_timeout(event: &crate::web_chat::WebChannelEvent) {
+fn assert_turn_timeout(event: &crate::web_chat::ScopedWebEvent) {
     assert_eq!(event.event_name(), "chat_error", "{event:?}");
-    assert_eq!(event.error_type.as_deref(), Some("turn_timeout"));
-    assert_eq!(event.error_retryable, Some(true));
-    let message = event.message.clone().unwrap_or_default();
+    let crate::web_chat::WebChannelEvent::ChatError {
+        error_type,
+        error_retryable,
+        message,
+        ..
+    } = event.wire_event()
+    else {
+        panic!("expected chat_error event: {event:?}");
+    };
+    assert_eq!(error_type.as_deref(), Some("turn_timeout"));
+    assert_eq!(*error_retryable, Some(true));
+    let message = message.clone();
     assert!(
         !message.contains("openhuman_turn_wall_clock_timeout"),
         "internal marker must not leak into user copy: {message}"

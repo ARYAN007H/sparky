@@ -617,11 +617,14 @@ mod tool_progress_tests {
         let event = recv_for_thread(&mut events, thread_id).await;
         assert_eq!(event.event_name(), "tool_progress");
         assert_eq!(event.context().request_id, "req-tool-progress");
-        assert_eq!(event.tool_call_id.as_deref(), Some("call-1"));
-        assert_eq!(
-            event.message.as_deref(),
-            Some("running 15s · 2.0 KB output")
-        );
+        assert!(matches!(
+            event.wire_event(),
+            crate::web_chat::WebChannelEvent::ToolProgress {
+                tool_call_id: Some(call_id),
+                message: Some(message),
+                ..
+            } if call_id == "call-1" && message == "running 15s · 2.0 KB output"
+        ));
         drop(tx);
     }
 }
