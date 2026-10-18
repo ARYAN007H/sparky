@@ -343,8 +343,7 @@ fn child_native_failure_survives_parent_acknowledgement_at_same_timestamp() {
         .expect("native child span");
     assert_eq!(child_span.status, SpanStatus::Error);
     assert_eq!(
-        child_span.attributes["error.message"],
-        "Operation failed",
+        child_span.attributes["error.message"], "Operation failed",
         "terminal failures use the content-free native fallback, not raw provider prose"
     );
 }
