@@ -310,7 +310,7 @@ The agent `memory` tool applies the same confinement and overwrites any
 | [`schemas.rs`](./schemas.rs), [`schemas/defs.rs`](./schemas/defs.rs), [`schemas/defs/`](./schemas/defs/) | The `openhuman.memory_*` controller schemas, split by controller group with shared field helpers. |
 | [`schemas/handlers.rs`](./schemas/handlers.rs) | Thin handlers using the shared parse, config-load, operation and result-serialization path. |
 | [`types.rs`](./types.rs) | RPC request and view shapes; contract types are re-exported from `tinymemory_api`. |
-| [`error.rs`](./error.rs) | `MemoryError` and the seven stable error codes. |
+| [`error.rs`](./error.rs) | Maps upstream `tinymemory_api::Error` values to the existing structured RPC envelope. |
 | [`status.rs`](./status.rs) | The memory row of `subsystems.status`. |
 | [`test_fixtures.rs`](./test_fixtures.rs) | Shared in-memory engines for the unit tests. |
 
@@ -356,7 +356,8 @@ The agent `memory` tool applies the same confinement and overwrites any
 - `deletion::forget_thread` (`deletion.rs`): called by `threads` when a
   thread is deleted. `channels::forget_channel` is called by `channels` on
   disconnect.
-- `MemoryError` ([`error.rs`](./error.rs)): every RPC failure carries one of `MEMORY_OFF`,
+- Upstream `tinymemory_api::Error` values map at the RPC boundary ([`error.rs`](./error.rs)):
+  every RPC failure carries one of `MEMORY_OFF`,
   `UNSUPPORTED`, `INVALID_REQUEST`, `UNAUTHORIZED`, `INSUFFICIENT_CREDITS`,
   `UNAVAILABLE` or `ENGINE` in `data.code`. The two account-wide refusals are
   split out so a caller can tell "top up" and "try later" apart from an

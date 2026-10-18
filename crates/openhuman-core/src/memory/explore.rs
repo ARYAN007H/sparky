@@ -75,7 +75,7 @@ pub struct ItemsGetView {
 ///
 /// # Errors
 ///
-/// [`Error::invalid`] for a path that is too long or a step whose
+/// [`Error::InvalidRequest`] for a path that is too long or a step whose
 /// value the facet cannot take (blank, or an unknown kind).
 pub fn narrowed(filter: Option<MetaFilter>, path: &[PathStep]) -> Result<MetaFilter> {
     if path.len() > MAX_PATH_STEPS {

@@ -11,7 +11,7 @@
 //! - [`service`]: running in the background (one run per workspace, gated on
 //!   the import) and mapping the module's errors to [`Error`].
 //!
-//! [`Error`]: crate::memory::error::Error
+//! [`Error`]: tinymemory_api::Error
 
 pub mod app_host;
 pub mod claim;
