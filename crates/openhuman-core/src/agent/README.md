@@ -235,9 +235,9 @@ policy, persisted at `Config.agent_registry` and exposed as the
 display-safe `AgentDefinitionDisplay` for the UI.
 
 `prompts/` holds the bundled identity files (`SOUL.md`, `IDENTITY.md`,
-`ROLE.md`, `STYLE.md`, `USER.md`) and `SystemPromptBuilder`, which renders
-ordered `PromptSection`s into the system prompt, optionally as a
-`TieredPrompt` with cache breakpoints. `context/` keeps per-session
+`ROLE.md`, `STYLE.md`, `USER.md`) and `SystemPromptBuilder`, which selects
+OpenHuman product content and delegates tier assembly to TinyAgents,
+optionally returning a `TieredPrompt` with cache breakpoints. `context/` keeps per-session
 `ContextManager` state and the byte-stable channel prompt builder. `debug/`
 renders the exact prompt a live session would send, by building a real
 session host and calling `build_system_prompt`.
@@ -348,7 +348,7 @@ Persistence, setup and RPC:
 - `run_subagent`, `run_subagent_with_parent`, `SubagentRunOptions`
   ([`subagent_host/lifecycle.rs`](./subagent_host/lifecycle.rs), [`subagent_host/types.rs`](./subagent_host/types.rs)).
 - `run_triage`, `apply_decision`, `TriggerEnvelope` (`triage/`).
-- `SystemPromptBuilder` ([`prompts/builder.rs`](./prompts/builder.rs)).
+- `SystemPromptBuilder` ([`crate::prompts::composition`](../prompts/composition.rs)) is the product adapter over TinyAgents prompt composition.
 - `AgentTurnOrigin` and `with_origin` (`turn_origin.rs`).
 
 ## RPC surface

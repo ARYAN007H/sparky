@@ -46,7 +46,7 @@ impl OpenHumanSessionHost {
             tracing::debug!(
                 "[agents_md] disabled by config; skipping AGENTS.md injection for main agent"
             );
-            crate::agent::prompts::AgentsMdContent::default()
+            tinyagents_harness::context::AgentsMdContent::default()
         };
         let ctx = PromptContext {
             workspace_dir: &self.workspace_dir,

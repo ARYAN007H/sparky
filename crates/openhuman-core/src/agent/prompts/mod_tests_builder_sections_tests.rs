@@ -165,8 +165,6 @@ fn identity_section_creates_missing_workspace_files() {
         include_str!("SOUL.md"),
         "seeded SOUL.md must be the checked-in template verbatim"
     );
-
-    let _ = std::fs::remove_dir_all(workspace);
 }
 
 #[test]

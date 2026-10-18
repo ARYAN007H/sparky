@@ -1,13 +1,6 @@
 [
   {
     "rule": "json-write",
-    "path": "crates/openhuman-core/src/agent/prompts/agents_md.rs",
-    "line": 198,
-    "text": "std::fs::OpenOptions::new()",
-    "occurrence": 1
-  },
-  {
-    "rule": "json-write",
     "path": "crates/openhuman-core/src/attachments/legacy.rs",
     "line": 143,
     "text": "let mut file = tokio::fs::OpenOptions::new()",

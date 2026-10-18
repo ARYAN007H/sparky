@@ -24,26 +24,7 @@ pub(crate) fn subagent_prompt_protocol(
     parent_format: tinytools_agent::dialect::ToolCallFormat,
     tools: &[tinytools::ToolSpec],
 ) -> (tinytools_agent::dialect::ToolCallFormat, String) {
-    use tinytools_agent::dialect::ToolCallFormat;
-    use tinytools_agent::dialect::{
-        CodeDialect, CodeStyle, NativeDialect, PFormatDialect, ToolDialect,
-    };
-    let instructions = match parent_format {
-        ToolCallFormat::PFormat => {
-            let registry = tinytools_agent::build_registry(
-                tools
-                    .iter()
-                    .map(|tool| (tool.name.as_str(), &tool.parameters)),
-            );
-            PFormatDialect::new(registry).prompt_instructions(tools)
-        }
-        // The native request carries its own structured catalogue; retain
-        // only the dialect guidance in the text prompt.
-        ToolCallFormat::Native => NativeDialect.prompt_instructions(&[]),
-        ToolCallFormat::Json => crate::agent::prompts::harness_json_tool_prompt(tools),
-        ToolCallFormat::Python => CodeDialect::instructions(CodeStyle::Python),
-        ToolCallFormat::TypeScript => CodeDialect::instructions(CodeStyle::TypeScript),
-    };
+    let instructions = tinytools_agent::dialect::render_protocol_instructions(parent_format, tools);
     (parent_format, instructions)
 }
 

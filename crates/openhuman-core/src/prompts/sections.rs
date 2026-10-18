@@ -1,6 +1,6 @@
-//! Concrete [`PromptSection`] implementations.
+//! OpenHuman-owned prompt content sections.
 //!
-//! Each unit struct renders one logical block of the system prompt.
+//! Each unit struct renders one logical block of OpenHuman's system prompt.
 //! The rendering logic delegates to the free helpers in
 //! workspace-file helpers re-exported by [`super`] for workspace-file injection and
 //! sub-agent plumbing.
@@ -9,6 +9,10 @@ use crate::agent::prompts::types::*;
 use crate::prompts::{inject_workspace_file, sync_workspace_file};
 use anyhow::Result;
 use std::fmt::Write;
+use tinyagents_harness::prompt::{
+    split_prompt_tiers, PromptTier, TieredPromptPart, PROMPT_TIER_CONTEXT_MARKER,
+    PROMPT_TIER_VOLATILE_MARKER,
+};
 use tinytools::ToolSpec;
 use tinytools_agent::dialect::render_pformat_catalogue;
 use tinytools_agent::dialect::ToolCallFormat;
@@ -30,12 +34,12 @@ impl ArchetypePromptSection {
     }
 }
 
-impl PromptSection for ArchetypePromptSection {
+impl ArchetypePromptSection {
     fn name(&self) -> &str {
         "archetype_prompt"
     }
 
-    fn build(&self, _ctx: &PromptContext<'_>) -> Result<String> {
+    pub(crate) fn build(&self, _ctx: &PromptContext<'_>) -> Result<String> {
         if self.body.trim().is_empty() {
             return Ok(String::new());
         }
@@ -59,23 +63,14 @@ impl DynamicPromptSection {
     }
 }
 
-impl PromptSection for DynamicPromptSection {
+impl tinyagents_harness::prompt::DynamicPromptSection<PromptContext<'_>> for DynamicPromptSection {
     fn name(&self) -> &str {
         "dynamic_prompt"
     }
 
-    fn tier(&self) -> PromptTier {
-        // A builder that declares no tiers is treated as all-volatile, the
-        // conservative reading: nothing stable is placed behind it by mistake.
-        PromptTier::Volatile
-    }
-
-    fn build(&self, ctx: &PromptContext<'_>) -> Result<String> {
-        (self.builder)(ctx)
-    }
-
-    fn build_parts(&self, ctx: &PromptContext<'_>) -> Result<Vec<(PromptTier, String)>> {
-        let body = (self.builder)(ctx)?;
+    fn render(&self, ctx: &PromptContext<'_>) -> tinyagents_harness::Result<Vec<TieredPromptPart>> {
+        let body = (self.builder)(ctx)
+            .map_err(|error| tinyagents_harness::TinyAgentsError::Model(error.to_string()))?;
         let has_marker =
             body.contains(PROMPT_TIER_CONTEXT_MARKER) || body.contains(PROMPT_TIER_VOLATILE_MARKER);
         // A builder that marks its tiers starts in `Stable`; one that does not
@@ -136,20 +131,15 @@ pub struct UserIdentitySection;
 pub struct PersonalityRosterSection;
 
 // ─────────────────────────────────────────────────────────────────────────────
-// PromptSection implementations
+// OpenHuman content renderers adapted to the TinyAgents section contract
 // ─────────────────────────────────────────────────────────────────────────────
 
-impl PromptSection for PersonalityRosterSection {
-    fn tier(&self) -> PromptTier {
-        // Carries each personality's recent context, which the session rewrites.
-        PromptTier::Volatile
-    }
-
+impl PersonalityRosterSection {
     fn name(&self) -> &str {
         "personality_roster"
     }
 
-    fn build(&self, ctx: &PromptContext<'_>) -> Result<String> {
+    pub(crate) fn build(&self, ctx: &PromptContext<'_>) -> Result<String> {
         if ctx.personality_roster.is_empty() {
             return Ok(String::new());
         }
@@ -179,12 +169,12 @@ impl PromptSection for PersonalityRosterSection {
     }
 }
 
-impl PromptSection for IdentitySection {
+impl IdentitySection {
     fn name(&self) -> &str {
         "identity"
     }
 
-    fn build(&self, ctx: &PromptContext<'_>) -> Result<String> {
+    pub(crate) fn build(&self, ctx: &PromptContext<'_>) -> Result<String> {
         let mut prompt = String::new();
         // ROLE.md is the user-facing agent's own role brief (#5701) — the
         // `# Master Agent` / `## Core Responsibilities` preamble that used to
@@ -215,17 +205,12 @@ impl PromptSection for IdentitySection {
     }
 }
 
-impl PromptSection for AgentsInstructionsSection {
-    fn tier(&self) -> PromptTier {
-        // AGENTS.md layers: per project and per install, stable within a session.
-        PromptTier::Context
-    }
-
+impl AgentsInstructionsSection {
     fn name(&self) -> &str {
         "agents_md"
     }
 
-    fn build(&self, ctx: &PromptContext<'_>) -> Result<String> {
+    pub(crate) fn build(&self, ctx: &PromptContext<'_>) -> Result<String> {
         let mut out = String::new();
         crate::prompts::write_agents_md_blocks(
             &mut out,
@@ -236,12 +221,12 @@ impl PromptSection for AgentsInstructionsSection {
     }
 }
 
-impl PromptSection for ToolsSection {
+impl ToolsSection {
     fn name(&self) -> &str {
         "tools"
     }
 
-    fn build(&self, ctx: &PromptContext<'_>) -> Result<String> {
+    pub(crate) fn build(&self, ctx: &PromptContext<'_>) -> Result<String> {
         let browser_deferred = ctx.tools.iter().any(|tool| {
             matches!(tool.name.as_ref(), "browser" | "browser_open")
                 && !ctx.visible_tool_names.contains(tool.name.as_ref())
@@ -314,12 +299,12 @@ impl PromptSection for ToolsSection {
     }
 }
 
-impl PromptSection for SafetySection {
+impl SafetySection {
     fn name(&self) -> &str {
         "safety"
     }
 
-    fn build(&self, _ctx: &PromptContext<'_>) -> Result<String> {
+    pub(crate) fn build(&self, _ctx: &PromptContext<'_>) -> Result<String> {
         Ok("## Safety\n\n- Do not exfiltrate private data.\n- Do not run destructive commands without asking.\n- Do not bypass oversight or approval mechanisms.\n- Prefer `trash` over `rm`.\n- When in doubt, ask before acting externally.".into())
     }
 }
@@ -344,7 +329,7 @@ impl PromptSection for SafetySection {
 /// agent's own `prompt.md`, not here.
 ///
 /// Byte-stable (no time / RNG / host) so it lives in the KV-cache-friendly
-/// prefix. Must contain no em-dashes per [`crate::agent::prompts::builder::GLOBAL_STYLE_SUFFIX`].
+/// prefix. Must contain no em-dashes per [`crate::prompts::GLOBAL_STYLE_SUFFIX`].
 /// Heading the grounding contract renders under, in both the global
 /// [`GROUNDING_BODY`] and any agent prompt that carries its own copy. The
 /// builder matches on this to avoid emitting the contract twice.
@@ -364,27 +349,22 @@ pub const GROUNDING_BODY: &str = "## Grounding and tool use\n\n\
     - Never delete state, data or services the solution needs at runtime, including during cleanup. Before finishing, verify the final state the way a fresh consumer would see it.\n\
     - Skills run only via `run_workflow`, and only the skills listed as installed exist. Do not invent skill ids.";
 
-impl PromptSection for GroundingSection {
+impl GroundingSection {
     fn name(&self) -> &str {
         "grounding"
     }
 
-    fn build(&self, _ctx: &PromptContext<'_>) -> Result<String> {
+    pub(crate) fn build(&self, _ctx: &PromptContext<'_>) -> Result<String> {
         Ok(GROUNDING_BODY.into())
     }
 }
 
-impl PromptSection for WorkspaceSection {
-    fn tier(&self) -> PromptTier {
-        // Names the resolved workspace; per install, not per build.
-        PromptTier::Context
-    }
-
+impl WorkspaceSection {
     fn name(&self) -> &str {
         "workspace"
     }
 
-    fn build(&self, _ctx: &PromptContext<'_>) -> Result<String> {
+    pub(crate) fn build(&self, _ctx: &PromptContext<'_>) -> Result<String> {
         // Intentionally does NOT print a hardcoded path: `shell` and the file
         // tools resolve relative paths against the agent's *action directory*,
         // which is not `workspace_dir`. Printing `workspace_dir` here used to
@@ -420,17 +400,12 @@ impl PromptSection for WorkspaceSection {
     }
 }
 
-impl PromptSection for RuntimeSection {
-    fn tier(&self) -> PromptTier {
-        // Host runtime facts; per install, not per build.
-        PromptTier::Context
-    }
-
+impl RuntimeSection {
     fn name(&self) -> &str {
         "runtime"
     }
 
-    fn build(&self, ctx: &PromptContext<'_>) -> Result<String> {
+    pub(crate) fn build(&self, ctx: &PromptContext<'_>) -> Result<String> {
         // A SaaS process serves many users; the machine it runs on is not
         // theirs to know.
         let host = if crate::core::runtime::is_saas() {
@@ -446,17 +421,12 @@ impl PromptSection for RuntimeSection {
     }
 }
 
-impl PromptSection for DateTimeSection {
-    fn tier(&self) -> PromptTier {
-        // The live clock is carried in the user message. This section is static.
-        PromptTier::Stable
-    }
-
+impl DateTimeSection {
     fn name(&self) -> &str {
         "datetime"
     }
 
-    fn build(&self, ctx: &PromptContext<'_>) -> Result<String> {
+    pub(crate) fn build(&self, ctx: &PromptContext<'_>) -> Result<String> {
         // No concrete timestamp here. The live "now" is injected per turn
         // on the user message via `current_datetime_line`
         // (the main session loop and the sub-agent runner both do this), so
@@ -488,17 +458,12 @@ impl PromptSection for DateTimeSection {
     }
 }
 
-impl PromptSection for UserIdentitySection {
-    fn tier(&self) -> PromptTier {
-        // The signed-in user, which changes on login and on logout.
-        PromptTier::Volatile
-    }
-
+impl UserIdentitySection {
     fn name(&self) -> &str {
         "user_identity"
     }
 
-    fn build(&self, ctx: &PromptContext<'_>) -> Result<String> {
+    pub(crate) fn build(&self, ctx: &PromptContext<'_>) -> Result<String> {
         let identity = match ctx.user_identity.as_ref() {
             Some(id) if !id.is_empty() => id,
             _ => return Ok(String::new()),
@@ -527,6 +492,38 @@ impl PromptSection for UserIdentitySection {
         Ok(out.trim_end().to_string())
     }
 }
+
+macro_rules! implement_owner_prompt_section {
+    ($section:ty, $tier:expr) => {
+        impl<'a> tinyagents_harness::prompt::DynamicPromptSection<PromptContext<'a>> for $section {
+            fn name(&self) -> &str {
+                self.name()
+            }
+
+            fn render(
+                &self,
+                context: &PromptContext<'a>,
+            ) -> tinyagents_harness::Result<Vec<TieredPromptPart>> {
+                let content = self.build(context).map_err(|error| {
+                    tinyagents_harness::TinyAgentsError::Model(error.to_string())
+                })?;
+                Ok(vec![TieredPromptPart::new($tier, content)])
+            }
+        }
+    };
+}
+
+implement_owner_prompt_section!(ArchetypePromptSection, PromptTier::Stable);
+implement_owner_prompt_section!(PersonalityRosterSection, PromptTier::Volatile);
+implement_owner_prompt_section!(IdentitySection, PromptTier::Stable);
+implement_owner_prompt_section!(AgentsInstructionsSection, PromptTier::Context);
+implement_owner_prompt_section!(ToolsSection, PromptTier::Stable);
+implement_owner_prompt_section!(SafetySection, PromptTier::Stable);
+implement_owner_prompt_section!(GroundingSection, PromptTier::Stable);
+implement_owner_prompt_section!(WorkspaceSection, PromptTier::Context);
+implement_owner_prompt_section!(RuntimeSection, PromptTier::Context);
+implement_owner_prompt_section!(DateTimeSection, PromptTier::Stable);
+implement_owner_prompt_section!(UserIdentitySection, PromptTier::Volatile);
 
 /// Collapse whitespace in a user-identity field for a single markdown bullet.
 fn sanitize_identity_field(s: &str) -> String {

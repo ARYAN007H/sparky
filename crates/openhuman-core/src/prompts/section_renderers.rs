@@ -152,7 +152,7 @@ pub fn render_user_identity(ctx: &PromptContext<'_>) -> Result<String> {
 /// Datetime is appended last so the time-volatile section sits at the
 /// tail of the prompt and the rest of the prefix stays cache-stable
 /// across turns within the same minute, matching the convention used
-/// by [`crate::agent::prompts::builder::SystemPromptBuilder::with_defaults`].
+/// by [`crate::prompts::SystemPromptBuilder::with_defaults`].
 pub fn render_ambient_environment(ctx: &PromptContext<'_>) -> Result<String> {
     let mut out = String::with_capacity(512);
     let runtime = render_runtime(ctx)?;
