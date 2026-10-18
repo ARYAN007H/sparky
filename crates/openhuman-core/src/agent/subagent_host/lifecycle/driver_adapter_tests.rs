@@ -93,10 +93,7 @@ fn durable_winner_cause_is_restored_without_a_host_cache() {
         &persistence,
     );
 
-    assert_eq!(
-        projected.failure_cause,
-        Some(winner_cause)
-    );
+    assert_eq!(projected.failure_cause, Some(winner_cause));
     assert_eq!(projected.output, "durable winner");
 }
 
@@ -123,10 +120,7 @@ fn a_losing_cached_cause_cannot_replace_the_durable_winner_cause() {
         &persistence,
     );
 
-    assert_eq!(
-        projected.failure_cause,
-        Some(winner_cause)
-    );
+    assert_eq!(projected.failure_cause, Some(winner_cause));
     assert_eq!(projected.output, "durable winner");
 }
 
@@ -162,10 +156,7 @@ fn non_incomplete_winners_discard_stale_typed_causes() {
     let persistence = OpenHumanPersistence::new(directory.path().join("checkpoints"));
     let stale = cause("not_found", "file_read", "stale cause");
     let statuses = [
-        (
-            SubagentOutcomeKind::Completed,
-            SubagentRunStatus::Completed,
-        ),
+        (SubagentOutcomeKind::Completed, SubagentRunStatus::Completed),
         (
             SubagentOutcomeKind::AwaitingInput(SubagentPause {
                 reason: "question".into(),
