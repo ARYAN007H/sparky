@@ -136,6 +136,19 @@ impl Binding {
         self.context.as_ref().and_then(Weak::upgrade)
     }
 
+    /// Acquire the bound context for one callback. A missing weak reference is
+    /// an intentional unbound test/pre-boot context; an expired bound context
+    /// fails closed instead of borrowing the callback runtime's ambient one.
+    fn callback_context(&self) -> Result<Option<Arc<CoreContext>>, String> {
+        match &self.context {
+            Some(context) => context
+                .upgrade()
+                .map(Some)
+                .ok_or_else(|| "the schedule callback's bound context has expired".to_string()),
+            None => Ok(None),
+        }
+    }
+
     /// Runs `fut` under the bound context. A context that has since been
     /// dropped (its agent is no longer live) runs `fut` as the caller is.
     pub(crate) async fn within<F: Future>(&self, fut: F) -> F::Output {
@@ -191,9 +204,16 @@ impl ScheduleHost {
     /// One attempt of a shell or agent job, classified `retryable` or permanent.
     async fn execute(&self, job: CronJob, run_id: String) -> BusResult<Attempt> {
         tracing::debug!(job_id = %job.id, %run_id, "[cron:bus] Execute");
+        let context_pin = self
+            .binding
+            .callback_context()
+            .map_err(|error| bus_error("Execute", error))?;
         let executor = Arc::clone(&self.executor);
         self.binding
-            .offload(async move { executor.execute(&job, &run_id).await })
+            .offload(async move {
+                let _context_pin = context_pin;
+                executor.execute(&job, &run_id).await
+            })
             .await
             .map_err(|e| bus_error("Execute", e))
     }
@@ -201,9 +221,16 @@ impl ScheduleHost {
     /// The final failure of a run: reported once.
     async fn failed(&self, job: CronJob, run_id: String, attempt: Attempt) -> BusResult<()> {
         tracing::debug!(job_id = %job.id, %run_id, "[cron:bus] Failed");
+        let context_pin = self
+            .binding
+            .callback_context()
+            .map_err(|error| bus_error("Failed", error))?;
         let executor = Arc::clone(&self.executor);
         self.binding
-            .offload(async move { executor.failed(&job, &run_id, &attempt).await })
+            .offload(async move {
+                let _context_pin = context_pin;
+                executor.failed(&job, &run_id, &attempt).await
+            })
             .await
             .map_err(|e| bus_error("Failed", e))
     }
@@ -211,10 +238,15 @@ impl ScheduleHost {
     /// Send a finished run's output exactly once; the reply is its status.
     async fn send(&self, job: CronJob, run_id: String, attempt: Attempt) -> BusResult<String> {
         tracing::debug!(job_id = %job.id, %run_id, "[cron:bus] Send");
+        let context_pin = self
+            .binding
+            .callback_context()
+            .map_err(|error| bus_error("Send", error))?;
         let binding = self.binding.clone();
         let status: Result<DeliveryStatus, String> = self
             .binding
             .offload(async move {
+                let _context_pin = context_pin;
                 run_delivery::send(&binding, &job, &run_id, &attempt)
                     .await
                     .map_err(|error| error.to_string())
@@ -229,9 +261,16 @@ impl ScheduleHost {
     /// Project the module's terminal decision without sending a second time.
     async fn deliver(&self, projection: DeliveryProjection) -> BusResult<()> {
         tracing::debug!(job_id = %projection.job.id, run_id = %projection.run_id, "[cron:bus] Deliver");
+        let context_pin = self
+            .binding
+            .callback_context()
+            .map_err(|error| bus_error("Deliver", error))?;
         let binding = self.binding.clone();
         self.binding
-            .offload(async move { run_delivery::deliver(&binding, &projection).await })
+            .offload(async move {
+                let _context_pin = context_pin;
+                run_delivery::deliver(&binding, &projection).await
+            })
             .await
             .map_err(|e| bus_error("Deliver", e))?;
         Ok(())
@@ -240,9 +279,16 @@ impl ScheduleHost {
     /// A flow row's schedule tick (or a `system:<name>` job).
     async fn schedule_trigger(&self, job: CronJob, run_id: String) -> BusResult<Attempt> {
         tracing::debug!(job_id = %job.id, %run_id, "[cron:bus] ScheduleTrigger");
+        let context_pin = self
+            .binding
+            .callback_context()
+            .map_err(|error| bus_error("ScheduleTrigger", error))?;
         let binding = self.binding.clone();
         self.binding
-            .offload(async move { run_delivery::trigger(&binding, &job, &run_id).await })
+            .offload(async move {
+                let _context_pin = context_pin;
+                run_delivery::trigger(&binding, &job, &run_id).await
+            })
             .await
             .map_err(|e| bus_error("ScheduleTrigger", e))
     }

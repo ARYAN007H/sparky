@@ -231,6 +231,40 @@ async fn module_scheduler_slot_is_per_store_scope_and_refuses_a_duplicate() {
     second.drain().await;
 }
 
+#[tokio::test]
+async fn started_agent_scheduler_pins_its_context_only_until_stop_is_confirmed() {
+    use crate::core::runtime::{ContextOverlay, CoreContext, DispatchCtx, DomainSet};
+
+    let tmp = TempDir::new().unwrap();
+    let config = test_config(&tmp).await;
+    let agent = format!("retire-{}", uuid::Uuid::new_v4().simple());
+    let context = CoreContext::for_test_with_config(DomainSet::full(), config.clone()).derive_with(
+        ContextOverlay::new(
+            config.clone(),
+            DomainSet::full(),
+            crate::tools::toolpacks::ToolGroups::none(),
+        )
+        .session_agent(agent),
+    );
+    let weak = Arc::downgrade(&context);
+    let mut dispatcher = JobDispatcher::new(
+        &DispatchCtx::new(Arc::clone(&context)),
+        &config,
+        &security(&config),
+    );
+    assert_eq!(dispatcher.tick(&config).await.unwrap(), 0);
+
+    drop(dispatcher);
+    drop(context);
+    tokio::time::timeout(std::time::Duration::from_secs(3), async {
+        while weak.upgrade().is_some() {
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .expect("the finite StopScheduler owner releases its context after confirmation");
+}
+
 /// Upgrade regression: a job whose retry budget and single-flight setting lived
 /// in the old `cron_job_policies` side table keeps firing after the upgrade,
 /// with that policy now on the job itself.
