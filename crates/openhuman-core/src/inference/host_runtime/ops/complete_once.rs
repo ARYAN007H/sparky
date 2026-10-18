@@ -70,7 +70,9 @@ pub async fn complete_once_observed(
     endpoint: &CompletionEndpoint,
     request: ModelRequest,
     budget: Option<&crate::agent::tinyagents::budget::ModelBudget>,
-    observer: Option<std::sync::Arc<dyn tinyagents_harness::observability::PhysicalDispatchObserver>>,
+    observer: Option<
+        std::sync::Arc<dyn tinyagents_harness::observability::PhysicalDispatchObserver>,
+    >,
 ) -> Result<ModelResponse, String> {
     if !request.tools.is_empty() {
         return Err(
