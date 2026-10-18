@@ -270,10 +270,14 @@ impl LeaseStore for DocumentLeases {
             return Err(LeaseError::Lost);
         }
         self.declare().await?;
-        // `release` ends the lease at the moment it is called, by tsd's own
-        // clock reading; the caller's clock is only for acquire and renew.
+        // A release carries no clock of its own: it is judged at the instant
+        // the grant was last issued (its expiry less one TTL), when it was
+        // live by construction, so tsd marks the record released.
+        let issued_ms = grant
+            .expires_at_ms
+            .saturating_sub(self.ttl_ms.unsigned_abs());
         let released = self
-            .leases_at(grant.expires_at_ms.saturating_sub(self.ttl_ms.unsigned_abs()))
+            .leases_at(issued_ms)
             .release(LEASE_OWNER, &grant.key, &self.node, grant.epoch)
             .await?;
         if !released {
