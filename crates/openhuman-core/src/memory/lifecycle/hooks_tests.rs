@@ -80,17 +80,31 @@ fn turn_indices_follow_the_committed_transcript() {
 
 #[test]
 fn typed_skip_reasons_expose_only_account_wide_errors() {
-    let unavailable = MemoryApiError::Unavailable("connection refused".into());
-    let invalid = MemoryApiError::InvalidRequest("bad scope".into());
+    let account_wide = [
+        MemoryApiError::Off("disabled".into()),
+        MemoryApiError::Unauthorized("bad key".into()),
+        MemoryApiError::InsufficientCredits("top up".into()),
+        MemoryApiError::Unavailable("connection refused".into()),
+    ];
+    for error in &account_wide {
+        assert_eq!(
+            account_wide_skip_reason(&SkipReason::Engine(error.clone())),
+            Some(error)
+        );
+    }
 
-    assert_eq!(
-        account_wide_skip_reason(&SkipReason::Engine(unavailable.clone())),
-        Some(&unavailable)
-    );
-    assert_eq!(
-        account_wide_skip_reason(&SkipReason::Engine(invalid)),
-        None
-    );
+    let local = [
+        MemoryApiError::InvalidRequest("bad scope".into()),
+        MemoryApiError::NotFound("item".into()),
+        MemoryApiError::Conflict("duplicate".into()),
+        MemoryApiError::Engine("corrupt index".into()),
+    ];
+    for error in local {
+        assert_eq!(
+            account_wide_skip_reason(&SkipReason::Engine(error)),
+            None
+        );
+    }
     assert_eq!(account_wide_skip_reason(&SkipReason::Empty), None);
 }
 
@@ -391,11 +405,13 @@ fn a_refusal_is_read_back_from_a_skipped_section() {
         skipped: vec![
             tinymemory_tools::recall::SkippedSection {
                 heading: "Learnings".into(),
-                reason: "empty".into(),
+                reason: SkipReason::Empty,
             },
             tinymemory_tools::recall::SkippedSection {
                 heading: "History".into(),
-                reason: "unauthorized: ["UNAUTHORIZED"] memory API fetch (HTTP 401)".into(),
+                reason: SkipReason::Engine(MemoryApiError::Unauthorized(
+                    "memory API fetch (HTTP 401)".into(),
+                )),
             },
         ],
         engine: "tinyhumans".into(),
