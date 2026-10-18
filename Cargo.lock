@@ -9756,7 +9756,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2 0.10.9",
- "thiserror 2.0.20",
+ "tinystoragedrivers-schema",
  "tokio",
  "ulid",
  "zstd 0.13.3",
@@ -9800,6 +9800,15 @@ dependencies = [
  "tokio",
  "tokio-util",
  "url",
+]
+
+[[package]]
+name = "tinystoragedrivers-schema"
+version = "1.0.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror 2.0.20",
 ]
 
 [[package]]
