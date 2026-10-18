@@ -126,6 +126,9 @@ impl DeletionExecutor for Executor<'_> {
         let bound = engine::resolve(self.config)
             .engine()
             .map_err(|error| error.code().to_string())?;
+        // Pending source/thread filters keep TinyMemory's ordinary root-tree
+        // default: all ordinary scopes, but never a service sandbox. Do not
+        // narrow them to one authenticated profile root.
         let ops = MemoryOps::unconfined();
         ops.forget_or_enqueue(Some(bound.engine.as_ref()), deletion.clone(), |deletion| {
             enqueue(&self.config.workspace_dir, deletion);
@@ -176,6 +179,8 @@ pub async fn forget_thread(config: &Config, thread_id: &str) -> usize {
             return 0;
         }
     };
+    // Match queued deletion's ordinary root-tree filter, including when the
+    // profile root sits above other ordinary namespaces.
     let ops = MemoryOps::unconfined();
     let engine = bound.as_ref().map(|bound| bound.engine.as_ref());
     match ops
