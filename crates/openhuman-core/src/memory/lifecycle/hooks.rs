@@ -15,12 +15,12 @@ use std::time::Duration;
 
 use chrono::{DateTime, Utc};
 use serde::Serialize;
-use tinymemory_api::{ToolCallRef, Turn};
+use tinymemory_api::{Error, ToolCallRef, Turn};
 use tinymemory_tools::{Compaction, ContextPack, PostTurn, PreTurn, SessionStart};
+use tinymemory_tools::recall::SkipReason;
 
 use crate::config::Config;
 use crate::memory::engine;
-use tinymemory_api::Error;
 use crate::memory::scope::ResolvedIdentity;
 
 use super::{agent_memory_on, jobs, log_only};
@@ -247,7 +247,7 @@ pub(crate) async fn pre_turn_work(
                     }
                     Err(error) => {
                         tracing::warn!(%error, "[memory:hooks] pre_turn refused");
-                        Err(Error::from(error))
+                        Err(error)
                     }
                 }
             } else if resumed {
@@ -259,12 +259,12 @@ pub(crate) async fn pre_turn_work(
                     .await
                     .map_err(|error| {
                         tracing::warn!(%error, "[memory:hooks] recall failed");
-                        Error::from(error)
+                        error
                     })
             } else {
                 memory.recall(&user_text).await.map_err(|error| {
                     tracing::warn!(%error, "[memory:hooks] recall failed");
-                    Error::from(error)
+                    error
                 })
             }
         }
@@ -307,8 +307,15 @@ fn refusal_of(outcomes: &[Result<ContextPack, Error>]) -> Option<Error> {
             .iter()
             .filter_map(|outcome| outcome.as_ref().ok())
             .flat_map(|pack| pack.skipped.iter())
-            .find_map(|skipped| Error::refusal_from_skip_reason(&skipped.reason))
+            .find_map(|skipped| account_wide_skip_reason(&skipped.reason).cloned())
     })
+}
+
+fn account_wide_skip_reason(reason: &SkipReason) -> Option<&Error> {
+    match reason {
+        SkipReason::Engine(error) if error.is_account_wide() => Some(error),
+        SkipReason::Empty | SkipReason::Engine(_) => None,
+    }
 }
 
 /// A tool call the reply made, with a one-line result.
