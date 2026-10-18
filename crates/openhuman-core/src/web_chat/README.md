@@ -235,8 +235,9 @@ own config has no workspace to write to and ends in a retryable `turn_timeout`
 ### The event bus
 
 [`event_bus.rs`](./event_bus.rs) holds an in-process `tokio::sync::broadcast` channel of
-`WebChannelEvent` (the type is defined in [`channel_event.rs`](./channel_event.rs)). Any domain can
-publish to it with `publish_web_channel_event`; consumers call
+`ScopedWebEvent` (the host routing envelope in [`channel_event.rs`](./channel_event.rs)). Its
+wire payload is TinyChannels' typed `WebChannelEvent`; any domain can publish through
+`publish_web_channel_event`, and consumers call
 `subscribe_web_channel_events`. It also registers process-lifetime,
 `OnceLock`-guarded subscribers on `core::bus::BUS` that turn `DomainEvent`s
 into socket events:
@@ -280,7 +281,7 @@ and artifact bridges itself (`openhuman-tui/src/runner.rs`).
 | [`presentation.rs`](./presentation.rs) | The terminal `chat_done` event, `deliver_response` (persist, then one `chat_done`) for the Flow Canvas, and `deliver_response_single_bubble` for core-initiated turns. |
 | [`reply_persistence.rs`](./reply_persistence.rs) | `persist_delivered_reply`: durable reply row under the deterministic reply id. |
 | [`suggestions.rs`](./suggestions.rs) | Post-turn follow-up suggestions (`chat_suggestions`). |
-| [`channel_event.rs`](./channel_event.rs) | The host's flat in-process event with private routing stamps; wire payload types are owned by `tinychannels-bus`. |
+| [`channel_event.rs`](./channel_event.rs) | The host routing envelope around TinyChannels' canonical typed web event; only routing stamps remain host-private. |
 | [`event_bus.rs`](./event_bus.rs) | The broadcast channel and the `DomainEvent` surface subscribers. |
 | [`egress_surface.rs`](./egress_surface.rs) | The `external_transfer_pending` bridge. |
 | [`web_errors.rs`](./web_errors.rs) | Thin shell over [`web_errors/`](./web_errors/): `classify.rs` (the classification ladder and `ClassifiedError`), `backend_error_code.rs`, `budget.rs`, `retry.rs`, `timeout.rs`. The class to copy table is in `inference/failure_copy/`. |
@@ -305,7 +306,8 @@ and artifact bridges itself (`openhuman-tui/src/runner.rs`).
 - `ChatRequestMetadata` (`tinychannels_bus::web`) is per-request metadata
   (`speak_reply`, `source`, `session_id`, `agent_id` for trace attribution)
   passed by every caller of `start_chat` and `spawn_progress_bridge`.
-- `WebChannelEvent` (`channel_event.rs`) is the event payload sent to clients.
+- `tinychannels_bus::web::WebChannelEvent` is the typed event payload sent to
+  clients; `ScopedWebEvent` carries host-private routing stamps beside it.
   New fields are additive so older clients keep working.
 - `publish_web_channel_event` / `subscribe_web_channel_events`
   (`event_bus.rs`) are the bus.
