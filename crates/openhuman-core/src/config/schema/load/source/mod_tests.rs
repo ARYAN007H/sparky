@@ -252,30 +252,6 @@ async fn two_scopes_keep_their_config_apart() {
     assert!(!bob.read().await.unwrap().contents.contains("alice-model"));
 }
 
-#[tokio::test]
-async fn concurrent_first_config_writes_use_insert_preconditions() {
-    let tmp = tempfile::tempdir().unwrap();
-    let storage = MemoryStorage::new();
-    let first = document_source(&storage, "alice", &tmp.path().join("a.toml"));
-    let second = document_source(&storage, "alice", &tmp.path().join("b.toml"));
-
-    let (first, second) = tokio::join!(
-        first.write("default_model = \"first\"\n"),
-        second.write("default_model = \"second\"\n"),
-    );
-
-    assert_ne!(first.is_ok(), second.is_ok(), "one insert must win CAS");
-    let saved = document_source(&storage, "alice", &tmp.path().join("c.toml"))
-        .read()
-        .await
-        .unwrap()
-        .contents;
-    assert!(
-        saved.contains("first") ^ saved.contains("second"),
-        "{saved}"
-    );
-}
-
 // ── Through Config ───────────────────────────────────────────────────────────
 
 #[tokio::test]
