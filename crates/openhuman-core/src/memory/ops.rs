@@ -29,9 +29,9 @@ use super::engine::{
     self, Binding, BoundEngine, CORTEXDB_ENGINE, DISABLED_ENGINE, TINYHUMANS_ENGINE,
 };
 use super::types::{
-    clamp_limit, EngineSetParams, EngineStatus, EngineView, EnginesListView, EraseAllParams,
-    EraseAllView, FetchParams, FetchView, ForgetParams, ForgetView, ItemsListParams, ItemsListView,
-    LearnParams, LearnView, RecallParams, RecallView, RefersTo,
+    EngineSetParams, EngineStatus, EngineView, EnginesListView, EraseAllParams, EraseAllView,
+    FetchParams, FetchView, ForgetParams, ForgetView, ItemsListParams, ItemsListView, LearnParams,
+    LearnView, RecallParams, RecallView, RefersTo,
 };
 use tinymemory_api::{Error, Result};
 
@@ -614,27 +614,6 @@ pub async fn erase_all(
     Ok(EraseAllView {
         erased_scopes: report.erased_scopes,
     })
-}
-
-/// The ids among `ids` naming an item in `reach`, read through `get` in
-/// chunks of its id limit.
-async fn within_reach(
-    bound: &BoundEngine,
-    ids: Vec<ItemId>,
-    reach: tinymemory_api::Reach,
-) -> Result<Vec<ItemId>> {
-    let mut kept = Vec::new();
-    for chunk in ids.chunks(tinymemory_api::explore::MAX_GET_IDS) {
-        let found = bound
-            .engine
-            .get(tinymemory_api::GetRequest {
-                ids: chunk.to_vec(),
-                reach: Some(reach.clone()),
-            })
-            .await?;
-        kept.extend(found.into_iter().map(|hit| hit.id));
-    }
-    Ok(kept)
 }
 
 /// `memory_items_list`.

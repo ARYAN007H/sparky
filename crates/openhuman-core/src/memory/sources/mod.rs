@@ -10,7 +10,6 @@
 pub mod state;
 mod sync;
 
-use tinymemory_api::MetaFilter;
 use tinymemory_tools::ops::MemoryOps;
 
 use crate::config::schema::{MemorySourceConfig, MemorySourceKind};
