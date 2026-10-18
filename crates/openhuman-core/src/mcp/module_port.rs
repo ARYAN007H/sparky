@@ -87,7 +87,9 @@ impl McpModulePort for TinyMcpPort {
             },),
             true,
         )
-        .await
+        .await;
+        eprintln!("DBGSB open ok={}", r.is_ok());
+        r
     }
 
     async fn close(&self, data_dir: &str) -> Result<Option<String>, ModuleCallError> {
