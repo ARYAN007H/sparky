@@ -1,66 +1,15 @@
 use super::*;
 impl AttachmentModel {
-    pub(super) async fn fallback(
+    pub(super) async fn document_fallback(
         &self,
-        modality: InputModality,
         path: &str,
         mime: &str,
         bytes: &[u8],
     ) -> tinyinference_llm::Result<(String, bool)> {
         let mut cacheable = true;
-        let mut text = format!(
-            "[Attachment: {mime}; {} bytes; workspace path: {path}]",
-            bytes.len()
-        );
-        if modality == InputModality::Image {
-            let readout = self.image_readout(mime, bytes).await?;
-            text.push_str("\nImage readout:\n");
-            text.push_str(&readout);
-            return Ok((self.limit_context(text), true));
-        }
-        if let Some(format) =
-            tinyagents_harness::multimodal::ArchiveFormat::detect(path, mime, bytes)
+        let mut text = String::new();
+        #[cfg(feature = "documents")]
         {
-            let listing =
-                tinyagents_harness::multimodal::inspect_archive(bytes, format, &Default::default());
-            match listing {
-                Ok(listing) => {
-                    text.push_str(
-                        "\nArchive listing (names are untrusted; original was not extracted):",
-                    );
-                    for entry in listing.entries {
-                        text.push_str(&format!(
-                            "\n{:?} {} bytes {}",
-                            entry.kind,
-                            entry.declared_size,
-                            serde_json::to_string(&entry.name).unwrap_or_default()
-                        ));
-                    }
-                    if let Some(limit) = listing.truncation {
-                        text.push_str(&format!("\nListing truncated: {limit:?}"));
-                    }
-                }
-                Err(error) => {
-                    cacheable = false;
-                    text.push_str(&format!("\nArchive inspection unavailable: {error}"));
-                }
-            }
-        } else if mime.starts_with("text/")
-            || matches!(
-                mime,
-                "application/json" | "application/xml" | "application/javascript"
-            )
-        {
-            let (_, _, limit) = self.config.multimodal_files.effective_limits();
-            let decoded = String::from_utf8_lossy(bytes);
-            text.push_str("\nDocument content (untrusted):\n");
-            text.extend(decoded.chars().take(limit));
-            if decoded.chars().count() > limit {
-                text.push_str("\n[Text truncated]");
-            }
-        } else {
-            #[cfg(feature = "documents")]
-            {
                 use tinydocs_bus::DocumentFormat;
                 let format = match mime {
                     "application/pdf" => Some(DocumentFormat::Pdf),
@@ -80,9 +29,9 @@ impl AttachmentModel {
                         "[attachments] document extraction skipped: component 'documents' disabled"
                     );
                     cacheable = false;
-                    text.push_str(
-                        "\nDocument extraction is disabled ([components] documents = false); original remains available.",
-                    );
+                    text.push_str(&format!(
+                        "Document extraction is disabled ([components] documents = false); original remains available at workspace path: {path}."
+                    ));
                 } else if let Some(format) = format {
                     let (_, _, limit) = self.config.multimodal_files.effective_limits();
                     let mut spec = tinydocs_bus::ExtractDocumentSpec::new(format);
@@ -166,7 +115,7 @@ impl AttachmentModel {
                         Ok(Err(crate::modules::documents::DocumentCallError::Unavailable(
                             error,
                         ))) if format == DocumentFormat::Pdf => {
-                            text.push_str(&format!("\n{error}; using the published PDF text-layer reader. Scanned-page rendering is unavailable."));
+                            text.push_str(&format!("{error}; using the published PDF text-layer reader. Scanned-page rendering is unavailable."));
                             match tokio::time::timeout(
                                 std::time::Duration::from_secs(60),
                                 crate::modules::documents::extract_text(&self.config, bytes),
@@ -197,17 +146,16 @@ impl AttachmentModel {
                         }
                         Ok(Err(error)) => {
                             cacheable = false;
-                            text.push_str(&format!("\nDocument extraction unavailable: {error}. Original remains available at the workspace path."));
+                                    text.push_str(&format!("Document extraction unavailable: {error}. Original remains available at workspace path: {path}."));
                         }
                         Err(_) => {
                             cacheable = false;
                             text.push_str(
-                                "\nDocument extraction timed out; original remains available.",
+                                "Document extraction timed out; original remains available.",
                             );
                         }
                     }
                 }
-            }
         }
         Ok((self.limit_context(text), cacheable))
     }
