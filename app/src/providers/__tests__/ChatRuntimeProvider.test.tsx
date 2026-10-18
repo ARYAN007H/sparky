@@ -880,7 +880,13 @@ describe('ChatRuntimeProvider — dedupe, proactive resolution, mid-turn invaria
 
     it('flushes queued upload originals through core staging and caches only returned references', async () => {
       const listeners = renderProvider();
-      const raw = '[FILE:data:application/zip;name=archive.zip;base64,AQID]';
+      const parts = [
+        {
+          kind: 'file' as const,
+          fileName: 'archive.zip',
+          media: { url: 'data:application/zip;name=archive.zip;base64,AQID' },
+        },
+      ];
       const durable =
         '[ATTACHMENT:%7B%22path%22%3A%22uploads%2Ft%2Fa%2Farchive.zip%22%2C%22name%22%3A%22archive.zip%22%2C%22mime%22%3A%22application%2Fzip%22%2C%22size_bytes%22%3A3%7D]';
       vi.mocked(threadApi.appendMessage).mockImplementation(async (_tid, message) =>
@@ -891,13 +897,14 @@ describe('ChatRuntimeProvider — dedupe, proactive resolution, mid-turn invaria
           threadId: 't-upload',
           message: {
             id: 'queued-upload',
-            content: raw,
+            content: '',
             type: 'text',
             extraMetadata: { attachmentNames: ['archive.zip'], attachmentKinds: ['file'] },
             sender: 'user',
             createdAt: '2026-01-01T00:00:00.000Z',
           },
-          text: raw,
+          text: '',
+          attachments: parts,
         })
       );
       await act(async () => {
@@ -912,7 +919,8 @@ describe('ChatRuntimeProvider — dedupe, proactive resolution, mid-turn invaria
       await waitFor(() =>
         expect(threadApi.appendMessage).toHaveBeenCalledWith(
           't-upload',
-          expect.objectContaining({ content: raw, sender: 'user' })
+          expect.objectContaining({ content: '', sender: 'user' }),
+          parts
         )
       );
       const row = store
