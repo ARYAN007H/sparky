@@ -407,7 +407,7 @@ async fn tool_registry_entries_fall_back_on_current_thread_runtime() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-#[ignore = "Temporary: registry-installed servers are never operator-trusted, so the jail must start the stub; it cannot until tinymcp lets the host choose the enforcement level (https://github.com/tinyhumansai/tinymcp/pull/126) and TinyBox has a Linux backend with real process isolation."]
+#[cfg_attr(target_os = "linux", ignore = "Temporary on Linux: registry-installed servers are never operator-trusted, so the jail must start the stub. tinymcp 0.19.5 (https://github.com/tinyhumansai/tinymcp/pull/126) lets the host declare best-effort enforcement, which macOS Seatbelt uses; Linux still needs a TinyBox backend with real process isolation, which has not shipped.")]
 async fn tool_registry_entries_include_connected_mcp_client_tools() {
     let tmp = tempdir().expect("tempdir");
     let config = Config {
