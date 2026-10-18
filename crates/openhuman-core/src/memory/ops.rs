@@ -269,17 +269,23 @@ pub async fn fetch_with(
 ) -> Result<FetchView> {
     let bound = bound(config)?;
     let descriptor = bound.engine.descriptor();
-    if params.mode.is_none() && descriptor.fetch_modes.is_empty() {
-        return Err(Error::Unsupported("the engine offers no fetch mode".into()));
+    match params.mode {
+        Some(mode) => descriptor.ensure_mode(mode)?,
+        None if descriptor.fetch_modes.is_empty() => {
+            return Err(Error::Unsupported("the engine offers no fetch mode".into()));
+        }
+        None => {}
     }
-    let request = memory_ops(config)?.fetch_request(
+    let ops = memory_ops(config)?;
+    let refers_to = time_hint(config, params.refers_to)?;
+    let request = ops.fetch_request(
         FetchOptions {
             query: params.query,
             mode: params.mode,
             filter: params.filter,
             limit: params.limit,
             cursor: params.cursor,
-            refers_to: time_hint(config, params.refers_to)?,
+            refers_to,
             exclude_thread,
         },
         descriptor,
@@ -325,7 +331,8 @@ pub async fn learn_with(
     host_meta: Option<MemoryMeta>,
     options: WriteOptions,
 ) -> Result<LearnView> {
-    let item = memory_ops(config)?.store_item(learning_item(params, host_meta)?)?;
+    let item = learning_item(params, host_meta)?;
+    let item = memory_ops(config)?.store_item(item)?;
     let bound = bound(config)?;
     let receipt = bound.engine.store_with(item, options).await?;
     super::lifecycle::prefetch::invalidate(config);
@@ -627,9 +634,10 @@ pub async fn erase_all(
 pub async fn items_list(config: &Config, params: ItemsListParams) -> Result<ItemsListView> {
     let bound = bound(config)?;
     let preview = params.preview;
+    let filter = super::explore::narrowed(params.filter, &params.path)?;
     let request = memory_ops(config)?.list_request(ListOptions {
-        filter: params.filter,
-        path: params.path,
+        filter: Some(filter),
+        path: Vec::new(),
         limit: params.limit,
         cursor: params.cursor,
     })?;
