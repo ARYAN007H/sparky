@@ -71,7 +71,7 @@ fn dynamic_child_prompt_lists_text_dialect_catalogue_once() {
     let schema = r#"{"type":"object","properties":{"path":{"type":"string"}}}"#;
     let tools = [PromptTool {
         name: std::borrow::Cow::Borrowed("unique_probe_tool"),
-        description: std::borrow::Cow::Borrowed("A single visible probe."),
+        description: std::borrow::Cow::Borrowed("catalogue sentinel for one visible probe"),
         parameters_schema: Some(schema.to_owned()),
     }];
     let workflows = [];
@@ -85,7 +85,7 @@ fn dynamic_child_prompt_lists_text_dialect_catalogue_once() {
     ] {
         let specs = [tinytools::ToolSpec {
             name: "unique_probe_tool".into(),
-            description: "A single visible probe.".into(),
+            description: "catalogue sentinel for one visible probe".into(),
             parameters: serde_json::from_str(schema).unwrap(),
         }];
         let (_, dispatcher_instructions) = subagent_prompt_protocol(format, &specs);
@@ -112,7 +112,7 @@ fn dynamic_child_prompt_lists_text_dialect_catalogue_once() {
 
         let prompt = load_prompt_source(&definition, &context).unwrap();
         assert_eq!(
-            prompt.matches("unique_probe_tool").count(),
+            prompt.matches("catalogue sentinel for one visible probe").count(),
             1,
             "dynamic {format:?} prompt should render its tool catalogue once"
         );
