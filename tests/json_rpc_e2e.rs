@@ -3178,10 +3178,11 @@ async fn json_rpc_cron_manual_worker_survives_caller_cancel_on_published_tinyflo
 
     let duplicate_context = Arc::clone(&default_context);
     let duplicate_job_id = first_job.id.clone();
+    let duplicate_config = config.clone();
     let duplicate = CoreContext::scope(Arc::clone(&duplicate_context), async move {
         openhuman_core::cron::ops::run_job_now(
             &DispatchCtx::new(Arc::clone(&duplicate_context)),
-            &config,
+            &duplicate_config,
             &duplicate_job_id,
         )
         .await
