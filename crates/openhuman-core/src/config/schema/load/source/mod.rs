@@ -83,7 +83,12 @@ pub(crate) trait ConfigSource: Send + Sync {
 
     /// Replace the config text. Returns `Err` only while the previous config is
     /// still the live one, so callers may roll back in-memory state on `Err`.
-    async fn write(&self, toml: &str, expected: Option<tinystoragedrivers::Version>) -> Result<Option<tinystoragedrivers::Version>>;
+    async fn write(&self, toml: &str) -> Result<()>;
+
+    async fn write_versioned(&self, toml: &str, _expected: Option<tinystoragedrivers::Version>) -> Result<Option<tinystoragedrivers::Version>> {
+        self.write(toml).await?;
+        Ok(None)
+    }
 }
 
 /// The source for the config at `config_path`.

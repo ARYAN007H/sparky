@@ -581,7 +581,7 @@ impl Config {
 
         tracing::debug!(source = source.label(), "[config] saving config");
         let expected = *config_to_save.document_version.lock().unwrap();
-        let version = source.write(&toml_str, expected).await?;
+        let version = source.write_versioned(&toml_str, expected).await?;
         *self.document_version.lock().unwrap() = version;
 
         Ok(())

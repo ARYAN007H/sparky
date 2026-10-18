@@ -181,7 +181,12 @@ impl ConfigSource for DocumentConfigSource {
         })
     }
 
-    async fn write(&self, toml: &str, expected: Option<tinystoragedrivers::Version>) -> Result<Option<tinystoragedrivers::Version>> {
+    async fn write(&self, toml: &str) -> Result<()> {
+        self.write_versioned(toml, None).await?;
+        Ok(())
+    }
+
+    async fn write_versioned(&self, toml: &str, expected: Option<tinystoragedrivers::Version>) -> Result<Option<tinystoragedrivers::Version>> {
         let body = zeroize::Zeroizing::new(
             strip_bootstrap(toml).context("strip bootstrap tables from the config")?,
         );
