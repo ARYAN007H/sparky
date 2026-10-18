@@ -9,12 +9,13 @@
 pub mod contract_schema;
 #[cfg(any(feature = "voice", feature = "channels"))]
 pub(crate) mod credentials;
-pub mod traits;
 
-pub use traits::{Channel, ChannelSendExt, SendMessage};
+pub use tinychannels_bus::{Channel, ChannelSendExt, SendMessage};
 
 #[cfg(feature = "channels")]
 pub mod bus;
+#[cfg(feature = "channels")]
+pub mod callback_slot;
 #[cfg(feature = "channels")]
 mod commands;
 #[cfg(feature = "channels")]
@@ -126,3 +127,7 @@ pub(crate) use runtime::{session, start_channels_with_session};
 #[cfg(all(test, feature = "channels", feature = "modules"))]
 #[path = "module_fixture_tests.rs"]
 pub(crate) mod module_fixture;
+
+#[cfg(test)]
+#[path = "contract_reexport_tests.rs"]
+mod contract_reexport_tests;

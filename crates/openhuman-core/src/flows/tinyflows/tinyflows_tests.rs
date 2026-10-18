@@ -32,8 +32,6 @@ use crate::config::Config;
 use crate::security::SecurityPolicy;
 
 use super::build_capabilities;
-#[cfg(target_os = "linux")]
-use super::caps::OpenHumanCode;
 use super::caps::{OpenHumanHttp, OpenHumanTools};
 
 fn test_config(tmp: &TempDir) -> Arc<Config> {
@@ -79,6 +77,7 @@ fn http_adapter(allowed_domains: Vec<String>) -> OpenHumanHttp {
         &config.action_dir,
     ));
     OpenHumanHttp {
+        ctx: crate::core::runtime::DispatchCtx::ambient(),
         security,
         http_config: crate::config::HttpRequestConfig {
             allowed_domains,
@@ -87,6 +86,7 @@ fn http_adapter(allowed_domains: Vec<String>) -> OpenHumanHttp {
         http_creds: Arc::new(
             crate::security::credentials::HttpCredentialsStore::from_config(&config),
         ),
+        approval: Default::default(),
     }
 }
 
@@ -104,7 +104,12 @@ fn tools_adapter(config: Arc<Config>) -> OpenHumanTools {
         &config.workspace_dir,
         &config.action_dir,
     ));
-    OpenHumanTools { config, security }
+    OpenHumanTools {
+        ctx: crate::core::runtime::DispatchCtx::ambient(),
+        config,
+        security,
+        approval: Default::default(),
+    }
 }
 
 /// Minimal seeded [`ToolContract`](super::caps::ToolContract) for the tests

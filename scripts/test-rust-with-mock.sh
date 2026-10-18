@@ -78,28 +78,34 @@ PRODUCT_FEATURES="$(bash "$REPO_ROOT/scripts/ci/product-features.sh")"
 native_module_target="$(bash "$SCRIPT_DIR/ci/native-test-module-platform.sh")"
 IFS=$'\t' read -r module_ext wallet_platform <<< "$native_module_target"
 
-# Tokenjuice JSON-RPC coverage loads the production native module. Keep the
-# test run hermetic by building the pinned submodule instead of falling back
-# to GitHub release metadata.
-if [ -z "${TINYJUICE_TEST_MODULE:-}" ]; then
-  juice_manifest="vendor/tinyjuice/crates/tinyjuice-module/Cargo.toml"
-  juice_target_dir="$REPO_ROOT/target/native-test-modules/tinyjuice"
-  juice_module="$juice_target_dir/release/libtinyjuice_module.$module_ext"
-  echo "Building TinyJuice test module from the pinned submodule ..."
-  cargo build --release --manifest-path "$juice_manifest" --target-dir "$juice_target_dir"
-  export TINYJUICE_TEST_MODULE="$juice_module"
+# shellcheck source=modules/stage-local-modules.sh
+source "$SCRIPT_DIR/modules/stage-local-modules.sh"
+
+# Connectors, tokenjuice, search, hosts and MCP: the registry-pinned release,
+# as in CI (#7618: no module is compiled from source there). With
+# OPENHUMAN_MODULE_SOURCE=source they are built from the pinned submodules
+# instead (scripts/modules/build.mjs), which is how a module change is tried
+# against the core locally.
+local_source_ids=()
+if local_module_source_is_source; then
+  local_source_ids+=(tinyconnectors tinyflows tinyjuice tinysearch tinyhosts tinymcp)
+else
+  for released_id in tinychannels tinyflows tinyjuice tinysearch; do
+    released_dir="$(stage_release_module "$released_id" "$wallet_platform" "$module_ext")"
+    if [ "$released_id" = "tinychannels" ]; then
+      tinychannels_dir="$released_dir"
+    fi
+    export OPENHUMAN_MODULE_PATH="$released_dir${OPENHUMAN_MODULE_PATH:+:$OPENHUMAN_MODULE_PATH}"
+  done
 fi
 
-# Search JSON-RPC/agent coverage calls the TinySearch module against the mock
-# backend's managed Exa/Gemini routes. Build the pinned submodule so the suite
-# never depends on a published release.
-if [ -z "${TINYSEARCH_TEST_MODULE:-}" ]; then
-  search_manifest="vendor/tinysearch/crates/tinysearch/Cargo.toml"
-  search_target_dir="$REPO_ROOT/target/native-test-modules/tinysearch"
-  search_module="$search_target_dir/release/libtinysearch.$module_ext"
-  echo "Building TinySearch test module from the pinned submodule ..."
-  cargo build --release --manifest-path "$search_manifest" --target-dir "$search_target_dir"
-  export TINYSEARCH_TEST_MODULE="$search_module"
+# TinyChannels host unit tests use the pinned module artifact through the
+# regular loader. Its source module is not linked into the core: tinychannels-
+# module currently requires TinyBus 0.1.4 while this host pins 0.1.3.
+if local_module_source_is_source; then
+  released_dir="$(stage_release_module tinychannels "$wallet_platform" "$module_ext")"
+  tinychannels_dir="$released_dir"
+  export OPENHUMAN_MODULE_PATH="$released_dir${OPENHUMAN_MODULE_PATH:+:$OPENHUMAN_MODULE_PATH}"
 fi
 
 # Wallet JSON-RPC E2E sends a recovery phrase only to an attested module. Build
@@ -142,24 +148,11 @@ fi
 export OPENHUMAN_MODULE_PATH="$docs_dir${OPENHUMAN_MODULE_PATH:+:$OPENHUMAN_MODULE_PATH}"
 
 # The released TinyHosts contract test runs in its own process, outside the
-# generic unit suite. Keep the recipient pinned to the registry digest just
-# like the other native module fixtures.
-hosts_asset="$(node scripts/ci/self-hosted/test-module-assets.mjs "$wallet_platform" tinyhosts)"
-IFS=$'\t' read -r _hosts_id hosts_url hosts_filename hosts_sha256 <<< "$hosts_asset"
-hosts_dir="$REPO_ROOT/target/test-modules/tinyhosts/$hosts_sha256"
-hosts_archive="$hosts_dir/$hosts_filename"
-if [ ! -f "$hosts_dir/libtinyhosts.$module_ext" ]; then
-  echo "Downloading the checksum-pinned TinyHosts test module ..."
-  mkdir -p "$hosts_dir"
-  curl --fail --location --silent --show-error "$hosts_url" --output "$hosts_archive"
-  if command -v shasum >/dev/null 2>&1; then
-    echo "${hosts_sha256}  $hosts_archive" | shasum -a 256 -c
-  else
-    echo "${hosts_sha256}  $hosts_archive" | sha256sum --check
-  fi
-  tar --no-same-owner -xzf "$hosts_archive" -C "$hosts_dir"
+# generic unit suite, so its directory goes only on that process (below).
+# The recipient stays pinned to the registry digest like the other fixtures.
+if ! local_module_source_is_source; then
+  hosts_dir="$(stage_release_module tinyhosts "$wallet_platform" "$module_ext")"
 fi
-export OPENHUMAN_TINYHOSTS_TEST_MODULE="$hosts_dir/libtinyhosts.$module_ext"
 
 # TinyBox command analysis is required by shell-backed storage and capability
 # tests. Load the published, checksum-pinned module rather than relying on the
@@ -182,35 +175,46 @@ fi
 export OPENHUMAN_MODULE_PATH="$tinybox_dir${OPENHUMAN_MODULE_PATH:+:$OPENHUMAN_MODULE_PATH}"
 
 # The MCP registry E2E targets exercise real TinyMCP lifecycle calls through
-# the host's module adapter. Load the released, checksum-pinned module just as
-# the self-hosted CI installer does.
-tinymcp_asset="$(node scripts/ci/self-hosted/test-module-assets.mjs "$wallet_platform" tinymcp)"
-IFS=$'\t' read -r _tinymcp_id tinymcp_url tinymcp_filename tinymcp_sha256 <<< "$tinymcp_asset"
-tinymcp_dir="$REPO_ROOT/target/test-modules/tinymcp/$tinymcp_sha256"
-tinymcp_archive="$tinymcp_dir/$tinymcp_filename"
-if [ ! -f "$tinymcp_dir/libtinymcp_module.$module_ext" ]; then
-  echo "Downloading the checksum-pinned TinyMCP test module ..."
-  mkdir -p "$tinymcp_dir"
-  curl --fail --location --silent --show-error "$tinymcp_url" --output "$tinymcp_archive"
-  if command -v shasum >/dev/null 2>&1; then
-    echo "${tinymcp_sha256}  $tinymcp_archive" | shasum -a 256 -c
+# the host's module adapter, so they load the released, checksum-pinned module
+# just as the self-hosted CI installer does (source mode builds it instead).
+if ! local_module_source_is_source; then
+  tinymcp_dir="$(stage_release_module tinymcp "$wallet_platform" "$module_ext")"
+  export OPENHUMAN_MODULE_PATH="$tinymcp_dir${OPENHUMAN_MODULE_PATH:+:$OPENHUMAN_MODULE_PATH}"
+else
+  tinymcp_dir="$REPO_ROOT/target/module-sources/tinymcp"
+fi
+if [ "$module_ext" = "dll" ]; then
+  if local_module_source_is_source; then
+    tinymcp_artifact="$tinymcp_dir/tinymcp.dll"
   else
-    echo "${tinymcp_sha256}  $tinymcp_archive" | sha256sum --check
+    tinymcp_artifact="$tinymcp_dir/tinymcp_module.dll"
   fi
-  tar --no-same-owner -xzf "$tinymcp_archive" -C "$tinymcp_dir"
+elif local_module_source_is_source; then
+  tinymcp_artifact="$tinymcp_dir/libtinymcp.$module_ext"
+else
+  tinymcp_artifact="$tinymcp_dir/libtinymcp_module.$module_ext"
 fi
-export OPENHUMAN_MODULE_PATH="$tinymcp_dir${OPENHUMAN_MODULE_PATH:+:$OPENHUMAN_MODULE_PATH}"
-export OPENHUMAN_TINYMCP_TEST_MODULE="$tinymcp_dir/libtinymcp_module.$module_ext"
 
-if [ -z "${TINYCONNECTORS_TEST_MODULE:-}" ]; then
-  connectors_manifest="vendor/tinyconnectors/crates/tinyconnectors/Cargo.toml"
-  connectors_target_dir="${TINYCONNECTORS_TARGET_DIR:-$REPO_ROOT/target/native-test-modules/tinyconnectors}"
-  connectors_module="$connectors_target_dir/release/libtinyconnectors.$module_ext"
-  echo "Building TinyConnectors test module from the pinned submodule ..."
-  cargo build --release --manifest-path "$connectors_manifest" --target-dir "$connectors_target_dir"
-  connectors_module="$(node scripts/ci/stage-connector-test-module.mjs \
-    "$connectors_module" "$REPO_ROOT/target/test-modules/tinyconnectors")"
+# Build the source modules in one call (local source mode only). The connector
+# directory goes only on the processes that exercise it: most Composio
+# raw-coverage groups explicitly test the absent-module path.
+if [ "${#local_source_ids[@]}" -gt 0 ]; then
+  stage_source_modules "${local_source_ids[@]}"
 fi
+if local_module_source_is_source; then
+  connectors_dir="$REPO_ROOT/target/module-sources/tinyconnectors"
+else
+  connectors_dir="$(stage_release_module tinyconnectors "$wallet_platform" "$module_ext")"
+fi
+for source_id in ${local_source_ids[@]+"${local_source_ids[@]}"}; do
+  if [ "$source_id" != tinyconnectors ] && [ "$source_id" != tinyhosts ]; then
+    export OPENHUMAN_MODULE_PATH="$REPO_ROOT/target/module-sources/$source_id${OPENHUMAN_MODULE_PATH:+:$OPENHUMAN_MODULE_PATH}"
+  fi
+done
+if local_module_source_is_source; then
+  hosts_dir="$REPO_ROOT/target/module-sources/tinyhosts"
+fi
+connectors_module_path="$connectors_dir${OPENHUMAN_MODULE_PATH:+:$OPENHUMAN_MODULE_PATH}"
 
 cargo_test() {
   cargo test --manifest-path Cargo.toml --workspace \
@@ -239,8 +243,13 @@ run_raw_coverage_modules() {
     if { [ "$module" = "composio_credentials_state_raw_coverage_e2e" ] ||
          [ "$module" = "composio_tools_direct_raw_coverage_e2e" ] ||
          [ "$module" = "tools_composio_large_round25_raw_coverage_e2e" ]; } &&
-       [ -z "${TINYCONNECTORS_TEST_MODULE:-}" ]; then
-      TINYCONNECTORS_TEST_MODULE="$connectors_module" \
+       true; then
+      OPENHUMAN_MODULE_PATH="$connectors_module_path" \
+        cargo_test --test raw_coverage_all -- "${module}::" --test-threads=1 "$@"
+    elif [ "$module" = "automation_scheduling_e2e" ]; then
+      # This target executes a scheduled shell job through the verified TinyBox
+      # release, which the ordinary isolated raw-coverage processes do not see.
+      OPENHUMAN_MODULE_PATH="$connectors_module_path" \
         cargo_test --test raw_coverage_all -- "${module}::" --test-threads=1 "$@"
     else
       cargo_test --test raw_coverage_all -- "${module}::" --test-threads=1 "$@"
@@ -261,8 +270,16 @@ run_in_process_modules() {
   while IFS= read -r module; do
     [ -n "$module" ] || continue
     echo "[test-rust-with-mock] in-process module: ${module}"
-    TINYCONNECTORS_TEST_MODULE="${TINYCONNECTORS_TEST_MODULE:-$connectors_module}" \
-      cargo_test --test in_process_all -- "${module}::" "$@"
+    if [ "$module" = "config_auth_app_state_connectivity_e2e" ]; then
+      # RPC fixtures in this module bind ephemeral listeners and mutate
+      # process-wide credential state; parallel tests can tear down a peer's
+      # listener before its final auth call.
+      OPENHUMAN_MODULE_PATH="$connectors_module_path" \
+        cargo_test --test in_process_all -- "${module}::" --test-threads=1 "$@"
+    else
+      OPENHUMAN_MODULE_PATH="$connectors_module_path" \
+        cargo_test --test in_process_all -- "${module}::" "$@"
+    fi
   done < <(in_process_modules)
 }
 
@@ -276,6 +293,7 @@ run_json_rpc_e2e() {
     return 1
   fi
   test_names="$(printf '%s\n' "$listing" | sed -n 's/: test$//p')"
+  if [ -n "${JSON_RPC_E2E_FILTER:-}" ]; then test_names="$(printf "%s\n" "$test_names" | grep -- "$JSON_RPC_E2E_FILTER" || true)"; fi
   if [ -z "$test_names" ]; then
     echo "[test-rust-with-mock] ERROR: json_rpc_e2e enumeration returned no tests." >&2
     return 1
@@ -295,22 +313,44 @@ run_build_only_reaper_test() {
     -- --exact --test-threads=1 "$@"
 }
 
+run_tinychannels_linked_fixture_tests() {
+  # These confidential calls use the linked test module and run in fresh
+  # processes so process-wide module-loader state cannot leak into the unit
+  # suite. The linked source is explicit and never falls back to downloading.
+  OPENHUMAN_MODULE_PATH="$tinychannels_dir${OPENHUMAN_MODULE_PATH:+:$OPENHUMAN_MODULE_PATH}" \
+    cargo_test --features e2e-test-support --lib channels::module_fixture:: \
+      -- --test-threads=1 "$@"
+  OPENHUMAN_MODULE_PATH="$tinychannels_dir${OPENHUMAN_MODULE_PATH:+:$OPENHUMAN_MODULE_PATH}" \
+    cargo_test --features e2e-test-support --lib \
+      modules::ops::tests::a_registered_linked_factory_serves_the_module_and_status_says_so \
+      -- --exact --test-threads=1 "$@"
+  OPENHUMAN_MODULE_PATH="$tinychannels_dir${OPENHUMAN_MODULE_PATH:+:$OPENHUMAN_MODULE_PATH}" \
+    cargo_test --lib \
+    channels::host::channel_events::tests:: -- --test-threads=1 "$@"
+}
+
 run_full_suite() {
   # Several unit fixtures mutate process-wide state (provider overrides and
   # temporary executable paths). Keep this aggregate invocation deterministic;
   # integration targets below retain their own, narrower isolation strategies.
-  TINYCONNECTORS_TEST_MODULE="${TINYCONNECTORS_TEST_MODULE:-$connectors_module}" \
+  OPENHUMAN_MODULE_PATH="$connectors_module_path" \
     cargo_test --lib -- --test-threads=1 \
     --skip a_build_only_runtime_is_swept_before_it_can_be_invoked "$@"
   # The core binary and the developer bins live in `crates/openhuman-cli`;
   # `--workspace --bins` picks them up there (plus the TUI binary).
   cargo_test --bins -- --test-threads=1 "$@"
   run_build_only_reaper_test "$@"
+  run_tinychannels_linked_fixture_tests "$@"
   cargo_test --doc -- "$@"
 
   while IFS= read -r target; do
     [ -n "$target" ] || continue
-    if [ "$target" = "raw_coverage_all" ]; then
+    if [ "$target" = "tinydocs_linked_e2e" ]; then
+      # This local-only target is intentionally outside the product set; turn
+      # on its linked implementation feature explicitly so the glob does not
+      # silently skip it or Cargo reject it for missing required features.
+      cargo_test --features linked-modules --test "$target" -- "$@"
+    elif [ "$target" = "raw_coverage_all" ]; then
       # These suites used to run as separate integration-test binaries. Run
       # each generated module filter in its own cargo process so local
       # `pnpm test:rust` preserves the same process-global isolation as CI.
@@ -319,20 +359,29 @@ run_full_suite() {
       run_in_process_modules "$@"
     elif [ "$target" = "json_rpc_e2e" ]; then
       run_json_rpc_e2e "$@"
+    elif [ "$target" = "tinymcp_storage_smoke_e2e" ]; then
+      OPENHUMAN_MODULE_PATH="$tinymcp_dir${OPENHUMAN_MODULE_PATH:+:$OPENHUMAN_MODULE_PATH}" \
+        cargo_test --features e2e-test-support --test "$target" -- "$@"
     elif [ "$target" = "mcp_registry_e2e" ]; then
       # The TinyMCP module owns process-level directory transitions; this
       # binary exercises several workspaces against that shared module object.
-      TINYCONNECTORS_TEST_MODULE="${TINYCONNECTORS_TEST_MODULE:-$connectors_module}" \
+      OPENHUMAN_MODULE_PATH="$connectors_module_path" \
         cargo_test --test "$target" -- --ignored --test-threads=1 "$@"
+    elif [ "$target" = "mcp_registry_multi_server" ]; then
+      # The host opens multiple per-workspace clients to one TinyMCP module.
+      # Keep this integration target serial so those module-backed transitions
+      # do not race through the process-global loader.
+      OPENHUMAN_TINYMCP_TEST_MODULE="$tinymcp_artifact" \
+        cargo_test --test "$target" -- --test-threads=1 "$@"
     else
-      TINYCONNECTORS_TEST_MODULE="${TINYCONNECTORS_TEST_MODULE:-$connectors_module}" \
+      OPENHUMAN_MODULE_PATH="$connectors_module_path" \
         cargo_test --test "$target" -- "$@"
     fi
   done < <(integration_test_targets)
 
   # Loading a native module mutates process-global module state, so exercise
   # the published contract in a fresh libtest process with its pinned artifact.
-  TINYCONNECTORS_TEST_MODULE="${TINYCONNECTORS_TEST_MODULE:-$connectors_module}" \
+  OPENHUMAN_MODULE_PATH="$hosts_dir:$connectors_module_path" \
     cargo_test --lib \
       hosting::test::released_artifact_serves_providers_and_confidential_local_preparation \
       -- --exact --ignored --test-threads=1
@@ -366,8 +415,22 @@ elif [ "$#" -ge 2 ] && [ "$1" = "--test" ] && [ "$2" = "mcp_registry_e2e" ]; the
   if [ "${1:-}" = "--" ]; then
     shift
   fi
-  TINYCONNECTORS_TEST_MODULE="${TINYCONNECTORS_TEST_MODULE:-$connectors_module}" \
+  OPENHUMAN_MODULE_PATH="$connectors_module_path" \
     cargo_test --test mcp_registry_e2e -- --ignored --test-threads=1 "$@"
+elif [ "$#" -ge 2 ] && [ "$1" = "--test" ] && [ "$2" = "tinymcp_storage_smoke_e2e" ]; then
+  shift 2
+  if [ "${1:-}" = "--" ]; then
+    shift
+  fi
+  OPENHUMAN_MODULE_PATH="$tinymcp_dir${OPENHUMAN_MODULE_PATH:+:$OPENHUMAN_MODULE_PATH}" \
+    cargo_test --features e2e-test-support --test tinymcp_storage_smoke_e2e -- "$@"
+elif [ "$#" -ge 2 ] && [ "$1" = "--test" ] && [ "$2" = "mcp_registry_multi_server" ]; then
+  shift 2
+  if [ "${1:-}" = "--" ]; then
+    shift
+  fi
+  OPENHUMAN_TINYMCP_TEST_MODULE="$tinymcp_artifact" \
+    cargo_test --test mcp_registry_multi_server -- --test-threads=1 "$@"
 else
   cargo_test "$@"
 fi

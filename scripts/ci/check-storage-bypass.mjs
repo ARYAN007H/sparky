@@ -14,10 +14,11 @@
 //   json-write   fs::write / File::create / OpenOptions::new() / NamedTempFile - a raw file
 //                store; use the document, stream or secret port
 //
-// A file may keep a rule when it is the legacy fallback of a store that already
-// runs on the port (it serves the host that configured no backend), or when its
-// state is per-machine and must not be shared. Both are listed in ALLOW with the
-// reason; the reason is the review.
+// A file may keep a rule when it is a read-only legacy importer, or when its
+// state is per-machine, bootstrap or non-record bytes. Each is listed in ALLOW
+// with the reason; the reason is the review. A store's own file fallback is
+// never allowed: with no installed backend it uses the workspace default
+// (`storage::local`).
 //
 //   node scripts/ci/check-storage-bypass.mjs
 //   node scripts/ci/check-storage-bypass.mjs --write-baseline
@@ -64,9 +65,9 @@ export const CURATED_VENDOR_ROOTS = [
   "vendor/tinyagents/crates/tinyagents-tasks/src",
   "vendor/tinyskills/crates/tinyskills/src/registry/store.rs",
   "vendor/tinyagents/crates/tinyagents-session/src/run_ledger",
-  "vendor/tinyagents/crates/tinyagents-session/src/threads/store",
+  "vendor/tinyagents/crates/tinyagents-session/src/threads/mod.rs",
   "vendor/tinyagents/crates/tinyagents-session/src/transcript",
-  "vendor/tinyagents/crates/tinyagents-session/src/turn_state/store.rs",
+  "vendor/tinyagents/crates/tinyagents-session/src/turn_state/mirror",
   "vendor/tinymcp/crates/tinymcp/src/registry/store",
   "vendor/tinymcp/crates/tinymcp/src/audit/store",
   "vendor/tinymcp/crates/tinymcp/src/tinybus_module/service.rs",

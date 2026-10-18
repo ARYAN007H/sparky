@@ -1,49 +1,13 @@
 //! Per-sender routing and runtime command handling.
 
 use super::context::{clear_sender_history, ChannelRouteSelection, ChannelRuntimeContext};
-use super::traits;
 use super::{Channel, ChannelSendExt, SendMessage};
 use crate::inference::provider;
 use std::sync::Arc;
-#[cfg(test)]
-use tinychannels::remote::{parse_remote_command, RemoteCommand};
-#[cfg(test)]
-use tinychannels::routes::{
-    parse_runtime_command as parse_portable_runtime_command,
-    resolve_provider_alias as resolve_portable_provider_alias,
-    ChannelRuntimeCommand as PortableCommand,
-};
+use tinychannels_bus as traits;
 use tinychannels_bus::module_control::{
     ChannelControlRequest, ChannelControlResult, ProviderDescriptor,
 };
-
-#[cfg(test)]
-#[derive(Debug, Clone, PartialEq, Eq)]
-enum ChannelRuntimeCommand {
-    Portable(PortableCommand),
-    Remote(RemoteCommand),
-}
-
-#[cfg(test)]
-fn parse_runtime_command(channel_name: &str, content: &str) -> Option<ChannelRuntimeCommand> {
-    let trimmed = content.trim();
-    if !trimmed.starts_with('/') {
-        return None;
-    }
-
-    if tinychannels::capabilities_for(channel_name).remote_control {
-        if let Some(remote) = parse_remote_command(content) {
-            return Some(ChannelRuntimeCommand::Remote(remote));
-        }
-    }
-
-    parse_portable_runtime_command(channel_name, trimmed).map(ChannelRuntimeCommand::Portable)
-}
-
-#[cfg(test)]
-fn resolve_provider_alias(name: &str) -> Option<String> {
-    resolve_portable_provider_alias(name, &provider_descriptors())
-}
 
 fn provider_descriptors() -> Vec<ProviderDescriptor> {
     provider::list_providers()
@@ -124,12 +88,14 @@ impl RouteCallbacks {
         context: ChannelRuntimeContext,
         cancellation: tokio_util::sync::CancellationToken,
     ) -> Self {
+        let ctx = context.dispatch_ctx();
         Self {
-            context,
-            core_context: crate::core::runtime::CoreContext::current(),
-            tenant: crate::core::runtime::tenant::current_tenant_or_isolated(
+            core_context: ctx.resolved(),
+            tenant: crate::core::runtime::tenant::isolated_unless_tenant(
+                ctx.tenant(),
                 "channel_remote_control",
             ),
+            context,
             cancellation,
         }
     }
@@ -143,6 +109,12 @@ impl RouteCallbacks {
     ) -> tinybus::Result<tinychannels_bus::ChannelBackendResult> {
         match request {
             tinychannels_bus::ChannelBackendRequest::RemoteControl(request) => {
+                // The captured context is the carrier; without one the host's
+                // default context (none in SaaS, which fails closed).
+                let dispatch_ctx = match &self.core_context {
+                    Some(core) => crate::core::runtime::DispatchCtx::new(Arc::clone(core)),
+                    None => crate::core::runtime::DispatchCtx::host_default(),
+                };
                 let dispatch = async {
                     tokio::select! {
                         biased;
@@ -150,6 +122,7 @@ impl RouteCallbacks {
                             Err(tinybus::Error::failed("channel session ended"))
                         }
                         result = super::host::remote_control::dispatch_callback(
+                            &dispatch_ctx,
                             &self.context,
                             &self.tenant,
                             &self.cancellation,
@@ -215,7 +188,7 @@ pub(crate) async fn handle_runtime_command_if_needed(
         let close = lease.close().await;
         let response = response?;
         close?;
-        Ok::<_, crate::modules::client::ModuleCallError>(response)
+        Ok::<_, tinybus::module::ModuleCallError>(response)
     }
     .await;
     let (reply, next_route, clear_history) = match operation {
@@ -225,7 +198,7 @@ pub(crate) async fn handle_runtime_command_if_needed(
             clear_history,
         }) => (reply, next_route, clear_history),
         Ok(_) => {
-            crate::modules::client::ModuleClient::report_malformed_reply("tinychannels");
+            crate::modules::report::malformed_reply("tinychannels");
             return true;
         }
         Err(_) => {
@@ -251,7 +224,7 @@ pub(crate) async fn handle_runtime_command_if_needed(
         );
     }
     if clear_history {
-        clear_sender_history(ctx, sender_key);
+        clear_sender_history(&ctx.conversation_histories, sender_key);
     }
     let Some(reply) = reply else {
         return false;

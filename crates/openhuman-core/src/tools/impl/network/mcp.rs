@@ -234,6 +234,7 @@ impl Tool for McpListToolsTool {
                 name: tool.name.clone(),
                 description: projected.description.clone().or(projected.title.clone()),
                 input_schema: tool.input_schema.clone(),
+                meta: None,
             })
             .collect();
         let safe = crate::mcp::registry::tools_safe_for_agent(&server, policy_tools);
@@ -546,10 +547,8 @@ fn unavailable_outcome(server: &str, tool: &str) -> tinymcp_bus::McpCallOutcome 
     )
 }
 
-pub(super) fn input_module_error_code(
-    error: crate::modules::client::ModuleCallError,
-) -> &'static str {
-    use crate::modules::client::ModuleCallError;
+pub(super) fn input_module_error_code(error: tinybus::module::ModuleCallError) -> &'static str {
+    use tinybus::module::ModuleCallError;
     match error {
         ModuleCallError::Unavailable | ModuleCallError::IncompatibleContract => {
             tinymcp_bus::errors::BUS
@@ -559,10 +558,8 @@ pub(super) fn input_module_error_code(
     }
 }
 
-pub(super) fn input_module_error_message(
-    error: crate::modules::client::ModuleCallError,
-) -> &'static str {
-    use crate::modules::client::ModuleCallError;
+pub(super) fn input_module_error_message(error: tinybus::module::ModuleCallError) -> &'static str {
+    use tinybus::module::ModuleCallError;
     match error {
         ModuleCallError::Unavailable => "TinyMCP module is unavailable",
         ModuleCallError::IncompatibleContract => "TinyMCP contract is incompatible",

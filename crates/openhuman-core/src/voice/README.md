@@ -347,7 +347,7 @@ count, rolling recent-transcript buffer) behind a `OnceCell` singleton.
   the handlers here.
 - Backend credentials come from
   `security::credentials::session_support::resolve_backend_credential` (session
-  JWT or TinyHumans API key) and backend URLs from `BackendClient`. The core
+  JWT or TinyHumans API key) and backend URLs from `Config.resolved_endpoints`. The core
   does not hold hosted URLs itself.
 - Config shape lives under `config/schema/` (`voice_server.rs`,
   `voice_providers.rs`); migrations live in `config/migrations/`.
@@ -406,6 +406,6 @@ Tests sit beside their modules as `<module>_tests.rs` (for example
 
 ## Further reading
 
-- [Voice tools](../../../../gitbooks/features/native-tools/voice.md)
+- [Voice tools](../../../../docs/gitbooks/en/features/native-tools/voice.md)
 - [tinyvoice submodule](../../../../vendor/tinyvoice/README.md)
-- [Chat](../../../../gitbooks/features/chat.md)
+- [Chat](../../../../docs/gitbooks/en/features/chat.md)

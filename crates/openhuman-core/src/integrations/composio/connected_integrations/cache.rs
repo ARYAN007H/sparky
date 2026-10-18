@@ -53,7 +53,7 @@ pub(crate) fn cache_generation(key: &str) -> Arc<AtomicU64> {
 
 /// Resolve the catalog's profile/operator identity, refusing missing SaaS scope.
 fn current_cache_scope_prefix(operation: &'static str) -> Option<String> {
-    let tenant = match crate::core::runtime::current_tenant() {
+    let tenant = match crate::core::runtime::DispatchCtx::ambient().tenant() {
         Ok(tenant) => tenant,
         Err(error) => {
             // NoTenant is a fixed, content-free error; do not attach identities.
@@ -131,8 +131,13 @@ static COMPOSIO_CACHE_TEST_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::co
 /// credentials. SaaS work without a profile cannot read or populate the cache.
 pub(crate) fn checked_cache_key(config: &Config) -> Option<String> {
     let prefix = current_cache_scope_prefix("cache_key")?;
-    let backend_url = crate::backend::base_url(&config.api_url)
-        .map(|url| crate::util::url::normalize_backend_api_base_url(&url))
+    // The control-plane origin a host's config enricher resolved (empty when no
+    // host resolved one, as with no hosted connection).
+    let backend_url = config
+        .resolved_endpoints
+        .control_plane_url
+        .as_deref()
+        .map(crate::util::url::normalize_backend_api_base_url)
         .unwrap_or_default();
     Some(format!(
         "{prefix}{}",

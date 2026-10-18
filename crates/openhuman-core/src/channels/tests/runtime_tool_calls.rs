@@ -3,7 +3,7 @@ use super::super::context::{
     CHANNEL_MESSAGE_TIMEOUT_SECS,
 };
 use super::super::runtime::process_channel_message;
-use super::super::{traits, Channel};
+use super::super::Channel;
 use super::common::{
     IterativeToolModel, MockPriceTool, ModelCaptureModel, RecordingChannel,
     TelegramRecordingChannel, ToolCallingModel,
@@ -12,6 +12,7 @@ use crate::inference::provider;
 use std::collections::HashMap;
 use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
+use tinychannels_bus as traits;
 use tinyinference_llm::model::ChatModel;
 
 #[tokio::test]
@@ -47,6 +48,7 @@ async fn process_channel_message_executes_native_tool_calls() {
         multimodal: crate::config::MultimodalConfig::default(),
         multimodal_files: crate::config::MultimodalFileConfig::default(),
         config: None,
+        core: None,
     });
 
     process_channel_message(
@@ -119,6 +121,7 @@ async fn process_channel_message_handles_models_command_without_llm_call() {
         multimodal: crate::config::MultimodalConfig::default(),
         multimodal_files: crate::config::MultimodalFileConfig::default(),
         config: None,
+        core: None,
     });
 
     let cmd_msg = traits::ChannelMessage {
@@ -220,6 +223,7 @@ async fn process_channel_message_uses_route_override_provider_and_model() {
         multimodal: crate::config::MultimodalConfig::default(),
         multimodal_files: crate::config::MultimodalFileConfig::default(),
         config: None,
+        core: None,
     });
 
     process_channel_message(runtime_ctx, routed_msg).await;
@@ -271,6 +275,7 @@ async fn process_channel_message_respects_configured_max_tool_iterations_above_d
         multimodal: crate::config::MultimodalConfig::default(),
         multimodal_files: crate::config::MultimodalFileConfig::default(),
         config: None,
+        core: None,
     });
 
     process_channel_message(
@@ -330,6 +335,7 @@ async fn process_channel_message_reports_configured_max_tool_iterations_limit() 
         multimodal: crate::config::MultimodalConfig::default(),
         multimodal_files: crate::config::MultimodalFileConfig::default(),
         config: None,
+        core: None,
     });
 
     process_channel_message(

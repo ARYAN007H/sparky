@@ -304,3 +304,16 @@ test("host calls to the JSONL task opener cannot hide their persistent path", ()
   assert.equal(findings.length, 1);
   assert.equal(findings[0].rule, "task-store-open");
 });
+
+test("current thread and turn-state host facades remain curated after storage migration", () => {
+  assert.ok(
+    CURATED_VENDOR_ROOTS.includes(
+      "vendor/tinyagents/crates/tinyagents-session/src/threads/mod.rs",
+    ),
+  );
+  assert.ok(
+    CURATED_VENDOR_ROOTS.includes(
+      "vendor/tinyagents/crates/tinyagents-session/src/turn_state/mirror",
+    ),
+  );
+});

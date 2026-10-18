@@ -1,14 +1,13 @@
-//! Identity-scoped implementation of TinyChannels' 14 host callbacks.
+//! Identity-scoped implementation of TinyChannels' host callbacks (durable state goes through the storage bus).
 
-use super::delivery_store::ChannelDeliveryStore;
 use crate::channels::context::ChannelRuntimeContext;
 use crate::channels::runtime::dispatch::RuntimeChannelMessage;
 use crate::config::Config;
 use std::sync::{Arc, OnceLock, Weak};
 use tinybus::{Error, Result};
 use tinychannels_bus::{
-    ChannelBackendRequest, ChannelBackendResult, DeliveryQueueEntry, DeliveryTerminalResult,
-    HostEventPublication, HostTranscriptionRequest, HostTranscriptionResult,
+    ChannelBackendRequest, ChannelBackendResult, HostEventPublication, HostTranscriptionRequest,
+    HostTranscriptionResult,
 };
 use tokio::sync::mpsc;
 
@@ -26,26 +25,25 @@ pub(super) struct ChannelHostCallbacks {
     cancellation: tokio_util::sync::CancellationToken,
     context: Arc<OnceLock<Weak<ChannelRuntimeContext>>>,
     dispatch: mpsc::Sender<RuntimeChannelMessage>,
-    delivery: ChannelDeliveryStore,
 }
 
 impl ChannelHostCallbacks {
     pub(super) fn new(
+        ctx: &crate::core::runtime::DispatchCtx,
         config: Arc<Config>,
         context: Arc<OnceLock<Weak<ChannelRuntimeContext>>>,
         dispatch: mpsc::Sender<RuntimeChannelMessage>,
     ) -> Self {
-        let delivery = ChannelDeliveryStore::for_workspace(&config.workspace_dir);
         Self {
             config,
-            core_context: crate::core::runtime::CoreContext::current(),
-            tenant: crate::core::runtime::tenant::current_tenant_or_isolated(
+            core_context: ctx.resolved(),
+            tenant: crate::core::runtime::tenant::isolated_unless_tenant(
+                ctx.tenant(),
                 "channel_host_callback",
             ),
             cancellation: crate::channels::runtime::session::channel_session(),
             context,
             dispatch,
-            delivery,
         }
     }
 
@@ -127,65 +125,6 @@ impl ChannelHostCallbacks {
             .map_err(|_| Error::failed("channel identity persistence failed"))
     }
 
-    async fn save_pending_delivery(&self, entry: DeliveryQueueEntry) -> Result<()> {
-        Self::validate_callback_size(&entry)?;
-        self.delivery
-            .save_pending(entry)
-            .await
-            .map_err(|_| Error::failed("delivery persistence failed"))
-    }
-
-    async fn load_pending_delivery(&self, id: String) -> Result<Option<DeliveryQueueEntry>> {
-        self.delivery
-            .load_pending(id)
-            .await
-            .map_err(|_| Error::failed("delivery lookup failed"))
-    }
-
-    async fn load_pending_deliveries(&self) -> Result<Vec<DeliveryQueueEntry>> {
-        self.delivery
-            .load_pending_all()
-            .await
-            .map_err(|_| Error::failed("delivery lookup failed"))
-    }
-
-    async fn remove_pending_delivery(&self, id: String) -> Result<()> {
-        self.delivery
-            .remove_pending(id)
-            .await
-            .map_err(|_| Error::failed("delivery removal failed"))
-    }
-
-    async fn save_failed_delivery(&self, entry: DeliveryQueueEntry) -> Result<()> {
-        Self::validate_callback_size(&entry)?;
-        self.delivery
-            .save_failed(entry)
-            .await
-            .map_err(|_| Error::failed("failed delivery persistence failed"))
-    }
-
-    async fn load_failed_delivery(&self, id: String) -> Result<Option<DeliveryQueueEntry>> {
-        self.delivery
-            .load_failed(id)
-            .await
-            .map_err(|_| Error::failed("failed delivery lookup failed"))
-    }
-
-    async fn save_delivery_result(&self, result: DeliveryTerminalResult) -> Result<()> {
-        Self::validate_callback_size(&result)?;
-        self.delivery
-            .save_result(result)
-            .await
-            .map_err(|_| Error::failed("delivery result persistence failed"))
-    }
-
-    async fn load_delivery_result(&self, id: String) -> Result<Option<DeliveryTerminalResult>> {
-        self.delivery
-            .load_result(id)
-            .await
-            .map_err(|_| Error::failed("delivery result lookup failed"))
-    }
-
     async fn transcribe(
         &self,
         request: HostTranscriptionRequest,
@@ -222,6 +161,12 @@ impl ChannelHostCallbacks {
                 let context = self.context()?;
                 let tenant = &self.tenant;
                 let cancellation = &self.cancellation;
+                // The captured context is the carrier; without one the host's
+                // default context (none in SaaS, which fails closed).
+                let dispatch_ctx = match &self.core_context {
+                    Some(core) => crate::core::runtime::DispatchCtx::new(Arc::clone(core)),
+                    None => crate::core::runtime::DispatchCtx::host_default(),
+                };
                 let dispatch = async {
                     tokio::select! {
                         biased;
@@ -229,6 +174,7 @@ impl ChannelHostCallbacks {
                             Err(Error::failed("channel session ended"))
                         }
                         result = crate::channels::host::remote_control::dispatch_callback(
+                            &dispatch_ctx,
                             context.as_ref(),
                             tenant,
                             cancellation,

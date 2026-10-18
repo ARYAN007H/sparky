@@ -48,6 +48,7 @@ pub(crate) mod direct_auth;
 pub mod execute_dispatch;
 pub(crate) mod file_store;
 mod file_store_documents;
+pub(crate) use file_store_documents::migrate_legacy_state;
 pub mod googlecalendar_args;
 pub mod identity;
 pub mod identity_store;
@@ -55,6 +56,8 @@ pub mod module_client;
 pub mod ops;
 pub(crate) mod processing;
 pub mod schemas;
+#[cfg(test)]
+pub(crate) mod test_backend_route;
 pub mod tools;
 pub(crate) mod trigger_history;
 pub mod types;
@@ -87,6 +90,3 @@ pub use types::{
     ComposioToolsResponse, ComposioTriggerEvent, ComposioTriggerHistoryEntry,
     ComposioTriggerHistoryResult, ComposioTriggerMetadata,
 };
-
-/// Product-specific task recency scoping used by the briefing runner.
-pub(crate) mod task_recency_context;

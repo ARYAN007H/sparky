@@ -27,6 +27,47 @@ const repoRoot = path.join(
 );
 const runner = path.join(repoRoot, "scripts", "test-rust-e2e.sh");
 
+test("Rust E2E keeps module cache paths out of a shared runner home", (t) => {
+  if (process.platform === "win32") return t.skip("runner shell test requires Unix permissions");
+
+  const source = fs.readFileSync(runner, "utf8");
+  const start = source.indexOf('CREATED_XDG_DATA_HOME=""');
+  const end = source.indexOf("\ncleanup() {", start);
+  assert.notEqual(start, -1, "runner initializes its private XDG directories");
+  assert.notEqual(end, -1, "runner XDG setup ends before cleanup");
+  const setup = source.slice(start, end);
+  const script = [
+    "set -euo pipefail",
+    setup,
+    'printf "DATA=%s\\nCACHE=%s\\nCREATED_DATA=%s\\nCREATED_CACHE=%s\\n" "${XDG_DATA_HOME:-}" "${XDG_CACHE_HOME:-}" "$CREATED_XDG_DATA_HOME" "${CREATED_XDG_CACHE_HOME:-}"',
+  ].join("\n");
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), "rust-e2e-shared-home-"));
+  fs.chmodSync(home, 0o755);
+  let output;
+  try {
+    output = execFileSync("bash", ["-c", script], {
+      encoding: "utf8",
+      env: { ...process.env, HOME: home, XDG_DATA_HOME: "", XDG_CACHE_HOME: "" },
+    });
+    const values = Object.fromEntries(
+      output.trim().split("\n").map((line) => line.split("=", 2)),
+    );
+    assert.ok(values.DATA, output);
+    assert.ok(values.CACHE && values.CACHE !== values.DATA, output);
+    assert.equal(values.CREATED_DATA, values.DATA, output);
+    assert.equal(values.CREATED_CACHE, values.CACHE, output);
+    assert.equal(fs.statSync(values.DATA).mode & 0o777, 0o700);
+    assert.equal(fs.statSync(values.CACHE).mode & 0o777, 0o700);
+    assert.ok(!values.DATA.startsWith(home), output);
+  } finally {
+    const createdData = output?.match(/^CREATED_DATA=(.*)$/m)?.[1];
+    const createdCache = output?.match(/^CREATED_CACHE=(.*)$/m)?.[1];
+    if (createdData) fs.rmSync(createdData, { recursive: true, force: true });
+    if (createdCache) fs.rmSync(createdCache, { recursive: true, force: true });
+    fs.rmSync(home, { recursive: true, force: true });
+  }
+});
+
 /** Extract a top-level `name() { … }` block from the runner, verbatim. */
 function extractFunction(name) {
   const source = fs.readFileSync(runner, "utf8");
@@ -243,28 +284,12 @@ test("mcp_registry_e2e runs serially because its module state is process-global"
   );
 });
 
-test("the E2E runner builds and exports its pinned search module fixture", () => {
+test("the E2E runner stages released search and connector fixtures, and builds only in local source mode", () => {
   const source = fs.readFileSync(runner, "utf8");
   const start = source.indexOf("# Module-backed Composio coverage");
   const end = source.indexOf('echo "[rust-e2e] Running', start);
   assert.ok(start >= 0 && end > start, "module preparation block exists");
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "rust-e2e-modules-"));
-  const connectorDir = path.join(
-    dir,
-    "target/native-test-modules/tinyconnectors/release",
-  );
-  fs.mkdirSync(connectorDir, { recursive: true });
-  fs.writeFileSync(
-    path.join(connectorDir, "libtinyconnectors.so"),
-    "pinned connector fixture",
-  );
-  const runLog = path.join(dir, "runs.log");
-  const cargo = path.join(dir, "cargo");
-  fs.writeFileSync(
-    cargo,
-    '#!/usr/bin/env bash\nprintf \'%s\\n\' "$*" >> "$STUB_RUN_LOG"\n',
-    { mode: 0o755 },
-  );
   try {
     const output = execFileSync(
       "bash",
@@ -273,39 +298,23 @@ test("the E2E runner builds and exports its pinned search module fixture", () =>
         [
           "set -euo pipefail",
           'REPO_ROOT="$STUB_DIR"',
-          'CARGO_BIN="$STUB_DIR/cargo"',
-          "module_ext=so",
-          "unset TINYCONNECTORS_TEST_MODULE TINYSEARCH_TEST_MODULE",
+          "e2e_source_ids=(tinyconnectors tinysearch)",
+          "unset OPENHUMAN_MODULE_PATH",
+          'stage_source_modules() { printf "built=%s\\n" "$*"; }',
           source.slice(start, end),
-          "printf 'search=%s\\n' \"${TINYSEARCH_TEST_MODULE:-}\"",
+          "printf 'path=%s\\n' \"${OPENHUMAN_MODULE_PATH:-}\"",
         ].join("\n"),
       ],
-      {
-        encoding: "utf8",
-        env: { ...process.env, STUB_DIR: dir, STUB_RUN_LOG: runLog },
-      },
+      { encoding: "utf8", env: { ...process.env, STUB_DIR: dir } },
     );
+    assert.match(output, /built=tinyconnectors tinysearch/);
     assert.ok(
       output.includes(
-        `search=${dir}/target/native-test-modules/tinysearch/release/libtinysearch.so`,
+        `path=${dir}/target/module-sources/tinysearch:${dir}/target/module-sources/tinyconnectors`,
       ),
       output,
     );
-    assert.match(
-      fs.readFileSync(
-        path.join(dir, "target/test-modules/tinyconnectors/modules.toml"),
-        "utf8",
-      ),
-      /"libtinyconnectors\.so" = "[a-f0-9]{64}"/,
-    );
-    assert.ok(
-      fs
-        .readFileSync(runLog, "utf8")
-        .includes(
-          "build --release --manifest-path vendor/tinysearch/crates/tinysearch/Cargo.toml --target-dir " +
-            path.join(dir, "target/native-test-modules/tinysearch"),
-        ),
-    );
+    assert.doesNotMatch(source, /--target-dir/, "no temp or ad hoc target dir");
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }

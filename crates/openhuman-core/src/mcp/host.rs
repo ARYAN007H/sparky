@@ -9,6 +9,14 @@ use std::sync::OnceLock;
 
 use crate::config::Config;
 
+pub use super::host_cleanup::{
+    reserve_agent_directory, spawn_agent_cleanup, AgentDirectoryCleanup,
+};
+#[cfg(not(feature = "mcp"))]
+pub use super::host_cleanup::{take_agent_cleanup, AgentMcpCleanup};
+#[cfg(feature = "mcp")]
+pub use super::module_client::agent_cleanup::{take_agent_cleanup, AgentMcpCleanup};
+
 const PROXY_SERVICE_KEY: &str = "tool.mcp_client";
 const DEFAULT_CORE_PORT: u16 = 7788;
 static DEFAULT_CONFIG: OnceLock<Config> = OnceLock::new();
@@ -19,13 +27,11 @@ pub fn set_default_config(config: &Config) {
     let _ = DEFAULT_CONFIG.set(config.clone());
 }
 
-/// The config named by the current scoped dispatch, or the process default
+/// The config named by the dispatch context `ctx`, or the process default
 /// outside a tenant scope.
-pub fn ambient_config() -> Option<Config> {
-    match crate::core::runtime::current_tenant() {
-        Ok(tenant) if tenant.is_scoped() => {
-            crate::core::runtime::CoreContext::with_current_embedder_config(Clone::clone)
-        }
+pub fn ambient_config(ctx: &crate::core::runtime::DispatchCtx) -> Option<Config> {
+    match ctx.tenant() {
+        Ok(tenant) if tenant.is_scoped() => ctx.embedder_config(),
         _ => DEFAULT_CONFIG.get().cloned(),
     }
 }
@@ -95,10 +101,10 @@ pub fn schedule_agent_close_with_cleanup(
     let _ = after_close();
 }
 
-/// No agent-scoped module cleanup is pending when MCP is disabled.
+/// Host-owned directory cleanup can remain pending even without MCP.
 #[cfg(not(feature = "mcp"))]
-pub fn agent_close_pending(_workspace_dir: &std::path::Path, _agent_id: &str) -> bool {
-    false
+pub fn agent_close_pending(workspace_dir: &std::path::Path, agent_id: &str) -> bool {
+    super::host_cleanup::directory_pending(workspace_dir, agent_id)
 }
 
 /// Converts the MCP section of product configuration to the module contract.
@@ -119,6 +125,7 @@ pub fn client_config(config: &Config) -> tinymcp_bus::McpClientConfig {
     client.client_identity.name = config.mcp_client.client_identity.name.clone();
     client.client_identity.title = config.mcp_client.client_identity.title.clone();
     client.client_identity.version = config.mcp_client.client_identity.version.clone();
+    client.client_identity.capabilities = tinymcp_bus::ui::client_capabilities();
     client.registry_auth = config.mcp_client.registry_auth.clone();
 
     // GitBooks uses dedicated deferred tools and is not part of the configured
