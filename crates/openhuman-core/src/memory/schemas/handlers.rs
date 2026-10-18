@@ -6,7 +6,7 @@ use std::future::Future;
 use crate::config::Config;
 use crate::core::all::ControllerFuture;
 use crate::core::runtime::DispatchCtx;
-use crate::core::Outcome;
+use crate::core::{Outcome, StructuredRpcError};
 use tinymemory_api::{Error, Result};
 use crate::memory::explore::{ExploreParams, ItemsGetParams};
 use crate::memory::lifecycle::views::{self, JobsRunParams, PackPreviewParams, PolicySetParams};
@@ -58,20 +58,23 @@ where
     })
 }
 
-fn parse<T: DeserializeOwned>(params: Map<String, Value>) -> Result<T, String> {
+fn parse<T: DeserializeOwned>(params: Map<String, Value>) -> std::result::Result<T, String> {
     serde_json::from_value(Value::Object(params))
-        .map_err(|error| Error::InvalidRequest(format!("invalid params: {error}")).into())
+        .map_err(|error| {
+            StructuredRpcError::from(Error::InvalidRequest(format!("invalid params: {error}")))
+                .encode()
+        })
 }
 
-fn to_json<T: Serialize>(value: T) -> Result<Value, String> {
+fn to_json<T: Serialize>(value: T) -> std::result::Result<Value, String> {
     Outcome::new(value, Vec::new()).into_cli_compatible_json()
 }
 
-fn finish<T: Serialize>(result: Result<T>) -> Result<Value, String> {
-    to_json(result.map_err(String::from)?)
+fn finish<T: Serialize>(result: Result<T>) -> std::result::Result<Value, String> {
+    to_json(result.map_err(|error| StructuredRpcError::from(error).encode())?)
 }
 
-async fn load(ctx: &DispatchCtx) -> Result<Config, String> {
+async fn load(ctx: &DispatchCtx) -> std::result::Result<Config, String> {
     ctx.load_config().await
 }
 
