@@ -24,8 +24,5 @@ fn failed_attempt_after_concurrent_recovery_does_not_become_terminal() {
 
     clear_outage(Some(&state), "stub-cloud");
 
-    assert!(matches!(
-        record_outage(Some(&mut attempt)),
-        None
-    ));
+    assert!(matches!(record_outage(Some(&mut attempt)), None));
 }

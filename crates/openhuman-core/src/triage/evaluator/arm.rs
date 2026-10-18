@@ -7,16 +7,16 @@ use std::time::Instant;
 
 use anyhow::anyhow;
 
-use crate::agent::bus::{AgentTurnRequest, AgentTurnResponse, AGENT_RUN_TURN_METHOD};
+use crate::agent::bus::{AGENT_RUN_TURN_METHOD, AgentTurnRequest, AgentTurnResponse};
 use crate::agent_registry::host_definition::AgentDefinitionRegistry;
 use crate::config::MultimodalConfig;
 use crate::core::bus::BUS;
 use crate::inference::provider::error_classify::parse_retry_after_ms;
+use tinyagents_harness::error::TinyAgentsError;
+use tinyagents_harness::retry::{FailoverDecision, FailoverReason, FailoverState, decide};
 use tinyagents_session::transcript::TranscriptMessage;
 use tinybus::NativeRequestError;
-use tinyagents_harness::error::TinyAgentsError;
-use tinyagents_harness::retry::{decide, FailoverDecision, FailoverReason, FailoverState};
-use tinyinference_providers::{is_budget_message, BudgetMatch};
+use tinyinference_providers::{BudgetMatch, is_budget_message};
 
 use super::super::decision::parse_triage_decision;
 use super::super::envelope::TriggerEnvelope;
@@ -299,4 +299,3 @@ fn is_prompt_guard_rejection(message: &str) -> bool {
 fn is_inference_budget_exceeded(message: &str) -> bool {
     is_budget_message(message, BudgetMatch::Strict)
 }
-
