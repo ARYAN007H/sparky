@@ -75,6 +75,10 @@ async fn run() -> anyhow::Result<()> {
         }
         tokio::time::sleep(std::time::Duration::from_millis(50)).await;
     }
+    if !sent {
+        for r in bot.received_requests().await.unwrap_or_default() { eprintln!("DBG {} {}", r.url.path(), String::from_utf8_lossy(&r.body)); }
+        eprintln!("DBG running={}", listener.is_running());
+    }
     listener.stop();
     assert!(
         sent,
