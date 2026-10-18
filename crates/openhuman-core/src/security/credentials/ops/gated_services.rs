@@ -49,7 +49,7 @@ pub async fn start_credential_gated_services(
 ) {
     // Optional TinyFlows resources warm in the background and must never hold
     // credential activation or ordinary chat startup on module availability.
-    crate::skills::bundled::schedule_flow_authoring_prewarm(ctx, config, None);
+    crate::skills::schedule_flow_authoring_prewarm(ctx, config, None);
     // These login-gated services are mutually independent — the ONLY ordering
     // constraint is voice-server → standalone-dictation-listener (they contend
     // for the single rdev global listener on macOS). Previously each was

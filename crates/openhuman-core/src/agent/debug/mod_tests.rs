@@ -12,12 +12,13 @@ async fn debug_dump_composes_each_flow_prompt_from_the_copilot_bus() {
     };
     AgentDefinitionRegistry::init_global(&config.workspace_dir)
         .expect("initialize builtin registry");
+    let ctx = crate::core::runtime::DispatchCtx::host_default();
 
     for (agent_id, required) in [
         ("workflow_builder", "propose_workflow"),
         ("flow_discovery", "suggest_workflows"),
     ] {
-        let prompt = render_via_session(&config, agent_id)
+        let prompt = render_via_session(&ctx, &config, agent_id)
             .await
             .unwrap_or_else(|error| panic!("rendering {agent_id}: {error:#}"));
         assert!(

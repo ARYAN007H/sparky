@@ -18,7 +18,7 @@ use crate::core::runtime::{DispatchCtx, DomainSet};
 use tinyskills::{MaterializeEntry, MaterializeFile, MaterializeSource, Skill, SkillScope};
 use tinyflows_bus::copilot::ResourceFile;
 
-use super::super::ops_discover::api::DiscoveryGate;
+use super::super::ops_discover::DiscoveryGate;
 
 const FLOW_SKILL_ID: &str = "flow-authoring";
 const FLOW_ROOT_NAME: &str = "builtin-flow-skills";
