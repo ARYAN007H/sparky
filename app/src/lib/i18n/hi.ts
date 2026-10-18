@@ -1184,9 +1184,6 @@ const messages: TranslationMap = {
   'voice.settingsSaved': 'वॉइस सेटिंग्स सेव हो गईं।',
   'voice.failedToLoadSettings': 'ध्वनि सेटिंग लोड करने में विफल',
   'voice.failedToSaveSettings': 'ध्वनि सेटिंग सहेजने में विफल',
-  'voice.debug.alwaysOn': 'हमेशा-चालू सुनना',
-  'voice.debug.alwaysOnDesc':
-    'माइक्रोफ़ोन खुला रखें और आप जो कहते हैं वह बिना हॉटकी के स्वचालित रूप से एजेंट को भेजें। स्क्रीन लॉक होने पर रुक जाता है।',
   'voice.providers.saved': 'ध्वनि प्रदाता सहेजे गए.',
   'voice.providers.failedToSave': 'ध्वनि प्रदाताओं को सहेजने में विफल',
   'voice.mode.start': 'वॉइस चैट शुरू करें',
@@ -3494,8 +3491,6 @@ const messages: TranslationMap = {
     'एक OPENHUMAN_APPROVAL_GATE=0 ओवरराइड का पता चला लेकिन अनदेखा कर दिया गया: डेस्कटॉप ऐप अनुमोदन गेट को हमेशा चालू रखता है।',
 
   // Run queue
-  'notch.ready': 'तैयार',
-  'notch.listening': 'सुन रहा हूं…',
 
   'orchestration.detail.stop': 'रोकें',
 
