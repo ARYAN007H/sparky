@@ -550,7 +550,9 @@ async fn unsupported_media_urls_and_oversized_inline_sources_fail_before_inferen
     let error = model.invoke(&(), unsupported).await.unwrap_err();
     assert!(error.to_string().contains("unsupported media URL scheme"));
 
-    let max_encoded_bytes = 50 * 1024 * 1024 * 4 / 3 + 4;
+    // Leave room for a data-URI header while still proving an oversized body
+    // is rejected before the owner resolver or inference transport runs.
+    let max_encoded_bytes = 50 * 1024 * 1024 * 4 / 3 + 4097;
     let oversized = user_request(vec![ContentBlock::Document(MediaRef::Base64 {
         data: "A".repeat(max_encoded_bytes + 1),
         media_type: "application/octet-stream".into(),
@@ -558,6 +560,6 @@ async fn unsupported_media_urls_and_oversized_inline_sources_fail_before_inferen
     let error = model.invoke(&(), oversized).await.unwrap_err();
     assert!(error
         .to_string()
-        .contains("inline media exceeds size limit"));
+        .contains("attachment exceeds configured file limit"));
     assert!(transport.requests.lock().unwrap().is_empty());
 }
