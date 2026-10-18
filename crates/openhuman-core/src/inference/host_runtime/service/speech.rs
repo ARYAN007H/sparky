@@ -153,3 +153,7 @@ pub async fn tts(
         voice_id: model_ids::effective_tts_voice_id(config),
     })
 }
+
+#[cfg(test)]
+#[path = "speech_tests.rs"]
+mod tests;
