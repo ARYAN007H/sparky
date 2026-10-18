@@ -212,14 +212,6 @@ impl SteerRefused {
     }
 }
 
-/// Milliseconds since the Unix epoch, for the queued item's metadata.
-fn now_ms() -> u64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|elapsed| u64::try_from(elapsed.as_millis()).unwrap_or(u64::MAX))
-        .unwrap_or(0)
-}
-
 #[cfg(test)]
 #[path = "turn_steering_tests.rs"]
 mod tests;
