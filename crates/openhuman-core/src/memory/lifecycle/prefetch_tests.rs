@@ -1,6 +1,6 @@
 use super::*;
 
-use crate::memory::test_fixtures::config_in;
+use crate::memory::test_fixtures::{bind_reference, config_in, stored};
 
 const MAX_PENDING: usize = 16;
 
@@ -88,6 +88,50 @@ async fn identity_config_thread_workspace_and_context_are_isolated() {
         assert!(completed(&cache, &other).is_none());
     }
     assert!(completed(&Cache::default(), &key).is_none());
+}
+
+#[tokio::test]
+async fn pre_turn_logs_channel_metadata_without_writing_legacy_thread_map() {
+    let _guard = TEST_LOCK.lock().await;
+    let tmp = tempfile::tempdir().unwrap();
+    let config = Arc::new(config_in(&tmp));
+    let engine = bind_reference(&config);
+    let identity = tinymemory_tools::layout::identity::Identity::agent("channel-agent")
+        .resolve(&crate::memory::scope::identity_pins(&config));
+    let thread_id = "telegram-thread";
+    let key = Key::new(&config, &identity, thread_id, false);
+    let cache = cache(&crate::core::runtime::DispatchCtx::ambient());
+
+    assert!(pre_turn(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        config.clone(),
+        identity,
+        thread_id.into(),
+        0,
+        "hello from telegram".into(),
+        0,
+        chrono::Utc::now(),
+        false,
+        None,
+        Some("telegram".into()),
+    )
+    .is_none());
+    drain(&cache, &key).await;
+
+    let turns = stored(&engine, tinymemory_api::MetaFilter::kinds([
+        tinymemory_api::ItemKind::Conversation,
+    ]))
+    .await;
+    assert_eq!(turns.len(), 1);
+    assert_eq!(turns[0].meta.channel.as_deref(), Some("telegram"));
+    assert!(
+        !config
+            .workspace_dir
+            .join("memory")
+            .join("channel_threads.json")
+            .exists(),
+        "new turns must not write the legacy channel/thread map"
+    );
 }
 
 #[test]
