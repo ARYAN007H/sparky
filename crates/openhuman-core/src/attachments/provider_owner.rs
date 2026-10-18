@@ -37,11 +37,16 @@ pub(super) fn wrap(
         },
         max_historical_media_items: MAX_HISTORICAL_MEDIA_BLOCKS,
     };
-    let extractor = Arc::new(OwnedDocumentsExtractor { ctx: ctx.clone() });
+    let extractor = Arc::new(OwnedDocumentsExtractor { ctx: ctx.downgrade() });
     let model = MediaRequestModel::new(
         inner,
         request_config,
-        |_, request| Ok(super::super::take_request_scope(&mut request.metadata)),
+        |_, request| {
+            let mime_hints = typed_mime_hints(request);
+            let mut scope = super::super::take_request_scope(&mut request.metadata);
+            scope.mime_hints = mime_hints;
+            Ok(scope)
+        },
         host.clone(),
         extractor,
     )
@@ -82,13 +87,34 @@ impl MediaSourceResolver<AttachmentAccessScope> for AttachmentModel {
                 }
             }
         };
-        let Some((resolved_modality, path, mime, bytes, recovered)) =
+        let Some((resolved_modality, path, mut mime, bytes, recovered)) =
             self.resolve_block(&block, scope).await.map_err(|error| error.to_string())?
         else {
             return Err("unsupported media source".into());
         };
         if bytes.len() > max_bytes || resolved_modality != modality {
             return Err("attachment exceeds configured file limit".into());
+        }
+        if modality == InputModality::Image {
+            mime = tinyagents_harness::multimodal::mime::image_mime_from_magic(&bytes)
+                .map(str::to_owned)
+                .or_else(|| tinyagents_harness::multimodal::mime::detect_image_mime(
+                    Some(std::path::Path::new(&path)),
+                    &bytes,
+                    scope.mime_hints.get(source).map(String::as_str),
+                ))
+                .ok_or_else(|| "image attachment type cannot be determined".to_string())?;
+        } else if mime == "application/octet-stream" {
+            mime = scope
+                .mime_hints
+                .get(source)
+                .cloned()
+                .or_else(|| tinyagents_harness::multimodal::mime::detect_file_mime(
+                    Some(std::path::Path::new(&path)),
+                    &bytes,
+                    None,
+                ))
+                .unwrap_or(mime);
         }
         let mut resolved = ResolvedMedia::new(ResolvedAttachment {
             size_bytes: bytes.len(),
@@ -227,14 +253,48 @@ impl MediaHistoryFallback<AttachmentAccessScope> for AttachmentModel {
     }
 }
 
-struct OwnedDocumentsExtractor { ctx: crate::core::runtime::DispatchCtx }
+fn typed_mime_hints(request: &ModelRequest) -> std::collections::HashMap<String, String> {
+    let mut hints = std::collections::HashMap::new();
+    for message in &request.messages {
+        let Message::User(user) = message else { continue };
+        for block in &user.content {
+            match block {
+                ContentBlock::Image(image) => {
+                    if let Some(mime) = &image.mime_type {
+                        hints.insert(image.url.clone(), mime.clone());
+                    }
+                }
+                ContentBlock::Audio(media)
+                | ContentBlock::Video(media)
+                | ContentBlock::Document(media) => {
+                    let (source, mime) = match media {
+                        MediaRef::Path { path, media_type } => (path.clone(), media_type.clone()),
+                        MediaRef::Url { url, media_type } => (url.clone(), media_type.clone()),
+                        MediaRef::Base64 { data, media_type } => (
+                            format!("data:{media_type};base64,{data}"),
+                            Some(media_type.clone()),
+                        ),
+                    };
+                    if let Some(mime) = mime { hints.insert(source, mime); }
+                }
+                _ => ()
+            }
+        }
+    }
+    hints
+}
+
+struct OwnedDocumentsExtractor {
+    ctx: Option<std::sync::Weak<crate::core::runtime::CoreContext>>,
+}
 
 #[async_trait]
 impl TextExtractor for OwnedDocumentsExtractor {
     fn handles(&self, mime: &str) -> bool { mime == "application/pdf" }
 
     async fn extract(&self, mime: &str, bytes: &[u8]) -> Result<String, String> {
-        crate::agent::multimodal::DocumentsTextExtractor { ctx: &self.ctx }
+        let ctx = crate::core::runtime::DispatchCtx::from_weak(self.ctx.as_ref());
+        crate::agent::multimodal::DocumentsTextExtractor { ctx: &ctx }
             .extract(mime, bytes).await
     }
 }
