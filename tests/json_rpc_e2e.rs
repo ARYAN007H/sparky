@@ -2772,17 +2772,25 @@ async fn json_rpc_cron_manual_worker_survives_caller_cancel_on_published_tinyflo
     write_min_config(&openhuman_home, &mock_origin);
     write_min_config(&openhuman_home.join("users").join("e2e-user"), &mock_origin);
 
-    let config = Config {
+    let storage_url = openhuman_core::storage::config::default_url(&workspace);
+    let config_path = openhuman_home.join("config.toml");
+    let config_text = std::fs::read_to_string(&config_path).expect("read E2E config");
+    std::fs::write(
+        &config_path,
+        format!("{config_text}\n[storage]\nurl = {storage_url:?}\n"),
+    )
+    .expect("bind E2E config to its explicit storage URL");
+    let mut config = Config {
         workspace_dir: workspace.clone(),
         action_dir: workspace.clone(),
-        config_path: openhuman_home.join("config.toml"),
+        config_path,
         ..Config::default()
     };
+    config.storage.url = Some(storage_url.clone());
 
     // Install the exact backend CoreContext will use before seeding. Opening
     // the local fallback alone is insufficient: core boot may subsequently
     // install/rebind the configured backend, leaving a fixture in the wrong DB.
-    let storage_url = openhuman_core::storage::config::default_url(&workspace);
     let backend = openhuman_core::storage::open(&storage_url)
         .await
         .expect("open the host's workspace storage backend");
