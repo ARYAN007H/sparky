@@ -17,19 +17,41 @@ use tinychannels_bus::{ContentPart, MediaReference};
 const MAX_PARTS: usize = 32;
 
 /// Why a typed attachment could not be accepted.
-#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AttachmentPartError {
-    #[error("too many attachments ({count}, max {MAX_PARTS})")]
     TooMany { count: usize },
-    #[error("attachment {index}: {kind} parts are not supported as chat attachments")]
     UnsupportedKind { index: usize, kind: &'static str },
-    #[error("attachment {index}: media needs an inline data: URI or an http(s) url")]
     NoSource { index: usize },
-    #[error("attachment {index}: local paths are not accepted")]
     LocalPath { index: usize },
-    #[error("attachment {index}: url must not contain whitespace or ']'")]
     BadUrl { index: usize },
 }
+
+impl std::fmt::Display for AttachmentPartError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::TooMany { count } => {
+                write!(f, "too many attachments ({count}, max {MAX_PARTS})")
+            }
+            Self::UnsupportedKind { index, kind } => write!(
+                f,
+                "attachment {index}: {kind} parts are not supported as chat attachments"
+            ),
+            Self::NoSource { index } => write!(
+                f,
+                "attachment {index}: media needs an inline data: URI or an http(s) url"
+            ),
+            Self::LocalPath { index } => {
+                write!(f, "attachment {index}: local paths are not accepted")
+            }
+            Self::BadUrl { index } => write!(
+                f,
+                "attachment {index}: url must not contain whitespace or ']'"
+            ),
+        }
+    }
+}
+
+impl std::error::Error for AttachmentPartError {}
 
 fn kind_name(part: &ContentPart) -> &'static str {
     match part {
@@ -109,9 +131,9 @@ pub fn fold_into_message(
         }
         out.push_str(&chunk);
     }
-    tracing::debug!(
-        parts = parts.len(),
-        "[attachments] folded typed attachments into message"
+    log::debug!(
+        "[attachments] folded typed attachments into message parts={}",
+        parts.len()
     );
     Ok(out)
 }
