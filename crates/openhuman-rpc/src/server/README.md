@@ -104,7 +104,6 @@ outermost to innermost:
 | `GET /events` | SSE filtered by `client_id` | bearer header, or a one-shot bind token from `core.events_subscribe_token` |
 | `GET /events/webhooks` | webhook debug SSE | bearer header or `?token=` |
 | `GET /events/domain` | every `DomainEvent` as SSE, for the live event log | bearer |
-| `GET /ws/dictation` | dictation WebSocket | bearer header or `?token=`, plus origin check |
 | `GET /ws/live-voice` | live voice agent WebSocket | bearer header or `?token=`, plus origin check |
 | `GET /oauth/mcp/callback` | MCP browser OAuth redirect target | public; the one-time `state` is the guard |
 | `GET /dev/connect` | debug handoff to a loopback Vite renderer | public; guarded in the handler |
