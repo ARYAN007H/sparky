@@ -11,13 +11,13 @@ fn ids(request_id: &str) -> TurnIds {
 }
 
 async fn next_for(
-    rx: &mut tokio::sync::broadcast::Receiver<WebChannelEvent>,
+    rx: &mut tokio::sync::broadcast::Receiver<ScopedWebEvent>,
     request_id: &str,
-) -> WebChannelEvent {
+) -> ScopedWebEvent {
     tokio::time::timeout(std::time::Duration::from_secs(5), async {
         loop {
             match rx.recv().await {
-                Ok(event) if event.request_id == request_id => return event,
+                Ok(event) if event.context().request_id == request_id => return event,
                 Ok(_) | Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue,
                 Err(error) => panic!("bus closed: {error}"),
             }
@@ -25,6 +25,10 @@ async fn next_for(
     })
     .await
     .expect("event within timeout")
+}
+
+fn wire(event: &ScopedWebEvent) -> serde_json::Value {
+    serde_json::to_value(event).unwrap()
 }
 
 #[tokio::test]
@@ -46,12 +50,14 @@ async fn output_events_keep_the_turns_ids_and_one_increasing_seq() {
     }
     let first = next_for(&mut rx, "surface-seq").await;
     let second = next_for(&mut rx, "surface-seq").await;
-    assert_eq!(first.event, "text_delta");
-    assert_eq!(first.client_id, "surface-client");
-    assert_eq!(first.thread_id, "surface-thread-surface-seq");
-    assert_eq!((first.delta.as_deref(), first.round), (Some("a"), Some(2)));
-    assert_eq!((first.seq, second.seq), (Some(1), Some(2)));
-    assert!(first.ts.is_some(), "every event carries a wall-clock stamp");
+    let first_wire = wire(&first);
+    let second_wire = wire(&second);
+    assert_eq!(first.event_name(), "text_delta");
+    assert_eq!(first.context().client_id, "surface-client");
+    assert_eq!(first.context().thread_id, "surface-thread-surface-seq");
+    assert_eq!((first_wire["delta"].as_str(), first_wire["round"].as_u64()), (Some("a"), Some(2)));
+    assert_eq!((first.context().seq, second.context().seq), (Some(1), Some(2)));
+    assert!(first.context().ts.is_some(), "every event carries a wall-clock stamp");
 }
 
 #[tokio::test]
@@ -65,9 +71,10 @@ async fn an_interim_bubble_carries_the_round_the_canonical_output_lacks() {
     .await;
     surface.interim(3, "Let me check.".into()).await;
     let event = next_for(&mut rx, "surface-interim").await;
-    assert_eq!(event.event, "chat_interim");
-    assert_eq!(event.full_response.as_deref(), Some("Let me check."));
-    assert_eq!(event.round, Some(3));
+    let event_wire = wire(&event);
+    assert_eq!(event.event_name(), "chat_interim");
+    assert_eq!(event_wire["full_response"], "Let me check.");
+    assert_eq!(event_wire["round"], 3);
 }
 
 #[tokio::test]
@@ -87,9 +94,58 @@ async fn host_authored_events_pass_through_without_a_seq() {
         })
         .await;
     let event = next_for(&mut rx, "surface-terminal").await;
-    assert_eq!(event.event, "chat_cancelled");
-    assert_eq!(event.cancel_reason.as_deref(), Some("user_stop"));
-    assert_eq!(event.seq, None);
+    let event_wire = wire(&event);
+    assert_eq!(event.event_name(), "chat_cancelled");
+    assert_eq!(event_wire["cancel_reason"], "user_stop");
+    assert_eq!(event.context().seq, None);
+}
+
+#[tokio::test]
+async fn direct_and_projected_events_keep_their_historical_wire_normalization() {
+    let mut rx = crate::web_chat::subscribe_web_channel_events();
+    let direct = Surface::new(
+        &DispatchCtx::ambient(),
+        ids("surface-direct-null"),
+        crate::config::Config::default(),
+    )
+    .await;
+    direct
+        .event(bus_web::WebChannelEvent::ApprovalRequest {
+            context: direct.context(),
+            tool_name: Some(String::new()),
+            message: None,
+            args: Some(serde_json::Value::Null),
+            tool_call_id: None,
+            expires_at: None,
+            detached: None,
+        })
+        .await;
+    let direct_event = next_for(&mut rx, "surface-direct-null").await;
+    let direct_wire = wire(&direct_event);
+    assert_eq!(direct_wire["tool_name"], "");
+    assert_eq!(direct_wire["args"], serde_json::Value::Null);
+
+    let projected = Surface::new(
+        &DispatchCtx::ambient(),
+        ids("surface-projected-null"),
+        crate::config::Config::default(),
+    )
+    .await;
+    projected
+        .output(ChannelOutputEvent::ToolCallStarted {
+            call_id: "call-null".into(),
+            tool_name: String::new(),
+            arguments: serde_json::Value::Null,
+            iteration: 1,
+            display_label: None,
+            display_detail: None,
+        })
+        .await;
+    let projected_event = next_for(&mut rx, "surface-projected-null").await;
+    let projected_wire = wire(&projected_event);
+    assert_eq!(projected_event.event_name(), "tool_call");
+    assert!(projected_wire.get("tool_name").is_none());
+    assert!(projected_wire.get("args").is_none());
 }
 
 #[tokio::test]
@@ -108,8 +164,8 @@ async fn module_projected_cancellation_closes_the_turn() {
         .await;
 
     let event = next_for(&mut rx, "surface-cancel").await;
-    assert_eq!(event.event, "chat_cancelled");
-    assert_eq!(event.seq, Some(1));
+    assert_eq!(event.event_name(), "chat_cancelled");
+    assert_eq!(event.context().seq, Some(1));
     let state = surface.state.lock().await;
     assert!(state.closed);
     assert!(state.handle.is_none());
