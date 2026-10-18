@@ -458,6 +458,46 @@ async fn module_builtin_gate_only_narrows_context_and_explicit_config() {
         !config_hidden.iter().any(|skill| skill.id() == "flow-authoring"),
         "a narrower supplied Config hides resources from an enabled parent context"
     );
+
+    let mut modules_disabled = enabled_config.clone();
+    modules_disabled.modules.enabled = false;
+    let modules_hidden = CoreContext::scope(
+        CoreContext::for_test_with_components(all).derive_with(
+            ContextOverlay::new(enabled_config.clone(), DomainSet::full(), ToolGroups::none())
+                .profile("shared"),
+        ),
+        async {
+            let dispatch = crate::core::runtime::DispatchCtx::ambient();
+            crate::skills::load_workflow_metadata_for(&dispatch, &modules_disabled)
+        },
+    )
+    .await;
+    assert!(
+        !modules_hidden
+            .iter()
+            .any(|skill| skill.id() == "flow-authoring"),
+        "a profile with modules disabled cannot reuse another profile's warmed snapshot"
+    );
+
+    let mut skills_disabled = all;
+    skills_disabled.skills = false;
+    let skills_context_hidden = CoreContext::scope(
+        CoreContext::for_test_with_components(skills_disabled).derive_with(
+            ContextOverlay::new(enabled_config.clone(), DomainSet::full(), ToolGroups::none())
+                .profile("shared"),
+        ),
+        async {
+            let dispatch = crate::core::runtime::DispatchCtx::ambient();
+            crate::skills::load_workflow_metadata_for(&dispatch, &enabled_config)
+        },
+    )
+    .await;
+    assert!(
+        !skills_context_hidden
+            .iter()
+            .any(|skill| skill.id() == "flow-authoring"),
+        "an all-enabled Config cannot widen a context with Skills disabled"
+    );
 }
 
 #[test]
