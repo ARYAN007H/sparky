@@ -1,5 +1,6 @@
-use super::tests::{config, flow_job};
 use super::*;
+
+use super::tests::{config, flow_job};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use tempfile::TempDir;
 
