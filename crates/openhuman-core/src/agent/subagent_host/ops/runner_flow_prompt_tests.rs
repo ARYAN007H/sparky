@@ -63,7 +63,6 @@ async fn typed_flow_builtin_requires_its_loaded_config() {
         .get("workflow_builder")
         .expect("workflow_builder builtin");
     let temp = tempfile::tempdir().expect("workspace");
-    let context = prompt_context(temp.path(), "workflow_builder");
     let loaded_config = Err("config unavailable".into());
     let error = load_flow_prompt(definition, &loaded_config)
         .await

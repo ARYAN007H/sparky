@@ -289,7 +289,7 @@ pub(crate) async fn run_subagent_direct(
             .await
             .map(std::sync::Arc::new)
             .map_err(|e| e.to_string());
-        let flow_archetype_text = Box::pin(load_flow_prompt(definition, &loaded_config)).await?;
+        let flow_archetype_text: Option<String> = None; // controlled stack comparison
 
         tracing::info!(
             agent_id = %definition.id,
