@@ -37,7 +37,9 @@ fn outage_failure_maps_to_deferred_then_terminal_host_outcomes() {
         let mut attempt = state
             .try_acquire("stub-cloud".to_string(), monotonic_ms())
             .expect("attempt");
+        let before = now_ms();
         let outcome = record_outage(Some(&mut attempt)).expect("host outcome");
+        let after = now_ms();
         if failure < 8 {
             match outcome {
                 TriageOutcome::Deferred {
@@ -45,8 +47,7 @@ fn outage_failure_maps_to_deferred_then_terminal_host_outcomes() {
                     reason,
                 } => {
                     assert_eq!(reason, "managed backend outage; retry 0ms backoff");
-                    assert!(defer_until_ms >= now_ms() - 50);
-                    assert!(defer_until_ms <= now_ms() + 50);
+                    assert!((before..=after).contains(&defer_until_ms));
                 }
                 TriageOutcome::Decision(_) | TriageOutcome::Terminal { .. } => {
                     panic!("failure {failure} should remain deferred")
@@ -276,10 +277,11 @@ async fn in_flight_breaker_defers_before_dispatch_for_one_second() {
     let outcome = run_triage_with_arms_for_test_with_state(cloud_arm(), None, &envelope(), &state)
         .await
         .expect("deferred outcome");
+    let after = now_ms();
 
     match outcome {
         TriageOutcome::Deferred { defer_until_ms, .. } => {
-            assert!((before + 900..=before + 1_500).contains(&defer_until_ms));
+            assert!((before + 1_000..=after + 1_000).contains(&defer_until_ms));
         }
         TriageOutcome::Decision(_) | TriageOutcome::Terminal { .. } => {
             panic!("expected an in-flight deferral")

@@ -391,7 +391,7 @@ fn rejection_delay_ms(rejection: BreakerRejection, now_ms: u64) -> u64 {
     match rejection {
         BreakerRejection::Backoff {
             next_attempt_ms, ..
-        } => next_attempt_ms.saturating_sub(now_ms),
+        } => next_attempt_ms.saturating_sub(now_ms).max(1_000),
         BreakerRejection::InFlight => 1_000,
     }
 }
