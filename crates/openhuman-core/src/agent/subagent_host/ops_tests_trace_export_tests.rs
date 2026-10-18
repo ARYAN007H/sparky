@@ -102,6 +102,10 @@ async fn prepared_child_run_is_exported_from_its_native_journal_lineage() {
         .iter()
         .filter(|observation| observation.run_id == child_run_id)
         .collect();
+    let durable_child: Vec<_> = child_observations
+        .iter()
+        .map(|observation| (*observation).clone())
+        .collect();
     let child_finalized_at = child_observations
         .iter()
         .find_map(|observation| match &observation.event {
@@ -221,4 +225,34 @@ async fn prepared_child_run_is_exported_from_its_native_journal_lineage() {
         !exported.contains("private-child-answer-should-not-be-exported"),
         "the native export keeps captured content off"
     );
+
+    let child_spans = crate::core::observability::progress_tracing::build_subagent_trace(
+        &durable_child,
+        Some("native-trace-thread"),
+        "writer",
+        "child-task",
+        false,
+        child_finalized_at.saturating_add(1),
+    );
+    let child_root = child_spans
+        .iter()
+        .find(|span| {
+            span.kind == tinyagents_harness::observability::trace_export::SpanKind::Turn
+        })
+        .expect("the real durable child journal builds a distinct child root trace");
+    assert_eq!(child_root.trace_id, format!("subagent:{}", child_run_id.as_str()));
+    assert_eq!(child_root.attributes["thread.id"], "native-trace-thread");
+    assert_eq!(child_root.attributes["agent.id"], "writer");
+    assert_eq!(child_root.attributes["channel.source"], "subagent");
+    assert_eq!(child_root.attributes["run.type"], "subagent");
+    assert_eq!(child_root.attributes["run.id"], child_run_id.as_str());
+    assert_eq!(child_root.attributes["parent_run_id"], root_run_id.as_str());
+    assert_eq!(child_root.attributes["root_run_id"], root_run_id.as_str());
+    let child_export = spans_to_ndjson(
+        tinyagents_harness::observability::trace_export::serialize::SpanEnvelope::Langfuse,
+        &child_spans,
+    );
+    assert!(child_export.contains("native-trace-thread"));
+    assert!(child_export.contains("writer"));
+    assert!(!child_export.contains("private-child-answer-should-not-be-exported"));
 }
