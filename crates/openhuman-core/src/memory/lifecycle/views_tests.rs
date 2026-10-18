@@ -97,7 +97,7 @@ fn the_policy_round_trips_and_refuses_out_of_range_values() {
                 ..bad
             },
         );
-        assert!(matches!(result, Err(MemoryError::InvalidRequest(_))));
+        assert!(matches!(result, Err(Error::InvalidRequest(_))));
         assert!(
             serde_json::to_value(&config).unwrap() == before,
             "invalid policy update must be atomic"

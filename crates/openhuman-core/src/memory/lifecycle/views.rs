@@ -7,7 +7,7 @@ use tinymemory_tools::{ContextPack, SessionStart};
 
 use crate::config::schema::MemoryRecallConfig;
 use crate::config::Config;
-use crate::memory::error::{MemoryError, MemoryResult};
+use crate::memory::error::{Error, Result};
 use crate::memory::scope::{self, MemoryIdentity};
 
 use super::jobs;
@@ -89,9 +89,9 @@ fn within<T: PartialOrd + std::fmt::Display + Copy>(
     value: Option<T>,
     min: T,
     max: T,
-) -> MemoryResult<Option<T>> {
+) -> Result<Option<T>> {
     match value {
-        Some(value) if value < min || value > max => Err(MemoryError::invalid(format!(
+        Some(value) if value < min || value > max => Err(Error::invalid(format!(
             "{name} must be between {min} and {max}"
         ))),
         other => Ok(other),
@@ -99,7 +99,7 @@ fn within<T: PartialOrd + std::fmt::Display + Copy>(
 }
 
 /// Applies `params` to `config`; the caller persists it.
-pub fn apply_policy_set(config: &mut Config, params: &PolicySetParams) -> MemoryResult<()> {
+pub fn apply_policy_set(config: &mut Config, params: &PolicySetParams) -> Result<()> {
     // Validate every value before changing the config. Callers may use this
     // function directly, without a persistence layer to discard partial edits.
     let budget_tokens = within("budget_tokens", params.budget_tokens, 100, 16_000)?;
@@ -157,7 +157,7 @@ pub fn apply_policy_set(config: &mut Config, params: &PolicySetParams) -> Memory
     Ok(())
 }
 
-fn validate_build_delay_secs(value: Option<u64>) -> MemoryResult<Option<u64>> {
+fn validate_build_delay_secs(value: Option<u64>) -> Result<Option<u64>> {
     let Some(seconds) = value else {
         return Ok(None);
     };
@@ -168,7 +168,7 @@ fn validate_build_delay_secs(value: Option<u64>) -> MemoryResult<Option<u64>> {
         .and_then(|delay| chrono::Utc::now().checked_sub_signed(delay))
         .is_none()
     {
-        return Err(MemoryError::invalid(
+        return Err(Error::invalid(
             "build_delay_secs must fit within the supported date range",
         ));
     }
@@ -208,7 +208,7 @@ pub async fn pack_preview(
     config: &Config,
     identity: &MemoryIdentity,
     params: PackPreviewParams,
-) -> MemoryResult<PackPreviewView> {
+) -> Result<PackPreviewView> {
     let (memory, identity) =
         super::named_agent_memory(config, identity, params.agent_id.as_deref())?;
     let query = params.query.filter(|query| !query.trim().is_empty());
@@ -252,7 +252,7 @@ pub struct AgentsView {
 }
 
 /// `memory_agents_list`: the agents with conversations under the root.
-pub async fn agents_list(config: &Config, identity: &MemoryIdentity) -> MemoryResult<AgentsView> {
+pub async fn agents_list(config: &Config, identity: &MemoryIdentity) -> Result<AgentsView> {
     let (memory, identity) = super::current_agent_memory(config, identity)?;
     let page = memory
         .engine()
@@ -301,7 +301,7 @@ pub struct JobsRunView {
 }
 
 /// `memory_jobs_run`: runs now, ignoring the build delay.
-pub async fn jobs_run(config: &Config, params: JobsRunParams) -> MemoryResult<JobsRunView> {
+pub async fn jobs_run(config: &Config, params: JobsRunParams) -> Result<JobsRunView> {
     Ok(JobsRunView {
         runs: jobs::run(
             config,

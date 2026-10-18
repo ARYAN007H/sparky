@@ -20,7 +20,7 @@ use crate::config::schema::MemorySourceKind;
 use crate::config::Config;
 
 use super::engine;
-use super::error::{MemoryError, MemoryResult};
+use super::error::{Error, Result};
 use super::lifecycle::jobs;
 use super::scope::MemoryIdentity;
 
@@ -47,7 +47,7 @@ pub fn brain_node(
     layout: &MemoryLayout,
     source: &BrainSource,
     item: &StoreItem,
-) -> MemoryResult<Namespace> {
+) -> Result<Namespace> {
     Ok(brain_node_with(
         config.memory.split_github_by_repo,
         layout,
@@ -61,14 +61,14 @@ fn layout(config: &Config, identity: &MemoryIdentity) -> MemoryLayout {
     identity.resolve(config).layout
 }
 
-fn brain(config: &Config, identity: &MemoryIdentity) -> MemoryResult<Brain> {
+fn brain(config: &Config, identity: &MemoryIdentity) -> Result<Brain> {
     let bound = engine::resolve(config).engine()?;
     Ok(Brain::new(bound.engine, layout(config, identity)))
 }
 
-fn parse_source(raw: &str) -> MemoryResult<BrainSource> {
+fn parse_source(raw: &str) -> Result<BrainSource> {
     raw.parse()
-        .map_err(|error: tinymemory_api::Error| MemoryError::invalid(error.to_string()))
+        .map_err(|error: tinymemory_api::Error| Error::invalid(error.to_string()))
 }
 
 /// One brain source and how many documents it holds.
@@ -92,7 +92,7 @@ pub struct BrainSourcesView {
 }
 
 /// `memory_brain_sources`: the brain's sources and their sizes.
-pub async fn sources(config: &Config, identity: &MemoryIdentity) -> MemoryResult<BrainSourcesView> {
+pub async fn sources(config: &Config, identity: &MemoryIdentity) -> Result<BrainSourcesView> {
     let bound = engine::resolve(config).engine()?;
     let layout = layout(config, identity);
     let page = bound
@@ -156,10 +156,10 @@ pub async fn search(
     config: &Config,
     identity: &MemoryIdentity,
     params: BrainSearchParams,
-) -> MemoryResult<BrainSearchView> {
+) -> Result<BrainSearchView> {
     let query = params.query.trim();
     if query.is_empty() {
-        return Err(MemoryError::invalid("the query is blank"));
+        return Err(Error::invalid("the query is blank"));
     }
     let source = params.source.as_deref().map(parse_source).transpose()?;
     let limit = super::types::clamp_limit(params.limit);
@@ -207,7 +207,7 @@ pub struct BrainIngestView {
 /// `action_dir`.
 ///
 /// [`SecurityPolicy::validate_path`]: crate::security::SecurityPolicy::validate_path
-async fn ingest_path(config: &Config, path: &str) -> MemoryResult<std::path::PathBuf> {
+async fn ingest_path(config: &Config, path: &str) -> Result<std::path::PathBuf> {
     let policy = crate::security::SecurityPolicy::from_config(
         &config.autonomy,
         &config.workspace_dir,
@@ -215,7 +215,7 @@ async fn ingest_path(config: &Config, path: &str) -> MemoryResult<std::path::Pat
     );
     policy.validate_path(path.trim()).await.map_err(|error| {
         tracing::warn!("[memory:brain] ingest path refused by the security policy");
-        MemoryError::invalid(format!("cannot read the file: {error}"))
+        Error::invalid(format!("cannot read the file: {error}"))
     })
 }
 
@@ -225,23 +225,23 @@ pub async fn ingest(
     config: &Config,
     identity: &MemoryIdentity,
     params: BrainIngestParams,
-) -> MemoryResult<BrainIngestView> {
+) -> Result<BrainIngestView> {
     let source = params.source.as_deref().map(parse_source).transpose()?;
     let mut document = match (params.path.as_deref(), params.text.as_deref()) {
         (Some(path), None) => {
             let resolved = ingest_path(config, path).await?;
             let path = resolved.as_path();
             let size = std::fs::metadata(path)
-                .map_err(|error| MemoryError::invalid(format!("cannot read the file: {error}")))?
+                .map_err(|error| Error::invalid(format!("cannot read the file: {error}")))?
                 .len();
             if size > MAX_INGEST_BYTES {
-                return Err(MemoryError::invalid(format!(
+                return Err(Error::invalid(format!(
                     "the file is {size} bytes; the limit is {MAX_INGEST_BYTES}"
                 )));
             }
             let bytes = tokio::fs::read(path)
                 .await
-                .map_err(|error| MemoryError::invalid(format!("cannot read the file: {error}")))?;
+                .map_err(|error| Error::invalid(format!("cannot read the file: {error}")))?;
             let mut raw = RawDocument::new(bytes);
             if let Some(name) = path.file_name().and_then(|name| name.to_str()) {
                 raw = raw.with_filename(name);
@@ -255,12 +255,12 @@ pub async fn ingest(
                 meta,
             )
             .await
-            .map_err(|error| MemoryError::invalid(format!("cannot convert the file: {error}")))?
+            .map_err(|error| Error::invalid(format!("cannot convert the file: {error}")))?
         }
         (None, Some(text)) => {
             tinymemory_tools::BrainDocument::new(source.unwrap_or_else(files_source), text)
         }
-        _ => return Err(MemoryError::invalid("pass exactly one of `path` or `text`")),
+        _ => return Err(Error::invalid("pass exactly one of `path` or `text`")),
     };
     if let Some(title) = params.title.filter(|title| !title.trim().is_empty()) {
         document = document.titled(title);
@@ -302,7 +302,7 @@ pub async fn forget(
     config: &Config,
     identity: &MemoryIdentity,
     params: BrainForgetParams,
-) -> MemoryResult<BrainForgetView> {
+) -> Result<BrainForgetView> {
     let source = parse_source(&params.source)?;
     let report = brain(config, identity)?.forget(&source).await?;
     tracing::info!(source = %source, forgotten = report.forgotten, "[memory:brain] source forgotten");

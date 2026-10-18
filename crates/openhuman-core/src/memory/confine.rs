@@ -21,7 +21,7 @@ use tinymemory_api::{ExplorePage, MemoryMeta, MetaFilter, Namespace, Reach};
 
 use crate::config::Config;
 
-use super::error::{MemoryError, MemoryResult};
+use super::error::{Error, Result};
 use super::explore::{self, ExploreParams, ItemsGetParams, ItemsGetView};
 use super::ops;
 use super::scope::MemoryIdentity;
@@ -42,8 +42,8 @@ pub fn allowed_reach(config: &Config, identity: &MemoryIdentity) -> Reach {
 ///
 /// # Errors
 ///
-/// [`MemoryError::InvalidRequest`] when `reach` reads outside `allowed`.
-pub fn confine_reach(reach: Option<Reach>, allowed: &Reach) -> MemoryResult<Reach> {
+/// [`Error::InvalidRequest`] when `reach` reads outside `allowed`.
+pub fn confine_reach(reach: Option<Reach>, allowed: &Reach) -> Result<Reach> {
     match reach {
         None => Ok(allowed.clone()),
         Some(reach) if reach.within(allowed) => Ok(reach),
@@ -53,7 +53,7 @@ pub fn confine_reach(reach: Option<Reach>, allowed: &Reach) -> MemoryResult<Reac
                 allowed = %allowed.at,
                 "[memory:confine] refused a reach outside the caller's root"
             );
-            Err(MemoryError::invalid(format!(
+            Err(Error::invalid(format!(
                 "the reach `{}` is outside this caller's memory (`{}`)",
                 reach.at, allowed.at
             )))
@@ -65,9 +65,9 @@ pub fn confine_reach(reach: Option<Reach>, allowed: &Reach) -> MemoryResult<Reac
 ///
 /// # Errors
 ///
-/// [`MemoryError::InvalidRequest`] when the filter's reach reads outside
+/// [`Error::InvalidRequest`] when the filter's reach reads outside
 /// `allowed`.
-pub fn confine_filter(filter: Option<MetaFilter>, allowed: &Reach) -> MemoryResult<MetaFilter> {
+pub fn confine_filter(filter: Option<MetaFilter>, allowed: &Reach) -> Result<MetaFilter> {
     let mut filter = filter.unwrap_or_default();
     filter.reach = Some(confine_reach(filter.reach.take(), allowed)?);
     Ok(filter)
@@ -79,13 +79,13 @@ pub fn confine_filter(filter: Option<MetaFilter>, allowed: &Reach) -> MemoryResu
 ///
 /// # Errors
 ///
-/// [`MemoryError::InvalidRequest`] when the namespace is outside the
+/// [`Error::InvalidRequest`] when the namespace is outside the
 /// layout's subtree.
 pub fn confine_learn_meta(
     config: &Config,
     identity: &MemoryIdentity,
     meta: Option<MemoryMeta>,
-) -> MemoryResult<MemoryMeta> {
+) -> Result<MemoryMeta> {
     let resolved = identity.resolve(config);
     let allowed = Reach::subtree(resolved.root().clone());
     let mut meta = meta.unwrap_or_default();
@@ -98,7 +98,7 @@ pub fn confine_learn_meta(
             allowed = %allowed.at,
             "[memory:confine] refused a learning outside the caller's root"
         );
-        return Err(MemoryError::invalid(format!(
+        return Err(Error::invalid(format!(
             "the namespace `{}` is outside this caller's memory (`{}`)",
             meta.namespace, allowed.at
         )));
@@ -115,7 +115,7 @@ pub async fn recall(
     config: &Config,
     identity: &MemoryIdentity,
     mut params: RecallParams,
-) -> MemoryResult<RecallView> {
+) -> Result<RecallView> {
     params.filter = Some(confine_filter(
         params.filter,
         &allowed_reach(config, identity),
@@ -132,7 +132,7 @@ pub async fn fetch(
     config: &Config,
     identity: &MemoryIdentity,
     mut params: FetchParams,
-) -> MemoryResult<FetchView> {
+) -> Result<FetchView> {
     params.filter = Some(confine_filter(
         params.filter,
         &allowed_reach(config, identity),
@@ -149,7 +149,7 @@ pub async fn learn(
     config: &Config,
     identity: &MemoryIdentity,
     mut params: LearnParams,
-) -> MemoryResult<LearnView> {
+) -> Result<LearnView> {
     params.meta = Some(confine_learn_meta(config, identity, params.meta)?);
     ops::learn(config, params, None).await
 }
@@ -164,7 +164,7 @@ pub async fn forget(
     config: &Config,
     identity: &MemoryIdentity,
     mut params: ForgetParams,
-) -> MemoryResult<ForgetView> {
+) -> Result<ForgetView> {
     params.reach = Some(confine_reach(
         params.reach,
         &allowed_reach(config, identity),
@@ -183,7 +183,7 @@ pub async fn items_list(
     config: &Config,
     identity: &MemoryIdentity,
     mut params: ItemsListParams,
-) -> MemoryResult<ItemsListView> {
+) -> Result<ItemsListView> {
     let narrowed = explore::narrowed(params.filter.take(), &params.path)?;
     params.filter = Some(confine_filter(
         Some(narrowed),
@@ -203,7 +203,7 @@ pub async fn explore(
     config: &Config,
     identity: &MemoryIdentity,
     mut params: ExploreParams,
-) -> MemoryResult<ExplorePage> {
+) -> Result<ExplorePage> {
     let narrowed = explore::narrowed(params.filter.take(), &params.path)?;
     params.filter = Some(confine_filter(
         Some(narrowed),
@@ -224,7 +224,7 @@ pub async fn items_get(
     config: &Config,
     identity: &MemoryIdentity,
     mut params: ItemsGetParams,
-) -> MemoryResult<ItemsGetView> {
+) -> Result<ItemsGetView> {
     params.reach = Some(confine_reach(
         params.reach,
         &allowed_reach(config, identity),

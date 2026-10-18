@@ -44,7 +44,7 @@ use tinymemory_api::{Namespace, Segment, SegmentKind};
 use tinymemory_tools::MemoryLayout;
 
 use crate::config::{Config, MemoryLayoutMode};
-use crate::memory::error::{MemoryError, MemoryResult};
+use crate::memory::error::{Error, Result};
 
 /// The memory agent id of work no agent is running (RPC, sync jobs, the UI).
 pub const DEFAULT_AGENT_ID: &str = "assistant";
@@ -255,15 +255,15 @@ pub fn actor_of_root(root: &str) -> String {
 /// # Errors
 ///
 /// The config could not be loaded or saved.
-pub async fn switch_to_v3(config: &Config) -> MemoryResult<()> {
+pub async fn switch_to_v3(config: &Config) -> Result<()> {
     let mut config = Config::load_from_config_path(&config.config_path, &config.workspace_dir)
         .await
-        .map_err(|error| MemoryError::Engine(format!("loading config failed: {error:#}")))?;
+        .map_err(|error| Error::Engine(format!("loading config failed: {error:#}")))?;
     config.memory.layout = MemoryLayoutMode::V3;
     config
         .save()
         .await
-        .map_err(|error| MemoryError::Engine(format!("saving config failed: {error:#}")))?;
+        .map_err(|error| Error::Engine(format!("saving config failed: {error:#}")))?;
     super::engine::invalidate();
     tracing::info!("[memory:scope] memory switched to layout v3");
     Ok(())

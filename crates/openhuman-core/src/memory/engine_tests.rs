@@ -423,7 +423,7 @@ fn a_disabled_memory_component_binds_no_engine() {
     assert!(switched_off(&config));
     assert!(matches!(
         bind_with_root(&config, None),
-        Err(MemoryError::Off(_))
+        Err(Error::Off(_))
     ));
 }
 

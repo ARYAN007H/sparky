@@ -30,7 +30,7 @@ pub const ENGINE: &str = "ENGINE";
 
 /// A memory operation failure.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
-pub enum MemoryError {
+pub enum Error {
     /// Memory is off: no usable engine.
     #[error("memory is off: {0}")]
     Off(String),
@@ -54,7 +54,7 @@ pub enum MemoryError {
     Engine(String),
 }
 
-impl MemoryError {
+impl Error {
     /// The stable wire code.
     #[must_use]
     pub fn code(&self) -> &'static str {
@@ -101,7 +101,7 @@ impl MemoryError {
     }
 }
 
-impl From<tinymemory_api::Error> for MemoryError {
+impl From<tinymemory_api::Error> for Error {
     fn from(error: tinymemory_api::Error) -> Self {
         use tinymemory_api::Error as E;
         // A 402 arrives as `Engine` with the backend's code on its message.
@@ -118,7 +118,7 @@ impl From<tinymemory_api::Error> for MemoryError {
     }
 }
 
-impl MemoryError {
+impl Error {
     /// The account-wide refusal behind a recall section's skip reason, if it
     /// was one.
     ///
@@ -142,14 +142,14 @@ impl MemoryError {
     }
 }
 
-impl From<MemoryError> for String {
-    fn from(error: MemoryError) -> Self {
+impl From<Error> for String {
+    fn from(error: Error) -> Self {
         error.to_structured().encode()
     }
 }
 
 /// Result alias for memory operations.
-pub type MemoryResult<T> = Result<T, MemoryError>;
+pub type Result<T> = Result<T, Error>;
 
 #[cfg(test)]
 #[path = "error_tests.rs"]

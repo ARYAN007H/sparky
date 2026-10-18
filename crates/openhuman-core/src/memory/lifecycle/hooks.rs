@@ -20,7 +20,7 @@ use tinymemory_tools::{Compaction, ContextPack, PostTurn, PreTurn, SessionStart}
 
 use crate::config::Config;
 use crate::memory::engine;
-use crate::memory::error::MemoryError;
+use crate::memory::error::Error;
 use crate::memory::scope::ResolvedIdentity;
 
 use super::{agent_memory_on, jobs, log_only};
@@ -54,7 +54,7 @@ pub struct TurnPack {
     #[serde(skip)]
     pub citations: Vec<crate::web_chat::TurnCitation>,
     /// Set when nothing was recalled because the engine refused the whole
-    /// account (a `MemoryError` code such as `INSUFFICIENT_CREDITS`): the
+    /// account (a `Error` code such as `INSUFFICIENT_CREDITS`): the
     /// block is then a notice saying so, not recalled memory.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub refusal: Option<&'static str>,
@@ -85,13 +85,13 @@ impl TurnPack {
     /// The notice a turn is given when its recall was refused outright, so
     /// the model does not read an empty pack as "nothing is stored" and tell
     /// the user so (#6718). `None` for a failure that is not account-wide.
-    fn refused(error: &MemoryError, engine: String) -> Option<Self> {
+    fn refused(error: &Error, engine: String) -> Option<Self> {
         let why = match error {
-            MemoryError::InsufficientCredits(_) => {
+            Error::InsufficientCredits(_) => {
                 "the account is out of credits; topping up restores it"
             }
-            MemoryError::Unauthorized(_) => "the memory engine rejected the sign-in or API key",
-            MemoryError::Unavailable(_) => "the memory engine could not be reached",
+            Error::Unauthorized(_) => "the memory engine rejected the sign-in or API key",
+            Error::Unavailable(_) => "the memory engine could not be reached",
             _ => return None,
         };
         let markdown = format!(
@@ -247,7 +247,7 @@ pub(crate) async fn pre_turn_work(
                     }
                     Err(error) => {
                         tracing::warn!(%error, "[memory:hooks] pre_turn refused");
-                        Err(MemoryError::from(error))
+                        Err(Error::from(error))
                     }
                 }
             } else if resumed {
@@ -259,12 +259,12 @@ pub(crate) async fn pre_turn_work(
                     .await
                     .map_err(|error| {
                         tracing::warn!(%error, "[memory:hooks] recall failed");
-                        MemoryError::from(error)
+                        Error::from(error)
                     })
             } else {
                 memory.recall(&user_text).await.map_err(|error| {
                     tracing::warn!(%error, "[memory:hooks] recall failed");
-                    MemoryError::from(error)
+                    Error::from(error)
                 })
             }
         }
@@ -294,7 +294,7 @@ pub(crate) async fn pre_turn_work(
 
 /// The account-wide refusal behind a recall that came back empty, if any:
 /// the first refusing error, else the first refusing skipped section.
-fn refusal_of(outcomes: &[Result<ContextPack, MemoryError>]) -> Option<MemoryError> {
+fn refusal_of(outcomes: &[Result<ContextPack, Error>]) -> Option<Error> {
     let failed = outcomes.iter().find_map(|outcome| {
         outcome
             .as_ref()
@@ -307,7 +307,7 @@ fn refusal_of(outcomes: &[Result<ContextPack, MemoryError>]) -> Option<MemoryErr
             .iter()
             .filter_map(|outcome| outcome.as_ref().ok())
             .flat_map(|pack| pack.skipped.iter())
-            .find_map(|skipped| MemoryError::refusal_from_skip_reason(&skipped.reason))
+            .find_map(|skipped| Error::refusal_from_skip_reason(&skipped.reason))
     })
 }
 

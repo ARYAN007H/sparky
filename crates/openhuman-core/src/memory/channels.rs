@@ -15,7 +15,7 @@ use tinymemory_api::{ForgetTarget, ItemKind, MetaFilter};
 use crate::config::Config;
 
 use super::engine;
-use super::error::{MemoryError, MemoryResult};
+use super::error::{Error, Result};
 
 /// Serialises read-modify-writes of the file in this process.
 static LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
@@ -94,11 +94,11 @@ pub fn threads_of(workspace_dir: &Path, channel: &str) -> Vec<String> {
 /// names the threads the channel owned at disconnect, so a thread the
 /// channel brings later is never caught by it. A failure is returned after
 /// the rest are tried.
-pub async fn forget_channel(config: &Config, channel: &str) -> MemoryResult<usize> {
+pub async fn forget_channel(config: &Config, channel: &str) -> Result<usize> {
     let threads = threads_of(&config.workspace_dir, channel);
     let bound = match engine::resolve(config).engine() {
         Ok(bound) => Some(bound),
-        Err(MemoryError::Off(_)) => None,
+        Err(Error::Off(_)) => None,
         Err(error) => return Err(error),
     };
     let mut forgotten = 0;
@@ -106,7 +106,7 @@ pub async fn forget_channel(config: &Config, channel: &str) -> MemoryResult<usiz
     for thread_id in threads {
         let result = match &bound {
             Some(bound) => forget_thread_with(bound, &thread_id).await,
-            None => Err(MemoryError::Off("memory is off".to_string())),
+            None => Err(Error::Off("memory is off".to_string())),
         };
         match result {
             Ok(count) => forgotten += count,
@@ -115,7 +115,7 @@ pub async fn forget_channel(config: &Config, channel: &str) -> MemoryResult<usiz
                     &config.workspace_dir,
                     super::deletion::PendingDeletion::Thread { thread_id },
                 );
-                if !matches!(error, MemoryError::Off(_)) && failure.is_none() {
+                if !matches!(error, Error::Off(_)) && failure.is_none() {
                     failure = Some(error);
                 }
             }
@@ -141,7 +141,7 @@ pub async fn forget_channel(config: &Config, channel: &str) -> MemoryResult<usiz
     }
 }
 
-async fn forget_thread_with(bound: &engine::BoundEngine, thread_id: &str) -> MemoryResult<usize> {
+async fn forget_thread_with(bound: &engine::BoundEngine, thread_id: &str) -> Result<usize> {
     let filter = MetaFilter {
         thread_id: Some(thread_id.to_string()),
         ..MetaFilter::kinds([ItemKind::Conversation])

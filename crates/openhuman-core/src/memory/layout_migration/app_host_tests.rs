@@ -176,13 +176,13 @@ async fn a_shared_tree_reaches_the_module_as_a_claim() {
 #[test]
 fn errors_keep_their_wire_codes_across_the_module_boundary() {
     for error in [
-        MemoryError::Off("x".into()),
-        MemoryError::Unsupported("x".into()),
-        MemoryError::invalid("x"),
-        MemoryError::Unauthorized("x".into()),
-        MemoryError::Unavailable("x".into()),
-        MemoryError::InsufficientCredits("[USER_INSUFFICIENT_CREDITS] x".into()),
-        MemoryError::Engine("x".into()),
+        Error::Off("x".into()),
+        Error::Unsupported("x".into()),
+        Error::invalid("x"),
+        Error::Unauthorized("x".into()),
+        Error::Unavailable("x".into()),
+        Error::InsufficientCredits("[USER_INSUFFICIENT_CREDITS] x".into()),
+        Error::Engine("x".into()),
     ] {
         let back = from_module(to_module(error.clone()));
         assert_eq!(back.code(), error.code(), "{error:?}");

@@ -417,7 +417,7 @@ async fn explicit_memory_disable_refuses_new_writes_and_keeps_old_writes_pending
             &json!({"action":"learn","text":"Must not persist"}),
             &call_facts
         ),
-        Err(MemoryError::Off(_))
+        Err(Error::Off(_))
     ));
     assert_eq!(drain(&config).await, 0);
     assert_eq!(read(&config.workspace_dir).unwrap().len(), 1);
