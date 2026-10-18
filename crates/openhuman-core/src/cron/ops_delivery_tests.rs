@@ -146,7 +146,11 @@ async fn run_job_now_pairs_trigger_and_completion_after_delivery() {
     .expect("Run Now completion event arrives");
     assert_eq!(pair, vec!["triggered", "completed"]);
     let runs = cron::list_runs(&config, &job.id, 10).unwrap();
-    assert_eq!(runs[0].delivery_status, None);
+    assert_eq!(
+        runs[0].delivery_status,
+        Some(DeliveryStatus::NotRequested),
+        "requested delivery is projected even when the configured mode sends nothing"
+    );
 }
 
 #[tokio::test]

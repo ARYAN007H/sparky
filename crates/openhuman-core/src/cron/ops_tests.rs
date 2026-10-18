@@ -361,7 +361,7 @@ pub(super) fn single_flight_system_job(config: &Config, name: &str) -> CronJob {
         },
     )
     .unwrap();
-    job
+    crate::cron::get_job(config, &job.id).unwrap()
 }
 
 #[tokio::test]
