@@ -130,7 +130,7 @@ start_cancel_watchdog() {
         exit 0
       fi
     done
-  ) &
+  ) >/dev/null &
   WATCHDOG_PID=$!
   echo "[ci-cancel-aware] cancellation watchdog polling every ${interval}s (run ${GITHUB_RUN_ID})" >&2
 }
