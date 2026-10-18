@@ -959,7 +959,6 @@ export default function Skills() {
                   onCtaClick={() => navigate(item.route!)}
                 />
               );
-              /* v8 ignore stop */
             }
           })}
         </div>
