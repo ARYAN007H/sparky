@@ -56,6 +56,7 @@ pub(crate) mod journal_projection;
 /// Langfuse ingestion exporter (remote push through the configured backend).
 pub(crate) mod langfuse;
 mod otlp;
+mod graph_langfuse;
 
 /// The [`SpanCollector`] state machine that folds progress events into spans.
 mod collector;
@@ -85,6 +86,7 @@ pub(crate) fn export_brand() -> ExportBrand<'static> {
 
 pub(crate) use export::export_subagent_journal_trace;
 pub(crate) use export::{export_run_trace, export_run_trace_from_journal};
+pub(crate) use graph_langfuse::export_graph_run_trace;
 
 #[cfg(test)]
 mod journal_projection_tests;
