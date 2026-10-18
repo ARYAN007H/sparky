@@ -230,7 +230,7 @@ pub(super) async fn try_arm(
 pub(crate) fn classify_error(message: String) -> ArmError {
     let err = anyhow!("{message}");
     // Budget-exceeded is technically a 400 (not 5xx/429), so the
-    // generic transient checks above won't catch it — but it is a
+    // generic owner classifier below won't catch it — but it is a
     // user-actionable upstream blocker, not a code bug, so we route
     // it through `BudgetExhausted` to avoid Sentry pages.
     if is_inference_budget_exceeded(&message) {

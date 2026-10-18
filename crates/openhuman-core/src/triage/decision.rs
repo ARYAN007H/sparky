@@ -1,6 +1,5 @@
-//! Structured decision emitted by the `trigger_triage` agent, plus a
-//! deliberately-tolerant parser that accepts whatever shape a small
-//! local model is likely to produce.
+//! Structured decision emitted by the `trigger_triage` agent, plus host
+//! action normalization and validation around TinyAgents' lenient parser.
 //!
 //! The contract is described in
 //! `crates/openhuman-core/src/agent_registry/agents/trigger_triage/prompt.md` — the triage
@@ -103,16 +102,9 @@ pub enum ParseError {
 
 /// Parse the triage agent's raw reply text into a [`TriageDecision`].
 ///
-/// Algorithm (keep in sync with the prompt's output contract):
-///
-/// 1. Try to extract the **last** fenced ```json block — small models
-///    often add commentary *after* the JSON and we want the JSON.
-/// 2. If no fence, brace-match the **last** balanced `{ … }` object in
-///    the text. This handles "Here's my decision: { … }" and
-///    "{ … } (hope that helps)".
-/// 3. Strip trailing commas before the parse (`,}` → `}`, `,]` → `]`).
-/// 4. Parse as JSON, lowercasing the `action` string in flight.
-/// 5. Reject if React / Escalate but `target_agent`/`prompt` missing.
+/// TinyAgents selects and repairs the last complete JSON object. OpenHuman
+/// keeps the triage-specific casing normalization and action-field validation:
+/// React / Escalate must include a non-empty target and prompt.
 pub fn parse_triage_decision(llm_text: &str) -> Result<TriageDecision, ParseError> {
     let (value, _) = parse_lenient_last_object(llm_text).ok_or(ParseError::NoJsonObject)?;
     let normalized = lowercase_action_value(&value.to_string());
