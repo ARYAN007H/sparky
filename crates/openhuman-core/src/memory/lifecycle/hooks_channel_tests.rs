@@ -4,7 +4,7 @@ use super::*;
 fn channel_metadata_does_not_change_stable_ids_for_either_conversation_turn_role() {
     for role in [Role::User, Role::Assistant] {
         let mut tagged = StoreItem::Conversation {
-            turns: vec![Turn::new(role.clone(), "same turn")],
+            turns: vec![Turn::new(role, "same turn")],
             meta: MemoryMeta::default(),
         };
         let untagged = tagged.clone();
