@@ -31,11 +31,11 @@ fn apify_linkedin_scrape_controller_is_retired() {
 #[test]
 fn tools_schema_wire_contracts_are_preserved() {
     let contracts: &[(&str, &[Field], &[&str])] = &[
-        ("composio_execute", &[Field { name: "action", required: Some(true) }], &[]),
-        ("web_answer", &[Field { name: "query", required: Some(true) }, Field { name: "depth", required: None }], &["citations"]),
-        ("web_contents", &[Field { name: "urls", required: Some(true) }], &[]),
-        ("searxng_search", &[Field { name: "query", required: Some(true) }, Field { name: "max_results", required: None }], &[]),
-        ("web_search", &[Field { name: "query", required: Some(true) }], &["provider"]),
+        ("composio_execute", &[Field { name: "action", required: Some(true), type_debug: None }], &[]),
+        ("web_answer", &[Field { name: "query", required: Some(true), type_debug: None }, Field { name: "depth", required: None, type_debug: None }], &["citations"]),
+        ("web_contents", &[Field { name: "urls", required: Some(true), type_debug: None }], &[]),
+        ("searxng_search", &[Field { name: "query", required: Some(true), type_debug: None }, Field { name: "max_results", required: None, type_debug: None }], &[]),
+        ("web_search", &[Field { name: "query", required: Some(true), type_debug: None }], &["provider"]),
     ];
     for (function, inputs, outputs) in contracts {
         let contract = Contract {
@@ -43,6 +43,7 @@ fn tools_schema_wire_contracts_are_preserved() {
             function: *function,
             input_count: None,
             input_order: None,
+            required_input_order: None,
             inputs: *inputs,
             output_fields: *outputs,
             outputs: None,

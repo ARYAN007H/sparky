@@ -8,16 +8,16 @@ fn wallet_schema_wire_contracts_are_preserved() {
 
     let contracts: &[(&str, Option<&[&str]>, Option<usize>, &[Field])] = &[
         ("generate_mnemonic", Some(&["wordCount"][..]), None, &[]),
-        ("validate_mnemonic", Some(&["phrase"][..]), None, &[Field { name: "phrase", required: Some(true) }]),
+        ("validate_mnemonic", Some(&["phrase"][..]), None, &[Field { name: "phrase", required: Some(true), type_debug: None }]),
         ("derive_recovery_material", Some(&["phrase"][..]), None, &[]),
         ("tx_status", Some(&["chain", "hash", "evmNetwork"][..]), None, &[]),
         ("status", None, Some(0), &[]),
         ("setup", None, Some(6), &[
-            Field { name: "encryptedMnemonic", required: Some(true) },
-            Field { name: "force", required: Some(false) },
+            Field { name: "encryptedMnemonic", required: Some(true), type_debug: None },
+            Field { name: "force", required: Some(false), type_debug: None },
         ]),
         ("execute_prepared", Some(&["quoteId", "confirmed"][..]), None, &[]),
-        ("prepare_transfer", None, None, &[Field { name: "assetSymbol", required: Some(false) }]),
+        ("prepare_transfer", None, None, &[Field { name: "assetSymbol", required: Some(false), type_debug: None }]),
     ];
     for (function, input_order, input_count, inputs) in contracts {
         let contract = Contract {
@@ -25,6 +25,7 @@ fn wallet_schema_wire_contracts_are_preserved() {
             function: *function,
             input_count: *input_count,
             input_order: *input_order,
+            required_input_order: None,
             inputs: *inputs,
             output_fields: &[],
             outputs: None,

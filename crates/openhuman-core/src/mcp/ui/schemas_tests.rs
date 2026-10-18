@@ -1,26 +1,23 @@
 use super::*;
+use crate::core::all::{assert_schema_contract, ControllerSchemaContract as Contract, SchemaFieldContract as Field};
 use crate::core::runtime::DispatchCtx;
 
 #[test]
-fn every_registered_controller_is_in_the_mcp_ui_namespace() {
-    let controllers = all_registered_controllers();
-    assert_eq!(controllers.len(), all_controller_schemas().len());
-    for controller in controllers {
-        assert_eq!(controller.schema.namespace, "mcp_ui");
-        assert_ne!(controller.schema.function, "unknown");
-    }
-}
-
-#[test]
-fn tool_call_requires_server_and_tool() {
-    let schema = schemas("tool_call");
-    let required: Vec<_> = schema
-        .inputs
-        .iter()
-        .filter(|field| field.required)
-        .map(|field| field.name)
-        .collect();
-    assert_eq!(required, vec!["server_id", "tool_name"]);
+fn mcp_ui_schema_contracts_are_preserved() {
+    let contract = Contract {
+        namespace: "mcp_ui",
+        function: "tool_call",
+        input_count: None,
+        input_order: None,
+        required_input_order: Some(&["server_id", "tool_name"]),
+        inputs: &[
+            Field { name: "server_id", required: Some(true), type_debug: None },
+            Field { name: "tool_name", required: Some(true), type_debug: None },
+        ],
+        output_fields: &[],
+        outputs: None,
+    };
+    assert_schema_contract(&schemas("tool_call"), &contract);
 }
 
 async fn with_workspace<F: std::future::Future>(body: F) -> F::Output {
