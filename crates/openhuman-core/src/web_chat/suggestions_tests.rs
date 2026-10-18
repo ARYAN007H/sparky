@@ -138,8 +138,7 @@ async fn emits_chat_suggestions_for_a_well_formed_reply() {
         .await
         .expect("chat_suggestions should have been emitted");
     assert_eq!(ev.context().turn_request_id.as_deref(), Some("req-1"));
-    let crate::web_chat::WebChannelEvent::ChatSuggestions { suggestions, .. } =
-        ev.wire_event()
+    let crate::web_chat::WebChannelEvent::ChatSuggestions { suggestions, .. } = ev.wire_event()
     else {
         panic!("expected chat_suggestions event");
     };

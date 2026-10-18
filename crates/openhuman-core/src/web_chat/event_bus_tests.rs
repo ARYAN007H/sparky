@@ -1,4 +1,5 @@
 use super::*;
+use crate::web_chat::{QueueItemPayload, ScopedWebEvent, WebChannelEvent, WebEventContext};
 use tokio::sync::broadcast;
 
 fn wire(event: &ScopedWebEvent) -> serde_json::Value {
