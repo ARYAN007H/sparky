@@ -214,6 +214,15 @@ impl JobDispatcher {
             .binding
             .within(async { DocScope::current(config) })
             .await?;
+        // StartScheduler bypasses the ScheduleStore wrapper in client.rs.
+        // Run the module-owned schema migration on its exact document scope
+        // before the first scheduler request can observe or claim jobs.
+        let _: serde_json::Value = crate::cron::client::store_in(
+            config,
+            &scope,
+            tinyflows_bus::schedule::StoreOperation::Migrate,
+        )
+        .await?;
         let storage = StoreConfig {
             backend: StoreBackend::Documents {
                 callback: crate::cron::documents_port::address(&scope).await?,
