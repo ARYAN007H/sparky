@@ -305,7 +305,7 @@ feature) nothing loads and every cron call answers `COMPONENT_DISABLED:tinyflows
 | [`handlers.rs`](./handlers.rs) | The job-kind handler registry (`JobKindHandler`, `JobOutcome`, `register_kind`) and the system-job handlers. |
 | `ops.rs` | Business operations: `add_once`, `add_once_at`, pause/resume, and the async `cron_*` RPC operations. Also re-exported as `cron::rpc`. |
 | [`schemas.rs`](./schemas.rs) | Controller schemas and handlers for the `cron` namespace. |
-| [`scheduler.rs`](./scheduler.rs) | The host loop: `run`, `tick_once`, `JobDispatcher` (one manual-tick module scheduler per scope), the live-agent pass, `execute_job_now` (Run Now, through `ExecuteJob`), the manual-run guard and the health signals. |
+| [`scheduler.rs`](./scheduler.rs) | The host loop: `run`, `tick_once`, `JobDispatcher` (one manual-tick module scheduler per scope), the live-agent pass, and health signals. Run Now uses a per-invocation manual-worker owner through Schedule contract v6. |
 | `scheduler/executor.rs` | `HostExecutor`: one shell or agent attempt through the registry, failure classification, the retries-exhausted report, the cadence warning. |
 | `scheduler/builtin.rs` | The default `shell`, `agent` and `flow` handlers. |
 | `scheduler/run_delivery.rs` | `deliver` (delivery plus completion events) and `trigger` (flow schedule trigger, system jobs). |
@@ -334,8 +334,9 @@ feature) nothing loads and every cron call answers `COMPONENT_DISABLED:tinyflows
 - `AgentJobSpec`: the store's agent-job creation spec (from `tinyflows_bus::schedule`),
   used by `add_agent_job_from_spec`.
 - `scheduler::run(ctx, config)`: the service entry point.
-- `scheduler::execute_job_now` and `scheduler::deliver_job`: what Run Now uses
-  to execute and deliver outside the loop.
+- `scheduler::run_job_now`: manual worker lifecycle owner used by Run Now and
+  the run tool; `scheduler::execute_job_now` preserves the synchronous tuple
+  adapter for existing host callers.
 - `add_job`, `add_shell_job`, `add_agent_job_with_definition`,
   `add_agent_job_from_spec`, `add_flow_schedule_job`, `find_flow_schedule_job`,
   `get_job`, `list_jobs`, `update_job`, `remove_job`, `list_runs`,
@@ -363,7 +364,7 @@ Namespace `cron`, registered through `all_cron_registered_controllers` in
 | `cron.list` | List all jobs. |
 | `cron.update` | Patch a job. |
 | `cron.remove` | Delete a job. |
-| `cron.run` | Run Now. Records a `queued` placeholder run, returns at once, then executes in the background through `execute_job_now` and `deliver_job` and records the real result. Refused when `cron.enabled` is false or the job is already running. |
+| `cron.run` | Run Now. Waits for module-confirmed admission, then returns `queued` while the invocation owner observes completion and acknowledges its module handle. Refused when `cron.enabled` is false or the job is already running. |
 | `cron.runs` | Run history for a job. |
 
 ## Event bus
