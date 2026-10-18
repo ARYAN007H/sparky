@@ -203,6 +203,15 @@ async fn message_append_with_config(
     origin: Option<&crate::agent::turn_origin::AgentTurnOrigin>,
     persistence_dir: &std::path::Path,
 ) -> Result<Outcome<ApiEnvelope<ConversationMessageRecord>>, ThreadsError> {
+    if request.message.sender == "user" && !request.attachments.is_empty() {
+        // Typed attachments become the staging markers here, once, so the
+        // rest of this function sees the same content a marker send would.
+        request.message.content = crate::agent::attachments::parts::fold_into_message(
+            &request.message.content,
+            &request.attachments,
+        )
+        .map_err(|error| ThreadsError::Message(error.to_string()))?;
+    }
     if request.message.sender == "user" {
         let raw_upload = request.message.content.contains("[IMAGE:")
             || request.message.content.contains("[FILE:");
