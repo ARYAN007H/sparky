@@ -60,8 +60,9 @@ the harness runs come from [`agents/`](agents/) below.
 
 Each built-in agent owns a subfolder with an `agent.toml` (id, `when_to_use`,
 model, tool scope, sandbox mode, iteration cap, tier, `omit_*` flags, parsed
-directly into `AgentDefinition`), a `prompt.md` holding the static archetype
-body, and a `prompt.rs` that `include_str!`s that body and exposes
+through `tinyagents_definition::parse_str` into `AgentDefinition`), a
+`prompt.md` holding the static archetype body, and a `prompt.rs` that
+`include_str!`s that body and exposes
 `pub fn build(&PromptContext) -> anyhow::Result<String>`, appending
 runtime-dependent sections (rendered tool list, workspace) to it.
 Every archetype uses the shared sub-agent turn graph.

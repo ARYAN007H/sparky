@@ -3,8 +3,8 @@
 //! Every built-in agent lives in its own subfolder here, with these files:
 //!
 //! * `agent.toml`  — id, when_to_use, model, tool allowlist, sandbox,
-//!   iteration cap, and the `omit_*` flags. Parsed
-//!   directly into [`AgentDefinition`] via serde.
+//!   iteration cap, and the `omit_*` flags. Parsed into [`AgentDefinition`]
+//!   through the portable definition loader.
 //! * `prompt.rs`   — a Rust module exporting `pub fn build(ctx: &PromptContext)
 //!   -> anyhow::Result<String>` that returns the sub-agent's system
 //!   prompt body. Dynamic: may branch on available tools, user profile,
@@ -31,7 +31,7 @@
 
 use crate::agent_registry::host_definition::{AgentDefinition, PromptBuilder};
 use anyhow::{Context, Result};
-use tinyagents_definition::{DefinitionSet, DefinitionSource, PromptSource};
+use tinyagents_definition::{parse_str, DefinitionSet, DefinitionSource, PromptSource};
 
 /// A single built-in agent: its id plus the metadata TOML and a
 /// function-driven prompt builder.
@@ -215,13 +215,12 @@ fn parse_builtin(b: &BuiltinAgent) -> Result<AgentDefinition> {
     // The TOML ships without `system_prompt` — serde falls back to
     // `defaults::empty_inline_prompt` — and the loader injects the
     // rendered sibling `prompt.md` immediately below.
-    let mut def: AgentDefinition = toml::from_str(b.toml)
+    let mut def: AgentDefinition = parse_str(b.toml, DefinitionSource::Builtin)
         .with_context(|| format!("parsing built-in agent `{}` TOML", b.id))?;
 
-    // Install the function-driven prompt builder and stamp the source.
+    // Install the host-owned function-driven prompt builder.
     def.system_prompt = PromptSource::Dynamic(());
     def.extensions.prompt_builder = Some(b.prompt_fn);
-    def.source = DefinitionSource::Builtin;
 
     // Sanity check: file layout id must match declared TOML id. This
     // catches copy-paste mistakes where someone forgets to update the
