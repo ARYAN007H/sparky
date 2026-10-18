@@ -1238,6 +1238,17 @@ pub(crate) fn expect_schema_fields(schema: &ControllerSchema, fields: &[(&str, O
 }
 
 #[cfg(test)]
+pub(crate) fn expect_schema_required_inputs(schema: &ControllerSchema, required: &[&str]) {
+    let actual: Vec<_> = schema
+        .inputs
+        .iter()
+        .filter(|field| field.required)
+        .map(|field| field.name)
+        .collect();
+    assert_eq!(actual, required, "{}.{} required inputs", schema.namespace, schema.function);
+}
+
+#[cfg(test)]
 pub(crate) fn expect_schema_input_order(schema: &ControllerSchema, inputs: &[&str]) {
     let actual: Vec<_> = schema.inputs.iter().map(|field| field.name).collect();
     assert_eq!(actual, inputs, "{}.{} input order", schema.namespace, schema.function);

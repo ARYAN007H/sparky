@@ -1,84 +1,31 @@
 use super::*;
-use crate::core::all::{assert_schema_contract, ControllerSchemaContract, SchemaFieldContract};
+use crate::core::all::{expect_schema_fields, expect_schema_identity, expect_schema_required_inputs};
 
 #[test]
 fn credential_schema_wire_contracts_are_preserved() {
-    // These fixed rows replace independent schema assertions that were
-    // previously scattered across one test per method. The key/function pairs
-    // and field expectations are copied from those prior assertions.
-    let contracts: &[(&str, ControllerSchemaContract)] = &[
-        (
-            "auth_set_credential",
-            ControllerSchemaContract {
-                namespace: "auth",
-                function: "set_credential",
-                input_count: None,
-                input_order: None,
-                required_input_order: Some(&["token"]),
-                inputs: &["kind", "userId", "user"].map(|name| SchemaFieldContract {
-                    name,
-                    required: None,
-                    type_debug: None,
-                }),
-                output_fields: &[],
-                outputs: None,
-            },
-        ),
-        (
-            "auth_clear_credential",
-            ControllerSchemaContract {
-                namespace: "auth",
-                function: "clear_credential",
-                input_count: None,
-                input_order: None,
-                required_input_order: Some(&[]),
-                inputs: &[SchemaFieldContract {
-                    name: "kind",
-                    required: Some(false),
-                    type_debug: None,
-                }],
-                output_fields: &[],
-                outputs: None,
-            },
-        ),
-        (
-            "auth_list_provider_credentials",
-            ControllerSchemaContract {
-                namespace: "auth",
-                function: "list_provider_credentials",
-                input_count: None,
-                input_order: None,
-                required_input_order: None,
-                inputs: &[SchemaFieldContract {
-                    name: "provider",
-                    required: Some(false),
-                    type_debug: None,
-                }],
-                output_fields: &[],
-                outputs: None,
-            },
-        ),
-    ];
     let key_contracts = [
         ("auth_get_state", "get_state"),
         ("auth_get_session_token", "get_session_token"),
-        (
-            "auth_store_provider_credentials",
-            "store_provider_credentials",
-        ),
-        (
-            "auth_remove_provider_credentials",
-            "remove_provider_credentials",
-        ),
+        ("auth_store_provider_credentials", "store_provider_credentials"),
+        ("auth_remove_provider_credentials", "remove_provider_credentials"),
     ];
-    for (key, expected) in contracts {
-        assert_schema_contract(&schemas(key), expected);
-    }
     for (key, expected_function) in key_contracts {
         let schema = schemas(key);
-        assert_eq!(schema.namespace, "auth", "key `{key}` namespace");
-        assert_eq!(schema.function, expected_function, "key `{key}` function");
+        expect_schema_identity(&schema, "auth", expected_function);
     }
+    let set = schemas("auth_set_credential");
+    expect_schema_identity(&set, "auth", "set_credential");
+    expect_schema_required_inputs(&set, &["token"]);
+    expect_schema_fields(&set, &[("kind", None), ("userId", None), ("user", None)]);
+
+    let clear = schemas("auth_clear_credential");
+    expect_schema_identity(&clear, "auth", "clear_credential");
+    expect_schema_required_inputs(&clear, &[]);
+    expect_schema_fields(&clear, &[("kind", Some(false))]);
+
+    let list = schemas("auth_list_provider_credentials");
+    expect_schema_identity(&list, "auth", "list_provider_credentials");
+    expect_schema_fields(&list, &[("provider", Some(false))]);
 }
 
 // ── Param-deserialization helper ───────────────────────────────
