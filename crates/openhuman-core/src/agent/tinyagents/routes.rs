@@ -63,59 +63,6 @@ pub(super) fn route_fallback_policy(model: &str) -> Option<FallbackPolicy> {
     policy
 }
 
-/// Around-model middleware that feeds the cost event bridge (issue #4249,
-/// Phase 5): after the real model call, it reads the full host [`BilledUsage`] off
-/// the returned [`ModelResponse`] — token breakdowns from the crate `Usage`,
-/// backend-charged USD + context window from the G1 `raw` passthrough
-/// ([`usage_info_from_response`](crate::inference::provider::model::usage_info_from_response)) — and
-/// pushes it onto the shared [`ProviderUsageCarry`](super::observability::ProviderUsageCarry)
-/// the [`OpenhumanEventBridge`](super::OpenhumanEventBridge) drains on
-/// `UsageRecorded`.
-///
-/// It wraps the whole retry/fallback core, so it fires
-/// exactly once per logical model call (matching the single `UsageRecorded` the
-/// crate emits), for both the buffered and streamed paths (the streamed response
-/// is folded back to a `ModelResponse` with usage + raw intact). Push happens
-/// after the call returns, before the loop emits `UsageRecorded`, preserving the
-/// FIFO ordering the bridge relies on.
-pub(super) struct UsageCarryMiddleware {
-    carry: super::observability::ProviderUsageCarry,
-}
-
-impl UsageCarryMiddleware {
-    pub(super) fn new(carry: super::observability::ProviderUsageCarry) -> Self {
-        Self { carry }
-    }
-}
-
-#[async_trait]
-impl ModelMiddleware<(), crate::agent::tinyagents::host::OpenHumanRunContext>
-    for UsageCarryMiddleware
-{
-    fn name(&self) -> &str {
-        "openhuman.usage_carry"
-    }
-
-    async fn wrap_model(
-        &self,
-        ctx: &mut RunContext<crate::agent::tinyagents::host::OpenHumanRunContext>,
-        state: &(),
-        request: ModelRequest,
-        next: ModelHandler<'_, (), crate::agent::tinyagents::host::OpenHumanRunContext>,
-    ) -> tinyagents_harness::Result<MiddlewareModelOutcome> {
-        let outcome = next.run(ctx, state, request).await?;
-        let response = outcome.into_response();
-        if let Some(usage) = crate::inference::provider::model::usage_info_from_response(&response)
-        {
-            self.carry
-                .lock()
-                .unwrap_or_else(|p| p.into_inner())
-                .push_back(usage);
-        }
-        Ok(MiddlewareModelOutcome::from(response))
-    }
-}
-
 /// Captures the concrete provider/model/host-route selected for a successful
 /// call from TinyInference's canonical response metadata.
 ///
