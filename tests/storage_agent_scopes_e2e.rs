@@ -29,9 +29,6 @@ use storage_case::Case;
 
 #[path = "support/cron_policy_failure.rs"]
 mod cron_policy_failure;
-use cron_policy_failure::{
-    malformed_policy_rows_refuse_execution, policy_reads_refuse_execution_without_consuming_a_slot,
-};
 
 fn agent_context(config: &Config, agent: &str) -> Arc<CoreContext> {
     let context = CoreContext::current().unwrap().derive_with(
