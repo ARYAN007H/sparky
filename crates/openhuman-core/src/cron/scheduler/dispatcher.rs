@@ -52,8 +52,13 @@ pub(crate) async fn run_job_now(
     let ctx = ctx.clone();
     let config = config.clone();
     tokio::spawn(async move {
-        let result = own_manual_run(ctx, config, job, run_id, wait, delivery, reply_tx).await;
+        let mut reply_tx = Some(reply_tx);
+        let result =
+            own_manual_run(ctx, config, job, run_id, wait, delivery, &mut reply_tx).await;
         if let Err(error) = result {
+            if let Some(reply_tx) = reply_tx.take() {
+                let _ = reply_tx.send(Err(error.to_string()));
+            }
             tracing::warn!(%error, "[cron:scheduler] manual worker owner stopped before acknowledgement");
         }
     });
@@ -69,7 +74,7 @@ async fn own_manual_run(
     run_id: String,
     wait: bool,
     delivery: ManualDelivery,
-    reply_tx: tokio::sync::oneshot::Sender<Result<RunJobReply, String>>,
+    reply_tx: &mut Option<tokio::sync::oneshot::Sender<Result<RunJobReply, String>>>,
 ) -> Result<()> {
     // Keep the invocation's CoreContext strongly pinned while Binding itself
     // retains only a Weak reference. The task is the acyclic lifetime owner.
@@ -134,7 +139,6 @@ async fn own_manual_run(
     };
 
     let mut started = false;
-    let mut reply_tx = Some(reply_tx);
     let mut retry_delay = Duration::from_millis(20);
     let terminal = loop {
         let state = if !started {
