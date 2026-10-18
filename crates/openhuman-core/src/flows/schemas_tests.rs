@@ -1,21 +1,42 @@
 use super::*;
+use crate::core::all::{expect_schema_fields, expect_schema_input_order, expect_schema_output_names, expect_schema_required_inputs};
 use serde_json::json;
 
 #[test]
-fn run_schema_advertises_both_input_channels() {
-    let run = all_controller_schemas()
-        .into_iter()
-        .find(|s| s.function == "run")
-        .expect("the run controller is registered");
-    let names: Vec<_> = run.inputs.iter().map(|f| f.name).collect();
-    assert!(names.contains(&"input"), "trigger payload, got {names:?}");
-    assert!(names.contains(&"inputs"), "declared inputs, got {names:?}");
-
-    let declared = run.inputs.iter().find(|f| f.name == "inputs").unwrap();
-    assert!(
-        !declared.required,
-        "a flow with no declared inputs must still be runnable without the param"
-    );
+fn flow_schema_wire_contracts_are_preserved() {
+    let contracts = [
+        ("import", &["graph"][..], &["format"][..]),
+        ("create", &["name", "graph"][..], &["require_approval"][..]),
+        ("duplicate", &["id"][..], &[][..]),
+        ("prune_runs", &["id"][..], &[][..]),
+        ("run", &[][..], &["input", "inputs"][..]),
+        ("resume", &["id", "thread_id"][..], &["approvals"][..]),
+        ("list_runs", &[][..], &["limit"][..]),
+        ("get_run", &["run_id"][..], &[][..]),
+        (
+            "build",
+            &["mode"][..],
+            &["thread_id", "request_id"][..],
+        ),
+        ("build_cancel", &["thread_id"][..], &["request_id"][..]),
+        ("discover", &[][..], &["thread_id", "request_id"][..]),
+    ];
+    for (function, required, optional) in contracts {
+        let schema = schemas(function);
+        assert_eq!(schema.namespace, "flows", "{function} namespace");
+        expect_schema_required_inputs(&schema, required);
+        expect_schema_fields(
+            &schema,
+            &optional.iter().map(|name| (*name, Some(false))).collect::<Vec<_>>(),
+        );
+    }
+    let run = schemas("run");
+    expect_schema_fields(&run, &[("input", None), ("inputs", Some(false))]);
+    let discover = schemas("discover");
+    expect_schema_input_order(&discover, &["thread_id", "request_id"]);
+    expect_schema_output_names(&schemas("import"), &["graph", "warnings"]);
+    expect_schema_output_names(&schemas("duplicate"), &["flow"]);
+    assert_eq!(schemas("prune_runs").outputs[0].name, "result");
 }
 
 #[test]
@@ -96,23 +117,6 @@ fn all_controller_schemas_covers_every_supported_function() {
 }
 
 #[test]
-fn schemas_import_requires_graph_and_optional_format() {
-    let s = schemas("import");
-    assert_eq!(s.namespace, "flows");
-    let required: Vec<_> = s
-        .inputs
-        .iter()
-        .filter(|f| f.required)
-        .map(|f| f.name)
-        .collect();
-    assert_eq!(required, vec!["graph"]);
-    let format = s.inputs.iter().find(|f| f.name == "format").unwrap();
-    assert!(!format.required);
-    let names: Vec<_> = s.outputs.iter().map(|f| f.name).collect();
-    assert_eq!(names, vec!["graph", "warnings"]);
-}
-
-#[test]
 fn schemas_list_connections_has_no_inputs_and_secret_free_outputs() {
     let s = schemas("list_connections");
     assert_eq!(s.namespace, "flows");
@@ -152,144 +156,6 @@ fn schemas_list_connections_has_no_inputs_and_secret_free_outputs() {
     } else {
         panic!("connections output is not an Array");
     }
-}
-
-#[test]
-fn schemas_create_requires_name_and_graph() {
-    let s = schemas("create");
-    assert_eq!(s.namespace, "flows");
-    let required: Vec<_> = s
-        .inputs
-        .iter()
-        .filter(|f| f.required)
-        .map(|f| f.name)
-        .collect();
-    assert_eq!(required, vec!["name", "graph"]);
-}
-
-#[test]
-fn schemas_create_require_approval_is_optional() {
-    let s = schemas("create");
-    let field = s
-        .inputs
-        .iter()
-        .find(|f| f.name == "require_approval")
-        .unwrap();
-    assert!(!field.required);
-}
-
-#[test]
-fn schemas_duplicate_requires_id_and_outputs_flow() {
-    let s = schemas("duplicate");
-    assert_eq!(s.namespace, "flows");
-    let required: Vec<_> = s
-        .inputs
-        .iter()
-        .filter(|f| f.required)
-        .map(|f| f.name)
-        .collect();
-    assert_eq!(required, vec!["id"]);
-    assert_eq!(s.outputs.len(), 1);
-    assert_eq!(s.outputs[0].name, "flow");
-}
-
-#[test]
-fn schemas_prune_runs_requires_id_and_reports_counts() {
-    let s = schemas("prune_runs");
-    assert_eq!(s.namespace, "flows");
-    let required: Vec<_> = s
-        .inputs
-        .iter()
-        .filter(|f| f.required)
-        .map(|f| f.name)
-        .collect();
-    assert_eq!(required, vec!["id"]);
-    assert_eq!(s.outputs[0].name, "result");
-}
-
-#[test]
-fn schemas_run_input_is_optional() {
-    let s = schemas("run");
-    let input = s.inputs.iter().find(|f| f.name == "input").unwrap();
-    assert!(!input.required);
-}
-
-#[test]
-fn schemas_resume_requires_id_and_thread_id_but_not_approvals() {
-    let s = schemas("resume");
-    let required: Vec<_> = s
-        .inputs
-        .iter()
-        .filter(|f| f.required)
-        .map(|f| f.name)
-        .collect();
-    assert_eq!(required, vec!["id", "thread_id"]);
-    let approvals = s.inputs.iter().find(|f| f.name == "approvals").unwrap();
-    assert!(!approvals.required);
-}
-
-#[test]
-fn schemas_list_runs_limit_is_optional() {
-    let s = schemas("list_runs");
-    let limit = s.inputs.iter().find(|f| f.name == "limit").unwrap();
-    assert!(!limit.required);
-}
-
-#[test]
-fn schemas_get_run_requires_run_id() {
-    let s = schemas("get_run");
-    let required: Vec<_> = s
-        .inputs
-        .iter()
-        .filter(|f| f.required)
-        .map(|f| f.name)
-        .collect();
-    assert_eq!(required, vec!["run_id"]);
-}
-
-#[test]
-fn schemas_build_exposes_optional_stream_params() {
-    let s = schemas("build");
-    assert_eq!(s.namespace, "flows");
-    // The only structurally required build input is `mode`.
-    let required: Vec<_> = s
-        .inputs
-        .iter()
-        .filter(|f| f.required)
-        .map(|f| f.name)
-        .collect();
-    assert_eq!(required, vec!["mode"]);
-    // The streaming params are present and optional.
-    let thread = s.inputs.iter().find(|f| f.name == "thread_id").unwrap();
-    assert!(!thread.required);
-    let request = s.inputs.iter().find(|f| f.name == "request_id").unwrap();
-    assert!(!request.required);
-}
-
-#[test]
-fn schemas_build_cancel_requires_thread_id_but_not_request_id() {
-    let s = schemas("build_cancel");
-    assert_eq!(s.namespace, "flows");
-    assert_eq!(s.function, "build_cancel");
-    let required: Vec<_> = s
-        .inputs
-        .iter()
-        .filter(|f| f.required)
-        .map(|f| f.name)
-        .collect();
-    assert_eq!(required, vec!["thread_id"]);
-    let request = s.inputs.iter().find(|f| f.name == "request_id").unwrap();
-    assert!(!request.required);
-}
-
-#[test]
-fn schemas_discover_exposes_optional_stream_params() {
-    let s = schemas("discover");
-    assert_eq!(s.namespace, "flows");
-    // Discover has no required inputs — the two stream params are optional.
-    assert!(s.inputs.iter().all(|f| !f.required));
-    let names: Vec<_> = s.inputs.iter().map(|f| f.name).collect();
-    assert_eq!(names, vec!["thread_id", "request_id"]);
 }
 
 #[test]
