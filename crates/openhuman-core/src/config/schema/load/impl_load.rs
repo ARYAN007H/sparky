@@ -14,10 +14,10 @@ use super::secrets::{
 };
 use anyhow::{Context, Result};
 use std::path::Path;
-use std::sync::{Mutex, OnceLock};
-use tokio::fs;
 
 pub(super) use super::parse_source::parse_source_contents;
+pub(super) use super::config_file_read::read_config_with_recovery_or_default;
+pub(crate) use super::config_file_read::CONFIG_OWNER_MISMATCH_MARKER;
 
 impl Config {
     pub async fn load_or_init() -> Result<Self> {

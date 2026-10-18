@@ -2,6 +2,7 @@
 
 mod active_workspace;
 mod branches;
+mod config_file_read;
 mod dirs;
 pub(in crate::config::schema) mod env;
 mod env_overlay;
