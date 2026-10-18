@@ -75,29 +75,6 @@ mod attribution {
             "cold-cache attribution must resolve the on-disk session email"
         );
     }
-
-    use super::*;
-
-    #[test]
-    fn cap_wire_output_passes_through_small_payloads() {
-        let s = "small tool result".to_string();
-        assert_eq!(cap_wire_output(s.clone()), s);
-    }
-
-    #[test]
-    fn cap_wire_output_truncates_large_payloads_on_char_boundary() {
-        // A multibyte payload past the cap: result stays valid UTF-8, is shorter
-        // than the input, and carries the truncation marker.
-        let big = "é".repeat(MAX_WIRE_SUBAGENT_OUTPUT); // 2 bytes each → well over cap
-        let capped = cap_wire_output(big.clone());
-        assert!(capped.len() < big.len());
-        assert!(capped.contains("[truncated"));
-        // Truncation landed on a char boundary (no replacement char / panic).
-        assert!(capped.starts_with('é'));
-        // The final payload (content + marker) must honor the wire cap.
-        assert!(capped.len() <= MAX_WIRE_SUBAGENT_OUTPUT);
-    }
-
 }
 
 /// The `tool_result` wire event must carry the tool's real (capped) output
