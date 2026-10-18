@@ -208,17 +208,6 @@ pub(crate) fn pre_turn(
         guard_turn_work(
             &config.clone(),
             Box::pin(dispatch.clone().enter(async move {
-                if config.memory.conversations.enabled {
-                    if let Some(channel) = channel {
-                        let workspace = config.workspace_dir.clone();
-                        let thread = thread_id.clone();
-                        let _ = dispatch
-                            .spawn_blocking(move || {
-                                crate::memory::channels::record(&workspace, &channel, &thread)
-                            })
-                            .await;
-                    }
-                }
                 hooks::pre_turn_work(
                     &dispatch,
                     &config,
@@ -230,6 +219,7 @@ pub(crate) fn pre_turn(
                     at,
                     resumed_after_compaction,
                     observed_actor,
+                    channel,
                 )
                 .await
             })),

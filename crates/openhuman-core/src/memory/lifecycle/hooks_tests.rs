@@ -59,6 +59,7 @@ async fn run_pre_turn(
         at,
         resumed,
         observed_actor,
+        None,
     )
     .await
 }
