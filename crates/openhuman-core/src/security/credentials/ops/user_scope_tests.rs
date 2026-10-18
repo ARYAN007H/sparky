@@ -55,11 +55,9 @@ fn first_user_activation_queues_prelogin_purge_in_the_removed_workspace() {
 
     activate_user_scope(&ctx, "new-user").unwrap();
 
-    assert!(
-        list_threads(&ctx, prelogin_workspace.clone())
-            .unwrap()
-            .is_empty()
-    );
+    assert!(list_threads(&ctx, prelogin_workspace.clone())
+        .unwrap()
+        .is_empty());
     assert_eq!(
         pending(&prelogin_workspace),
         vec![PendingDeletion::Thread {

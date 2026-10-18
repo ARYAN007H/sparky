@@ -56,10 +56,10 @@ fn logged_channel_is_none_for_non_channel_origins_none_and_cron_replays() {
 #[tokio::test]
 async fn session_pre_and_post_turn_use_the_external_channel_origin_not_event_labels() {
     use crate::memory::test_fixtures::stored;
-    use tinymemory_api::{ItemKind, ListRequest, MemoryEngine, MetaFilter};
     use tinyagents_runtime::{
         CommitReceipt, ResumeMode, SessionTurnOutcome, TranscriptTurnOptions,
     };
+    use tinymemory_api::{ItemKind, ListRequest, MemoryEngine, MetaFilter};
 
     async fn log_turn(
         prelude: &OpenHumanTurnPrelude,
@@ -171,7 +171,14 @@ async fn session_pre_and_post_turn_use_the_external_channel_origin_not_event_lab
     .await;
 
     use crate::agent::turn_origin::{AgentTurnOrigin, TrustedAutomationSource};
-    log_turn(&prelude, &engine, "cli-thread", Some(AgentTurnOrigin::Cli), None).await;
+    log_turn(
+        &prelude,
+        &engine,
+        "cli-thread",
+        Some(AgentTurnOrigin::Cli),
+        None,
+    )
+    .await;
     log_turn(
         &prelude,
         &engine,

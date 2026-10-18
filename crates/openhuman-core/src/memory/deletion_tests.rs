@@ -22,9 +22,7 @@ fn thread(id: &str) -> PendingDeletion {
 
 #[test]
 fn offline_conversation_purge_queues_exact_thread_ids_in_its_workspace() {
-    use crate::threads::store::{
-        ensure_thread, purge_threads, CreateConversationThread,
-    };
+    use crate::threads::store::{ensure_thread, purge_threads, CreateConversationThread};
 
     let tmp = tempfile::tempdir().unwrap();
     let config = config_in(&tmp);
@@ -49,12 +47,17 @@ fn offline_conversation_purge_queues_exact_thread_ids_in_its_workspace() {
 
     assert_eq!(stats.thread_count, 2);
     assert_eq!(
-        pending(&workspace).into_iter().collect::<std::collections::HashSet<_>>(),
+        pending(&workspace)
+            .into_iter()
+            .collect::<std::collections::HashSet<_>>(),
         [thread("channel-thread-a"), thread("channel-thread-b")]
             .into_iter()
             .collect()
     );
-    assert_eq!(pending(&other_workspace), vec![thread("other-workspace-thread")]);
+    assert_eq!(
+        pending(&other_workspace),
+        vec![thread("other-workspace-thread")]
+    );
 
     let engine = bind_reference(&config);
     engine
@@ -86,9 +89,9 @@ fn offline_conversation_purge_queues_exact_thread_ids_in_its_workspace() {
 
     let left = stored(&engine, MetaFilter::default()).await;
     assert_eq!(left.len(), 2);
-    assert!(left.iter().any(|item| {
-        item.kind == ItemKind::Learning && item.text == "durable preference"
-    }));
+    assert!(left
+        .iter()
+        .any(|item| { item.kind == ItemKind::Learning && item.text == "durable preference" }));
     assert!(left.iter().any(|item| {
         item.kind == ItemKind::Conversation
             && item.meta.thread_id.as_deref() == Some("unrelated-thread")
@@ -101,7 +104,10 @@ fn offline_conversation_purge_queues_exact_thread_ids_in_its_workspace() {
             )
     }));
     assert!(pending(&workspace).is_empty());
-    assert_eq!(pending(&other_workspace), vec![thread("other-workspace-thread")]);
+    assert_eq!(
+        pending(&other_workspace),
+        vec![thread("other-workspace-thread")]
+    );
 }
 
 #[tokio::test]
