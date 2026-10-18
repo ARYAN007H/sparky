@@ -117,7 +117,7 @@ use tauri::{
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
 };
-use tauri::{AppHandle, Emitter, Manager, RunEvent};
+use tauri::{AppHandle, Manager, RunEvent};
 use tauri_plugin_notification::NotificationExt;
 
 #[cfg(any(windows, target_os = "linux"))]
