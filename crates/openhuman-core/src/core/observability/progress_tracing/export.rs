@@ -6,6 +6,7 @@ use crate::config::Config;
 
 use crate::config::schema::AgentTracingBackend;
 use std::time::Duration;
+use tinyagents_harness::observability::AgentObservation;
 use tinyagents_harness::observability::trace_export::otlp::otlp_requests;
 use tinyagents_harness::observability::trace_export::serialize::{spans_to_ndjson, SpanEnvelope};
 use tinyagents_harness::observability::trace_export::{TraceContext, TraceSpan};
@@ -132,7 +133,7 @@ pub(crate) fn export_spans(config: &AgentTracingConfig, spans: &[TraceSpan]) {
 /// 1. **Usage-data sharing** (`observability.share_usage_data`, on by default):
 ///    push the run's spans to the backend Langfuse proxy — endpoint derived from
 ///    the current backend host, authed with the session bearer (see
-///    [`otlp::push_spans`]). A failure (no live session, network, rejected
+///    [`push_spans`]). A failure (no live session, network, rejected
 ///    payload) just logs; there is no local fallback, since sharing and local
 ///    export are distinct opt-ins.
 /// 2. **Local exporter** (`observability.agent_tracing.enabled`, opt-in): append
@@ -157,9 +158,7 @@ pub(crate) async fn export_run_trace(config: &Config, spans: &[TraceSpan]) {
     }
 }
 
-/// Export a completed run when durable tinyagents observations are available.
-/// Remote usage-data sharing exports the live span tree as OTLP. The journal
-/// is still read for local parity checks and future recovery work.
+/// Export a completed run by collecting its durable native observations.
 pub(crate) async fn export_run_trace_from_journal(
     ctx: &crate::core::runtime::DispatchCtx,
     config: &Config,
@@ -242,7 +241,36 @@ pub(crate) async fn export_subagent_journal_trace(
                 return;
             }
         };
-    let first = &observations[0];
+    let spans = build_subagent_trace(
+        &observations,
+        thread_id,
+        agent_id,
+        task_id,
+        config.observability.agent_tracing.capture_content,
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis()
+            .min(u128::from(u64::MAX)) as u64,
+    );
+    if let Err(err) = push_spans(config, &spans).await {
+        log::warn!(
+            "[agent-tracing] child Langfuse OTLP push failed run_id={journal_run_id}: {err}"
+        );
+    }
+}
+
+pub(crate) fn build_subagent_trace(
+    observations: &[AgentObservation],
+    thread_id: Option<&str>,
+    agent_id: &str,
+    task_id: &str,
+    capture_content: bool,
+    finished_at_ms: u64,
+) -> Vec<TraceSpan> {
+    let Some(first) = observations.first() else {
+        return Vec::new();
+    };
     let user_id = crate::security::credentials::identity::peek_credential_user_identity()
         .and_then(|identity| identity.id.or(identity.email));
     let trace_ctx = TraceContext::new(format!("subagent:{journal_run_id}"), user_id)
@@ -250,7 +278,7 @@ pub(crate) async fn export_subagent_journal_trace(
         .with_agent_id(agent_id.to_string())
         .with_channel_source("subagent".to_string())
         .with_run_type(tinyagents_harness::observability::trace_export::RunType::Subagent)
-        .with_capture_content(config.observability.agent_tracing.capture_content)
+        .with_capture_content(capture_content)
         .with_run_lineage(
             Some(first.run_id.as_str().to_string()),
             first
@@ -270,19 +298,10 @@ pub(crate) async fn export_subagent_journal_trace(
     for observation in &rooted {
         collector.record(observation);
     }
-    let finished_at_ms = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_millis()
-        .min(u128::from(u64::MAX)) as u64;
     collector.finish(finished_at_ms);
     let mut spans = collector.spans().to_vec();
     tinyagents_harness::observability::trace_export::otlp::prepare_subagent_root(&mut spans);
-    if let Err(err) = push_spans(config, &spans).await {
-        log::warn!(
-            "[agent-tracing] child Langfuse OTLP push failed run_id={journal_run_id}: {err}"
-        );
-    }
+    spans
 }
 
 #[cfg(test)]

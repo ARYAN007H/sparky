@@ -18,4 +18,6 @@ pub(crate) fn export_brand() -> ExportBrand<'static> {
     }
 }
 
-pub(crate) use export::{export_run_trace_from_journal, export_subagent_journal_trace};
+pub(crate) use export::{
+    build_subagent_trace, export_run_trace_from_journal, export_subagent_journal_trace,
+};
