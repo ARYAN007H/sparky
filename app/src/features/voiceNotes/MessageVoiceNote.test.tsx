@@ -1,18 +1,21 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
+import { MessageVoiceNote, useMessageVoiceNote } from './MessageVoiceNote';
+
 const state = vi.hoisted(() => ({
   message: {
     metadata: { custom: { extraMetadata: {} as unknown } },
-    parts: [{ type: 'text', text: 'hello ' }, { type: 'text', text: 'there' }],
+    parts: [
+      { type: 'text', text: 'hello ' },
+      { type: 'text', text: 'there' },
+    ],
   },
 }));
 vi.mock('@assistant-ui/react', () => ({
   useAuiState: (selector: (s: unknown) => unknown) => selector({ message: state.message }),
 }));
 vi.mock('../../components/analytics', () => ({ trackAnalyticsEvent: vi.fn() }));
-
-import { MessageVoiceNote, useMessageVoiceNote } from './MessageVoiceNote';
 
 function Probe() {
   const note = useMessageVoiceNote();
@@ -31,7 +34,9 @@ describe('MessageVoiceNote', () => {
   });
 
   it('renders a player with the message text as the transcript for a voice note row', () => {
-    state.message.metadata.custom.extraMetadata = { voiceNote: { noteId: 'vn_1', durationMs: 5000 } };
+    state.message.metadata.custom.extraMetadata = {
+      voiceNote: { noteId: 'vn_1', durationMs: 5000 },
+    };
     render(<Probe />);
     expect(screen.getByTestId('voice-note-player')).toBeInTheDocument();
     expect(screen.getByTestId('voice-note-time')).toHaveTextContent('0:05');

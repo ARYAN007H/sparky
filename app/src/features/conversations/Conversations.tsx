@@ -34,7 +34,6 @@ import {
   useChatMascotSendBinding,
 } from '../../features/human/chatMascot';
 import MicComposer from '../../features/human/MicComposer';
-import { VoiceNoteComposer } from '../../features/voiceNotes/VoiceNoteComposer';
 import type { VoiceNoteDraft } from '../../features/voiceNotes/useVoiceNoteRecorder';
 import {
   storeVoiceNote,
@@ -42,6 +41,7 @@ import {
   VOICE_NOTE_SOURCE,
   type VoiceNoteMeta,
 } from '../../features/voiceNotes/voiceNoteApi';
+import { VoiceNoteComposer } from '../../features/voiceNotes/VoiceNoteComposer';
 import { useFlowApprovalRequests } from '../../hooks/useFlowApprovalRequests';
 import { useUnroutedApprovals } from '../../hooks/useUnroutedApprovals';
 import { useUsageState } from '../../hooks/useUsageState';

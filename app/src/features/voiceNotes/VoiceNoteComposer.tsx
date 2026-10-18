@@ -9,11 +9,11 @@
 import { MicIcon, SendIcon, SquareIcon, Trash2Icon } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import { useT } from '../../lib/i18n/I18nContext';
 import Button from '../../components/ui/Button';
+import { useT } from '../../lib/i18n/I18nContext';
 import { useVoiceNoteRecorder, type VoiceNoteDraft } from './useVoiceNoteRecorder';
-import { VoiceNotePlayer } from './VoiceNotePlayer';
 import { formatDuration } from './voiceNoteApi';
+import { VoiceNotePlayer } from './VoiceNotePlayer';
 
 export interface VoiceNoteComposerProps {
   disabled?: boolean;

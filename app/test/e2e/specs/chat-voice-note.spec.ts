@@ -73,7 +73,9 @@ describe('Chat voice notes', () => {
         id: 'msg_e2e_voice_user',
         content: TRANSCRIPT,
         type: 'text',
-        extraMetadata: { voiceNote: { noteId: 'vn_e2e_user', mime: 'audio/webm', durationMs: 4000 } },
+        extraMetadata: {
+          voiceNote: { noteId: 'vn_e2e_user', mime: 'audio/webm', durationMs: 4000 },
+        },
         sender: 'user',
         createdAt: now,
       },

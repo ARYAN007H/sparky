@@ -21,7 +21,12 @@ export const WAVEFORM_BARS = 40;
 export const MAX_RECORDING_MS = 5 * 60 * 1000;
 const SAMPLE_INTERVAL_MS = 100;
 
-const MIME_PREFERENCE = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/mp4'];
+const MIME_PREFERENCE = [
+  'audio/webm;codecs=opus',
+  'audio/webm',
+  'audio/ogg;codecs=opus',
+  'audio/mp4',
+];
 
 function pickMimeType(): string | undefined {
   if (typeof MediaRecorder === 'undefined') return undefined;

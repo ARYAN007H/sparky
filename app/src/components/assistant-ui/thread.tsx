@@ -24,7 +24,6 @@ import { Reasoning } from '@/components/assistant-ui/reasoning';
 import { TooltipIconButton } from '@/components/assistant-ui/tooltip-icon-button';
 import { Button } from '@/components/assistant-ui/ui/button';
 import { Skeleton } from '@/components/assistant-ui/ui/skeleton';
-import { MessageVoiceNote, useMessageVoiceNote } from '@/features/voiceNotes/MessageVoiceNote';
 import { ChatErrorNotice } from '@/features/conversations/aui/ChatErrorNotice';
 import { ChatSettingsPanel } from '@/features/conversations/aui/ChatSettingsPanel';
 import { ConnectionStateBanner } from '@/features/conversations/aui/ConnectionStateBanner';
@@ -35,6 +34,7 @@ import {
 import { onComposerPrefill } from '@/features/conversations/tools/mcpUi/composerPrefill';
 import { McpWidgetStrip } from '@/features/conversations/tools/mcpUi/McpWidgetStrip';
 import { collectMessageWidgets } from '@/features/conversations/tools/mcpUi/messageWidgets';
+import { MessageVoiceNote, useMessageVoiceNote } from '@/features/voiceNotes/MessageVoiceNote';
 import { useT } from '@/lib/i18n/I18nContext';
 import { CHAT_ERROR_METADATA_KEY } from '@/store/threadSlice';
 import { fullTimestamp, relativeTime } from '@/utils/relativeTime';

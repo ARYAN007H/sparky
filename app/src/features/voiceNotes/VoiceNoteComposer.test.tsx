@@ -1,10 +1,10 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('../../components/analytics', () => ({ trackAnalyticsEvent: vi.fn() }));
-
 import { reduceWaveform } from './useVoiceNoteRecorder';
 import { VoiceNoteComposer } from './VoiceNoteComposer';
+
+vi.mock('../../components/analytics', () => ({ trackAnalyticsEvent: vi.fn() }));
 
 class FakeRecorder {
   static instances: FakeRecorder[] = [];
@@ -71,7 +71,9 @@ describe('VoiceNoteComposer', () => {
 
   it('keeps the draft and reports the error when sending fails', async () => {
     const onError = vi.fn();
-    render(<VoiceNoteComposer onSend={vi.fn().mockRejectedValue(new Error('boom'))} onError={onError} />);
+    render(
+      <VoiceNoteComposer onSend={vi.fn().mockRejectedValue(new Error('boom'))} onError={onError} />
+    );
     await recordClip();
     fireEvent.click(screen.getByTestId('voice-note-send'));
     await waitFor(() => expect(onError).toHaveBeenCalledWith('boom'));

@@ -1,10 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const rpc = vi.hoisted(() => ({ callCoreRpc: vi.fn() }));
-const voice = vi.hoisted(() => ({ openhumanVoiceTranscribeBytes: vi.fn() }));
-vi.mock('../../services/coreRpcClient', () => rpc);
-vi.mock('../../utils/tauriCommands/voice', () => voice);
-
 import {
   base64ToBytes,
   bytesToBase64,
@@ -15,6 +10,11 @@ import {
   storeVoiceNote,
   transcribeVoiceNote,
 } from './voiceNoteApi';
+
+const rpc = vi.hoisted(() => ({ callCoreRpc: vi.fn() }));
+const voice = vi.hoisted(() => ({ openhumanVoiceTranscribeBytes: vi.fn() }));
+vi.mock('../../services/coreRpcClient', () => rpc);
+vi.mock('../../utils/tauriCommands/voice', () => voice);
 
 describe('voiceNoteApi', () => {
   beforeEach(() => {
@@ -71,7 +71,10 @@ describe('voiceNoteApi', () => {
   });
 
   it('transcribes with the recording extension and prefers cleaned text', async () => {
-    voice.openhumanVoiceTranscribeBytes.mockResolvedValue({ text: ' hello ', raw_text: 'hello raw' });
+    voice.openhumanVoiceTranscribeBytes.mockResolvedValue({
+      text: ' hello ',
+      raw_text: 'hello raw',
+    });
     const text = await transcribeVoiceNote(new Blob([new Uint8Array([9])], { type: 'audio/ogg' }));
     expect(text).toBe('hello');
     expect(voice.openhumanVoiceTranscribeBytes).toHaveBeenCalledWith([9], 'ogg', undefined, false);

@@ -9,12 +9,16 @@
 import { PauseIcon, PlayIcon } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { useT } from '../../lib/i18n/I18nContext';
-import { cn } from '../../lib/cn';
 import { trackAnalyticsEvent } from '../../components/analytics';
 import Button from '../../components/ui/Button';
-import { CollapsibleContent, CollapsibleRoot, CollapsibleTrigger } from '../../components/ui/Collapsible';
+import {
+  CollapsibleContent,
+  CollapsibleRoot,
+  CollapsibleTrigger,
+} from '../../components/ui/Collapsible';
 import Slider from '../../components/ui/Slider';
+import { cn } from '../../lib/cn';
+import { useT } from '../../lib/i18n/I18nContext';
 import { formatDuration, readVoiceNote } from './voiceNoteApi';
 
 export interface VoiceNotePlayerProps {
@@ -128,7 +132,9 @@ export function VoiceNotePlayer({
   const label = t('voiceNote.label').replace('{duration}', formatDuration(totalMs));
 
   return (
-    <div data-testid="voice-note-player" className={cn('flex min-w-56 flex-col gap-1.5', className)}>
+    <div
+      data-testid="voice-note-player"
+      className={cn('flex min-w-56 flex-col gap-1.5', className)}>
       <div className="flex items-center gap-2">
         <Button
           type="button"

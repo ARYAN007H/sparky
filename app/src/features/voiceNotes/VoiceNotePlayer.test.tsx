@@ -1,6 +1,8 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { VoiceNotePlayer } from './VoiceNotePlayer';
+
 const api = vi.hoisted(() => ({ readVoiceNote: vi.fn() }));
 const analytics = vi.hoisted(() => ({ trackAnalyticsEvent: vi.fn() }));
 vi.mock('./voiceNoteApi', async importOriginal => ({
@@ -8,8 +10,6 @@ vi.mock('./voiceNoteApi', async importOriginal => ({
   readVoiceNote: api.readVoiceNote,
 }));
 vi.mock('../../components/analytics', () => analytics);
-
-import { VoiceNotePlayer } from './VoiceNotePlayer';
 
 class FakeAudio {
   static last: FakeAudio | null = null;
