@@ -6,7 +6,9 @@ use crate::agent::prompts::types::{
 use crate::prompts::sections::*;
 use anyhow::{Result, anyhow};
 use std::path::Path;
-use tinyagents_harness::prompt::{DynamicPromptSection, PromptComposer};
+use tinyagents_harness::prompt::{
+    DynamicPromptSection as OwnerDynamicPromptSection, PromptComposer,
+};
 
 /// Bundled seed for the workspace's editable writing-style rules.
 pub const GLOBAL_STYLE_SUFFIX: &str = include_str!("../agent/prompts/STYLE.md");
@@ -34,7 +36,7 @@ enum ProductSection {
     Runtime,
 }
 
-impl<'a> DynamicPromptSection<PromptContext<'a>> for ProductSection {
+impl<'a> OwnerDynamicPromptSection<PromptContext<'a>> for ProductSection {
     fn name(&self) -> &str {
         match self {
             Self::Archetype(_) => "archetype_prompt",
@@ -52,7 +54,9 @@ impl<'a> DynamicPromptSection<PromptContext<'a>> for ProductSection {
     fn render(&self, context: &PromptContext<'a>) -> tinyagents_harness::Result<Vec<TieredPromptPart>> {
         match self {
             Self::Archetype(body) => ArchetypePromptSection::new(body.clone()).render(context),
-            Self::Dynamic(builder) => DynamicPromptSection::new(*builder).render(context),
+            Self::Dynamic(builder) => {
+                crate::prompts::sections::DynamicPromptSection::new(*builder).render(context)
+            }
             Self::Identity => IdentitySection.render(context),
             Self::AgentsInstructions => AgentsInstructionsSection.render(context),
             Self::Tools => ToolsSection.render(context),
@@ -69,7 +73,7 @@ struct OpenHumanPromptContent {
     verbatim: bool,
 }
 
-impl<'a> DynamicPromptSection<PromptContext<'a>> for OpenHumanPromptContent {
+impl<'a> OwnerDynamicPromptSection<PromptContext<'a>> for OpenHumanPromptContent {
     fn name(&self) -> &str {
         "openhuman_prompt_content"
     }

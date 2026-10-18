@@ -35,7 +35,7 @@ impl ArchetypePromptSection {
         "archetype_prompt"
     }
 
-    fn build(&self, _ctx: &PromptContext<'_>) -> Result<String> {
+    pub(crate) fn build(&self, _ctx: &PromptContext<'_>) -> Result<String> {
         if self.body.trim().is_empty() {
             return Ok(String::new());
         }
@@ -135,7 +135,7 @@ impl PersonalityRosterSection {
         "personality_roster"
     }
 
-    fn build(&self, ctx: &PromptContext<'_>) -> Result<String> {
+    pub(crate) fn build(&self, ctx: &PromptContext<'_>) -> Result<String> {
         if ctx.personality_roster.is_empty() {
             return Ok(String::new());
         }
@@ -170,7 +170,7 @@ impl IdentitySection {
         "identity"
     }
 
-    fn build(&self, ctx: &PromptContext<'_>) -> Result<String> {
+    pub(crate) fn build(&self, ctx: &PromptContext<'_>) -> Result<String> {
         let mut prompt = String::new();
         // ROLE.md is the user-facing agent's own role brief (#5701) — the
         // `# Master Agent` / `## Core Responsibilities` preamble that used to
@@ -206,7 +206,7 @@ impl AgentsInstructionsSection {
         "agents_md"
     }
 
-    fn build(&self, ctx: &PromptContext<'_>) -> Result<String> {
+    pub(crate) fn build(&self, ctx: &PromptContext<'_>) -> Result<String> {
         let mut out = String::new();
         crate::prompts::write_agents_md_blocks(
             &mut out,
@@ -222,7 +222,7 @@ impl ToolsSection {
         "tools"
     }
 
-    fn build(&self, ctx: &PromptContext<'_>) -> Result<String> {
+    pub(crate) fn build(&self, ctx: &PromptContext<'_>) -> Result<String> {
         let browser_deferred = ctx.tools.iter().any(|tool| {
             matches!(tool.name.as_ref(), "browser" | "browser_open")
                 && !ctx.visible_tool_names.contains(tool.name.as_ref())
@@ -300,7 +300,7 @@ impl SafetySection {
         "safety"
     }
 
-    fn build(&self, _ctx: &PromptContext<'_>) -> Result<String> {
+    pub(crate) fn build(&self, _ctx: &PromptContext<'_>) -> Result<String> {
         Ok("## Safety\n\n- Do not exfiltrate private data.\n- Do not run destructive commands without asking.\n- Do not bypass oversight or approval mechanisms.\n- Prefer `trash` over `rm`.\n- When in doubt, ask before acting externally.".into())
     }
 }
@@ -350,7 +350,7 @@ impl GroundingSection {
         "grounding"
     }
 
-    fn build(&self, _ctx: &PromptContext<'_>) -> Result<String> {
+    pub(crate) fn build(&self, _ctx: &PromptContext<'_>) -> Result<String> {
         Ok(GROUNDING_BODY.into())
     }
 }
@@ -360,7 +360,7 @@ impl WorkspaceSection {
         "workspace"
     }
 
-    fn build(&self, _ctx: &PromptContext<'_>) -> Result<String> {
+    pub(crate) fn build(&self, _ctx: &PromptContext<'_>) -> Result<String> {
         // Intentionally does NOT print a hardcoded path: `shell` and the file
         // tools resolve relative paths against the agent's *action directory*,
         // which is not `workspace_dir`. Printing `workspace_dir` here used to
@@ -401,7 +401,7 @@ impl RuntimeSection {
         "runtime"
     }
 
-    fn build(&self, ctx: &PromptContext<'_>) -> Result<String> {
+    pub(crate) fn build(&self, ctx: &PromptContext<'_>) -> Result<String> {
         // A SaaS process serves many users; the machine it runs on is not
         // theirs to know.
         let host = if crate::core::runtime::is_saas() {
@@ -422,7 +422,7 @@ impl DateTimeSection {
         "datetime"
     }
 
-    fn build(&self, ctx: &PromptContext<'_>) -> Result<String> {
+    pub(crate) fn build(&self, ctx: &PromptContext<'_>) -> Result<String> {
         // No concrete timestamp here. The live "now" is injected per turn
         // on the user message via `current_datetime_line`
         // (the main session loop and the sub-agent runner both do this), so
@@ -459,7 +459,7 @@ impl UserIdentitySection {
         "user_identity"
     }
 
-    fn build(&self, ctx: &PromptContext<'_>) -> Result<String> {
+    pub(crate) fn build(&self, ctx: &PromptContext<'_>) -> Result<String> {
         let identity = match ctx.user_identity.as_ref() {
             Some(id) if !id.is_empty() => id,
             _ => return Ok(String::new()),
