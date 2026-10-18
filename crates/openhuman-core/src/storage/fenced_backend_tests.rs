@@ -2,9 +2,9 @@
 //! view of the shared backend are refused while B's succeed.
 
 use super::*;
-use crate::storage::MemoryStorage;
-use crate::storage::fence::{FenceError, LeaseFence, ScopeMatch, fence_error};
+use crate::storage::fence::{fence_error, FenceError, LeaseFence, ScopeMatch};
 use crate::storage::lease::{DocumentLeases, LeaseGrant, LeaseStore, LocalLeases};
+use crate::storage::MemoryStorage;
 use serde_json::json;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
@@ -14,7 +14,9 @@ use std::time::Duration;
 #[derive(Debug, Default)]
 struct CountingBlobs {
     puts: AtomicU64,
+    expiring_puts: AtomicU64,
     stream_puts: AtomicU64,
+    expiring_stream_puts: AtomicU64,
     stream_bytes: AtomicU64,
     stream_gets: AtomicU64,
     presigned_gets: AtomicU64,
@@ -26,6 +28,7 @@ impl BlobStore for CountingBlobs {
     fn capabilities(&self) -> Capabilities {
         Capabilities::none()
             .with(Capability::StreamingBlobs)
+            .with(Capability::BlobTtl)
             .with(Capability::PresignedUrls)
     }
 
@@ -48,6 +51,55 @@ impl BlobStore for CountingBlobs {
         use tokio::io::AsyncReadExt;
 
         self.stream_puts.fetch_add(1, Ordering::SeqCst);
+        let mut buf = [0u8; 8 * 1024];
+        let mut read = 0u64;
+        loop {
+            let n = reader
+                .read(&mut buf)
+                .await
+                .map_err(|error| StorageError::backend("test reader failed").with_source(error))?;
+            if n == 0 {
+                break;
+            }
+            read += n as u64;
+        }
+        self.stream_bytes.store(read, Ordering::SeqCst);
+        if read != len {
+            return Err(StorageError::invalid_input("stream length mismatch"));
+        }
+        Ok(BlobMeta {
+            key: key.to_string(),
+            len,
+            content_type: content_type.map(str::to_string),
+        })
+    }
+
+    async fn put_expiring(
+        &self,
+        key: &str,
+        bytes: Vec<u8>,
+        content_type: Option<&str>,
+        _: Duration,
+    ) -> Result<BlobMeta> {
+        self.expiring_puts.fetch_add(1, Ordering::SeqCst);
+        Ok(BlobMeta {
+            key: key.to_string(),
+            len: bytes.len() as u64,
+            content_type: content_type.map(str::to_string),
+        })
+    }
+
+    async fn put_stream_expiring(
+        &self,
+        key: &str,
+        mut reader: BlobReader,
+        len: u64,
+        content_type: Option<&str>,
+        _: Duration,
+    ) -> Result<BlobMeta> {
+        use tokio::io::AsyncReadExt;
+
+        self.expiring_stream_puts.fetch_add(1, Ordering::SeqCst);
         let mut buf = [0u8; 8 * 1024];
         let mut read = 0u64;
         loop {
@@ -151,7 +203,7 @@ async fn fenced_blobs_keeps_large_uploads_on_the_native_stream_path() {
         inner: Arc::clone(&inner) as Arc<dyn BlobStore>,
         guard: no_fence_guard(),
     };
-    let len = 64 * 1024 * 1024;
+    let len = 32 * 1024 * 1024;
     let bytes_read = Arc::new(AtomicU64::new(0));
     let reader = LogicalReader {
         remaining: len,
@@ -174,6 +226,28 @@ async fn fenced_blobs_keeps_large_uploads_on_the_native_stream_path() {
     assert_eq!(inner.stream_bytes.load(Ordering::SeqCst), len);
     assert_eq!(inner.puts.load(Ordering::SeqCst), 0);
     assert!(blobs.capabilities().contains(Capability::StreamingBlobs));
+
+    let expiring_len = 32 * 1024 * 1024;
+    let expiring_reader = LogicalReader {
+        remaining: expiring_len,
+        bytes_read: Arc::clone(&bytes_read),
+    };
+    let meta = blobs
+        .put_stream_expiring(
+            "large-expiring",
+            Box::pin(expiring_reader),
+            expiring_len,
+            Some("application/octet-stream"),
+            Duration::from_secs(60),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(meta.len, expiring_len);
+    assert_eq!(bytes_read.load(Ordering::SeqCst), 2 * len);
+    assert_eq!(inner.expiring_stream_puts.load(Ordering::SeqCst), 1);
+    assert_eq!(inner.expiring_puts.load(Ordering::SeqCst), 0);
+    assert_eq!(inner.stream_bytes.load(Ordering::SeqCst), expiring_len);
 }
 
 #[tokio::test]
@@ -354,22 +428,18 @@ async fn a_node_that_lost_the_lease_cannot_write_and_the_new_holder_can() {
     let session = a.scoped("alice~default");
     assert!(session.streams().append("log", json!(1)).await.is_err());
     assert!(session.blobs().put("k", b"x".to_vec(), None).await.is_err());
-    assert!(
-        session
-            .documents()
-            .delete("notes", "n1", Precondition::None)
-            .await
-            .is_err()
-    );
+    assert!(session
+        .documents()
+        .delete("notes", "n1", Precondition::None)
+        .await
+        .is_err());
     // Reads are not.
-    assert!(
-        session
-            .documents()
-            .get("notes", "n1")
-            .await
-            .unwrap()
-            .is_some()
-    );
+    assert!(session
+        .documents()
+        .get("notes", "n1")
+        .await
+        .unwrap()
+        .is_some());
     // Other profiles' scopes are untouched.
     a.put("profile:bob", "n1").await.unwrap();
 
@@ -741,23 +811,19 @@ async fn expiring_blob_writes_are_fenced() {
     a.set_clock(1_000);
 
     let session = a.scoped("alice~default");
-    assert!(
-        session
-            .blobs()
-            .put_expiring("k", b"x".to_vec(), None, Duration::from_secs(60))
-            .await
-            .is_err()
-    );
-    assert!(
-        backend
-            .for_scope(&Scope::new("alice~default").unwrap())
-            .unwrap()
-            .blobs()
-            .get("k")
-            .await
-            .unwrap()
-            .is_none()
-    );
+    assert!(session
+        .blobs()
+        .put_expiring("k", b"x".to_vec(), None, Duration::from_secs(60))
+        .await
+        .is_err());
+    assert!(backend
+        .for_scope(&Scope::new("alice~default").unwrap())
+        .unwrap()
+        .blobs()
+        .get("k")
+        .await
+        .unwrap()
+        .is_none());
 }
 
 /// The wrapper must pass a conditional append through to a driver that has it:
