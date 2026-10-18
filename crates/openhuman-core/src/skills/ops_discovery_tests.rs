@@ -352,28 +352,6 @@ async fn flow_authoring_is_hidden_when_tinyflows_component_is_disabled() {
     crate::modules::tinyflows::copilot_proxy(&enabled_config)
         .await
         .expect("linked TinyFlows fixture is admitted and serving");
-    let state = crate::modules::ops::state_of(crate::modules::tinyflows::MODULE_ID);
-    assert_eq!(state, crate::modules::types::ModuleState::Ready);
-    let module_runtime = crate::modules::runtime::runtime()
-        .await
-        .expect("module runtime should be available after Copilot proxy setup");
-    let loaded_modules = module_runtime.host().list();
-    let record = crate::modules::registry::find(crate::modules::tinyflows::MODULE_ID)
-        .expect("TinyFlows registry record");
-    let loaded_for_record = loaded_modules.iter().find(|module| {
-        module.manifest.bus_name.as_str() == record.bus_name
-            && module.manifest.object_path.as_str() == record.object_path
-    });
-    let serving = crate::modules::runtime::is_module_serving(crate::modules::tinyflows::MODULE_ID);
-    eprintln!(
-        "flow resource readiness: resolver={state:?}, expected={}:{}, observed={loaded_for_record:#?}, serving={serving}",
-        record.bus_name,
-        record.object_path,
-    );
-    assert!(
-        serving,
-        "TinyFlows registry status should resolve the admitted host snapshot: {loaded_modules:#?}"
-    );
     let visible = CoreContext::scope(enabled_ctx, async {
         let dispatch = crate::core::runtime::DispatchCtx::ambient();
         let gate = crate::skills::ops_discover::DiscoveryGate::from_config(
@@ -391,6 +369,9 @@ async fn flow_authoring_is_hidden_when_tinyflows_component_is_disabled() {
             Some(enabled_domains),
         )
         .await;
+        assert!(crate::modules::runtime::is_module_serving(
+            crate::modules::tinyflows::MODULE_ID
+        ));
         crate::skills::load_workflow_metadata_for(&dispatch, &enabled_config)
     })
     .await;

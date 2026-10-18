@@ -31,9 +31,13 @@ async fn the_module_bus_is_a_singleton_and_serves_proxies() {
 #[tokio::test]
 async fn registry_id_matches_the_live_modules_bus_address_not_package_name() {
     let config = crate::config::Config::default();
-    crate::modules::tinyflows::copilot_proxy(&config)
+    let proxy = crate::modules::tinyflows::copilot_proxy(&config)
         .await
         .expect("linked TinyFlows module should be admitted and serving");
+    let _: Vec<tinyflows_bus::copilot::ResourceFile> = proxy
+        .call("ListResources", ())
+        .await
+        .expect("the resource call waits for module initialization");
 
     let record = crate::modules::registry::find(crate::modules::tinyflows::MODULE_ID)
         .expect("TinyFlows registry record");
