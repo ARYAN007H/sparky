@@ -207,3 +207,22 @@ async fn a_resumed_dry_run_lists_what_the_finished_import_recorded() {
     assert!(listed.contains(&"@profile/auth-profiles.json"));
     assert!(!listed.contains(&"@profile/http-credentials.json"));
 }
+
+#[cfg(unix)]
+#[tokio::test(flavor = "current_thread")]
+async fn an_unreadable_credential_file_aborts_the_migration_before_v2_is_published() {
+    use std::os::unix::fs::PermissionsExt;
+    install_master_key_source(Arc::new(FixedKey));
+    let fx = with_credentials();
+    let path = fx.target.profile_dir.join(PROFILES_FILENAME);
+    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o000)).unwrap();
+    if std::fs::read(&path).is_ok() {
+        clear_master_key_source();
+        return; // running as root: permissions do not apply
+    }
+    let result = run(&fx).await;
+    clear_master_key_source();
+    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).unwrap();
+    assert!(result.is_err());
+    assert!(!fx.target.profile_dir.join(".layout").exists());
+}

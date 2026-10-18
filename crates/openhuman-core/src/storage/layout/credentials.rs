@@ -39,14 +39,30 @@ pub const FILES: [(&str, &str); 2] = [
 /// A credential file the import would take: a regular file beside
 /// `config.toml` holding the document its store persists. `None` otherwise
 /// (missing, a symlink, or not that document: left in place).
-fn eligible(profile_dir: &Path, file: &str) -> Option<zeroize::Zeroizing<Vec<u8>>> {
+fn eligible(
+    profile_dir: &Path,
+    file: &str,
+) -> Result<Option<zeroize::Zeroizing<Vec<u8>>>, LayoutError> {
     let path = profile_dir.join(file);
-    let meta = std::fs::symlink_metadata(&path).ok()?;
+    let meta = match std::fs::symlink_metadata(&path) {
+        Ok(meta) => meta,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(e) => return Err(e.into()),
+    };
     if !meta.is_file() {
         tracing::warn!(target: "openhuman::storage", file, "[layout] credential entry is not a regular file; left in place");
-        return None;
+        return Ok(None);
     }
-    let bytes = zeroize::Zeroizing::new(std::fs::read(&path).ok()?);
+    // A read that fails for any reason but disappearance aborts, so the
+    // migration stays resumable instead of publishing v2 without the file.
+    let bytes = match std::fs::read(&path) {
+        Ok(bytes) => zeroize::Zeroizing::new(bytes),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(e) => {
+            tracing::warn!(target: "openhuman::storage", file, error = %e, "[layout] credential file unreadable");
+            return Err(e.into());
+        }
+    };
     let valid = if file == PROFILES_FILENAME {
         profiles::is_persisted_document(&bytes)
     } else {
@@ -54,23 +70,25 @@ fn eligible(profile_dir: &Path, file: &str) -> Option<zeroize::Zeroizing<Vec<u8>
     };
     if !valid {
         tracing::warn!(target: "openhuman::storage", file, "[layout] credential file is not a valid credential document; left in place");
-        return None;
+        return Ok(None);
     }
-    Some(bytes)
+    Ok(Some(bytes))
 }
 
 /// The credential files a migration of `profile_dir` would import: the
 /// eligible ones, and none when no master key is resolvable. Read-only; the
 /// dry run uses it so its plan matches the run.
-pub fn candidates(profile_dir: &Path) -> Vec<String> {
+pub fn candidates(profile_dir: &Path) -> Result<Vec<String>, LayoutError> {
     if !crate::security::secret_storage::encrypted_file_backend::storage_master_key_resolvable() {
-        return Vec::new();
+        return Ok(Vec::new());
     }
-    FILES
-        .iter()
-        .filter(|(file, _)| eligible(profile_dir, file).is_some())
-        .map(|(file, _)| (*file).to_owned())
-        .collect()
+    let mut found = Vec::new();
+    for (file, _) in FILES {
+        if eligible(profile_dir, file)?.is_some() {
+            found.push(file.to_owned());
+        }
+    }
+    Ok(found)
 }
 
 /// Imports the credential files of `target` into the v1 database's `local`
@@ -87,7 +105,7 @@ pub fn candidates(profile_dir: &Path) -> Vec<String> {
 pub async fn import(target: &Target) -> Result<Vec<String>, LayoutError> {
     let mut files = Vec::new();
     for (file, secret) in FILES {
-        if let Some(bytes) = eligible(&target.profile_dir, file) {
+        if let Some(bytes) = eligible(&target.profile_dir, file)? {
             files.push((file, secret, bytes));
         }
     }

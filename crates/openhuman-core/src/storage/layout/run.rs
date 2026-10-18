@@ -201,7 +201,7 @@ fn dry_run(target: &Target, resuming: bool) -> Result<DryRun, LayoutError> {
             // Once Import finished, a resume uses the list it recorded.
             let candidates = match state.as_ref() {
                 Some(s) if s.has(Step::Import) => s.credentials.clone(),
-                _ => super::credentials::candidates(&target.profile_dir),
+                _ => super::credentials::candidates(&target.profile_dir)?,
             };
             plan.entries
                 .extend(plan::scan_credentials(&target.profile_dir, &candidates));

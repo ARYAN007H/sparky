@@ -173,14 +173,16 @@ pub(crate) fn storage_master_key_resolvable() -> bool {
     if matches!(MASTER_KEY.get(), Some(Ok(Some(_)))) {
         return true;
     }
-    let host_denied = HOST_KEY_UNAVAILABLE.get().is_some();
+    let configured = env_set(MASTER_KEY_ENV) || env_set(MASTER_KEY_FILE_ENV);
+    // A configured key or a denied keychain skips the host probe entirely.
+    let host_skipped = configured || HOST_KEY_UNAVAILABLE.get().is_some();
     let dir = crate::security::secret_storage::store::workspace_dir_for_file_backend();
     resolvable(
         false,
-        env_set(MASTER_KEY_ENV) || env_set(MASTER_KEY_FILE_ENV),
+        configured,
         // A host source counts only when it already holds the key (an empty
         // one would have a key minted into it by the load), and is read last.
-        !host_denied
+        !host_skipped
             && key_source::installed_master_key_source()
                 .is_some_and(|source| matches!(source.load(), Ok(Some(_)))),
         dir.join("keyring/master.key").is_file(),
