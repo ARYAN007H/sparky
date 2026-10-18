@@ -34,11 +34,11 @@ pub(crate) async fn bootstrap_core_runtime(
     };
     let workspace_dir = cfg.workspace_dir.clone();
 
-    // The workflow metadata loader is synchronous. Resolve the module-owned
-    // flow-authoring files before any subscriber or session can snapshot it;
-    // this optional prewarm is bounded and fails open for ordinary chat.
+    // The workflow metadata loader is synchronous. Start module-owned resource
+    // acquisition before any subscriber or session snapshots it, but keep the
+    // optional download outside the critical bootstrap path.
     #[cfg(all(feature = "flows", feature = "skills"))]
-    crate::skills::bundled::flow_authoring::prewarm(ctx, &cfg, Some(domains)).await;
+    crate::skills::bundled::flow_authoring::schedule_prewarm(ctx, &cfg, Some(domains));
 
     // --- Legacy store import ---------------------------------------------
     // With a storage backend installed, bring the workspace's per-domain

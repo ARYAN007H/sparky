@@ -218,10 +218,17 @@ pub(crate) fn load_workflow_metadata_for_domains(
         Some(_) => None,
         None => discovery_home_dir(),
     };
+    let gate = DiscoveryGate::from_config(ctx, config, domains);
+    #[cfg(feature = "flows")]
+    if gate.flow_authoring_enabled()
+        && flow_generation_for(&config.workspace_dir, &gate).is_none()
+    {
+        crate::skills::bundled::flow_authoring::schedule_prewarm(ctx, config, domains);
+    }
     load_workflow_metadata_with_gate(
         &config.workspace_dir,
         home,
-        DiscoveryGate::from_config(ctx, config, domains),
+        gate,
     )
 }
 
