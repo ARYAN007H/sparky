@@ -33,21 +33,29 @@ pub(crate) async fn load_for_definition(
             definition.id
         )
     })?;
+    fetch_prompt(config, &definition.id).await.map(Some)
+}
+
+/// Fetch one of the two builtin flow archetypes through TinyFlows Copilot.
+pub(crate) async fn fetch_prompt(config: &Config, agent_id: &str) -> Result<String> {
+    ensure!(
+        matches!(agent_id, "workflow_builder" | "flow_discovery"),
+        "unsupported TinyFlows builtin prompt `{agent_id}`"
+    );
     let proxy = crate::modules::tinyflows::copilot_proxy(config)
         .await
         .map_err(anyhow::Error::msg)
-        .map_err(|error| error.context(format!("loading TinyFlows prompt `{}`", definition.id)))?;
+        .map_err(|error| error.context(format!("loading TinyFlows prompt `{agent_id}`")))?;
     let response: tinyflows_bus::copilot::TextResponse = proxy
-        .call("GetPrompt", (definition.id.clone(),))
+        .call("GetPrompt", (agent_id.to_string(),))
         .await
         .map_err(|error| anyhow!(error.wire_message()))
-        .map_err(|error| error.context(format!("fetching TinyFlows prompt `{}`", definition.id)))?;
+        .map_err(|error| error.context(format!("fetching TinyFlows prompt `{agent_id}`")))?;
     ensure!(
         !response.text.trim().is_empty(),
-        "TinyFlows returned an empty prompt for builtin `{}`",
-        definition.id
+        "TinyFlows returned an empty prompt for builtin `{agent_id}`"
     );
-    Ok(Some(response.text))
+    Ok(response.text)
 }
 
 #[cfg(test)]

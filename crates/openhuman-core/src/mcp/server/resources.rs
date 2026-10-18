@@ -1,8 +1,8 @@
-//! Static MCP resource catalog for bundled prompt assets.
+//! MCP resource catalog for bundled and module-owned prompt assets.
 //!
-//! Exposes `IDENTITY.md`, `SOUL.md`, `USER.md` and the `prompt.md` template
-//! for each built-in subagent as MCP resources. The content is
-//! embedded at compile time via `include_str!`.
+//! Static prompt assets are embedded at compile time via `include_str!`.
+//! The two TinyFlows archetypes are read through Copilot's `GetPrompt` bus
+//! method using the current dispatch config.
 //!
 //! ## URI scheme
 //!
@@ -15,9 +15,8 @@
 //!
 //! ## Catalog parity
 //!
-//! The unit test `catalog_mirrors_builtins` cross-references this catalog
-//! against `BUILTINS` in `loader.rs`. Adding a new built-in subagent without
-//! a matching catalog entry fails that test and therefore CI.
+//! The unit test `catalog_mirrors_builtins` cross-references the exposed
+//! resources against `BUILTINS` in `loader.rs`.
 
 use serde_json::{json, Value};
 use tinymcp_bus::{ResourceSpec, ToolCallError};
@@ -125,20 +124,6 @@ const RESOURCE_CATALOG: &[PromptResource] = &[
         description: "Specialist worker for task-source feeds, workflow bundles, and artifacts.",
         content: include_str!("../../agent/registry/agents/task_manager_agent/prompt.md"),
     },
-    #[cfg(feature = "flows")]
-    PromptResource {
-        uri: "openhuman://prompts/agents/flow_discovery",
-        name: "flow_discovery",
-        description: "Flow Scout — read-only workflow discovery agent that suggests automations from memory, threads, and integrations.",
-        content: tinyflows_copilot::prompts::FLOW_DISCOVERY,
-    },
-    #[cfg(feature = "flows")]
-    PromptResource {
-        uri: "openhuman://prompts/agents/workflow_builder",
-        name: "workflow_builder",
-        description: "Workflow authoring specialist that builds tinyflows automation graphs and returns proposals for review.",
-        content: tinyflows_copilot::prompts::WORKFLOW_BUILDER,
-    },
     #[cfg(feature = "skills")]
     PromptResource {
         uri: "openhuman://prompts/agents/skill_setup",
@@ -150,7 +135,7 @@ const RESOURCE_CATALOG: &[PromptResource] = &[
 
 /// The catalog as `resources/list` advertises it.
 pub fn resource_specs() -> Vec<ResourceSpec> {
-    let resources = RESOURCE_CATALOG
+    let mut resources = RESOURCE_CATALOG
         .iter()
         .map(|r| {
             ResourceSpec::new(r.uri, r.name)
@@ -158,6 +143,25 @@ pub fn resource_specs() -> Vec<ResourceSpec> {
                 .with_mime_type(MIME_TYPE)
         })
         .collect::<Vec<_>>();
+    #[cfg(feature = "flows")]
+    resources.extend([
+        ResourceSpec::new(
+            "openhuman://prompts/agents/flow_discovery",
+            "flow_discovery",
+        )
+        .with_description(
+            "Flow Scout — read-only workflow discovery agent that suggests automations from memory, threads, and integrations.",
+        )
+        .with_mime_type(MIME_TYPE),
+        ResourceSpec::new(
+            "openhuman://prompts/agents/workflow_builder",
+            "workflow_builder",
+        )
+        .with_description(
+            "Workflow authoring specialist that builds tinyflows automation graphs and returns proposals for review.",
+        )
+        .with_mime_type(MIME_TYPE),
+    ]);
     log::debug!("[mcp_server] resources/list count={}", resources.len());
     resources
 }
