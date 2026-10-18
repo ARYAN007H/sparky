@@ -296,9 +296,15 @@ async fn shared_otlp_transport_posts_rendered_graph_json_with_attribution() {
         .await;
 
     let url = format!("{}/otel/v1/traces", server.uri());
-    super::super::otlp::push_otlp_json_requests(&url, "session-token", &requests)
-        .await
-        .expect("send graph request through shared authenticated transport");
+    let transport = crate::backend::transport::plain::PlainHttpTransport::fresh();
+    super::super::otlp::push_otlp_json_requests_via(
+        transport.as_ref(),
+        &url,
+        "session-token",
+        &requests,
+    )
+    .await
+    .expect("send graph request through shared authenticated transport");
 }
 
 #[tokio::test]
@@ -321,9 +327,15 @@ async fn shared_otlp_transport_reports_http_and_partial_rejections() {
         .mount(&server)
         .await;
     let url = format!("{}/otel/v1/traces", server.uri());
-    let error = super::super::otlp::push_otlp_json_requests(&url, "token", &requests)
-        .await
-        .expect_err("HTTP failure must be reported");
+    let transport = crate::backend::transport::plain::PlainHttpTransport::fresh();
+    let error = super::super::otlp::push_otlp_json_requests_via(
+        transport.as_ref(),
+        &url,
+        "token",
+        &requests,
+    )
+    .await
+    .expect_err("HTTP failure must be reported");
     assert!(error.contains("503"), "{error}");
 
     let server = MockServer::start().await;
@@ -335,8 +347,14 @@ async fn shared_otlp_transport_reports_http_and_partial_rejections() {
         .mount(&server)
         .await;
     let url = format!("{}/otel/v1/traces", server.uri());
-    let error = super::super::otlp::push_otlp_json_requests(&url, "token", &requests)
-        .await
-        .expect_err("partial rejection must be reported");
+    let transport = crate::backend::transport::plain::PlainHttpTransport::fresh();
+    let error = super::super::otlp::push_otlp_json_requests_via(
+        transport.as_ref(),
+        &url,
+        "token",
+        &requests,
+    )
+    .await
+    .expect_err("partial rejection must be reported");
     assert!(error.contains("partially rejected"), "{error}");
 }

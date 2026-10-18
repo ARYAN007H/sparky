@@ -20,12 +20,22 @@ pub(super) async fn push_otlp_json_requests(
     token: &str,
     requests: &[Value],
 ) -> Result<(), String> {
-    let client = crate::backend::resolve_backend_transport()
-        .map_err(|err| format!("Langfuse OTLP push has no backend transport: {err}"))?
-        .http_client(crate::backend::TransportProfile::Api);
+    let transport = crate::backend::resolve_backend_transport()
+        .map_err(|err| format!("Langfuse OTLP push has no backend transport: {err}"))?;
+    push_otlp_json_requests_via(transport.as_ref(), url, token, requests).await
+}
+
+pub(super) async fn push_otlp_json_requests_via(
+    transport: &dyn crate::backend::BackendTransport,
+    url: &str,
+    token: &str,
+    requests: &[Value],
+) -> Result<(), String> {
+    let client = transport.http_client(crate::backend::TransportProfile::Api);
     for payload in requests {
         let response = client
             .post(url)
+            .headers(transport.attribution_headers())
             .header(
                 reqwest::header::AUTHORIZATION,
                 bearer_authorization_value(token),
