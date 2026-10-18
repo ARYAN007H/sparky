@@ -44,7 +44,7 @@ async fn agent_memory_needs_an_engine_and_follows_the_identity() {
     let identity = MemoryIdentity::team_member("acme", "writer").resolve(&config);
     assert!(matches!(
         agent_memory(&config, &identity),
-        Err(MemoryError::Off(_))
+        Err(Error::Off(_))
     ));
 
     bind_reference(&config);

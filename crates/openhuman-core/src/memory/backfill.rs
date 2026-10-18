@@ -38,7 +38,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::config::Config;
 use crate::memory::engine::{self, BoundEngine};
-use crate::memory::error::{MemoryError, MemoryResult};
+use crate::memory::error::{Error, Result};
 use crate::memory::scope::{MemoryIdentity, ResolvedIdentity};
 use crate::threads::store::blocking as threads;
 use tinymemory_integrations::import::ImportPhase;
@@ -140,10 +140,10 @@ async fn plan(
     workspace_dir: &Path,
     bound: Option<&BoundEngine>,
     stored: &BTreeMap<String, u32>,
-) -> MemoryResult<Vec<ThreadPlan>> {
+) -> Result<Vec<ThreadPlan>> {
     let listed = threads::list_threads(ctx.clone(), workspace_dir.to_path_buf())
         .await
-        .map_err(|error| MemoryError::Engine(format!("reading chat threads failed: {error}")))?;
+        .map_err(|error| Error::Engine(format!("reading chat threads failed: {error}")))?;
     let mut plans = Vec::new();
     for thread in listed {
         let messages = match threads::get_messages(
@@ -192,7 +192,7 @@ fn is_running(workspace_dir: &Path) -> bool {
 }
 
 /// `memory_conversations_backfill_status`.
-pub async fn status(ctx: &DispatchCtx, config: &Config) -> MemoryResult<BackfillView> {
+pub async fn status(ctx: &DispatchCtx, config: &Config) -> Result<BackfillView> {
     let workspace_dir = &config.workspace_dir;
     let file = read_file(workspace_dir);
     let mut state = file.state;
@@ -214,9 +214,9 @@ pub async fn start(
     ctx: &DispatchCtx,
     config: &Config,
     params: BackfillStartParams,
-) -> MemoryResult<BackfillView> {
+) -> Result<BackfillView> {
     if !params.consent {
-        return Err(MemoryError::invalid(
+        return Err(Error::invalid(
             "storing past chats uploads them to the selected engine; pass consent: true",
         ));
     }
@@ -303,7 +303,7 @@ async fn run(
                     .engine
                     .store_many_with(items, options)
                     .await
-                    .map_err(MemoryError::from);
+                    .map_err(Error::from);
                 if let Err(error) = stored {
                     tracing::warn!(
                         code = error.code(),

@@ -189,7 +189,7 @@ async fn ingest_refuses_bad_input() {
     ] {
         assert!(matches!(
             ingest(&config, &MemoryIdentity::root(), params).await,
-            Err(MemoryError::InvalidRequest(_))
+            Err(Error::InvalidRequest(_))
         ));
     }
     assert!(search(
@@ -291,7 +291,7 @@ async fn ingest_refuses_a_credential_store_a_system_root_traversal_and_null_byte
     ] {
         let result = ingest(&config, &MemoryIdentity::root(), path_params(path.clone())).await;
         assert!(
-            matches!(result, Err(MemoryError::InvalidRequest(_))),
+            matches!(result, Err(Error::InvalidRequest(_))),
             "{path:?}: {result:?}"
         );
     }
@@ -317,7 +317,7 @@ async fn ingest_refuses_a_symlink_into_a_credential_store() {
     )
     .await;
     assert!(
-        matches!(result, Err(MemoryError::InvalidRequest(_))),
+        matches!(result, Err(Error::InvalidRequest(_))),
         "{result:?}"
     );
     assert!(engine.is_empty());

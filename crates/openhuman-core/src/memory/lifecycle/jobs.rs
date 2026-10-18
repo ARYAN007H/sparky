@@ -29,7 +29,7 @@ use tinymemory_tools::queue::{JobRun, Selection};
 
 use crate::config::Config;
 use crate::memory::engine;
-use crate::memory::error::{MemoryError, MemoryResult};
+use crate::memory::error::{Error, Result};
 
 /// The cron job that runs the queue.
 pub const BACKGROUND_JOB: &str = "memory_background";
@@ -111,7 +111,7 @@ pub async fn snapshot(config: &Config) -> QueueState {
 
 /// Runs the selected jobs on the configured engine. Returns the runs it
 /// recorded; see `tinymemory_tools::queue::JobQueue::run` for the retry rules.
-pub async fn run(config: &Config, selection: Selection) -> MemoryResult<Vec<JobRun>> {
+pub async fn run(config: &Config, selection: Selection) -> Result<Vec<JobRun>> {
     let bound = engine::resolve(config).engine()?;
     queue_of(&config.workspace_dir)
         .run(
@@ -121,7 +121,7 @@ pub async fn run(config: &Config, selection: Selection) -> MemoryResult<Vec<JobR
         )
         .await
         .map_err(|error| match error {
-            QueueError::NoSuchJob(_) => MemoryError::invalid(error.to_string()),
+            QueueError::NoSuchJob(_) => Error::invalid(error.to_string()),
         })
 }
 
@@ -141,7 +141,7 @@ pub async fn run_due(config: &Config) {
             tracing::debug!(ran = runs.len(), "[memory:jobs] background run finished");
         }
         Ok(_) => {}
-        Err(MemoryError::Off(_)) => {}
+        Err(Error::Off(_)) => {}
         Err(error) => tracing::warn!(%error, "[memory:jobs] background run failed"),
     }
 }

@@ -20,7 +20,7 @@ use tinymemory_integrations::sources::SourceKind;
 use crate::config::schema::{MemorySourceConfig, MemorySourceKind};
 use crate::config::Config;
 use crate::memory::engine;
-use crate::memory::error::{MemoryError, MemoryResult};
+use crate::memory::error::{Error, Result};
 use crate::memory::types::SourceStatus;
 
 use super::state;
@@ -43,18 +43,18 @@ fn registered(source: &MemorySourceConfig) -> RegisteredSource {
     }
 }
 
-fn host_error(error: SyncError) -> MemoryError {
+fn host_error(error: SyncError) -> Error {
     match error {
-        SyncError::Invalid(message) => MemoryError::invalid(message),
+        SyncError::Invalid(message) => Error::invalid(message),
         SyncError::Read(message) => {
-            MemoryError::Engine(format!("reading the source failed: {message}"))
+            Error::Engine(format!("reading the source failed: {message}"))
         }
         SyncError::Engine(error) => error.into(),
     }
 }
 
 /// Checks `source` is readable as configured, without reading it.
-pub(super) fn validate(source: &MemorySourceConfig) -> MemoryResult<()> {
+pub(super) fn validate(source: &MemorySourceConfig) -> Result<()> {
     module::entry_for(&registered(source))
         .map(|_| ())
         .map_err(host_error)
@@ -128,7 +128,7 @@ fn syncer_for(config: &Config) -> Syncer {
 }
 
 /// Reads `source` and stores what it yields. Returns the number stored.
-pub async fn sync_one(config: &Config, source: &MemorySourceConfig) -> MemoryResult<u64> {
+pub async fn sync_one(config: &Config, source: &MemorySourceConfig) -> Result<u64> {
     engine::resolve(config).engine()?;
     run(config, source).await.map_err(host_error)
 }
@@ -197,7 +197,7 @@ pub fn start_sync(
     ctx: &crate::core::runtime::DispatchCtx,
     config: &Config,
     id: Option<&str>,
-) -> MemoryResult<Vec<String>> {
+) -> Result<Vec<String>> {
     engine::resolve(config).engine()?;
     let claims = syncer_for(config).start(id).map_err(host_error)?;
     let mut started = Vec::new();

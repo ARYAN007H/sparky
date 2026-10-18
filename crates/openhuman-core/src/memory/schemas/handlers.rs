@@ -7,7 +7,7 @@ use crate::config::Config;
 use crate::core::all::ControllerFuture;
 use crate::core::runtime::DispatchCtx;
 use crate::core::Outcome;
-use crate::memory::error::{MemoryError, MemoryResult};
+use crate::memory::error::{Error, Result};
 use crate::memory::explore::{ExploreParams, ItemsGetParams};
 use crate::memory::lifecycle::views::{self, JobsRunParams, PackPreviewParams, PolicySetParams};
 use crate::memory::scope::MemoryIdentity;
@@ -24,7 +24,7 @@ use serde_json::{json, Map, Value};
 
 /// The operation run after the common request parsing and config load.
 trait RpcOperation<P, R>: Send + 'static {
-    type Future: Future<Output = MemoryResult<R>> + Send + 'static;
+    type Future: Future<Output = Result<R>> + Send + 'static;
 
     fn call(self, ctx: DispatchCtx, config: Config, params: P) -> Self::Future;
 }
@@ -32,7 +32,7 @@ trait RpcOperation<P, R>: Send + 'static {
 impl<P, R, F, Fut> RpcOperation<P, R> for F
 where
     F: FnOnce(DispatchCtx, Config, P) -> Fut + Send + 'static,
-    Fut: Future<Output = MemoryResult<R>> + Send + 'static,
+    Fut: Future<Output = Result<R>> + Send + 'static,
 {
     type Future = Fut;
 
@@ -60,14 +60,14 @@ where
 
 fn parse<T: DeserializeOwned>(params: Map<String, Value>) -> Result<T, String> {
     serde_json::from_value(Value::Object(params))
-        .map_err(|error| MemoryError::invalid(format!("invalid params: {error}")).into())
+        .map_err(|error| Error::invalid(format!("invalid params: {error}")).into())
 }
 
 fn to_json<T: Serialize>(value: T) -> Result<Value, String> {
     Outcome::new(value, Vec::new()).into_cli_compatible_json()
 }
 
-fn finish<T: Serialize>(result: MemoryResult<T>) -> Result<Value, String> {
+fn finish<T: Serialize>(result: Result<T>) -> Result<Value, String> {
     to_json(result.map_err(String::from)?)
 }
 
@@ -75,11 +75,11 @@ async fn load(ctx: &DispatchCtx) -> Result<Config, String> {
     ctx.load_config().await
 }
 
-async fn save(config: &Config) -> MemoryResult<()> {
+async fn save(config: &Config) -> Result<()> {
     config
         .save()
         .await
-        .map_err(|error| MemoryError::Engine(format!("saving config failed: {error:#}")))
+        .map_err(|error| Error::Engine(format!("saving config failed: {error:#}")))
 }
 
 pub(super) fn engines_list(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {

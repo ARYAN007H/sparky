@@ -18,7 +18,7 @@ use tinymemory_api::{ExplorePage, ExploreRequest, Facet, GetRequest, Hit, ItemId
 use crate::config::Config;
 
 use super::engine;
-use super::error::{MemoryError, MemoryResult};
+use super::error::{Error, Result};
 
 /// Default bucket count of `memory_explore`.
 pub const DEFAULT_BUCKETS: usize = 50;
@@ -75,11 +75,11 @@ pub struct ItemsGetView {
 ///
 /// # Errors
 ///
-/// [`MemoryError::invalid`] for a path that is too long or a step whose
+/// [`Error::invalid`] for a path that is too long or a step whose
 /// value the facet cannot take (blank, or an unknown kind).
-pub fn narrowed(filter: Option<MetaFilter>, path: &[PathStep]) -> MemoryResult<MetaFilter> {
+pub fn narrowed(filter: Option<MetaFilter>, path: &[PathStep]) -> Result<MetaFilter> {
     if path.len() > MAX_PATH_STEPS {
-        return Err(MemoryError::invalid(format!(
+        return Err(Error::invalid(format!(
             "an explorer path takes at most {MAX_PATH_STEPS} steps"
         )));
     }
@@ -91,7 +91,7 @@ pub fn narrowed(filter: Option<MetaFilter>, path: &[PathStep]) -> MemoryResult<M
 }
 
 /// `memory_explore`.
-pub async fn explore(config: &Config, params: ExploreParams) -> MemoryResult<ExplorePage> {
+pub async fn explore(config: &Config, params: ExploreParams) -> Result<ExplorePage> {
     let bound = engine::resolve(config).engine()?;
     let mut request = ExploreRequest::new(params.facet, params.limit.unwrap_or(DEFAULT_BUCKETS));
     request.filter = super::ops::confine_filter(config, narrowed(params.filter, &params.path)?)?;
@@ -113,7 +113,7 @@ pub async fn explore(config: &Config, params: ExploreParams) -> MemoryResult<Exp
 }
 
 /// `memory_items_get`.
-pub async fn items_get(config: &Config, params: ItemsGetParams) -> MemoryResult<ItemsGetView> {
+pub async fn items_get(config: &Config, params: ItemsGetParams) -> Result<ItemsGetView> {
     let bound = engine::resolve(config).engine()?;
     let request = GetRequest {
         ids: params.ids.into_iter().map(ItemId::new).collect(),

@@ -21,7 +21,7 @@ use crate::config::Config;
 use crate::security::secret_storage::file_store::write_atomic;
 
 use super::engine;
-use super::error::{MemoryError, MemoryResult};
+use super::error::{Error, Result};
 use super::types::{ImportCounts, ImportScanView};
 
 /// Whether background work is paused right now. An automatic resume asks
@@ -104,8 +104,8 @@ pub(crate) fn listed_unconfirmed(workspace_dir: &Path) -> bool {
     read_file(workspace_dir).listed_unconfirmed
 }
 
-fn import_error(error: &ImportError) -> MemoryError {
-    MemoryError::invalid(error.to_string())
+fn import_error(error: &ImportError) -> Error {
+    Error::invalid(error.to_string())
 }
 
 fn importer(
@@ -122,7 +122,7 @@ fn importer(
         Arc::new(move || consent),
     )
     .with_describe(Arc::new(|error| {
-        MemoryError::from(error.clone()).to_string()
+        Error::from(error.clone()).to_string()
     }));
     if let Some(paused) = paused {
         importer = importer.with_pause(paused);
@@ -131,13 +131,13 @@ fn importer(
 }
 
 /// `memory_import_scan`.
-pub async fn scan(config: &Config) -> MemoryResult<ImportScanView> {
+pub async fn scan(config: &Config) -> Result<ImportScanView> {
     let workspace_dir = config.workspace_dir.clone();
     let counts = tokio::task::spawn_blocking(move || {
         tinymemory_integrations::import::count_legacy(&workspace_dir)
     })
     .await
-    .map_err(|error| MemoryError::Engine(format!("import scan failed: {error}")))?;
+    .map_err(|error| Error::Engine(format!("import scan failed: {error}")))?;
     let counts = counts.map(|counts: LegacyImportCounts| ImportCounts {
         documents: counts.documents,
         conversations: counts.conversations,
@@ -275,7 +275,7 @@ pub async fn start(
     ctx: &crate::core::runtime::DispatchCtx,
     config: &Config,
     consent: bool,
-) -> MemoryResult<ImportState> {
+) -> Result<ImportState> {
     launch(ctx, config, Mode::Import, consent, None).await
 }
 
@@ -284,7 +284,7 @@ pub async fn start(
 pub async fn retry_failed(
     ctx: &crate::core::runtime::DispatchCtx,
     config: &Config,
-) -> MemoryResult<ImportState> {
+) -> Result<ImportState> {
     launch(ctx, config, Mode::Retry, true, None).await
 }
 
@@ -302,7 +302,7 @@ async fn launch(
     mode: Mode,
     consent: bool,
     paused: Option<PauseCheck>,
-) -> MemoryResult<ImportState> {
+) -> Result<ImportState> {
     if mode == Mode::Import && !consent {
         return Err(import_error(&ImportError::ConsentRequired));
     }
@@ -315,7 +315,7 @@ async fn launch(
         // Items written to the legacy tree while it is being moved would be
         // left behind there.
         if super::layout_migration::service::is_running(config) {
-            return Err(MemoryError::invalid(if mode == Mode::Import {
+            return Err(Error::invalid(if mode == Mode::Import {
                 "memory is being organized; import once that finishes"
             } else {
                 "memory is being organized; retry once that finishes"
@@ -347,7 +347,7 @@ async fn launch(
         }
         Err(error) => {
             release(&workspace_dir);
-            return Err(MemoryError::Engine(format!("import start failed: {error}")));
+            return Err(Error::Engine(format!("import start failed: {error}")));
         }
     };
     let state = begun.state.clone();

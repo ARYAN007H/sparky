@@ -32,7 +32,7 @@ use crate::core::bus::BUS;
 use crate::core::events::DomainEvent;
 use crate::core::runtime::DispatchCtx;
 
-use super::error::MemoryError;
+use super::error::Error;
 use super::ops;
 pub use super::tool_budget::is_budget_refusal;
 use super::types::{FetchParams, ForgetParams, LearnParams, RecallParams, RecallView};
@@ -417,7 +417,7 @@ fn confine(filter: &mut Option<tinymemory_api::MetaFilter>, facts: &CallFacts) {
     filter.get_or_insert_with(Default::default).reach = Some(facts.reach.clone());
 }
 
-fn render_error(error: MemoryError) -> String {
+fn render_error(error: Error) -> String {
     format!("{} ({})", error, error.code())
 }
 
@@ -503,7 +503,7 @@ impl Tool for MemoryTool {
                 .await;
             return Ok(
                 match queued.unwrap_or_else(|_| {
-                    Err(MemoryError::Unavailable(
+                    Err(Error::Unavailable(
                         "memory write queue unavailable".into(),
                     ))
                 }) {

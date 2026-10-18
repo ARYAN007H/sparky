@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 use tinymemory_tools::layout_migration::{Error, Result};
 
 use super::{MigrationState, MigrationStateStore};
-use crate::memory::error::{MemoryError, MemoryResult};
+use crate::memory::error::{Error, Result};
 
 /// The state file of `workspace_dir`.
 #[must_use]
@@ -43,9 +43,9 @@ impl MigrationStateStore for FileStateStore {
     }
 }
 
-fn detail(error: MemoryError) -> String {
+fn detail(error: Error) -> String {
     match error {
-        MemoryError::Engine(message) => message,
+        Error::Engine(message) => message,
         other => other.to_string(),
     }
 }
@@ -56,14 +56,14 @@ fn detail(error: MemoryError) -> String {
 ///
 /// A state file that cannot be read or parsed: the migration must not start
 /// over and copy everything again on a damaged file.
-pub fn load(workspace_dir: &Path) -> MemoryResult<MigrationState> {
+pub fn load(workspace_dir: &Path) -> Result<MigrationState> {
     let file = path(workspace_dir);
     match std::fs::read(&file) {
         Ok(bytes) => serde_json::from_slice(&bytes).map_err(|error| {
-            MemoryError::Engine(format!("layout migration state unreadable: {error}"))
+            Error::Engine(format!("layout migration state unreadable: {error}"))
         }),
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(MigrationState::default()),
-        Err(error) => Err(MemoryError::Engine(format!(
+        Err(error) => Err(Error::Engine(format!(
             "layout migration state unreadable: {error}"
         ))),
     }
@@ -74,7 +74,7 @@ pub fn load(workspace_dir: &Path) -> MemoryResult<MigrationState> {
 /// # Errors
 ///
 /// When the file cannot be written.
-pub fn save(workspace_dir: &Path, state: &MigrationState) -> MemoryResult<()> {
+pub fn save(workspace_dir: &Path, state: &MigrationState) -> Result<()> {
     let file = path(workspace_dir);
     let write = || -> std::io::Result<()> {
         if let Some(dir) = file.parent() {
@@ -88,7 +88,7 @@ pub fn save(workspace_dir: &Path, state: &MigrationState) -> MemoryResult<()> {
         std::fs::rename(&temp, &file)
     };
     write()
-        .map_err(|error| MemoryError::Engine(format!("layout migration state not saved: {error}")))
+        .map_err(|error| Error::Engine(format!("layout migration state not saved: {error}")))
 }
 
 #[cfg(test)]

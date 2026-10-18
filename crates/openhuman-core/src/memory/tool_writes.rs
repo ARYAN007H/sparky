@@ -26,7 +26,7 @@ use tinymemory_tools::pending::{
     WriteGate, WriteOperation,
 };
 
-use super::error::{MemoryError, MemoryResult};
+use super::error::{Error, Result};
 use super::tools::CallFacts;
 use super::types::{ForgetParams, LearnParams};
 use crate::config::Config;
@@ -147,8 +147,8 @@ fn queue_path(config: &Config, root: &Namespace) -> PathBuf {
     ))
 }
 
-fn unavailable() -> MemoryError {
-    MemoryError::Unavailable(
+fn unavailable() -> Error {
+    Error::Unavailable(
         "memory write queue unavailable; durable queueing was not confirmed".into(),
     )
 }
@@ -159,9 +159,9 @@ pub(super) fn enqueue(
     config: &Config,
     args: &serde_json::Value,
     facts: &CallFacts,
-) -> MemoryResult<serde_json::Value> {
+) -> Result<serde_json::Value> {
     if super::engine::switched_off(config) {
-        return Err(MemoryError::Off("memory is disabled".into()));
+        return Err(Error::Off("memory is disabled".into()));
     }
     let confinement = super::user_scope::confinement(config)?;
     let reach = match confinement {
@@ -173,14 +173,14 @@ pub(super) fn enqueue(
     let operation = match args.get("action").and_then(serde_json::Value::as_str) {
         Some("learn") => {
             let mut params: LearnParams = serde_json::from_value(args.clone())
-                .map_err(|_| MemoryError::invalid("invalid learning arguments"))?;
+                .map_err(|_| Error::invalid("invalid learning arguments"))?;
             params.meta = None;
             let mut item = super::ops::learning_item(params, Some(facts.learn_meta()))?;
             if let Some(root) = confinement {
                 super::user_scope::clamp_item(&mut item, &root);
             }
             if !super::user_scope::within(&item.meta().namespace, &reach.at) || reach.inherit {
-                return Err(MemoryError::invalid(
+                return Err(Error::invalid(
                     "learning namespace is outside the trusted reach",
                 ));
             }
@@ -190,7 +190,7 @@ pub(super) fn enqueue(
         }
         Some("forget") => {
             let params: ForgetParams = serde_json::from_value(args.clone())
-                .map_err(|_| MemoryError::invalid("invalid forgetting arguments"))?;
+                .map_err(|_| Error::invalid("invalid forgetting arguments"))?;
             let mut ids: Vec<_> = params
                 .ids
                 .into_iter()
@@ -200,17 +200,17 @@ pub(super) fn enqueue(
             ids.sort();
             ids.dedup();
             if ids.is_empty() {
-                return Err(MemoryError::invalid("forget needs at least one id"));
+                return Err(Error::invalid("forget needs at least one id"));
             }
             WriteOperation::Forget { ids, reach }
         }
-        _ => return Err(MemoryError::invalid("expected a memory write")),
+        _ => return Err(Error::invalid("expected a memory write")),
     };
     let _guard = LOCK
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner);
     if !file.exists() && partitions(config)?.len() >= MAX_PENDING {
-        return Err(MemoryError::Unavailable(
+        return Err(Error::Unavailable(
             "memory write queue full; nothing was queued".into(),
         ));
     }
@@ -291,16 +291,16 @@ fn queue(file: &Path) -> Arc<Queue> {
     queue
 }
 
-fn map_pending(error: PendingError) -> MemoryError {
-    MemoryError::Unavailable(error.to_string())
+fn map_pending(error: PendingError) -> Error {
+    Error::Unavailable(error.to_string())
 }
 
-fn read_at(path: &Path) -> MemoryResult<Vec<Entry>> {
+fn read_at(path: &Path) -> Result<Vec<Entry>> {
     queue(path).entries().map_err(map_pending)
 }
 
 #[cfg(test)]
-fn write_at(file: &Path, entries: &[Entry]) -> MemoryResult<()> {
+fn write_at(file: &Path, entries: &[Entry]) -> Result<()> {
     FileStore {
         file: file.to_path_buf(),
     }
@@ -309,11 +309,11 @@ fn write_at(file: &Path, entries: &[Entry]) -> MemoryResult<()> {
 }
 
 #[cfg(test)]
-fn read(workspace: &Path) -> MemoryResult<Vec<Entry>> {
+fn read(workspace: &Path) -> Result<Vec<Entry>> {
     read_at(&path(workspace))
 }
 #[cfg(test)]
-fn write(workspace: &Path, entries: &[Entry]) -> MemoryResult<()> {
+fn write(workspace: &Path, entries: &[Entry]) -> Result<()> {
     write_at(&path(workspace), entries)
 }
 
@@ -352,7 +352,7 @@ fn owner_state(config: &Config) -> Arc<OwnerState> {
     owner
 }
 
-fn partitions(config: &Config) -> MemoryResult<Vec<PathBuf>> {
+fn partitions(config: &Config) -> Result<Vec<PathBuf>> {
     let prefix = format!("{}-", owner_prefix(config));
     let entries = match std::fs::read_dir(config.workspace_dir.join("memory")) {
         Ok(entries) => entries,
@@ -460,7 +460,7 @@ impl Drop for WriteFence {
 pub(crate) async fn fence_and_clear(
     ctx: &crate::core::runtime::DispatchCtx,
     config: &Config,
-) -> MemoryResult<WriteFence> {
+) -> Result<WriteFence> {
     let state = owner_state(config);
     let token = OwnedFenceToken::new(state.clone());
     let fencing_generation = token.generation();
@@ -482,7 +482,7 @@ pub(crate) async fn fence_and_clear(
                 .clear_stale(state.gate.process(), fencing_generation)
                 .map_err(map_pending)?;
         }
-        Ok::<_, MemoryError>(())
+        Ok::<_, Error>(())
     })
     .await
     .map_err(|_| unavailable())??;

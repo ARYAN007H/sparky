@@ -47,7 +47,7 @@ use crate::flows::{
     FLOWS_TAG,
 };
 use crate::memory::types::{FetchParams, RecallParams};
-use crate::memory::MemoryError;
+use crate::memory::Error;
 use crate::security::approval::{
     redact_args, summarize_action, ApprovalGate, ExecutionOutcome, GateOutcome,
 };
@@ -225,7 +225,7 @@ fn is_untrusted(meta: &MemoryMeta) -> bool {
 }
 
 /// Maps a memory failure onto the node's capability error.
-fn capability_error(op: &str, error: &MemoryError) -> EngineError {
+fn capability_error(op: &str, error: &Error) -> EngineError {
     EngineError::Capability(format!("memory node: {op} failed: {error}"))
 }
 
