@@ -12,6 +12,8 @@
 
 use super::activity::{Activity, Status};
 use openhuman_rpc::embed::chat_surface::WebChannelEvent;
+
+use crate::event_view::WebEventView;
 use std::collections::{HashMap, VecDeque};
 use std::sync::atomic::{AtomicU64, Ordering};
 
@@ -240,6 +242,7 @@ impl TranscriptState {
     /// bus is process-wide). Returns nothing; inspect [`Self::entries`] /
     /// [`Self::is_streaming`] afterwards.
     pub fn apply_event(&mut self, ev: &WebChannelEvent) {
+        let ev = WebEventView::from_event(ev);
         if ev.client_id != self.client_id
             || (!self.thread_id.is_empty() && ev.thread_id != self.thread_id)
         {
@@ -275,8 +278,8 @@ impl TranscriptState {
                     self.append_thinking(delta);
                 }
             }
-            "tool_call" | "tool_result" | "tool_args_delta" => self.apply_activity(ev, false),
-            event if event.starts_with("subagent_") => self.apply_activity(ev, true),
+            "tool_call" | "tool_result" | "tool_args_delta" => self.apply_activity(&ev, false),
+            event if event.starts_with("subagent_") => self.apply_activity(&ev, true),
             "artifact_pending" | "artifact_ready" | "artifact_failed" => {
                 self.viewport_changed(self.entries.len());
                 let status = ev.event.trim_start_matches("artifact_");
@@ -401,7 +404,7 @@ impl TranscriptState {
         }
     }
 
-    fn apply_activity(&mut self, ev: &WebChannelEvent, child: bool) {
+    fn apply_activity(&mut self, ev: &WebEventView, child: bool) {
         let identity = if child {
             ev.subagent
                 .as_ref()
