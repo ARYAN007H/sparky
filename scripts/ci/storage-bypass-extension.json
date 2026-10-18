@@ -280,16 +280,6 @@
     "issue": "https://github.com/tinyhumansai/openhuman/issues/7427"
   },
   {
-    "rule": "file-store-new",
-    "path": "crates/openhuman-core/src/memory/layout_migration/test_host.rs",
-    "line": 50,
-    "text": "store: FileStateStore::new(&config.workspace_dir),",
-    "occurrence": 1,
-    "classification": "scratch",
-    "reason": "Test-only layout migration host, wired under cfg(test), instantiates the file-state fixture for migration controls; it is not a product storage route.",
-    "issue": "https://github.com/tinyhumansai/openhuman/issues/7427"
-  },
-  {
     "rule": "writer-helper",
     "path": "crates/openhuman-core/src/modules/browser_task_report.rs",
     "line": 297,

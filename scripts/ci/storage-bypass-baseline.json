@@ -344,13 +344,6 @@
   },
   {
     "rule": "json-write",
-    "path": "crates/openhuman-core/src/skills/ops_discover/api.rs",
-    "line": 54,
-    "text": "std::fs::write(&readme_path, content)",
-    "occurrence": 1
-  },
-  {
-    "rule": "json-write",
     "path": "crates/openhuman-core/src/skills/webhooks/router.rs",
     "line": 537,
     "text": "if let Err(e) = std::fs::write(&path, json) {",

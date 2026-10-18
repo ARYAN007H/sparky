@@ -25,11 +25,11 @@ pub fn exists(workspace_dir: &Path) -> bool {
 
 /// The migration state kept in one workspace.
 #[derive(Debug, Clone)]
-pub struct FileStateStore {
+pub struct StateKvMigrationStore {
     workspace_dir: PathBuf,
 }
 
-impl FileStateStore {
+impl StateKvMigrationStore {
     /// The store of `workspace_dir`.
     #[must_use]
     pub fn new(workspace_dir: &Path) -> Self {
@@ -39,7 +39,7 @@ impl FileStateStore {
     }
 }
 
-impl MigrationStateStore for FileStateStore {
+impl MigrationStateStore for StateKvMigrationStore {
     fn load(&self) -> Result<MigrationState> {
         load(&self.workspace_dir).map_err(|error| Error::State(detail(error)))
     }
