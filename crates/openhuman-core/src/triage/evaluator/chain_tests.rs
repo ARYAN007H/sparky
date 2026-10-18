@@ -53,6 +53,7 @@ fn backoff_rejection_preserves_host_one_second_floor() {
             BreakerRejection::Backoff {
                 next_attempt_ms: 350,
                 failure_count: 1,
+                failure_limit_reached: false,
             },
             100,
         ),
@@ -63,6 +64,7 @@ fn backoff_rejection_preserves_host_one_second_floor() {
             BreakerRejection::Backoff {
                 next_attempt_ms: 1_600,
                 failure_count: 1,
+                failure_limit_reached: false,
             },
             100,
         ),
