@@ -170,7 +170,6 @@ async fn renewal_keeps_the_lease_and_a_lost_lease_fences_the_profile() {
         crate::web_chat::track_parallel_turn_for_test(
             &crate::core::runtime::DispatchCtx::new(Arc::clone(state.context())),
             "t1",
-            "req-1",
             turn.clone(),
         ),
     )
