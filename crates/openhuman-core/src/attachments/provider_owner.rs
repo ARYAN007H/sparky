@@ -313,6 +313,10 @@ fn history_source_block(modality: InputModality, source: &str) -> ContentBlock {
     }
 }
 
+#[cfg(test)]
+#[path = "provider_owner_tests.rs"]
+mod tests;
+
 struct OwnedDocumentsExtractor {
     ctx: Option<std::sync::Weak<crate::core::runtime::CoreContext>>,
 }

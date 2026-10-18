@@ -41,10 +41,6 @@ async fn missing_historical_media_does_not_block_latest_valid_media() {
             })
         })
         .collect::<Vec<_>>();
-    old_content.push(ContentBlock::Document(MediaRef::Url {
-        url: "ftp://docs.example.test/old.pdf?signature=document-private".into(),
-        media_type: Some("application/pdf".into()),
-    }));
     old_content.extend((0..8).map(|index| {
         ContentBlock::Image(ImageRef {
             url: format!("deleted-prior-upload-{index}.png"),
@@ -73,9 +69,6 @@ async fn missing_historical_media_does_not_block_latest_valid_media() {
     assert!(!serde_json::to_string(history)
         .unwrap()
         .contains("also-private"));
-    assert!(!serde_json::to_string(history)
-        .unwrap()
-        .contains("document-private"));
     let durable_text = serde_json::to_string(&durable).unwrap();
     assert!(signed_urls.iter().all(|url| durable_text.contains(url)));
     assert!(serde_json::to_string(&captured[0].messages[1])
