@@ -17,8 +17,6 @@ mod tool_progress_projection;
 use std::sync::Arc;
 
 #[cfg(test)]
-use tinyagents_harness::events::AgentEvent;
-#[cfg(test)]
 use tinyinference_llm::usage::Usage;
 
 #[cfg(test)]

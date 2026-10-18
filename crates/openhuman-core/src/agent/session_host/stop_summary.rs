@@ -46,9 +46,38 @@ pub(crate) fn classify_stop(
     TurnStop::classify(breaker_halt, wind_down, hit_cap, stop_fallback_class)
 }
 
+/// Classifies a completed turn with the failure classifier's typed cause when
+/// the harness carried one through the run. The human-readable stop note stays
+/// available for display, but never recovers the class or operation.
+pub(crate) fn classify_stop_with_cause(
+    breaker_halt: Option<&str>,
+    failure_cause: Option<tinyagents_harness::no_progress::ClassifiedStopCause>,
+    wind_down: bool,
+    hit_cap: bool,
+) -> Option<TurnStop> {
+    TurnStop::classify_with_cause(
+        breaker_halt,
+        failure_cause,
+        wind_down,
+        hit_cap,
+        stop_fallback_class,
+    )
+}
+
 /// Projects an incomplete result reason through the product's stop categories.
 pub(crate) fn stop_from_incomplete(reason: &str) -> TurnStop {
     TurnStop::from_incomplete_reason(reason, stop_fallback_class)
+}
+
+/// Projects an incomplete result with its typed breaker cause, when available.
+pub(crate) fn stop_from_incomplete_with_cause(
+    reason: &str,
+    failure_cause: Option<tinyagents_harness::no_progress::ClassifiedStopCause>,
+) -> TurnStop {
+    if let Some(cause) = failure_cause {
+        return TurnStop::from_classified_cause(cause);
+    }
+    stop_from_incomplete(reason)
 }
 
 /// Why the breaker stopped the turn, in terms a user can act on.

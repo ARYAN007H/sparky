@@ -76,6 +76,7 @@ pub(in super::super) async fn run_subagent_via_graph(
     // TinyAgents, where there is no config file. `None` yields the safe
     // byte-cap-only defaults.
     config: Option<&crate::config::Config>,
+    native_subagent: Option<crate::agent::tinyagents::NativeSubagentRunContext>,
 ) -> Result<
     (
         String,
@@ -87,16 +88,19 @@ pub(in super::super) async fn run_subagent_via_graph(
         // repeat-progress circuit breaker stopped the run; the caller reports
         // `Incomplete` instead of `Completed`.
         Option<String>,
+        // Typed cause is carried beside the display reason so callers do not
+        // need to reconstruct failure class or operation from prose.
+        Option<tinyagents_harness::no_progress::ClassifiedStopCause>,
     ),
     SubagentRunError,
 > {
     let (run_queue, message_run_queue) = queues;
+    let trace_session_group = run_context.thread_id.clone().or_else(|| thread_id.clone());
     // One resolved thread identity drives every child-facing boundary. An
     // explicit worker/task thread deliberately replaces the inherited parent;
     // otherwise a child remains in its parent's conversation. Do this before
     // constructing *any* model so managed requests, transcript metadata, and
     // the child carrier cannot disagree.
-    let trace_session_group = run_context.thread_id.clone().or_else(|| thread_id.clone());
     let thread_id = inherited_thread_id(run_context.thread_id.clone(), thread_id);
     // Where this child's transcript is written: its turn tree's store.
     let transcripts = super::transcript::subagent_transcripts(&run_context, &workspace_dir);
@@ -120,12 +124,10 @@ pub(in super::super) async fn run_subagent_via_graph(
     // seam this is a sub-agent turn, so the unknown-tool recovery uses the
     // sub-agent wording. With no progress sink the scoped events simply have
     // nowhere to go, which is harmless.
-    let child_journal_run_id = std::sync::Arc::new(std::sync::Mutex::new(None));
     let subagent_scope = Some(SubagentScope {
         agent_id: agent_id.to_string(),
         task_id: task_id.to_string(),
         extended_policy,
-        journal_run_id: Some(child_journal_run_id.clone()),
     });
 
     // A standalone summarizer model for the cap-hit checkpoint call below (the
@@ -204,7 +206,7 @@ pub(in super::super) async fn run_subagent_via_graph(
     child_context.thread_id = thread_id.clone();
     child_context.progress = on_progress.clone().or(child_context.progress);
     child_context.workspace = workspace_descriptor.clone().or(child_context.workspace);
-    let run_result = TurnSpec {
+    let turn_spec = TurnSpec {
         run_context: child_context,
         turn_models,
         provider_id,
@@ -256,34 +258,14 @@ pub(in super::super) async fn run_subagent_via_graph(
         // `subagent_scope`, so the seam never emits a top-level `TurnCompleted`
         // (they report via `Subagent*` events). Pass `false` for clarity.
         defer_turn_completed_to_caller: false,
-    }
-    .run()
-    .await;
-
-    if let Some(config) = config.filter(|config| config.observability.share_usage_data) {
-        let journal_run_id = child_journal_run_id
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .clone();
-        if let Some(journal_run_id) = journal_run_id {
-            let config = config.clone();
-            let thread_id = trace_session_group.clone();
-            let agent_id = agent_id.to_string();
-            let task_id = task_id.to_string();
-            let dispatch = dispatch.clone();
-            tokio::spawn(async move {
-                crate::core::observability::progress_tracing::export_subagent_journal_trace(
-                    &dispatch,
-                    &config,
-                    &journal_run_id,
-                    thread_id.as_deref(),
-                    &agent_id,
-                    &task_id,
-                )
-                .await;
-            });
-        }
-    }
+    };
+    let child_journal_run_id = native_subagent
+        .as_ref()
+        .map(|native| native.config.run_id.as_str().to_string());
+    let run_result = match native_subagent.as_ref() {
+        Some(native) => turn_spec.run_with_native_subagent(native.clone()).await,
+        None => turn_spec.run().await,
+    };
 
     let mut outcome = match run_result {
         Ok(outcome) => outcome,
@@ -343,6 +325,17 @@ pub(in super::super) async fn run_subagent_via_graph(
                 worker_thread_id.as_deref(),
                 &mapped,
             );
+            if let Some(native) = &native_subagent {
+                native.finalize_failed_boundary();
+            }
+            spawn_subagent_trace_export(
+                config,
+                &dispatch,
+                child_journal_run_id.as_deref(),
+                trace_session_group.as_deref(),
+                agent_id,
+                task_id,
+            );
             return Err(mapped);
         }
     };
@@ -387,6 +380,7 @@ pub(in super::super) async fn run_subagent_via_graph(
         let strategy = checkpoint::SubagentCheckpoint {
             chat_model: summary_model.clone(),
             agent_id: agent_id.to_string(),
+            model: model.to_string(),
             // The checkpoint summary call's output cap. #4469 item 5: honour this
             // sub-agent definition's own per-call output budget (the same
             // `max_output_tokens` bounding every task model call above) instead of
@@ -394,6 +388,19 @@ pub(in super::super) async fn run_subagent_via_graph(
             // definition that raised or lowered its output cap is respected by the
             // cap-summary call too.
             max_output_tokens,
+            trace: native_subagent.as_ref().and_then(|native| {
+                native
+                    .child_events
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .clone()
+                    .map(|events| {
+                        crate::agent::tinyagents::SupplementalTrace::new(
+                            events,
+                            native.config.run_id.clone(),
+                        )
+                    })
+            }),
         };
         match strategy.summarize_cap_hit(&results, max_iterations).await {
             Ok(co) => {
@@ -511,6 +518,39 @@ pub(in super::super) async fn run_subagent_via_graph(
         );
     }
 
+    // The child run's own loop ends before OpenHuman persists its transcript
+    // and any cap checkpoint. Finish the native journal only after that durable
+    // host boundary, then acknowledge it on the parent stream so the linked
+    // sub-agent span cannot close ahead of its child record.
+    if let Some(terminal) = outcome.deferred_terminal.take() {
+        let stop = crate::agent::session_host::stop_summary::classify_stop_with_cause(
+            outcome.breaker_halt.as_deref(),
+            outcome.failure_cause.clone(),
+            false,
+            outcome.hit_cap,
+        );
+        terminal
+            .finish(stop, (outcome.model_calls as u32).max(1))
+            .await;
+    }
+    if let Some(native) = &native_subagent {
+        native.parent_events.emit(
+            tinyagents_harness::events::AgentEvent::SubAgentRunCompleted {
+                run_id: native.config.run_id.clone(),
+            },
+        );
+    }
+    // Export only after the child journal's finalization and status flush so a
+    // detached reader cannot race ahead and force-close its spans at wall time.
+    spawn_subagent_trace_export(
+        config,
+        &dispatch,
+        child_journal_run_id.as_deref(),
+        trace_session_group.as_deref(),
+        agent_id,
+        task_id,
+    );
+
     // On an early-exit (`ask_user_clarification`), `outcome.text` is the question
     // and the runner checkpoints + returns AwaitingUser. `None` = ran to a final
     // answer (or a cap-hit checkpoint summary).
@@ -522,7 +562,41 @@ pub(in super::super) async fn run_subagent_via_graph(
         outcome.hit_cap,
         // #4466: propagate a circuit-breaker halt so the runner reports Incomplete.
         outcome.breaker_halt,
+        outcome.failure_cause,
     ))
+}
+
+fn spawn_subagent_trace_export(
+    config: Option<&crate::config::Config>,
+    dispatch: &crate::core::runtime::DispatchCtx,
+    journal_run_id: Option<&str>,
+    thread_id: Option<&str>,
+    agent_id: &str,
+    task_id: &str,
+) {
+    let (Some(config), Some(journal_run_id)) = (
+        config.filter(|config| config.observability.share_usage_data),
+        journal_run_id,
+    ) else {
+        return;
+    };
+    let config = config.clone();
+    let dispatch = dispatch.clone();
+    let journal_run_id = journal_run_id.to_owned();
+    let thread_id = thread_id.map(str::to_owned);
+    let agent_id = agent_id.to_owned();
+    let task_id = task_id.to_owned();
+    tokio::spawn(async move {
+        crate::core::observability::progress_tracing::export_subagent_journal_trace(
+            &dispatch,
+            &config,
+            &journal_run_id,
+            thread_id.as_deref(),
+            &agent_id,
+            &task_id,
+        )
+        .await;
+    });
 }
 
 /// A task-specific thread explicitly routes a worker; an absent task thread

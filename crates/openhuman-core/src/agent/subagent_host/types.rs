@@ -151,6 +151,9 @@ pub struct SubagentRunOutcome {
     pub output: String,
     /// How many LLM round-trips were performed during the run.
     pub iterations: usize,
+    /// Typed failure cause for a classified terminal halt. Kept alongside the
+    /// display status so later projections preserve class and operation.
+    pub failure_cause: Option<tinyagents_harness::no_progress::ClassifiedStopCause>,
     /// Total wall-clock duration of the run.
     pub elapsed: Duration,
     /// Which execution mode was used (Typed vs. Fork).

@@ -286,6 +286,7 @@ async fn explicit_worker_thread_replaces_parent_for_model_run_and_transcript() {
         "test",
         AgentTokenjuiceCompression::Off,
         None,
+        None,
     )
     .await
     .expect("worker run");
@@ -305,38 +306,40 @@ async fn subagent_runs_through_the_graph_engine_with_real_tools() {
     allowed.insert("echo".to_string());
     let mut history = vec![TranscriptMessage::user("please echo hi")];
 
-    let (output, iterations, usage, early_exit, hit_cap, _breaker) = run_subagent_via_graph(
-        crate::agent::tinyagents::TurnModelSource::from_model(provider),
-        "mock-model",
-        0.0,
-        &mut history,
-        parent_tools,
-        vec![],
-        vec![],
-        allowed,
-        10,
-        (None, None),
-        None,
-        "researcher",
-        "task-1",
-        false,
-        None,
-        crate::agent::tinyagents::host::OpenHumanRunContext::new(),
-        None,
-        std::env::temp_dir(),
-        None,
-        1024,
-        false,
-        "root-session__real_tools",
-        "mock-channel",
-        AgentTokenjuiceCompression::Off,
-        // No host config in tests: the graph takes byte-cap-only
-        // context defaults instead of reading the developer machine's
-        // real config.toml, which is what the old in-graph load did.
-        None,
-    )
-    .await
-    .expect("graph subagent runs");
+    let (output, iterations, usage, early_exit, hit_cap, _breaker, _cause) =
+        run_subagent_via_graph(
+            crate::agent::tinyagents::TurnModelSource::from_model(provider),
+            "mock-model",
+            0.0,
+            &mut history,
+            parent_tools,
+            vec![],
+            vec![],
+            allowed,
+            10,
+            (None, None),
+            None,
+            "researcher",
+            "task-1",
+            false,
+            None,
+            crate::agent::tinyagents::host::OpenHumanRunContext::new(),
+            None,
+            std::env::temp_dir(),
+            None,
+            1024,
+            false,
+            "root-session__real_tools",
+            "mock-channel",
+            AgentTokenjuiceCompression::Off,
+            // No host config in tests: the graph takes byte-cap-only
+            // context defaults instead of reading the developer machine's
+            // real config.toml, which is what the old in-graph load did.
+            None,
+            None,
+        )
+        .await
+        .expect("graph subagent runs");
 
     assert_eq!(output, "all done");
     assert_eq!(iterations, 2);
@@ -391,7 +394,7 @@ async fn child_text_and_thinking_deltas_are_scoped_to_the_subagent() {
     let parent_tools: Arc<Vec<Box<dyn Tool>>> = Arc::new(vec![]);
     let mut history = vec![TranscriptMessage::user("hi")];
 
-    let (output, _iters, _usage, _early, _hit_cap, _breaker) = run_subagent_via_graph(
+    let (output, _iters, _usage, _early, _hit_cap, _breaker, _cause) = run_subagent_via_graph(
         crate::agent::tinyagents::TurnModelSource::from_model(Arc::new(ThinkingStreamProvider)),
         "mock-model",
         0.0,
@@ -419,6 +422,7 @@ async fn child_text_and_thinking_deltas_are_scoped_to_the_subagent() {
         // No host config in tests: the graph takes byte-cap-only
         // context defaults instead of reading the developer machine's
         // real config.toml, which is what the old in-graph load did.
+        None,
         None,
     )
     .await
@@ -527,38 +531,40 @@ async fn ask_user_clarification_pauses_and_surfaces_the_question() {
     allowed.insert("ask_user_clarification".to_string());
     let mut history = vec![TranscriptMessage::user("help me")];
 
-    let (output, iterations, _usage, early_exit, _hit_cap, _breaker) = run_subagent_via_graph(
-        crate::agent::tinyagents::TurnModelSource::from_model(provider.clone()),
-        "mock-model",
-        0.0,
-        &mut history,
-        parent_tools,
-        vec![],
-        vec![],
-        allowed,
-        10,
-        (None, None),
-        None,
-        "researcher",
-        "task-9",
-        false,
-        None,
-        crate::agent::tinyagents::host::OpenHumanRunContext::new(),
-        None,
-        std::env::temp_dir(),
-        None,
-        1024,
-        false,
-        "root-session__clarification",
-        "mock-channel",
-        AgentTokenjuiceCompression::Off,
-        // No host config in tests: the graph takes byte-cap-only
-        // context defaults instead of reading the developer machine's
-        // real config.toml, which is what the old in-graph load did.
-        None,
-    )
-    .await
-    .expect("ask-clarification subagent runs");
+    let (output, iterations, _usage, early_exit, _hit_cap, _breaker, _cause) =
+        run_subagent_via_graph(
+            crate::agent::tinyagents::TurnModelSource::from_model(provider.clone()),
+            "mock-model",
+            0.0,
+            &mut history,
+            parent_tools,
+            vec![],
+            vec![],
+            allowed,
+            10,
+            (None, None),
+            None,
+            "researcher",
+            "task-9",
+            false,
+            None,
+            crate::agent::tinyagents::host::OpenHumanRunContext::new(),
+            None,
+            std::env::temp_dir(),
+            None,
+            1024,
+            false,
+            "root-session__clarification",
+            "mock-channel",
+            AgentTokenjuiceCompression::Off,
+            // No host config in tests: the graph takes byte-cap-only
+            // context defaults instead of reading the developer machine's
+            // real config.toml, which is what the old in-graph load did.
+            None,
+            None,
+        )
+        .await
+        .expect("ask-clarification subagent runs");
 
     // The loop paused after the tool round: the early-exit tool is surfaced
     // and the question is the returned text — the second model turn never ran.
@@ -619,38 +625,40 @@ async fn cap_hit_summarizes_a_resumable_checkpoint() {
     allowed.insert("noop".to_string());
     let mut history = vec![TranscriptMessage::user("do a big task")];
 
-    let (output, iterations, _usage, early_exit, hit_cap, _breaker) = run_subagent_via_graph(
-        crate::agent::tinyagents::TurnModelSource::from_model(Arc::new(LoopForeverProvider)),
-        "mock-model",
-        0.0,
-        &mut history,
-        parent_tools,
-        vec![],
-        vec![],
-        allowed,
-        2,
-        (None, None),
-        None,
-        "researcher",
-        "task-cap",
-        false,
-        None,
-        crate::agent::tinyagents::host::OpenHumanRunContext::new(),
-        None,
-        std::env::temp_dir(),
-        None,
-        1024,
-        false,
-        "root-session__cap_hit",
-        "mock-channel",
-        AgentTokenjuiceCompression::Off,
-        // No host config in tests: the graph takes byte-cap-only
-        // context defaults instead of reading the developer machine's
-        // real config.toml, which is what the old in-graph load did.
-        None,
-    )
-    .await
-    .expect("cap-hit subagent runs");
+    let (output, iterations, _usage, early_exit, hit_cap, _breaker, _cause) =
+        run_subagent_via_graph(
+            crate::agent::tinyagents::TurnModelSource::from_model(Arc::new(LoopForeverProvider)),
+            "mock-model",
+            0.0,
+            &mut history,
+            parent_tools,
+            vec![],
+            vec![],
+            allowed,
+            2,
+            (None, None),
+            None,
+            "researcher",
+            "task-cap",
+            false,
+            None,
+            crate::agent::tinyagents::host::OpenHumanRunContext::new(),
+            None,
+            std::env::temp_dir(),
+            None,
+            1024,
+            false,
+            "root-session__cap_hit",
+            "mock-channel",
+            AgentTokenjuiceCompression::Off,
+            // No host config in tests: the graph takes byte-cap-only
+            // context defaults instead of reading the developer machine's
+            // real config.toml, which is what the old in-graph load did.
+            None,
+            None,
+        )
+        .await
+        .expect("cap-hit subagent runs");
 
     // The loop paused at the 2-call budget and summarized instead of erroring.
     assert!(early_exit.is_none());

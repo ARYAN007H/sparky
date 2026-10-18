@@ -43,6 +43,8 @@ use super::ToolPolicyEnforcement;
 
 /// What the middleware stack needs to know about the turn.
 pub(super) struct TurnMiddlewareInputs {
+    /// Configured provider id used only when the response has no resolved route.
+    pub(super) provider_id: String,
     /// The turn's primary model name.
     pub(super) model: String,
     /// The shared tool sets the turn's tools resolve against.
@@ -122,6 +124,7 @@ pub(super) fn install_turn_middleware(
     inputs: TurnMiddlewareInputs,
 ) -> TurnWiring {
     let TurnMiddlewareInputs {
+        provider_id,
         model,
         tool_sets,
         allowed,
@@ -182,7 +185,10 @@ pub(super) fn install_turn_middleware(
     // TinyInference decorator attached in `turn_models` stamps the successful
     // unary response and the streamed terminal response, and this middleware
     // moves that metadata into the explicit OpenHuman carrier.
-    harness.push_model_middleware(Arc::new(routes::ResolvedRouteMiddleware));
+    harness.push_model_middleware(Arc::new(routes::ResolvedRouteMiddleware::new(
+        provider_id,
+        model,
+    )));
 
     // Per-call capability gate (issue #4249, Workstream 02.1): when the turn has
     // derivable capability needs (today: vision for a `hint:vision` turn), stamp

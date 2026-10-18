@@ -5,6 +5,9 @@ use std::sync::Arc;
 use tinyagents_runtime::ToolSnapshot;
 use tinytools::ToolSpec;
 
+#[path = "runtime_session_terminal_tests.rs"]
+mod terminal_tests;
+
 fn synthesized_tool_names(
     prelude: &super::OpenHumanTurnPrelude,
 ) -> std::collections::HashSet<String> {

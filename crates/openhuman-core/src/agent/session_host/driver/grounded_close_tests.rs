@@ -8,6 +8,7 @@ const CLEAN_REPLY: &str = "The workspace holds three crates; the build is green.
 fn classified_halt_returns_partial_work_without_provider_usage() {
     use tinyagents_harness::turn_outcome::ToolCallOutcome;
     let outcome = TinyagentsTurnOutcome {
+        deferred_terminal: None,
         text: String::new(),
         resolved_route: None,
         history: Vec::new(),
@@ -23,6 +24,11 @@ fn classified_halt_returns_partial_work_without_provider_usage() {
         wrap_up_injected: false,
         truncated: false,
         breaker_halt: Some("Stopping after 1 attempt(s): failure class `permission` still blocks operation `search` on `catalog`. Resolve this blocker before retrying.".into()),
+        failure_cause: Some(tinyagents_harness::no_progress::ClassifiedStopCause {
+            class: "permission".into(),
+            operation: "search".into(),
+            summary: "Stopping after 1 attempt(s): failure class `permission` still blocks operation `search` on `catalog`. Resolve this blocker before retrying.".into(),
+        }),
         tool_outcomes: vec![
             ToolCallOutcome { call_id: "a".into(), name: "list".into(), arguments: serde_json::json!({}), success: true, content: "three items".into(), duration_ms: 1 },
             ToolCallOutcome { call_id: "b".into(), name: "search".into(), arguments: serde_json::json!({}), success: false, content: "403 Forbidden".into(), duration_ms: 1 },
@@ -114,6 +120,7 @@ async fn grounded_close_uses_the_selected_model_and_keeps_verifier_out_of_contex
         "Summarize the workspace.",
         &outcome,
         None,
+        None,
     )
     .await
     .expect("blank terminal reply needs a close");
@@ -159,6 +166,7 @@ async fn terminal_failed_close_requests_are_counted_without_usage() {
         "Summarize the workspace.",
         &blank_outcome(false),
         None,
+        None,
     )
     .await
     .expect("blank terminal reply needs a close");
@@ -167,6 +175,222 @@ async fn terminal_failed_close_requests_are_counted_without_usage() {
     assert_eq!(closed.usage.input_tokens, 0);
     assert_eq!(closed.usage.output_tokens, 0);
     assert_eq!(closed.usage.last_call_input_tokens, 0);
+}
+
+#[tokio::test]
+async fn close_state_machine_calls_emit_correlated_native_model_events() {
+    use std::sync::Mutex;
+    use tinyagents_harness::events::{AgentEvent, EventListener, EventSink};
+    use tinyagents_harness::ids::RunId;
+    use tinyagents_harness::testkit::ScriptedModel;
+    use tinyinference_llm::model::ModelResponse;
+
+    #[derive(Default)]
+    struct Recorder(Mutex<Vec<AgentEvent>>);
+    impl EventListener for Recorder {
+        fn on_event(&self, record: &tinyagents_harness::events::EventRecord) {
+            self.0.lock().unwrap().push(record.event.clone());
+        }
+    }
+
+    async fn run(replies: Vec<ModelResponse>, expected_calls: usize, expect_failure: bool) {
+        let run_id = RunId::new("close-state-machine-trace");
+        let sink = EventSink::with_stream_id(run_id.as_str());
+        let recorder = Arc::new(Recorder::default());
+        sink.subscribe(recorder.clone());
+        let trace = SupplementalTrace::new(sink, run_id.clone());
+        let scripted = Arc::new(ScriptedModel::new(replies));
+        let source = TurnModelSource::from_model(scripted.clone());
+
+        close_if_needed(
+            &source,
+            "host-selected-model",
+            0.25,
+            None,
+            &tinytools_agent::dialect::NativeDialect,
+            &[],
+            "Summarize the workspace.",
+            &blank_outcome(false),
+            None,
+            Some(&trace),
+        )
+        .await
+        .expect("blank terminal reply needs a close");
+
+        let requests = scripted.requests();
+        assert_eq!(requests.len(), expected_calls);
+        let records = recorder.0.lock().unwrap();
+        let started: Vec<_> = records
+            .iter()
+            .filter_map(|event| match event {
+                AgentEvent::ModelStarted { call_id, model } => {
+                    assert_eq!(model, "host-selected-model");
+                    Some(call_id.as_str())
+                }
+                _ => None,
+            })
+            .collect();
+        let completed: Vec<_> = records
+            .iter()
+            .filter_map(|event| match event {
+                AgentEvent::ModelCompleted { call_id, .. } => Some(call_id.as_str()),
+                _ => None,
+            })
+            .collect();
+        let failed: Vec<_> = records
+            .iter()
+            .filter_map(|event| match event {
+                AgentEvent::ModelFailed { call_id, .. } => Some(call_id.as_str()),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(started.len(), expected_calls);
+        if expect_failure {
+            assert!(completed.is_empty());
+            assert_eq!(
+                failed, started,
+                "each failed request has one terminal event"
+            );
+        } else {
+            assert_eq!(
+                completed, started,
+                "each completed request has one terminal event"
+            );
+            assert!(failed.is_empty());
+        }
+        for (request, call_id) in requests.iter().zip(started) {
+            let correlation = request
+                .correlation
+                .as_ref()
+                .expect("host model forwards native call correlation");
+            assert_eq!(correlation.run_id, run_id.as_str());
+            assert_eq!(correlation.call_id, call_id);
+        }
+    }
+
+    run(
+        vec![
+            ModelResponse::assistant(CLEAN_REPLY),
+            ModelResponse::assistant("ACCEPT"),
+        ],
+        2,
+        false,
+    )
+    .await;
+    run(
+        vec![
+            ModelResponse::assistant(CLEAN_REPLY),
+            ModelResponse::assistant("REJECT"),
+            ModelResponse::assistant(CLEAN_REPLY),
+            ModelResponse::assistant("ACCEPT"),
+        ],
+        4,
+        false,
+    )
+    .await;
+    run(Vec::new(), 2, true).await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn close_stream_eof_and_timeout_emit_terminal_traces_without_timeout_usage() {
+    use std::sync::Mutex;
+    use tinyagents_harness::events::{AgentEvent, EventListener, EventSink};
+    use tinyagents_harness::ids::RunId;
+    use tinyinference_llm::model::{
+        ChatModel, ModelRequest, ModelResponse, ModelStream, ModelStreamItem,
+    };
+
+    struct EmptyOrPendingModel(bool);
+    #[async_trait::async_trait]
+    impl ChatModel<()> for EmptyOrPendingModel {
+        async fn invoke(
+            &self,
+            _state: &(),
+            _request: ModelRequest,
+        ) -> tinyinference_llm::Result<ModelResponse> {
+            Err(tinyinference_llm::Error::Model("stream only".into()))
+        }
+
+        async fn stream(
+            &self,
+            _state: &(),
+            _request: ModelRequest,
+        ) -> tinyinference_llm::Result<ModelStream> {
+            let items: std::pin::Pin<Box<dyn futures::Stream<Item = ModelStreamItem> + Send>> =
+                if self.0 {
+                    Box::pin(futures::stream::pending())
+                } else {
+                    Box::pin(futures::stream::empty())
+                };
+            Ok(ModelStream::new(items))
+        }
+    }
+
+    #[derive(Default)]
+    struct Recorder(Mutex<Vec<AgentEvent>>);
+    impl EventListener for Recorder {
+        fn on_event(&self, record: &tinyagents_harness::events::EventRecord) {
+            self.0.lock().unwrap().push(record.event.clone());
+        }
+    }
+
+    async fn run(pending: bool) -> (usize, usize, usize) {
+        let run_id = RunId::new(if pending {
+            "close-timeout"
+        } else {
+            "close-eof"
+        });
+        let sink = EventSink::with_stream_id(run_id.as_str());
+        let recorder = Arc::new(Recorder::default());
+        sink.subscribe(recorder.clone());
+        let trace = SupplementalTrace::new(sink, run_id);
+        let source = TurnModelSource::from_model(Arc::new(EmptyOrPendingModel(pending)));
+        let close = close_if_needed(
+            &source,
+            "host-selected-model",
+            0.0,
+            None,
+            &tinytools_agent::dialect::NativeDialect,
+            &[],
+            "Summarize the workspace.",
+            &blank_outcome(false),
+            pending.then_some(std::time::Duration::from_secs(1)),
+            Some(&trace),
+        )
+        .await
+        .expect("blank terminal reply needs a close");
+        let records = recorder.0.lock().unwrap();
+        let started = records
+            .iter()
+            .filter(|event| matches!(event, AgentEvent::ModelStarted { .. }))
+            .count();
+        let completed = records
+            .iter()
+            .filter(|event| matches!(event, AgentEvent::ModelCompleted { .. }))
+            .count();
+        let failed = records
+            .iter()
+            .filter(|event| matches!(event, AgentEvent::ModelFailed { .. }))
+            .count();
+        if pending {
+            assert!(!close.output.is_empty(), "timeout ships a fallback");
+            assert_eq!(
+                close.usage.model_calls, 0,
+                "timeout has no completion callback"
+            );
+            assert_eq!((started, completed, failed), (1, 0, 1));
+        } else {
+            assert_eq!(
+                close.usage.model_calls, 2,
+                "each EOF retry is observed once"
+            );
+            assert_eq!((started, completed, failed), (2, 0, 2));
+        }
+        (started, completed, failed)
+    }
+
+    run(false).await;
+    run(true).await;
 }
 
 #[tokio::test]
@@ -194,6 +418,7 @@ async fn required_output_repair_preserves_all_host_output_placements() {
             Some(&progress),
             1,
             &mut usage,
+            None,
         )
         .await
         .expect("reply lacks the required block");
@@ -227,6 +452,7 @@ async fn required_output_repair_preserves_all_host_output_placements() {
 
 fn blank_outcome(truncated: bool) -> TinyagentsTurnOutcome {
     TinyagentsTurnOutcome {
+        deferred_terminal: None,
         text: String::new(),
         resolved_route: None,
         history: Vec::new(),
@@ -241,6 +467,7 @@ fn blank_outcome(truncated: bool) -> TinyagentsTurnOutcome {
         hit_cap: false,
         wrap_up_injected: false,
         breaker_halt: None,
+        failure_cause: None,
         truncated,
         compaction: None,
         tool_outcomes: Vec::new(),
@@ -316,10 +543,109 @@ async fn timed_out_repair_keeps_the_usage_of_its_answered_call() {
             Some(&progress),
             2,
             &mut usage,
+            None,
         ),
     )
     .await;
 
     assert!(repaired.is_err(), "the blocked send outlives the budget");
     assert_eq!(usage.model_calls, 1, "the answered repair call is recorded");
+}
+
+#[test]
+fn supplemental_cached_response_is_marked_before_usage_without_provider_charge() {
+    use std::sync::{Arc, Mutex};
+    use tinyagents_harness::events::{AgentEvent, EventListener, EventSink};
+    use tinyagents_harness::ids::RunId;
+
+    #[derive(Default)]
+    struct Recorder(Mutex<Vec<AgentEvent>>);
+    impl EventListener for Recorder {
+        fn on_event(&self, record: &tinyagents_harness::events::EventRecord) {
+            self.0.lock().unwrap().push(record.event.clone());
+        }
+    }
+
+    let run_id = RunId::new("host-supplemental-cache-fixture");
+    let sink = EventSink::with_stream_id(run_id.as_str());
+    let recorder = Arc::new(Recorder::default());
+    sink.subscribe(recorder.clone());
+    let trace = SupplementalTrace::new(sink, run_id);
+    let (call_id, started_at_ms) = trace.begin("gpt-4.1");
+    let usage = tinyinference_llm::usage::Usage {
+        input_tokens: 14,
+        output_tokens: 3,
+        total_tokens: 17,
+        charged_amount: Some(tinyinference_llm::usage::ChargedAmount::usd_micros(900)),
+        ..Default::default()
+    };
+    let mut response = tinyinference_llm::model::ModelResponse::assistant("cached answer");
+    response.served_from_cache = true;
+    response.usage = Some(usage);
+    response.message.usage = Some(usage);
+    trace.completed(
+        call_id,
+        "gpt-4.1",
+        started_at_ms,
+        serde_json::json!(["cached prompt"]),
+        &response,
+    );
+
+    let records = recorder.0.lock().unwrap();
+    assert!(matches!(records.as_slice(), [
+        AgentEvent::ModelStarted { .. },
+        AgentEvent::ModelResponseCached { .. },
+        AgentEvent::UsageRecorded { usage },
+        AgentEvent::ModelCompleted { usage: Some(completed), .. },
+        AgentEvent::GenerationEnriched { enrichment, .. },
+    ] if usage.charged_amount.is_none()
+        && completed.charged_amount.is_none()
+        && enrichment.estimated_cost_usd.is_none()));
+}
+
+#[test]
+fn supplemental_free_route_uses_zero_catalog_rates() {
+    use std::sync::{Arc, Mutex};
+    use tinyagents_harness::events::{AgentEvent, EventListener, EventSink};
+    use tinyagents_harness::ids::RunId;
+
+    #[derive(Default)]
+    struct Recorder(Mutex<Vec<AgentEvent>>);
+    impl EventListener for Recorder {
+        fn on_event(&self, record: &tinyagents_harness::events::EventRecord) {
+            self.0.lock().unwrap().push(record.event.clone());
+        }
+    }
+
+    let run_id = RunId::new("host-supplemental-free-fixture");
+    let sink = EventSink::with_stream_id(run_id.as_str());
+    let recorder = Arc::new(Recorder::default());
+    sink.subscribe(recorder.clone());
+    let trace = SupplementalTrace::new(sink, run_id);
+    let (call_id, started_at_ms) = trace.begin("openrouter/test-model:free");
+    let response = tinyinference_llm::model::ModelResponse::assistant("free answer");
+    trace.completed(
+        call_id,
+        "openrouter/test-model:free",
+        started_at_ms,
+        serde_json::json!(["free prompt"]),
+        &response,
+    );
+
+    let records = recorder.0.lock().unwrap();
+    let enrichment = records
+        .iter()
+        .find_map(|event| match event {
+            AgentEvent::GenerationEnriched { enrichment, .. } => Some(enrichment),
+            _ => None,
+        })
+        .expect("supplemental generation carries catalog enrichment");
+    let pricing = enrichment
+        .pricing
+        .as_ref()
+        .expect("free routes have known zero rates");
+    assert_eq!(pricing.input_per_mtok_usd, Some(0.0));
+    assert_eq!(pricing.cached_input_per_mtok_usd, Some(0.0));
+    assert_eq!(pricing.output_per_mtok_usd, Some(0.0));
+    assert_eq!(enrichment.estimated_cost_usd, None);
 }

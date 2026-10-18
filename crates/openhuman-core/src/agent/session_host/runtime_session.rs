@@ -20,6 +20,10 @@ mod transcript;
 mod turn;
 pub(super) use turn::begin_turn_resume;
 
+type ActiveTerminalSidecar = std::sync::Arc<
+    std::sync::Mutex<crate::agent::tinyagents::host::run_context::SessionTurnSidecar>,
+>;
+
 use std::sync::Arc;
 
 use anyhow::Result;
@@ -65,9 +69,8 @@ pub(super) struct OpenHumanSessionState {
     pub(super) reply_language_directive: Option<String>,
     pub(super) time_zone: Option<String>,
     prelude: Option<OpenHumanTurnPrelude>,
-    /// The previous turn's deferred post-commit work (thread-goal
-    /// accounting). The next turn awaits it before loading the goal
-    /// (`post_commit::await_pending`).
+    active_terminal_sidecar: Option<ActiveTerminalSidecar>,
+    /// Previous turn's deferred goal accounting, awaited before the next turn.
     pending_post_commit: Option<tokio::task::JoinHandle<()>>,
 }
 
@@ -364,11 +367,14 @@ impl OpenHumanSessionHost {
                             .lock()
                             .unwrap_or_else(std::sync::PoisonError::into_inner)
                             .request_base_len = request_base_len;
-                        let prelude = state
-                            .lock()
-                            .unwrap_or_else(|poisoned| poisoned.into_inner())
-                            .prelude
-                            .clone();
+                        let (prelude, pending_post_commit) = {
+                            let mut state = state
+                                .lock()
+                                .unwrap_or_else(|poisoned| poisoned.into_inner());
+                            state.active_terminal_sidecar =
+                                Some(options.run_context.data.session_sidecar.clone());
+                            (state.prelude.clone(), state.pending_post_commit.take())
+                        };
                         let prelude = prelude.ok_or({
                             tinyagents_runtime::RuntimeError::MissingDependency(
                                 "OpenHumanTurnPrelude",
@@ -376,11 +382,6 @@ impl OpenHumanSessionHost {
                         })?;
                         // The previous turn's goal accounting was deferred past
                         // its completion; settle it before this turn reads the goal.
-                        let pending_post_commit = state
-                            .lock()
-                            .unwrap_or_else(|poisoned| poisoned.into_inner())
-                            .pending_post_commit
-                            .take();
                         post_commit::await_pending(pending_post_commit).await;
                         let new_session = !view.resumed && view.history.is_empty();
                         prelude
@@ -530,11 +531,10 @@ impl OpenHumanSessionHost {
                 move |terminal| {
                     let state = state.clone();
                     Box::pin(async move {
-                        state
-                            .lock()
-                            .unwrap_or_else(|poisoned| poisoned.into_inner())
-                            .terminals
-                            .push(terminal);
+                        let sidecar = post_commit::take_terminal_sidecar(&state, terminal.clone());
+                        if let Some(sidecar) = sidecar {
+                            post_commit::finalize_deferred_terminal(&sidecar, &terminal).await;
+                        }
                         Ok(())
                     })
                 }

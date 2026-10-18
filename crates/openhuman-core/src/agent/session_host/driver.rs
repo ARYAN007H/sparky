@@ -5,6 +5,7 @@
 //! complete immutable model history and tool declaration snapshot per call.
 
 mod grounded_close;
+use crate::agent::tinyagents::SupplementalTrace;
 
 use std::{collections::HashSet, sync::Arc, time::Instant};
 
@@ -244,6 +245,7 @@ impl SessionDriver<OpenHumanRunContext> for OpenHumanSessionDriver {
                 ));
             }
         };
+        let supplemental_trace = SupplementalTrace::install_for_turn(&sidecar, &mut outcome);
 
         if outcome.text.trim().is_empty() && outcome.tool_outcomes.is_empty() {
             return Err(driver_error(
@@ -257,7 +259,9 @@ impl SessionDriver<OpenHumanRunContext> for OpenHumanSessionDriver {
             && (outcome.model_calls >= self.max_iterations
                 || outcome.tool_calls >= self.max_iterations
                 || outcome.tool_outcomes.len() >= self.max_iterations);
-        // Normalize the exhausted-loop fallback when older hosted paths hide raw counters.
+        // Older hosted-harness fallbacks leave the raw counters unavailable.
+        // They only occur when the loop exhausted a tool round without a model
+        // conclusion, so normalize them to the same resumable cap state.
         let exhausted_fallback = outcome
             .text
             .starts_with("I finished this turn without writing up a result.");
@@ -295,6 +299,7 @@ impl SessionDriver<OpenHumanRunContext> for OpenHumanSessionDriver {
                 &user_message,
                 &outcome,
                 close_by.map(|at| at.saturating_duration_since(Instant::now())),
+                supplemental_trace.as_ref(),
             ) => close,
         };
         let mut output = close
@@ -362,6 +367,7 @@ impl SessionDriver<OpenHumanRunContext> for OpenHumanSessionDriver {
                         request.run_context.data.progress.as_ref(),
                         outcome.model_calls.saturating_add(1) as u32,
                         &mut repair_usage,
+                        supplemental_trace.as_ref(),
                     );
                     tokio::pin!(repair);
                     tokio::select! {
@@ -467,10 +473,10 @@ impl SessionDriver<OpenHumanRunContext> for OpenHumanSessionDriver {
             observed.tool_outcomes = outcome.tool_outcomes.clone();
             observed.hit_cap = outcome.hit_cap;
             observed.wrap_up_injected = outcome.wrap_up_injected;
-            // How the harness stopped the turn, if it did. The wind-down
-            // middleware marked the sidecar during the run.
-            observed.stop = crate::agent::session_host::stop_summary::classify_stop(
+            // Preserve the harness stop reason and the wind-down sidecar marker.
+            observed.stop = crate::agent::session_host::stop_summary::classify_stop_with_cause(
                 outcome.breaker_halt.as_deref(),
+                outcome.failure_cause.clone(),
                 observed.wind_down,
                 outcome.hit_cap,
             );
@@ -482,7 +488,7 @@ impl SessionDriver<OpenHumanRunContext> for OpenHumanSessionDriver {
                 );
             }
             observed.resolved_route = outcome.resolved_route.clone();
-        }
+        };
         // The turn compacted its context: persist the compacted history, so the
         // next turn starts from the checkpoint. The runtime session seals the
         // current generation and opens the next (the history no longer extends

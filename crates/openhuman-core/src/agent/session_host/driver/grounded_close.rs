@@ -6,8 +6,11 @@
 //! It deliberately uses the same explicit model source as the turn and keeps
 //! its usage in a sidecar; it never owns transcript history or persistence.
 
+use std::sync::Arc;
 use tinyagents_runtime::transcript::message_to_native_transcript as message_to_native_chat_message;
-use tinyinference_llm::model::{ChatModel, ModelRequest, ModelResponse, ModelStream};
+use tinyinference_llm::model::{
+    ChatModel, ModelCallCorrelation, ModelRequest, ModelResponse, ModelStream, ModelStreamItem,
+};
 use tinytools_agent::dialect::ToolDialect;
 
 use tinyagents_harness::middleware::wrap_harness_instruction;
@@ -18,7 +21,7 @@ use crate::agent::{
         close_verification_prompt, final_answer_instruction, harness_instruction_needles,
         render_tool_results, results_from_tool_outcomes,
     },
-    tinyagents::{TinyagentsTurnOutcome, TurnModelSource},
+    tinyagents::{SupplementalTrace, TinyagentsTurnOutcome, TurnModelSource},
 };
 use crate::inference::provider::{BilledUsage, AGENT_TURN_MAX_OUTPUT_TOKENS};
 
@@ -48,9 +51,17 @@ impl RepairUsage {
         }
     }
 
-    fn record(&mut self, usage: Option<BilledUsage>, measures_context: bool) {
+    fn record(
+        &mut self,
+        usage: Option<BilledUsage>,
+        measures_context: bool,
+        trace: Option<&SupplementalTrace>,
+    ) {
         self.model_calls += 1;
         if let Some(usage) = usage {
+            if let Some(model) = trace.and_then(SupplementalTrace::actual_model) {
+                self.pricing_model = model;
+            }
             if measures_context {
                 self.last_call_input_tokens = usage.input_tokens;
                 self.last_call_output_tokens = usage.output_tokens;
@@ -58,8 +69,12 @@ impl RepairUsage {
             self.input_tokens += usage.input_tokens;
             self.output_tokens += usage.output_tokens;
             self.cached_input_tokens += usage.cached_input_tokens();
-            self.cost
-                .add(crate::agent::cost::call_cost(&self.pricing_model, &usage));
+            if trace.is_some_and(SupplementalTrace::is_cache_hit) {
+                self.cost.add(tinyagents_harness::cost::CallCost::Unknown);
+            } else {
+                self.cost
+                    .add(crate::agent::cost::call_cost(&self.pricing_model, &usage));
+            }
         }
     }
 
@@ -67,10 +82,12 @@ impl RepairUsage {
         &mut self,
         kind: tinyagents_harness::close::CloseRequestKind,
         response: Option<&ModelResponse>,
+        trace: Option<&SupplementalTrace>,
     ) {
         self.record(
             response.and_then(crate::inference::provider::model::usage_info_from_response),
             kind != tinyagents_harness::close::CloseRequestKind::Verification,
+            trace,
         );
     }
 }
@@ -82,6 +99,54 @@ struct SummarizerSourceModel<'a> {
     model: &'a str,
     temperature: f64,
     thread_id: Option<&'a str>,
+    trace: Option<&'a Arc<SupplementalTrace>>,
+}
+
+struct SupplementalCall {
+    trace: Arc<SupplementalTrace>,
+    call_id: tinyagents_harness::ids::CallId,
+    started_at_ms: u64,
+    model: String,
+    input: serde_json::Value,
+    completed: bool,
+}
+
+impl SupplementalCall {
+    fn start(trace: &Arc<SupplementalTrace>, model: &str, request: &mut ModelRequest) -> Self {
+        let (call_id, started_at_ms) = trace.begin(model);
+        request.correlation = Some(ModelCallCorrelation::new(
+            trace.run_id().as_str(),
+            call_id.as_str(),
+        ));
+        Self {
+            trace: Arc::clone(trace),
+            call_id,
+            started_at_ms,
+            model: model.to_owned(),
+            input: serde_json::to_value(&request.messages).unwrap_or(serde_json::Value::Null),
+            completed: false,
+        }
+    }
+
+    fn complete(&mut self, response: &ModelResponse) {
+        self.trace.completed(
+            self.call_id.clone(),
+            &self.model,
+            self.started_at_ms,
+            self.input.clone(),
+            response,
+        );
+        self.completed = true;
+    }
+}
+
+impl Drop for SupplementalCall {
+    fn drop(&mut self) {
+        if !self.completed {
+            self.trace
+                .failed(self.call_id.clone(), &self.model, self.started_at_ms);
+        }
+    }
 }
 
 #[async_trait::async_trait]
@@ -89,25 +154,53 @@ impl ChatModel<()> for SummarizerSourceModel<'_> {
     async fn invoke(
         &self,
         state: &(),
-        request: ModelRequest,
+        mut request: ModelRequest,
     ) -> tinyinference_llm::Result<ModelResponse> {
         let model = self
             .source
             .build_summarizer(self.model, self.temperature, self.thread_id)
             .map_err(|error| tinyinference_llm::Error::Model(error.to_string()))?;
-        model.invoke(state, request).await
+        let mut call = self
+            .trace
+            .map(|trace| SupplementalCall::start(trace, self.model, &mut request));
+        match model.invoke(state, request).await {
+            Ok(response) => {
+                if let Some(call) = &mut call {
+                    call.complete(&response);
+                }
+                Ok(response)
+            }
+            Err(error) => Err(error),
+        }
     }
 
     async fn stream(
         &self,
         state: &(),
-        request: ModelRequest,
+        mut request: ModelRequest,
     ) -> tinyinference_llm::Result<ModelStream> {
         let model = self
             .source
             .build_summarizer(self.model, self.temperature, self.thread_id)
             .map_err(|error| tinyinference_llm::Error::Model(error.to_string()))?;
-        model.stream(state, request).await
+        let mut call = self
+            .trace
+            .map(|trace| SupplementalCall::start(trace, self.model, &mut request));
+        let stream = model.stream(state, request).await?;
+        Ok(stream.map_items(move |item| {
+            match &item {
+                ModelStreamItem::Completed(response) => {
+                    if let Some(call) = &mut call {
+                        call.complete(response);
+                    }
+                }
+                ModelStreamItem::Failed(_) | ModelStreamItem::ProviderFailed(_) => {
+                    call.take();
+                }
+                _ => {}
+            }
+            item
+        }))
     }
 }
 
@@ -151,6 +244,7 @@ pub(super) async fn repair_required_output(
     progress: Option<&tokio::sync::mpsc::Sender<crate::progress::AgentProgress>>,
     iteration: u32,
     usage: &mut RepairUsage,
+    trace: Option<&Arc<SupplementalTrace>>,
 ) -> Option<String> {
     use tinyagents_harness::config as required;
 
@@ -161,7 +255,7 @@ pub(super) async fn repair_required_output(
         .collect();
     let repair_instruction = wrap_harness_instruction(&required::repair_instruction(contract));
     let mut on_call_completed = |kind, response: Option<&ModelResponse>| {
-        usage.record_close_call(kind, response);
+        usage.record_close_call(kind, response, trace.map(Arc::as_ref));
     };
     let options = tinyagents_harness::close::RequiredOutputRepairOptions {
         request: tinyagents_harness::close::CloseRequestOptions {
@@ -178,6 +272,7 @@ pub(super) async fn repair_required_output(
         model,
         temperature,
         thread_id,
+        trace,
     };
     let repaired = tinyagents_harness::close::repair_required_output_with_repair_options(
         &model_client,
@@ -258,6 +353,7 @@ pub(super) async fn close_if_needed(
     user_message: &str,
     outcome: &TinyagentsTurnOutcome,
     budget: Option<std::time::Duration>,
+    trace: Option<&Arc<SupplementalTrace>>,
 ) -> Option<GroundedClose> {
     let needs_cap_close = outcome.hit_cap && !outcome.wrap_up_injected;
     let needs_final_close = outcome.text.trim().is_empty() || outcome.breaker_halt.is_some();
@@ -293,9 +389,10 @@ pub(super) async fn close_if_needed(
         model,
         temperature,
         thread_id,
+        trace,
     };
     let mut on_call_completed = |kind, response: Option<&ModelResponse>| {
-        usage.record_close_call(kind, response);
+        usage.record_close_call(kind, response, trace.map(Arc::as_ref));
     };
     let close_options = tinyagents_harness::close::CloseRequestOptions {
         model: Some(model),

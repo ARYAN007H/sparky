@@ -16,9 +16,6 @@ pub struct SubagentScope {
     pub agent_id: String,
     pub task_id: String,
     pub extended_policy: bool,
-    /// The durable journal stream minted for this child turn. Shared with the
-    /// host so it can export the completed child as its own Langfuse trace.
-    pub journal_run_id: Option<Arc<Mutex<Option<String>>>>,
 }
 
 /// A shared `call_id → tool_name` map. The model adapter's `ThinkingForwarder`

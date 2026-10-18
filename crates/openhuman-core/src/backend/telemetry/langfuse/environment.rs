@@ -167,5 +167,9 @@ pub(crate) fn journal_push_ready(config: &Config) -> bool {
 }
 
 #[cfg(test)]
-#[path = "../../../agent/progress_tracing/langfuse_tests.rs"]
+#[path = "environment_policy_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "environment_parse_tests.rs"]
+mod parse_tests;

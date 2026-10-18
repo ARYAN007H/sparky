@@ -19,7 +19,9 @@ pub(super) struct SubagentCheckpointOutcome {
 pub(super) struct SubagentCheckpoint {
     pub(super) chat_model: Arc<dyn ChatModel<()>>,
     pub(super) agent_id: String,
+    pub(super) model: String,
     pub(super) max_output_tokens: u32,
+    pub(super) trace: Option<Arc<crate::agent::tinyagents::SupplementalTrace>>,
 }
 
 impl SubagentCheckpoint {
@@ -60,8 +62,30 @@ impl CapSummaryModel for HostCapSummaryModel<'_> {
         ))];
         let request =
             ModelRequest::new(summary_input).with_max_tokens(self.checkpoint.max_output_tokens);
+        let trace_input =
+            serde_json::to_value(&request.messages).unwrap_or(serde_json::Value::Null);
+        let trace_call = self
+            .checkpoint
+            .trace
+            .as_ref()
+            .map(|trace| (trace.clone(), trace.begin(&self.checkpoint.model)));
         match self.checkpoint.chat_model.invoke(&(), request).await {
-            Ok(response) => {
+            Ok(mut response) => {
+                // Direct ChatModel invocation skips the normal stream adapter's
+                // response normalization. Keep the product fold and native trace
+                // on the same message-level usage when providers only fill it there.
+                if response.usage.is_none() {
+                    response.usage = response.message.usage;
+                }
+                if let Some((trace, (call_id, started_at_ms))) = trace_call {
+                    trace.completed(
+                        call_id,
+                        &self.checkpoint.model,
+                        started_at_ms,
+                        trace_input,
+                        &response,
+                    );
+                }
                 let usage = crate::inference::provider::model::usage_info_from_response(&response);
                 *self
                     .usage
@@ -71,6 +95,9 @@ impl CapSummaryModel for HostCapSummaryModel<'_> {
                 Ok(prose)
             }
             Err(error) => {
+                if let Some((trace, (call_id, started_at_ms))) = trace_call {
+                    trace.failed(call_id, &self.checkpoint.model, started_at_ms);
+                }
                 tracing::warn!(
                     agent_id = %self.checkpoint.agent_id,
                     max_calls,
@@ -82,3 +109,7 @@ impl CapSummaryModel for HostCapSummaryModel<'_> {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "checkpoint_tests.rs"]
+mod tests;

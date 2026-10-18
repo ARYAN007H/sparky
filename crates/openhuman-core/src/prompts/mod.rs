@@ -1,6 +1,8 @@
 //! Prompt product copy and rendering helpers used by agent and channel prompts.
 
+pub mod composition;
 pub mod sections;
+pub use composition::{SystemPromptBuilder, TieredPrompt, GLOBAL_STYLE_SUFFIX};
 
 #[path = "section_renderers.rs"]
 mod section_renderers;

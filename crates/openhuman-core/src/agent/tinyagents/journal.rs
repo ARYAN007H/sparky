@@ -57,9 +57,8 @@ use tinyagents_harness::observability::{
 
 use tinyagents_harness::store::AppendStore;
 
-/// Best-effort live request → durable tinyagents journal stream map. The web
-/// progress bridge uses this at turn end to shadow-project spans from the
-/// journal and compare them against the live `SpanCollector` path during C4 S3.
+/// Best-effort request-to-run map used by the web bridge to collect the
+/// completed run's durable native observations for export.
 fn request_journal_runs(ctx: &DispatchCtx) -> std::sync::Arc<RequestJournalRuns> {
     crate::core::runtime::slot_for::<RequestJournalRuns>(ctx)
 }
@@ -120,15 +119,22 @@ async fn journal_stores(
 /// `AgentEvent` stream carries no run-terminal event, so the authoritative
 /// terminal write is caller-driven here. Every method is best-effort and
 /// non-fatal.
+#[derive(Clone)]
 pub(crate) struct TurnJournal {
     run_id: RunId,
     status_store: Arc<DriverStatusStore>,
     event_sink: Arc<JournalSink>,
     /// The in-flight status snapshot, mutated in place to `completed`/`failed`.
-    status: Mutex<HarnessRunStatus>,
+    status: Arc<Mutex<HarnessRunStatus>>,
 }
 
 impl TurnJournal {
+    /// Flush events appended after the terminal status write without changing
+    /// that status. Child host persistence may finish after a typed RunFailed.
+    pub(crate) fn flush_events(&self) {
+        self.event_sink.flush();
+    }
+
     /// Best-effort terminal write: mark the run completed and persist. Non-fatal.
     pub(crate) async fn finish_completed(&self) {
         self.event_sink.flush();
@@ -166,6 +172,23 @@ impl TurnJournal {
             ),
         }
     }
+
+    /// Best-effort terminal write for a cooperatively cancelled run.
+    pub(crate) async fn finish_cancelled(&self, reason: &str) {
+        self.event_sink.flush();
+        let snapshot = {
+            let mut guard = self.status.lock().unwrap();
+            guard.mark_cancelled(reason);
+            guard.clone()
+        };
+        match self.status_store.put_status(snapshot).await {
+            Ok(()) => log::debug!("[journal] run cancelled run_id={}", self.run_id.as_str()),
+            Err(err) => log::debug!(
+                "[journal] cancelled status write failed run_id={} err={err}",
+                self.run_id.as_str()
+            ),
+        }
+    }
 }
 
 /// Attach a durable event journal + status writer to `events`, *in addition to*
@@ -191,6 +214,8 @@ pub(crate) async fn attach_turn_journal(
     model: &str,
     run_id: RunId,
     thread_id: Option<ThreadId>,
+    parent_run_id: Option<RunId>,
+    root_run_id: RunId,
 ) -> Option<TurnJournal> {
     let (journal_store, status_store) = match journal_stores(ctx).await {
         Ok(stores) => stores,
@@ -206,7 +231,10 @@ pub(crate) async fn attach_turn_journal(
     // `events` was seeded with `with_stream_id(run_id)`, every persisted
     // observation's `event_id` is the stable `{run_id}-evt-{offset}`.
     let journal: Arc<dyn HarnessEventJournal> = Arc::new(StoreEventJournal::new(journal_store));
-    let journal_sink = Arc::new(JournalSink::new(journal, run_id.clone()));
+    let journal_sink = Arc::new(
+        JournalSink::new(journal, run_id.clone())
+            .with_lineage(parent_run_id.clone(), root_run_id.clone()),
+    );
     let redacting = RedactingSink::new(journal_sink.clone(), process_env_secrets());
 
     // FanOutSink is the durable-observer composition seam (05.2 adds graph sinks
@@ -219,6 +247,8 @@ pub(crate) async fn attach_turn_journal(
     // recording the thread (when known) so list_by_thread answers at run start.
     let status_store = Arc::new(status_store);
     let mut status = HarnessRunStatus::new(run_id.clone(), ComponentId::new(model.to_string()));
+    status.parent_run_id = parent_run_id;
+    status.root_run_id = root_run_id;
     if let Some(thread_id) = thread_id {
         status = status.with_thread(thread_id);
     }
@@ -239,7 +269,7 @@ pub(crate) async fn attach_turn_journal(
         run_id,
         status_store,
         event_sink: journal_sink,
-        status: Mutex::new(status),
+        status: Arc::new(Mutex::new(status)),
     })
 }
 
@@ -247,10 +277,8 @@ pub(crate) async fn attach_turn_journal(
 /// whose stream offset is `>= from_offset`, in order. Reading from `0` replays
 /// the whole run.
 ///
-/// This is the seam a future replay RPC (05.x) will call so the desktop can
-/// reconnect mid-run and backfill the timeline from durable state instead of
-/// relying on transient `AgentProgress` buffering. Best-effort: a missing store
-/// or unknown run yields an empty `Vec`, not an error.
+/// Export and host readers use this to replay a durable run from its first
+/// event. Best-effort: a missing store or unknown run yields an empty `Vec`.
 pub(crate) async fn read_run_events(
     ctx: &DispatchCtx,
     run_id: &str,
@@ -262,6 +290,69 @@ pub(crate) async fn read_run_events(
         .read_from(run_id, from_offset)
         .await
         .map_err(|e| anyhow::anyhow!("[journal] read_run_events failed run_id={run_id}: {e}"))
+}
+
+/// Read a run and its lineage-linked descendants while retaining each journal
+/// stream's offset order. The stable merge uses timestamps across runs while
+/// retaining each stream's event offsets.
+pub(crate) async fn read_run_tree_events(
+    ctx: &DispatchCtx,
+    root_run_id: &str,
+) -> anyhow::Result<Vec<AgentObservation>> {
+    use tinyagents_harness::observability::HarnessStatusStore as _;
+
+    let (journal_store, status_store) = journal_stores(ctx).await?;
+    let statuses = status_store.list_by_root(root_run_id).await.map_err(|e| {
+        anyhow::anyhow!("[journal] list_by_root failed root_run_id={root_run_id}: {e}")
+    })?;
+    let mut run_ids = statuses
+        .into_iter()
+        .map(|status| status.run_id.as_str().to_owned())
+        .filter(|run_id| run_id != root_run_id)
+        .collect::<Vec<_>>();
+    run_ids.sort();
+    run_ids.dedup();
+    // Keep the parent stream first for equal timestamps. The merge itself
+    // does not invent event-specific precedence; the native collector must
+    // handle terminal facts in either arrival order.
+    run_ids.insert(0, root_run_id.to_owned());
+
+    let journal = StoreEventJournal::new(journal_store);
+    let mut streams = Vec::with_capacity(run_ids.len());
+    for run_id in run_ids {
+        let observations = journal.read_from(&run_id, 0).await.map_err(|e| {
+            anyhow::anyhow!("[journal] read tree events failed run_id={run_id}: {e}")
+        })?;
+        if !observations.is_empty() {
+            streams.push(observations);
+        }
+    }
+
+    Ok(merge_run_observations(streams))
+}
+
+/// Stable timestamp merge for independent run journals. Offsets are preserved
+/// within every source stream; equal timestamps retain source-list order, with
+/// the root run supplied first by `read_run_tree_events`.
+pub(crate) fn merge_run_observations(streams: Vec<Vec<AgentObservation>>) -> Vec<AgentObservation> {
+    let mut cursors = vec![0usize; streams.len()];
+    let mut merged = Vec::new();
+    loop {
+        let next = streams
+            .iter()
+            .enumerate()
+            .filter_map(|(stream_index, stream)| {
+                let observation = stream.get(cursors[stream_index])?;
+                Some((stream_index, observation.ts_ms, observation.offset))
+            })
+            .min_by_key(|(stream_index, ts_ms, offset)| (*ts_ms, *stream_index, *offset));
+        let Some((stream_index, _, _)) = next else {
+            break;
+        };
+        merged.push(streams[stream_index][cursors[stream_index]].clone());
+        cursors[stream_index] += 1;
+    }
+    merged
 }
 
 #[cfg(test)]

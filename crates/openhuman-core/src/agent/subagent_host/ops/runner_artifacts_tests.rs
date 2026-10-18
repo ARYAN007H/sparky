@@ -47,6 +47,7 @@ async fn byte_policy_projects_a_parent_readable_artifact_before_the_result_cap()
         agent_id: definition.id.clone(),
         output: original.clone(),
         iterations: 1,
+        failure_cause: None,
         elapsed: std::time::Duration::ZERO,
         mode: SubagentMode::Typed,
         status: SubagentRunStatus::Completed,
