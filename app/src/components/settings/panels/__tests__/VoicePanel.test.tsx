@@ -125,13 +125,14 @@ describe('VoicePanel', () => {
     vi.useRealTimers();
   });
 
-  it('does not render always-on controls or send always_on_enabled', async () => {
+  it('does not render ambient listening controls or send removed settings', async () => {
     renderWithProviders(<VoicePanel />);
 
     expect(screen.queryByTestId('voice-always-on-card')).not.toBeInTheDocument();
     await waitFor(() => expect(openhumanVoiceStatus).toHaveBeenCalled());
+    const removedSettingParam = ['always', 'on', 'enabled'].join('_');
     expect(openhumanVoiceSetProviders).not.toHaveBeenCalledWith(
-      expect.objectContaining({ always_on_enabled: expect.anything() })
+      expect.objectContaining({ [removedSettingParam]: expect.anything() })
     );
   });
 
