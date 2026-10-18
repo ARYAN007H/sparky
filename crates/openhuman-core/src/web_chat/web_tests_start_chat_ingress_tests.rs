@@ -27,10 +27,16 @@ async fn ptt_source_turn_completes_without_publishing_a_voice_event() {
     config.action_dir_override = Some(action_dir.clone());
     config.config_path = config_path;
     config.files_dir_override = Some(files_dir);
-    let core_context = crate::core::runtime::CoreContext::for_test_with_config(
-        crate::core::runtime::DomainSet::full(),
-        config,
-    );
+    let core_context =
+        crate::core::runtime::CoreContext::for_test(crate::core::runtime::DomainSet::full(), None)
+            .derive_with(
+                crate::core::runtime::ContextOverlay::new(
+                    config,
+                    crate::core::runtime::DomainSet::full(),
+                    Default::default(),
+                )
+                .without_user_skill_roots(),
+            );
     let ctx = crate::core::runtime::DispatchCtx::new(Arc::clone(&core_context));
 
     crate::core::runtime::CoreContext::scope(core_context, async {
