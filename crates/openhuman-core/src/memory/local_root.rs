@@ -137,7 +137,7 @@ pub fn legacy_root(user_id: &str) -> String {
 /// layout migration (which copies into the user root) has started or
 /// finished.
 fn has_memory_under_legacy_root(config: &Config) -> bool {
-    super::scope::layout_is_v3(config)
+    config.memory.layout == crate::config::MemoryLayoutMode::V3
         || super::layout_migration::state::path(&config.workspace_dir).exists()
 }
 

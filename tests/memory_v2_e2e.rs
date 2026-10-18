@@ -917,7 +917,7 @@ async fn the_agent_learn_returns_on_accept_and_recall_finds_it() {
         .expect("the signed-in config");
     let facts = openhuman_core::memory::tools::CallFacts::of(
         &config,
-        &openhuman_core::memory::scope::MemoryIdentity::agent("orchestrator"),
+        &tinymemory_tools::layout::identity::Identity::agent("orchestrator"),
     );
 
     // Control: `memory_learn` over RPC returns once the write is readable, so

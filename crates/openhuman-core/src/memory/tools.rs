@@ -98,9 +98,14 @@ impl CallFacts {
             crate::agent::tinyagents::host::run_context::memory_identity_for_tool(context)
                 .unwrap_or_else(|| {
                     crate::agent::tinyagents::host::run_context::parent_agent_id_for_tool(context)
-                        .map_or_else(super::scope::MemoryIdentity::root, |parent_agent_id| {
-                            super::scope::MemoryIdentity::agent(&parent_agent_id)
-                        })
+                        .map_or_else(
+                            tinymemory_tools::layout::identity::Identity::root,
+                            |parent_agent_id| {
+                                tinymemory_tools::layout::identity::Identity::agent(
+                                    &parent_agent_id,
+                                )
+                            },
+                        )
                 });
         Self {
             workspace: Some(workspace.display().to_string()),
@@ -119,8 +124,8 @@ impl CallFacts {
     /// The facts of a call made by `identity` under `config`, with no run
     /// context.
     #[must_use]
-    pub fn of(config: &Config, identity: &super::scope::MemoryIdentity) -> Self {
-        let resolved = identity.resolve(config);
+    pub fn of(config: &Config, identity: &tinymemory_tools::layout::identity::Identity) -> Self {
+        let resolved = identity.resolve(&crate::memory::scope::identity_pins(config));
         Self {
             agent_id: Some(resolved.agent_id.clone()),
             namespace: resolved.layout.learnings().clone(),

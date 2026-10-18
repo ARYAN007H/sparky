@@ -9,9 +9,10 @@
 use chrono::Utc;
 use tinymemory_api::{
     EraseRequest, FetchRequest, ForgetTarget, ItemId, LearningKind, ListRequest, MemoryMeta,
-    MetaFilter, RecallMode, RecallRequest, StoreItem, StoreReceipt, ThreadWindow, TimeHint,
-    WriteOptions,
+    MetaFilter, Namespace, Reach, RecallMode, RecallRequest, StoreItem, StoreReceipt, ThreadWindow,
+    TimeHint, WriteOptions,
 };
+use tinymemory_tools::confine::{Confinement, Policy};
 
 use crate::config::Config;
 
@@ -24,6 +25,34 @@ use super::types::{
     LearnParams, LearnView, RecallParams, RecallView, RefersTo,
 };
 use tinymemory_api::{Error, Result};
+
+/// Apply the SaaS tenant boundary to a host memory operation. The namespace
+/// mechanics live in TinyMemory; this adapter only selects the authenticated
+/// profile root and preserves the existing fail-closed error.
+pub(crate) fn saas_confinement(config: &Config, policy: Policy) -> Result<Option<Confinement>> {
+    if !crate::core::runtime::is_saas() {
+        return Ok(None);
+    }
+    let root = config
+        .memory
+        .root
+        .as_deref()
+        .map(str::trim)
+        .unwrap_or("")
+        .parse::<Namespace>();
+    match root {
+        Ok(root) if root != Namespace::ROOT => Ok(Some(Confinement {
+            allowed: Reach::subtree(root),
+            policy,
+        })),
+        Ok(_) | Err(_) => {
+            tracing::error!("[memory:scope] no valid confinement root in SaaS mode");
+            Err(Error::InvalidRequest(
+                "memory is unavailable: this agent has no valid memory root".into(),
+            ))
+        }
+    }
+}
 
 /// Default confidence of a learning stored without one.
 pub const DEFAULT_LEARNING_CONFIDENCE: f32 = 0.8;
@@ -336,8 +365,8 @@ pub async fn learn_with(
     let mut item = learning_item(params, host_meta)?;
     // The same confinement as `store_item`: a SaaS user's learning lands in
     // their own tree whatever namespace it names.
-    if let Some(root) = super::user_scope::confinement(config)? {
-        super::user_scope::clamp_item(&mut item, &root);
+    if let Some(confinement) = saas_confinement(config, Policy::Clamp)? {
+        confinement.item(&mut item)?;
     }
     let bound = bound(config)?;
     let receipt = bound.engine.store_with(item, options).await?;
@@ -358,8 +387,8 @@ pub async fn store_item_with(
     mut item: StoreItem,
     options: WriteOptions,
 ) -> Result<StoreReceipt> {
-    if let Some(root) = super::user_scope::confinement(config)? {
-        super::user_scope::clamp_item(&mut item, &root);
+    if let Some(confinement) = saas_confinement(config, Policy::Clamp)? {
+        confinement.item(&mut item)?;
     }
     let bound = bound(config)?;
     let receipt = bound.engine.store_with(item, options).await?;
@@ -383,8 +412,8 @@ pub async fn forget(config: &Config, params: ForgetParams) -> Result<ForgetView>
     }
     let bound = bound(config)?;
     // A SaaS user forgets only what lies in their own tree.
-    let reach = match super::user_scope::confinement(config)? {
-        Some(root) => Some(super::user_scope::clamp_reach(params.reach, &root)),
+    let reach = match saas_confinement(config, Policy::Clamp)? {
+        Some(confinement) => Some(confinement.reach(params.reach)?),
         None => params.reach,
     };
     let report = match reach {
@@ -497,11 +526,10 @@ pub async fn items_list(config: &Config, params: ItemsListParams) -> Result<Item
     })
 }
 
-/// `filter`, confined to the SaaS user's tree when `config` has one
-/// ([`super::user_scope`]).
+/// `filter`, confined to the SaaS user's tree when the process is SaaS.
 pub(crate) fn confine_filter(config: &Config, filter: MetaFilter) -> Result<MetaFilter> {
-    Ok(match super::user_scope::confinement(config)? {
-        Some(root) => super::user_scope::clamp_filter(filter, &root),
+    Ok(match saas_confinement(config, Policy::Clamp)? {
+        Some(confinement) => confinement.filter(Some(filter))?,
         None => filter,
     })
 }
@@ -509,3 +537,7 @@ pub(crate) fn confine_filter(config: &Config, filter: MetaFilter) -> Result<Meta
 #[cfg(test)]
 #[path = "ops_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "ops_saas_tests.rs"]
+mod saas_tests;

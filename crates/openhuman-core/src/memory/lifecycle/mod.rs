@@ -32,8 +32,8 @@ use crate::config::schema::MemoryRecallConfig;
 use crate::config::Config;
 
 use super::engine;
-use super::scope::ResolvedIdentity;
 use tinymemory_api::{Error, Result};
+use tinymemory_tools::layout::identity::ResolvedIdentity;
 
 /// TinyMemory's recall policy from `[memory.recall]`.
 #[must_use]
@@ -83,9 +83,9 @@ pub fn agent_memory(config: &Config, identity: &ResolvedIdentity) -> Result<Agen
 /// The memory of `identity` (the default agent for the root identity).
 pub fn current_agent_memory(
     config: &Config,
-    identity: &super::scope::MemoryIdentity,
+    identity: &tinymemory_tools::layout::identity::Identity,
 ) -> Result<(AgentMemory, ResolvedIdentity)> {
-    let identity = identity.resolve(config);
+    let identity = identity.resolve(&crate::memory::scope::identity_pins(config));
     let memory = agent_memory(config, &identity)?;
     Ok((memory, identity))
 }
@@ -94,10 +94,10 @@ pub fn current_agent_memory(
 /// itself when none is named.
 pub fn named_agent_memory(
     config: &Config,
-    identity: &super::scope::MemoryIdentity,
+    identity: &tinymemory_tools::layout::identity::Identity,
     agent_id: Option<&str>,
 ) -> Result<(AgentMemory, ResolvedIdentity)> {
-    let mut identity = identity.resolve(config);
+    let mut identity = identity.resolve(&crate::memory::scope::identity_pins(config));
     if let Some(agent_id) = agent_id.map(str::trim).filter(|id| !id.is_empty()) {
         identity.agent_id = agent_id.to_string();
     }

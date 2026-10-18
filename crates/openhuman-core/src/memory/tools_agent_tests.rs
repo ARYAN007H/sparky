@@ -2,7 +2,7 @@ use super::*;
 
 /// A tool context for a run that acts on memory as `identity`.
 fn tool_context_acting_as(
-    identity: crate::memory::scope::MemoryIdentity,
+    identity: tinymemory_tools::layout::identity::Identity,
 ) -> tinyagents_harness::tool::ToolExecutionContext {
     let mut host = crate::agent::tinyagents::host::OpenHumanRunContext::new();
     host.memory_identity = Some(identity);
@@ -19,9 +19,9 @@ fn tool_context_acting_as(
 #[test]
 fn gather_acts_as_the_identity_the_run_carries() {
     let config = Config::default();
-    let context = tool_context_acting_as(crate::memory::scope::MemoryIdentity::team_member(
-        "acme", "scout",
-    ));
+    let context = tool_context_acting_as(
+        tinymemory_tools::layout::identity::Identity::team_member("acme", "scout"),
+    );
     let facts = CallFacts::gather(&config, Some(&context));
     assert_eq!(facts.agent_id.as_deref(), Some("scout"));
     assert_eq!(facts.reach, Reach::subtree("team:acme".parse().unwrap()));
@@ -31,7 +31,7 @@ fn gather_acts_as_the_identity_the_run_carries() {
     let bare = CallFacts::gather(&config, None);
     assert_eq!(
         bare.agent_id.as_deref(),
-        Some(super::super::scope::DEFAULT_AGENT_ID)
+        Some(tinymemory_tools::layout::identity::DEFAULT_AGENT_ID)
     );
     assert!(bare.reach.at.is_root());
 }

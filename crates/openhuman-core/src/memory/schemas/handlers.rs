@@ -7,20 +7,30 @@ use crate::config::Config;
 use crate::core::all::ControllerFuture;
 use crate::core::runtime::DispatchCtx;
 use crate::core::{Outcome, StructuredRpcError};
-use crate::memory::explore::{ExploreParams, ItemsGetParams};
+use crate::memory::explore::{self, ExploreParams, ItemsGetParams};
 use crate::memory::lifecycle::views::{self, JobsRunParams, PackPreviewParams, PolicySetParams};
-use crate::memory::scope::MemoryIdentity;
+use crate::memory::scope;
 use crate::memory::types::{
     EmptyParams, EngineSetParams, EraseAllParams, FetchParams, ForgetParams, ImportStartParams,
     ImportStateView, ItemsListParams, LearnParams, RecallParams, SourceAddedView,
     SourceRemovedView, SourcesAddParams, SourcesListView, SourcesRemoveParams, SourcesSyncParams,
     SourcesSyncView,
 };
-use crate::memory::{backfill, brain, confine, engine, import, layout_migration, ops, sources};
+use crate::memory::{backfill, brain, engine, import, layout_migration, ops, sources};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use serde_json::{json, Map, Value};
-use tinymemory_api::{Error, Result};
+use tinymemory_api::{Error, Reach, Result};
+use tinymemory_tools::confine::{Confinement, Policy};
+use tinymemory_tools::layout::identity::Identity;
+
+fn rpc_confinement(config: &Config) -> Confinement {
+    let identity = Identity::root().resolve(&scope::identity_pins(config));
+    Confinement {
+        allowed: Reach::subtree(identity.root().clone()),
+        policy: Policy::Refuse,
+    }
+}
 
 /// The operation run after the common request parsing and config load.
 trait RpcOperation<P, R>: Send + 'static {
@@ -105,27 +115,50 @@ pub(super) fn engine_set(ctx: DispatchCtx, params: Map<String, Value>) -> Contro
 }
 
 pub(super) fn recall(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
-    rpc::<RecallParams, _>(ctx, params, |_, config, params| async move {
-        confine::recall(&config, &MemoryIdentity::root(), params).await
-    })
+    rpc::<RecallParams, _>(
+        ctx,
+        params,
+        |_, config, mut params: RecallParams| async move {
+            params.filter = Some(rpc_confinement(&config).filter(params.filter)?);
+            ops::recall(&config, params).await
+        },
+    )
 }
 
 pub(super) fn fetch(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
-    rpc::<FetchParams, _>(ctx, params, |_, config, params| async move {
-        confine::fetch(&config, &MemoryIdentity::root(), params).await
-    })
+    rpc::<FetchParams, _>(
+        ctx,
+        params,
+        |_, config, mut params: FetchParams| async move {
+            params.filter = Some(rpc_confinement(&config).filter(params.filter)?);
+            ops::fetch(&config, params).await
+        },
+    )
 }
 
 pub(super) fn learn(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
-    rpc::<LearnParams, _>(ctx, params, |_, config, params| async move {
-        confine::learn(&config, &MemoryIdentity::root(), params).await
-    })
+    rpc::<LearnParams, _>(
+        ctx,
+        params,
+        |_, config, mut params: LearnParams| async move {
+            let identity = Identity::root().resolve(&scope::identity_pins(&config));
+            params.meta = Some(
+                rpc_confinement(&config).learn_meta(params.meta, identity.layout.learnings())?,
+            );
+            ops::learn(&config, params, None).await
+        },
+    )
 }
 
 pub(super) fn forget(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
-    rpc::<ForgetParams, _>(ctx, params, |_, config, params| async move {
-        confine::forget(&config, &MemoryIdentity::root(), params).await
-    })
+    rpc::<ForgetParams, _>(
+        ctx,
+        params,
+        |_, config, mut params: ForgetParams| async move {
+            params.reach = Some(rpc_confinement(&config).reach(params.reach)?);
+            ops::forget(&config, params).await
+        },
+    )
 }
 
 pub(super) fn erase_all(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
@@ -135,21 +168,40 @@ pub(super) fn erase_all(ctx: DispatchCtx, params: Map<String, Value>) -> Control
 }
 
 pub(super) fn items_list(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
-    rpc::<ItemsListParams, _>(ctx, params, |_, config, params| async move {
-        confine::items_list(&config, &MemoryIdentity::root(), params).await
-    })
+    rpc::<ItemsListParams, _>(
+        ctx,
+        params,
+        |_, config, mut params: ItemsListParams| async move {
+            let narrowed = explore::narrowed(params.filter.take(), &params.path)?;
+            params.filter = Some(rpc_confinement(&config).filter(Some(narrowed))?);
+            params.path.clear();
+            ops::items_list(&config, params).await
+        },
+    )
 }
 
 pub(super) fn explore(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
-    rpc::<ExploreParams, _>(ctx, params, |_, config, params| async move {
-        confine::explore(&config, &MemoryIdentity::root(), params).await
-    })
+    rpc::<ExploreParams, _>(
+        ctx,
+        params,
+        |_, config, mut params: ExploreParams| async move {
+            let narrowed = explore::narrowed(params.filter.take(), &params.path)?;
+            params.filter = Some(rpc_confinement(&config).filter(Some(narrowed))?);
+            params.path.clear();
+            explore::explore(&config, params).await
+        },
+    )
 }
 
 pub(super) fn items_get(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
-    rpc::<ItemsGetParams, _>(ctx, params, |_, config, params| async move {
-        confine::items_get(&config, &MemoryIdentity::root(), params).await
-    })
+    rpc::<ItemsGetParams, _>(
+        ctx,
+        params,
+        |_, config, mut params: ItemsGetParams| async move {
+            params.reach = Some(rpc_confinement(&config).reach(params.reach)?);
+            explore::items_get(&config, params).await
+        },
+    )
 }
 
 pub(super) fn policy_get(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
@@ -168,13 +220,13 @@ pub(super) fn policy_set(ctx: DispatchCtx, params: Map<String, Value>) -> Contro
 
 pub(super) fn pack_preview(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     rpc::<PackPreviewParams, _>(ctx, params, |_, config, params| async move {
-        views::pack_preview(&config, &MemoryIdentity::root(), params).await
+        views::pack_preview(&config, &Identity::root(), params).await
     })
 }
 
 pub(super) fn agents_list(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     rpc::<EmptyParams, _>(ctx, params, |_, config, _| async move {
-        views::agents_list(&config, &MemoryIdentity::root()).await
+        views::agents_list(&config, &Identity::root()).await
     })
 }
 
@@ -198,25 +250,25 @@ pub(super) fn conversations_backfill_start(
 
 pub(super) fn brain_sources(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     rpc::<EmptyParams, _>(ctx, params, |_, config, _| async move {
-        brain::sources(&config, &MemoryIdentity::root()).await
+        brain::sources(&config, &Identity::root()).await
     })
 }
 
 pub(super) fn brain_search(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     rpc::<brain::BrainSearchParams, _>(ctx, params, |_, config, params| async move {
-        brain::search(&config, &MemoryIdentity::root(), params).await
+        brain::search(&config, &Identity::root(), params).await
     })
 }
 
 pub(super) fn brain_ingest(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     rpc::<brain::BrainIngestParams, _>(ctx, params, |_, config, params| async move {
-        brain::ingest(&config, &MemoryIdentity::root(), params).await
+        brain::ingest(&config, &Identity::root(), params).await
     })
 }
 
 pub(super) fn brain_forget(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     rpc::<brain::BrainForgetParams, _>(ctx, params, |_, config, params| async move {
-        brain::forget(&config, &MemoryIdentity::root(), params).await
+        brain::forget(&config, &Identity::root(), params).await
     })
 }
 

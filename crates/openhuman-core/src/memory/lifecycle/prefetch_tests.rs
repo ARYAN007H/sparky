@@ -1,6 +1,5 @@
 use super::*;
 
-use crate::memory::scope::MemoryIdentity;
 use crate::memory::test_fixtures::config_in;
 
 const MAX_PENDING: usize = 16;
@@ -33,7 +32,8 @@ async fn held_refresh_returns_immediately_and_later_turn_reads_completed_context
     let _guard = TEST_LOCK.lock().await;
     let tmp = tempfile::tempdir().unwrap();
     let config = config_in(&tmp);
-    let identity = MemoryIdentity::agent("a").resolve(&config);
+    let identity = tinymemory_tools::layout::identity::Identity::agent("a")
+        .resolve(&crate::memory::scope::identity_pins(&config));
     let key = Key::new(&config, &identity, "t", false);
     let cache = Arc::new(Cache::default());
     let release = Arc::new(tokio::sync::Notify::new());
@@ -60,7 +60,8 @@ async fn identity_config_thread_workspace_and_context_are_isolated() {
     let _guard = TEST_LOCK.lock().await;
     let tmp = tempfile::tempdir().unwrap();
     let config = config_in(&tmp);
-    let identity = MemoryIdentity::agent("a").resolve(&config);
+    let identity = tinymemory_tools::layout::identity::Identity::agent("a")
+        .resolve(&crate::memory::scope::identity_pins(&config));
     let key = Key::new(&config, &identity, "t", false);
     let cache = Arc::new(Cache::default());
     enqueue(
@@ -93,7 +94,8 @@ async fn identity_config_thread_workspace_and_context_are_isolated() {
 fn prefetch_key_tracks_memory_config_without_hashing_unrelated_config() {
     let tmp = tempfile::tempdir().unwrap();
     let config = config_in(&tmp);
-    let identity = MemoryIdentity::agent("a").resolve(&config);
+    let identity = tinymemory_tools::layout::identity::Identity::agent("a")
+        .resolve(&crate::memory::scope::identity_pins(&config));
     let key = Key::new(&config, &identity, "t", false);
 
     let mut memory_changed = config.clone();
@@ -118,7 +120,8 @@ async fn invalidation_rejects_late_results_and_preserves_bounded_pending_logs() 
     let _guard = TEST_LOCK.lock().await;
     let tmp = tempfile::tempdir().unwrap();
     let config = config_in(&tmp);
-    let identity = MemoryIdentity::agent("a").resolve(&config);
+    let identity = tinymemory_tools::layout::identity::Identity::agent("a")
+        .resolve(&crate::memory::scope::identity_pins(&config));
     let key = Key::new(&config, &identity, "t", false);
     let cache = Arc::new(Cache::default());
     CACHES.lock().unwrap().push(Arc::downgrade(&cache));
@@ -167,7 +170,8 @@ async fn expiration_failure_and_oversized_packs_are_not_reused() {
     let _guard = TEST_LOCK.lock().await;
     let tmp = tempfile::tempdir().unwrap();
     let config = config_in(&tmp);
-    let identity = MemoryIdentity::agent("a").resolve(&config);
+    let identity = tinymemory_tools::layout::identity::Identity::agent("a")
+        .resolve(&crate::memory::scope::identity_pins(&config));
     let key = Key::new(&config, &identity, "t", false);
     let cache = Arc::new(Cache::default());
     enqueue(
@@ -194,7 +198,8 @@ async fn credential_invalidation_removes_ready_and_rejects_late_inflight_results
     let _guard = TEST_LOCK.lock().await;
     let tmp = tempfile::tempdir().unwrap();
     let config = config_in(&tmp);
-    let identity = MemoryIdentity::agent("a").resolve(&config);
+    let identity = tinymemory_tools::layout::identity::Identity::agent("a")
+        .resolve(&crate::memory::scope::identity_pins(&config));
     let key = Key::new(&config, &identity, "t", false);
     let cache = Arc::new(Cache::default());
     CACHES.lock().unwrap().push(Arc::downgrade(&cache));
@@ -326,7 +331,8 @@ async fn slow_engine_results_survive_the_manual_pre_turn_cutoff() {
         .await
         .unwrap();
     crate::memory::engine::install_test_engine(&config.workspace_dir, engine.clone());
-    let identity = MemoryIdentity::agent("a").resolve(&config);
+    let identity = tinymemory_tools::layout::identity::Identity::agent("a")
+        .resolve(&crate::memory::scope::identity_pins(&config));
     let input = |index| {
         (
             "slow".to_string(),
@@ -401,7 +407,8 @@ async fn queued_work_keeps_the_callers_core_context() {
         Some(config.workspace_dir.clone()),
     );
     crate::core::runtime::CoreContext::scope(ctx.clone(), async {
-        let identity = MemoryIdentity::agent("scoped-agent").resolve(&config);
+        let identity = tinymemory_tools::layout::identity::Identity::agent("scoped-agent")
+            .resolve(&crate::memory::scope::identity_pins(&config));
         let key = Key::new(&config, &identity, "t", false);
         let cache = cache(&crate::core::runtime::DispatchCtx::ambient());
         let expected = ctx.clone();
@@ -429,7 +436,8 @@ fn runtime_shutdown_releases_worker_and_pending_work() {
     let _guard = TEST_LOCK.blocking_lock();
     let tmp = tempfile::tempdir().unwrap();
     let config = config_in(&tmp);
-    let identity = MemoryIdentity::agent("a").resolve(&config);
+    let identity = tinymemory_tools::layout::identity::Identity::agent("a")
+        .resolve(&crate::memory::scope::identity_pins(&config));
     let key = Key::new(&config, &identity, "t", false);
     let cache = Arc::new(Cache::default());
     let runtime = tokio::runtime::Builder::new_current_thread()
@@ -468,7 +476,8 @@ async fn an_erase_retires_queued_automatic_work_and_allows_later_work() {
     use std::sync::atomic::{AtomicUsize, Ordering};
     let tmp = tempfile::tempdir().unwrap();
     let config = crate::memory::test_fixtures::config_in(&tmp);
-    let identity = crate::memory::scope::MemoryIdentity::agent("erase-prefetch").resolve(&config);
+    let identity = tinymemory_tools::layout::identity::Identity::agent("erase-prefetch")
+        .resolve(&crate::memory::scope::identity_pins(&config));
     let key = Key::new(&config, &identity, "erase-prefetch", false);
     let cache = Arc::new(Cache::default());
     let earlier = Arc::new(AtomicUsize::new(0));
@@ -519,7 +528,8 @@ async fn an_erase_retires_queued_automatic_work_and_allows_later_work() {
 async fn erase_waits_for_current_automatic_work_before_returning_its_barrier() {
     let tmp = tempfile::tempdir().unwrap();
     let config = crate::memory::test_fixtures::config_in(&tmp);
-    let identity = crate::memory::scope::MemoryIdentity::agent("erase-active").resolve(&config);
+    let identity = tinymemory_tools::layout::identity::Identity::agent("erase-active")
+        .resolve(&crate::memory::scope::identity_pins(&config));
     let key = Key::new(&config, &identity, "erase-active", false);
     let cache = Arc::new(Cache::default());
     let started = Arc::new(tokio::sync::Notify::new());

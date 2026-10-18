@@ -65,15 +65,15 @@ Memory follows TinyMemory's standard layout (`tinymemory_tools::MemoryLayout`):
  +-- agent:<memory agent>   one agent's conversations, one turn per item
 ```
 
-A `MemoryIdentity` (in [`scope.rs`](./scope.rs)) is the acting agent definition and, for a
-team member, its team. It is explicit, never ambient: a turn's
-`OpenHumanRunContext::memory_identity` carries it (`MemoryIdentity::child` for
-each sub-agent, `team_member` from the team runtime through
-`HostTurnEnv::memory_identity`), the RPC handlers and the embed facade pass
-`MemoryIdentity::root()`, and the `confine`, `brain`, `lifecycle` and `ops`
-entry points take a `&MemoryIdentity`.
-`MemoryIdentity::resolve` turns it into a `ResolvedIdentity` (layout root plus
-memory agent id), first match wins:
+TinyMemory's `Identity` is the acting agent definition and, for a team member,
+its team. It is explicit, never ambient: a turn's
+`OpenHumanRunContext::memory_identity` carries it (`Identity::child` for each
+sub-agent, `team_member` from the team runtime through
+`HostTurnEnv::memory_identity`), and RPC/embed entry points construct
+`Identity::root()`. OpenHuman projects its config into upstream
+`IdentityPins` in [`scope.rs`](./scope.rs); `Identity::resolve(&pins)` returns
+the upstream `ResolvedIdentity` (layout root plus memory agent id), with this
+first-match precedence:
 
 | Rule | Memory agent id | Layout root |
 | --- | --- | --- |
@@ -87,10 +87,12 @@ The host binding is how a coordinating host (an embedder through
 its own: it derives a per-agent config with those two keys set. The
 identity is never taken from model arguments.
 
-Under `[memory] layout = "v3"` everything sits below the signed-in person's
-own scope root (`org:<id>`, `scope::user_root`), and every agent's chats
-share one chat node (`ws:main`, `scope::chat_node`), with the agent id kept
-on each turn. The person's actor is `user:<id>` (`scope::actor_of_root`),
+Under `[memory] layout = "v3"` the engine binds below the signed-in person's
+tenant root (`org:<id>`, `scope::user_root`), while namespace placement stays
+within the configured TinyMemory layout. Every agent's chats share the
+absolute `ws:main` child of that layout root (`tinymemory_tools::layout::identity::chat_node`),
+with the agent id kept on each turn. The person's actor is `user:<id>`
+(`tinymemory_tools::layout::identity::actor_of_root`),
 which is also the retired root still read during the move while
 `[memory] legacy_user_segment_read` is on. A signed-out session gets its
 root from a random install id minted once and recorded in
@@ -268,13 +270,12 @@ Anything unknown counts as not free.
 
 ### The RPC surface is confined
 
-The `memory_*` RPCs (and the MCP memory tools that dispatch through them)
-go through [`confine.rs`](./confine.rs). It resolves the identity in scope (the agent of a
-running turn, else the config's own root identity), fills an unset `reach`
-with that identity's subtree, refuses a wider reach with `INVALID_REQUEST`,
-and places a `learn` with no namespace at the identity's learnings node.
-The agent `memory` tool applies the same confinement and overwrites any
-`reach` in the model's filter.
+The `memory_*` RPC handlers apply TinyMemory `Confinement` with
+`Policy::Refuse`: an unset `reach` becomes the root identity's subtree, wider
+reaches return `INVALID_REQUEST`, and a `learn` with no namespace uses the
+identity's learnings node. SaaS operations use `Policy::Clamp` selected from
+the configured profile root in `ops.rs`. The agent `memory` tool stamps its
+trusted call facts; queued writes retain that call's narrower reach.
 
 ## Layout
 
@@ -283,7 +284,7 @@ The agent `memory` tool applies the same confinement and overwrites any
 | [`mod.rs`](./mod.rs) | Module declarations and re-exports (`memory_is_on`, `MemoryTool`, the controller aggregators, `register_memory_subscribers`). |
 | [`engine.rs`](./engine.rs) | `resolve` binds the configured engine or says why memory is off; per-fingerprint cache; host engine install; CortexDB key storage. |
 | [`guard.rs`](./guard.rs) | `ScrubbingEngine`: scrubs every write and times every engine call. |
-| [`scope.rs`](./scope.rs) | `MemoryIdentity`, `ResolvedIdentity`, resolution order, layout v3 roots. |
+| [`scope.rs`](./scope.rs) | Config-to-`IdentityPins` adapter, account root and layout migration switch. |
 | [`local_root.rs`](./local_root.rs) | The persistent install-id root of a signed-out session. |
 | [`lifecycle/mod.rs`](./lifecycle/mod.rs) | Builds `AgentMemory` for an identity under the `[memory.recall]` policy. |
 | [`lifecycle/hooks.rs`](./lifecycle/hooks.rs) | Lifecycle operations and bounded manual wrappers; `TurnPack`, `MemoryTurn`. |
@@ -294,7 +295,6 @@ The agent `memory` tool applies the same confinement and overwrites any
 | [`lifecycle/date_hint.rs`](./lifecycle/date_hint.rs) | Optional model call that works out which days a turn refers to. |
 | [`ops.rs`](./ops.rs) | Engine list/get/set, recall, fetch, learn, forget, erase all, items list. |
 | [`tool_budget.rs`](./tool_budget.rs), [`tool_writes.rs`](./tool_writes.rs) | Agent call deadlines; owner-scoped admission and file store for optional writes. The FIFO, coalescing and fencing are `tinymemory_tools::pending`. |
-| [`confine.rs`](./confine.rs) | Confines the RPC surface to the acting identity's subtree. |
 | [`explore.rs`](./explore.rs) | The facet explorer behind `memory_explore` and `memory_items_get`. |
 | [`brain.rs`](./brain.rs) | Brain source mapping and the `memory_brain_*` ops. |
 | [`sources/`](./sources/) | The `[[memory.sources]]` registry (`mod.rs`), sync state (`state.rs`) and the `SourceRegistry` adapter over `tinymemory_integrations::sources::sync` (`sync.rs`). |
@@ -320,8 +320,9 @@ The agent `memory` tool applies the same confinement and overwrites any
   `BoundEngine`, or learn that memory is off.
 - `engine::install_host_engine` (`engine.rs`): lets an embedder or test
   supply its own `MemoryEngine`.
-- `MemoryIdentity::child` and `MemoryIdentity::resolve` (`scope.rs`): derive
-  and resolve the acting identity a turn's run context carries.
+- TinyMemory `Identity::child` / `Identity::resolve` with
+  `scope::identity_pins` (`scope.rs`): derive and resolve the acting identity
+  a turn's run context carries.
 - `lifecycle::prefetch::pre_turn` and `compaction`
   (`lifecycle/prefetch.rs`): synchronous reads of completed packs plus scoped
   background refresh. `lifecycle::hooks` contains the underlying operations;
@@ -419,15 +420,16 @@ sits in the app directory shared by all accounts
 
 ## Gotchas
 
-- The acting identity is a task-local. Work spawned off a turn without
-  `scope::within` runs as the config's root identity, not the agent.
+- The acting identity is passed explicitly. Work spawned without an identity
+  runs as the config's root identity, not the agent.
 - Turn hooks run under the session's own config, which may be a derived
   context carrying a host binding (`[memory] agent_id` / `root`). Loading the
   global config instead would write to the wrong memory.
 - Every write must go through a bound engine so the scrubber sees it. Do not
   hold a raw `MemoryEngine` outside `engine.rs`.
-- RPC handlers must call through `confine.rs`, not [`ops.rs`](./ops.rs) directly, or a
-  caller can read another root's memory.
+- RPC handlers must apply upstream `Confinement` with `Policy::Refuse` in
+  [`schemas/handlers.rs`](./schemas/handlers.rs) before calling [`ops.rs`](./ops.rs),
+  or a caller can read another root's memory.
 - A new local state file should be written with `files::write_private`.
 - `engine::invalidate` clears the engine cache; tests that swap engines rely
   on the `CACHE_STABLE` lock and `install_test_engine`.

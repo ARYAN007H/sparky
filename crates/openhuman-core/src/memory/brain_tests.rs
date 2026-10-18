@@ -1,6 +1,5 @@
 use super::*;
 
-use crate::memory::scope::MemoryIdentity;
 use tinymemory_tools::layout::placement::file_into;
 
 use tinymemory_api::{ItemKind, MemoryMeta, MetaFilter};
@@ -57,7 +56,12 @@ async fn a_sources_collections_count_and_forget_with_it() {
         };
         engine.store(StoreItem::document(text, meta)).await.unwrap();
     }
-    let view = sources(&config, &MemoryIdentity::root()).await.unwrap();
+    let view = sources(
+        &config,
+        &tinymemory_tools::layout::identity::Identity::root(),
+    )
+    .await
+    .unwrap();
     let counts: Vec<(&str, u64)> = view
         .sources
         .iter()
@@ -68,7 +72,7 @@ async fn a_sources_collections_count_and_forget_with_it() {
 
     let gone = forget(
         &config,
-        &MemoryIdentity::root(),
+        &tinymemory_tools::layout::identity::Identity::root(),
         BrainForgetParams {
             source: "github".into(),
         },
@@ -94,7 +98,7 @@ async fn text_is_ingested_searched_counted_and_forgotten_per_source() {
 
     let ingested = ingest(
         &config,
-        &MemoryIdentity::root(),
+        &tinymemory_tools::layout::identity::Identity::root(),
         BrainIngestParams {
             path: None,
             text: Some("Refunds are issued within 14 days.".into()),
@@ -107,7 +111,7 @@ async fn text_is_ingested_searched_counted_and_forgotten_per_source() {
     assert_eq!(ingested.source, "notion");
     ingest(
         &config,
-        &MemoryIdentity::root(),
+        &tinymemory_tools::layout::identity::Identity::root(),
         BrainIngestParams {
             path: None,
             text: Some("Onboarding takes a week.".into()),
@@ -126,14 +130,19 @@ async fn text_is_ingested_searched_counted_and_forgotten_per_source() {
         "one belief build per source"
     );
 
-    let counts = sources(&config, &MemoryIdentity::root()).await.unwrap();
+    let counts = sources(
+        &config,
+        &tinymemory_tools::layout::identity::Identity::root(),
+    )
+    .await
+    .unwrap();
     assert_eq!(counts.root, "root");
     assert_eq!(counts.sources.len(), 2);
     assert_eq!(counts.unfiled, 0);
 
     let found = search(
         &config,
-        &MemoryIdentity::root(),
+        &tinymemory_tools::layout::identity::Identity::root(),
         BrainSearchParams {
             query: "refunds".into(),
             source: Some("notion".into()),
@@ -146,7 +155,7 @@ async fn text_is_ingested_searched_counted_and_forgotten_per_source() {
 
     let gone = forget(
         &config,
-        &MemoryIdentity::root(),
+        &tinymemory_tools::layout::identity::Identity::root(),
         BrainForgetParams {
             source: "notion".into(),
         },
@@ -188,13 +197,18 @@ async fn ingest_refuses_bad_input() {
         },
     ] {
         assert!(matches!(
-            ingest(&config, &MemoryIdentity::root(), params).await,
+            ingest(
+                &config,
+                &tinymemory_tools::layout::identity::Identity::root(),
+                params
+            )
+            .await,
             Err(Error::InvalidRequest(_))
         ));
     }
     assert!(search(
         &config,
-        &MemoryIdentity::root(),
+        &tinymemory_tools::layout::identity::Identity::root(),
         BrainSearchParams {
             query: " ".into(),
             source: None,
@@ -214,7 +228,7 @@ async fn a_file_is_converted_and_filed_under_files() {
     std::fs::write(&path, "# Guide\n\nAlways tag releases.").unwrap();
     let ingested = ingest(
         &config,
-        &MemoryIdentity::root(),
+        &tinymemory_tools::layout::identity::Identity::root(),
         BrainIngestParams {
             path: Some(path.display().to_string()),
             text: None,
@@ -244,7 +258,7 @@ async fn an_ingest_queues_a_belief_build_only_for_an_engine_that_waits_for_one()
         );
         ingest(
             &config,
-            &MemoryIdentity::root(),
+            &tinymemory_tools::layout::identity::Identity::root(),
             BrainIngestParams {
                 path: None,
                 text: Some("Refunds are issued within 14 days.".into()),
@@ -289,7 +303,12 @@ async fn ingest_refuses_a_credential_store_a_system_root_traversal_and_null_byte
         format!("{}/../guide.md", notes.display()),
         format!("{}\0.md", tmp.path().join("guide").display()),
     ] {
-        let result = ingest(&config, &MemoryIdentity::root(), path_params(path.clone())).await;
+        let result = ingest(
+            &config,
+            &tinymemory_tools::layout::identity::Identity::root(),
+            path_params(path.clone()),
+        )
+        .await;
         assert!(
             matches!(result, Err(Error::InvalidRequest(_))),
             "{path:?}: {result:?}"
@@ -312,7 +331,7 @@ async fn ingest_refuses_a_symlink_into_a_credential_store() {
 
     let result = ingest(
         &config,
-        &MemoryIdentity::root(),
+        &tinymemory_tools::layout::identity::Identity::root(),
         path_params(link.display().to_string()),
     )
     .await;
