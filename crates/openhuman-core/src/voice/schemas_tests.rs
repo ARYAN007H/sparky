@@ -1,113 +1,206 @@
 use super::*;
+use crate::core::all::{assert_schema_contract, ControllerSchemaContract, SchemaFieldContract};
 use crate::core::runtime::DispatchCtx;
 use serde_json::json;
 
 #[test]
-fn schema_names_are_stable() {
-    let s = voice_schemas("voice_status");
-    assert_eq!(s.namespace, "voice");
-    assert_eq!(s.function, "status");
-
-    let s = voice_schemas("voice_transcribe");
-    assert_eq!(s.namespace, "voice");
-    assert_eq!(s.function, "transcribe");
-
-    let s = voice_schemas("voice_transcribe_bytes");
-    assert_eq!(s.namespace, "voice");
-    assert_eq!(s.function, "transcribe_bytes");
-
-    let s = voice_schemas("voice_tts");
-    assert_eq!(s.namespace, "voice");
-    assert_eq!(s.function, "tts");
-
-    let s = voice_schemas("overlay_stt_notify");
-    assert_eq!(s.namespace, "voice");
-    assert_eq!(s.function, "overlay_stt_notify");
-
-    let s = voice_schemas("voice_stt_dispatch");
-    assert_eq!(s.namespace, "voice");
-    assert_eq!(s.function, "stt_dispatch");
-
-    let s = voice_schemas("voice_tts_dispatch");
-    assert_eq!(s.namespace, "voice");
-    assert_eq!(s.function, "tts_dispatch");
-
-    let s = voice_schemas("voice_set_providers");
-    assert_eq!(s.namespace, "voice");
-    assert_eq!(s.function, "set_providers");
-}
-
-#[test]
-fn factory_dispatch_schemas_are_wired_into_registry() {
-    // Both dispatch endpoints + the persistence endpoint must be reachable
-    // through the registered_controllers list; without them the JSON-RPC
-    // router will reject the new method names with "unknown method".
-    let registry = all_voice_registered_controllers();
-    let functions: Vec<&'static str> = registry.iter().map(|c| c.schema.function).collect();
-    assert!(
-        functions.contains(&"stt_dispatch"),
-        "voice.stt_dispatch must be registered (got {functions:?})"
-    );
-    assert!(
-        functions.contains(&"tts_dispatch"),
-        "voice.tts_dispatch must be registered"
-    );
-    assert!(
-        functions.contains(&"set_providers"),
-        "voice.set_providers must be registered"
-    );
-}
-
-#[test]
-fn controller_lists_match_lengths() {
+fn voice_schema_wire_contracts_are_preserved() {
+    let contracts: &[(&str, ControllerSchemaContract)] = &[
+        (
+            "voice_status",
+            ControllerSchemaContract {
+                namespace: "voice",
+                function: "status",
+                input_count: Some(0),
+                input_order: None,
+                required_input_order: None,
+                inputs: &[],
+                output_fields: &[],
+                outputs: None,
+            },
+        ),
+        (
+            "voice_transcribe",
+            ControllerSchemaContract {
+                namespace: "voice",
+                function: "transcribe",
+                input_count: None,
+                input_order: None,
+                required_input_order: Some(&["audio_path"]),
+                inputs: &[],
+                output_fields: &[],
+                outputs: None,
+            },
+        ),
+        (
+            "voice_transcribe_bytes",
+            ControllerSchemaContract {
+                namespace: "voice",
+                function: "transcribe_bytes",
+                input_count: None,
+                input_order: None,
+                required_input_order: Some(&["audio_bytes"]),
+                inputs: &[SchemaFieldContract {
+                    name: "extension",
+                    required: Some(false),
+                    type_debug: None,
+                }],
+                output_fields: &[],
+                outputs: None,
+            },
+        ),
+        (
+            "voice_tts",
+            ControllerSchemaContract {
+                namespace: "voice",
+                function: "tts",
+                input_count: None,
+                input_order: None,
+                required_input_order: Some(&["text"]),
+                inputs: &[SchemaFieldContract {
+                    name: "output_path",
+                    required: Some(false),
+                    type_debug: None,
+                }],
+                output_fields: &[],
+                outputs: None,
+            },
+        ),
+        (
+            "overlay_stt_notify",
+            ControllerSchemaContract {
+                namespace: "voice",
+                function: "overlay_stt_notify",
+                input_count: None,
+                input_order: None,
+                required_input_order: None,
+                inputs: &[],
+                output_fields: &[],
+                outputs: None,
+            },
+        ),
+        (
+            "voice_stt_dispatch",
+            ControllerSchemaContract {
+                namespace: "voice",
+                function: "stt_dispatch",
+                input_count: None,
+                input_order: None,
+                required_input_order: None,
+                inputs: &[],
+                output_fields: &[],
+                outputs: None,
+            },
+        ),
+        (
+            "voice_tts_dispatch",
+            ControllerSchemaContract {
+                namespace: "voice",
+                function: "tts_dispatch",
+                input_count: None,
+                input_order: None,
+                required_input_order: None,
+                inputs: &[],
+                output_fields: &[],
+                outputs: None,
+            },
+        ),
+        (
+            "voice_set_providers",
+            ControllerSchemaContract {
+                namespace: "voice",
+                function: "set_providers",
+                input_count: None,
+                input_order: None,
+                required_input_order: None,
+                inputs: &[],
+                output_fields: &[],
+                outputs: None,
+            },
+        ),
+        (
+            "voice_server_start",
+            ControllerSchemaContract {
+                namespace: "voice",
+                function: "server_start",
+                input_count: None,
+                input_order: None,
+                required_input_order: Some(&[]),
+                inputs: &[],
+                output_fields: &[],
+                outputs: None,
+            },
+        ),
+        (
+            "voice_update_provider_settings",
+            ControllerSchemaContract {
+                namespace: "voice",
+                function: "update_provider_settings",
+                input_count: None,
+                input_order: None,
+                required_input_order: Some(&[]),
+                inputs: &[
+                    SchemaFieldContract {
+                        name: "voice_providers",
+                        required: Some(false),
+                        type_debug: None,
+                    },
+                    SchemaFieldContract {
+                        name: "stt_provider",
+                        required: Some(false),
+                        type_debug: None,
+                    },
+                    SchemaFieldContract {
+                        name: "tts_provider",
+                        required: Some(false),
+                        type_debug: None,
+                    },
+                ],
+                output_fields: &[],
+                outputs: None,
+            },
+        ),
+        (
+            "voice_list_models",
+            ControllerSchemaContract {
+                namespace: "voice",
+                function: "list_models",
+                input_count: None,
+                input_order: None,
+                required_input_order: Some(&["provider_id"]),
+                inputs: &[],
+                output_fields: &[],
+                outputs: None,
+            },
+        ),
+        (
+            "voice_test_provider",
+            ControllerSchemaContract {
+                namespace: "voice",
+                function: "test_provider",
+                input_count: None,
+                input_order: None,
+                required_input_order: Some(&["workload", "provider"]),
+                inputs: &[],
+                output_fields: &[],
+                outputs: None,
+            },
+        ),
+    ];
+    for (key, expected) in contracts {
+        assert_schema_contract(&voice_schemas(key), expected);
+    }
+    let registered: Vec<_> = all_voice_registered_controllers()
+        .into_iter()
+        .map(|controller| controller.schema.function)
+        .collect();
+    for expected in ["stt_dispatch", "tts_dispatch", "set_providers"] {
+        assert!(registered.contains(&expected), "voice.{expected} not registered");
+    }
     assert_eq!(
         all_voice_controller_schemas().len(),
         all_voice_registered_controllers().len()
     );
-}
-
-#[test]
-fn status_schema_has_no_inputs() {
-    let s = voice_schemas("voice_status");
-    assert!(s.inputs.is_empty());
-}
-
-#[test]
-fn transcribe_schema_requires_audio_path() {
-    let s = voice_schemas("voice_transcribe");
-    assert!(s
-        .inputs
-        .iter()
-        .any(|i| i.name == "audio_path" && i.required));
-}
-
-#[test]
-fn transcribe_bytes_schema_requires_audio_bytes() {
-    let s = voice_schemas("voice_transcribe_bytes");
-    assert!(s
-        .inputs
-        .iter()
-        .any(|i| i.name == "audio_bytes" && i.required));
-}
-
-#[test]
-fn transcribe_bytes_schema_has_optional_extension() {
-    let s = voice_schemas("voice_transcribe_bytes");
-    let ext = s.inputs.iter().find(|i| i.name == "extension").unwrap();
-    assert!(!ext.required);
-}
-
-#[test]
-fn tts_schema_requires_text() {
-    let s = voice_schemas("voice_tts");
-    assert!(s.inputs.iter().any(|i| i.name == "text" && i.required));
-}
-
-#[test]
-fn tts_schema_has_optional_output_path() {
-    let s = voice_schemas("voice_tts");
-    let output_path = s.inputs.iter().find(|i| i.name == "output_path").unwrap();
-    assert!(!output_path.required);
 }
 
 #[test]
@@ -311,48 +404,9 @@ fn deserialize_voice_tts_accepts_optional_output_path() {
     assert_eq!(parsed.output_path.as_deref(), Some("/tmp/out.wav"));
 }
 
-#[test]
-fn server_start_schema_inputs_are_all_optional() {
-    let s = voice_schemas("voice_server_start");
-    for f in &s.inputs {
-        assert!(
-            !f.required,
-            "voice_server_start input `{}` should be optional",
-            f.name
-        );
-    }
-}
-
-#[test]
-fn every_registered_function_has_non_empty_description() {
-    for handler in all_voice_registered_controllers() {
-        assert!(
-            !handler.schema.description.is_empty(),
-            "fn {} missing description",
-            handler.schema.function
-        );
-    }
-}
-
 // ---------------------------------------------------------------------------
 // New voice provider registry RPC tests
 // ---------------------------------------------------------------------------
-
-#[test]
-fn new_provider_schemas_are_named_correctly() {
-    let s = voice_schemas("voice_update_provider_settings");
-    assert_eq!(s.namespace, "voice");
-    assert_eq!(s.function, "update_provider_settings");
-
-    let s = voice_schemas("voice_list_models");
-    assert_eq!(s.namespace, "voice");
-    assert_eq!(s.function, "list_models");
-
-    let s = voice_schemas("voice_test_provider");
-    assert_eq!(s.namespace, "voice");
-    assert_eq!(s.function, "test_provider");
-}
-
 #[test]
 fn new_rpcs_are_in_registry() {
     let registry = all_voice_registered_controllers();
@@ -409,39 +463,6 @@ fn validate_tts_provider_accepts_slug_grammar() {
     assert!(validate_tts_provider("openai:alloy").is_ok());
     assert!(validate_tts_provider("elevenlabs:voice-id").is_ok());
     assert!(validate_tts_provider("custom").is_ok());
-}
-
-#[test]
-fn update_provider_settings_schema_has_correct_inputs() {
-    let s = voice_schemas("voice_update_provider_settings");
-    let names: Vec<&str> = s.inputs.iter().map(|i| i.name).collect();
-    assert!(names.contains(&"voice_providers"));
-    assert!(names.contains(&"stt_provider"));
-    assert!(names.contains(&"tts_provider"));
-    // All should be optional
-    for input in &s.inputs {
-        assert!(
-            !input.required,
-            "voice_update_provider_settings input `{}` should be optional",
-            input.name
-        );
-    }
-}
-
-#[test]
-fn list_models_schema_requires_provider_id() {
-    let s = voice_schemas("voice_list_models");
-    assert!(s
-        .inputs
-        .iter()
-        .any(|i| i.name == "provider_id" && i.required));
-}
-
-#[test]
-fn test_provider_schema_requires_workload_and_provider() {
-    let s = voice_schemas("voice_test_provider");
-    assert!(s.inputs.iter().any(|i| i.name == "workload" && i.required));
-    assert!(s.inputs.iter().any(|i| i.name == "provider" && i.required));
 }
 
 #[test]
