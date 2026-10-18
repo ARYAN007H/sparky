@@ -4,6 +4,8 @@
 
 pub mod types;
 pub use types::*;
+#[cfg(feature = "flows")]
+pub(crate) mod flow_archetype;
 mod connected_identities;
 pub use connected_identities::render_connected_identities;
 
