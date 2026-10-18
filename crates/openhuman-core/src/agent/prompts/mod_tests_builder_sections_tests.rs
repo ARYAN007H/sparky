@@ -776,11 +776,12 @@ fn unmarked_dynamic_body_stays_volatile_after_stable_and_context_messages() {
         .build_tiered(&ctx)
         .unwrap();
     let messages = rendered.system_messages();
-    assert_eq!(messages.len(), 1, "unmarked body is volatile, while the adapter keeps the stable prefix");
+    assert_eq!(messages.len(), 2, "the stable prefix and unmarked volatile body stay separate");
     assert!(rendered.parts.iter().any(|(tier, part)| {
         *tier == PromptTier::Volatile && part.contains("Unmarked dynamic UTF-8 📎 body.")
     }));
-    assert!(rendered.parts.iter().any(|(tier, _)| *tier == PromptTier::Stable));
+    assert!(messages[0].contains("## Grounding and tool use"));
+    assert!(messages[1].contains("Unmarked dynamic UTF-8 📎 body."));
     let _ = std::fs::remove_dir_all(workspace);
 }
 
