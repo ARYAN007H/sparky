@@ -121,7 +121,6 @@ fn registered_controller_schemas_are_consistent_and_serializable() {
         let serialized_inputs = serialized["inputs"]
             .as_array()
             .unwrap_or_else(|| panic!("{method} inputs are not serialized as an array"));
-        let mut required = BTreeSet::new();
         let mut params = Map::new();
         for input in &schema.inputs {
             let matching = serialized_inputs
@@ -136,7 +135,6 @@ fn registered_controller_schemas_are_consistent_and_serializable() {
                 input.name
             );
             if input.required {
-                assert!(required.insert(input.name), "duplicate required input in {method}");
                 // `validate_params` accepts null for every declared type, so this
                 // safely checks required-key acceptance without executing a handler.
                 params.insert(input.name.to_owned(), Value::Null);
@@ -146,6 +144,15 @@ fn registered_controller_schemas_are_consistent_and_serializable() {
             validate_params(schema, &params).is_ok(),
             "{method} rejects a map containing all required schema inputs"
         );
+        for input in schema.inputs.iter().filter(|input| input.required) {
+            let mut missing = params.clone();
+            missing.remove(input.name);
+            assert!(
+                validate_params(schema, &missing).is_err(),
+                "{method} accepts params without required input `{}`",
+                input.name
+            );
+        }
     }
 }
 
