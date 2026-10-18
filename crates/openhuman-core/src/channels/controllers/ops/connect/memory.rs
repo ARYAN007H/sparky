@@ -2,8 +2,8 @@
 
 use crate::config::Config;
 
-/// Forgets every conversation memory logged from this channel (the threads
-/// `memory::channels` recorded for it), and reports how many items went.
+/// Forgets every conversation memory logged from this channel, and reports
+/// how many items went.
 ///
 /// The count is reported to the caller as `memory_chunks_deleted` (the
 /// disconnect reply's field name predates memory v2 and is kept as a wire
