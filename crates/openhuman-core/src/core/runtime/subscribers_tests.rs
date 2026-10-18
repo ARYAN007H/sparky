@@ -1,4 +1,4 @@
-use super::{group_first_time_when_bus_ready, DomainSubscriberPlan};
+use super::{DomainSubscriberPlan, group_first_time_when_bus_ready};
 use crate::config::test_env::EnvVarGuard;
 
 // ---- domain-subscriber gating (#4796 DoD item 3) ----------------------------
@@ -285,8 +285,7 @@ fn proactive_message_reaches_web_on_channelless_core_boot() {
 #[test]
 fn proactive_message_is_scoped_to_originating_saas_profile() {
     const CHILD: &str = "OPENHUMAN_PROACTIVE_SUBSCRIBER_TEST_CHILD";
-    const TEST_NAME: &str =
-        "core::runtime::subscribers::tests::proactive_message_is_scoped_to_originating_saas_profile";
+    const TEST_NAME: &str = "core::runtime::subscribers::tests::proactive_message_is_scoped_to_originating_saas_profile";
 
     if std::env::var(CHILD).as_deref() == Ok("1") {
         tokio::runtime::Builder::new_current_thread()

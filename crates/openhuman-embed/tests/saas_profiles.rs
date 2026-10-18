@@ -11,8 +11,8 @@ mod common;
 use std::time::Duration;
 
 use common::{
-    chat_requests, echo_inference, last_user_message, runtime_without_master_key as runtime,
-    PointedTransport,
+    PointedTransport, chat_requests, echo_inference, last_user_message,
+    runtime_without_master_key as runtime,
 };
 use openhuman_embed::profiles::ProfileCredentialKind;
 use openhuman_embed::{
@@ -160,20 +160,24 @@ async fn scenario() {
             Err(e) => panic!("alice never went idle: {e}"),
         }
     }
-    assert!(!profiles
-        .list()
-        .await
-        .unwrap()
-        .iter()
-        .any(|s| s.open && s.profile_id == alice.profile_id));
+    assert!(
+        !profiles
+            .list()
+            .await
+            .unwrap()
+            .iter()
+            .any(|s| s.open && s.profile_id == alice.profile_id)
+    );
     // Reopening picks the same thread back up.
     let alice_h = profiles.open("alice").await.expect("reopen alice");
-    assert!(alice_h
-        .threads()
-        .await
-        .unwrap()
-        .iter()
-        .any(|t| t.id == "t1"));
+    assert!(
+        alice_h
+            .threads()
+            .await
+            .unwrap()
+            .iter()
+            .any(|t| t.id == "t1")
+    );
 
     // ── a relayed platform message ──────────────────────────────────────
     let mut bob_events = bob_h.events();
@@ -224,24 +228,32 @@ async fn scenario() {
         again.duplicate,
         "a retried delivery runs nothing: {again:?}"
     );
-    assert!(bob_h
-        .threads()
-        .await
-        .unwrap()
-        .iter()
-        .any(|t| t.id == relayed.thread_id));
-    assert!(!alice_h
-        .threads()
-        .await
-        .unwrap()
-        .iter()
-        .any(|t| t.id == relayed.thread_id));
+    assert!(
+        bob_h
+            .threads()
+            .await
+            .unwrap()
+            .iter()
+            .any(|t| t.id == relayed.thread_id)
+    );
+    assert!(
+        !alice_h
+            .threads()
+            .await
+            .unwrap()
+            .iter()
+            .any(|t| t.id == relayed.thread_id)
+    );
     // Nothing of bob's relay reached alice's stream.
     tokio::time::sleep(Duration::from_millis(300)).await;
     while let Ok(Some(event)) =
         tokio::time::timeout(Duration::from_millis(50), alice_events.recv()).await
     {
-        assert_ne!(event.context().thread_id, relayed.thread_id, "leaked: {event:?}");
+        assert_ne!(
+            event.context().thread_id,
+            relayed.thread_id,
+            "leaked: {event:?}"
+        );
     }
 
     // ── the process is locked to SaaS ───────────────────────────────────

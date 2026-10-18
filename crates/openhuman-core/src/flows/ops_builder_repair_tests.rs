@@ -5,8 +5,9 @@ use crate::{
     flows::{
         agents::workflow_builder::builder_prompt::{BuildMode, BuilderRequest},
         ops::{
+            FlowStreamTarget,
             builder::{backend_repair_message, is_backend_or_infrastructure_failure},
-            flows_build_with_extra_hidden_tools, FlowStreamTarget,
+            flows_build_with_extra_hidden_tools,
         },
     },
 };
@@ -76,10 +77,12 @@ fn repair_backend_failure_returns_no_proposal_before_starting_the_builder() {
 
         assert_eq!(outcome.value["proposal"], Value::Null);
         assert_eq!(outcome.value["error"], Value::Null);
-        assert!(outcome.value["assistant_text"]
-            .as_str()
-            .expect("assistant text")
-            .contains("workflow was not changed"));
+        assert!(
+            outcome.value["assistant_text"]
+                .as_str()
+                .expect("assistant text")
+                .contains("workflow was not changed")
+        );
 
         let request_id = format!("backend-repair-{}", uuid::Uuid::new_v4());
         let stream = FlowStreamTarget {
