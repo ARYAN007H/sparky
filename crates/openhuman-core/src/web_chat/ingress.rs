@@ -300,3 +300,7 @@ impl IngressPolicy<QueuedPayload> for WebIngress {
         })
     }
 }
+
+#[cfg(test)]
+#[path = "ingress_tests.rs"]
+mod tests;
