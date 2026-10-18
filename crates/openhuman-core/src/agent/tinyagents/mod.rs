@@ -74,7 +74,9 @@ pub(crate) use observability::SubagentScope;
 pub(crate) use supplemental_trace::SupplementalTrace;
 pub(crate) use turn_exec::TurnSpec;
 pub(crate) use turn_exec_native::NativeSubagentRunContext;
-pub(crate) use turn_outcome::{DeferredTurnTerminal, TinyagentsTurnOutcome};
+#[cfg(test)]
+pub(crate) use turn_outcome::DeferredTurnTerminal;
+pub(crate) use turn_outcome::TinyagentsTurnOutcome;
 #[cfg(test)]
 pub(crate) use turn_policy::is_subagent_spawn_or_delegate_tool;
 pub(crate) use turn_policy::{
