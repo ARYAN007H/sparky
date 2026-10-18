@@ -170,10 +170,26 @@ async fn observer_fires_once_per_call_on_success_and_error() {
 }
 
 #[derive(Default)]
-struct PhysicalRecorder(Arc<Mutex<Vec<(tinyagents_harness::observability::PhysicalDispatchMetadata, tinyagents_harness::observability::PhysicalDispatchOutcome)>>>);
+struct PhysicalRecorder(
+    Arc<
+        Mutex<
+            Vec<(
+                tinyagents_harness::observability::PhysicalDispatchMetadata,
+                tinyagents_harness::observability::PhysicalDispatchOutcome,
+            )>,
+        >,
+    >,
+);
 
 struct PhysicalTerminal {
-    recorder: Arc<Mutex<Vec<(tinyagents_harness::observability::PhysicalDispatchMetadata, tinyagents_harness::observability::PhysicalDispatchOutcome)>>>,
+    recorder: Arc<
+        Mutex<
+            Vec<(
+                tinyagents_harness::observability::PhysicalDispatchMetadata,
+                tinyagents_harness::observability::PhysicalDispatchOutcome,
+            )>,
+        >,
+    >,
     metadata: tinyagents_harness::observability::PhysicalDispatchMetadata,
 }
 
@@ -182,7 +198,10 @@ impl tinyagents_harness::observability::PhysicalDispatchTerminal for PhysicalTer
         self: Box<Self>,
         outcome: tinyagents_harness::observability::PhysicalDispatchOutcome,
     ) {
-        self.recorder.lock().unwrap().push((self.metadata.clone(), outcome));
+        self.recorder
+            .lock()
+            .unwrap()
+            .push((self.metadata.clone(), outcome));
     }
 }
 
@@ -204,16 +223,28 @@ async fn physical_observer_reports_content_free_provider_outcome() {
     let recorder = Arc::new(PhysicalRecorder::default());
     completer(&server)
         .physical_observer(recorder.clone())
-        .complete(CompletionRequest::new("requested-model", vec![ChatMessage::user("private")]))
+        .complete(CompletionRequest::new(
+            "requested-model",
+            vec![ChatMessage::user("private")],
+        ))
         .await
         .unwrap();
 
     let events = recorder.0.lock().unwrap();
     assert_eq!(events.len(), 1);
-    assert_eq!(events[0].0.requested_model.as_deref(), Some("requested-model"));
-    assert_eq!(events[0].1.status, tinyagents_harness::observability::PhysicalDispatchStatus::Succeeded);
+    assert_eq!(
+        events[0].0.requested_model.as_deref(),
+        Some("requested-model")
+    );
+    assert_eq!(
+        events[0].1.status,
+        tinyagents_harness::observability::PhysicalDispatchStatus::Succeeded
+    );
     assert_eq!(events[0].1.usage.as_ref().unwrap().input_tokens, 100);
-    assert_eq!(events[0].1.answered_model.as_deref(), Some("vendor/answered"));
+    assert_eq!(
+        events[0].1.answered_model.as_deref(),
+        Some("vendor/answered")
+    );
 }
 
 #[tokio::test]
@@ -225,7 +256,11 @@ async fn physical_observer_reports_each_structured_repair_dispatch() {
         .and(path("/v1/chat/completions"))
         .respond_with(move |_request: &wiremock::Request| {
             let mut replies = replies_for_handler.lock().unwrap();
-            let text = if *replies == 0 { "invalid" } else { "{\"ok\":true}" };
+            let text = if *replies == 0 {
+                "invalid"
+            } else {
+                "{\"ok\":true}"
+            };
             *replies += 1;
             ResponseTemplate::new(200).set_body_json(body(text, "stop"))
         })
@@ -247,7 +282,8 @@ async fn physical_observer_reports_each_structured_repair_dispatch() {
     assert_eq!(events.len(), 2);
     assert!(events.iter().all(|(metadata, outcome)| {
         metadata.requested_model.as_deref() == Some("repair-model")
-            && outcome.status == tinyagents_harness::observability::PhysicalDispatchStatus::Succeeded
+            && outcome.status
+                == tinyagents_harness::observability::PhysicalDispatchStatus::Succeeded
             && outcome.usage.as_ref().unwrap().input_tokens == 100
     }));
 }
