@@ -2710,7 +2710,9 @@ fn json_rpc_cron_manual_worker_survives_caller_cancel_on_published_tinyflows() {
 }
 
 async fn json_rpc_cron_manual_worker_survives_caller_cancel_on_published_tinyflows_inner() {
-    use openhuman_core::storage::{CollectionSpec, DocumentStore, Precondition};
+    use openhuman_core::storage::{
+        CollectionSpec, DocumentStore, Precondition, Scope, StorageBackend,
+    };
     use openhuman_core::{
         config::Config,
         core::{
@@ -2777,6 +2779,84 @@ async fn json_rpc_cron_manual_worker_survives_caller_cancel_on_published_tinyflo
         ..Config::default()
     };
 
+    // Install the exact backend CoreContext will use before seeding. Opening
+    // the local fallback alone is insufficient: core boot may subsequently
+    // install/rebind the configured backend, leaving a fixture in the wrong DB.
+    let storage_url = openhuman_core::storage::config::default_url(&workspace);
+    let backend = openhuman_core::storage::open(&storage_url)
+        .await
+        .expect("open the host's workspace storage backend");
+    openhuman_core::storage::install_for_url(&storage_url, Arc::clone(&backend));
+    assert_eq!(
+        openhuman_core::storage::installed_url().as_deref(),
+        Some(storage_url.as_str())
+    );
+    let scoped = backend
+        .for_scope(&Scope::local())
+        .expect("open the operator storage scope");
+    let docs = Arc::clone(scoped.documents());
+    for collection in ["cron_jobs", "cron_runs", "cron_counters", "tsd.migrations"] {
+        docs.ensure_collection(&CollectionSpec::new(collection))
+            .await
+            .unwrap();
+    }
+    assert!(
+        docs.get("tsd.migrations", "cron/cron.jobs/jobs_v2")
+            .await
+            .unwrap()
+            .is_none(),
+        "the fresh backend has not run Cron migration before the v1 fixture is seeded"
+    );
+    docs.put(
+        "cron_jobs",
+        "legacy-migration-proof",
+        json!({
+            "claim_generation": 1,
+            "expression": "0 9 * * *",
+            "command": "echo migrated",
+            "schedule": "{\"kind\":\"every\",\"every_ms\":3600000}",
+            "job_type": "shell",
+            "session_target": "isolated",
+            "enabled": false,
+            "delivery": "{\"mode\":\"none\",\"channel\":null,\"to\":null,\"best_effort\":true}",
+            "delete_after_run": false,
+            "created_at": "2026-03-04T05:06:07.123Z",
+            "created_ms": 1772600767123_i64,
+            "next_run": "2026-03-05T09:00:00Z",
+            "next_run_ms": 1772701200000_i64,
+            "next_run_ns": 1772701200000000000_i64,
+            "name": "legacy-migration-proof"
+        }),
+        Precondition::None,
+    )
+    .await
+    .unwrap();
+    docs.put(
+        "cron_runs",
+        "00000000000000000007",
+        json!({
+            "seq": 7,
+            "job_id": "legacy-migration-proof",
+            "started_at": "2026-03-04T09:00:00Z",
+            "started_ns": 1772614800000000000_i64,
+            "finished_at": "2026-03-04T09:00:02Z",
+            "status": "success",
+            "duration_ms": 2000,
+            "output": "legacy run preserved"
+        }),
+        Precondition::None,
+    )
+    .await
+    .unwrap();
+    docs.put(
+        "cron_counters",
+        "runs",
+        json!({ "next": 8 }),
+        Precondition::None,
+    )
+    .await
+    .unwrap();
+
     openhuman_core::core::bus::init().await.unwrap();
     let (default_context, _, _) = CoreContext::init_with_config(
         HostKind::Library,
@@ -2793,78 +2873,11 @@ async fn json_rpc_cron_manual_worker_survives_caller_cancel_on_published_tinyflo
         workspace,
         "the RPC host and pre-seeded migration rows share the same workspace"
     );
-    // Seed the exact v1 document collections after the host has installed its
-    // backend, but before auth activation or any Cron request can run Migrate.
-    let docs = CoreContext::scope(Arc::clone(&default_context), async {
-        let opened = openhuman_core::storage::local::open("published TinyFlows E2E", &workspace)
-            .expect("open the core's installed local storage backend");
-        assert_eq!(opened.scope.as_str(), "local");
-        let scoped = opened.scoped().expect("scope E2E storage");
-        let docs = Arc::clone(scoped.documents());
-        for collection in ["cron_jobs", "cron_runs", "cron_counters", "tsd.migrations"] {
-            docs.ensure_collection(&CollectionSpec::new(collection))
-                .await
-                .unwrap();
-        }
-        assert!(
-            docs.get("tsd.migrations", "cron/cron.jobs/jobs_v2")
-                .await
-                .unwrap()
-                .is_none(),
-            "the module has not migrated this backend before the v1 fixture is seeded"
-        );
-        docs.put(
-            "cron_jobs",
-            "legacy-migration-proof",
-            json!({
-                "claim_generation": 1,
-                "expression": "0 9 * * *",
-                "command": "echo migrated",
-                "schedule": "{\"kind\":\"every\",\"every_ms\":3600000}",
-                "job_type": "shell",
-                "session_target": "isolated",
-                "enabled": false,
-                "delivery": "{\"mode\":\"none\",\"channel\":null,\"to\":null,\"best_effort\":true}",
-                "delete_after_run": false,
-                "created_at": "2026-03-04T05:06:07.123Z",
-                "created_ms": 1772600767123_i64,
-                "next_run": "2026-03-05T09:00:00Z",
-                "next_run_ms": 1772701200000_i64,
-                "next_run_ns": 1772701200000000000_i64,
-                "name": "legacy-migration-proof"
-            }),
-            Precondition::None,
-        )
-        .await
-        .unwrap();
-        docs.put(
-            "cron_runs",
-            "00000000000000000007",
-            json!({
-                "seq": 7,
-                "job_id": "legacy-migration-proof",
-                "started_at": "2026-03-04T09:00:00Z",
-                "started_ns": 1772614800000000000_i64,
-                "finished_at": "2026-03-04T09:00:02Z",
-                "status": "success",
-                "duration_ms": 2000,
-                "output": "legacy run preserved"
-            }),
-            Precondition::None,
-        )
-        .await
-        .unwrap();
-        docs.put(
-            "cron_counters",
-            "runs",
-            json!({ "next": 8 }),
-            Precondition::None,
-        )
-        .await
-        .unwrap();
-        docs
-    })
-    .await;
+    assert_eq!(
+        openhuman_core::storage::installed_url().as_deref(),
+        Some(storage_url.as_str()),
+        "CoreContext initialization retains the seeded backend URL"
+    );
     let (rpc_addr, rpc_join) = serve_on_ephemeral(build_core_http_router(false)).await;
     let rpc_base = format!("http://{rpc_addr}");
     let jobs = post_json_rpc(&rpc_base, 80_001, "openhuman.cron_list", json!({})).await;
