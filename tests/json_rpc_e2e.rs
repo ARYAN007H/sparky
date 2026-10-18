@@ -19,17 +19,17 @@ use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Duration;
 
 use axum::extract::State;
-use axum::http::{header::AUTHORIZATION, HeaderMap, StatusCode, Uri};
+use axum::http::{HeaderMap, StatusCode, Uri, header::AUTHORIZATION};
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use futures_util::StreamExt;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use tempfile::tempdir;
 use tinyinference_llm::message::Message;
 use tinyinference_llm::model::ModelRequest;
 
-use openhuman_core::core::auth::{init_rpc_token, CORE_TOKEN_ENV_VAR};
+use openhuman_core::core::auth::{CORE_TOKEN_ENV_VAR, init_rpc_token};
 use openhuman_core::platform::connectivity::rpc::pick_listen_port;
 use openhuman_rpc::server::build_core_http_router;
 
@@ -1536,10 +1536,12 @@ async fn json_rpc_tokenjuice_detect_and_cache_stats() {
     )
     .await;
     let stats_result = assert_no_jsonrpc_error(&stats, "tokenjuice_cache_stats");
-    assert!(stats_result
-        .get("entries")
-        .and_then(Value::as_u64)
-        .is_some());
+    assert!(
+        stats_result
+            .get("entries")
+            .and_then(Value::as_u64)
+            .is_some()
+    );
     assert!(stats_result.get("bytes").and_then(Value::as_u64).is_some());
 
     rpc_join.abort();
@@ -1564,14 +1566,18 @@ async fn json_rpc_tokenjuice_settings_and_savings() {
     let settings = get_result
         .get("settings")
         .expect("settings_get returns a settings object");
-    assert!(settings
-        .get("router_enabled")
-        .and_then(Value::as_bool)
-        .is_some());
-    assert!(settings
-        .get("ccr_min_tokens")
-        .and_then(Value::as_u64)
-        .is_some());
+    assert!(
+        settings
+            .get("router_enabled")
+            .and_then(Value::as_bool)
+            .is_some()
+    );
+    assert!(
+        settings
+            .get("ccr_min_tokens")
+            .and_then(Value::as_u64)
+            .is_some()
+    );
 
     // settings_update: flip the CCR token threshold and confirm it round-trips.
     let updated = post_json_rpc(
@@ -1600,11 +1606,13 @@ async fn json_rpc_tokenjuice_settings_and_savings() {
     .await;
     let savings_result = assert_no_jsonrpc_error(&savings, "tokenjuice_savings_stats");
     assert!(savings_result.get("attributionModel").is_some());
-    assert!(savings_result
-        .get("total")
-        .and_then(|t| t.get("tokensSaved"))
-        .and_then(Value::as_u64)
-        .is_some());
+    assert!(
+        savings_result
+            .get("total")
+            .and_then(|t| t.get("tokensSaved"))
+            .and_then(Value::as_u64)
+            .is_some()
+    );
     assert!(savings_result.get("cache").is_some());
 
     // savings_reset: zeroes the totals.
@@ -1814,24 +1822,32 @@ async fn json_rpc_agent_registry_manages_defaults_and_custom_agents() {
         .iter()
         .find(|definition| definition.get("id").and_then(Value::as_str) == Some("critic"))
         .expect("safe agent library should include critic");
-    assert!(memory_agent
-        .get("display_name")
-        .and_then(Value::as_str)
-        .is_some());
-    assert!(memory_agent
-        .get("when_to_use")
-        .and_then(Value::as_str)
-        .is_some());
+    assert!(
+        memory_agent
+            .get("display_name")
+            .and_then(Value::as_str)
+            .is_some()
+    );
+    assert!(
+        memory_agent
+            .get("when_to_use")
+            .and_then(Value::as_str)
+            .is_some()
+    );
     assert!(memory_agent.get("system_prompt").is_none());
     assert!(memory_agent.get("tools").is_some());
-    assert!(memory_agent
-        .get("direct_tool_count")
-        .and_then(Value::as_u64)
-        .is_some());
-    assert!(memory_agent
-        .get("can_run_as_user_facing_worker")
-        .and_then(Value::as_bool)
-        .is_some());
+    assert!(
+        memory_agent
+            .get("direct_tool_count")
+            .and_then(Value::as_u64)
+            .is_some()
+    );
+    assert!(
+        memory_agent
+            .get("can_run_as_user_facing_worker")
+            .and_then(Value::as_bool)
+            .is_some()
+    );
 
     let missing = post_json_rpc(
         &rpc_base,
@@ -3332,10 +3348,12 @@ async fn json_rpc_thread_working_dir_binds_before_the_first_message() {
     )
     .await;
     let cleared = assert_no_jsonrpc_error(&cleared, "threads_update_working_dir clear");
-    assert!(cleared
-        .get("data")
-        .and_then(|d| d.get("actionDir"))
-        .is_none());
+    assert!(
+        cleared
+            .get("data")
+            .and_then(|d| d.get("actionDir"))
+            .is_none()
+    );
 
     // 3. A protected folder is refused.
     let ssh = home.join(".ssh");
@@ -3550,8 +3568,7 @@ async fn json_rpc_thread_generate_title_falls_back_when_provider_path_is_unavail
 
     assert_ne!(generated_title, original_title);
     assert_eq!(
-        generated_title,
-        "summarize latest five",
+        generated_title, "summarize latest five",
         "fallback title should be the 3-word shape derived from the first user message (filler stripped), got: {generated_title}"
     );
 
@@ -3732,11 +3749,13 @@ async fn json_rpc_thread_turn_state_lifecycle() {
     )
     .await;
     let missing_outer = assert_no_jsonrpc_error(&get_turn_missing, "turn_state_get_turn (absent)");
-    assert!(missing_outer
-        .get("data")
-        .and_then(|d| d.get("turnState"))
-        .map(|v| v.is_null())
-        .unwrap_or(true));
+    assert!(
+        missing_outer
+            .get("data")
+            .and_then(|d| d.get("turnState"))
+            .map(|v| v.is_null())
+            .unwrap_or(true)
+    );
 
     // clear → cleared:true
     let cleared = post_json_rpc(
@@ -3764,11 +3783,13 @@ async fn json_rpc_thread_turn_state_lifecycle() {
     )
     .await;
     let again_outer = assert_no_jsonrpc_error(&got_again, "turn_state_get (after clear)");
-    assert!(again_outer
-        .get("data")
-        .and_then(|d| d.get("turnState"))
-        .map(|v| v.is_null())
-        .unwrap_or(true));
+    assert!(
+        again_outer
+            .get("data")
+            .and_then(|d| d.get("turnState"))
+            .map(|v| v.is_null())
+            .unwrap_or(true)
+    );
 
     api_join.abort();
     rpc_join.abort();
@@ -6125,14 +6146,25 @@ async fn json_rpc_wallet_network_defaults_lists_all_chains() {
     let body = assert_no_jsonrpc_error(&resp, "wallet_network_defaults");
     let result = body.get("result").unwrap_or(body);
     let rows = result.as_array().expect("array");
-    assert!(!rows.is_empty(), "wallet defaults must include at least one network");
+    assert!(
+        !rows.is_empty(),
+        "wallet defaults must include at least one network"
+    );
     for row in rows {
-        assert!(row.is_object(), "each network default must be an object: {row}");
         assert!(
-            row.get("chain").and_then(Value::as_str).is_some_and(|chain| !chain.is_empty()),
+            row.is_object(),
+            "each network default must be an object: {row}"
+        );
+        assert!(
+            row.get("chain")
+                .and_then(Value::as_str)
+                .is_some_and(|chain| !chain.is_empty()),
             "each network default must expose a chain identifier: {row}"
         );
-        assert!(row.get("chainId").is_some(), "each row carries the chainId field: {row}");
+        assert!(
+            row.get("chainId").is_some(),
+            "each row carries the chainId field: {row}"
+        );
     }
 
     mock_join.abort();
@@ -6747,12 +6779,14 @@ async fn json_rpc_local_ai_ollama_endpoint_normalizes_bind_address_and_clears() 
     )
     .await;
     let clear_result = assert_no_jsonrpc_error(&clear, "clear ollama base_url");
-    assert!(clear_result
-        .get("result")
-        .and_then(|value| value.get("config"))
-        .and_then(|config| config.get("local_ai"))
-        .and_then(|local_ai| local_ai.get("base_url"))
-        .is_none_or(Value::is_null));
+    assert!(
+        clear_result
+            .get("result")
+            .and_then(|value| value.get("config"))
+            .and_then(|config| config.get("local_ai"))
+            .and_then(|local_ai| local_ai.get("base_url"))
+            .is_none_or(Value::is_null)
+    );
 
     mock_join.abort();
     rpc_join.abort();
@@ -7534,10 +7568,12 @@ async fn voice_live_settings_round_trip_over_json_rpc() {
     .await;
     let tested = assert_no_jsonrpc_error(&tested, "voice_live_test_provider");
     assert_eq!(tested["ok"], false);
-    assert!(tested["error"]
-        .as_str()
-        .unwrap_or_default()
-        .contains("not_configured"));
+    assert!(
+        tested["error"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("not_configured")
+    );
 
     mock_join.abort();
     rpc_join.abort();
@@ -9821,9 +9857,11 @@ async fn json_rpc_task_sources_crud_and_status() {
         .as_array()
         .expect("list returns array")
         .clone();
-    assert!(sources
-        .iter()
-        .any(|s| s.get("id").and_then(Value::as_str) == Some(id.as_str())));
+    assert!(
+        sources
+            .iter()
+            .any(|s| s.get("id").and_then(Value::as_str) == Some(id.as_str()))
+    );
 
     // ── get roundtrips ───────────────────────────────────────────────
     let get = post_json_rpc(
