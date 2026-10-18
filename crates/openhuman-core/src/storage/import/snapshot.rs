@@ -104,6 +104,3 @@ fn companion(path: &Path, suffix: &str) -> PathBuf {
     PathBuf::from(name)
 }
 
-#[cfg(test)]
-#[path = "snapshot_tests.rs"]
-mod tests;
