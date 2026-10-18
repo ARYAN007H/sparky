@@ -334,6 +334,10 @@ async fn stale_document_config_snapshot_returns_conflict_instead_of_overwriting(
         .find_map(|cause| cause.downcast_ref::<tinystoragedrivers::StorageError>())
         .expect("CAS failure retains the typed storage error");
     assert_eq!(storage_error.kind(), tinystoragedrivers::ErrorKind::Conflict);
+    let rpc_error = crate::config::ops::config_save_error(error);
+    let rpc_error = crate::core::StructuredRpcError::decode(&rpc_error)
+        .expect("config RPC boundary exposes a structured conflict");
+    assert_eq!(rpc_error.data.unwrap()["kind"], "ConfigConflict");
     let loaded = Config::load_from_config_path(&path, &tmp.path().join("workspace"))
         .await
         .unwrap();

@@ -9,7 +9,7 @@ mod search;
 mod tool_dispatcher;
 mod ui;
 
-pub(super) fn config_save_error(error: anyhow::Error) -> String {
+pub(crate) fn config_save_error(error: anyhow::Error) -> String {
     let conflict = error.chain().any(|cause| {
         cause
             .downcast_ref::<tinystoragedrivers::StorageError>()
