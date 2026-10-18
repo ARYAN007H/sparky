@@ -5,6 +5,7 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
+use futures::future::BoxFuture;
 use serde::Serialize;
 use tinymemory_api::{Hit, ObservedActor, ThreadWindow, ToolCallRef, Turn};
 use tinymemory_tools::layout::identity::ResolvedIdentity;
