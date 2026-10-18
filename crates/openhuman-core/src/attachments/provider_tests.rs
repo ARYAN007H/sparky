@@ -243,11 +243,9 @@ async fn derivative_cache_survives_model_recreation_and_invalidates_changed_cont
     config.action_dir = temp.path().into();
     let config = Arc::new(config);
     let make = || AttachmentModel {
-        inner: Arc::new(Probe::default()),
         config: config.clone(),
-        profile: ModelProfile::default(),
-        fallback_cache: Mutex::new(Default::default()),
         core: None,
+        fallback_cache: Mutex::new(Default::default()),
     };
     let first = make();
     let scope = super::super::AttachmentAccessScope::default();
@@ -292,11 +290,9 @@ async fn cache_is_not_written_beside_unmanaged_local_files() {
     let mut config = Config::default();
     config.action_dir = temp.path().into();
     let model = AttachmentModel {
-        inner: Arc::new(Probe::default()),
         config: Arc::new(config),
-        profile: ModelProfile::default(),
-        fallback_cache: Mutex::new(Default::default()),
         core: None,
+        fallback_cache: Mutex::new(Default::default()),
     };
     model
         .save_fallback(

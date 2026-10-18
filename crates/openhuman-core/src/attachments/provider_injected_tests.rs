@@ -117,11 +117,9 @@ async fn pdf_attachment_degrades_to_a_note_when_documents_component_is_off() {
     let mut config = Config::default();
     config.components.documents = false;
     let model = AttachmentModel {
-        inner: Arc::new(Probe::default()),
         config: Arc::new(config),
-        profile: ModelProfile::default(),
-        fallback_cache: Mutex::new(Default::default()),
         core: None,
+        fallback_cache: Mutex::new(Default::default()),
     };
     let (text, cacheable) = model
         .fallback(

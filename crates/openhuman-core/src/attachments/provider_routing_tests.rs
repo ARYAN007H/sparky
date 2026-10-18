@@ -464,7 +464,7 @@ async fn unsupported_media_urls_and_oversized_inline_sources_fail_before_inferen
         url: "file:///etc/passwd".into(),
         media_type: Some("application/pdf".into()),
     })]);
-    let error = model.prepare(unsupported).await.unwrap_err();
+    let error = model.invoke(&(), unsupported).await.unwrap_err();
     assert!(error.to_string().contains("unsupported media URL scheme"));
 
     let max_encoded_bytes = 50 * 1024 * 1024 * 4 / 3 + 4;
@@ -472,7 +472,7 @@ async fn unsupported_media_urls_and_oversized_inline_sources_fail_before_inferen
         data: "A".repeat(max_encoded_bytes + 1),
         media_type: "application/octet-stream".into(),
     })]);
-    let error = model.prepare(oversized).await.unwrap_err();
+    let error = model.invoke(&(), oversized).await.unwrap_err();
     assert!(error
         .to_string()
         .contains("inline media exceeds size limit"));

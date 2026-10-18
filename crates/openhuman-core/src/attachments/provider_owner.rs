@@ -14,10 +14,8 @@ pub(super) fn wrap(
     profile: ModelProfile,
 ) -> Arc<dyn ChatModel<()>> {
     let host = Arc::new(AttachmentModel {
-        inner: inner.clone(),
         config: config.clone(),
         core: ctx.downgrade(),
-        profile: profile.clone(),
         fallback_cache: std::sync::Mutex::new(std::collections::HashMap::new()),
     });
     let (max_images, image_mb) = config.multimodal.effective_limits();
