@@ -140,3 +140,5 @@ pub(super) async fn read_config_with_recovery_or_default(
     }
 }
 
+pub(super) use super::parse_source::parse_source_contents;
+

@@ -6,6 +6,7 @@ mod dirs;
 pub(in crate::config::schema) mod env;
 mod env_overlay;
 mod impl_load;
+mod parse_source;
 mod migrate;
 mod parse;
 mod saas_scope;
