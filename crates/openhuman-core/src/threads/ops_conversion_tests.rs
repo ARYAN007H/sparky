@@ -505,8 +505,10 @@ async fn thread_delete_queues_memory_before_snapshot_cleanup_error() {
     };
     config.memory.engine.clear();
 
-    let mut host_overrides = crate::agent::host_overrides::HostOverrides::default();
-    host_overrides.session_store = Some(std::sync::Arc::new(FailingTurnStateDeleteProvider));
+    let host_overrides = crate::agent::host_overrides::HostOverrides {
+        session_store: Some(std::sync::Arc::new(FailingTurnStateDeleteProvider)),
+        ..Default::default()
+    };
     let ctx = DispatchCtx::new(
         CoreContext::for_test(DomainSet::full(), Some(dir.clone())).derive_with(
             ContextOverlay::new(config.clone(), DomainSet::full(), ToolGroups::none())
