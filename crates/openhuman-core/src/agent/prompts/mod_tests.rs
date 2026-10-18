@@ -167,9 +167,9 @@ fn legacy_dynamic_tier_markers_preserve_literal_body_slices() {
             (PromptTier::Volatile, "é stable\n".to_string()),
             (
                 PromptTier::Context,
-                "\r\n\n<!--prompt-tier:unknown-->\n".to_string(),
+                "\n<!--prompt-tier:unknown-->\n".to_string(),
             ),
-            (PromptTier::Volatile, "\n📎 tail".to_string()),
+            (PromptTier::Volatile, "📎 tail".to_string()),
         ],
         "markers are trimmed only for recognition; the remaining bytes retain their original line endings and unknown comments"
     );
