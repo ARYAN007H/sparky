@@ -192,13 +192,11 @@ async fn render_via_session(config: &Config, agent_id: &str) -> Result<DumpedPro
     agent.refresh_delegation_tools();
 
     #[cfg(feature = "flows")]
-    let flow_archetype_text = match AgentDefinitionRegistry::current()
-        .and_then(|registry| registry.get(agent_id).cloned())
-    {
+    let flow_archetype_text = match agent.resolved_definition() {
         Some(definition) => {
             crate::agent::prompts::flow_archetype::load_for_definition(
                 Some(config),
-                &definition,
+                definition.as_ref(),
             )
             .await?
         }
