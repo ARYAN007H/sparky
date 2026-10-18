@@ -316,7 +316,7 @@ async fn stale_document_config_snapshot_returns_conflict_instead_of_overwriting(
         keys(3),
     );
     let path = tmp.path().join("config.toml");
-    let mut initial = config_at(tmp.path(), "initial");
+    let initial = config_at(tmp.path(), "initial");
     initial.save().await.unwrap();
     let mut first = Config::load_from_config_path(&path, &tmp.path().join("workspace"))
         .await
