@@ -112,7 +112,7 @@ fn dynamic_child_prompt_lists_text_dialect_catalogue_once() {
 
         let prompt = load_prompt_source(&definition, &context).unwrap();
         assert_eq!(
-            prompt.matches("unique_probe_tool(").count(),
+            prompt.matches("unique_probe_tool").count(),
             1,
             "dynamic {format:?} prompt should render its tool catalogue once"
         );
