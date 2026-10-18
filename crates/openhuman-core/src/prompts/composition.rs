@@ -1,10 +1,8 @@
 //! OpenHuman's product-specific system-prompt selection and additions.
 
-use crate::agent::prompts::types::{
-    PromptContext, PromptTier, TieredPromptPart,
-};
+use crate::agent::prompts::types::{PromptContext, PromptTier, TieredPromptPart};
 use crate::prompts::sections::*;
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use std::path::Path;
 use tinyagents_harness::prompt::{
     DynamicPromptSection as OwnerDynamicPromptSection, PromptComposer,
@@ -51,7 +49,10 @@ impl<'a> OwnerDynamicPromptSection<PromptContext<'a>> for ProductSection {
         }
     }
 
-    fn render(&self, context: &PromptContext<'a>) -> tinyagents_harness::Result<Vec<TieredPromptPart>> {
+    fn render(
+        &self,
+        context: &PromptContext<'a>,
+    ) -> tinyagents_harness::Result<Vec<TieredPromptPart>> {
         match self {
             Self::Archetype(body) => ArchetypePromptSection::new(body.clone()).render(context),
             Self::Dynamic(builder) => {
@@ -78,14 +79,15 @@ impl<'a> OwnerDynamicPromptSection<PromptContext<'a>> for OpenHumanPromptContent
         "openhuman_prompt_content"
     }
 
-    fn render(&self, context: &PromptContext<'a>) -> tinyagents_harness::Result<Vec<TieredPromptPart>> {
+    fn render(
+        &self,
+        context: &PromptContext<'a>,
+    ) -> tinyagents_harness::Result<Vec<TieredPromptPart>> {
         let mut parts = Vec::new();
         let mut has_grounding = false;
         for section in &self.sections {
             for part in section.render(context)? {
-                if !part.content.trim().is_empty()
-                    && part.content.contains(GROUNDING_HEADING)
-                {
+                if !part.content.trim().is_empty() && part.content.contains(GROUNDING_HEADING) {
                     has_grounding = true;
                 }
                 parts.push(part);
@@ -236,4 +238,3 @@ impl SystemPromptBuilder {
         })
     }
 }
-

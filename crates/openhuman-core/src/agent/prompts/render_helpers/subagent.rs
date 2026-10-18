@@ -4,9 +4,9 @@
 //! [`SystemPromptBuilder::for_subagent`](crate::prompts::SystemPromptBuilder::for_subagent)
 //! for callers that only hold indices into the parent's tool vec.
 
-use crate::prompts::GLOBAL_STYLE_SUFFIX;
 use super::types::*;
 use crate::prompts::sections::GROUNDING_BODY;
+use crate::prompts::GLOBAL_STYLE_SUFFIX;
 use crate::prompts::{inject_workspace_file, write_agents_md_blocks};
 use std::fmt::Write;
 use std::path::Path;
@@ -161,7 +161,10 @@ pub fn render_subagent_system_prompt_with_format(
         parameters: tool.parameters_schema(),
     }));
     if !tool_specs.is_empty() {
-        out.push_str(&dialect::render_prompt_instructions(tool_call_format, &tool_specs));
+        out.push_str(&dialect::render_prompt_instructions(
+            tool_call_format,
+            &tool_specs,
+        ));
     }
     out.push_str("\nUse the provided tools to accomplish the task. Reply with a concise, dense final answer when you have one — the parent agent will weave it back into the user-visible response.\n\n");
 

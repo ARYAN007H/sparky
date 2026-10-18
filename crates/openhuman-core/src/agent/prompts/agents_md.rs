@@ -3,7 +3,7 @@
 use std::path::Path;
 
 pub use tinyagents_harness::context::{
-    AGENTS_MD_FILENAME, AgentsMdContent, MAX_AGENTS_MD_READ_BYTES,
+    AgentsMdContent, AGENTS_MD_FILENAME, MAX_AGENTS_MD_READ_BYTES,
 };
 
 /// Load one instruction file after applying OpenHuman's path-root policy.

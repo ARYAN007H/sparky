@@ -120,7 +120,7 @@ fn identity_section_creates_missing_workspace_files() {
     let tools: Vec<Box<dyn Tool>> = vec![];
     let prompt_tools = PromptTool::from_tools(&tools);
     let ctx = PromptContext {
-        workspace_dir: &workspace,
+        workspace_dir: workspace.path(),
         model_name: "test-model",
         agent_id: "",
         tools: &prompt_tools,
@@ -165,8 +165,6 @@ fn identity_section_creates_missing_workspace_files() {
         include_str!("SOUL.md"),
         "seeded SOUL.md must be the checked-in template verbatim"
     );
-
-    let _ = std::fs::remove_dir_all(workspace);
 }
 
 #[test]
@@ -702,15 +700,11 @@ fn composed_prompt_keeps_context_and_volatile_system_message_boundaries() {
         ))
     }
 
-    let workspace = std::env::temp_dir().join(format!(
-        "openhuman_prompt_composition_{}",
-        uuid::Uuid::new_v4()
-    ));
-    std::fs::create_dir_all(&workspace).unwrap();
+    let workspace = tempfile::tempdir().unwrap();
     let custom_style = "# User style\nKeep this exact custom style.";
-    std::fs::write(workspace.join("STYLE.md"), custom_style).unwrap();
+    std::fs::write(workspace.path().join("STYLE.md"), custom_style).unwrap();
     let ctx = PromptContext {
-        workspace_dir: &workspace,
+        workspace_dir: workspace.path(),
         model_name: "test-model",
         agent_id: "",
         tools: &[],
@@ -732,9 +726,20 @@ fn composed_prompt_keeps_context_and_volatile_system_message_boundaries() {
         .unwrap();
     assert_eq!(RENDERS.load(std::sync::atomic::Ordering::SeqCst), 1);
     assert!(!rendered.breakpoints.is_empty());
-    assert!(rendered.breakpoints.iter().all(|offset| rendered.text.is_char_boundary(*offset)));
+    assert!(rendered
+        .breakpoints
+        .iter()
+        .all(|offset| rendered.text.is_char_boundary(*offset)));
+    let stable_boundary = rendered.breakpoints[0];
+    assert!(rendered.text[..stable_boundary].contains("Stable 📍"));
+    assert!(rendered.text[..stable_boundary].contains(custom_style));
+    assert!(!rendered.text[..stable_boundary].contains("Context instructions 🧭."));
     let messages = rendered.system_messages();
-    assert_eq!(messages.len(), 2, "Stable+Context remain first, Volatile second");
+    assert_eq!(
+        messages.len(),
+        2,
+        "Stable+Context remain first, Volatile second"
+    );
     assert!(messages[0].contains("Product grounding."));
     assert!(messages[0].contains("Context instructions 🧭."));
     assert!(messages[0].contains("Stable 📍"));
@@ -743,7 +748,11 @@ fn composed_prompt_keeps_context_and_volatile_system_message_boundaries() {
     assert_eq!(messages[0].matches("## Grounding and tool use").count(), 1);
     assert!(messages[1].contains("Volatile identity."));
     assert!(!messages[1].contains(custom_style));
-    let _ = std::fs::remove_dir_all(workspace);
+    assert_eq!(
+        std::fs::read_to_string(workspace.path().join("STYLE.md")).unwrap(),
+        custom_style,
+        "composition must preserve the user-edited STYLE.md bytes"
+    );
 }
 
 #[test]
@@ -751,13 +760,9 @@ fn unmarked_dynamic_body_stays_volatile_after_stable_and_context_messages() {
     fn dynamic_prompt(_ctx: &PromptContext<'_>) -> anyhow::Result<String> {
         Ok("Unmarked dynamic UTF-8 📎 body.".to_string())
     }
-    let workspace = std::env::temp_dir().join(format!(
-        "openhuman_unmarked_prompt_{}",
-        uuid::Uuid::new_v4()
-    ));
-    std::fs::create_dir_all(&workspace).unwrap();
+    let workspace = tempfile::tempdir().unwrap();
     let ctx = PromptContext {
-        workspace_dir: &workspace,
+        workspace_dir: workspace.path(),
         model_name: "test-model",
         agent_id: "",
         tools: &[],
@@ -776,13 +781,16 @@ fn unmarked_dynamic_body_stays_volatile_after_stable_and_context_messages() {
         .build_tiered(&ctx)
         .unwrap();
     let messages = rendered.system_messages();
-    assert_eq!(messages.len(), 2, "the stable prefix and unmarked volatile body stay separate");
+    assert_eq!(
+        messages.len(),
+        2,
+        "the stable prefix and unmarked volatile body stay separate"
+    );
     assert!(rendered.parts.iter().any(|(tier, part)| {
         *tier == PromptTier::Volatile && part.contains("Unmarked dynamic UTF-8 📎 body.")
     }));
     assert!(messages[0].contains("## Grounding and tool use"));
     assert!(messages[1].contains("Unmarked dynamic UTF-8 📎 body."));
-    let _ = std::fs::remove_dir_all(workspace);
 }
 
 #[test]

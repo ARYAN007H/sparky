@@ -500,9 +500,9 @@ macro_rules! implement_owner_prompt_section {
                 &self,
                 context: &PromptContext<'a>,
             ) -> tinyagents_harness::Result<Vec<TieredPromptPart>> {
-                let content = self
-                    .build(context)
-                    .map_err(|error| tinyagents_harness::TinyAgentsError::Model(error.to_string()))?;
+                let content = self.build(context).map_err(|error| {
+                    tinyagents_harness::TinyAgentsError::Model(error.to_string())
+                })?;
                 Ok(vec![TieredPromptPart::new($tier, content)])
             }
         }
