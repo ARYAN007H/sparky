@@ -27,7 +27,8 @@ export const PIN_MAP = {
 
 /**
  * Return sorted, unique repository paths needed by the pin gate. Providers use
- * builtAgainst; other records use submodule or sharesWith. Omit absent paths.
+ * builtAgainst; other records use submodule or sharesWith. Records without a
+ * configured path are omitted.
  */
 export function modulePinRepositories(pinMap = PIN_MAP) {
   return [
