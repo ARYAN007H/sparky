@@ -6,8 +6,9 @@
 //! here so they can be unit-tested without a terminal.
 //!
 //! The single entry point is [`TranscriptState::apply_event`], which folds a
-//! [`WebChannelEvent`] (the same struct the desktop app receives over Socket.IO)
-//! into the transcript. Events for a different `client_id` are ignored, so a
+//! TinyChannels-owned typed [`WebChannelEvent`] (the same wire contract the
+//! desktop app receives over Socket.IO) into the transcript. Events for a
+//! different `client_id` are ignored, so a
 //! process-wide broadcast bus can be drained safely.
 
 use super::activity::{Activity, Status};
