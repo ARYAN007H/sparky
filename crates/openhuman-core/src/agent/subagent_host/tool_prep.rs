@@ -24,7 +24,7 @@ pub(crate) fn subagent_prompt_protocol(
     parent_format: tinytools_agent::dialect::ToolCallFormat,
     tools: &[tinytools::ToolSpec],
 ) -> (tinytools_agent::dialect::ToolCallFormat, String) {
-    let instructions = tinytools_agent::dialect::render_prompt_instructions(parent_format, tools);
+    let instructions = tinytools_agent::dialect::render_protocol_instructions(parent_format, tools);
     (parent_format, instructions)
 }
 
