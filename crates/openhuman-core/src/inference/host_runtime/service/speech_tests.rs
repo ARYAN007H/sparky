@@ -39,3 +39,86 @@ async fn tts_rejects_output_outside_allowed_roots() {
     assert!(error.contains("output_path"), "unexpected error: {error}");
     assert!(!output.parent().unwrap().exists());
 }
+
+#[tokio::test]
+async fn tts_output_path_allows_workspace_and_local_ai_models_roots() {
+    let tmp = tempfile::tempdir().unwrap();
+    let config = enabled_config(&tmp);
+    let runtime = crate::inference::local_runtime_config(&config);
+    let model_root = tinyinference_local::service::paths::config_root_dir(&runtime)
+        .join("models")
+        .join("local-ai");
+
+    for output in [
+        config.workspace_dir.join("speech.wav"),
+        model_root.join("speech.wav"),
+    ] {
+        let resolved = validated_tts_output_path(
+            &config,
+            &runtime,
+            Some(output.to_str().unwrap()),
+        )
+        .await
+        .unwrap();
+        assert!(resolved.ends_with("speech.wav"));
+    }
+}
+
+#[tokio::test]
+async fn tts_output_path_rejects_traversal() {
+    let tmp = tempfile::tempdir().unwrap();
+    let config = enabled_config(&tmp);
+    let runtime = crate::inference::local_runtime_config(&config);
+    let traversal = config.workspace_dir.join("../outside/speech.wav");
+
+    let error = validated_tts_output_path(
+        &config,
+        &runtime,
+        Some(traversal.to_str().unwrap()),
+    )
+    .await
+    .unwrap_err();
+
+    assert!(error.contains("output_path"));
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn tts_output_path_rejects_symlink_escape() {
+    let tmp = tempfile::tempdir().unwrap();
+    let config = enabled_config(&tmp);
+    let runtime = crate::inference::local_runtime_config(&config);
+    let outside = tmp.path().join("outside");
+    std::fs::create_dir_all(&outside).unwrap();
+    let link = config.workspace_dir.join("linked");
+    std::os::unix::fs::symlink(&outside, &link).unwrap();
+    let output = link.join("speech.wav");
+
+    let error = validated_tts_output_path(
+        &config,
+        &runtime,
+        Some(output.to_str().unwrap()),
+    )
+    .await
+    .unwrap_err();
+
+    assert!(error.contains("output_path"));
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn tts_output_path_keeps_always_forbidden_paths_blocked() {
+    let tmp = tempfile::tempdir().unwrap();
+    let config = enabled_config(&tmp);
+    let runtime = crate::inference::local_runtime_config(&config);
+
+    let error = validated_tts_output_path(
+        &config,
+        &runtime,
+        Some("/etc/openhuman-tts-test.wav"),
+    )
+    .await
+    .unwrap_err();
+
+    assert!(error.contains("output_path"));
+}
