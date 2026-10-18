@@ -9,6 +9,10 @@ use crate::agent::prompts::types::*;
 use crate::prompts::{inject_workspace_file, sync_workspace_file};
 use anyhow::Result;
 use std::fmt::Write;
+use tinyagents_harness::prompt::{
+    split_prompt_tiers, PromptTier, TieredPromptPart, PROMPT_TIER_CONTEXT_MARKER,
+    PROMPT_TIER_VOLATILE_MARKER,
+};
 use tinytools::ToolSpec;
 use tinytools_agent::dialect::render_pformat_catalogue;
 use tinytools_agent::dialect::ToolCallFormat;

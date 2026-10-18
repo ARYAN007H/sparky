@@ -1,11 +1,11 @@
 //! OpenHuman's product-specific system-prompt selection and additions.
 
-use crate::agent::prompts::types::{PromptContext, PromptTier, TieredPromptPart};
+use crate::agent::prompts::types::PromptContext;
 use crate::prompts::sections::*;
 use anyhow::{anyhow, Result};
 use std::path::Path;
 use tinyagents_harness::prompt::{
-    DynamicPromptSection as OwnerDynamicPromptSection, PromptComposer,
+    DynamicPromptSection as OwnerDynamicPromptSection, PromptComposer, PromptTier, TieredPromptPart,
 };
 
 /// Bundled seed for the workspace's editable writing-style rules.

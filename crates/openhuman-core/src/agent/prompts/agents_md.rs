@@ -1,10 +1,7 @@
 //! OpenHuman's path-policy adapter for the TinyAgents `AGENTS.md` loader.
 
 use std::path::Path;
-
-pub use tinyagents_harness::context::{
-    AgentsMdContent, AGENTS_MD_FILENAME, MAX_AGENTS_MD_READ_BYTES,
-};
+use tinyagents_harness::context::AgentsMdContent;
 
 /// Load one instruction file after applying OpenHuman's path-root policy.
 pub fn load_agents_md(dir: &Path) -> Option<String> {
@@ -14,7 +11,10 @@ pub fn load_agents_md(dir: &Path) -> Option<String> {
 }
 
 /// Load the workspace and effective action-directory layers once each.
-pub fn load_agents_md_layers(workspace_dir: &Path, action_dir: &Path) -> AgentsMdContent {
+pub fn load_agents_md_layers(
+    workspace_dir: &Path,
+    action_dir: &Path,
+) -> tinyagents_harness::context::AgentsMdContent {
     tinyagents_harness::context::load_agents_md_layers(
         workspace_dir,
         action_dir,

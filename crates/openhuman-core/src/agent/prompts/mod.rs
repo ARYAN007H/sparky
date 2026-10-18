@@ -4,7 +4,7 @@ pub mod types;
 pub use types::*;
 
 pub mod agents_md;
-pub use agents_md::{load_agents_md, load_agents_md_layers, AgentsMdContent, AGENTS_MD_FILENAME};
+pub use agents_md::{load_agents_md, load_agents_md_layers};
 
 pub use crate::prompts::composition::{SystemPromptBuilder, TieredPrompt, GLOBAL_STYLE_SUFFIX};
 

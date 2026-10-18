@@ -1,4 +1,5 @@
 use super::*;
+use tinyagents_harness::prompt::{PromptTier, PROMPT_TIER_CONTEXT_MARKER, PROMPT_TIER_VOLATILE_MARKER};
 
 #[test]
 fn composed_prompt_keeps_context_and_volatile_system_message_boundaries() {

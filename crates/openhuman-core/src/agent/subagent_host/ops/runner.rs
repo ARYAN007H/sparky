@@ -627,7 +627,7 @@ async fn run_typed_mode(
             Some(dir) => crate::agent::prompts::load_agents_md_layers(&parent.workspace_dir, &dir),
             None => {
                 // No resolvable project dir — still surface the workspace layer.
-                crate::agent::prompts::AgentsMdContent {
+                tinyagents_harness::context::AgentsMdContent {
                     global: crate::agent::prompts::load_agents_md(&parent.workspace_dir),
                     local: None,
                 }
@@ -638,7 +638,7 @@ async fn run_typed_mode(
             agent_id = %definition.id,
             "[agents_md] disabled by config; skipping AGENTS.md injection for subagent"
         );
-        crate::agent::prompts::AgentsMdContent::default()
+        tinyagents_harness::context::AgentsMdContent::default()
     };
 
     let prompt_ctx = PromptContext {
