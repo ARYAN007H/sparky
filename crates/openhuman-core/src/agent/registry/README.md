@@ -77,7 +77,7 @@ subagent ids are tolerated here as a separate integrity concern).
 `BUILTINS` is also the registration point for archetypes that live with
 other domains: `skill_setup`
 ([`skills/catalog/agent/`](../../skills/catalog/agent/), feature `skills`), and
-`workflow_builder` and `flow_discovery` ([`flows/agents/`](../../flows/agents/), feature `flows`).
+`workflow_builder` and `flow_discovery` ([`agents/`](./agents/), feature `flows`).
 Workspace-level overrides (`<workspace_dir>/agents/*.toml`, with a
 `~/.openhuman/agents/` fallback) are loaded separately by
 `tinyagents_definition::DefinitionSet::load_dirs` and replace built-ins on id collision;
