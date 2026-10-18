@@ -3012,6 +3012,28 @@ async fn json_rpc_cron_manual_worker_survives_caller_cancel_on_published_tinyflo
         .expect("manual host handler start signal remains open");
     caller.abort();
     assert!(caller.await.unwrap_err().is_cancelled());
+    let queued_response = post_json_rpc(
+        &rpc_base,
+        80_006,
+        "openhuman.cron_runs",
+        json!({ "job_id": job.id }),
+    )
+    .await;
+    let queued_history = peel_logs_envelope(assert_no_jsonrpc_error(
+        &queued_response,
+        "queued cron_runs while the system handler is held",
+    ));
+    let queued_run = queued_history
+        .as_array()
+        .and_then(|runs| runs.first())
+        .unwrap_or_else(|| panic!("the admitted run has its queued history: {queued_history}"));
+    assert_eq!(queued_run["id"], 8, "v1 next=8 seeds the queue slot");
+    assert_eq!(queued_run["status"], "queued");
+    let invocation_id = queued_run["run_id"]
+        .as_str()
+        .filter(|id| !id.is_empty())
+        .expect("the queued run carries the invocation identity")
+        .to_string();
     let _ = release_tx.send(());
 
     let mut seen_events = Vec::new();
@@ -3030,7 +3052,7 @@ async fn json_rpc_cron_manual_worker_survives_caller_cancel_on_published_tinyflo
     assert_eq!(seen_events[0].0, "triggered");
     assert_eq!(seen_events[1], ("completed", true));
 
-    let mut manual_history = String::new();
+    let mut manual_history = serde_json::Value::Null;
     for _ in 0..100 {
         let runs = post_json_rpc(
             &rpc_base,
@@ -3039,23 +3061,32 @@ async fn json_rpc_cron_manual_worker_survives_caller_cancel_on_published_tinyflo
             json!({ "job_id": job.id }),
         )
         .await;
-        manual_history = assert_no_jsonrpc_error(&runs, "cron_runs").to_string();
-        if manual_history.contains("system job") && manual_history.contains("\"status\":\"ok\"") {
+        manual_history = peel_logs_envelope(assert_no_jsonrpc_error(&runs, "cron_runs")).clone();
+        if manual_history.to_string().contains("system job")
+            && manual_history.to_string().contains("\"status\":\"ok\"")
+        {
             break;
         }
         tokio::time::sleep(Duration::from_millis(50)).await;
     }
+    let terminal_run = manual_history
+        .as_array()
+        .and_then(|runs| runs.first())
+        .unwrap_or_else(|| panic!("the released worker committed terminal history: {manual_history}"));
     assert!(
-        manual_history.contains("system job") && manual_history.contains("\"status\":\"ok\""),
+        terminal_run["output"]
+            .as_str()
+            .is_some_and(|output| output.contains("system job"))
+            && terminal_run["status"] == "ok",
         "the released worker committed its terminal history after the caller disconnected: {manual_history}"
     );
     assert!(
-        manual_history.contains("\"id\":8"),
-        "the first post-migration run continues at imported counter value 8: {manual_history}"
+        terminal_run["id"] == 9,
+        "the terminal record follows queued slot 8 from the imported counter: {manual_history}"
     );
     assert!(
-        manual_history.contains("\"run_id\":\""),
-        "the module persisted this manual invocation's identity: {manual_history}"
+        terminal_run["run_id"] == invocation_id,
+        "the terminal record preserves the queued invocation identity: {manual_history}"
     );
     drop(subscription);
 
