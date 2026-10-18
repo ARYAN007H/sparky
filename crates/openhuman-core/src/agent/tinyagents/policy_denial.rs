@@ -21,6 +21,9 @@
 
 use tinytools::status::POLICY_BLOCKED_MARKER;
 use tinytools::PermissionLevel;
+use tinyagents_harness::middleware::library::{
+    StructuredDenialParts, StructuredDenialRenderOptions,
+};
 
 /// Generic workaround for a raw security-policy / autonomy block. These denials
 /// originate deep in the tools / `SecurityPolicy` layer (autonomy tier, command
@@ -169,8 +172,11 @@ impl PolicyDenial<'_> {
             ),
         };
 
-        format!(
-            "Blocked: {blocked}. Reason: {reason}. Workaround: {workaround} {RELAY_INSTRUCTION}"
+        StructuredDenialParts::new(blocked, reason, workaround, RELAY_INSTRUCTION).render_with_options(
+            &StructuredDenialRenderOptions {
+                reason_label: "Reason",
+                relay_separator: " ",
+            },
         )
     }
 }
