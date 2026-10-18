@@ -4,7 +4,8 @@ use async_trait::async_trait;
 use tinyagents_harness::multimodal::{
     config::{FileLimits, ImageLimits},
     MediaFallbackCache, MediaFallbackRenderer, MediaHistoryFallback, MediaRequestConfig,
-    MediaRequestModel, MediaSourceResolver, ResolvedAttachment, ResolvedMedia, TextExtractor,
+    MediaRequestModel, MediaSourceKind, MediaSourceMetadata, MediaSourceResolver,
+    ResolvedAttachment, ResolvedMedia, TextExtractor,
 };
 
 pub(super) fn wrap(
@@ -77,32 +78,75 @@ impl MediaSourceResolver<AttachmentAccessScope> for AttachmentModel {
         max_bytes: usize,
         mime_hint: Option<&str>,
     ) -> Result<ResolvedMedia, String> {
-        if !source.starts_with("data:")
-            && source.contains("://")
+        self.resolve_with_source_metadata(
+            scope,
+            modality,
+            source,
+            max_bytes,
+            &MediaSourceMetadata {
+                kind: MediaSourceKind::Untyped,
+                mime_hint: mime_hint.map(str::to_owned),
+                encoded_len: None,
+            },
+        )
+        .await
+    }
+
+    async fn resolve_with_source_metadata(
+        &self,
+        scope: &AttachmentAccessScope,
+        modality: InputModality,
+        source: &str,
+        max_bytes: usize,
+        metadata: &MediaSourceMetadata,
+    ) -> Result<ResolvedMedia, String> {
+        if (metadata.kind == MediaSourceKind::Url
+            && !source.starts_with("data:")
             && !source.starts_with("http://")
-            && !source.starts_with("https://")
+            && !source.starts_with("https://"))
+            || (metadata.kind == MediaSourceKind::Untyped
+                && !source.starts_with("data:")
+                && source.contains("://")
+                && !source.starts_with("http://")
+                && !source.starts_with("https://"))
         {
             return Err("unsupported media URL scheme".into());
+        }
+        if metadata.kind == MediaSourceKind::Base64
+            && metadata.encoded_len.unwrap_or(source.len()) > 50 * 1024 * 1024 * 4 / 3 + 4
+        {
+            return Err("inline media exceeds size limit".into());
         }
         let block = match modality {
             InputModality::Image => ContentBlock::Image(ImageRef {
                 url: source.to_owned(),
-                mime_type: mime_hint.map(str::to_owned),
+                mime_type: metadata.mime_hint.clone(),
             }),
             InputModality::Audio | InputModality::Video | InputModality::Document => {
-                let media = if source.starts_with("data:")
-                    || source.starts_with("http://")
-                    || source.starts_with("https://")
-                {
-                    MediaRef::Url {
-                        url: source.to_owned(),
-                        media_type: mime_hint.map(str::to_owned),
-                    }
-                } else {
-                    MediaRef::Path {
+                let mime = metadata.mime_hint.clone();
+                let media = match metadata.kind {
+                    MediaSourceKind::Path => MediaRef::Path {
                         path: source.to_owned(),
-                        media_type: mime_hint.map(str::to_owned),
-                    }
+                        media_type: mime,
+                    },
+                    MediaSourceKind::Url => MediaRef::Url {
+                        url: source.to_owned(),
+                        media_type: mime,
+                    },
+                    MediaSourceKind::Base64 => MediaRef::Base64 {
+                        data: source.to_owned(),
+                        media_type: mime.unwrap_or_else(|| "application/octet-stream".into()),
+                    },
+                    MediaSourceKind::Untyped if source.starts_with("data:")
+                        || source.starts_with("http://")
+                        || source.starts_with("https://") => MediaRef::Url {
+                            url: source.to_owned(),
+                            media_type: mime,
+                        },
+                    MediaSourceKind::Untyped => MediaRef::Path {
+                        path: source.to_owned(),
+                        media_type: mime,
+                    },
                 };
                 match modality {
                     InputModality::Audio => ContentBlock::Audio(media),
@@ -132,7 +176,7 @@ impl MediaSourceResolver<AttachmentAccessScope> for AttachmentModel {
                     )
                 })
                 .ok_or_else(|| "image attachment type cannot be determined".to_string())?;
-        } else if let Some(mime_hint) = mime_hint {
+        } else if let Some(mime_hint) = metadata.mime_hint.as_deref() {
             // Typed per-block metadata is authoritative for that reference.
             // Marker references pass no hint and retain source detection.
             mime = mime_hint.to_owned();
