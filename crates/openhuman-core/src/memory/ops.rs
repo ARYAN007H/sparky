@@ -15,11 +15,13 @@ use chrono::Utc;
 #[cfg(feature = "channels")]
 use tinymemory_api::ItemKind;
 use tinymemory_api::{
-    EraseRequest, FetchRequest, ForgetTarget, ItemId, LearningKind, ListRequest, MemoryMeta,
-    MetaFilter, Namespace, Reach, RecallMode, RecallRequest, StoreItem, StoreReceipt, ThreadWindow,
-    TimeHint, WriteOptions,
+    ForgetTarget, MemoryMeta, MetaFilter, Namespace, Reach, RecallMode, StoreItem, StoreReceipt,
+    ThreadWindow, TimeHint, WriteOptions,
 };
 use tinymemory_tools::confine::{Confinement, Policy};
+use tinymemory_tools::ops::{
+    ExploreOptions, FetchOptions, LearningOptions, ListOptions, MemoryOps, RecallOptions,
+};
 
 use crate::config::Config;
 
@@ -62,7 +64,7 @@ pub(crate) fn saas_confinement(config: &Config, policy: Policy) -> Result<Option
 }
 
 /// Default confidence of a learning stored without one.
-pub const DEFAULT_LEARNING_CONFIDENCE: f32 = 0.8;
+pub const DEFAULT_LEARNING_CONFIDENCE: f32 = tinymemory_tools::ops::DEFAULT_LEARNING_CONFIDENCE;
 
 /// `memory_engines_list`.
 #[must_use]
@@ -196,6 +198,15 @@ fn bound(config: &Config) -> Result<BoundEngine> {
     engine::resolve(config).engine()
 }
 
+/// The native request adapter with the authenticated SaaS profile boundary,
+/// or no namespace boundary for a single-user host.
+pub(crate) fn memory_ops(config: &Config) -> Result<MemoryOps> {
+    Ok(match saas_confinement(config, Policy::Clamp)? {
+        Some(confinement) => MemoryOps::new(confinement),
+        None => MemoryOps::unconfined(),
+    })
+}
+
 /// The [`TimeHint`] for `refers_to`, in the user's time zone
 /// ([`Config::time_zone`]).
 fn time_hint(config: &Config, refers_to: Option<RefersTo>) -> Result<Option<TimeHint>> {
@@ -221,16 +232,15 @@ pub async fn recall_with(
     exclude_thread: Option<ThreadWindow>,
 ) -> Result<RecallView> {
     let bound = bound(config)?;
-    let request = RecallRequest {
+    let request = memory_ops(config)?.recall_request(RecallOptions {
         question: params.question,
-        filter: confine_filter(config, params.filter.unwrap_or_default())?,
-        limit: clamp_limit(params.limit),
+        filter: params.filter,
+        limit: params.limit,
         instructions: None,
         refers_to: time_hint(config, params.refers_to)?,
         exclude_thread,
         mode,
-    };
-    request.validate()?;
+    })?;
     let answer = bound.engine.recall(request).await?;
     tracing::debug!(
         engine = %bound.id,
@@ -259,28 +269,15 @@ pub async fn fetch_with(
 ) -> Result<FetchView> {
     let bound = bound(config)?;
     let descriptor = bound.engine.descriptor();
-    let mode = match params.mode {
-        Some(mode) => {
-            descriptor.ensure_mode(mode)?;
-            mode
-        }
-        None => *descriptor
-            .fetch_modes
-            .first()
-            .ok_or_else(|| Error::Unsupported("the engine offers no fetch mode".into()))?,
-    };
-    let request = FetchRequest {
+    let request = memory_ops(config)?.fetch_request(FetchOptions {
         query: params.query,
-        mode,
-        filter: confine_filter(config, params.filter.unwrap_or_default())?,
-        limit: clamp_limit(params.limit),
+        mode: params.mode,
+        filter: params.filter,
+        limit: params.limit,
         cursor: params.cursor,
-        beliefs: 0,
-        max_scopes: None,
         refers_to: time_hint(config, params.refers_to)?,
         exclude_thread,
-    };
-    request.validate()?;
+    }, descriptor)?;
     let page = bound.engine.fetch(request).await?;
     tracing::debug!(engine = %bound.id, hits = page.hits.len(), "[memory:ops] fetch answered");
     Ok(FetchView {
@@ -293,27 +290,15 @@ pub async fn fetch_with(
 /// stores. `host_meta` wins over the caller's `meta` field by field, so a
 /// caller cannot overwrite what the host knows (thread, agent, tool call).
 pub fn learning_item(params: LearnParams, host_meta: Option<MemoryMeta>) -> Result<StoreItem> {
-    let confidence = params.confidence.unwrap_or(DEFAULT_LEARNING_CONFIDENCE);
-    if !(0.0..=1.0).contains(&confidence) {
-        return Err(Error::InvalidRequest(
-            ("confidence must be between 0 and 1").into(),
-        ));
-    }
-    let mut meta = params.meta.unwrap_or_default();
-    if let Some(host) = host_meta {
-        meta = meta.overlay(host);
-    }
-    if meta.observed_at.is_none() {
-        meta.observed_at = Some(Utc::now());
-    }
-    let item = StoreItem::learning(
-        params.text.trim(),
-        params.kind.unwrap_or(LearningKind::Fact),
-        confidence,
-        meta,
-    );
-    item.validate()?;
-    Ok(item)
+    MemoryOps::unconfined().learning_item(LearningOptions {
+        text: params.text,
+        kind: params.kind,
+        confidence: params.confidence,
+        meta: params.meta,
+        host_meta,
+        default_namespace: Namespace::ROOT,
+        now: Utc::now(),
+    })
 }
 
 /// `memory_learn`: returns once the learning is readable.
@@ -334,12 +319,7 @@ pub async fn learn_with(
     host_meta: Option<MemoryMeta>,
     options: WriteOptions,
 ) -> Result<LearnView> {
-    let mut item = learning_item(params, host_meta)?;
-    // The same confinement as `store_item`: a SaaS user's learning lands in
-    // their own tree whatever namespace it names.
-    if let Some(confinement) = saas_confinement(config, Policy::Clamp)? {
-        confinement.item(&mut item)?;
-    }
+    let item = memory_ops(config)?.store_item(learning_item(params, host_meta)?)?;
     let bound = bound(config)?;
     let receipt = bound.engine.store_with(item, options).await?;
     super::lifecycle::prefetch::invalidate(config);
@@ -359,9 +339,7 @@ pub async fn store_item_with(
     mut item: StoreItem,
     options: WriteOptions,
 ) -> Result<StoreReceipt> {
-    if let Some(confinement) = saas_confinement(config, Policy::Clamp)? {
-        confinement.item(&mut item)?;
-    }
+    let item = memory_ops(config)?.store_item(item)?;
     let bound = bound(config)?;
     let receipt = bound.engine.store_with(item, options).await?;
     super::lifecycle::prefetch::invalidate(config);
@@ -370,38 +348,15 @@ pub async fn store_item_with(
 
 /// `memory_forget`.
 pub async fn forget(config: &Config, params: ForgetParams) -> Result<ForgetView> {
-    let ids: Vec<ItemId> = params
-        .ids
-        .into_iter()
-        .map(|id| id.trim().to_string())
-        .filter(|id| !id.is_empty())
-        .map(ItemId)
-        .collect();
-    if ids.is_empty() {
+    if !params.ids.iter().any(|id| !id.trim().is_empty()) {
         return Err(Error::InvalidRequest(
             ("forget needs at least one id").into(),
         ));
     }
     let bound = bound(config)?;
-    // A SaaS user forgets only what lies in their own tree.
-    let reach = match saas_confinement(config, Policy::Clamp)? {
-        Some(confinement) => Some(confinement.reach(params.reach)?),
-        None => params.reach,
-    };
-    let report = match reach {
-        // With a reach the engine forgets by id inside it: `forget_within`
-        // never looks beyond the reach for an id, where `ForgetTarget::Ids`
-        // sweeps every scope of the tree to find one.
-        Some(reach) => {
-            let ids = within_reach(&bound, ids, reach.clone()).await?;
-            if ids.is_empty() {
-                tracing::debug!(engine = %bound.id, "[memory:ops] forget: nothing in reach");
-                return Ok(ForgetView { forgotten: 0 });
-            }
-            bound.engine.forget_within(ids, reach).await?
-        }
-        None => bound.engine.forget(ForgetTarget::Ids(ids)).await?,
-    };
+    let report = memory_ops(config)?
+        .forget(bound.engine.as_ref(), params.ids, params.reach)
+        .await?;
     tracing::debug!(engine = %bound.id, forgotten = report.forgotten, "[memory:ops] forget");
     super::lifecycle::prefetch::invalidate(config);
     Ok(ForgetView {
@@ -644,10 +599,7 @@ pub async fn erase_all(
     // remote wipe; hold the owner barrier until the erase has completed.
     let _writes = super::tool_writes::fence_and_clear(ctx, config).await?;
     super::lifecycle::prefetch::invalidate(config);
-    let mut request = EraseRequest::new(tinymemory_api::Reach::subtree(
-        tinymemory_api::Namespace::ROOT,
-    ));
-    request.whole_tree = true;
+    let request = MemoryOps::unconfined().erase_all_request(true)?;
     tracing::info!(engine = %bound.id, "[memory:ops] erase_all: erasing the whole memory");
     let report = bound.engine.erase(request).await.map_err(|error| {
         tracing::warn!(engine = %bound.id, error = %error, "[memory:ops] erase_all failed");
@@ -688,16 +640,14 @@ async fn within_reach(
 /// `memory_items_list`.
 pub async fn items_list(config: &Config, params: ItemsListParams) -> Result<ItemsListView> {
     let bound = bound(config)?;
-    let request = ListRequest {
-        filter: confine_filter(
-            config,
-            super::explore::narrowed(params.filter, &params.path)?,
-        )?,
-        limit: clamp_limit(params.limit),
+    let preview = params.preview;
+    let request = memory_ops(config)?.list_request(ListOptions {
+        filter: params.filter,
+        path: params.path,
+        limit: params.limit,
         cursor: params.cursor,
-    };
-    request.validate()?;
-    let page = if params.preview {
+    })?;
+    let page = if preview {
         bound.engine.list_preview(request).await?
     } else {
         bound.engine.list(request).await?
@@ -705,14 +655,6 @@ pub async fn items_list(config: &Config, params: ItemsListParams) -> Result<Item
     Ok(ItemsListView {
         items: page.items,
         next_cursor: page.next_cursor,
-    })
-}
-
-/// `filter`, confined to the SaaS user's tree when the process is SaaS.
-pub(crate) fn confine_filter(config: &Config, filter: MetaFilter) -> Result<MetaFilter> {
-    Ok(match saas_confinement(config, Policy::Clamp)? {
-        Some(confinement) => confinement.filter(Some(filter))?,
-        None => filter,
     })
 }
 
