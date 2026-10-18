@@ -136,6 +136,56 @@ fn flow_trace_config_uses_bus_trigger_and_flow_coordinates() {
 }
 
 #[test]
+fn flow_batch_keeps_trace_metadata_and_agent_graph_node_keys() {
+    let thread_id = "flow:flow-1:uuid-1";
+    let client = LangfuseClient::new(
+        "https://backend.test/telemetry/langfuse/ingestion",
+        LangfuseAuth::Bearer {
+            token: "token".to_string(),
+        },
+    )
+    .expect("client");
+    let exporter = build_flow_exporter(client, "flow-1");
+    let trace = build_flow_trace_config(
+        "Daily digest",
+        "flow-1",
+        thread_id,
+        "completed",
+        FlowRunTrigger::Rpc,
+    );
+    let payload = exporter
+        .build_ingestion_batch(trace, &sample_observations(thread_id))
+        .expect("batch");
+    let batch = payload["batch"].as_array().expect("batch array");
+
+    let trace_event = &batch[0];
+    assert_eq!(trace_event["type"], "trace-create");
+    assert_eq!(trace_event["body"]["id"], thread_id);
+    assert_eq!(trace_event["body"]["sessionId"], "flow:flow-1");
+    assert_eq!(trace_event["body"]["name"], "flow.run:Daily digest");
+    assert_eq!(trace_event["body"]["metadata"]["flow_id"], "flow-1");
+    assert_eq!(trace_event["body"]["metadata"]["status"], "completed");
+    assert_eq!(trace_event["body"]["metadata"]["source"], "flows");
+    assert_eq!(trace_event["body"]["metadata"]["run_type"], "flow");
+    assert_eq!(trace_event["body"]["metadata"]["trigger"], "rpc");
+    assert_eq!(trace_event["body"]["tags"], json!(["run:flow", "trigger:rpc"]));
+    assert_eq!(trace_event["body"]["release"], APP_VERSION);
+    assert_eq!(trace_event["body"]["metadata"]["app_version"], APP_VERSION);
+
+    let node = batch
+        .iter()
+        .find(|event| {
+            event["type"] == "span-create"
+                && event["body"]["id"] == format!("{thread_id}:node:fetch:1")
+        })
+        .expect("node span");
+    assert_eq!(node["body"]["traceId"], thread_id);
+    assert_eq!(node["body"]["metadata"]["langgraph_node"], "fetch");
+    assert_eq!(node["body"]["metadata"]["langgraph_step"], 1);
+    assert_eq!(node["body"]["metadata"]["flow_id"], "flow-1");
+}
+
+#[test]
 fn flow_export_uses_the_backend_v4_otlp_route() {
     let client = LangfuseClient::new(
         "https://staging-api.tinyhumans.ai/telemetry/langfuse/ingestion",
@@ -164,6 +214,20 @@ async fn flow_export_is_a_noop_when_usage_sharing_is_disabled() {
         "completed",
         FlowRunTrigger::Rpc,
         &sample_observations("flow:flow-1:uuid-1"),
+    )
+    .await;
+}
+
+#[tokio::test]
+async fn flow_export_with_empty_observations_is_a_noop() {
+    export_graph_run_trace(
+        &Config::default(),
+        "Daily digest",
+        "flow-1",
+        "flow:flow-1:uuid-1",
+        "completed",
+        FlowRunTrigger::AppEvent,
+        &[],
     )
     .await;
 }
