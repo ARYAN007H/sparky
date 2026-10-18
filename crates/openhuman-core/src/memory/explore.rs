@@ -62,13 +62,14 @@ pub async fn explore(config: &Config, params: ExploreParams) -> Result<ExplorePa
     let bound = engine::resolve(config).engine()?;
     let facet = params.facet;
     let depth = params.path.len();
+    let filter = narrowed(params.filter, &params.path)?;
     let page = super::ops::memory_ops(config)?
         .explore(
             bound.engine.as_ref(),
             ExploreOptions {
                 facet: params.facet,
-                path: params.path,
-                filter: params.filter,
+                path: Vec::new(),
+                filter: Some(filter),
                 limit: params.limit,
                 scan_limit: params.scan_limit,
             },
