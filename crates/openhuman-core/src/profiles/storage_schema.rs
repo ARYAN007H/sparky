@@ -119,7 +119,7 @@ fn lease_v2(old: &Value) -> Option<Value> {
 ///
 /// A storage error; the records not yet moved stay for the next open.
 pub async fn migrate_legacy_leases(scoped: &ScopedStorage) -> Result<usize> {
-    use tinystoragedrivers::{Capability, Key, Precondition, Query};
+    use tinystoragedrivers::{Capability, DocumentStoreExt, Key, Precondition, Query};
     let docs = scoped.documents();
     if !docs
         .capabilities()
