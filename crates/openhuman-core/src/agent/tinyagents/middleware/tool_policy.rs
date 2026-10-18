@@ -80,8 +80,10 @@ impl ToolPolicyMiddleware {
         });
         let denial: DenialRenderer = Arc::new(|call, policy, decision| {
             let (action, reason) = match decision {
-                PolicyDecision::RequireApproval { reason } => ("requires approval", reason),
-                PolicyDecision::Deny { reason } => ("denied", reason),
+                PolicyDecision::RequireApproval { reason } => {
+                    ("requires approval", reason.as_str())
+                }
+                PolicyDecision::Deny { reason } => ("denied", reason.as_str()),
                 PolicyDecision::Allow => ("allowed", ""),
             };
             tinytools::registry::denials::record(call.name.as_str(), policy, action, reason);
