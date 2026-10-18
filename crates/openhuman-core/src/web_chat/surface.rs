@@ -2,7 +2,6 @@
 //! module. Canonical output crosses TinyBus; the host retains event delivery,
 //! tenant routing, and web-chat-specific lifecycle policy.
 
-use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 
 use sha2::Digest as _;
@@ -38,10 +37,6 @@ pub(crate) struct Surface {
     ctx: DispatchCtx,
     scope_key: String,
     ids: TurnIds,
-    /// The round of the narration the next `chat_interim` carries. The
-    /// canonical `Clarification` output has no round, and the frontend keys one
-    /// interim bubble per round, so the host supplies it here.
-    interim_round: Arc<AtomicU32>,
 }
 
 impl Surface {
@@ -74,7 +69,6 @@ impl Surface {
             ctx: ctx.clone(),
             scope_key,
             ids,
-            interim_round: Arc::new(AtomicU32::new(0)),
         }
     }
 
@@ -125,10 +119,17 @@ impl Surface {
         }
     }
 
-    fn publish(&self, event: bus_web::WebChannelEvent) {
+    /// Close a canonical projection even when a turn ended without a terminal
+    /// output event. Safe to call after the module already auto-closed it.
+    pub(crate) async fn close(&self) {
+        let mut state = self.state.lock().await;
+        self.end_if_needed(&mut state).await;
+    }
+
+    fn publish(&self, event: bus_web::WebChannelEvent, interim_round: Option<u32>) {
         let mut flat = WebChannelEvent::from(event);
         if flat.event == "chat_interim" && flat.round.is_none() {
-            flat.round = Some(self.interim_round.load(Ordering::Relaxed)).filter(|r| *r > 0);
+            flat.round = interim_round.filter(|round| *round > 0);
         }
         publish_web_channel_event_in(&self.ctx, flat);
     }
@@ -137,6 +138,10 @@ impl Surface {
     /// sequence order. Module errors fail closed; the host never reimplements
     /// the projection locally.
     pub(crate) async fn output(&self, event: ChannelOutputEvent) {
+        self.project(event, None).await;
+    }
+
+    async fn project(&self, event: ChannelOutputEvent, interim_round: Option<u32>) {
         let mut state = self.state.lock().await;
         if state.closed {
             log::debug!(
@@ -155,7 +160,6 @@ impl Surface {
                 return;
             }
         };
-        let terminal = matches!(&event, ChannelOutputEvent::FinalMessage { .. });
         let projected: tinychannels_bus::module_web_output::WebOutputEvents = match state
             .module
             .call_confidential(
@@ -174,8 +178,9 @@ impl Surface {
                 return;
             }
         };
+        let terminal = projected.events.iter().any(is_terminal);
         for event in projected.events {
-            self.publish(event);
+            self.publish(event, interim_round);
         }
         if terminal {
             self.end_if_needed(&mut state).await;
@@ -184,8 +189,7 @@ impl Surface {
 
     /// The leading narration of `round`, flushed as an interim bubble.
     pub(crate) async fn interim(&self, round: u32, text: String) {
-        self.interim_round.store(round, Ordering::Relaxed);
-        self.output(ChannelOutputEvent::Clarification { prompt: text })
+        self.project(ChannelOutputEvent::Clarification { prompt: text }, Some(round))
             .await;
     }
 
@@ -200,7 +204,7 @@ impl Surface {
                 | bus_web::WebChannelEvent::ChatCancelled { .. }
         );
         let mut state = self.state.lock().await;
-        self.publish(event);
+        self.publish(event, None);
         if terminal {
             self.end_if_needed(&mut state).await;
         }
@@ -215,6 +219,50 @@ impl Surface {
             ..Default::default()
         }
     }
+}
+
+impl Drop for Surface {
+    fn drop(&mut self) {
+        if Arc::strong_count(&self.state) != 1 {
+            return;
+        }
+        let Ok(runtime) = tokio::runtime::Handle::try_current() else {
+            return;
+        };
+        let state = Arc::clone(&self.state);
+        let request_id = self.ids.request_id.clone();
+        runtime.spawn(async move {
+            let mut state = state.lock().await;
+            state.closed = true;
+            let Some(handle) = state.handle.take() else {
+                return;
+            };
+            if let Err(error) = state
+                .module
+                .call_confidential::<()>(
+                    "tinychannels",
+                    tinychannels_bus::methods::END_WEB_TURN,
+                    (EndWebTurn {
+                        handle: handle.handle,
+                    },),
+                )
+                .await
+            {
+                log::warn!(
+                    "[web-channel] dropped projection turn cleanup failed request_id={request_id}: {error}"
+                );
+            }
+        });
+    }
+}
+
+fn is_terminal(event: &bus_web::WebChannelEvent) -> bool {
+    matches!(
+        event,
+        bus_web::WebChannelEvent::ChatDone { .. }
+            | bus_web::WebChannelEvent::ChatError { .. }
+            | bus_web::WebChannelEvent::ChatCancelled { .. }
+    )
 }
 
 #[cfg(test)]

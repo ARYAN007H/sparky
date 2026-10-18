@@ -483,6 +483,7 @@ impl ProgressProjection {
             self.round,
             self.events_seen,
         );
+        self.surface.close().await;
     }
 }
 
