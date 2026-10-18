@@ -16,10 +16,7 @@ impl tinyagents_session::port::TurnStates for FailingTurnStateDelete {
         unreachable!("only delete is used by this fixture")
     }
 
-    fn get(
-        &self,
-        _: &str,
-    ) -> Result<Option<tinyagents_session::turn_state::TurnState>, String> {
+    fn get(&self, _: &str) -> Result<Option<tinyagents_session::turn_state::TurnState>, String> {
         unreachable!("only delete is used by this fixture")
     }
 
