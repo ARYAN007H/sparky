@@ -245,3 +245,31 @@ async fn double_cloud_parse_failure_without_local_returns_terminal_not_err() {
         "1 cloud + 1 cloud retry, no local"
     );
 }
+
+#[tokio::test]
+async fn in_flight_breaker_defers_before_dispatch_for_one_second() {
+    let state = new_retry_state();
+    let attempt = state
+        .try_acquire("stub-cloud:stub-cloud-model".to_string(), monotonic_ms())
+        .expect("held attempt");
+    let before = now_ms();
+
+    let outcome = run_triage_with_arms_for_test_with_state(
+        cloud_arm(),
+        None,
+        &envelope(),
+        &state,
+    )
+    .await
+    .expect("deferred outcome");
+
+    match outcome {
+        TriageOutcome::Deferred { defer_until_ms, .. } => {
+            assert!((before + 900..=before + 1_500).contains(&defer_until_ms));
+        }
+        TriageOutcome::Decision(_) | TriageOutcome::Terminal { .. } => {
+            panic!("expected an in-flight deferral")
+        }
+    }
+    drop(attempt);
+}
