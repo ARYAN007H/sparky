@@ -78,7 +78,14 @@ impl ToolPolicyMiddleware {
             policy,
             tool_sets: host.tool_sets.clone(),
         });
-        let denial: DenialRenderer = Arc::new(|call, policy, decision| match decision {
+        let denial: DenialRenderer = Arc::new(|call, policy, decision| {
+            let (action, reason) = match decision {
+                PolicyDecision::RequireApproval { reason } => ("requires approval", reason),
+                PolicyDecision::Deny { reason } => ("denied", reason),
+                PolicyDecision::Allow => ("allowed", ""),
+            };
+            tinytools::registry::denials::record(call.name.as_str(), policy, action, reason);
+            match decision {
                 PolicyDecision::RequireApproval { reason } => PolicyDenial::ApprovalRequired {
                     tool: &call.name,
                     policy,
@@ -92,7 +99,8 @@ impl ToolPolicyMiddleware {
                 }
                 .render(),
                 PolicyDecision::Allow => String::new(),
-            });
+            }
+        });
         let post_host = host.clone();
         let gate = ToolPolicyGateMiddleware::new(desktop_policy)
             .with_denial_renderer(denial)
