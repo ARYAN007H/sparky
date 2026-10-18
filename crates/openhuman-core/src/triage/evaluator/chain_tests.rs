@@ -9,6 +9,13 @@ fn dropped_attempt_releases_in_flight_state() {
 }
 
 #[test]
+fn monotonic_clock_does_not_move_backwards() {
+    let before = monotonic_ms();
+    let after = monotonic_ms();
+    assert!(after >= before);
+}
+
+#[test]
 fn only_one_initial_outage_attempt_can_be_in_flight() {
     let state = new_retry_state();
 

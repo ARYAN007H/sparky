@@ -1,4 +1,10 @@
+use super::super::chain::record_outage;
 use super::*;
+use tinyagents_harness::retry::{PersistentFailoverBreaker, PersistentFailoverBreakerConfig};
+
+fn wall_clock_ms() -> i64 {
+    chrono::Utc::now().timestamp_millis()
+}
 
 #[test]
 fn outage_backoff_is_exponential_and_has_terminal_limit() {
@@ -34,12 +40,10 @@ fn outage_failure_maps_to_deferred_then_terminal_host_outcomes() {
     });
 
     for failure in 1..=8 {
-        let mut attempt = state
-            .try_acquire("stub-cloud".to_string(), monotonic_ms())
-            .expect("attempt");
-        let before = now_ms();
+        let mut attempt = begin_outage_attempt(Some(&state), "stub-cloud").expect("attempt");
+        let before = wall_clock_ms();
         let outcome = record_outage(Some(&mut attempt)).expect("host outcome");
-        let after = now_ms();
+        let after = wall_clock_ms();
         if failure < 8 {
             match outcome {
                 TriageOutcome::Deferred {
@@ -269,15 +273,14 @@ async fn double_cloud_parse_failure_without_local_returns_terminal_not_err() {
 #[tokio::test]
 async fn in_flight_breaker_defers_before_dispatch_for_one_second() {
     let state = new_retry_state();
-    let attempt = state
-        .try_acquire("stub-cloud:stub-cloud-model".to_string(), monotonic_ms())
-        .expect("held attempt");
-    let before = now_ms();
+    let attempt =
+        begin_outage_attempt(Some(&state), "stub-cloud:stub-cloud-model").expect("held attempt");
+    let before = wall_clock_ms();
 
     let outcome = run_triage_with_arms_for_test_with_state(cloud_arm(), None, &envelope(), &state)
         .await
         .expect("deferred outcome");
-    let after = now_ms();
+    let after = wall_clock_ms();
 
     match outcome {
         TriageOutcome::Deferred { defer_until_ms, .. } => {

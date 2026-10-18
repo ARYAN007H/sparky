@@ -222,6 +222,16 @@
   {
     "file": "crates/openhuman-core/src/triage/evaluator/chain.rs",
     "scope": "",
+    "name": "TRIAGE_MONOTONIC_START",
+    "type": "OnceLock<Instant>",
+    "count": 1,
+    "category": "A",
+    "reason": "Provides one monotonic millisecond epoch for provider/model outage-breaker timestamps across all calls in the process; it stores no tenant or trigger data.",
+    "verification": "triage/evaluator/chain_tests.rs: monotonic_clock_does_not_move_backwards; triage/evaluator/chain_tests.rs: only_one_initial_outage_attempt_can_be_in_flight"
+  },
+  {
+    "file": "crates/openhuman-core/src/triage/evaluator/chain.rs",
+    "scope": "",
     "name": "TRIAGE_RETRY_STATE",
     "type": "OnceLock<RetryState>",
     "count": 1,
