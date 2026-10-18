@@ -9,14 +9,12 @@
 //! own [`memory_adapter`] module, per this repo's ~500-line file-size
 //! convention (`caps/` is already large); the durable SQLite checkpoint
 //! backend lives in `tinyflows_sqlite::checkpoint`; run observability logging lives
-//! in [`observability`]; post-run Langfuse export of a run's durable graph
-//! observations lives in [`langfuse_export`]. The `flows::` domain
+//! in [`observability`]. The `flows::` domain
 //! (`crates/openhuman-core/src/flows/ops.rs`) calls [`build_capabilities`] /
-//! [`open_flow_checkpointer`] to drive a run and
-//! [`langfuse_export::export_flow_run_trace`] after it settles.
+//! [`open_flow_checkpointer`] to drive a run and adapts engine observations
+//! for the agent-owned progress tracing exporter after it settles.
 
 pub mod caps;
-pub mod langfuse_export;
 pub mod memory_adapter;
 pub mod observability;
 pub mod state;
