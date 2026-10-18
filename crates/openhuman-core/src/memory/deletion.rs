@@ -125,8 +125,7 @@ impl DeletionExecutor for Executor<'_> {
         let bound = engine::resolve(self.config)
             .engine()
             .map_err(|error| error.code().to_string())?;
-        let ops = super::ops::memory_ops(self.config)
-            .map_err(|error| error.code().to_string())?;
+        let ops = super::ops::memory_ops(self.config).map_err(|error| error.code().to_string())?;
         ops.forget_or_enqueue(Some(bound.engine.as_ref()), deletion.clone(), |deletion| {
             enqueue(&self.config.workspace_dir, deletion);
         })
