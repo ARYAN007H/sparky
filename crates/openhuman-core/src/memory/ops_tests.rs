@@ -187,12 +187,14 @@ async fn forget_needs_an_id() {
 fn host_meta_wins_over_caller_meta() {
     let caller = MemoryMeta {
         thread_id: Some("forged".into()),
+        channel: Some("caller-channel".into()),
         repo: Some("owner/repo".into()),
         tags: vec!["mine".into()],
         ..MemoryMeta::default()
     };
     let host = MemoryMeta {
         thread_id: Some("t-real".into()),
+        channel: Some("telegram".into()),
         agent_id: Some("orchestrator".into()),
         tool_call: Some(ToolCallRef {
             name: "memory".into(),
@@ -217,6 +219,7 @@ fn host_meta_wins_over_caller_meta() {
     .unwrap();
     let meta = item.meta();
     assert_eq!(meta.thread_id.as_deref(), Some("t-real"));
+    assert_eq!(meta.channel.as_deref(), Some("telegram"));
     assert_eq!(meta.agent_id.as_deref(), Some("orchestrator"));
     assert_eq!(
         meta.repo.as_deref(),
@@ -239,6 +242,25 @@ fn host_meta_wins_over_caller_meta() {
         }
         other => panic!("expected a learning, got {:?}", other.kind()),
     }
+}
+
+#[test]
+fn host_metadata_none_preserves_caller_channel() {
+    let item = learning_item(
+        LearnParams {
+            text: "likes tea".into(),
+            kind: None,
+            confidence: None,
+            meta: Some(MemoryMeta {
+                channel: Some("caller-channel".into()),
+                ..MemoryMeta::default()
+            }),
+        },
+        Some(MemoryMeta::default()),
+    )
+    .unwrap();
+
+    assert_eq!(item.meta().channel.as_deref(), Some("caller-channel"));
 }
 
 #[test]
