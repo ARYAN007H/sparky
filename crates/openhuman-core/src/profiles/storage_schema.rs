@@ -115,16 +115,23 @@ fn lease_v2(old: &Value) -> Option<Value> {
 /// `tsd.leases` wins: it is newer. Epochs carry over, so a holder fenced at
 /// the old epoch stays fenced. Returns the records moved.
 ///
+/// This is a stop-the-world cutover, like the rest of schema v2 (the registry
+/// in this same scope moves the same way): every node of a deployment must
+/// run this version, because an old node would acquire in a recreated
+/// `leases` collection that new nodes never read.
+///
 /// # Errors
 ///
 /// A storage error; the records not yet moved stay for the next open.
 pub async fn migrate_legacy_leases(scoped: &ScopedStorage) -> Result<usize> {
     use tinystoragedrivers::{Capability, DocumentStoreExt, Key, Precondition, Query};
     let docs = scoped.documents();
-    if !docs
+    // A driver that cannot list collections is asked for the records
+    // directly, so a live legacy lease is never silently ignored.
+    if docs
         .capabilities()
         .contains(Capability::CollectionEnumeration)
-        || !docs
+        && !docs
             .collections("")
             .await?
             .iter()

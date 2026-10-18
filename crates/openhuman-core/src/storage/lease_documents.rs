@@ -45,9 +45,10 @@ pub struct DocumentLeases {
     /// The epoch this instance holds per key and the generation of its latest
     /// grant (see the module docs): a superseded grant cannot renew.
     held: Mutex<HashMap<String, (u64, Version)>>,
-    /// Serializes `acquire` on this instance so an older completion cannot
-    /// overwrite newer held state.
-    acquire_gate: tokio::sync::Mutex<()>,
+    /// Serializes acquire, renew and release on this instance, so the
+    /// latest-grant check, the tsd call and the held-state update are one
+    /// step and an older completion cannot overwrite newer held state.
+    gate: tokio::sync::Mutex<()>,
     declared: tokio::sync::OnceCell<()>,
 }
 
@@ -80,7 +81,7 @@ impl DocumentLeases {
             // the instant it is issued.
             ttl_ms: i64::try_from(ttl.as_millis()).unwrap_or(i64::MAX).max(1),
             held: Mutex::new(HashMap::new()),
-            acquire_gate: tokio::sync::Mutex::new(()),
+            gate: tokio::sync::Mutex::new(()),
             declared: tokio::sync::OnceCell::new(),
         }
     }
@@ -208,7 +209,7 @@ impl LeaseStore for DocumentLeases {
     async fn acquire(&self, key: &str, now_ms: u64) -> Result<LeaseGrant, LeaseError> {
         validate_key(key)?;
         self.declare().await?;
-        let _gate = self.acquire_gate.lock().await;
+        let _gate = self.gate.lock().await;
         let outcome = self
             .leases_at(now_ms)
             .acquire_with(Acquire {
@@ -252,6 +253,7 @@ impl LeaseStore for DocumentLeases {
 
     async fn renew(&self, grant: &LeaseGrant, now_ms: u64) -> Result<LeaseGrant, LeaseError> {
         validate_key(&grant.key)?;
+        let _gate = self.gate.lock().await;
         if now_ms >= grant.expires_at_ms || !self.is_latest(grant) {
             tracing::info!(
                 target: "openhuman::storage::lease",
@@ -303,6 +305,7 @@ impl LeaseStore for DocumentLeases {
 
     async fn release(&self, grant: LeaseGrant) -> Result<(), LeaseError> {
         validate_key(&grant.key)?;
+        let _gate = self.gate.lock().await;
         if !self.is_latest(&grant) {
             return Err(LeaseError::Lost);
         }
