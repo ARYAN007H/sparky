@@ -164,7 +164,7 @@ fn time_hint(config: &Config, refers_to: Option<RefersTo>) -> Result<Option<Time
     };
     TimeHint::new(from, to.unwrap_or(from), Some(config.time_zone()))
         .map(Some)
-        .map_err(Error::from)
+        
 }
 
 /// `memory_recall`.
