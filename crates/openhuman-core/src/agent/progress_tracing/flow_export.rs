@@ -170,5 +170,5 @@ pub(crate) async fn export_graph_run_trace(
 }
 
 #[cfg(test)]
-#[path = "graph_langfuse_tests.rs"]
+#[path = "flow_export_tests.rs"]
 mod tests;
