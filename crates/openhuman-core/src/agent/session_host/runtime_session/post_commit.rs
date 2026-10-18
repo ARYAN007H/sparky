@@ -26,6 +26,30 @@ use std::time::{Duration, Instant};
 
 use tinyinference_llm::message::Message;
 
+pub(super) async fn finalize_deferred_terminal(
+    sidecar: &std::sync::Mutex<crate::agent::tinyagents::host::run_context::SessionTurnSidecar>,
+    terminal: &tinyagents_runtime::SessionTerminal,
+) {
+    let (deferred, stop, turn) = {
+        let mut sidecar = sidecar
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        (
+            sidecar.deferred_terminal.take(),
+            sidecar.stop.clone(),
+            (sidecar.model_calls as u32).max(1),
+        )
+    };
+    let Some(deferred) = deferred else {
+        return;
+    };
+    match terminal {
+        tinyagents_runtime::SessionTerminal::Completed(_) => deferred.finish(stop, turn).await,
+        tinyagents_runtime::SessionTerminal::Cancelled => deferred.finish_cancelled().await,
+        tinyagents_runtime::SessionTerminal::Failed(_) => deferred.finish_failed().await,
+    }
+}
+
 /// How long a new turn waits for the previous turn's deferred post-commit
 /// work before it proceeds anyway. Generous: the work is a local goal-store
 /// update. The bound only exists so a wedged store cannot wedge the thread.
