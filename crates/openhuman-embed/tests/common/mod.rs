@@ -95,6 +95,7 @@ pub fn runtime_without_master_key() -> tokio::runtime::Runtime {
         .max_blocking_threads(MAX_BLOCKING_THREADS)
         .build()
         .expect("tokio runtime");
+    #[cfg(feature = "modules")]
     link_tinyflows(&runtime);
     runtime
 }
