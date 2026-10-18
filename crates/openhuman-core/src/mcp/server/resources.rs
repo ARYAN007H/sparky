@@ -169,7 +169,23 @@ pub fn resource_specs() -> Vec<ResourceSpec> {
 /// The `resources/read` result for `uri`, or
 /// [`ToolCallError::ResourceNotFound`] (`-32002`) when the catalog has no such
 /// entry. TinyMCP has already rejected a missing or blank `uri`.
-pub fn read_resource(uri: &str) -> Result<Value, ToolCallError> {
+pub async fn read_resource(
+    ctx: &crate::core::runtime::DispatchCtx,
+    uri: &str,
+) -> Result<Value, ToolCallError> {
+    #[cfg(feature = "flows")]
+    if let Some(agent_id) = flow_prompt_agent_id(uri) {
+        let config = ctx
+            .load_config()
+            .await
+            .map_err(|_| ToolCallError::Internal("TinyFlows prompt config is unavailable".into()))?;
+        return read_flow_prompt(&config, uri, agent_id).await;
+    }
+
+    read_static_resource(uri)
+}
+
+fn read_static_resource(uri: &str) -> Result<Value, ToolCallError> {
     let resource = RESOURCE_CATALOG
         .iter()
         .find(|r| r.uri == uri)
@@ -183,13 +199,38 @@ pub fn read_resource(uri: &str) -> Result<Value, ToolCallError> {
         resource.content.len()
     );
 
-    Ok(json!({
+    Ok(resource_contents(uri, resource.content))
+}
+
+#[cfg(feature = "flows")]
+fn flow_prompt_agent_id(uri: &str) -> Option<&'static str> {
+    match uri {
+        "openhuman://prompts/agents/flow_discovery" => Some("flow_discovery"),
+        "openhuman://prompts/agents/workflow_builder" => Some("workflow_builder"),
+        _ => None,
+    }
+}
+
+#[cfg(feature = "flows")]
+async fn read_flow_prompt(
+    config: &crate::config::Config,
+    uri: &str,
+    agent_id: &str,
+) -> Result<Value, ToolCallError> {
+    let text = crate::agent::prompts::flow_archetype::fetch_prompt(config, agent_id)
+        .await
+        .map_err(|_| ToolCallError::Internal("TinyFlows prompt is unavailable".into()))?;
+    Ok(resource_contents(uri, &text))
+}
+
+fn resource_contents(uri: &str, text: &str) -> Value {
+    json!({
         "contents": [{
-            "uri": resource.uri,
+            "uri": uri,
             "mimeType": MIME_TYPE,
-            "text": resource.content
+            "text": text
         }]
-    }))
+    })
 }
 
 #[cfg(test)]
