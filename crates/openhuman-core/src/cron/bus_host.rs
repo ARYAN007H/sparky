@@ -129,6 +129,13 @@ impl Binding {
         DispatchCtx::from_weak(self.context.as_ref())
     }
 
+    /// Pin the bound context for a finite module lifecycle handoff. The host
+    /// registration itself keeps only the weak reference, avoiding a cycle
+    /// through long-lived scheduler state.
+    pub(crate) fn pin_context(&self) -> Option<Arc<CoreContext>> {
+        self.context.as_ref().and_then(Weak::upgrade)
+    }
+
     /// Runs `fut` under the bound context. A context that has since been
     /// dropped (its agent is no longer live) runs `fut` as the caller is.
     pub(crate) async fn within<F: Future>(&self, fut: F) -> F::Output {

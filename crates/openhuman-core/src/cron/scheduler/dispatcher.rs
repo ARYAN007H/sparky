@@ -65,6 +65,7 @@ pub(crate) async fn run_job_now(
     reply_rx
         .await
         .map_err(|_| anyhow!("cron manual worker owner stopped before reporting admission"))?
+        .map_err(anyhow::Error::msg)
 }
 
 async fn own_manual_run(
@@ -178,15 +179,19 @@ async fn own_manual_run(
                 {
                     Ok(Some(state)) => state,
                     // The released contract defines absence as no retained worker
-                    // in this module generation. It is quiescent, but does not
-                    // prove admission or success.
+                    // in this module generation. We cannot infer that the
+                    // service is still in the generation that prepared this
+                    // handle, so keep the callback and context and reconcile.
                     Ok(None) => {
                         if let Some(reply_tx) = reply_tx.take() {
                             let _ = reply_tx.send(Err(
                                 "cron manual worker disappeared before a terminal result".to_string(),
                             ));
                         }
-                        return Ok(());
+                        tracing::debug!("[cron:scheduler] manual handle absent without observed terminal state; retaining callback while reconciling");
+                        tokio::time::sleep(retry_delay).await;
+                        retry_delay = (retry_delay * 2).min(Duration::from_secs(1));
+                        continue;
                     }
                     Err(error) => {
                         tracing::debug!(error = %error.wire_message(), "[cron:scheduler] retrying WaitManualRun");
@@ -259,7 +264,29 @@ async fn own_manual_run(
         };
         match result {
             Ok(true) => break,
-            Ok(false) => tracing::debug!("[cron:scheduler] terminal manual handle not yet acknowledged"),
+            Ok(false) => {
+                tracing::debug!("[cron:scheduler] terminal manual handle not yet acknowledged");
+                match module::proxy(&config).await {
+                    Ok(proxy) => match proxy
+                        .call::<Option<ManualRunState>>(
+                            members::WAIT_MANUAL_RUN,
+                            (WaitManualRun {
+                                handle: ack.handle.clone(),
+                            },),
+                        )
+                        .await
+                    {
+                        // The worker's terminal state was observed before
+                        // Ack, so absence now means the acknowledgement's
+                        // effect committed despite an earlier lost response.
+                        Ok(None) => break,
+                        Ok(Some(ManualRunState::Terminal { .. })) => {}
+                        Ok(Some(_)) => tracing::warn!("[cron:scheduler] acknowledged manual worker returned to a nonterminal state"),
+                        Err(error) => tracing::debug!(error = %error.wire_message(), "[cron:scheduler] reconciling manual acknowledgement"),
+                    },
+                    Err(error) => tracing::debug!(%error, "[cron:scheduler] reconciling manual acknowledgement"),
+                }
+            }
             Err(error) => tracing::debug!(error = %error.wire_message(), "[cron:scheduler] retrying ambiguous AcknowledgeManualRun"),
         }
         tokio::time::sleep(retry_delay).await;
@@ -464,6 +491,7 @@ impl Drop for JobDispatcher {
             return;
         };
         let config = self.binding.config();
+        let context_pin = self.binding.pin_context();
         let Ok(runtime) = tokio::runtime::Handle::try_current() else {
             return;
         };
@@ -472,6 +500,7 @@ impl Drop for JobDispatcher {
         // is retried while the registration remains owned by this task.
         runtime.spawn(async move {
             let Started { handle, host } = started;
+            let _context_pin = context_pin;
             let _host_lifetime = host;
             let mut retry_delay = Duration::from_millis(100);
             loop {
