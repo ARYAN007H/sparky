@@ -489,6 +489,38 @@ impl UserIdentitySection {
     }
 }
 
+macro_rules! implement_owner_prompt_section {
+    ($section:ty, $tier:expr) => {
+        impl<'a> tinyagents_harness::prompt::DynamicPromptSection<PromptContext<'a>> for $section {
+            fn name(&self) -> &str {
+                self.name()
+            }
+
+            fn render(
+                &self,
+                context: &PromptContext<'a>,
+            ) -> tinyagents_harness::Result<Vec<TieredPromptPart>> {
+                let content = self
+                    .build(context)
+                    .map_err(|error| tinyagents_harness::TinyAgentsError::Model(error.to_string()))?;
+                Ok(vec![TieredPromptPart::new($tier, content)])
+            }
+        }
+    };
+}
+
+implement_owner_prompt_section!(ArchetypePromptSection, PromptTier::Stable);
+implement_owner_prompt_section!(PersonalityRosterSection, PromptTier::Volatile);
+implement_owner_prompt_section!(IdentitySection, PromptTier::Stable);
+implement_owner_prompt_section!(AgentsInstructionsSection, PromptTier::Context);
+implement_owner_prompt_section!(ToolsSection, PromptTier::Stable);
+implement_owner_prompt_section!(SafetySection, PromptTier::Stable);
+implement_owner_prompt_section!(GroundingSection, PromptTier::Stable);
+implement_owner_prompt_section!(WorkspaceSection, PromptTier::Context);
+implement_owner_prompt_section!(RuntimeSection, PromptTier::Context);
+implement_owner_prompt_section!(DateTimeSection, PromptTier::Stable);
+implement_owner_prompt_section!(UserIdentitySection, PromptTier::Volatile);
+
 /// Collapse whitespace in a user-identity field for a single markdown bullet.
 fn sanitize_identity_field(s: &str) -> String {
     s.chars()
