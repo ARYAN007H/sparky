@@ -14,7 +14,6 @@ mod halt;
 mod stop_summary;
 mod table;
 
-#[cfg(test)]
 pub(crate) use halt::TerminalInferenceFailure;
 pub(crate) use halt::{
     recoverable_identical_halt_summary, recoverable_no_progress_halt_summary,
