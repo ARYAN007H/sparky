@@ -210,3 +210,19 @@ fn a_late_importer_rechecks_the_marker_under_the_claim() {
         .collect();
     assert_eq!(ids, ["first"]);
 }
+
+#[test]
+fn a_durable_session_keeps_its_scoped_lifecycle_key_after_document_reopen() {
+    let storage = MemoryStorage::new();
+    let mut saved = session("scoped-lifecycle");
+    let key = tinyagents_orchestration::subagent::SubagentTaskKey {
+        root_run_id: "root".into(),
+        parent_run_id: "parent".into(),
+        thread_id: Some("thread".into()),
+        task_id: "task".into(),
+    };
+    saved.lifecycle_key = Some(key.clone());
+    docs_in(&storage, "local").save(&[saved]).unwrap();
+    let loaded = docs_in(&storage, "local").load().unwrap();
+    assert_eq!(loaded[0].lifecycle_key, Some(key));
+}

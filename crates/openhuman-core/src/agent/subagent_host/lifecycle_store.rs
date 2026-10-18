@@ -1,18 +1,18 @@
-//! The sub-agent lifecycle records on the storage port.
+//! Migration from retired OpenHuman sub-agent checkpoints.
 //!
-//! One record per scoped task key (`record/<key component>` in `tsd.kv`, owner
-//! `subagents`, namespace `lifecycle`) holds the key's pause checkpoint and
-//! its terminal outcome together, so "a terminal closes the pause" is one
-//! compare-and-swap rather than two files under a lock. A second value per task id
-//! (`index/<task component>`) lists the scoped keys that share the id.
+//! The host's former `subagents/lifecycle` KV values and lifecycle JSON
+//! files are compatibility sources. This adapter reads their product fields,
+//! imports missing file records once per backend/scope, and converts them
+//! into TinyAgents' neutral document records without changing source files
+//! or existing KV values.
 //!
-//! Before schema v2 these were `<workspace>/.openhuman/subagent_checkpoints/
-//! lifecycle/<component>.{pause,terminal}.json` and `task-<component>.index.json`
-//! guarded by `flock` files. [`LifecycleStore::open`] imports them once per
-//! backend and scope (`tsd.migrations`) and leaves the files in place.
+//! TinyAgents' `DocumentSubagentPersistence` owns active pause/terminal
+//! transitions, compare-and-swap and live-task lookup. The host retains only
+//! legacy schema conversion, product metadata and storage scope selection.
 
 use std::path::{Path, PathBuf};
 
+#[cfg(test)]
 use sha2::{Digest, Sha256};
 use tinyagents_orchestration::subagent::{SubagentError, SubagentOutcome, SubagentTaskKey};
 
@@ -76,6 +76,7 @@ fn failure(error: impl std::fmt::Display) -> SubagentError {
     SubagentError::Persistence(format!("{error:#}"))
 }
 
+#[cfg(test)]
 fn hex(value: &str) -> String {
     value
         .as_bytes()
@@ -89,6 +90,7 @@ fn hex(value: &str) -> String {
 /// inherit a rendered parent identifier, however; that exceptional form is
 /// hashed while keeping every key field in the digest input so distinct
 /// lifecycle scopes cannot alias.
+#[cfg(test)]
 fn bounded(encoded: String) -> String {
     if encoded.len() <= 180 {
         encoded
@@ -97,6 +99,7 @@ fn bounded(encoded: String) -> String {
     }
 }
 
+#[cfg(test)]
 pub(super) fn key_component(key: &SubagentTaskKey) -> String {
     bounded(format!(
         "{}-{}-{}-{}",
@@ -107,6 +110,7 @@ pub(super) fn key_component(key: &SubagentTaskKey) -> String {
     ))
 }
 
+#[cfg(test)]
 pub(super) fn task_component(task_id: &str) -> String {
     bounded(hex(task_id))
 }
@@ -129,7 +133,7 @@ fn workspace_of(checkpoint_dir: &Path) -> PathBuf {
     checkpoint_dir.to_path_buf()
 }
 
-/// The lifecycle store of one checkpoint directory's workspace.
+/// Legacy migration sources and destination documents in one acting scope.
 pub(super) struct LifecycleStore {
     kv: StateKv,
     documents: std::sync::Arc<dyn tinystoragedrivers::DocumentStore>,
@@ -222,15 +226,18 @@ impl LifecycleStore {
         Ok(store)
     }
 
+    #[cfg(test)]
     fn record_name(key: &SubagentTaskKey) -> String {
         format!("record/{}", key_component(key))
     }
 
+    #[cfg(test)]
     fn index_name(task_id: &str) -> String {
         format!("index/{}", task_component(task_id))
     }
 
     /// The record of `key` (empty when nothing was written).
+    #[cfg(test)]
     pub(super) fn record(&self, key: &SubagentTaskKey) -> Result<LifecycleRecord, SubagentError> {
         Ok(self
             .kv
@@ -241,6 +248,7 @@ impl LifecycleStore {
 
     /// Changes the record of `key` under compare-and-swap; `change` may run
     /// more than once, and returns its result and whether it changed the record.
+    #[cfg(test)]
     pub(super) fn update<R: Send + 'static>(
         &self,
         key: &SubagentTaskKey,
@@ -252,6 +260,7 @@ impl LifecycleStore {
     }
 
     /// The scoped keys that share `task_id`.
+    #[cfg(test)]
     pub(super) fn index_keys(&self, task_id: &str) -> Result<Vec<SubagentTaskKey>, SubagentError> {
         Ok(self
             .kv
@@ -259,36 +268,6 @@ impl LifecycleStore {
             .map_err(failure)?
             .unwrap_or_default()
             .keys)
-    }
-
-    pub(super) fn add_index_key(&self, key: &SubagentTaskKey) -> Result<(), SubagentError> {
-        let key = key.clone();
-        self.kv
-            .update::<TaskIndex, ()>(&Self::index_name(&key.task_id), {
-                let key = key.clone();
-                move |index| {
-                    if index.keys.contains(&key) {
-                        return ((), false);
-                    }
-                    index.keys.push(key.clone());
-                    ((), true)
-                }
-            })
-            .map_err(failure)
-    }
-
-    pub(super) fn remove_index_key(&self, key: &SubagentTaskKey) -> Result<(), SubagentError> {
-        let key = key.clone();
-        self.kv
-            .update::<TaskIndex, ()>(&Self::index_name(&key.task_id), {
-                let key = key.clone();
-                move |index| {
-                    let before = index.keys.len();
-                    index.keys.retain(|candidate| candidate != &key);
-                    ((), index.keys.len() != before)
-                }
-            })
-            .map_err(failure)
     }
 }
 
@@ -323,7 +302,7 @@ fn import_legacy(kv: &StateKv, dir: &Path) -> anyhow::Result<()> {
                     super::persistence::OpenHumanPersistence::checkpoint_from_persisted_pause(
                         persisted,
                     )
-                    .map_err(serde::de::Error::custom)
+                    .map_err(<serde_json::Error as serde::de::Error>::custom)
                 });
             match checkpoint {
                 Ok(pause) => {
