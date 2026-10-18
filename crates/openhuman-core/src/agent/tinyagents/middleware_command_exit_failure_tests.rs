@@ -15,13 +15,14 @@ fn sigpipe_git_log_report() -> String {
 
 async fn run_shell(
     mw: &RepeatedToolFailureMiddleware,
+    context: &mut RunContext<OpenHumanRunContext>,
     id: &str,
     command: &str,
     mut result: TaToolResult,
 ) {
     let mut call = TaToolCall::new(id, "shell", json!({ "command": command }));
-    mw.before_tool(&mut ctx(), &(), &mut call).await.unwrap();
-    mw.after_tool(&mut ctx(), &(), &invocation(id, "shell"), &mut result)
+    mw.before_tool(context, &(), &mut call).await.unwrap();
+    mw.after_tool(context, &(), &invocation(id, "shell"), &mut result)
         .await
         .unwrap();
 }
@@ -169,7 +170,7 @@ async fn a_faulted_module_tool_is_steered_away_once_then_halts() {
     .await
     .unwrap();
     assert_eq!(drain_pause_count(&handle), 0);
-    let nudges = drain_nudge_messages(&mw);
+    let nudges = drain_nudge_messages(&mw, &mut context).await;
     assert_eq!(nudges.len(), 1, "{nudges:?}");
     assert!(nudges[0].contains("`web_search_tool`"), "{}", nudges[0]);
     assert!(nudges[0].contains("Do not call"), "{}", nudges[0]);
