@@ -197,7 +197,9 @@ fn sync_owner_snapshot(
         host.cached_input_tokens = snapshot.cached_input_tokens;
         host.last_call_input_tokens = snapshot.last_call_input_tokens;
         host.last_call_output_tokens = snapshot.last_call_output_tokens;
-        host.resolved_route = snapshot.resolved_route;
+        if snapshot.resolved_route.is_some() {
+            host.resolved_route = snapshot.resolved_route;
+        }
         host.model_calls = snapshot.model_calls;
         host.tool_outcomes = snapshot.tool_outcomes;
     }
@@ -269,9 +271,6 @@ impl Middleware<(), crate::agent::tinyagents::host::OpenHumanRunContext>
                 .as_ref()
                 .filter(|_| !response.served_from_cache)
             {
-                guard.input_tokens += usage.input_tokens;
-                guard.output_tokens += usage.output_tokens;
-                guard.cached_input_tokens += usage.cache_read_tokens;
                 let host_usage =
                     crate::inference::provider::model::usage_info_from_response(response)
                         .unwrap_or(
@@ -310,6 +309,27 @@ impl Middleware<(), crate::agent::tinyagents::host::OpenHumanRunContext>
             }
         }
         Ok(())
+    }
+
+    async fn after_agent(
+        &self,
+        ctx: &mut RunContext<crate::agent::tinyagents::host::OpenHumanRunContext>,
+        state: &(),
+        run: &mut tinyagents_harness::middleware::AgentRun,
+    ) -> TaResult<()> {
+        self.owner.after_agent(ctx, state, run).await
+    }
+
+    async fn on_error(
+        &self,
+        ctx: &mut RunContext<crate::agent::tinyagents::host::OpenHumanRunContext>,
+        error: &tinyagents_harness::error::TinyAgentsError,
+    ) -> TaResult<()> {
+        <tinyagents_harness::middleware::library::TranscriptSnapshotMiddleware as Middleware<
+            (),
+            crate::agent::tinyagents::host::OpenHumanRunContext,
+        >>::on_error(&self.owner, ctx, error)
+        .await
     }
 }
 
