@@ -90,11 +90,7 @@ impl Case {
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         let data_dir = tempfile::tempdir().expect("temp dir");
         let Some(url) = driver.url(data_dir.path()) else {
-            eprintln!(
-                "skipped {}: {}",
-                driver.name(),
-                "driver not compiled in"
-            );
+            eprintln!("skipped {}: {}", driver.name(), "driver not compiled in");
             return None;
         };
         let open_url = url.clone();
