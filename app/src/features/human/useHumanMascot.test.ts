@@ -369,7 +369,6 @@ describe('useHumanMascot state machine', () => {
       capturedListeners?.onDone?.(
         fakeEvent({
           full_response: 'sure thing',
-          rounds_used: 1,
           total_input_tokens: 1,
           total_output_tokens: 1,
         })
@@ -388,7 +387,6 @@ describe('useHumanMascot state machine', () => {
       capturedListeners?.onDone?.(
         fakeEvent({
           full_response: 'Sorry, that failed because the provider is unavailable.',
-          rounds_used: 1,
           total_input_tokens: 1,
           total_output_tokens: 1,
         })
@@ -427,7 +425,6 @@ describe('useHumanMascot state machine', () => {
       capturedListeners?.onDone?.(
         fakeEvent({
           full_response: 'hi',
-          rounds_used: 1,
           total_input_tokens: 1,
           total_output_tokens: 1,
         })
@@ -466,7 +463,6 @@ describe('useHumanMascot state machine', () => {
       capturedListeners?.onDone?.(
         fakeEvent({
           full_response: 'Here is the result.',
-          rounds_used: 2,
           total_input_tokens: 1,
           total_output_tokens: 1,
         })
@@ -486,7 +482,6 @@ describe('useHumanMascot state machine', () => {
       capturedListeners?.onDone?.(
         fakeEvent({
           full_response: 'Here is the result.',
-          rounds_used: 1,
           total_input_tokens: 1,
           total_output_tokens: 1,
         })
@@ -511,7 +506,6 @@ describe('useHumanMascot state machine', () => {
       capturedListeners?.onDone?.(
         fakeEvent({
           full_response: 'Research complete.',
-          rounds_used: 1,
           total_input_tokens: 1,
           total_output_tokens: 1,
         })
@@ -555,7 +549,6 @@ describe('useHumanMascot state machine', () => {
       capturedListeners?.onDone?.(
         fakeEvent({
           full_response: 'Sorry, the researcher failed.',
-          rounds_used: 2,
           total_input_tokens: 1,
           total_output_tokens: 1,
         })
@@ -575,7 +568,6 @@ describe('useHumanMascot state machine', () => {
       capturedListeners?.onDone?.(
         fakeEvent({
           full_response: 'Done.',
-          rounds_used: 2,
           total_input_tokens: 1,
           total_output_tokens: 1,
         })
@@ -591,7 +583,6 @@ describe('useHumanMascot state machine', () => {
       capturedListeners?.onDone?.(
         fakeEvent({
           full_response: 'Here you go.',
-          rounds_used: 1,
           total_input_tokens: 1,
           total_output_tokens: 1,
         })
@@ -623,7 +614,6 @@ describe('useHumanMascot state machine', () => {
       capturedListeners?.onDone?.(
         fakeEvent({
           full_response: 'Here you go.',
-          rounds_used: 1,
           total_input_tokens: 1,
           total_output_tokens: 1,
         })
@@ -664,7 +654,6 @@ describe('useHumanMascot TTS playback', () => {
       thread_id: 't',
       request_id: 'r',
       full_response: text,
-      rounds_used: 1,
       total_input_tokens: 1,
       total_output_tokens: 1,
     };
@@ -1071,7 +1060,6 @@ describe('useHumanMascot streaming TTS (#5358)', () => {
       thread_id: 't',
       request_id: 'r',
       full_response: text,
-      rounds_used: 1,
       total_input_tokens: 1,
       total_output_tokens: 1,
     };

@@ -136,7 +136,6 @@ describe('ChatRuntimeProvider — dedupe, proactive resolution, mid-turn invaria
             thread_id: 'unmounted-snapshot',
             request_id: 'unmounted-request',
             full_response: 'Delivered reply',
-            rounds_used: 1,
             total_input_tokens: 0,
             total_output_tokens: 0,
           });
@@ -460,7 +459,6 @@ describe('ChatRuntimeProvider — dedupe, proactive resolution, mid-turn invaria
           thread_id: 't-par',
           request_id: 'branch',
           full_response: 'branch done',
-          rounds_used: 1,
           total_input_tokens: 0,
           total_output_tokens: 0,
           segment_total: 0,
@@ -588,7 +586,6 @@ describe('ChatRuntimeProvider — dedupe, proactive resolution, mid-turn invaria
         thread_id: 't-done',
         request_id: 'r-done',
         full_response: 'hello',
-        rounds_used: 1,
         total_input_tokens: 5,
         total_output_tokens: 7,
         segment_total: 1,
@@ -618,7 +615,6 @@ describe('ChatRuntimeProvider — dedupe, proactive resolution, mid-turn invaria
           request_id: 'bgdeliver-1',
           client_id: 'system',
           full_response: 'Same two issues as before',
-          rounds_used: 1,
         });
       });
 
@@ -740,7 +736,6 @@ describe('ChatRuntimeProvider — dedupe, proactive resolution, mid-turn invaria
           thread_id: 't-user',
           request_id: 'r-user',
           full_response: 'hi',
-          rounds_used: 1,
         });
       });
 
@@ -768,7 +763,6 @@ describe('ChatRuntimeProvider — dedupe, proactive resolution, mid-turn invaria
           thread_id: 't-gone',
           request_id: 'r-gone',
           full_response: 'an answer nobody stored',
-          rounds_used: 1,
         });
       });
 
@@ -790,7 +784,6 @@ describe('ChatRuntimeProvider — dedupe, proactive resolution, mid-turn invaria
           request_id: 'r-seg',
           full_response: 'one two',
           segment_total: 2,
-          rounds_used: 1,
         });
       });
 
@@ -824,7 +817,6 @@ describe('ChatRuntimeProvider — dedupe, proactive resolution, mid-turn invaria
           thread_id: 't-lost',
           request_id: 'r-lost',
           full_response: 'the answer the core stored',
-          rounds_used: 1,
         });
       });
 
@@ -876,7 +868,6 @@ describe('ChatRuntimeProvider — dedupe, proactive resolution, mid-turn invaria
           thread_id: 't-plan',
           request_id: 'r-plan',
           full_response: 'done',
-          rounds_used: 1,
           total_input_tokens: 1,
           total_output_tokens: 1,
           segment_total: 1,
@@ -925,7 +916,6 @@ describe('ChatRuntimeProvider — dedupe, proactive resolution, mid-turn invaria
           thread_id: 't-upload',
           request_id: 'r-upload',
           full_response: 'done',
-          rounds_used: 1,
           total_input_tokens: 1,
           total_output_tokens: 1,
         });
@@ -966,7 +956,6 @@ describe('ChatRuntimeProvider — dedupe, proactive resolution, mid-turn invaria
           thread_id: 't-fup',
           request_id: 'r-fup',
           full_response: 'assistant reply',
-          rounds_used: 1,
           total_input_tokens: 1,
           total_output_tokens: 1,
         });
@@ -991,7 +980,6 @@ describe('ChatRuntimeProvider — dedupe, proactive resolution, mid-turn invaria
           thread_id: 't-rid',
           request_id: 'req-abc',
           full_response: 'the answer',
-          rounds_used: 1,
           total_input_tokens: 1,
           total_output_tokens: 1,
         });
@@ -1546,7 +1534,6 @@ describe('ChatRuntimeProvider — dedupe, proactive resolution, mid-turn invaria
           thread_id: 't-segmented',
           request_id: 'r-segmented',
           full_response: 'Part one.\n\nPart two.',
-          rounds_used: 1,
           total_input_tokens: 10,
           total_output_tokens: 20,
           segment_total: 2,
@@ -1589,7 +1576,6 @@ describe('ChatRuntimeProvider — dedupe, proactive resolution, mid-turn invaria
           thread_id: 't-complete',
           request_id: 'r-complete',
           full_response: 'Part one.\n\nPart two.',
-          rounds_used: 1,
           total_input_tokens: 10,
           total_output_tokens: 20,
           segment_total: 2,
@@ -1635,7 +1621,6 @@ describe('ChatRuntimeProvider — dedupe, proactive resolution, mid-turn invaria
           // segments.join('') === 'Hello.World.' !== full_response, but
           // delivery is still complete.
           full_response: '\nHello.\n\nWorld.\n',
-          rounds_used: 1,
           total_input_tokens: 10,
           total_output_tokens: 20,
           segment_total: 2,
@@ -1667,7 +1652,6 @@ describe('ChatRuntimeProvider — dedupe, proactive resolution, mid-turn invaria
           thread_id: 't-missing',
           request_id: 'r-missing',
           full_response: 'Part one.\n\nPart two.',
-          rounds_used: 1,
           total_input_tokens: 10,
           total_output_tokens: 20,
           segment_total: 2,
@@ -1706,7 +1690,6 @@ describe('ChatRuntimeProvider — dedupe, proactive resolution, mid-turn invaria
             thread_id: 't-stale',
             request_id: 'r-stale',
             full_response: 'Stale segment.',
-            rounds_used: 1,
             total_input_tokens: 10,
             total_output_tokens: 20,
             segment_total: 1,
@@ -1865,7 +1848,6 @@ describe('ChatRuntimeProvider — dedupe, proactive resolution, mid-turn invaria
           thread_id: 't-inv',
           request_id: 'r1',
           full_response: '',
-          rounds_used: 1,
           total_input_tokens: 0,
           total_output_tokens: 0,
         });
@@ -1901,7 +1883,6 @@ describe('ChatRuntimeProvider — dedupe, proactive resolution, mid-turn invaria
           thread_id: 't-inv',
           request_id: 'r1',
           full_response: '',
-          rounds_used: 1,
           total_input_tokens: 0,
           total_output_tokens: 0,
         });
@@ -2947,7 +2928,6 @@ describe('ChatRuntimeProvider — skill tool-chain latency (#4273 AC3)', () => {
       thread_id: thread,
       request_id: 'r1',
       full_response: '',
-      rounds_used: 1,
       total_input_tokens: 0,
       total_output_tokens: 0,
     }) as chatService.ChatDoneEvent;
@@ -3089,7 +3069,6 @@ describe('ChatRuntimeProvider — detached sub-agent approvals', () => {
     thread_id: threadId,
     request_id: 'parent-turn',
     full_response: 'I asked the image agent to make it.',
-    rounds_used: 1,
     total_input_tokens: 0,
     total_output_tokens: 0,
     segment_total: 0,

@@ -46,7 +46,9 @@ import type {
   ProactiveMessageEvent,
   QueueItemEvent,
   QueueItemPayload,
+  WireEvent,
 } from './chatWire';
+import { decodeApprovalDecided, decodeRunModeChanged, externalTransferProvider } from './chatWire';
 import { callCoreRpc } from './coreRpcClient';
 import { socketService } from './socketService';
 
