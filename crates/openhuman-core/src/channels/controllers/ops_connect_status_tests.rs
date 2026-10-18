@@ -292,9 +292,6 @@ async fn disconnect_discord_bot_token_clears_runtime_config() {
 }
 
 // ── iMessage channel ───────────────────────────────────────────
-#[path = "ops_connect_memory_tests.rs"]
-mod memory_tests;
-
 #[tokio::test]
 async fn persist_prepared_imessage_allowed_contacts() {
     let (_tmp, config) = isolated_test_config();

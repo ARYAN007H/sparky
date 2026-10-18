@@ -108,9 +108,6 @@ fn typed_skip_reasons_expose_only_account_wide_errors() {
 #[path = "hooks_channel_tests.rs"]
 mod channel_tests;
 
-#[path = "hooks_channel_tests.rs"]
-mod channel_tests;
-
 #[test]
 fn a_logged_reply_keeps_one_line_per_tool_result() {
     let calls = vec![
