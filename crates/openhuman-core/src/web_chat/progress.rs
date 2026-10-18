@@ -27,7 +27,7 @@ use crate::config::Config;
 use crate::core::runtime::DispatchCtx;
 use crate::threads::turn_state::mirror::ObserveProgress;
 
-#[path = "progress_bridge_trace.rs"]
+#[path = "progress_trace.rs"]
 mod trace;
 
 /// Cadence of the `inference_heartbeat` liveness beat while a turn is in

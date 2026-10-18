@@ -8,7 +8,7 @@
 use crate::agent::progress_tracing::SpanCollector;
 use tinyagents_harness::observability::trace_export as te;
 
-use super::super::types::ChatRequestMetadata;
+use tinychannels_bus::web::ChatRequestMetadata;
 
 /// The span collector for the turn, and the trace context the journal export
 /// reuses after the turn ends. `None` when tracing is disabled.
@@ -35,7 +35,7 @@ pub(super) fn span_collector(
     let identity = crate::security::credentials::identity::peek_credential_user_identity();
     let user_id = identity
         .and_then(|i| i.id.or(i.email))
-        .or_else(|| super::session_profile_user_attribution(config));
+        .or_else(|| session_profile_user_attribution(config));
     let user_attributed = user_id.is_some();
     // Run origin for trace metadata: the request's source tag
     // ("ptt"/"dictation"/"type"/"autonomous"/…), else a
@@ -71,4 +71,19 @@ pub(super) fn span_collector(
         trace_ctx = trace_ctx.with_agent_id(agent_id);
     }
     Some((SpanCollector::new(trace_ctx.clone()), trace_ctx))
+}
+
+/// Trace user attribution for a turn whose stored user payload carries no
+/// identity (headless / autonomous / freshly booted cores): read the on-disk
+/// app-session profile and return the user's email (preferred) or backend user
+/// id. `None` when signed out or the profile is unreadable.
+fn session_profile_user_attribution(config: &crate::config::Config) -> Option<String> {
+    let state = crate::security::credentials::session_support::build_session_state(config).ok()?;
+    state
+        .user
+        .as_ref()
+        .and_then(|u| u.get("email"))
+        .and_then(serde_json::Value::as_str)
+        .map(str::to_string)
+        .or(state.user_id)
 }
