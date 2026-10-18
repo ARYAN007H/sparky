@@ -8,8 +8,9 @@ impl From<tinymemory_api::Error> for StructuredRpcError {
     fn from(error: tinymemory_api::Error) -> Self {
         let code = error.code();
         let message = match error {
-            tinymemory_api::Error::NotFound(message)
-            | tinymemory_api::Error::Config(message) => format!("invalid request: {message}"),
+            tinymemory_api::Error::NotFound(message) | tinymemory_api::Error::Config(message) => {
+                format!("invalid request: {message}")
+            }
             tinymemory_api::Error::Conflict(message) => format!("engine error: {message}"),
             error => error.to_string(),
         };

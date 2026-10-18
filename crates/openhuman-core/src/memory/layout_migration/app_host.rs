@@ -12,8 +12,8 @@ use super::claim::ClaimKey;
 use super::state::FileStateStore;
 use crate::config::{Config, MemoryLayoutMode};
 use crate::memory::engine::{self, CORTEXDB_ENGINE};
-use tinymemory_api::{Error, Result};
 use crate::memory::scope::{self, MemoryIdentity};
+use tinymemory_api::{Error, Result};
 
 /// The app's [`lm::LayoutHost`], bound to one account's config.
 pub struct AppHost {
@@ -46,11 +46,8 @@ pub(super) fn to_module(error: Error) -> lm::Error {
         Error::Unsupported(message) => EngineError::Unsupported(message).into(),
         Error::Unauthorized(message) => EngineError::Unauthorized(message).into(),
         Error::Unavailable(message) => EngineError::Unavailable(message).into(),
-        // Temporarily mirrors the old adapter behavior; the focused regression
-        // run will pin the typed-credit loss before this arm is corrected.
-        Error::InsufficientCredits(message) | Error::Engine(message) => {
-            EngineError::Engine(message).into()
-        }
+        Error::InsufficientCredits(message) => EngineError::InsufficientCredits(message).into(),
+        Error::Engine(message) => EngineError::Engine(message).into(),
     }
 }
 

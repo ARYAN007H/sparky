@@ -21,8 +21,8 @@ use crate::config::Config;
 use crate::security::secret_storage::file_store::write_atomic;
 
 use super::engine;
-use tinymemory_api::{Error, Result};
 use super::types::{ImportCounts, ImportScanView};
+use tinymemory_api::{Error, Result};
 
 /// Whether background work is paused right now. An automatic resume asks
 /// before it starts and again before every batch it stores.
@@ -121,9 +121,7 @@ fn importer(
         Arc::new(TokioPacer),
         Arc::new(move || consent),
     )
-    .with_describe(Arc::new(|error| {
-        error.to_string()
-    }));
+    .with_describe(Arc::new(|error| error.to_string()));
     if let Some(paused) = paused {
         importer = importer.with_pause(paused);
     }
@@ -315,11 +313,14 @@ async fn launch(
         // Items written to the legacy tree while it is being moved would be
         // left behind there.
         if super::layout_migration::service::is_running(config) {
-            return Err(Error::InvalidRequest((if mode == Mode::Import {
-                "memory is being organized; import once that finishes"
-            } else {
-                "memory is being organized; retry once that finishes"
-            }).into()));
+            return Err(Error::InvalidRequest(
+                (if mode == Mode::Import {
+                    "memory is being organized; import once that finishes"
+                } else {
+                    "memory is being organized; retry once that finishes"
+                })
+                .into(),
+            ));
         }
         RUNNING
             .lock()

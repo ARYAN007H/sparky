@@ -20,9 +20,9 @@ use crate::config::schema::MemorySourceKind;
 use crate::config::Config;
 
 use super::engine;
-use tinymemory_api::{Error, Result};
 use super::lifecycle::jobs;
 use super::scope::MemoryIdentity;
+use tinymemory_api::{Error, Result};
 
 /// Largest file `memory_brain_ingest` reads, in bytes.
 pub const MAX_INGEST_BYTES: u64 = 25 * 1024 * 1024;
@@ -260,7 +260,11 @@ pub async fn ingest(
         (None, Some(text)) => {
             tinymemory_tools::BrainDocument::new(source.unwrap_or_else(files_source), text)
         }
-        _ => return Err(Error::InvalidRequest(("pass exactly one of `path` or `text`").into())),
+        _ => {
+            return Err(Error::InvalidRequest(
+                ("pass exactly one of `path` or `text`").into(),
+            ))
+        }
     };
     if let Some(title) = params.title.filter(|title| !title.trim().is_empty()) {
         document = document.titled(title);

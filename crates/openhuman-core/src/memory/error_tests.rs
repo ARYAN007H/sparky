@@ -3,7 +3,12 @@ use tinymemory_api::Error as MemoryApiError;
 #[test]
 fn upstream_errors_keep_the_memory_rpc_wire_codes_and_messages() {
     let cases = [
-        (MemoryApiError::Off("sign in".into()), "MEMORY_OFF", "memory is off: sign in", true),
+        (
+            MemoryApiError::Off("sign in".into()),
+            "MEMORY_OFF",
+            "memory is off: sign in",
+            true,
+        ),
         (
             MemoryApiError::Unsupported("fetch".into()),
             "UNSUPPORTED",

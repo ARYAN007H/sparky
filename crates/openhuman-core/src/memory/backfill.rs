@@ -38,9 +38,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::config::Config;
 use crate::memory::engine::{self, BoundEngine};
-use tinymemory_api::{Error, Result};
 use crate::memory::scope::{MemoryIdentity, ResolvedIdentity};
 use crate::threads::store::blocking as threads;
+use tinymemory_api::{Error, Result};
 use tinymemory_integrations::import::ImportPhase;
 
 use tinymemory_tools::backfill::{first_live_turn, group_items, turn_groups, ThreadMessage};
@@ -216,9 +216,9 @@ pub async fn start(
     params: BackfillStartParams,
 ) -> Result<BackfillView> {
     if !params.consent {
-        return Err(Error::InvalidRequest((
-            "storing past chats uploads them to the selected engine; pass consent: true"
-        ).into()));
+        return Err(Error::InvalidRequest(
+            ("storing past chats uploads them to the selected engine; pass consent: true").into(),
+        ));
     }
     let bound = engine::resolve(config).engine()?;
     let workspace_dir = config.workspace_dir.clone();
@@ -299,11 +299,7 @@ async fn run(
                 } else {
                     tinymemory_api::WriteOptions::accepted()
                 };
-                let stored = bound
-                    .engine
-                    .store_many_with(items, options)
-                    .await
-                    ;
+                let stored = bound.engine.store_many_with(items, options).await;
                 if let Err(error) = stored {
                     tracing::warn!(
                         code = error.code(),

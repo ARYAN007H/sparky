@@ -7,10 +7,10 @@ use crate::config::Config;
 use crate::core::events::DomainEvent;
 use crate::flows::store;
 use crate::memory::types::{ForgetParams, ItemsListParams, MAX_LIMIT};
-use tinymemory_api::{Error, Result};
 use async_trait::async_trait;
 use std::sync::Arc;
 use tinybus::EventHandler;
+use tinymemory_api::{Error, Result};
 use tinymemory_api::{ItemKind, MetaFilter, StoreItem};
 use {crate::flows::flow_meta, crate::flows::flow_tag, tinyflows_catalog::FlowRun};
 

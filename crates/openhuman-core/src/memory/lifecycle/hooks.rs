@@ -16,8 +16,8 @@ use std::time::Duration;
 use chrono::{DateTime, Utc};
 use serde::Serialize;
 use tinymemory_api::{Error, ToolCallRef, Turn};
-use tinymemory_tools::{Compaction, ContextPack, PostTurn, PreTurn, SessionStart};
 use tinymemory_tools::recall::SkipReason;
+use tinymemory_tools::{Compaction, ContextPack, PostTurn, PreTurn, SessionStart};
 
 use crate::config::Config;
 use crate::memory::engine;

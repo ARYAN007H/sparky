@@ -100,10 +100,7 @@ fn typed_skip_reasons_expose_only_account_wide_errors() {
         MemoryApiError::Engine("corrupt index".into()),
     ];
     for error in local {
-        assert_eq!(
-            account_wide_skip_reason(&SkipReason::Engine(error)),
-            None
-        );
+        assert_eq!(account_wide_skip_reason(&SkipReason::Engine(error)), None);
     }
     assert_eq!(account_wide_skip_reason(&SkipReason::Empty), None);
 }
@@ -334,10 +331,7 @@ async fn an_out_of_credits_recall_tells_the_turn_memory_is_unavailable() {
     .await
     .expect("a refused recall still gives the turn a notice");
 
-    assert_eq!(
-        pack.refusal,
-        Some("INSUFFICIENT_CREDITS")
-    );
+    assert_eq!(pack.refusal, Some("INSUFFICIENT_CREDITS"));
     assert!(
         pack.markdown.contains("out of credits"),
         "{}",
