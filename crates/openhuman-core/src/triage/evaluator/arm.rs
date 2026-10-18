@@ -250,7 +250,7 @@ pub(crate) fn classify_error(message: String) -> ArmError {
     match decide(
         reason,
         FailoverState {
-            retryable: true,
+            retryable: reason != FailoverReason::Unknown,
             attempts_remaining: true,
             larger_window_available: false,
         },
