@@ -104,7 +104,7 @@ async fn published_module_prompts_render_through_the_normal_host_path() {
     let disabled_config_path = temp.path().join("disabled-config.toml");
     std::fs::write(
         &disabled_config_path,
-        "api_url = \"http://127.0.0.1:1\"\n\n[components]\nskills = true\nflows = false\ntinyflows = false\n\n[modules]\nenabled = true\n\n[[modules.overrides]]\nid = \"tinyflows\"\npath = \"unused-while-disabled\"\n",
+        "api_url = \"http://127.0.0.1:1\"\n\n[components]\nskills = true\nflows = true\ntinyflows = true\n\n[modules]\nenabled = false\n",
     )
     .expect("disabled components config");
     let disabled_config = openhuman_core::config::Config::load_from_config_path(
@@ -116,7 +116,7 @@ async fn published_module_prompts_render_through_the_normal_host_path() {
     let disabled = openhuman_core::skills::load_workflow_metadata_for(&ctx, &disabled_config);
     assert!(
         !disabled.iter().any(|skill| skill.id() == "flow-authoring"),
-        "a profile with TinyFlows disabled cannot see the shared workspace builtin"
+        "a profile with modules disabled cannot see the shared workspace builtin"
     );
     let mut disabled_options =
         openhuman_core::agent::debug::DumpPromptOptions::new("workflow_builder");
@@ -124,7 +124,7 @@ async fn published_module_prompts_render_through_the_normal_host_path() {
     disabled_options.config_path_override = Some(disabled_config_path);
     let ordinary_prompt = openhuman_core::agent::debug::dump_agent_prompt(disabled_options)
         .await
-        .expect("ordinary prompt construction continues when TinyFlows is disabled");
+        .expect("ordinary prompt construction continues when modules are disabled");
     assert!(ordinary_prompt.text.contains("## Workspace"));
 
     // Re-enable the same profile after the disabled view and ensure the
