@@ -4,7 +4,7 @@
 //!
 //! * `agent.toml`  — id, when_to_use, model, tool allowlist, sandbox,
 //!   iteration cap, and the `omit_*` flags. Parsed
-//!   directly into [`AgentDefinition`] via serde.
+//!   parsed into [`AgentDefinition`] through the portable definition loader.
 //! * `prompt.rs`   — a Rust module exporting `pub fn build(ctx: &PromptContext)
 //!   -> anyhow::Result<String>` that returns the sub-agent's system
 //!   prompt body. Dynamic: may branch on available tools, user profile,
