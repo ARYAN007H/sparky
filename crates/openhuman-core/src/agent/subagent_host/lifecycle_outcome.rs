@@ -28,6 +28,16 @@ pub(super) fn host_outcome_to_neutral(
             serde_json::json!(outcome.artifact_paths),
         ),
     ]);
+    if let Some(cause) = &outcome.failure_cause {
+        extensions.insert(
+            "failure_cause".into(),
+            serde_json::json!({
+                "class": cause.class,
+                "operation": cause.operation,
+                "summary": cause.summary,
+            }),
+        );
+    }
     let status = match outcome.status {
         SubagentRunStatus::Completed => SubagentOutcomeKind::Completed,
         SubagentRunStatus::AwaitingUser {
