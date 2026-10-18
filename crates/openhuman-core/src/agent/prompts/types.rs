@@ -11,6 +11,11 @@ use std::path::Path;
 use tinyskills::Skill as Workflow;
 use tinytools::Tool;
 
+pub use tinyagents_harness::prompt::{
+    DynamicPromptSection, PromptTier, TieredPromptPart, PROMPT_TIER_CONTEXT_MARKER,
+    PROMPT_TIER_VOLATILE_MARKER, split_prompt_tiers,
+};
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants
 // ─────────────────────────────────────────────────────────────────────────────
