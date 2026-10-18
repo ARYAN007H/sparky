@@ -7,6 +7,7 @@ async fn legacy_always_on_voice_fields_are_ignored_and_dropped_on_save() {
     std::fs::write(
         &config_path,
         r#"[voice_server]
+stt_engine = "openai"
 always_on_enabled = true
 wake_word = "Hey Tiny"
 vad_onset_threshold = 0.01
@@ -18,9 +19,14 @@ vad_max_utterance_secs = 30.0
     .unwrap();
 
     let config = load_or_init_for_workspace(tmp.path()).await;
+    assert_eq!(config.voice_server.stt_engine, SttEngine::Openai);
     config.save().await.unwrap();
 
     let saved = std::fs::read_to_string(config_path).unwrap();
+    assert!(
+        saved.contains("stt_engine = \"openai\""),
+        "retained voice setting was not loaded and saved:\n{saved}"
+    );
     for retired in [
         "always_on_enabled",
         "wake_word",
