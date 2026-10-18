@@ -9,11 +9,10 @@ use serde::Serialize;
 use tinymemory_api::{Hit, ObservedActor, ThreadWindow, ToolCallRef, Turn};
 use tinymemory_tools::layout::identity::ResolvedIdentity;
 use tinymemory_tools::lifecycle::turn::{
-    self as native_turn, CitationSink, Clock, CompactionOptions, DateHintModel, EngineResolver,
-    JobsSink, LoggedToolCall, PostTurn, PreTurn, PreTurnOptions, TurnHooks as NativeTurnHooks,
-    TurnPack as NativeTurnPack,
+    self as native_turn, CitationSink, Clock, CompactionOptions, EngineResolver, JobsSink,
+    LoggedToolCall, PreTurnOptions, TurnHooks as NativeTurnHooks, TurnPack as NativeTurnPack,
 };
-use tinymemory_tools::{AgentMemory, BackgroundJob};
+use tinymemory_tools::{AgentMemory, BackgroundJob, Compaction, PostTurn, PreTurn};
 
 use crate::config::Config;
 use crate::core::runtime::{CoreContext, DispatchCtx};
@@ -300,7 +299,7 @@ pub(crate) async fn compaction_work(
     let hooks = turn_hooks(ctx, &Arc::new(config.clone()), identity, thread_id);
     hooks
         .compaction(
-            native_turn::Compaction {
+            Compaction {
                 thread_id: thread_id.to_owned(),
                 dropped,
                 focus: None,
