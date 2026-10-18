@@ -312,6 +312,95 @@ async fn physical_observer_sees_the_buyer_charge_settled_by_the_budget() {
 }
 
 #[tokio::test]
+async fn physical_observer_reports_no_dispatch_for_a_budget_refusal() {
+    let server = MockServer::start().await;
+    let recorder = Arc::new(PhysicalRecorder::default());
+    let budget = crate::budget::ModelBudget {
+        ledger: crate::budget::Budget::new(crate::budget::SpendLimits {
+            tokens: Some(10_000),
+            cost_micros: Some(0),
+        }),
+        call: crate::budget::CallBudget {
+            input_tokens: 5_000,
+            output_tokens: 1_000,
+            cost_micros: 1,
+        },
+    };
+
+    let error = completer(&server)
+        .budget(budget)
+        .physical_observer(recorder.clone())
+        .complete(CompletionRequest::new(
+            "refused-model",
+            vec![ChatMessage::user("private")],
+        ))
+        .await
+        .expect_err("the zero-cost ledger refuses the positive reservation");
+
+    assert!(matches!(error, CoreError::BudgetExceeded { .. }));
+    assert!(recorder.0.lock().unwrap().is_empty());
+    assert!(server.received_requests().await.unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn physical_observer_keeps_completed_usage_when_a_repair_is_cancelled() {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    let server = MockServer::start().await;
+    let attempt = Arc::new(AtomicUsize::new(0));
+    let attempt_for_handler = Arc::clone(&attempt);
+    Mock::given(method("POST"))
+        .and(path("/v1/chat/completions"))
+        .respond_with(move |_request: &wiremock::Request| {
+            let current = attempt_for_handler.fetch_add(1, Ordering::SeqCst);
+            let mut reply = body(if current == 0 { "invalid" } else { "late" }, "stop");
+            reply["usage"]["buyer_cost_micro"] = json!(7);
+            let response = ResponseTemplate::new(200).set_body_json(reply);
+            if current == 0 {
+                response
+            } else {
+                response.set_delay(Duration::from_secs(10))
+            }
+        })
+        .mount(&server)
+        .await;
+    let recorder = Arc::new(PhysicalRecorder::default());
+    let cancellation = crate::cancellation::Cancellation::default();
+    let request = CompletionRequest::new("cancel-model", vec![ChatMessage::user("private")])
+        .response_format(ResponseFormat::JsonObject)
+        .structured_retries(1);
+    let complete = completer(&server)
+        .physical_observer(recorder.clone())
+        .cancellation(cancellation.clone());
+    let task = tokio::spawn(async move { complete.complete(request).await });
+
+    tokio::time::timeout(Duration::from_secs(5), async {
+        loop {
+            if server.received_requests().await.unwrap().len() == 2 {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .expect("repair dispatch reached the delayed provider response");
+    cancellation.cancel().await;
+    assert!(matches!(task.await.unwrap(), Err(CoreError::Cancelled { .. })));
+
+    let events = recorder.0.lock().unwrap();
+    assert_eq!(events.len(), 2);
+    assert_eq!(
+        events[0].1.status,
+        tinyagents_harness::observability::PhysicalDispatchStatus::Succeeded
+    );
+    assert_eq!(events[0].1.usage.as_ref().unwrap().cost_usd, Some(0.000007));
+    assert_eq!(
+        events[1].1.status,
+        tinyagents_harness::observability::PhysicalDispatchStatus::Cancelled
+    );
+}
+
+#[tokio::test]
 async fn physical_observer_reports_each_structured_repair_dispatch() {
     let server = MockServer::start().await;
     let replies = Arc::new(Mutex::new(0));
