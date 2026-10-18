@@ -249,10 +249,16 @@ async fn physical_observer_reports_content_free_provider_outcome() {
 
 #[tokio::test]
 async fn physical_observer_sees_the_buyer_charge_settled_by_the_budget() {
+    use tinyagents_harness::observability::turn_observer::{
+        ObserverScope, TraceContent, TurnObservation, with_observer,
+    };
+
     let mut reply = body("hi", "stop");
     reply["usage"]["buyer_cost_micro"] = json!(7);
     let server = server_replying(reply).await;
     let recorder = Arc::new(PhysicalRecorder::default());
+    let ambient = Arc::new(TurnRecorder::default());
+    let scope = ObserverScope::new(ambient.clone(), TraceContent::MetadataOnly);
     let budget = crate::budget::ModelBudget {
         ledger: crate::budget::Budget::new(crate::budget::SpendLimits {
             tokens: Some(10_000),
@@ -265,21 +271,35 @@ async fn physical_observer_sees_the_buyer_charge_settled_by_the_budget() {
         },
     };
 
-    let response = completer(&server)
-        .budget(budget.clone())
-        .physical_observer(recorder.clone())
-        .complete(CompletionRequest::new(
-            "budgeted-model",
-            vec![ChatMessage::user("private")],
-        ))
-        .await
-        .unwrap();
+    let response = with_observer(scope, async {
+        completer(&server)
+            .budget(budget.clone())
+            .physical_observer(recorder.clone())
+            .complete(CompletionRequest::new(
+                "budgeted-model",
+                vec![ChatMessage::user("private")],
+            ))
+            .await
+            .unwrap()
+    })
+    .await;
 
     assert_eq!(response.usage.unwrap().cost_usd, Some(0.000007));
     assert_eq!(budget.ledger.snapshot().spent.cost_micros, 7);
     let events = recorder.0.lock().unwrap();
     assert_eq!(events.len(), 1);
     assert_eq!(events[0].1.usage.as_ref().unwrap().cost_usd, Some(0.000007));
+    drop(events);
+    let ambient_events = ambient.0.lock().unwrap();
+    let dispatches = ambient_events
+        .iter()
+        .filter_map(|event| match event {
+            TurnObservation::ModelDispatch { usage, .. } => Some(usage),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(dispatches.len(), 1);
+    assert_eq!(dispatches[0].as_ref().unwrap().cost_usd, Some(0.000007));
 }
 
 #[tokio::test]
