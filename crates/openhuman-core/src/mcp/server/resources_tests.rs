@@ -74,6 +74,16 @@ fn list_resources_includes_core_and_agent_uris() {
     ] {
         assert!(uris.contains(&expected), "missing URI {expected}");
     }
+    for flow_uri in [
+        "openhuman://prompts/agents/workflow_builder",
+        "openhuman://prompts/agents/flow_discovery",
+    ] {
+        assert_eq!(
+            uris.contains(&flow_uri),
+            cfg!(feature = "flows"),
+            "flow prompt resource feature gate mismatch for {flow_uri}"
+        );
+    }
 }
 
 #[test]
@@ -97,6 +107,7 @@ fn read_resource_returns_minus_32002_for_unknown_uri() {
 #[tokio::test]
 async fn read_resource_returns_content_for_each_subagent() {
     use crate::agent::registry::agents::BUILTINS;
+    #[cfg(feature = "flows")]
     let config = crate::config::Config::default();
     for b in BUILTINS {
         let uri = format!("openhuman://prompts/agents/{}", b.id);
