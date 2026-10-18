@@ -24,7 +24,6 @@
 //! family must convert to the facade+stub shape (see `voice/`).
 
 mod agent_route;
-pub mod agents;
 pub mod builder_host;
 pub(crate) mod builder_tools;
 mod builder_tools_connection_reads;

@@ -137,8 +137,8 @@ pub const BUILTINS: &[BuiltinAgent] = &[
     #[cfg(feature = "flows")]
     BuiltinAgent {
         id: "workflow_builder",
-        toml: include_str!("../../../flows/agents/workflow_builder/agent.toml"),
-        prompt_fn: crate::flows::agents::workflow_builder::prompt::build,
+        toml: include_str!("workflow_builder/agent.toml"),
+        prompt_fn: super::workflow_builder::prompt::build,
     },
     // Workflow-discovery specialist (the "Flow Scout"): reads the user's
     // memory/threads/people/connections/flows read-only and ends by calling
@@ -150,8 +150,8 @@ pub const BUILTINS: &[BuiltinAgent] = &[
     #[cfg(feature = "flows")]
     BuiltinAgent {
         id: "flow_discovery",
-        toml: include_str!("../../../flows/agents/flow_discovery/agent.toml"),
-        prompt_fn: crate::flows::agents::flow_discovery::prompt::build,
+        toml: include_str!("flow_discovery/agent.toml"),
+        prompt_fn: super::flow_discovery::prompt::build,
     },
 ];
 
