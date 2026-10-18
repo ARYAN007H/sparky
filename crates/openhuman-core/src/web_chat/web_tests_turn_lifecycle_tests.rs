@@ -158,3 +158,57 @@ async fn a_refused_message_publishes_no_turn_events() {
         assert_ne!(event.thread_id, "lifecycle-refused", "{}", event.event);
     }
 }
+
+/// A real turn, with no hooks: the thread's session is checked out on a
+/// context with its own config, the agent runs and fails (no provider can be
+/// reached in a test), and the turn ends in exactly one classified
+/// `chat_error` after which the thread is free and no session is cached.
+#[tokio::test]
+async fn a_turn_whose_provider_is_unreachable_ends_in_one_classified_chat_error() {
+    use crate::core::runtime::{context::CoreContext, DomainSet};
+    let _serial = FORCED_ERROR_TEST_LOCK.lock().await;
+    let tmp = tempfile::tempdir().expect("workspace");
+    let config = crate::config::Config {
+        workspace_dir: tmp.path().join("workspace"),
+        action_dir: tmp.path().join("workspace"),
+        config_path: tmp.path().join("config.toml"),
+        ..Default::default()
+    };
+    std::fs::create_dir_all(&config.workspace_dir).expect("workspace dir");
+    let ctx = DispatchCtx::new(CoreContext::for_test_with_config(
+        DomainSet::full(),
+        config,
+    ));
+    let thread_id = "lifecycle-real-turn";
+    let mut rx = subscribe_web_channel_events();
+
+    let request_id = start_chat(
+        &ctx,
+        "real-client",
+        thread_id,
+        "what is two plus two",
+        None,
+        None,
+        None,
+        None,
+        ChatRequestMetadata::default(),
+    )
+    .await
+    .expect("the message is accepted");
+
+    let error = wait_for_event(&mut rx, &request_id, "chat_error").await;
+    assert!(error.error_type.as_deref().is_some_and(|kind| !kind.is_empty()));
+    assert_eq!(error.client_id, "real-client");
+    assert!(error.copy_key.is_some(), "the failure carries its copy key");
+
+    // The terminal event is the go-ahead for the next message: the thread is
+    // free, and the failed turn left no cached agent behind.
+    assert!(!in_flight_entries_for_test(&ctx)
+        .await
+        .iter()
+        .any(|(k, _)| k == thread_id));
+    assert!(!crate::web_chat::ops::thread_sessions(&ctx)
+        .lock()
+        .await
+        .contains_key(&key_for(&ctx, thread_id)));
+}
