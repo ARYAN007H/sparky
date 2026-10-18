@@ -1,4 +1,4 @@
-use super::{is_started, runtime};
+use super::{is_module_serving, is_started, runtime};
 
 /// The process-global runtime is stable within one caller runtime.
 #[tokio::test]
