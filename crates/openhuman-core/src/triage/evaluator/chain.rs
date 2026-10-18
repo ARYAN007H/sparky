@@ -231,11 +231,11 @@ where
 
                 match try_arm(&cloud, envelope, TriageResolutionPath::CloudAfterRetry).await {
                     Ok(run) => {
-                    clear_outage(retry_state, &retry_key, outage_attempt.as_mut());
+                        clear_outage(retry_state, &retry_key, outage_attempt.as_mut());
                         return Ok(TriageOutcome::Decision(run));
                     }
                     Err(ArmError::Fatal(err)) => {
-                    clear_outage(retry_state, &retry_key, outage_attempt.as_mut());
+                        clear_outage(retry_state, &retry_key, outage_attempt.as_mut());
                         return Err(err);
                     }
                     Err(ArmError::BudgetExhausted(err)) => {
