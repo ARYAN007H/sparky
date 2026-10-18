@@ -90,7 +90,7 @@ if (!isStandaloneWindow) {
 function bootRender() {
   // Reveal scrollbars only while a pane is actually scrolling. Installed here
   // rather than in a component so it covers every window entry (main, mascot,
-  // notch, overlay) with one document-level capture listener, and so panes
+  // overlay) with one document-level capture listener, and so panes
   // mounted later need no wiring. Lives for the document's lifetime.
   installAutoHideScrollbars();
 
