@@ -195,3 +195,7 @@ pub async fn local_ai_tts(
         .map_err(|e| e.to_string())?;
     Ok(Outcome::single_log(output, "local ai tts completed"))
 }
+
+#[cfg(test)]
+#[path = "runtime_ops_tests.rs"]
+mod tests;
