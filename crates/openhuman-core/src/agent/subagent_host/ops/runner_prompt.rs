@@ -9,32 +9,21 @@ use crate::agent::subagent_host::tool_prep::load_prompt_source;
 /// on the same profile snapshot without giving the generic runtime file access.
 pub(super) type LoadedConfig = Result<std::sync::Arc<crate::config::Config>, String>;
 
-/// Prefetch a module-owned archetype before entering the large typed-runner future.
-pub(super) async fn load_flow_prompt(
+/// Load and render a typed sub-agent prompt using this spawn's config snapshot.
+pub(super) async fn load_typed_prompt_source(
     definition: &AgentDefinition,
-    config: &LoadedConfig,
-) -> Result<Option<String>, SubagentRunError> {
-    #[cfg(feature = "flows")]
-    {
-        return Ok(crate::agent::prompts::flow_archetype::load_for_definition(
-            config.as_ref().ok().map(|config| config.as_ref()),
-            definition,
-        )
-        .await?);
-    }
-    #[cfg(not(feature = "flows"))]
-    {
-        let _ = (definition, config);
-        Ok(None)
-    }
-}
-
-/// Synchronously render a typed prompt with the already scoped module text.
-pub(super) fn load_typed_prompt_source<'a>(
-    definition: &AgentDefinition,
-    mut prompt_context: PromptContext<'a>,
-    flow_archetype_text: Option<&'a str>,
+    _config: &LoadedConfig,
+    mut prompt_context: PromptContext<'_>,
 ) -> Result<String, SubagentRunError> {
-    prompt_context.flow_archetype_text = flow_archetype_text;
+    #[cfg(feature = "flows")]
+    let flow_archetype_text = crate::agent::prompts::flow_archetype::load_for_definition(
+        _config.as_ref().ok().map(|config| config.as_ref()),
+        definition,
+    )
+    .await?;
+    #[cfg(not(feature = "flows"))]
+    let flow_archetype_text: Option<String> = None;
+
+    prompt_context.flow_archetype_text = flow_archetype_text.as_deref();
     load_prompt_source(definition, &prompt_context)
 }
