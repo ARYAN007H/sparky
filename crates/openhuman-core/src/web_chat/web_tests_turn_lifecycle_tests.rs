@@ -220,7 +220,6 @@ async fn a_turn_with_an_unavailable_local_provider_ends_in_one_classified_chat_e
     .await
     .expect("the message is accepted");
 
-    let requests = server.received_requests().await.expect("captured requests");
     // Interactive turns make five attempts with 3/6/12/24 s exponential
     // backoff. Additive 25% jitter raises the longest backoff sequence to
     // 56.25 s; leave margin for local setup and request handling while keeping
@@ -240,6 +239,10 @@ async fn a_turn_with_an_unavailable_local_provider_ends_in_one_classified_chat_e
     {
         Ok(error) => error,
         Err(_) => {
+            let requests = server
+                .received_requests()
+                .await
+                .expect("captured requests after timeout");
             let in_flight = crate::web_chat::runner::runtime(&ctx)
                 .runner
                 .is_in_flight(&crate::web_chat::runner::scope_of(&ctx), thread_id)
@@ -253,18 +256,29 @@ async fn a_turn_with_an_unavailable_local_provider_ends_in_one_classified_chat_e
         .received_requests()
         .await
         .expect("captured requests after terminal event");
+    let inference_requests: Vec<_> = requests
+        .iter()
+        .filter(|request| request.method == "POST" && request.url.path() == "/v1/chat/completions")
+        .collect();
     assert!(
-        requests.iter().any(|request| {
-            request.method == "POST"
-                && request.url.path() == "/v1/chat/completions"
-                && serde_json::from_slice::<serde_json::Value>(&request.body)
-                    .ok()
-                    .and_then(|body| body.get("model").cloned())
-                    .and_then(|model| model.as_str().map(str::to_owned))
-                    .as_deref()
-                    == Some("qwen3:4b-instruct")
-        }),
+        !inference_requests.is_empty(),
         "the intended local inference request was not observed: {requests:?}"
+    );
+    assert_eq!(
+        inference_requests.len(),
+        5,
+        "the retry policy should exhaust exactly five inference attempts: {requests:?}"
+    );
+    assert!(
+        inference_requests.iter().all(|request| {
+            serde_json::from_slice::<serde_json::Value>(&request.body)
+                .ok()
+                .and_then(|body| body.get("model").cloned())
+                .and_then(|model| model.as_str().map(str::to_owned))
+                .as_deref()
+                == Some("qwen3:4b-instruct")
+        }),
+        "all inference retries must target the configured model: {inference_requests:?}"
     );
     assert_eq!(
         error.error_type.as_deref(),
