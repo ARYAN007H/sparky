@@ -5,12 +5,13 @@
 //! materialization, and keeps a process snapshot so synchronous discovery can
 //! verify the disk tree without reaching across the async bus boundary.
 
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{BTreeSet, HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{LazyLock, RwLock};
+use std::sync::{Arc, LazyLock, Mutex, RwLock};
 use std::time::Duration;
 use sha2::Digest;
+use tokio::sync::Mutex as AsyncMutex;
 
 use crate::config::Config;
 use crate::core::runtime::{DispatchCtx, DomainSet};
@@ -38,6 +39,10 @@ struct SnapshotKey {
 static SNAPSHOTS: LazyLock<RwLock<HashMap<SnapshotKey, Snapshot>>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
 static NEXT_GENERATION: AtomicU64 = AtomicU64::new(1);
+static WARMUP_LOCKS: LazyLock<Mutex<HashMap<SnapshotKey, Arc<AsyncMutex<()>>>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
+static SCHEDULED: LazyLock<Mutex<HashSet<SnapshotKey>>> =
+    LazyLock::new(|| Mutex::new(HashSet::new()));
 
 /// Product-owned root for one explicit workspace/config/tenant snapshot,
 /// separate from static bundles and other profiles sharing the workspace.
@@ -46,6 +51,76 @@ pub(crate) fn root(workspace: &Path, gate: &DiscoveryGate) -> PathBuf {
         .join(".openhuman")
         .join(FLOW_ROOT_NAME)
         .join(scope_directory(gate))
+}
+
+/// Schedule optional resource loading without holding up runtime bootstrap,
+/// channel construction, or the first ordinary agent turn.
+pub(crate) fn schedule_prewarm(
+    ctx: &DispatchCtx,
+    config: &Config,
+    domains: Option<DomainSet>,
+) {
+    let gate = DiscoveryGate::from_config(ctx, config, domains);
+    if !gate.flow_authoring_enabled() {
+        return;
+    }
+    let workspace = config.workspace_dir.clone();
+    let key = snapshot_key(&workspace, &gate);
+    if generation_if_current(&workspace, &gate).is_some() {
+        return;
+    }
+    let state = crate::modules::ops::state_of(crate::modules::tinyflows::MODULE_ID);
+    if state == crate::modules::types::ModuleState::Failed
+        || (state == crate::modules::types::ModuleState::Ready
+            && !crate::modules::runtime::is_module_serving(crate::modules::tinyflows::MODULE_ID))
+    {
+        return;
+    }
+
+    let owned_ctx = ctx.clone();
+    let owned_config = config.clone();
+    spawn_background(key, async move {
+        prewarm(&owned_ctx, &owned_config, domains).await;
+    });
+}
+
+fn spawn_background(
+    key: SnapshotKey,
+    operation: impl std::future::Future<Output = ()> + Send + 'static,
+) -> bool {
+    let Ok(handle) = tokio::runtime::Handle::try_current() else {
+        return false;
+    };
+    let inserted = SCHEDULED
+        .lock()
+        .is_ok_and(|mut scheduled| scheduled.insert(key.clone()));
+    if !inserted {
+        return false;
+    }
+    handle.spawn(async move {
+        struct ScheduledGuard(SnapshotKey);
+        impl Drop for ScheduledGuard {
+            fn drop(&mut self) {
+                if let Ok(mut scheduled) = SCHEDULED.lock() {
+                    scheduled.remove(&self.0);
+                }
+            }
+        }
+        let _guard = ScheduledGuard(key);
+        operation.await;
+    });
+    true
+}
+
+fn warmup_lock(key: &SnapshotKey) -> Arc<AsyncMutex<()>> {
+    let mut locks = WARMUP_LOCKS
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    Arc::clone(
+        locks
+            .entry(key.clone())
+            .or_insert_with(|| Arc::new(AsyncMutex::new(()))),
+    )
 }
 
 /// Fetch and materialize Copilot resources when every owning capability is
@@ -69,6 +144,29 @@ pub(crate) async fn prewarm(
 
     let workspace = config.workspace_dir.as_path();
     let key = snapshot_key(workspace, &gate);
+    let lock = warmup_lock(&key);
+    let _guard = match tokio::time::timeout(COPILOT_RESOURCE_DEADLINE, lock.lock()).await {
+        Ok(guard) => guard,
+        Err(_) => {
+            tracing::warn!(
+                timeout_seconds = COPILOT_RESOURCE_DEADLINE.as_secs(),
+                "[skills][bundled] flow-authoring prewarm is already busy; skipping optional fetch"
+            );
+            return;
+        }
+    };
+    if generation_if_current(workspace, &gate).is_some() {
+        return;
+    }
+    prewarm_locked(workspace, &gate, &key, config).await;
+}
+
+async fn prewarm_locked(
+    workspace: &Path,
+    gate: &DiscoveryGate,
+    key: &SnapshotKey,
+    config: &Config,
+) {
     let fetched = tokio::time::timeout(COPILOT_RESOURCE_DEADLINE, async {
         let proxy = crate::modules::tinyflows::copilot_proxy(config).await?;
         let member = tinyflows_bus::copilot::METHODS
@@ -127,7 +225,7 @@ pub(crate) async fn prewarm(
     }
 
     let generation = NEXT_GENERATION.fetch_add(1, Ordering::SeqCst);
-    if let Err(error) = materialize(workspace, &gate, &resources) {
+    if let Err(error) = materialize(workspace, gate, &resources) {
         tracing::warn!(%error, "[skills][bundled] flow-authoring materialization failed; hiding builtin");
         clear_snapshot(&key);
         return;
