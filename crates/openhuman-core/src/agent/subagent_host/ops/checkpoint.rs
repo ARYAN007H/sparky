@@ -2,7 +2,6 @@
 
 use crate::inference::provider::BilledUsage;
 use std::sync::{Arc, Mutex};
-use tinyagents_harness::ids::CallId;
 use tinyagents_harness::summarization::CapToolResult;
 use tinyagents_orchestration::subagent::{summarize_at_cap, CapSummaryModel};
 use tinyinference_llm::message::Message;
@@ -71,7 +70,13 @@ impl CapSummaryModel for HostCapSummaryModel<'_> {
             .as_ref()
             .map(|trace| (trace.clone(), trace.begin(&self.checkpoint.model)));
         match self.checkpoint.chat_model.invoke(&(), request).await {
-            Ok(response) => {
+            Ok(mut response) => {
+                // Direct ChatModel invocation skips the normal stream adapter's
+                // response normalization. Keep the product fold and native trace
+                // on the same message-level usage when providers only fill it there.
+                if response.usage.is_none() {
+                    response.usage = response.message.usage;
+                }
                 if let Some((trace, (call_id, started_at_ms))) = trace_call {
                     trace.completed(
                         call_id,
