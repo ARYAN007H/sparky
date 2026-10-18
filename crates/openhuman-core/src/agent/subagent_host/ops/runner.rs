@@ -413,8 +413,7 @@ fn workspace_descriptor_for_subagent(
 /// `Config::load_or_init()` is **not cached** — it re-resolves the config dirs
 /// and re-reads `config.toml` on every call. `run_typed_mode` needed it in six
 /// places, so a single sub-agent spawn used to hit the disk six times and could
-/// observe six *different* configs if the file changed mid-spawn. One snapshot
-/// is both cheaper and more coherent.
+/// observe six *different* configs if the file changed mid-spawn.
 ///
 /// The error is captured as a `String` rather than dropped to `Option` so the
 /// sites that log it can say why the config was unavailable; every site
@@ -792,7 +791,7 @@ async fn run_typed_mode(
         );
     }
 
-    let (output, iterations, agg_usage, early_exit_tool, hit_cap, breaker_halt) =
+    let (output, iterations, agg_usage, early_exit_tool, hit_cap, breaker_halt, failure_cause) =
         super::graph::run_subagent_via_graph(
             subagent_source.clone(),
             &model,
@@ -911,6 +910,7 @@ async fn run_typed_mode(
         elapsed: started.elapsed(),
         mode: SubagentMode::Typed,
         status,
+        failure_cause,
         final_history: history,
         usage,
         // Filled in by `run_subagent` once the offload step has had its say, so

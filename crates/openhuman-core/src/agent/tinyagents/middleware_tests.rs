@@ -319,8 +319,30 @@ fn drain_pause_count(handle: &SteeringHandle) -> usize {
 
 /// Collect the nudge texts queued for the next model request. Nudges are
 /// request-scoped (#6725): they never ride a steering command.
-fn drain_nudge_messages(mw: &RepeatedToolFailureMiddleware) -> Vec<String> {
-    mw.take_pending_nudges()
+async fn drain_nudge_messages(
+    mw: &RepeatedToolFailureMiddleware,
+    context: &mut RunContext<crate::agent::tinyagents::host::OpenHumanRunContext>,
+) -> Vec<String> {
+    let injector = mw.nudge_injector();
+    let mut request = ModelRequest {
+        messages: vec![TaMessage::user("request")],
+        ..Default::default()
+    };
+    injector
+        .before_model_dispatch(context, &(), &mut request)
+        .await
+        .expect("queued correction is injected into the model request");
+    let messages = request
+        .messages
+        .iter()
+        .skip(1)
+        .map(|message| message.text().to_owned())
+        .collect();
+    injector
+        .after_model_dispatch(context, &(), true)
+        .await
+        .expect("request delivery consumes the staged correction");
+    messages
 }
 
 // ── RepeatedToolFailureMiddleware body-level ok:false (flows breaker) ────

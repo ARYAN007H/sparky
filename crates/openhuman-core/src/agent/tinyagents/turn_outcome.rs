@@ -153,6 +153,8 @@ pub(crate) struct TinyagentsTurnOutcome {
     /// `text` already carries this same summary; the flag lets the status mapper
     /// distinguish a breaker halt from a genuine final answer.
     pub breaker_halt: Option<String>,
+    /// Typed classified-failure cause retained by the harness run, if present.
+    pub failure_cause: Option<tinyagents_harness::no_progress::ClassifiedStopCause>,
     /// `true` when the run ended on a reply that ran out of output tokens
     /// (`finish_reason = length`) with no visible text and no tool call — the
     /// model spent its whole output budget reasoning, even after the harness's

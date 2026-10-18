@@ -88,6 +88,9 @@ pub(in super::super) async fn run_subagent_via_graph(
         // repeat-progress circuit breaker stopped the run; the caller reports
         // `Incomplete` instead of `Completed`.
         Option<String>,
+        // Typed cause is carried beside the display reason so callers do not
+        // need to reconstruct failure class or operation from prose.
+        Option<tinyagents_harness::no_progress::ClassifiedStopCause>,
     ),
     SubagentRunError,
 > {
@@ -520,8 +523,9 @@ pub(in super::super) async fn run_subagent_via_graph(
     // host boundary, then acknowledge it on the parent stream so the linked
     // sub-agent span cannot close ahead of its child record.
     if let Some(terminal) = outcome.deferred_terminal.take() {
-        let stop = crate::agent::session_host::stop_summary::classify_stop(
+        let stop = crate::agent::session_host::stop_summary::classify_stop_with_cause(
             outcome.breaker_halt.as_deref(),
+            outcome.failure_cause.clone(),
             false,
             outcome.hit_cap,
         );
@@ -558,6 +562,7 @@ pub(in super::super) async fn run_subagent_via_graph(
         outcome.hit_cap,
         // #4466: propagate a circuit-breaker halt so the runner reports Incomplete.
         outcome.breaker_halt,
+        outcome.failure_cause,
     ))
 }
 

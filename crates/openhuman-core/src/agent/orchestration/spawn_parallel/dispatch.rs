@@ -92,6 +92,7 @@ async fn create_spawn_parallel_worktree(
                             status: ParallelAgentStatus::Failed,
                             output: None,
                             error: Some(format!("worktree isolation failed: {err}")),
+                            failure_cause: None,
                             awaiting_question: None,
                             checkpoint_path: None,
                             ownership: task.ownership.clone(),
@@ -122,6 +123,7 @@ async fn create_spawn_parallel_worktree(
                     error: Some(
                         "worktree isolation requested but action_dir is unavailable".to_string(),
                     ),
+                    failure_cause: None,
                     awaiting_question: None,
                     checkpoint_path: None,
                     ownership: task.ownership.clone(),
@@ -204,6 +206,7 @@ pub(crate) async fn stage_spawn_parallel_workers_from_defs(
                     status: ParallelAgentStatus::Failed,
                     output: None,
                     error: Some(rejection.error),
+                    failure_cause: None,
                     awaiting_question: None,
                     checkpoint_path: None,
                     ownership: rejection.ownership,

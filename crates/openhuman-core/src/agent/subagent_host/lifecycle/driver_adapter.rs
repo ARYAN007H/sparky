@@ -285,6 +285,7 @@ impl SubagentExecutor<crate::agent::tinyagents::host::OpenHumanRunContext> for O
                                     agent_id: agent_id.clone(),
                                     output: output.clone(),
                                     iterations: 1,
+                                    failure_cause: None,
                                     elapsed: std::time::Duration::ZERO,
                                     mode: crate::agent::subagent_host::SubagentMode::Typed,
                                     status,
@@ -348,6 +349,12 @@ pub(in crate::agent::subagent_host) fn outcome_to_host(
 ) -> SubagentRunOutcome {
     let persistence_disposition = result.disposition;
     let outcome = result.outcome;
+    let neutral_failure_cause = match &outcome.status {
+        SubagentOutcomeKind::Incomplete(_) => failure_cause_from_extensions(&outcome.extensions),
+        SubagentOutcomeKind::Completed
+        | SubagentOutcomeKind::AwaitingInput(_)
+        | SubagentOutcomeKind::Cancelled => None,
+    };
     let elapsed_from_neutral = outcome
         .extensions
         .get("elapsed_ns")
@@ -392,6 +399,7 @@ pub(in crate::agent::subagent_host) fn outcome_to_host(
             .unwrap_or_else(|| fallback_agent_id.to_owned()),
         output: outcome.output.clone(),
         iterations: outcome.usage.calls as usize,
+        failure_cause: neutral_failure_cause.clone(),
         elapsed: std::time::Duration::from_millis(
             durable_metadata
                 .map(|(_, elapsed_ms)| elapsed_ms)
@@ -443,6 +451,13 @@ pub(in crate::agent::subagent_host) fn outcome_to_host(
     };
     host.status = status;
     host.persistence_disposition = persistence_disposition;
+    if matches!(host.status, SubagentRunStatus::Incomplete { .. }) {
+        if host.failure_cause.is_none() {
+            host.failure_cause = neutral_failure_cause;
+        }
+    } else {
+        host.failure_cause = None;
+    }
     if is_awaiting_input {
         host.status = SubagentRunStatus::AwaitingUser {
             question: match host.status {
@@ -454,6 +469,17 @@ pub(in crate::agent::subagent_host) fn outcome_to_host(
         };
     }
     host
+}
+
+fn failure_cause_from_extensions(
+    extensions: &std::collections::BTreeMap<String, serde_json::Value>,
+) -> Option<tinyagents_harness::no_progress::ClassifiedStopCause> {
+    let cause = extensions.get("failure_cause")?.as_object()?;
+    Some(tinyagents_harness::no_progress::ClassifiedStopCause {
+        class: cause.get("class")?.as_str()?.to_owned(),
+        operation: cause.get("operation")?.as_str()?.to_owned(),
+        summary: cause.get("summary")?.as_str()?.to_owned(),
+    })
 }
 
 pub(super) fn map_lifecycle_error(error: SubagentError) -> SubagentRunError {
@@ -468,3 +494,7 @@ fn cost_source_of(charged: Option<&ChargedAmount>) -> tinyagents_harness::cost::
         None => tinyagents_harness::cost::CostSource::Unknown,
     }
 }
+
+#[cfg(test)]
+#[path = "driver_adapter_tests.rs"]
+mod tests;

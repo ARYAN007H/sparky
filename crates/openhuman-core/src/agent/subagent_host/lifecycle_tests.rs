@@ -29,6 +29,7 @@ fn cached_outcome(status: SubagentRunStatus) -> SubagentRunOutcome {
         agent_id: "researcher".into(),
         output: "partial output".into(),
         iterations: 1,
+        failure_cause: None,
         elapsed: std::time::Duration::from_millis(1),
         mode: SubagentMode::Typed,
         status,
@@ -610,6 +611,7 @@ async fn driver_inline_projection_returns_the_durable_winner_not_a_local_loser()
         output: winner.output.clone(),
         agent_id: "winner-agent".into(),
         iterations: 7,
+        failure_cause: None,
         ..cached_outcome(SubagentRunStatus::Incomplete {
             reason: "winner stopped".into(),
         })
