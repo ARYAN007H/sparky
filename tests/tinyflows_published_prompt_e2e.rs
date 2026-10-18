@@ -79,7 +79,7 @@ async fn published_module_prompts_render_through_the_normal_host_path() {
             .iter()
             .find(|skill| skill.id() == "flow-authoring")
             .expect("the published module's flow-authoring skill is discoverable");
-        assert_eq!(flow.scope, tinyskills::SkillScope::Builtin);
+        assert_eq!(flow.scope.precedence(), 0, "flow-authoring is a Builtin");
         let flow_dir = flow
             .location
             .as_deref()
