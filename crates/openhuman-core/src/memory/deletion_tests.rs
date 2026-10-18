@@ -20,8 +20,8 @@ fn thread(id: &str) -> PendingDeletion {
     }
 }
 
-#[test]
-fn offline_conversation_purge_queues_exact_thread_ids_in_its_workspace() {
+#[tokio::test]
+async fn offline_conversation_purge_queues_exact_thread_ids_in_its_workspace() {
     use crate::threads::store::{ensure_thread, purge_threads, CreateConversationThread};
 
     let tmp = tempfile::tempdir().unwrap();
