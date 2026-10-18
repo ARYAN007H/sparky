@@ -1,6 +1,10 @@
 use super::*;
 use tokio::sync::broadcast;
 
+fn wire(event: &ScopedWebEvent) -> serde_json::Value {
+    serde_json::to_value(event).expect("web event serializes")
+}
+
 /// `fresh_approval_surface_subscription` returns `Some` when the global event bus has
 /// been initialised and `None` otherwise (bus not started).  It must never return `None`
 /// after `init_global` has been called — the production path always initialises the bus
@@ -35,21 +39,15 @@ async fn fresh_approval_surface_subscription_is_not_a_singleton() {
 /// Drain the web-channel receiver until an `external_transfer_pending` event
 /// whose `args.service` matches `marker` arrives (the bus is process-wide).
 async fn find_egress_web_event(
-    rx: &mut broadcast::Receiver<WebChannelEvent>,
+    rx: &mut broadcast::Receiver<ScopedWebEvent>,
     marker: &str,
-) -> WebChannelEvent {
+) -> ScopedWebEvent {
     loop {
         match rx.recv().await {
-            Ok(ev)
-                if ev.event == "external_transfer_pending"
-                    && ev
-                        .args
-                        .as_ref()
-                        .and_then(|a| a.get("service"))
-                        .and_then(|s| s.as_str())
-                        == Some(marker) =>
-            {
-                return ev;
+            Ok(ev) if ev.event_name() == "external_transfer_pending" => {
+                if wire(&ev)["args"]["service"] == marker {
+                    return ev;
+                }
             }
             Ok(_) => continue,
             Err(broadcast::error::RecvError::Lagged(_)) => continue,
@@ -80,10 +78,10 @@ async fn egress_surface_bridges_pending_with_chat_context() {
     });
 
     let ev = find_egress_web_event(&mut web_rx, marker).await;
-    assert_eq!(ev.thread_id, "thread-1");
-    assert_eq!(ev.client_id, "client-1");
-    assert_eq!(ev.request_id, "request-1");
-    let args = ev.args.expect("args present");
+    assert_eq!(ev.context().thread_id, "thread-1");
+    assert_eq!(ev.context().client_id, "client-1");
+    assert_eq!(ev.context().request_id, "request-1");
+    let args = wire(&ev)["args"].clone();
     assert_eq!(args["provider_slug"], "composio");
     assert_eq!(args["reason"], "tool_call");
     assert_eq!(args["is_external"], true);
@@ -118,12 +116,9 @@ async fn egress_surface_drops_pending_without_chat_context() {
 
     loop {
         match web_rx.recv().await {
-            Ok(ev) if ev.event == "external_transfer_pending" => {
-                let svc = ev
-                    .args
-                    .as_ref()
-                    .and_then(|a| a.get("service"))
-                    .and_then(|s| s.as_str());
+            Ok(ev) if ev.event_name() == "external_transfer_pending" => {
+                let value = wire(&ev);
+                let svc = value["args"]["service"].as_str();
                 assert_ne!(
                     svc,
                     Some(dropped_marker),
@@ -145,20 +140,15 @@ async fn egress_surface_drops_pending_without_chat_context() {
 /// Drain the web-channel receiver until an event of the given name whose
 /// `args.artifact_id` matches `marker` arrives.
 async fn find_artifact_web_event(
-    rx: &mut broadcast::Receiver<WebChannelEvent>,
+    rx: &mut broadcast::Receiver<ScopedWebEvent>,
     event_name: &str,
     marker: &str,
-) -> WebChannelEvent {
+) -> ScopedWebEvent {
     loop {
         match rx.recv().await {
             Ok(ev)
-                if ev.event == event_name
-                    && ev
-                        .args
-                        .as_ref()
-                        .and_then(|a| a.get("artifact_id"))
-                        .and_then(|s| s.as_str())
-                        == Some(marker) =>
+                if ev.event_name() == event_name
+                    && wire(&ev)["args"]["artifact_id"].as_str() == Some(marker) =>
             {
                 return ev;
             }
@@ -195,8 +185,8 @@ async fn artifact_surface_bridges_tool_call_id_and_request_id() {
         request_id: Some("req-1".to_string()),
     });
     let ev = find_artifact_web_event(&mut web_rx, "artifact_pending", pending_id).await;
-    assert_eq!(ev.tool_call_id, Some("call-1".to_string()));
-    assert_eq!(ev.turn_request_id, Some("req-1".to_string()));
+    assert_eq!(wire(&ev)["tool_call_id"], "call-1");
+    assert_eq!(wire(&ev)["turn_request_id"], "req-1");
 
     let ready_id = "artifact-corr-ready";
     crate::core::bus::BUS.publish(DomainEvent::ArtifactReady {
@@ -212,8 +202,8 @@ async fn artifact_surface_bridges_tool_call_id_and_request_id() {
         request_id: Some("req-2".to_string()),
     });
     let ev = find_artifact_web_event(&mut web_rx, "artifact_ready", ready_id).await;
-    assert_eq!(ev.tool_call_id, Some("call-2".to_string()));
-    assert_eq!(ev.turn_request_id, Some("req-2".to_string()));
+    assert_eq!(wire(&ev)["tool_call_id"], "call-2");
+    assert_eq!(wire(&ev)["turn_request_id"], "req-2");
 
     let failed_id = "artifact-corr-failed";
     crate::core::bus::BUS.publish(DomainEvent::ArtifactFailed {
@@ -228,8 +218,8 @@ async fn artifact_surface_bridges_tool_call_id_and_request_id() {
         request_id: Some("req-3".to_string()),
     });
     let ev = find_artifact_web_event(&mut web_rx, "artifact_failed", failed_id).await;
-    assert_eq!(ev.tool_call_id, Some("call-3".to_string()));
-    assert_eq!(ev.turn_request_id, Some("req-3".to_string()));
+    assert_eq!(wire(&ev)["tool_call_id"], "call-3");
+    assert_eq!(wire(&ev)["turn_request_id"], "req-3");
 }
 
 /// A producer that ran outside a harness tool-call context (CLI, cron)
@@ -254,21 +244,21 @@ async fn artifact_surface_leaves_tool_call_id_none_when_absent() {
         request_id: None,
     });
     let ev = find_artifact_web_event(&mut web_rx, "artifact_ready", ready_id).await;
-    assert_eq!(ev.tool_call_id, None);
-    assert_eq!(ev.turn_request_id, None);
+    assert!(wire(&ev).get("tool_call_id").is_none());
+    assert!(wire(&ev).get("turn_request_id").is_none());
 }
 
 /// Drain the web-channel receiver until an event with the given `event` name
 /// and `thread_id` arrives (the bus is process-wide, so unrelated events from
 /// other tests may interleave).
 async fn find_agent_web_event(
-    rx: &mut broadcast::Receiver<WebChannelEvent>,
+    rx: &mut broadcast::Receiver<ScopedWebEvent>,
     event: &str,
     thread_id: &str,
-) -> WebChannelEvent {
+) -> ScopedWebEvent {
     loop {
         match rx.recv().await {
-            Ok(ev) if ev.event == event && ev.thread_id == thread_id => return ev,
+            Ok(ev) if ev.event_name() == event && ev.context().thread_id == thread_id => return ev,
             Ok(_) => continue,
             Err(broadcast::error::RecvError::Lagged(_)) => continue,
             Err(broadcast::error::RecvError::Closed) => {
