@@ -52,3 +52,37 @@ fn reply_metadata_exists_only_after_the_reply_audio_is_stored() {
     assert_eq!(meta["noteId"], "reply-req_1");
     assert_eq!(meta["mime"], "audio/mpeg");
 }
+
+#[test]
+fn rpc_round_trip_and_bad_base64() {
+    let tmp = tempfile::tempdir().unwrap();
+    let out = store_from_rpc(tmp.path(), "rt", "audio/webm", "YWJj").unwrap();
+    assert_eq!(out.value["mime"], "audio/webm");
+    let read = read_for_rpc(tmp.path(), "rt").unwrap().value;
+    assert_eq!(read["audio_base64"], "YWJj");
+    assert!(read_for_rpc(tmp.path(), "none").unwrap().value["audio_base64"].is_null());
+    assert!(store_from_rpc(tmp.path(), "bad", "audio/webm", "!!!").is_err());
+}
+
+#[test]
+fn synthesized_reply_is_stored_only_with_decodable_audio() {
+    let tmp = tempfile::tempdir().unwrap();
+    assert!(!store_synthesized_reply(tmp.path(), "r1", "", "audio/mpeg"));
+    assert!(!store_synthesized_reply(tmp.path(), "r1", "***", "audio/mpeg"));
+    assert!(store_synthesized_reply(tmp.path(), "r1", "YWJj", "audio/mpeg"));
+    assert!(reply_note_metadata(tmp.path(), "r1").is_some());
+}
+
+#[test]
+fn reply_mode_decides_when_the_reply_is_spoken() {
+    use crate::config::schema::VoiceReplyMode;
+    let mut config = crate::config::Config::default();
+    // Default is mirror: only a voice-note turn is answered aloud.
+    assert!(!should_speak_reply(&config, "t", None, Some("keyboard")));
+    assert!(should_speak_reply(&config, "t", None, Some(VOICE_NOTE_SOURCE)));
+    assert!(should_speak_reply(&config, "t", Some(true), None));
+    config.channel_voice.reply_mode = VoiceReplyMode::Always;
+    assert!(should_speak_reply(&config, "t", None, None));
+    config.channel_voice.threads.insert("t".into(), VoiceReplyMode::Never);
+    assert!(!should_speak_reply(&config, "t", None, Some(VOICE_NOTE_SOURCE)));
+}

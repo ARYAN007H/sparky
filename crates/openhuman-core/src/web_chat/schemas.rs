@@ -14,7 +14,7 @@ use super::ops::{
     channel_web_queue_status,
 };
 use super::types::{
-    ChatRequestMetadata, WebCancelParams, WebChatParams, WebQueueParams, WebQueueRemoveParams,
+    ChatRequestMetadata, VoiceNoteReadParams, VoiceNoteStoreParams, WebCancelParams, WebChatParams, WebQueueParams, WebQueueRemoveParams,
 };
 
 pub fn all_web_channel_controller_schemas() -> Vec<ControllerSchema> {
@@ -24,6 +24,8 @@ pub fn all_web_channel_controller_schemas() -> Vec<ControllerSchema> {
         schemas("queue_status"),
         schemas("queue_clear"),
         schemas("queue_remove"),
+        schemas("voice_note_store"),
+        schemas("voice_note_read"),
     ]
 }
 
@@ -48,6 +50,14 @@ pub fn all_web_channel_registered_controllers() -> Vec<RegisteredController> {
         RegisteredController {
             schema: schemas("queue_remove"),
             handler: handle_queue_remove,
+        },
+        RegisteredController {
+            schema: schemas("voice_note_store"),
+            handler: handle_voice_note_store,
+        },
+        RegisteredController {
+            schema: schemas("voice_note_read"),
+            handler: handle_voice_note_read,
         },
     ]
 }
@@ -140,6 +150,24 @@ pub fn schemas(function: &str) -> ControllerSchema {
                 "{ thread_id, item_id, removed }.",
             )],
         },
+        "voice_note_store" => ControllerSchema {
+            namespace: "channel",
+            function: "web_voice_note_store",
+            description: "Store the audio of a voice note the user recorded, so the thread row can point at it.",
+            inputs: vec![
+                required_string("note_id", "Caller-chosen id (letters, digits, '-', '_'); storing the same id again replaces the audio."),
+                required_string("audio_base64", "Base64 of the recorded audio."),
+                optional_string("mime", "Audio mime type (default audio/webm)."),
+            ],
+            outputs: vec![json_output("result", "{ note_id, mime }.")],
+        },
+        "voice_note_read" => ControllerSchema {
+            namespace: "channel",
+            function: "web_voice_note_read",
+            description: "Read the audio of a stored voice note (user recording or spoken assistant reply).",
+            inputs: vec![required_string("note_id", "Voice note id from the message metadata.")],
+            outputs: vec![json_output("result", "{ note_id, mime, audio_base64 }; audio_base64 is null when no audio exists.")],
+        },
         _ => ControllerSchema {
             namespace: "channel",
             function: "unknown",
@@ -210,6 +238,30 @@ fn handle_queue_remove(ctx: DispatchCtx, params: Map<String, Value>) -> Controll
     Box::pin(async move {
         let p = deserialize_params::<WebQueueRemoveParams>(params)?;
         to_json(channel_web_queue_remove(&ctx, &p.client_id, &p.thread_id, &p.item_id).await?)
+    })
+}
+
+fn handle_voice_note_store(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+    Box::pin(async move {
+        let p = deserialize_params::<VoiceNoteStoreParams>(params)?;
+        let config = ctx.load_config().await?;
+        to_json(super::voice_notes::store_from_rpc(
+            &config.workspace_dir,
+            &p.note_id,
+            p.mime.as_deref().unwrap_or("audio/webm"),
+            &p.audio_base64,
+        )?)
+    })
+}
+
+fn handle_voice_note_read(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+    Box::pin(async move {
+        let p = deserialize_params::<VoiceNoteReadParams>(params)?;
+        let config = ctx.load_config().await?;
+        to_json(super::voice_notes::read_for_rpc(
+            &config.workspace_dir,
+            &p.note_id,
+        )?)
     })
 }
 

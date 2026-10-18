@@ -122,6 +122,41 @@ pub(crate) fn reply_note_metadata(workspace: &Path, request_id: &str) -> Option<
     })
 }
 
+/// `channel.web_voice_note_store`: decode and store a recorded note.
+pub(crate) fn store_from_rpc(
+    workspace: &Path,
+    note_id: &str,
+    mime: &str,
+    audio_base64: &str,
+) -> Result<crate::core::Outcome<Value>, String> {
+    use base64::Engine as _;
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(audio_base64.trim())
+        .map_err(|e| format!("audio_base64 is not valid base64: {e}"))?;
+    let stored = store_note(workspace, note_id, mime, &bytes)?;
+    Ok(crate::core::Outcome::single_log(
+        json!({ "note_id": note_id, "mime": stored }),
+        "voice note stored",
+    ))
+}
+
+/// `channel.web_voice_note_read`: the note's audio, or null audio when absent.
+pub(crate) fn read_for_rpc(
+    workspace: &Path,
+    note_id: &str,
+) -> Result<crate::core::Outcome<Value>, String> {
+    use base64::Engine as _;
+    let value = match read_note(workspace, note_id)? {
+        Some((bytes, mime)) => json!({
+            "note_id": note_id,
+            "mime": mime,
+            "audio_base64": base64::engine::general_purpose::STANDARD.encode(bytes),
+        }),
+        None => json!({ "note_id": note_id, "mime": null, "audio_base64": null }),
+    };
+    Ok(crate::core::Outcome::single_log(value, "voice note read"))
+}
+
 /// Whether this turn's reply is also spoken: an explicit `speak_reply` always
 /// wins, otherwise the `[channel_voice]` policy for the `web` channel decides
 /// (`always`, or `mirror` when the user sent a voice note).
