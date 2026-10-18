@@ -2,7 +2,7 @@
 //! `tinyagents` harness event stream onto openhuman's [`AgentProgress`] +
 //! cost tracker (issue #4249). See the parent module doc for the overview.
 
-use std::sync::atomic::Ordering;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 use tokio::sync::mpsc::Sender;
@@ -56,6 +56,11 @@ pub(crate) struct OpenhumanEventBridge {
     /// model as `{provider_id}.{model}`.
     pub(super) provider_id: String,
     pub(super) max_iterations: u32,
+    /// Supplemental host repairs are durable trace generations but are not
+    /// extra agent-loop iterations or live wallet events. They share this
+    /// run-local ordered event sink, so `ModelStarted` brackets the following
+    /// `UsageRecorded` and terminal model event synchronously.
+    pub(super) supplemental_call_active: AtomicBool,
     /// `None` for a parent turn; `Some` to emit child-scoped `Subagent*` events.
     pub(super) scope: Option<SubagentScope>,
     /// The agent definition the run acts as (its memory identity's agent),
@@ -168,6 +173,7 @@ impl OpenhumanEventBridge {
             model: model.into(),
             provider_id: provider_id.into(),
             max_iterations: max_iterations as u32,
+            supplemental_call_active: AtomicBool::new(false),
             scope,
             definition: std::sync::OnceLock::new(),
             cursor,

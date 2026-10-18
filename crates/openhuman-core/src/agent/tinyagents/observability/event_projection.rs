@@ -14,6 +14,11 @@ use super::event_bridge::OpenhumanEventBridge;
 impl EventListener for OpenhumanEventBridge {
     fn on_event(&self, record: &EventRecord) {
         match &record.event {
+            AgentEvent::ModelStarted { call_id, .. }
+                if call_id.as_str().contains("-host-supplemental-") =>
+            {
+                self.supplemental_call_active.store(true, std::sync::atomic::Ordering::SeqCst);
+            }
             AgentEvent::ModelStarted { .. } => {
                 let iteration = tinyagents_harness::events::advance_iteration(&self.cursor);
                 match &self.scope {
@@ -127,7 +132,14 @@ impl EventListener for OpenhumanEventBridge {
             // `UsageRecorded` carries the authoritative per-call usage and fires
             // exactly once per model call; prefer it over `ModelCompleted`'s
             // optional usage to avoid double counting.
-            AgentEvent::UsageRecorded { usage } => self.record_usage(usage),
+            AgentEvent::UsageRecorded { usage } => {
+                if !self
+                    .supplemental_call_active
+                    .load(std::sync::atomic::Ordering::SeqCst)
+                {
+                    self.record_usage(usage);
+                }
+            }
             // Per-call generation telemetry. `ModelCompleted` fires exactly once
             // per model call, after `UsageRecorded`, and is the only event
             // carrying the captured request messages (incl. the system prompt)
@@ -136,6 +148,12 @@ impl EventListener for OpenhumanEventBridge {
             // child call carries its owning `subagent_task_id` so the trace
             // exporter nests the generation under the subagent span (this is
             // what makes the Context Scout's model calls visible in Langfuse).
+            AgentEvent::ModelCompleted {
+                call_id,
+                ..
+            } if call_id.as_str().contains("-host-supplemental-") => {
+                self.supplemental_call_active.store(false, std::sync::atomic::Ordering::SeqCst);
+            }
             AgentEvent::ModelCompleted {
                 usage,
                 input,
@@ -197,6 +215,11 @@ impl EventListener for OpenhumanEventBridge {
                     reasoning_tokens,
                     cost_usd: call_cost,
                 });
+            }
+            AgentEvent::ModelFailed { call_id, .. }
+                if call_id.as_str().contains("-host-supplemental-") =>
+            {
+                self.supplemental_call_active.store(false, std::sync::atomic::Ordering::SeqCst);
             }
             AgentEvent::CostRecorded { cost } => {
                 tracing::debug!(
