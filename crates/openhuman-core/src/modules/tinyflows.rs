@@ -275,7 +275,7 @@ pub(crate) use imp::{
 
 #[cfg(not(feature = "modules"))]
 mod imp {
-    use super::disabled_message;
+    use super::{disabled_message, ServedObjectRegistration};
     use crate::config::Config;
 
     fn unavailable(config: &Config) -> String {
