@@ -288,6 +288,48 @@ async fn text_archive_and_unavailable_pdf_dispatch_to_distinct_fallbacks() {
         if matches!(&user.content[1], ContentBlock::Document(MediaRef::Path { path, .. }) if path == "note.txt")));
 }
 
+#[cfg(feature = "documents")]
+#[tokio::test]
+async fn disabled_tinydocs_fallback_runs_through_the_owner_wrapper_without_caching() {
+    let temp = tempfile::tempdir().unwrap();
+    let relative = "uploads/thread/id/brief.pdf";
+    let path = temp.path().join(relative);
+    tokio::fs::create_dir_all(path.parent().unwrap()).await.unwrap();
+    tokio::fs::write(&path, b"%PDF-1.4 original bytes")
+        .await
+        .unwrap();
+    let mut config = (*offline_config(temp.path())).clone();
+    config.components.documents = false;
+    let transport = Arc::new(CaptureModel::new(vec![]));
+    let model = controlled_wrapper(transport.clone(), Arc::new(config), &[]);
+
+    model
+        .invoke(
+            &(),
+            user_request(vec![local_media(
+                InputModality::Document,
+                relative,
+                "application/pdf",
+            )]),
+        )
+        .await
+        .unwrap();
+
+    let captured = transport.requests.lock().unwrap();
+    let Message::User(user) = &captured[0].1.messages[0] else {
+        panic!("expected user message")
+    };
+    assert!(user.content[0]
+        .text()
+        .contains("Document extraction is disabled"));
+    assert!(user.content[0].text().contains("brief.pdf"));
+    assert!(!path
+        .parent()
+        .unwrap()
+        .join(".openhuman-derived/readout.txt")
+        .exists());
+}
+
 #[tokio::test]
 async fn paid_vision_readout_is_reused_across_recreated_wrappers_and_invalidated_by_source_changes()
 {
