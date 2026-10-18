@@ -232,7 +232,7 @@ fn background_services_drive_the_scheduler_and_stop_with_the_runtime() {
         tokio::spawn(async {
             let backend = stub_backend().await;
             let mut config = offline_config();
-            config.reliability.scheduler_poll_secs = 1;
+            config.reliability.scheduler_poll_secs = 5;
             let temp = tempfile::tempdir().expect("workspace");
             let workspace = Workspace::dir(temp.path().join("state"));
             let runtime = Runtime::builder()
@@ -268,6 +268,13 @@ fn background_services_drive_the_scheduler_and_stop_with_the_runtime() {
                 *fired.lock().unwrap() > 0
             })
             .await;
+            wait_for("the first scheduled run to finish", || {
+                runtime
+                    .cron()
+                    .runs("svc-tick", 10)
+                    .is_ok_and(|runs| runs.first().is_some_and(|run| run.status == "ok"))
+            })
+            .await;
             let runs_after_first = runtime.cron().runs("svc-tick", 10).unwrap().len();
             assert!(runs_after_first > 0, "the scheduler records its callback");
 
@@ -279,7 +286,9 @@ fn background_services_drive_the_scheduler_and_stop_with_the_runtime() {
             // Explicit control.
             runtime.stop_services();
             wait_for_services_changed(&mut events, false).await;
-            tokio::time::sleep(Duration::from_millis(1_250)).await;
+            // The host scheduler clamps the configured poll cadence to at least five
+            // seconds, so observe beyond one full effective poll interval.
+            tokio::time::sleep(Duration::from_millis(6_200)).await;
             assert_eq!(
                 runtime.cron().runs("svc-tick", 10).unwrap().len(),
                 runs_after_first,
@@ -287,14 +296,17 @@ fn background_services_drive_the_scheduler_and_stop_with_the_runtime() {
             );
             runtime.start_services().await;
             wait_for_services_changed(&mut events, true).await;
-            wait_for("the scheduler to fire after restart", || {
-                runtime.cron().runs("svc-tick", 10).unwrap().len() > runs_after_first
+            wait_for("the scheduler to complete a run after restart", || {
+                runtime.cron().runs("svc-tick", 10).is_ok_and(|runs| {
+                    runs.len() > runs_after_first
+                        && runs.first().is_some_and(|run| run.status == "ok")
+                })
             })
             .await;
             let runs_after_restart = runtime.cron().runs("svc-tick", 10).unwrap().len();
 
             drop(runtime);
-            tokio::time::sleep(Duration::from_millis(1_250)).await;
+            tokio::time::sleep(Duration::from_millis(6_200)).await;
             let second = Runtime::builder()
                 .config(config)
                 .workspace(workspace)
@@ -327,7 +339,7 @@ fn deferred_services_wait_for_the_host_so_a_due_job_finds_its_handler() {
         tokio::spawn(async {
             let backend = stub_backend().await;
             let mut config = offline_config();
-            config.reliability.scheduler_poll_secs = 1;
+            config.reliability.scheduler_poll_secs = 5;
             let runtime = Runtime::builder()
                 .config(config)
                 .workspace(Workspace::Ephemeral)
@@ -351,7 +363,9 @@ fn deferred_services_wait_for_the_host_so_a_due_job_finds_its_handler() {
                     JobSchedule::Every { ms: 1_000 },
                 ))
                 .unwrap();
-            tokio::time::sleep(Duration::from_secs(2)).await;
+            // The scheduler clamps host polling to five seconds; wait beyond
+            // that interval so an incorrectly-started scheduler would run.
+            tokio::time::sleep(Duration::from_millis(6_200)).await;
             assert!(
                 runtime.cron().runs("deferred-tick", 10).unwrap().is_empty(),
                 "a deferred build must not run the due job"
