@@ -251,3 +251,79 @@ async fn a_detached_driver_keeps_its_carried_actor_for_lifecycle_reads_and_commi
     // Keep the production bundle alive until its detached completion finished.
     drop(bundle);
 }
+
+async fn assert_legacy_owner_terminal(format: &str) {
+    use super::super::persistence::OpenHumanPersistence;
+    let workspace = tempfile::tempdir().unwrap();
+    let key = task();
+    let owner = tinyagents_orchestration::subagent::FileSubagentPersistence::new(workspace.path());
+    let mut outcome = SubagentOutcome::cancelled(&key.task_id);
+    outcome.output = "legacy terminal".into();
+    owner.record_terminal(&key, &outcome, None).await.unwrap();
+    let file = std::fs::read_dir(workspace.path().join("lifecycle"))
+        .unwrap()
+        .map(|entry| entry.unwrap().path())
+        .find(|path| {
+            path.file_name()
+                .unwrap()
+                .to_string_lossy()
+                .ends_with(".terminal.json")
+        })
+        .unwrap();
+    let mut record: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(&file).unwrap()).unwrap();
+    if format == "bare" {
+        record = record["outcome"].clone();
+        record["extensions"]["agent_id"] = serde_json::json!("legacy-owner");
+        record["extensions"]["elapsed_ms"] = serde_json::json!(41);
+        record["extensions"]["legacy_extra"] = serde_json::json!({"kept": true});
+    } else {
+        if format == "keyless" {
+            record.as_object_mut().unwrap().remove("key");
+        }
+        record["agent_id"] = serde_json::json!("legacy-owner");
+        record["elapsed_ms"] = serde_json::json!(41);
+        record["legacy_extra"] = serde_json::json!({"kept": true});
+    }
+    let bytes = serde_json::to_vec_pretty(&record).unwrap();
+    std::fs::write(&file, &bytes).unwrap();
+    let adapter = OpenHumanPersistence::new(workspace.path().to_path_buf());
+    let stale_path = adapter.legacy_pause_path(&key);
+    let stale = OpenHumanPersistence::checkpoint_from_persisted_pause(paused(&key)).unwrap();
+    let stale_bytes = serde_json::to_vec(&stale).unwrap();
+    std::fs::write(&stale_path, &stale_bytes).unwrap();
+
+    let terminal = adapter
+        .load_terminal(&key)
+        .await
+        .unwrap()
+        .expect("legacy terminal remains visible");
+    assert_eq!(terminal.output, "legacy terminal");
+    assert_eq!(terminal.extensions["agent_id"], "legacy-owner");
+    assert_eq!(terminal.extensions["elapsed_ms"], 41);
+    assert_eq!(terminal.extensions["legacy_extra"]["kept"], true);
+    assert!(adapter.load_pause(&key).await.unwrap().is_none());
+    assert!(super::super::load_subagent_checkpoint(workspace.path(), &key.task_id).is_err());
+    let reopened = OpenHumanPersistence::new(workspace.path().to_path_buf());
+    assert_eq!(
+        reopened.load_terminal(&key).await.unwrap().unwrap(),
+        terminal
+    );
+    assert_eq!(std::fs::read(&file).unwrap(), bytes);
+    assert_eq!(std::fs::read(&stale_path).unwrap(), stale_bytes);
+}
+
+#[tokio::test]
+async fn legacy_owner_terminal_key_bearing_keeps_flattened_extensions() {
+    assert_legacy_owner_terminal("current").await;
+}
+
+#[tokio::test]
+async fn legacy_owner_terminal_keyless_keeps_host_metadata() {
+    assert_legacy_owner_terminal("keyless").await;
+}
+
+#[tokio::test]
+async fn legacy_owner_terminal_bare_outcome_keeps_extensions() {
+    assert_legacy_owner_terminal("bare").await;
+}

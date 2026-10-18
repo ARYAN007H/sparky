@@ -10,6 +10,7 @@ pub(crate) struct OpenHumanDriverBundle {
 }
 
 impl OpenHumanDriverBundle {
+    #[cfg(test)]
     pub(crate) fn new(checkpoint_dir: PathBuf) -> Result<Self, SubagentRunError> {
         Self::with_in_flight(
             checkpoint_dir,
@@ -17,6 +18,7 @@ impl OpenHumanDriverBundle {
         )
     }
 
+    #[cfg(test)]
     pub(crate) fn with_in_flight(
         checkpoint_dir: PathBuf,
         in_flight: tinyagents_orchestration::subagent::SubagentInFlight,
