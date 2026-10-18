@@ -2777,67 +2777,6 @@ async fn json_rpc_cron_manual_worker_survives_caller_cancel_on_published_tinyflo
         ..Config::default()
     };
 
-    // Seed the exact v1 document collections before any Cron controller or
-    // scheduler can ask TinyFlows to migrate them.
-    let opened = openhuman_core::storage::local::open("published TinyFlows E2E", &workspace)
-        .expect("open the same local storage scope the core will use");
-    let scoped = opened.scoped().expect("scope E2E storage");
-    let docs = Arc::clone(scoped.documents());
-    for collection in ["cron_jobs", "cron_runs", "cron_counters"] {
-        docs.ensure_collection(&CollectionSpec::new(collection))
-            .await
-            .unwrap();
-    }
-    docs.put(
-        "cron_jobs",
-        "legacy-migration-proof",
-        json!({
-            "claim_generation": 1,
-            "expression": "0 9 * * *",
-            "command": "echo migrated",
-            "schedule": "{\"kind\":\"every\",\"every_ms\":3600000}",
-            "job_type": "shell",
-            "session_target": "isolated",
-            "enabled": false,
-            "delivery": "{\"mode\":\"none\",\"channel\":null,\"to\":null,\"best_effort\":true}",
-            "delete_after_run": false,
-            "created_at": "2026-03-04T05:06:07.123Z",
-            "created_ms": 1772600767123_i64,
-            "next_run": "2026-03-05T09:00:00Z",
-            "next_run_ms": 1772701200000_i64,
-            "next_run_ns": 1772701200000000000_i64,
-            "name": "legacy-migration-proof"
-        }),
-        Precondition::None,
-    )
-    .await
-    .unwrap();
-    docs.put(
-        "cron_runs",
-        "00000000000000000007",
-        json!({
-            "seq": 7,
-            "job_id": "legacy-migration-proof",
-            "started_at": "2026-03-04T09:00:00Z",
-            "started_ns": 1772614800000000000_i64,
-            "finished_at": "2026-03-04T09:00:02Z",
-            "status": "success",
-            "duration_ms": 2000,
-            "output": "legacy run preserved"
-        }),
-        Precondition::None,
-    )
-    .await
-    .unwrap();
-    docs.put(
-        "cron_counters",
-        "runs",
-        json!({ "next": 8 }),
-        Precondition::None,
-    )
-    .await
-    .unwrap();
-
     openhuman_core::core::bus::init().await.unwrap();
     let (default_context, _, _) = CoreContext::init_with_config(
         HostKind::Library,
@@ -2854,6 +2793,70 @@ async fn json_rpc_cron_manual_worker_survives_caller_cancel_on_published_tinyflo
         workspace,
         "the RPC host and pre-seeded migration rows share the same workspace"
     );
+    // Seed the exact v1 document collections after the host has installed its
+    // backend, but before auth activation or any Cron request can run Migrate.
+    let docs = CoreContext::scope(Arc::clone(&default_context), async {
+        let opened = openhuman_core::storage::local::open("published TinyFlows E2E", &workspace)
+            .expect("open the core's installed local storage backend");
+        let scoped = opened.scoped().expect("scope E2E storage");
+        let docs = Arc::clone(scoped.documents());
+        for collection in ["cron_jobs", "cron_runs", "cron_counters"] {
+            docs.ensure_collection(&CollectionSpec::new(collection))
+                .await
+                .unwrap();
+        }
+        docs.put(
+            "cron_jobs",
+            "legacy-migration-proof",
+            json!({
+                "claim_generation": 1,
+                "expression": "0 9 * * *",
+                "command": "echo migrated",
+                "schedule": "{\"kind\":\"every\",\"every_ms\":3600000}",
+                "job_type": "shell",
+                "session_target": "isolated",
+                "enabled": false,
+                "delivery": "{\"mode\":\"none\",\"channel\":null,\"to\":null,\"best_effort\":true}",
+                "delete_after_run": false,
+                "created_at": "2026-03-04T05:06:07.123Z",
+                "created_ms": 1772600767123_i64,
+                "next_run": "2026-03-05T09:00:00Z",
+                "next_run_ms": 1772701200000_i64,
+                "next_run_ns": 1772701200000000000_i64,
+                "name": "legacy-migration-proof"
+            }),
+            Precondition::None,
+        )
+        .await
+        .unwrap();
+        docs.put(
+            "cron_runs",
+            "00000000000000000007",
+            json!({
+                "seq": 7,
+                "job_id": "legacy-migration-proof",
+                "started_at": "2026-03-04T09:00:00Z",
+                "started_ns": 1772614800000000000_i64,
+                "finished_at": "2026-03-04T09:00:02Z",
+                "status": "success",
+                "duration_ms": 2000,
+                "output": "legacy run preserved"
+            }),
+            Precondition::None,
+        )
+        .await
+        .unwrap();
+        docs.put(
+            "cron_counters",
+            "runs",
+            json!({ "next": 8 }),
+            Precondition::None,
+        )
+        .await
+        .unwrap();
+        docs
+    })
+    .await;
     let (rpc_addr, rpc_join) = serve_on_ephemeral(build_core_http_router(false)).await;
     let rpc_base = format!("http://{rpc_addr}");
     let store_session = post_json_rpc(
