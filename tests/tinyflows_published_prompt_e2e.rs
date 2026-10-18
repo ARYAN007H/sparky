@@ -98,4 +98,25 @@ async fn published_module_prompts_render_through_the_normal_host_path() {
         });
         assert!(!body.is_empty(), "published resource {resource:?} is empty");
     }
+
+    // A live disk edit must invalidate both the cached metadata and the
+    // resource-read path; cached Builtin metadata cannot bless changed bytes.
+    let resource = flow.resources.first().expect("published reference files");
+    std::fs::write(flow_root.join(resource), "tampered resource").expect("tamper resource");
+    let after_tamper = openhuman_core::skills::load_workflow_metadata(&workspace);
+    assert!(
+        !after_tamper
+            .iter()
+            .any(|skill| skill.id() == "flow-authoring"),
+        "a cache hit must not advertise tampered module resources"
+    );
+    assert!(
+        openhuman_core::skills::read_workflow_resource(
+            &workspace,
+            "flow-authoring",
+            resource,
+        )
+        .is_err(),
+        "the resource reader must refuse tampered module bytes"
+    );
 }
