@@ -36,7 +36,7 @@ fn a_saas_config_without_a_valid_root_is_refused() {
 }
 
 #[test]
-fn invalid_saas_identity_keeps_the_existing_rpc_error_before_any_engine_call() {
+fn invalid_saas_identity_keeps_the_existing_rpc_error() {
     for config in [
         Config::default(),
         user_config("not a namespace!"),
