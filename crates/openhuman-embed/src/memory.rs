@@ -52,7 +52,7 @@ pub use openhuman_core::memory::lifecycle::views::{AgentCount, AgentsView};
 pub use openhuman_core::memory::types::{
     FetchView, ForgetView, ItemsListView, LearnParams, LearnView, RecallView,
 };
-pub use tinymemory_api::{Error, Result};
+use tinymemory_api::{Error, Result};
 
 /// The TinyMemory engine contract, for a host that implements or installs an
 /// engine ([`install_host_engine`]) or reads the items this facade returns.
