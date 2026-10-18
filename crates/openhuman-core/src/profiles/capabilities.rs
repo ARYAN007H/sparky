@@ -122,8 +122,10 @@ impl ProfileCapabilities {
                     | crate::core::all::DomainGroup::Flows
                     | crate::core::all::DomainGroup::Mcp
             )
-            && !matches!(name, "http_request" | "use_skill" | "continue_subagent")
-            && !tinyagents_definition::SPAWN_TOOL_NAMES.contains(&name)
+            && !matches!(
+                name,
+                "http_request" | "spawn_agent" | "spawn_async_subagent" | "use_skill"
+            )
             && !name.starts_with("delegate_")
             && !name.starts_with("mcp_")
             && crate::tools::toolpacks::pack_for_tool(name)
