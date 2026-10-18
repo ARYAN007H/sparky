@@ -52,7 +52,6 @@ async fn output_events_keep_the_turns_ids_and_one_increasing_seq() {
     let first = next_for(&mut rx, "surface-seq").await;
     let second = next_for(&mut rx, "surface-seq").await;
     let first_wire = wire(&first);
-    let second_wire = wire(&second);
     assert_eq!(first.event_name(), "text_delta");
     assert_eq!(first.context().client_id, "surface-client");
     assert_eq!(first.context().thread_id, "surface-thread-surface-seq");
