@@ -41,7 +41,7 @@ pub(super) fn wrap(
     let model = MediaRequestModel::new(
         inner,
         request_config,
-        |_, request| Ok(super::take_request_scope(&mut request.metadata)),
+        |_, request| Ok(super::super::take_request_scope(&mut request.metadata)),
         host.clone(),
         extractor,
     )
@@ -166,7 +166,16 @@ impl MediaFallbackCache<AttachmentAccessScope> for AttachmentModel {
         attachment: &ResolvedAttachment,
     ) -> Option<String> {
         let key = self.fallback_key(&attachment.name, &attachment.mime, &attachment.bytes);
-        self.cached_fallback(&attachment.name, &key, scope).await
+        if let Some(text) = self.fallback_cache.lock().ok()?.get(&key).cloned() {
+            return Some(text);
+        }
+        let text = self.cached_fallback(&attachment.name, &key, scope).await?;
+        if let Ok(mut cache) = self.fallback_cache.lock() {
+            if cache.len() < 16 {
+                cache.insert(key, text.clone());
+            }
+        }
+        Some(text)
     }
 
     async fn put(
@@ -177,6 +186,11 @@ impl MediaFallbackCache<AttachmentAccessScope> for AttachmentModel {
         text: &str,
     ) {
         let key = self.fallback_key(&attachment.name, &attachment.mime, &attachment.bytes);
+        if let Ok(mut cache) = self.fallback_cache.lock() {
+            if cache.len() < 16 {
+                cache.insert(key.clone(), text.to_owned());
+            }
+        }
         self.save_fallback(&attachment.name, &key, text, scope).await;
     }
 }
@@ -184,7 +198,7 @@ impl MediaFallbackCache<AttachmentAccessScope> for AttachmentModel {
 impl MediaHistoryFallback<AttachmentAccessScope> for AttachmentModel {
     fn omitted(&self, scope: &AttachmentAccessScope, _modality: InputModality, source: &str) -> String {
         let block = ContentBlock::Document(MediaRef::Path { path: source.to_owned(), media_type: None });
-        let hint = super::provider::historical_source_hint(&block, scope);
+        let hint = super::historical_source_hint(&block, scope);
         format!("[Earlier attachment omitted by history budget; workspace path: {hint}]")
     }
 
@@ -196,7 +210,7 @@ impl MediaHistoryFallback<AttachmentAccessScope> for AttachmentModel {
         error: &str,
     ) -> Option<String> {
         let error = error.to_owned();
-        if !error.contains(super::SOURCE_MISSING_MARKER)
+        if !error.contains(super::super::SOURCE_MISSING_MARKER)
             && !error.contains("attachments are disabled for this origin")
             && !error.contains("remote attachment fetch is disabled")
         {
@@ -208,7 +222,7 @@ impl MediaHistoryFallback<AttachmentAccessScope> for AttachmentModel {
             InputModality::Video => ContentBlock::Video(MediaRef::Path { path: source.to_owned(), media_type: None }),
             InputModality::Document => ContentBlock::Document(MediaRef::Path { path: source.to_owned(), media_type: None }),
         };
-        let hint = super::provider::historical_source_hint(&block, scope);
+        let hint = super::historical_source_hint(&block, scope);
         Some(format!("[Earlier attachment unavailable or omitted at workspace path: {hint}]") )
     }
 }
