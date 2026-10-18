@@ -58,9 +58,7 @@ pub(crate) fn dialogue_tools(action_dir: &Path, root_config: &Config) -> Vec<Box
         // Interactive plan-review gate: parks the live turn on a thread-scoped
         // plan the user must approve before execution (Codex/Claude plan mode).
         Box::new(crate::plan_review::RequestPlanReviewTool::new()),
-        Box::new(super::tools::PlanExitTool::new(std::sync::Arc::new(
-            super::tools::plan_exit::mode_lookup,
-        ))),
+        Box::new(PlanExitTool::new()),
         // Workflow composition: `run_workflow` runs another workflow as a
         // subagent and (by default) waits on its result like a function call;
         // `await_workflow` re-attaches to a run that outlived its inline wait.
