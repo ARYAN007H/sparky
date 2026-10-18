@@ -9,7 +9,11 @@ fn key() -> SubagentTaskKey {
     }
 }
 
-fn cause(class: &str, operation: &str, summary: &str) -> tinyagents_harness::no_progress::ClassifiedStopCause {
+fn cause(
+    class: &str,
+    operation: &str,
+    summary: &str,
+) -> tinyagents_harness::no_progress::ClassifiedStopCause {
     tinyagents_harness::no_progress::ClassifiedStopCause {
         class: class.into(),
         operation: operation.into(),
@@ -21,8 +25,12 @@ fn neutral_outcome(status: SubagentOutcomeKind) -> SubagentOutcome {
     let mut outcome = SubagentOutcome::cancelled("task");
     outcome.status = status;
     outcome.output = "durable winner".into();
-    outcome.extensions.insert("agent_id".into(), serde_json::json!("winner"));
-    outcome.extensions.insert("elapsed_ms".into(), serde_json::json!(0));
+    outcome
+        .extensions
+        .insert("agent_id".into(), serde_json::json!("winner"));
+    outcome
+        .extensions
+        .insert("elapsed_ms".into(), serde_json::json!(0));
     outcome.extensions.insert(
         "failure_cause".into(),
         serde_json::json!({
@@ -77,7 +85,12 @@ fn durable_winner_cause_is_restored_without_a_host_cache() {
         "path was not found",
     )));
 
-    let projected = project(outcome, None, SubagentPersistenceDisposition::TerminalExisting, &persistence);
+    let projected = project(
+        outcome,
+        None,
+        SubagentPersistenceDisposition::TerminalExisting,
+        &persistence,
+    );
 
     assert_eq!(
         projected.failure_cause,
