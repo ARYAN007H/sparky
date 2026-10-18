@@ -358,8 +358,20 @@ async fn flow_authoring_is_hidden_when_tinyflows_component_is_disabled() {
         .await
         .expect("module runtime should be available after Copilot proxy setup");
     let loaded_modules = module_runtime.host().list();
+    let record = crate::modules::registry::find(crate::modules::tinyflows::MODULE_ID)
+        .expect("TinyFlows registry record");
+    let loaded_for_record = loaded_modules.iter().find(|module| {
+        module.manifest.bus_name.as_str() == record.bus_name
+            && module.manifest.object_path.as_str() == record.object_path
+    });
+    let serving = crate::modules::runtime::is_module_serving(crate::modules::tinyflows::MODULE_ID);
+    eprintln!(
+        "flow resource readiness: resolver={state:?}, expected={}:{}, observed={loaded_for_record:#?}, serving={serving}",
+        record.bus_name,
+        record.object_path,
+    );
     assert!(
-        crate::modules::runtime::is_module_serving(crate::modules::tinyflows::MODULE_ID),
+        serving,
         "TinyFlows registry status should resolve the admitted host snapshot: {loaded_modules:#?}"
     );
     let visible = CoreContext::scope(enabled_ctx, async {
