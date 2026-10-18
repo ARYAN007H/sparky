@@ -207,9 +207,7 @@ pub(super) fn install_turn_middleware(
     // selected) instead of failing at the provider.
     if let Some(required) = required_capabilities {
         harness.push_model_middleware(Arc::new(
-            tinyagents_harness::middleware::library::RequiredCapabilitiesMiddleware::new(
-            required,
-            ),
+            tinyagents_harness::middleware::library::RequiredCapabilitiesMiddleware::new(required),
         ));
     }
 

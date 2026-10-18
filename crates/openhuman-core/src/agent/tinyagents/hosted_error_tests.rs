@@ -34,6 +34,20 @@ fn a_run_budget_timeout_names_the_run_bound() {
 }
 
 #[test]
+fn an_unbounded_timeout_keeps_the_owner_conversion() {
+    let error = hosted(HostedErrorKind::Timeout, None);
+    let owner = TinyAgentsError::from(error.clone());
+    let projected = run_error_from_hosted(error);
+
+    assert_eq!(projected.to_string(), owner.to_string());
+    assert_eq!(
+        TurnTimeoutBound::from_message(&projected.to_string()),
+        None,
+        "the host must not invent a run-remaining bound when the owner supplied none"
+    );
+}
+
+#[test]
 fn a_non_timeout_failure_is_converted_as_before() {
     let err = run_error_from_hosted(hosted(HostedErrorKind::Provider, None));
     assert!(matches!(err, TinyAgentsError::Model(_)));

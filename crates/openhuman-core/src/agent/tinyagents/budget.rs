@@ -31,8 +31,7 @@ impl ModelBudget {
 
     /// Wrap the model with TinyAgents' shared physical-call budget engine.
     pub(crate) fn wrap(&self, model: Arc<dyn ChatModel<()>>) -> Arc<dyn ChatModel<()>> {
-        tinyagents_harness::cost::ModelBudget::new(self.ledger.clone(), self.call)
-            .wrap_model(model)
+        tinyagents_harness::cost::ModelBudget::new(self.ledger.clone(), self.call).wrap_model(model)
     }
 }
 
