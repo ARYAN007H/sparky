@@ -258,6 +258,8 @@ impl WebIngress {
                 self.shared.note_cancel(
                     &cancelled,
                     CancelNote {
+                        // The interrupter's client hears how it ended.
+                        client_id: Some(request.payload.client_id.clone()),
                         superseded_by: Some(request.request_id.clone()),
                         ..CancelNote::default()
                     },

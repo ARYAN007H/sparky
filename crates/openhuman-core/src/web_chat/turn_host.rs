@@ -628,3 +628,7 @@ impl TurnHost<QueuedPayload> for WebHost {
         );
     }
 }
+
+#[cfg(test)]
+#[path = "turn_host_tests.rs"]
+mod tests;
