@@ -480,7 +480,6 @@ describe('ChatRuntimeProvider — dedupe, proactive resolution, mid-turn invaria
           request_id: 'branch-error',
           message: 'The provider refused this turn.',
           error_type: 'provider_error',
-          round: 0,
         });
       });
 
@@ -511,7 +510,6 @@ describe('ChatRuntimeProvider — dedupe, proactive resolution, mid-turn invaria
             request_id: requestId,
             message: 'core english message',
             error_type: 'rate_limited',
-            round: 0,
             ...extra,
           });
         });
@@ -879,7 +877,6 @@ describe('ChatRuntimeProvider — dedupe, proactive resolution, mid-turn invaria
           request_id: 'r-plan',
           message: 'boom',
           error_type: 'inference',
-          round: 1,
         });
       });
       expect(store.getState().chatRuntime.pendingPlanReviewByThread['t-plan']).toBeUndefined();
@@ -1964,7 +1961,6 @@ describe('ChatRuntimeProvider — dedupe, proactive resolution, mid-turn invaria
           request_id: 'r1',
           message: 'timeout',
           error_type: 'timeout',
-          round: 0,
         });
       });
 
@@ -1991,7 +1987,6 @@ describe('ChatRuntimeProvider — dedupe, proactive resolution, mid-turn invaria
           request_id: 'old',
           message: 'Earlier turn failed',
           error_type: 'inference',
-          round: 0,
         });
       });
 
@@ -2023,7 +2018,6 @@ describe('ChatRuntimeProvider — dedupe, proactive resolution, mid-turn invaria
           request_id: 'r1',
           message: serverMessage,
           error_type: 'inference',
-          round: 0,
         });
       });
 
@@ -2045,7 +2039,6 @@ describe('ChatRuntimeProvider — dedupe, proactive resolution, mid-turn invaria
           request_id: 'r1',
           message: repeated,
           error_type: 'inference',
-          round: 0,
         });
       });
 
@@ -2062,7 +2055,6 @@ describe('ChatRuntimeProvider — dedupe, proactive resolution, mid-turn invaria
           request_id: 'r2',
           message: repeated,
           error_type: 'inference',
-          round: 0,
         });
       });
 
@@ -2523,7 +2515,6 @@ describe('ChatRuntimeProvider — dedupe, proactive resolution, mid-turn invaria
           request_id: 'r1',
           message: serverMessage,
           error_type,
-          round: 0,
         });
       });
 
@@ -2550,7 +2541,6 @@ describe('ChatRuntimeProvider — dedupe, proactive resolution, mid-turn invaria
           request_id: 'r1',
           message: serverMessage,
           error_type: 'inference',
-          round: 0,
         });
       });
 
@@ -2572,7 +2562,6 @@ describe('ChatRuntimeProvider — dedupe, proactive resolution, mid-turn invaria
           request_id: 'r1',
           message: '',
           error_type: 'inference',
-          round: 0,
         });
       });
 
@@ -2600,7 +2589,6 @@ describe('ChatRuntimeProvider — dedupe, proactive resolution, mid-turn invaria
           request_id: 'r1',
           message: 'request cancelled by user',
           error_type: 'cancelled',
-          round: 0,
         });
       });
 
@@ -2622,7 +2610,6 @@ describe('ChatRuntimeProvider — dedupe, proactive resolution, mid-turn invaria
           request_id: 'r1',
           message: '',
           error_type: 'network',
-          round: 0,
         });
       });
 
@@ -2712,7 +2699,6 @@ describe('ChatRuntimeProvider — chat_cancelled (wire-contract.md)', () => {
         request_id: 'r-stop',
         message: 'Cancelled',
         error_type: 'cancelled',
-        round: 0,
       });
       listeners.onCancelled?.({
         thread_id: threadId,
@@ -2757,7 +2743,6 @@ describe('ChatRuntimeProvider — chat_cancelled (wire-contract.md)', () => {
         request_id: 'r-thinking',
         message: 'Cancelled',
         error_type: 'cancelled',
-        round: 1,
       });
       listeners.onCancelled?.({
         thread_id: threadId,
@@ -2812,7 +2797,6 @@ describe('ChatRuntimeProvider — chat_cancelled (wire-contract.md)', () => {
         request_id: 'r-branch',
         message: 'Cancelled',
         error_type: 'cancelled',
-        round: 1,
       });
       listeners.onCancelled?.({
         thread_id: threadId,
