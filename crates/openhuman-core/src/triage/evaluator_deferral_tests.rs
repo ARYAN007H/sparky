@@ -115,7 +115,7 @@ async fn repeated_no_local_failures_back_off_before_calling_cloud_again() {
     AgentDefinitionRegistry::init_global_builtins().expect("init_global_builtins");
     let counter = StdArc::new(AtomicUsize::new(0));
     let counter_for_stub = StdArc::clone(&counter);
-    let state = std::sync::Mutex::new(std::collections::HashMap::new());
+    let state = new_retry_state();
 
     let _guard = mock_agent_run_turn(move |_req| {
         let counter = StdArc::clone(&counter_for_stub);
