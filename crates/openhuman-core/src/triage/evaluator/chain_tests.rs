@@ -22,7 +22,7 @@ fn unguarded_success_does_not_clear_another_in_flight_attempt() {
     let state = new_retry_state();
     let mut attempt = begin_outage_attempt(Some(&state), "stub-cloud").expect("attempt");
 
-    clear_outage(Some(&state), "stub-cloud", None);
+    clear_outage(None);
 
     assert!(begin_outage_attempt(Some(&state), "stub-cloud").is_none());
     attempt.record_success();
@@ -33,7 +33,7 @@ fn stale_failure_after_concurrent_recovery_remains_deferred() {
     let state = new_retry_state();
     let mut attempt = begin_outage_attempt(Some(&state), "stub-cloud").expect("attempt");
 
-    clear_outage(Some(&state), "stub-cloud", Some(&mut attempt));
+    clear_outage(Some(&mut attempt));
 
     assert!(matches!(
         record_outage(Some(&mut attempt)),

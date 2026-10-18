@@ -80,9 +80,9 @@ fn prefers_last_fenced_block() {
 }
 
 #[test]
-fn corrected_unfenced_object_after_fence_is_selected() {
-    let reply = "```json\n{\"action\":\"drop\",\"reason\":\"old\"}\n```\nCorrection: {\"action\":\"acknowledge\",\"reason\":\"corrected\"}";
+fn owner_relaxed_json_recovery_preserves_action_normalization() {
+    let reply = "{action: \"DROP\", reason: \"recovered\",}";
     let decision = parse_triage_decision(reply).unwrap();
-    assert_eq!(decision.action, TriageAction::Acknowledge);
-    assert_eq!(decision.reason, "corrected");
+    assert_eq!(decision.action, TriageAction::Drop);
+    assert_eq!(decision.reason, "recovered");
 }

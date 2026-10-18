@@ -163,11 +163,11 @@ where
     // ── Cloud arm ──────────────────────────────────────────────────
     match try_arm(&cloud, envelope, TriageResolutionPath::Cloud).await {
         Ok(run) => {
-            clear_outage(retry_state, &retry_key, outage_attempt.as_mut());
+            clear_outage(outage_attempt.as_mut());
             return Ok(TriageOutcome::Decision(run));
         }
         Err(ArmError::Fatal(err)) => {
-            clear_outage(retry_state, &retry_key, outage_attempt.as_mut());
+            clear_outage(outage_attempt.as_mut());
             return Err(err);
         }
         Err(ArmError::BudgetExhausted(err)) => {
@@ -231,11 +231,11 @@ where
 
                 match try_arm(&cloud, envelope, TriageResolutionPath::CloudAfterRetry).await {
                     Ok(run) => {
-                        clear_outage(retry_state, &retry_key, outage_attempt.as_mut());
+                        clear_outage(outage_attempt.as_mut());
                         return Ok(TriageOutcome::Decision(run));
                     }
                     Err(ArmError::Fatal(err)) => {
-                        clear_outage(retry_state, &retry_key, outage_attempt.as_mut());
+                        clear_outage(outage_attempt.as_mut());
                         return Err(err);
                     }
                     Err(ArmError::BudgetExhausted(err)) => {
@@ -308,7 +308,7 @@ where
             "cloud retry exhausted; local arm unavailable".to_string()
         };
         if cloud_budget_exhausted.is_some() || cloud_safety_flagged.is_some() {
-            clear_outage(retry_state, &retry_key, outage_attempt.as_mut());
+            clear_outage(outage_attempt.as_mut());
             return Ok(TriageOutcome::Terminal { reason });
         }
 
@@ -332,7 +332,7 @@ where
 
     match try_arm(&local, envelope, TriageResolutionPath::LocalFallback).await {
         Ok(run) => {
-            clear_outage(retry_state, &retry_key, outage_attempt.as_mut());
+            clear_outage(outage_attempt.as_mut());
             Ok(TriageOutcome::Decision(run))
         }
         Err(ArmError::Fatal(err))
@@ -381,11 +381,7 @@ fn now_ms() -> i64 {
     chrono::Utc::now().timestamp_millis()
 }
 
-fn clear_outage(
-    _state: Option<&RetryState>,
-    _key: &str,
-    attempt: Option<&mut PersistentFailoverAttempt<String>>,
-) {
+fn clear_outage(attempt: Option<&mut PersistentFailoverAttempt<String>>) {
     if let Some(attempt) = attempt {
         attempt.record_success();
     }

@@ -39,9 +39,28 @@ fn outage_failure_maps_to_deferred_then_terminal_host_outcomes() {
             .expect("attempt");
         let outcome = record_outage(Some(&mut attempt)).expect("host outcome");
         if failure < 8 {
-            assert!(matches!(outcome, TriageOutcome::Deferred { .. }));
+            match outcome {
+                TriageOutcome::Deferred {
+                    defer_until_ms,
+                    reason,
+                } => {
+                    assert_eq!(reason, "managed backend outage; retry 0ms backoff");
+                    assert!(defer_until_ms >= now_ms() - 50);
+                    assert!(defer_until_ms <= now_ms() + 50);
+                }
+                TriageOutcome::Decision(_) | TriageOutcome::Terminal { .. } => {
+                    panic!("failure {failure} should remain deferred")
+                }
+            }
         } else {
-            assert!(matches!(outcome, TriageOutcome::Terminal { .. }));
+            match outcome {
+                TriageOutcome::Terminal { reason } => {
+                    assert!(reason.contains("retry limit (8)"));
+                }
+                TriageOutcome::Decision(_) | TriageOutcome::Deferred { .. } => {
+                    panic!("failure 8 should reach the terminal limit")
+                }
+            }
         }
     }
 }
