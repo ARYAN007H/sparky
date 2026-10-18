@@ -60,10 +60,11 @@ async fn chat_done_carries_timing_when_a_snapshot_is_supplied() {
         subagents: Vec::new(),
         reasoning_tokens: 0,
     };
-    let timing = crate::web_chat::turn_timing::TurnTimingSnapshot {
+    let timing = tinychannels_bus::web::TurnTimingSnapshot {
         first_token_ms: Some(120),
         first_tool_ms: None,
         total_ms: Some(2000),
+        ..Default::default()
     };
 
     test_support::deliver_response_with_timing_for_test(

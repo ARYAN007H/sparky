@@ -533,7 +533,7 @@ async fn plan_review_surface_bridges_plan_review_decided() {
 #[tokio::test]
 async fn publish_web_channel_event_stamps_ts_when_unset() {
     let mut web_rx = subscribe_web_channel_events();
-    let before = crate::web_chat::progress_bridge::unix_epoch_ms();
+    let before = crate::web_chat::progress::unix_epoch_ms();
 
     publish_web_channel_event(WebChannelEvent {
         event: "ts_stamp_probe".to_string(),
@@ -542,7 +542,7 @@ async fn publish_web_channel_event_stamps_ts_when_unset() {
     });
 
     let ev = find_agent_web_event(&mut web_rx, "ts_stamp_probe", "thread-ts-stamp-probe").await;
-    let after = crate::web_chat::progress_bridge::unix_epoch_ms();
+    let after = crate::web_chat::progress::unix_epoch_ms();
     let ts = ev
         .ts
         .expect("publish_web_channel_event must stamp ts when unset");
