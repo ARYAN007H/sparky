@@ -119,6 +119,8 @@ for any commit without posting it.
     validation, `verify-runner.sh` compares `/etc/ohci/build-info` with that pin,
     checks preinstalled tools (Python 3.10 with tomli, or stdlib tomllib), and selects `rust-toolchain.toml` explicitly.
     Missing metadata, tools, or the compiler fail; CI does not install replacements.
+    The selected compiler's `llvm-cov` and `llvm-profdata` executables are checked,
+    and `CARGO_LLVM_COV_SETUP=no` disables implicit component installation.
   - The pinned shared checkout action fetches the PR merge ref with
     `fetch-depth: 0` and `submodule-depth: 0`: full root and recursive submodule
     history for pin ancestry checks, with unused `wiki` submodules excluded.

@@ -123,5 +123,19 @@
     "Fresh compiler-key namespace and local outputs; package caches retained and shared CAS may deduplicate existing blobs.",
     "Observed shared-host co-tenancy; elapsed differences do not isolate cache-only effects or establish speedup against the historical GitHub job.",
     "Only closed scratch footprints are authoritative; optional live disk polling stopped early during cold and did not cover warm."
-  ]
+  ],
+  "post_measurement_preflight_validation": {
+    "introduced_revision": "cd1f587ee246b1d0753e84160c265a5f20ad16dc",
+    "verify_runner_sha256": "8a41db134461a1dcc8f861a18d919366c63caf1fa54b1c58a427367f98b48f74",
+    "scope": "Required pinned LLVM executables and disabled implicit installation; measured lane selections, build settings and cache policy unchanged.",
+    "old_missing_tools_exit": 0,
+    "new_missing_tools_exit": 1,
+    "negative_environment_empty": true,
+    "installed_tools_positive_exit": 0,
+    "implicit_setup_disabled": true,
+    "focused_tests_passed": 7,
+    "script_tests_passed": 772,
+    "script_tests_skipped": 3,
+    "script_test_failures": 0
+  }
 }

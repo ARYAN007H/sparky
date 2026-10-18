@@ -133,10 +133,10 @@ workflow routing, since pre-merge runs can execute the old workflow.
 Both runs at `3a01ec0c54a54f30a14ab92cd5fdbf241d6e9316` independently passed
 with identical selected test identities. The [measurement record](ci-private-measurements-8063.json)
 contains exact counters, resource limits and archive digests.
-Both use the same published image, frozen injected rootfs/kernel, four vCPUs,
+Both used the same published image, frozen injected rootfs/kernel, four vCPUs,
 13 GiB RAM, 160 GiB scratch, 32 GiB guest swap and the production 58 GiB shared
-host limit. The cold used the 180-minute workflow budget and 195-minute guest
-deadline; there were no additional per-unit CPU or memory caps.
+host limit. The measured contract used a 180-minute full-entry budget and
+195-minute guest deadline; there were no additional per-unit CPU or memory caps.
 
 | Metric                                  |               Cold |               Warm |
 | --------------------------------------- | -----------------: | -----------------: |
@@ -148,6 +148,7 @@ deadline; there were no additional per-unit CPU or memory caps.
 | Local compiler-cache hits               |              2,286 |              2,717 |
 | Remote compiler-cache hits              |                  0 |              3,801 |
 | Compiler-cache misses                   |              3,830 |                 33 |
+| Compiler-cache hit rate                 |              37.4% |              99.5% |
 | Compiler-cache errors                   |                  0 |                  0 |
 | Cache-save duration/result              |     206 s / exit 0 |       1 s / exit 0 |
 
@@ -195,14 +196,39 @@ CAS may already contain deduplicated blobs. The warm repeat retained that same
 namespace and package-cache disk. This is compiler-key cold, with observed
 production co-tenancy. Neighbors changed during the cold run and transient host
 memory reclaim occurred; periodic unit PSI avg10 samples reached 60.91%, with
-zero host OOM events. The warm observed unit PSI avg10 maximum was 4.56%. Historical and cold/warm elapsed differences do not isolate
-a cache-only causal effect.
+zero host OOM events. The warm observed unit PSI avg10 maximum was 4.56%.
+Historical and cold/warm elapsed differences do not isolate a cache-only causal
+effect.
 
 The completed cold/warm scratch had 2,133,032,960 / 2,155,548,672 bytes
 (about 1.99 / 2.01 GiB) free. Optional live disk polling stopped early in cold
-and did not cover warm; these are closed footprints rather than peak headroom. Release
-example files were absent after scoped cleanup. Logical ordinary ELF sizes fell
+and did not cover warm; these are closed footprints rather than peak headroom.
+Release example files were absent after scoped cleanup. Logical ordinary ELF sizes fell
 from 922,632,896 to 538,239,416 bytes for approvals and from 926,900,368 to
 536,418,496 for Composio relative to the disk-full diagnostic. Reflinks make
 allocated subtree sizes upper bounds, so those figures do not establish physical
 reclaimed bytes. The remaining scratch margin is narrow.
+
+### Preflight guard added after measurement
+
+After the measured revision, preflight gained a required LLVM-tool check and
+`CARGO_LLVM_COV_SETUP=no`. The paired results above retain their exact measured
+revision; the lane selections, build settings and compiler-cache policy are
+unchanged. Separate published-image verification reproduced the old guard
+accepting a missing LLVM-tool path, then confirmed the new guard rejects it
+before publishing environment. The real installed tools passed. Seven focused
+contract tests and the complete script suite passed: 772 tests, three platform
+skips, zero failures. No component installation or image modification was used
+for this guard verification.
+
+### Trusted-base rollout
+
+[The earlier GitHub run](https://github.com/tinyhumansai/openhuman/actions/runs/39066797765)
+used main's 120-minute workflow and cancelled during Rust lint after core coverage
+passed. [Budget prerequisite #8067](https://github.com/tinyhumansai/openhuman/pull/8067)
+raises that finite limit to 180 minutes, matching the measured contract and the
+already configured 195-minute supervisor deadline. A fresh synchronize or
+ready-for-review event must follow its merge:
+[reruns retain the original event revision](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/re-run-workflows-and-jobs).
+Verification of the new checkout/Tinymold action steps through trusted-main
+routing remains pending their rollout.
