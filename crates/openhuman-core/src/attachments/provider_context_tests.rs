@@ -18,3 +18,21 @@ async fn the_wrapped_model_keeps_its_turns_context_while_another_is_active() {
     assert!(Arc::ptr_eq(seen.core().expect("bound"), &turn));
     assert!(!Arc::ptr_eq(seen.core().expect("bound"), &other));
 }
+
+#[test]
+fn owner_media_wrapper_does_not_keep_a_turn_context_alive() {
+    use crate::core::runtime::{CoreContext, DispatchCtx, DomainSet};
+    let context = CoreContext::for_test(DomainSet::full(), None);
+    let weak = Arc::downgrade(&context);
+    let dispatch = DispatchCtx::new(Arc::clone(&context));
+    let wrapper = owner::wrap(
+        &dispatch,
+        Arc::new(Probe::default()),
+        Arc::new(Config::default()),
+        ModelProfile::default(),
+    );
+    drop(dispatch);
+    drop(context);
+    assert!(weak.upgrade().is_none(), "the provider wrapper retains only weak turn context");
+    drop(wrapper);
+}
