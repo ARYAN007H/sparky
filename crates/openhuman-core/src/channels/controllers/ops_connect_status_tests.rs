@@ -4,6 +4,12 @@ use tinymemory_api::conformance::ReferenceEngine;
 use tinymemory_api::{MemoryEngine, MemoryMeta, Role, SourceKind, StoreItem, Turn};
 use crate::core::runtime::{ContextOverlay, CoreContext, DispatchCtx, DomainSet};
 
+async fn use_linked_channel_module(config: &mut Config) {
+    config.modules.source = crate::config::schema::ModuleSourceMode::Linked;
+    config.modules.allow_download = false;
+    let _client = crate::channels::module_fixture::client().await;
+}
+
 fn channel_memory_item(thread_id: &str, channel: &str) -> StoreItem {
     StoreItem::Conversation {
         turns: vec![Turn::new(Role::User, format!("hello from {channel}"))],
@@ -44,7 +50,18 @@ async fn store_channel_thread(
         id,
         "hello",
     );
-    let thread_id = params.thread_id();
+    let identity = crate::modules::channel_controller::prepare_identity(
+        &crate::channels::module_fixture::client().await,
+        tinychannels_bus::module_inbound::PrepareChannelIdentityRequest {
+            channel: channel.to_string(),
+            sender: Some(format!("sender-{id}")),
+            reply_target: Some(format!("chat-{id}")),
+            thread_ts: None,
+        },
+    )
+    .await
+    .expect("TinyChannels module should prepare the canonical thread id");
+    let thread_id = identity.thread_id;
     let now = chrono::Utc::now().to_rfc3339();
     crate::threads::store::blocking::ensure_thread(
         ctx.clone(),
@@ -277,6 +294,7 @@ async fn disconnect_discord_bot_token_clears_runtime_config() {
 #[tokio::test]
 async fn disconnect_rpc_reports_stamped_memory_count() {
     let (_tmp, mut config) = isolated_test_config();
+    use_linked_channel_module(&mut config).await;
     config.channels_config.discord = Some(DiscordConfig {
         bot_token: "discord-token-abc".into(),
         guild_id: Some("guild-1".into()),
@@ -308,6 +326,7 @@ async fn disconnect_rpc_reports_stamped_memory_count() {
 #[tokio::test]
 async fn disconnect_rpc_reports_zero_and_queues_when_memory_is_off() {
     let (_tmp, mut config) = isolated_test_config();
+    use_linked_channel_module(&mut config).await;
     config.channels_config.discord = Some(DiscordConfig {
         bot_token: "discord-token-abc".into(),
         guild_id: Some("guild-1".into()),
@@ -344,6 +363,7 @@ async fn disconnect_rpc_reports_zero_and_queues_when_memory_is_off() {
 #[tokio::test]
 async fn disconnect_rpc_surfaces_memory_error_after_queuing_snapshot() {
     let (_tmp, mut config) = isolated_test_config();
+    use_linked_channel_module(&mut config).await;
     config.channels_config.discord = Some(DiscordConfig {
         bot_token: "discord-token-abc".into(),
         guild_id: Some("guild-1".into()),
