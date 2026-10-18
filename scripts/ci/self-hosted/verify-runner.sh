@@ -27,6 +27,21 @@ assert sys.version_info >= (3, 10)
 print(tomllib.load(open(sys.argv[1], "rb"))["toolchain"]["channel"])
 PYTHON
 )"
+# cargo-llvm-cov --version does not inspect LLVM tools. Check the pinned
+# toolchain before publishing environment, and forbid its automatic installer.
+verify_llvm_tools() {
+  local toolchain="$1" target_libdir llvm_bin tool
+  target_libdir="$(rustup run "$toolchain" rustc --print target-libdir)" || return $?
+  llvm_bin="$(dirname "$target_libdir")/bin"
+  for tool in llvm-cov llvm-profdata; do
+    if [[ ! -x "$llvm_bin/$tool" ]]; then
+      printf '::error::Missing preinstalled LLVM tool for %s: %s\n' "$toolchain" "$tool" >&2
+      return 1
+    fi
+  done
+  printf 'CARGO_LLVM_COV_SETUP=no\n' >> "$GITHUB_ENV"
+}
+verify_llvm_tools "$channel"
 # rustup run --install is deliberately absent: an image without this toolchain fails.
 rustup run "$channel" rustc --version
 rustup run "$channel" cargo clippy --version
