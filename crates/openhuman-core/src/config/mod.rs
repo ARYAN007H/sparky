@@ -42,7 +42,7 @@ pub use schema::{
     output_language_directive, runtime_proxy_config, set_runtime_proxy_config, AgentConfig,
     AuditConfig, AutonomyConfig, BrowserComputerUseConfig, BrowserConfig, BudgetAction,
     BudgetPeriod, BudgetPolicy, BudgetScope, CapabilityProviderConfig,
-    CapabilityProviderTrustState, ChannelsConfig, CompactionSettings, CompactionStrategy,
+    CapabilityProviderTrustState, ChannelVoiceConfig, ChannelVoiceOverride, ChannelsConfig, CompactionSettings, CompactionStrategy,
     ComposioConfig, ComposioDirectBaseUrls, ComposioHostCredential, ComputerConfig, Config,
     ContextConfig, CostConfig, CronConfig, CurlConfig, DashboardConfig, DecisionModel,
     DelegateAgentConfig, DiagramViewerConfig, DictationActivationMode, DictationConfig,
