@@ -181,7 +181,7 @@ const VoicePanel = ({ embedded = false, scrollable = true }: VoicePanelProps = {
       log('[VoicePanel:providers] saved %o', snapshot);
       setNotice(t('voice.providers.saved'));
       // Force a reload so the rest of the panel reflects the new state.
-      await loadData(true);
+      await loadData();
     } catch (err) {
       const message = err instanceof Error ? err.message : t('voice.providers.failedToSave');
       setError(message);
@@ -214,7 +214,7 @@ const VoicePanel = ({ embedded = false, scrollable = true }: VoicePanelProps = {
       setSavedSttProvider(sttProvider);
       setSavedTtsProvider(ttsProvider);
       setNotice(t('voice.providers.saved'));
-      void loadData(true);
+      void loadData();
     } catch (err) {
       setError(err instanceof Error ? err.message : t('voice.providers.failedToSave'));
     } finally {
@@ -324,7 +324,7 @@ const VoicePanel = ({ embedded = false, scrollable = true }: VoicePanelProps = {
     setNotice(null);
     log('[voice:piper] re-checking user-supplied piper binary and voice');
     try {
-      await loadData(false);
+      await loadData();
     } finally {
       setIsCheckingPiper(false);
     }
