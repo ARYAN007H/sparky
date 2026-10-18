@@ -9,7 +9,6 @@ use tinyagents_harness::context::RunConfig;
 use tinyinference_llm::message::Message;
 
 use crate::memory::lifecycle::hooks::{MemoryTurn, TurnPack, OPEN_TAG};
-use tinymemory_tools::layout::identity::Identity;
 
 fn context(pack: Option<TurnPack>) -> RunContext<OpenHumanRunContext> {
     let config = crate::config::Config::default();

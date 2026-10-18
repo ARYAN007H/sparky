@@ -3,7 +3,6 @@ use super::*;
 fn ambient() -> DispatchCtx {
     DispatchCtx::ambient()
 }
-use tinymemory_tools::layout::identity::Identity;
 use crate::memory::test_fixtures::{bind_reference, config_in, stored};
 use std::path::{Path, PathBuf};
 use tinymemory_api::{ItemKind, MetaFilter, Namespace};

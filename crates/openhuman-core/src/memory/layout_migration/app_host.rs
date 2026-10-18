@@ -12,8 +12,6 @@ use super::claim::ClaimKey;
 use super::state::FileStateStore;
 use crate::config::{Config, MemoryLayoutMode};
 use crate::memory::engine::{self, CORTEXDB_ENGINE};
-use crate::memory::scope;
-use tinymemory_tools::layout::identity::Identity;
 use tinymemory_api::{Error, Result};
 
 /// The app's [`lm::LayoutHost`], bound to one account's config.

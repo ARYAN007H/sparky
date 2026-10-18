@@ -76,8 +76,7 @@ fn a_profile_binds_its_user_root_never_an_org_root() {
 
 #[test]
 fn the_memory_binding_wins_over_pins_and_teams() {
-    use tinymemory_tools::layout::identity::Identity;
-    let layout = profile_layout(Path::new("/srv/oh"), &id());
+        let layout = profile_layout(Path::new("/srv/oh"), &id());
     let mut config = profile_config(&layout, &id());
     config.memory.agents.insert(
         "planner".into(),
