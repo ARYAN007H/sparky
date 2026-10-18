@@ -131,11 +131,6 @@ pub struct PersonalityRosterSection;
 // ─────────────────────────────────────────────────────────────────────────────
 
 impl PersonalityRosterSection {
-    fn tier(&self) -> PromptTier {
-        // Carries each personality's recent context, which the session rewrites.
-        PromptTier::Volatile
-    }
-
     fn name(&self) -> &str {
         "personality_roster"
     }
@@ -207,11 +202,6 @@ impl IdentitySection {
 }
 
 impl AgentsInstructionsSection {
-    fn tier(&self) -> PromptTier {
-        // AGENTS.md layers: per project and per install, stable within a session.
-        PromptTier::Context
-    }
-
     fn name(&self) -> &str {
         "agents_md"
     }
@@ -366,11 +356,6 @@ impl GroundingSection {
 }
 
 impl WorkspaceSection {
-    fn tier(&self) -> PromptTier {
-        // Names the resolved workspace; per install, not per build.
-        PromptTier::Context
-    }
-
     fn name(&self) -> &str {
         "workspace"
     }
@@ -412,11 +397,6 @@ impl WorkspaceSection {
 }
 
 impl RuntimeSection {
-    fn tier(&self) -> PromptTier {
-        // Host runtime facts; per install, not per build.
-        PromptTier::Context
-    }
-
     fn name(&self) -> &str {
         "runtime"
     }
@@ -438,11 +418,6 @@ impl RuntimeSection {
 }
 
 impl DateTimeSection {
-    fn tier(&self) -> PromptTier {
-        // The live clock is carried in the user message. This section is static.
-        PromptTier::Stable
-    }
-
     fn name(&self) -> &str {
         "datetime"
     }
@@ -480,11 +455,6 @@ impl DateTimeSection {
 }
 
 impl UserIdentitySection {
-    fn tier(&self) -> PromptTier {
-        // The signed-in user, which changes on login and on logout.
-        PromptTier::Volatile
-    }
-
     fn name(&self) -> &str {
         "user_identity"
     }
