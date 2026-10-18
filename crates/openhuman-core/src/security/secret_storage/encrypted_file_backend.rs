@@ -174,7 +174,8 @@ pub(crate) fn storage_master_key_resolvable() -> bool {
         env_set(MASTER_KEY_ENV) || env_set(MASTER_KEY_FILE_ENV),
         // A host source counts only when it already holds the key: an empty
         // one would have a key minted into it by the load.
-        key_source::installed_master_key_source().is_some_and(|source| matches!(source.load(), Ok(Some(_)))),
+        key_source::installed_master_key_source()
+            .is_some_and(|source| matches!(source.load(), Ok(Some(_)))),
         dir.join("keyring/master.key").is_file(),
     )
 }
