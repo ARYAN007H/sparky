@@ -97,6 +97,8 @@ pub async fn run(ctx: &crate::core::runtime::DispatchCtx, config: Config) -> Res
 pub use dispatcher::execute_job_now;
 pub(crate) use dispatcher::run_job_now;
 pub(crate) use dispatcher::{tick_once, JobDispatcher};
+#[cfg(test)]
+pub(crate) use dispatcher::lose_next_ack_reply_after_commit_for_test;
 pub use live_agents::run_live_agent_pass;
 pub(crate) use live_agents::LiveAgentSchedulers;
 pub(crate) fn scheduler_config(config: &Config) -> serde_json::Value {

@@ -366,7 +366,8 @@ async fn wait_for_ack_reply_loss_test_gate(workspace: &std::path::Path) -> bool 
     {
         let _ = entered.send(());
     }
-    if let Some(release) = gate.release.lock().await.take() {
+    let release = gate.release.lock().await.take();
+    if let Some(release) = release {
         let _ = release.await;
     }
     true

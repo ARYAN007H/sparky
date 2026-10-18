@@ -228,7 +228,7 @@ async fn manual_run_projects_its_captured_job_after_the_saved_job_is_deleted() {
         &config,
         &job.id,
         CronJobPatch {
-            name: Some(job.name.clone()),
+            name: Some("captured before delete".to_string()),
             ..CronJobPatch::default()
         },
     )
@@ -331,7 +331,7 @@ async fn detached_manual_run_waits_for_durable_admission_after_starting() {
     let task_config = config.clone();
     let task_job = job.clone();
     let task_run_id = run_id.clone();
-    let mut call = tokio::spawn(async move {
+    let call = tokio::spawn(async move {
         crate::cron::scheduler::run_job_now(
             &dispatch,
             &task_config,

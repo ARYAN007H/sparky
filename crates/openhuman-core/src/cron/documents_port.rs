@@ -362,7 +362,8 @@ async fn pause_manual_claim_if_armed(ops: &[WriteOp]) {
     {
         let _ = entered.send(());
     }
-    if let Some(release) = gate.release.lock().await.take() {
+    let release = gate.release.lock().await.take();
+    if let Some(release) = release {
         let _ = release.await;
     }
 }
