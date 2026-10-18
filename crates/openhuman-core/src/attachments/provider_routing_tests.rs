@@ -319,10 +319,11 @@ async fn disabled_tinydocs_fallback_runs_through_the_owner_wrapper_without_cachi
     let Message::User(user) = &captured[0].1.messages[0] else {
         panic!("expected user message")
     };
-    assert!(user.content[0]
-        .text()
-        .contains("Document extraction is disabled"));
-    assert!(user.content[0].text().contains("brief.pdf"));
+    let ContentBlock::Text(fallback) = &user.content[0] else {
+        panic!("expected document fallback text")
+    };
+    assert!(fallback.contains("Document extraction is disabled"));
+    assert!(fallback.contains("brief.pdf"));
     assert!(!path
         .parent()
         .unwrap()
