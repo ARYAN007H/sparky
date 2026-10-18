@@ -131,7 +131,7 @@ async fn dropping_a_surface_ends_its_module_owned_turn() {
     let (module, handle) = {
         let state = surface.state.lock().await;
         (
-            state.module.clone(),
+            state.module.as_ref().unwrap().clone(),
             state.handle.as_ref().unwrap().handle.clone(),
         )
     };

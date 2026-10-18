@@ -28,13 +28,14 @@ struct SurfaceState {
     module: Option<tinybus::module::ModuleClient>,
     handle: Option<WebTurnHandle>,
     closed: bool,
+    cleanup_done: Arc<tokio::sync::Notify>,
+    request_id: String,
 }
 
 /// One module-owned projection turn plus its host broadcast destination.
 #[derive(Clone)]
 pub(crate) struct Surface {
     state: Arc<tokio::sync::Mutex<SurfaceState>>,
-    cleanup_done: Arc<tokio::sync::Notify>,
     ctx: DispatchCtx,
     scope_key: String,
     ids: TurnIds,
@@ -66,8 +67,9 @@ impl Surface {
                 module: Some(module),
                 handle: None,
                 closed: false,
+                cleanup_done: Arc::new(tokio::sync::Notify::new()),
+                request_id: ids.request_id.clone(),
             })),
-            cleanup_done: Arc::new(tokio::sync::Notify::new()),
             ctx: ctx.clone(),
             scope_key,
             ids,
@@ -90,8 +92,9 @@ impl Surface {
                 module: None,
                 handle: None,
                 closed: false,
+                cleanup_done: Arc::new(tokio::sync::Notify::new()),
+                request_id: ids.request_id.clone(),
             })),
-            cleanup_done: Arc::new(tokio::sync::Notify::new()),
             ctx: ctx.clone(),
             scope_key,
             ids,
@@ -265,37 +268,39 @@ impl Surface {
     }
 }
 
-impl Drop for Surface {
+impl Drop for SurfaceState {
     fn drop(&mut self) {
-        if Arc::strong_count(&self.state) != 1 {
-            return;
-        }
-        let Ok(runtime) = tokio::runtime::Handle::try_current() else {
+        let Some(handle) = self.handle.take() else {
+            self.cleanup_done.notify_one();
             return;
         };
-        let state = Arc::clone(&self.state);
+        let Some(module) = self.module.as_ref().cloned() else {
+            self.cleanup_done.notify_one();
+            return;
+        };
+        let Ok(runtime) = tokio::runtime::Handle::try_current() else {
+            log::warn!(
+                "[web-channel] dropped projection turn without an async runtime request_id={}",
+                self.request_id
+            );
+            return;
+        };
         let cleanup_done = Arc::clone(&self.cleanup_done);
-        let request_id = self.ids.request_id.clone();
+        let request_id = self.request_id.clone();
         runtime.spawn(async move {
-            let mut state = state.lock().await;
-            state.closed = true;
-            if let Some(handle) = state.handle.take() {
-                if let Some(module) = state.module.as_ref() {
-                    if let Err(error) = module
-                    .call_confidential::<()>(
-                        "tinychannels",
-                        tinychannels_bus::methods::END_WEB_TURN,
-                        (EndWebTurn {
-                            handle: handle.handle,
-                        },),
-                    )
-                    .await
-                    {
-                        log::warn!(
-                            "[web-channel] dropped projection turn cleanup failed request_id={request_id}: {error}"
-                        );
-                    }
-                }
+            if let Err(error) = module
+                .call_confidential::<()>(
+                    "tinychannels",
+                    tinychannels_bus::methods::END_WEB_TURN,
+                    (EndWebTurn {
+                        handle: handle.handle,
+                    },),
+                )
+                .await
+            {
+                log::warn!(
+                    "[web-channel] dropped projection turn cleanup failed request_id={request_id}: {error}"
+                );
             }
             cleanup_done.notify_one();
         });
