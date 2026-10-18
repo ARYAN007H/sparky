@@ -6,6 +6,7 @@ use tinyinference_llm::model::{ChatModel, ModelProfile, ModelRequest, ModelRespo
 struct GatedRepairModel {
     calls: std::sync::atomic::AtomicUsize,
     repair_started: tokio::sync::Notify,
+    repair_call_id: std::sync::Mutex<Option<String>>,
 }
 
 #[async_trait]
@@ -23,15 +24,23 @@ impl ChatModel<()> for GatedRepairModel {
     async fn invoke(
         &self,
         _state: &(),
-        _request: ModelRequest,
+        request: ModelRequest,
     ) -> tinyinference_llm::Result<ModelResponse> {
+        let supplemental = request
+            .correlation
+            .as_ref()
+            .filter(|correlation| correlation.call_id.contains("-host-supplemental-"));
+        if let Some(correlation) = supplemental {
+            *self.repair_call_id.lock().unwrap() = Some(correlation.call_id.clone());
+            self.repair_started.notify_one();
+            return std::future::pending().await;
+        }
         if self.calls.fetch_add(1, std::sync::atomic::Ordering::SeqCst) == 0 {
             return Ok(ModelResponse::assistant(
                 "The answer omits its required block.",
             ));
         }
-        self.repair_started.notify_one();
-        std::future::pending().await
+        Ok(ModelResponse::assistant("The answer still omits its block."))
     }
 }
 
@@ -56,6 +65,7 @@ async fn cancellation_during_required_output_repair_finalizes_native_run() {
     let model = Arc::new(GatedRepairModel {
         calls: std::sync::atomic::AtomicUsize::new(0),
         repair_started: tokio::sync::Notify::new(),
+        repair_call_id: std::sync::Mutex::new(None),
     });
     let chat_model: Arc<dyn ChatModel<()>> = model.clone();
     let mut host = crate::agent::SessionHostBuilder::new()
@@ -88,6 +98,12 @@ async fn cancellation_during_required_output_repair_finalizes_native_run() {
     let turn =
         tokio::spawn(async move { host.run_single_with_origin("hello", Some(origin)).await });
     model.repair_started.notified().await;
+    let repair_call_id = model
+        .repair_call_id
+        .lock()
+        .unwrap()
+        .clone()
+        .expect("only a post-harness supplemental call releases this barrier");
     cancellation.cancel();
     assert!(turn.await.expect("turn task").is_err());
 
@@ -117,6 +133,21 @@ async fn cancellation_during_required_output_repair_finalizes_native_run() {
             )
         })
         .expect("the native run is finalized");
+    let completed = observations
+        .iter()
+        .position(|record| matches!(
+            &record.event,
+            AgentEvent::RunCompleted { run_id: completed, .. } if completed.as_str() == run_id
+        ))
+        .expect("the harness completed before host repair");
+    let repair_started = observations
+        .iter()
+        .position(|record| matches!(
+            &record.event,
+            AgentEvent::ModelStarted { call_id, .. } if call_id.as_str() == repair_call_id
+        ))
+        .expect("the correlated post-harness repair is journaled");
+    assert!(repair_started > completed, "repair follows harness completion");
     assert!(finalized > failure, "finalization follows cancellation");
     assert!(observations.iter().any(|record| matches!(
         &record.event,
