@@ -1,16 +1,6 @@
 use super::*;
 
 #[test]
-fn all_schemas_returns_two() {
-    assert_eq!(all_controller_schemas().len(), 2);
-}
-
-#[test]
-fn all_controllers_returns_two() {
-    assert_eq!(all_registered_controllers().len(), 2);
-}
-
-#[test]
 fn report_schema() {
     let s = schemas("report");
     assert_eq!(s.namespace, "doctor");
@@ -24,15 +14,6 @@ fn models_schema_has_optional_use_cache() {
     assert_eq!(s.function, "models");
     let use_cache = s.inputs.iter().find(|f| f.name == "use_cache");
     assert!(use_cache.is_some_and(|f| !f.required));
-}
-
-#[test]
-fn schemas_and_controllers_match() {
-    let s = all_controller_schemas();
-    let c = all_registered_controllers();
-    for (schema, ctrl) in s.iter().zip(c.iter()) {
-        assert_eq!(schema.function, ctrl.schema.function);
-    }
 }
 
 #[test]

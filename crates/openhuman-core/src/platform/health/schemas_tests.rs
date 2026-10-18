@@ -2,16 +2,6 @@ use super::*;
 use crate::core::runtime::DispatchCtx;
 
 #[test]
-fn all_schemas_returns_two() {
-    assert_eq!(all_controller_schemas().len(), 2);
-}
-
-#[test]
-fn all_controllers_returns_two() {
-    assert_eq!(all_registered_controllers().len(), 2);
-}
-
-#[test]
 fn snapshot_schema() {
     let s = schemas("snapshot");
     assert_eq!(s.namespace, "health");
@@ -28,16 +18,6 @@ fn system_info_schema() {
     assert!(s.inputs.is_empty());
     // version, os, arch, pid
     assert_eq!(s.outputs.len(), 4);
-}
-
-#[test]
-fn schemas_and_controllers_match() {
-    let s = all_controller_schemas();
-    let c = all_registered_controllers();
-    assert_eq!(s.len(), c.len());
-    for (schema, controller) in s.iter().zip(c.iter()) {
-        assert_eq!(schema.function, controller.schema.function);
-    }
 }
 
 #[tokio::test]

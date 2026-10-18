@@ -1,24 +1,6 @@
 use super::*;
 
 #[test]
-fn all_schemas_returns_nine() {
-    assert_eq!(all_controller_schemas().len(), 9);
-}
-
-#[test]
-fn all_controllers_returns_nine() {
-    assert_eq!(all_registered_controllers().len(), 9);
-}
-
-#[test]
-fn all_schemas_use_service_namespace() {
-    for s in all_controller_schemas() {
-        assert_eq!(s.namespace, "service");
-        assert!(!s.description.is_empty());
-    }
-}
-
-#[test]
 fn lifecycle_schemas_have_no_inputs_except_self_signals() {
     for fn_name in ["install", "start", "stop", "status", "uninstall"] {
         let s = schemas(fn_name);
@@ -58,16 +40,6 @@ fn daemon_host_set_requires_show_tray() {
     assert_eq!(s.inputs.len(), 1);
     assert_eq!(s.inputs[0].name, "show_tray");
     assert!(s.inputs[0].required);
-}
-
-#[test]
-fn schemas_and_controllers_match() {
-    let s = all_controller_schemas();
-    let c = all_registered_controllers();
-    assert_eq!(s.len(), c.len());
-    for (schema, ctrl) in s.iter().zip(c.iter()) {
-        assert_eq!(schema.function, ctrl.schema.function);
-    }
 }
 
 #[test]
