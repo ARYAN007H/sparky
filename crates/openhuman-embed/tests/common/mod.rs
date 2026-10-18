@@ -63,6 +63,7 @@ pub fn offline_config() -> Config {
 /// here, with a config that asks for `linked`: the resolution slot is
 /// process-wide, so every later caller (a profile's own config included) sees
 /// the linked module. Only this module changes source.
+#[cfg(feature = "modules")]
 pub fn link_tinyflows(runtime: &tokio::runtime::Runtime) {
     use openhuman_core::config::schema::{ModuleOverride, ModuleSourceMode};
     openhuman_embed::modules::register_linked("tinyflows", tinyflows_module::linked_module);
