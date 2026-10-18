@@ -6,6 +6,20 @@ use tinyflows_bus::runs::FlowRunTrigger;
 use wiremock::matchers::{body_json, header, method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
+fn attributed_test_client() -> reqwest::Client {
+    let mut headers = reqwest::header::HeaderMap::new();
+    headers.insert(
+        crate::backend::transport::plain::TEST_PRODUCT_HEADER,
+        reqwest::header::HeaderValue::from_static(
+            crate::backend::transport::plain::TEST_PRODUCT_IDENTITY,
+        ),
+    );
+    reqwest::Client::builder()
+        .default_headers(headers)
+        .build()
+        .expect("attributed test client")
+}
+
 fn sample_observations(thread_id: &str) -> Vec<GraphObservation> {
     let node = NodeId::new("fetch");
     let mk = |offset: u64, step: usize, ts_ms: u64, event: GraphEvent| GraphObservation {
@@ -296,15 +310,10 @@ async fn shared_otlp_transport_posts_rendered_graph_json_with_attribution() {
         .await;
 
     let url = format!("{}/otel/v1/traces", server.uri());
-    let transport = crate::backend::transport::plain::PlainHttpTransport::fresh();
-    super::super::otlp::push_otlp_json_requests_via(
-        transport.as_ref(),
-        &url,
-        "session-token",
-        &requests,
-    )
-    .await
-    .expect("send graph request through shared authenticated transport");
+    let client = attributed_test_client();
+    super::super::otlp::push_otlp_json_requests_via(&client, &url, "session-token", &requests)
+        .await
+        .expect("send graph request through shared authenticated transport");
 }
 
 #[tokio::test]
@@ -327,15 +336,10 @@ async fn shared_otlp_transport_reports_http_and_partial_rejections() {
         .mount(&server)
         .await;
     let url = format!("{}/otel/v1/traces", server.uri());
-    let transport = crate::backend::transport::plain::PlainHttpTransport::fresh();
-    let error = super::super::otlp::push_otlp_json_requests_via(
-        transport.as_ref(),
-        &url,
-        "token",
-        &requests,
-    )
-    .await
-    .expect_err("HTTP failure must be reported");
+    let client = attributed_test_client();
+    let error = super::super::otlp::push_otlp_json_requests_via(&client, &url, "token", &requests)
+        .await
+        .expect_err("HTTP failure must be reported");
     assert!(error.contains("503"), "{error}");
 
     let server = MockServer::start().await;
@@ -347,14 +351,9 @@ async fn shared_otlp_transport_reports_http_and_partial_rejections() {
         .mount(&server)
         .await;
     let url = format!("{}/otel/v1/traces", server.uri());
-    let transport = crate::backend::transport::plain::PlainHttpTransport::fresh();
-    let error = super::super::otlp::push_otlp_json_requests_via(
-        transport.as_ref(),
-        &url,
-        "token",
-        &requests,
-    )
-    .await
-    .expect_err("partial rejection must be reported");
+    let client = attributed_test_client();
+    let error = super::super::otlp::push_otlp_json_requests_via(&client, &url, "token", &requests)
+        .await
+        .expect_err("partial rejection must be reported");
     assert!(error.contains("partially rejected"), "{error}");
 }
