@@ -127,6 +127,8 @@ pub mod voice;
 #[cfg(feature = "modules")]
 pub mod wallet;
 #[cfg(feature = "web3")]
+pub mod wallet_backend;
+#[cfg(feature = "web3")]
 mod wallet_host;
 #[cfg(feature = "web3")]
 pub(crate) mod wallet_service;

@@ -272,9 +272,6 @@ impl RuntimeBuilder {
         if let Some(port) = self.listen_port {
             builder = builder.port(port);
         }
-        if let Some(transport) = self.backend_transport.take() {
-            builder = builder.backend_transport(transport);
-        }
         let runtime = builder.build().await.map_err(|error| {
             log::warn!("[embed][runtime] core build failed: {error:#}");
             RuntimeError::Build(error)
@@ -518,6 +515,7 @@ fn map_ws(err: crate::HarnessError) -> RuntimeError {
         crate::HarnessError::Workspace { what, source } => RuntimeError::Workspace { what, source },
         crate::HarnessError::Invalid(msg) => RuntimeError::Invalid(msg),
         crate::HarnessError::Build(e) => RuntimeError::Build(e),
+        crate::HarnessError::McpCleanup(e) => RuntimeError::Build(e.into()),
         crate::HarnessError::Call(e) => RuntimeError::Call(e),
         crate::HarnessError::AlreadyRunning => RuntimeError::AlreadyRunning,
     }
