@@ -8,7 +8,7 @@ use std::sync::{
 use tinymemory_api::conformance::ReferenceEngine;
 use tinymemory_api::{
     EngineDescriptor, FetchMode, FetchRequest, ForgetReport, ForgetTarget, ItemKind, ListRequest,
-    MemoryEngine, MemoryMeta, MetaFilter, RecallRequest, SourceKind, SourceRef, StoreItem,
+    MemoryEngine, MemoryMeta, MetaFilter, Reach, RecallRequest, SourceKind, SourceRef, StoreItem,
     StoreReceipt, ToolCallRef,
 };
 
@@ -67,6 +67,171 @@ fn invalid_saas_root_is_refused_before_store_reaches_the_engine() {
         assert_eq!(calls.load(Ordering::SeqCst), 0, "root: {root:?}");
     }
     println!("SAAS_MEMORY_STORE_GUARD_CHILD_PASSED");
+}
+
+#[test]
+fn valid_saas_identity_clamps_memory_operations_in_an_isolated_process() {
+    const CHILD: &str = "OPENHUMAN_TEST_SAAS_MEMORY_CLAMP";
+    const TEST_NAME: &str =
+        "memory::ops::tests::valid_saas_identity_clamps_memory_operations_in_an_isolated_process";
+
+    if std::env::var_os(CHILD).is_none() {
+        let output = std::process::Command::new(std::env::current_exe().unwrap())
+            .args(["--exact", TEST_NAME, "--nocapture"])
+            .env(CHILD, "1")
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success()
+                && String::from_utf8_lossy(&output.stdout)
+                    .contains("SAAS_MEMORY_CLAMP_CHILD_PASSED"),
+            "isolated SaaS clamp test process failed or ran zero tests:\n{}\n{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+        return;
+    }
+
+    crate::core::runtime::mode::lock_mode(crate::core::runtime::Mode::Saas).unwrap();
+    tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap()
+        .block_on(async {
+            let tmp = tempfile::tempdir().unwrap();
+            let mut config = config_in(&tmp);
+            config.memory.root = Some("team:acme".into());
+            let engine = bind_reference(&config);
+            let own = engine
+                .store(StoreItem::learning(
+                    "acme shared note",
+                    tinymemory_api::LearningKind::Fact,
+                    0.9,
+                    MemoryMeta {
+                        namespace: "team:acme".parse().unwrap(),
+                        ..MemoryMeta::default()
+                    },
+                ))
+                .await
+                .unwrap()
+                .id
+                .0;
+            let foreign = engine
+                .store(StoreItem::learning(
+                    "other team's private marker",
+                    tinymemory_api::LearningKind::Fact,
+                    0.9,
+                    MemoryMeta {
+                        namespace: "team:other".parse().unwrap(),
+                        ..MemoryMeta::default()
+                    },
+                ))
+                .await
+                .unwrap()
+                .id
+                .0;
+
+            let listed = items_list(&config, Default::default()).await.unwrap();
+            assert_eq!(listed.items.len(), 1);
+            assert_eq!(listed.items[0].id.0, own);
+
+            let fetched = fetch(
+                &config,
+                FetchParams {
+                    refers_to: None,
+                    query: "private marker".into(),
+                    mode: None,
+                    filter: None,
+                    limit: None,
+                    cursor: None,
+                },
+            )
+            .await
+            .unwrap();
+            assert!(!fetched.hits.iter().any(|hit| hit.id.0 == foreign));
+
+            let recalled = recall(
+                &config,
+                RecallParams {
+                    refers_to: None,
+                    question: "private marker".into(),
+                    filter: None,
+                    limit: None,
+                },
+            )
+            .await
+            .unwrap();
+            assert!(recalled
+                .citations
+                .iter()
+                .all(|citation| citation.id.0 != foreign));
+
+            let learned = learn(
+                &config,
+                learn_params("clamped learning"),
+                Some(MemoryMeta {
+                    namespace: "team:other".parse().unwrap(),
+                    ..MemoryMeta::default()
+                }),
+            )
+            .await
+            .unwrap();
+            let stored = store_item(
+                &config,
+                StoreItem::learning(
+                    "clamped store",
+                    tinymemory_api::LearningKind::Fact,
+                    0.9,
+                    MemoryMeta {
+                        namespace: "team:other".parse().unwrap(),
+                        ..MemoryMeta::default()
+                    },
+                ),
+            )
+            .await
+            .unwrap();
+            let own_items = engine
+                .list(tinymemory_api::ListRequest {
+                    filter: MetaFilter {
+                        reach: Some(Reach::subtree("team:acme".parse().unwrap())),
+                        ..MetaFilter::default()
+                    },
+                    limit: 20,
+                    cursor: None,
+                })
+                .await
+                .unwrap()
+                .items;
+            for id in [learned.id, stored.id.0] {
+                let item = own_items.iter().find(|item| item.id.0 == id).unwrap();
+                assert_eq!(item.meta.namespace, "team:acme".parse().unwrap());
+            }
+
+            let forgotten = forget(
+                &config,
+                ForgetParams {
+                    ids: vec![foreign.clone()],
+                    reach: None,
+                },
+            )
+            .await
+            .unwrap();
+            assert_eq!(forgotten.forgotten, 0);
+            let foreign_items = engine
+                .list(tinymemory_api::ListRequest {
+                    filter: MetaFilter {
+                        reach: Some(Reach::subtree("team:other".parse().unwrap())),
+                        ..MetaFilter::default()
+                    },
+                    limit: 20,
+                    cursor: None,
+                })
+                .await
+                .unwrap()
+                .items;
+            assert!(foreign_items.iter().any(|item| item.id.0 == foreign));
+        });
+    println!("SAAS_MEMORY_CLAMP_CHILD_PASSED");
 }
 
 struct CountingEngine {
