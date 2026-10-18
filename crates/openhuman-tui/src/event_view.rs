@@ -51,6 +51,14 @@ impl WebEventView {
             ..Self::default()
         };
         use WebChannelEvent as E;
+        let subagent_view = |detail: &tinychannels_bus::web::WebSubagentProgressDetail| {
+            SubagentView {
+                task_id: Some(detail.task_id.clone()),
+                display_name: detail.display_name.clone(),
+                elapsed_ms: detail.elapsed_ms,
+                output: detail.output.clone(),
+            }
+        };
         match event {
             E::ChatDone { full_response, .. }
             | E::ChatInterim { full_response, .. }
@@ -82,14 +90,10 @@ impl WebEventView {
             | E::SubagentThinkingDelta { delta, .. } => {
                 view.delta.clone_from(delta);
             }
-            E::IterationStart { message, .. }
-            | E::RunModeChanged { message, .. }
-            | E::UserError {
-                error_source: message,
-                ..
-            } => {
+            E::IterationStart { message, .. } | E::RunModeChanged { message, .. } => {
                 view.message.clone_from(message);
             }
+            E::UserError { error_type, .. } => view.error_type.clone_from(error_type),
             E::ToolCall {
                 tool_name,
                 skill_id,
@@ -104,6 +108,7 @@ impl WebEventView {
                 args,
                 tool_call_id,
                 tool_display_label,
+                subagent,
                 ..
             } => {
                 view.tool_name.clone_from(tool_name);
@@ -111,6 +116,9 @@ impl WebEventView {
                 view.args.clone_from(args);
                 view.tool_call_id.clone_from(tool_call_id);
                 view.tool_display_label.clone_from(tool_display_label);
+                if let E::SubagentToolCall { .. } = event {
+                    view.subagent = subagent.as_ref().map(&subagent_view);
+                }
             }
             E::ApprovalRequest {
                 tool_name,
@@ -157,6 +165,7 @@ impl WebEventView {
                 failure,
                 elapsed_ms,
                 tool_display_label,
+                subagent,
                 ..
             }
             | E::SubagentToolResult {
@@ -169,6 +178,7 @@ impl WebEventView {
                 failure,
                 elapsed_ms,
                 tool_display_label,
+                subagent,
                 ..
             } => {
                 view.tool_name.clone_from(tool_name);
@@ -180,6 +190,9 @@ impl WebEventView {
                 view.failure.clone_from(failure);
                 view.elapsed_ms.clone_from(elapsed_ms);
                 view.tool_display_label.clone_from(tool_display_label);
+                if let E::SubagentToolResult { .. } = event {
+                    view.subagent = subagent.as_ref().map(&subagent_view);
+                }
             }
             E::ToolArgsDelta {
                 delta,
@@ -239,12 +252,7 @@ impl WebEventView {
                 view.tool_name.clone_from(tool_name);
                 view.skill_id.clone_from(skill_id);
                 view.message.clone_from(message);
-                view.subagent = subagent.as_ref().map(|detail| SubagentView {
-                    task_id: Some(detail.task_id.clone()),
-                    display_name: detail.display_name.clone(),
-                    elapsed_ms: detail.elapsed_ms,
-                    output: detail.output.clone(),
-                });
+                view.subagent = subagent.as_ref().map(&subagent_view);
             }
             E::ArtifactReady {
                 tool_call_id, args, ..
