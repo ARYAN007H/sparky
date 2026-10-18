@@ -328,7 +328,7 @@ fn desktop_workspace(workspace: &Path) -> Fixture {
     // x402 payment ledger: a payment that changed status appears twice.
     let payment = |id: &str, status: &str| {
         format!(
-            r#"{{"id":"{id}","url":"https://api.example/x","asset":"0xusdc","amountAtomic":2500,"amountDisplay":"0.002500 USDC","recipient":"0xpayee","network":"eip155:8453","txSignature":null,"status":"{status}","timestamp":"2026-10-12T10:00:00Z"}}"#
+            r#"{{"id":"{id}","url":"https://api.example/x","asset":"0xusdc","amountAtomic":2500,"amountDisplay":"0.002500 USDC","recipient":"0xpayee","network":"eip155:8453","txSignature":null,"status":"{status}","timestamp":"2026-10-12T10:00:00Z","sessionId":"s1"}}"#
         )
     };
     write(
