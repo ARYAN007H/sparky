@@ -330,7 +330,7 @@ async fn scenario() {
         tokio::time::timeout(Duration::from_secs(30), async {
             loop {
                 let event = events.recv().await.unwrap();
-                if event.event == "channel_outbound" {
+                if event.event_name() == "channel_outbound" {
                     break;
                 }
             }
