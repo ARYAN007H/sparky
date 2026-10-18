@@ -51,6 +51,7 @@ pub(crate) fn config_save_conflict(
         message: "Configuration changed on another instance; reload it and retry".into(),
         data: Some(serde_json::json!({
             "kind": "ConfigConflict",
+            "code": "CONFIG_CONFLICT",
             "retryable": retryable,
         })),
         expected_user_state: true,
