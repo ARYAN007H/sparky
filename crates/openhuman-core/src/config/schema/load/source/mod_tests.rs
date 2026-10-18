@@ -202,16 +202,16 @@ async fn document_source_write_uses_its_last_read_revision() {
     let first = document_source(&storage, "tenant-source-cas", &path);
     let stale = document_source(&storage, "tenant-source-cas", &path);
 
-    first.write("default_model = \"seed\"\\n").await.unwrap();
+    first.write("default_model = \"seed\"\n").await.unwrap();
     first.read().await.unwrap();
     stale.read().await.unwrap();
     first
-        .write("default_model = \"winner\"\\n")
+        .write("default_model = \"winner\"\n")
         .await
         .unwrap();
 
     let error = stale
-        .write("output_language = \"fr\"\\n")
+        .write("output_language = \"fr\"\n")
         .await
         .expect_err("a source snapshot cannot overwrite a newer document revision");
     let storage_error = error
