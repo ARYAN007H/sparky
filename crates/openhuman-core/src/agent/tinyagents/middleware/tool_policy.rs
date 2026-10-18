@@ -9,8 +9,8 @@ use async_trait::async_trait;
 use tinyagents_harness::context::RunContext;
 use tinyagents_harness::error::Result as TaResult;
 use tinyagents_harness::middleware::{
-    MiddlewareToolOutcome, PolicyDecision, ToolCallPolicy, ToolHandler, ToolMiddleware,
-    ToolPolicyGate,
+    DenialRenderer, MiddlewareToolOutcome, PolicyDecision, ToolCallPolicy, ToolHandler,
+    ToolMiddleware, ToolPolicyGate,
 };
 use tinyinference_llm::tool::ToolCall as TaToolCall;
 use tinytools::ToolResult as TaToolResult;
@@ -30,6 +30,8 @@ use tinytools::Tool;
 pub(crate) struct ToolPolicyMiddleware {
     /// The builder policy behind the harness gate.
     gate: ToolPolicyGate<OpenHumanRunContext>,
+    /// Host-authored denial copy plugged into the owner policy boundary.
+    render_denial: DenialRenderer,
     /// The session's channel-permission snapshot — enforces the per-channel deny
     /// + per-call permission-level ceiling the engine ran in `agent_tool_exec`.
     session: tinytools::ToolPolicySession,
@@ -68,6 +70,23 @@ impl ToolPolicyMiddleware {
     ) -> Self {
         Self {
             gate: ToolPolicyGate::new(policy),
+            render_denial: Arc::new(|call, policy, decision| match decision {
+                PolicyDecision::RequireApproval { reason } => {
+                    PolicyDenial::ApprovalRequired {
+                        tool: &call.name,
+                        policy,
+                        reason,
+                    }
+                    .render()
+                }
+                PolicyDecision::Deny { reason } => PolicyDenial::PolicyDenied {
+                    tool: &call.name,
+                    policy,
+                    reason,
+                }
+                .render(),
+                PolicyDecision::Allow => String::new(),
+            }),
             session,
             tool_sets,
             channel,
@@ -373,19 +392,7 @@ impl ToolMiddleware<(), crate::agent::tinyagents::host::OpenHumanRunContext>
                 reason = %reason,
                 "[tinyagents::mw] tool blocked by policy"
             );
-            let content = match &decision {
-                PolicyDecision::RequireApproval { .. } => PolicyDenial::ApprovalRequired {
-                    tool: &call.name,
-                    policy: policy_name,
-                    reason,
-                },
-                _ => PolicyDenial::PolicyDenied {
-                    tool: &call.name,
-                    policy: policy_name,
-                    reason,
-                },
-            }
-            .render();
+            let content = (self.render_denial)(&call, policy_name, &decision);
             return Ok(MiddlewareToolOutcome::Result(TaToolResult::error(content)));
         }
 
