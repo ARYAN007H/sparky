@@ -63,7 +63,11 @@ fn add_once_propagates_parse_delay_errors() {
 fn add_once_at_stores_exact_timestamp() {
     let tmp = TempDir::new().unwrap();
     let config = test_config(&tmp);
-    let when = chrono::Utc::now() + chrono::Duration::hours(1);
+    // The store keeps instants as epoch milliseconds.
+    let when = chrono::DateTime::from_timestamp_millis(
+        (chrono::Utc::now() + chrono::Duration::hours(1)).timestamp_millis(),
+    )
+    .unwrap();
     let job = add_once_at(&config, when, "echo hi").unwrap();
     match job.schedule {
         Schedule::At { at } => assert_eq!(at, when),
@@ -334,30 +338,6 @@ async fn cron_run_response_conforms_to_its_declared_schema() {
     }
 }
 
-#[tokio::test]
-async fn cron_run_rejects_duplicate_concurrent_execution() {
-    let tmp = TempDir::new().unwrap();
-    let config = test_config(&tmp);
-    let job = make_job(&config, "*/5 * * * *", None, "echo hello");
-
-    // Hold the run claim directly to simulate an in-flight execution without
-    // spawning a real long-running subprocess (deterministic, no timing dependency).
-    let running = crate::cron::scheduler::try_acquire_run(&job.id).expect("the job is free");
-    let err = cron_run(
-        &crate::core::runtime::DispatchCtx::ambient(),
-        &config,
-        &job.id,
-    )
-    .await
-    .unwrap_err();
-    drop(running);
-
-    assert!(
-        err.contains("already running"),
-        "expected 'already running', got: {err}"
-    );
-}
-
 // ── run_job_now / single-flight ─────────────────────────────────
 
 pub(super) fn single_flight_system_job(config: &Config, name: &str) -> CronJob {
@@ -381,7 +361,7 @@ pub(super) fn single_flight_system_job(config: &Config, name: &str) -> CronJob {
         },
     )
     .unwrap();
-    job
+    crate::cron::get_job(config, &job.id).unwrap()
 }
 
 #[tokio::test]
@@ -415,30 +395,6 @@ async fn run_job_now_runs_and_records_the_handler_result() {
 }
 
 #[tokio::test]
-async fn run_job_now_refuses_a_job_that_is_already_running() {
-    let tmp = TempDir::new().unwrap();
-    let config = test_config(&tmp);
-    let job = single_flight_system_job(&config, "ops-run-now-busy");
-    let _running = crate::cron::scheduler::try_acquire_run(&job.id).expect("the job is free");
-    let err = run_job_now(
-        &crate::core::runtime::DispatchCtx::ambient(),
-        &config,
-        &job.id,
-    )
-    .await
-    .unwrap_err();
-    assert!(err.contains("already running"), "{err}");
-    let err = cron_run(
-        &crate::core::runtime::DispatchCtx::ambient(),
-        &config,
-        &job.id,
-    )
-    .await
-    .unwrap_err();
-    assert!(err.contains("already running"), "{err}");
-}
-
-#[tokio::test]
 async fn run_job_now_reports_an_unknown_job() {
     let tmp = TempDir::new().unwrap();
     let config = test_config(&tmp);
@@ -449,25 +405,6 @@ async fn run_job_now_reports_an_unknown_job() {
     )
     .await
     .is_err());
-}
-
-#[test]
-fn required_delivery_failure_only_fails_non_best_effort_runs() {
-    let cases = [
-        (true, DeliveryStatus::Failed, false, false),
-        (true, DeliveryStatus::Failed, true, true),
-        (true, DeliveryStatus::NotRequested, false, true),
-        (true, DeliveryStatus::Suppressed, false, true),
-        (false, DeliveryStatus::Delivered, true, false),
-    ];
-
-    for (execution_success, delivery_status, best_effort, expected) in cases {
-        assert_eq!(
-            success_after_delivery(execution_success, &delivery_status, best_effort),
-            expected,
-            "unexpected success for execution_success={execution_success}, delivery_status={delivery_status:?}, best_effort={best_effort}"
-        );
-    }
 }
 
 #[tokio::test]
@@ -521,7 +458,10 @@ async fn run_job_now_records_required_delivery_failure_as_error() {
     let runs = cron::list_runs(&config, &job.id, 10).unwrap();
     assert_eq!(runs.len(), 1);
     assert_eq!(runs[0].status, "error");
-    assert_eq!(runs[0].delivery_status, Some(DeliveryStatus::Failed));
+    assert_eq!(
+        runs[0].delivery_status,
+        Some(tinyflows_bus::schedule::types::DeliveryStatus::Failed)
+    );
     assert_eq!(
         cron::get_job(&config, &job.id)
             .unwrap()

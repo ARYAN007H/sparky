@@ -1,7 +1,7 @@
 //! Typed calls to the `tinyflows` module's `Schedule` object.
 //!
 //! The scheduler runtime, the cron job and run store and the schedule maths
-//! all run in the module (`tinyflows_bus::schedule`, contract v3). This file is
+//! all run in the module (`tinyflows_bus::schedule`, contract v6). This file is
 //! the only place core builds those requests: it turns a [`Config`] and a
 //! [`StoreOperation`] into a `ScheduleStore` request bound to the acting
 //! scope's document port ([`super::documents_port`]), and wraps every pure
@@ -9,8 +9,10 @@
 //! function. Members are named through the contract constants; nothing here
 //! parses a cron expression or computes a next run.
 //!
-//! Every call logs `[cron:bus]` with the member (never a payload) so a failing
-//! call is greppable.
+//! Every store operation first asks the module to perform its idempotent,
+//! module-owned migration. Direct scheduler lifecycle entry points must do the
+//! same before bypassing this store wrapper. Every call logs `[cron:bus]` with
+//! the member (never a payload) so a failing call is greppable.
 
 use anyhow::{anyhow, Result};
 use chrono::{DateTime, Duration, Utc};
@@ -58,6 +60,18 @@ async fn store_config(config: &Config, scope: &DocScope) -> Result<StoreConfig> 
 
 /// Run one store operation in `scope` and decode its reply.
 pub(crate) async fn store_in<R: DeserializeOwned>(
+    config: &Config,
+    scope: &DocScope,
+    operation: StoreOperation,
+) -> Result<R> {
+    if !matches!(&operation, StoreOperation::Migrate) {
+        let _: Value = store_raw(config, scope, StoreOperation::Migrate).await?;
+    }
+    store_raw(config, scope, operation).await
+}
+
+/// Send one operation without adding another migration request.
+async fn store_raw<R: DeserializeOwned>(
     config: &Config,
     scope: &DocScope,
     operation: StoreOperation,

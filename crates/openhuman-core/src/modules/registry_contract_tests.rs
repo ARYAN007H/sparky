@@ -174,23 +174,65 @@ fn the_flows_record_serves_the_schedule_object() {
     assert_ne!(record.object_path, schedule::OBJECT_PATH);
     assert_ne!(schedule::INTERFACE, schedule::CALLBACK_INTERFACE);
     assert_ne!(schedule::INTERFACE, schedule::DOCUMENT_INTERFACE);
-    assert_eq!(schedule::CONTRACT_VERSION, 3, "the host speaks contract v3");
+    assert_eq!(schedule::CONTRACT_VERSION, 6, "the host speaks contract v6");
     assert_eq!(component_for("tinyflows"), Some("tinyflows"));
 }
 
-/// The pins are the published v0.8.23 `checksum.toml` (the first release with
-/// schedule contract v3).
+/// The pins are the published v0.8.25 `checksum.toml` (the first release with
+/// schedule contract v6).
 #[test]
 fn the_flows_record_pins_every_host_of_one_release() {
     let record = find("tinyflows").unwrap();
-    assert_eq!(record.version, "0.8.23");
+    assert_eq!(record.version, "0.8.25");
     assert_eq!(record.assets.len(), 11);
-    for asset in record.assets {
-        assert!(
-            asset.archive.starts_with("tinyflows-module-0.8.23-"),
-            "{}",
-            asset.archive
-        );
-        assert_eq!(asset.sha256.len(), 64, "{}", asset.archive);
+    let expected = [
+        (
+            "tinyflows-module-0.8.25-macos-26-arm64.tar.gz",
+            "af7e4fd98885704f4745384b32f628128954389595269698bc26fa90be41ea68",
+        ),
+        (
+            "tinyflows-module-0.8.25-macos-26-x86_64.tar.gz",
+            "d253d9ca4d95b806042b7b5bc4f98acfdb174c0512e3fb7035a46a7e0e07b39d",
+        ),
+        (
+            "tinyflows-module-0.8.25-macos-15-arm64.tar.gz",
+            "2f6a938f3d12874db93d3b44eca3e7aa44418cd1c6d07a06813d3ff10eddacbe",
+        ),
+        (
+            "tinyflows-module-0.8.25-macos-15-x86_64.tar.gz",
+            "7dafc35c4754e1198209f0fd182e3ab3e7e1aa2bb6cfdcfad1bae0649049aa7f",
+        ),
+        (
+            "tinyflows-module-0.8.25-ubuntu-24.04-x86_64.tar.gz",
+            "1a713e76ff38034481a06cfc0dc9cee1c59af80af6338d9d4a4c8901fbab7c8f",
+        ),
+        (
+            "tinyflows-module-0.8.25-ubuntu-24.04-arm64.tar.gz",
+            "b0f59ee5d2f7726f409a5e3d5cd48eea2f2a2f32fe82a070eb8758ee80ae2646",
+        ),
+        (
+            "tinyflows-module-0.8.25-ubuntu-22.04-x86_64.tar.gz",
+            "4d8f500c83243894daea71a3051c1d549269cd2079bf114469c41324a7e3733d",
+        ),
+        (
+            "tinyflows-module-0.8.25-ubuntu-22.04-arm64.tar.gz",
+            "3eadc6e3e71a6176354a695b33897b6eda61ba469f26dc51e27dd3e966cebda0",
+        ),
+        (
+            "tinyflows-module-0.8.25-windows-2025-x86_64.zip",
+            "9cf9b8bf35b4e7134a57dc5e03d14966c9ff468bfec16fcac8b22285dcbc2e40",
+        ),
+        (
+            "tinyflows-module-0.8.25-windows-2022-x86_64.zip",
+            "bb5c8d97030aa53a05c3baf60bb1e3a6a8631be6add72a03823052b795fb1286",
+        ),
+        (
+            "tinyflows-module-0.8.25-windows-11-arm64.zip",
+            "712cf7bc89b3d0a1a02beff3d792990047cd946a23433a3e6f54b35545963ad8",
+        ),
+    ];
+    for (asset, (archive, sha256)) in record.assets.iter().zip(expected) {
+        assert_eq!(asset.archive, archive);
+        assert_eq!(asset.sha256, sha256, "{}", asset.archive);
     }
 }

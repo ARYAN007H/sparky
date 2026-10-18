@@ -13,7 +13,7 @@ scheduler runtime (poll pass, process-wide run claims, retry with backoff,
 completion and rescheduling), the cron job and run store, and the schedule
 maths (cron expressions, one-shot instants, intervals, active hours, the
 agent-job cadence floor). Core reaches it only through the `tinyflows-bus`
-contract (`tinyflows_bus::schedule`, v3), and keeps what is policy and what is
+contract (`tinyflows_bus::schedule`, v6), and keeps what is policy and what is
 pluggable: the callbacks the module runs jobs through, the document port it
 persists through, the job-kind handler registry, delivery, the operator limits
 and the RPC and tool surface. Core links neither `tinyflows-schedule` nor
@@ -67,14 +67,14 @@ jobs, the turn's message id.
 
 ### Run claims
 
-The module keeps process-wide run claims per `(scope, job id)`; the host uses
-the scope `openhuman` for every scheduler so the poll loop of any agent and
-Run Now refuse to start a job another of them is running. `cron.run` also
-takes a host-side guard (`scheduler::try_acquire_run`) so a second concurrent
-Run Now is rejected at once; a Run Now that loses to a scheduled run is
-refused by the module's `ExecuteJob` ("job is already running"), and the host
-records nothing for it. A claim releases on drop, so a scheduled run and a manual run
-never overlap.
+The module keeps process-wide occurrence claims per scheduler scope and job
+id. Each host scheduler and manual run uses the stable `DocScope` identity, so
+jobs in one document scope cannot overlap while distinct workspaces or agent
+scopes remain independent. Run Now reserves an inert module handle, starts
+the worker, and observes its state until the module confirms admission or a
+terminal result. The owner task keeps that invocation's callback and context
+alive through terminal acknowledgement, even if the RPC or tool caller goes
+away.
 
 ### Executing a job
 
@@ -278,8 +278,11 @@ on the storage ports via the host's document port
 ([`documents_port.rs`](./documents_port.rs)): one `ScheduleDocuments` object per
 `(workspace, storage scope)`, which relays `get`/`put`/`query`/`atomic_batch`
 and friends mechanically, preserves the `conflict` error kind and refuses any
-collection other than the four schedule ones. The configured history cap and
-due-job batch size ride on every request. tinyflows has no SQLite store of its
+collection or shared TSD key outside the schedule module's owner namespace.
+The module owns the v1-to-v2 schedule migration, including its exact progress
+keys and legacy source retirement. Core calls its `Migrate` operation before
+store CRUD, scheduler start and manual-run preparation. The configured history
+cap and due-job batch size ride on every request. tinyflows has no SQLite store of its
 own, so there is one path whatever the storage URL says: the installed backend
 when there is one, else the workspace default (`sqlite:<workspace>/storage`).
 The `jobs.db` tinyflows used to write (with its policy side table) is decoded
@@ -301,11 +304,11 @@ feature) nothing loads and every cron call answers `COMPONENT_DISABLED:tinyflows
 | [`store.rs`](./store.rs) | The synchronous job and run API the core calls. Applies the operator limits, then sends one `StoreOperation` to the module. |
 | [`client.rs`](./client.rs) | Typed calls to the module's `Schedule` object: `store_in`/`store_blocking`, `runs_closer_than`, `parse_human_delay`, `default_delivery`, `check_origin_requirements`, and other host adapters. |
 | [`documents_port.rs`](./documents_port.rs) | The `ScheduleDocuments` callback object: the scope's document store, served to the module. |
-| [`bus_host.rs`](./bus_host.rs) | `Binding` (config, policy, context of one scope) and the `ScheduleHost` callback object (`Execute`, `Failed`, `Deliver`, `ScheduleTrigger`), served per scheduler. |
+| [`bus_host.rs`](./bus_host.rs) | `Binding` (config, policy, context of one scope) and `ScheduleHost` callbacks (`Execute`, `Failed`, `Send`, `Deliver`, `ScheduleTrigger`), served per scheduler or manual invocation. |
 | [`handlers.rs`](./handlers.rs) | The job-kind handler registry (`JobKindHandler`, `JobOutcome`, `register_kind`) and the system-job handlers. |
 | `ops.rs` | Business operations: `add_once`, `add_once_at`, pause/resume, and the async `cron_*` RPC operations. Also re-exported as `cron::rpc`. |
 | [`schemas.rs`](./schemas.rs) | Controller schemas and handlers for the `cron` namespace. |
-| [`scheduler.rs`](./scheduler.rs) | The host loop: `run`, `tick_once`, `JobDispatcher` (one manual-tick module scheduler per scope), the live-agent pass, `execute_job_now` (Run Now, through `ExecuteJob`), the manual-run guard and the health signals. |
+| [`scheduler.rs`](./scheduler.rs) | The host loop: `run`, `tick_once`, `JobDispatcher` (one manual-tick module scheduler per scope), the live-agent pass, and health signals. Run Now uses a per-invocation manual-worker owner through Schedule contract v6. |
 | `scheduler/executor.rs` | `HostExecutor`: one shell or agent attempt through the registry, failure classification, the retries-exhausted report, the cadence warning. |
 | `scheduler/builtin.rs` | The default `shell`, `agent` and `flow` handlers. |
 | `scheduler/run_delivery.rs` | `deliver` (delivery plus completion events) and `trigger` (flow schedule trigger, system jobs). |
@@ -334,8 +337,9 @@ feature) nothing loads and every cron call answers `COMPONENT_DISABLED:tinyflows
 - `AgentJobSpec`: the store's agent-job creation spec (from `tinyflows_bus::schedule`),
   used by `add_agent_job_from_spec`.
 - `scheduler::run(ctx, config)`: the service entry point.
-- `scheduler::execute_job_now` and `scheduler::deliver_job`: what Run Now uses
-  to execute and deliver outside the loop.
+- `scheduler::run_job_now`: manual worker lifecycle owner used by Run Now and
+  the run tool; `scheduler::execute_job_now` preserves the synchronous tuple
+  adapter for existing host callers.
 - `add_job`, `add_shell_job`, `add_agent_job_with_definition`,
   `add_agent_job_from_spec`, `add_flow_schedule_job`, `find_flow_schedule_job`,
   `get_job`, `list_jobs`, `update_job`, `remove_job`, `list_runs`,
@@ -363,7 +367,7 @@ Namespace `cron`, registered through `all_cron_registered_controllers` in
 | `cron.list` | List all jobs. |
 | `cron.update` | Patch a job. |
 | `cron.remove` | Delete a job. |
-| `cron.run` | Run Now. Records a `queued` placeholder run, returns at once, then executes in the background through `execute_job_now` and `deliver_job` and records the real result. Refused when `cron.enabled` is false or the job is already running. |
+| `cron.run` | Run Now. Waits for module-confirmed admission, then returns `queued` while the invocation owner observes completion and acknowledges its module handle. Refused when `cron.enabled` is false or the job is already running. |
 | `cron.runs` | Run history for a job. |
 
 ## Event bus
@@ -436,7 +440,7 @@ Cron publishes, through [`core/bus.rs`](../core/bus.rs), these `DomainEvent` var
   table, then collection) are folded into the job by the importer and by
   the module's store when it opens.
 - A `CronJobPatch` crosses the bus as JSON and `agent_id` is a double option
-  whose `null` means "clear"; the contract (tinyflows v0.8.23) omits it when
+  whose `null` means "clear"; the contract (tinyflows v0.8.25) omits it when
   unset, so an unrelated patch leaves the agent definition alone
   (`a_patch_over_the_bus_keeps_the_agent_definition_it_does_not_mention`).
 - The hosted-profile sweep runs an agent-only scheduler (`JobDispatcher::agent_only`):

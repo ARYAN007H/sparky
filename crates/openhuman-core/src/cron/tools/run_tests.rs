@@ -56,10 +56,7 @@ async fn force_runs_job_and_records_history() {
     let runs = cron::list_runs(&cfg, &job.id, 10).unwrap();
     if let Some(run) = runs.first() {
         assert_eq!(run.status, if result.is_error { "error" } else { "ok" });
-        assert_eq!(
-            run.delivery_status,
-            Some(cron::DeliveryStatus::NotRequested)
-        );
+        assert_eq!(run.delivery_status, None);
     }
 }
 
@@ -141,10 +138,7 @@ async fn cron_run_tool_pairs_start_and_completion_without_requesting_delivery() 
     .expect("cron_run completion event arrives");
     assert_eq!(pair, vec!["triggered", "completed"]);
     let runs = cron::list_runs(&cfg, &job.id, 10).unwrap();
-    assert_eq!(
-        runs[0].delivery_status,
-        Some(cron::DeliveryStatus::NotRequested)
-    );
+    assert_eq!(runs[0].delivery_status, None);
 }
 
 // ── GHSA-f46p-6vf9-64mm: approval gate must fire for cron_run ────

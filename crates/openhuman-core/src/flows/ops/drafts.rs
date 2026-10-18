@@ -17,6 +17,20 @@ pub fn flows_draft_create(
     Ok(Outcome::single_log(draft, "draft created"))
 }
 
+/// Create a draft from the Copilot bus's portable JSON payload.
+pub(crate) fn flows_draft_create_from_copilot(
+    config: &Config,
+    flow_id: Option<String>,
+    name: String,
+    graph: Value,
+    origin: Value,
+) -> Result<Value, String> {
+    let origin =
+        serde_json::from_value(origin).map_err(|error| format!("bad `origin`: {error}"))?;
+    let draft = flows_draft_create(config, flow_id, name, graph, origin)?.value;
+    serde_json::to_value(draft).map_err(|error| error.to_string())
+}
+
 /// Reads a draft by id (errors if it does not exist).
 pub fn flows_draft_get(
     config: &Config,

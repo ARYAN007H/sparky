@@ -7,7 +7,7 @@ use std::sync::Arc;
 use tinyflows_bus::schedule::types::CronRun;
 use tinyflows_bus::schedule::CronJob;
 
-fn run<T: DeserializeOwned + Send + 'static>(
+fn run<T: Send + DeserializeOwned + 'static>(
     backend: &Arc<dyn StorageBackend>,
     scope: &Scope,
     operation: StoreOperation,

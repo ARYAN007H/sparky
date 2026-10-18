@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use super::*;
 
 /// The schedulers of the live embedded agents, one per agent id.

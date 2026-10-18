@@ -105,10 +105,7 @@ async fn schedule_trigger_runs_trusted_memory_job_child() {
     );
     let (_host, proxy) = agent_only_host(&config).await;
     let attempt: Attempt = proxy
-        .call(
-            callbacks::SCHEDULE_TRIGGER,
-            (&job.command, "run-memory-agent-only"),
-        )
+        .call(callbacks::SCHEDULE_TRIGGER, (&job, "run-memory-agent-only"))
         .await
         .unwrap();
 

@@ -240,18 +240,20 @@ fn extract_workflow_proposal_ignores_non_proposal_tool_results() {
 /// The terminal-state guarantee's core invariant: whatever `build_trail_off_fallback`
 /// returns, it must ALWAYS read as a question — the user is never left with
 /// silence, regardless of what (if anything) the tool history contains.
-#[test]
-fn build_trail_off_fallback_always_yields_a_question() {
-    let fallback = build_trail_off_fallback(&[]);
+#[tokio::test]
+async fn build_trail_off_fallback_always_yields_a_question() {
+    let config = Config::default();
+    let fallback = build_trail_off_fallback(&config, &[]).await.unwrap();
     assert!(
-        text_looks_like_question(&fallback),
+        text_looks_like_question(&config, &fallback).await.unwrap(),
         "fallback with no tool history must still be a question: {fallback}"
     );
     assert!(!fallback.trim().is_empty());
 }
 
-#[test]
-fn build_trail_off_fallback_surfaces_last_dry_run_blocker() {
+#[tokio::test]
+async fn build_trail_off_fallback_surfaces_last_dry_run_blocker() {
+    let config = Config::default();
     let history = vec![
         builder_tool_call("call_1", "dry_run_workflow"),
         builder_tool_result(
@@ -259,9 +261,9 @@ fn build_trail_off_fallback_surfaces_last_dry_run_blocker() {
             r#"{"ok": false, "null_resolutions": [{"node_id": "send", "path": "args.channel"}]}"#,
         ),
     ];
-    let fallback = build_trail_off_fallback(&history);
+    let fallback = build_trail_off_fallback(&config, &history).await.unwrap();
     assert!(
-        text_looks_like_question(&fallback),
+        text_looks_like_question(&config, &fallback).await.unwrap(),
         "blocker fallback must still end in a question: {fallback}"
     );
     assert!(
@@ -270,8 +272,9 @@ fn build_trail_off_fallback_surfaces_last_dry_run_blocker() {
     );
 }
 
-#[test]
-fn build_trail_off_fallback_surfaces_gate_rejection_error_text() {
+#[tokio::test]
+async fn build_trail_off_fallback_surfaces_gate_rejection_error_text() {
+    let config = Config::default();
     let history = vec![
         builder_tool_call("call_1", "propose_workflow"),
         builder_tool_result(
@@ -279,13 +282,14 @@ fn build_trail_off_fallback_surfaces_gate_rejection_error_text() {
             "propose_workflow rejected: tool slug 'slack:not_a_real_action' does not exist",
         ),
     ];
-    let fallback = build_trail_off_fallback(&history);
-    assert!(text_looks_like_question(&fallback));
+    let fallback = build_trail_off_fallback(&config, &history).await.unwrap();
+    assert!(text_looks_like_question(&config, &fallback).await.unwrap());
     assert!(fallback.contains("does not exist"));
 }
 
-#[test]
-fn build_trail_off_fallback_ignores_unrelated_read_tool_output() {
+#[tokio::test]
+async fn build_trail_off_fallback_ignores_unrelated_read_tool_output() {
+    let config = Config::default();
     // A plain-text result from a tool OUTSIDE the builder authoring belt (e.g.
     // a read-only history lookup) must never be misattributed as the blocker
     // — this stays tool-agnostic within the authoring belt, not "any tool".
@@ -293,16 +297,17 @@ fn build_trail_off_fallback_ignores_unrelated_read_tool_output() {
         builder_tool_call("call_1", "get_flow_history"),
         builder_tool_result("call_1", "no prior revisions found"),
     ];
-    let fallback = build_trail_off_fallback(&history);
-    assert!(text_looks_like_question(&fallback));
+    let fallback = build_trail_off_fallback(&config, &history).await.unwrap();
+    assert!(text_looks_like_question(&config, &fallback).await.unwrap());
     assert!(
         !fallback.contains("no prior revisions found"),
         "must not surface an unrelated read-tool's output as the blocker: {fallback}"
     );
 }
 
-#[test]
-fn build_trail_off_fallback_ignores_a_successful_proposal_payload() {
+#[tokio::test]
+async fn build_trail_off_fallback_ignores_a_successful_proposal_payload() {
+    let config = Config::default();
     let history = vec![
         builder_tool_call("call_1", "propose_workflow"),
         builder_tool_result(
@@ -310,13 +315,14 @@ fn build_trail_off_fallback_ignores_a_successful_proposal_payload() {
             r#"{"type": "workflow_proposal", "name": "demo", "graph": {}}"#,
         ),
     ];
-    let fallback = build_trail_off_fallback(&history);
-    assert!(text_looks_like_question(&fallback));
+    let fallback = build_trail_off_fallback(&config, &history).await.unwrap();
+    assert!(text_looks_like_question(&config, &fallback).await.unwrap());
     assert!(!fallback.contains("workflow_proposal"));
 }
 
-#[test]
-fn build_trail_off_fallback_picks_the_most_recent_blocker() {
+#[tokio::test]
+async fn build_trail_off_fallback_picks_the_most_recent_blocker() {
+    let config = Config::default();
     // Two dry-run failures in the history: the fallback should describe the
     // LAST one (the one the agent was still stuck on), not the first.
     let history = vec![
@@ -325,7 +331,7 @@ fn build_trail_off_fallback_picks_the_most_recent_blocker() {
         builder_tool_call("call_2", "dry_run_workflow"),
         builder_tool_result("call_2", r#"{"ok": false, "errors": ["second issue"]}"#),
     ];
-    let fallback = build_trail_off_fallback(&history);
+    let fallback = build_trail_off_fallback(&config, &history).await.unwrap();
     assert!(fallback.contains("second issue"));
     assert!(!fallback.contains("first issue"));
 }
@@ -336,31 +342,35 @@ fn build_trail_off_fallback_picks_the_most_recent_blocker() {
 /// resurfaced as "here's where I got stuck" — that failure is already
 /// resolved. The scan must stop at the most recent authoring-belt result,
 /// not keep walking backward past a success to an older, stale blocker.
-#[test]
-fn build_trail_off_fallback_does_not_resurface_a_resolved_blocker() {
+#[tokio::test]
+async fn build_trail_off_fallback_does_not_resurface_a_resolved_blocker() {
+    let config = Config::default();
     let history = vec![
         builder_tool_call("call_1", "dry_run_workflow"),
         builder_tool_result("call_1", r#"{"ok": false, "errors": ["first issue"]}"#),
         builder_tool_call("call_2", "dry_run_workflow"),
         builder_tool_result("call_2", r#"{"ok": true, "warnings": []}"#),
     ];
-    let fallback = build_trail_off_fallback(&history);
+    let fallback = build_trail_off_fallback(&config, &history).await.unwrap();
     assert!(
         !fallback.contains("first issue"),
         "must not surface an already-resolved blocker: {fallback}"
     );
-    assert!(text_looks_like_question(&fallback));
+    assert!(text_looks_like_question(&config, &fallback).await.unwrap());
 }
 
 /// Change 2 of the #4887 regression fix: when the trail-off backstop fires on
 /// a genuine non-question (a status dump), the model's original words must
 /// still be present in the combined output — the fallback question is added
 /// on top, never a replacement.
-#[test]
-fn combine_trail_off_fallback_preserves_original_text_on_genuine_non_question() {
+#[tokio::test]
+async fn combine_trail_off_fallback_preserves_original_text_on_genuine_non_question() {
+    let config = Config::default();
     let original = "## Done so far\n- Checked connections\n- Verified contracts";
-    let fallback = build_trail_off_fallback(&[]);
-    let combined = combine_trail_off_fallback(&fallback, original);
+    let fallback = build_trail_off_fallback(&config, &[]).await.unwrap();
+    let combined = combine_trail_off_fallback(&config, &fallback, original)
+        .await
+        .unwrap();
     // Assert the exact combined string, not just that both pieces appear
     // somewhere — this pins the documented fallback-first ordering and the
     // `---` divider, which a looser `contains`-based check wouldn't catch a
@@ -369,17 +379,28 @@ fn combine_trail_off_fallback_preserves_original_text_on_genuine_non_question() 
     // The combined text still ends in the model's original (non-question)
     // words, so the "is this a question" invariant applies to the
     // fallback alone, not the full combined string.
-    assert!(text_looks_like_question(&fallback));
+    assert!(text_looks_like_question(&config, &fallback).await.unwrap());
 }
 
 /// Guards against prepending an empty divider when the original text is a
 /// genuine silent turn (empty/whitespace-only) — there is nothing to
 /// preserve, so the combined output should just be the fallback.
-#[test]
-fn combine_trail_off_fallback_returns_fallback_alone_for_genuine_silence() {
-    let fallback = build_trail_off_fallback(&[]);
-    assert_eq!(combine_trail_off_fallback(&fallback, ""), fallback);
-    assert_eq!(combine_trail_off_fallback(&fallback, "   \n\n  "), fallback);
+#[tokio::test]
+async fn combine_trail_off_fallback_returns_fallback_alone_for_genuine_silence() {
+    let config = Config::default();
+    let fallback = build_trail_off_fallback(&config, &[]).await.unwrap();
+    assert_eq!(
+        combine_trail_off_fallback(&config, &fallback, "")
+            .await
+            .unwrap(),
+        fallback
+    );
+    assert_eq!(
+        combine_trail_off_fallback(&config, &fallback, "   \n\n  ")
+            .await
+            .unwrap(),
+        fallback
+    );
 }
 
 #[test]

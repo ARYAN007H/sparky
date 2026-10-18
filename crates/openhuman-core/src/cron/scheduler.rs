@@ -23,7 +23,6 @@ mod dispatcher;
 pub(crate) mod executor;
 mod failure_classification;
 mod live_agents;
-mod manual_run;
 mod origin_context;
 mod origin_delivery;
 pub(crate) mod run_delivery;
@@ -49,32 +48,25 @@ pub use delivery::deliver_job;
 use crate::config::Config;
 use crate::core::bus::BUS;
 use crate::core::events::DomainEvent;
-use crate::cron::bus_host::{self, Binding, HostRegistration, CLAIM_SCOPE};
+use crate::cron::bus_host::{self, Binding, HostRegistration};
 use crate::cron::documents_port::DocScope;
 use crate::modules::tinyflows as module;
 use crate::security::SecurityPolicy;
 use anyhow::{anyhow, Result};
-use manual_run::{LoopSlot, MIN_POLL_SECONDS};
-use std::collections::{HashMap, HashSet};
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, LazyLock, Mutex};
+use std::sync::Arc;
 use tinyflows_bus::schedule::types::CronJob;
-use tinyflows_bus::schedule::{members, Attempt, StartScheduler, StoreBackend, StoreConfig};
+use tinyflows_bus::schedule::{
+    members, ManualDelivery, RunJobReply, StartScheduler, StoreBackend, StoreConfig,
+};
 use tokio::time::{self, Duration};
 
 pub async fn run(ctx: &crate::core::runtime::DispatchCtx, config: Config) -> Result<()> {
-    let Some(_slot) = LoopSlot::acquire() else {
-        tracing::warn!(
-            "[cron:scheduler] a scheduler loop is already running; not starting another"
-        );
-        return Ok(());
-    };
     // Ensure the global event bus is initialized so cron delivery events
     // are not silently dropped. This is a no-op if already initialized.
     crate::core::bus::init().await.expect("bus init");
     crate::platform::health::bus::register_health_subscriber();
 
-    let poll_secs = config.reliability.scheduler_poll_secs.max(MIN_POLL_SECONDS);
+    let poll_secs = config.reliability.scheduler_poll_secs.max(5);
     let mut interval = time::interval(Duration::from_secs(poll_secs));
     let security = Arc::new(SecurityPolicy::from_config(
         &config.autonomy,
@@ -103,8 +95,17 @@ pub async fn run(ctx: &crate::core::runtime::DispatchCtx, config: Config) -> Res
 }
 
 pub use dispatcher::execute_job_now;
+#[cfg(test)]
+pub(crate) use dispatcher::lose_next_ack_reply_after_commit_for_test;
+pub(crate) use dispatcher::run_job_now;
 pub(crate) use dispatcher::{tick_once, JobDispatcher};
 pub use live_agents::run_live_agent_pass;
 pub(crate) use live_agents::LiveAgentSchedulers;
-pub use manual_run::is_running;
-pub(crate) use manual_run::{scheduler_config, try_acquire_run, ALREADY_RUNNING};
+pub(crate) fn scheduler_config(config: &Config) -> serde_json::Value {
+    serde_json::json!({
+        "poll_secs": config.reliability.scheduler_poll_secs,
+        "max_concurrent": config.scheduler.max_concurrent,
+        "retries": config.reliability.scheduler_retries,
+        "backoff_ms": config.reliability.provider_backoff_ms,
+    })
+}

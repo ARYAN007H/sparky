@@ -45,6 +45,8 @@ mod spawn_subagent;
 pub mod spawn_worker_thread;
 #[path = "tools/steer_subagent.rs"]
 mod steer_subagent;
+#[path = "tools/structured_payload.rs"]
+pub(crate) mod structured_payload;
 #[path = "tools/subagent_abort_report.rs"]
 mod subagent_abort_report;
 #[cfg(test)]

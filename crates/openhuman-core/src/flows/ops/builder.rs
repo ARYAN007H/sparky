@@ -6,9 +6,8 @@ use crate::core::runtime::DispatchCtx;
 /// Scout `flows_discover`) rather than routing a hand-crafted delegate prompt
 /// through the chat orchestrator.
 ///
-/// The turn's natural-language brief is rendered **server-side** from the
-/// structured [`BuilderRequest`](crate::flows::agents::workflow_builder::builder_prompt::BuilderRequest)
-/// (create / revise / repair / build). The agent ends by calling
+/// The turn's natural-language brief is rendered by the TinyFlows module from
+/// its bus request (create / revise / repair / build). The agent ends by calling
 /// `propose_workflow` / `revise_workflow` / `save_workflow`; we capture the
 /// resulting `{ type: "workflow_proposal", … }` payload from the run's tool
 /// history and return it alongside the agent's final assistant text.
@@ -19,7 +18,7 @@ use crate::core::runtime::DispatchCtx;
 pub async fn flows_build(
     ctx: &DispatchCtx,
     config: &Config,
-    req: crate::flows::agents::workflow_builder::builder_prompt::BuilderRequest,
+    req: tinyflows_bus::copilot::BuilderPromptRequest,
     stream: Option<FlowStreamTarget>,
 ) -> Result<Outcome<Value>, String> {
     flows_build_with_extra_hidden_tools(ctx, config, req, stream, &[]).await
@@ -34,23 +33,23 @@ pub async fn flows_build(
 pub(crate) async fn flows_build_with_extra_hidden_tools(
     ctx: &DispatchCtx,
     config: &Config,
-    req: crate::flows::agents::workflow_builder::builder_prompt::BuilderRequest,
+    req: tinyflows_bus::copilot::BuilderPromptRequest,
     stream: Option<FlowStreamTarget>,
     extra_hidden_tools: &[&str],
 ) -> Result<Outcome<Value>, String> {
     use crate::agent::OpenHumanSessionHost;
-    use crate::flows::agents::workflow_builder::builder_prompt::render_prompt;
-
-    // Reject invalid turns (e.g. a `build` with no `flow_id`) before we render a
-    // brief that would tell the agent to save onto nothing.
-    req.validate()?;
-
-    let prompt = render_prompt(&req);
-    if matches!(
-        req.mode,
-        crate::flows::agents::workflow_builder::builder_prompt::BuildMode::Repair
-    ) {
-        if let Some(assistant_text) = req.error.as_deref().and_then(backend_repair_message) {
+    let prompt = crate::flows::copilot_bus::call::<tinyflows_bus::copilot::TextResponse, _>(
+        config,
+        "RenderBuilderPrompt",
+        (req.clone(),),
+    )
+    .await?
+    .text;
+    if req.mode == "repair" {
+        if let Some(assistant_text) = match req.error.as_deref() {
+            Some(error) => backend_repair_message(config, error).await?,
+            None => None,
+        } {
             if let Some(target) = &stream {
                 finalize_flow_stream(ctx, target, &Ok(assistant_text.clone()), &prompt, config)
                     .await;
@@ -371,10 +370,10 @@ pub(crate) async fn flows_build_with_extra_hidden_tools(
     // that makes it a hard invariant regardless of model behavior — the user
     // is NEVER left with silence or an unanswerable status note.
     let trail_off = !capped && proposal.is_none() && run_error.is_none();
-    let assistant_text = if trail_off && !text_looks_like_question(&assistant_text) {
+    let assistant_text = if trail_off && !text_looks_like_question(config, &assistant_text).await? {
         let runtime_history = agent.history();
-        let fallback = build_trail_off_fallback(&runtime_history);
-        let combined = combine_trail_off_fallback(&fallback, &assistant_text);
+        let fallback = build_trail_off_fallback(config, &runtime_history).await?;
+        let combined = combine_trail_off_fallback(config, &fallback, &assistant_text).await?;
         tracing::warn!(
             target: "flows",
             flow_id = req.flow_id.as_deref().unwrap_or("<none>"),
@@ -468,19 +467,16 @@ pub(super) fn extract_workflow_proposal(
     history: &[tinytools_agent::dialect::TranscriptEntry],
 ) -> Option<Value> {
     use tinytools_agent::dialect::TranscriptEntry;
-    let mut latest = None;
-    for message in history {
-        if let TranscriptEntry::ToolResults(results) = message {
-            for result in results {
-                if let Ok(value) = serde_json::from_str::<Value>(&result.content) {
-                    if value.get("type").and_then(Value::as_str) == Some("workflow_proposal") {
-                        latest = Some(value);
-                    }
-                }
-            }
-        }
-    }
-    latest
+    crate::agent::orchestration::tools::structured_payload::extract_last_typed_payload(
+        history.iter().flat_map(|message| match message {
+            TranscriptEntry::ToolResults(results) => results
+                .iter()
+                .map(|result| result.content.as_str())
+                .collect::<Vec<_>>(),
+            _ => Vec::new(),
+        }),
+        "workflow_proposal",
+    )
 }
 
 /// Keep the builder's first turn from auto-resuming another flow's session.
@@ -497,33 +493,4 @@ pub(crate) fn start_builder_turn_clean(agent: &mut crate::agent::OpenHumanSessio
         suppress_transcript_autoload: true,
         ..Default::default()
     });
-}
-
-pub(super) fn is_backend_or_infrastructure_failure(error: &str) -> bool {
-    let error = error.to_ascii_lowercase();
-    [
-        "backend returned 5",
-        "internal server error",
-        "service unavailable",
-        "bad gateway",
-        "gateway timeout",
-        "connection refused",
-        "connection reset",
-        "connection timed out",
-        "transport error while calling",
-        "bucket does not exist",
-        "http 5",
-        "status 5",
-        "5xx",
-    ]
-    .iter()
-    .any(|marker| error.contains(marker))
-}
-
-pub(super) fn backend_repair_message(error: &str) -> Option<String> {
-    is_backend_or_infrastructure_failure(error).then(|| {
-        format!(
-            "The workflow was not changed because this run failed in an external service.\n\n{error}"
-        )
-    })
 }

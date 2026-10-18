@@ -13,23 +13,7 @@ pub(crate) fn force_next_run_for_test(
     job_id: &str,
     at: DateTime<Utc>,
 ) -> Result<()> {
-    use tinystoragedrivers::Precondition;
-    let opened = crate::storage::local::open("cron::store", &config.workspace_dir)?;
-    let docs = std::sync::Arc::clone(opened.scoped()?.documents());
-    let job_id = job_id.to_string();
-    crate::storage::block_on_anyhow(async move {
-        let stored = docs
-            .get("cron_jobs", &job_id)
-            .await?
-            .ok_or_else(|| anyhow::anyhow!("no job {job_id}"))?;
-        let mut doc = stored.doc;
-        doc["next_run"] = serde_json::json!(at.to_rfc3339());
-        doc["next_run_ms"] = serde_json::json!(at.timestamp_millis());
-        doc["next_run_ns"] = serde_json::json!(at.timestamp_nanos_opt().unwrap_or(i64::MAX));
-        docs.put("cron_jobs", &job_id, doc, Precondition::None)
-            .await?;
-        Ok(())
-    })
+    super::force_next_run_for_test(config, job_id, at)
 }
 
 fn test_config(tmp: &TempDir) -> Config {

@@ -30,6 +30,7 @@ pub(crate) mod builder_tools;
 mod builder_tools_connection_reads;
 pub mod bus;
 pub mod catalogue;
+mod copilot_bus;
 mod draft_store;
 pub mod memory_tools;
 pub mod node_contracts;
@@ -43,7 +44,6 @@ pub mod skills;
 mod store;
 /// The tinyflows engine seam (formerly `crate::tinyflows`).
 pub mod tinyflows;
-pub mod tools;
 
 // Portable catalog vocabulary is imported directly from `tinyflows-catalog`.
 

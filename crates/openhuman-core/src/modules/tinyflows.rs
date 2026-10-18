@@ -2,7 +2,7 @@
 //!
 //! The module owns the scheduler runtime (poll loop, claims, retry, completion),
 //! the cron job and run store, and the schedule maths behind
-//! `tinyflows_bus::schedule` (contract v3). This host file is the whole
+//! `tinyflows_bus::schedule` (contract v6). This host file is the whole
 //! transport story for it:
 //!
 //! - [`proxy`] loads the module lazily and returns a proxy for its `Schedule`
@@ -32,6 +32,15 @@ pub(crate) const MODULE_ID: &str = "tinyflows";
 /// name serves them all, and the object path names the scope.
 pub(crate) const HOST_BUS_NAME: &str = "ai.tinyhumans.openhuman.CronHost";
 
+/// Owns the interfaces served at one module-bus object path.
+pub(crate) struct ServedObjectRegistration(String);
+
+impl Drop for ServedObjectRegistration {
+    fn drop(&mut self) {
+        unserve(std::mem::take(&mut self.0));
+    }
+}
+
 /// The switched-off message callers surface verbatim.
 pub(crate) fn disabled_message() -> String {
     format!(
@@ -42,7 +51,9 @@ pub(crate) fn disabled_message() -> String {
 
 #[cfg(feature = "modules")]
 mod imp {
-    use super::{disabled_message, HOST_BUS_NAME, MODULE_ID};
+    #[cfg(not(test))]
+    use super::MODULE_ID;
+    use super::{disabled_message, ServedObjectRegistration, HOST_BUS_NAME};
     use crate::config::Config;
     #[cfg(not(test))]
     use crate::modules::ops;
@@ -96,6 +107,38 @@ mod imp {
             .map_err(|error| format!("the tinyflows schedule object is unreachable: {error}"))
     }
 
+    async fn copilot_interface_proxy(config: &Config) -> Result<Proxy, String> {
+        ensure(config).await?;
+        let runtime = runtime::runtime()
+            .await
+            .map_err(|error| format!("the module bus is unavailable: {error}"))?;
+        runtime
+            .connection()
+            .proxy(
+                tinyflows_bus::BUS_NAME,
+                tinyflows_bus::OBJECT_PATH,
+                tinyflows_bus::copilot::INTERFACE,
+            )
+            .map(|proxy| proxy.with_timeout(CALL_TIMEOUT))
+            .map_err(|error| format!("the tinyflows copilot object is unreachable: {error}"))
+    }
+
+    async fn copilot_invoke_interface_proxy(config: &Config) -> Result<Proxy, String> {
+        ensure(config).await?;
+        let runtime = runtime::runtime()
+            .await
+            .map_err(|error| format!("the module bus is unavailable: {error}"))?;
+        runtime
+            .connection()
+            .proxy(
+                tinyflows_bus::BUS_NAME,
+                tinyflows_bus::OBJECT_PATH,
+                tinyflows_bus::copilot::INTERFACE,
+            )
+            .map(|proxy| proxy.with_timeout(RUN_TIMEOUT))
+            .map_err(|error| format!("the tinyflows copilot object is unreachable: {error}"))
+    }
+
     /// A proxy for the module's `Schedule` object (store, maths and
     /// validation members, which answer quickly).
     pub(crate) async fn proxy(config: &Config) -> Result<Proxy, String> {
@@ -105,6 +148,16 @@ mod imp {
     /// A proxy whose deadline fits a call that runs a whole job (`ExecuteJob`).
     pub(crate) async fn run_proxy(config: &Config) -> Result<Proxy, String> {
         schedule_proxy(config, RUN_TIMEOUT).await
+    }
+
+    /// A proxy for the module's Copilot tool, prompt and fallback services.
+    pub(crate) async fn copilot_proxy(config: &Config) -> Result<Proxy, String> {
+        copilot_interface_proxy(config).await
+    }
+
+    /// A long-deadline Copilot proxy for module-owned tool execution.
+    pub(crate) async fn copilot_invoke_proxy(config: &Config) -> Result<Proxy, String> {
+        copilot_invoke_interface_proxy(config).await
     }
 
     /// Serve `object` at `path` on the module bus, on the module runtime, and
@@ -133,6 +186,53 @@ mod imp {
             .await
             .map_err(|error| format!("serving the host object did not finish: {error}"))?;
         served
+    }
+
+    /// Serve two interfaces at one object path and return an RAII token for
+    /// their shared registration. The token is created on the module runtime
+    /// task, so if the caller is cancelled while this operation is in flight,
+    /// the detached task's output drops the token and unregisters the object.
+    pub(crate) async fn serve_pair(
+        path: String,
+        first: impl tinybus::service::Interface + 'static,
+        second: impl tinybus::service::Interface + 'static,
+    ) -> Result<ServedObjectRegistration, String> {
+        serve_pair_after_first(path, first, second, async {}).await
+    }
+
+    pub(crate) async fn serve_pair_after_first<F>(
+        path: String,
+        first: impl tinybus::service::Interface + 'static,
+        second: impl tinybus::service::Interface + 'static,
+        after_first: F,
+    ) -> Result<ServedObjectRegistration, String>
+    where
+        F: std::future::Future<Output = ()> + Send + 'static,
+    {
+        let runtime = runtime::runtime()
+            .await
+            .map_err(|error| format!("the module bus is unavailable: {error}"))?;
+        let connection = runtime.connection().clone();
+        runtime
+            .spawn(async move {
+                let object_path = ObjectPath::new(&path).map_err(|error| error.to_string())?;
+                connection
+                    .request_name(HOST_BUS_NAME)
+                    .await
+                    .map_err(|error| error.to_string())?;
+                connection
+                    .serve_at(object_path.clone(), first)
+                    .await
+                    .map_err(|error| error.to_string())?;
+                after_first.await;
+                if let Err(error) = connection.serve_at(object_path.clone(), second).await {
+                    let _ = connection.unserve(&object_path).await;
+                    return Err(error.to_string());
+                }
+                Ok(ServedObjectRegistration(path))
+            })
+            .await
+            .map_err(|error| format!("serving the host object did not finish: {error}"))?
     }
 
     /// Stop serving `path`. Fire and forget: a call already admitted finishes.
@@ -166,12 +266,16 @@ mod imp {
 #[path = "tinyflows_fixture.rs"]
 mod fixture;
 
+#[cfg(all(test, feature = "modules"))]
+pub(crate) use imp::serve_pair_after_first;
 #[cfg(feature = "modules")]
-pub(crate) use imp::{proxy, run_proxy, serve, unserve};
+pub(crate) use imp::{
+    copilot_invoke_proxy, copilot_proxy, proxy, run_proxy, serve, serve_pair, unserve,
+};
 
 #[cfg(not(feature = "modules"))]
 mod imp {
-    use super::disabled_message;
+    use super::{disabled_message, ServedObjectRegistration};
     use crate::config::Config;
 
     fn unavailable(config: &Config) -> String {
@@ -191,6 +295,14 @@ mod imp {
         Err(unavailable(config))
     }
 
+    pub(crate) async fn copilot_proxy(config: &Config) -> Result<tinybus::Proxy, String> {
+        Err(unavailable(config))
+    }
+
+    pub(crate) async fn copilot_invoke_proxy(config: &Config) -> Result<tinybus::Proxy, String> {
+        Err(unavailable(config))
+    }
+
     pub(crate) async fn serve(
         _path: String,
         _object: impl tinybus::service::Interface + 'static,
@@ -198,11 +310,21 @@ mod imp {
         Err("scheduled jobs are unavailable: this build has no module loader".to_string())
     }
 
+    pub(crate) async fn serve_pair(
+        _path: String,
+        _first: impl tinybus::service::Interface + 'static,
+        _second: impl tinybus::service::Interface + 'static,
+    ) -> Result<ServedObjectRegistration, String> {
+        Err("scheduled jobs are unavailable: this build has no module loader".to_string())
+    }
+
     pub(crate) fn unserve(_path: String) {}
 }
 
 #[cfg(not(feature = "modules"))]
-pub(crate) use imp::{proxy, run_proxy, serve, unserve};
+pub(crate) use imp::{
+    copilot_invoke_proxy, copilot_proxy, proxy, run_proxy, serve, serve_pair, unserve,
+};
 
 /// Whether the module can serve in this build and configuration (the switch
 /// is on and the loader exists). Does not load anything.

@@ -63,6 +63,15 @@ pub(crate) fn config_aware_engine_compatibility_errors(
     referenced_workflow_compatibility_errors(config, graph)
 }
 
+/// Config-aware compatibility check for a portable Copilot graph payload.
+pub(crate) fn engine_compatibility_errors_json(
+    config: &Config,
+    graph: Value,
+) -> Result<Vec<String>, String> {
+    let graph = tinyflows::migrate::deserialize_graph(graph)?;
+    Ok(config_aware_engine_compatibility_errors(config, &graph))
+}
+
 /// Validates a candidate graph without persisting it — the same
 /// migrate/validate path `flows_create` and `ProposeWorkflowTool` use — and
 /// reports structural errors alongside non-fatal trigger warnings
@@ -206,7 +215,7 @@ pub fn flows_import(
         other => {
             return Err(format!(
                 "unknown import format '{other}' (expected 'native' or 'n8n')"
-            ))
+            ));
         }
     };
     tracing::debug!(
