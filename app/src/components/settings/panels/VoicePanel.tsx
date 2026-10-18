@@ -4,7 +4,6 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { cn } from '../../../lib/cn';
 import { useT } from '../../../lib/i18n/I18nContext';
-import PttSettingsPanel from '../../../pages/settings/voice/PttSettingsPanel';
 import {
   clearVoiceProviderKey,
   loadVoiceSettings,
@@ -508,14 +507,6 @@ const VoicePanel = ({ embedded = false, scrollable = true }: VoicePanelProps = {
           isSavingRouting={isSavingRouting}
           saveRouting={saveRouting}
         />
-
-        {/* ─── Section 3: Push-to-talk ─────────────────────────────────
-            Global PTT hotkey + session preferences. The panel is
-            self-contained — it only mutates the `ptt` slice, and
-            `usePttHotkey` (T11) reacts to slice changes to (re)register
-            the binding with the Tauri shell. Mounted here so users hunt
-            for it under Voice settings alongside dictation. */}
-        <PttSettingsPanel />
 
         {/* Mascot voice picker now lives in Mascot settings. Link
             kept here so users hunting in Voice settings can find it. */}
