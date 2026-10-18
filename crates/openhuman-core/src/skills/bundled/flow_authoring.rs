@@ -79,11 +79,7 @@ fn schedule_prewarm_operation(
         return false;
     }
     let state = crate::modules::ops::state_of(crate::modules::tinyflows::MODULE_ID);
-    if state == crate::modules::types::ModuleState::Failed
-        || crate::modules::runtime::is_module_terminally_unavailable(
-            crate::modules::tinyflows::MODULE_ID,
-        )
-    {
+    if state == crate::modules::types::ModuleState::Failed {
         return false;
     }
 

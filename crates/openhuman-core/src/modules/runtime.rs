@@ -134,38 +134,6 @@ pub fn is_module_serving(id: &str) -> bool {
     })
 }
 
-/// Whether an already-started module host has recorded a terminal state for
-/// this registry module. An absent or initializing module is transient: an
-/// optional background prewarm may still start or wait for it.
-#[must_use]
-pub fn is_module_terminally_unavailable(id: &str) -> bool {
-    let Some(record) = crate::modules::registry::find(id) else {
-        return true;
-    };
-    let Some(Ok(runtime)) = RUNTIME.get() else {
-        return false;
-    };
-    runtime
-        .host()
-        .list()
-        .into_iter()
-        .find(|module| {
-            module.manifest.bus_name.as_str() == record.bus_name
-                && module.manifest.object_path.as_str() == record.object_path
-        })
-        .is_some_and(|module| {
-            matches!(
-                module.state,
-                tinybus::module::ModuleState::Rejected { .. }
-                    | tinybus::module::ModuleState::Unresolved { .. }
-                    | tinybus::module::ModuleState::Faulted { .. }
-                    | tinybus::module::ModuleState::Failed { .. }
-                    | tinybus::module::ModuleState::Stopped
-                    | tinybus::module::ModuleState::Disabled
-            )
-        })
-}
-
 #[cfg(test)]
 #[path = "runtime_tests.rs"]
 mod tests;
