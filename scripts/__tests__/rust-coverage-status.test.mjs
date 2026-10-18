@@ -420,3 +420,48 @@ test("coverage inventory exceptions match the source gates and remain required a
     /target_features_satisfied "\$\{target\}" && target_expected_in_coverage "\$\{target\}"/,
   );
 });
+
+test("nextest product suites share one Cargo argument set and differ only in their filter", () => {
+  const source = fs.readFileSync(runner, "utf8");
+  const nextestOnly = (name) => {
+    const pattern = new RegExp(
+      `suite "${name}" llvm_cov \\\\\\n?\\s*--no-report --no-fail-fast \\\\\\n?\\s*"\\$\\{UNIFIED_PRODUCT_ARGS\\[@\\]\\}" -E "\\$\\{(FILTER_[A-Z_]+)\\}"`,
+    );
+    const match = source.match(pattern);
+    assert.ok(match, `${name} must use the unified product arguments`);
+    return match[1];
+  };
+  const filters = [
+    nextestOnly("openhuman lib\\+bins \\(nextest\\)"),
+    nextestOnly("openhuman-embed"),
+    nextestOnly("openhuman-tinyhumans"),
+    nextestOnly("openhuman-cli integration tests \\(nextest\\)"),
+  ];
+  assert.equal(new Set(filters).size, 4, "every suite selects its own tests");
+  // The cli inventory is listed with the same arguments so it reuses the build.
+  assert.match(
+    source,
+    /cargo nextest list .*\n\s*"\$\{UNIFIED_PRODUCT_ARGS\[@\]\}" -E "\$\{FILTER_CLI_TESTS\}"/,
+  );
+  // One package set, whose cargo resolution unifies the core's features once.
+  const args = source.match(/^UNIFIED_PRODUCT_ARGS=\((.*)\)$/m)[1];
+  assert.equal(
+    args,
+    "-p openhuman -p openhuman-embed -p openhuman-tinyhumans -p openhuman-cli --all-targets",
+  );
+  // Exact package matches: `package(openhuman)` alone would be a glob of the name.
+  for (const value of [
+    "FILTER_CORE='package(=openhuman)'",
+    "FILTER_EMBED='package(=openhuman-embed)'",
+    "FILTER_TINYHUMANS='package(=openhuman-tinyhumans)'",
+    "FILTER_CLI_TESTS='package(=openhuman-cli) & kind(test)'",
+  ])
+    assert.ok(source.includes(value), value);
+  // The old per-package nextest selections are gone; rpc, tui and the default
+  // feature suites keep their own resolutions.
+  assert.doesNotMatch(source, /-p openhuman-cli --tests/);
+  assert.doesNotMatch(source, /-p openhuman --lib --bins\n\s*else/);
+  assert.match(source, /suite "openhuman-rpc" llvm_cov_package .*-p openhuman-rpc --all-targets/);
+  assert.match(source, /suite "openhuman-tui" llvm_cov_package .*-p openhuman-tui --all-targets/);
+  assert.match(source, /suite "openhuman-embed \(default\)" llvm_cov_package .*-p openhuman-embed --all-targets/);
+});
