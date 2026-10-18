@@ -19,7 +19,7 @@ use tokio::sync::broadcast;
 use super::RelayMessage;
 use super::{
     ConversationMessageRecord, ConversationThreadSummary, Inner, ProfileError, ProfileId,
-    WebChannelEvent,
+    ScopedWebEvent,
 };
 use crate::call::call_in;
 use crate::error::CoreError;
@@ -91,13 +91,13 @@ pub struct RelayAccepted {
 /// filter the gateway's `/events` stream applies.
 pub struct ProfileEvents {
     profile: String,
-    rx: broadcast::Receiver<WebChannelEvent>,
+    rx: broadcast::Receiver<ScopedWebEvent>,
 }
 
 impl ProfileEvents {
     /// The next event of this profile, or `None` once the bus is gone.
     /// Events the receiver fell too far behind on are skipped.
-    pub async fn recv(&mut self) -> Option<WebChannelEvent> {
+    pub async fn recv(&mut self) -> Option<ScopedWebEvent> {
         loop {
             match self.rx.recv().await {
                 Ok(event) if event.belongs_to_profile(&self.profile) => return Some(event),

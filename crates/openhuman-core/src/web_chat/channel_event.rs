@@ -57,6 +57,11 @@ impl ScopedWebEvent {
         self.event.context()
     }
 
+    /// The canonical owner event carried by this host-routing envelope.
+    pub fn wire_event(&self) -> &WebChannelEvent {
+        &self.event
+    }
+
     /// Historical Socket.IO discriminator for this canonical event.
     pub fn event_name(&self) -> String {
         serde_json::to_value(&self.event)
