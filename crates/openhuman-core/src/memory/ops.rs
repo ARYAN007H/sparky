@@ -437,7 +437,7 @@ pub async fn erase_all(
     tracing::info!(engine = %bound.id, "[memory:ops] erase_all: erasing the whole memory");
     let report = bound.engine.erase(request).await.map_err(|error| {
         tracing::warn!(engine = %bound.id, error = %error, "[memory:ops] erase_all failed");
-        Error::from(error)
+        error
     })?;
     tracing::info!(
         engine = %bound.id,
