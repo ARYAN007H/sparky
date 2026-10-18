@@ -4,7 +4,7 @@ use chrono::Utc;
 use tinymemory_api::{LearningKind, MemoryEngine, MemoryMeta, StoreItem};
 
 use crate::memory::lifecycle::hooks::pre_turn_work;
-use crate::memory::scope::MemoryIdentity;
+use tinymemory_tools::layout::identity::Identity;
 use crate::memory::test_fixtures::{bind_reference, config_in};
 
 #[test]
@@ -121,7 +121,7 @@ async fn the_preview_reads_without_logging_and_agents_are_listed() {
         ))
         .await
         .unwrap();
-    let writer = scope::MemoryIdentity::agent("writer").resolve(&config);
+    let writer = tinymemory_tools::layout::identity::Identity::agent("writer").resolve(&crate::memory::scope::identity_pins(&config));
     pre_turn_work(
         &crate::core::runtime::DispatchCtx::ambient(),
         &config,
@@ -138,7 +138,7 @@ async fn the_preview_reads_without_logging_and_agents_are_listed() {
 
     let turn = pack_preview(
         &config,
-        &MemoryIdentity::root(),
+        &tinymemory_tools::layout::identity::Identity::root(),
         PackPreviewParams {
             query: Some("when do invoices go out?".into()),
             agent_id: Some("writer".into()),
@@ -153,14 +153,14 @@ async fn the_preview_reads_without_logging_and_agents_are_listed() {
 
     let session = pack_preview(
         &config,
-        &MemoryIdentity::root(),
+        &tinymemory_tools::layout::identity::Identity::root(),
         PackPreviewParams::default(),
     )
     .await
     .unwrap();
     assert_eq!(session.mode, "session");
 
-    let agents = agents_list(&config, &MemoryIdentity::root()).await.unwrap();
+    let agents = agents_list(&config, &tinymemory_tools::layout::identity::Identity::root()).await.unwrap();
     assert_eq!(
         agents.agents,
         [AgentCount {

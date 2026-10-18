@@ -38,7 +38,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::config::Config;
 use crate::memory::engine::{self, BoundEngine};
-use crate::memory::scope::{MemoryIdentity, ResolvedIdentity};
+use tinymemory_tools::layout::identity::{Identity, ResolvedIdentity};
 use crate::threads::store::blocking as threads;
 use tinymemory_api::{Error, Result};
 use tinymemory_integrations::import::ImportPhase;
@@ -254,7 +254,7 @@ pub async fn start(
         turns = pending_turns,
         "[memory:backfill] started"
     );
-    let identity = MemoryIdentity::agent(MAIN_AGENT).resolve(config);
+    let identity = tinymemory_tools::layout::identity::Identity::agent(MAIN_AGENT).resolve(&crate::memory::scope::identity_pins(config));
     tokio::spawn(async move {
         run(&workspace_dir, &bound, &identity, file, plans).await;
         release(&workspace_dir);
