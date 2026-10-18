@@ -97,13 +97,7 @@ function bootRender() {
   installAutoHideScrollbars();
 
   const root = ReactDOM.createRoot(document.getElementById('root') as HTMLElement);
-  const tree = isMascotWindow ? (
-    <MascotWindowApp />
-  ) : isNotchWindow ? (
-    <NotchApp />
-  ) : (
-    <App />
-  );
+  const tree = isMascotWindow ? <MascotWindowApp /> : isNotchWindow ? <NotchApp /> : <App />;
   root.render(<React.StrictMode>{tree}</React.StrictMode>);
 }
 

@@ -237,7 +237,6 @@ const AppRoutes = ({ location }: AppRoutesProps = {}) => {
         }
       />
 
-
       {/* Dev-only harnesses. Registered behind `IS_DEV` so their component
           trees are dead code in a production build and drop out of the bundle
           entirely — `import.meta.env.DEV` is substituted at build time, so
