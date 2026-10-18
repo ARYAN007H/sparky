@@ -94,7 +94,7 @@ impl DocumentConfigSource {
     }
 
     /// The decrypted stored body, or `None` when the scope has no document.
-    async fn stored_body(&self) -> Result<Option<zeroize::Zeroizing<String>>> {
+    async fn stored_body(&self) -> Result<Option<(zeroize::Zeroizing<String>, tinystoragedrivers::Version)>> {
         self.docs
             .ensure_collection(&CollectionSpec::new(CONFIG_COLLECTION))
             .await
@@ -121,7 +121,7 @@ impl DocumentConfigSource {
             .map_err(|error| anyhow!("the config document does not decrypt: {error}"))?;
         let body = String::from_utf8(plain.to_vec())
             .map_err(|_| anyhow!("the config document is not UTF-8"))?;
-        Ok(Some(zeroize::Zeroizing::new(body)))
+        Ok(Some((zeroize::Zeroizing::new(body), versioned.version)))
     }
 }
 
@@ -154,7 +154,7 @@ impl ConfigSource for DocumentConfigSource {
     }
 
     async fn read(&self) -> Result<ConfigRead> {
-        let Some(body) = self.stored_body().await? else {
+        let Some((body, document_version)) = self.stored_body().await? else {
             tracing::debug!(scope = %self.scope.as_str(), "[config] no config document; reading the file");
             return self.file.read().await;
         };
@@ -177,10 +177,12 @@ impl ConfigSource for DocumentConfigSource {
             contents,
             recovered: false,
             from_document: true,
+            document_version: Some(document_version),
+            document_version: Some(document_version),
         })
     }
 
-    async fn write(&self, toml: &str) -> Result<()> {
+    async fn write(&self, toml: &str, expected: Option<tinystoragedrivers::Version>) -> Result<Option<tinystoragedrivers::Version>> {
         let body = zeroize::Zeroizing::new(
             strip_bootstrap(toml).context("strip bootstrap tables from the config")?,
         );
@@ -192,14 +194,8 @@ impl ConfigSource for DocumentConfigSource {
             .await
             .context("declare the config collection")?;
         let id = document_id(self.scope.as_str())?;
-        let current = self.docs
-            .get(CONFIG_COLLECTION, &id)
-            .await
-            .context("read the config document before writing")?;
-        let precondition = current
-            .as_ref()
-            .map_or(Precondition::Absent, |stored| stored.unchanged());
-        self.docs
+        let precondition = expected.map_or(Precondition::Absent, Precondition::Version);
+        let version = self.docs
             .put(
                 CONFIG_COLLECTION,
                 &id,
@@ -209,6 +205,6 @@ impl ConfigSource for DocumentConfigSource {
             .await
             .context("write the config document")?;
         tracing::debug!(scope = %self.scope.as_str(), "[config] wrote the config document");
-        Ok(())
+        Ok(Some(version))
     }
 }

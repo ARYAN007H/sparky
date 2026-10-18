@@ -54,6 +54,10 @@ pub struct CustomEmbeddingsConfig {
 /// `Clone` is implemented by hand in `config_clone.rs` so it is emitted once.
 #[derive(Debug, Serialize, Deserialize, JsonSchema)]
 pub struct Config {
+    /// Revision of the shared config document this snapshot was loaded from.
+    #[serde(skip)]
+    #[schemars(skip)]
+    pub(crate) document_version: std::sync::Mutex<Option<tinystoragedrivers::Version>>,
     /// Immutable operator provider binding, absent from the user wire format.
     #[serde(skip)]
     #[schemars(skip)]

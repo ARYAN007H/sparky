@@ -12,6 +12,7 @@ impl Clone for Config {
     #[inline(never)]
     fn clone(&self) -> Self {
         Self {
+            document_version: std::sync::Mutex::new(*self.document_version.lock().unwrap()),
             profile_providers: self.profile_providers.clone(),
             workspace_dir: self.workspace_dir.clone(),
             action_dir: self.action_dir.clone(),
