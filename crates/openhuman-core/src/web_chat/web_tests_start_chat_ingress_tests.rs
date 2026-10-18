@@ -152,8 +152,13 @@ async fn start_chat_emits_sanitized_chat_error_on_inference_failure() {
     // by the dedicated `network` arm (was the generic catch-all). The key property
     // this test guards — raw transport details must never leak into the
     // user-facing copy — still holds for the new arm.
-    assert_eq!(recv.error_type.as_deref(), Some("network"));
-    let message = recv.message.unwrap_or_default();
+    let crate::web_chat::WebChannelEvent::ChatError {
+        error_type: Some(error_type), message, ..
+    } = recv.wire_event() else {
+        panic!("expected classified chat error: {recv:?}");
+    };
+    assert_eq!(error_type, "network");
+    let message = message.as_deref().unwrap_or_default();
     assert!(
         !message.contains("error sending request for url")
             && !message.contains("internal-api.example.invalid"),

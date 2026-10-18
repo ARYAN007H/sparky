@@ -308,27 +308,11 @@ async fn start_chat_emits_structured_rate_limit_metadata_on_chat_error_event() {
     .await
     .expect("expected chat_error event for started chat request");
 
-    assert_eq!(
-        recv.error_type.as_deref(),
-        Some("rate_limited"),
-        "error_type token unchanged for backward compat"
-    );
-    assert_eq!(
-        recv.error_source.as_deref(),
-        Some("provider"),
-        "upstream 429 must classify as provider source on the wire: {recv:?}"
-    );
-    assert_eq!(
-        recv.error_retryable,
-        Some(true),
-        "transient upstream 429 must be retryable on the wire: {recv:?}"
-    );
-    assert_eq!(
-        recv.error_retry_after_ms,
-        Some(30_000),
-        "30s Retry-After must surface as 30000ms on the wire (FE countdown): \
-         {recv:?}"
-    );
+    assert!(matches!(recv.wire_event(), crate::web_chat::WebChannelEvent::ChatError {
+        error_type: Some(error_type), error_source: Some(source),
+        error_retryable: Some(true), error_retry_after_ms: Some(30_000), ..
+    } if error_type == "rate_limited" && source == "provider"),
+    "upstream 429 wire classification and countdown changed: {recv:?}");
     assert_eq!(
         recv.error_provider.as_deref(),
         Some("openrouter"),
