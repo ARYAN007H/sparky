@@ -192,8 +192,13 @@ test("private validation and cache save have measured budgets without suppressin
 
 test("private LLVM preflight rejects missing tools before publishing environment", () => {
   const source = readFileSync(helper, "utf8");
-  const definition = source.match(/^verify_llvm_tools\(\) \{\n[\s\S]*?^\}/m)?.[0];
-  assert.ok(definition, "LLVM preflight must validate the pinned toolchain tools");
+  const definition = source.match(
+    /^verify_llvm_tools\(\) \{\n[\s\S]*?^\}/m,
+  )?.[0];
+  assert.ok(
+    definition,
+    "LLVM preflight must validate the pinned toolchain tools",
+  );
   const dir = mkdtempSync(join(tmpdir(), "guest LLVM tools "));
   try {
     const libdir = join(dir, "pinned toolchain", "lib");
@@ -231,7 +236,10 @@ printf "%s\\n" "$FIXTURE_LIBDIR"
       writeFileSync(log, "");
       const result = spawnSync(
         "bash",
-        ["-c", `set -euo pipefail\n${definition}\nverify_llvm_tools pinned-fixture`],
+        [
+          "-c",
+          `set -euo pipefail\n${definition}\nverify_llvm_tools pinned-fixture`,
+        ],
         {
           encoding: "utf8",
           env: {
