@@ -689,3 +689,63 @@ fn verbatim_builder_renders_the_body_and_nothing_else() {
         .unwrap();
     assert_eq!(rendered.trim_end(), "Review the diff.");
 }
+
+#[test]
+fn composed_prompt_keeps_context_and_volatile_system_message_boundaries() {
+    fn dynamic_prompt(_ctx: &PromptContext<'_>) -> anyhow::Result<String> {
+        Ok(format!(
+            "## Grounding and tool use\n\nProduct grounding.\n{context}\n## Project context\nContext instructions.\n{volatile}\nVolatile identity.",
+            context = PROMPT_TIER_CONTEXT_MARKER,
+            volatile = PROMPT_TIER_VOLATILE_MARKER,
+        ))
+    }
+
+    let workspace = std::env::temp_dir().join(format!(
+        "openhuman_prompt_composition_{}",
+        uuid::Uuid::new_v4()
+    ));
+    std::fs::create_dir_all(&workspace).unwrap();
+    let custom_style = "# User style\nKeep this exact custom style.";
+    std::fs::write(workspace.join("STYLE.md"), custom_style).unwrap();
+    let ctx = PromptContext {
+        workspace_dir: &workspace,
+        model_name: "test-model",
+        agent_id: "",
+        tools: &[],
+        workflows: &[],
+        dispatcher_instructions: "",
+        visible_tool_names: &NO_FILTER,
+        tool_call_format: ToolCallFormat::PFormat,
+        connected_integrations: &[],
+        connected_identities_md: String::new(),
+        user_identity: None,
+        personality_roster: vec![],
+        agents_md_global: None,
+        agents_md_local: None,
+    };
+
+    let rendered = SystemPromptBuilder::from_dynamic(dynamic_prompt)
+        .build_tiered(&ctx)
+        .unwrap();
+    let messages = rendered.system_messages();
+    assert_eq!(messages.len(), 2, "Stable+Context remain first, Volatile second");
+    assert!(messages[0].contains("Product grounding."));
+    assert!(messages[0].contains("Context instructions."));
+    assert!(messages[0].contains(custom_style));
+    assert!(!messages[0].contains("Volatile identity."));
+    assert_eq!(messages[0].matches("## Grounding and tool use").count(), 1);
+    assert!(messages[1].contains("Volatile identity."));
+    assert!(!messages[1].contains(custom_style));
+    let _ = std::fs::remove_dir_all(workspace);
+}
+
+#[test]
+fn empty_verbatim_prompt_keeps_legacy_flattened_newline_without_system_messages() {
+    let rendered = SystemPromptBuilder::verbatim(String::new())
+        .build_tiered(&ctx_with_identity(None))
+        .unwrap();
+
+    assert_eq!(rendered.text, "\n");
+    assert!(rendered.parts.is_empty());
+    assert!(rendered.system_messages().is_empty());
+}
