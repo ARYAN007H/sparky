@@ -341,7 +341,9 @@ async fn flow_authoring_is_hidden_when_tinyflows_component_is_disabled() {
             domains.flows = false;
         }
         let context = CoreContext::for_test_with_components(components).derive_with(
-            ContextOverlay::new(config.clone(), domains, ToolGroups::none()).profile(profile_id),
+            ContextOverlay::new(config.clone(), domains, ToolGroups::none())
+                .profile(profile_id)
+                .without_user_skill_roots(),
         );
         (context, config, domains)
     };
@@ -395,7 +397,8 @@ async fn module_builtin_gate_only_narrows_context_and_explicit_config() {
             DomainSet::full(),
             ToolGroups::none(),
         )
-        .profile("shared"),
+        .profile("shared")
+        .without_user_skill_roots(),
     );
 
     let enabled = CoreContext::scope(enabled_context, async {
@@ -415,7 +418,8 @@ async fn module_builtin_gate_only_narrows_context_and_explicit_config() {
                 DomainSet::full(),
                 ToolGroups::none(),
             )
-            .profile("shared"),
+            .profile("shared")
+            .without_user_skill_roots(),
         );
     let context_component_hidden = CoreContext::scope(context_component_context, async {
         let dispatch = crate::core::runtime::DispatchCtx::ambient();
@@ -433,7 +437,8 @@ async fn module_builtin_gate_only_narrows_context_and_explicit_config() {
     narrowed_domains.flows = false;
     let context_domain_context = CoreContext::for_test_with_components(all).derive_with(
         ContextOverlay::new(enabled_config.clone(), narrowed_domains, ToolGroups::none())
-            .profile("shared"),
+            .profile("shared")
+            .without_user_skill_roots(),
     );
     let context_domain_hidden = CoreContext::scope(context_domain_context, async {
         let dispatch = crate::core::runtime::DispatchCtx::ambient();
@@ -460,7 +465,8 @@ async fn module_builtin_gate_only_narrows_context_and_explicit_config() {
                 DomainSet::full(),
                 ToolGroups::none(),
             )
-            .profile("shared"),
+            .profile("shared")
+            .without_user_skill_roots(),
         ),
         async {
             let dispatch = crate::core::runtime::DispatchCtx::ambient();
@@ -484,7 +490,8 @@ async fn module_builtin_gate_only_narrows_context_and_explicit_config() {
                 DomainSet::full(),
                 ToolGroups::none(),
             )
-            .profile("shared"),
+            .profile("shared")
+            .without_user_skill_roots(),
         ),
         async {
             let dispatch = crate::core::runtime::DispatchCtx::ambient();
@@ -508,7 +515,8 @@ async fn module_builtin_gate_only_narrows_context_and_explicit_config() {
                 DomainSet::full(),
                 ToolGroups::none(),
             )
-            .profile("shared"),
+            .profile("shared")
+            .without_user_skill_roots(),
         ),
         async {
             let dispatch = crate::core::runtime::DispatchCtx::ambient();
@@ -529,19 +537,20 @@ async fn module_builtin_gate_only_narrows_context_and_explicit_config() {
         let config = enabled_config.clone();
         let ctx = CoreContext::for_test_with_components(all).derive_with(
             ContextOverlay::new(config.clone(), DomainSet::full(), ToolGroups::none())
-                .profile(profile_id),
+                .profile(profile_id)
+                .without_user_skill_roots(),
         );
         (ctx, config)
     };
     let (tenant_a_ctx, tenant_a_config) = tenant_snapshot("tenant-a");
-    let tenant_a = CoreContext::scope(tenant_a_ctx, async {
+    let tenant_a = CoreContext::scope(tenant_a_ctx.clone(), async {
         let dispatch = crate::core::runtime::DispatchCtx::ambient();
         crate::skills::bundled::flow_authoring::prewarm(&dispatch, &tenant_a_config, None).await;
         crate::skills::load_workflow_metadata_for(&dispatch, &tenant_a_config)
     })
     .await;
     let (tenant_b_ctx, tenant_b_config) = tenant_snapshot("tenant-b");
-    let tenant_b = CoreContext::scope(tenant_b_ctx, async {
+    let tenant_b = CoreContext::scope(tenant_b_ctx.clone(), async {
         let dispatch = crate::core::runtime::DispatchCtx::ambient();
         crate::skills::bundled::flow_authoring::prewarm(&dispatch, &tenant_b_config, None).await;
         crate::skills::load_workflow_metadata_for(&dispatch, &tenant_b_config)
@@ -555,6 +564,16 @@ async fn module_builtin_gate_only_narrows_context_and_explicit_config() {
         .iter()
         .find(|skill| skill.id() == "flow-authoring")
         .expect("tenant B has its own warmed snapshot");
+    assert_eq!(flow_a.scope, tinyskills::SkillScope::Builtin);
+    assert_eq!(flow_b.scope, tinyskills::SkillScope::Builtin);
+    let flow_a_document = flow_a.location.as_deref().expect("tenant A document");
+    assert!(
+        flow_a_document.starts_with(workspace.path()),
+        "tamper target must be inside the isolated temp workspace: {}",
+        flow_a_document.display()
+    );
+    let flow_b_document = flow_b.location.as_deref().expect("tenant B document");
+    assert!(flow_b_document.starts_with(workspace.path()));
     let flow_a_file = flow_a
         .location
         .as_deref()

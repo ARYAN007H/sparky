@@ -108,17 +108,29 @@ async fn module_owned_flow_skill_is_findable_after_scoped_prewarm() {
         workspace_dir: tmp.path().to_path_buf(),
         ..Default::default()
     };
-    let ctx = crate::core::runtime::DispatchCtx::host_default();
-    crate::modules::tinyflows::copilot_proxy(&config)
-        .await
-        .expect("linked TinyFlows fixture is admitted and serving");
-    crate::skills::bundled::flow_authoring::prewarm(&ctx, &config, None).await;
-
-    let tool = SkillSearchTool::new(Arc::new(config));
-    let result = tool
-        .execute(json!({ "query": "flow authoring" }))
-        .await
-        .expect("dispatch");
+    let context =
+        crate::core::runtime::CoreContext::for_test(crate::core::runtime::DomainSet::full(), None)
+            .derive_with(
+                crate::core::runtime::ContextOverlay::new(
+                    config.clone(),
+                    crate::core::runtime::DomainSet::full(),
+                    crate::tools::toolpacks::ToolGroups::none(),
+                )
+                .profile("skill-search")
+                .without_user_skill_roots(),
+            );
+    let result = crate::core::runtime::CoreContext::scope(context, async {
+        let ctx = crate::core::runtime::DispatchCtx::ambient();
+        crate::modules::tinyflows::copilot_proxy(&config)
+            .await
+            .expect("linked TinyFlows fixture is admitted and serving");
+        crate::skills::bundled::flow_authoring::prewarm(&ctx, &config, None).await;
+        let tool = SkillSearchTool::new(Arc::new(config));
+        tool.execute(json!({ "query": "flow authoring" }))
+            .await
+            .expect("dispatch")
+    })
+    .await;
     let text = format!("{result:?}");
     assert!(
         text.contains("flow-authoring"),
