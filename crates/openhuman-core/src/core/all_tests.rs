@@ -121,6 +121,11 @@ fn registered_controller_schemas_are_consistent_and_serializable() {
         let serialized_inputs = serialized["inputs"]
             .as_array()
             .unwrap_or_else(|| panic!("{method} inputs are not serialized as an array"));
+        assert_eq!(
+            serialized_inputs.len(),
+            schema.inputs.len(),
+            "{method} serialized input count differs from its registered schema"
+        );
         let mut params = Map::new();
         for input in &schema.inputs {
             let matching = serialized_inputs
