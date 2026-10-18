@@ -26,6 +26,27 @@ fn outage_backoff_is_exponential_and_has_terminal_limit() {
 }
 
 #[test]
+fn outage_failure_maps_to_deferred_then_terminal_host_outcomes() {
+    let state = PersistentFailoverBreaker::new(PersistentFailoverBreakerConfig {
+        base_backoff_ms: 0,
+        max_backoff_ms: 0,
+        failure_limit: 8,
+    });
+
+    for failure in 1..=8 {
+        let mut attempt = state
+            .try_acquire("stub-cloud".to_string(), monotonic_ms())
+            .expect("attempt");
+        let outcome = record_outage(Some(&mut attempt)).expect("host outcome");
+        if failure < 8 {
+            assert!(matches!(outcome, TriageOutcome::Deferred { .. }));
+        } else {
+            assert!(matches!(outcome, TriageOutcome::Terminal { .. }));
+        }
+    }
+}
+
+#[test]
 fn outage_state_isolated_by_model() {
     let state = new_retry_state();
     let mut first = state
