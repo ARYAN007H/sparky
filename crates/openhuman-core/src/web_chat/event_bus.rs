@@ -512,18 +512,14 @@ pub fn approval_request_event(
     expires_at: Option<&str>,
     detached: bool,
 ) -> WebChannelEvent {
-    WebChannelEvent {
-        event: "approval_request".to_string(),
-        client_id: client_id.to_string(),
-        thread_id: thread_id.to_string(),
-        request_id: request_id.to_string(),
+    WebChannelEvent::ApprovalRequest {
+        context: event_context(client_id, thread_id, request_id),
         tool_name: Some(tool_name.to_string()),
         message: Some(format!("Run `{tool_name}` — {action_summary}")),
         args: Some(args_redacted.clone()),
         tool_call_id: tool_call_id.map(str::to_string),
         expires_at: expires_at.map(str::to_string),
         detached: detached.then_some(true),
-        ..Default::default()
     }
 }
 
@@ -541,17 +537,13 @@ pub fn plan_review_request_event(
     tool_call_id: Option<&str>,
     expires_at: Option<&str>,
 ) -> WebChannelEvent {
-    WebChannelEvent {
-        event: "plan_review_request".to_string(),
-        client_id: client_id.to_string(),
-        thread_id: thread_id.to_string(),
-        request_id: request_id.to_string(),
+    WebChannelEvent::PlanReviewRequest {
+        context: event_context(client_id, thread_id, request_id),
         tool_name: Some("request_plan_review".to_string()),
         message: Some(summary.to_string()),
         args: Some(serde_json::json!({ "steps": steps })),
         tool_call_id: tool_call_id.map(str::to_string),
         expires_at: expires_at.map(str::to_string),
-        ..Default::default()
     }
 }
 
@@ -618,16 +610,12 @@ impl EventHandler<DomainEvent> for ApprovalSurfaceSubscriber {
                     log::info!(
                         "[web-channel] approval-surface emitting approval_decided request_id={request_id} thread_id={thread_id} client_id={client_id} tool={tool_name} decision={decision}"
                     );
-                    publish_web_channel_event(WebChannelEvent {
-                        event: "approval_decided".to_string(),
-                        client_id: client_id.clone(),
-                        thread_id: thread_id.clone(),
-                        request_id: request_id.clone(),
+                    publish_web_channel_event(WebChannelEvent::ApprovalDecided {
+                        context: event_context(client_id, thread_id, request_id),
                         tool_name: Some(tool_name.clone()),
                         message: Some(decision.clone()),
                         tool_call_id: tool_call_id.clone(),
                         cancel_reason: resolution.clone(),
-                        ..Default::default()
                     });
                 }
                 _ => {
@@ -680,16 +668,12 @@ impl EventHandler<DomainEvent> for ApprovalSurfaceSubscriber {
                     log::info!(
                         "[web-channel] plan-review-surface emitting plan_review_decided request_id={request_id} thread_id={thread_id} client_id={client_id} decision={decision}"
                     );
-                    publish_web_channel_event(WebChannelEvent {
-                        event: "plan_review_decided".to_string(),
-                        client_id: client_id.clone(),
-                        thread_id: thread_id.clone(),
-                        request_id: request_id.clone(),
+                    publish_web_channel_event(WebChannelEvent::PlanReviewDecided {
+                        context: event_context(client_id, thread_id, request_id),
                         tool_name: Some("request_plan_review".to_string()),
                         message: Some(decision.clone()),
                         tool_call_id: tool_call_id.clone(),
                         cancel_reason: resolution.clone(),
-                        ..Default::default()
                     });
                 }
                 _ => {
