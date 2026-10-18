@@ -1,5 +1,6 @@
 //! Committed-turn goal accounting and billing projection.
 
+use crate::agent::subagent_host::SubagentUsageExt as _;
 /// Account only a receipt-backed turn, using the same direct-plus-completed
 /// child total the codec attached to the atomic transcript append.
 pub(in crate::agent::session_host) async fn account_committed_turn_against_goal(

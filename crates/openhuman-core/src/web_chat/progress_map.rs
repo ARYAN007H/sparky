@@ -7,6 +7,7 @@
 
 use serde::Serialize;
 use serde_json::Value;
+use crate::agent::subagent_host::SubagentUsageExt as _;
 use tinychannels_bus::module_progressive::{
     ChannelOutputEvent, SubagentOutput, SubagentUsage, ToolFailureSummary,
 };
