@@ -1,3 +1,5 @@
+use super::*;
+
 #[cfg(feature = "flows")]
 #[tokio::test]
 async fn cold_flow_prompt_uses_the_module_and_warm_resume_does_not_refetch() {
@@ -38,7 +40,7 @@ async fn cold_flow_prompt_uses_the_module_and_warm_resume_does_not_refetch() {
 
     let mut disabled_config = (*prelude.runtime_config.as_deref().expect("scoped config")).clone();
     disabled_config.components.tinyflows = false;
-    prelude.runtime_config = Some(std::sync::Arc::new(disabled_config));
+    prelude.runtime_config = Some(Arc::new(disabled_config));
     let warm = prelude
         .prepare(false)
         .await
@@ -49,7 +51,7 @@ async fn cold_flow_prompt_uses_the_module_and_warm_resume_does_not_refetch() {
         Ok(_) => panic!("cold flow prompt must honor the disabled component"),
         Err(error) => error,
     };
-    assert!(error.to_string().contains("COMPONENT_DISABLED:tinyflows"));
+    assert!(format!("{error:#}").contains("COMPONENT_DISABLED:tinyflows"));
 }
 
 #[cfg(feature = "flows")]
