@@ -1,4 +1,5 @@
 //! Credential-safe routes, wire turn requests and their typed outcomes.
+use openhuman_core::agent::subagent_host::SubagentUsageExt as _;
 use serde::{Deserialize, Serialize};
 
 #[cfg(test)]

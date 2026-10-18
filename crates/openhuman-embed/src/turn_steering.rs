@@ -25,7 +25,7 @@
 
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 
-use openhuman_core::agent::queued_turn::QueuedTurn;
+use openhuman_core::agent::queued_turn::{steer_message, QueuedTurn};
 use tinyagents_harness::run_queue::{QueueLane, RunQueue};
 
 /// The run queue a turn is steered through.
