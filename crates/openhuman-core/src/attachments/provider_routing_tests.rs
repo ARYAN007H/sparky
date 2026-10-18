@@ -134,6 +134,42 @@ async fn typed_document_mime_hints_are_per_block_and_markers_use_source_detectio
 }
 
 #[tokio::test]
+async fn typed_base64_document_is_resolved_once_with_its_original_mime() {
+    let temp = tempfile::tempdir().unwrap();
+    let config = offline_config(temp.path());
+    let transport = Arc::new(CaptureModel::new(vec![]));
+    let model = controlled_wrapper(transport.clone(), config, &[]);
+
+    model
+        .invoke(
+            &(),
+            user_request(vec![ContentBlock::Document(MediaRef::Base64 {
+                data: "aGVsbG8=".into(),
+                media_type: "text/plain".into(),
+            })]),
+        )
+        .await
+        .unwrap();
+
+    let captured = transport.requests.lock().unwrap();
+    assert_eq!(captured.len(), 1);
+    let Message::User(user) = &captured[0].1.messages[0] else {
+        panic!("expected user message")
+    };
+    let payload = user
+        .content
+        .iter()
+        .find_map(|block| match block {
+            ContentBlock::Text(text) => Some(text.as_str()),
+            _ => None,
+        })
+        .expect("owner fallback should render the document text");
+    assert!(payload.contains("mime=\"text/plain\""));
+    assert!(payload.contains("hello"));
+    assert!(!temp.path().join("uploads/legacy-media").exists());
+}
+
+#[tokio::test]
 async fn native_audio_and_pdf_require_both_model_facts_and_transport_support() {
     let temp = tempfile::tempdir().unwrap();
     let config = offline_config(temp.path());
