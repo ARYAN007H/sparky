@@ -1,12 +1,15 @@
 /**
  * Utilities for multimodal chat attachments.
  *
- * Images are embedded as `[IMAGE:<data-uri>]` markers. Other files
- * are embedded as `[FILE:<data-uri>]` markers. The Rust agent harness
- * (`agent/multimodal.rs`) parses, validates, and expands both shapes before
- * the provider call.
+ * Originals travel as typed `ContentPart`s ({@link attachmentsToParts}) next to
+ * the message text; the core stages them and returns durable
+ * `[ATTACHMENT:…]` references, which {@link parseAttachmentReferences} reads
+ * back for display. The `[IMAGE:]`/`[FILE:]` marker grammar is an internal
+ * staging format of the core and is no longer built here.
  */
 import debugFactory from 'debug';
+
+import type { ContentPart } from '../services/chatWire';
 
 const debug = debugFactory('chat:attachments');
 
