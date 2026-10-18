@@ -217,10 +217,6 @@ describe('VoicePanel', () => {
     const sttSelect = (await screen.findByTestId('stt-provider-select')) as HTMLSelectElement;
     await waitFor(() => expect(sttSelect.value).toBe('elevenlabs'));
 
-    // Keep the saveRouting refresh pending so it does not clear the error set
-    // by the failed persistence attempt.
-    vi.mocked(openhumanVoiceStatus).mockImplementation(() => new Promise(() => {}));
-
     // Switch back to cloud, then save.
     fireEvent.change(sttSelect, { target: { value: 'cloud' } });
     await waitFor(() => expect(sttSelect.value).toBe('cloud'));
@@ -282,6 +278,10 @@ describe('VoicePanel', () => {
     // Wait for the initial load to complete (elevenlabs seeded from voiceSettings).
     const sttSelect = (await screen.findByTestId('stt-provider-select')) as HTMLSelectElement;
     await waitFor(() => expect(sttSelect.value).toBe('elevenlabs'));
+
+    // Keep the saveRouting refresh pending so it does not clear the error set
+    // by the failed persistence attempt.
+    vi.mocked(openhumanVoiceStatus).mockImplementation(() => new Promise(() => {}));
 
     // Change provider and click save to trigger the RPC error.
     fireEvent.change(sttSelect, { target: { value: 'cloud' } });
