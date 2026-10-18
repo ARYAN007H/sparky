@@ -212,8 +212,25 @@ async fn a_turn_with_an_unavailable_local_provider_ends_in_one_classified_chat_e
     // The managed default needs a host backend transport, which this
     // in-process test intentionally does not install. Route the turn to the
     // local mock server instead so it exercises an actual provider failure.
+    // Pin the workload explicitly: some test hosts do not install the built-in
+    // Master definition, in which case an absent default model resolves to
+    // `chat` and would ignore `coding_provider`.
+    config.default_model = Some("hint:coding".to_owned());
     config.coding_provider = Some("ollama:qwen3:4b-instruct".to_owned());
     config.local_ai.base_url = Some(server.uri());
+    let role = crate::agent::session_host::provider_role_for_definition(
+        config.default_model.as_deref(),
+        None,
+    );
+    assert_eq!(
+        role, "coding",
+        "the fixture must select the coding workload"
+    );
+    assert_eq!(
+        crate::inference::provider::provider_for_role(role, &config),
+        "ollama:qwen3:4b-instruct",
+        "the fixture must route coding to its local inference provider"
+    );
     std::fs::create_dir_all(&config.workspace_dir).expect("workspace dir");
     let ctx = DispatchCtx::new(CoreContext::for_test_with_config(DomainSet::full(), config));
     let thread_id = "lifecycle-real-turn";
