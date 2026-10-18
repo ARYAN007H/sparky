@@ -30,7 +30,6 @@ provisioning, deploys and the runner token.
 | `rust-cov`        | test modules from the registry, then `scripts/ci/rust-coverage.sh`                                                                                                                                                                                                        |
 | `rust-lint`       | clippy (product set; embed's clippy covers the core's contributor set), embed and tinyhumans lint, embed gates-off check                                                                                                                                                  |
 | `rust-gates-off`  | gates-off checks and gate-contract tests, kernel floor, dep-sim calibration                                                                                                                                                                                               |
-| `storage-drivers` | the `storage_*_e2e` targets and `cli_storage_url_e2e` once per driver (memory, sqlite, file), plus the lib tests of the stores on the storage ports, with `storage-sqlite,storage-file`; armed by the `storage` area. MongoDB runs nightly and on demand in its own workflow, `storage-mongodb.yml`, not on pull requests |
 | `tauri`           | Tauri clippy and coverage, plus a private uninstrumented application build                                                                                                                                                                                                |
 | `pester`          | `install.ps1` tests                                                                                                                                                                                                                                                       |
 
@@ -141,10 +140,26 @@ for any commit without posting it.
     All private instrumented checks use `LLVM_PROFILE_FILE_NAME=openhuman-%8m.profraw`:
     LLVM's locked merge pool bounds raw profiles to eight files per binary,
     including the auxiliary gates, Tauri, and storage configurations.
-  - After all offline examples succeed, Cargo removes their completed
-    release-profile outputs from `target/ci-private-build`. The Linux fleet
-    example is the only release invocation in this plan. Debug/coverage outputs
-    and Tinymold's store remain available for later checks and cache saving.
+  - Redundant compilations are avoided on purpose; keep them out when editing:
+    - `rust-coverage.sh` (nextest runner) builds the product-feature packages
+      (`openhuman`, `-embed`, `-tinyhumans`, `-cli`) with one Cargo argument set
+      and varies only the nextest filter per suite. Cargo hashes units by
+      resolved features and those packages resolve the core differently when
+      selected separately, so separate `-p` runs would each compile the core
+      again. The `rpc`, `tui` and default-feature suites keep their own
+      resolutions on purpose.
+    - Auxiliary coverage suites (gates-off, Tauri) pass `--no-report`; each
+      `cargo llvm-cov report` re-merges every profile in the shared coverage
+      target, so each lane ends with one report check (`gates-off-coverage-report`,
+      `tauri-coverage-report`) that still runs after a failed suite.
+    - `storage-schema` builds its dump example in `target/ci-private-build`
+      with the plain build's environment and the core product features
+      (`STORAGE_SCHEMA_FEATURES=core-product`), shared with the uninstrumented
+      Composio regression's `openhuman-cli` build. The schema only depends on
+      gates present in both sets.
+    - Offline examples run with `--profile dev`, so the release-declared Linux
+      fleet measurement shares the dev build instead of a thin-LTO one. Run the
+      script without `--profile` to get the declared release measurement.
   - Cargo registry, pnpm store, and content-based frontend caches remain on the
     slot cache disk. Rust output caching uses Tinymold alone.
   - VM sizing is a supervisor setting; it is not assumed by the lane scheduler.
@@ -152,8 +167,8 @@ for any commit without posting it.
     (4096 MiB of old-space heap); hosted keeps its default Node budget.
     Vitest currently uses 8 workers.
 - **`hosted`**: lanes grouped into jobs sized for 4-core, ~14 GB runners:
-  `checks`, `rust-lint` (lint and gates-off in turn), `rust-cov`, `tauri`,
-  `storage` (the `storage-drivers` lane) and `pester`. Groups whose areas are untouched don't start.
+  `checks`, `rust-lint` (lint and gates-off in turn), `rust-cov`, `tauri`
+  and `pester`. Groups whose areas are untouched don't start.
 
 ## Why the EX63 cannot run outsider code
 
