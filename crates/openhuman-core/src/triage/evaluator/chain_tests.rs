@@ -45,3 +45,27 @@ fn stale_failure_after_concurrent_recovery_remains_deferred() {
 fn in_flight_rejection_preserves_one_second_requeue_delay() {
     assert_eq!(rejection_delay_ms(BreakerRejection::InFlight, 123), 1_000);
 }
+
+#[test]
+fn backoff_rejection_preserves_host_one_second_floor() {
+    assert_eq!(
+        rejection_delay_ms(
+            BreakerRejection::Backoff {
+                next_attempt_ms: 350,
+                failure_count: 1,
+            },
+            100,
+        ),
+        1_000
+    );
+    assert_eq!(
+        rejection_delay_ms(
+            BreakerRejection::Backoff {
+                next_attempt_ms: 1_600,
+                failure_count: 1,
+            },
+            100,
+        ),
+        1_500
+    );
+}
