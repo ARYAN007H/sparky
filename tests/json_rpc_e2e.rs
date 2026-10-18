@@ -5919,13 +5919,7 @@ async fn json_rpc_wallet_tx_reads_and_web3_gates_round_trip() {
 }
 
 // ---------------------------------------------------------------------------
-// Multi-chain wallet E2E suite (PR multi-chain-complete).
-//
-// One test per chain exercising prepare_transfer → execute_prepared via the
-// public JSON-RPC controllers, with a chain-specific axum mock for the
-// upstream RPC/REST endpoint. The mocks return canned but real-shaped
-// responses; the assertions verify that the core actually signs and
-// broadcasts (not just that the controllers wire up).
+// Wallet host seam E2E coverage for chain selection and prepared execution.
 // ---------------------------------------------------------------------------
 
 const E2E_TEST_MNEMONIC_ADDRS_EVM: &str = "0x9858EfFD232B4033E47d90003D41EC34EcaEda94";
@@ -11368,7 +11362,7 @@ async fn json_rpc_flows_validate_reports_warnings_and_errors() {
 /// `openhuman.flows_import` returns a native graph without persisting a flow row.
 #[cfg(feature = "flows")]
 #[tokio::test]
-async fn json_rpc_flows_import_native_and_n8n() {
+async fn json_rpc_flows_import_does_not_persist() {
     let _env_lock = json_rpc_e2e_env_lock_async().await;
     let (rpc_base, _tmp, api_join, rpc_join, _guards) = boot_flows_rpc_env().await;
 
@@ -12919,7 +12913,10 @@ async fn json_rpc_flows_strict_create_refuses_binding_to_undeclared_agent_field(
     )
     .await;
 
-    let refusal = strict_create_refusal(&create)
+    let refusal = create
+        .get("error")
+        .and_then(|error| error.get("message"))
+        .and_then(Value::as_str)
         .unwrap_or_else(|| panic!("strict create must be refused, got: {create}"));
     assert!(
         refusal.contains("output_parser.schema"),
