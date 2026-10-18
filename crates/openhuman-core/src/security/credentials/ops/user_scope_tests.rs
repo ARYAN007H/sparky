@@ -20,19 +20,16 @@ fn first_user_activation_queues_prelogin_purge_in_the_removed_workspace() {
     use crate::memory::deletion::{pending, PendingDeletion};
     use crate::threads::store::{ensure_thread, list_threads, CreateConversationThread};
 
-    let _guard = crate::config::TEST_ENV_LOCK.blocking_lock();
-    let previous_home = std::env::var_os("HOME");
-    let previous_workspace = std::env::var_os("OPENHUMAN_WORKSPACE");
     let tmp = tempfile::tempdir().unwrap();
-    unsafe {
-        std::env::set_var("HOME", tmp.path());
-        std::env::set_var("OPENHUMAN_WORKSPACE", tmp.path());
-    }
+    let env = crate::config::test_env::EnvVarGuard::locked().with("HOME", tmp.path());
 
     let root = crate::config::default_root_openhuman_dir().unwrap();
+    let _env = env.with("OPENHUMAN_WORKSPACE", &root);
     let prelogin_workspace = crate::config::pre_login_user_dir(&root).join("workspace");
     let active_workspace = crate::config::user_openhuman_dir(&root, "new-user").join("workspace");
     let ctx = crate::core::runtime::DispatchCtx::unbound();
+    assert!(operator_user_activation_allowed());
+    assert!(crate::config::read_active_user_id(&root).is_none());
     ensure_thread(
         &ctx,
         prelogin_workspace.clone(),
@@ -47,6 +44,14 @@ fn first_user_activation_queues_prelogin_purge_in_the_removed_workspace() {
         },
     )
     .unwrap();
+    assert_eq!(
+        list_threads(&ctx, prelogin_workspace.clone())
+            .unwrap()
+            .iter()
+            .map(|thread| thread.id.as_str())
+            .collect::<Vec<_>>(),
+        vec!["prelogin-channel-thread"]
+    );
 
     activate_user_scope(&ctx, "new-user").unwrap();
 
@@ -62,13 +67,4 @@ fn first_user_activation_queues_prelogin_purge_in_the_removed_workspace() {
         }]
     );
     assert!(pending(&active_workspace).is_empty());
-
-    match previous_home {
-        Some(value) => unsafe { std::env::set_var("HOME", value) },
-        None => unsafe { std::env::remove_var("HOME") },
-    }
-    match previous_workspace {
-        Some(value) => unsafe { std::env::set_var("OPENHUMAN_WORKSPACE", value) },
-        None => unsafe { std::env::remove_var("OPENHUMAN_WORKSPACE") },
-    }
 }

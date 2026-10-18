@@ -48,11 +48,11 @@ fn offline_conversation_purge_queues_exact_thread_ids_in_its_workspace() {
     let stats = purge_threads(&ctx, workspace.clone()).unwrap();
 
     assert_eq!(stats.thread_count, 2);
-    let mut queued = pending(&workspace);
-    queued.sort_by(|left, right| format!("{left:?}").cmp(&format!("{right:?}")));
     assert_eq!(
-        queued,
-        vec![thread("channel-thread-a"), thread("channel-thread-b")]
+        pending(&workspace).into_iter().collect::<std::collections::HashSet<_>>(),
+        [thread("channel-thread-a"), thread("channel-thread-b")]
+            .into_iter()
+            .collect()
     );
     assert_eq!(pending(&other_workspace), vec![thread("other-workspace-thread")]);
 
