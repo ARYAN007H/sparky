@@ -101,7 +101,7 @@ pub async fn complete_once(
 
     let model: std::sync::Arc<dyn ChatModel<()>> = std::sync::Arc::new(model);
     let model = match budget {
-        Some(budget) => budget.wrap(model),
+        Some(budget) => budget.wrap_model(model),
         None => model,
     };
     model
