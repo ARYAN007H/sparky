@@ -214,7 +214,7 @@ async fn prepared_child_run_is_exported_from_its_native_journal_lineage() {
         child_span.parent_span_id.as_deref(),
         Some(root_span.span_id.as_str())
     );
-    assert_eq!(root_span.attributes["parent_run_id"], root_run_id.as_str());
+    assert_eq!(root_span.attributes["run.id"], root_run_id.as_str());
     assert_eq!(root_span.attributes["root_run_id"], root_run_id.as_str());
     let generation = spans
         .iter()

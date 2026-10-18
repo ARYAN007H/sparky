@@ -248,10 +248,10 @@ fn per_run_trace_snapshots_keep_reused_call_ids_scoped_and_content_gated() {
     );
     assert!(snapshot
         .iter()
-        .any(|span| span["name"] == "agent.iteration"));
+        .any(|span| span["name"] == "agent.iteration#1"));
     assert!(snapshot
         .iter()
-        .any(|span| span["name"] == "subagent.iteration"));
+        .any(|span| span["name"] == "subagent.iteration#1"));
 }
 
 #[test]
@@ -344,7 +344,8 @@ fn child_native_failure_survives_parent_acknowledgement_at_same_timestamp() {
     assert_eq!(child_span.status, SpanStatus::Error);
     assert_eq!(
         child_span.attributes["error.message"],
-        "child provider failed"
+        "Operation failed",
+        "terminal failures use the content-free native fallback, not raw provider prose"
     );
 }
 
@@ -501,7 +502,7 @@ fn separate_child_trace_roots_observations_but_retains_parent_lineage() {
         .iter()
         .find(|span| span.kind == SpanKind::Turn)
         .expect("child trace has its own root turn");
-    assert_eq!(root.attributes["run_id"], "child-run");
+    assert_eq!(root.attributes["run.id"], "child-run");
     assert_eq!(root.attributes["parent_run_id"], "root-run");
     assert_eq!(root.attributes["root_run_id"], "root-run");
     assert!(collector
