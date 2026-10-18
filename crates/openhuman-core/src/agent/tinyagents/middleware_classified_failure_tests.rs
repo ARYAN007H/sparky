@@ -22,6 +22,7 @@ async fn varied_queries_against_one_forbidden_endpoint_stop_on_first_failure() {
     let handle = SteeringHandle::allow_all();
     let slot = std::sync::Arc::new(std::sync::Mutex::new(None));
     let mw = RepeatedToolFailureMiddleware::new(handle.clone(), 3, slot.clone());
+    let mut context = ctx();
     let mut call = TaToolCall::new(
         "forbidden-1",
         "web_fetch",
@@ -29,10 +30,10 @@ async fn varied_queries_against_one_forbidden_endpoint_stop_on_first_failure() {
             "url": "https://example.test/restricted?query=first"
         }),
     );
-    mw.before_tool(&mut ctx(), &(), &mut call).await.unwrap();
+    mw.before_tool(&mut context, &(), &mut call).await.unwrap();
     let mut result = failing_result("web_fetch", "403 Forbidden");
     mw.after_tool(
-        &mut ctx(),
+        &mut context,
         &(),
         &invocation("forbidden-1", "web_fetch"),
         &mut result,
@@ -56,16 +57,17 @@ async fn schema_repair_gets_three_attempts_before_stopping() {
     let handle = SteeringHandle::allow_all();
     let slot = std::sync::Arc::new(std::sync::Mutex::new(None));
     let mw = RepeatedToolFailureMiddleware::new(handle.clone(), 8, slot.clone());
+    let mut context = ctx();
     for (id, value) in [("schema-1", 1), ("schema-2", 2), ("schema-3", 3)] {
         let mut call = TaToolCall::new(
             id,
             "search",
             serde_json::json!({"query": value, "endpoint": "catalog"}),
         );
-        mw.before_tool(&mut ctx(), &(), &mut call).await.unwrap();
+        mw.before_tool(&mut context, &(), &mut call).await.unwrap();
         let mut result =
             failing_result("search", "schema validation failed: query must be a string");
-        mw.after_tool(&mut ctx(), &(), &invocation(id, "search"), &mut result)
+        mw.after_tool(&mut context, &(), &invocation(id, "search"), &mut result)
             .await
             .unwrap();
     }
@@ -81,10 +83,10 @@ async fn schema_repair_gets_three_attempts_before_stopping() {
         "search",
         serde_json::json!({"query": 4, "endpoint": "catalog"}),
     );
-    mw.before_tool(&mut ctx(), &(), &mut call).await.unwrap();
+    mw.before_tool(&mut context, &(), &mut call).await.unwrap();
     let mut result = failing_result("search", "schema validation failed: query must be a string");
     mw.after_tool(
-        &mut ctx(),
+        &mut context,
         &(),
         &invocation("schema-4", "search"),
         &mut result,
@@ -143,19 +145,20 @@ async fn missing_desktop_window_allows_one_rediscovery_then_stops() {
     let handle = SteeringHandle::allow_all();
     let slot = std::sync::Arc::new(std::sync::Mutex::new(None));
     let mw = RepeatedToolFailureMiddleware::new(handle.clone(), 3, slot.clone());
+    let mut context = ctx();
     for id in ["window-1", "window-2"] {
         let mut call = TaToolCall::new(
             id,
             "tinydesktop_click",
             serde_json::json!({"window_id": 17, "element": id}),
         );
-        mw.before_tool(&mut ctx(), &(), &mut call).await.unwrap();
+        mw.before_tool(&mut context, &(), &mut call).await.unwrap();
         let mut result = failing_result(
             "tinydesktop_click",
             r#"{"error":{"code":"WINDOW_NOT_FOUND"}}"#,
         );
         mw.after_tool(
-            &mut ctx(),
+            &mut context,
             &(),
             &invocation(id, "tinydesktop_click"),
             &mut result,
@@ -174,15 +177,16 @@ async fn transient_failures_have_two_retries_and_success_clears_only_that_scope(
     let handle = SteeringHandle::allow_all();
     let slot = std::sync::Arc::new(std::sync::Mutex::new(None));
     let mw = RepeatedToolFailureMiddleware::new(handle.clone(), 3, slot.clone());
+    let mut context = ctx();
     for (id, endpoint) in [("a1", "alpha"), ("b1", "beta"), ("a2", "alpha")] {
         let mut call = TaToolCall::new(
             id,
             "web_fetch",
             serde_json::json!({"endpoint": endpoint, "query": id}),
         );
-        mw.before_tool(&mut ctx(), &(), &mut call).await.unwrap();
+        mw.before_tool(&mut context, &(), &mut call).await.unwrap();
         let mut result = failing_result("web_fetch", "503 Service Unavailable");
-        mw.after_tool(&mut ctx(), &(), &invocation(id, "web_fetch"), &mut result)
+        mw.after_tool(&mut context, &(), &invocation(id, "web_fetch"), &mut result)
             .await
             .unwrap();
     }
@@ -192,11 +196,11 @@ async fn transient_failures_have_two_retries_and_success_clears_only_that_scope(
         "web_fetch",
         serde_json::json!({"endpoint": "alpha"}),
     );
-    mw.before_tool(&mut ctx(), &(), &mut recovered)
+    mw.before_tool(&mut context, &(), &mut recovered)
         .await
         .unwrap();
     let mut ok = tool_result("web_fetch", "ready");
-    mw.after_tool(&mut ctx(), &(), &invocation("a-ok", "web_fetch"), &mut ok)
+    mw.after_tool(&mut context, &(), &invocation("a-ok", "web_fetch"), &mut ok)
         .await
         .unwrap();
     for id in ["b2", "b3"] {
@@ -205,9 +209,9 @@ async fn transient_failures_have_two_retries_and_success_clears_only_that_scope(
             "web_fetch",
             serde_json::json!({"endpoint": "beta", "query": id}),
         );
-        mw.before_tool(&mut ctx(), &(), &mut call).await.unwrap();
+        mw.before_tool(&mut context, &(), &mut call).await.unwrap();
         let mut result = failing_result("web_fetch", "503 Service Unavailable");
-        mw.after_tool(&mut ctx(), &(), &invocation(id, "web_fetch"), &mut result)
+        mw.after_tool(&mut context, &(), &invocation(id, "web_fetch"), &mut result)
             .await
             .unwrap();
     }
