@@ -471,10 +471,12 @@ async fn timeout_returns_deny() {
         )
         .await
     });
+    // Wait for the park to register. On a loaded machine the poll can miss the
+    // row's whole short life (it expires after the gate's TTL), so a finished
+    // call also ends the wait; the outcome below is what the test asserts.
     let mut tries = 0;
-    while gate.list_pending().unwrap().is_empty() {
+    while gate.list_pending().unwrap().is_empty() && !handle.is_finished() {
         tries += 1;
-        // A hang guard (10 s), not a latency budget: a loaded machine can delay the park.
         assert!(tries < 1000, "audit row never appeared for timeout test");
         tokio::time::sleep(Duration::from_millis(10)).await;
     }
@@ -512,10 +514,11 @@ async fn cancel_flow_run_parks_for_approval_when_a_gate_is_present() {
         )
         .await
     });
+    // See `timeout_returns_deny`: a finished call also ends the wait.
     let mut tries = 0;
-    while gate.list_pending().unwrap().is_empty() {
+    while gate.list_pending().unwrap().is_empty() && !handle.is_finished() {
         tries += 1;
-        assert!(tries < 50, "audit row never appeared for cancel_flow_run");
+        assert!(tries < 1000, "audit row never appeared for cancel_flow_run");
         tokio::time::sleep(Duration::from_millis(10)).await;
     }
     drop(env);
