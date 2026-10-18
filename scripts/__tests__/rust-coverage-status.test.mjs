@@ -305,7 +305,7 @@ test("private coverage executes every package configuration once and reports aft
   // resolves (and builds) the core and its dependencies once for all of them.
   const unified = selections.filter((line) =>
     line.includes(
-      "--features channels -p openhuman -p openhuman-embed -p openhuman-tinyhumans -p openhuman-cli --all-targets -E ",
+      "--features channels,storage-file -p openhuman -p openhuman-embed -p openhuman-tinyhumans -p openhuman-cli --all-targets -E ",
     ),
   );
   assert.equal(unified.length, 4);
@@ -365,6 +365,9 @@ test("CLI inventory sends product features only to nextest, preserving instrumen
   const script = [
     "set -euo pipefail",
     'CORE_PRODUCT_FEATURES="channels,modules"',
+    ...source
+      .split("\n")
+      .filter((line) => /^(UNIFIED_PRODUCT_ARGS|FILTER_CLI_TESTS)=/.test(line)),
     "expected_inventory=/dev/null",
     "export CARGO_BUILD_TARGET_DIR=preserved-target",
     `bash() {
@@ -374,7 +377,7 @@ test("CLI inventory sends product features only to nextest, preserving instrumen
         done
         printf '%s\\n' 'export INVENTORY_INSTRUMENTED=1' 'export CARGO_TARGET_DIR=instrumented-target'
       elif [[ "$*" == *"nextest list"* ]]; then
-        [[ "$*" == *"--features channels,modules"* ]] || return 65
+        [[ "$*" == *"--features channels,modules -p openhuman -p openhuman-embed -p openhuman-tinyhumans -p openhuman-cli --all-targets -E package(=openhuman-cli) & kind(test)"* ]] || return 65
         [[ "$INVENTORY_INSTRUMENTED" == 1 && "$CARGO_TARGET_DIR" == instrumented-target && "$CARGO_BUILD_TARGET_DIR" == preserved-target ]] || return 66
       else return 67
       fi
