@@ -185,6 +185,55 @@ async fn cold_flow_prompt_uses_the_module_and_warm_resume_does_not_refetch() {
     assert!(error.to_string().contains("COMPONENT_DISABLED:tinyflows"));
 }
 
+#[cfg(feature = "flows")]
+#[tokio::test]
+async fn explicit_flow_session_prompt_override_does_not_require_tinyflows_or_config() {
+    use tinyagents_definition::{DefinitionSource, PromptSource};
+
+    let temp = tempfile::tempdir().expect("workspace");
+    let config = crate::config::Config {
+        workspace_dir: temp.path().join("workspace"),
+        action_dir: temp.path().join("action"),
+        config_path: temp.path().join("config.toml"),
+        ..Default::default()
+    };
+    let mut definition = crate::agent::harness::host_definition::AgentDefinitionRegistry::builtins_only()
+        .get("workflow_builder")
+        .expect("workflow_builder builtin")
+        .clone();
+    definition.source = DefinitionSource::CustomRegistry;
+    definition.system_prompt = PromptSource::Inline("session-owned flow prompt".into());
+
+    let mut host = crate::agent::OpenHumanSessionHost::from_config_with_definition(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        &definition,
+    )
+    .expect("explicit flow definition session");
+    host.ensure_runtime_session().expect("runtime session");
+    let mut prelude = host
+        .runtime_state
+        .lock()
+        .expect("runtime state")
+        .prelude
+        .clone()
+        .expect("prelude");
+    prelude.runtime_config = None;
+
+    let prepared = prelude
+        .prepare(true)
+        .await
+        .expect("static session override does not load TinyFlows");
+    let prompt = prepared
+        .prefix
+        .expect("cold preparation has a prompt prefix")
+        .messages()
+        .iter()
+        .map(tinyinference_llm::message::Message::text)
+        .collect::<String>();
+    assert!(prompt.contains("session-owned flow prompt"));
+}
+
 /// A full progress channel must not discard the only terminal signal. A busy
 /// bridge can catch up after the turn commits; it cannot infer completion from
 /// an event that was dropped.
