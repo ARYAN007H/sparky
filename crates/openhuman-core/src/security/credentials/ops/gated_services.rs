@@ -51,8 +51,7 @@ pub async fn start_credential_gated_services(
     // constraint is voice-server → standalone-dictation-listener (they contend
     // for the single rdev global listener on macOS). Previously each was
     // `.await`ed in series, so their cold-start costs SUMMED: the local-AI
-    // bootstrap (Ollama/embeddings) + the Windows WASAPI microphone init
-    // (a synchronous readiness handshake in `always_on::spawn_capture_thread`)
+    // bootstrap (Ollama/embeddings) + voice startup
     // stacked into the ~10s stall users hit before hotkeys/commands were usable
     // — worst on Windows (#3490). Worse,
     // the hotkey/command registration (steps 2–3) sat

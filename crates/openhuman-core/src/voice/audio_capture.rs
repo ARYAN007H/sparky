@@ -1,5 +1,5 @@
 //! Host recording policy over module-owned native capture and audio preparation.
-use super::capture_lease::{CaptureLease, Kind};
+use super::capture_lease::CaptureLease;
 use crate::config::Config;
 /// Sample rate of the TinyVoice output contract (mono 16 kHz PCM).
 pub(crate) const TARGET_SAMPLE_RATE: u32 = 16_000;
