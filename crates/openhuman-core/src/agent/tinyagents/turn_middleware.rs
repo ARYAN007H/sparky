@@ -206,9 +206,11 @@ pub(super) fn install_turn_middleware(
     // model is rejected pre-dispatch (and, once 02.2 lands, a capable fallback is
     // selected) instead of failing at the provider.
     if let Some(required) = required_capabilities {
-        harness.push_model_middleware(Arc::new(routes::RequiredCapabilitiesMiddleware::new(
+        harness.push_model_middleware(Arc::new(
+            tinyagents_harness::middleware::library::RequiredCapabilitiesMiddleware::new(
             required,
-        )));
+            ),
+        ));
     }
 
     // Fallback event parity (issue #4249, Workstream 02.2): the crate's
@@ -220,7 +222,9 @@ pub(super) fn install_turn_middleware(
     // `[fallback]`). Installed only when a fallback chain exists; it never re-issues
     // the call, so it adds no provider dispatch (no double-fallback).
     if has_route_fallback {
-        harness.push_model_middleware(Arc::new(routes::FallbackObserverMiddleware::new(model)));
+        harness.push_model_middleware(Arc::new(
+            tinyagents_harness::middleware::library::FallbackObserverMiddleware::new(model),
+        ));
     }
 
     // Capture context settings before `install` consumes `context_mw`.

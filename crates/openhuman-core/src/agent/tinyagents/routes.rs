@@ -5,9 +5,6 @@ use std::sync::LazyLock;
 use async_trait::async_trait;
 use tinyagents_harness::context::RunContext;
 use tinyagents_harness::events::{AgentEvent, GenerationEnrichment, GenerationPricing};
-pub(super) use tinyagents_harness::middleware::library::{
-    FallbackObserverMiddleware, RequiredCapabilitiesMiddleware,
-};
 use tinyagents_harness::middleware::{MiddlewareModelOutcome, ModelHandler, ModelMiddleware};
 use tinyagents_harness::retry::FallbackPolicy;
 use tinyagents_registry::WorkloadRouter;
@@ -15,7 +12,8 @@ use tinyinference_llm::model::{CapabilitySet, ModelRequest};
 
 /// The workload routing table (fallback chains and the vision `image_in` gate)
 /// projected into the crate [`WorkloadRouter`] from the upstream declarative
-/// [`WORKLOAD_ROUTES`] table, which owns the policy.
+/// [`WORKLOAD_ROUTES`](tinyinference_llm::model::workload::WORKLOAD_ROUTES) table,
+/// which owns the policy.
 static OH_WORKLOAD_ROUTER: LazyLock<WorkloadRouter> =
     LazyLock::new(|| WorkloadRouter::from_workload_routes("hint:vision"));
 
