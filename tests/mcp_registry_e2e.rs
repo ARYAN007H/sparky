@@ -73,7 +73,7 @@ fn http_server(url: &str) -> Value {
 }
 
 #[tokio::test]
-#[ignore = "requires a TinyMCP library: node scripts/modules/build.mjs tinymcp"]
+#[ignore = "requires a TinyMCP library (node scripts/modules/build.mjs tinymcp). Temporary: registry-installed servers are never operator-trusted, so the jail must start the stub; it cannot until tinymcp lets the host choose the enforcement level (https://github.com/tinyhumansai/tinymcp/pull/126) and TinyBox has a Linux backend with real process isolation."]
 async fn module_tool_call_reports_unknown_tool_as_error() {
     let (_tmp, config) = fresh_workspace_config();
     let server_id = install_server(&config, "@openhuman-test/echo", stdio_server()).await;
@@ -100,7 +100,7 @@ async fn module_tool_call_reports_unknown_tool_as_error() {
 }
 
 #[tokio::test]
-#[ignore = "requires a TinyMCP library: node scripts/modules/build.mjs tinymcp"]
+#[ignore = "requires a TinyMCP library (node scripts/modules/build.mjs tinymcp). Temporary: registry-installed servers are never operator-trusted, so the jail must start the stub; it cannot until tinymcp lets the host choose the enforcement level (https://github.com/tinyhumansai/tinymcp/pull/126) and TinyBox has a Linux backend with real process isolation."]
 async fn disabling_server_drops_its_live_module_connection() {
     let (_tmp, config) = fresh_workspace_config();
     let server_id = install_server(&config, "@openhuman-test/echo", stdio_server()).await;
@@ -126,7 +126,7 @@ async fn disabling_server_drops_its_live_module_connection() {
 }
 
 #[tokio::test]
-#[ignore = "requires a TinyMCP library: node scripts/modules/build.mjs tinymcp"]
+#[ignore = "requires a TinyMCP library (node scripts/modules/build.mjs tinymcp). Temporary: registry-installed servers are never operator-trusted, so the jail must start the stub; it cannot until tinymcp lets the host choose the enforcement level (https://github.com/tinyhumansai/tinymcp/pull/126) and TinyBox has a Linux backend with real process isolation."]
 async fn disabled_server_accepts_environment_update_without_reconnecting() {
     use std::collections::HashMap;
 
@@ -148,7 +148,7 @@ async fn disabled_server_accepts_environment_update_without_reconnecting() {
 }
 
 #[tokio::test]
-#[ignore = "requires a TinyMCP library: node scripts/modules/build.mjs tinymcp"]
+#[ignore = "requires a TinyMCP library (node scripts/modules/build.mjs tinymcp). Temporary: registry-installed servers are never operator-trusted, so the jail must start the stub; it cannot until tinymcp lets the host choose the enforcement level (https://github.com/tinyhumansai/tinymcp/pull/126) and TinyBox has a Linux backend with real process isolation."]
 async fn per_config_lookups_are_isolated_by_workspace() {
     use openhuman_core::mcp::registry::{connections, ops};
 
