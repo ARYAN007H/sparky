@@ -205,7 +205,7 @@ unsafe fn build_panel(mtm: MainThreadMarker, frame: NSRect) -> Retained<NSPanel>
 
         // Float above the menu bar. NSStatusWindowLevel = 25, which sits above
         // NSMainMenuWindowLevel = 24. Same recipe used by the mascot panel and
-        // the `configure_overlay_window_macos` helper.
+        // the app's main-window setup.
         panel.setLevel(25);
         panel.setCollectionBehavior(
             NSWindowCollectionBehavior::CanJoinAllSpaces

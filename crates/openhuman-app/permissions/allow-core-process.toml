@@ -1,6 +1,6 @@
 [[permission]]
 identifier = "allow-core-process"
-description = "Privileged desktop permissions for core process control, service management, dictation, window/UI, notifications, log access, and workspace integration"
+description = "Privileged desktop permissions for core process control, service management, window/UI, notifications, log access, and workspace integration"
 
 [permission.commands]
 

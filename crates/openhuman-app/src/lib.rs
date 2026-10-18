@@ -796,8 +796,6 @@ async fn install_app_update(
     app.restart();
 }
 
-/// Register (or re-register) the global dictation toggle hotkey.
-/// Emits `dictation://toggle` to all webviews when the shortcut is pressed.
 fn is_daemon_mode() -> bool {
     std::env::args().any(|arg| arg == "daemon" || arg == "--daemon")
 }

@@ -4,7 +4,7 @@ Tauri v2 permission sets for the app's own commands (the ones registered in
 `generate_handler!` in [`src/lib.rs`](../src/lib.rs)). Each `.toml` file defines one
 `[[permission]]` with an `identifier` and a `[permission.commands] allow`
 list. The capability in [`../capabilities/default.json`](../capabilities/README.md)
-grants all of them to the `main` and `overlay` windows by identifier.
+grants all of them to the `main` window by identifier.
 
 ## How it works
 
@@ -21,7 +21,7 @@ renderer invoke('gateway_list')
    |
    v
 RuntimeAuthority::resolve_access
-   |  capability "default" (windows: main, overlay)
+   |  capability "default" (window: main)
    |    -> allow-core-process, allow-app-update, ... (these files)
    |  command listed in one of them?  yes -> run handler
    v                                   no  -> "not allowed. Command not found"
