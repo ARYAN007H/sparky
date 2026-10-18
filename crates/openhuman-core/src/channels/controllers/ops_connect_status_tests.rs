@@ -1,4 +1,69 @@
 use super::*;
+use std::sync::Arc;
+use tinymemory_api::conformance::ReferenceEngine;
+use tinymemory_api::{MemoryEngine, MemoryMeta, Role, SourceKind, StoreItem, Turn};
+
+fn channel_memory_item(thread_id: &str, channel: &str) -> StoreItem {
+    StoreItem::Conversation {
+        turns: vec![Turn::new(Role::User, format!("hello from {channel}"))],
+        meta: MemoryMeta {
+            thread_id: Some(thread_id.into()),
+            channel: Some(channel.into()),
+            source: tinymemory_api::SourceRef {
+                kind: SourceKind::Conversation,
+                id: Some(thread_id.into()),
+            },
+            ..MemoryMeta::default()
+        },
+    }
+}
+
+async fn store_channel_thread(config: &Config, channel: &str, id: &str) -> String {
+    use crate::threads::store::{ConversationMessage, CreateConversationThread};
+    use serde_json::json;
+
+    let params = crate::channels::providers::relay::RelayInboundParams::new(
+        channel,
+        format!("chat-{id}"),
+        format!("sender-{id}"),
+        id,
+        "hello",
+    );
+    let thread_id = params.thread_id();
+    let now = chrono::Utc::now().to_rfc3339();
+    let ctx = crate::core::runtime::DispatchCtx::ambient();
+    crate::threads::store::blocking::ensure_thread(
+        ctx.clone(),
+        config.workspace_dir.clone(),
+        CreateConversationThread {
+            id: thread_id.clone(),
+            title: params.thread_title(),
+            created_at: now.clone(),
+            parent_thread_id: None,
+            labels: None,
+            personality_id: None,
+            working_dir: None,
+        },
+    )
+    .await
+    .unwrap();
+    crate::threads::store::blocking::append_message(
+        ctx,
+        config.workspace_dir.clone(),
+        thread_id.clone(),
+        ConversationMessage {
+            id: format!("user:{id}"),
+            content: "hello".into(),
+            message_type: "text".into(),
+            extra_metadata: json!({"scope": "channel", "channel": channel}),
+            sender: "user".into(),
+            created_at: now,
+        },
+    )
+    .await
+    .unwrap();
+    thread_id
+}
 
 #[tokio::test]
 async fn persist_prepared_discord_configuration_and_encrypted_token() {
@@ -192,6 +257,92 @@ async fn disconnect_discord_bot_token_clears_runtime_config() {
     assert!(
         discord.is_none(),
         "channels_config.discord should be removed after disconnect"
+    );
+}
+
+#[tokio::test]
+async fn disconnect_rpc_reports_stamped_memory_count() {
+    let (_tmp, mut config) = isolated_test_config();
+    config.channels_config.discord = Some(DiscordConfig {
+        bot_token: "discord-token-abc".into(),
+        guild_id: Some("guild-1".into()),
+        channel_id: Some("channel-2".into()),
+        allowed_users: vec![],
+        listen_to_bots: false,
+        mention_only: false,
+    });
+    config.save().await.expect("save Discord setup");
+    let engine = Arc::new(ReferenceEngine::new());
+    crate::memory::engine::install_test_engine(&config.workspace_dir, engine.clone());
+    engine
+        .store(channel_memory_item("discord-thread", "discord"))
+        .await
+        .unwrap();
+    engine
+        .store(channel_memory_item("telegram-thread", "telegram"))
+        .await
+        .unwrap();
+
+    let outcome = disconnect_channel(&config, "discord", ChannelAuthMode::BotToken, true)
+        .await
+        .expect("disconnect clears memory");
+
+    assert_eq!(outcome.value["memory_chunks_deleted"], 1);
+    assert_eq!(engine.len(), 1, "the other channel memory remains");
+}
+
+#[tokio::test]
+async fn disconnect_rpc_reports_zero_and_queues_when_memory_is_off() {
+    let (_tmp, mut config) = isolated_test_config();
+    config.channels_config.discord = Some(DiscordConfig {
+        bot_token: "discord-token-abc".into(),
+        guild_id: Some("guild-1".into()),
+        channel_id: Some("channel-2".into()),
+        allowed_users: vec![],
+        listen_to_bots: false,
+        mention_only: false,
+    });
+    config.memory.engine.clear();
+    config.save().await.expect("save Discord setup");
+    let thread_id = store_channel_thread(&config, "discord", "offline-message").await;
+
+    let outcome = disconnect_channel(&config, "discord", ChannelAuthMode::BotToken, true)
+        .await
+        .expect("offline memory queues deletion");
+
+    assert_eq!(outcome.value["memory_chunks_deleted"], 0);
+    assert_eq!(
+        crate::memory::deletion::pending(&config.workspace_dir),
+        vec![crate::memory::deletion::PendingDeletion::Thread { thread_id }]
+    );
+}
+
+#[tokio::test]
+async fn disconnect_rpc_surfaces_memory_error_after_queuing_snapshot() {
+    let (_tmp, mut config) = isolated_test_config();
+    config.channels_config.discord = Some(DiscordConfig {
+        bot_token: "discord-token-abc".into(),
+        guild_id: Some("guild-1".into()),
+        channel_id: Some("channel-2".into()),
+        allowed_users: vec![],
+        listen_to_bots: false,
+        mention_only: false,
+    });
+    config.save().await.expect("save Discord setup");
+    let thread_id = store_channel_thread(&config, "discord", "failed-message").await;
+    crate::memory::test_fixtures::RefusingEngine::with(tinymemory_api::Error::Engine(
+        "forget failed".into(),
+    ))
+    .bind(&config);
+
+    let error = disconnect_channel(&config, "discord", ChannelAuthMode::BotToken, true)
+        .await
+        .expect_err("disconnect must report the failed memory clear");
+
+    assert!(error.contains("channel disconnected, but failed to clear memory chunks"));
+    assert_eq!(
+        crate::memory::deletion::pending(&config.workspace_dir),
+        vec![crate::memory::deletion::PendingDeletion::Thread { thread_id }]
     );
 }
 
