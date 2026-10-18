@@ -159,6 +159,7 @@ fn a_telegram_message_is_answered_by_the_bound_runtime_agent() {
                 .config(offline_config())
                 .workspace(Workspace::Ephemeral)
                 .backend_url(backend.uri())
+                .api_key("sk-managed-fixture")
                 .build()
                 .await
                 .expect("runtime builds");
