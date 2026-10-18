@@ -64,7 +64,7 @@ pub use lifecycle::{
 pub(crate) use ops::is_safe_task_id;
 pub use types::{
     SubagentCheckpointData, SubagentMode, SubagentRunError, SubagentRunOptions, SubagentRunOutcome,
-    SubagentRunStatus, SubagentUsage,
+    SubagentRunStatus, SubagentUsage, SubagentUsageExt,
 };
 
 pub(crate) use ops::{append_subagent_role_contract, resolve_subagent_source};
