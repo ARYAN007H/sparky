@@ -294,7 +294,7 @@ pub fn learning_item(params: LearnParams, host_meta: Option<MemoryMeta>) -> Resu
     }
     let mut meta = params.meta.unwrap_or_default();
     if let Some(host) = host_meta {
-        merge_meta(&mut meta, host);
+        meta = meta.overlay(host);
     }
     if meta.observed_at.is_none() {
         meta.observed_at = Some(Utc::now());
@@ -307,41 +307,6 @@ pub fn learning_item(params: LearnParams, host_meta: Option<MemoryMeta>) -> Resu
     );
     item.validate()?;
     Ok(item)
-}
-
-/// Overlays every field `host` sets onto `meta`.
-fn merge_meta(meta: &mut MemoryMeta, host: MemoryMeta) {
-    macro_rules! take {
-        ($($field:ident),*) => {$(
-            if host.$field.is_some() {
-                meta.$field = host.$field;
-            }
-        )*};
-    }
-    take!(
-        workspace,
-        folder,
-        file_path,
-        language,
-        repo,
-        commit,
-        url,
-        thread_id,
-        turns,
-        agent_id,
-        tool_call,
-        observed_at,
-        derive
-    );
-    meta.source = host.source;
-    // The host's node is authoritative: a caller cannot write into another
-    // agent's memory.
-    meta.namespace = host.namespace;
-    for tag in host.tags {
-        if !meta.tags.contains(&tag) {
-            meta.tags.push(tag);
-        }
-    }
 }
 
 /// `memory_learn`: returns once the learning is readable.
