@@ -80,6 +80,6 @@ pub(super) fn handle_web_event(
                 present_pending_plan_review(ui);
             }
         }
-        _ => state.apply_event(scoped.wire_event()),
+        _ => state.apply_event_view(&ev),
     }
 }
