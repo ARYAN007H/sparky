@@ -288,5 +288,15 @@
     "category": "A",
     "reason": "Keeps the one process-wide event-bus subscription that writes artifact rows alive and makes registration idempotent; it holds no data, and each event names the workspace and thread its row is written to.",
     "verification": "threads/artifact_rows_tests.rs: recording_an_artifact_twice_writes_one_row"
+  },
+  {
+    "file": "crates/openhuman-core/src/mcp/host_cleanup.rs",
+    "scope": "",
+    "name": "CLIENTS",
+    "type": "OnceLock<ClientTable<CleanupClient>>",
+    "count": 1,
+    "category": "B",
+    "reason": "The canonical TinyMCP client table is keyed by the resolved agent directory. Host completion and exact-client eviction preserve the same directory fence across close and purge; no runtime guard is retained in the table.",
+    "verification": "mcp/module_client_owner_tests.rs: orphaned_shutdown_cleanup_keeps_a_host_directory_reservation_until_confirmed; mcp/module_client/cleanup_tests.rs: a_pending_close_fences_the_folder_under_another_spelling"
   }
 ]
