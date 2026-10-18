@@ -172,7 +172,7 @@ pub async fn run(
             },
             recv = web_rx.recv() => match recv {
                 Ok(ev) => {
-                    let before=ui.viewport.total_rows();handle_web_event(&ev, &mut state, &mut ui);
+                    let before=ui.viewport.total_rows();handle_web_event(ev.wire_event(), &mut state, &mut ui);
                     if ui.scroll_from_bottom>0 {ui.viewport.rows(&state,ui.transcript_area.width.saturating_sub(2),ui.transcript_area.height,ui.scroll_from_bottom);ui.scroll_from_bottom=ui.scroll_from_bottom.saturating_add(ui.viewport.total_rows().saturating_sub(before));}
                     dirty = true;
                 },
