@@ -52,6 +52,7 @@ mod steering_forwarder;
 pub(crate) mod tool_registration;
 mod turn_exec;
 mod turn_exec_native;
+mod supplemental_trace;
 mod turn_middleware;
 pub(crate) mod turn_model_resolver;
 mod turn_outcome;
@@ -72,6 +73,7 @@ pub(crate) use crate::inference::turn_models::TurnModels;
 pub(crate) use observability::SubagentScope;
 pub(crate) use turn_exec::TurnSpec;
 pub(crate) use turn_exec_native::NativeSubagentRunContext;
+pub(crate) use supplemental_trace::SupplementalTrace;
 pub(crate) use turn_outcome::{DeferredTurnTerminal, TinyagentsTurnOutcome};
 #[cfg(test)]
 pub(crate) use turn_policy::is_subagent_spawn_or_delegate_tool;
