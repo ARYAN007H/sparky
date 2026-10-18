@@ -41,7 +41,7 @@ fn host_pack_citations_follow_references_and_exclude_unshown_hits() {
 #[tokio::test]
 async fn background_prefetch_records_citations_only_when_returning_the_pack() {
     let tmp = tempfile::tempdir().unwrap();
-    let config = Arc::new(config_in(&tmp));
+    let config = std::sync::Arc::new(config_in(&tmp));
     let engine = bind_reference(&config);
     engine
         .store(StoreItem::learning(
@@ -56,7 +56,7 @@ async fn background_prefetch_records_citations_only_when_returning_the_pack() {
         .resolve(&crate::memory::scope::identity_pins(&config));
     let ctx = crate::core::runtime::DispatchCtx::ambient();
 
-    assert!(super::super::prefetch::pre_turn(
+    assert!(super::super::super::prefetch::pre_turn(
         &ctx,
         config.clone(),
         identity.clone(),
@@ -72,7 +72,7 @@ async fn background_prefetch_records_citations_only_when_returning_the_pack() {
     .is_none());
     assert!(crate::web_chat::citations::take_turn_citations(&ctx, "citation-thread").is_empty());
 
-    super::super::prefetch::settle_for_test(
+    super::super::super::prefetch::settle_for_test(
         &ctx,
         &config,
         &identity,
@@ -80,7 +80,7 @@ async fn background_prefetch_records_citations_only_when_returning_the_pack() {
         false,
     )
     .await;
-    let pack = super::super::prefetch::pre_turn(
+    let pack = super::super::super::prefetch::pre_turn(
         &ctx,
         config,
         identity,
@@ -125,7 +125,7 @@ async fn replaying_a_committed_reply_does_not_queue_its_build_twice() {
 #[test]
 fn memory_turn_keeps_its_core_context_without_owning_the_core() {
     let tmp = tempfile::tempdir().unwrap();
-    let config = Arc::new(config_in(&tmp));
+    let config = std::sync::Arc::new(config_in(&tmp));
     let identity = tinymemory_tools::layout::identity::Identity::agent("context-agent")
         .resolve(&crate::memory::scope::identity_pins(&config));
     let core = crate::core::runtime::CoreContext::for_test(
@@ -138,7 +138,7 @@ fn memory_turn_keeps_its_core_context_without_owning_the_core() {
         identity,
         thread_id: "context-thread".into(),
         pack: None,
-        in_prompt_from: std::sync::Arc::new(super::super::window::InPromptFrom::new(2, 4)),
+        in_prompt_from: std::sync::Arc::new(super::super::super::window::InPromptFrom::new(2, 4)),
         core: Some(weak.clone()),
     };
 
