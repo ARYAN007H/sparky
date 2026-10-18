@@ -131,13 +131,13 @@ impl Memory {
     /// Binds `base` to the layout root `root` (`team:acme`).
     pub(crate) fn bind(mut base: Config, root: &str) -> Result<Self> {
         let root = root.trim();
-        openhuman_core::memory::scope::validate_root(root).map_err(Error::invalid)?;
+        openhuman_core::memory::scope::validate_root(root).map_err(Error::InvalidRequest)?;
         let namespace: Namespace = root
             .parse()
             .map_err(|error: tinymemory_api::Error| Error::InvalidRequest(error.to_string()))?;
         if namespace.is_root() {
             return Err(Error::InvalidRequest(
-                "a tenant's memory needs a root below the store root",
+                "a tenant's memory needs a root below the store root".into(),
             ));
         }
         let layout = MemoryLayout::new(namespace)?;
