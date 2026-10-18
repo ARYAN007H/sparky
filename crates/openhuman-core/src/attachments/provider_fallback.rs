@@ -2,7 +2,6 @@ use super::*;
 impl AttachmentModel {
     pub(super) async fn document_fallback(
         &self,
-        path: &str,
         mime: &str,
         bytes: &[u8],
     ) -> tinyinference_llm::Result<(String, bool)> {
@@ -15,7 +14,7 @@ impl AttachmentModel {
         #[cfg(not(feature = "documents"))]
         let text = String::new();
         #[cfg(not(feature = "documents"))]
-        let _ = (path, mime, bytes);
+        let _ = (mime, bytes);
         #[cfg(feature = "documents")]
         {
                 use tinydocs_bus::DocumentFormat;
@@ -38,7 +37,7 @@ impl AttachmentModel {
                     );
                     cacheable = false;
                     text.push_str(&format!(
-                        "Document extraction is disabled ([components] documents = false); original remains available at workspace path: {path}."
+                        "Document extraction is disabled ([components] documents = false); original remains available."
                     ));
                 } else if let Some(format) = format {
                     let (_, _, limit) = self.config.multimodal_files.effective_limits();
@@ -154,7 +153,7 @@ impl AttachmentModel {
                         }
                         Ok(Err(error)) => {
                             cacheable = false;
-                                    text.push_str(&format!("Document extraction unavailable: {error}. Original remains available at workspace path: {path}."));
+                                    text.push_str(&format!("Document extraction unavailable: {error}. Original remains available."));
                         }
                         Err(_) => {
                             cacheable = false;

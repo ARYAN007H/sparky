@@ -380,6 +380,9 @@ async fn paid_vision_readout_is_reused_across_recreated_wrappers_and_invalidated
         assert!(call.messages[0]
             .text()
             .contains("Image readout:\nmock vision readout"));
+        assert!(call.messages[0]
+            .text()
+            .contains("workspace path: uploads/thread/image/original.jpg"));
         let Message::User(user) = &call.messages[0] else {
             panic!("expected main user message")
         };
@@ -391,6 +394,37 @@ async fn paid_vision_readout_is_reused_across_recreated_wrappers_and_invalidated
     assert!(
         matches!(&request.messages[0], Message::User(user) if matches!(&user.content[0], ContentBlock::Image(image) if image.url == "uploads/thread/image/original.jpg"))
     );
+}
+
+#[tokio::test]
+async fn image_readout_for_unmanaged_sources_uses_the_wrapper_memory_cache() {
+    let temp = tempfile::tempdir().unwrap();
+    let source = "outside-uploads.jpg";
+    tokio::fs::write(temp.path().join(source), b"\xff\xd8\xff\xe0same image")
+        .await
+        .unwrap();
+    let config = offline_config(temp.path());
+    let mut vision = CaptureModel::new(vec![InputModality::Image]);
+    vision.profile.provider = Some("injected".into());
+    vision.profile.modalities.image_in = true;
+    vision.reply = "mock vision readout";
+    let vision = Arc::new(vision);
+    let _override =
+        crate::inference::provider::factory::test_provider_override::install_model(vision.clone());
+    let model = controlled_wrapper(Arc::new(CaptureModel::new(vec![])), config, &[]);
+    let request = user_request(vec![ContentBlock::Image(ImageRef {
+        url: source.into(),
+        mime_type: Some("image/jpeg".into()),
+    })]);
+
+    model.invoke(&(), request.clone()).await.unwrap();
+    model.invoke(&(), request).await.unwrap();
+
+    assert_eq!(vision.requests.lock().unwrap().len(), 1);
+    assert!(!temp
+        .path()
+        .join(".openhuman-derived/readout.txt")
+        .exists());
 }
 
 #[tokio::test]

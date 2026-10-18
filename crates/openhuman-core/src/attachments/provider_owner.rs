@@ -149,18 +149,18 @@ impl MediaFallbackRenderer<AttachmentAccessScope> for AttachmentModel {
         attachment: &ResolvedAttachment,
     ) -> Result<Option<String>, String> {
         if modality == InputModality::Image {
-            let key = self.fallback_key(&attachment.name, &attachment.mime, &attachment.bytes);
-            if let Some(text) = self.cached_fallback(&attachment.name, &key, _scope).await {
+            if let Some(text) = MediaFallbackCache::get(self, _scope, modality, attachment).await {
                 return Ok(Some(text));
             }
             let text = format!(
-                "Image readout (untrusted):\n{}",
+                "{}\nImage readout:\n{}",
+                attachment_header(attachment),
                 self.image_readout(&attachment.mime, &attachment.bytes)
                     .await
                     .map_err(|error| error.to_string())?
             );
             let text = self.limit_context(text);
-            self.save_fallback(&attachment.name, &key, &text, _scope).await;
+            MediaFallbackCache::put(self, _scope, modality, attachment, &text).await;
             return Ok(Some(text));
         }
         #[cfg(feature = "documents")]
@@ -169,22 +169,28 @@ impl MediaFallbackRenderer<AttachmentAccessScope> for AttachmentModel {
             | "application/vnd.openxmlformats-officedocument.presentationml.presentation"
             | "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
         {
-            let key = self.fallback_key(&attachment.name, &attachment.mime, &attachment.bytes);
-            if let Some(text) = self.cached_fallback(&attachment.name, &key, _scope).await {
+            if let Some(text) = MediaFallbackCache::get(self, _scope, modality, attachment).await {
                 return Ok(Some(text));
             }
-            let (text, cacheable) = self.document_fallback(
-                &attachment.name,
+            let (body, cacheable) = self.document_fallback(
                 &attachment.mime,
                 &attachment.bytes,
             ).await.map_err(|error| error.to_string())?;
+            let text = format!("{}\n{body}", attachment_header(attachment));
             if cacheable {
-                self.save_fallback(&attachment.name, &key, &text, _scope).await;
+                MediaFallbackCache::put(self, _scope, modality, attachment, &text).await;
             }
             return Ok(Some(text));
         }
         Ok(None)
     }
+}
+
+fn attachment_header(attachment: &ResolvedAttachment) -> String {
+    format!(
+        "[Attachment: {}; {} bytes; workspace path: {}]",
+        attachment.mime, attachment.size_bytes, attachment.name
+    )
 }
 
 #[async_trait]
@@ -201,9 +207,7 @@ impl MediaFallbackCache<AttachmentAccessScope> for AttachmentModel {
         }
         let text = self.cached_fallback(&attachment.name, &key, scope).await?;
         if let Ok(mut cache) = self.fallback_cache.lock() {
-            if cache.len() < 16 {
-                cache.insert(key, text.clone());
-            }
+            cache.insert(key, text.clone());
         }
         Some(text)
     }
@@ -217,9 +221,7 @@ impl MediaFallbackCache<AttachmentAccessScope> for AttachmentModel {
     ) {
         let key = self.fallback_key(&attachment.name, &attachment.mime, &attachment.bytes);
         if let Ok(mut cache) = self.fallback_cache.lock() {
-            if cache.len() < 16 {
-                cache.insert(key.clone(), text.to_owned());
-            }
+            cache.insert(key.clone(), text.to_owned());
         }
         self.save_fallback(&attachment.name, &key, text, scope).await;
     }
