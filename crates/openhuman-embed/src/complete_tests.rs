@@ -216,6 +216,42 @@ async fn physical_observer_reports_content_free_provider_outcome() {
     assert_eq!(events[0].1.answered_model.as_deref(), Some("vendor/answered"));
 }
 
+#[tokio::test]
+async fn physical_observer_reports_each_structured_repair_dispatch() {
+    let server = MockServer::start().await;
+    let replies = Arc::new(Mutex::new(0));
+    let replies_for_handler = Arc::clone(&replies);
+    Mock::given(method("POST"))
+        .and(path("/v1/chat/completions"))
+        .respond_with(move |_request: &wiremock::Request| {
+            let mut replies = replies_for_handler.lock().unwrap();
+            let text = if *replies == 0 { "invalid" } else { "{\"ok\":true}" };
+            *replies += 1;
+            ResponseTemplate::new(200).set_body_json(body(text, "stop"))
+        })
+        .mount(&server)
+        .await;
+    let recorder = Arc::new(PhysicalRecorder::default());
+    let request = CompletionRequest::new("repair-model", vec![ChatMessage::user("private")])
+        .response_format(ResponseFormat::JsonObject)
+        .structured_retries(1);
+
+    completer(&server)
+        .physical_observer(recorder.clone())
+        .complete(request)
+        .await
+        .unwrap();
+
+    assert_eq!(*replies.lock().unwrap(), 2);
+    let events = recorder.0.lock().unwrap();
+    assert_eq!(events.len(), 2);
+    assert!(events.iter().all(|(metadata, outcome)| {
+        metadata.requested_model.as_deref() == Some("repair-model")
+            && outcome.status == tinyagents_harness::observability::PhysicalDispatchStatus::Succeeded
+            && outcome.usage.as_ref().unwrap().input_tokens == 100
+    }));
+}
+
 #[test]
 fn json_reply_tolerates_one_code_fence() {
     assert_eq!(
