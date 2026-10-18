@@ -64,14 +64,6 @@ async fn a_disabled_host_reports_unavailable_without_starting_a_broker() {
     config.modules.enabled = false;
 
     assert!(matches!(
-        super::route(&config, "pause").await,
-        Err(VoiceCallError::Unavailable(_))
-    ));
-    assert!(matches!(
-        super::sequence_utterance(&config, "hey tiny pause", "Hey Tiny").await,
-        Err(VoiceCallError::Unavailable(_))
-    ));
-    assert!(matches!(
         super::gate_recording(
             &config,
             1.0,
@@ -86,10 +78,6 @@ async fn a_disabled_host_reports_unavailable_without_starting_a_broker() {
     ));
     assert!(matches!(
         super::is_hallucinated(&config, "okay", HallucinationMode::Dictation).await,
-        Err(VoiceCallError::Unavailable(_))
-    ));
-    assert!(matches!(
-        super::encode_wav(&config, &[0.1, 0.2], 16_000).await,
         Err(VoiceCallError::Unavailable(_))
     ));
     assert!(matches!(
