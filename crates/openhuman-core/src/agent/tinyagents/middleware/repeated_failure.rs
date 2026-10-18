@@ -13,7 +13,7 @@ use tinyagents_harness::middleware::{
     Middleware, ToolFactsLookup, ToolInvocationIdentity,
 };
 use tinyagents_harness::no_progress::{
-    classified_step_with_cause, clear_recovered, ClassifiedFailureTracker,
+    classified_step, classified_step_with_cause, clear_recovered, ClassifiedFailureTracker,
     ClassifiedStepWithCause, FailurePolicy, NoProgress, NoProgressTracker,
     RecoverableFailureLadder, ToolAttempt,
 };
