@@ -41,9 +41,13 @@ async fn attachment_scope_observes_even_after_an_earlier_middleware_stops() {
 #[tokio::test]
 async fn transcript_snapshot_keeps_a_completed_failed_tool_row() {
     let sink = Arc::new(std::sync::Mutex::new(TranscriptSnapshot::default()));
+    let owner_sink = tinyagents_harness::middleware::library::new_transcript_snapshot_sink();
     let middleware = TranscriptSnapshotMiddleware {
         sink: sink.clone(),
-        started: Default::default(),
+        owner: tinyagents_harness::middleware::library::TranscriptSnapshotMiddleware::new(
+            owner_sink.clone(),
+        ),
+        owner_sink,
     };
     let mut context = RunContext::new(
         RunConfig::new("snapshot-tool-outcome"),

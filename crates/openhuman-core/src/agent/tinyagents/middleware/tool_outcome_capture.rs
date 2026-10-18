@@ -27,9 +27,6 @@ pub(crate) struct ToolOutcomeCaptureMiddleware {
     /// 1.6 owns the raw outcome fields; the host still adds classified failure
     /// metadata for the UI.
     failure_map: crate::agent::tinyagents::observability::ToolFailureMap,
-    /// Invocation start + the original structured arguments.  `after_tool`
-    /// receives only an identity/result pair, so preserve both facts at the
-    /// boundary where TinyTools still exposes the full call.
 }
 
 impl ToolOutcomeCaptureMiddleware {

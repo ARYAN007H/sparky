@@ -2,15 +2,13 @@
 //! context middlewares, plus the small observation hook it owns (transcript
 //! snapshot).
 
-use std::collections::HashMap;
 use std::sync::Arc;
-use std::time::Instant;
 
 use async_trait::async_trait;
 
 use tinyagents_harness::context::RunContext;
 use tinyagents_harness::error::Result as TaResult;
-use tinyagents_harness::middleware::{Middleware, ToolInvocationIdentity};
+use tinyagents_harness::middleware::Middleware;
 use tinyagents_harness::runtime::AgentHarness;
 use tinyinference_llm::message::Message;
 use tinyinference_llm::model::{ModelRequest, ModelResponse, ResolvedModelRoute};
@@ -175,11 +173,33 @@ pub(crate) type TranscriptSnapshotSink = Arc<std::sync::Mutex<TranscriptSnapshot
 /// failure.
 pub(crate) struct TranscriptSnapshotMiddleware {
     sink: TranscriptSnapshotSink,
-    /// `after_tool` receives no structured arguments or start time. Keep both
-    /// while the harness still exposes the concrete call so an erroring run can
-    /// hand the same honest tool result to the durable partial append as a
-    /// completed run does.
-    started: Arc<std::sync::Mutex<HashMap<String, (Instant, serde_json::Value)>>>,
+    /// TinyAgents owns request acceptance, transcript replay, call timing and
+    /// tool outcome capture. OpenHuman mirrors that snapshot while adding the
+    /// pricing data the owner intentionally does not know about.
+    owner_sink: tinyagents_harness::middleware::library::TranscriptSnapshotSink,
+    owner: tinyagents_harness::middleware::library::TranscriptSnapshotMiddleware,
+}
+
+fn sync_owner_snapshot(
+    owner: &tinyagents_harness::middleware::library::TranscriptSnapshotSink,
+    host: &TranscriptSnapshotSink,
+) {
+    let Some(snapshot) = owner.lock().ok().map(|snapshot| snapshot.clone()) else {
+        return;
+    };
+    if let Ok(mut host) = host.lock() {
+        host.messages = snapshot.messages;
+        host.accepted_len = snapshot.accepted_len;
+        host.request_base_len = snapshot.request_base_len;
+        host.input_tokens = snapshot.input_tokens;
+        host.output_tokens = snapshot.output_tokens;
+        host.cached_input_tokens = snapshot.cached_input_tokens;
+        host.last_call_input_tokens = snapshot.last_call_input_tokens;
+        host.last_call_output_tokens = snapshot.last_call_output_tokens;
+        host.resolved_route = snapshot.resolved_route;
+        host.model_calls = snapshot.model_calls;
+        host.tool_outcomes = snapshot.tool_outcomes;
+    }
 }
 
 #[async_trait]
@@ -192,76 +212,44 @@ impl Middleware<(), crate::agent::tinyagents::host::OpenHumanRunContext>
 
     async fn before_tool(
         &self,
-        _ctx: &mut RunContext<crate::agent::tinyagents::host::OpenHumanRunContext>,
-        _state: &(),
+        ctx: &mut RunContext<crate::agent::tinyagents::host::OpenHumanRunContext>,
+        state: &(),
         call: &mut tinyinference_llm::tool::ToolCall,
     ) -> TaResult<()> {
-        if let Ok(mut started) = self.started.lock() {
-            started.insert(
-                call.id.to_string(),
-                (Instant::now(), call.arguments.clone()),
-            );
-        }
-        Ok(())
+        self.owner.before_tool(ctx, state, call).await
     }
 
     async fn after_tool(
         &self,
-        _ctx: &mut RunContext<crate::agent::tinyagents::host::OpenHumanRunContext>,
-        _state: &(),
-        invocation: &ToolInvocationIdentity,
+        ctx: &mut RunContext<crate::agent::tinyagents::host::OpenHumanRunContext>,
+        state: &(),
+        invocation: &tinyagents_harness::middleware::ToolInvocationIdentity,
         result: &mut TaToolResult,
     ) -> TaResult<()> {
-        // A tool result reaches a provider only with the next request, so it
-        // also sits past `accepted_len` until that request is answered.
-        let call_id = invocation.call_id().to_string();
-        let (duration_ms, arguments) = self
-            .started
-            .lock()
-            .ok()
-            .and_then(|mut started| started.remove(&call_id))
-            .map(|(started, arguments)| {
-                (
-                    started.elapsed().as_millis().min(u128::from(u64::MAX)) as u64,
-                    arguments,
-                )
-            })
-            .unwrap_or_default();
-        let content = crate::agent::tinyagents::middleware::tool_result_text(result);
-        if let Ok(mut guard) = self.sink.lock() {
-            guard
-                .messages
-                .push(Message::tool(call_id.clone(), content.clone()));
-            guard.tool_outcomes.push(ToolCallOutcome {
-                call_id,
-                name: invocation.tool_name().to_string(),
-                arguments,
-                success: !result.is_error,
-                content,
-                duration_ms,
-            });
-        }
+        self.owner.after_tool(ctx, state, invocation, result).await?;
+        sync_owner_snapshot(&self.owner_sink, &self.sink);
         Ok(())
     }
 
     async fn before_model_dispatch(
         &self,
-        _ctx: &mut RunContext<crate::agent::tinyagents::host::OpenHumanRunContext>,
-        _state: &(),
+        ctx: &mut RunContext<crate::agent::tinyagents::host::OpenHumanRunContext>,
+        state: &(),
         request: &mut ModelRequest,
     ) -> TaResult<()> {
-        if let Ok(mut guard) = self.sink.lock() {
-            guard.messages = request.messages.clone();
-        }
+        self.owner.before_model_dispatch(ctx, state, request).await?;
+        sync_owner_snapshot(&self.owner_sink, &self.sink);
         Ok(())
     }
 
     async fn after_model(
         &self,
         ctx: &mut RunContext<crate::agent::tinyagents::host::OpenHumanRunContext>,
-        _state: &(),
+        state: &(),
         response: &mut ModelResponse,
     ) -> TaResult<()> {
+        self.owner.after_model(ctx, state, response).await?;
+        sync_owner_snapshot(&self.owner_sink, &self.sink);
         // The model middleware records this same route in the host context.
         // Prefer response metadata because it is the exact accepted call; the
         // context slot is the compatibility seam for a model wrapper that only
@@ -274,20 +262,6 @@ impl Middleware<(), crate::agent::tinyagents::host::OpenHumanRunContext>
                 .clone()
         });
         if let Ok(mut guard) = self.sink.lock() {
-            guard.accepted_len = guard.messages.len();
-            guard.model_calls += 1;
-            // The response has not been sent back to a provider yet, so it sits
-            // past `accepted_len`; an error before the next request still keeps
-            // it, as text.
-            guard
-                .messages
-                .push(Message::Assistant(response.message.clone()));
-            // A cache replay spent nothing, but its request was still this
-            // size, so the context figure follows every answered call.
-            if let Some(usage) = response.usage.as_ref() {
-                guard.last_call_input_tokens = usage.input_tokens;
-                guard.last_call_output_tokens = usage.output_tokens;
-            }
             // A cache replay consumed no provider tokens.
             if let Some(usage) = response
                 .usage
@@ -398,9 +372,17 @@ impl TurnContextMiddleware {
         // This also mirrors the incoming transcript before compaction/trim, so
         // the caller's error path persists the completed rounds faithfully.
         if let Some(sink) = self.transcript_snapshot {
+            let owner_sink =
+                tinyagents_harness::middleware::library::new_transcript_snapshot_sink();
+            if let (Ok(host), Ok(mut owner)) = (sink.lock(), owner_sink.lock()) {
+                owner.request_base_len = host.request_base_len;
+            }
             harness.push_middleware(Arc::new(TranscriptSnapshotMiddleware {
                 sink,
-                started: Default::default(),
+                owner: tinyagents_harness::middleware::library::TranscriptSnapshotMiddleware::new(
+                    owner_sink.clone(),
+                ),
+                owner_sink,
             }));
         }
         // Microcompact is NOT registered here any more (issue #6014). It used to
