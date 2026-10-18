@@ -108,10 +108,15 @@ fn dynamic_child_prompt_lists_text_dialect_catalogue_once() {
             agents_md_global: None,
             agents_md_local: None,
         };
-        let mut definition = AgentDefinition::default();
-        definition.id = "dynamic-child".into();
-        definition.system_prompt = PromptSource::Dynamic(());
-        definition.extensions.prompt_builder = Some(dynamic_subagent_prompt);
+        let definition = AgentDefinition {
+            id: "dynamic-child".into(),
+            system_prompt: PromptSource::Dynamic(()),
+            extensions: crate::agent_registry::host_definition::AgentExt {
+                prompt_builder: Some(dynamic_subagent_prompt),
+                ..Default::default()
+            },
+            ..AgentDefinition::default()
+        };
 
         let prompt = load_prompt_source(&definition, &context).unwrap();
         catalogue_counts.push(
