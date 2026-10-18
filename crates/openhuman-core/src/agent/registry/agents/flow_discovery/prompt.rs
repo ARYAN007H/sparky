@@ -9,9 +9,9 @@ use crate::agent::prompts::PromptContext;
 use anyhow::{anyhow, Result};
 
 pub fn build(ctx: &PromptContext<'_>) -> Result<String> {
-    let archetype = ctx.flow_archetype_text.ok_or_else(|| {
-        anyhow!("flow_discovery requires a scoped TinyFlows GetPrompt response")
-    })?;
+    let archetype = ctx
+        .flow_archetype_text
+        .ok_or_else(|| anyhow!("flow_discovery requires a scoped TinyFlows GetPrompt response"))?;
     super::super::flow_prompts::build_with_archetype(ctx, archetype)
 }
 

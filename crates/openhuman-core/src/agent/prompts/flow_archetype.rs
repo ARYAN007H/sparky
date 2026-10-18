@@ -12,7 +12,10 @@ use crate::{agent::harness::host_definition::AgentDefinition, config::Config};
 pub(crate) fn is_bus_backed_builtin(definition: &AgentDefinition) -> bool {
     matches!(&definition.source, DefinitionSource::Builtin)
         && matches!(&definition.system_prompt, PromptSource::Dynamic(()))
-        && matches!(definition.id.as_str(), "workflow_builder" | "flow_discovery")
+        && matches!(
+            definition.id.as_str(),
+            "workflow_builder" | "flow_discovery"
+        )
 }
 
 /// Fetch the archetype for a resolved definition through the module bus.

@@ -9,11 +9,9 @@ fn credential_resolution_ignores_absent_and_foreign_refs() {
     let tmp = tempfile::TempDir::new().unwrap();
     let store = store(&tmp);
     assert!(resolve_http_credential(&store, None).unwrap().is_none());
-    assert!(
-        resolve_http_credential(&store, Some("composio:x:y"))
-            .unwrap()
-            .is_none()
-    );
+    assert!(resolve_http_credential(&store, Some("composio:x:y"))
+        .unwrap()
+        .is_none());
 }
 
 #[test]

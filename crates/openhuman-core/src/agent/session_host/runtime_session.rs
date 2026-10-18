@@ -279,9 +279,8 @@ impl OpenHumanTurnPrelude {
             None
         };
         let prefix = if cold {
-            let tiered = self.build_system_prompt_tiered_with_flow_archetype(
-                flow_archetype_text.as_deref(),
-            )?;
+            let tiered = self
+                .build_system_prompt_tiered_with_flow_archetype(flow_archetype_text.as_deref())?;
             Some(super::prefix_snapshot::tiered_prefix_snapshot(&tiered))
         } else {
             None

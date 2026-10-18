@@ -1,10 +1,7 @@
 use super::*;
 
 #[cfg(feature = "flows")]
-fn prompt_context<'a>(
-    workspace: &'a std::path::Path,
-    agent_id: &'a str,
-) -> PromptContext<'a> {
+fn prompt_context<'a>(workspace: &'a std::path::Path, agent_id: &'a str) -> PromptContext<'a> {
     static VISIBLE: std::sync::OnceLock<std::collections::HashSet<String>> =
         std::sync::OnceLock::new();
     PromptContext {
@@ -48,7 +45,10 @@ async fn typed_subagent_prompts_use_scoped_bus_text_for_both_flow_builtins() {
         let body = load_typed_prompt_source(definition, &loaded_config, context)
             .await
             .unwrap_or_else(|error| panic!("loading {agent_id} prompt: {error}"));
-        assert!(body.contains(expected_tool), "{agent_id} prompt missing its tool");
+        assert!(
+            body.contains(expected_tool),
+            "{agent_id} prompt missing its tool"
+        );
         assert!(body.contains("## Workspace"));
     }
 }

@@ -175,10 +175,9 @@ pub async fn read_resource(
 ) -> Result<Value, ToolCallError> {
     #[cfg(feature = "flows")]
     if let Some(agent_id) = flow_prompt_agent_id(uri) {
-        let config = ctx
-            .load_config()
-            .await
-            .map_err(|_| ToolCallError::Internal("TinyFlows prompt config is unavailable".into()))?;
+        let config = ctx.load_config().await.map_err(|_| {
+            ToolCallError::Internal("TinyFlows prompt config is unavailable".into())
+        })?;
         return read_flow_prompt(&config, uri, agent_id).await;
     }
 

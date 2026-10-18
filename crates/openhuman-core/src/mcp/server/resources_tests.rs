@@ -57,8 +57,8 @@ async fn flow_prompt_resource_fails_closed_when_tinyflows_is_disabled() {
         ),
     );
     let error = read_resource(&ctx, "openhuman://prompts/agents/flow_discovery")
-    .await
-    .expect_err("disabled TinyFlows must not expose a copied prompt");
+        .await
+        .expect_err("disabled TinyFlows must not expose a copied prompt");
     assert_eq!(error.code(), -32603);
     assert!(error.message().contains("unavailable"));
 }

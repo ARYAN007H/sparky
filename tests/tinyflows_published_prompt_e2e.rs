@@ -1,9 +1,9 @@
 //! Normal-host prompt composition against the checksum-verified TinyFlows v0.8.26 module.
 
-#[path = "support/published_tinyflows.rs"]
-mod published_tinyflows;
 #[path = "support/env_guard.rs"]
 mod env_guard;
+#[path = "support/published_tinyflows.rs"]
+mod published_tinyflows;
 
 use env_guard::EnvVarGuard;
 
@@ -42,8 +42,14 @@ async fn published_module_prompts_render_through_the_normal_host_path() {
             .await
             .unwrap_or_else(|error| panic!("rendering {agent_id} prompt: {error:#}"));
         let lower = prompt.text.to_lowercase();
-        assert!(prompt.text.contains(required), "{agent_id} prompt missing {required}");
-        assert!(lower.contains(invariant), "{agent_id} prompt missing {invariant}");
+        assert!(
+            prompt.text.contains(required),
+            "{agent_id} prompt missing {required}"
+        );
+        assert!(
+            lower.contains(invariant),
+            "{agent_id} prompt missing {invariant}"
+        );
         assert!(prompt.text.contains("## Workspace"));
     }
 }

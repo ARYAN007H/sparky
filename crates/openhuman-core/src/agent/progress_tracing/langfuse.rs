@@ -35,9 +35,9 @@ use serde_json::json;
 #[cfg(test)]
 use tinyagents_harness::events::AgentEvent;
 #[cfg(test)]
-use tinyagents_harness::observability::AgentObservation;
-#[cfg(test)]
 use tinyagents_harness::observability::trace_export::{SpanStatus, TraceSpan};
+#[cfg(test)]
+use tinyagents_harness::observability::AgentObservation;
 
 const LOG_TARGET: &str = "agent-tracing::langfuse";
 

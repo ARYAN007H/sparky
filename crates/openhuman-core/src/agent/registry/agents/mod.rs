@@ -31,6 +31,8 @@ mod flow_prompts;
 mod fleet_prompt_tests;
 
 pub mod critic;
+#[cfg(feature = "flows")]
+pub mod flow_discovery;
 pub mod image_agent;
 pub mod morning_briefing;
 pub mod orchestrator;
@@ -42,8 +44,6 @@ pub mod trigger_reactor;
 pub mod trigger_triage;
 pub mod video_agent;
 pub mod vision_agent;
-#[cfg(feature = "flows")]
-pub mod flow_discovery;
 #[cfg(feature = "flows")]
 pub mod workflow_builder;
 

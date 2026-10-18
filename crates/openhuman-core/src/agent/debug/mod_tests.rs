@@ -20,7 +20,10 @@ async fn debug_dump_composes_each_flow_prompt_from_the_copilot_bus() {
         let prompt = render_via_session(&config, agent_id)
             .await
             .unwrap_or_else(|error| panic!("rendering {agent_id}: {error:#}"));
-        assert!(prompt.text.contains(required), "{agent_id} prompt missing {required}");
+        assert!(
+            prompt.text.contains(required),
+            "{agent_id} prompt missing {required}"
+        );
         assert!(prompt.text.contains("## Workspace"));
     }
 }

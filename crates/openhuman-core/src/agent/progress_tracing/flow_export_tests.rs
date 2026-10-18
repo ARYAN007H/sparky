@@ -170,7 +170,10 @@ fn flow_batch_keeps_trace_metadata_and_agent_graph_node_keys() {
     assert_eq!(trace_event["body"]["metadata"]["source"], "flows");
     assert_eq!(trace_event["body"]["metadata"]["run_type"], "flow");
     assert_eq!(trace_event["body"]["metadata"]["trigger"], "rpc");
-    assert_eq!(trace_event["body"]["tags"], json!(["run:flow", "trigger:rpc"]));
+    assert_eq!(
+        trace_event["body"]["tags"],
+        json!(["run:flow", "trigger:rpc"])
+    );
     assert_eq!(trace_event["body"]["release"], APP_VERSION);
     assert_eq!(trace_event["body"]["metadata"]["app_version"], APP_VERSION);
 

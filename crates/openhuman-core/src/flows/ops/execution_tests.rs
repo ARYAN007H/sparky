@@ -1,6 +1,6 @@
 use super::*;
-use tinyflows::graph::GraphEvent;
 use tinyflows::graph::ids;
+use tinyflows::graph::GraphEvent;
 
 #[test]
 fn graph_observations_are_adapted_without_changing_their_wire_shape() {

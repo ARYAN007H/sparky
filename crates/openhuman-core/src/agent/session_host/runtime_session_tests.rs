@@ -197,10 +197,11 @@ async fn explicit_flow_session_prompt_override_does_not_require_tinyflows_or_con
         config_path: temp.path().join("config.toml"),
         ..Default::default()
     };
-    let mut definition = crate::agent::harness::host_definition::AgentDefinitionRegistry::builtins_only()
-        .get("workflow_builder")
-        .expect("workflow_builder builtin")
-        .clone();
+    let mut definition =
+        crate::agent::harness::host_definition::AgentDefinitionRegistry::builtins_only()
+            .get("workflow_builder")
+            .expect("workflow_builder builtin")
+            .clone();
     definition.source = DefinitionSource::CustomRegistry;
     definition.system_prompt = PromptSource::Inline("session-owned flow prompt".into());
 

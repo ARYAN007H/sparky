@@ -12,13 +12,13 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use tinyflows::caps::*;
 use tinyflows::error::{EngineError, Result};
 
 use super::*;
 use crate::config::Config;
-use crate::inference::provider::{BilledUsage, is_raw_passthrough_model};
+use crate::inference::provider::{is_raw_passthrough_model, BilledUsage};
 use tinyagents_session::transcript::TranscriptMessage;
 use tinyflows::nodes::integration::agent_prompt;
 

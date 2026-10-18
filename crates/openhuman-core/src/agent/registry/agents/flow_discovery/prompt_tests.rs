@@ -32,16 +32,20 @@ async fn module_prompt_teaches_the_read_only_emit_invariant() {
         ..crate::config::Config::default()
     };
     let registry = crate::agent::harness::host_definition::AgentDefinitionRegistry::builtins_only();
-    let definition = registry.get("flow_discovery").expect("flow_discovery builtin");
-    let archetype = crate::agent::prompts::flow_archetype::load_for_definition(
-        Some(&config),
-        definition,
-    )
-    .await
-    .expect("TinyFlows GetPrompt succeeds")
-    .expect("flow builtin prompt");
-    let body = build(&ctx(workspace.path(), &std::collections::HashSet::new(), Some(&archetype)))
-        .expect("compose module prompt");
+    let definition = registry
+        .get("flow_discovery")
+        .expect("flow_discovery builtin");
+    let archetype =
+        crate::agent::prompts::flow_archetype::load_for_definition(Some(&config), definition)
+            .await
+            .expect("TinyFlows GetPrompt succeeds")
+            .expect("flow builtin prompt");
+    let body = build(&ctx(
+        workspace.path(),
+        &std::collections::HashSet::new(),
+        Some(&archetype),
+    ))
+    .expect("compose module prompt");
     let lc = body.to_lowercase();
     assert!(lc.contains("suggest_workflows"), "must name the emit tool");
     assert!(

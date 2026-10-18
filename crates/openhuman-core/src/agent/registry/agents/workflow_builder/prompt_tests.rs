@@ -3,7 +3,10 @@ use crate::agent::prompts::{PromptContext, PromptTool};
 #[test]
 fn builder_prompt_composes_supplied_archetype_tools_and_workspace() {
     let temp = tempfile::tempdir().expect("workspace");
-    let tools = [PromptTool::new("save_workflow", "Save the proposed workflow")];
+    let tools = [PromptTool::new(
+        "save_workflow",
+        "Save the proposed workflow",
+    )];
     let visible = std::collections::HashSet::from(["save_workflow".to_string()]);
     let context = PromptContext {
         workspace_dir: temp.path(),
