@@ -30,7 +30,7 @@ fn upstream_engine_status_maps_health_reason_and_capabilities() {
         assert_eq!(row.class, "external");
         assert_eq!(row.health, expected_health);
         assert_eq!(row.health_reason, reason);
-        assert_eq!(row.contract_version, "2.0");
+        assert_eq!(row.contract_version, tinymemory_api::CONTRACT_VERSION);
         assert_eq!(row.capabilities, vec!["recall", "store"]);
         assert!(row.fell_back_from.is_none());
         assert!(row.last_error.is_none());
@@ -47,7 +47,7 @@ async fn memory_off_reports_a_null_row_with_the_reason() {
     assert_eq!(row.class, "null");
     assert_eq!(row.health, "down");
     assert!(row.health_reason.is_some());
-    assert_eq!(row.contract_version, CONTRACT_VERSION);
+    assert_eq!(row.contract_version, tinymemory_api::CONTRACT_VERSION);
     assert!(row.capabilities.is_empty());
     assert_eq!(
         row.fell_back_from.as_deref(),
