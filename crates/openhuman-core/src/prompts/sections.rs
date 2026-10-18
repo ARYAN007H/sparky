@@ -325,7 +325,7 @@ impl SafetySection {
 /// agent's own `prompt.md`, not here.
 ///
 /// Byte-stable (no time / RNG / host) so it lives in the KV-cache-friendly
-/// prefix. Must contain no em-dashes per [`crate::agent::prompts::builder::GLOBAL_STYLE_SUFFIX`].
+/// prefix. Must contain no em-dashes per [`crate::prompts::GLOBAL_STYLE_SUFFIX`].
 /// Heading the grounding contract renders under, in both the global
 /// [`GROUNDING_BODY`] and any agent prompt that carries its own copy. The
 /// builder matches on this to avoid emitting the contract twice.

@@ -348,7 +348,7 @@ Persistence, setup and RPC:
 - `run_subagent`, `run_subagent_with_parent`, `SubagentRunOptions`
   ([`subagent_host/lifecycle.rs`](./subagent_host/lifecycle.rs), [`subagent_host/types.rs`](./subagent_host/types.rs)).
 - `run_triage`, `apply_decision`, `TriggerEnvelope` (`triage/`).
-- `SystemPromptBuilder` ([`prompts/builder.rs`](./prompts/builder.rs)).
+- `SystemPromptBuilder` ([`prompts` (product adapter over TinyAgents prompt composition)](./prompts/builder.rs)).
 - `AgentTurnOrigin` and `with_origin` (`turn_origin.rs`).
 
 ## RPC surface
