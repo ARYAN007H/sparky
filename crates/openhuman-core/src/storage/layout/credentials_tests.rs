@@ -5,7 +5,7 @@ use crate::security::secret_storage::{
 use crate::storage::layout::test_fixtures::{v1_profile, write, Fixture};
 use crate::storage::layout::{migrate, restore, Options, Outcome};
 use std::sync::Arc;
-use tinystoragedrivers::secrets::{DerivedKeys, SecretStore as _};
+use tinystoragedrivers::secrets::DerivedKeys;
 use zeroize::Zeroizing;
 
 const PROFILES: &str =
