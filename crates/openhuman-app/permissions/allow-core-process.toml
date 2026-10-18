@@ -64,9 +64,6 @@ allow = [
     # restart-driven flips, causing a false re-flip and restart loop on
     # every login. (#900)
     "get_active_user_id",
-    # The renderer RPC URL handed to a child overlay webview that was spawned
-    # with `OPENHUMAN_CORE_RPC_URL` (falls back to `None` when unset).
-    "overlay_parent_rpc_url",
 
     # =========================
     # GATEWAYS
@@ -123,26 +120,8 @@ allow = [
     "auth_current_user",
 
     # =========================
-    # DICTATION
-    # =========================
-    "register_dictation_hotkey",
-    "unregister_dictation_hotkey",
-
-    # =========================
-    # PUSH-TO-TALK (PTT)
-    # =========================
-    # Voice settings panel registers/unregisters the global PTT hotkey and shows
-    # the PTT overlay via these invokes. Without these allow entries the invoke
-    # is rejected with "Command <name> not allowed by ACL" and PTT (plus the
-    # always-on listening flow that depends on hotkey registration) never works.
-    "register_ptt_hotkey",
-    "unregister_ptt_hotkey",
-    "show_ptt_overlay",
-
-    # =========================
     # WINDOW / UI
     # =========================
-    "activate_main_window",
     # RootShellLayout keeps the native titlebar in sync with the sidebar.
     "set_titlebar_for_sidebar",
     # Floating mascot window (native NSPanel on macOS; errors elsewhere).
