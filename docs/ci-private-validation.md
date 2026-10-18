@@ -127,3 +127,82 @@ run cold merely because its target directory is new. Record Tinymold hit/miss an
 save time, test counts, coverage presence, linkage proof, each check's result and
 elapsed time. Preserve failed runs too. After merging, repeat through trusted-main
 workflow routing, since pre-merge runs can execute the old workflow.
+
+## Complete Linux manual validation
+
+Both runs at `3a01ec0c54a54f30a14ab92cd5fdbf241d6e9316` independently passed
+with identical selected test identities. The [measurement record](ci-private-measurements-8063.json)
+contains exact counters, resource limits and archive digests.
+Both use the same published image, frozen injected rootfs/kernel, four vCPUs,
+13 GiB RAM, 160 GiB scratch, 32 GiB guest swap and the production 58 GiB shared
+host limit. The cold used the 180-minute workflow budget and 195-minute guest
+deadline; there were no additional per-unit CPU or memory caps.
+
+| Metric                                  |               Cold |               Warm |
+| --------------------------------------- | -----------------: | -----------------: |
+| Validation lane interval                |        8,631.081 s |        4,134.076 s |
+| Full manual entry, including cache save | 8,869 s (2h27m49s) | 4,172 s (1h09m32s) |
+| Whole VM lifecycle                      |        8,877.017 s |        4,180.850 s |
+| Rust test executions                    |             15,572 |             15,572 |
+| Rust failures/errors                    |                  0 |                  0 |
+| Local compiler-cache hits               |              2,286 |              2,717 |
+| Remote compiler-cache hits              |                  0 |              3,801 |
+| Compiler-cache misses                   |              3,830 |                 33 |
+| Compiler-cache errors                   |                  0 |                  0 |
+| Cache-save duration/result              |     206 s / exit 0 |       1 s / exit 0 |
+
+| Configuration                              | Cold executions | Warm executions |
+| ------------------------------------------ | --------------: | --------------: |
+| `openhuman-lib-bins-nextest-`              |          10,168 |          10,168 |
+| `openhuman-embed`                          |             372 |             372 |
+| `openhuman-rpc`                            |             154 |             154 |
+| `openhuman-tinyhumans`                     |             328 |             328 |
+| `openhuman-embed-default-`                 |             337 |             337 |
+| `openhuman-tinyhumans-default-`            |             328 |             328 |
+| `openhuman-tui`                            |              91 |              91 |
+| `openhuman-cli-integration-tests-nextest-` |             447 |             447 |
+| `composio-stack-uninstrumented`            |               1 |               1 |
+| `gate-contract-tests`                      |             432 |             432 |
+| `gate-contract-tests-features`             |              56 |              56 |
+| `tauri`                                    |             309 |             309 |
+| `storage-e2e`                              |              43 |              43 |
+| `storage-lib-tests`                        |           2,486 |           2,486 |
+| `cron-module-tests`                        |              13 |              13 |
+| `storage-session-store-tests`              |               7 |               7 |
+
+Independent pair verification parsed the XML and individual identities against
+count JSON and the compiled CLI inventory: 42 expected CLI targets, 36 executed
+binaries and six present ignored-only binaries. All 16 configurations ran once;
+all 50 active checks passed sequentially, including ten dependency edges. Nine
+LCOV reports were nonempty, all 1,554 eligible source files were present, and
+actual ordinary and instrumented ELF files contained mold metadata. The retained
+changed-line gate exited zero with zero measured product lines; its percentage
+is not a measurement of these CI scripts. All 23 offline examples and Pester
+also passed.
+
+The manual full-entry clock starts before cloning a local root Git bundle and
+includes fresh public vendor clones using the pinned shared checkout script,
+pinned action downloads, preflight, cache setup, all forced-area lanes,
+coverage/link checks and cache save. It excludes host preparation, VM boot and
+shutdown, GitHub step dispatch, the path-filter action and artifact upload. The
+whole-VM clock includes boot, entry smoke and shutdown. GitHub uses an
+authenticated root checkout of the PR merge ref instead of this local bundle.
+These values therefore describe the manual run rather than a GitHub job.
+
+Cold means a new empty remote ActionCache namespace, fresh guest, target outputs
+and local Tinymold store. Production package caches are retained, and the shared
+CAS may already contain deduplicated blobs. The warm repeat retained that same
+namespace and package-cache disk. This is compiler-key cold, with observed
+production co-tenancy. Neighbors changed during the cold run and transient host
+memory reclaim occurred; periodic unit PSI avg10 samples reached 60.91%, with
+zero host OOM events. The warm observed unit PSI avg10 maximum was 4.56%. Historical and cold/warm elapsed differences do not isolate
+a cache-only causal effect.
+
+The completed cold/warm scratch had 2,133,032,960 / 2,155,548,672 bytes
+(about 1.99 / 2.01 GiB) free. Optional live disk polling stopped early in cold
+and did not cover warm; these are closed footprints rather than peak headroom. Release
+example files were absent after scoped cleanup. Logical ordinary ELF sizes fell
+from 922,632,896 to 538,239,416 bytes for approvals and from 926,900,368 to
+536,418,496 for Composio relative to the disk-full diagnostic. Reflinks make
+allocated subtree sizes upper bounds, so those figures do not establish physical
+reclaimed bytes. The remaining scratch margin is narrow.
