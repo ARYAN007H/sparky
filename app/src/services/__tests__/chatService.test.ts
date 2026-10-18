@@ -506,3 +506,95 @@ describe('chatService.chatCancel', () => {
     });
   });
 });
+
+describe('chatService typed attachments', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockCallCoreRpc.mockResolvedValue(undefined);
+  });
+
+  const image = {
+    kind: 'image' as const,
+    media: { url: 'data:image/png;base64,AAA', contentType: 'image/png', fileName: 'a.png' },
+  };
+
+  it('chatSend forwards attachments as typed parts and leaves the text alone', async () => {
+    bindMockSocket(createMockSocket());
+
+    await chatSend({ threadId: 'thread-1', message: 'look', attachments: [image] });
+
+    const params = mockCallCoreRpc.mock.calls[0][0].params;
+    expect(params.message).toBe('look');
+    expect(params.attachments).toEqual([image]);
+    expect(JSON.stringify(params.message)).not.toMatch(/\[(IMAGE|FILE):/);
+  });
+
+  it('chatSend omits the attachments param when there are none', async () => {
+    bindMockSocket(createMockSocket());
+
+    await chatSend({ threadId: 'thread-1', message: 'hi', attachments: [] });
+
+    expect(mockCallCoreRpc.mock.calls[0][0].params.attachments).toBeUndefined();
+  });
+});
+
+describe('chatService wire decoding', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  // The core publishes the run mode in `message` and an approval's terminal
+  // outcome in `cancel_reason` (the tinychannels WebChannelEvent schema has no
+  // `mode` / `resolution` field), so consumers must get them lifted.
+  it('lifts run_mode_changed.message into mode', () => {
+    const socket = createMockSocket();
+    bindMockSocket(socket);
+    const onRunModeChanged = vi.fn();
+    subscribeChatEvents({ onRunModeChanged });
+
+    socket.emit('run_mode_changed', {
+      event: 'run_mode_changed',
+      client_id: '',
+      thread_id: 't1',
+      request_id: '',
+      message: 'plan',
+    });
+
+    expect(onRunModeChanged).toHaveBeenCalledTimes(1);
+    expect(onRunModeChanged.mock.calls[0][0]).toMatchObject({ thread_id: 't1', mode: 'plan' });
+  });
+
+  it('drops run_mode_changed with an unknown mode', () => {
+    const socket = createMockSocket();
+    bindMockSocket(socket);
+    const onRunModeChanged = vi.fn();
+    subscribeChatEvents({ onRunModeChanged });
+
+    socket.emit('run_mode_changed', { thread_id: 't1', request_id: '', message: 'turbo' });
+
+    expect(onRunModeChanged).not.toHaveBeenCalled();
+  });
+
+  it('lifts approval_decided.cancel_reason into resolution', () => {
+    const socket = createMockSocket();
+    bindMockSocket(socket);
+    const onApprovalDecided = vi.fn();
+    subscribeChatEvents({ onApprovalDecided });
+
+    socket.emit('approval_decided', {
+      event: 'approval_decided',
+      client_id: 'c1',
+      thread_id: 't1',
+      request_id: 'r1',
+      tool_name: 'shell',
+      message: 'deny',
+      cancel_reason: 'expired',
+    });
+
+    expect(onApprovalDecided).toHaveBeenCalledTimes(1);
+    expect(onApprovalDecided.mock.calls[0][0]).toMatchObject({
+      request_id: 'r1',
+      resolution: 'expired',
+    });
+  });
+});
