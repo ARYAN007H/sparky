@@ -21,6 +21,7 @@ async fn run() -> anyhow::Result<()> {
         .config(support::offline_config())
         .workspace(Workspace::Ephemeral)
         .backend_url(backend.uri())
+        .api_key("sk-fixture")
         .provider(support::route(&provider, "fixture"))
         .build()
         .await?;
