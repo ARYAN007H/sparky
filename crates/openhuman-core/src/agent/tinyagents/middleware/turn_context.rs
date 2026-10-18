@@ -226,7 +226,9 @@ impl Middleware<(), crate::agent::tinyagents::host::OpenHumanRunContext>
         invocation: &tinyagents_harness::middleware::ToolInvocationIdentity,
         result: &mut TaToolResult,
     ) -> TaResult<()> {
-        self.owner.after_tool(ctx, state, invocation, result).await?;
+        self.owner
+            .after_tool(ctx, state, invocation, result)
+            .await?;
         sync_owner_snapshot(&self.owner_sink, &self.sink);
         Ok(())
     }
@@ -237,7 +239,9 @@ impl Middleware<(), crate::agent::tinyagents::host::OpenHumanRunContext>
         state: &(),
         request: &mut ModelRequest,
     ) -> TaResult<()> {
-        self.owner.before_model_dispatch(ctx, state, request).await?;
+        self.owner
+            .before_model_dispatch(ctx, state, request)
+            .await?;
         sync_owner_snapshot(&self.owner_sink, &self.sink);
         Ok(())
     }

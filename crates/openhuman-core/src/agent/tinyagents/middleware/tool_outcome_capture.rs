@@ -133,12 +133,16 @@ impl Middleware<(), crate::agent::tinyagents::host::OpenHumanRunContext>
             .filter(|v| v.is_object() && v.get("kind").is_some());
         // TinyAgents owns call timing, argument correlation and the outcome
         // record. Run it after host enrichment so the sink sees the final text.
-        self.capture.after_tool(ctx, state, invocation, result).await?;
-        let captured = self
-            .sink
-            .lock()
-            .ok()
-            .and_then(|outcomes| outcomes.iter().rev().find(|outcome| outcome.call_id == call_id).cloned());
+        self.capture
+            .after_tool(ctx, state, invocation, result)
+            .await?;
+        let captured = self.sink.lock().ok().and_then(|outcomes| {
+            outcomes
+                .iter()
+                .rev()
+                .find(|outcome| outcome.call_id == call_id)
+                .cloned()
+        });
         if let (Some(captured), Ok(mut map)) = (captured, self.failure_map.lock()) {
             // Keep duration + rendered output size as a compatibility fallback
             // for old/deserialized completion events; TinyAgents 1.6 supplies

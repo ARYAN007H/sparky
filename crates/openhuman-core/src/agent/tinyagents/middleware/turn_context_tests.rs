@@ -63,10 +63,8 @@ async fn transcript_snapshot_keeps_a_completed_failed_tool_row() {
         .before_tool(&mut context, &(), &mut call)
         .await
         .expect("snapshot accepts tool start");
-    let invocation = tinyagents_harness::middleware::ToolInvocationIdentity::new(
-        "failed-call",
-        "write_file",
-    );
+    let invocation =
+        tinyagents_harness::middleware::ToolInvocationIdentity::new("failed-call", "write_file");
     let mut result = TaToolResult::error("permission denied");
     middleware
         .after_tool(&mut context, &(), &invocation, &mut result)
@@ -114,13 +112,14 @@ async fn owner_snapshot_spend_is_not_counted_twice_and_cache_replay_stays_free()
         .before_model_dispatch(&mut context, &(), &mut first)
         .await
         .expect("snapshot first dispatched request");
-    let mut answered = tinyinference_llm::model::ModelResponse::assistant("answer one")
-        .with_usage(tinyinference_llm::usage::Usage {
+    let mut answered = tinyinference_llm::model::ModelResponse::assistant("answer one").with_usage(
+        tinyinference_llm::usage::Usage {
             input_tokens: 12,
             output_tokens: 4,
             cache_read_tokens: 3,
             ..Default::default()
-        });
+        },
+    );
     middleware
         .after_model(&mut context, &(), &mut answered)
         .await
@@ -170,13 +169,14 @@ async fn owner_snapshot_spend_is_not_counted_twice_and_cache_replay_stays_free()
         .before_model_dispatch(&mut context, &(), &mut replay_request)
         .await
         .expect("snapshot cache replay request");
-    let mut replay = tinyinference_llm::model::ModelResponse::assistant("answer three")
-        .with_usage(tinyinference_llm::usage::Usage {
+    let mut replay = tinyinference_llm::model::ModelResponse::assistant("answer three").with_usage(
+        tinyinference_llm::usage::Usage {
             input_tokens: 7,
             output_tokens: 3,
             cache_read_tokens: 7,
             ..Default::default()
-        });
+        },
+    );
     replay.served_from_cache = true;
     middleware
         .after_model(&mut context, &(), &mut replay)

@@ -71,14 +71,12 @@ impl ToolPolicyMiddleware {
         Self {
             gate: ToolPolicyGate::new(policy),
             render_denial: Arc::new(|call, policy, decision| match decision {
-                PolicyDecision::RequireApproval { reason } => {
-                    PolicyDenial::ApprovalRequired {
-                        tool: &call.name,
-                        policy,
-                        reason,
-                    }
-                    .render()
+                PolicyDecision::RequireApproval { reason } => PolicyDenial::ApprovalRequired {
+                    tool: &call.name,
+                    policy,
+                    reason,
                 }
+                .render(),
                 PolicyDecision::Deny { reason } => PolicyDenial::PolicyDenied {
                     tool: &call.name,
                     policy,
