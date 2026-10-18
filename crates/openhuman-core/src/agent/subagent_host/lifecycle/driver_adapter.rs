@@ -21,6 +21,18 @@ impl OpenHumanDriverBundle {
         checkpoint_dir: PathBuf,
         in_flight: tinyagents_orchestration::subagent::SubagentInFlight,
     ) -> Result<Self, SubagentRunError> {
+        Self::with_in_flight_for(
+            checkpoint_dir,
+            in_flight,
+            crate::core::runtime::DispatchCtx::ambient(),
+        )
+    }
+
+    pub(crate) fn with_in_flight_for(
+        checkpoint_dir: PathBuf,
+        in_flight: tinyagents_orchestration::subagent::SubagentInFlight,
+        dispatch: crate::core::runtime::DispatchCtx,
+    ) -> Result<Self, SubagentRunError> {
         let failures = Arc::new(Mutex::new(HashMap::new()));
         let host_outcome = Arc::new(Mutex::new(HashMap::new()));
         let configured_tool_result = Arc::new(Mutex::new(HashMap::new()));
@@ -35,7 +47,9 @@ impl OpenHumanDriverBundle {
             configured_tool_result: Arc::clone(&configured_tool_result),
         });
         let persistence = Arc::new(
-            OpenHumanPersistence::new(checkpoint_dir).with_host_outcome(Arc::clone(&host_outcome)),
+            OpenHumanPersistence::new(checkpoint_dir)
+                .with_dispatch(dispatch)
+                .with_host_outcome(Arc::clone(&host_outcome)),
         );
         let lifecycle_persistence: Arc<
             dyn tinyagents_orchestration::subagent::SubagentPersistence,

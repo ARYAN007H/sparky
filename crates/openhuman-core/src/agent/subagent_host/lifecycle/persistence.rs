@@ -3,6 +3,7 @@ use crate::agent::subagent_host::types::SubagentCheckpointData;
 
 pub(in crate::agent::subagent_host) struct OpenHumanPersistence {
     checkpoint_dir: std::path::PathBuf,
+    dispatch: crate::core::runtime::DispatchCtx,
     host_outcome: Arc<Mutex<HashMap<SubagentTaskKey, SubagentRunOutcome>>>,
 }
 
@@ -26,8 +27,17 @@ impl OpenHumanPersistence {
     pub(in crate::agent::subagent_host) fn new(checkpoint_dir: std::path::PathBuf) -> Self {
         Self {
             checkpoint_dir,
+            dispatch: crate::core::runtime::DispatchCtx::ambient(),
             host_outcome: Arc::new(Mutex::new(HashMap::new())),
         }
+    }
+
+    pub(in crate::agent::subagent_host) fn with_dispatch(
+        mut self,
+        dispatch: crate::core::runtime::DispatchCtx,
+    ) -> Self {
+        self.dispatch = dispatch;
+        self
     }
 
     pub(in crate::agent::subagent_host) fn with_host_outcome(
@@ -85,7 +95,34 @@ impl OpenHumanPersistence {
         &self,
     ) -> Result<tinyagents_orchestration::subagent::DocumentSubagentPersistence, SubagentError>
     {
-        super::store::LifecycleStore::open(&self.checkpoint_dir)?.neutral_store()
+        self.open_store(false)
+    }
+
+    fn open_store(
+        &self,
+        terminal: bool,
+    ) -> Result<tinyagents_orchestration::subagent::DocumentSubagentPersistence, SubagentError>
+    {
+        let open = || {
+            let legacy = if terminal {
+                super::store::LifecycleStore::before_terminal(&self.checkpoint_dir)?
+            } else {
+                super::store::LifecycleStore::open(&self.checkpoint_dir)?
+            };
+            legacy.neutral_store()
+        };
+        // The generic driver may run in a detached Tokio task. Storage reads
+        // before execution and commits after execution must use the actor the
+        // authenticated parent carried, even outside the executor's scope.
+        if let Some(core) = self.dispatch.resolved() {
+            crate::core::runtime::CoreContext::sync_scope(core, open)
+        } else if crate::core::runtime::is_saas() {
+            Err(SubagentError::Persistence(
+                "subagent lifecycle requires a resolved actor context".into(),
+            ))
+        } else {
+            open()
+        }
     }
 
     pub(super) fn pause_path(&self, key: &SubagentTaskKey) -> std::path::PathBuf {

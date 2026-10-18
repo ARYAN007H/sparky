@@ -391,9 +391,10 @@ async fn invoke_driver_tool_with_request(
                     .unwrap_or_else(|| PathBuf::from(".openhuman/subagent_checkpoints"))
             }),
     );
-    let bundle = OpenHumanDriverBundle::with_in_flight(
+    let bundle = OpenHumanDriverBundle::with_in_flight_for(
         checkpoint_dir.clone(),
         shared_subagent_flight(&parent.data.dispatch_ctx(), &checkpoint_dir),
+        parent.data.dispatch_ctx(),
     )?;
     let request_host = host_request.clone();
     let request_task_id = task_id.clone();
@@ -554,9 +555,7 @@ pub(crate) fn load_subagent_checkpoint(
     task_id: &str,
 ) -> Result<super::SubagentCheckpointData, SubagentRunError> {
     let persistence = OpenHumanPersistence::new(checkpoint_dir.to_path_buf());
-    // This reads under the full-key lifecycle lock and filters terminal state,
-    // so an index left behind by terminal cleanup can never reopen a closed
-    // subagent as an old pause.
+    // The owner filters terminal records, so stale indexes cannot reopen a pause.
     persistence.checkpoint_for_task(task_id)
 }
 
@@ -675,9 +674,10 @@ impl OpenHumanSubagentHost {
             invocation: HostInvocation::Agent(self.definition),
             options: self.options,
         };
-        let driver = OpenHumanDriverBundle::with_in_flight(
+        let driver = OpenHumanDriverBundle::with_in_flight_for(
             checkpoint_dir.clone(),
             shared_subagent_flight(&parent.data.dispatch_ctx(), &checkpoint_dir),
+            parent.data.dispatch_ctx(),
         )?;
         let request = if continuation {
             SubagentRequest::continue_with_key(task_key.clone(), child, request, input, None, None)
