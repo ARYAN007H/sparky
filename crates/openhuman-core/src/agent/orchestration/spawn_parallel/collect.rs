@@ -119,6 +119,7 @@ pub(crate) async fn project_spawn_parallel_result(
                         stop: matches!(result.status, ParallelAgentStatus::Incomplete).then(|| {
                             crate::agent::session_host::stop_summary::stop_from_incomplete(
                                 error.as_deref().unwrap_or(""),
+                                result.failure_cause.clone(),
                             )
                         }),
                     })
