@@ -33,9 +33,34 @@ use tinymemory_tools::layout::identity::ResolvedIdentity;
 pub(super) struct PendingMemoryTurn {
     identity: ResolvedIdentity,
     user_index: u32,
+    channel: Option<String>,
     // The canonical runtime can commit on a different task. Restore the
     // authenticated profile captured at preparation, never infer it from config.
     profile_context: ProfileMemoryContext,
+}
+
+/// The provider channel that owns a logged conversation, if this turn came
+/// from a registered external channel. Event-context labels such as `cron`,
+/// `voice`, and `mcp_server` are not channel owners.
+fn logged_channel(origin: Option<&crate::agent::turn_origin::AgentTurnOrigin>) -> Option<String> {
+    let Some(crate::agent::turn_origin::AgentTurnOrigin::ExternalChannel {
+        channel,
+        message_id,
+        ..
+    }) = origin
+    else {
+        return None;
+    };
+    if message_id.starts_with("cron:") {
+        return None;
+    }
+    let channel = channel.trim().to_ascii_lowercase();
+    if channel.is_empty()
+        || tinychannels_bus::controllers::find_channel_definition(&channel).is_none()
+    {
+        return None;
+    }
+    Some(channel)
 }
 
 // Missing profile authority must not be confused with an ordinary desktop turn.
@@ -143,6 +168,7 @@ impl OpenHumanTurnPrelude {
             .pending_memory_turn = Some(PendingMemoryTurn {
             identity: identity.clone(),
             user_index,
+            channel: logged_channel(origin.as_ref()),
             profile_context,
         });
         let pack = crate::memory::lifecycle::prefetch::pre_turn(
@@ -231,6 +257,7 @@ impl OpenHumanTurnPrelude {
                 assistant_text,
                 tool_calls,
                 Utc::now(),
+                pending.channel,
             )
             .await;
         };

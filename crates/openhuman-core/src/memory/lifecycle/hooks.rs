@@ -366,6 +366,7 @@ pub async fn post_turn(
     assistant_text: String,
     tool_calls: Vec<ToolCallSummary>,
     at: DateTime<Utc>,
+    channel: Option<String>,
 ) {
     if !config.memory.conversations.enabled {
         return;
@@ -386,6 +387,7 @@ pub async fn post_turn(
         }
     };
     let mut post = PostTurn::new(&thread_id, turn_index, text);
+    post.channel = channel;
     post.at = Some(at);
     post.tool_calls = tool_calls
         .iter()
