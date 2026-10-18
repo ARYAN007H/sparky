@@ -23,15 +23,16 @@ fn harness_timeout(tool: &str) -> String {
 
 async fn run_call(
     mw: &RepeatedToolFailureMiddleware,
+    context: &mut RunContext<OpenHumanRunContext>,
     id: &str,
     tool: &str,
     args: serde_json::Value,
     error: &str,
 ) {
     let mut call = TaToolCall::new(id, tool, args);
-    mw.before_tool(&mut ctx(), &(), &mut call).await.unwrap();
+    mw.before_tool(context, &(), &mut call).await.unwrap();
     let mut result = failing_result(tool, error);
-    mw.after_tool(&mut ctx(), &(), &invocation(id, tool), &mut result)
+    mw.after_tool(context, &(), &invocation(id, tool), &mut result)
         .await
         .unwrap();
 }
