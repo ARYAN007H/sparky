@@ -18,6 +18,7 @@ use std::sync::{Arc, LazyLock, Mutex};
 use async_trait::async_trait;
 use tinymemory_tools::deletion::{Backoff, DeletionExecutor, DeletionQueue, Drain};
 use tinymemory_tools::list_store::{ListStore, StoreError};
+use tinymemory_tools::ops::MemoryOps;
 
 pub use tinymemory_tools::deletion::PendingDeletion;
 
@@ -125,7 +126,7 @@ impl DeletionExecutor for Executor<'_> {
         let bound = engine::resolve(self.config)
             .engine()
             .map_err(|error| error.code().to_string())?;
-        let ops = super::ops::memory_ops(self.config).map_err(|error| error.code().to_string())?;
+        let ops = MemoryOps::unconfined();
         ops.forget_or_enqueue(Some(bound.engine.as_ref()), deletion.clone(), |deletion| {
             enqueue(&self.config.workspace_dir, deletion);
         })
@@ -175,22 +176,7 @@ pub async fn forget_thread(config: &Config, thread_id: &str) -> usize {
             return 0;
         }
     };
-    let ops = match super::ops::memory_ops(config) {
-        Ok(ops) => ops,
-        Err(error) => {
-            tracing::warn!(
-                code = error.code(),
-                "[memory:deletion] forgetting a deleted thread failed; queued"
-            );
-            enqueue(
-                &config.workspace_dir,
-                PendingDeletion::Thread {
-                    thread_id: thread_id.to_string(),
-                },
-            );
-            return 0;
-        }
-    };
+    let ops = MemoryOps::unconfined();
     let engine = bound.as_ref().map(|bound| bound.engine.as_ref());
     match ops
         .forget_thread(engine, thread_id, |deletion| {
