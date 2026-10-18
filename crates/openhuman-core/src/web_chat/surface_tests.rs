@@ -29,7 +29,12 @@ async fn next_for(
 #[tokio::test]
 async fn output_events_keep_the_turns_ids_and_one_increasing_seq() {
     let mut rx = crate::web_chat::subscribe_web_channel_events();
-    let surface = Surface::new(&DispatchCtx::ambient(), ids("surface-seq"));
+    let surface = Surface::new(
+        &DispatchCtx::ambient(),
+        ids("surface-seq"),
+        crate::config::Config::default(),
+    )
+    .await;
     for text in ["a", "b"] {
         surface
             .output(ChannelOutputEvent::TextDelta {
@@ -51,7 +56,12 @@ async fn output_events_keep_the_turns_ids_and_one_increasing_seq() {
 #[tokio::test]
 async fn an_interim_bubble_carries_the_round_the_canonical_output_lacks() {
     let mut rx = crate::web_chat::subscribe_web_channel_events();
-    let surface = Surface::new(&DispatchCtx::ambient(), ids("surface-interim"));
+    let surface = Surface::new(
+        &DispatchCtx::ambient(),
+        ids("surface-interim"),
+        crate::config::Config::default(),
+    )
+    .await;
     surface.interim(3, "Let me check.".into()).await;
     let event = next_for(&mut rx, "surface-interim").await;
     assert_eq!(event.event, "chat_interim");
@@ -62,7 +72,12 @@ async fn an_interim_bubble_carries_the_round_the_canonical_output_lacks() {
 #[tokio::test]
 async fn host_authored_events_pass_through_without_a_seq() {
     let mut rx = crate::web_chat::subscribe_web_channel_events();
-    let surface = Surface::new(&DispatchCtx::ambient(), ids("surface-terminal"));
+    let surface = Surface::new(
+        &DispatchCtx::ambient(),
+        ids("surface-terminal"),
+        crate::config::Config::default(),
+    )
+    .await;
     surface
         .event(bus_web::WebChannelEvent::ChatCancelled {
             context: surface.context(),
@@ -78,7 +93,12 @@ async fn host_authored_events_pass_through_without_a_seq() {
 
 #[tokio::test]
 async fn the_addressing_context_names_the_turn() {
-    let surface = Surface::new(&DispatchCtx::ambient(), ids("surface-context"));
+    let surface = Surface::new(
+        &DispatchCtx::ambient(),
+        ids("surface-context"),
+        crate::config::Config::default(),
+    )
+    .await;
     let context = surface.context();
     assert_eq!(
         (context.client_id.as_str(), context.request_id.as_str()),
