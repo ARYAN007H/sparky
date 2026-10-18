@@ -248,7 +248,11 @@ impl ProfileHandle {
                         text: full_response.clone(),
                     });
                 }
-                WebChannelEvent::ChatError { message, error_type, .. } => {
+                WebChannelEvent::ChatError {
+                    message,
+                    error_type,
+                    ..
+                } => {
                     log::debug!(
                         "[embed][profiles] chat failed profile={} request_id={request_id} error_type={:?}",
                         self.profile.id,
