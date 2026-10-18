@@ -52,6 +52,19 @@ impl ScopedWebEvent {
         self.profile.as_deref() == Some(profile)
     }
 
+    /// Addressing and ordering fields from the canonical TinyChannels event.
+    pub fn context(&self) -> &bus_web::WebEventContext {
+        self.event.context()
+    }
+
+    /// Historical Socket.IO discriminator for this canonical event.
+    pub fn event_name(&self) -> String {
+        serde_json::to_value(&self.event)
+            .ok()
+            .and_then(|value| value.get("event").and_then(serde_json::Value::as_str).map(str::to_owned))
+            .expect("typed web events always serialize an event discriminator")
+    }
+
     /// Stamp routing metadata from the host execution context.
     pub(crate) fn stamp_tenant(&mut self, tenant: Option<crate::core::runtime::Tenant>) {
         let Some(tenant) = tenant else {

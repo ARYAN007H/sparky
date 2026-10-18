@@ -37,7 +37,7 @@ use serde_json::Value;
 use socketioxide::extract::{AckSender, Data, SocketRef, TryData};
 use socketioxide::SocketIo;
 
-use crate::core_host::web_chat::{GuardrailPayload, WebChannelEvent};
+use crate::core_host::web_chat::{GuardrailPayload, ScopedWebEvent};
 
 /// Shell-originated companion lifecycle events that still need to reach
 /// Socket.IO-only surfaces such as the native macOS notch WKWebView.
@@ -1129,8 +1129,8 @@ fn join_room_logged(socket: &SocketRef, room: &str, client_id: &str) -> bool {
     }
 }
 
-fn emit_web_channel_event(io: &SocketIo, event: WebChannelEvent) {
-    let name = event.event.clone();
+fn emit_web_channel_event(io: &SocketIo, event: ScopedWebEvent) {
+    let name = event.event_name();
     // Deliver to the initiating client's own room AND the per-thread room. The
     // thread room lets a socket that reconnected with a new client_id (after
     // re-subscribing via `thread:subscribe`) keep receiving an in-flight turn's
@@ -1145,9 +1145,10 @@ fn emit_web_channel_event(io: &SocketIo, event: WebChannelEvent) {
     // `client_id` room, then to the thread room EXCEPT the `client_id` room —
     // each socket is reached exactly once regardless of room overlap.
     // "system" broadcasts and events without a thread_id keep single-room delivery.
-    let primary = event.client_id.clone();
-    let thread_room = (event.client_id != "system" && !event.thread_id.is_empty())
-        .then(|| format!("thread:{}", event.thread_id));
+    let context = event.context();
+    let primary = context.client_id.clone();
+    let thread_room = (context.client_id != "system" && !context.thread_id.is_empty())
+        .then(|| format!("thread:{}", context.thread_id));
     if let Ok(payload) = serde_json::to_value(event) {
         log::debug!(
             "[socketio] send event={} primary={} thread_room={:?} thread_id={} request_id={}",
