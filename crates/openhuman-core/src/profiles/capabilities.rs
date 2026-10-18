@@ -27,6 +27,10 @@ pub struct ProfileCapabilities {
     system_prompt: Option<String>,
 }
 
+#[cfg(test)]
+#[path = "capabilities_tests.rs"]
+mod tests;
+
 impl ProfileCapabilities {
     /// Construct immutable adapters. `None` names select only supplied host tools.
     pub fn new(
