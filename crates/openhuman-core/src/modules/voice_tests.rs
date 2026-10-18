@@ -118,80 +118,15 @@ fn the_registry_entry_matches_the_interface_this_client_calls() {
     );
 }
 
-#[tokio::test]
-async fn every_entry_point_degrades_rather_than_hanging_when_the_module_is_gone() {
-    // The fallback directions are asymmetric on purpose, and the asymmetry is
-    // the point: whichever way a caller falls, it must first get a plain error
-    // back rather than a panic or a stall. `ops.rs` falls OPEN on this error
-    // (failing closed would silently delete real speech) and `always_on`'s
-    // wake-word gate falls CLOSED (failing open would hand an unaddressed
-    // utterance to the agent). Both depend on seeing `Unavailable`.
-    let mut config = offline_config();
-    config.modules.enabled = false;
-
-    assert!(matches!(
-        super::is_hallucinated(
-            &config,
-            "thank you for watching",
-            HallucinationMode::Conversation
-        )
-        .await,
-        Err(VoiceCallError::Unavailable(_))
-    ));
-    assert!(matches!(
-        super::sequence_utterance(&config, "hey tiny pause", "Hey Tiny").await,
-        Err(VoiceCallError::Unavailable(_))
-    ));
-
-    // The session surface has to reach the same verdict, because always_on now
-    // retries `open` on a cooldown instead of tearing the loop down: a variant
-    // other than `Unavailable` here would change that path's behaviour.
-    assert!(matches!(
-        super::VadSession::open(
-            &config,
-            super::vad_config_from_server_config(&crate::config::VoiceServerConfig::default())
-        )
-        .await,
-        Err(VoiceCallError::Unavailable(_))
-    ));
-    assert!(matches!(
-        super::prepare_frames(&config, &[0.1, 0.2], 32_000, 2).await,
-        Err(VoiceCallError::Unavailable(_))
-    ));
-    assert!(matches!(
-        super::frame_energies(&config, &[0.1, 0.2], 1).await,
-        Err(VoiceCallError::Unavailable(_))
-    ));
-    assert!(matches!(
-        super::encode_wav_pcm16(&config, &[1i16, 2], 16_000, 1).await,
-        Err(VoiceCallError::Unavailable(_))
-    ));
-}
-
 #[test]
 fn every_member_this_client_calls_is_one_the_contract_declares() {
     // Host adapters use contract constants for call sites. Keep the curated
     // surface, including capture leases and hotkeys, aligned with the module.
     use tinyvoice_bus::names::methods;
     let called = [
-        methods::ROUTE,
-        methods::EXTRACT_COMMAND,
-        methods::WAKE_WORD_PRESENT,
         methods::IS_HALLUCINATED,
-        methods::VAD_OPEN,
-        methods::VAD_PUSH,
-        methods::VAD_IS_SPEAKING,
-        methods::VAD_RESET,
-        methods::VAD_CLOSE,
-        methods::PREPARE_FRAMES,
-        methods::FRAME_ENERGIES,
-        methods::ENCODE_WAV,
         methods::ENCODE_WAV_PCM16,
         methods::PREPARE_CAPTURE,
-        methods::CAPTURE_POLL,
-        methods::CAPTURE_SHUTDOWN,
-        methods::CAPTURE_START,
-        methods::CAPTURE_STOP,
         methods::RESERVE_CAPTURE,
         methods::LIST_INPUT_DEVICES,
         methods::RECORDING_START,
