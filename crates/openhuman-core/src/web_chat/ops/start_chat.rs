@@ -10,9 +10,7 @@
 use std::time::Duration;
 
 use serde_json::json;
-use tinyagents_harness::turn_runner::{
-    QueueDisposition, TurnRequest, TurnRunnerError,
-};
+use tinyagents_harness::turn_runner::{QueueDisposition, TurnRequest, TurnRunnerError};
 use tinychannels_bus::web::{ChatRequestMetadata, QueueMode};
 use uuid::Uuid;
 
@@ -300,13 +298,19 @@ async fn start_chat_inner(
                     shared.mark_queued(&id);
                 }
                 Err(TurnRunnerError::Rejected(reason) | TurnRunnerError::Failed(reason)) => {
-                    shared.admit(&id, Admission::Rejected(StartChatError::Other(reason.clone())));
+                    shared.admit(
+                        &id,
+                        Admission::Rejected(StartChatError::Other(reason.clone())),
+                    );
                 }
                 Err(TurnRunnerError::Consumed | TurnRunnerError::Cancelled) | Ok(_) => {
                     shared.admit(&id, Admission::Started);
                 }
             }
-            log::debug!("[web-channel] turn finished request_id={id} ok={}", outcome.is_ok());
+            log::debug!(
+                "[web-channel] turn finished request_id={id} ok={}",
+                outcome.is_ok()
+            );
         },
     ));
 

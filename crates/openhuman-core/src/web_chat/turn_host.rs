@@ -285,8 +285,14 @@ impl WebHost {
                 })
             }
             Err(err) => {
-                self.budget_outcome(&ctx, request, &fingerprint.provider_binding, &config, err.to_string())
-                    .await
+                self.budget_outcome(
+                    &ctx,
+                    request,
+                    &fingerprint.provider_binding,
+                    &config,
+                    err.to_string(),
+                )
+                .await
             }
         };
         #[cfg(feature = "tinymemes")]
@@ -440,7 +446,10 @@ async fn speak_and_publish(
     );
     if speak_reply && !task_result.full_response.trim().is_empty() {
         let opts = crate::voice::reply_speech::ReplySpeechOptions {
-            voice_id: config.channel_voice.resolve_voice("web").map(str::to_string),
+            voice_id: config
+                .channel_voice
+                .resolve_voice("web")
+                .map(str::to_string),
             ..Default::default()
         };
         match crate::voice::reply_speech::synthesize_reply(config, &task_result.full_response, &opts)

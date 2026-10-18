@@ -1,7 +1,7 @@
 use super::*;
-use crate::web_chat::WebChannelEvent;
 use crate::agent::progress::AgentProgress;
 use crate::config::Config;
+use crate::web_chat::WebChannelEvent;
 use std::time::Duration;
 use tokio::sync::broadcast::error::TryRecvError;
 
@@ -27,7 +27,6 @@ fn interim_narration_surfaces_and_trims_substantial_text() {
         Some("Let me check your calendar for conflicts first.".to_string())
     );
 }
-
 
 /// Attribution for a turn whose stored user payload carries no identity.
 mod attribution {

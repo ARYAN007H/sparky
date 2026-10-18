@@ -1,8 +1,8 @@
 use super::*;
-use crate::web_chat::runner::runtime;
-use crate::web_chat::track_parallel_turn_for_test;
 use crate::core::runtime::{context::CoreContext, ContextOverlay, DomainSet};
 use crate::tools::toolpacks::ToolGroups;
+use crate::web_chat::runner::runtime;
+use crate::web_chat::track_parallel_turn_for_test;
 
 fn agent(parent: &Arc<CoreContext>, id: &str) -> Arc<CoreContext> {
     parent.derive_with(
@@ -100,7 +100,9 @@ async fn a_user_cancel_under_the_fence_placeholder_id_keeps_the_callers_client()
     let seen = tokio::time::timeout(std::time::Duration::from_secs(10), async {
         loop {
             match events.recv().await {
-                Ok(event) if event.event == "chat_cancelled" && event.thread_id == "fence-thread" => {
+                Ok(event)
+                    if event.event == "chat_cancelled" && event.thread_id == "fence-thread" =>
+                {
                     return event.client_id;
                 }
                 Ok(_) | Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue,

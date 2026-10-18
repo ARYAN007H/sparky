@@ -31,7 +31,10 @@
 pub mod backend;
 pub mod blocking;
 
-#[allow(deprecated, reason = "v21 ChannelMessage/SendMessage shims stay until the native channel path moves to canonical v22 content")]
+#[allow(
+    deprecated,
+    reason = "v21 ChannelMessage/SendMessage shims stay until the native channel path moves to canonical v22 content"
+)]
 mod bus;
 mod legacy_import;
 #[cfg(test)]

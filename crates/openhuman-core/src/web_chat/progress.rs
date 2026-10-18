@@ -13,10 +13,12 @@ use std::collections::HashMap;
 use std::time::Instant;
 
 use serde_json::json;
-use tinychannels_bus::module_progressive::ChannelOutputEvent;
-use tinychannels_bus::web::{ChatRequestMetadata, TurnCostThrottle, TurnTimingSnapshot, TurnTimingState};
 use tinyagents_session::port::TurnStates;
 use tinyagents_session::turn_state::TurnStateMirror;
+use tinychannels_bus::module_progressive::ChannelOutputEvent;
+use tinychannels_bus::web::{
+    ChatRequestMetadata, TurnCostThrottle, TurnTimingSnapshot, TurnTimingState,
+};
 
 use super::progress_ledger::{ChildDone, Ledger};
 use super::progress_map as map;
@@ -322,8 +324,13 @@ impl ProgressProjection {
                 cached_input_tokens,
                 total_usd,
             } => {
-                self.ledger()
-                    .cost(&model, input_tokens, output_tokens, cached_input_tokens, total_usd);
+                self.ledger().cost(
+                    &model,
+                    input_tokens,
+                    output_tokens,
+                    cached_input_tokens,
+                    total_usd,
+                );
                 log::debug!(
                     "[web_channel] turn cost update model={model} iter={iteration} in={input_tokens} out={output_tokens} cached_in={cached_input_tokens} total_usd={total_usd:.4} thread_id={}",
                     self.ids.thread_id
@@ -479,10 +486,7 @@ impl ProgressProjection {
                 dirty_status,
                 ..
             } => {
-                let parent_call_id = self
-                    .subagent_parent_call_ids
-                    .remove(&task_id)
-                    .flatten();
+                let parent_call_id = self.subagent_parent_call_ids.remove(&task_id).flatten();
                 self.ledger().child_completed(&ChildDone {
                     agent_id: &agent_id,
                     task_id: &task_id,
@@ -522,10 +526,7 @@ impl ProgressProjection {
                     self.ids.thread_id,
                     self.ids.request_id
                 );
-                let parent_call_id = self
-                    .subagent_parent_call_ids
-                    .remove(&task_id)
-                    .flatten();
+                let parent_call_id = self.subagent_parent_call_ids.remove(&task_id).flatten();
                 self.ledger().child_failed(
                     &agent_id,
                     &task_id,
@@ -534,7 +535,13 @@ impl ProgressProjection {
                     self.child_tool_counts.get(&task_id).copied(),
                 );
                 self.surface
-                    .output(map::sub_failed(&agent_id, &task_id, round, error, parent_call_id))
+                    .output(map::sub_failed(
+                        &agent_id,
+                        &task_id,
+                        round,
+                        error,
+                        parent_call_id,
+                    ))
                     .await;
             }
             AgentProgress::SubagentAwaitingUser {

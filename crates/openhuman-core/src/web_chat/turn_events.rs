@@ -11,11 +11,11 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
-use tinychannels_bus::web as bus_web;
 use tinyagents_harness::progress::AgentProgress;
 use tinyagents_harness::turn_runner::{
     EventSink, FailureClassifier, ReplyStore, Summarizer, TerminalEvent, TurnRequest, TurnResult,
 };
+use tinychannels_bus::web as bus_web;
 
 use super::runner::{CancelNote, Shared};
 use super::surface::{Surface, TurnIds};
@@ -279,13 +279,9 @@ impl WebEvents {
         }
     }
 
-    async fn failed(
-        &self,
-        request: &TurnRequest<QueuedPayload>,
-        surface: &Surface,
-        error: &str,
-    ) {
-        let parallel = request.disposition == tinyagents_harness::turn_runner::QueueDisposition::Parallel;
+    async fn failed(&self, request: &TurnRequest<QueuedPayload>, surface: &Surface, error: &str) {
+        let parallel =
+            request.disposition == tinyagents_harness::turn_runner::QueueDisposition::Parallel;
         let raw = host_error(error, Some(request));
         let (client_id, thread_id, request_id) = (
             &request.payload.client_id,

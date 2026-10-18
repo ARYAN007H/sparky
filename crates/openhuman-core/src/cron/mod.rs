@@ -12,10 +12,16 @@
 // Host-condition policy (battery / AC / CPU) that throttles background LLM
 // work such as memory digests. The cron poll loop itself does not consult it.
 
-#[allow(deprecated, reason = "v21 ChannelMessage/SendMessage shims stay until the native channel path moves to canonical v22 content")]
+#[allow(
+    deprecated,
+    reason = "v21 ChannelMessage/SendMessage shims stay until the native channel path moves to canonical v22 content"
+)]
 pub mod bus;
 pub(crate) mod bus_host;
-#[allow(deprecated, reason = "v21 ChannelMessage/SendMessage shims stay until the native channel path moves to canonical v22 content")]
+#[allow(
+    deprecated,
+    reason = "v21 ChannelMessage/SendMessage shims stay until the native channel path moves to canonical v22 content"
+)]
 pub mod channel_bridge;
 pub(crate) mod client;
 pub mod completion_owner;

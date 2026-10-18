@@ -320,7 +320,12 @@ pub async fn channel_web_queue_remove(
     }
     let rt = runtime(ctx);
     let scope = scope_of(ctx);
-    if rt.runner.in_flight_request_id(&scope, thread_id).await.is_none() {
+    if rt
+        .runner
+        .in_flight_request_id(&scope, thread_id)
+        .await
+        .is_none()
+    {
         return Ok(Outcome::single_log(
             json!({
                 "thread_id": thread_id,
@@ -365,7 +370,12 @@ pub async fn channel_web_queue_clear(
 ) -> Result<Outcome<Value>, String> {
     let rt = runtime(ctx);
     let scope = scope_of(ctx);
-    if rt.runner.in_flight_request_id(&scope, thread_id).await.is_none() {
+    if rt
+        .runner
+        .in_flight_request_id(&scope, thread_id)
+        .await
+        .is_none()
+    {
         return Ok(Outcome::single_log(
             json!({
                 "thread_id": thread_id.trim(),

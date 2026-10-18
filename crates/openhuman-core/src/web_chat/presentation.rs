@@ -1,8 +1,8 @@
 //! Presentation layer for web-channel chat responses: store a finished reply,
 //! then announce it to the client as one unmodified `chat_done` message.
 
-use tinychannels_bus::web as bus_web;
 use crate::agent::subagent_host::SubagentUsageExt as _;
+use tinychannels_bus::web as bus_web;
 
 use crate::agent::tinyagents::host::LastTurnUsage;
 use crate::web_chat::{SubagentUsagePayload, TurnUsagePayload, WebChannelEvent};

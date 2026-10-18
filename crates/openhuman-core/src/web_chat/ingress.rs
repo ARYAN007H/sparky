@@ -14,7 +14,7 @@ use tinyagents_harness::turn_runner::{
 };
 
 use super::ops::StartChatError;
-use super::runner::{Admission, CancelNote, Shared, WebRunner, scope_of};
+use super::runner::{scope_of, Admission, CancelNote, Shared, WebRunner};
 use crate::agent::queued_turn::QueuedPayload;
 use crate::core::events::DomainEvent;
 use crate::core::runtime::DispatchCtx;
@@ -43,7 +43,11 @@ impl WebIngress {
         let _ = self.runner.set(Arc::downgrade(runner));
     }
 
-    fn refuse(&self, request: &TurnRequest<QueuedPayload>, error: StartChatError) -> IngressDecision {
+    fn refuse(
+        &self,
+        request: &TurnRequest<QueuedPayload>,
+        error: StartChatError,
+    ) -> IngressDecision {
         let reason = error.to_string();
         self.shared
             .admit(&request.request_id, Admission::Rejected(error));
@@ -61,9 +65,10 @@ impl WebIngress {
             return IngressDecision::Continue;
         }
         let staged = async {
-            let config = ctx.load_config().await.map_err(|error| {
-                format!("upload configuration unavailable: {error}")
-            })?;
+            let config = ctx
+                .load_config()
+                .await
+                .map_err(|error| format!("upload configuration unavailable: {error}"))?;
             // Stage where the turn will read: the thread's working folder when
             // one is bound (the turn applies the same folder), else action_dir.
             let workspace = crate::agent::attachments::thread_action_dir(

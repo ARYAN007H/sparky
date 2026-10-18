@@ -5,9 +5,9 @@
 //! file builds no `WebChannelEvent`. Payload caps are applied here, before the
 //! projection, so a multi-megabyte tool result never reaches the socket.
 
+use crate::agent::subagent_host::SubagentUsageExt as _;
 use serde::Serialize;
 use serde_json::Value;
-use crate::agent::subagent_host::SubagentUsageExt as _;
 use tinychannels_bus::module_progressive::{
     ChannelOutputEvent, SubagentOutput, SubagentUsage, ToolFailureSummary,
 };
@@ -72,7 +72,12 @@ fn subagent(agent_id: &str, task_id: &str, state: &str) -> SubagentOutput {
     }
 }
 
-fn lifecycle(stage: &str, message: Option<String>, iteration: Option<u32>, max: Option<u32>) -> ChannelOutputEvent {
+fn lifecycle(
+    stage: &str,
+    message: Option<String>,
+    iteration: Option<u32>,
+    max: Option<u32>,
+) -> ChannelOutputEvent {
     ChannelOutputEvent::Lifecycle {
         stage: stage.to_owned(),
         message,
@@ -215,7 +220,9 @@ pub(super) fn sub_completed(
     parent_call_id: Option<String>,
 ) -> ChannelOutputEvent {
     let mut out = subagent(agent_id, task_id, "completed");
-    out.message = Some(format!("Sub-agent '{agent_id}' completed in {elapsed_ms}ms"));
+    out.message = Some(format!(
+        "Sub-agent '{agent_id}' completed in {elapsed_ms}ms"
+    ));
     out.tool_name = Some(agent_id.to_owned());
     out.success = Some(true);
     out.iteration = Some(iterations);
@@ -356,7 +363,15 @@ pub(super) fn sub_delta(
     delta: String,
     iteration: u32,
 ) -> ChannelOutputEvent {
-    let mut out = subagent(agent_id, task_id, if thinking { "thinking_delta" } else { "text_delta" });
+    let mut out = subagent(
+        agent_id,
+        task_id,
+        if thinking {
+            "thinking_delta"
+        } else {
+            "text_delta"
+        },
+    );
     out.message = Some(delta);
     out.iteration = Some(iteration);
     ChannelOutputEvent::Subagent(Box::new(out))

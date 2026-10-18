@@ -1,6 +1,6 @@
 use super::*;
-use tinyagents_harness::run_queue::QueuedMessage;
 use tinyagents_harness::run_queue::QueueLane;
+use tinyagents_harness::run_queue::QueuedMessage;
 
 #[test]
 fn recovered_steer_becomes_a_queued_turn_on_the_forwarders_thread() {

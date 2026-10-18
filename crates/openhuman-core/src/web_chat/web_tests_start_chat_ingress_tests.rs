@@ -638,7 +638,9 @@ fn timeout_bound_tag_separates_the_two_harness_ceilings() {
         "per_model_call"
     );
     assert_eq!(
-        super::super::turn_events::timeout_bound_tag("openrouter API error (500 Internal Server Error)"),
+        super::super::turn_events::timeout_bound_tag(
+            "openrouter API error (500 Internal Server Error)"
+        ),
         "none",
         "a non-timeout error must not carry a timeout bound"
     );
@@ -663,7 +665,10 @@ fn hosted_timeout_bound_reaches_the_sentry_tag_and_keeps_the_user_class() {
         };
         let err = crate::agent::tinyagents::hosted_error::run_error_from_hosted(hosted);
         let flattened = format!("run_chat_task failed error=tinyagents harness run failed: {err}");
-        assert_eq!(super::super::turn_events::timeout_bound_tag(&flattened), tag);
+        assert_eq!(
+            super::super::turn_events::timeout_bound_tag(&flattened),
+            tag
+        );
         assert_eq!(
             super::super::web_errors::classify_inference_error(&flattened).error_type,
             "turn_timeout"

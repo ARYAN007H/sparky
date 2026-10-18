@@ -79,7 +79,10 @@ async fn web_queue_retains_typed_queued_turn_metadata() {
     assert_eq!(queued.payload.client_id, "queue-test-client");
     assert_eq!(queued.thread_id, thread_id);
     assert!(queued.payload.queued_at_ms > 0);
-    assert_eq!(queued.payload.model_override.as_deref(), Some("model-override"));
+    assert_eq!(
+        queued.payload.model_override.as_deref(),
+        Some("model-override")
+    );
     assert_eq!(queued.payload.temperature, Some(0.7));
     assert_eq!(queued.payload.locale.as_deref(), Some("ar"));
 

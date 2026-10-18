@@ -30,8 +30,15 @@ use super::types::WebChatTaskResult;
 use crate::agent::queued_turn::QueuedPayload;
 use crate::core::runtime::DispatchCtx;
 
-pub(super) type WebRunner =
-    TurnRunner<WebHost, WebIngress, WebReplies, WebEvents, WebFailures, WebSummarizer, QueuedPayload>;
+pub(super) type WebRunner = TurnRunner<
+    WebHost,
+    WebIngress,
+    WebReplies,
+    WebEvents,
+    WebFailures,
+    WebSummarizer,
+    QueuedPayload,
+>;
 
 /// How long a stopped turn may keep running so the session runtime can persist
 /// the rounds it completed. Just above the runtime's own 2 s driver grace; the
@@ -90,13 +97,17 @@ pub(super) struct Shared {
 }
 
 fn locked<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
-    mutex.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+    mutex
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
 impl Shared {
     /// Run `f` on the slot of `request_id`, creating it on first use.
     pub(super) fn with<R>(&self, request_id: &str, f: impl FnOnce(&mut TurnSlot) -> R) -> R {
-        f(locked(&self.turns).entry(request_id.to_owned()).or_default())
+        f(locked(&self.turns)
+            .entry(request_id.to_owned())
+            .or_default())
     }
 
     /// Drop the slot of a finished request and hand back what it held.

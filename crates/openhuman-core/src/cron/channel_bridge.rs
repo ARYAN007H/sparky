@@ -10,8 +10,8 @@
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex, RwLock};
-use tinychannels_runtime::context::ChatMessage;
 use tinychannels_bus::SendMessage;
+use tinychannels_runtime::context::ChatMessage;
 use tinychannels_runtime::Channel;
 
 /// Same shape as `channels::context::ConversationHistoryMap`, spelled out so

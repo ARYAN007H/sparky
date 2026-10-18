@@ -86,7 +86,9 @@ pub(crate) async fn test_hooks_active() -> bool {
 /// `Some(outcome)` is the whole turn.
 pub(crate) async fn run_test_hooks(
     shared: &super::super::runner::Shared,
-    request: &tinyagents_harness::turn_runner::TurnRequest<crate::agent::queued_turn::QueuedPayload>,
+    request: &tinyagents_harness::turn_runner::TurnRequest<
+        crate::agent::queued_turn::QueuedPayload,
+    >,
 ) -> Option<Result<tinyagents_harness::turn_runner::TurnResult, String>> {
     use tinyagents_harness::turn_runner::TurnResult;
     let (thread_id, request_id) = (&request.thread_id, &request.request_id);
@@ -109,7 +111,9 @@ pub(crate) async fn run_test_hooks(
         }
     }
     let _guard = DropGuard(block.dropped.clone());
-    log::debug!("[web-channel][test] parking the turn thread_id={thread_id} request_id={request_id}");
+    log::debug!(
+        "[web-channel][test] parking the turn thread_id={thread_id} request_id={request_id}"
+    );
     // The turn future is live and parked: a test may cancel now.
     block
         .started
