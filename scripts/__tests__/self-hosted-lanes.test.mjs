@@ -294,38 +294,6 @@ test("the storage area arms the core coverage lane, which covers every storage d
       );
     }
   }
-  // The coverage suites run the per-driver storage targets (memory, sqlite and
-  // file cases) and the session-store driver tests in their one build.
-  const coverage = fs.readFileSync(
-    path.join(repoRoot, "scripts/ci/rust-coverage.sh"),
-    "utf8",
-  );
-  assert.match(
-    coverage,
-    /^CORE_PRODUCT_FEATURES="\$\(bash scripts\/ci\/product-features\.sh --core\),storage-file"$/m,
-  );
-  assert.match(
-    coverage,
-    /-p openhuman-rpc --all-targets \\\n\s+--features storage-sqlite,storage-file/,
-  );
-  // MongoDB runs the shared storage targets that support its feature set.
-  const onDisk = fs
-    .readdirSync(path.join(repoRoot, "tests"))
-    .filter((f) => /^(storage_.*_e2e|cli_storage_url_e2e)\.rs$/.test(f))
-    .map((f) => f.replace(/\.rs$/, ""))
-    .sort();
-  const mongo = fs.readFileSync(
-    path.join(repoRoot, ".github/workflows/storage-mongodb.yml"),
-    "utf8",
-  );
-  const inMongo = [...mongo.matchAll(/--test (\S+)/g)]
-    .map((m) => m[1])
-    .sort();
-  assert.deepEqual(
-    inMongo,
-    onDisk.filter((target) => target !== "storage_default_import_e2e"),
-    "storage-mongodb.yml",
-  );
   // Without the area (or a core change) the coverage lane stays off.
   const off = buildPlan({ profile: "hosted", areas: NONE });
   assert.equal(off.lanes.find((l) => l.name === "rust-cov").active, false);

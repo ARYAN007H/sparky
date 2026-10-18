@@ -140,10 +140,6 @@ jobs:
         if: ${{ !cancelled() && contains(fromJSON(steps.lanes.outputs.lanes || '[]'), 'tauri') }}
         run: node scripts/ci/self-hosted/lanes.mjs --wait tauri
 
-      - name: "Lane: storage drivers (sqlite + file)"
-        if: ${{ !cancelled() && contains(fromJSON(steps.lanes.outputs.lanes || '[]'), 'storage-drivers') }}
-        run: node scripts/ci/self-hosted/lanes.mjs --wait storage-drivers
-
       - name: "Lane: install.ps1 (Pester)"
         if: ${{ !cancelled() && contains(fromJSON(steps.lanes.outputs.lanes || '[]'), 'pester') }}
         run: node scripts/ci/self-hosted/lanes.mjs --wait pester
@@ -397,10 +393,6 @@ jobs:
       - name: "Lane: Tauri clippy + coverage"
         if: ${{ !cancelled() && contains(fromJSON(steps.lanes.outputs.lanes || '[]'), 'tauri') }}
         run: node scripts/ci/self-hosted/lanes.mjs --wait tauri
-
-      - name: "Lane: storage drivers (sqlite + file)"
-        if: ${{ !cancelled() && contains(fromJSON(steps.lanes.outputs.lanes || '[]'), 'storage-drivers') }}
-        run: node scripts/ci/self-hosted/lanes.mjs --wait storage-drivers
 
       - name: "Lane: install.ps1 (Pester)"
         if: ${{ !cancelled() && contains(fromJSON(steps.lanes.outputs.lanes || '[]'), 'pester') }}

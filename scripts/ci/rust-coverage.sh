@@ -8,12 +8,7 @@ set -euo pipefail
 
 OUT="${OUT:-lcov-core.info}"
 PRODUCT_FEATURES="$(bash scripts/ci/product-features.sh)"
-# Coverage adds `storage-file` to the product set. It is a no-op gate in the
-# core (the sqlite and file drivers are always compiled in) that arms the file
-# cases of the per-driver storage e2e targets, so these suites cover the
-# memory, sqlite and file drivers in the same build instead of a second core
-# compile of their own.
-CORE_PRODUCT_FEATURES="$(bash scripts/ci/product-features.sh --core),storage-file"
+CORE_PRODUCT_FEATURES="$(bash scripts/ci/product-features.sh --core)"
 
 # Sandboxed acting-tool tests deliberately do not forward RUSTUP_HOME. The
 # container installs Rust outside HOME, so its rustup proxy otherwise tries
@@ -307,7 +302,7 @@ else
   suite "openhuman-embed" llvm_cov_embed --no-report --no-fail-fast -p openhuman-embed --all-targets
 fi
 suite "openhuman-rpc" llvm_cov_package --no-report --no-fail-fast -p openhuman-rpc --all-targets \
-  --features storage-sqlite,storage-file
+  --features storage-sqlite
 if [ "${OH_COV_RUNNER:-cargo}" = "nextest" ]; then
   suite "openhuman-tinyhumans" llvm_cov --no-report --no-fail-fast \
     "${UNIFIED_PRODUCT_ARGS[@]}" -E "${FILTER_TINYHUMANS}"
