@@ -40,7 +40,9 @@ impl ChatModel<()> for GatedRepairModel {
                 "The answer omits its required block.",
             ));
         }
-        Ok(ModelResponse::assistant("The answer still omits its block."))
+        Ok(ModelResponse::assistant(
+            "The answer still omits its block.",
+        ))
     }
 }
 
@@ -135,19 +137,26 @@ async fn cancellation_during_required_output_repair_finalizes_native_run() {
         .expect("the native run is finalized");
     let completed = observations
         .iter()
-        .position(|record| matches!(
-            &record.event,
-            AgentEvent::RunCompleted { run_id: completed, .. } if completed.as_str() == run_id
-        ))
+        .position(|record| {
+            matches!(
+                &record.event,
+                AgentEvent::RunCompleted { run_id: completed, .. } if completed.as_str() == run_id
+            )
+        })
         .expect("the harness completed before host repair");
     let repair_started = observations
         .iter()
-        .position(|record| matches!(
-            &record.event,
-            AgentEvent::ModelStarted { call_id, .. } if call_id.as_str() == repair_call_id
-        ))
+        .position(|record| {
+            matches!(
+                &record.event,
+                AgentEvent::ModelStarted { call_id, .. } if call_id.as_str() == repair_call_id
+            )
+        })
         .expect("the correlated post-harness repair is journaled");
-    assert!(repair_started > completed, "repair follows harness completion");
+    assert!(
+        repair_started > completed,
+        "repair follows harness completion"
+    );
     assert!(finalized > failure, "finalization follows cancellation");
     assert!(observations.iter().any(|record| matches!(
         &record.event,
