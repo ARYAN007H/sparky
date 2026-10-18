@@ -470,3 +470,7 @@ fn cost_source_of(charged: Option<&ChargedAmount>) -> tinyagents_harness::cost::
         None => tinyagents_harness::cost::CostSource::Unknown,
     }
 }
+
+#[cfg(test)]
+#[path = "driver_adapter_tests.rs"]
+mod tests;
