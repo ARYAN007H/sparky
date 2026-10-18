@@ -32,8 +32,9 @@ message boundaries.
 ## Bundled assets
 
 `IDENTITY.md`, `ROLE.md`, `SOUL.md`, and [`STYLE.md`](./STYLE.md) are the
-bundled prompt assets. `sync_workspace_file` seeds a workspace copy and
-preserves user edits until a later bundled-content update. The product prompt
+bundled prompt assets. `sync_workspace_file` seeds a workspace copy, refreshes
+an unmodified copy when bundled content changes, and preserves user edits.
+The product prompt
 composition reads the workspace `STYLE.md`, falling back to the bundled copy
 when the file cannot be read. [`USER.md`](./USER.md) is exposed as an MCP
 resource and is not read by this module.
