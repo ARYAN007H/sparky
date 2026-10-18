@@ -53,6 +53,7 @@ fn request(id: &str, content: &str, sender: &str) -> AppendConversationMessageRe
             sender: sender.into(),
             created_at: "2026-10-04T00:00:00Z".into(),
         },
+        attachments: vec![],
     }
 }
 
@@ -324,4 +325,53 @@ async fn raw_append_stages_in_the_bound_thread_folder() {
     assert_eq!(files.len(), 1);
     assert!(folder.join(&files[0].path).is_file());
     assert!(!config.action_dir.join("uploads").exists());
+}
+
+#[tokio::test]
+async fn typed_attachment_is_staged_like_a_marker_and_leaves_the_text_clean() {
+    use tinychannels_bus::{ContentPart, MediaReference};
+    let (_temp, config) = setup().await;
+    let mut req = request("typed", "look", "user");
+    req.attachments = vec![ContentPart::Image {
+        media: MediaReference {
+            url: Some("data:image/png;base64,iVBORw0KGgo=".into()),
+            ..Default::default()
+        },
+        caption: None,
+        alt_text: None,
+    }];
+    let saved = append_with_test_config(req, &config, None)
+        .await
+        .unwrap()
+        .value
+        .data
+        .unwrap();
+    let (text, files) = crate::agent::attachments::parse(&saved.content);
+    assert_eq!(text.trim(), "look");
+    assert_eq!(files.len(), 1);
+    assert_eq!(
+        tokio::fs::read(config.action_dir.join(&files[0].path))
+            .await
+            .unwrap(),
+        b"\x89PNG\r\n\x1a\n"
+    );
+}
+
+#[tokio::test]
+async fn typed_attachment_with_a_local_path_is_rejected() {
+    use tinychannels_bus::{ContentPart, MediaReference};
+    let (_temp, config) = setup().await;
+    let mut req = request("bad", "look", "user");
+    req.attachments = vec![ContentPart::File {
+        media: MediaReference {
+            path: Some("/etc/passwd".into()),
+            ..Default::default()
+        },
+        file_name: None,
+        caption: None,
+    }];
+    let err = append_with_test_config(req, &config, None)
+        .await
+        .expect_err("local paths must be refused");
+    assert!(err.to_string().contains("local paths"), "{err}");
 }
