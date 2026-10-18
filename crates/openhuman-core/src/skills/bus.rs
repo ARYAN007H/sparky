@@ -215,7 +215,9 @@ pub(crate) fn ensure_triggered_workflow_subscriber_for(
     domains: Option<crate::core::runtime::DomainSet>,
 ) {
     TRIGGERED_WORKFLOW_HANDLE.get_or_init(|| {
-        let workflows = crate::skills::load_workflow_metadata_for_domains(ctx, config, domains);
+        let workflows = crate::skills::ops_discover::load_workflow_metadata_for_domains(
+            ctx, config, domains,
+        );
         register_triggered_workflow_subscriber(&workflows)
     });
 }
