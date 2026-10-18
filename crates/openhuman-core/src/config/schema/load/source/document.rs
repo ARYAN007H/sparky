@@ -1,6 +1,6 @@
 //! [`DocumentConfigSource`]: the config as the `config/{scope}` document.
 
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
@@ -36,6 +36,7 @@ pub(crate) struct DocumentConfigSource {
     scope: Scope,
     keys: Arc<dyn KeyProvider>,
     file: FileConfigSource,
+    observed_version: Mutex<Option<tinystoragedrivers::Version>>,
 }
 
 impl DocumentConfigSource {
@@ -50,6 +51,7 @@ impl DocumentConfigSource {
             scope,
             keys,
             file,
+            observed_version: Mutex::new(None),
         }
     }
 
@@ -57,22 +59,6 @@ impl DocumentConfigSource {
         self.keys
             .data_key(&self.scope)
             .map_err(|error| anyhow!("no data key for the config document: {error}"))
-    }
-
-    /// Read the current document revision for callers that intentionally
-    /// replace the latest value rather than saving a previously loaded config
-    /// snapshot. `Config::save` uses the revision captured at load time.
-    async fn current_version(&self) -> Result<Option<tinystoragedrivers::Version>> {
-        self.docs
-            .ensure_collection(&CollectionSpec::new(CONFIG_COLLECTION))
-            .await
-            .context("declare the config collection")?;
-        let stored = self
-            .docs
-            .get(CONFIG_COLLECTION, &document_id(self.scope.as_str())?)
-            .await
-            .context("read the config document")?;
-        Ok(stored.map(|versioned| versioned.version))
     }
 
     /// The local file's text for its bootstrap tables.
@@ -174,7 +160,9 @@ impl ConfigSource for DocumentConfigSource {
     async fn read(&self) -> Result<ConfigRead> {
         let Some((body, document_version)) = self.stored_body().await? else {
             tracing::debug!(scope = %self.scope.as_str(), "[config] no config document; reading the file");
-            return self.file.read().await;
+            let read = self.file.read().await?;
+            *self.observed_version.lock().unwrap() = None;
+            return Ok(read);
         };
         // Bootstrap tables come from the file, whatever the document says.
         // Through the file source, so its corruption recovery (a `.bak`, a
@@ -191,17 +179,19 @@ impl ConfigSource for DocumentConfigSource {
         // here: the loader's file-corruption branch would rename the local
         // `config.toml` aside and save only to the document, losing the
         // bootstrap tables on the next boot.
-        Ok(ConfigRead {
+        let read = ConfigRead {
             contents,
             recovered: false,
             from_document: true,
             document_version: Some(document_version),
-        })
+        };
+        *self.observed_version.lock().unwrap() = Some(document_version);
+        Ok(read)
     }
 
     async fn write(&self, toml: &str) -> Result<()> {
-        let current_version = self.current_version().await?;
-        self.write_versioned(toml, current_version).await?;
+        let expected = *self.observed_version.lock().unwrap();
+        self.write_versioned(toml, expected).await?;
         Ok(())
     }
 
@@ -232,6 +222,7 @@ impl ConfigSource for DocumentConfigSource {
             )
             .await
             .context("write the config document")?;
+        *self.observed_version.lock().unwrap() = Some(version);
         tracing::debug!(scope = %self.scope.as_str(), "[config] wrote the config document");
         Ok(Some(version))
     }

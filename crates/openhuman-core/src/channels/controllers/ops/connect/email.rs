@@ -31,7 +31,13 @@ pub(crate) async fn persist_email_config(
     persisted
         .save()
         .await
-        .map_err(|e| format!("failed to persist email config.toml: {e}"))?;
+        .map_err(|error| {
+            crate::config::ops::config_save_error_with_context(
+                error,
+                "failed to persist email config.toml",
+                false,
+            )
+        })?;
 
     tracing::info!(
         target: "openhuman::channels",

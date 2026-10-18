@@ -11,23 +11,50 @@ mod tool_dispatcher;
 mod ui;
 
 pub(crate) fn config_save_error(error: anyhow::Error) -> String {
+    config_save_error_with_retryability(error, true)
+}
+
+pub(crate) fn config_save_error_with_retryability(
+    error: anyhow::Error,
+    retryable: bool,
+) -> String {
+    if let Some(conflict) = config_save_conflict(&error, retryable) {
+        return conflict.encode();
+    }
+    error.to_string()
+}
+
+pub(crate) fn config_save_error_with_context(
+    error: anyhow::Error,
+    context: &str,
+    retryable: bool,
+) -> String {
+    if let Some(conflict) = config_save_conflict(&error, retryable) {
+        return conflict.encode();
+    }
+    format!("{context}: {error:#}")
+}
+
+pub(crate) fn config_save_conflict(
+    error: &anyhow::Error,
+    retryable: bool,
+) -> Option<crate::core::StructuredRpcError> {
     let conflict = error.chain().any(|cause| {
         cause
             .downcast_ref::<tinystoragedrivers::StorageError>()
             .is_some_and(|error| error.kind() == tinystoragedrivers::ErrorKind::Conflict)
     });
-    if conflict {
-        return crate::core::StructuredRpcError {
-            message: "Configuration changed on another instance; reload it and retry".into(),
-            data: Some(serde_json::json!({
-                "kind": "ConfigConflict",
-                "retryable": true,
-            })),
-            expected_user_state: true,
-        }
-        .encode();
+    if !conflict {
+        return None;
     }
-    error.to_string()
+    Some(crate::core::StructuredRpcError {
+        message: "Configuration changed on another instance; reload it and retry".into(),
+        data: Some(serde_json::json!({
+            "kind": "ConfigConflict",
+            "retryable": retryable,
+        })),
+        expected_user_state: true,
+    })
 }
 
 // ── Public re-exports (preserving the flat external API) ─────────────────────

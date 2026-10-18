@@ -116,7 +116,13 @@ pub(crate) async fn persist_prepared_connection(
             persisted
                 .save()
                 .await
-                .map_err(|error| format!("failed to persist {channel_id} config.toml: {error}"))?;
+                .map_err(|error| {
+                    crate::config::ops::config_save_error_with_context(
+                        error,
+                        &format!("failed to persist {channel_id} config.toml"),
+                        false,
+                    )
+                })?;
         }
     }
     let log = if local_only {

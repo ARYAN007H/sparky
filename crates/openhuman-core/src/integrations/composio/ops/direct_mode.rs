@@ -102,7 +102,13 @@ pub async fn composio_set_api_key(
         cfg_mut
             .save()
             .await
-            .map_err(|e| format!("[composio-direct] save config failed: {e}"))?;
+            .map_err(|error| {
+                crate::config::ops::config_save_error_with_context(
+                    error,
+                    "[composio-direct] save config failed",
+                    false,
+                )
+            })?;
         "mode=direct"
     } else {
         "mode unchanged"
@@ -152,7 +158,13 @@ pub async fn composio_clear_api_key(
     cfg_mut
         .save()
         .await
-        .map_err(|e| format!("[composio-direct] save config failed: {e}"))?;
+        .map_err(|error| {
+            crate::config::ops::config_save_error_with_context(
+                error,
+                "[composio-direct] save config failed",
+                false,
+            )
+        })?;
     direct_auth::reset_all_direct_auth_failures();
 
     crate::core::bus::BUS.publish(crate::core::events::DomainEvent::ComposioConfigChanged {

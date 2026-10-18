@@ -36,7 +36,13 @@ pub async fn disconnect_channel(
             persisted
                 .save()
                 .await
-                .map_err(|e| format!("failed to clear telegram config.toml: {e}"))?;
+                .map_err(|error| {
+                    crate::config::ops::config_save_error_with_context(
+                        error,
+                        "failed to clear telegram config.toml",
+                        false,
+                    )
+                })?;
             tracing::info!(
                 target: "openhuman::channels",
                 "[telegram] disconnect_channel: cleared channels_config.telegram"
@@ -48,7 +54,13 @@ pub async fn disconnect_channel(
             persisted
                 .save()
                 .await
-                .map_err(|e| format!("failed to clear discord config.toml: {e}"))?;
+                .map_err(|error| {
+                    crate::config::ops::config_save_error_with_context(
+                        error,
+                        "failed to clear discord config.toml",
+                        false,
+                    )
+                })?;
             tracing::info!(
                 target: "openhuman::channels",
                 "[discord] disconnect_channel: cleared channels_config.discord"
@@ -60,7 +72,13 @@ pub async fn disconnect_channel(
             persisted
                 .save()
                 .await
-                .map_err(|e| format!("failed to clear imessage config.toml: {e}"))?;
+                .map_err(|error| {
+                    crate::config::ops::config_save_error_with_context(
+                        error,
+                        "failed to clear imessage config.toml",
+                        false,
+                    )
+                })?;
             tracing::info!(
                 target: "openhuman::channels",
                 "[imessage] disconnect_channel: cleared channels_config.imessage"
@@ -72,7 +90,13 @@ pub async fn disconnect_channel(
             persisted
                 .save()
                 .await
-                .map_err(|e| format!("failed to clear yuanbao config.toml: {e}"))?;
+                .map_err(|error| {
+                    crate::config::ops::config_save_error_with_context(
+                        error,
+                        "failed to clear yuanbao config.toml",
+                        false,
+                    )
+                })?;
             tracing::info!(
                 target: "openhuman::channels",
                 "[yuanbao] disconnect_channel: cleared channels_config.yuanbao"
@@ -84,7 +108,13 @@ pub async fn disconnect_channel(
             persisted
                 .save()
                 .await
-                .map_err(|e| format!("failed to clear email config.toml: {e}"))?;
+                .map_err(|error| {
+                    crate::config::ops::config_save_error_with_context(
+                        error,
+                        "failed to clear email config.toml",
+                        false,
+                    )
+                })?;
             tracing::info!(
                 target: "openhuman::channels",
                 "[email] disconnect_channel: cleared channels_config.email"
