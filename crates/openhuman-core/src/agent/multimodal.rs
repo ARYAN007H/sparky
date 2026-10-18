@@ -19,7 +19,6 @@ use crate::config::{
 use tinyagents_session::transcript::{TranscriptMessage, TranscriptPart};
 
 use tinyagents_harness::multimodal::{
-    self as mm,
     config::ImageLimits,
     markers,
     payload::sha256_prefix,

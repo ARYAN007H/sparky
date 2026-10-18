@@ -10,7 +10,10 @@ impl AttachmentModel {
         let mut cacheable = true;
         #[cfg(not(feature = "documents"))]
         let cacheable = false;
+        #[cfg(feature = "documents")]
         let mut text = String::new();
+        #[cfg(not(feature = "documents"))]
+        let text = String::new();
         #[cfg(not(feature = "documents"))]
         let _ = (path, mime, bytes);
         #[cfg(feature = "documents")]

@@ -81,12 +81,13 @@ async fn sweep_keeps_fresh_attachments() {
         .nth(1)
         .and_then(|s| s.split(']').next())
         .map(str::trim)
-        .expect("placeholder carries an id");
+        .expect("placeholder carries an id")
+        .to_owned();
 
     sweep_stale_attachments().await;
 
     let index = build_attachment_index(&[TranscriptMessage::user(placeholdered)]).await;
-    assert!(index.contains_key(id), "fresh attachment retained after sweep");
+    assert!(index.contains_key(&id), "fresh attachment retained after sweep");
 }
 
 #[test]
