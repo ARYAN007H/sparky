@@ -26,6 +26,7 @@ fn wallet_schema_wire_contracts_are_preserved() {
             input_count: *input_count,
             input_order: *input_order,
             inputs: *inputs,
+            output_fields: &[],
             outputs: None,
         };
         let schema = wallet_schemas(function);

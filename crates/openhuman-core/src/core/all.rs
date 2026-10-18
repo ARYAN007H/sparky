@@ -1211,6 +1211,7 @@ pub(crate) struct ControllerSchemaContract {
     pub input_count: Option<usize>,
     pub input_order: Option<&'static [&'static str]>,
     pub inputs: &'static [SchemaFieldContract],
+    pub output_fields: &'static [&'static str],
     pub outputs: Option<&'static [&'static str]>,
 }
 
@@ -1233,6 +1234,14 @@ pub(crate) fn assert_schema_contract(schema: &ControllerSchema, expected: &Contr
         if let Some(required) = expected.required {
             assert_eq!(field.required, required, "{}.{} input `{}` requiredness", expected.namespace, expected.function, expected.name);
         }
+    }
+    for output_name in expected.output_fields {
+        assert!(
+            schema.outputs.iter().any(|field| field.name == *output_name),
+            "{}.{} is missing output `{output_name}`",
+            expected.namespace,
+            expected.function
+        );
     }
     if let Some(outputs) = expected.outputs {
         let actual: Vec<_> = schema.outputs.iter().map(|field| field.name).collect();
