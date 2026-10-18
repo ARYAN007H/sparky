@@ -246,11 +246,11 @@ async fn a_turn_whose_provider_is_unreachable_ends_in_one_classified_chat_error(
         "{request}"
     );
 
-    let runtime = super::runner::runtime(&ctx);
+    let runtime = crate::web_chat::runner::runtime(&ctx);
     assert!(
         !runtime
             .runner
-            .is_in_flight(&super::runner::scope_of(&ctx), thread_id)
+            .is_in_flight(&crate::web_chat::runner::scope_of(&ctx), thread_id)
             .await
     );
     let extra_terminal_events = std::iter::from_fn(|| rx.try_recv().ok())
