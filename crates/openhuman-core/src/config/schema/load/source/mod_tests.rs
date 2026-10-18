@@ -106,7 +106,7 @@ async fn a_save_keeps_hand_edits_but_not_comments() {
 }
 
 #[tokio::test]
-async fn non_config_rpc_handlers_preserve_document_conflicts() {
+async fn voice_settings_rpc_preserves_document_conflicts() {
     use crate::core::runtime::{context::CoreContext, DispatchCtx, DomainSet};
     use serde_json::json;
 
@@ -150,6 +150,31 @@ async fn non_config_rpc_handlers_preserve_document_conflicts() {
     assert_eq!(structured.data.as_ref().unwrap()["kind"], "ConfigConflict");
     assert_eq!(structured.data.as_ref().unwrap()["retryable"], true);
 
+}
+
+#[tokio::test]
+async fn memory_engine_rpc_preserves_document_conflicts() {
+    use crate::core::runtime::{context::CoreContext, DispatchCtx, DomainSet};
+    use serde_json::json;
+
+    let tmp = tempfile::tempdir().unwrap();
+    let storage = MemoryStorage::new();
+    let _forced = ForcedDocumentSource::new(
+        scoped(&storage, "tenant-memory-rpc"),
+        Scope::new("tenant-memory-rpc").unwrap(),
+        keys(10),
+    );
+    let seed = config_at(tmp.path(), "initial");
+    seed.save().await.unwrap();
+    let stale = Config::load_from_config_path(&seed.config_path, &seed.workspace_dir)
+        .await
+        .unwrap();
+    let mut winner = Config::load_from_config_path(&seed.config_path, &seed.workspace_dir)
+        .await
+        .unwrap();
+    winner.default_model = Some("winner".into());
+    winner.save().await.unwrap();
+
     let memory = crate::core::all::all_registered_controllers()
         .into_iter()
         .find(|controller| controller.rpc_method_name() == "openhuman.memory_engine_set")
@@ -158,7 +183,7 @@ async fn non_config_rpc_handlers_preserve_document_conflicts() {
     let error = CoreContext::scope(ctx.clone(), async move {
         (memory.handler)(
             DispatchCtx::new(ctx),
-            json!({"engine": "disabled"}).as_object().unwrap().clone(),
+            json!({"engine": "none"}).as_object().unwrap().clone(),
         )
         .await
         .unwrap_err()
