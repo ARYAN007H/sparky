@@ -22,3 +22,7 @@ pub fn load_agents_md_layers(workspace_dir: &Path, action_dir: &Path) -> AgentsM
         |path, root| crate::security::validate_path_within_root(path, root).is_ok(),
     )
 }
+
+#[cfg(test)]
+#[path = "agents_md_tests.rs"]
+mod tests;
