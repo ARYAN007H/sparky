@@ -915,10 +915,7 @@ async fn the_agent_learn_returns_on_accept_and_recall_finds_it() {
     let config = openhuman_core::config::load_config_with_timeout()
         .await
         .expect("the signed-in config");
-    let facts = openhuman_core::memory::tools::CallFacts::of(
-        &config,
-        &Default::default(),
-    );
+    let facts = openhuman_core::memory::tools::CallFacts::of(&config, &Default::default());
 
     // Control: `memory_learn` over RPC returns once the write is readable, so
     // the hosted engine reads the store back after its write.
