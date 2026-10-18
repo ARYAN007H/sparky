@@ -197,9 +197,6 @@ fn sync_owner_snapshot(
         host.cached_input_tokens = snapshot.cached_input_tokens;
         host.last_call_input_tokens = snapshot.last_call_input_tokens;
         host.last_call_output_tokens = snapshot.last_call_output_tokens;
-        if snapshot.resolved_route.is_some() {
-            host.resolved_route = snapshot.resolved_route;
-        }
         host.model_calls = snapshot.model_calls;
         host.tool_outcomes = snapshot.tool_outcomes;
     }
@@ -271,9 +268,6 @@ impl Middleware<(), crate::agent::tinyagents::host::OpenHumanRunContext>
                 .as_ref()
                 .filter(|_| !response.served_from_cache)
             {
-                guard.input_tokens += usage.input_tokens;
-                guard.output_tokens += usage.output_tokens;
-                guard.cached_input_tokens += usage.cache_read_tokens;
                 let host_usage =
                     crate::inference::provider::model::usage_info_from_response(response)
                         .unwrap_or(

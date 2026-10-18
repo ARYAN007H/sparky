@@ -155,3 +155,53 @@ async fn owner_snapshot_spend_is_not_counted_twice_and_cache_replay_stays_free()
     assert_eq!(snapshot.last_call_input_tokens, 12);
     assert_eq!(snapshot.last_call_output_tokens, 5);
 }
+
+#[tokio::test]
+async fn host_route_fallback_survives_owner_snapshot_syncs() {
+    let sink = Arc::new(std::sync::Mutex::new(TranscriptSnapshot::default()));
+    let owner_sink = tinyagents_harness::middleware::library::new_transcript_snapshot_sink();
+    let middleware = TranscriptSnapshotMiddleware {
+        sink: sink.clone(),
+        owner: tinyagents_harness::middleware::library::TranscriptSnapshotMiddleware::new(
+            owner_sink.clone(),
+        ),
+        owner_sink,
+    };
+    let mut context = RunContext::new(
+        RunConfig::new("snapshot-route-fallback"),
+        crate::agent::tinyagents::host::OpenHumanRunContext::new(),
+    );
+    let mut request = ModelRequest::default();
+    middleware
+        .before_model_dispatch(&mut context, &(), &mut request)
+        .await
+        .expect("snapshot dispatched request");
+    let mut first = ModelResponse::assistant("first");
+    first.resolved_route = Some(ResolvedModelRoute::new("provider", "model-a", "route-a"));
+    middleware
+        .after_model(&mut context, &(), &mut first)
+        .await
+        .expect("snapshot first route");
+
+    *context.data.resolved_route.lock().expect("route lock") =
+        Some(ResolvedModelRoute::new("provider", "model-b", "route-b"));
+    let mut second_request = ModelRequest::default();
+    middleware
+        .before_model_dispatch(&mut context, &(), &mut second_request)
+        .await
+        .expect("snapshot next dispatched request");
+    let mut second = ModelResponse::assistant("second");
+    middleware
+        .after_model(&mut context, &(), &mut second)
+        .await
+        .expect("snapshot host route fallback");
+    middleware
+        .before_model_dispatch(&mut context, &(), &mut ModelRequest::default())
+        .await
+        .expect("later sync leaves host route intact");
+
+    assert_eq!(
+        sink.lock().expect("host snapshot lock").resolved_route,
+        Some(ResolvedModelRoute::new("provider", "model-b", "route-b"))
+    );
+}
