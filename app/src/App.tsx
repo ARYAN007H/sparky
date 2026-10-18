@@ -231,10 +231,6 @@ export function AppShellDesktop() {
     navigate,
   ]);
 
-  // Sync the notch indicator to the persisted always-on listening state once
-  // the core is ready (once per boot). Extracted to a hook so it's testable.
-  useNotchBootSync(isBootstrapping);
-
   const scrollRef = useRef<HTMLDivElement>(null);
   const navType = useNavigationType();
 

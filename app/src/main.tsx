@@ -9,7 +9,6 @@ import './index.css';
 import { installAutoHideScrollbars } from './lib/autoHideScrollbars';
 import { getCoreStateSnapshot } from './lib/coreState/store';
 import MascotWindowApp from './mascot/MascotWindowApp';
-import NotchApp from './notch/NotchApp';
 import OverlayApp from './overlay/OverlayApp';
 import './polyfills';
 import { initGA, initSentry, startUiInteractionTracking, trackEvent } from './services/analytics';
@@ -42,16 +41,13 @@ const urlWindowParam = (() => {
   }
 })();
 const isMascotWindow = urlWindowParam === 'mascot';
-const isNotchWindow = urlWindowParam === 'notch';
 const currentWindowLabel = isMascotWindow
   ? 'mascot'
-  : isNotchWindow
-    ? 'notch'
-    : tauriRuntimeAvailable()
-      ? getCurrentWindow().label
-      : 'main';
+  : tauriRuntimeAvailable()
+    ? getCurrentWindow().label
+    : 'main';
 const isOverlayWindow = currentWindowLabel === 'overlay';
-const isStandaloneWindow = isOverlayWindow || isMascotWindow || isNotchWindow;
+const isStandaloneWindow = isOverlayWindow || isMascotWindow;
 
 const ensureDefaultHashRoute = () => {
   const hash = window.location.hash;
@@ -101,8 +97,6 @@ function bootRender() {
   const root = ReactDOM.createRoot(document.getElementById('root') as HTMLElement);
   const tree = isMascotWindow ? (
     <MascotWindowApp />
-  ) : isNotchWindow ? (
-    <NotchApp />
   ) : isOverlayWindow ? (
     <OverlayApp />
   ) : (
@@ -117,7 +111,7 @@ function bootRender() {
 // `setActiveUserId(...)` wrote in a prior session — see
 // `resolveActiveUserBootstrap` for the full rationale (#4545, #900).
 const activeUserBootstrap = resolveActiveUserBootstrap({
-  isStandaloneNativeWindow: isMascotWindow || isNotchWindow,
+  isStandaloneNativeWindow: isMascotWindow,
   coreMode: getStoredCoreMode(),
   getActiveUserIdFromCore,
 });

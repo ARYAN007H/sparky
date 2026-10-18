@@ -58,7 +58,6 @@ export interface VoiceServerSettings {
   /** Custom vocabulary words to bias the STT engine toward (names, technical terms). */
   custom_dictionary: string[];
   /** Phase 2: continuous always-on listening (no hotkey). Opt-in. */
-  always_on_enabled: boolean;
   /** Hosted speech-to-text engine. There is no local option — the bundled
    *  whisper.cpp engine was removed. */
   stt_engine: SttEngine;
@@ -113,7 +112,6 @@ export async function openhumanUpdateVoiceServerSettings(update: {
   min_duration_secs?: number;
   silence_threshold?: number;
   custom_dictionary?: string[];
-  always_on_enabled?: boolean;
   stt_engine?: SttEngine;
 }): Promise<CommandResponse<ConfigSnapshot>> {
   return await callCoreRpc<CommandResponse<ConfigSnapshot>>({
