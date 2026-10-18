@@ -2973,11 +2973,11 @@ async fn json_rpc_cron_manual_worker_survives_caller_cancel_on_published_tinyflo
         }))
         .expect("subscribe to the production Cron domain events");
 
-    let rpc_base = rpc_base.clone();
+    let caller_rpc_base = rpc_base.clone();
     let job_id = job.id.clone();
     let caller = tokio::spawn(async move {
         post_json_rpc(
-            &rpc_base,
+            &caller_rpc_base,
             80_004,
             "openhuman.cron_run",
             json!({ "job_id": job_id }),
@@ -3093,14 +3093,20 @@ async fn json_rpc_cron_manual_worker_survives_caller_cancel_on_published_tinyflo
 
     let first_config = config.clone();
     let first_job_id = first_job.id.clone();
+    let first_context = Arc::clone(&default_context);
     let first = tokio::spawn(async move {
-        let dispatch = DispatchCtx::new(Arc::clone(&default_context));
+        let dispatch = DispatchCtx::new(first_context);
         openhuman_core::cron::ops::run_job_now(&dispatch, &first_config, &first_job_id).await
     });
     tokio::time::timeout(Duration::from_secs(10), scope_started_rx.recv())
         .await
         .expect("the first document scope starts its manual worker")
         .expect("scope handler channel remains open");
+    first.abort();
+    assert!(
+        first.await.unwrap_err().is_cancelled(),
+        "cancel the core's synchronous Run Now waiter while its module worker remains active"
+    );
 
     let duplicate = openhuman_core::cron::ops::run_job_now(
         &DispatchCtx::new(Arc::clone(&default_context)),
@@ -3108,18 +3114,21 @@ async fn json_rpc_cron_manual_worker_survives_caller_cancel_on_published_tinyflo
         &first_job.id,
     )
     .await;
+    let refusal = match duplicate {
+        Err(error) => error,
+        Ok((false, message)) => message,
+        Ok((true, message)) => panic!("same-scope active run unexpectedly succeeded: {message}"),
+    };
     assert!(
-        duplicate
-            .as_ref()
-            .err()
-            .is_some_and(|error| error.contains("AlreadyRunning")),
-        "the same scope refuses the active job: {duplicate:?}"
+        refusal.contains("AlreadyRunning"),
+        "the same scope refuses the active job: {refusal}"
     );
 
     let second_config = config.clone();
     let second_job_id = second_job.id.clone();
+    let second_context = Arc::clone(&agent_context);
     let second = tokio::spawn(async move {
-        let dispatch = DispatchCtx::new(Arc::clone(&agent_context));
+        let dispatch = DispatchCtx::new(second_context);
         openhuman_core::cron::ops::run_job_now(&dispatch, &second_config, &second_job_id).await
     });
     tokio::time::timeout(Duration::from_secs(10), scope_started_rx.recv())
@@ -3129,6 +3138,27 @@ async fn json_rpc_cron_manual_worker_survives_caller_cancel_on_published_tinyflo
     scope_release.add_permits(2);
     assert!(first.await.unwrap().unwrap().0);
     assert!(second.await.unwrap().unwrap().0);
+    let (operator_runs, agent_runs) = tokio::time::timeout(Duration::from_secs(10), async {
+        loop {
+            let operator_runs = CoreContext::scope(Arc::clone(&default_context), async {
+                openhuman_core::cron::list_runs(&config, &first_job.id, 10).unwrap()
+            })
+            .await;
+            let agent_runs = CoreContext::scope(Arc::clone(&agent_context), async {
+                openhuman_core::cron::list_runs(&config, &second_job.id, 10).unwrap()
+            })
+            .await;
+            if operator_runs.first().is_some_and(|run| run.status == "ok")
+                && agent_runs.first().is_some_and(|run| run.status == "ok")
+            {
+                break (operator_runs, agent_runs);
+            }
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .expect("both scoped workers commit terminal run history after the first caller cancels");
+    assert_ne!(operator_runs[0].run_id, agent_runs[0].run_id);
 
     mock_join.abort();
     rpc_join.abort();
