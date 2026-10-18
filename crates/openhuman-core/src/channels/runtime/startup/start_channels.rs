@@ -30,9 +30,9 @@ async fn start_channels_inner(mut config: Config, session: CancellationToken) ->
     // The listener runs for the host's own tenant (none in SaaS, where hosted
     // channels go through the relay under their profile's context).
     let dispatch = crate::core::runtime::DispatchCtx::host_default();
-    // Initialize the global event bus singleton and register the tracing
-    // subscriber for debug logging of all domain events.
+    // Initialize the global event bus singleton.
     crate::core::bus::init().await.expect("bus init");
+    let bus = crate::core::bus::BUS.get().expect("bus initialised");
     // Domain subscribers (tracing, health, persistence, web surfaces, composio,
     // task sources) are registered by `core::runtime::subscribers`
     // on every core boot, not here: this entry point is skipped when no
