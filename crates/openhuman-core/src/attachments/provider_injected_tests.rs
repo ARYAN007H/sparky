@@ -108,4 +108,3 @@ fn bare_injected_builder_does_not_load_operator_config() {
         .unwrap();
     assert!(agent.runtime_config().is_none());
 }
-

@@ -30,8 +30,14 @@ async fn image_placeholder_rehydrates_to_inline_data_uri() {
     let rehydrated = rehydrate_image_placeholders(&messages).await;
     assert_eq!(rehydrated.len(), 1);
     let content = &rehydrated[0].content;
-    assert!(content.contains("[IMAGE:data:image/png;base64,"), "{content}");
-    assert!(!content.contains("#att:"), "placeholder consumed: {content}");
+    assert!(
+        content.contains("[IMAGE:data:image/png;base64,"),
+        "{content}"
+    );
+    assert!(
+        !content.contains("#att:"),
+        "placeholder consumed: {content}"
+    );
 }
 
 #[tokio::test]
@@ -55,7 +61,10 @@ async fn stash_image_attachments_caps_at_max_images() {
     };
     let out = stash_image_attachments(&msg, &config).await;
     assert!(out.contains("#att:"), "first image stashed: {out}");
-    assert!(out.contains("over image limit"), "second image capped: {out}");
+    assert!(
+        out.contains("over image limit"),
+        "second image capped: {out}"
+    );
 }
 
 #[test]
@@ -68,7 +77,9 @@ fn extract_image_placeholders_pulls_attachment_tokens_in_order() {
             "[Image: image #att:bbb222]".to_string()
         ]
     );
-    assert!(markers::extract_image_placeholders_in_text("[Image: (could not be processed)]").is_empty());
+    assert!(
+        markers::extract_image_placeholders_in_text("[Image: (could not be processed)]").is_empty()
+    );
     assert!(markers::extract_image_placeholders_in_text("no images here").is_empty());
 }
 
@@ -87,7 +98,10 @@ async fn sweep_keeps_fresh_attachments() {
     sweep_stale_attachments().await;
 
     let index = build_attachment_index(&[TranscriptMessage::user(placeholdered)]).await;
-    assert!(index.contains_key(&id), "fresh attachment retained after sweep");
+    assert!(
+        index.contains_key(&id),
+        "fresh attachment retained after sweep"
+    );
 }
 
 #[test]

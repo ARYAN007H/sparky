@@ -2,9 +2,9 @@
 use super::*;
 use async_trait::async_trait;
 use tinyagents_harness::multimodal::{
-    config::{FileLimits, ImageLimits}, MediaFallbackCache, MediaFallbackRenderer,
-    MediaHistoryFallback, MediaRequestConfig, MediaRequestModel, MediaSourceResolver,
-    ResolvedAttachment, ResolvedMedia, TextExtractor,
+    config::{FileLimits, ImageLimits},
+    MediaFallbackCache, MediaFallbackRenderer, MediaHistoryFallback, MediaRequestConfig,
+    MediaRequestModel, MediaSourceResolver, ResolvedAttachment, ResolvedMedia, TextExtractor,
 };
 
 pub(super) fn wrap(
@@ -27,7 +27,11 @@ pub(super) fn wrap(
             allow_remote_fetch: config.multimodal.allow_remote_fetch,
         },
         files: FileLimits {
-            max_files: if config.multimodal_files.max_files == 0 { 0 } else { max_files },
+            max_files: if config.multimodal_files.max_files == 0 {
+                0
+            } else {
+                max_files
+            },
             max_file_size_mb: file_mb,
             max_extracted_text_chars: text_limit,
             allow_remote_fetch: config.multimodal_files.allow_remote_fetch,
@@ -35,7 +39,9 @@ pub(super) fn wrap(
         },
         max_historical_media_items: MAX_HISTORICAL_MEDIA_BLOCKS,
     };
-    let extractor = Arc::new(OwnedDocumentsExtractor { ctx: ctx.downgrade() });
+    let extractor = Arc::new(OwnedDocumentsExtractor {
+        ctx: ctx.downgrade(),
+    });
     let model = MediaRequestModel::new(
         inner,
         request_config,
@@ -87,9 +93,15 @@ impl MediaSourceResolver<AttachmentAccessScope> for AttachmentModel {
                     || source.starts_with("http://")
                     || source.starts_with("https://")
                 {
-                    MediaRef::Url { url: source.to_owned(), media_type: mime_hint.map(str::to_owned) }
+                    MediaRef::Url {
+                        url: source.to_owned(),
+                        media_type: mime_hint.map(str::to_owned),
+                    }
                 } else {
-                    MediaRef::Path { path: source.to_owned(), media_type: mime_hint.map(str::to_owned) }
+                    MediaRef::Path {
+                        path: source.to_owned(),
+                        media_type: mime_hint.map(str::to_owned),
+                    }
                 };
                 match modality {
                     InputModality::Audio => ContentBlock::Audio(media),
@@ -98,8 +110,10 @@ impl MediaSourceResolver<AttachmentAccessScope> for AttachmentModel {
                 }
             }
         };
-        let Some((resolved_modality, path, mut mime, bytes, recovered)) =
-            self.resolve_block(&block, scope).await.map_err(|error| error.to_string())?
+        let Some((resolved_modality, path, mut mime, bytes, recovered)) = self
+            .resolve_block(&block, scope)
+            .await
+            .map_err(|error| error.to_string())?
         else {
             return Err("unsupported media source".into());
         };
@@ -109,11 +123,13 @@ impl MediaSourceResolver<AttachmentAccessScope> for AttachmentModel {
         if modality == InputModality::Image {
             mime = tinyagents_harness::multimodal::mime::image_mime_from_magic(&bytes)
                 .map(str::to_owned)
-                .or_else(|| tinyagents_harness::multimodal::mime::detect_image_mime(
-                    Some(std::path::Path::new(&path)),
-                    &bytes,
-                    None,
-                ))
+                .or_else(|| {
+                    tinyagents_harness::multimodal::mime::detect_image_mime(
+                        Some(std::path::Path::new(&path)),
+                        &bytes,
+                        None,
+                    )
+                })
                 .ok_or_else(|| "image attachment type cannot be determined".to_string())?;
         } else if let Some(mime_hint) = mime_hint {
             // Typed per-block metadata is authoritative for that reference.
@@ -121,11 +137,11 @@ impl MediaSourceResolver<AttachmentAccessScope> for AttachmentModel {
             mime = mime_hint.to_owned();
         } else if mime == "application/octet-stream" {
             mime = tinyagents_harness::multimodal::mime::detect_file_mime(
-                    Some(std::path::Path::new(&path)),
-                    &bytes,
-                    None,
-                )
-                .unwrap_or(mime);
+                Some(std::path::Path::new(&path)),
+                &bytes,
+                None,
+            )
+            .unwrap_or(mime);
         }
         let mut resolved = ResolvedMedia::new(ResolvedAttachment {
             size_bytes: bytes.len(),
@@ -136,9 +152,7 @@ impl MediaSourceResolver<AttachmentAccessScope> for AttachmentModel {
         if recovered {
             let annotation = format!(
                 "[Recovered attachment: {}; {} bytes; workspace path: {}]",
-                resolved.attachment.mime,
-                resolved.attachment.size_bytes,
-                resolved.attachment.name
+                resolved.attachment.mime, resolved.attachment.size_bytes, resolved.attachment.name
             );
             resolved = resolved.with_annotation(annotation);
         }
@@ -170,18 +184,20 @@ impl MediaFallbackRenderer<AttachmentAccessScope> for AttachmentModel {
             return Ok(Some(text));
         }
         #[cfg(feature = "documents")]
-        if matches!(attachment.mime.as_str(), "application/pdf"
-            | "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-            | "application/vnd.openxmlformats-officedocument.presentationml.presentation"
-            | "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-        {
+        if matches!(
+            attachment.mime.as_str(),
+            "application/pdf"
+                | "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                | "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+                | "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        ) {
             if let Some(text) = MediaFallbackCache::get(self, _scope, modality, attachment).await {
                 return Ok(Some(text));
             }
-            let (body, cacheable) = self.document_fallback(
-                &attachment.mime,
-                &attachment.bytes,
-            ).await.map_err(|error| error.to_string())?;
+            let (body, cacheable) = self
+                .document_fallback(&attachment.mime, &attachment.bytes)
+                .await
+                .map_err(|error| error.to_string())?;
             let text = format!("{}\n{body}", attachment_header(attachment));
             if cacheable {
                 MediaFallbackCache::put(self, _scope, modality, attachment, &text).await;
@@ -229,12 +245,18 @@ impl MediaFallbackCache<AttachmentAccessScope> for AttachmentModel {
         if let Ok(mut cache) = self.fallback_cache.lock() {
             cache.insert(key.clone(), text.to_owned());
         }
-        self.save_fallback(&attachment.name, &key, text, scope).await;
+        self.save_fallback(&attachment.name, &key, text, scope)
+            .await;
     }
 }
 
 impl MediaHistoryFallback<AttachmentAccessScope> for AttachmentModel {
-    fn omitted(&self, scope: &AttachmentAccessScope, modality: InputModality, source: &str) -> String {
+    fn omitted(
+        &self,
+        scope: &AttachmentAccessScope,
+        modality: InputModality,
+        source: &str,
+    ) -> String {
         let block = history_source_block(modality, source);
         let hint = super::historical_source_hint(&block, scope);
         format!("[Earlier attachment omitted by history budget; workspace path: {hint}]")
@@ -256,7 +278,9 @@ impl MediaHistoryFallback<AttachmentAccessScope> for AttachmentModel {
         }
         let block = history_source_block(modality, source);
         let hint = super::historical_source_hint(&block, scope);
-        Some(format!("[Earlier attachment unavailable or omitted at workspace path: {hint}]") )
+        Some(format!(
+            "[Earlier attachment unavailable or omitted at workspace path: {hint}]"
+        ))
     }
 }
 
@@ -297,11 +321,14 @@ struct OwnedDocumentsExtractor {
 
 #[async_trait]
 impl TextExtractor for OwnedDocumentsExtractor {
-    fn handles(&self, mime: &str) -> bool { mime == "application/pdf" }
+    fn handles(&self, mime: &str) -> bool {
+        mime == "application/pdf"
+    }
 
     async fn extract(&self, mime: &str, bytes: &[u8]) -> Result<String, String> {
         let ctx = crate::core::runtime::DispatchCtx::from_weak(self.ctx.as_ref());
         crate::agent::multimodal::DocumentsTextExtractor { ctx: &ctx }
-            .extract(mime, bytes).await
+            .extract(mime, bytes)
+            .await
     }
 }

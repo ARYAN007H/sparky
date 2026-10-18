@@ -31,6 +31,9 @@ fn owner_media_wrapper_does_not_keep_a_turn_context_alive() {
     );
     drop(dispatch);
     drop(context);
-    assert!(weak.upgrade().is_none(), "the provider wrapper retains only weak turn context");
+    assert!(
+        weak.upgrade().is_none(),
+        "the provider wrapper retains only weak turn context"
+    );
     drop(wrapper);
 }

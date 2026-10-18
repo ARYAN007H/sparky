@@ -13,9 +13,7 @@ use std::time::Duration;
 use async_trait::async_trait;
 use reqwest::Client;
 
-use crate::config::{
-    build_runtime_proxy_client_with_timeouts, MultimodalConfig,
-};
+use crate::config::{build_runtime_proxy_client_with_timeouts, MultimodalConfig};
 use tinyagents_session::transcript::{TranscriptMessage, TranscriptPart};
 
 use tinyagents_harness::multimodal::{
@@ -25,7 +23,6 @@ use tinyagents_harness::multimodal::{
     resolve::{resolve_image, TextExtractor},
     BlobAttachmentStash,
 };
-
 
 /// Hard upper bound on how long the `tinydocs` module may spend extracting a
 /// PDF's text layer before the attempt is abandoned and the file degrades to a

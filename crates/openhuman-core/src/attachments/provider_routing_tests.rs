@@ -33,11 +33,7 @@ impl ChatModel<()> for CaptureModel {
             && self.transport_inputs.contains(&modality)
             && matches!(
                 mime,
-                "audio/wav"
-                    | "application/pdf"
-                    | "text/plain"
-                    | "text/markdown"
-                    | "image/jpeg"
+                "audio/wav" | "application/pdf" | "text/plain" | "text/markdown" | "image/jpeg"
             )
     }
     async fn invoke(
@@ -106,11 +102,7 @@ async fn typed_document_mime_hints_are_per_block_and_markers_use_source_detectio
         .await
         .unwrap();
     let transport = Arc::new(CaptureModel::new(vec![InputModality::Document]));
-    let model = controlled_wrapper(
-        transport.clone(),
-        config,
-        &[InputModality::Document],
-    );
+    let model = controlled_wrapper(transport.clone(), config, &[InputModality::Document]);
 
     model
         .invoke(
@@ -294,7 +286,9 @@ async fn disabled_tinydocs_fallback_runs_through_the_owner_wrapper_without_cachi
     let temp = tempfile::tempdir().unwrap();
     let relative = "uploads/thread/id/brief.pdf";
     let path = temp.path().join(relative);
-    tokio::fs::create_dir_all(path.parent().unwrap()).await.unwrap();
+    tokio::fs::create_dir_all(path.parent().unwrap())
+        .await
+        .unwrap();
     tokio::fs::write(&path, b"%PDF-1.4 original bytes")
         .await
         .unwrap();
@@ -421,10 +415,7 @@ async fn image_readout_for_unmanaged_sources_uses_the_wrapper_memory_cache() {
     model.invoke(&(), request).await.unwrap();
 
     assert_eq!(vision.requests.lock().unwrap().len(), 1);
-    assert!(!temp
-        .path()
-        .join(".openhuman-derived/readout.txt")
-        .exists());
+    assert!(!temp.path().join(".openhuman-derived/readout.txt").exists());
 }
 
 #[tokio::test]

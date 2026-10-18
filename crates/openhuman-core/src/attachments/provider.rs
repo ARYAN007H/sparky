@@ -62,12 +62,7 @@ pub(crate) fn wrap(
     }
     profile.modalities.image_in |=
         crate::inference::model_context::model_vision_enabled(model, &config);
-    owner::wrap(
-        ctx,
-        inner,
-        config,
-        profile,
-    )
+    owner::wrap(ctx, inner, config, profile)
 }
 
 /// Injected models supply their own selected-model facts through ModelProfile.
@@ -158,7 +153,6 @@ impl AttachmentModel {
         }
         Ok(bytes)
     }
-
 }
 
 fn historical_source_hint(block: &ContentBlock, scope: &AttachmentAccessScope) -> String {
