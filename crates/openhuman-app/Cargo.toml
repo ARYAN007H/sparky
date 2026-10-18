@@ -76,6 +76,7 @@ openhuman-rpc = { path = "../openhuman-rpc", default-features = false, features 
     "server",
     "jev",
     "channels",
+    "whatsapp-web",
     "media",
     "inference",
     "voice",
