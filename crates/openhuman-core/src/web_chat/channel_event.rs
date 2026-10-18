@@ -1,279 +1,46 @@
-//! The in-process form of the events the web channel publishes to connected
-//! clients.
-//!
-//! The wire vocabulary is owned by `tinychannels-bus` (`bus_web`): a typed,
-//! tagged enum plus the payload structs re-exported below. Domains still build
-//! this flat struct and hand it to
-//! [`publish_web_channel_event`](super::publish_web_channel_event) (the
-//! Socket.IO transport in `openhuman-rpc`, the `/events` stream and the TUI all
-//! read it), and the web adapter's typed events land here through the
-//! `From<bus_web::WebChannelEvent>` conversion below.
+//! Host-only routing envelope around TinyChannels' typed web event contract.
 
-use serde::{Deserialize, Serialize};
+use serde::{Serialize, Serializer};
 use tinychannels_bus::web as bus_web;
 
 pub use bus_web::{
     ChatSuggestion, GuardrailPayload, GuardrailReason, QueueItemPayload, SubagentProgressDetail,
-    SubagentUsagePayload, TurnTimingPayload, TurnUsagePayload,
+    SubagentUsagePayload, TurnTimingPayload, TurnUsagePayload, WebChannelEvent,
 };
 
-/// Standard event payload for the web channel transport.
+/// A typed wire event plus tenant stamps used only for in-process routing.
 ///
-/// This structure defines the data sent to Socket.IO clients for various
-/// chat-related events, such as message delivery, tool execution, and errors.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub struct WebChannelEvent {
-    /// The agent whose work produced this event (`CoreContext::session_agent`),
-    /// stamped at publish time. Never serialized: it routes the event to its
-    /// owner's stream in SaaS mode and is not part of the wire payload.
-    #[serde(skip)]
-    pub agent: Option<String>,
-    /// The tenant (SaaS profile) whose work produced this event, stamped at
-    /// publish time. Never serialized: the `/events` stream of a SaaS user
-    /// carries only events of that user's profile.
-    #[serde(skip)]
-    pub profile: Option<String>,
-    /// The event name (e.g., `chat_message`, `tool_call`).
-    pub event: String,
-    /// Unique identifier for the Socket.IO client.
-    pub client_id: String,
-    /// Identifier for the specific chat thread.
-    pub thread_id: String,
-    /// Unique identifier for the individual request/turn.
-    pub request_id: String,
-    /// The full text of the assistant's response (sent on completion).
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub full_response: Option<String>,
-    /// A partial message segment or an error description.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub message: Option<String>,
-    /// Type of error, if the event represents a failure.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub error_type: Option<String>,
-    /// Structured rate-limit / error metadata produced by
-    /// `classify_inference_error` (issue #2606). All four fields are
-    /// additive — older FE clients that only read `message`/`error_type`
-    /// keep working; new clients can read these to render countdown,
-    /// retry-button, and fallback-CTA UI without regexing the message.
-    ///
-    /// Where the limit originated:
-    /// `"provider"` | `"openhuman_budget"` | `"agent_loop"`
-    /// | `"openhuman_billing"` | `"transport"` | `"config"`.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub error_source: Option<String>,
-    /// Whether the same prompt can be retried in this same thread.
-    /// `false` for non-retryable business 429s, auth, model_unavailable,
-    /// context_overflow, and billing exhaustion.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub error_retryable: Option<bool>,
-    /// Milliseconds to wait before retrying, as supplied by the upstream
-    /// `Retry-After:` / `retry_after:` header. `None` when the upstream
-    /// didn't supply one or the error class has no retry-after concept.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub error_retry_after_ms: Option<u64>,
-    /// Provider name extracted from `"<provider> API error (...)"`
-    /// envelopes. `None` for non-provider errors (OpenHuman budget cap,
-    /// agent loop) and for transport failures without a provider prefix.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub error_provider: Option<String>,
-    /// `Some(false)` once the reliable-provider chain has exhausted
-    /// every configured `model_fallbacks` entry. `None` means "unknown
-    /// — FE should not promise a fallback".
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub error_fallback_available: Option<bool>,
-    /// Stable i18n key of the failure-copy table row behind `message`
-    /// (`chat_error.<class>`). `message` is always the finished English copy;
-    /// a UI that knows the key renders it in the user's locale instead and
-    /// falls back to `message` for an unknown key. Absent on error types that
-    /// have no table row (cancellation, guardrail, tool errors).
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub copy_key: Option<String>,
-    /// Values `copy_key`'s copy needs: `retry_after_secs`, `provider`,
-    /// `detail` (the sanitized provider error quoted under the copy).
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub copy_params: Option<serde_json::Value>,
-    /// Name of the tool being called.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub tool_name: Option<String>,
-    /// ID of the skill owning the tool.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub skill_id: Option<String>,
-    /// Arguments passed to the tool.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub args: Option<serde_json::Value>,
-    /// The raw output from the tool execution.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub output: Option<String>,
-    /// Whether the tool execution or request was successful.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub success: Option<bool>,
-    /// The current iteration/round number in a tool-call loop.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub round: Option<u32>,
-    /// 0-based index when a response is delivered as multiple segments.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub segment_index: Option<u32>,
-    /// Total number of segments in a segmented delivery.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub segment_total: Option<u32>,
-    /// Id of the thread row the producer already persisted for this message
-    /// (`proactive_message` only). A client appending the message reuses it so
-    /// its append collapses onto the stored row; absent means no row exists
-    /// and the client generates its own id.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub persisted_message_id: Option<String>,
-    /// Fine-grained streaming payload for `text_delta`, `thinking_delta`,
-    /// and `tool_args_delta` events. Concatenating `delta`s in order
-    /// yields the full text/thinking/arguments string.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub delta: Option<String>,
-    /// Discriminator for the `delta` payload: `"text"`, `"thinking"`,
-    /// or `"tool_args"`. Only set on streaming delta events.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub delta_kind: Option<String>,
-    /// Provider-assigned tool call id that groups `tool_args_delta`
-    /// chunks together and ties them to the eventual `tool_call` /
-    /// `tool_result` events.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub tool_call_id: Option<String>,
-    /// Structured, user-facing classification of a failed tool call (class,
-    /// category, plain-language cause + next action). Present on `tool_result`
-    /// events when the tool failed; the chat "View processing" timeline renders
-    /// the "why / what to do next" pair. `None` on success.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub failure: Option<serde_json::Value>,
-    /// Optional citations attached to `chat_done` payloads.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub citations: Option<serde_json::Value>,
-    /// Sub-agent specific progress detail. Populated on
-    /// `subagent_spawned`, `subagent_completed`, `subagent_iteration_start`,
-    /// `subagent_tool_call`, and `subagent_tool_result` events so the UI
-    /// can attribute child activity to the parent's live subagent row
-    /// without overloading the flat top-level fields. `None` for any
-    /// non-subagent event.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub subagent: Option<SubagentProgressDetail>,
-    /// Server-computed human label for a tool call (on `tool_call` /
-    /// `subagent_tool_call`), e.g. "Reading messages". The frontend renders
-    /// this verbatim for dynamic Composio/MCP/integration tools it can't
-    /// label itself, falling back to its own formatter when absent.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub tool_display_label: Option<String>,
-    /// Server-computed contextual detail for a tool call (on `tool_call` /
-    /// `subagent_tool_call`), e.g. "steven@gmail.com" — the bracketed target
-    /// shown after [`Self::tool_display_label`].
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub tool_display_detail: Option<String>,
-    /// Milliseconds the tool call took to execute. Present on `tool_result` /
-    /// `subagent_tool_result`, mirroring `AgentProgress::ToolCallCompleted`'s
-    /// `elapsed_ms` / `SubagentToolCallCompleted`'s `elapsed_ms` — carried
-    /// as a plain top-level field (in addition to `subagent.elapsed_ms` for
-    /// the sub-agent case) so a frontend that only reads flat fields still
-    /// gets real timing instead of guessing from wall-clock deltas.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub elapsed_ms: Option<u64>,
-    /// Structured, tool-specific result payload copied from a tool's
-    /// `ToolResult::metadata` when it is a JSON object carrying a `"kind"`
-    /// discriminator, e.g.
-    /// `{"kind":"web_search","query":"...","provider":"...","results":[...]}`.
-    /// Present on `tool_result` / `subagent_tool_result` only for tools that
-    /// populate metadata of that shape (currently the web-search tools); the
-    /// model-facing `output` text is unaffected and stays byte-identical to
-    /// what the model itself saw.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub structured: Option<serde_json::Value>,
-    /// Holistic token/cost/context usage for a completed turn (parent +
-    /// sub-agents), carried on `chat_done`. Lets the UI footer show session
-    /// tokens, USD cost, and real context-window utilisation, with a
-    /// per-sub-agent hover breakdown. `None` for every non-`chat_done` event and
-    /// for synthetic done events that never ran a real turn.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub usage: Option<TurnUsagePayload>,
-    /// Additive per-request monotonic ordering key stamped by the web-channel
-    /// progress bridge on every event it emits (conversations-timeline-refactor,
-    /// Phase 4). Together with the always-present `request_id`, the frontend
-    /// dedups replayed vs live events by `(request_id, seq)` and orders them
-    /// identically to the persisted turn-state snapshot. `None` on events not
-    /// emitted through the stamping bridge and on older cores — older frontends
-    /// simply ignore it.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub seq: Option<u64>,
-    /// Epoch milliseconds this event was emitted at. Additive wall-clock
-    /// stamp so a frontend can order/annotate events without deriving time
-    /// from arrival order. `None` on emit sites not yet updated to stamp it.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub ts: Option<u64>,
-    /// RFC3339 timestamp of when a pending approval / plan review expires,
-    /// mirrored from `PendingApproval::expires_at` (`security::approval::types`).
-    /// Present on `approval_request` / `plan_review_request` events.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub expires_at: Option<String>,
-    /// The turn/request id a lifecycle event (approval, plan review, queue
-    /// item, cancellation) correlates back to, when distinct from the
-    /// top-level `request_id` (e.g. a decision event fired outside the
-    /// original turn's request context).
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub turn_request_id: Option<String>,
-    /// Time-to-first-visible timing summary, carried on `chat_done`. See
-    /// `web_chat::turn_timing`.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub timing: Option<TurnTimingPayload>,
-    /// Follow-up prompt suggestions offered to the user after a turn.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub suggestions: Option<Vec<ChatSuggestion>>,
-    /// Guardrail verdict attached to a blocked/flagged turn.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub guardrail: Option<GuardrailPayload>,
-    /// Run-queue item this event reports on (queued/delivered/removed).
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub queue_item: Option<QueueItemPayload>,
-    /// Session goal snapshot, carried on goal-lifecycle events. Left as a
-    /// raw `Value` because the goal shape is owned by `tinyagents-graph`,
-    /// not this crate.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub goal: Option<serde_json::Value>,
-    /// Session todo-list snapshot, carried on todo-lifecycle events. Raw
-    /// `Value` for the same reason as `goal`.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub todos: Option<serde_json::Value>,
-    /// Human-readable reason a turn/queue item was cancelled.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub cancel_reason: Option<String>,
-    /// Id of the turn/request that superseded this one (e.g. a steer
-    /// requeue), when applicable.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub superseded_by: Option<String>,
-    /// `Some(true)` on an `approval_request` whose park can outlive the chat
-    /// turn it is shown on (an async-delegated sub-agent). The client keeps
-    /// such a card across that turn's `chat_done` and clears it on
-    /// `approval_decided` instead. Absent for an ordinary in-turn park.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub detached: Option<bool>,
-    /// Typed content parts (media, voice notes) of `chat_done` /
-    /// `chat_message` / `proactive_message`, as the web adapter projects them.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub parts: Option<serde_json::Value>,
+/// `event` remains the TinyChannels-owned wire contract. The routing fields
+/// are deliberately absent from serialization and cannot be supplied by the
+/// event producer's payload.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ScopedWebEvent {
+    pub(crate) event: WebChannelEvent,
+    agent: Option<String>,
+    profile: Option<String>,
 }
 
-impl WebChannelEvent {
-    /// Whether a SaaS user agent's stream may carry this event: only one
-    /// stamped with that agent. An unstamped event (published outside any
-    /// agent scope) is dropped rather than guessed at.
+impl ScopedWebEvent {
+    pub(crate) fn new(event: WebChannelEvent) -> Self {
+        Self {
+            event,
+            agent: None,
+            profile: None,
+        }
+    }
+
+    /// Whether this event belongs on the named agent's stream.
     pub fn belongs_to(&self, agent: &str) -> bool {
         self.agent.as_deref() == Some(agent)
     }
 
-    /// Whether a SaaS profile's stream may carry this event: only one stamped
-    /// with that profile. An unstamped event is dropped rather than guessed at.
+    /// Whether this event belongs on the named profile's stream.
     pub fn belongs_to_profile(&self, profile: &str) -> bool {
         self.profile.as_deref() == Some(profile)
     }
 
-    /// Stamp the tenant whose work produced this event where the publisher
-    /// left it unset. A SaaS task with no scope (`None`) stamps nothing, so
-    /// the event reaches no user's stream.
-    pub fn stamp_tenant(&mut self, tenant: Option<crate::core::runtime::Tenant>) {
+    /// Stamp routing metadata from the host execution context.
+    pub(crate) fn stamp_tenant(&mut self, tenant: Option<crate::core::runtime::Tenant>) {
         let Some(tenant) = tenant else {
             return;
         };
@@ -286,29 +53,12 @@ impl WebChannelEvent {
     }
 }
 
-impl From<bus_web::WebChannelEvent> for WebChannelEvent {
-    /// The wire form of a typed event is, by construction, the flat struct's
-    /// serialization, so the conversion goes through it. Two spellings the
-    /// typed projection cannot omit are normalised to the deployed wire: a
-    /// `null` argument payload and an unnamed tool on an argument delta are
-    /// absent, not empty.
-    fn from(event: bus_web::WebChannelEvent) -> Self {
-        let mut flat = serde_json::to_value(&event)
-            .and_then(serde_json::from_value::<WebChannelEvent>)
-            .unwrap_or_else(|error| {
-                log::warn!("[web-channel] typed event did not convert to the bus form: {error}");
-                WebChannelEvent::default()
-            });
-        if flat.args.as_ref().is_some_and(serde_json::Value::is_null) {
-            flat.args = None;
-        }
-        if flat.tool_name.as_deref() == Some("") {
-            flat.tool_name = None;
-        }
-        flat
+impl Serialize for ScopedWebEvent {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        self.event.serialize(serializer)
     }
 }
 
-#[cfg(test)]
-#[path = "channel_event_tests.rs"]
-mod tests;
