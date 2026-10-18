@@ -273,7 +273,7 @@ pub(crate) fn build_subagent_trace(
     };
     let user_id = crate::security::credentials::identity::peek_credential_user_identity()
         .and_then(|identity| identity.id.or(identity.email));
-    let trace_ctx = TraceContext::new(format!("subagent:{journal_run_id}"), user_id)
+    let trace_ctx = TraceContext::new(format!("subagent:{}", first.run_id.as_str()), user_id)
         .with_session_group(thread_id.unwrap_or(task_id).to_string())
         .with_agent_id(agent_id.to_string())
         .with_channel_source("subagent".to_string())
@@ -289,7 +289,7 @@ pub(crate) fn build_subagent_trace(
         );
     let rooted =
         tinyagents_harness::observability::trace_export::journal_export::root_subagent_observations(
-            &observations,
+            observations,
         );
     let observation_root = first.run_id.clone();
     let mut collector =
