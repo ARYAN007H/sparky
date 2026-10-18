@@ -317,7 +317,9 @@ fn flow_generation_for(workspace: &Path, gate: &DiscoveryGate) -> Option<u64> {
     #[cfg(feature = "flows")]
     {
         gate.flow_authoring_enabled()
-            .then(|| crate::skills::bundled::flow_authoring::generation_if_current(workspace))
+            .then(|| {
+                crate::skills::bundled::flow_authoring::generation_if_current(workspace, gate)
+            })
             .flatten()
     }
     #[cfg(not(feature = "flows"))]

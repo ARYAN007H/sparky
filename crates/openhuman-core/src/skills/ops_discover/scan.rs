@@ -53,7 +53,11 @@ pub(super) fn discover_filtered(
         && kinds.contains(&RootKind::Skill)
         && let (Some(workspace), Some(generation)) = (workspace_dir, flow_generation)
         && let Some(flow_authoring) =
-            crate::skills::bundled::flow_authoring::materialized_skill(workspace, generation)
+            crate::skills::bundled::flow_authoring::materialized_skill(
+                workspace,
+                gate,
+                generation,
+            )
     {
         builtin.push(flow_authoring);
     }

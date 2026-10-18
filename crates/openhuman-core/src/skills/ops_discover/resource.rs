@@ -60,10 +60,12 @@ fn read_workflow_resource_with_gate(
         }
         let generation = crate::skills::bundled::flow_authoring::generation_if_current(
             workspace_dir,
+            &gate,
         )
         .ok_or_else(|| "flow-authoring resources are unavailable".to_string())?;
         return crate::skills::bundled::flow_authoring::read_resource(
             workspace_dir,
+            &gate,
             generation,
             &skill,
             relative_path,
