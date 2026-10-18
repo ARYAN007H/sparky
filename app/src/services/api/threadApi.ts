@@ -1,5 +1,6 @@
 import debug from 'debug';
 
+import type { ContentPart } from '../chatWire';
 import type {
   DerivedTranscriptGetOptions,
   DerivedTranscriptPage,

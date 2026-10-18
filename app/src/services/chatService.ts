@@ -42,6 +42,7 @@ import type {
   ChatToolArgsDeltaEvent,
   ChatToolCallEvent,
   ChatToolResultEvent,
+  ContentPart,
   ExternalTransferPendingEvent,
   ProactiveMessageEvent,
   QueueItemEvent,
@@ -881,6 +882,12 @@ type QueueMode = 'interrupt' | 'steer' | 'followup' | 'collect' | 'parallel';
 interface ChatSendParams {
   threadId: string;
   message: string;
+  /**
+   * Typed attachments (`image`/`video`/`file` parts with an inline `data:` URI)
+   * sent beside `message`; the core stages them. Never splice upload markers
+   * into `message`.
+   */
+  attachments?: ContentPart[];
   model?: string;
   /**
    * BCP-47 UI locale (e.g. `'ar'`, `'zh-CN'`) — drives the core's
@@ -943,6 +950,7 @@ export async function chatSend(params: ChatSendParams): Promise<string | undefin
       client_id: clientId,
       thread_id: params.threadId,
       message: params.message,
+      attachments: params.attachments?.length ? params.attachments : undefined,
       model_override: params.model ?? undefined,
       locale: params.locale ?? undefined,
       speak_reply: params.speakReply ?? undefined,
@@ -1155,6 +1163,8 @@ export async function editMessage(params: {
   threadId: string;
   messageId: string;
   content: string;
+  /** Typed attachments sent with the replacement content. */
+  attachments?: ContentPart[];
 }): Promise<void> {
   const socket = socketService.getSocket();
   const clientId = socket?.id;
@@ -1164,6 +1174,7 @@ export async function editMessage(params: {
       thread_id: params.threadId,
       message_id: params.messageId,
       content: params.content,
+      attachments: params.attachments?.length ? params.attachments : undefined,
       client_id: clientId ?? undefined,
     },
   });
