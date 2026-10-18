@@ -222,16 +222,14 @@ pub(super) fn sub_completed(
     out.output_chars = Some(output_chars);
     out.output = Some(cap_web_output(output));
     // Present only when this child's spend is not already inside the parent
-    // turn's totals; the consumer adds it unconditionally. An unknown cost is
-    // never guessed.
-    out.usage = usage.and_then(|usage| {
-        Some(SubagentUsage {
-            input_tokens: usage.input_tokens,
-            output_tokens: usage.output_tokens,
-            cached_input_tokens: usage.cached_input_tokens,
-            charged_amount_usd: usage.cost().usd()?,
-            cost_source: Default::default(),
-        })
+    // turn's totals; the consumer adds it unconditionally, and reads an
+    // unknown cost as zero.
+    out.usage = usage.map(|usage| SubagentUsage {
+        input_tokens: usage.input_tokens,
+        output_tokens: usage.output_tokens,
+        cached_input_tokens: usage.cached_input_tokens,
+        charged_amount_usd: usage.cost().usd().unwrap_or_default(),
+        cost_source: Default::default(),
     });
     out.worktree_path = worktree_path;
     out.changed_files = changed_files;
