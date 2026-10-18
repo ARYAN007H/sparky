@@ -4,9 +4,7 @@ use std::sync::{
     atomic::{AtomicUsize, Ordering},
     Arc,
 };
-use tinyagents_harness::events::{
-    AgentEvent, EventSink, GenerationEnrichment, GenerationPricing,
-};
+use tinyagents_harness::events::{AgentEvent, EventSink, GenerationEnrichment, GenerationPricing};
 use tinyagents_harness::ids::{CallId, RunId};
 
 use super::TinyagentsTurnOutcome;

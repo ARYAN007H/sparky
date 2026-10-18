@@ -44,8 +44,7 @@ async fn failed_cap_summary_is_traced_and_keeps_deterministic_fallback() {
         model: "claude-opus-4-8".into(),
         max_output_tokens: 64,
         trace: Some(crate::agent::tinyagents::SupplementalTrace::new(
-            events,
-            run_id,
+            events, run_id,
         )),
     };
     let results = [CapToolResult {
@@ -60,7 +59,9 @@ async fn failed_cap_summary_is_traced_and_keeps_deterministic_fallback() {
         .await
         .expect("owner fallback preserves a successful checkpoint");
     assert!(summary.text.contains("tool-call limit (2 steps)"));
-    assert!(summary.text.contains("read_file [ok]: found a useful source"));
+    assert!(summary
+        .text
+        .contains("read_file [ok]: found a useful source"));
     assert!(summary.usage.is_none());
 
     let records = recorder.0.lock().unwrap();

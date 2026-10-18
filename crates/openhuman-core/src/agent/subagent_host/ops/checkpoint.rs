@@ -2,9 +2,9 @@
 
 use crate::inference::provider::BilledUsage;
 use std::sync::{Arc, Mutex};
+use tinyagents_harness::ids::CallId;
 use tinyagents_harness::summarization::CapToolResult;
 use tinyagents_orchestration::subagent::{summarize_at_cap, CapSummaryModel};
-use tinyagents_harness::ids::CallId;
 use tinyinference_llm::message::Message;
 use tinyinference_llm::model::{ChatModel, ModelRequest};
 
@@ -63,7 +63,8 @@ impl CapSummaryModel for HostCapSummaryModel<'_> {
         ))];
         let request =
             ModelRequest::new(summary_input).with_max_tokens(self.checkpoint.max_output_tokens);
-        let trace_input = serde_json::to_value(&request.messages).unwrap_or(serde_json::Value::Null);
+        let trace_input =
+            serde_json::to_value(&request.messages).unwrap_or(serde_json::Value::Null);
         let trace_call = self
             .checkpoint
             .trace
