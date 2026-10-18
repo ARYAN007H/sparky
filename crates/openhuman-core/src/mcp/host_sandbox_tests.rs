@@ -59,3 +59,31 @@ fn a_grant_that_contains_a_credential_store_is_not_admitted() {
     ));
     assert!(!exposes_credentials(Path::new("/home/user"), None));
 }
+
+#[test]
+fn enforcement_is_declared_only_where_the_host_accepts_a_best_effort_backend() {
+    assert_eq!(enforcement(true), StdioSandboxEnforcement::Enforced);
+    assert_eq!(enforcement(false), StdioSandboxEnforcement::Declared);
+    assert_eq!(
+        enforcement(require_process_isolation(true)),
+        StdioSandboxEnforcement::Enforced,
+        "a SaaS tenant is always enforced"
+    );
+    let desktop = enforcement(require_process_isolation(false));
+    if cfg!(target_os = "macos") {
+        assert_eq!(desktop, StdioSandboxEnforcement::Declared);
+    } else {
+        assert_eq!(desktop, StdioSandboxEnforcement::Enforced);
+    }
+}
+
+#[cfg(feature = "modules")]
+#[test]
+fn built_sandbox_enforcement_follows_the_isolation_requirement() {
+    let tmp = tempfile::tempdir().unwrap();
+    let sandbox = stdio_sandbox(&config_in(tmp.path())).expect("a sandbox");
+    assert_eq!(
+        sandbox.enforcement,
+        enforcement(sandbox.require_process_isolation)
+    );
+}

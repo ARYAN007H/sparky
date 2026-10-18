@@ -21,7 +21,7 @@
 
 use std::path::{Path, PathBuf};
 
-use tinymcp_bus::StdioSandboxConfig;
+use tinymcp_bus::{StdioSandboxConfig, StdioSandboxEnforcement};
 
 use crate::config::Config;
 use crate::security::SecurityPolicy;
@@ -60,6 +60,7 @@ pub(super) fn stdio_sandbox(config: &Config) -> Option<StdioSandboxConfig> {
         allow_net: true,
         allow_subprocess: true,
         require_process_isolation: isolated,
+        enforcement: enforcement(isolated),
     })
 }
 
@@ -110,6 +111,19 @@ pub(super) async fn with_toolchain_grants(_config: &Config, _sandbox: &mut Stdio
 /// always requires the floor.
 pub(super) fn require_process_isolation(saas: bool) -> bool {
     saas || !cfg!(target_os = "macos")
+}
+
+/// How the module treats a backend that cannot meet the isolation floor
+/// (`StdioSandboxEnforcement`, tinymcp contract 1.27). Where the host accepts a
+/// best-effort backend (the macOS desktop's Seatbelt) the jail is `Declared`,
+/// so the module starts the server instead of refusing the best-effort
+/// backend; everywhere else it is `Enforced`.
+pub(super) fn enforcement(isolated: bool) -> StdioSandboxEnforcement {
+    if isolated {
+        StdioSandboxEnforcement::Enforced
+    } else {
+        StdioSandboxEnforcement::Declared
+    }
 }
 
 fn merge(into: &mut Vec<String>, extra: &[PathBuf]) {
