@@ -43,7 +43,6 @@ fn ensure_test_rpc_auth() -> String {
         .expect("rpc bearer must be installed after ensure_test_rpc_auth")
         .to_string()
 }
-
 /// Build the test router (Socket.IO disabled — no real runtime needed).
 fn test_router() -> axum::Router {
     let _ = ensure_test_rpc_auth();
@@ -134,4 +133,3 @@ async fn test_chat_completions_with_bearer_not_rejected_as_auth_error() {
         "403 must not fire when bearer is present"
     );
 }
-
