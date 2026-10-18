@@ -1,6 +1,22 @@
 use super::*;
 use crate::agent::tinyagents::middleware::repeated_failure::RepeatedToolFailureMiddleware;
 
+async fn run_failing_tool(
+    mw: &RepeatedToolFailureMiddleware,
+    context: &mut RunContext<crate::agent::tinyagents::host::OpenHumanRunContext>,
+    id: &str,
+    tool: &str,
+    arguments: serde_json::Value,
+    error: &str,
+) {
+    let mut call = TaToolCall::new(id, tool, arguments);
+    mw.before_tool(context, &(), &mut call).await.unwrap();
+    let mut result = failing_result(tool, error);
+    mw.after_tool(context, &(), &invocation(id, tool), &mut result)
+        .await
+        .unwrap();
+}
+
 #[tokio::test]
 async fn varied_queries_against_one_forbidden_endpoint_stop_on_first_failure() {
     let handle = SteeringHandle::allow_all();
@@ -231,20 +247,15 @@ async fn shell_timeout_nudges_once_then_halts_on_second() {
     let slot = std::sync::Arc::new(std::sync::Mutex::new(None));
     let mw = RepeatedToolFailureMiddleware::new(handle.clone(), 3, slot.clone());
     let mut context = ctx();
-    let mut run = |id: &'static str, command: &'static str| {
-        let mw = &mw;
-        let context = &mut context;
-        async move {
-            let mut call = TaToolCall::new(id, "shell", serde_json::json!({ "command": command }));
-            mw.before_tool(context, &(), &mut call).await.unwrap();
-            let mut result = failing_result("shell", "Command timed out after 60s and was killed");
-            mw.after_tool(context, &(), &invocation(id, "shell"), &mut result)
-                .await
-                .unwrap();
-        }
-    };
-
-    run("sh-1", "for d in a.io b.io c.io; do whois $d; done").await;
+    run_failing_tool(
+        &mw,
+        &mut context,
+        "sh-1",
+        "shell",
+        serde_json::json!({ "command": "for d in a.io b.io c.io; do whois $d; done" }),
+        "Command timed out after 60s and was killed",
+    )
+    .await;
     assert_eq!(drain_pause_count(&handle), 0, "first timeout must not halt");
     assert!(slot.lock().unwrap().is_none());
     let nudges = drain_nudge_messages(&mw, &mut context).await;
@@ -252,7 +263,15 @@ async fn shell_timeout_nudges_once_then_halts_on_second() {
     assert!(nudges[0].contains("timed out"), "{nudges:?}");
     assert!(nudges[0].contains("smaller, bounded"), "{nudges:?}");
 
-    run("sh-2", "whois a.io").await;
+    run_failing_tool(
+        &mw,
+        &mut context,
+        "sh-2",
+        "shell",
+        serde_json::json!({ "command": "whois a.io" }),
+        "Command timed out after 60s and was killed",
+    )
+    .await;
     assert_eq!(drain_pause_count(&handle), 1, "second timeout halts");
     let summary = slot.lock().unwrap().clone().unwrap();
     assert!(summary.contains("uncertain_side_effect"), "{summary}");
@@ -273,29 +292,15 @@ async fn a_refused_integration_steers_the_model_off_it_instead_of_ending_the_run
     let mw = RepeatedToolFailureMiddleware::new(handle.clone(), 3, slot.clone());
     let refused = "Web search failed: search ExecuteTool failed: ai.tinyhumans.tinybus.Error.Failed: provider request failed: provider returned HTTP 401";
     let mut context = ctx();
-    let mut run = |id: &'static str, query: &'static str| {
-        let mw = &mw;
-        let context = &mut context;
-        async move {
-            let mut call = TaToolCall::new(
-                id,
-                "web_search_tool",
-                serde_json::json!({ "query": query, "max_results": 10 }),
-            );
-            mw.before_tool(context, &(), &mut call).await.unwrap();
-            let mut result = failing_result("web_search_tool", refused);
-            mw.after_tool(
-                context,
-                &(),
-                &invocation(id, "web_search_tool"),
-                &mut result,
-            )
-            .await
-            .unwrap();
-        }
-    };
-
-    run("ws-1", "regex chess move generator").await;
+    run_failing_tool(
+        &mw,
+        &mut context,
+        "ws-1",
+        "web_search_tool",
+        serde_json::json!({ "query": "regex chess move generator", "max_results": 10 }),
+        refused,
+    )
+    .await;
     assert_eq!(
         drain_pause_count(&handle),
         0,
@@ -315,7 +320,15 @@ async fn a_refused_integration_steers_the_model_off_it_instead_of_ending_the_run
     );
 
     // The model insists on the same operation: now the ledger stops it.
-    run("ws-2", "regex chess move generator").await;
+    run_failing_tool(
+        &mw,
+        &mut context,
+        "ws-2",
+        "web_search_tool",
+        serde_json::json!({ "query": "regex chess move generator", "max_results": 10 }),
+        refused,
+    )
+    .await;
     assert_eq!(
         drain_pause_count(&handle),
         1,
@@ -707,7 +720,7 @@ async fn a_success_clears_the_invalid_arguments_count_and_a_rejection_is_nudged(
         "the success restarted the count: three more rejections stay inside the budget"
     );
     assert!(slot.lock().unwrap().is_none());
-    reject(&mw, "r-7").await;
+    reject(&mw, &mut context, "r-7").await;
     assert_eq!(
         drain_pause_count(&handle),
         1,

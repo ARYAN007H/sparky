@@ -23,7 +23,7 @@ fn harness_timeout(tool: &str) -> String {
 
 async fn run_call(
     mw: &RepeatedToolFailureMiddleware,
-    context: &mut RunContext<OpenHumanRunContext>,
+    context: &mut RunContext<crate::agent::tinyagents::host::OpenHumanRunContext>,
     id: &str,
     tool: &str,
     args: serde_json::Value,

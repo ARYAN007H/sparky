@@ -15,7 +15,7 @@ fn sigpipe_git_log_report() -> String {
 
 async fn run_shell(
     mw: &RepeatedToolFailureMiddleware,
-    context: &mut RunContext<OpenHumanRunContext>,
+    context: &mut RunContext<crate::agent::tinyagents::host::OpenHumanRunContext>,
     id: &str,
     command: &str,
     mut result: TaToolResult,
@@ -171,11 +171,12 @@ async fn a_faulted_module_tool_is_steered_away_once_then_halts() {
     let handle = SteeringHandle::allow_all();
     let slot = std::sync::Arc::new(std::sync::Mutex::new(None));
     let mw = RepeatedToolFailureMiddleware::new(handle.clone(), 3, slot.clone());
+    let mut context = ctx();
     let mut call = TaToolCall::new("search-1", "web_search_tool", json!({ "query": "one" }));
-    mw.before_tool(&mut ctx(), &(), &mut call).await.unwrap();
+    mw.before_tool(&mut context, &(), &mut call).await.unwrap();
     let mut result = failing_result("web_search_tool", MODULE_FAULT);
     mw.after_tool(
-        &mut ctx(),
+        &mut context,
         &(),
         &invocation("search-1", "web_search_tool"),
         &mut result,
@@ -189,10 +190,10 @@ async fn a_faulted_module_tool_is_steered_away_once_then_halts() {
     assert!(nudges[0].contains("Do not call"), "{}", nudges[0]);
 
     let mut call = TaToolCall::new("search-2", "web_search_tool", json!({ "query": "two" }));
-    mw.before_tool(&mut ctx(), &(), &mut call).await.unwrap();
+    mw.before_tool(&mut context, &(), &mut call).await.unwrap();
     let mut result = failing_result("web_search_tool", MODULE_FAULT);
     mw.after_tool(
-        &mut ctx(),
+        &mut context,
         &(),
         &invocation("search-2", "web_search_tool"),
         &mut result,

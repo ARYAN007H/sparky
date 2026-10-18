@@ -13,7 +13,7 @@ const FETCH_503: &str = "HTTP 503 Service Unavailable from example.test; the ser
 /// Run one failing `tool` call with `url` and `error` through the breaker.
 async fn fail_call(
     mw: &RepeatedToolFailureMiddleware,
-    context: &mut RunContext<OpenHumanRunContext>,
+    context: &mut RunContext<crate::agent::tinyagents::host::OpenHumanRunContext>,
     id: &str,
     tool: &str,
     arguments: serde_json::Value,
