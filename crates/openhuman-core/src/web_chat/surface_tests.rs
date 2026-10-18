@@ -115,7 +115,7 @@ async fn module_projected_cancellation_closes_the_turn() {
     assert!(state.handle.is_none());
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn dropping_a_surface_ends_its_module_owned_turn() {
     let surface = Surface::new(
         &DispatchCtx::ambient(),
@@ -140,20 +140,20 @@ async fn dropping_a_surface_ends_its_module_owned_turn() {
     let left = surface.clone();
     let right = surface.clone();
     drop(surface);
-    let barrier = Arc::new(tokio::sync::Barrier::new(3));
+    let barrier = Arc::new(std::sync::Barrier::new(3));
     let left_barrier = Arc::clone(&barrier);
     let right_barrier = Arc::clone(&barrier);
-    let left_drop = tokio::spawn(async move {
-        left_barrier.wait().await;
+    let left_drop = std::thread::spawn(move || {
+        left_barrier.wait();
         drop(left);
     });
-    let right_drop = tokio::spawn(async move {
-        right_barrier.wait().await;
+    let right_drop = std::thread::spawn(move || {
+        right_barrier.wait();
         drop(right);
     });
-    barrier.wait().await;
-    left_drop.await.unwrap();
-    right_drop.await.unwrap();
+    barrier.wait();
+    left_drop.join().unwrap();
+    right_drop.join().unwrap();
     tokio::time::timeout(std::time::Duration::from_secs(5), cleanup_done.notified())
         .await
         .expect("drop cleanup completes");

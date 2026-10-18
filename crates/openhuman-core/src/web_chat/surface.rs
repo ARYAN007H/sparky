@@ -29,6 +29,7 @@ struct SurfaceState {
     handle: Option<WebTurnHandle>,
     closed: bool,
     cleanup_done: Arc<tokio::sync::Notify>,
+    cleanup_runtime: Option<tokio::runtime::Handle>,
     request_id: String,
 }
 
@@ -68,6 +69,7 @@ impl Surface {
                 handle: None,
                 closed: false,
                 cleanup_done: Arc::new(tokio::sync::Notify::new()),
+                cleanup_runtime: Some(tokio::runtime::Handle::current()),
                 request_id: ids.request_id.clone(),
             })),
             ctx: ctx.clone(),
@@ -93,6 +95,7 @@ impl Surface {
                 handle: None,
                 closed: false,
                 cleanup_done: Arc::new(tokio::sync::Notify::new()),
+                cleanup_runtime: None,
                 request_id: ids.request_id.clone(),
             })),
             ctx: ctx.clone(),
@@ -278,13 +281,14 @@ impl Drop for SurfaceState {
             self.cleanup_done.notify_one();
             return;
         };
-        let Ok(runtime) = tokio::runtime::Handle::try_current() else {
+        let Some(runtime) = self.cleanup_runtime.as_ref() else {
             log::warn!(
-                "[web-channel] dropped projection turn without an async runtime request_id={}",
+                "[web-channel] dropped projection turn without a cleanup runtime request_id={}",
                 self.request_id
             );
             return;
         };
+        let runtime = runtime.clone();
         let cleanup_done = Arc::clone(&self.cleanup_done);
         let request_id = self.request_id.clone();
         runtime.spawn(async move {
