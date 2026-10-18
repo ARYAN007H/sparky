@@ -2,52 +2,38 @@ use super::*;
 
 #[test]
 fn outage_backoff_is_exponential_and_has_terminal_limit() {
-    let state = std::sync::Mutex::new(std::collections::HashMap::new());
+    let state = new_retry_state();
     let delays = [30_000, 60_000, 120_000, 240_000, 480_000, 900_000, 900_000];
+    let mut now = 0;
 
     for delay in delays {
-        let generation = begin_outage_attempt(Some(&state), "stub-cloud").expect("attempt");
-        let outcome =
-            record_outage(Some(&state), "stub-cloud", Some(generation)).expect("backoff outcome");
-        match outcome {
-            TriageOutcome::Deferred { reason, .. } => {
-                assert!(reason.contains(&format!("{delay}ms backoff")));
-            }
-            TriageOutcome::Decision(_) | TriageOutcome::Terminal { .. } => {
-                panic!("outage should remain retryable before the limit")
-            }
-        }
-        state
-            .lock()
-            .expect("test state lock")
-            .get_mut("stub-cloud")
-            .expect("recorded outage")
-            .next_attempt_ms = 0;
+        let mut attempt = state
+            .try_acquire("stub-cloud".to_string(), now)
+            .expect("attempt");
+        let failure = attempt.record_failure(now).expect("failure");
+        assert!(!failure.failure_limit_reached);
+        assert_eq!(failure.next_attempt_ms.saturating_sub(now), delay);
+        now = failure.next_attempt_ms;
     }
 
-    let generation = begin_outage_attempt(Some(&state), "stub-cloud").expect("attempt");
-    let outcome =
-        record_outage(Some(&state), "stub-cloud", Some(generation)).expect("terminal outcome");
-    assert!(matches!(outcome, TriageOutcome::Terminal { .. }));
-    let states = state.lock().expect("terminal outage state");
-    let outage = states.get("stub-cloud").expect("terminal outage retained");
-    assert_eq!(outage.consecutive_failures, 8);
-    assert!(outage.next_attempt_ms > chrono::Utc::now().timestamp_millis());
-    drop(states);
+    let mut attempt = state
+        .try_acquire("stub-cloud".to_string(), now)
+        .expect("terminal attempt");
+    let failure = attempt.record_failure(now).expect("terminal failure");
+    assert!(failure.failure_limit_reached);
+    assert_eq!(failure.failure_count, 8);
     assert!(begin_outage_attempt(Some(&state), "stub-cloud").is_none());
 }
 
 #[test]
 fn outage_state_isolated_by_model() {
-    let state = std::sync::Mutex::new(std::collections::HashMap::new());
-    let generation = begin_outage_attempt(Some(&state), "managed:model-a").expect("attempt");
-    let first =
-        record_outage(Some(&state), "managed:model-a", Some(generation)).expect("first outage");
-    assert!(matches!(first, TriageOutcome::Deferred { .. }));
-    let generation = begin_outage_attempt(Some(&state), "managed:model-b").expect("attempt");
-    assert!(record_outage(Some(&state), "managed:model-b", Some(generation)).is_some());
-    let states = state.lock().expect("test state lock");
-    assert_eq!(states.len(), 2, "models must not share outage windows");
+    let state = new_retry_state();
+    let mut first = state
+        .try_acquire("managed:model-a".to_string(), 0)
+        .expect("first model attempt");
+    first.record_failure(0).expect("first outage");
+    assert!(state.try_acquire("managed:model-b".to_string(), 0).is_ok());
+    assert!(state.try_acquire("managed:model-a".to_string(), 1).is_err());
 }
 
 #[tokio::test]
