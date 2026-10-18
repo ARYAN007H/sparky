@@ -84,7 +84,6 @@ impl lm::LayoutHost for AppHost {
         // switch.
         let mut v3 = self.config.clone();
         v3.memory.layout = MemoryLayoutMode::V3;
-        v3.memory.root = Some(signed_in_root(&self.config).map_err(to_module)?);
         let layout = tinymemory_tools::layout::identity::Identity::root()
             .resolve(&crate::memory::scope::identity_pins(&v3))
             .layout;

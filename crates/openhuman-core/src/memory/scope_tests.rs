@@ -94,17 +94,20 @@ fn upstream_identity_and_confinement_keep_embedded_root_and_rpc_policy() {
 }
 
 #[test]
-fn upstream_v3_identity_pools_at_the_account_root_workspace() {
+fn account_v3_identity_pools_at_the_absolute_layout_workspace() {
     let mut config = Config::default();
     config.config_path = "/srv/openhuman/users/6512ab0f6512ab0f6512ab0f/config.toml".into();
-    config.memory.root = user_root(&config);
     config.memory.layout = MemoryLayoutMode::V3;
 
     let resolved = Identity::root().resolve(&super::identity_pins(&config));
-    assert_eq!(resolved.root(), &ns("org:6512ab0f6512ab0f6512ab0f"));
+    assert_eq!(
+        user_root(&config).as_deref(),
+        Some("org:6512ab0f6512ab0f6512ab0f")
+    );
+    assert_eq!(resolved.root(), &Namespace::ROOT);
     assert_eq!(
         resolved.layout.pooled_conversations_node(),
-        Some(&ns("org:6512ab0f6512ab0f6512ab0f/ws:main"))
+        Some(&ns("ws:main"))
     );
 }
 
