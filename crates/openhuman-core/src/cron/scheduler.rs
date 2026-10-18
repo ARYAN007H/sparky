@@ -48,7 +48,7 @@ pub use delivery::deliver_job;
 use crate::config::Config;
 use crate::core::bus::BUS;
 use crate::core::events::DomainEvent;
-use crate::cron::bus_host::{self, Binding, HostRegistration, CLAIM_SCOPE};
+use crate::cron::bus_host::{self, Binding, HostRegistration};
 use crate::cron::documents_port::DocScope;
 use crate::modules::tinyflows as module;
 use crate::security::SecurityPolicy;
@@ -56,7 +56,7 @@ use anyhow::{anyhow, Result};
 use std::sync::Arc;
 use tinyflows_bus::schedule::types::CronJob;
 use tinyflows_bus::schedule::{
-    members, ManualDelivery, RunJobNow, RunJobReply, StartScheduler, StoreBackend,
+    members, ManualDelivery, RunJobReply, StartScheduler, StoreBackend,
     StoreConfig,
 };
 use tokio::time::{self, Duration};

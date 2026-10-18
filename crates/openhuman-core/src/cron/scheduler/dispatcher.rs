@@ -457,20 +457,27 @@ impl Drop for JobDispatcher {
             return;
         };
         // Stop the module's scheduler (releasing its claims) before the
-        // callback object it would call goes away.
+        // callback object it would call goes away. A failed or ambiguous stop
+        // is retried while the registration remains owned by this task.
         runtime.spawn(async move {
-            match module::proxy(&config).await {
-                Ok(proxy) => {
-                    let stopped = proxy
-                        .call::<()>(members::STOP_SCHEDULER, (started.handle.clone(),))
-                        .await;
-                    if let Err(error) = stopped {
-                        tracing::debug!(error = %error.wire_message(), "[cron:scheduler] StopScheduler failed");
-                    }
+            let Started { handle, host } = started;
+            let _host_lifetime = host;
+            let mut retry_delay = Duration::from_millis(100);
+            loop {
+                let stopped = match module::proxy(&config).await {
+                    Ok(proxy) => proxy
+                        .call::<()>(members::STOP_SCHEDULER, (handle.clone(),))
+                        .await
+                        .map_err(|error| error.wire_message()),
+                    Err(error) => Err(error),
+                };
+                match stopped {
+                    Ok(()) => break,
+                    Err(error) => tracing::debug!(%error, "[cron:scheduler] retrying StopScheduler while retaining callback"),
                 }
-                Err(error) => tracing::debug!(%error, "[cron:scheduler] StopScheduler skipped"),
+                tokio::time::sleep(retry_delay).await;
+                retry_delay = (retry_delay * 2).min(Duration::from_secs(5));
             }
-            drop(started.host);
         });
     }
 }

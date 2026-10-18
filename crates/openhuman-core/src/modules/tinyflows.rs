@@ -2,7 +2,7 @@
 //!
 //! The module owns the scheduler runtime (poll loop, claims, retry, completion),
 //! the cron job and run store, and the schedule maths behind
-//! `tinyflows_bus::schedule` (contract v3). This host file is the whole
+//! `tinyflows_bus::schedule` (contract v6). This host file is the whole
 //! transport story for it:
 //!
 //! - [`proxy`] loads the module lazily and returns a proxy for its `Schedule`
