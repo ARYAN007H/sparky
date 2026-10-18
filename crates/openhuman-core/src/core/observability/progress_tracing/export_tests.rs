@@ -107,3 +107,31 @@ async fn external_backend_is_skipped_before_session_lookup() {
     }];
     assert!(push_spans(&config, &spans).await.is_ok());
 }
+
+#[tokio::test]
+async fn child_export_obeys_sharing_and_readiness_gates_before_reading() {
+    let dispatch = crate::core::runtime::DispatchCtx::ambient();
+    let mut config = Config::default();
+    crate::core::observability::progress_tracing::export_subagent_journal_trace(
+        &dispatch,
+        &config,
+        "missing-child-run",
+        None,
+        "worker",
+        "task-1",
+    )
+    .await;
+
+    config.observability.share_usage_data = true;
+    config.api_url = Some("https://external.invalid/api".into());
+    assert!(!crate::backend::telemetry::langfuse::journal_push_ready(&config));
+    crate::core::observability::progress_tracing::export_subagent_journal_trace(
+        &dispatch,
+        &config,
+        "missing-child-run",
+        None,
+        "worker",
+        "task-1",
+    )
+    .await;
+}

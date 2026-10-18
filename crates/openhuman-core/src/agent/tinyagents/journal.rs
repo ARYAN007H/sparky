@@ -57,9 +57,8 @@ use tinyagents_harness::observability::{
 
 use tinyagents_harness::store::AppendStore;
 
-/// Best-effort live request → durable tinyagents journal stream map. The web
-/// progress bridge uses this at turn end to shadow-project spans from the
-/// journal and compare them against the live `SpanCollector` path during C4 S3.
+/// Best-effort request-to-run map used by the web bridge to collect the
+/// completed run's durable native observations for export.
 fn request_journal_runs(ctx: &DispatchCtx) -> std::sync::Arc<RequestJournalRuns> {
     crate::core::runtime::slot_for::<RequestJournalRuns>(ctx)
 }
@@ -278,10 +277,8 @@ pub(crate) async fn attach_turn_journal(
 /// whose stream offset is `>= from_offset`, in order. Reading from `0` replays
 /// the whole run.
 ///
-/// This is the seam a future replay RPC (05.x) will call so the desktop can
-/// reconnect mid-run and backfill the timeline from durable state instead of
-/// relying on transient `AgentProgress` buffering. Best-effort: a missing store
-/// or unknown run yields an empty `Vec`, not an error.
+/// Export and host readers use this to replay a durable run from its first
+/// event. Best-effort: a missing store or unknown run yields an empty `Vec`.
 pub(crate) async fn read_run_events(
     ctx: &DispatchCtx,
     run_id: &str,
