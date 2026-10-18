@@ -10,8 +10,8 @@ use serde::Serialize;
 use tinymemory_api::{Hit, ObservedActor, ThreadWindow, ToolCallRef, Turn};
 use tinymemory_tools::layout::identity::ResolvedIdentity;
 use tinymemory_tools::lifecycle::turn::{
-    self as native_turn, CitationSink, Clock, CompactionOptions, EngineResolver, JobsSink,
-    LoggedToolCall, PreTurnOptions, TurnHooks as NativeTurnHooks, TurnPack as NativeTurnPack,
+    self as native_turn, CitationSink, Clock, EngineResolver, JobsSink, LoggedToolCall,
+    PreTurnOptions, TurnHooks as NativeTurnHooks, TurnPack as NativeTurnPack,
 };
 use tinymemory_tools::{AgentMemory, BackgroundJob, Compaction, PostTurn, PreTurn};
 
@@ -251,7 +251,7 @@ pub(crate) async fn pre_turn_work(
         date_hint_margin: Duration::from_millis(100),
     };
     hooks
-        .pre_turn_work(turn, options)
+        .pre_turn_background_work(turn, options)
         .await
         .map(TurnPack::from_native)
 }
@@ -307,16 +307,13 @@ pub(crate) async fn compaction_work(
 ) -> Option<TurnPack> {
     let hooks = turn_hooks(ctx, &Arc::new(config.clone()), identity, thread_id);
     hooks
-        .compaction(
+        .compaction_background_work(
             Compaction {
                 thread_id: thread_id.to_owned(),
                 dropped,
                 focus: None,
             },
-            CompactionOptions {
-                recall: identity.recall,
-                timeout: Duration::from_millis(config.memory.recall.compaction_timeout_ms.max(1)),
-            },
+            identity.recall,
         )
         .await
         .map(TurnPack::from_native)
