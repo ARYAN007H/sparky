@@ -1,6 +1,7 @@
 //! Scoped async preparation for typed sub-agent prompt rendering.
 
-use super::{load_prompt_source, AgentDefinition, PromptContext, SubagentRunError};
+use super::{AgentDefinition, PromptContext, SubagentRunError};
+use crate::agent::subagent_host::tool_prep::load_prompt_source;
 
 /// One spawn's snapshot of the host config, loaded once by [`super::run_subagent`].
 ///
