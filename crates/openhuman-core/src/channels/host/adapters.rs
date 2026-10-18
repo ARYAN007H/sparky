@@ -137,6 +137,7 @@ impl SpeechSynthesizer for VoiceSynthesizer {
         Ok(SpeechResult {
             audio_base64: value.audio_base64,
             mime_type: value.audio_mime,
+            duration_ms: None,
             visemes,
         })
     }
