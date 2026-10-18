@@ -285,6 +285,7 @@ impl SubagentExecutor<crate::agent::tinyagents::host::OpenHumanRunContext> for O
                                     agent_id: agent_id.clone(),
                                     output: output.clone(),
                                     iterations: 1,
+                                    failure_cause: None,
                                     elapsed: std::time::Duration::ZERO,
                                     mode: crate::agent::subagent_host::SubagentMode::Typed,
                                     status,
@@ -392,6 +393,7 @@ pub(in crate::agent::subagent_host) fn outcome_to_host(
             .unwrap_or_else(|| fallback_agent_id.to_owned()),
         output: outcome.output.clone(),
         iterations: outcome.usage.calls as usize,
+        failure_cause: None,
         elapsed: std::time::Duration::from_millis(
             durable_metadata
                 .map(|(_, elapsed_ms)| elapsed_ms)
