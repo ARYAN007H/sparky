@@ -391,11 +391,38 @@ test("private gates-off and Tauri execute equivalent coverage suites with nextes
       // Pinned cargo-llvm-cov 0.9.1 rejects combining these two flags;
       // --no-report already preserves previous instrumentation profiles.
       assert.doesNotMatch(c.run, /--no-clean(?:\s|$)/);
-      assert.match(c.run, /--lcov --output-path ci-out\/lcov\//);
-      assert.match(c.run, /--no-report .*\|\| rc=\$\?; cargo llvm-cov report/);
-      assert.match(c.run, /exit "\$rc"$/);
+      // Suites never report: each report re-merges every profile in the
+      // shared coverage target, so one report check per workspace does it.
+      assert.match(c.run, /--no-report /);
+      assert.doesNotMatch(c.run, /llvm-cov report|--lcov|--output-path/);
     }
   }
+  for (const [lane, check, manifest, out] of [
+    ["rust-gates-off", "gates-off-coverage-report", "Cargo.toml", "lcov-gates-off.info"],
+    ["tauri", "tauri-coverage-report", "crates/openhuman-app/Cargo.toml", "lcov-tauri.info"],
+  ]) {
+    const checks = plan.lanes.find((l) => l.name === lane).checks;
+    const report = checks.find((c) => c.name === check);
+    assert.ok(report, check);
+    assert.deepEqual(report.needs, [], "reports even after failed suites");
+    assert.equal(report.env.CARGO_BUILD_TARGET_DIR, "target/ci-private-coverage");
+    assert.match(
+      report.run,
+      new RegExp(`cargo llvm-cov report --manifest-path ${manifest.replace(/\./g, "\\.")} --lcov --output-path ci-out/lcov/${out.replace(/\./g, "\\.")}$`),
+    );
+    assert.equal(
+      checks.filter((c) => /llvm-cov report/.test(c.run)).length,
+      1,
+      `${lane} merges the shared profiles once`,
+    );
+    assert.equal(checks.at(-1).name, check, "the report follows every suite");
+  }
+  assert.equal(
+    new Set(
+      plan.lanes.flatMap((l) => l.checks.filter((c) => /llvm-cov report/.test(c.run)).map((c) => c.run)),
+    ).size,
+    2,
+  );
   const checks = Object.fromEntries(
     plan.lanes.flatMap((l) => l.checks.map((c) => [c.name, c])),
   );
@@ -410,7 +437,7 @@ test("private gates-off and Tauri execute equivalent coverage suites with nextes
   );
 });
 
-test("private auxiliary coverage reports after failed tests and preserves the failure", () => {
+test("private auxiliary coverage suites keep their failure and the lane report still runs", async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "lane-coverage-report-"));
   const cargo = path.join(dir, "cargo");
   const calls = path.join(dir, "calls");
@@ -420,25 +447,59 @@ test("private auxiliary coverage reports after failed tests and preserves the fa
     { mode: 0o755 },
   );
   const plan = buildPlan({ profile: "ex63", areas: ALL, env: EX63_ENV });
-  const check = plan.lanes
-    .find((l) => l.name === "rust-gates-off")
-    .checks.find((c) => c.name === "gate-contract-tests");
-  const result = spawnSync("bash", ["-o", "pipefail", "-c", check.run], {
+  const gates = plan.lanes.find((l) => l.name === "rust-gates-off");
+  const suite = gates.checks.find((c) => c.name === "gate-contract-tests");
+  const env = {
+    ...process.env,
+    PATH: `${dir}:${process.env.PATH}`,
+    CARGO_CALLS: calls,
+    NEXTEST_REPORT_DIR: path.join(dir, "reports"),
+    NEXTEST_EXPECTED_TARGETS: path.join(dir, "expected-targets"),
+  };
+  const result = spawnSync("bash", ["-o", "pipefail", "-c", suite.run], {
     cwd: repoRoot,
-    env: {
-      ...process.env,
-      PATH: `${dir}:${process.env.PATH}`,
-      CARGO_CALLS: calls,
-      NEXTEST_REPORT_DIR: path.join(dir, "reports"),
-      NEXTEST_EXPECTED_TARGETS: path.join(dir, "expected-targets"),
-    },
+    env,
   });
-  assert.equal(result.status, 17);
-  const commands = fs.readFileSync(calls, "utf8").trim().split("\n");
-  assert.equal(commands.length, 3);
+  assert.equal(result.status, 17, "the suite preserves the nextest failure");
+  let commands = fs.readFileSync(calls, "utf8").trim().split("\n");
+  assert.equal(commands.length, 2);
   assert.match(commands[0], /^metadata /);
   assert.match(commands[1], /^llvm-cov nextest /);
-  assert.match(commands[2], /^llvm-cov report /);
+  // The lane's single report check runs after the failed suite and succeeds.
+  const report = gates.checks.find((c) => c.name === "gates-off-coverage-report");
+  const reported = spawnSync("bash", ["-o", "pipefail", "-c", report.run], {
+    cwd: repoRoot,
+    env,
+  });
+  assert.equal(reported.status, 0);
+  commands = fs.readFileSync(calls, "utf8").trim().split("\n");
+  assert.match(commands.at(-1), /^llvm-cov report --manifest-path Cargo\.toml --lcov /);
+  // In the runner a failed suite does not stop the report check.
+  const out = fs.mkdtempSync(path.join(os.tmpdir(), "lane-coverage-run-"));
+  try {
+    fs.mkdirSync(path.join(out, "logs"));
+    const result = await new Runner(
+      {
+        profile: "ex63",
+        lanes: [
+          {
+            name: "rust-gates-off",
+            checks: [
+              { name: "suite", when: true, needs: [], run: "exit 17" },
+              { name: "report", when: true, needs: [], run: "echo reported" },
+            ],
+          },
+        ],
+      },
+      { out, maxParallel: 1 },
+    ).run();
+    assert.deepEqual(
+      result[0].checks.map((c) => c.status),
+      ["failure", "success"],
+    );
+  } finally {
+    fs.rmSync(out, { recursive: true, force: true });
+  }
   const tauri = plan.lanes.find((l) => l.name === "tauri");
   assert.match(
     tauri.checks.find((c) => c.name === "build-tauri").run,
@@ -965,61 +1026,19 @@ test("private coverage pools profiles for every Rust configuration without chang
   }
 });
 
-test("private release cleanup follows successful examples and names only the ordinary release profile", () => {
+test("offline examples build in the dev profile so no release artifacts need cleaning", () => {
   for (const plan of plans()) {
     const lint = plan.lanes.find((lane) => lane.name === "rust-lint");
-    const cleanupIndex = lint.checks.findIndex(
-      (check) => check.name === "release-example-cleanup",
-    );
-    if (plan.profile === "hosted") {
-      assert.equal(cleanupIndex, -1);
-      continue;
-    }
-    const examplesIndex = lint.checks.findIndex(
-      (check) => check.name === "embed-offline-examples",
-    );
-    assert.equal(cleanupIndex, examplesIndex + 1);
-    const cleanup = lint.checks[cleanupIndex];
-    assert.equal(cleanup.when, true);
-    assert.deepEqual(cleanup.needs, ["embed-offline-examples"]);
+    const examples = lint.checks.find((c) => c.name === "embed-offline-examples");
+    assert.equal(examples.run, "node scripts/run-embed-examples.mjs --profile dev");
     assert.equal(
-      cleanup.run,
-      "bash scripts/ci-cancel-aware.sh cargo clean --profile release --target-dir target/ci-private-build",
+      lint.checks.some((c) => c.name === "release-example-cleanup"),
+      false,
     );
-    assert.doesNotMatch(
-      cleanup.run,
-      /ci-private-coverage|tinymold|--profile dev|rm /,
+    assert.equal(
+      lint.checks.some((c) => /cargo clean|--release/.test(c.run)),
+      false,
     );
-  }
-});
-
-test("failed offline examples block release cleanup while independent Rust validation continues", async () => {
-  const plan = buildPlan({ profile: "ex63", areas: ALL, env: EX63_ENV });
-  const lint = plan.lanes.find((lane) => lane.name === "rust-lint");
-  const cleanup = lint.checks.find(
-    (check) => check.name === "release-example-cleanup",
-  );
-  assert.ok(cleanup);
-  const out = fs.mkdtempSync(
-    path.join(os.tmpdir(), "release-cleanup-dependency-"),
-  );
-  try {
-    fs.mkdirSync(path.join(out, "logs"));
-    const checks = [
-      { name: "embed-offline-examples", when: true, needs: [], run: "exit 1" },
-      cleanup,
-      { name: "independent", when: true, needs: [], run: "echo continued" },
-    ];
-    const result = await new Runner(
-      { profile: "ex63", lanes: [{ name: "rust-lint", checks }] },
-      { out, maxParallel: 1 },
-    ).run();
-    assert.deepEqual(
-      result[0].checks.map((check) => check.status),
-      ["failure", "blocked", "success"],
-    );
-  } finally {
-    fs.rmSync(out, { recursive: true, force: true });
   }
 });
 
