@@ -168,6 +168,16 @@ fn tool_catalog_matches_frontend_fixture() {
 
     if std::env::var("UPDATE_TOOL_CATALOG").as_deref() == Ok("1") {
         assert!(full_product_features_enabled(), "{REGENERATE_COMMAND}");
+        // Keep the hosted families the fixture already lists: this build
+        // cannot see them, so regenerating must not drop them.
+        let mut names = names;
+        if let Ok(previous) = std::fs::read_to_string(&path) {
+            if let Ok(previous) = serde_json::from_str::<Vec<String>>(&previous) {
+                names.extend(previous.into_iter().filter(|n| is_hosted_tool(n)));
+                names.sort();
+                names.dedup();
+            }
+        }
         let json = serde_json::to_string_pretty(&names).expect("serialize tool catalog");
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent).expect("create fixture directory");
