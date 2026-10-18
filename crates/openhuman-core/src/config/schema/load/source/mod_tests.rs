@@ -325,15 +325,20 @@ async fn stale_document_config_snapshot_returns_conflict_instead_of_overwriting(
         .await
         .unwrap();
     first.default_model = Some("first".into());
-    stale.default_model = Some("stale".into());
+    stale.output_language = Some("fr".into());
     first.save().await.unwrap();
 
     let error = stale.save().await.unwrap_err();
-    assert!(format!("{error:#}").contains("conflict"), "{error:#}");
+    let storage_error = error
+        .chain()
+        .find_map(|cause| cause.downcast_ref::<tinystoragedrivers::StorageError>())
+        .expect("CAS failure retains the typed storage error");
+    assert_eq!(storage_error.kind(), tinystoragedrivers::ErrorKind::Conflict);
     let loaded = Config::load_from_config_path(&path, &tmp.path().join("workspace"))
         .await
         .unwrap();
     assert_eq!(loaded.default_model.as_deref(), Some("first"));
+    assert_ne!(loaded.output_language.as_deref(), Some("fr"));
 }
 
 #[tokio::test]
