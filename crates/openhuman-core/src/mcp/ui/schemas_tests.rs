@@ -1,33 +1,12 @@
 use super::*;
-use crate::core::all::{
-    assert_schema_contract, ControllerSchemaContract as Contract, SchemaFieldContract as Field,
-};
+use crate::core::all::{expect_schema_fields, expect_schema_identity};
 use crate::core::runtime::DispatchCtx;
 
 #[test]
 fn mcp_ui_schema_contracts_are_preserved() {
-    let contract = Contract {
-        namespace: "mcp_ui",
-        function: "tool_call",
-        input_count: None,
-        input_order: None,
-        required_input_order: Some(&["server_id", "tool_name"]),
-        inputs: &[
-            Field {
-                name: "server_id",
-                required: Some(true),
-                type_debug: None,
-            },
-            Field {
-                name: "tool_name",
-                required: Some(true),
-                type_debug: None,
-            },
-        ],
-        output_fields: &[],
-        outputs: None,
-    };
-    assert_schema_contract(&schemas("tool_call"), &contract);
+    let schema = schemas("tool_call");
+    expect_schema_identity(&schema, "mcp_ui", "tool_call");
+    expect_schema_fields(&schema, &[("server_id", Some(true)), ("tool_name", Some(true))]);
 }
 
 async fn with_workspace<F: std::future::Future>(body: F) -> F::Output {

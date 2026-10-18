@@ -1217,6 +1217,50 @@ pub(crate) struct ControllerSchemaContract {
     pub outputs: Option<&'static [&'static str]>,
 }
 
+#[cfg(test)]
+pub(crate) fn expect_schema_identity(schema: &ControllerSchema, namespace: &str, function: &str) {
+    assert_eq!(schema.namespace, namespace);
+    assert_eq!(schema.function, function);
+}
+
+#[cfg(test)]
+pub(crate) fn expect_schema_fields(schema: &ControllerSchema, fields: &[(&str, Option<bool>)]) {
+    for (name, required) in fields {
+        let field = schema
+            .inputs
+            .iter()
+            .find(|field| field.name == *name)
+            .unwrap_or_else(|| panic!("{}.{} is missing input `{name}`", schema.namespace, schema.function));
+        if let Some(required) = required {
+            assert_eq!(field.required, *required, "{}.{} input `{name}`", schema.namespace, schema.function);
+        }
+    }
+}
+
+#[cfg(test)]
+pub(crate) fn expect_schema_input_order(schema: &ControllerSchema, inputs: &[&str]) {
+    let actual: Vec<_> = schema.inputs.iter().map(|field| field.name).collect();
+    assert_eq!(actual, inputs, "{}.{} input order", schema.namespace, schema.function);
+}
+
+#[cfg(test)]
+pub(crate) fn expect_schema_output_names(schema: &ControllerSchema, outputs: &[&str]) {
+    let actual: Vec<_> = schema.outputs.iter().map(|field| field.name).collect();
+    assert_eq!(actual, outputs, "{}.{} output names", schema.namespace, schema.function);
+}
+
+#[cfg(test)]
+pub(crate) fn expect_schema_output_fields(schema: &ControllerSchema, outputs: &[&str]) {
+    for name in outputs {
+        assert!(
+            schema.outputs.iter().any(|field| field.name == *name),
+            "{}.{} is missing output `{name}`",
+            schema.namespace,
+            schema.function
+        );
+    }
+}
+
 /// Check one controller against a fixed wire contract copied from its
 /// independently asserted domain schema tests.
 #[cfg(test)]

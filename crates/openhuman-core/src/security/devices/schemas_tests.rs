@@ -1,65 +1,35 @@
 use super::*;
 use crate::core::all::{
-    assert_schema_contract, ControllerSchemaContract as Contract, SchemaFieldContract as Field,
+    expect_schema_fields, expect_schema_identity, expect_schema_input_order,
+    expect_schema_output_names, expect_schema_output_fields,
 };
 use serde_json::json;
 
 #[test]
 fn device_schema_wire_contracts_are_preserved() {
-    let contracts = [
-        Contract {
-            namespace: "devices",
-            function: "create_pairing",
-            input_count: Some(1),
-            input_order: Some(&["label"]),
-            required_input_order: None,
-            inputs: &[Field {
-                name: "label",
-                required: Some(false),
-                type_debug: None,
-            }],
-            output_fields: &["channel_id", "pairing_token", "core_pubkey"],
-            outputs: None,
-        },
-        Contract {
-            namespace: "devices",
-            function: "list",
-            input_count: Some(0),
-            input_order: None,
-            required_input_order: None,
-            inputs: &[],
-            output_fields: &[],
-            outputs: Some(&["devices"]),
-        },
-        Contract {
-            namespace: "devices",
-            function: "revoke",
-            input_count: Some(1),
-            input_order: Some(&["channel_id"]),
-            required_input_order: None,
-            inputs: &[Field {
-                name: "channel_id",
-                required: Some(true),
-                type_debug: None,
-            }],
-            output_fields: &[],
-            outputs: Some(&["success"]),
-        },
-    ];
+    let contracts = ["create_pairing", "list", "revoke"];
     let names: Vec<_> = all_controller_schemas()
         .into_iter()
         .map(|schema| schema.function)
         .collect();
-    assert_eq!(
-        names,
-        contracts
-            .iter()
-            .map(|contract| contract.function)
-            .collect::<Vec<_>>()
-    );
-    for contract in &contracts {
-        assert_schema_contract(&schemas(contract.function), contract);
-    }
+    assert_eq!(names, contracts);
+
+    let create = schemas("create_pairing");
+    expect_schema_identity(&create, "devices", "create_pairing");
+    expect_schema_input_order(&create, &["label"]);
+    expect_schema_fields(&create, &[("label", Some(false))]);
+    expect_schema_output_fields(&create, &["channel_id", "pairing_token", "core_pubkey"]);
+
+    let list = schemas("list");
+    expect_schema_identity(&list, "devices", "list");
+    assert!(list.inputs.is_empty());
+    expect_schema_output_names(&list, &["devices"]);
+
+    let revoke = schemas("revoke");
+    expect_schema_identity(&revoke, "devices", "revoke");
+    expect_schema_input_order(&revoke, &["channel_id"]);
+    expect_schema_fields(&revoke, &[("channel_id", Some(true))]);
+    expect_schema_output_names(&revoke, &["success"]);
 }
 
 #[test]

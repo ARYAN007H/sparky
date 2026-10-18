@@ -1,8 +1,6 @@
 use super::*;
 
-use crate::core::all::{
-    assert_schema_contract, ControllerSchemaContract as Contract, SchemaFieldContract as Field,
-};
+use crate::core::all::{expect_schema_fields, expect_schema_identity, expect_schema_output_fields};
 use crate::tools::schemas::registry::tools_schemas;
 use serde_json::{json, Map};
 const BASE_CONTROLLERS: usize = 5;
@@ -32,81 +30,20 @@ fn apify_linkedin_scrape_controller_is_retired() {
 
 #[test]
 fn tools_schema_wire_contracts_are_preserved() {
-    let contracts: &[(&str, &[Field], &[&str])] = &[
-        (
-            "composio_execute",
-            &[Field {
-                name: "action",
-                required: Some(true),
-                type_debug: None,
-            }],
-            &[],
-        ),
-        (
-            "web_answer",
-            &[
-                Field {
-                    name: "query",
-                    required: Some(true),
-                    type_debug: None,
-                },
-                Field {
-                    name: "depth",
-                    required: None,
-                    type_debug: None,
-                },
-            ],
-            &["citations"],
-        ),
-        (
-            "web_contents",
-            &[Field {
-                name: "urls",
-                required: Some(true),
-                type_debug: None,
-            }],
-            &[],
-        ),
-        (
-            "searxng_search",
-            &[
-                Field {
-                    name: "query",
-                    required: Some(true),
-                    type_debug: None,
-                },
-                Field {
-                    name: "max_results",
-                    required: None,
-                    type_debug: None,
-                },
-            ],
-            &[],
-        ),
-        (
-            "web_search",
-            &[Field {
-                name: "query",
-                required: Some(true),
-                type_debug: None,
-            }],
-            &["provider"],
-        ),
+    let contracts: &[(&str, &[(&str, Option<bool>)])] = &[
+        ("composio_execute", &[("action", Some(true))]),
+        ("web_answer", &[("query", Some(true)), ("depth", None)]),
+        ("web_contents", &[("urls", Some(true))]),
+        ("searxng_search", &[("query", Some(true)), ("max_results", None)]),
+        ("web_search", &[("query", Some(true))]),
     ];
-    for (function, inputs, outputs) in contracts {
-        let contract = Contract {
-            namespace: "tools",
-            function: *function,
-            input_count: None,
-            input_order: None,
-            required_input_order: None,
-            inputs: *inputs,
-            output_fields: *outputs,
-            outputs: None,
-        };
+    for (function, inputs) in contracts {
         let schema = tools_schemas(&format!("tools_{function}"));
-        assert_schema_contract(&schema, &contract);
+        expect_schema_identity(&schema, "tools", function);
+        expect_schema_fields(&schema, inputs);
     }
+    expect_schema_output_fields(&tools_schemas("tools_web_answer"), &["citations"]);
+    expect_schema_output_fields(&tools_schemas("tools_web_search"), &["provider"]);
 }
 
 #[test]
