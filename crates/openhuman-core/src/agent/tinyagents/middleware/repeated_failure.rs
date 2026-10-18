@@ -438,7 +438,7 @@ impl FailureScopePolicy<OpenHumanRunContext> for HostFailurePolicy {
         error: &str,
     ) {
         self.stop
-            .halt_classified(summary.to_owned(), class, &call.name, repeated, || {
+            .record_classified_halt(summary.to_owned(), class, &call.name, repeated, || {
                 first_error_line(error)
             });
     }
