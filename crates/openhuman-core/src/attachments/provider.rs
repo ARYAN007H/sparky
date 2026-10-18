@@ -1,16 +1,17 @@
 //! Ephemeral provider request preparation for durable workspace attachments.
 use super::AttachmentAccessScope;
 use crate::config::Config;
-use async_trait::async_trait;
 use base64::{engine::general_purpose::STANDARD, Engine};
 use std::sync::Arc;
 use tinyinference_llm::{
     message::{ContentBlock, ImageRef, MediaRef, Message},
-    model::{
-        ChatModel, InputModality, InputSource, ModelProfile, ModelRequest, ModelResponse,
-        ModelStream,
-    },
+    model::{ChatModel, InputModality, InputSource, ModelProfile, ModelRequest},
 };
+
+#[cfg(test)]
+use async_trait::async_trait;
+#[cfg(test)]
+use tinyinference_llm::model::{ModelResponse, ModelStream};
 
 pub(crate) fn wrap(
     ctx: &crate::core::runtime::DispatchCtx,
@@ -62,13 +63,7 @@ pub(crate) fn wrap(
     }
     profile.modalities.image_in |=
         crate::inference::model_context::model_vision_enabled(model, &config);
-    Arc::new(AttachmentModel {
-        inner,
-        config,
-        core: ctx.downgrade(),
-        profile,
-        fallback_cache: std::sync::Mutex::new(std::collections::HashMap::new()),
-    })
+    owner::wrap(ctx, inner, config, profile)
 }
 
 /// Injected models supply their own selected-model facts through ModelProfile.
@@ -79,43 +74,18 @@ pub(crate) fn wrap_injected(
     config: Arc<Config>,
 ) -> Arc<dyn ChatModel<()>> {
     let profile = inner.profile().cloned().unwrap_or_default();
-    Arc::new(AttachmentModel {
-        inner,
-        config,
-        core: ctx.downgrade(),
-        profile,
-        fallback_cache: std::sync::Mutex::new(std::collections::HashMap::new()),
-    })
+    owner::wrap(ctx, inner, config, profile)
 }
 
 struct AttachmentModel {
-    inner: Arc<dyn ChatModel<()>>,
     config: Arc<Config>,
     /// The context the wrapped turn runs under. Weak: a model held by a turn
     /// must not keep a tenant's context alive.
     core: Option<std::sync::Weak<crate::core::runtime::CoreContext>>,
-    profile: ModelProfile,
     fallback_cache: std::sync::Mutex<std::collections::HashMap<String, String>>,
 }
 
 const MAX_HISTORICAL_MEDIA_BLOCKS: usize = 8;
-
-fn is_media_block(block: &ContentBlock) -> bool {
-    matches!(
-        block,
-        ContentBlock::Image(_)
-            | ContentBlock::Audio(_)
-            | ContentBlock::Video(_)
-            | ContentBlock::Document(_)
-    )
-}
-
-fn recoverable_historical_media_error(error: &tinyinference_llm::Error) -> bool {
-    let error = error.to_string();
-    error.contains(super::SOURCE_MISSING_MARKER)
-        || error.contains("attachments are disabled for this origin")
-        || error.contains("remote attachment fetch is disabled")
-}
 
 impl AttachmentModel {
     /// The dispatch context of the turn this model serves.
@@ -123,18 +93,6 @@ impl AttachmentModel {
         crate::core::runtime::DispatchCtx::from_weak(self.core.as_ref())
     }
 
-    fn native(&self, modality: InputModality, mime: &str) -> bool {
-        let known = match modality {
-            InputModality::Image => self.profile.modalities.image_in,
-            InputModality::Audio => self.profile.modalities.audio_in,
-            InputModality::Video => self.profile.modalities.video_in,
-            InputModality::Document => self.profile.modalities.document_in,
-        };
-        known
-            && self
-                .inner
-                .supports_input(modality, mime, InputSource::Base64)
-    }
     async fn read(
         &self,
         path: &str,
@@ -196,184 +154,6 @@ impl AttachmentModel {
         }
         Ok(bytes)
     }
-    async fn prepare(&self, mut request: ModelRequest) -> tinyinference_llm::Result<ModelRequest> {
-        let scope = super::take_request_scope(&mut request.metadata);
-        if let Some(Message::User(user)) = request
-            .messages
-            .iter()
-            .rev()
-            .find(|m| matches!(m, Message::User(_)))
-        {
-            let images = user
-                .content
-                .iter()
-                .filter(|b| matches!(b, ContentBlock::Image(_)))
-                .count();
-            let files = user
-                .content
-                .iter()
-                .filter(|b| {
-                    matches!(
-                        b,
-                        ContentBlock::Audio(_) | ContentBlock::Video(_) | ContentBlock::Document(_)
-                    )
-                })
-                .count();
-            let (max_images, _) = self.config.multimodal.effective_limits();
-            let (max_files, _, _) = self.config.multimodal_files.effective_limits();
-            if images > max_images
-                || files > max_files
-                || self.config.multimodal_files.max_files == 0 && images + files > 0
-            {
-                return Err(tinyinference_llm::Error::Model(
-                    "attachment count exceeds configured limit".into(),
-                ));
-            }
-        }
-        let latest_user_message = request
-            .messages
-            .iter()
-            .rposition(|message| matches!(message, Message::User(_)));
-        let mut historical_media_to_resolve = std::collections::HashSet::new();
-        let mut remaining_historical = MAX_HISTORICAL_MEDIA_BLOCKS;
-        for (message_index, message) in request.messages.iter().enumerate().rev() {
-            if Some(message_index) == latest_user_message {
-                continue;
-            }
-            let Message::User(user) = message else {
-                continue;
-            };
-            for (block_index, block) in user.content.iter().enumerate().rev() {
-                if is_media_block(block) && remaining_historical > 0 {
-                    historical_media_to_resolve.insert((message_index, block_index));
-                    remaining_historical -= 1;
-                }
-            }
-        }
-        if scope.external_channel
-            && request.messages.iter().any(|message| {
-                matches!(message, Message::User(user) if user.content.iter().any(is_media_block))
-            })
-        {
-            return Err(tinyinference_llm::Error::Model(
-                "attachment resolution is disabled for external channel input".into(),
-            ));
-        }
-        for (message_index, message) in request.messages.iter_mut().enumerate() {
-            let Message::User(user) = message else {
-                continue;
-            };
-            let mut out = Vec::new();
-            for (block_index, block) in std::mem::take(&mut user.content).into_iter().enumerate() {
-                if Some(message_index) != latest_user_message
-                    && is_media_block(&block)
-                    && !historical_media_to_resolve.contains(&(message_index, block_index))
-                {
-                    let hint = historical_source_hint(&block, &scope);
-                    out.push(ContentBlock::Text(format!(
-                        "[Earlier attachment omitted by history budget; workspace path: {hint}]"
-                    )));
-                    continue;
-                }
-                let resolved = match self.resolve_block(&block, &scope).await {
-                    Ok(resolved) => resolved,
-                    Err(error)
-                        if Some(message_index) != latest_user_message
-                            && recoverable_historical_media_error(&error) =>
-                    {
-                        let hint = historical_source_hint(&block, &scope);
-                        out.push(ContentBlock::Text(format!(
-                            "[Earlier attachment unavailable or omitted at workspace path: {hint}]"
-                        )));
-                        continue;
-                    }
-                    Err(error) => return Err(error),
-                };
-                let Some((modality, path, mut mime, bytes, recovered)) = resolved else {
-                    out.push(block);
-                    continue;
-                };
-                if modality == InputModality::Image && bytes.is_empty() {
-                    return Err(tinyinference_llm::Error::Model(
-                        "image reference has no bytes".into(),
-                    ));
-                }
-                if modality == InputModality::Image {
-                    mime = tinyagents_harness::multimodal::mime::image_mime_from_magic(&bytes)
-                        .map(str::to_owned)
-                        .or_else(|| {
-                            tinyagents_harness::multimodal::mime::detect_image_mime(
-                                Some(std::path::Path::new(&path)),
-                                &bytes,
-                                None,
-                            )
-                        })
-                        .ok_or_else(|| {
-                            tinyinference_llm::Error::Model(
-                                "image attachment type cannot be determined".into(),
-                            )
-                        })?;
-                }
-                if self.native(modality, &mime) {
-                    if recovered {
-                        out.push(ContentBlock::Text(format!(
-                            "[Recovered attachment: {mime}; {} bytes; workspace path: {path}]",
-                            bytes.len()
-                        )));
-                    }
-
-                    let bytes = if mime == "image/png" {
-                        tinyagents_harness::multimodal::optimize_png_lossless(&bytes)
-                            .unwrap_or(bytes)
-                    } else {
-                        bytes
-                    };
-                    let data = STANDARD.encode(bytes);
-                    out.push(match modality {
-                        InputModality::Image => ContentBlock::Image(ImageRef {
-                            url: format!("data:{mime};base64,{data}"),
-                            mime_type: Some(mime),
-                        }),
-                        InputModality::Audio => ContentBlock::Audio(MediaRef::base64(data, mime)),
-                        InputModality::Video => ContentBlock::Video(MediaRef::base64(data, mime)),
-                        InputModality::Document => {
-                            ContentBlock::Document(MediaRef::base64(data, mime))
-                        }
-                    });
-                } else {
-                    let key = self.fallback_key(&path, &mime, &bytes);
-                    let cached = self
-                        .fallback_cache
-                        .lock()
-                        .expect("fallback cache")
-                        .get(&key)
-                        .cloned();
-                    let cached = match cached {
-                        Some(text) => Some(text),
-                        None => self.cached_fallback(&path, &key, &scope).await,
-                    };
-                    let text = match cached {
-                        Some(text) => text,
-                        None => {
-                            let (text, cacheable) =
-                                self.fallback(modality, &path, &mime, &bytes).await?;
-                            if cacheable {
-                                self.save_fallback(&path, &key, &text, &scope).await;
-                            }
-                            let mut cache = self.fallback_cache.lock().expect("fallback cache");
-                            if cache.len() < 16 {
-                                cache.insert(key, text.clone());
-                            }
-                            text
-                        }
-                    };
-                    out.push(ContentBlock::Text(text));
-                }
-            }
-            user.content = out;
-        }
-        Ok(request)
-    }
 }
 
 fn historical_source_hint(block: &ContentBlock, scope: &AttachmentAccessScope) -> String {
@@ -402,6 +182,9 @@ fn historical_source_hint(block: &ContentBlock, scope: &AttachmentAccessScope) -
     source.chars().take(180).collect()
 }
 
+#[path = "provider_owner.rs"]
+mod owner;
+
 fn is_local_reference(source: &str) -> bool {
     let bytes = source.as_bytes();
     let windows_drive_path = bytes.len() >= 3
@@ -414,33 +197,6 @@ fn is_local_reference(source: &str) -> bool {
 #[cfg(any(test, windows))]
 use crate::security::secure_open::normalize_windows_path_for_comparison;
 use crate::security::secure_open::secure_open;
-
-#[async_trait]
-impl ChatModel<()> for AttachmentModel {
-    fn profile(&self) -> Option<&ModelProfile> {
-        Some(&self.profile)
-    }
-    fn cache_identity(&self) -> Option<String> {
-        self.inner.cache_identity()
-    }
-    fn supports_input(&self, m: InputModality, t: &str, s: InputSource) -> bool {
-        self.inner.supports_input(m, t, s)
-    }
-    async fn invoke(
-        &self,
-        state: &(),
-        request: ModelRequest,
-    ) -> tinyinference_llm::Result<ModelResponse> {
-        self.inner.invoke(state, self.prepare(request).await?).await
-    }
-    async fn stream(
-        &self,
-        state: &(),
-        request: ModelRequest,
-    ) -> tinyinference_llm::Result<ModelStream> {
-        self.inner.stream(state, self.prepare(request).await?).await
-    }
-}
 
 #[path = "provider_cache.rs"]
 mod cache;

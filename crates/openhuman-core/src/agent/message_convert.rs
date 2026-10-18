@@ -143,10 +143,8 @@ pub(crate) fn user_text_with_markers(msg: &Message) -> String {
 /// Build the content blocks for a user turn, lifting any `[IMAGE:…]` markers out
 /// of the text into typed [`ContentBlock::Image`] blocks.
 ///
-/// By the time a user message reaches this bridge the multimodal pipeline has
-/// already rehydrated and normalized every attachment into an inline
-/// `[IMAGE:data:<mime>;base64,…]` marker (see
-/// [`crate::agent::multimodal::prepare_messages_for_provider`]).
+/// The TinyAgents media request wrapper resolves marker references on a
+/// disposable provider request after this bridge turns them into typed blocks.
 /// Leaving those buried in a single [`ContentBlock::Text`] ships the base64 to
 /// the model as literal text, so vision models never actually see the image —
 /// PNG screenshots fail outright and JPEGs get guessed at (#5359). Splitting the
@@ -157,7 +155,8 @@ pub(crate) fn user_text_with_markers(msg: &Message) -> String {
 /// Blocks are emitted in **source order** — prose and images interleave as the
 /// user wrote them, so a caption stays next to its image. A marker whose payload
 /// is empty or malformed is kept verbatim as text. Local references are
-/// resolved by the host model decorator before provider serialization. If no
+/// resolved through TinyAgents' owner wrapper and OpenHuman's authorized
+/// source resolver before provider serialization. If no
 /// marker is lifted, the owner helper keeps the original text (including
 /// whitespace around an empty or malformed marker); this also removes the old
 /// host helper's incidental trimming of that text.

@@ -161,3 +161,65 @@ async fn fifo_attachment_is_rejected_without_waiting_for_a_writer() {
     );
     assert!(!model.0.load(Ordering::SeqCst));
 }
+
+#[tokio::test]
+async fn oversized_local_file_marker_fails_before_primary_or_materialization() {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    #[derive(Default)]
+    struct NeverCalled(AtomicUsize);
+
+    #[async_trait]
+    impl ChatModel<()> for NeverCalled {
+        fn supports_input(&self, _: InputModality, _: &str, _: InputSource) -> bool {
+            false
+        }
+
+        fn profile(&self) -> Option<&ModelProfile> {
+            None
+        }
+
+        async fn invoke(
+            &self,
+            _: &(),
+            _: ModelRequest,
+        ) -> tinyinference_llm::Result<ModelResponse> {
+            self.0.fetch_add(1, Ordering::SeqCst);
+            Err(tinyinference_llm::Error::Model(
+                "unexpected primary model invocation".into(),
+            ))
+        }
+    }
+
+    let temp = tempfile::tempdir().unwrap();
+    let uploads = temp.path().join("uploads");
+    tokio::fs::create_dir_all(&uploads).await.unwrap();
+    tokio::fs::write(uploads.join("oversized.txt"), vec![b'x'; 1024 * 1024 + 1])
+        .await
+        .unwrap();
+
+    let mut config = Config::default();
+    config.action_dir = temp.path().to_path_buf();
+    config.workspace_dir = temp.path().join("internal");
+    config.multimodal_files.max_file_size_mb = 1;
+    let primary = Arc::new(NeverCalled::default());
+    let wrapped = wrap_injected(
+        &crate::core::runtime::DispatchCtx::host_default(),
+        primary.clone(),
+        Arc::new(config),
+    );
+    let request = ModelRequest::new(vec![Message::User(
+        tinyinference_llm::message::UserMessage {
+            content: vec![ContentBlock::Text(
+                "Please inspect [FILE:uploads/oversized.txt]".into(),
+            )],
+        },
+    )]);
+
+    let error = wrapped.invoke(&(), request).await.unwrap_err();
+    assert!(error
+        .to_string()
+        .contains("attachment exceeds configured file limit"));
+    assert_eq!(primary.0.load(Ordering::SeqCst), 0);
+    assert!(!uploads.join("legacy-media").exists());
+}

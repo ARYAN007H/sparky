@@ -225,7 +225,7 @@ async fn unknown_video_retains_path_as_metadata_without_specialist() {
     let captured = probe.requests.lock().unwrap().clone();
     let text = captured[0].messages[0].text();
     assert!(text.contains("clip.mp4"));
-    assert!(text.contains("14 bytes"));
+    assert!(text.contains("size=\"14 B\""));
     assert!(!serde_json::to_string(&captured[0])
         .unwrap()
         .contains("base64"));
@@ -243,11 +243,9 @@ async fn derivative_cache_survives_model_recreation_and_invalidates_changed_cont
     config.action_dir = temp.path().into();
     let config = Arc::new(config);
     let make = || AttachmentModel {
-        inner: Arc::new(Probe::default()),
         config: config.clone(),
-        profile: ModelProfile::default(),
-        fallback_cache: Mutex::new(Default::default()),
         core: None,
+        fallback_cache: Mutex::new(Default::default()),
     };
     let first = make();
     let scope = super::super::AttachmentAccessScope::default();
@@ -292,11 +290,9 @@ async fn cache_is_not_written_beside_unmanaged_local_files() {
     let mut config = Config::default();
     config.action_dir = temp.path().into();
     let model = AttachmentModel {
-        inner: Arc::new(Probe::default()),
         config: Arc::new(config),
-        profile: ModelProfile::default(),
-        fallback_cache: Mutex::new(Default::default()),
         core: None,
+        fallback_cache: Mutex::new(Default::default()),
     };
     model
         .save_fallback(

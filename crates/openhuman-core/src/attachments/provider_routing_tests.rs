@@ -31,7 +31,10 @@ impl ChatModel<()> for CaptureModel {
     fn supports_input(&self, modality: InputModality, mime: &str, source: InputSource) -> bool {
         source == InputSource::Base64
             && self.transport_inputs.contains(&modality)
-            && matches!(mime, "audio/wav" | "application/pdf" | "image/jpeg")
+            && matches!(
+                mime,
+                "audio/wav" | "application/pdf" | "text/plain" | "text/markdown" | "image/jpeg"
+            )
     }
     async fn invoke(
         &self,
@@ -64,18 +67,17 @@ fn controlled_wrapper(
     inner: Arc<CaptureModel>,
     config: Arc<Config>,
     model_inputs: &[InputModality],
-) -> AttachmentModel {
+) -> Arc<dyn ChatModel<()>> {
     let mut profile = ModelProfile::default();
     profile.modalities.image_in = model_inputs.contains(&InputModality::Image);
     profile.modalities.audio_in = model_inputs.contains(&InputModality::Audio);
     profile.modalities.document_in = model_inputs.contains(&InputModality::Document);
-    AttachmentModel {
+    owner::wrap(
+        &crate::core::runtime::DispatchCtx::default(),
         inner,
         config,
         profile,
-        fallback_cache: Mutex::new(Default::default()),
-        core: None,
-    }
+    )
 }
 fn user_request(blocks: Vec<ContentBlock>) -> ModelRequest {
     ModelRequest::new(vec![Message::User(UserMessage { content: blocks })])
@@ -90,6 +92,82 @@ fn local_media(modality: InputModality, path: &str, mime: &str) -> ContentBlock 
         InputModality::Document => ContentBlock::Document(media),
         _ => panic!("fixture supports audio and documents"),
     }
+}
+
+#[tokio::test]
+async fn typed_document_mime_hints_are_per_block_and_markers_use_source_detection() {
+    let temp = tempfile::tempdir().unwrap();
+    let config = offline_config(temp.path());
+    tokio::fs::write(temp.path().join("shared.bin"), b"plain attachment bytes")
+        .await
+        .unwrap();
+    let transport = Arc::new(CaptureModel::new(vec![InputModality::Document]));
+    let model = controlled_wrapper(transport.clone(), config, &[InputModality::Document]);
+
+    model
+        .invoke(
+            &(),
+            user_request(vec![
+                local_media(InputModality::Document, "shared.bin", "application/pdf"),
+                local_media(InputModality::Document, "shared.bin", "text/markdown"),
+                ContentBlock::Text("[FILE:shared.bin]".into()),
+            ]),
+        )
+        .await
+        .unwrap();
+
+    let captured = transport.requests.lock().unwrap();
+    let Message::User(user) = &captured[0].1.messages[0] else {
+        panic!("expected user message")
+    };
+    let mimes: Vec<_> = user
+        .content
+        .iter()
+        .filter_map(|block| match block {
+            ContentBlock::Document(MediaRef::Base64 { media_type, .. }) => {
+                Some(media_type.as_str())
+            }
+            _ => None,
+        })
+        .collect();
+    assert_eq!(mimes, ["application/pdf", "text/markdown", "text/plain"]);
+}
+
+#[tokio::test]
+async fn typed_base64_document_is_resolved_once_with_its_original_mime() {
+    let temp = tempfile::tempdir().unwrap();
+    let config = offline_config(temp.path());
+    let transport = Arc::new(CaptureModel::new(vec![]));
+    let model = controlled_wrapper(transport.clone(), config, &[]);
+
+    model
+        .invoke(
+            &(),
+            user_request(vec![ContentBlock::Document(MediaRef::Base64 {
+                data: "aGVsbG8=".into(),
+                media_type: "text/plain".into(),
+            })]),
+        )
+        .await
+        .unwrap();
+
+    let captured = transport.requests.lock().unwrap();
+    assert_eq!(captured.len(), 1);
+    let Message::User(user) = &captured[0].1.messages[0] else {
+        panic!("expected user message")
+    };
+    let payload = user
+        .content
+        .iter()
+        .find_map(|block| match block {
+            ContentBlock::Text(text) => Some(text.as_str()),
+            _ => None,
+        })
+        .expect("owner fallback should render the document text");
+    assert!(payload.contains("[FILE-EXTRACTED:"), "{payload}");
+    assert!(payload.contains("mime=\"text/plain\""));
+    assert!(payload.contains("hello"));
+    assert!(payload.contains("uploads/legacy-media/"));
 }
 
 #[tokio::test]
@@ -216,7 +294,7 @@ async fn text_archive_and_unavailable_pdf_dispatch_to_distinct_fallbacks() {
         ContentBlock::Text(text) => text.as_str(),
         _ => panic!("expected fallback text"),
     };
-    assert!(text(1).contains("Document content (untrusted)"));
+    assert!(text(1).contains("[FILE-EXTRACTED: name=\"note.txt\""));
     assert!(text(1).contains("visible text payload"));
     assert!(text(2).contains("Archive listing"));
     assert!(text(2).contains("inside.txt"));
@@ -237,6 +315,90 @@ async fn text_archive_and_unavailable_pdf_dispatch_to_distinct_fallbacks() {
     );
     assert!(matches!(&request.messages[0], Message::User(user)
         if matches!(&user.content[1], ContentBlock::Document(MediaRef::Path { path, .. }) if path == "note.txt")));
+}
+
+#[cfg(feature = "documents")]
+#[tokio::test]
+async fn disabled_tinydocs_fallback_runs_through_the_owner_wrapper_without_caching() {
+    let temp = tempfile::tempdir().unwrap();
+    let relative = "uploads/thread/id/brief.pdf";
+    let path = temp.path().join(relative);
+    tokio::fs::create_dir_all(path.parent().unwrap())
+        .await
+        .unwrap();
+    tokio::fs::write(&path, b"%PDF-1.4 original bytes")
+        .await
+        .unwrap();
+    let mut config = (*offline_config(temp.path())).clone();
+    config.components.documents = false;
+    let transport = Arc::new(CaptureModel::new(vec![]));
+    let model = controlled_wrapper(transport.clone(), Arc::new(config), &[]);
+
+    model
+        .invoke(
+            &(),
+            user_request(vec![local_media(
+                InputModality::Document,
+                relative,
+                "application/pdf",
+            )]),
+        )
+        .await
+        .unwrap();
+
+    let captured = transport.requests.lock().unwrap();
+    let Message::User(user) = &captured[0].1.messages[0] else {
+        panic!("expected user message")
+    };
+    let ContentBlock::Text(fallback) = &user.content[0] else {
+        panic!("expected document fallback text")
+    };
+    assert!(fallback.contains("Document extraction is disabled"));
+    assert!(fallback.contains("brief.pdf"));
+    assert!(!path
+        .parent()
+        .unwrap()
+        .join(".openhuman-derived/readout.txt")
+        .exists());
+}
+
+#[cfg(not(feature = "documents"))]
+#[tokio::test]
+async fn pdf_metadata_fallback_is_cacheable_without_the_documents_feature() {
+    let temp = tempfile::tempdir().unwrap();
+    let relative = "uploads/thread/id/brief.pdf";
+    let path = temp.path().join(relative);
+    tokio::fs::create_dir_all(path.parent().unwrap())
+        .await
+        .unwrap();
+    tokio::fs::write(&path, b"%PDF-1.4 original bytes")
+        .await
+        .unwrap();
+    let config = offline_config(temp.path());
+    let transport = Arc::new(CaptureModel::new(vec![]));
+    let model = controlled_wrapper(transport.clone(), config, &[]);
+    let request = user_request(vec![local_media(
+        InputModality::Document,
+        relative,
+        "application/pdf",
+    )]);
+
+    model.invoke(&(), request.clone()).await.unwrap();
+    model.invoke(&(), request).await.unwrap();
+
+    let calls = transport.requests.lock().unwrap();
+    assert_eq!(calls.len(), 2);
+    let fallback = calls[0].1.messages[0].text();
+    assert!(fallback.contains("[FILE-ATTACHED:"), "{fallback}");
+    assert!(
+        fallback.contains("name=\"uploads/thread/id/brief.pdf\""),
+        "{fallback}"
+    );
+    assert!(path
+        .parent()
+        .unwrap()
+        .join(".openhuman-derived/readout.txt")
+        .exists());
 }
 
 #[tokio::test]
@@ -288,6 +450,9 @@ async fn paid_vision_readout_is_reused_across_recreated_wrappers_and_invalidated
         assert!(call.messages[0]
             .text()
             .contains("Image readout:\nmock vision readout"));
+        assert!(call.messages[0]
+            .text()
+            .contains("workspace path: uploads/thread/image/original.jpg"));
         let Message::User(user) = &call.messages[0] else {
             panic!("expected main user message")
         };
@@ -299,6 +464,34 @@ async fn paid_vision_readout_is_reused_across_recreated_wrappers_and_invalidated
     assert!(
         matches!(&request.messages[0], Message::User(user) if matches!(&user.content[0], ContentBlock::Image(image) if image.url == "uploads/thread/image/original.jpg"))
     );
+}
+
+#[tokio::test]
+async fn image_readout_for_unmanaged_sources_uses_the_wrapper_memory_cache() {
+    let temp = tempfile::tempdir().unwrap();
+    let source = "outside-uploads.jpg";
+    tokio::fs::write(temp.path().join(source), b"\xff\xd8\xff\xe0same image")
+        .await
+        .unwrap();
+    let config = offline_config(temp.path());
+    let mut vision = CaptureModel::new(vec![InputModality::Image]);
+    vision.profile.provider = Some("injected".into());
+    vision.profile.modalities.image_in = true;
+    vision.reply = "mock vision readout";
+    let vision = Arc::new(vision);
+    let _override =
+        crate::inference::provider::factory::test_provider_override::install_model(vision.clone());
+    let model = controlled_wrapper(Arc::new(CaptureModel::new(vec![])), config, &[]);
+    let request = user_request(vec![ContentBlock::Image(ImageRef {
+        url: source.into(),
+        mime_type: Some("image/jpeg".into()),
+    })]);
+
+    model.invoke(&(), request.clone()).await.unwrap();
+    model.invoke(&(), request).await.unwrap();
+
+    assert_eq!(vision.requests.lock().unwrap().len(), 1);
+    assert!(!temp.path().join(".openhuman-derived/readout.txt").exists());
 }
 
 #[tokio::test]
@@ -389,41 +582,6 @@ async fn streaming_prepares_only_the_ephemeral_request_and_preserves_order_and_o
     );
 }
 
-#[tokio::test]
-async fn fallback_truncates_text_and_keeps_corrupt_archives_uncached() {
-    let temp = tempfile::tempdir().unwrap();
-    let mut config = (*offline_config(temp.path())).clone();
-    config.multimodal_files.max_extracted_text_chars = 1_000;
-    let transport = Arc::new(CaptureModel::new(vec![]));
-    let model = controlled_wrapper(transport, Arc::new(config), &[]);
-
-    let (text, cacheable) = model
-        .fallback(
-            InputModality::Document,
-            "long.txt",
-            "text/plain",
-            &vec![b'x'; 1_001],
-        )
-        .await
-        .unwrap();
-    assert!(cacheable);
-    assert!(text.contains("[Attachment context truncated]"));
-    assert!(!text.contains(&"x".repeat(1_001)));
-
-    let (archive, cacheable) = model
-        .fallback(
-            InputModality::Document,
-            "corrupt.zip",
-            "application/zip",
-            b"not a zip archive",
-        )
-        .await
-        .unwrap();
-    assert!(!cacheable);
-    assert!(archive.contains("Archive inspection unavailable"));
-    assert!(archive.contains("workspace path: corrupt.zip"));
-}
-
 #[cfg(unix)]
 #[test]
 fn secure_open_rejects_invalid_paths_and_reads_authorized_absolute_paths() {
@@ -457,25 +615,110 @@ fn secure_open_rejects_invalid_paths_and_reads_authorized_absolute_paths() {
 #[tokio::test]
 async fn unsupported_media_urls_and_oversized_inline_sources_fail_before_inference() {
     let temp = tempfile::tempdir().unwrap();
-    let config = offline_config(temp.path());
     let transport = Arc::new(CaptureModel::new(vec![]));
+    let config = offline_config(temp.path());
     let model = controlled_wrapper(transport.clone(), config, &[]);
 
     let unsupported = user_request(vec![ContentBlock::Document(MediaRef::Url {
         url: "file:///etc/passwd".into(),
         media_type: Some("application/pdf".into()),
     })]);
-    let error = model.prepare(unsupported).await.unwrap_err();
+    let error = model.invoke(&(), unsupported).await.unwrap_err();
     assert!(error.to_string().contains("unsupported media URL scheme"));
 
-    let max_encoded_bytes = 50 * 1024 * 1024 * 4 / 3 + 4;
+    // The host guard rejects encoded data larger than its configured limit
+    // (including room for the data-URI header) before calling the resolver.
+    let mut small_limit = (*offline_config(temp.path())).clone();
+    small_limit.multimodal_files.max_file_size_mb = 1;
+    let model = controlled_wrapper(transport.clone(), Arc::new(small_limit), &[]);
+    let max_encoded_bytes = 1024 * 1024 * 4 / 3 + 4097;
     let oversized = user_request(vec![ContentBlock::Document(MediaRef::Base64 {
         data: "A".repeat(max_encoded_bytes + 1),
         media_type: "application/octet-stream".into(),
     })]);
-    let error = model.prepare(oversized).await.unwrap_err();
+    let error = model.invoke(&(), oversized).await.unwrap_err();
     assert!(error
         .to_string()
-        .contains("inline media exceeds size limit"));
+        .contains("attachment exceeds configured file limit"));
+
+    // A valid base64 body just over the decoded byte limit must also fail
+    // before legacy materialization or inference.
+    let decoded_oversize_len = (1024_usize * 1024 + 1).div_ceil(3) * 4;
+    let decoded_oversized = user_request(vec![ContentBlock::Document(MediaRef::Base64 {
+        data: "A".repeat(decoded_oversize_len),
+        media_type: "text/plain".into(),
+    })]);
+    let error = model.invoke(&(), decoded_oversized).await.unwrap_err();
+    assert!(error.to_string().to_lowercase().contains("limit"));
     assert!(transport.requests.lock().unwrap().is_empty());
+    assert!(!temp.path().join("uploads/legacy-media").exists());
+}
+
+#[tokio::test]
+async fn data_uri_payload_containing_a_url_is_not_treated_as_a_remote_source() {
+    let temp = tempfile::tempdir().unwrap();
+    let config = offline_config(temp.path());
+    let transport = Arc::new(CaptureModel::new(vec![]));
+    let model = controlled_wrapper(transport.clone(), config, &[]);
+    let request = user_request(vec![ContentBlock::Document(MediaRef::Url {
+        url: "data:text/plain,https://files.invalid/reference".into(),
+        media_type: Some("text/plain".into()),
+    })]);
+
+    model.invoke(&(), request).await.unwrap();
+    let captured = transport.requests.lock().unwrap();
+    assert_eq!(captured.len(), 1);
+    assert!(captured[0].1.messages[0]
+        .text()
+        .contains("https://files.invalid/reference"));
+}
+
+#[tokio::test]
+async fn selected_historical_unsupported_media_url_still_fails_before_inference() {
+    let temp = tempfile::tempdir().unwrap();
+    let config = offline_config(temp.path());
+    let transport = Arc::new(CaptureModel::new(vec![]));
+    let model = controlled_wrapper(transport.clone(), config, &[]);
+    let request = ModelRequest::new(vec![
+        Message::User(UserMessage {
+            content: vec![ContentBlock::Document(MediaRef::Url {
+                url: "ftp://docs.example.test/current.pdf?signature=private".into(),
+                media_type: Some("application/pdf".into()),
+            })],
+        }),
+        Message::User(UserMessage {
+            content: vec![ContentBlock::Text("continue".into())],
+        }),
+    ]);
+
+    let error = model.invoke(&(), request).await.unwrap_err();
+    assert!(error.to_string().contains("unsupported media URL scheme"));
+    assert!(transport.requests.lock().unwrap().is_empty());
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn typed_path_and_url_kinds_remain_distinct_for_opaque_file_sources() {
+    let temp = tempfile::tempdir().unwrap();
+    tokio::fs::write(temp.path().join("file:fixture.txt"), b"authorized path")
+        .await
+        .unwrap();
+    let config = offline_config(temp.path());
+    let transport = Arc::new(CaptureModel::new(vec![]));
+    let model = controlled_wrapper(transport.clone(), config, &[]);
+
+    let path = user_request(vec![ContentBlock::Document(MediaRef::Path {
+        path: "file:fixture.txt".into(),
+        media_type: Some("text/plain".into()),
+    })]);
+    model.invoke(&(), path).await.unwrap();
+    assert_eq!(transport.requests.lock().unwrap().len(), 1);
+
+    let url = user_request(vec![ContentBlock::Document(MediaRef::Url {
+        url: "file:fixture.txt".into(),
+        media_type: Some("text/plain".into()),
+    })]);
+    let error = model.invoke(&(), url).await.unwrap_err();
+    assert!(error.to_string().contains("unsupported media URL scheme"));
+    assert_eq!(transport.requests.lock().unwrap().len(), 1);
 }

@@ -1,7 +1,5 @@
 use super::tests::Probe;
 use super::*;
-#[cfg(feature = "documents")]
-use std::sync::Mutex;
 
 #[tokio::test]
 async fn injected_turn_source_uses_bound_workspace_and_explicit_model_facts() {
@@ -109,30 +107,4 @@ fn bare_injected_builder_does_not_load_operator_config() {
         .build()
         .unwrap();
     assert!(agent.runtime_config().is_none());
-}
-
-#[cfg(feature = "documents")]
-#[tokio::test]
-async fn pdf_attachment_degrades_to_a_note_when_documents_component_is_off() {
-    let mut config = Config::default();
-    config.components.documents = false;
-    let model = AttachmentModel {
-        inner: Arc::new(Probe::default()),
-        config: Arc::new(config),
-        profile: ModelProfile::default(),
-        fallback_cache: Mutex::new(Default::default()),
-        core: None,
-    };
-    let (text, cacheable) = model
-        .fallback(
-            InputModality::Document,
-            "uploads/t/id/brief.pdf",
-            "application/pdf",
-            b"%PDF-1.4",
-        )
-        .await
-        .unwrap();
-    assert!(text.contains("Document extraction is disabled"), "{text}");
-    assert!(text.contains("brief.pdf"));
-    assert!(!cacheable);
 }
