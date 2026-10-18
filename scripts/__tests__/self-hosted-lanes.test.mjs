@@ -255,6 +255,7 @@ test("untouched areas leave only the always-on gates", () => {
     "static:crate-chain",
     "static:process-statics",
     "static:module-source",
+    "static:storage-bypass",
     "static:module-pins",
     "static:submodule-monotonic",
   ]);
@@ -294,6 +295,7 @@ test("the storage area arms only the storage-drivers lane, with the sqlite and f
         "static:crate-chain",
         "static:process-statics",
         "static:module-source",
+        "static:storage-bypass",
         "static:module-pins",
         "static:submodule-monotonic",
       ],
@@ -469,7 +471,7 @@ test("private auxiliary coverage reports after failed tests and preserves the fa
       .readFileSync(path.join(dir, "expected-targets"), "utf8")
       .trim()
       .split("\n").length,
-    10,
+    11,
   );
   const commands = fs.readFileSync(calls, "utf8").trim().split("\n");
   assert.equal(commands.length, 3);
@@ -804,7 +806,10 @@ test("module boundary policy and checker changes arm their own scripts lane", ()
     "scripts/ci/rust-coverage.sh",
     "scripts/ci/fetch-submodule-tags.sh",
   ]) {
-    assert.ok(scripts.includes(`'${file}'`), `${file} must run its regressions`);
+    assert.ok(
+      scripts.includes(`'${file}'`),
+      `${file} must run its regressions`,
+    );
   }
   for (const file of [
     "scripts/ci/check-module-boundaries.mjs",
@@ -827,7 +832,10 @@ test("process-static policy and checker changes arm their own scripts lane", () 
     "scripts/ci/rust-coverage.sh",
     "scripts/ci/fetch-submodule-tags.sh",
   ]) {
-    assert.ok(scripts.includes(`'${file}'`), `${file} must run its regressions`);
+    assert.ok(
+      scripts.includes(`'${file}'`),
+      `${file} must run its regressions`,
+    );
   }
   for (const file of [
     "scripts/ci/check-process-statics.mjs",
@@ -955,7 +963,10 @@ test("nextest validation helpers arm Rust validation and script regressions on t
     "scripts/ci/rust-coverage.sh",
     "scripts/ci/fetch-submodule-tags.sh",
   ]) {
-    assert.ok(scripts.includes(`'${file}'`), `${file} must run its regressions`);
+    assert.ok(
+      scripts.includes(`'${file}'`),
+      `${file} must run its regressions`,
+    );
   }
   assert.ok(
     scripts.includes("'scripts/lib/**'"),
@@ -1098,4 +1109,41 @@ test("private ordinary Rust builds keep line tables while coverage and hosted pr
       }
     }
   }
+});
+
+test("storage-bypass runs under cancellation supervision in both profiles", () => {
+  for (const profile of ["hosted", "ex63"]) {
+    const plan = buildPlan({
+      profile,
+      areas: NONE,
+      env: profile === "ex63" ? EX63_ENV : {},
+    });
+    const check = plan.lanes
+      .flatMap((lane) => lane.checks)
+      .find((check) => check.name === "storage-bypass");
+    assert.equal(check.when, true);
+    assert.equal(
+      check.run,
+      "bash scripts/ci-cancel-aware.sh node scripts/ci/check-storage-bypass.mjs",
+    );
+  }
+});
+
+test("storage checker and debt policy changes arm their own scripts lane", () => {
+  const filters = fs.readFileSync(
+    path.join(repoRoot, ".github/ci-paths-filter.yml"),
+    "utf8",
+  );
+  const scripts = filters.split(/^scripts:\s*$/m)[1].split(/^\S[^\n]*:/m)[0];
+  for (const pattern of [
+    "scripts/ci/check-storage-bypass.mjs",
+    "scripts/ci/check-crate-chain.mjs",
+    "scripts/ci/storage-bypass-debt.mjs",
+    "scripts/ci/storage-bypass*.json",
+    "scripts/ci/storage-bypass*.md",
+  ])
+    assert.ok(
+      scripts.includes(`'${pattern}'`),
+      `${pattern} must arm the scripts area`,
+    );
 });
