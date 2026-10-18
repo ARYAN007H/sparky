@@ -89,3 +89,69 @@ async fn transcript_snapshot_keeps_a_completed_failed_tool_row() {
     assert!(!outcome.success);
     assert_eq!(outcome.content, "permission denied");
 }
+
+#[tokio::test]
+async fn owner_snapshot_spend_is_not_counted_twice_and_cache_replay_stays_free() {
+    let sink = Arc::new(std::sync::Mutex::new(TranscriptSnapshot::default()));
+    let owner_sink = tinyagents_harness::middleware::library::new_transcript_snapshot_sink();
+    let middleware = TranscriptSnapshotMiddleware {
+        sink: sink.clone(),
+        owner: tinyagents_harness::middleware::library::TranscriptSnapshotMiddleware::new(
+            owner_sink.clone(),
+        ),
+        owner_sink,
+    };
+    let mut context = RunContext::new(
+        RunConfig::new("snapshot-cache-replay"),
+        crate::agent::tinyagents::host::OpenHumanRunContext::new(),
+    );
+    let first = ModelRequest {
+        messages: vec![Message::user("question")],
+        ..ModelRequest::default()
+    };
+    let mut first = first;
+    middleware
+        .before_model_dispatch(&mut context, &(), &mut first)
+        .await
+        .expect("snapshot first dispatched request");
+    let mut answered = tinyinference_llm::model::ModelResponse::assistant("answer one")
+        .with_usage(tinyinference_llm::usage::Usage {
+            input_tokens: 12,
+            output_tokens: 4,
+            cache_read_tokens: 3,
+            ..Default::default()
+        });
+    middleware
+        .after_model(&mut context, &(), &mut answered)
+        .await
+        .expect("snapshot first answer");
+
+    let mut second = ModelRequest {
+        messages: vec![Message::user("question"), Message::assistant("answer one")],
+        ..ModelRequest::default()
+    };
+    middleware
+        .before_model_dispatch(&mut context, &(), &mut second)
+        .await
+        .expect("snapshot replay request");
+    let mut replay = tinyinference_llm::model::ModelResponse::assistant("answer two")
+        .with_usage(tinyinference_llm::usage::Usage {
+            input_tokens: 12,
+            output_tokens: 5,
+            cache_read_tokens: 12,
+            ..Default::default()
+        });
+    replay.served_from_cache = true;
+    middleware
+        .after_model(&mut context, &(), &mut replay)
+        .await
+        .expect("snapshot replay answer");
+
+    let snapshot = sink.lock().expect("host snapshot lock");
+    assert_eq!(snapshot.model_calls, 2);
+    assert_eq!(snapshot.input_tokens, 12);
+    assert_eq!(snapshot.output_tokens, 4);
+    assert_eq!(snapshot.cached_input_tokens, 3);
+    assert_eq!(snapshot.last_call_input_tokens, 12);
+    assert_eq!(snapshot.last_call_output_tokens, 5);
+}
