@@ -44,6 +44,8 @@ async fn tts_output_path_allows_workspace_and_local_ai_models_roots() {
     let mut config = enabled_config(&tmp);
     config.autonomy.enabled = true;
     config.autonomy.workspace_only = true;
+    config.action_dir = tmp.path().join("action");
+    std::fs::create_dir_all(&config.action_dir).unwrap();
     let runtime = crate::inference::local_runtime_config(&config);
     let model_root = tinyinference_local::service::paths::config_root_dir(&runtime)
         .join("models")
