@@ -289,6 +289,14 @@ fn plain_assistant_prose_is_not_misread_as_a_tool_round() {
 }
 
 #[test]
+fn user_image_marker_text_preserves_whitespace_when_no_image_is_lifted() {
+    for text in ["  [IMAGE:]  ", "  dangling [IMAGE:data:x  "] {
+        let user = chat_message_to_message(&TranscriptMessage::user(text));
+        assert_eq!(user, Message::user(text));
+    }
+}
+
+#[test]
 fn reasoning_content_uses_typed_thinking_block_and_round_trips_metadata() {
     let mut chat = TranscriptMessage::assistant("visible answer");
     chat.extra_metadata = Some(serde_json::json!({ REASONING_EXT_KEY: "private thoughts" }));
