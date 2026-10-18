@@ -59,6 +59,9 @@ pub struct EditMessageRequest {
     pub thread_id: String,
     pub message_id: String,
     pub content: String,
+    /// Typed attachments sent with the replacement content.
+    #[serde(default)]
+    pub attachments: Vec<tinychannels_bus::ContentPart>,
     #[serde(default)]
     pub client_id: Option<String>,
 }
@@ -87,6 +90,11 @@ pub async fn edit_message(
 ) -> Result<Outcome<Value>, ThreadsError> {
     let client_id = request.client_id.unwrap_or_else(|| "system".to_string());
     let thread_id = request.thread_id;
+    // Typed attachments become upload markers before anything is cancelled or
+    // truncated, so a bad attachment fails the edit without side effects.
+    let content =
+        crate::agent::attachments::parts::fold_into_message(&request.content, &request.attachments)
+            .map_err(|e| ThreadsError::Message(e.to_string()))?;
     let dir = workspace_dir().await.map_err(ThreadsError::Message)?;
     // The request's own tenant picks the store key, so a SaaS profile edits
     // the transcript its turns were written to.
@@ -128,7 +136,7 @@ pub async fn edit_message(
         ctx,
         &client_id,
         &thread_id,
-        &request.content,
+        &content,
         None,
         None,
         None,

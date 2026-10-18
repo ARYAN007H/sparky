@@ -394,7 +394,7 @@ function chatTurnUsagePayload(event: ChatDoneEvent): {
         agentId: s.agent_id,
         inputTokens: s.input_tokens,
         outputTokens: s.output_tokens,
-        costUsd: s.cost_usd,
+        costUsd: s.cost_usd ?? null,
       })),
     };
   }
@@ -643,12 +643,14 @@ const ChatRuntimeProvider = ({ children }: { children: React.ReactNode }) => {
       const queued = store.getState().queue.pendingFollowupsByThread[threadId] ?? [];
       // Persist sequentially so the queued prompts land in the append-log in the
       // order the user queued them (concurrent dispatches would race), and
-      // surface failures instead of dropping them silently. The stored message
-      // carries the original upload markers in memory. The append boundary
-      // saves originals and returns durable references before writing history.
+      // surface failures instead of dropping them silently. The typed
+      // attachments are held in memory beside the text; the append boundary
+      // saves the originals and returns durable references before writing history.
       for (const item of queued) {
         try {
-          await dispatch(addMessageLocal({ threadId, message: item.message })).unwrap();
+          await dispatch(
+            addMessageLocal({ threadId, message: item.message, attachments: item.attachments })
+          ).unwrap();
         } catch (error) {
           rtLog('flush_followup_append_failed', {
             thread: threadId,

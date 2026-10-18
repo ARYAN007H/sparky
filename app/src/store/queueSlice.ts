@@ -22,6 +22,7 @@ import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
 
 import { parseAttachmentReferences } from '../lib/attachments';
 import type { QueueItemPayload } from '../services/chatService';
+import type { ContentPart } from '../services/chatWire';
 import type { ThreadMessage } from '../types/thread';
 import { clearAllChatRuntime, clearRuntimeForThread, endInferenceTurn } from './chatRuntimeSlice';
 import { resetUserScopedState } from './resetActions';
@@ -38,8 +39,10 @@ export interface RunQueueItem {
 
 /** A follow-up this client queued, held until it can be persisted. */
 export interface PendingFollowup {
-  /** The user message exactly as an interactive send would store it. */
+  /** The user message exactly as an interactive send would store it (text only). */
   message: ThreadMessage;
+  /** Its typed attachments; the core stages them when the follow-up is persisted. */
+  attachments: ContentPart[];
   /** `clipQueuePreview` of the text sent to the core; matches the item's preview. */
   preview: string;
 }
@@ -54,8 +57,10 @@ const initialState: QueueState = { itemsByThread: {}, pendingFollowupsByThread: 
 /** Mirrors core queue previews: caption or filenames, clipped at 80 code points. */
 const QUEUE_PREVIEW_CHARS = 80;
 
-export function clipQueuePreview(text: string): string {
-  const names: string[] = [];
+export function clipQueuePreview(text: string, attachments: ContentPart[] = []): string {
+  const names: string[] = attachments.map(part =>
+    'media' in part ? (part.media.fileName ?? 'attachment') : 'attachment'
+  );
   const caption = text
     .replace(/\[(IMAGE|FILE|ATTACHMENT):([^\]]+)\]/g, (marker, kind: string, source: string) => {
       if (kind === 'ATTACHMENT') {
@@ -129,11 +134,16 @@ const queueSlice = createSlice({
     /** Record a follow-up the core accepted; `text` is what was sent to it. */
     pendingFollowupAdded: (
       state,
-      action: PayloadAction<{ threadId: string; message: ThreadMessage; text: string }>
+      action: PayloadAction<{
+        threadId: string;
+        message: ThreadMessage;
+        text: string;
+        attachments?: ContentPart[];
+      }>
     ) => {
-      const { threadId, message, text } = action.payload;
+      const { threadId, message, text, attachments = [] } = action.payload;
       const bucket = state.pendingFollowupsByThread[threadId] ?? [];
-      bucket.push({ message, preview: clipQueuePreview(text) });
+      bucket.push({ message, attachments, preview: clipQueuePreview(text, attachments) });
       state.pendingFollowupsByThread[threadId] = bucket;
     },
   },

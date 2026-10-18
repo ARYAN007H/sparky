@@ -5,6 +5,10 @@
 //! of directly constructing channel instances. The [`CronDeliverySubscriber`]
 //! picks up those events and dispatches to the appropriate channel, keeping
 //! channel construction out of the scheduler.
+#![allow(
+    deprecated,
+    reason = "the v21 ChannelMessage/SendMessage shims stay in use here until the single inbound path (senamakel/openhuman#136) moves the host to canonical v22 content"
+)]
 
 use crate::core::events::DomainEvent;
 use async_trait::async_trait;

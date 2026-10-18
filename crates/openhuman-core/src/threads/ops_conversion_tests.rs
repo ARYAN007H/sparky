@@ -198,6 +198,7 @@ async fn message_append_returns_typed_not_found_for_stale_thread() {
                 sender: "user".to_string(),
                 created_at: "2026-01-01T00:00:00Z".to_string(),
             },
+            attachments: vec![],
         },
     )
     .await

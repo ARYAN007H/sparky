@@ -216,3 +216,19 @@ describe('clipQueuePreview', () => {
     expect(clipQueuePreview('😀'.repeat(81))).toBe(`${'😀'.repeat(80)}…`);
   });
 });
+
+describe('clipQueuePreview with typed attachments', () => {
+  const file = (name?: string) => ({
+    kind: 'file' as const,
+    media: { url: 'data:application/pdf;base64,AAA', fileName: name },
+  });
+
+  it('uses the caption when there is one', () => {
+    expect(clipQueuePreview('see this', [file('a.pdf')])).toBe('see this');
+  });
+
+  it('falls back to the attachment file names when there is no caption', () => {
+    expect(clipQueuePreview('', [file('a.pdf'), file('b.pdf')])).toBe('a.pdf, b.pdf');
+    expect(clipQueuePreview('', [file()])).toBe('attachment');
+  });
+});

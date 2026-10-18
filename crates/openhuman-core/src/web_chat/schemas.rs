@@ -73,6 +73,12 @@ pub fn schemas(function: &str) -> ControllerSchema {
                 required_string("client_id", "Client stream identifier."),
                 required_string("thread_id", "Thread identifier."),
                 required_string("message", "User message."),
+                FieldSchema {
+                    name: "attachments",
+                    ty: TypeSchema::Option(Box::new(TypeSchema::Json)),
+                    comment: "Typed attachments (tinychannels ContentPart[]: image/video/audio/file parts whose media carries an inline data: or http(s) url). Replaces splicing [IMAGE:]/[FILE:] markers into `message`.",
+                    required: false,
+                },
                 optional_string("model_override", "Optional model override."),
                 optional_f64("temperature", "Optional temperature override."),
                 optional_string(
@@ -187,6 +193,9 @@ pub fn schemas(function: &str) -> ControllerSchema {
 fn handle_chat(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let p = deserialize_params::<WebChatParams>(params)?;
+        let message =
+            crate::agent::attachments::parts::fold_into_message(&p.message, &p.attachments)
+                .map_err(|e| e.to_string())?;
         // Recorded before the turn starts so it reads the new choice.
         crate::agent::tinyagents::apply_requested_effort(
             &ctx,
@@ -198,7 +207,7 @@ fn handle_chat(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture
                 &ctx,
                 &p.client_id,
                 &p.thread_id,
-                &p.message,
+                &message,
                 p.model_override,
                 p.temperature,
                 p.locale,

@@ -239,7 +239,7 @@ tinymcp-bus = { path = "../../vendor/tinymcp/crates/tinymcp-bus", features = ["s
 # types, so this vocabulary is always-on kernel surface. It costs serde/schemars and nothing
 # this build did not already have.
 tinychannels-bus = { version = "0.1", path = "../../vendor/tinychannels/crates/tinychannels-bus" }
-# The web adapter (`adapters::web`) and the channel runtime traits live here.
+# Channel/ChatMessage traits and the web adapter live in the runtime library.
 tinychannels-runtime = { path = "../../vendor/tinychannels/crates/tinychannels-runtime" }
 # tinybus — the message bus. Owns what `crates/openhuman-core/src/core/event_bus/` used to: the typed
 # pub/sub surface (`EventBus`, `EventHandler`, `SubscriptionHandle`), the
@@ -511,7 +511,7 @@ tokio-tungstenite = { version = "0.29", default-features = false, features = ["c
 [dev-dependencies]
 # Legacy TinyChannels provider/runtime fixtures remain available to tests only;
 # production channel execution uses the TinyBus module contract above.
-tinychannels = { path = "../../vendor/tinychannels", features = ["email", "lark", "whatsapp-web"] }
+tinychannels = { path = "../../vendor/tinychannels", features = ["relay-websocket", "email", "lark", "whatsapp-web"] }
 # The real TinyChannels module, linked into the test binary (never the product)
 # as the fixture behind `channels::module_fixture`.
 tinychannels-module = { path = "../../vendor/tinychannels/crates/tinychannels-module", features = ["static-link"] }

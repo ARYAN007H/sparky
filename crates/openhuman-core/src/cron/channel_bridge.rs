@@ -7,6 +7,10 @@
 //! channel instances (to send through). The runtime registers both here when
 //! it starts; nothing registers in a core with no channels, and every accessor
 //! then answers "unavailable" instead of failing.
+#![allow(
+    deprecated,
+    reason = "the v21 ChannelMessage/SendMessage shims stay in use here until the single inbound path (senamakel/openhuman#136) moves the host to canonical v22 content"
+)]
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex, RwLock};
