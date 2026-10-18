@@ -160,13 +160,14 @@ impl OpenHumanTurnPrelude {
         }
         let user_index = hooks::user_turn_index(committed_turns);
         let (in_prompt_from, compacted) = in_prompt_window(history, committed_turns, current);
+        let memory_channel = logged_channel(origin.as_ref());
         self.mutable
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .pending_memory_turn = Some(PendingMemoryTurn {
             identity: identity.clone(),
             user_index,
-            channel: logged_channel(origin.as_ref()),
+            channel: memory_channel.clone(),
             profile_context,
         });
         let pack = crate::memory::lifecycle::prefetch::pre_turn(
@@ -182,7 +183,7 @@ impl OpenHumanTurnPrelude {
             origin
                 .as_ref()
                 .and_then(crate::memory::lifecycle::sender::channel_actor),
-            Some(self.event_channel.clone()),
+            memory_channel,
         );
         Some(Arc::new(MemoryTurn {
             config,
