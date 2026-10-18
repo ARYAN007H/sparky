@@ -27,21 +27,19 @@ pub(super) fn turn_timeout_bound(bound: TimeoutBound) -> TurnTimeoutBound {
 /// other hosted error kinds.
 pub(crate) fn run_error_from_hosted(error: HostedError) -> TinyAgentsError {
     if matches!(error.kind, HostedErrorKind::Timeout) {
-        let bound = error
-            .timeout_bound
-            .map(turn_timeout_bound)
-            .unwrap_or(TurnTimeoutBound::RunRemaining);
-        tracing::debug!(
-            timeout_bound = bound.tag(),
-            "[tinyagents] hosted turn timed out; carrying the typed bound"
-        );
-        TinyAgentsError::Timeout(format!(
-            "hosted agent invocation exceeded its {}",
-            bound.phrase()
-        ))
-    } else {
-        TinyAgentsError::from(error)
+        if let Some(timeout_bound) = error.timeout_bound {
+            let bound = turn_timeout_bound(timeout_bound);
+            tracing::debug!(
+                timeout_bound = bound.tag(),
+                "[tinyagents] hosted turn timed out; carrying the typed bound"
+            );
+            return TinyAgentsError::Timeout(format!(
+                "hosted agent invocation exceeded its {}",
+                bound.phrase()
+            ));
+        }
     }
+    TinyAgentsError::from(error)
 }
 
 #[cfg(test)]
