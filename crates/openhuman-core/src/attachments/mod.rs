@@ -23,6 +23,9 @@ pub(crate) mod provider;
 pub(crate) struct AttachmentAccessScope {
     pub(crate) external_channel: bool,
     pub(crate) workspace: Option<PathBuf>,
+    /// MIME hints captured from typed transcript blocks before the owner
+    /// request adapter resolves their source strings.
+    pub(crate) mime_hints: std::collections::HashMap<String, String>,
 }
 
 const REQUEST_SCOPE_KEY: &str = "__openhuman_attachment_access_scope";
@@ -62,6 +65,7 @@ pub(crate) fn take_request_scope(metadata: &mut serde_json::Value) -> Attachment
             .get("workspace")
             .and_then(serde_json::Value::as_str)
             .map(PathBuf::from),
+        mime_hints: Default::default(),
     }
 }
 
