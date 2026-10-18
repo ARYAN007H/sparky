@@ -1338,9 +1338,6 @@ const en: TranslationMap = {
   'voice.settingsSaved': 'Voice settings saved.',
   'voice.failedToLoadSettings': 'Failed to load voice settings',
   'voice.failedToSaveSettings': 'Failed to save voice settings',
-  'voice.debug.alwaysOn': 'Always-on listening',
-  'voice.debug.alwaysOnDesc':
-    'Keep the microphone open and send what you say to the agent automatically, no hotkey. Pauses when the screen is locked.',
   'voice.providers.saved': 'Voice providers saved.',
   'voice.providers.failedToSave': 'Failed to save voice providers',
   'voice.mode.start': 'Start voice chat',
@@ -4093,8 +4090,6 @@ const en: TranslationMap = {
     'An OPENHUMAN_APPROVAL_GATE=0 override was detected but ignored: the desktop app always keeps the approval gate on.',
 
   // Run queue
-  'notch.ready': 'Ready',
-  'notch.listening': 'Listening…',
 
   // Code block chrome
   'codeBlock.copy': 'Copy',

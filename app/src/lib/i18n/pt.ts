@@ -1205,9 +1205,6 @@ const messages: TranslationMap = {
   'voice.settingsSaved': 'Configurações de voz salvas.',
   'voice.failedToLoadSettings': 'Falha ao carregar configurações de voz',
   'voice.failedToSaveSettings': 'Falha ao salvar as configurações de voz',
-  'voice.debug.alwaysOn': 'Escuta contínua',
-  'voice.debug.alwaysOnDesc':
-    'Mantém o microfone aberto e envia o que você diz ao agente automaticamente, sem atalho. Pausa quando a tela está bloqueada.',
   'voice.providers.saved': 'Provedores de voz salvos.',
   'voice.providers.failedToSave': 'Falha ao salvar provedores de voz',
   'voice.mode.start': 'Iniciar chat de voz',
@@ -3594,8 +3591,6 @@ const messages: TranslationMap = {
     'Uma substituição OPENHUMAN_APPROVAL_GATE=0 foi detetada mas ignorada: o aplicativo de desktop mantém sempre o portão de aprovação ativado.',
 
   // Run queue
-  'notch.ready': 'Pronto',
-  'notch.listening': 'Ouvindo…',
 
   'orchestration.detail.stop': 'Parar',
 

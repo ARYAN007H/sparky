@@ -1206,9 +1206,6 @@ const messages: TranslationMap = {
   'voice.settingsSaved': 'Impostazioni vocali salvate.',
   'voice.failedToLoadSettings': 'Impossibile caricare le impostazioni vocali',
   'voice.failedToSaveSettings': 'Impossibile salvare le impostazioni vocali',
-  'voice.debug.alwaysOn': 'Ascolto sempre attivo',
-  'voice.debug.alwaysOnDesc':
-    'Mantieni il microfono aperto e invia automaticamente ciò che dici all’agente, senza scorciatoia. Si mette in pausa quando lo schermo è bloccato.',
   'voice.providers.saved': 'Fornitori di servizi vocali salvati.',
   'voice.providers.failedToSave': 'Impossibile salvare i provider vocali',
   'voice.mode.start': 'Avvia la chat vocale',
@@ -3606,8 +3603,6 @@ const messages: TranslationMap = {
     "È stato rilevato un override OPENHUMAN_APPROVAL_GATE=0 ma è stato ignorato: l'app desktop mantiene sempre attiva la porta di approvazione.",
 
   // Run queue
-  'notch.ready': 'Pronto',
-  'notch.listening': 'Ascolto…',
 
   'orchestration.detail.stop': 'Arresta',
 

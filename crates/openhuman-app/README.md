@@ -187,7 +187,7 @@ Platform integration:
 | [`src/imessage_scanner/`](src/imessage_scanner/) | macOS: reads `chat.db` and ingests conversations into memory. See [`src/imessage_scanner/`](src/imessage_scanner/README.md). |
 | [`src/dictation_hotkeys.rs`](src/dictation_hotkeys.rs), [`src/ptt_hotkeys.rs`](src/ptt_hotkeys.rs) | Global shortcut parsing and state for dictation and push-to-talk. |
 | [`src/ptt_overlay.rs`](src/ptt_overlay.rs) | Borderless always-on-top window for push-to-talk, rendering the `/ptt-overlay` route. |
-| [`src/mascot_native_window.rs`](src/mascot_native_window.rs), [`src/notch_window.rs`](src/notch_window.rs) | macOS: native NSPanel plus WKWebView hosts for the floating mascot and the notch activity pill. |
+| [`src/mascot_native_window.rs`](src/mascot_native_window.rs) | macOS: native NSPanel plus WKWebView host for the floating mascot. |
 | [`src/window_state.rs`](src/window_state.rs) | Saves and restores main window position and size, with a DPI guard and work-area clamping. |
 | [`src/directory_picker.rs`](src/directory_picker.rs) | Native folder chooser for the folder memory source. |
 | [`src/workspace_paths.rs`](src/workspace_paths.rs) | Open, reveal or preview a file, only after resolving it inside the active workspace. |
@@ -234,7 +234,7 @@ The authoritative list is the `tauri::generate_handler!` call near the end of
 | Gateways (feature `gateways`) | `gateway_list`, `gateway_save`, `gateway_delete`, `gateway_activate`, `gateway_active`, `gateway_status` |
 | Session | `auth_login_with_token`, `auth_store_session`, `auth_logout`, `auth_state`, `auth_current_user`, `get_active_user_id` |
 | Updates | `check_app_update`, `download_app_update`, `install_app_update`, `apply_app_update`, `check_core_update`, `apply_core_update` |
-| App and windows | `app_quit`, `restart_app`, `activate_main_window`, `set_titlebar_for_sidebar`, `mascot_window_show`, `mascot_window_hide`, `notch_window_show`, `notch_window_hide` |
+| App and windows | `app_quit`, `restart_app`, `activate_main_window`, `set_titlebar_for_sidebar`, `mascot_window_show`, `mascot_window_hide` |
 | Hotkeys and voice | `register_dictation_hotkey`, `unregister_dictation_hotkey`, `register_ptt_hotkey`, `unregister_ptt_hotkey`, `show_ptt_overlay` |
 | Notifications | `notification_permission_state`, `notification_permission_request`, `show_native_notification` |
 | Files and logs | `open_workspace_path`, `reveal_workspace_path`, `preview_workspace_text`, `download_artifact_to_downloads`, `pick_directory_via_dialog`, `reveal_logs_folder`, `logs_folder_path`, `reset_local_data` |

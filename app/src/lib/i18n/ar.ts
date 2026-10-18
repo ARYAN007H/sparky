@@ -1161,9 +1161,6 @@ const messages: TranslationMap = {
   'voice.settingsSaved': 'تم حفظ إعدادات الصوت.',
   'voice.failedToLoadSettings': 'فشل تحميل إعدادات الصوت',
   'voice.failedToSaveSettings': 'فشل في حفظ إعدادات الصوت',
-  'voice.debug.alwaysOn': 'الاستماع الدائم',
-  'voice.debug.alwaysOnDesc':
-    'أبقِ الميكروفون مفتوحًا وأرسل ما تقوله إلى الوكيل تلقائيًا دون مفتاح اختصار. يتوقف مؤقتًا عند قفل الشاشة.',
   'voice.providers.saved': 'تم حفظ موفري الصوت.',
   'voice.providers.failedToSave': 'فشل في حفظ موفري الصوت',
   'voice.mode.start': 'بدء المحادثة الصوتية',
@@ -3470,8 +3467,6 @@ const messages: TranslationMap = {
     'تم اكتشاف تجاوز OPENHUMAN_APPROVAL_GATE=0 لكنه تم تجاهله: يحافظ تطبيق سطح المكتب دائمًا على تفعيل بوابة الموافقة.',
 
   // Run queue
-  'notch.ready': 'جاهز',
-  'notch.listening': 'أستمع…',
 
   'orchestration.detail.stop': 'إيقاف',
 

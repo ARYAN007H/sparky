@@ -3184,18 +3184,6 @@ pub fn run() {
             //       let _ = window.show();
             //   }
 
-            // Notch activity indicator: transparent pill at the top-centre of
-            // the primary screen. Shows live voice / agent state. macOS only
-            // (physical notch or menu-bar HUD on older hardware).
-            //
-            // It is NOT auto-shown here: the notch is the always-on listening
-            // HUD, so its visibility is owned by the frontend, which calls
-            // `notch_window_show` / `notch_window_hide` (via `syncNotchVisibility`)
-            // to mirror `voice_server.always_on_enabled` — once on boot and
-            // whenever the Settings toggle flips. Showing it unconditionally
-            // here would flash the pill on every launch even with always-on
-            // listening disabled (the default).
-
             // Tray icon setup moved to RunEvent::Ready (see below) — GTK is only
             // initialized after the event loop starts, so we must delay tray creation
             // until the Ready event fires. Creating the tray here would panic on
@@ -3286,8 +3274,6 @@ pub fn run() {
             native_notifications::show_native_notification,
             mascot_window_show,
             mascot_window_hide,
-            notch_window_show,
-            notch_window_hide,
             file_logging::reveal_logs_folder,
             file_logging::logs_folder_path,
             workspace_paths::open_workspace_path,

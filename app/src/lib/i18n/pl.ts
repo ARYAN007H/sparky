@@ -1199,9 +1199,6 @@ const messages: TranslationMap = {
   'voice.settingsSaved': 'Ustawienia głosu zapisane.',
   'voice.failedToLoadSettings': 'Nie udało się załadować ustawień głosu',
   'voice.failedToSaveSettings': 'Nie udało się zapisać ustawień głosu',
-  'voice.debug.alwaysOn': 'Ciągłe nasłuchiwanie',
-  'voice.debug.alwaysOnDesc':
-    'Utrzymuje mikrofon włączony i automatycznie wysyła to, co mówisz, do agenta, bez skrótu. Wstrzymuje się, gdy ekran jest zablokowany.',
   'voice.providers.saved': 'Zapisano dostawców głosu.',
   'voice.providers.failedToSave': 'Nie udało się zapisać dostawców głosu',
   'voice.mode.start': 'Rozpocznij czat głosowy',
@@ -3592,8 +3589,6 @@ const messages: TranslationMap = {
     'Wykryto nadpisanie OPENHUMAN_APPROVAL_GATE=0, ale je zignorowano: aplikacja desktopowa zawsze utrzymuje bramkę zatwierdzania włączoną.',
 
   // Run queue
-  'notch.ready': 'Gotowe',
-  'notch.listening': 'Słucham…',
 
   'orchestration.detail.stop': 'Zatrzymaj',
 

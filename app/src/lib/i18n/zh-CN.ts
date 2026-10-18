@@ -1109,9 +1109,6 @@ const messages: TranslationMap = {
   'voice.settingsSaved': '语音设置已保存。',
   'voice.failedToLoadSettings': '无法加载语音设置',
   'voice.failedToSaveSettings': '无法保存语音设置',
-  'voice.debug.alwaysOn': '常驻聆听',
-  'voice.debug.alwaysOnDesc':
-    '保持麦克风开启，无需快捷键即可自动将你说的话发送给智能体。屏幕锁定时暂停。',
   'voice.providers.saved': '语音提供商已保存。',
   'voice.providers.failedToSave': '无法保存语音提供商',
   'voice.mode.start': '开始语音聊天',
@@ -3344,8 +3341,6 @@ const messages: TranslationMap = {
     '检测到 OPENHUMAN_APPROVAL_GATE=0 覆盖，但已忽略：桌面应用始终保持审批门开启。',
 
   // Run queue
-  'notch.ready': '就绪',
-  'notch.listening': '聆听中…',
 
   'orchestration.detail.stop': '停止',
 

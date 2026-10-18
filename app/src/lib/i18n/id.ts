@@ -1196,9 +1196,6 @@ const messages: TranslationMap = {
   'voice.settingsSaved': 'Pengaturan suara tersimpan.',
   'voice.failedToLoadSettings': 'Gagal memuat pengaturan suara',
   'voice.failedToSaveSettings': 'Gagal menyimpan pengaturan suara',
-  'voice.debug.alwaysOn': 'Mendengarkan terus-menerus',
-  'voice.debug.alwaysOnDesc':
-    'Biarkan mikrofon tetap aktif dan kirim ucapan Anda ke agen secara otomatis, tanpa pintasan. Berhenti sementara saat layar terkunci.',
   'voice.providers.saved': 'Penyedia suara disimpan.',
   'voice.providers.failedToSave': 'Gagal menyimpan penyedia suara',
   'voice.mode.start': 'Mulai obrolan suara',
@@ -3567,8 +3564,6 @@ const messages: TranslationMap = {
     'Override OPENHUMAN_APPROVAL_GATE=0 terdeteksi tetapi diabaikan: aplikasi desktop selalu menjaga gerbang persetujuan tetap aktif.',
 
   // Run queue
-  'notch.ready': 'Siap',
-  'notch.listening': 'Mendengar…',
 
   'orchestration.detail.stop': 'Hentikan',
 

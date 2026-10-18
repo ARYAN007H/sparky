@@ -1193,9 +1193,6 @@ const messages: TranslationMap = {
   'voice.settingsSaved': 'Настройки голоса сохранены.',
   'voice.failedToLoadSettings': 'Не удалось загрузить голосовые настройки.',
   'voice.failedToSaveSettings': 'Не удалось сохранить голосовые настройки.',
-  'voice.debug.alwaysOn': 'Постоянное прослушивание',
-  'voice.debug.alwaysOnDesc':
-    'Держит микрофон включённым и автоматически отправляет сказанное агенту без горячей клавиши. Приостанавливается при блокировке экрана.',
   'voice.providers.saved': 'Поставщики голосовой связи сохранены.',
   'voice.providers.failedToSave': 'Не удалось сохранить поставщиков голосовой связи.',
   'voice.mode.start': 'Начать голосовой чат',
@@ -3582,8 +3579,6 @@ const messages: TranslationMap = {
     'Обнаружено переопределение OPENHUMAN_APPROVAL_GATE=0, но оно проигнорировано: настольное приложение всегда держит шлюз одобрения включённым.',
 
   // Run queue
-  'notch.ready': 'Готово',
-  'notch.listening': 'Слушаю…',
 
   'orchestration.detail.stop': 'Остановить',
 
