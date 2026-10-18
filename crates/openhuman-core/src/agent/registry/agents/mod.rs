@@ -19,10 +19,13 @@
 //! `loader.rs` holds [`BUILTINS`], [`load_builtins`] and
 //! [`validate_tier_hierarchy`]. The slice also registers archetypes that
 //! live with other domains (`skills/*/agent/`,
-//! `flows/agents/`), so this directory is not the full built-in set. The
+//! `flows/*`), so this directory is not the full built-in set. The
 //! package `README.md` one level up describes what each archetype does.
 
 mod loader;
+
+#[cfg(feature = "flows")]
+mod flow_prompts;
 
 #[cfg(test)]
 #[path = "fleet_prompt_tests.rs"]
@@ -40,5 +43,9 @@ pub mod trigger_reactor;
 pub mod trigger_triage;
 pub mod video_agent;
 pub mod vision_agent;
+#[cfg(feature = "flows")]
+pub mod flow_discovery;
+#[cfg(feature = "flows")]
+pub mod workflow_builder;
 
 pub use loader::{load_builtins, validate_tier_hierarchy, BuiltinAgent, BUILTINS};
