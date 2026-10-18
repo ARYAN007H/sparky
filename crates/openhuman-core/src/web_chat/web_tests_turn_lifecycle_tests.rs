@@ -177,7 +177,10 @@ async fn a_turn_whose_provider_is_unreachable_ends_in_one_classified_chat_error(
 
         let (mut socket, _) = listener.accept().await.expect("inference request");
         let mut request = [0_u8; 2048];
-        let length = socket.read(&mut request).await.expect("read inference request");
+        let length = socket
+            .read(&mut request)
+            .await
+            .expect("read inference request");
         let _ = request_tx.send(String::from_utf8_lossy(&request[..length]).into_owned());
         // Dropping the connection produces a deterministic transport failure.
     });
@@ -194,10 +197,7 @@ async fn a_turn_whose_provider_is_unreachable_ends_in_one_classified_chat_error(
     config.chat_provider = Some("ollama:qwen3:4b-instruct".to_owned());
     config.local_ai.base_url = Some(format!("http://{address}"));
     std::fs::create_dir_all(&config.workspace_dir).expect("workspace dir");
-    let ctx = DispatchCtx::new(CoreContext::for_test_with_config(
-        DomainSet::full(),
-        config,
-    ));
+    let ctx = DispatchCtx::new(CoreContext::for_test_with_config(DomainSet::full(), config));
     let thread_id = "lifecycle-real-turn";
     let mut rx = subscribe_web_channel_events();
 
@@ -226,17 +226,25 @@ async fn a_turn_whose_provider_is_unreachable_ends_in_one_classified_chat_error(
     assert!(request.starts_with("POST /api/chat "), "{request}");
 
     let runtime = super::runner::runtime(&ctx);
-    assert!(!runtime
-        .runner
-        .is_in_flight(&super::runner::scope_of(&ctx), thread_id)
-        .await);
+    assert!(
+        !runtime
+            .runner
+            .is_in_flight(&super::runner::scope_of(&ctx), thread_id)
+            .await
+    );
     let extra_terminal_events = std::iter::from_fn(|| rx.try_recv().ok())
         .filter(|event| {
             event.request_id == request_id
-                && matches!(event.event.as_str(), "chat_done" | "chat_error" | "chat_cancelled")
+                && matches!(
+                    event.event.as_str(),
+                    "chat_done" | "chat_error" | "chat_cancelled"
+                )
         })
         .count();
-    assert_eq!(extra_terminal_events, 0, "one terminal event was already received");
+    assert_eq!(
+        extra_terminal_events, 0,
+        "one terminal event was already received"
+    );
 
     // The terminal event is the go-ahead for the next message: the thread is
     // free, and the failed turn left no cached agent behind.

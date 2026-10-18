@@ -31,9 +31,7 @@ use tokio::sync::{Mutex as AsyncMutex, Notify};
 
 use checkpoint::absolute_checkpoint_dir;
 
-use super::{
-    SubagentRunError, SubagentRunOptions, SubagentRunOutcome, SubagentRunStatus,
-};
+use super::{SubagentRunError, SubagentRunOptions, SubagentRunOutcome, SubagentRunStatus};
 
 fn root_context_from_options(
     options: &SubagentRunOptions,
