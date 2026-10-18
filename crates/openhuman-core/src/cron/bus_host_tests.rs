@@ -3,8 +3,7 @@
 
 use super::*;
 use crate::cron::handlers::{
-    kind_handler, register_kind, JobKindHandler, JobOutcome, JobRunContext,
-    KIND_REGISTRY_TEST_LOCK,
+    kind_handler, register_kind, JobKindHandler, JobOutcome, JobRunContext, KIND_REGISTRY_TEST_LOCK,
 };
 use async_trait::async_trait;
 use std::sync::atomic::{AtomicUsize, Ordering};
