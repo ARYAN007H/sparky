@@ -306,7 +306,7 @@ where
             return Ok(TriageOutcome::Terminal { reason });
         }
 
-        return match record_outage(retry_state, &retry_key, retry_generation) {
+        return match record_outage(outage_attempt.as_mut()) {
             Some(TriageOutcome::Terminal { reason }) => Ok(TriageOutcome::Terminal { reason }),
             Some(TriageOutcome::Deferred {
                 defer_until_ms,
@@ -375,66 +375,34 @@ fn now_ms() -> i64 {
     chrono::Utc::now().timestamp_millis()
 }
 
-fn clear_outage(state: Option<&RetryState>, key: &str, generation: Option<u64>) {
+fn clear_outage(state: Option<&RetryState>, key: &str) {
     if let Some(state) = state {
-        let mut states = state.lock().expect("triage retry state lock poisoned");
-        if states
-            .get(key)
-            .is_some_and(|outage| Some(outage.generation) == generation)
-        {
-            states.remove(key);
-        }
+        state.reset(&key.to_string());
     }
 }
 
-pub(crate) fn begin_outage_attempt(state: Option<&RetryState>, key: &str) -> Option<u64> {
-    let state = state?;
-    let mut states = state.lock().expect("triage retry state lock poisoned");
-    let outage = states.entry(key.to_string()).or_default();
-    if outage.in_flight || (outage.consecutive_failures > 0 && outage.next_attempt_ms > now_ms()) {
-        return None;
-    }
-    outage.in_flight = true;
-    outage.generation = outage.generation.wrapping_add(1).max(1);
-    Some(outage.generation)
+pub(crate) fn begin_outage_attempt(
+    state: Option<&RetryState>,
+    key: &str,
+) -> Option<PersistentFailoverAttempt<String>> {
+    state?.try_acquire(key.to_string(), monotonic_ms()).ok()
 }
 
 pub(crate) fn record_outage(
-    state: Option<&RetryState>,
-    key: &str,
-    generation: Option<u64>,
+    attempt: Option<&mut PersistentFailoverAttempt<String>>,
 ) -> Option<TriageOutcome> {
-    let state = state?;
-    let mut states = state.lock().expect("triage retry state lock poisoned");
-    let Some(outage) = states.get_mut(key) else {
-        return (generation.is_some()).then(|| TriageOutcome::Deferred {
-            defer_until_ms: now_ms().saturating_add(OUTAGE_BACKOFF_BASE_MS),
-            reason: "managed backend recovered during another attempt".to_string(),
-        });
-    };
-    if !outage.in_flight || Some(outage.generation) != generation {
-        return Some(TriageOutcome::Deferred {
-            defer_until_ms: now_ms().saturating_add(OUTAGE_BACKOFF_BASE_MS),
-            reason: "managed backend outage; another attempt is being recorded".to_string(),
-        });
-    }
-    outage.in_flight = false;
-    outage.consecutive_failures = outage.consecutive_failures.saturating_add(1);
-    if outage.consecutive_failures >= OUTAGE_FAILURE_LIMIT {
-        let failures = outage.consecutive_failures;
-        outage.next_attempt_ms = now_ms().saturating_add(OUTAGE_BACKOFF_CAP_MS);
+    let failure = attempt?.record_failure(monotonic_ms())?;
+    let delay_ms = failure
+        .next_attempt_ms
+        .saturating_sub(monotonic_ms())
+        .min(i64::MAX as u64) as i64;
+    if failure.failure_limit_reached {
         return Some(TriageOutcome::Terminal {
-            reason: format!("managed backend outage reached retry limit ({failures})"),
+            reason: format!("managed backend outage reached retry limit ({})", failure.failure_count),
         });
     }
-
-    let exponent = outage.consecutive_failures.saturating_sub(1).min(10);
-    let delay_ms = OUTAGE_BACKOFF_BASE_MS
-        .saturating_mul(1_i64 << exponent)
-        .min(OUTAGE_BACKOFF_CAP_MS);
-    outage.next_attempt_ms = now_ms().saturating_add(delay_ms);
     Some(TriageOutcome::Deferred {
-        defer_until_ms: outage.next_attempt_ms,
+        defer_until_ms: now_ms().saturating_add(delay_ms),
         reason: format!("managed backend outage; retry {delay_ms}ms backoff"),
     })
 }
