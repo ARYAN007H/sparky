@@ -1,7 +1,7 @@
 use super::approval::approval_tool_name;
 use super::repeated_failure::{is_body_level_failure, user_actionable_escalation};
 use super::tool_output::{
-    is_compaction_exempt, is_truncation_exempt, COMPACTION_EXEMPT_TOOLS, SAMPLING_TOOLS,
+    COMPACTION_EXEMPT_TOOLS, SAMPLING_TOOLS, is_compaction_exempt, is_truncation_exempt,
 };
 use crate::agent::tinyagents::middleware::repeated_failure::RepeatedToolFailureMiddleware;
 use crate::agent::tinyagents::middleware::tool_outcome_capture::ToolOutcomeCaptureMiddleware;

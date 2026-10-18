@@ -13,8 +13,10 @@
 //! * `prompt.rs`   — exposes `pub fn build(&PromptContext) ->
 //!   anyhow::Result<String>`, which appends runtime-dependent sections
 //!   (rendered tool list, workspace) to the `prompt.md` body.
-//!   [`BUILTINS`] installs it as `PromptSource::Dynamic` on the parsed
-//!   definition. Most archetypes keep a `prompt_tests.rs` beside it.
+//!   [`BUILTINS`] pairs the parsed definition with its host prompt callback.
+//!   The loader records `PromptSource::Dynamic(())` and stores that callback
+//!   in the host-only prompt-builder extension. Most archetypes keep a
+//!   `prompt_tests.rs` beside it.
 //!
 //! `loader.rs` holds [`BUILTINS`] and [`load_builtins`]. It delegates tier
 //! validation to `tinyagents_definition::DefinitionSet`. The slice also
