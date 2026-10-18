@@ -3,7 +3,7 @@
 //! A thin host over two shared engines. TinyAgents' turn runner owns the
 //! lifecycle of a chat turn (ingress order, per-thread serialization, the
 //! queue modes, cancellation, the idle and wall-clock guards, reply
-//! persistence, one terminal event), and the `tinychannels` web adapter owns
+//! persistence, one terminal event), and TinyChannels' compiled web module owns
 //! the projection of a turn's output onto the web wire. This module is what
 //! only OpenHuman can supply: the ports the runner calls (`ingress.rs`,
 //! `turn_host.rs`, `turn_events.rs`, state in `runner.rs`), the session
@@ -14,8 +14,8 @@
 //! (`event_bus.rs`) and the `channel.web_*` RPC (`schemas.rs`). See `README.md`
 //! for the lifecycle and wiring.
 //!
-//! The wire types are `tinychannels-bus`'s (`channel_event.rs` keeps the flat
-//! in-process form every consumer already reads).
+//! The wire types are `tinychannels-bus`'s. OpenHuman adds only a host-private
+//! routing envelope around those typed events for its process-wide bus.
 
 mod channel_event;
 mod egress_surface;
@@ -56,8 +56,9 @@ pub(crate) use web_errors::{
 
 // Public API — event bus
 pub use channel_event::{
-    ChatSuggestion, GuardrailPayload, GuardrailReason, QueueItemPayload, SubagentProgressDetail,
-    SubagentUsagePayload, TurnTimingPayload, TurnUsagePayload, WebChannelEvent,
+    ChatSuggestion, GuardrailPayload, GuardrailReason, QueueItemPayload, ScopedWebEvent,
+    SubagentProgressDetail, SubagentUsagePayload, TurnTimingPayload, TurnUsagePayload,
+    WebChannelEvent,
 };
 pub use egress_surface::register_egress_surface_subscriber;
 pub use event_bus::{

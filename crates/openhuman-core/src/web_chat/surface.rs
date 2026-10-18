@@ -167,12 +167,13 @@ impl Surface {
         self.end_if_needed(&mut state).await;
     }
 
-    fn publish(&self, event: bus_web::WebChannelEvent, interim_round: Option<u32>) {
-        let mut flat = WebChannelEvent::from(event);
-        if flat.event == "chat_interim" && flat.round.is_none() {
-            flat.round = interim_round.filter(|round| *round > 0);
+    fn publish(&self, mut event: bus_web::WebChannelEvent, interim_round: Option<u32>) {
+        if let bus_web::WebChannelEvent::ChatInterim { round, .. } = &mut event {
+            if round.is_none() {
+                *round = interim_round.filter(|round| *round > 0);
+            }
         }
-        publish_web_channel_event_in(&self.ctx, flat);
+        publish_web_channel_event_in(&self.ctx, event);
     }
 
     /// Project one canonical output event onto the web wire, in module-owned
