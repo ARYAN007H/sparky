@@ -98,16 +98,7 @@ impl TurnSteering {
         }
         self.0.queue.push_now(
             QueueLane::Steer,
-            QueuedTurn {
-                id: uuid::Uuid::new_v4().to_string(),
-                text,
-                client_id: String::new(),
-                thread_id: String::new(),
-                queued_at_ms: now_ms(),
-                model_override: None,
-                temperature: None,
-                locale: None,
-            },
+            steer_message(uuid::Uuid::new_v4().to_string(), text, "", ""),
         );
         drop(state);
         log::debug!("[embed][agent] steer queued for the running turn");
