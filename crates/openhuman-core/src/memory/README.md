@@ -164,8 +164,10 @@ without a second manual timeout wrapper.
 A few details hang off the turn. For a message that arrived on a channel,
 `lifecycle::sender::channel_actor` records the sender as the observed actor
 (`user:+1555...` for phone-addressed channels, `user:<email>`, otherwise
-`<channel>:<sender>`). The session host records the channel/thread pairing
-in [`channels.rs`](./channels.rs) so a channel's memory can be forgotten later. With
+`<channel>:<sender>`). The session host stamps both logged turns with the
+normalized provider channel from the turn origin. Disconnect uses that
+metadata and the canonical channel thread IDs prepared by the TinyChannels
+module to forget only that channel's conversations. With
 `[memory.recall] date_hint` on, `lifecycle::date_hint::extract` makes one
 small model call to work out which days the user means; a late or bad
 answer just leaves the pack in its normal order. The pack's citations are
@@ -293,12 +295,11 @@ trusted call facts; queued writes retain that call's narrower reach.
 | [`lifecycle/views.rs`](./lifecycle/views.rs) | Policy get/set, pack preview, agents list, jobs list/run for the UI. |
 | [`lifecycle/sender.rs`](./lifecycle/sender.rs) | Maps a channel message's sender to an observed actor. |
 | [`lifecycle/date_hint.rs`](./lifecycle/date_hint.rs) | Optional model call that works out which days a turn refers to. |
-| [`ops.rs`](./ops.rs) | Engine list/get/set, recall, fetch, learn, forget, erase all, items list. |
+| [`ops.rs`](./ops.rs) | Engine list/get/set, recall, fetch, learn, forget, channel conversation cleanup, erase all, items list. |
 | [`tool_budget.rs`](./tool_budget.rs), [`tool_writes.rs`](./tool_writes.rs) | Agent call deadlines; owner-scoped admission and file store for optional writes. The FIFO, coalescing and fencing are `tinymemory_tools::pending`. |
 | [`explore.rs`](./explore.rs) | The facet explorer behind `memory_explore` and `memory_items_get`. |
 | [`brain.rs`](./brain.rs) | Brain source mapping and the `memory_brain_*` ops. |
 | [`sources/`](./sources/) | The `[[memory.sources]]` registry (`mod.rs`), sync state (`state.rs`) and the `SourceRegistry` adapter over `tinymemory_integrations::sources::sync` (`sync.rs`). |
-| [`channels.rs`](./channels.rs) | Channel to thread records, for forgetting a channel. |
 | [`deletion.rs`](./deletion.rs) | Hard deletes; the file store and executor for the pending-deletion queue (`tinymemory_tools::deletion`, with retry backoff on background ticks). |
 | [`backfill.rs`](./backfill.rs) | Consent-gated, resumable storing of past chats; turns are built by `tinymemory_tools::backfill`. |
 | [`import.rs`](./import.rs) | Host adapter for the consent-gated, resumable v1 import and the retry of refused items; the driver is the module's `Importer`, which skips what v1 synced from Composio connectors. |
@@ -401,6 +402,11 @@ For one release, disconnect reads a valid `channel_threads.json` written by
 older versions as a read-only fallback for legacy conversations. Current code
 does not write this file. Malformed JSON keeps the existing quarantine behavior;
 remove the compatibility reader in the next release.
+
+Before enumerating canonical channel threads, disconnect asks the TinyChannels
+module to prepare the channel's base thread ID. If identity preparation fails,
+known legacy thread IDs are queued and the failure is returned to the caller;
+the host does not recreate the module's ID algorithm.
 
 The sources registry is `[[memory.sources]]` in `config.toml`. The CortexDB
 key is in the OS keyring. The layout migration's shared-tree claim marker
