@@ -64,9 +64,7 @@ pub(super) struct OpenHumanSessionState {
     pub(super) time_zone: Option<String>,
     prelude: Option<OpenHumanTurnPrelude>,
     active_terminal_sidecar: Option<ActiveTerminalSidecar>,
-    /// The previous turn's deferred post-commit work (thread-goal
-    /// accounting). The next turn awaits it before loading the goal
-    /// (`post_commit::await_pending`).
+    /// Previous turn's deferred goal accounting, awaited before the next turn.
     pending_post_commit: Option<tokio::task::JoinHandle<()>>,
 }
 
