@@ -23,7 +23,7 @@ fn graph_observations_are_adapted_without_changing_their_wire_shape() {
         },
     };
 
-    let converted = exporter_observations(&[engine.clone()]);
+    let converted = exporter_observations(std::slice::from_ref(&engine));
     assert_eq!(converted.len(), 1);
     assert_eq!(
         serde_json::to_value(&engine).unwrap(),
