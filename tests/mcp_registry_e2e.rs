@@ -8,6 +8,9 @@
 
 #![cfg(feature = "mcp")]
 
+#[path = "support/mcp_stub_jail.rs"]
+mod mcp_stub_jail;
+
 use openhuman_core::config::{schema::ModuleOverride, Config};
 use serde_json::{json, Map, Value};
 
@@ -31,6 +34,8 @@ fn fresh_workspace_config() -> (tempfile::TempDir, Config) {
         },
         ..Config::default()
     };
+    let mut cfg = cfg;
+    mcp_stub_jail::grant_stub(&mut cfg, env!("CARGO_BIN_EXE_test-mcp-stub"));
     (tmp, cfg)
 }
 

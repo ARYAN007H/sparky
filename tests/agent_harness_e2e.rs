@@ -11,6 +11,8 @@
 //! a false positive here — the lock IS the serialization mechanism.
 #![allow(clippy::await_holding_lock)]
 
+#[path = "support/mcp_stub_jail.rs"]
+mod mcp_stub_jail;
 #[path = "support/env_guard.rs"]
 mod env_guard;
 #[path = "support/linked_modules.rs"]
@@ -513,6 +515,8 @@ encrypt = false
 {extra_config}
 "#
     );
+    // The jail the MCP stub runs in must be able to read the stub binary.
+    let cfg = cfg + &mcp_stub_jail::local_jail_toml(env!("CARGO_BIN_EXE_test-mcp-stub"));
     fn write_config_file(config_dir: &Path, cfg: &str) {
         std::fs::create_dir_all(config_dir).expect("mkdir openhuman");
         std::fs::write(config_dir.join("config.toml"), cfg).expect("write config");
