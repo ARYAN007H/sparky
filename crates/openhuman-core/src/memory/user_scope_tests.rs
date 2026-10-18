@@ -36,6 +36,22 @@ fn a_saas_config_without_a_valid_root_is_refused() {
 }
 
 #[test]
+fn invalid_saas_identity_keeps_the_existing_rpc_error_before_any_engine_call() {
+    for config in [
+        Config::default(),
+        user_config("not a namespace!"),
+        user_config("root"),
+    ] {
+        let error = confinement_in(true, &config).unwrap_err();
+        assert!(matches!(
+            error,
+            Error::InvalidRequest(message)
+                if message == "memory is unavailable: this agent has no valid memory root"
+        ));
+    }
+}
+
+#[test]
 fn reads_never_climb_out_of_the_root() {
     let root = ns("user:u-a");
     assert_eq!(clamp_reach(None, &root), Reach::subtree(root.clone()));

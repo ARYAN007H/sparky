@@ -1,9 +1,102 @@
 use super::*;
 
 use crate::config::schema::MemoryAgentConfig;
+use tinymemory_api::{MetaFilter, Reach};
+use tinymemory_tools::confine::{Confinement, Policy};
+use tinymemory_tools::layout::identity::{Identity, ResolvedIdentity};
 
 fn ns(value: &str) -> Namespace {
     value.parse().unwrap()
+}
+
+#[test]
+fn config_identity_adapter_preserves_host_definition_recall_and_v3_pins() {
+    let mut config = Config::default();
+    config.memory.agent_id = Some("host-agent".into());
+    config.memory.root = Some("team:host".into());
+    config.memory.recall.enabled = false;
+    config.memory.layout = MemoryLayoutMode::V3;
+    config.memory.agents.insert(
+        "planner".into(),
+        MemoryAgentConfig {
+            agent_id: Some("planner-memory".into()),
+            root: Some("project:q4".into()),
+            recall: Some(true),
+        },
+    );
+
+    let pins = super::identity_pins(&config);
+    assert_eq!(pins.agent_id.as_deref(), Some("host-agent"));
+    assert_eq!(pins.root.as_deref(), Some("team:host"));
+    assert!(!pins.recall);
+    assert!(pins.v3);
+    assert_eq!(pins.agents.len(), 1);
+    assert_eq!(pins.agents["planner"].agent_id.as_deref(), Some("planner-memory"));
+    assert_eq!(pins.agents["planner"].root.as_deref(), Some("project:q4"));
+    assert_eq!(pins.agents["planner"].recall, Some(true));
+
+    let resolved: ResolvedIdentity = Identity::team_member("other", "planner").resolve(&pins);
+    assert_eq!(resolved.agent_id, "host-agent");
+    assert_eq!(resolved.root(), &ns("team:host"));
+    assert!(resolved.recall);
+    assert_eq!(resolved.layout.pooled_conversations_node(), Some(&ns("team:host/ws:main")));
+}
+
+#[test]
+fn upstream_identity_and_confinement_keep_embedded_root_and_rpc_policy() {
+    let mut config = Config::default();
+    config.memory.root = Some("project:embed/team:acme".into());
+    let resolved = Identity::agent("planner").resolve(&super::identity_pins(&config));
+    assert_eq!(resolved.root(), &ns("project:embed/team:acme"));
+
+    let allowed = Reach::subtree(resolved.root().clone());
+    let rpc = Confinement {
+        allowed: allowed.clone(),
+        policy: Policy::Refuse,
+    };
+    let narrow = ns("project:embed/team:acme/agent:planner");
+    assert_eq!(
+        rpc.filter(Some(MetaFilter {
+            reach: Some(Reach::exact(narrow.clone())),
+            ..MetaFilter::default()
+        }))
+        .unwrap()
+        .reach,
+        Some(Reach::exact(narrow))
+    );
+    assert!(rpc
+        .filter(Some(MetaFilter {
+            reach: Some(Reach::subtree(ns("project:embed/team:other"))),
+            ..MetaFilter::default()
+        }))
+        .is_err());
+
+    let saas = Confinement {
+        allowed,
+        policy: Policy::Clamp,
+    };
+    let clamped = saas
+        .filter(Some(MetaFilter {
+            reach: Some(Reach::subtree(Namespace::ROOT)),
+            ..MetaFilter::default()
+        }))
+        .unwrap();
+    assert_eq!(clamped.reach, Some(Reach::subtree(resolved.root().clone())));
+}
+
+#[test]
+fn upstream_v3_identity_pools_at_the_account_root_workspace() {
+    let mut config = Config::default();
+    config.config_path = "/srv/openhuman/users/6512ab0f6512ab0f6512ab0f/config.toml".into();
+    config.memory.root = user_root(&config);
+    config.memory.layout = MemoryLayoutMode::V3;
+
+    let resolved = Identity::root().resolve(&super::identity_pins(&config));
+    assert_eq!(resolved.root(), &ns("org:6512ab0f6512ab0f6512ab0f"));
+    assert_eq!(
+        resolved.layout.pooled_conversations_node(),
+        Some(&ns("org:6512ab0f6512ab0f6512ab0f/ws:main"))
+    );
 }
 
 #[test]
