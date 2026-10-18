@@ -248,6 +248,41 @@ async fn physical_observer_reports_content_free_provider_outcome() {
 }
 
 #[tokio::test]
+async fn physical_observer_sees_the_buyer_charge_settled_by_the_budget() {
+    let mut reply = body("hi", "stop");
+    reply["usage"]["buyer_cost_micro"] = json!(7);
+    let server = server_replying(reply).await;
+    let recorder = Arc::new(PhysicalRecorder::default());
+    let budget = crate::budget::ModelBudget {
+        ledger: crate::budget::Budget::new(crate::budget::SpendLimits {
+            tokens: Some(10_000),
+            cost_micros: Some(1_000),
+        }),
+        call: crate::budget::CallBudget {
+            input_tokens: 5_000,
+            output_tokens: 1_000,
+            cost_micros: 1_000,
+        },
+    };
+
+    let response = completer(&server)
+        .budget(budget.clone())
+        .physical_observer(recorder.clone())
+        .complete(CompletionRequest::new(
+            "budgeted-model",
+            vec![ChatMessage::user("private")],
+        ))
+        .await
+        .unwrap();
+
+    assert_eq!(response.usage.unwrap().cost_usd, Some(0.000007));
+    assert_eq!(budget.ledger.snapshot().spent.cost_micros, 7);
+    let events = recorder.0.lock().unwrap();
+    assert_eq!(events.len(), 1);
+    assert_eq!(events[0].1.usage.as_ref().unwrap().cost_usd, Some(0.000007));
+}
+
+#[tokio::test]
 async fn physical_observer_reports_each_structured_repair_dispatch() {
     let server = MockServer::start().await;
     let replies = Arc::new(Mutex::new(0));
