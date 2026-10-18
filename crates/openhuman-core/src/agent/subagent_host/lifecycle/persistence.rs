@@ -1,6 +1,9 @@
 use super::*;
 use crate::agent::subagent_host::types::SubagentCheckpointData;
 
+#[path = "legacy_terminal.rs"]
+pub(super) mod legacy_terminal;
+
 pub(in crate::agent::subagent_host) struct OpenHumanPersistence {
     checkpoint_dir: std::path::PathBuf,
     dispatch: crate::core::runtime::DispatchCtx,
@@ -196,6 +199,9 @@ impl OpenHumanPersistence {
         &self,
         key: &SubagentTaskKey,
     ) -> Result<Option<SubagentCheckpointData>, SubagentError> {
+        if self.read_terminal_record(key)?.is_some() {
+            return Ok(None);
+        }
         let store = self.store()?;
         if store.terminal_outcome(key)?.is_some() {
             return Ok(None);
@@ -340,6 +346,24 @@ impl OpenHumanPersistence {
         &self,
         key: &SubagentTaskKey,
     ) -> Result<Option<TerminalRecord>, SubagentError> {
+        if let Some(outcome) = legacy_terminal::owner_terminal(&self.checkpoint_dir, key)? {
+            self.open_store(true)?
+                .import_record(key, None, Some(outcome.clone()))?;
+            return Ok(Some(TerminalRecord {
+                agent_id: outcome
+                    .extensions
+                    .get("agent_id")
+                    .and_then(serde_json::Value::as_str)
+                    .unwrap_or_default()
+                    .to_owned(),
+                elapsed_ms: outcome
+                    .extensions
+                    .get("elapsed_ms")
+                    .and_then(serde_json::Value::as_u64)
+                    .unwrap_or_default(),
+                outcome,
+            }));
+        }
         let raw = match std::fs::read_to_string(self.terminal_path(key)) {
             Ok(raw) => raw,
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
@@ -623,6 +647,7 @@ impl tinyagents_orchestration::subagent::SubagentPersistence for OpenHumanPersis
         &self,
         mut pause: tinyagents_orchestration::subagent::PersistedSubagentPause,
     ) -> Result<SubagentPausePersistenceDisposition, SubagentError> {
+        let _ = self.read_terminal_record(&pause.key)?;
         let host_elapsed = self
             .host_outcome
             .lock()
@@ -672,6 +697,7 @@ impl tinyagents_orchestration::subagent::SubagentPersistence for OpenHumanPersis
         outcome: &SubagentOutcome,
         replaces: Option<&SubagentResume>,
     ) -> Result<SubagentTerminalPersistenceDisposition, SubagentError> {
+        let _ = self.read_terminal_record(key)?;
         let host = self
             .host_outcome
             .lock()
