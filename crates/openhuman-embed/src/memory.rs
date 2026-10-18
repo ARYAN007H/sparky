@@ -193,7 +193,11 @@ impl Memory {
 
     /// The agents with logged turns under the root, most first.
     pub async fn agents(&self) -> Result<AgentsView> {
-        lifecycle::views::agents_list(&self.config, &tinymemory_tools::layout::identity::Identity::root()).await
+        lifecycle::views::agents_list(
+            &self.config,
+            &tinymemory_tools::layout::identity::Identity::root(),
+        )
+        .await
     }
 
     /// A page of items, newest first.
@@ -377,7 +381,11 @@ impl Memory {
 
     /// The brain's sources under the root and their sizes.
     pub async fn brain_sources(&self) -> Result<BrainSourcesView> {
-        brain::sources(&self.config, &tinymemory_tools::layout::identity::Identity::root()).await
+        brain::sources(
+            &self.config,
+            &tinymemory_tools::layout::identity::Identity::root(),
+        )
+        .await
     }
 
     /// Brain documents matching `query`, optionally of one source.
@@ -401,7 +409,12 @@ impl Memory {
 
     /// Files a document (a file on disk, or text) in the root's brain.
     pub async fn brain_ingest(&self, params: BrainIngestParams) -> Result<BrainIngestView> {
-        brain::ingest(&self.config, &tinymemory_tools::layout::identity::Identity::root(), params).await
+        brain::ingest(
+            &self.config,
+            &tinymemory_tools::layout::identity::Identity::root(),
+            params,
+        )
+        .await
     }
 
     /// Forgets every brain document of one source under the root.

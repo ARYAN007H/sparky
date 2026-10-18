@@ -9,8 +9,8 @@
 use chrono::Utc;
 use tinymemory_api::{
     EraseRequest, FetchRequest, ForgetTarget, ItemId, LearningKind, ListRequest, MemoryMeta,
-    MetaFilter, Namespace, Reach, RecallMode, RecallRequest, StoreItem, StoreReceipt,
-    ThreadWindow, TimeHint, WriteOptions,
+    MetaFilter, Namespace, Reach, RecallMode, RecallRequest, StoreItem, StoreReceipt, ThreadWindow,
+    TimeHint, WriteOptions,
 };
 use tinymemory_tools::confine::{Confinement, Policy};
 

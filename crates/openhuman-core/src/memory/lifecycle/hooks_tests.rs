@@ -145,7 +145,8 @@ async fn pre_turn_logs_the_user_turn_and_injects_what_memory_holds() {
         ))
         .await
         .unwrap();
-    let identity = tinymemory_tools::layout::identity::Identity::agent("orchestrator").resolve(&crate::memory::scope::identity_pins(&config));
+    let identity = tinymemory_tools::layout::identity::Identity::agent("orchestrator")
+        .resolve(&crate::memory::scope::identity_pins(&config));
 
     let pack = run_pre_turn(
         &crate::core::runtime::DispatchCtx::ambient(),
@@ -188,7 +189,8 @@ async fn recall_off_still_logs_and_logging_off_still_recalls() {
         .unwrap();
 
     config.memory.recall.enabled = false;
-    let quiet = tinymemory_tools::layout::identity::Identity::agent("a").resolve(&crate::memory::scope::identity_pins(&config));
+    let quiet = tinymemory_tools::layout::identity::Identity::agent("a")
+        .resolve(&crate::memory::scope::identity_pins(&config));
     assert!(run_pre_turn(
         &crate::core::runtime::DispatchCtx::ambient(),
         &config,
@@ -206,7 +208,8 @@ async fn recall_off_still_logs_and_logging_off_still_recalls() {
 
     config.memory.recall.enabled = true;
     config.memory.conversations.enabled = false;
-    let reader = tinymemory_tools::layout::identity::Identity::agent("a").resolve(&crate::memory::scope::identity_pins(&config));
+    let reader = tinymemory_tools::layout::identity::Identity::agent("a")
+        .resolve(&crate::memory::scope::identity_pins(&config));
     let pack = run_pre_turn(
         &crate::core::runtime::DispatchCtx::ambient(),
         &config,
@@ -224,7 +227,8 @@ async fn recall_off_still_logs_and_logging_off_still_recalls() {
     );
 
     config.memory.recall.enabled = false;
-    let none = tinymemory_tools::layout::identity::Identity::agent("a").resolve(&crate::memory::scope::identity_pins(&config));
+    let none = tinymemory_tools::layout::identity::Identity::agent("a")
+        .resolve(&crate::memory::scope::identity_pins(&config));
     assert!(run_pre_turn(
         &crate::core::runtime::DispatchCtx::ambient(),
         &config,
@@ -239,7 +243,8 @@ async fn recall_off_still_logs_and_logging_off_still_recalls() {
 async fn pre_turn_without_an_engine_runs_the_turn_without_a_pack() {
     let tmp = tempfile::tempdir().unwrap();
     let config = config_in(&tmp);
-    let identity = tinymemory_tools::layout::identity::Identity::agent("a").resolve(&crate::memory::scope::identity_pins(&config));
+    let identity = tinymemory_tools::layout::identity::Identity::agent("a")
+        .resolve(&crate::memory::scope::identity_pins(&config));
     assert!(run_pre_turn(
         &crate::core::runtime::DispatchCtx::ambient(),
         &config,
@@ -257,7 +262,8 @@ async fn post_turn_logs_the_reply_and_queues_belief_builds() {
     let mut config = config_in(&tmp);
     config.memory.recall.build_beliefs_every = 2;
     let engine = bind_reference(&config);
-    let identity = tinymemory_tools::layout::identity::Identity::agent("writer").resolve(&crate::memory::scope::identity_pins(&config));
+    let identity = tinymemory_tools::layout::identity::Identity::agent("writer")
+        .resolve(&crate::memory::scope::identity_pins(&config));
 
     let mut first = reply("t", 1, "Here is the draft.");
     first.3.push(ToolCallSummary {
@@ -293,7 +299,8 @@ async fn compaction_recalls_from_the_dropped_turns() {
     let tmp = tempfile::tempdir().unwrap();
     let config = config_in(&tmp);
     bind_reference(&config);
-    let identity = tinymemory_tools::layout::identity::Identity::agent("a").resolve(&crate::memory::scope::identity_pins(&config));
+    let identity = tinymemory_tools::layout::identity::Identity::agent("a")
+        .resolve(&crate::memory::scope::identity_pins(&config));
     let _ = run_pre_turn(
         &crate::core::runtime::DispatchCtx::ambient(),
         &config,
@@ -319,7 +326,8 @@ async fn an_out_of_credits_recall_tells_the_turn_memory_is_unavailable() {
     let tmp = tempfile::tempdir().unwrap();
     let config = config_in(&tmp);
     crate::memory::test_fixtures::RefusingEngine::out_of_credits().bind(&config);
-    let identity = tinymemory_tools::layout::identity::Identity::agent("orchestrator").resolve(&crate::memory::scope::identity_pins(&config));
+    let identity = tinymemory_tools::layout::identity::Identity::agent("orchestrator")
+        .resolve(&crate::memory::scope::identity_pins(&config));
 
     let pack = run_pre_turn(
         &crate::core::runtime::DispatchCtx::ambient(),
@@ -349,7 +357,8 @@ async fn an_unreachable_engine_is_named_as_unreachable() {
         "connection refused".into(),
     ))
     .bind(&config);
-    let identity = tinymemory_tools::layout::identity::Identity::agent("orchestrator").resolve(&crate::memory::scope::identity_pins(&config));
+    let identity = tinymemory_tools::layout::identity::Identity::agent("orchestrator")
+        .resolve(&crate::memory::scope::identity_pins(&config));
 
     let pack = run_pre_turn(
         &crate::core::runtime::DispatchCtx::ambient(),
@@ -376,7 +385,8 @@ async fn an_engine_fault_that_is_not_account_wide_injects_nothing() {
         "index corrupt".into(),
     ))
     .bind(&config);
-    let identity = tinymemory_tools::layout::identity::Identity::agent("orchestrator").resolve(&crate::memory::scope::identity_pins(&config));
+    let identity = tinymemory_tools::layout::identity::Identity::agent("orchestrator")
+        .resolve(&crate::memory::scope::identity_pins(&config));
 
     assert!(run_pre_turn(
         &crate::core::runtime::DispatchCtx::ambient(),
@@ -466,7 +476,8 @@ async fn a_turn_pack_stays_within_its_budget_against_a_large_store() {
     let config = config_in(&tmp);
     let engine = bind_reference(&config);
     fill_with_learnings(&engine, 1500).await;
-    let identity = tinymemory_tools::layout::identity::Identity::agent("orchestrator").resolve(&crate::memory::scope::identity_pins(&config));
+    let identity = tinymemory_tools::layout::identity::Identity::agent("orchestrator")
+        .resolve(&crate::memory::scope::identity_pins(&config));
 
     let pack = run_pre_turn(
         &crate::core::runtime::DispatchCtx::ambient(),
@@ -505,7 +516,8 @@ async fn a_resumed_session_pack_stays_within_one_budget_and_repeats_nothing() {
     let config = config_in(&tmp);
     let engine = bind_reference(&config);
     fill_with_learnings(&engine, 1500).await;
-    let identity = tinymemory_tools::layout::identity::Identity::agent("orchestrator").resolve(&crate::memory::scope::identity_pins(&config));
+    let identity = tinymemory_tools::layout::identity::Identity::agent("orchestrator")
+        .resolve(&crate::memory::scope::identity_pins(&config));
     // Earlier turns of the thread, logged the way a session logs them. Each
     // line is distinct, so a repeat can only be one item injected twice.
     for turn in 0..6u32 {
@@ -575,7 +587,8 @@ async fn a_resumed_session_without_logging_still_opens_with_the_thread() {
     let tmp = tempfile::tempdir().unwrap();
     let mut config = config_in(&tmp);
     let _engine = bind_reference(&config);
-    let identity = tinymemory_tools::layout::identity::Identity::agent("orchestrator").resolve(&crate::memory::scope::identity_pins(&config));
+    let identity = tinymemory_tools::layout::identity::Identity::agent("orchestrator")
+        .resolve(&crate::memory::scope::identity_pins(&config));
     let _ = run_pre_turn(
         &crate::core::runtime::DispatchCtx::ambient(),
         &config,
@@ -591,7 +604,8 @@ async fn a_resumed_session_without_logging_still_opens_with_the_thread() {
     .await;
 
     config.memory.conversations.enabled = false;
-    let reader = tinymemory_tools::layout::identity::Identity::agent("orchestrator").resolve(&crate::memory::scope::identity_pins(&config));
+    let reader = tinymemory_tools::layout::identity::Identity::agent("orchestrator")
+        .resolve(&crate::memory::scope::identity_pins(&config));
     let mut resumed = input("t-quiet", 2, "remind me where the offsite is");
     resumed.5 = true;
     resumed.3 = 2;
@@ -612,7 +626,8 @@ async fn a_blank_turn_is_refused_without_a_pack_with_or_without_logging() {
     let tmp = tempfile::tempdir().unwrap();
     let mut config = config_in(&tmp);
     let engine = bind_reference(&config);
-    let identity = tinymemory_tools::layout::identity::Identity::agent("orchestrator").resolve(&crate::memory::scope::identity_pins(&config));
+    let identity = tinymemory_tools::layout::identity::Identity::agent("orchestrator")
+        .resolve(&crate::memory::scope::identity_pins(&config));
     assert!(run_pre_turn(
         &crate::core::runtime::DispatchCtx::ambient(),
         &config,
@@ -629,7 +644,8 @@ async fn a_blank_turn_is_refused_without_a_pack_with_or_without_logging() {
     );
 
     config.memory.conversations.enabled = false;
-    let reader = tinymemory_tools::layout::identity::Identity::agent("orchestrator").resolve(&crate::memory::scope::identity_pins(&config));
+    let reader = tinymemory_tools::layout::identity::Identity::agent("orchestrator")
+        .resolve(&crate::memory::scope::identity_pins(&config));
     assert!(run_pre_turn(
         &crate::core::runtime::DispatchCtx::ambient(),
         &config,
@@ -676,7 +692,8 @@ async fn a_date_hint_asks_the_model_in_the_users_zone_and_never_costs_the_pack()
             ))
             .await
             .unwrap();
-        let identity = tinymemory_tools::layout::identity::Identity::agent("orchestrator").resolve(&crate::memory::scope::identity_pins(&config));
+        let identity = tinymemory_tools::layout::identity::Identity::agent("orchestrator")
+            .resolve(&crate::memory::scope::identity_pins(&config));
 
         let pack = run_pre_turn(
             &crate::core::runtime::DispatchCtx::ambient(),

@@ -32,8 +32,8 @@ use crate::config::schema::MemoryRecallConfig;
 use crate::config::Config;
 
 use super::engine;
-use tinymemory_tools::layout::identity::ResolvedIdentity;
 use tinymemory_api::{Error, Result};
+use tinymemory_tools::layout::identity::ResolvedIdentity;
 
 /// TinyMemory's recall policy from `[memory.recall]`.
 #[must_use]

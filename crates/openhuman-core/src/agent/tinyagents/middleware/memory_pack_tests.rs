@@ -14,7 +14,8 @@ fn context(pack: Option<TurnPack>) -> RunContext<OpenHumanRunContext> {
     let config = crate::config::Config::default();
     let mut data = OpenHumanRunContext::new();
     data.memory_turn = Some(Arc::new(MemoryTurn {
-        identity: tinymemory_tools::layout::identity::Identity::agent("a").resolve(&crate::memory::scope::identity_pins(&config)),
+        identity: tinymemory_tools::layout::identity::Identity::agent("a")
+            .resolve(&crate::memory::scope::identity_pins(&config)),
         config: Arc::new(config),
         thread_id: "t".into(),
         pack,

@@ -115,35 +115,50 @@ pub(super) fn engine_set(ctx: DispatchCtx, params: Map<String, Value>) -> Contro
 }
 
 pub(super) fn recall(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
-    rpc::<RecallParams, _>(ctx, params, |_, config, mut params: RecallParams| async move {
-        params.filter = Some(rpc_confinement(&config).filter(params.filter)?);
-        ops::recall(&config, params).await
-    })
+    rpc::<RecallParams, _>(
+        ctx,
+        params,
+        |_, config, mut params: RecallParams| async move {
+            params.filter = Some(rpc_confinement(&config).filter(params.filter)?);
+            ops::recall(&config, params).await
+        },
+    )
 }
 
 pub(super) fn fetch(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
-    rpc::<FetchParams, _>(ctx, params, |_, config, mut params: FetchParams| async move {
-        params.filter = Some(rpc_confinement(&config).filter(params.filter)?);
-        ops::fetch(&config, params).await
-    })
+    rpc::<FetchParams, _>(
+        ctx,
+        params,
+        |_, config, mut params: FetchParams| async move {
+            params.filter = Some(rpc_confinement(&config).filter(params.filter)?);
+            ops::fetch(&config, params).await
+        },
+    )
 }
 
 pub(super) fn learn(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
-    rpc::<LearnParams, _>(ctx, params, |_, config, mut params: LearnParams| async move {
-        let identity = Identity::root().resolve(&scope::identity_pins(&config));
-        params.meta = Some(
-            rpc_confinement(&config)
-                .learn_meta(params.meta, identity.layout.learnings())?,
-        );
-        ops::learn(&config, params, None).await
-    })
+    rpc::<LearnParams, _>(
+        ctx,
+        params,
+        |_, config, mut params: LearnParams| async move {
+            let identity = Identity::root().resolve(&scope::identity_pins(&config));
+            params.meta = Some(
+                rpc_confinement(&config).learn_meta(params.meta, identity.layout.learnings())?,
+            );
+            ops::learn(&config, params, None).await
+        },
+    )
 }
 
 pub(super) fn forget(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
-    rpc::<ForgetParams, _>(ctx, params, |_, config, mut params: ForgetParams| async move {
-        params.reach = Some(rpc_confinement(&config).reach(params.reach)?);
-        ops::forget(&config, params).await
-    })
+    rpc::<ForgetParams, _>(
+        ctx,
+        params,
+        |_, config, mut params: ForgetParams| async move {
+            params.reach = Some(rpc_confinement(&config).reach(params.reach)?);
+            ops::forget(&config, params).await
+        },
+    )
 }
 
 pub(super) fn erase_all(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
@@ -153,28 +168,40 @@ pub(super) fn erase_all(ctx: DispatchCtx, params: Map<String, Value>) -> Control
 }
 
 pub(super) fn items_list(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
-    rpc::<ItemsListParams, _>(ctx, params, |_, config, mut params: ItemsListParams| async move {
-        let narrowed = explore::narrowed(params.filter.take(), &params.path)?;
-        params.filter = Some(rpc_confinement(&config).filter(Some(narrowed))?);
-        params.path.clear();
-        ops::items_list(&config, params).await
-    })
+    rpc::<ItemsListParams, _>(
+        ctx,
+        params,
+        |_, config, mut params: ItemsListParams| async move {
+            let narrowed = explore::narrowed(params.filter.take(), &params.path)?;
+            params.filter = Some(rpc_confinement(&config).filter(Some(narrowed))?);
+            params.path.clear();
+            ops::items_list(&config, params).await
+        },
+    )
 }
 
 pub(super) fn explore(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
-    rpc::<ExploreParams, _>(ctx, params, |_, config, mut params: ExploreParams| async move {
-        let narrowed = explore::narrowed(params.filter.take(), &params.path)?;
-        params.filter = Some(rpc_confinement(&config).filter(Some(narrowed))?);
-        params.path.clear();
-        explore::explore(&config, params).await
-    })
+    rpc::<ExploreParams, _>(
+        ctx,
+        params,
+        |_, config, mut params: ExploreParams| async move {
+            let narrowed = explore::narrowed(params.filter.take(), &params.path)?;
+            params.filter = Some(rpc_confinement(&config).filter(Some(narrowed))?);
+            params.path.clear();
+            explore::explore(&config, params).await
+        },
+    )
 }
 
 pub(super) fn items_get(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
-    rpc::<ItemsGetParams, _>(ctx, params, |_, config, mut params: ItemsGetParams| async move {
-        params.reach = Some(rpc_confinement(&config).reach(params.reach)?);
-        explore::items_get(&config, params).await
-    })
+    rpc::<ItemsGetParams, _>(
+        ctx,
+        params,
+        |_, config, mut params: ItemsGetParams| async move {
+            params.reach = Some(rpc_confinement(&config).reach(params.reach)?);
+            explore::items_get(&config, params).await
+        },
+    )
 }
 
 pub(super) fn policy_get(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {

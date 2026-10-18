@@ -56,7 +56,12 @@ async fn a_sources_collections_count_and_forget_with_it() {
         };
         engine.store(StoreItem::document(text, meta)).await.unwrap();
     }
-    let view = sources(&config, &tinymemory_tools::layout::identity::Identity::root()).await.unwrap();
+    let view = sources(
+        &config,
+        &tinymemory_tools::layout::identity::Identity::root(),
+    )
+    .await
+    .unwrap();
     let counts: Vec<(&str, u64)> = view
         .sources
         .iter()
@@ -125,7 +130,12 @@ async fn text_is_ingested_searched_counted_and_forgotten_per_source() {
         "one belief build per source"
     );
 
-    let counts = sources(&config, &tinymemory_tools::layout::identity::Identity::root()).await.unwrap();
+    let counts = sources(
+        &config,
+        &tinymemory_tools::layout::identity::Identity::root(),
+    )
+    .await
+    .unwrap();
     assert_eq!(counts.root, "root");
     assert_eq!(counts.sources.len(), 2);
     assert_eq!(counts.unfiled, 0);
@@ -187,7 +197,12 @@ async fn ingest_refuses_bad_input() {
         },
     ] {
         assert!(matches!(
-            ingest(&config, &tinymemory_tools::layout::identity::Identity::root(), params).await,
+            ingest(
+                &config,
+                &tinymemory_tools::layout::identity::Identity::root(),
+                params
+            )
+            .await,
             Err(Error::InvalidRequest(_))
         ));
     }
@@ -288,7 +303,12 @@ async fn ingest_refuses_a_credential_store_a_system_root_traversal_and_null_byte
         format!("{}/../guide.md", notes.display()),
         format!("{}\0.md", tmp.path().join("guide").display()),
     ] {
-        let result = ingest(&config, &tinymemory_tools::layout::identity::Identity::root(), path_params(path.clone())).await;
+        let result = ingest(
+            &config,
+            &tinymemory_tools::layout::identity::Identity::root(),
+            path_params(path.clone()),
+        )
+        .await;
         assert!(
             matches!(result, Err(Error::InvalidRequest(_))),
             "{path:?}: {result:?}"

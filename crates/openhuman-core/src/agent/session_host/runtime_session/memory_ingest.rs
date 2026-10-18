@@ -122,7 +122,9 @@ impl OpenHumanTurnPrelude {
         // The identity the turn's run context carries: the host environment's
         // (a team member's), narrowed to this agent.
         let acting = self.host_env.memory_identity.clone().unwrap_or_default();
-        let mut identity = acting.child(&self.agent_definition_id).resolve(&crate::memory::scope::identity_pins(&config));
+        let mut identity = acting
+            .child(&self.agent_definition_id)
+            .resolve(&crate::memory::scope::identity_pins(&config));
         if self.omit_memory_context {
             identity.recall = false;
         }

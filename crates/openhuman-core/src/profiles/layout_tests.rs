@@ -68,7 +68,8 @@ fn a_profile_binds_its_user_root_never_an_org_root() {
     // and every operation is confined to `user:<id>`.
     assert_eq!(config.memory.layout, MemoryLayoutMode::Legacy);
     assert_ne!(config.memory.layout, MemoryLayoutMode::V3);
-    let bound = tinymemory_tools::layout::identity::Identity::root().resolve(&crate::memory::scope::identity_pins(&config));
+    let bound = tinymemory_tools::layout::identity::Identity::root()
+        .resolve(&crate::memory::scope::identity_pins(&config));
     assert_eq!(bound.root().to_string(), "user:65f1c0ffee0123456789abcd");
     assert_eq!(bound.agent_id, id.as_str());
     assert_eq!(bound.root().to_string(), "user:65f1c0ffee0123456789abcd");
@@ -76,13 +77,14 @@ fn a_profile_binds_its_user_root_never_an_org_root() {
 
 #[test]
 fn the_memory_binding_wins_over_pins_and_teams() {
-        let layout = profile_layout(Path::new("/srv/oh"), &id());
+    let layout = profile_layout(Path::new("/srv/oh"), &id());
     let mut config = profile_config(&layout, &id());
     config.memory.agents.insert(
         "planner".into(),
         toml::from_str("agent_id = \"other\"\nroot = \"team:shared\"").unwrap(),
     );
-    let resolved = tinymemory_tools::layout::identity::Identity::team_member("shared", "planner").resolve(&crate::memory::scope::identity_pins(&config));
+    let resolved = tinymemory_tools::layout::identity::Identity::team_member("shared", "planner")
+        .resolve(&crate::memory::scope::identity_pins(&config));
     assert_eq!(resolved.agent_id, id().as_str());
     assert_eq!(resolved.root().to_string(), memory_root(&id()));
 }

@@ -558,7 +558,9 @@ fn schedule_partition(ctx: &crate::core::runtime::DispatchCtx, config: Arc<Confi
 pub(crate) async fn drain(config: &Config) -> usize {
     let file = queue_path(
         config,
-        tinymemory_tools::layout::identity::Identity::root().resolve(&crate::memory::scope::identity_pins(config)).root(),
+        tinymemory_tools::layout::identity::Identity::root()
+            .resolve(&crate::memory::scope::identity_pins(config))
+            .root(),
     );
     let owner = owner_state(config);
     let _owner = owner.barrier.read().await;
