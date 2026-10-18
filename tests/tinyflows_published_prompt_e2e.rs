@@ -1,17 +1,11 @@
-//! Normal-host smoke test for the published TinyFlows Copilot prompt contract.
-//!
-//! Run manually with a native TinyFlows release artifact staged locally:
-//! `OPENHUMAN_TINYFLOWS_PUBLISHED_LIBRARY=/path/to/libtinyflows_module.dylib \
-//! cargo test -p openhuman-cli --test tinyflows_published_prompt_e2e -- --ignored`.
+//! Normal-host prompt composition against the checksum-verified TinyFlows v0.8.26 module.
+
+#[path = "support/published_tinyflows.rs"]
+mod published_tinyflows;
 
 #[tokio::test]
-#[ignore = "set OPENHUMAN_TINYFLOWS_PUBLISHED_LIBRARY to a published native module artifact"]
 async fn published_module_prompts_render_through_the_normal_host_path() {
-    let library = std::env::var("OPENHUMAN_TINYFLOWS_PUBLISHED_LIBRARY")
-        .expect("published module library path is required");
-    let library = std::path::PathBuf::from(library);
-    assert!(library.is_file(), "published module library must exist");
-
+    let (library, _) = published_tinyflows::staged_v0_8_26_module();
     let temp = tempfile::tempdir().expect("scratch directory");
     let workspace = temp.path().join("workspace");
     std::fs::create_dir_all(&workspace).expect("workspace directory");
@@ -25,14 +19,14 @@ async fn published_module_prompts_render_through_the_normal_host_path() {
     std::fs::write(
         &config_path,
         format!(
-            "[components]\ntinyflows = true\n\n[[modules.overrides]]\nid = \"tinyflows\"\npath = {quoted_library}\n"
+            "[components]\ntinyflows = true\n\n[modules]\nenabled = true\n\n[[modules.overrides]]\nid = \"tinyflows\"\npath = {quoted_library}\n"
         ),
     )
     .expect("module override config");
 
-    for (agent_id, required) in [
-        ("workflow_builder", "propose_workflow"),
-        ("flow_discovery", "suggest_workflows"),
+    for (agent_id, required, invariant) in [
+        ("workflow_builder", "propose_workflow", "propose-only"),
+        ("flow_discovery", "suggest_workflows", "read-only"),
     ] {
         let mut options = openhuman_core::agent::debug::DumpPromptOptions::new(agent_id);
         options.workspace_dir_override = Some(workspace.clone());
@@ -40,7 +34,9 @@ async fn published_module_prompts_render_through_the_normal_host_path() {
         let prompt = openhuman_core::agent::debug::dump_agent_prompt(options)
             .await
             .unwrap_or_else(|error| panic!("rendering {agent_id} prompt: {error:#}"));
+        let lower = prompt.text.to_lowercase();
         assert!(prompt.text.contains(required), "{agent_id} prompt missing {required}");
+        assert!(lower.contains(invariant), "{agent_id} prompt missing {invariant}");
         assert!(prompt.text.contains("## Workspace"));
     }
 }

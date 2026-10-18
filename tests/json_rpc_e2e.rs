@@ -2741,7 +2741,7 @@ async fn json_rpc_cron_manual_worker_survives_caller_cancel_on_published_tinyflo
     let _source_dir_guard = EnvVarGuard::unset("OPENHUMAN_MODULE_SOURCE_DIR");
     clear_forced_chat_completions();
 
-    let (artifact, _artifact_digest) = published_tinyflows::staged_v0_8_26_module();
+    let (artifact, _) = published_tinyflows::staged_v0_8_26_module();
     let module_path = artifact.parent().expect("native artifact directory");
     let _module_path_guard = EnvVarGuard::set_to_path("OPENHUMAN_MODULE_PATH", module_path);
 
