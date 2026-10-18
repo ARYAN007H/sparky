@@ -6123,11 +6123,19 @@ async fn json_rpc_wallet_network_defaults_returns_network_rows() {
     let body = assert_no_jsonrpc_error(&resp, "wallet_network_defaults");
     let result = body.get("result").unwrap_or(body);
     let rows = result.as_array().expect("array");
-    assert!(!rows.is_empty(), "wallet defaults must include at least one network");
+    assert!(
+        !rows.is_empty(),
+        "wallet defaults must include at least one network"
+    );
     for row in rows {
-        assert!(row.is_object(), "each network default must be an object: {row}");
         assert!(
-            row.get("chain").and_then(Value::as_str).is_some_and(|chain| !chain.is_empty()),
+            row.is_object(),
+            "each network default must be an object: {row}"
+        );
+        assert!(
+            row.get("chain")
+                .and_then(Value::as_str)
+                .is_some_and(|chain| !chain.is_empty()),
             "each network default must expose a chain identifier: {row}"
         );
         if row.get("evmNetwork").is_some() {
