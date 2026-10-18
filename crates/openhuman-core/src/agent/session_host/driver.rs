@@ -5,7 +5,7 @@
 //! complete immutable model history and tool declaration snapshot per call.
 
 mod grounded_close;
-use grounded_close::SupplementalTrace;
+use crate::agent::tinyagents::SupplementalTrace;
 
 use std::{collections::HashSet, sync::Arc, time::Instant};
 

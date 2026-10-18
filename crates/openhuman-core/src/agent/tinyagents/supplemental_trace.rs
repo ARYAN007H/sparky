@@ -155,6 +155,10 @@ impl SupplementalTrace {
     pub(crate) fn is_cache_hit(&self) -> bool {
         self.cache_hit.load(Ordering::SeqCst)
     }
+
+    pub(crate) fn run_id(&self) -> &RunId {
+        &self.run_id
+    }
 }
 
 fn valid_provider_id(value: &str) -> bool {

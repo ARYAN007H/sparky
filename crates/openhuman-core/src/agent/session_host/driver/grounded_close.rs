@@ -424,7 +424,7 @@ async fn completion(
     .with_max_tokens(AGENT_TURN_MAX_OUTPUT_TOKENS);
     let request = match (trace, call_id.as_ref()) {
         (Some(trace), Some(call_id)) => request.with_correlation(ModelCallCorrelation::new(
-            trace.run_id.as_str(),
+            trace.run_id().as_str(),
             call_id.as_str(),
         )),
         _ => request,
