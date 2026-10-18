@@ -708,11 +708,6 @@ export type OutboundVoice =
       durationMs?: number | null;
       kind: 'media';
       media: MediaReference;
-      /**
-       * Normalised 0.0-1.0 loudness preview for providers that draw one
-       * (WhatsApp push-to-talk). Absent when the codec path produced none.
-       */
-      waveform?: number[] | null;
     }
   | {
       kind: 'synthesize';
