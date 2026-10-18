@@ -53,6 +53,7 @@ async fn renew_extends_and_keeps_the_epoch() {
     let renewed = a.renew(&grant, 900).await.unwrap();
     assert_eq!(renewed.epoch, grant.epoch);
     assert_eq!(renewed.expires_at_ms, 1_900);
+    assert!(renewed.version > grant.version);
     assert!(matches!(
         b.acquire("k", 1_500).await,
         Err(LeaseError::Held(_))
