@@ -2,7 +2,7 @@ use super::*;
 
 use tinymemory_api::{
     Error as MemoryApiError, ItemKind, LearningKind, MemoryEngine, MemoryMeta, MetaFilter, Role,
-    StoreItem,
+    StoreItem, Turn,
 };
 use tinymemory_tools::recall::SkipReason;
 
@@ -59,6 +59,7 @@ async fn run_pre_turn(
         at,
         resumed,
         observed_actor,
+        None,
     )
     .await
 }
@@ -68,7 +69,7 @@ async fn run_post_turn(
     identity: &tinymemory_tools::layout::identity::ResolvedIdentity,
     (thread, index, text, calls, at): PostTurnArgs,
 ) {
-    post_turn(config, identity, thread, index, text, calls, at).await;
+    post_turn(config, identity, thread, index, text, calls, at, None).await;
 }
 
 #[test]
@@ -103,6 +104,9 @@ fn typed_skip_reasons_expose_only_account_wide_errors() {
     }
     assert_eq!(account_wide_skip_reason(&SkipReason::Empty), None);
 }
+
+#[path = "hooks_channel_tests.rs"]
+mod channel_tests;
 
 #[test]
 fn a_logged_reply_keeps_one_line_per_tool_result() {

@@ -33,9 +33,32 @@ use tinymemory_tools::layout::identity::ResolvedIdentity;
 pub(super) struct PendingMemoryTurn {
     identity: ResolvedIdentity,
     user_index: u32,
+    channel: Option<String>,
     // The canonical runtime can commit on a different task. Restore the
     // authenticated profile captured at preparation, never infer it from config.
     profile_context: ProfileMemoryContext,
+}
+
+/// The provider channel that owns a logged conversation, if this turn came
+/// from an external channel. Event-context labels such as `cron`, `voice`, and
+/// `mcp_server` are not channel owners.
+fn logged_channel(origin: Option<&crate::agent::turn_origin::AgentTurnOrigin>) -> Option<String> {
+    let Some(crate::agent::turn_origin::AgentTurnOrigin::ExternalChannel {
+        channel,
+        message_id,
+        ..
+    }) = origin
+    else {
+        return None;
+    };
+    if message_id.starts_with("cron:") {
+        return None;
+    }
+    let channel = channel.trim().to_ascii_lowercase();
+    if channel.is_empty() {
+        return None;
+    }
+    Some(channel)
 }
 
 // Missing profile authority must not be confused with an ordinary desktop turn.
@@ -137,12 +160,14 @@ impl OpenHumanTurnPrelude {
         }
         let user_index = hooks::user_turn_index(committed_turns);
         let (in_prompt_from, compacted) = in_prompt_window(history, committed_turns, current);
+        let memory_channel = logged_channel(origin.as_ref());
         self.mutable
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .pending_memory_turn = Some(PendingMemoryTurn {
             identity: identity.clone(),
             user_index,
+            channel: memory_channel.clone(),
             profile_context,
         });
         let pack = crate::memory::lifecycle::prefetch::pre_turn(
@@ -158,7 +183,7 @@ impl OpenHumanTurnPrelude {
             origin
                 .as_ref()
                 .and_then(crate::memory::lifecycle::sender::channel_actor),
-            Some(self.event_channel.clone()),
+            memory_channel,
         );
         Some(Arc::new(MemoryTurn {
             config,
@@ -231,6 +256,7 @@ impl OpenHumanTurnPrelude {
                 assistant_text,
                 tool_calls,
                 Utc::now(),
+                pending.channel,
             )
             .await;
         };
