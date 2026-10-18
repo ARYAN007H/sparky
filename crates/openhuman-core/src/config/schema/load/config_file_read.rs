@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use anyhow::Result;
 use std::path::Path;
 use tokio::fs;
 
@@ -124,7 +124,7 @@ pub(crate) const CONFIG_OWNER_MISMATCH_MARKER: &str = "[config owner mismatch]";
 /// Numeric ids and mode bits are not PII, so this is safe both in the local log
 /// and in the error chain that reaches the client.
 #[cfg(unix)]
-async fn describe_config_ownership(path: &Path) -> String {
+pub(super) async fn describe_config_ownership(path: &Path) -> String {
     use std::os::unix::fs::{MetadataExt, PermissionsExt};
 
     let Ok(meta) = fs::metadata(path).await else {
@@ -147,6 +147,6 @@ async fn describe_config_ownership(path: &Path) -> String {
 }
 
 #[cfg(not(unix))]
-async fn describe_config_ownership(_path: &Path) -> String {
+pub(super) async fn describe_config_ownership(_path: &Path) -> String {
     String::new()
 }
