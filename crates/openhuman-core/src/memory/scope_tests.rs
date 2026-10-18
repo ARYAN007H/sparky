@@ -3,7 +3,10 @@ use super::*;
 use crate::config::schema::MemoryAgentConfig;
 use tinymemory_api::{MetaFilter, Reach};
 use tinymemory_tools::confine::{Confinement, Policy};
-use tinymemory_tools::layout::identity::{Identity, ResolvedIdentity};
+use tinymemory_tools::layout::identity::{
+    account_root, actor_of_root, chat_node, validate_root, Identity, ResolvedIdentity,
+    DEFAULT_AGENT_ID,
+};
 
 fn ns(value: &str) -> Namespace {
     value.parse().unwrap()
@@ -273,10 +276,10 @@ fn layout_v3_pools_every_agents_chats_at_ws_main() {
         legacy.layout.conversations("researcher").unwrap(),
         ns("agent:researcher")
     );
-    assert!(!layout_is_v3(&config));
+    assert_ne!(config.memory.layout, MemoryLayoutMode::V3);
 
     config.memory.layout = MemoryLayoutMode::V3;
-    assert!(layout_is_v3(&config));
+    assert_eq!(config.memory.layout, MemoryLayoutMode::V3);
     let researcher = tinymemory_tools::layout::identity::Identity::agent("researcher").resolve(&crate::memory::scope::identity_pins(&config));
     let coder = tinymemory_tools::layout::identity::Identity::agent("coder").resolve(&crate::memory::scope::identity_pins(&config));
     assert_eq!(

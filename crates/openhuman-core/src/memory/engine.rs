@@ -415,7 +415,7 @@ fn rooted(
     let Some(root) = root else {
         return (settings, "|root=legacy".to_string());
     };
-    let actor = super::tinymemory_tools::layout::identity::actor_of_root(root);
+    let actor = tinymemory_tools::layout::identity::actor_of_root(root);
     let retired = legacy_read.then(|| actor.clone());
     let fingerprint = format!(
         "|root={root}|tenant={tenant}|retired={}",

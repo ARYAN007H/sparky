@@ -122,7 +122,7 @@ async fn the_switch_writes_the_migrated_persons_own_config_fresh() {
     let saved = Config::load_from_config_path(&snapshot.config_path, &snapshot.workspace_dir)
         .await
         .unwrap();
-    assert!(crate::memory::scope::layout_is_v3(&saved));
+    assert_eq!(saved.memory.layout, crate::config::MemoryLayoutMode::V3);
     assert_eq!(saved.memory.agent_id.as_deref(), Some("changed-later"));
 }
 

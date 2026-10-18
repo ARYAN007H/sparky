@@ -22,7 +22,10 @@ fn the_policy_round_trips_and_refuses_out_of_range_values() {
     let mut config = Config::default();
     let view = policy_view(&config);
     assert!(view.log_conversations);
-    assert_eq!(view.agent_id, scope::DEFAULT_AGENT_ID);
+    assert_eq!(
+        view.agent_id,
+        tinymemory_tools::layout::identity::DEFAULT_AGENT_ID
+    );
     assert_eq!(view.root, "root");
     assert!(!view.host_bound);
 

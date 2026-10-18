@@ -36,7 +36,6 @@
 
 use openhuman_core::config::Config;
 use openhuman_core::memory::engine::{self, Binding};
-use openhuman_core::memory::tinymemory_tools::layout::identity::Identity;
 use openhuman_core::memory::{brain, explore, lifecycle, ops, types};
 use tinymemory_api::{
     ItemKind, MemoryMeta, MetaFilter, Namespace, Reach, StoreItem, StoreReceipt, WriteOptions,
@@ -131,7 +130,7 @@ impl Memory {
     /// Binds `base` to the layout root `root` (`team:acme`).
     pub(crate) fn bind(mut base: Config, root: &str) -> Result<Self> {
         let root = root.trim();
-        openhuman_core::memory::tinymemory_tools::layout::identity::validate_root(root).map_err(Error::InvalidRequest)?;
+        tinymemory_tools::layout::identity::validate_root(root).map_err(Error::InvalidRequest)?;
         let namespace: Namespace = root
             .parse()
             .map_err(|error: tinymemory_api::Error| Error::InvalidRequest(error.to_string()))?;
