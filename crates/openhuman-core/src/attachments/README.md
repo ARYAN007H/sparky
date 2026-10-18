@@ -62,8 +62,12 @@ TinyAgents' `MediaRequestModel` prepares a disposable request copy and owns
 generic media counting, bounded history selection, native conversion, and the
 default text/archive fallback. OpenHuman supplies the policy-authorized source
 resolver, host configuration and caches, image readout, and TinyDocs document
-extraction. It selects native media only when the actual selected model is
-known to accept the modality **and** the underlying transport supports its MIME
+extraction. The adapter forwards each typed block's original path, URL, or
+base64 kind and MIME hint to the owner resolver; base64 length is checked
+before it becomes a data URI. Marker and image-string sources remain untyped
+and use the host's existing source detection. The wrapper selects native media
+only when the actual selected model is known to accept the modality **and** the
+underlying transport supports its MIME
 type and source representation. Unknown model capabilities do not imply
 multimodal support. Uploaded local references are read under policy and encoded
 for that request; the durable reference and original file remain unchanged. A
