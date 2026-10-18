@@ -30,7 +30,6 @@
 //! if this ever becomes a loadable module — a module can rank, but it cannot be
 //! the thing that decides whose skills a caller may see.
 
-use std::path::PathBuf;
 use std::sync::Arc;
 
 use async_trait::async_trait;
