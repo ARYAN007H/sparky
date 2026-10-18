@@ -158,8 +158,8 @@ pub async fn stash_image_attachments(message: &str, image_config: &MultimodalCon
     for (idx, reference) in image_refs.iter().enumerate() {
         // Enforce the per-turn image cap at ingress: over-cap markers degrade
         // to a text placeholder and are never read or stashed (rewriting the
-        // markers removes the count check `prepare_messages_for_provider` would
-        // otherwise apply, and bounds stash growth per message).
+        // markers are rewritten before they reach the owner request wrapper,
+        // and bounds stash growth per ingress message).
         if idx >= max_images {
             placeholders.push("[Image: (over image limit)]".to_string());
             continue;
