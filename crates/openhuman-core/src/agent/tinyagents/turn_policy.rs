@@ -158,14 +158,10 @@ pub(crate) fn tool_call_limit(max_iterations: usize, cap: Option<usize>) -> usiz
 /// the `pub(super)` runner helper) so the invariant travels with the
 /// registration site that enforces it.
 ///
-/// This uses TinyAgents' canonical spawn-tool names and also strips the host's
-/// continuation tool and synthesized `delegate_*` tools. The caller-side
-/// filter additionally resolves unprefixed `delegate_name` overrides through
-/// the definition registry before constructing a child's tool surface.
+/// This is a strict subset of the caller-side strip. The caller also resolves
+/// host-defined, unprefixed `delegate_name` overrides through the registry.
 pub(crate) fn is_subagent_spawn_or_delegate_tool(name: &str) -> bool {
-    tinyagents_definition::SPAWN_TOOL_NAMES.contains(&name)
-        || name.starts_with("delegate_")
-        || name == "continue_subagent"
+    name == "spawn_subagent" || name.starts_with("delegate_") || name == "spawn_worker_thread"
 }
 
 #[cfg(test)]
