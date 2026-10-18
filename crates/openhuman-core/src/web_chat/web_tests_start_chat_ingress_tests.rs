@@ -1,6 +1,83 @@
 use super::*;
 
 #[tokio::test]
+async fn ptt_source_turn_completes_without_publishing_a_voice_event() {
+    use std::sync::Arc;
+    use tinybus::EventHandler;
+    use tinyinference_llm::model::ChatModel;
+
+    let _turn_lock = RUN_CHAT_TASK_TEST_LOCK.lock().await;
+    let _inference = crate::inference::inference_test_guard_async().await;
+    let _model = crate::inference::provider::factory::test_provider_override::install_model(
+        Arc::new(tinyagents_harness::testkit::ScriptedModel::replies(vec!["hello from mock"])),
+    );
+
+    struct VoiceEvents(tokio::sync::mpsc::UnboundedSender<String>);
+
+    #[async_trait::async_trait]
+    impl EventHandler<crate::core::events::DomainEvent> for VoiceEvents {
+        fn name(&self) -> &str {
+            "web_chat::ptt_regression_test"
+        }
+
+        async fn handle(&self, event: &crate::core::events::DomainEvent) {
+            if event.domain() == "voice" {
+                let _ = self.0.send(format!("{event:?}"));
+            }
+        }
+    }
+
+    crate::core::bus::init().await.expect("event bus init");
+    let (voice_tx, mut voice_events) = tokio::sync::mpsc::unbounded_channel();
+    let _voice_subscription = crate::core::bus::BUS
+        .subscribe(Arc::new(VoiceEvents(voice_tx)))
+        .expect("voice event subscription");
+    let mut web_events = subscribe_web_channel_events();
+    let thread_id = "ptt-event-regression";
+    let request_id = start_chat(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        "ptt-test-client",
+        thread_id,
+        "recognized words",
+        None,
+        None,
+        None,
+        None,
+        ChatRequestMetadata {
+            source: Some("ptt".to_string()),
+            session_id: Some(42),
+            ..Default::default()
+        },
+    )
+    .await
+    .expect("PTT web chat turn should start");
+
+    let done = tokio::time::timeout(std::time::Duration::from_secs(20), async {
+        loop {
+            let event = web_events.recv().await.expect("web event stream stays open");
+            if event.request_id == request_id && event.event == "chat_done" {
+                break event;
+            }
+            assert_ne!(
+                (event.request_id.as_str(), event.event.as_str()),
+                (request_id.as_str(), "chat_error"),
+                "PTT turn should complete successfully: {event:?}"
+            );
+        }
+    })
+    .await
+    .expect("PTT turn should finish");
+    assert_eq!(done.full_response.as_deref(), Some("hello from mock"));
+
+    assert!(
+        tokio::time::timeout(std::time::Duration::from_secs(1), voice_events.recv())
+            .await
+            .is_err(),
+        "a successful source=ptt message must not publish a voice event"
+    );
+}
+
+#[tokio::test]
 async fn start_chat_validates_required_fields() {
     let err = start_chat(
         &crate::core::runtime::DispatchCtx::ambient(),
