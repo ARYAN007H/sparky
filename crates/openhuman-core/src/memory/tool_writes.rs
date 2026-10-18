@@ -171,7 +171,7 @@ pub(super) fn enqueue(
     let operation = match args.get("action").and_then(serde_json::Value::as_str) {
         Some("learn") => {
             let mut params: LearnParams = serde_json::from_value(args.clone())
-                .map_err(|_| Error::InvalidRequest(("invalid learning arguments").into()))?;
+                .map_err(|_| Error::InvalidRequest("invalid learning arguments".into()))?;
             params.meta = None;
             let mut item = super::ops::learning_item(params, Some(facts.learn_meta()))?;
             if let Some(root) = confinement {
@@ -188,7 +188,7 @@ pub(super) fn enqueue(
         }
         Some("forget") => {
             let params: ForgetParams = serde_json::from_value(args.clone())
-                .map_err(|_| Error::InvalidRequest(("invalid forgetting arguments").into()))?;
+                .map_err(|_| Error::InvalidRequest("invalid forgetting arguments".into()))?;
             let mut ids: Vec<_> = params
                 .ids
                 .into_iter()
@@ -204,7 +204,7 @@ pub(super) fn enqueue(
             }
             WriteOperation::Forget { ids, reach }
         }
-        _ => return Err(Error::InvalidRequest(("expected a memory write").into())),
+        _ => return Err(Error::InvalidRequest("expected a memory write".into())),
     };
     let _guard = LOCK
         .lock()
