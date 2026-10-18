@@ -326,6 +326,7 @@ fn awaiting_user_outcome_maps_to_resume_envelope_not_bare_success() {
         agent_id: "crypto_agent".to_string(),
         output: String::new(),
         iterations: 1,
+        failure_cause: None,
         elapsed: Duration::from_secs(0),
         mode: SubagentMode::Typed,
         status: SubagentRunStatus::AwaitingUser {

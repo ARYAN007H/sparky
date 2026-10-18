@@ -16,6 +16,7 @@ fn paused_outcomes_preserve_answer_choices_and_worker_resume_options() {
         agent_id: definition.id.clone(),
         output: "partial work".into(),
         iterations: 2,
+        failure_cause: None,
         elapsed: std::time::Duration::from_millis(25),
         mode: crate::agent::subagent_host::SubagentMode::Typed,
         status: SubagentRunStatus::AwaitingUser {
@@ -66,6 +67,7 @@ fn host_outcome_terminal_record_round_trips_through_json_bytes() {
         agent_id: definition.id.clone(),
         output: "durable".into(),
         iterations: 2,
+        failure_cause: None,
         elapsed: std::time::Duration::from_millis(25),
         mode: crate::agent::subagent_host::SubagentMode::Typed,
         status: SubagentRunStatus::Completed,
