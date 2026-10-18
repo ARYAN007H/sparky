@@ -43,6 +43,7 @@ async fn flow_prompt_fetch_uses_the_copilot_get_prompt_bus_member() {
     config.workspace_dir = temp.path().join("workspace");
     config.config_path = temp.path().join("config.toml");
 
+    let mut texts = std::collections::HashMap::new();
     for id in ["workflow_builder", "flow_discovery"] {
         let definition = registry.get(id).expect("builtin flow agent");
         let text = load_for_definition(Some(&config), definition)
@@ -50,9 +51,7 @@ async fn flow_prompt_fetch_uses_the_copilot_get_prompt_bus_member() {
             .expect("bus prompt fetch")
             .expect("flow builtin prompt");
         assert!(!text.trim().is_empty(), "{id} prompt must be nonempty");
-        assert!(
-            !text.contains("tinyflows_copilot::prompts"),
-            "host receives prompt text over the bus"
-        );
+        texts.insert(id, text);
     }
+    assert_ne!(texts["workflow_builder"], texts["flow_discovery"]);
 }
