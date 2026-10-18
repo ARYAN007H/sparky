@@ -306,18 +306,28 @@ async fn repeated_tool_failure_nudges_change_of_strategy_before_the_halt() {
     let mut context = ctx();
     // First identical failure: not a loop yet — no steering.
     let mut r = failing_result("read_file", "file not found");
-    mw.after_tool(&mut context, &(), &invocation("read-1", "read_file"), &mut r)
-        .await
-        .unwrap();
+    mw.after_tool(
+        &mut context,
+        &(),
+        &invocation("read-1", "read_file"),
+        &mut r,
+    )
+    .await
+    .unwrap();
     assert!(
         handle.drain().is_empty(),
         "a single failure is never a loop"
     );
     // Second identical failure: the nudge fires, still no halt.
     let mut r = failing_result("read_file", "file not found");
-    mw.after_tool(&mut context, &(), &invocation("read-2", "read_file"), &mut r)
-        .await
-        .unwrap();
+    mw.after_tool(
+        &mut context,
+        &(),
+        &invocation("read-2", "read_file"),
+        &mut r,
+    )
+    .await
+    .unwrap();
     let nudges = drain_nudge_messages(&mw, &mut context).await;
     assert_eq!(
         nudges.len(),

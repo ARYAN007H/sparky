@@ -338,7 +338,15 @@ async fn a_failed_browser_task_nudges_toward_its_hint_then_stops_on_a_repeat() {
     );
     let args =
         serde_json::json!({"action": "task", "goal": "book it", "url": "https://shop.test/"});
-    run_call(&mw, &mut context, "task-1", "browser", args.clone(), Err(&error)).await;
+    run_call(
+        &mw,
+        &mut context,
+        "task-1",
+        "browser",
+        args.clone(),
+        Err(&error),
+    )
+    .await;
     assert_eq!(drain_pause_count(&handle), 0);
     let nudges = drain_nudge_messages(&mw, &mut context).await;
     assert_eq!(nudges.len(), 1, "{nudges:?}");

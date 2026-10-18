@@ -100,7 +100,6 @@ impl RepeatedToolFailureMiddleware {
     pub(crate) fn nudge_injector(&self) -> EphemeralInstructionMiddleware {
         self.owner.nudge_injector()
     }
-
 }
 
 struct HostFailurePolicy {

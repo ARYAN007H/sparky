@@ -127,7 +127,14 @@ async fn an_identical_failing_command_repeated_unchanged_still_halts() {
     let mut context = ctx();
     let report = tinytools::render_command_failure(Some(2), "", "make: *** No rule to make target");
     for id in ["make-1", "make-2", "make-3", "make-4"] {
-        run_shell(&mw, &mut context, id, "make build", failing_result("shell", &report)).await;
+        run_shell(
+            &mw,
+            &mut context,
+            id,
+            "make build",
+            failing_result("shell", &report),
+        )
+        .await;
     }
     assert_eq!(drain_pause_count(&handle), 1);
 }
