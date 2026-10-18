@@ -67,9 +67,8 @@ fn one_shot(url: &str, args: &[&str]) -> (std::process::Output, tempfile::TempDi
     (output, workspace)
 }
 
-/// Every driver is asked the same thing: write a job in one process, list in
-/// another. A durable driver shows it to the second process; `memory` keeps
-/// nothing between processes, so it must not.
+/// Write a job in one process, list in another: the backend is what carries
+/// it from the first to the second.
 #[test]
 fn a_second_process_reads_what_a_one_shot_wrote_to_the_backend() {
     let case = UrlCase::open();
@@ -88,7 +87,7 @@ fn a_second_process_reads_what_a_one_shot_wrote_to_the_backend() {
     assert!(
         added.status.success(),
         "cron add against {}: {stderr}",
-        case.driver.name()
+        case.url
     );
 
     // A different workspace: only the backend can hold the job.
@@ -99,17 +98,10 @@ fn a_second_process_reads_what_a_one_shot_wrote_to_the_backend() {
         String::from_utf8_lossy(&listed.stderr)
     );
     let stdout = String::from_utf8_lossy(&listed.stdout);
-    if case.driver.is_durable() {
-        assert!(
-            stdout.contains("storage-probe"),
-            "second process sees the job: {stdout}"
-        );
-    } else {
-        assert!(
-            !stdout.contains("storage-probe"),
-            "memory keeps nothing between processes: {stdout}"
-        );
-    }
+    assert!(
+        stdout.contains("storage-probe"),
+        "second process sees the job: {stdout}"
+    );
 
     // And without the URL the same fresh workspace has nothing.
     let workspace = tempfile::tempdir().unwrap();
