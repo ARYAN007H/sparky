@@ -13,7 +13,7 @@ fn enabled_config(tmp: &tempfile::TempDir) -> Config {
 async fn tts_rejects_empty_text_before_resolving_piper() {
     let tmp = tempfile::tempdir().unwrap();
     let config = enabled_config(&tmp);
-    let service = LocalAiService::new(&config);
+    let service = LocalAiService::new(&crate::inference::local_runtime_config(&config));
 
     let error = tts(&service, &config, " \n\t ", None).await.unwrap_err();
 
@@ -24,7 +24,7 @@ async fn tts_rejects_empty_text_before_resolving_piper() {
 async fn tts_rejects_output_outside_allowed_roots() {
     let tmp = tempfile::tempdir().unwrap();
     let config = enabled_config(&tmp);
-    let service = LocalAiService::new(&config);
+    let service = LocalAiService::new(&crate::inference::local_runtime_config(&config));
     let output = tmp.path().join("outside").join("speech.wav");
 
     let error = tts(
