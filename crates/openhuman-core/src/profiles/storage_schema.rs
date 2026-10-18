@@ -134,7 +134,10 @@ pub async fn migrate_legacy_leases(scoped: &ScopedStorage) -> Result<usize> {
     }
     tinystoragedrivers::primitives::ensure(scoped).await?;
     let mut moved = 0;
-    for legacy in docs.query_all(LEGACY_LEASE_COLLECTION, &Query::all()).await? {
+    for legacy in docs
+        .query_all(LEGACY_LEASE_COLLECTION, &Query::all())
+        .await?
+    {
         let Some(body) = lease_v2(&legacy.doc) else {
             log::warn!("[profiles][lease] skipping a malformed legacy lease record");
             continue;
