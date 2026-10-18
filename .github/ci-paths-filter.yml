@@ -204,8 +204,8 @@ scripts:
   - 'app/scripts/e2e-web-session.sh'
   - 'app/vite.config.*'
   # The storage-target parity test in self-hosted-lanes.test.mjs checks that
-  # every registered `tests/storage_*_e2e.rs` target is in the storage lane
-  # and the MongoDB workflow; adding a target must run it.
+  # every registered `tests/storage_*_e2e.rs` target is in the storage lane;
+  # adding a target must run it.
   - 'tests/storage_*.rs'
   - 'tests/cli_storage_url_e2e.rs'
   - 'crates/openhuman-cli/Cargo.toml'
