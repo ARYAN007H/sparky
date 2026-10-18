@@ -792,7 +792,15 @@ async fn run_typed_mode(
         );
     }
 
-    let (output, iterations, agg_usage, early_exit_tool, hit_cap, breaker_halt) =
+    let (
+        output,
+        iterations,
+        agg_usage,
+        early_exit_tool,
+        hit_cap,
+        breaker_halt,
+        failure_cause,
+    ) =
         super::graph::run_subagent_via_graph(
             subagent_source.clone(),
             &model,
@@ -911,6 +919,7 @@ async fn run_typed_mode(
         elapsed: started.elapsed(),
         mode: SubagentMode::Typed,
         status,
+        failure_cause,
         final_history: history,
         usage,
         // Filled in by `run_subagent` once the offload step has had its say, so
