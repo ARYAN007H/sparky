@@ -7,12 +7,11 @@
 //! its usage in a sidecar; it never owns transcript history or persistence.
 
 use futures::StreamExt;
+use std::sync::Arc;
 use tinyagents_runtime::transcript::message_to_native_transcript as message_to_native_chat_message;
 use tinyagents_session::transcript::TranscriptMessage;
-use tinyinference_llm::model::{ModelRequest, ModelStreamItem};
+use tinyinference_llm::model::{ModelCallCorrelation, ModelRequest, ModelStreamItem};
 use tinytools_agent::dialect::ToolDialect;
-
-use tinyagents_harness::middleware::wrap_harness_instruction;
 
 use crate::agent::{
     session_host::turn_checkpoint::{
@@ -21,10 +20,11 @@ use crate::agent::{
         parse_close_verdict, quotes_harness_instruction, render_tool_results,
         results_from_tool_outcomes, CloseVerdict, CloseViolation,
     },
-    tinyagents::{TinyagentsTurnOutcome, TurnModelSource},
+    tinyagents::{SupplementalTrace, TinyagentsTurnOutcome, TurnModelSource},
 };
 use crate::inference::provider::model::dialect_response_from_provider;
 use crate::inference::provider::{BilledUsage, ChatResponse, AGENT_TURN_MAX_OUTPUT_TOKENS};
+use tinyagents_harness::middleware::wrap_harness_instruction;
 
 /// Accounting from model calls performed after the harness loop has ended.
 #[derive(Default)]
@@ -52,9 +52,17 @@ impl RepairUsage {
         }
     }
 
-    fn record(&mut self, usage: Option<BilledUsage>, measures_context: bool) {
+    fn record(
+        &mut self,
+        usage: Option<BilledUsage>,
+        measures_context: bool,
+        trace: Option<&SupplementalTrace>,
+    ) {
         self.model_calls += 1;
         if let Some(usage) = usage {
+            if let Some(model) = trace.and_then(SupplementalTrace::actual_model) {
+                self.pricing_model = model;
+            }
             if measures_context {
                 self.last_call_input_tokens = usage.input_tokens;
                 self.last_call_output_tokens = usage.output_tokens;
@@ -62,8 +70,12 @@ impl RepairUsage {
             self.input_tokens += usage.input_tokens;
             self.output_tokens += usage.output_tokens;
             self.cached_input_tokens += usage.cached_input_tokens();
-            self.cost
-                .add(crate::agent::cost::call_cost(&self.pricing_model, &usage));
+            if trace.is_some_and(SupplementalTrace::is_cache_hit) {
+                self.cost.add(tinyagents_harness::cost::CallCost::Unknown);
+            } else {
+                self.cost
+                    .add(crate::agent::cost::call_cost(&self.pricing_model, &usage));
+            }
         }
     }
 }
@@ -108,6 +120,7 @@ pub(super) async fn repair_required_output(
     progress: Option<&tokio::sync::mpsc::Sender<crate::progress::AgentProgress>>,
     iteration: u32,
     usage: &mut RepairUsage,
+    trace: Option<&Arc<SupplementalTrace>>,
 ) -> Option<String> {
     use tinyagents_harness::config as required;
 
@@ -122,9 +135,16 @@ pub(super) async fn repair_required_output(
     prompt_history.push(TranscriptMessage::user(wrap_harness_instruction(
         &required::repair_instruction(contract),
     )));
-    let (candidate, candidate_usage) =
-        completion(source, model, temperature, thread_id, prompt_history).await;
-    usage.record(candidate_usage, true);
+    let (candidate, candidate_usage) = completion(
+        source,
+        model,
+        temperature,
+        thread_id,
+        prompt_history,
+        trace.map(Arc::as_ref),
+    )
+    .await;
+    usage.record(candidate_usage, true, trace.map(Arc::as_ref));
     let candidate = candidate.trim().to_owned();
     let candidate_is_usable = !candidate.is_empty()
         && !contains_tool_call(dispatcher, &candidate)
@@ -206,6 +226,7 @@ pub(super) async fn close_if_needed(
     user_message: &str,
     outcome: &TinyagentsTurnOutcome,
     budget: Option<std::time::Duration>,
+    trace: Option<&Arc<SupplementalTrace>>,
 ) -> Option<GroundedClose> {
     let needs_cap_close = outcome.hit_cap && !outcome.wrap_up_injected;
     let needs_final_close = outcome.text.trim().is_empty() || outcome.breaker_halt.is_some();
@@ -228,7 +249,17 @@ pub(super) async fn close_if_needed(
     let ask = |prompt: String| {
         let mut messages = base.clone();
         messages.push(TranscriptMessage::user(prompt));
-        async move { completion(source, model, temperature, thread_id, messages).await }
+        async move {
+            completion(
+                source,
+                model,
+                temperature,
+                thread_id,
+                messages,
+                trace.map(Arc::as_ref),
+            )
+            .await
+        }
     };
     // A closing response is only user-visible after a separate, tool-less
     // verifier accepts it.  This prevents a fluent repair from contradicting a
@@ -246,6 +277,7 @@ pub(super) async fn close_if_needed(
                 temperature,
                 thread_id,
                 vec![TranscriptMessage::user(prompt)],
+                trace.map(Arc::as_ref),
             )
             .await;
             let violation = match parse_close_verdict(&verdict) {
@@ -266,7 +298,15 @@ pub(super) async fn close_if_needed(
     let mut usage = RepairUsage::for_model(model);
     let output = within_close_budget(
         budget,
-        close_with_one_repair(instruction, stop_reason, ask, verify, &fallback, &mut usage),
+        close_with_one_repair(
+            instruction,
+            stop_reason,
+            ask,
+            verify,
+            &fallback,
+            &mut usage,
+            trace.map(Arc::as_ref),
+        ),
         &fallback,
     )
     .await;
@@ -318,6 +358,7 @@ async fn close_with_one_repair<A, AF, V, VF>(
     verify: V,
     fallback: impl FnOnce() -> String,
     usage: &mut RepairUsage,
+    trace: Option<&SupplementalTrace>,
 ) -> String
 where
     A: Fn(String) -> AF,
@@ -328,7 +369,7 @@ where
     let mut prompt = instruction.clone();
     for attempt in 0..2 {
         let (candidate, candidate_usage) = ask(prompt).await;
-        usage.record(candidate_usage, true);
+        usage.record(candidate_usage, true, trace);
         let candidate = candidate.trim().to_owned();
         let violation = if candidate.is_empty() {
             Some(CloseViolation::NoReply)
@@ -338,7 +379,7 @@ where
             let (violation, verify_usage) = verify(candidate.clone()).await;
             // The verifier sees one synthetic prompt, not the conversation
             // context that will be resumed, so it must not replace the gauge.
-            usage.record(verify_usage, false);
+            usage.record(verify_usage, false, trace);
             violation
         };
         let Some(violation) = violation else {
@@ -362,10 +403,16 @@ async fn completion(
     temperature: f64,
     thread_id: Option<&str>,
     messages: Vec<TranscriptMessage>,
+    trace: Option<&SupplementalTrace>,
 ) -> (String, Option<BilledUsage>) {
     let Ok(model_client) = source.build_summarizer(model, temperature, thread_id) else {
         return (String::new(), None);
     };
+    let (call_id, started_at_ms) = trace
+        .map(|trace| trace.begin(model))
+        .map_or((None, None), |(call_id, started_at)| {
+            (Some(call_id), Some(started_at))
+        });
     let request = ModelRequest::new(
         messages
             .iter()
@@ -375,7 +422,18 @@ async fn completion(
     .with_model(model)
     .with_temperature(temperature)
     .with_max_tokens(AGENT_TURN_MAX_OUTPUT_TOKENS);
+    let request = match (trace, call_id.as_ref()) {
+        (Some(trace), Some(call_id)) => request.with_correlation(ModelCallCorrelation::new(
+            trace.run_id().as_str(),
+            call_id.as_str(),
+        )),
+        _ => request,
+    };
+    let input = serde_json::to_value(&request.messages).unwrap_or(serde_json::Value::Null);
     let Ok(mut stream) = model_client.stream(&(), request).await else {
+        if let (Some(trace), Some(call_id), Some(started_at_ms)) = (trace, call_id, started_at_ms) {
+            trace.failed(call_id, model, started_at_ms);
+        }
         return (String::new(), None);
     };
     let mut buffered = String::new();
@@ -389,16 +447,29 @@ async fn completion(
                 } else {
                     buffered
                 };
+                if let (Some(trace), Some(call_id), Some(started_at_ms)) =
+                    (trace, call_id, started_at_ms)
+                {
+                    trace.completed(call_id, model, started_at_ms, input, &response);
+                }
                 return (
                     selected,
                     crate::inference::provider::model::usage_info_from_response(&response),
                 );
             }
             ModelStreamItem::Failed(_) | ModelStreamItem::ProviderFailed(_) => {
+                if let (Some(trace), Some(call_id), Some(started_at_ms)) =
+                    (trace, call_id, started_at_ms)
+                {
+                    trace.failed(call_id, model, started_at_ms);
+                }
                 return (String::new(), None);
             }
             _ => {}
         }
+    }
+    if let (Some(trace), Some(call_id), Some(started_at_ms)) = (trace, call_id, started_at_ms) {
+        trace.failed(call_id, model, started_at_ms);
     }
     (String::new(), None)
 }

@@ -70,6 +70,25 @@ fn no_billing_metadata_leaves_raw_clean() {
 }
 
 #[test]
+fn explicitly_reported_zero_charge_survives_in_native_usage() {
+    let chat = ChatResponse {
+        text: Some("free route".to_string()),
+        usage: Some(BilledUsage::from_counts(5, 3).with_charged_usd(0.0)),
+        ..Default::default()
+    };
+
+    let response = response_to_model_response(&chat, &empty_registry(), false);
+    assert_eq!(
+        response
+            .usage
+            .and_then(|usage| usage.charged_amount)
+            .map(|charge| charge.micros),
+        Some(0),
+        "native journal usage must retain known-free versus unknown"
+    );
+}
+
+#[test]
 fn provider_neutral_total_cost_metadata_is_recovered() {
     let model_response = ModelResponse {
         usage: Some(Usage::new(8, 3)),

@@ -34,6 +34,7 @@ use crate::agent::tinyagents::turn_plan::{
 };
 use crate::agent::tinyagents::turn_run_error::map_turn_run_error;
 use crate::agent::tinyagents::turn_run_finalize::finalize_turn_outcome;
+use crate::agent::tinyagents::NativeSubagentRunContext;
 use crate::agent::tinyagents::{journal, routes, steering_forwarder};
 use crate::inference::turn_models::TurnModels;
 use tinyagents_harness::events::EventSink;
@@ -114,7 +115,14 @@ impl TurnSpec<'_> {
     /// Plan the turn with [`OpenHumanTurnPlanner`] and drive it on the runtime
     /// `TurnDriver` (channel/CLI and sub-agent routes).
     pub(crate) async fn run(self) -> Result<TinyagentsTurnOutcome> {
-        Box::pin(drive_turn(self, None)).await
+        Box::pin(drive_turn(self, None, None)).await
+    }
+
+    pub(crate) async fn run_with_native_subagent(
+        self,
+        native: NativeSubagentRunContext,
+    ) -> Result<TinyagentsTurnOutcome> {
+        Box::pin(drive_turn(self, None, Some(native))).await
     }
 
     /// Drive a hosted root turn: the same plan, executed through
@@ -129,7 +137,7 @@ impl TurnSpec<'_> {
     ) -> Result<TinyagentsTurnOutcome> {
         self.subagent_scope = None;
         self.deterministic_cacheable = false;
-        Box::pin(drive_turn(self, Some((hosted_base, agent_id)))).await
+        Box::pin(drive_turn(self, Some((hosted_base, agent_id)), None)).await
     }
 }
 
@@ -139,6 +147,7 @@ async fn drive_turn(
         Arc<crate::agent::tinyagents::host::OpenHumanHostBase>,
         String,
     )>,
+    native_subagent: Option<NativeSubagentRunContext>,
 ) -> Result<TinyagentsTurnOutcome> {
     let TurnSpec {
         mut run_context,
@@ -254,11 +263,15 @@ async fn drive_turn(
     // runtime/session already created. Retain that root config id here instead
     // of manufacturing a second literal `agent_turn` root. The driver adds the
     // `scope:root` / `scope:subagent` tag.
-    let mut config = run_context
-        .root_run_config(if is_subagent {
-            "openhuman-subagent"
-        } else {
-            "openhuman-agent-turn"
+    let mut config = native_subagent
+        .as_ref()
+        .map(|native| native.config.clone())
+        .unwrap_or_else(|| {
+            run_context.root_run_config(if is_subagent {
+                "openhuman-subagent"
+            } else {
+                "openhuman-agent-turn"
+            })
         })
         .with_max_model_calls(max_iterations)
         .with_max_tool_calls(run_context.tool_call_limit_for(max_iterations))
@@ -276,6 +289,7 @@ async fn drive_turn(
     if let Some(cap) = max_output_tokens {
         config = config.with_max_turn_output_tokens(cap);
     }
+    let journal_run_id = config.run_id.clone();
 
     tracing::info!(
         model,
@@ -300,6 +314,12 @@ async fn drive_turn(
     run_context.tool_result_artifact_index = tool_result_artifact_index.clone();
     run_context.tool_outcomes = Some(tool_outcome_sink.clone());
     let mut ctx = run_context.clone().into_tinyagents(config);
+    if native_subagent.is_some() {
+        // The prepared child context carries the parent's sink. Never attach
+        // child model/tool records to it: those records have run-local offsets
+        // and the parent run id. Emit the lifecycle link through that sink.
+        ctx.events = EventSink::with_stream_id(journal_run_id.as_str());
+    }
     let run_instance_id = ctx.instance_id();
     // Assemble the run's store registry: the tool-result artifact index (when
     // present) and — behind the default-ON session dual-write flag — the
@@ -352,16 +372,20 @@ async fn drive_turn(
     // with it (`with_stream_id`), so every persisted observation's `event_id` is
     // the restart-stable `{run_id}-evt-{offset}` a late-attach replay
     // reconstructs the timeline from (05.1). The same id keys the journal + status.
-    let journal_run_id = tinyagents_harness::observability::mint_run_id();
-    if let Some(scope) = &subagent_scope {
-        if let Some(slot) = &scope.journal_run_id {
-            *slot
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner) =
-                Some(journal_run_id.as_str().to_string());
-        }
-    }
     let sink = EventSink::with_stream_id(journal_run_id.as_str());
+    if let Some(native) = &native_subagent {
+        *native
+            .child_events
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(sink.clone());
+        native
+            .parent_events
+            .emit(tinyagents_harness::events::AgentEvent::SubAgentRunStarted {
+                name: native.name.clone(),
+                depth: native.depth,
+                run_id: journal_run_id.clone(),
+            });
+    }
     // Attach the event bridge for EVERY turn — including an unobserved
     // (`on_progress = None`) background/cron turn (#4467, item 3). The bridge's
     // `record_usage` feeds the global cost tracker on each `UsageRecorded` event
@@ -412,8 +436,16 @@ async fn drive_turn(
         model,
         journal_run_id.clone(),
         journal_thread_id,
+        ctx.config.lineage.parent_run_id.clone(),
+        ctx.config.lineage.root_run_id.clone(),
     )
     .await;
+    if let Some(native) = &native_subagent {
+        *native
+            .child_journal
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = turn_journal.clone();
+    }
     if !is_subagent {
         if let Some(crate::security::turn_origin::AgentTurnOrigin::WebChat {
             request_id: Some(request_id),
@@ -512,6 +544,7 @@ async fn drive_turn(
         &mut prepared.harness,
         &steering,
         TurnMiddlewareInputs {
+            provider_id: provider_id.clone(),
             model: model.to_string(),
             tool_sets,
             allowed,
@@ -671,13 +704,15 @@ async fn drive_turn(
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner())
         .clone();
-    Ok(finalize_turn_outcome(
+    let outcome = finalize_turn_outcome(
         run,
         model,
         max_iterations,
         &subagent_scope,
         pause_at_cap,
         turn_journal.as_ref(),
+        &sink,
+        defer_turn_completed_to_caller || native_subagent.is_some(),
         compression_mw.as_ref(),
         prompt_cache_guard.as_ref(),
         turn_completed_sink,
@@ -690,6 +725,8 @@ async fn drive_turn(
         resolved_route,
         request_base_len,
         &run_context.dispatch_ctx(),
+        journal_run_id,
     )
-    .await)
+    .await;
+    Ok(outcome)
 }

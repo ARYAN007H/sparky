@@ -11,6 +11,7 @@ const FALLBACK: &str = "deterministic fallback";
 fn classified_halt_returns_partial_work_without_provider_usage() {
     use tinyagents_harness::turn_outcome::ToolCallOutcome;
     let outcome = TinyagentsTurnOutcome {
+        deferred_terminal: None,
         text: String::new(),
         resolved_route: None,
         history: Vec::new(),
@@ -89,6 +90,7 @@ async fn run(candidates: Vec<String>, verdicts: Vec<Option<CloseViolation>>) -> 
         verify,
         || FALLBACK.to_string(),
         &mut usage,
+        None,
     )
     .await;
 
@@ -203,6 +205,7 @@ async fn an_empty_candidate_is_re_asked_before_the_fallback() {
 
 fn blank_outcome(truncated: bool) -> TinyagentsTurnOutcome {
     TinyagentsTurnOutcome {
+        deferred_terminal: None,
         text: String::new(),
         resolved_route: None,
         history: Vec::new(),
@@ -221,6 +224,171 @@ fn blank_outcome(truncated: bool) -> TinyagentsTurnOutcome {
         compaction: None,
         tool_outcomes: Vec::new(),
     }
+}
+
+#[tokio::test]
+async fn supplemental_close_call_emits_native_start_and_actual_completion() {
+    use std::sync::{Arc, Mutex};
+    use tinyagents_harness::events::{AgentEvent, EventListener, EventSink};
+    use tinyagents_harness::ids::RunId;
+    use tinyagents_session::transcript::TranscriptMessage;
+
+    #[derive(Default)]
+    struct Recorder(Mutex<Vec<AgentEvent>>);
+    impl EventListener for Recorder {
+        fn on_event(&self, record: &tinyagents_harness::events::EventRecord) {
+            self.0.lock().unwrap().push(record.event.clone());
+        }
+    }
+
+    let run_id = RunId::new("host-supplemental-fixture");
+    let sink = EventSink::with_stream_id(run_id.as_str());
+    let recorder = Arc::new(Recorder::default());
+    sink.subscribe(recorder.clone());
+    let trace = SupplementalTrace::new(sink, run_id.clone());
+    let source = TurnModelSource::from_model(Arc::new(
+        tinyagents_harness::testkit::ScriptedModel::replies(vec!["supplemental answer"]),
+    ));
+
+    let (text, usage) = completion(
+        &source,
+        "gpt-4.1",
+        0.0,
+        None,
+        vec![TranscriptMessage::user("supplemental prompt")],
+        Some(trace.as_ref()),
+    )
+    .await;
+
+    assert_eq!(text, "supplemental answer");
+    assert!(usage.is_none());
+    let records = recorder.0.lock().unwrap();
+    let started = records
+        .iter()
+        .find_map(|event| match event {
+            AgentEvent::ModelStarted { call_id, model } => {
+                assert_eq!(model, "gpt-4.1");
+                Some(call_id)
+            }
+            _ => None,
+        })
+        .expect("supplemental source emits a typed start");
+    assert_eq!(
+        started.as_str(),
+        "host-supplemental-fixture-host-supplemental-1"
+    );
+    assert!(
+        records.iter().any(|event| matches!(
+            event,
+            AgentEvent::ModelCompleted {
+                call_id,
+                input: Some(input),
+                output: Some(output),
+                ..
+            } if call_id == started
+                && input.to_string().contains("supplemental prompt")
+                && output.to_string().contains("supplemental answer")
+        )),
+        "the source response is journaled with its actual IO"
+    );
+}
+
+#[test]
+fn supplemental_cached_response_is_marked_before_usage_without_provider_charge() {
+    use std::sync::{Arc, Mutex};
+    use tinyagents_harness::events::{AgentEvent, EventListener, EventSink};
+    use tinyagents_harness::ids::RunId;
+
+    #[derive(Default)]
+    struct Recorder(Mutex<Vec<AgentEvent>>);
+    impl EventListener for Recorder {
+        fn on_event(&self, record: &tinyagents_harness::events::EventRecord) {
+            self.0.lock().unwrap().push(record.event.clone());
+        }
+    }
+
+    let run_id = RunId::new("host-supplemental-cache-fixture");
+    let sink = EventSink::with_stream_id(run_id.as_str());
+    let recorder = Arc::new(Recorder::default());
+    sink.subscribe(recorder.clone());
+    let trace = SupplementalTrace::new(sink, run_id);
+    let (call_id, started_at_ms) = trace.begin("gpt-4.1");
+    let usage = tinyinference_llm::usage::Usage {
+        input_tokens: 14,
+        output_tokens: 3,
+        total_tokens: 17,
+        charged_amount: Some(tinyinference_llm::usage::ChargedAmount::usd_micros(900)),
+        ..Default::default()
+    };
+    let mut response = tinyinference_llm::model::ModelResponse::assistant("cached answer");
+    response.served_from_cache = true;
+    response.usage = Some(usage);
+    response.message.usage = Some(usage);
+    trace.completed(
+        call_id,
+        "gpt-4.1",
+        started_at_ms,
+        serde_json::json!(["cached prompt"]),
+        &response,
+    );
+
+    let records = recorder.0.lock().unwrap();
+    assert!(matches!(records.as_slice(), [
+        AgentEvent::ModelStarted { .. },
+        AgentEvent::ModelResponseCached { .. },
+        AgentEvent::UsageRecorded { usage },
+        AgentEvent::ModelCompleted { usage: Some(completed), .. },
+        AgentEvent::GenerationEnriched { enrichment, .. },
+    ] if usage.charged_amount.is_none()
+        && completed.charged_amount.is_none()
+        && enrichment.estimated_cost_usd.is_none()));
+}
+
+#[test]
+fn supplemental_free_route_uses_zero_catalog_rates() {
+    use std::sync::{Arc, Mutex};
+    use tinyagents_harness::events::{AgentEvent, EventListener, EventSink};
+    use tinyagents_harness::ids::RunId;
+
+    #[derive(Default)]
+    struct Recorder(Mutex<Vec<AgentEvent>>);
+    impl EventListener for Recorder {
+        fn on_event(&self, record: &tinyagents_harness::events::EventRecord) {
+            self.0.lock().unwrap().push(record.event.clone());
+        }
+    }
+
+    let run_id = RunId::new("host-supplemental-free-fixture");
+    let sink = EventSink::with_stream_id(run_id.as_str());
+    let recorder = Arc::new(Recorder::default());
+    sink.subscribe(recorder.clone());
+    let trace = SupplementalTrace::new(sink, run_id);
+    let (call_id, started_at_ms) = trace.begin("openrouter/test-model:free");
+    let response = tinyinference_llm::model::ModelResponse::assistant("free answer");
+    trace.completed(
+        call_id,
+        "openrouter/test-model:free",
+        started_at_ms,
+        serde_json::json!(["free prompt"]),
+        &response,
+    );
+
+    let records = recorder.0.lock().unwrap();
+    let enrichment = records
+        .iter()
+        .find_map(|event| match event {
+            AgentEvent::GenerationEnriched { enrichment, .. } => Some(enrichment),
+            _ => None,
+        })
+        .expect("supplemental generation carries catalog enrichment");
+    let pricing = enrichment
+        .pricing
+        .as_ref()
+        .expect("free routes have known zero rates");
+    assert_eq!(pricing.input_per_mtok_usd, Some(0.0));
+    assert_eq!(pricing.cached_input_per_mtok_usd, Some(0.0));
+    assert_eq!(pricing.output_per_mtok_usd, Some(0.0));
+    assert_eq!(enrichment.estimated_cost_usd, None);
 }
 
 /// #6951: a turn that ended because the model ran out of output tokens while
@@ -287,7 +455,7 @@ async fn timed_out_close_keeps_the_usage_of_finished_calls() {
 
     let output = within_close_budget(
         Some(std::time::Duration::from_secs(20)),
-        close_with_one_repair(instruction, None, ask, verify, fallback, &mut usage),
+        close_with_one_repair(instruction, None, ask, verify, fallback, &mut usage, None),
         fallback,
     )
     .await;
@@ -334,6 +502,7 @@ async fn timed_out_repair_keeps_the_usage_of_its_answered_call() {
             Some(&progress),
             2,
             &mut usage,
+            None,
         ),
     )
     .await;

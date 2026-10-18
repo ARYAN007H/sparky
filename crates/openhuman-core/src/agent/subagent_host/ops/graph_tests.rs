@@ -286,6 +286,7 @@ async fn explicit_worker_thread_replaces_parent_for_model_run_and_transcript() {
         "test",
         AgentTokenjuiceCompression::Off,
         None,
+        None,
     )
     .await
     .expect("worker run");
@@ -333,6 +334,7 @@ async fn subagent_runs_through_the_graph_engine_with_real_tools() {
         // No host config in tests: the graph takes byte-cap-only
         // context defaults instead of reading the developer machine's
         // real config.toml, which is what the old in-graph load did.
+        None,
         None,
     )
     .await
@@ -419,6 +421,7 @@ async fn child_text_and_thinking_deltas_are_scoped_to_the_subagent() {
         // No host config in tests: the graph takes byte-cap-only
         // context defaults instead of reading the developer machine's
         // real config.toml, which is what the old in-graph load did.
+        None,
         None,
     )
     .await
@@ -556,6 +559,7 @@ async fn ask_user_clarification_pauses_and_surfaces_the_question() {
         // context defaults instead of reading the developer machine's
         // real config.toml, which is what the old in-graph load did.
         None,
+        None,
     )
     .await
     .expect("ask-clarification subagent runs");
@@ -647,6 +651,7 @@ async fn cap_hit_summarizes_a_resumable_checkpoint() {
         // No host config in tests: the graph takes byte-cap-only
         // context defaults instead of reading the developer machine's
         // real config.toml, which is what the old in-graph load did.
+        None,
         None,
     )
     .await

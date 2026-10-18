@@ -49,8 +49,10 @@ mod policy_denial;
 pub(crate) mod reaper;
 mod routes;
 mod steering_forwarder;
+mod supplemental_trace;
 pub(crate) mod tool_registration;
 mod turn_exec;
+mod turn_exec_native;
 mod turn_middleware;
 pub(crate) mod turn_model_resolver;
 mod turn_outcome;
@@ -69,7 +71,11 @@ pub(crate) use crate::inference::reasoning::{apply_requested_effort, parse_reaso
 pub use crate::inference::turn_models::TurnModelSource;
 pub(crate) use crate::inference::turn_models::TurnModels;
 pub(crate) use observability::SubagentScope;
+pub(crate) use supplemental_trace::SupplementalTrace;
 pub(crate) use turn_exec::TurnSpec;
+pub(crate) use turn_exec_native::NativeSubagentRunContext;
+#[cfg(test)]
+pub(crate) use turn_outcome::DeferredTurnTerminal;
 pub(crate) use turn_outcome::TinyagentsTurnOutcome;
 #[cfg(test)]
 pub(crate) use turn_policy::is_subagent_spawn_or_delegate_tool;

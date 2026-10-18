@@ -87,24 +87,18 @@ pub(super) fn tier_gate_decision(
 
 /// Run a sub-agent based on its definition and a task prompt.
 ///
-/// This is the primary entry point for agent delegation. It performs the following:
-/// 1. Generates a unique `task_id` if one wasn't provided.
-/// 2. Asks the turn's
-///    explicit root-turn dispatch guard
-///    whether a delegation can still succeed, and refuses before spending
-///    anything if it cannot (#5804).
-/// 3. Reads the parent's explicit [`ParentExecutionContext`] from its run
-///    carrier.
-/// 4. Dispatches to `run_typed_mode`.
+/// Creates a task id, checks the root-turn dispatch budget, reads the parent's
+/// [`ParentExecutionContext`], then dispatches to `run_typed_mode`.
 ///
 /// On success returns a [`SubagentRunOutcome`] whose `output` is the
 /// final assistant text. On failure the error is suitable for stringifying
 /// into a `tool_result` block — including the two dispatch refusals, whose
-/// messages tell the model to summarise rather than delegate again.
-pub(crate) async fn run_subagent_direct(
+/// messages direct the model to summarize rather than delegate again.
+pub(crate) async fn run_subagent_direct_with_native_context(
     definition: &AgentDefinition,
     task_prompt: &str,
     mut options: SubagentRunOptions,
+    native: crate::agent::tinyagents::NativeSubagentRunContext,
 ) -> Result<SubagentRunOutcome, SubagentRunError> {
     // Unconditionally heap-allocate the entire run_subagent body so
     // every caller doesn't have to carry this future's state inline.
@@ -320,6 +314,7 @@ pub(crate) async fn run_subagent_direct(
                     &parent_for_subagent,
                     &task_id,
                     &loaded_config,
+                    native,
                 ))
                 .await
             })
@@ -446,6 +441,7 @@ async fn run_typed_mode(
     parent: &ParentExecutionContext,
     task_id: &str,
     config: &LoadedConfig,
+    native: crate::agent::tinyagents::NativeSubagentRunContext,
 ) -> Result<SubagentRunOutcome, SubagentRunError> {
     let started = Instant::now();
 
@@ -832,6 +828,7 @@ async fn run_typed_mode(
             // The spawn-wide config snapshot supplies the `[context]`
             // knobs the graph used to load for itself.
             config.as_ref().ok().map(|c| c.as_ref()),
+            Some(native),
         )
         .await?;
 

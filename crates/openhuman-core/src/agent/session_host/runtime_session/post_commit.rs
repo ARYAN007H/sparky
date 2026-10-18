@@ -26,6 +26,45 @@ use std::time::{Duration, Instant};
 
 use tinyinference_llm::message::Message;
 
+pub(super) fn take_terminal_sidecar(
+    state: &std::sync::Arc<std::sync::Mutex<super::OpenHumanSessionState>>,
+    terminal: tinyagents_runtime::SessionTerminal,
+) -> Option<
+    std::sync::Arc<
+        std::sync::Mutex<crate::agent::tinyagents::host::run_context::SessionTurnSidecar>,
+    >,
+> {
+    let mut state = state
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    state.terminals.push(terminal);
+    state.active_terminal_sidecar.take()
+}
+
+pub(super) async fn finalize_deferred_terminal(
+    sidecar: &std::sync::Mutex<crate::agent::tinyagents::host::run_context::SessionTurnSidecar>,
+    terminal: &tinyagents_runtime::SessionTerminal,
+) {
+    let (deferred, stop, turn) = {
+        let mut sidecar = sidecar
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        (
+            sidecar.deferred_terminal.take(),
+            sidecar.stop.clone(),
+            (sidecar.model_calls as u32).max(1),
+        )
+    };
+    let Some(deferred) = deferred else {
+        return;
+    };
+    match terminal {
+        tinyagents_runtime::SessionTerminal::Completed(_) => deferred.finish(stop, turn).await,
+        tinyagents_runtime::SessionTerminal::Cancelled => deferred.finish_cancelled().await,
+        tinyagents_runtime::SessionTerminal::Failed(_) => deferred.finish_failed().await,
+    }
+}
+
 /// How long a new turn waits for the previous turn's deferred post-commit
 /// work before it proceeds anyway. Generous: the work is a local goal-store
 /// update. The bound only exists so a wedged store cannot wedge the thread.
@@ -140,13 +179,16 @@ pub(super) async fn finalize_committed_turn(
     let input = tinyagents_harness::summarization::last_user_message(&receipt.outcome.history)
         .map(crate::agent::message_convert::user_text_with_markers)
         .unwrap_or_default();
-    let sidecar = receipt
-        .options
-        .context
-        .session_sidecar
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner)
-        .clone();
+    let (sidecar, deferred_terminal) = {
+        let mut sidecar = receipt
+            .options
+            .context
+            .session_sidecar
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let terminal = sidecar.deferred_terminal.take();
+        (sidecar.clone(), terminal)
+    };
     // This turn's model calls, not every assistant row of the
     // whole conversation (`turn_iterations`).
     let iterations = turn_iterations(sidecar.model_calls, &receipt.outcome.history);
@@ -160,6 +202,15 @@ pub(super) async fn finalize_committed_turn(
     );
     let usage = super::holistic_last_turn_usage(&sidecar);
     let interrupted = sidecar.hit_cap || receipt.outcome.interrupted;
+    // This hook runs only after the runtime durably appended the turn. Emit
+    // OpenHuman's classified stop before the terminal journal flush, so native
+    // completion cannot overwrite a cancellation/timeout/stop or hide commit
+    // time from the exported span.
+    if let Some(terminal) = deferred_terminal {
+        terminal
+            .finish(sidecar.stop.clone(), (sidecar.model_calls as u32).max(1))
+            .await;
+    }
     // State the caller reads as soon as `run_turn` returns.
     let prelude = {
         let mut state = state

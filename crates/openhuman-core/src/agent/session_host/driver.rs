@@ -5,6 +5,7 @@
 //! complete immutable model history and tool declaration snapshot per call.
 
 mod grounded_close;
+use crate::agent::tinyagents::SupplementalTrace;
 
 use std::{collections::HashSet, sync::Arc, time::Instant};
 
@@ -233,6 +234,7 @@ impl SessionDriver<OpenHumanRunContext> for OpenHumanSessionDriver {
                 ));
             }
         };
+        let supplemental_trace = SupplementalTrace::install_for_turn(&sidecar, &mut outcome);
 
         if outcome.text.trim().is_empty() && outcome.tool_outcomes.is_empty() {
             return Err(driver_error(
@@ -241,15 +243,13 @@ impl SessionDriver<OpenHumanRunContext> for OpenHumanSessionDriver {
                 },
             ));
         }
-        // A cap pause is advisory in the harness.  Treat an exhausted loop
-        // without a usable final response as capped even if that pause arrived
-        // after the loop's own limit check.
+        // Treat an exhausted loop without a final response as capped even if
+        // the harness pause arrived after its own limit check.
         outcome.hit_cap |= outcome.text.trim().is_empty()
             && (outcome.model_calls >= self.max_iterations
                 || outcome.tool_calls >= self.max_iterations
                 || outcome.tool_outcomes.len() >= self.max_iterations);
-        // Older hosted-harness paths materialize this fallback before exposing
-        // the outcome, which leaves the raw call counters unavailable here.
+        // Older hosted-harness fallbacks leave the raw counters unavailable.
         // It is only produced when the loop exhausted a tool round without a
         // model conclusion, so normalize it to the same resumable cap state.
         let exhausted_fallback = outcome
@@ -294,6 +294,7 @@ impl SessionDriver<OpenHumanRunContext> for OpenHumanSessionDriver {
                 &user_message,
                 &outcome,
                 close_by.map(|at| at.saturating_duration_since(Instant::now())),
+                supplemental_trace.as_ref(),
             ) => close,
         };
         let mut output = close
@@ -361,6 +362,7 @@ impl SessionDriver<OpenHumanRunContext> for OpenHumanSessionDriver {
                         request.run_context.data.progress.as_ref(),
                         outcome.model_calls.saturating_add(1) as u32,
                         &mut repair_usage,
+                        supplemental_trace.as_ref(),
                     );
                     tokio::pin!(repair);
                     tokio::select! {
@@ -481,7 +483,7 @@ impl SessionDriver<OpenHumanRunContext> for OpenHumanSessionDriver {
                 );
             }
             observed.resolved_route = outcome.resolved_route.clone();
-        }
+        };
         // The turn compacted its context: persist the compacted history, so the
         // next turn starts from the checkpoint. The runtime session seals the
         // current generation and opens the next (the history no longer extends
