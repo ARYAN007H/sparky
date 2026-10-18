@@ -439,3 +439,7 @@ fn clear_snapshot(key: &SnapshotKey) {
         crate::skills::ops_discover::invalidate_workflow_metadata_cache();
     }
 }
+
+#[cfg(test)]
+#[path = "flow_authoring_tests.rs"]
+mod tests;

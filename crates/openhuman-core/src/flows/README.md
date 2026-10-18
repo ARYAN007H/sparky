@@ -219,11 +219,12 @@ makes a real Composio call, limited to Read-scope actions on a connected
 toolkit. `resume_flow_run` is `Execute`-gated because resuming lets approved
 nodes fire.
 
-The long authoring manual is a bundled skill ([`skills/mod.rs`](./skills/mod.rs), needs both the
-`flows` and `skills` features): the portable `flow-authoring` pages from
-`tinyflows-copilot`, registered with OpenHuman's native skill runtime. Binding
-rules stay in the agent prompt; reference material the model looks up goes in
-the skill.
+The long authoring manual is owned by TinyFlows Copilot. With the `flows` and
+`skills` features and runtime components enabled, OpenHuman requests its
+`flow-authoring` files through `tinyflows_bus::copilot::ListResources` and
+materializes them through TinySkills under a separate scoped builtin root.
+Binding rules stay in the agent prompt; reference material the model looks up
+goes in the skill.
 
 ### Flow memory
 
@@ -270,7 +271,7 @@ Top level:
 | `../agent/registry/agents/` | `workflow_builder/` and `flow_discovery/` built-in definitions and prompt builders. |
 | [`catalogue.rs`](./catalogue.rs) | `flow_entries` lists saved flows as `Workflow` entries with `WorkflowScope::Flow`, so the skill catalogue and `skill_search` show one list. |
 | [`node_contracts.rs`](./node_contracts.rs) | Host overlay on `tinyflows::catalog`'s node-kind contracts (which `tool_call` slugs resolve to Composio or native `oh:` tools, which trigger kinds dispatch here). |
-| `skills/` | Registers the bundled `flow-authoring` skill. |
+| `../skills/bundled/flow_authoring.rs` | Adapts Copilot `ListResources` to TinySkills materialization and scoped skill discovery. |
 | `tinyflows/` | The capability seam. See [tinyflows/README.md](tinyflows/README.md). |
 
 `ops/`, grouped by role:
