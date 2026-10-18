@@ -1,7 +1,7 @@
 use super::*;
 use crate::core::all::{
     expect_schema_fields, expect_schema_identity, expect_schema_input_order,
-    expect_schema_output_names, expect_schema_output_fields,
+    expect_schema_output_fields, expect_schema_output_names,
 };
 use serde_json::json;
 

@@ -6,7 +6,10 @@ use crate::core::runtime::DispatchCtx;
 fn mcp_ui_schema_contracts_are_preserved() {
     let schema = schemas("tool_call");
     expect_schema_identity(&schema, "mcp_ui", "tool_call");
-    expect_schema_fields(&schema, &[("server_id", Some(true)), ("tool_name", Some(true))]);
+    expect_schema_fields(
+        &schema,
+        &[("server_id", Some(true)), ("tool_name", Some(true))],
+    );
 }
 
 async fn with_workspace<F: std::future::Future>(body: F) -> F::Output {

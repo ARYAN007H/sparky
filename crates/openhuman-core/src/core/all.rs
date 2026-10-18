@@ -1211,9 +1211,18 @@ pub(crate) fn expect_schema_fields(schema: &ControllerSchema, fields: &[(&str, O
             .inputs
             .iter()
             .find(|field| field.name == *name)
-            .unwrap_or_else(|| panic!("{}.{} is missing input `{name}`", schema.namespace, schema.function));
+            .unwrap_or_else(|| {
+                panic!(
+                    "{}.{} is missing input `{name}`",
+                    schema.namespace, schema.function
+                )
+            });
         if let Some(required) = required {
-            assert_eq!(field.required, *required, "{}.{} input `{name}`", schema.namespace, schema.function);
+            assert_eq!(
+                field.required, *required,
+                "{}.{} input `{name}`",
+                schema.namespace, schema.function
+            );
         }
     }
 }
@@ -1226,19 +1235,31 @@ pub(crate) fn expect_schema_required_inputs(schema: &ControllerSchema, required:
         .filter(|field| field.required)
         .map(|field| field.name)
         .collect();
-    assert_eq!(actual, required, "{}.{} required inputs", schema.namespace, schema.function);
+    assert_eq!(
+        actual, required,
+        "{}.{} required inputs",
+        schema.namespace, schema.function
+    );
 }
 
 #[cfg(test)]
 pub(crate) fn expect_schema_input_order(schema: &ControllerSchema, inputs: &[&str]) {
     let actual: Vec<_> = schema.inputs.iter().map(|field| field.name).collect();
-    assert_eq!(actual, inputs, "{}.{} input order", schema.namespace, schema.function);
+    assert_eq!(
+        actual, inputs,
+        "{}.{} input order",
+        schema.namespace, schema.function
+    );
 }
 
 #[cfg(test)]
 pub(crate) fn expect_schema_output_names(schema: &ControllerSchema, outputs: &[&str]) {
     let actual: Vec<_> = schema.outputs.iter().map(|field| field.name).collect();
-    assert_eq!(actual, outputs, "{}.{} output names", schema.namespace, schema.function);
+    assert_eq!(
+        actual, outputs,
+        "{}.{} output names",
+        schema.namespace, schema.function
+    );
 }
 
 #[cfg(test)]

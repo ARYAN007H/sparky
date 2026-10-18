@@ -19,7 +19,10 @@ fn wallet_schema_wire_contracts_are_preserved() {
     assert!(status.inputs.is_empty());
     let setup = wallet_schemas("setup");
     assert_eq!(setup.inputs.len(), 6);
-    expect_schema_fields(&setup, &[("encryptedMnemonic", Some(true)), ("force", Some(false))]);
+    expect_schema_fields(
+        &setup,
+        &[("encryptedMnemonic", Some(true)), ("force", Some(false))],
+    );
     expect_schema_fields(
         &wallet_schemas("validate_mnemonic"),
         &[("phrase", Some(true))],

@@ -34,7 +34,10 @@ fn tools_schema_wire_contracts_are_preserved() {
         ("composio_execute", &[("action", Some(true))]),
         ("web_answer", &[("query", Some(true)), ("depth", None)]),
         ("web_contents", &[("urls", Some(true))]),
-        ("searxng_search", &[("query", Some(true)), ("max_results", None)]),
+        (
+            "searxng_search",
+            &[("query", Some(true)), ("max_results", None)],
+        ),
         ("web_search", &[("query", Some(true))]),
     ];
     for (function, inputs) in contracts {

@@ -1,13 +1,21 @@
 use super::*;
-use crate::core::all::{expect_schema_fields, expect_schema_identity, expect_schema_required_inputs};
+use crate::core::all::{
+    expect_schema_fields, expect_schema_identity, expect_schema_required_inputs,
+};
 
 #[test]
 fn credential_schema_wire_contracts_are_preserved() {
     let key_contracts = [
         ("auth_get_state", "get_state"),
         ("auth_get_session_token", "get_session_token"),
-        ("auth_store_provider_credentials", "store_provider_credentials"),
-        ("auth_remove_provider_credentials", "remove_provider_credentials"),
+        (
+            "auth_store_provider_credentials",
+            "store_provider_credentials",
+        ),
+        (
+            "auth_remove_provider_credentials",
+            "remove_provider_credentials",
+        ),
     ];
     for (key, expected_function) in key_contracts {
         let schema = schemas(key);
