@@ -1,5 +1,5 @@
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use async_trait::async_trait;
 use tinyinference_llm::model::{ChatModel, ModelRequest, ModelResponse};
@@ -104,7 +104,7 @@ async fn drain_suggestions_event(
     loop {
         match tokio::time::timeout(Duration::from_secs(2), rx.recv()).await {
             Ok(Ok(ev)) if ev.event == "chat_suggestions" && ev.thread_id == thread_id => {
-                return Some(ev)
+                return Some(ev);
             }
             Ok(Ok(_)) => continue,
             Ok(Err(tokio::sync::broadcast::error::RecvError::Lagged(_))) => continue,

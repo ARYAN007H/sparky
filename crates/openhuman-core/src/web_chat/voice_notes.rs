@@ -12,7 +12,7 @@
 
 use std::path::{Path, PathBuf};
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 const LOG_PREFIX: &str = "[web_channel][voice_note]";
 /// `source` the composer stamps on a turn that began as a voice note.

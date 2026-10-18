@@ -248,10 +248,12 @@ async fn a_turn_stopped_before_its_config_resolved_cannot_be_closed() {
     let shared = Arc::new(Shared::default());
     let summarizer = WebSummarizer::new(shared.clone());
     let req = request("close-none", QueueDisposition::Interrupt);
-    assert!(summarizer
-        .grounded_close(&req, RUNNER_DEADLINE)
-        .await
-        .is_none());
+    assert!(
+        summarizer
+            .grounded_close(&req, RUNNER_DEADLINE)
+            .await
+            .is_none()
+    );
     assert!(summarizer.grounded_close(&req, RUNNER_IDLE).await.is_none());
 }
 

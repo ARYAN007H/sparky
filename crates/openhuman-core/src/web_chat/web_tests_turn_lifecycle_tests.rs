@@ -150,10 +150,12 @@ async fn a_refused_message_publishes_no_turn_events() {
     .await
     .expect_err("the guardrail refuses it");
     assert!(matches!(error, StartChatError::Guardrail { .. }), "{error}");
-    assert!(!in_flight_entries_for_test(&DispatchCtx::ambient())
-        .await
-        .iter()
-        .any(|(k, _)| k == "lifecycle-refused"));
+    assert!(
+        !in_flight_entries_for_test(&DispatchCtx::ambient())
+            .await
+            .iter()
+            .any(|(k, _)| k == "lifecycle-refused")
+    );
     while let Ok(event) = rx.try_recv() {
         assert_ne!(event.thread_id, "lifecycle-refused", "{}", event.event);
     }
@@ -165,11 +167,11 @@ async fn a_refused_message_publishes_no_turn_events() {
 /// `chat_error` after which the thread is free and no session is cached.
 #[tokio::test]
 async fn a_turn_with_an_unavailable_local_provider_ends_in_one_classified_chat_error() {
-    use crate::core::runtime::{context::CoreContext, DomainSet};
+    use crate::core::runtime::{DomainSet, context::CoreContext};
     let _serial = FORCED_ERROR_TEST_LOCK.lock().await;
     use wiremock::{
-        matchers::{method, path},
         Mock, MockServer, ResponseTemplate,
+        matchers::{method, path},
     };
 
     let server = MockServer::start().await;
@@ -314,12 +316,16 @@ async fn a_turn_with_an_unavailable_local_provider_ends_in_one_classified_chat_e
 
     // The terminal event is the go-ahead for the next message: the thread is
     // free, and the failed turn left no cached agent behind.
-    assert!(!in_flight_entries_for_test(&ctx)
-        .await
-        .iter()
-        .any(|(k, _)| k == thread_id));
-    assert!(!crate::web_chat::ops::thread_sessions(&ctx)
-        .lock()
-        .await
-        .contains_key(&key_for(&ctx, thread_id)));
+    assert!(
+        !in_flight_entries_for_test(&ctx)
+            .await
+            .iter()
+            .any(|(k, _)| k == thread_id)
+    );
+    assert!(
+        !crate::web_chat::ops::thread_sessions(&ctx)
+            .lock()
+            .await
+            .contains_key(&key_for(&ctx, thread_id))
+    );
 }

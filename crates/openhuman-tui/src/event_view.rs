@@ -76,37 +76,101 @@ impl WebEventView {
             E::ChatCancelled { cancel_reason, .. } => {
                 view.message.clone_from(cancel_reason);
             }
-            E::TextDelta { delta, .. } | E::ThinkingDelta { delta, .. } | E::SubagentTextDelta { delta, .. } | E::SubagentThinkingDelta { delta, .. } => {
+            E::TextDelta { delta, .. }
+            | E::ThinkingDelta { delta, .. }
+            | E::SubagentTextDelta { delta, .. }
+            | E::SubagentThinkingDelta { delta, .. } => {
                 view.delta.clone_from(delta);
             }
             E::IterationStart { message, .. }
             | E::RunModeChanged { message, .. }
-            | E::UserError { error_source: message, .. } => {
+            | E::UserError {
+                error_source: message,
+                ..
+            } => {
                 view.message.clone_from(message);
             }
-            E::ToolCall { tool_name, skill_id, args, tool_call_id, tool_display_label, .. }
-            | E::SubagentToolCall { tool_name, skill_id, args, tool_call_id, tool_display_label, .. } => {
+            E::ToolCall {
+                tool_name,
+                skill_id,
+                args,
+                tool_call_id,
+                tool_display_label,
+                ..
+            }
+            | E::SubagentToolCall {
+                tool_name,
+                skill_id,
+                args,
+                tool_call_id,
+                tool_display_label,
+                ..
+            } => {
                 view.tool_name.clone_from(tool_name);
                 view.skill_id.clone_from(skill_id);
                 view.args.clone_from(args);
                 view.tool_call_id.clone_from(tool_call_id);
                 view.tool_display_label.clone_from(tool_display_label);
             }
-            E::ApprovalRequest { tool_name, args, tool_call_id, message, .. }
-            | E::PlanReviewRequest { tool_name, args, tool_call_id, message, .. } => {
+            E::ApprovalRequest {
+                tool_name,
+                args,
+                tool_call_id,
+                message,
+                ..
+            }
+            | E::PlanReviewRequest {
+                tool_name,
+                args,
+                tool_call_id,
+                message,
+                ..
+            } => {
                 view.tool_name.clone_from(tool_name);
                 view.args.clone_from(args);
                 view.tool_call_id.clone_from(tool_call_id);
                 view.message.clone_from(message);
             }
-            E::ApprovalDecided { tool_name, message, tool_call_id, .. }
-            | E::PlanReviewDecided { tool_name, message, tool_call_id, .. } => {
+            E::ApprovalDecided {
+                tool_name,
+                message,
+                tool_call_id,
+                ..
+            }
+            | E::PlanReviewDecided {
+                tool_name,
+                message,
+                tool_call_id,
+                ..
+            } => {
                 view.tool_name.clone_from(tool_name);
                 view.message.clone_from(message);
                 view.tool_call_id.clone_from(tool_call_id);
             }
-            E::ToolResult { tool_name, skill_id, output, args, success, tool_call_id, failure, elapsed_ms, tool_display_label, .. }
-            | E::SubagentToolResult { tool_name, skill_id, output, args, success, tool_call_id, failure, elapsed_ms, tool_display_label, .. } => {
+            E::ToolResult {
+                tool_name,
+                skill_id,
+                output,
+                args,
+                success,
+                tool_call_id,
+                failure,
+                elapsed_ms,
+                tool_display_label,
+                ..
+            }
+            | E::SubagentToolResult {
+                tool_name,
+                skill_id,
+                output,
+                args,
+                success,
+                tool_call_id,
+                failure,
+                elapsed_ms,
+                tool_display_label,
+                ..
+            } => {
                 view.tool_name.clone_from(tool_name);
                 view.skill_id.clone_from(skill_id);
                 view.output.clone_from(output);
@@ -117,21 +181,61 @@ impl WebEventView {
                 view.elapsed_ms.clone_from(elapsed_ms);
                 view.tool_display_label.clone_from(tool_display_label);
             }
-            E::ToolArgsDelta { delta, tool_name, skill_id, tool_call_id, .. } => {
+            E::ToolArgsDelta {
+                delta,
+                tool_name,
+                skill_id,
+                tool_call_id,
+                ..
+            } => {
                 view.delta.clone_from(delta);
                 view.tool_name.clone_from(tool_name);
                 view.skill_id.clone_from(skill_id);
                 view.tool_call_id.clone_from(tool_call_id);
             }
-            E::ToolProgress { tool_call_id, message, .. } => {
+            E::ToolProgress {
+                tool_call_id,
+                message,
+                ..
+            } => {
                 view.tool_call_id.clone_from(tool_call_id);
                 view.message.clone_from(message);
             }
-            E::SubagentSpawned { tool_name, skill_id, subagent, message, .. }
-            | E::SubagentCompleted { tool_name, skill_id, subagent, message, .. }
-            | E::SubagentFailed { tool_name, skill_id, subagent, message, .. }
-            | E::SubagentAwaitingUser { tool_name, skill_id, subagent, message, .. }
-            | E::SubagentIterationStart { tool_name, skill_id, subagent, message, .. } => {
+            E::SubagentSpawned {
+                tool_name,
+                skill_id,
+                subagent,
+                message,
+                ..
+            }
+            | E::SubagentCompleted {
+                tool_name,
+                skill_id,
+                subagent,
+                message,
+                ..
+            }
+            | E::SubagentFailed {
+                tool_name,
+                skill_id,
+                subagent,
+                message,
+                ..
+            }
+            | E::SubagentAwaitingUser {
+                tool_name,
+                skill_id,
+                subagent,
+                message,
+                ..
+            }
+            | E::SubagentIterationStart {
+                tool_name,
+                skill_id,
+                subagent,
+                message,
+                ..
+            } => {
                 view.tool_name.clone_from(tool_name);
                 view.skill_id.clone_from(skill_id);
                 view.message.clone_from(message);
@@ -142,9 +246,15 @@ impl WebEventView {
                     output: detail.output.clone(),
                 });
             }
-            E::ArtifactReady { tool_call_id, args, .. }
-            | E::ArtifactFailed { tool_call_id, args, .. }
-            | E::ArtifactPending { tool_call_id, args, .. } => {
+            E::ArtifactReady {
+                tool_call_id, args, ..
+            }
+            | E::ArtifactFailed {
+                tool_call_id, args, ..
+            }
+            | E::ArtifactPending {
+                tool_call_id, args, ..
+            } => {
                 view.tool_call_id.clone_from(tool_call_id);
                 view.args.clone_from(args);
             }

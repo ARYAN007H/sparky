@@ -5,9 +5,9 @@
 use async_trait::async_trait;
 use std::sync::{Arc, OnceLock};
 
+use super::channel_event::event_context;
 use crate::core::events::DomainEvent;
 use crate::web_chat::WebChannelEvent;
-use super::channel_event::event_context;
 use tinybus::EventHandler;
 use tinybus::SubscriptionHandle;
 

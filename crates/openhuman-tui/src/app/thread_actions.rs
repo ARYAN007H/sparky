@@ -48,12 +48,21 @@ pub(super) fn send_message(
             // Surface the failure in-transcript via a synthetic chat_error so
             // the reducer clears the streaming state and shows the reason.
             web_chat::publish_web_channel_event(WebChannelEvent {
-                event: "chat_error".to_string(),
-                client_id: cid,
-                thread_id: tid,
+                context: web_chat::WebEventContext {
+                    client_id: cid,
+                    thread_id: tid,
+                    ..Default::default()
+                },
                 message: Some(format!("Failed to send: {e}")),
                 error_type: Some("transport".to_string()),
-                ..Default::default()
+                error_source: None,
+                error_retryable: None,
+                error_retry_after_ms: None,
+                error_provider: None,
+                error_fallback_available: None,
+                copy_key: None,
+                copy_params: None,
+                guardrail: None,
             });
         }
     });

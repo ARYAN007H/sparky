@@ -488,7 +488,7 @@ async fn approval_surface_drops_approval_decided_without_chat_routing() {
                     if ev.event == "approval_decided"
                         && ev.request_id == "req-decided-no-route" =>
                 {
-                    return Some(ev)
+                    return Some(ev);
                 }
                 Ok(_) => continue,
                 Err(broadcast::error::RecvError::Lagged(_)) => continue,

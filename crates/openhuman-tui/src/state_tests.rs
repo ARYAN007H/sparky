@@ -32,18 +32,25 @@ fn ev(event: &str, fields: serde_json::Value) -> WebChannelEvent {
         "thread_id": "thread-1",
         "request_id": "request-1"
     });
-    value.as_object_mut().unwrap().extend(
-        fields.as_object().unwrap().clone(),
-    );
+    value
+        .as_object_mut()
+        .unwrap()
+        .extend(fields.as_object().unwrap().clone());
     serde_json::from_value(value).expect("test event matches the owner contract")
 }
 
 fn text_delta(delta: &str) -> WebChannelEvent {
-    ev("text_delta", serde_json::json!({"delta":delta,"delta_kind":"text"}))
+    ev(
+        "text_delta",
+        serde_json::json!({"delta":delta,"delta_kind":"text"}),
+    )
 }
 
 fn thinking_delta(delta: &str) -> WebChannelEvent {
-    ev("thinking_delta", serde_json::json!({"delta":delta,"delta_kind":"thinking"}))
+    ev(
+        "thinking_delta",
+        serde_json::json!({"delta":delta,"delta_kind":"thinking"}),
+    )
 }
 
 #[test]
@@ -106,7 +113,10 @@ fn chat_done_replaces_streamed_text_with_full_response() {
     let mut s = TranscriptState::new(CLIENT);
     s.begin_user_turn("hi");
     s.apply_event(&text_delta("Hel")); // partial / laggy stream
-    let done = ev("chat_done", serde_json::json!({"full_response":"Hello, world!"}));
+    let done = ev(
+        "chat_done",
+        serde_json::json!({"full_response":"Hello, world!"}),
+    );
     s.apply_event(&done);
 
     let assistant: Vec<_> = s
@@ -126,7 +136,10 @@ fn chat_done_replaces_streamed_text_with_full_response() {
 fn chat_done_without_prior_deltas_still_shows_full_response() {
     let mut s = TranscriptState::new(CLIENT);
     s.begin_user_turn("hi");
-    let done = ev("chat_done", serde_json::json!({"full_response":"Direct answer"}));
+    let done = ev(
+        "chat_done",
+        serde_json::json!({"full_response":"Direct answer"}),
+    );
     s.apply_event(&done);
     let assistant = s
         .entries()
@@ -141,7 +154,10 @@ fn chat_done_without_prior_deltas_still_shows_full_response() {
 fn chat_error_pushes_error_entry_and_ends_stream() {
     let mut s = TranscriptState::new(CLIENT);
     s.begin_user_turn("hi");
-    let err = ev("chat_error", serde_json::json!({"message":"rate limited","error_type":"rate_limit"}));
+    let err = ev(
+        "chat_error",
+        serde_json::json!({"message":"rate limited","error_type":"rate_limit"}),
+    );
     s.apply_event(&err);
     let error = s
         .entries()
@@ -156,9 +172,12 @@ fn chat_error_pushes_error_entry_and_ends_stream() {
 fn retryable_error_includes_retry_timing() {
     let mut state = TranscriptState::new(CLIENT);
     state.begin_user_turn("try");
-    state.apply_event(&ev("chat_error", serde_json::json!({
-        "message":"rate limited","error_retryable":true,"error_retry_after_ms":2100
-    })));
+    state.apply_event(&ev(
+        "chat_error",
+        serde_json::json!({
+            "message":"rate limited","error_retryable":true,"error_retry_after_ms":2100
+        }),
+    ));
     assert_eq!(
         state.entries().last().unwrap().text,
         "rate limited · retryable after 3s"
@@ -171,7 +190,10 @@ fn last_assistant_excludes_an_in_flight_partial_answer() {
     state.begin_user_turn("question");
     state.apply_event(&text_delta("partial"));
     assert_eq!(state.last_assistant(), None);
-    state.apply_event(&ev("chat_done", serde_json::json!({"full_response":"complete"})));
+    state.apply_event(&ev(
+        "chat_done",
+        serde_json::json!({"full_response":"complete"}),
+    ));
     assert_eq!(state.last_assistant(), Some("complete"));
 }
 
@@ -181,7 +203,9 @@ fn events_for_other_client_id_are_ignored() {
     s.begin_user_turn("hi");
     let before = s.entries().len();
     let foreign = {
-        let mut event = serde_json::to_value(ev("text_delta", serde_json::json!({"delta":"not mine"}))).unwrap();
+        let mut event =
+            serde_json::to_value(ev("text_delta", serde_json::json!({"delta":"not mine"})))
+                .unwrap();
         event["client_id"] = "tui-someone-else".into();
         serde_json::from_value(event).unwrap()
     };
@@ -223,13 +247,19 @@ fn projected_transcript_is_restored_in_chronological_order() {
 fn tool_result_updates_the_originating_activity() {
     let mut s = TranscriptState::new(CLIENT);
     s.begin_user_turn("do it");
-    let call = ev("tool_call", serde_json::json!({
-        "tool_name":"web_search","args":{"query":"rust ratatui"}
-    }));
+    let call = ev(
+        "tool_call",
+        serde_json::json!({
+            "tool_name":"web_search","args":{"query":"rust ratatui"}
+        }),
+    );
     s.apply_event(&call);
-    let result = ev("tool_result", serde_json::json!({
-        "tool_name":"web_search","success":true,"output":"3 results"
-    }));
+    let result = ev(
+        "tool_result",
+        serde_json::json!({
+            "tool_name":"web_search","success":true,"output":"3 results"
+        }),
+    );
     s.apply_event(&result);
 
     let tools: Vec<_> = s
@@ -248,9 +278,12 @@ fn tool_result_updates_the_originating_activity() {
 fn failed_tool_result_uses_cross_marker() {
     let mut s = TranscriptState::new(CLIENT);
     s.begin_user_turn("do it");
-    let result = ev("tool_result", serde_json::json!({
-        "tool_name":"run_shell","success":false,"output":"exit code 1"
-    }));
+    let result = ev(
+        "tool_result",
+        serde_json::json!({
+            "tool_name":"run_shell","success":false,"output":"exit code 1"
+        }),
+    );
     s.apply_event(&result);
     let tool = s
         .entries()
@@ -292,14 +325,20 @@ fn concurrent_same_named_tools_match_results_by_call_identity() {
     let mut state = TranscriptState::new(CLIENT);
     state.set_thread("thread-1");
     for id in ["a", "b"] {
-        state.apply_event(&ev("tool_call", serde_json::json!({
-            "tool_call_id":id,"tool_name":"read","request_id":"turn"
-        })));
+        state.apply_event(&ev(
+            "tool_call",
+            serde_json::json!({
+                "tool_call_id":id,"tool_name":"read","request_id":"turn"
+            }),
+        ));
     }
-    state.apply_event(&ev("tool_result", serde_json::json!({
-        "tool_call_id":"b","tool_name":"read","request_id":"turn",
-        "success":false,"output":"failure"
-    })));
+    state.apply_event(&ev(
+        "tool_result",
+        serde_json::json!({
+            "tool_call_id":"b","tool_name":"read","request_id":"turn",
+            "success":false,"output":"failure"
+        }),
+    ));
     assert_eq!(
         state.entries()[0].activity.as_ref().unwrap().status,
         Status::Running
@@ -308,9 +347,12 @@ fn concurrent_same_named_tools_match_results_by_call_identity() {
         state.entries()[1].activity.as_ref().unwrap().status,
         Status::Error
     );
-    state.apply_event(&ev("tool_result", serde_json::json!({
-        "tool_call_id":"b","request_id":"turn","success":false
-    })));
+    state.apply_event(&ev(
+        "tool_result",
+        serde_json::json!({
+            "tool_call_id":"b","request_id":"turn","success":false
+        }),
+    ));
     assert_eq!(state.entries().len(), 2);
 }
 
@@ -322,9 +364,12 @@ fn child_activity_accumulates_output_and_failed_status_in_one_record() {
         ("subagent_text_delta", Some("partial")),
         ("subagent_failed", None),
     ] {
-        state.apply_event(&ev(event, serde_json::json!({
-            "skill_id":"task","request_id":"turn","delta":delta,"message":"Timed out"
-        })));
+        state.apply_event(&ev(
+            event,
+            serde_json::json!({
+                "skill_id":"task","request_id":"turn","delta":delta,"message":"Timed out"
+            }),
+        ));
     }
     assert_eq!(state.entries().len(), 1);
     let child = state.entries()[0].activity.as_ref().unwrap();
@@ -337,7 +382,10 @@ fn child_activity_accumulates_output_and_failed_status_in_one_record() {
 #[test]
 fn sequence_duplicates_do_not_duplicate_streamed_text() {
     let mut state = TranscriptState::new(CLIENT);
-    let event = ev("text_delta", serde_json::json!({"request_id":"turn","seq":0,"delta":"one","delta_kind":"text"}));
+    let event = ev(
+        "text_delta",
+        serde_json::json!({"request_id":"turn","seq":0,"delta":"one","delta_kind":"text"}),
+    );
     state.apply_event(&event);
     state.apply_event(&event);
     assert_eq!(state.entries()[0].text, "one");

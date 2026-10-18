@@ -64,9 +64,12 @@ fn idle_and_old_entry_edits_do_not_revisit_settled_history() {
 fn indexed_rows_equal_full_wrapping_after_updates_resizes_and_expired_journal() {
     use openhuman_rpc::embed::chat_surface::WebChannelEvent;
     let mut state = TranscriptState::new("test");
-    state.apply_event(&serde_json::from_value(serde_json::json!({
-        "event":"tool_call","client_id":"test","tool_call_id":"first","tool_name":"tool"
-    })).unwrap());
+    state.apply_event(
+        &serde_json::from_value(serde_json::json!({
+            "event":"tool_call","client_id":"test","tool_call_id":"first","tool_name":"tool"
+        }))
+        .unwrap(),
+    );
     for index in 0..150 {
         state.push_system(format!("entry {index} 界e\u{301}\nnext"));
     }
@@ -76,10 +79,13 @@ fn indexed_rows_equal_full_wrapping_after_updates_resizes_and_expired_journal() 
             state.toggle_entry(0);
         }
         if step == 4 {
-            state.apply_event(&serde_json::from_value(serde_json::json!({
-                "event":"tool_result","client_id":"test","tool_call_id":"first",
-                "output":"a\nb\nc","success":true
-            })).unwrap());
+            state.apply_event(
+                &serde_json::from_value(serde_json::json!({
+                    "event":"tool_result","client_id":"test","tool_call_id":"first",
+                    "output":"a\nb\nc","success":true
+                }))
+                .unwrap(),
+            );
         }
         if step == 5 {
             for _ in 0..140 {
@@ -161,7 +167,10 @@ fn changing_an_old_tools_height_updates_prefix_lookup_without_rebuilding_history
         let mut value = serde_json::json!({
             "event":name,"client_id":"test","tool_call_id":"old","tool_name":"tool"
         });
-        value.as_object_mut().unwrap().extend(fields.as_object().unwrap().clone());
+        value
+            .as_object_mut()
+            .unwrap()
+            .extend(fields.as_object().unwrap().clone());
         serde_json::from_value::<WebChannelEvent>(value).unwrap()
     };
     state.apply_event(&event("tool_call"));

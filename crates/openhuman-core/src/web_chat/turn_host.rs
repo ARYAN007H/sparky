@@ -16,19 +16,19 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
+use tinyagents_harness::CancellationToken;
 use tinyagents_harness::run_queue::RunQueue;
 use tinyagents_harness::turn_runner::{
     QueueDisposition, TurnHost, TurnRequest, TurnResult, TurnSession, TurnSignal,
 };
-use tinyagents_harness::CancellationToken;
 use tinyinference_llm::failure::is_empty_provider_response_text;
-use tokio::sync::{mpsc, watch, Mutex as AsyncMutex};
+use tokio::sync::{Mutex as AsyncMutex, mpsc, watch};
 
 use super::ops::{self, BudgetCorrelation};
-use super::progress::{ProgressProjection, INFERENCE_HEARTBEAT_SECS};
+use super::progress::{INFERENCE_HEARTBEAT_SECS, ProgressProjection};
 use super::runner::{Admission, Shared};
 use super::session::{
-    checkin_session_agent, checkout_session_agent, normalize_model_override, CheckoutPolicy,
+    CheckoutPolicy, checkin_session_agent, checkout_session_agent, normalize_model_override,
 };
 use super::surface::TurnIds;
 use super::turn_activity::{TurnActivity, WorkTracker};
@@ -37,7 +37,7 @@ use super::web_errors::{
     inference_budget_exceeded_user_message, is_inference_budget_exceeded_error,
 };
 use crate::agent::queued_turn::QueuedPayload;
-use crate::agent::turn_origin::{with_origin, AgentTurnOrigin};
+use crate::agent::turn_origin::{AgentTurnOrigin, with_origin};
 use crate::core::events::DomainEvent;
 use crate::core::runtime::DispatchCtx;
 use tinyagents_harness::progress::AgentProgress;
@@ -453,8 +453,12 @@ async fn speak_and_publish(
                 .map(str::to_string),
             ..Default::default()
         };
-        match crate::voice::reply_speech::synthesize_reply(config, &task_result.full_response, &opts)
-            .await
+        match crate::voice::reply_speech::synthesize_reply(
+            config,
+            &task_result.full_response,
+            &opts,
+        )
+        .await
         {
             Ok(outcome) => {
                 let stored = super::voice_notes::store_synthesized_reply(

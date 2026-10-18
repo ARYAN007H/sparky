@@ -5,7 +5,7 @@ use tinychannels_bus::web as bus_web;
 
 pub use bus_web::{
     ChatSuggestion, GuardrailPayload, GuardrailReason, QueueItemPayload, SubagentProgressDetail,
-    SubagentUsagePayload, TurnTimingPayload, TurnUsagePayload, WebChannelEvent,
+    SubagentUsagePayload, TurnTimingPayload, TurnUsagePayload, WebChannelEvent, WebEventContext,
 };
 
 pub(crate) fn event_context(
@@ -93,4 +93,3 @@ impl Serialize for ScopedWebEvent {
 #[cfg(test)]
 #[path = "channel_event_tests.rs"]
 mod tests;
-

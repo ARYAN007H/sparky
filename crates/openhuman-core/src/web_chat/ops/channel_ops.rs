@@ -3,15 +3,15 @@
 //! inspecting/clearing a thread's run queue. The turns and their queues live
 //! in the context's turn runner; these are the thin entry points over it.
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
-use crate::core::runtime::DispatchCtx;
 use crate::core::Outcome;
+use crate::core::runtime::DispatchCtx;
 use crate::web_chat::WebChannelEvent;
 use crate::web_chat::channel_event::event_context;
 
 use super::super::event_bus::publish_web_channel_event_in;
-use super::super::runner::{runtime, scope_of, CancelNote};
+use super::super::runner::{CancelNote, runtime, scope_of};
 use super::super::types::ChatRequestMetadata;
 use super::start_chat::start_chat;
 
@@ -125,7 +125,9 @@ async fn cancel_chat_inner(
         if let Some(rid) = request_id {
             log::info!(
                 "[web-channel] ignoring stale cancel request_id={rid} for thread_id={thread_id} — current in-flight is {:?}; newer turn preserved",
-                live.iter().find(|turn| !turn.parallel).map(|turn| turn.request_id.as_str())
+                live.iter()
+                    .find(|turn| !turn.parallel)
+                    .map(|turn| turn.request_id.as_str())
             );
         }
     }

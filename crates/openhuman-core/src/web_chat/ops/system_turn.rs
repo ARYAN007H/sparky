@@ -17,10 +17,10 @@
 use std::sync::Arc;
 use tinyagents_harness::run_queue::RunQueue;
 
-use crate::agent::turn_origin::{with_origin, AgentTurnOrigin};
+use crate::agent::turn_origin::{AgentTurnOrigin, with_origin};
 
 use super::super::session::{
-    checkin_session_agent_if_vacant, checkout_session_agent, CheckedOutSession, CheckoutPolicy,
+    CheckedOutSession, CheckoutPolicy, checkin_session_agent_if_vacant, checkout_session_agent,
 };
 
 /// Client id stamped on host-authored turns. Never a real socket, so it never
