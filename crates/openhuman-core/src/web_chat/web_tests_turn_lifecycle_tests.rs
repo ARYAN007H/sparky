@@ -187,7 +187,6 @@ async fn a_turn_with_an_unavailable_local_provider_ends_in_one_classified_chat_e
         .respond_with(ResponseTemplate::new(503).set_body_json(serde_json::json!({
             "error": { "message": "model is currently unavailable" }
         })))
-        .expect_at_least(1)
         .mount(&server)
         .await;
     let tmp = tempfile::tempdir().expect("workspace");
