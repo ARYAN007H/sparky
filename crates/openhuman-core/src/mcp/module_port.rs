@@ -7,13 +7,6 @@ pub(super) struct TinyMcpPort {
     root: ModuleClient,
     /// The host config the stdio sandbox's toolchain grants resolve against.
     host_config: Option<crate::config::Config>,
-    /// Resolves the stdio sandbox's toolchain grants against `config` when the
-    /// configured client is opened.
-    pub(super) fn with_host_config(mut self, config: crate::config::Config) -> Self {
-        self.host_config = Some(config);
-        self
-    }
-
     #[cfg(feature = "modules")]
     pinned: tokio::sync::OnceCell<ModuleObjectClient>,
 }
@@ -26,6 +19,13 @@ impl TinyMcpPort {
             #[cfg(feature = "modules")]
             pinned: tokio::sync::OnceCell::new(),
         }
+    }
+
+    /// Resolves the stdio sandbox's toolchain grants against `config` when the
+    /// configured client is opened.
+    pub(super) fn with_host_config(mut self, config: crate::config::Config) -> Self {
+        self.host_config = Some(config);
+        self
     }
 
     #[cfg(feature = "modules")]
