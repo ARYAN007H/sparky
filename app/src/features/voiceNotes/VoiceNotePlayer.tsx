@@ -32,7 +32,12 @@ export interface VoiceNotePlayerProps {
   className?: string;
 }
 
-export function VoiceNotePlayer({
+/** Keyed on the audio source so a different note starts from a clean player. */
+export function VoiceNotePlayer(props: VoiceNotePlayerProps) {
+  return <VoiceNotePlayerBody key={`${props.noteId ?? ''}|${props.src ?? ''}`} {...props} />;
+}
+
+function VoiceNotePlayerBody({
   noteId,
   src,
   durationMs,
@@ -45,7 +50,8 @@ export function VoiceNotePlayer({
   const objectUrlRef = useRef<string | null>(null);
   const [playing, setPlaying] = useState(false);
   const [positionMs, setPositionMs] = useState(0);
-  const [totalMs, setTotalMs] = useState(durationMs ?? 0);
+  const [loadedMs, setLoadedMs] = useState<number | null>(null);
+  const totalMs = loadedMs ?? durationMs ?? 0;
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
 
@@ -58,15 +64,8 @@ export function VoiceNotePlayer({
     }
   }, []);
 
-  // A different note (or draft) invalidates whatever element was prepared.
-  useEffect(() => {
-    release();
-    setPlaying(false);
-    setPositionMs(0);
-    setError(false);
-    setTotalMs(durationMs ?? 0);
-    return release;
-  }, [noteId, src, durationMs, release]);
+  // Release the element and any object URL when the player goes away.
+  useEffect(() => release, [release]);
 
   const ensureAudio = useCallback(async (): Promise<HTMLAudioElement | null> => {
     if (audioRef.current) return audioRef.current;
@@ -87,11 +86,11 @@ export function VoiceNotePlayer({
         setLoading(false);
       }
     }
-    const audio = new Audio(url);
+    const audio = new window.Audio(url);
     audio.addEventListener('timeupdate', () => setPositionMs(audio.currentTime * 1000));
     audio.addEventListener('loadedmetadata', () => {
       if (Number.isFinite(audio.duration) && audio.duration > 0) {
-        setTotalMs(audio.duration * 1000);
+        setLoadedMs(audio.duration * 1000);
       }
     });
     audio.addEventListener('ended', () => {
@@ -156,7 +155,6 @@ export function VoiceNotePlayer({
               className="flex h-6 items-center gap-px">
               {waveform.map((bar, index) => (
                 <span
-                  // eslint-disable-next-line react/no-array-index-key
                   key={index}
                   className={cn(
                     'w-0.5 flex-1 rounded-full',
