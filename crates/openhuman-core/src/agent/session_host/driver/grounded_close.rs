@@ -7,18 +7,11 @@
 //! its usage in a sidecar; it never owns transcript history or persistence.
 
 use futures::StreamExt;
-use std::sync::{
-    Arc,
-};
+use std::sync::Arc;
 use tinyagents_runtime::transcript::message_to_native_transcript as message_to_native_chat_message;
 use tinyagents_session::transcript::TranscriptMessage;
 use tinyinference_llm::model::{ModelCallCorrelation, ModelRequest, ModelStreamItem};
 use tinytools_agent::dialect::ToolDialect;
-
-use tinyagents_harness::middleware::wrap_harness_instruction;
-use tinyagents_harness::{
-    events::AgentEvent,
-};
 
 use crate::agent::{
     session_host::turn_checkpoint::{
@@ -31,6 +24,7 @@ use crate::agent::{
 };
 use crate::inference::provider::model::dialect_response_from_provider;
 use crate::inference::provider::{BilledUsage, ChatResponse, AGENT_TURN_MAX_OUTPUT_TOKENS};
+use tinyagents_harness::middleware::wrap_harness_instruction;
 
 /// Accounting from model calls performed after the harness loop has ended.
 #[derive(Default)]
