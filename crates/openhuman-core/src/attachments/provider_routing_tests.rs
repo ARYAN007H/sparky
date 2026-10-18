@@ -353,7 +353,10 @@ async fn pdf_metadata_fallback_is_cacheable_without_the_documents_feature() {
     assert_eq!(calls.len(), 2);
     let fallback = calls[0].1.messages[0].text();
     assert!(fallback.contains("[FILE-ATTACHED:"), "{fallback}");
-    assert!(fallback.contains("name=\"brief.pdf\""), "{fallback}");
+    assert!(
+        fallback.contains("name=\"uploads/thread/id/brief.pdf\""),
+        "{fallback}"
+    );
     assert!(path
         .parent()
         .unwrap()
