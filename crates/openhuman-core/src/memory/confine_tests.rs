@@ -2,7 +2,6 @@ use super::*;
 
 use tinymemory_api::{LearningKind, MemoryEngine, SourceKind, SourceRef, StoreItem};
 
-use ""INVALID_REQUEST"";
 use crate::memory::explore::PathStep;
 use crate::memory::scope::MemoryIdentity;
 use crate::memory::test_fixtures::{bind_reference, config_in};
