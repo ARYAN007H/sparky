@@ -168,14 +168,21 @@ pub(crate) fn storage_master_key() -> Result<[u8; KEY_LEN], String> {
 pub(crate) fn storage_master_key_resolvable() -> bool {
     let env_set =
         |name: &str| std::env::var_os(name).is_some_and(|v| !v.to_string_lossy().trim().is_empty());
+    // Cached outcomes first: a loaded key answers yes, and a denied keychain
+    // is not asked again this session.
+    if matches!(MASTER_KEY.get(), Some(Ok(Some(_)))) {
+        return true;
+    }
+    let host_denied = HOST_KEY_UNAVAILABLE.get().is_some();
     let dir = crate::security::secret_storage::store::workspace_dir_for_file_backend();
     resolvable(
-        matches!(MASTER_KEY.get(), Some(Ok(Some(_)))),
+        false,
         env_set(MASTER_KEY_ENV) || env_set(MASTER_KEY_FILE_ENV),
-        // A host source counts only when it already holds the key: an empty
-        // one would have a key minted into it by the load.
-        key_source::installed_master_key_source()
-            .is_some_and(|source| matches!(source.load(), Ok(Some(_)))),
+        // A host source counts only when it already holds the key (an empty
+        // one would have a key minted into it by the load), and is read last.
+        !host_denied
+            && key_source::installed_master_key_source()
+                .is_some_and(|source| matches!(source.load(), Ok(Some(_)))),
         dir.join("keyring/master.key").is_file(),
     )
 }
