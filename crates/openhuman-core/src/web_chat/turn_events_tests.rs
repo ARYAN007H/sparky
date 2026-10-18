@@ -33,7 +33,7 @@ async fn events_for(
     rx: &mut tokio::sync::broadcast::Receiver<crate::web_chat::ScopedWebEvent>,
     request_id: &str,
     count: usize,
-) -> Vec<WebChannelEvent> {
+) -> Vec<crate::web_chat::ScopedWebEvent> {
     tokio::time::timeout(Duration::from_secs(5), async {
         let mut seen = Vec::new();
         while seen.len() < count {
