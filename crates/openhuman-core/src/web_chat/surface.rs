@@ -12,7 +12,6 @@ use tinychannels_bus::module_web_output::{
 use tinychannels_bus::web as bus_web;
 
 use super::event_bus_channel::publish_web_channel_event_in;
-use super::WebChannelEvent;
 use crate::config::Config;
 use crate::core::runtime::DispatchCtx;
 

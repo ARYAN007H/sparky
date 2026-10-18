@@ -8,6 +8,19 @@ pub use bus_web::{
     SubagentUsagePayload, TurnTimingPayload, TurnUsagePayload, WebChannelEvent,
 };
 
+pub(crate) fn event_context(
+    client_id: impl Into<String>,
+    thread_id: impl Into<String>,
+    request_id: impl Into<String>,
+) -> bus_web::WebEventContext {
+    bus_web::WebEventContext {
+        client_id: client_id.into(),
+        thread_id: thread_id.into(),
+        request_id: request_id.into(),
+        ..Default::default()
+    }
+}
+
 /// A typed wire event plus tenant stamps used only for in-process routing.
 ///
 /// `event` remains the TinyChannels-owned wire contract. The routing fields
