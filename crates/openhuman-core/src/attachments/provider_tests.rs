@@ -225,7 +225,7 @@ async fn unknown_video_retains_path_as_metadata_without_specialist() {
     let captured = probe.requests.lock().unwrap().clone();
     let text = captured[0].messages[0].text();
     assert!(text.contains("clip.mp4"));
-    assert!(text.contains("14 bytes"));
+    assert!(text.contains("size=\"14 B\""));
     assert!(!serde_json::to_string(&captured[0])
         .unwrap()
         .contains("base64"));

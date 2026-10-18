@@ -71,6 +71,12 @@ impl MediaSourceResolver<AttachmentAccessScope> for AttachmentModel {
         max_bytes: usize,
         mime_hint: Option<&str>,
     ) -> Result<ResolvedMedia, String> {
+        if source.contains("://")
+            && !source.starts_with("http://")
+            && !source.starts_with("https://")
+        {
+            return Err("unsupported media URL scheme".into());
+        }
         let block = match modality {
             InputModality::Image => ContentBlock::Image(ImageRef {
                 url: source.to_owned(),

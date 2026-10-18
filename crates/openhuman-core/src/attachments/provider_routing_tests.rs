@@ -265,7 +265,7 @@ async fn text_archive_and_unavailable_pdf_dispatch_to_distinct_fallbacks() {
         ContentBlock::Text(text) => text.as_str(),
         _ => panic!("expected fallback text"),
     };
-    assert!(text(1).contains("Document content (untrusted)"));
+    assert!(text(1).contains("[FILE-EXTRACTED: name=\"note.txt\""));
     assert!(text(1).contains("visible text payload"));
     assert!(text(2).contains("Archive listing"));
     assert!(text(2).contains("inside.txt"));
