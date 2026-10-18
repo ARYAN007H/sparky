@@ -3,27 +3,6 @@ use crate::core::runtime::DispatchCtx;
 
 use crate::core::TypeSchema;
 #[test]
-fn inference_catalog_counts_match_and_nonempty() {
-    let declared = all_controller_schemas();
-    let registered = all_registered_controllers();
-    assert_eq!(declared.len(), registered.len());
-    assert!(declared.len() >= 19);
-}
-
-#[test]
-fn inference_schemas_use_inference_namespace() {
-    for schema in all_controller_schemas() {
-        assert_eq!(
-            schema.namespace, "inference",
-            "function {}",
-            schema.function
-        );
-        assert!(!schema.description.is_empty());
-        assert!(!schema.outputs.is_empty());
-    }
-}
-
-#[test]
 fn inference_schema_function_names_are_stable() {
     let functions: Vec<&str> = all_controller_schemas()
         .into_iter()

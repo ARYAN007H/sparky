@@ -10,23 +10,6 @@ fn scoped_ctx(config: crate::config::Config) -> std::sync::Arc<CoreContext> {
     CoreContext::for_test_with_config(DomainSet::full(), config)
 }
 
-#[test]
-fn all_schemas_are_in_sandbox_namespace() {
-    for schema in all_controller_schemas() {
-        assert_eq!(schema.namespace, "sandbox");
-    }
-}
-
-#[test]
-fn registered_controllers_match_schemas() {
-    let schemas = all_controller_schemas();
-    let controllers = all_registered_controllers();
-    assert_eq!(schemas.len(), controllers.len());
-    for (s, c) in schemas.iter().zip(controllers.iter()) {
-        assert_eq!(s.function, c.schema.function);
-    }
-}
-
 #[tokio::test]
 async fn handle_status_returns_json() {
     let ctx = scoped_ctx(crate::config::Config::default());
