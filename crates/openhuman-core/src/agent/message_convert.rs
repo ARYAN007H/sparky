@@ -16,11 +16,6 @@
 //! resulting transcript back out, so a turn can run on the `tinyagents`
 //! agent-loop while callers keep speaking the row vocabulary.
 
-use tinyinference_llm::message::{ContentBlock, ImageRef, MediaRef, Message, UserMessage};
-use tinyinference_llm::tool::ToolCall as TaToolCall;
-use tinytools_agent::dialect::{
-    DialectMessage, DialectRole, ToolDialect, TranscriptEntry,
-};
 #[cfg(test)]
 use tinyagents_runtime::transcript::{
     message_to_display_transcript as message_to_chat_message,
@@ -28,6 +23,9 @@ use tinyagents_runtime::transcript::{
     REASONING_EXT_KEY,
 };
 use tinyagents_session::transcript::TranscriptMessage;
+use tinyinference_llm::message::{ContentBlock, ImageRef, MediaRef, Message, UserMessage};
+use tinyinference_llm::tool::ToolCall as TaToolCall;
+use tinytools_agent::dialect::{DialectMessage, DialectRole, ToolDialect, TranscriptEntry};
 
 /// Convert the host provider response at its boundary into the canonical
 /// dialect input. The dialect crate owns all parsing after this field-wise map.
