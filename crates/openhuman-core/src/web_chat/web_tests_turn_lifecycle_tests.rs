@@ -25,7 +25,7 @@ async fn wait_for_event(
     rx: &mut tokio::sync::broadcast::Receiver<crate::web_chat::ScopedWebEvent>,
     request_id: &str,
     name: &str,
-) -> crate::web_chat::WebChannelEvent {
+) -> crate::web_chat::ScopedWebEvent {
     timeout(Duration::from_secs(10), async {
         loop {
             match rx.recv().await {
