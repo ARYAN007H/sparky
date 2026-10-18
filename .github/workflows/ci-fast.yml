@@ -68,7 +68,7 @@ jobs:
             [ "${login}" = "${AUTHOR}" ] && { [ "${ASSOCIATION}" = "OWNER" ] || [ "${ASSOCIATION}" = "MEMBER" ]; }
           }
           member=false
-          if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ]; then
+          if [ "${GITHUB_EVENT_NAME:-}" = "workflow_dispatch" ]; then
             # No PR author: the dispatcher, who already needs write access,
             # must be an org member. Without the membership token that cannot
             # be checked, so a dispatch then stays off EX63.
