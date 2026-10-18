@@ -52,10 +52,11 @@ impl ConfigSource for FileConfigSource {
             contents,
             recovered,
             from_document: false,
+            document_version: None,
         })
     }
 
-    async fn write(&self, toml_str: &str) -> Result<()> {
+    async fn write(&self, toml_str: &str, _expected: Option<tinystoragedrivers::Version>) -> Result<Option<tinystoragedrivers::Version>> {
         let config_path = &self.path;
         let parent_dir = config_path
             .parent()
@@ -150,6 +151,6 @@ impl ConfigSource for FileConfigSource {
             // left behind holding the whole config.
             let _ = fs::remove_file(&temp_path).await;
         }
-        committed
+        committed.map(|()| None)
     }
 }
