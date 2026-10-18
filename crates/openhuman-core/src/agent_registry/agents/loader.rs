@@ -189,25 +189,9 @@ fn builtin_enabled(_b: &BuiltinAgent) -> bool {
     true
 }
 
-/// Validate the cross-agent spawn-hierarchy contract documented on
-/// [`AgentTier`].
-///
-/// Rules enforced here:
-///
-/// * `Chat` agents MUST NOT list another `Chat` agent in `subagents`.
-/// * `Reasoning` agents MUST NOT list another `Reasoning` agent in
-///   `subagents`.
-/// * `Worker` agents MUST NOT list any [`SubagentEntry::AgentId`]
-///   entries. (Skills wildcards are allowed: they expand to the connected
-///   integrations' actions as searchable tools on the agent's own belt,
-///   not to a spawn.)
-///
-/// Skills-wildcard entries (`{ skills = "*" }`) are intentionally
-/// untouched: they name no agent, so there is no tier pair to check.
-///
-/// Called from [`load_builtins`] for the bundled archetype set and from
-/// [`crate::agent_registry::host_definition::AgentDefinitionRegistry::load`]
-/// after workspace-local TOML overrides are merged, so custom user
+/// `load_builtins` parses and validates the bundled archetypes using the
+/// owning `tinyagents_definition::DefinitionSet`. Workspace definitions are
+/// validated by `AgentDefinitionRegistry::load` after overrides are merged.
 /// agents that violate the contract fail the boot rather than crashing
 /// at spawn time.
 /// Parse a single [`BuiltinAgent`] triple into a finished [`AgentDefinition`].

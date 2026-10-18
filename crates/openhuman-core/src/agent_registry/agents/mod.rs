@@ -16,8 +16,8 @@
 //!   [`BUILTINS`] installs it as `PromptSource::Dynamic` on the parsed
 //!   definition. Most archetypes keep a `prompt_tests.rs` beside it.
 //!
-//! `loader.rs` holds [`BUILTINS`], [`load_builtins`] and
-//! [`validate_tier_hierarchy`]. The slice also registers archetypes that
+//! `loader.rs` holds [`BUILTINS`] and [`load_builtins`]. It delegates tier
+//! validation to `tinyagents_definition::DefinitionSet`. The slice also registers archetypes that
 //! live with other domains (`skills/*/agent/`,
 //! `flows/agents/`), so this directory is not the full built-in set. The
 //! package `README.md` one level up describes what each archetype does.

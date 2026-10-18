@@ -71,7 +71,7 @@ Every archetype uses the shared sub-agent turn graph.
 `load_builtins`, which parses each `agent.toml`, installs
 `PromptSource::Dynamic(prompt_fn)`, stamps
 `DefinitionSource::Builtin`, checks that the folder id matches the TOML id,
-and then runs `validate_tier_hierarchy`: a `worker` may not list any agent-id
+and then runs `DefinitionSet::validate_tier_hierarchy`: a `worker` may not list any agent-id
 subagent, and `chat -> chat` / `reasoning -> reasoning` delegation is
 rejected (the pair rule is `validate_tier_transition` in the harness; unknown
 subagent ids are tolerated here as a separate integrity concern).
@@ -82,7 +82,7 @@ other domains: `skill_setup`
 Workspace-level overrides (`<workspace_dir>/agents/*.toml`, with a
 `~/.openhuman/agents/` fallback) are loaded separately by
 `tinyagents_definition::DefinitionSet::load_dirs` and replace built-ins on id collision;
-`AgentDefinitionRegistry::load` re-runs `validate_tier_hierarchy` after that
+`AgentDefinitionRegistry::load` re-runs the owner validation after that
 merge.
 
 The 12 archetypes in this directory:
