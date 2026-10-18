@@ -43,7 +43,7 @@ pub(crate) fn subagent_prompt_protocol(
 /// The shared static names stay aligned with TinyAgents; registry lookup is
 /// needed only for host-defined, unprefixed `delegate_name` overrides.
 pub(super) fn is_subagent_spawn_tool(name: &str) -> bool {
-    if crate::agent::tinyagents::is_subagent_spawn_or_delegate_tool(name) {
+    if crate::agent::tinyagents::turn_policy::is_subagent_spawn_or_delegate_tool(name) {
         return true;
     }
     // Synthesised delegation tools are named by the target agent's
