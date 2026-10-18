@@ -1,7 +1,7 @@
 use super::*;
 
 use crate::config::schema::MemoryAgentConfig;
-use tinymemory_api::{MetaFilter, Reach};
+use tinymemory_api::{MetaFilter, Namespace, Reach};
 use tinymemory_tools::confine::{Confinement, Policy};
 use tinymemory_tools::layout::identity::{
     account_root, actor_of_root, chat_node, validate_root, Identity, ResolvedIdentity,

@@ -8,10 +8,10 @@ use tinymemory_api::{
 use tinymemory_tools::confine::{Confinement, Policy};
 use tinymemory_tools::layout::identity::Identity;
 
-use crate::memory::explore::{self, ExploreParams, ItemsGetParams, ItemsListParams, PathStep};
+use crate::memory::explore::{self, ItemsGetParams, PathStep};
 use crate::memory::test_fixtures::{bind_reference, config_in};
 use crate::memory::types::{
-    FetchParams, ForgetParams, LearnParams, RecallParams,
+    FetchParams, ForgetParams, ItemsListParams, LearnParams, RecallParams,
 };
 
 fn ns(raw: &str) -> Namespace {
