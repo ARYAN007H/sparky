@@ -25,7 +25,7 @@
 //! thread that delivered the callback: an agent turn is deep and long, and the
 //! bus runtime is for serving. The binding's context is re-entered around it.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::future::Future;
 use std::sync::{Arc, RwLock, Weak};
 
@@ -39,11 +39,6 @@ use crate::config::Config;
 use crate::core::runtime::{CoreContext, DispatchCtx};
 use crate::modules::tinyflows as module;
 use crate::security::SecurityPolicy;
-
-/// The claim namespace every host scheduler and every manual run shares: job
-/// ids are unique across agents, so Run Now, the run tool and the poll loop of
-/// any agent refuse to start a job another of them is running.
-pub(crate) const CLAIM_SCOPE: &str = "openhuman";
 
 /// What every callback of one scheduler shares: the config it acts on, the
 /// security policy, and the context it was built in.
@@ -228,15 +223,10 @@ impl ScheduleHost {
     async fn deliver(&self, projection: DeliveryProjection) -> BusResult<()> {
         tracing::debug!(job_id = %projection.job.id, run_id = %projection.run_id, "[cron:bus] Deliver");
         let binding = self.binding.clone();
-        let run_id = projection.run_id.clone();
         self.binding
             .offload(async move { run_delivery::deliver(&binding, &projection).await })
             .await
             .map_err(|e| bus_error("Deliver", e))?;
-        tokio::spawn(async move {
-            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-            release_manual_host(&run_id);
-        });
         Ok(())
     }
 
@@ -256,29 +246,6 @@ impl ScheduleHost {
 pub(crate) struct HostRegistration {
     path: String,
     address: CallbackAddress,
-}
-
-static MANUAL_HOSTS: std::sync::LazyLock<std::sync::Mutex<HashMap<String, HostRegistration>>> =
-    std::sync::LazyLock::new(Default::default);
-
-/// Keep a detached run's callback served until its terminal projection.
-pub(crate) fn retain_manual_host(run_id: &str, host: HostRegistration) {
-    MANUAL_HOSTS
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner)
-        .insert(run_id.to_string(), host);
-    let run_id = run_id.to_string();
-    tokio::spawn(async move {
-        tokio::time::sleep(std::time::Duration::from_secs(2 * 60 * 60)).await;
-        release_manual_host(&run_id);
-    });
-}
-
-pub(crate) fn release_manual_host(run_id: &str) {
-    MANUAL_HOSTS
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner)
-        .remove(run_id);
 }
 
 impl HostRegistration {

@@ -1,4 +1,8 @@
 use super::*;
+use tinyflows_bus::schedule::{
+    AcknowledgeManualRun, ManualRunHandle, ManualRunOutcome, ManualRunRequest, ManualRunState,
+    PrepareManualRun, StartManualRun, WaitManualRun,
+};
 
 /// Compatibility adapter for callers that need a synchronous Run Now result.
 /// TinyFlows owns admission, retries, delivery and persistence.
@@ -33,9 +37,9 @@ pub async fn execute_job_now(
     }
 }
 
-/// Admit and optionally wait for a manual run through the module's durable
-/// occurrence path. Detached runs keep their callback object served until the
-/// module sends the terminal projection.
+/// Start one invocation-owned manual worker. Its owner task is independent of
+/// the RPC/tool future and keeps this invocation's callback and context alive
+/// until the module reports terminal state and acknowledges the handle.
 pub(crate) async fn run_job_now(
     ctx: &crate::core::runtime::DispatchCtx,
     config: &Config,
@@ -44,16 +48,40 @@ pub(crate) async fn run_job_now(
     wait: bool,
     delivery: ManualDelivery,
 ) -> Result<RunJobReply> {
+    let (reply_tx, reply_rx) = tokio::sync::oneshot::channel();
+    let ctx = ctx.clone();
+    let config = config.clone();
+    tokio::spawn(async move {
+        let result = own_manual_run(ctx, config, job, run_id, wait, delivery, reply_tx).await;
+        if let Err(error) = result {
+            tracing::warn!(%error, "[cron:scheduler] manual worker owner stopped before acknowledgement");
+        }
+    });
+    reply_rx
+        .await
+        .map_err(|_| anyhow!("cron manual worker owner stopped before reporting admission"))?
+}
+
+async fn own_manual_run(
+    ctx: crate::core::runtime::DispatchCtx,
+    config: Config,
+    job: CronJob,
+    run_id: String,
+    wait: bool,
+    delivery: ManualDelivery,
+    reply_tx: tokio::sync::oneshot::Sender<Result<RunJobReply, String>>,
+) -> Result<()> {
+    // Keep the invocation's CoreContext strongly pinned while Binding itself
+    // retains only a Weak reference. The task is the acyclic lifetime owner.
+    let _context_pin = ctx.core().cloned();
     let security = Arc::new(SecurityPolicy::from_config(
         &config.autonomy,
         &config.workspace_dir,
         &config.action_dir,
     ));
-    let binding = Binding::new(ctx, config, security);
+    let binding = Binding::new(&ctx, &config, security);
     let host = bus_host::register(binding.clone()).await.map_err(|e| anyhow!(e))?;
-    let scope = binding
-        .within(async { DocScope::current(config) })
-        .await?;
+    let scope = binding.within(async { DocScope::current(&config) }).await?;
     let storage = StoreConfig {
         backend: StoreBackend::Documents {
             callback: crate::cron::documents_port::address(&scope).await?,
@@ -61,41 +89,173 @@ pub(crate) async fn run_job_now(
         max_run_history: config.cron.max_run_history,
         max_tasks: config.scheduler.max_tasks,
     };
-    let request = RunJobNow {
-        scope: CLAIM_SCOPE.to_string(),
-        callback: host.address(),
-        config: scheduler_config(config),
-        storage,
-        job,
-        run_id: run_id.clone(),
-        delivery,
-        wait,
+    // ManualStart bypasses ScheduleStore, so migration must precede Prepare and
+    // any possible claim just as it does for the ordinary scheduler.
+    crate::cron::client::store_in::<serde_json::Value>(
+        &config,
+        &scope,
+        tinyflows_bus::schedule::StoreOperation::Migrate,
+    )
+    .await?;
+
+    let scope_id = scope.scheduler_scope();
+    let request_id = uuid::Uuid::new_v4().to_string();
+    let prepare = PrepareManualRun {
+        scope: scope_id,
+        request_id,
     };
-    if !wait {
-        bus_host::retain_manual_host(&run_id, host);
-    }
-    let reply = async {
-        let proxy = module::run_proxy(config).await.map_err(|e| anyhow!(e))?;
-        proxy
-            .call(members::RUN_JOB_NOW, (request,))
-            .await
-            .map_err(|error| anyhow!(error.wire_message()))
-    }
-    .await;
-    match reply {
-        Ok(reply) => {
-            if !wait && !matches!(reply, RunJobReply::Accepted { .. }) {
-                bus_host::release_manual_host(&run_id);
+    let handle: ManualRunHandle = loop {
+        let proxy = match module::proxy(&config).await {
+            Ok(proxy) => proxy,
+            Err(error) => {
+                tracing::debug!(%error, "[cron:scheduler] retrying manual PrepareManualRun");
+                tokio::time::sleep(Duration::from_millis(250)).await;
+                continue;
             }
-            Ok(reply)
-        }
-        Err(error) => {
-            if !wait {
-                bus_host::release_manual_host(&run_id);
+        };
+        match proxy.call(members::PREPARE_MANUAL_RUN, (&prepare,)).await {
+            Ok(handle) => break handle,
+            Err(error) => {
+                tracing::debug!(error = %error.wire_message(), "[cron:scheduler] retrying manual PrepareManualRun");
+                tokio::time::sleep(Duration::from_millis(250)).await;
             }
-            Err(error)
         }
+    };
+    let start = StartManualRun {
+        handle: handle.clone(),
+        request: ManualRunRequest {
+            callback: host.address(),
+            config: scheduler_config(&config),
+            storage,
+            job,
+            run_id,
+            delivery,
+        },
+    };
+
+    let mut started = false;
+    let mut reply_tx = Some(reply_tx);
+    let mut retry_delay = Duration::from_millis(20);
+    let terminal = loop {
+        let state = if !started {
+            match module::proxy(&config).await {
+                Ok(proxy) => match proxy.call::<ManualRunState>(members::START_MANUAL_RUN, (&start,)).await {
+                    Ok(state) => state,
+                    Err(error) => {
+                        tracing::debug!(error = %error.wire_message(), "[cron:scheduler] retrying identical StartManualRun");
+                        tokio::time::sleep(retry_delay).await;
+                        retry_delay = (retry_delay * 2).min(Duration::from_secs(1));
+                        continue;
+                    }
+                },
+                Err(error) => {
+                    tracing::debug!(%error, "[cron:scheduler] retrying identical StartManualRun");
+                    tokio::time::sleep(retry_delay).await;
+                    retry_delay = (retry_delay * 2).min(Duration::from_secs(1));
+                    continue;
+                }
+            }
+        } else {
+            let proxy = module::proxy(&config).await.map_err(|error| anyhow!(error))?;
+            match proxy
+                .call::<Option<ManualRunState>>(
+                    members::WAIT_MANUAL_RUN,
+                    (WaitManualRun {
+                        handle: handle.clone(),
+                    },),
+                )
+                .await
+            {
+                Ok(Some(state)) => state,
+                // The released contract defines absence as no retained worker
+                // in this module generation. It is quiescent, but does not
+                // prove admission or success.
+                Ok(None) => {
+                    if let Some(reply_tx) = reply_tx.take() {
+                        let _ = reply_tx.send(Err(
+                            "cron manual worker disappeared before a terminal result".to_string(),
+                        ));
+                    }
+                    return Ok(());
+                }
+                Err(error) => {
+                    tracing::debug!(error = %error.wire_message(), "[cron:scheduler] retrying WaitManualRun");
+                    tokio::time::sleep(retry_delay).await;
+                    retry_delay = (retry_delay * 2).min(Duration::from_secs(1));
+                    continue;
+                }
+            }
+        };
+
+        match state {
+            ManualRunState::Prepared => {
+                started = false;
+                retry_delay = Duration::from_millis(20);
+                continue;
+            }
+            ManualRunState::Starting => {
+                // Starting does not mean the claim or queue row is durable.
+                started = true;
+            }
+            ManualRunState::Running { run_id } => {
+                started = true;
+                if !wait {
+                    if let Some(reply_tx) = reply_tx.take() {
+                        let _ = reply_tx.send(Ok(RunJobReply::Accepted { run_id }));
+                    }
+                }
+            }
+            ManualRunState::Terminal { outcome } => break outcome,
+            ManualRunState::Stopping { .. } | ManualRunState::CleanupPending { .. } => {
+                started = true;
+            }
+        }
+        tokio::time::sleep(retry_delay).await;
+        retry_delay = (retry_delay * 2).min(Duration::from_secs(1));
+    };
+
+    let outcome_reply = match terminal {
+        ManualRunOutcome::Completed {
+            run_id,
+            attempt,
+            success,
+            delivery_status,
+        } => Ok(RunJobReply::Completed {
+            run_id,
+            attempt,
+            success,
+            delivery_status,
+        }),
+        ManualRunOutcome::Refused { reason, .. } => Ok(RunJobReply::Refused { reason }),
+        ManualRunOutcome::Stopped { .. } => Err("cron manual run was stopped".to_string()),
+        ManualRunOutcome::Failed { message, .. } => Err(message),
+    };
+    if let Some(reply_tx) = reply_tx.take() {
+        let _ = reply_tx.send(outcome_reply);
     }
+
+    let ack = AcknowledgeManualRun { handle };
+    let mut retry_delay = Duration::from_millis(20);
+    loop {
+        let result = match module::proxy(&config).await {
+            Ok(proxy) => proxy.call::<bool>(members::ACKNOWLEDGE_MANUAL_RUN, (&ack,)).await,
+            Err(error) => {
+                tracing::debug!(%error, "[cron:scheduler] retrying AcknowledgeManualRun");
+                tokio::time::sleep(retry_delay).await;
+                retry_delay = (retry_delay * 2).min(Duration::from_secs(1));
+                continue;
+            }
+        };
+        match result {
+            Ok(true) => break,
+            Ok(false) => tracing::debug!("[cron:scheduler] terminal manual handle not yet acknowledged"),
+            Err(error) => tracing::debug!(error = %error.wire_message(), "[cron:scheduler] retrying ambiguous AcknowledgeManualRun"),
+        }
+        tokio::time::sleep(retry_delay).await;
+        retry_delay = (retry_delay * 2).min(Duration::from_secs(1));
+    }
+    drop(host);
+    Ok(())
 }
 
 /// Single poll cycle of the scheduler loop, extracted so tests can drive
