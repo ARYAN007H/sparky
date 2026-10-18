@@ -173,7 +173,11 @@ impl Middleware<(), crate::agent::tinyagents::host::OpenHumanRunContext>
         ctx: &mut RunContext<crate::agent::tinyagents::host::OpenHumanRunContext>,
         error: &tinyagents_harness::error::TinyAgentsError,
     ) -> TaResult<()> {
-        self.capture.on_error(ctx, error).await
+        <tinyagents_harness::middleware::library::ToolOutcomeCaptureMiddleware as Middleware<
+            (),
+            crate::agent::tinyagents::host::OpenHumanRunContext,
+        >>::on_error(&self.capture, ctx, error)
+        .await
     }
 }
 

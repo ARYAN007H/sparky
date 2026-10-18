@@ -63,7 +63,10 @@ async fn transcript_snapshot_keeps_a_completed_failed_tool_row() {
         .before_tool(&mut context, &(), &mut call)
         .await
         .expect("snapshot accepts tool start");
-    let invocation = ToolInvocationIdentity::new("failed-call", "write_file");
+    let invocation = tinyagents_harness::middleware::ToolInvocationIdentity::new(
+        "failed-call",
+        "write_file",
+    );
     let mut result = TaToolResult::error("permission denied");
     middleware
         .after_tool(&mut context, &(), &invocation, &mut result)

@@ -2,6 +2,7 @@
 //! context middlewares, plus the small observation hook it owns (transcript
 //! snapshot).
 
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use async_trait::async_trait;
