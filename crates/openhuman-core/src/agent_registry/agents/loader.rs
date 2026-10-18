@@ -31,7 +31,7 @@
 
 use crate::agent_registry::host_definition::{AgentDefinition, PromptBuilder};
 use anyhow::{Context, Result};
-use tinyagents_definition::{DefinitionSet, DefinitionSource, PromptSource};
+use tinyagents_definition::{DefinitionSet, DefinitionSource, PromptSource, parse_str};
 
 /// A single built-in agent: its id plus the metadata TOML and a
 /// function-driven prompt builder.
@@ -215,13 +215,12 @@ fn parse_builtin(b: &BuiltinAgent) -> Result<AgentDefinition> {
     // The TOML ships without `system_prompt` — serde falls back to
     // `defaults::empty_inline_prompt` — and the loader injects the
     // rendered sibling `prompt.md` immediately below.
-    let mut def: AgentDefinition = toml::from_str(b.toml)
+    let mut def: AgentDefinition = parse_str(b.toml, DefinitionSource::Builtin)
         .with_context(|| format!("parsing built-in agent `{}` TOML", b.id))?;
 
     // Install the function-driven prompt builder and stamp the source.
     def.system_prompt = PromptSource::Dynamic(());
     def.extensions.prompt_builder = Some(b.prompt_fn);
-    def.source = DefinitionSource::Builtin;
 
     // Sanity check: file layout id must match declared TOML id. This
     // catches copy-paste mistakes where someone forgets to update the
