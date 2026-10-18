@@ -31,6 +31,7 @@ pub(crate) struct ToolPolicyMiddleware {
     /// TinyAgents owns evaluation and denial short-circuiting.
     gate: ToolPolicyGateMiddleware<OpenHumanRunContext>,
     /// OpenHuman's concrete channel ceiling and disclosure snapshot.
+    #[cfg(test)]
     host: Arc<ToolPolicyHostState>,
 }
 
@@ -114,7 +115,11 @@ impl ToolPolicyMiddleware {
             .with_post_gate(Arc::new(move |_ctx, call| {
                 post_host.render_skill_for_session(call)
             }));
-        Self { gate, host }
+        Self {
+            gate,
+            #[cfg(test)]
+            host,
+        }
     }
 
     // Keep focused host-adapter tests on the concrete disclosure callbacks

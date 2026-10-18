@@ -552,3 +552,47 @@ async fn existing_error_is_some_behavior_is_unchanged_by_body_level_check() {
         "the third identical error+ok:false result halts, same as a plain error"
     );
 }
+
+#[tokio::test]
+async fn shared_failure_middleware_keeps_distinct_run_contexts_isolated() {
+    let handle = SteeringHandle::allow_all();
+    let middleware = RepeatedToolFailureMiddleware::new(
+        handle.clone(),
+        3,
+        std::sync::Arc::new(std::sync::Mutex::new(None)),
+    );
+    let mut first_run = ctx();
+    let mut second_run = ctx();
+
+    for (context, id) in [(&mut first_run, "first"), (&mut second_run, "second")] {
+        for attempt in 0..2 {
+            let mut result = failing_result("flaky", "same failure");
+            middleware
+                .after_tool(
+                    context,
+                    &(),
+                    &invocation(format!("{id}-{attempt}"), "flaky"),
+                    &mut result,
+                )
+                .await
+                .unwrap();
+        }
+    }
+    assert_eq!(drain_pause_count(&handle), 0);
+
+    let mut result = failing_result("flaky", "same failure");
+    middleware
+        .after_tool(
+            &mut first_run,
+            &(),
+            &invocation("first-third", "flaky"),
+            &mut result,
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        drain_pause_count(&handle),
+        1,
+        "only the first run's third failure reaches its own halt threshold"
+    );
+}
