@@ -81,8 +81,14 @@ pub(crate) trait ConfigSource: Send + Sync {
     /// Read the config text, recovering from corruption where the source can.
     async fn read(&self) -> Result<ConfigRead>;
 
-    /// Replace the config text. Returns `Err` only while the previous config is
-    /// still the live one, so callers may roll back in-memory state on `Err`.
+    /// Replace the config text.
+    ///
+    /// On a document source, this uses the handle's last successfully observed
+    /// revision; a handle that has not observed a document (or observed its
+    /// absence) is create-only. This is a last-observation rule for the source
+    /// handle, not a snapshot lease for every read. Callers saving a loaded
+    /// config snapshot use [`Self::write_versioned`] with that snapshot's
+    /// captured revision instead.
     async fn write(&self, toml: &str) -> Result<()>;
 
     /// Persist a config snapshot against the revision it was loaded from.
