@@ -123,7 +123,8 @@ async fn the_preview_reads_without_logging_and_agents_are_listed() {
         ))
         .await
         .unwrap();
-    let writer = tinymemory_tools::layout::identity::Identity::agent("writer").resolve(&crate::memory::scope::identity_pins(&config));
+    let writer = tinymemory_tools::layout::identity::Identity::agent("writer")
+        .resolve(&crate::memory::scope::identity_pins(&config));
     pre_turn_work(
         &crate::core::runtime::DispatchCtx::ambient(),
         &config,
@@ -162,7 +163,12 @@ async fn the_preview_reads_without_logging_and_agents_are_listed() {
     .unwrap();
     assert_eq!(session.mode, "session");
 
-    let agents = agents_list(&config, &tinymemory_tools::layout::identity::Identity::root()).await.unwrap();
+    let agents = agents_list(
+        &config,
+        &tinymemory_tools::layout::identity::Identity::root(),
+    )
+    .await
+    .unwrap();
     assert_eq!(
         agents.agents,
         [AgentCount {

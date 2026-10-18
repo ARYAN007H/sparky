@@ -9,9 +9,7 @@ use tinymemory_tools::layout::identity::Identity;
 
 use crate::memory::explore::{self, ItemsGetParams, PathStep};
 use crate::memory::test_fixtures::{bind_reference, config_in};
-use crate::memory::types::{
-    FetchParams, ForgetParams, ItemsListParams, LearnParams, RecallParams,
-};
+use crate::memory::types::{FetchParams, ForgetParams, ItemsListParams, LearnParams, RecallParams};
 
 fn ns(raw: &str) -> Namespace {
     raw.parse().unwrap()
@@ -86,10 +84,7 @@ fn rpc_refuse_uses_the_identity_subtree_and_rejects_wider_reaches() {
         ));
     }
 
-    let team = confinement(
-        &config_in(&tmp),
-        &Identity::team_member("acme", "scout"),
-    );
+    let team = confinement(&config_in(&tmp), &Identity::team_member("acme", "scout"));
     assert_eq!(team.allowed, Reach::subtree(ns("team:acme")));
 }
 
@@ -206,12 +201,26 @@ async fn rpc_items_get_and_forget_cannot_reach_another_root() {
     .unwrap();
     assert_eq!(forgotten.forgotten, 0);
 
-    let engine: Arc<dyn MemoryEngine> = crate::memory::engine::resolve(&config).engine().unwrap().engine;
-    assert_eq!(ids(&engine.list(tinymemory_api::ListRequest {
-        filter: MetaFilter { reach: Some(Reach::subtree(ns("team:other"))), ..MetaFilter::default() },
-        limit: 10,
-        cursor: None,
-    }).await.unwrap().items).as_slice(), [theirs]);
+    let engine: Arc<dyn MemoryEngine> = crate::memory::engine::resolve(&config)
+        .engine()
+        .unwrap()
+        .engine;
+    assert_eq!(
+        ids(&engine
+            .list(tinymemory_api::ListRequest {
+                filter: MetaFilter {
+                    reach: Some(Reach::subtree(ns("team:other"))),
+                    ..MetaFilter::default()
+                },
+                limit: 10,
+                cursor: None,
+            })
+            .await
+            .unwrap()
+            .items)
+        .as_slice(),
+        [theirs]
+    );
 }
 
 #[tokio::test]
@@ -222,9 +231,7 @@ async fn rpc_learn_uses_the_layout_default_and_refuses_an_explicit_outside_names
     let engine = bind_reference(&config);
     let identity = Identity::root().resolve(&crate::memory::scope::identity_pins(&config));
     let rpc = confinement(&config, &Identity::root());
-    let default_meta = rpc
-        .learn_meta(None, identity.layout.learnings())
-        .unwrap();
+    let default_meta = rpc.learn_meta(None, identity.layout.learnings()).unwrap();
     let result = crate::memory::ops::learn(
         &config,
         LearnParams {

@@ -98,9 +98,14 @@ impl CallFacts {
             crate::agent::tinyagents::host::run_context::memory_identity_for_tool(context)
                 .unwrap_or_else(|| {
                     crate::agent::tinyagents::host::run_context::parent_agent_id_for_tool(context)
-                        .map_or_else(tinymemory_tools::layout::identity::Identity::root, |parent_agent_id| {
-                            tinymemory_tools::layout::identity::Identity::agent(&parent_agent_id)
-                        })
+                        .map_or_else(
+                            tinymemory_tools::layout::identity::Identity::root,
+                            |parent_agent_id| {
+                                tinymemory_tools::layout::identity::Identity::agent(
+                                    &parent_agent_id,
+                                )
+                            },
+                        )
                 });
         Self {
             workspace: Some(workspace.display().to_string()),

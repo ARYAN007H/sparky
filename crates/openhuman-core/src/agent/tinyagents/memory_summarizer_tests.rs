@@ -20,7 +20,8 @@ impl Summarizer for Failing {
 async fn bound_turn(tmp: &tempfile::TempDir) -> Arc<MemoryTurn> {
     let config = config_in(tmp);
     bind_reference(&config);
-    let identity = tinymemory_tools::layout::identity::Identity::agent("orchestrator").resolve(&crate::memory::scope::identity_pins(&config));
+    let identity = tinymemory_tools::layout::identity::Identity::agent("orchestrator")
+        .resolve(&crate::memory::scope::identity_pins(&config));
     pre_turn_work(
         &crate::core::runtime::DispatchCtx::ambient(),
         &config,
@@ -249,7 +250,8 @@ async fn a_held_memory_engine_does_not_delay_transcript_compaction() {
             inner: tinymemory_api::conformance::ReferenceEngine::new(),
         }),
     );
-    let identity = tinymemory_tools::layout::identity::Identity::agent("orchestrator").resolve(&crate::memory::scope::identity_pins(&config));
+    let identity = tinymemory_tools::layout::identity::Identity::agent("orchestrator")
+        .resolve(&crate::memory::scope::identity_pins(&config));
     let turn = Arc::new(MemoryTurn {
         config: Arc::new(config),
         identity,

@@ -30,7 +30,8 @@ pub struct PolicyView {
 /// `memory_policy_get`.
 #[must_use]
 pub fn policy_view(config: &Config) -> PolicyView {
-    let resolved = tinymemory_tools::layout::identity::Identity::root().resolve(&crate::memory::scope::identity_pins(config));
+    let resolved = tinymemory_tools::layout::identity::Identity::root()
+        .resolve(&crate::memory::scope::identity_pins(config));
     PolicyView {
         log_conversations: config.memory.conversations.enabled,
         recall: config.memory.recall.clone(),
@@ -251,7 +252,10 @@ pub struct AgentsView {
 }
 
 /// `memory_agents_list`: the agents with conversations under the root.
-pub async fn agents_list(config: &Config, identity: &tinymemory_tools::layout::identity::Identity) -> Result<AgentsView> {
+pub async fn agents_list(
+    config: &Config,
+    identity: &tinymemory_tools::layout::identity::Identity,
+) -> Result<AgentsView> {
     let (memory, identity) = super::current_agent_memory(config, identity)?;
     let page = memory
         .engine()

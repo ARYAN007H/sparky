@@ -51,11 +51,19 @@ pub fn brain_node(
 }
 
 /// The layout the brain RPCs act on: `identity`'s.
-fn layout(config: &Config, identity: &tinymemory_tools::layout::identity::Identity) -> MemoryLayout {
-    identity.resolve(&crate::memory::scope::identity_pins(config)).layout
+fn layout(
+    config: &Config,
+    identity: &tinymemory_tools::layout::identity::Identity,
+) -> MemoryLayout {
+    identity
+        .resolve(&crate::memory::scope::identity_pins(config))
+        .layout
 }
 
-fn brain(config: &Config, identity: &tinymemory_tools::layout::identity::Identity) -> Result<Brain> {
+fn brain(
+    config: &Config,
+    identity: &tinymemory_tools::layout::identity::Identity,
+) -> Result<Brain> {
     let bound = engine::resolve(config).engine()?;
     Ok(Brain::new(bound.engine, layout(config, identity)))
 }
@@ -86,7 +94,10 @@ pub struct BrainSourcesView {
 }
 
 /// `memory_brain_sources`: the brain's sources and their sizes.
-pub async fn sources(config: &Config, identity: &tinymemory_tools::layout::identity::Identity) -> Result<BrainSourcesView> {
+pub async fn sources(
+    config: &Config,
+    identity: &tinymemory_tools::layout::identity::Identity,
+) -> Result<BrainSourcesView> {
     let bound = engine::resolve(config).engine()?;
     let layout = layout(config, identity);
     let page = bound

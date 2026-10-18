@@ -9,7 +9,10 @@ fn facts() -> CallFacts {
     CallFacts {
         thread_id: Some("thread-tool-1".into()),
         agent_id: Some("orchestrator".into()),
-        ..CallFacts::of(&Config::default(), &tinymemory_tools::layout::identity::Identity::agent("orchestrator"))
+        ..CallFacts::of(
+            &Config::default(),
+            &tinymemory_tools::layout::identity::Identity::agent("orchestrator"),
+        )
     }
 }
 

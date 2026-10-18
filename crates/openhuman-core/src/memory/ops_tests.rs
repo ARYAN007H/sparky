@@ -15,7 +15,8 @@ use tinymemory_api::{
 #[test]
 fn invalid_saas_root_is_refused_before_store_reaches_the_engine() {
     const CHILD: &str = "OPENHUMAN_TEST_SAAS_MEMORY_STORE_GUARD";
-    const TEST_NAME: &str = "memory::ops::tests::invalid_saas_root_is_refused_before_store_reaches_the_engine";
+    const TEST_NAME: &str =
+        "memory::ops::tests::invalid_saas_root_is_refused_before_store_reaches_the_engine";
 
     if std::env::var_os(CHILD).is_none() {
         let output = std::process::Command::new(std::env::current_exe().unwrap())
@@ -271,18 +272,12 @@ impl MemoryEngine for CountingEngine {
         self.inner.store(item).await
     }
 
-    async fn forget(
-        &self,
-        target: ForgetTarget,
-    ) -> tinymemory_api::Result<ForgetReport> {
+    async fn forget(&self, target: ForgetTarget) -> tinymemory_api::Result<ForgetReport> {
         self.calls.fetch_add(1, Ordering::SeqCst);
         self.inner.forget(target).await
     }
 
-    async fn list(
-        &self,
-        request: ListRequest,
-    ) -> tinymemory_api::Result<tinymemory_api::ListPage> {
+    async fn list(&self, request: ListRequest) -> tinymemory_api::Result<tinymemory_api::ListPage> {
         self.calls.fetch_add(1, Ordering::SeqCst);
         self.inner.list(request).await
     }

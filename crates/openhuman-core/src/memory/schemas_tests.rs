@@ -357,10 +357,7 @@ async fn rpc_memory_handlers_apply_the_refuse_boundary_before_operations() {
             "forget",
             json!({"ids": ["not-present"], "reach": outside.clone()}),
         ),
-        (
-            "items_list",
-            json!({"filter": {"reach": outside.clone()}}),
-        ),
+        ("items_list", json!({"filter": {"reach": outside.clone()}})),
         (
             "explore",
             json!({
@@ -539,7 +536,8 @@ async fn rpc_learn_invalidates_a_cached_prefetch_pack() {
 
     let ctx = CoreContext::for_test_with_config(DomainSet::full(), config.clone());
     let dispatch = DispatchCtx::new(ctx.clone());
-    let identity = tinymemory_tools::layout::identity::Identity::root().resolve(&crate::memory::scope::identity_pins(&config));
+    let identity = tinymemory_tools::layout::identity::Identity::root()
+        .resolve(&crate::memory::scope::identity_pins(&config));
     let thread = "rpc-learn-invalidates-prefetch";
     let input = || {
         (
