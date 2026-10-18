@@ -10,9 +10,9 @@ use async_trait::async_trait;
 use tinyagents_harness::context::RunContext;
 use tinyagents_harness::error::Result as TaResult;
 use tinyagents_harness::middleware::{
-    call_effect, dispatch_target, is_repeat_call_exempt, repeat_guard_marker, CallEffect,
-    FailureScope, FailureScopeMiddleware, FailureScopePolicy, FailureStopKind, Middleware,
-    ToolFactsLookup, ToolInvocationIdentity,
+    call_effect, dispatch_target, is_repeat_call_exempt, repeat_guard_marker, FailureScope,
+    FailureScopeMiddleware, FailureScopePolicy, FailureStopKind, Middleware, ToolFactsLookup,
+    ToolInvocationIdentity,
 };
 use tinyagents_harness::no_progress::FailurePolicy;
 use tinyagents_harness::steering::SteeringHandle;
