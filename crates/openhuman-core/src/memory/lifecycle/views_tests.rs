@@ -136,6 +136,7 @@ async fn the_preview_reads_without_logging_and_agents_are_listed() {
         Utc::now(),
         false,
         None,
+        None,
     )
     .await;
 
