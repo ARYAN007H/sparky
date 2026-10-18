@@ -6,11 +6,14 @@
 //! session's config) share one implementation. Every write is
 //! scrubbed of secrets and PII by the bound engine itself ([`super::guard`]).
 
+use std::collections::{BTreeMap, BTreeSet};
+use std::path::Path;
+
 use chrono::Utc;
 use tinymemory_api::{
-    EraseRequest, FetchRequest, ForgetTarget, ItemId, LearningKind, ListRequest, MemoryMeta,
-    MetaFilter, Namespace, Reach, RecallMode, RecallRequest, StoreItem, StoreReceipt, ThreadWindow,
-    TimeHint, WriteOptions,
+    EraseRequest, FetchRequest, ForgetTarget, ItemId, ItemKind, LearningKind, ListRequest,
+    MemoryMeta, MetaFilter, Namespace, Reach, RecallMode, RecallRequest, StoreItem, StoreReceipt,
+    ThreadWindow, TimeHint, WriteOptions,
 };
 use tinymemory_tools::confine::{Confinement, Policy};
 
@@ -400,6 +403,189 @@ pub async fn forget(config: &Config, params: ForgetParams) -> Result<ForgetView>
     Ok(ForgetView {
         forgotten: report.forgotten,
     })
+}
+
+/// Forgets conversation memory owned by an external channel on disconnect.
+///
+/// The engine filter removes stamped turns in one operation. A bounded
+/// snapshot of canonical thread IDs plus the previous release's read-only
+/// channel map supplies thread-level fallback for turns that predate channel
+/// metadata. New turns never write that map; remove the compatibility reader
+/// after one release.
+pub async fn forget_channel(config: &Config, channel: &str) -> Result<usize> {
+    let channel = channel.trim().to_ascii_lowercase();
+    let legacy_threads = legacy_channel_threads(&config.workspace_dir, &channel);
+    let bound = match engine::resolve(config).engine() {
+        Ok(bound) => Some(bound),
+        Err(Error::Off(_)) => None,
+        Err(error) => return Err(error),
+    };
+    if channel.is_empty() {
+        return Ok(0);
+    }
+
+    // Capture the request's tenant/profile before the thread-store wrappers
+    // move their I/O to the blocking pool.
+    let ctx = crate::core::runtime::DispatchCtx::ambient();
+    let threads = channel_thread_snapshot(&ctx, config, &channel, legacy_threads).await?;
+    let Some(bound) = bound else {
+        enqueue_channel_threads(config, &threads);
+        tracing::debug!(channel = %channel, queued = threads.len(), "[memory:channels] channel forget queued");
+        return Ok(0);
+    };
+
+    let filter = MetaFilter {
+        channel: Some(channel.clone()),
+        ..MetaFilter::kinds([ItemKind::Conversation])
+    };
+    let mut forgotten = match bound.engine.forget(ForgetTarget::Filter(filter)).await {
+        Ok(report) => report.forgotten,
+        Err(Error::Off(_)) => {
+            enqueue_channel_threads(config, &threads);
+            return Ok(0);
+        }
+        Err(error) => {
+            enqueue_channel_threads(config, &threads);
+            return Err(error);
+        }
+    };
+
+    let mut failure = None;
+    for thread_id in &threads {
+        match forget_channel_thread(&bound, thread_id).await {
+            Ok(count) => forgotten += count,
+            Err(error) => {
+                super::deletion::enqueue(
+                    &config.workspace_dir,
+                    super::deletion::PendingDeletion::Thread {
+                        thread_id: thread_id.clone(),
+                    },
+                );
+                if !matches!(error, Error::Off(_)) && failure.is_none() {
+                    failure = Some(error);
+                }
+            }
+        }
+    }
+
+    tracing::debug!(
+        channel = %channel,
+        forgotten,
+        queued = super::deletion::pending(&config.workspace_dir).len(),
+        "[memory:channels] channel forgotten"
+    );
+    match failure {
+        Some(error) => Err(error),
+        None => Ok(forgotten),
+    }
+}
+
+fn channel_key(channel: &str) -> String {
+    channel.trim().to_ascii_lowercase()
+}
+
+/// Reads only the legacy map written by prior releases. Corrupt JSON keeps the
+/// existing quarantine behavior; current code never creates or updates it.
+fn legacy_channel_threads(workspace: &Path, channel: &str) -> BTreeSet<String> {
+    let file = workspace.join("memory").join("channel_threads.json");
+    let Ok(text) = std::fs::read_to_string(&file) else {
+        return BTreeSet::new();
+    };
+    let all: BTreeMap<String, BTreeSet<String>> = serde_json::from_str(&text).unwrap_or_else(
+        |error| {
+            tracing::warn!(%error, "[memory:channels] legacy channel map unparsable; set aside");
+            if let Err(error) = std::fs::rename(&file, file.with_extension("json.corrupt")) {
+                tracing::warn!(%error, "[memory:channels] could not set legacy map aside");
+            }
+            BTreeMap::new()
+        },
+    );
+    all.get(&channel_key(channel)).cloned().unwrap_or_default()
+}
+
+fn is_channel_thread_id(thread_id: &str, channel: &str) -> bool {
+    let base = tinychannels_runtime::channel::derive_inbound_thread_id(channel, None, None, None);
+    if thread_id == base {
+        return true;
+    }
+    thread_id.strip_prefix(&base).is_some_and(|suffix| {
+        suffix.starts_with('/') || suffix.starts_with("#thread:")
+    })
+}
+
+fn enqueue_channel_threads(config: &Config, threads: &BTreeSet<String>) {
+    for thread_id in threads {
+        super::deletion::enqueue(
+            &config.workspace_dir,
+            super::deletion::PendingDeletion::Thread {
+                thread_id: thread_id.clone(),
+            },
+        );
+    }
+}
+
+async fn channel_thread_snapshot(
+    ctx: &crate::core::runtime::DispatchCtx,
+    config: &Config,
+    channel: &str,
+    mut owned: BTreeSet<String>,
+) -> Result<BTreeSet<String>> {
+    let threads = match crate::threads::store::blocking::list_threads(
+        ctx.clone(),
+        config.workspace_dir.clone(),
+    )
+    .await
+    {
+        Ok(threads) => threads,
+        Err(error) => {
+            enqueue_channel_threads(config, &owned);
+            return Err(Error::Engine(format!(
+                "reading channel thread snapshot failed: {error}"
+            )));
+        }
+    };
+    for thread in threads {
+        if owned.contains(&thread.id) || is_channel_thread_id(&thread.id, channel) {
+            owned.insert(thread.id);
+            continue;
+        }
+        let messages = match crate::threads::store::blocking::get_messages(
+            ctx.clone(),
+            config.workspace_dir.clone(),
+            thread.id.clone(),
+        )
+        .await
+        {
+            Ok(messages) => messages,
+            Err(error) => {
+                enqueue_channel_threads(config, &owned);
+                return Err(Error::Engine(format!(
+                    "reading channel message snapshot failed: {error}"
+                )));
+            }
+        };
+        if messages.iter().any(|message| {
+            message
+                .extra_metadata
+                .get("channel")
+                .and_then(serde_json::Value::as_str)
+                .is_some_and(|value| channel_key(value) == channel)
+        }) {
+            owned.insert(thread.id);
+        }
+    }
+    Ok(owned)
+}
+
+async fn forget_channel_thread(
+    bound: &BoundEngine,
+    thread_id: &str,
+) -> Result<usize> {
+    let filter = MetaFilter {
+        thread_id: Some(thread_id.to_string()),
+        ..MetaFilter::kinds([ItemKind::Conversation])
+    };
+    Ok(bound.engine.forget(ForgetTarget::Filter(filter)).await?.forgotten)
 }
 
 /// `memory_erase_all`: erases everything the bound engine holds, the whole
