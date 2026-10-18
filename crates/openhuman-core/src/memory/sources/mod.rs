@@ -59,7 +59,7 @@ pub fn list(config: &Config) -> Vec<SourceView> {
 pub fn normalize_target(kind: MemorySourceKind, target: &str) -> Result<String> {
     let target = target.trim();
     if target.is_empty() {
-        return Err(Error::InvalidRequest(("target must not be empty").into()));
+        return Err(Error::InvalidRequest("target must not be empty".into()));
     }
     match kind {
         MemorySourceKind::Folder | MemorySourceKind::File => Ok(target.to_string()),
@@ -82,8 +82,8 @@ pub fn normalize_target(kind: MemorySourceKind, target: &str) -> Result<String> 
 }
 
 fn http_url(target: &str) -> Result<String> {
-    let url = url::Url::parse(target)
-        .map_err(|_| Error::InvalidRequest(("target is not a URL").into()))?;
+    let url =
+        url::Url::parse(target).map_err(|_| Error::InvalidRequest("target is not a URL".into()))?;
     if !matches!(url.scheme(), "http" | "https") || url.host_str().is_none() {
         return Err(Error::InvalidRequest(
             ("target must be an http(s) URL").into(),

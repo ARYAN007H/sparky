@@ -147,7 +147,7 @@ pub fn apply_engine_set(config: &mut Config, params: &EngineSetParams) -> Result
 
 fn validate_endpoint(endpoint: &str) -> Result<()> {
     let parsed = url::Url::parse(endpoint)
-        .map_err(|_| Error::InvalidRequest(("the endpoint is not a valid URL").into()))?;
+        .map_err(|_| Error::InvalidRequest("the endpoint is not a valid URL".into()))?;
     if !matches!(parsed.scheme(), "http" | "https") || parsed.host_str().is_none() {
         return Err(Error::InvalidRequest(
             ("the endpoint must be an http(s) URL with a host").into(),

@@ -154,7 +154,7 @@ pub async fn search(
 ) -> Result<BrainSearchView> {
     let query = params.query.trim();
     if query.is_empty() {
-        return Err(Error::InvalidRequest(("the query is blank").into()));
+        return Err(Error::InvalidRequest("the query is blank".into()));
     }
     let source = params.source.as_deref().map(parse_source).transpose()?;
     let limit = super::types::clamp_limit(params.limit);
