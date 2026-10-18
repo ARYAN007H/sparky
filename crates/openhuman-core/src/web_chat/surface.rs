@@ -154,12 +154,7 @@ impl Surface {
                 return;
             }
         };
-        let terminal = matches!(
-            &event,
-            ChannelOutputEvent::FinalMessage { .. }
-                | ChannelOutputEvent::ChatError { .. }
-                | ChannelOutputEvent::ChatCancelled { .. }
-        );
+        let terminal = matches!(&event, ChannelOutputEvent::FinalMessage { .. });
         let projected: tinychannels_bus::module_web_output::WebOutputEvents = match state
             .module
             .call_confidential(
