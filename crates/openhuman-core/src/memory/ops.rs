@@ -491,15 +491,14 @@ fn legacy_channel_threads(workspace: &Path, channel: &str) -> BTreeSet<String> {
     let Ok(text) = std::fs::read_to_string(&file) else {
         return BTreeSet::new();
     };
-    let all: BTreeMap<String, BTreeSet<String>> = serde_json::from_str(&text).unwrap_or_else(
-        |error| {
+    let all: BTreeMap<String, BTreeSet<String>> =
+        serde_json::from_str(&text).unwrap_or_else(|error| {
             tracing::warn!(%error, "[memory:channels] legacy channel map unparsable; set aside");
             if let Err(error) = std::fs::rename(&file, file.with_extension("json.corrupt")) {
                 tracing::warn!(%error, "[memory:channels] could not set legacy map aside");
             }
             BTreeMap::new()
-        },
-    );
+        });
     all.get(&channel_key(channel)).cloned().unwrap_or_default()
 }
 
@@ -508,9 +507,9 @@ fn is_channel_thread_id(thread_id: &str, channel: &str) -> bool {
     if thread_id == base {
         return true;
     }
-    thread_id.strip_prefix(&base).is_some_and(|suffix| {
-        suffix.starts_with('/') || suffix.starts_with("#thread:")
-    })
+    thread_id
+        .strip_prefix(&base)
+        .is_some_and(|suffix| suffix.starts_with('/') || suffix.starts_with("#thread:"))
 }
 
 fn enqueue_channel_threads(config: &Config, threads: &BTreeSet<String>) {
@@ -577,15 +576,16 @@ async fn channel_thread_snapshot(
     Ok(owned)
 }
 
-async fn forget_channel_thread(
-    bound: &BoundEngine,
-    thread_id: &str,
-) -> Result<usize> {
+async fn forget_channel_thread(bound: &BoundEngine, thread_id: &str) -> Result<usize> {
     let filter = MetaFilter {
         thread_id: Some(thread_id.to_string()),
         ..MetaFilter::kinds([ItemKind::Conversation])
     };
-    Ok(bound.engine.forget(ForgetTarget::Filter(filter)).await?.forgotten)
+    Ok(bound
+        .engine
+        .forget(ForgetTarget::Filter(filter))
+        .await?
+        .forgotten)
 }
 
 /// `memory_erase_all`: erases everything the bound engine holds, the whole

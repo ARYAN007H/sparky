@@ -1,12 +1,12 @@
 use super::*;
-use std::sync::Arc;
-use tinymemory_api::conformance::ReferenceEngine;
-use tinymemory_api::{MemoryEngine, MemoryMeta, Role, SourceKind, StoreItem, Turn};
 use crate::core::runtime::{ContextOverlay, CoreContext, DispatchCtx, DomainSet};
 use crate::threads::store::{
     ConversationMessage, ConversationMessagePatch, CreateConversationThread,
 };
 use serde_json::json;
+use std::sync::Arc;
+use tinymemory_api::conformance::ReferenceEngine;
+use tinymemory_api::{MemoryEngine, MemoryMeta, Role, SourceKind, StoreItem, Turn};
 
 fn conversation(thread: &str, channel: Option<&str>) -> StoreItem {
     let mut meta = MemoryMeta::from_source(SourceKind::Conversation, Some(thread.to_string()));
@@ -385,7 +385,13 @@ async fn offline_snapshot_scans_every_thread_and_message_page() {
     assert!(threads[..64]
         .iter()
         .all(|thread| thread.id != target_thread));
-    assert!(threads.iter().position(|thread| thread.id == target_thread).unwrap() >= 64);
+    assert!(
+        threads
+            .iter()
+            .position(|thread| thread.id == target_thread)
+            .unwrap()
+            >= 64
+    );
 
     let messages = crate::threads::store::blocking::get_messages(
         ctx.clone(),
@@ -467,7 +473,10 @@ async fn filter_failure_is_visible_and_queued_snapshot_does_not_catch_reconnecte
         tinymemory_api::MetaFilter::kinds([tinymemory_api::ItemKind::Conversation]),
     )
     .await;
-    assert_eq!(remaining[0].meta.thread_id.as_deref(), Some(new_thread.as_str()));
+    assert_eq!(
+        remaining[0].meta.thread_id.as_deref(),
+        Some(new_thread.as_str())
+    );
 }
 
 #[tokio::test]
