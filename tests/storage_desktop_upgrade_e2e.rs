@@ -504,9 +504,6 @@ async fn a_desktop_upgrade_is_lossless_and_leaves_the_legacy_files_untouched() {
 
     // Connectors: preferences and each day's archive in its own stream.
     let connectors = module_storage(backend.as_ref(), "tinyconnectors");
-    for c in ["composio-user-scopes","connectors.user_scopes"] { eprintln!("DBG {c} {}", count(&connectors, c).await); }
-    eprintln!("DBG streams {:?}", connectors.streams().len("triggers/2026-10-12").await.ok());
-    eprintln!("DBG streams {:?}", connectors.streams().len("connectors.triggers/2026-10-12").await.ok());
     assert_eq!(
         count(&connectors, "connectors.user_scopes").await,
         fixture.connector_prefs
