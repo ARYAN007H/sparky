@@ -12,7 +12,12 @@ fn child_tool_surface_never_contains_any_spawn_or_continuation_tool() {
     let spawn_names = tinyagents_definition::SPAWN_TOOL_NAMES
         .iter()
         .copied()
-        .chain(["delegate", "delegate_graph", "delegate_researcher", "continue_subagent"])
+        .chain([
+            "delegate",
+            "delegate_graph",
+            "delegate_researcher",
+            "continue_subagent",
+        ])
         .collect::<Vec<_>>();
     for name in &spawn_names {
         assert!(
@@ -21,9 +26,9 @@ fn child_tool_surface_never_contains_any_spawn_or_continuation_tool() {
         );
     }
     let tools: Vec<Box<dyn Tool>> = spawn_names
-    .into_iter()
-    .map(|name| Box::new(NamedTool(name)) as Box<dyn Tool>)
-    .collect();
+        .into_iter()
+        .map(|name| Box::new(NamedTool(name)) as Box<dyn Tool>)
+        .collect();
 
     let indices = filter_tool_indices(&tools, &ToolScope::Wildcard, &[], None);
 
