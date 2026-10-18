@@ -15,12 +15,12 @@ use super::secrets::{
 use anyhow::{Context, Result};
 use std::path::Path;
 
+pub(crate) use super::config_file_read::parse_config_with_recovery;
 pub(super) use super::config_file_read::read_config_with_recovery_or_default;
+pub(crate) use super::config_file_read::CONFIG_OWNER_MISMATCH_MARKER;
 pub(super) use super::config_file_read::{
     migration_source, parse_config_boxed, parse_toml_off_worker,
 };
-pub(crate) use super::config_file_read::parse_config_with_recovery;
-pub(crate) use super::config_file_read::CONFIG_OWNER_MISMATCH_MARKER;
 pub(super) use super::parse_source::parse_source_contents;
 
 impl Config {
