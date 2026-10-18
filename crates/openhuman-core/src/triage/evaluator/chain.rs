@@ -139,7 +139,7 @@ where
                         BreakerRejection::Backoff {
                             next_attempt_ms, ..
                         } => next_attempt_ms.saturating_sub(monotonic_ms()),
-                        BreakerRejection::InFlight => OUTAGE_BACKOFF_BASE_MS as u64,
+                        BreakerRejection::InFlight => 1_000,
                     };
                     return Ok(TriageOutcome::Deferred {
                         defer_until_ms: now_ms().saturating_add(delta_ms as i64),
@@ -168,14 +168,11 @@ where
     // ── Cloud arm ──────────────────────────────────────────────────
     match try_arm(&cloud, envelope, TriageResolutionPath::Cloud).await {
         Ok(run) => {
-            clear_outage(retry_state, &retry_key);
-            if let Some(attempt) = outage_attempt.as_mut() {
-                attempt.record_success();
-            }
+            clear_outage(outage_attempt.as_mut());
             return Ok(TriageOutcome::Decision(run));
         }
         Err(ArmError::Fatal(err)) => {
-            clear_outage(retry_state, &retry_key);
+            clear_outage(outage_attempt.as_mut());
             return Err(err);
         }
         Err(ArmError::BudgetExhausted(err)) => {
@@ -239,14 +236,11 @@ where
 
                 match try_arm(&cloud, envelope, TriageResolutionPath::CloudAfterRetry).await {
                     Ok(run) => {
-                        clear_outage(retry_state, &retry_key);
-                        if let Some(attempt) = outage_attempt.as_mut() {
-                            attempt.record_success();
-                        }
+                    clear_outage(outage_attempt.as_mut());
                         return Ok(TriageOutcome::Decision(run));
                     }
                     Err(ArmError::Fatal(err)) => {
-                        clear_outage(retry_state, &retry_key);
+                    clear_outage(outage_attempt.as_mut());
                         return Err(err);
                     }
                     Err(ArmError::BudgetExhausted(err)) => {
@@ -319,10 +313,7 @@ where
             "cloud retry exhausted; local arm unavailable".to_string()
         };
         if cloud_budget_exhausted.is_some() || cloud_safety_flagged.is_some() {
-            clear_outage(retry_state, &retry_key);
-            if let Some(attempt) = outage_attempt.as_mut() {
-                attempt.record_success();
-            }
+            clear_outage(outage_attempt.as_mut());
             return Ok(TriageOutcome::Terminal { reason });
         }
 
@@ -346,7 +337,7 @@ where
 
     match try_arm(&local, envelope, TriageResolutionPath::LocalFallback).await {
         Ok(run) => {
-            clear_outage(retry_state, &retry_key);
+            clear_outage(outage_attempt.as_mut());
             Ok(TriageOutcome::Decision(run))
         }
         Err(ArmError::Fatal(err))
@@ -395,9 +386,9 @@ fn now_ms() -> i64 {
     chrono::Utc::now().timestamp_millis()
 }
 
-fn clear_outage(state: Option<&RetryState>, key: &str) {
-    if let Some(state) = state {
-        state.reset(&key.to_string());
+fn clear_outage(attempt: Option<&mut PersistentFailoverAttempt<String>>) {
+    if let Some(attempt) = attempt {
+        attempt.record_success();
     }
 }
 
@@ -411,7 +402,13 @@ pub(crate) fn begin_outage_attempt(
 pub(crate) fn record_outage(
     attempt: Option<&mut PersistentFailoverAttempt<String>>,
 ) -> Option<TriageOutcome> {
-    let failure = attempt?.record_failure(monotonic_ms())?;
+    let attempt = attempt?;
+    let Some(failure) = attempt.record_failure(monotonic_ms()) else {
+        return Some(TriageOutcome::Deferred {
+            defer_until_ms: now_ms().saturating_add(OUTAGE_BACKOFF_BASE_MS),
+            reason: "managed backend recovered during another attempt".to_string(),
+        });
+    };
     let delay_ms = failure
         .next_attempt_ms
         .saturating_sub(monotonic_ms())
