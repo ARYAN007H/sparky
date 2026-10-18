@@ -5989,34 +5989,6 @@ async fn start_mock_evm_with_chain_id(chain_id_hex: &str) -> (SocketAddr, Arc<Mu
     (addr, raw_txs)
 }
 
-async fn mock_solana_rpc(Json(payload): Json<Value>) -> Json<Value> {
-    let method = payload
-        .get("method")
-        .and_then(Value::as_str)
-        .unwrap_or_default();
-    let result = match method {
-        "getLatestBlockhash" => json!({
-            "context": {"slot": 0},
-            "value": {
-                "blockhash": "GHtXQBsoZHVnNFa9YevAzFr17DJjgHXk3ycTKD5xD3Zi",
-                "lastValidBlockHeight": 0u64
-            }
-        }),
-        "getBalance" => json!({"context": {"slot": 0}, "value": 0u64}),
-        "sendTransaction" => Value::String(
-            "5xS9pXmqVz8R1nuRZTfsdsAxBdBFmtnAtuYbCsmK5DYzGn5vR4VqWGmiR5McLnYx8oFqLdo62q4qiUZpQyR4Hkn3".to_string(),
-        ),
-        _ => Value::Null,
-    };
-    Json(json!({"jsonrpc":"2.0","id":1,"result":result}))
-}
-
-async fn start_mock_solana() -> SocketAddr {
-    let app = Router::new().route("/", post(mock_solana_rpc));
-    let (addr, _join) = serve_on_ephemeral(app).await;
-    addr
-}
-
 async fn wallet_setup_via_rpc(rpc_base: &str, encrypted_mnemonic: &str) {
     let setup = post_json_rpc(
         rpc_base,
