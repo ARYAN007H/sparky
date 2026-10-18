@@ -77,7 +77,8 @@ impl MediaSourceResolver<AttachmentAccessScope> for AttachmentModel {
         max_bytes: usize,
         mime_hint: Option<&str>,
     ) -> Result<ResolvedMedia, String> {
-        if source.contains("://")
+        if !source.starts_with("data:")
+            && source.contains("://")
             && !source.starts_with("http://")
             && !source.starts_with("https://")
         {
@@ -291,9 +292,7 @@ fn history_source_block(modality: InputModality, source: &str) -> ContentBlock {
             mime_type: None,
         }),
         modality => {
-            let media = if source.starts_with("data:")
-                || source.starts_with("http://")
-                || source.starts_with("https://")
+            let media = if source.starts_with("data:") || source.contains("://")
             {
                 MediaRef::Url {
                     url: source.to_owned(),

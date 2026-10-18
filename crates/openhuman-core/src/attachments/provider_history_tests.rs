@@ -47,6 +47,10 @@ async fn missing_historical_media_does_not_block_latest_valid_media() {
             mime_type: Some("image/png".into()),
         })
     }));
+    old_content.push(ContentBlock::Document(MediaRef::Url {
+        url: "ftp://docs.example.test/old.pdf?signature=document-private".into(),
+        media_type: Some("application/pdf".into()),
+    }));
     let old_user = Message::User(tinyinference_llm::message::UserMessage {
         content: old_content,
     });
@@ -69,6 +73,9 @@ async fn missing_historical_media_does_not_block_latest_valid_media() {
     assert!(!serde_json::to_string(history)
         .unwrap()
         .contains("also-private"));
+    assert!(!serde_json::to_string(history)
+        .unwrap()
+        .contains("document-private"));
     let durable_text = serde_json::to_string(&durable).unwrap();
     assert!(signed_urls.iter().all(|url| durable_text.contains(url)));
     assert!(serde_json::to_string(&captured[0].messages[1])

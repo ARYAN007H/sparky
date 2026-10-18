@@ -539,8 +539,8 @@ fn secure_open_rejects_invalid_paths_and_reads_authorized_absolute_paths() {
 #[tokio::test]
 async fn unsupported_media_urls_and_oversized_inline_sources_fail_before_inference() {
     let temp = tempfile::tempdir().unwrap();
-    let config = offline_config(temp.path());
     let transport = Arc::new(CaptureModel::new(vec![]));
+    let config = offline_config(temp.path());
     let model = controlled_wrapper(transport.clone(), config, &[]);
 
     let unsupported = user_request(vec![ContentBlock::Document(MediaRef::Url {
@@ -550,16 +550,47 @@ async fn unsupported_media_urls_and_oversized_inline_sources_fail_before_inferen
     let error = model.invoke(&(), unsupported).await.unwrap_err();
     assert!(error.to_string().contains("unsupported media URL scheme"));
 
-    // Leave room for a data-URI header while still proving an oversized body
-    // is rejected before the owner resolver or inference transport runs.
-    let max_encoded_bytes = 50 * 1024 * 1024 * 4 / 3 + 4097;
+    // The host guard rejects encoded data larger than its configured limit
+    // (including room for the data-URI header) before calling the resolver.
+    let mut small_limit = (*offline_config(temp.path())).clone();
+    small_limit.multimodal_files.max_file_size_mb = 1;
+    let model = controlled_wrapper(transport.clone(), Arc::new(small_limit), &[]);
+    let max_encoded_bytes = 1024 * 1024 * 4 / 3 + 4097;
     let oversized = user_request(vec![ContentBlock::Document(MediaRef::Base64 {
         data: "A".repeat(max_encoded_bytes + 1),
         media_type: "application/octet-stream".into(),
     })]);
     let error = model.invoke(&(), oversized).await.unwrap_err();
-    assert!(error
-        .to_string()
-        .contains("attachment exceeds configured file limit"));
+    assert!(error.to_string().contains("attachment exceeds configured file limit"));
+
+    // A valid base64 body just over the decoded byte limit must also fail
+    // before legacy materialization or inference.
+    let decoded_oversize_len = ((1024 * 1024 + 1 + 2) / 3) * 4;
+    let decoded_oversized = user_request(vec![ContentBlock::Document(MediaRef::Base64 {
+        data: "A".repeat(decoded_oversize_len),
+        media_type: "text/plain".into(),
+    })]);
+    let error = model.invoke(&(), decoded_oversized).await.unwrap_err();
+    assert!(error.to_string().to_lowercase().contains("limit"));
     assert!(transport.requests.lock().unwrap().is_empty());
+    assert!(!temp.path().join("uploads/legacy-media").exists());
+}
+
+#[tokio::test]
+async fn data_uri_payload_containing_a_url_is_not_treated_as_a_remote_source() {
+    let temp = tempfile::tempdir().unwrap();
+    let config = offline_config(temp.path());
+    let transport = Arc::new(CaptureModel::new(vec![]));
+    let model = controlled_wrapper(transport.clone(), config, &[]);
+    let request = user_request(vec![ContentBlock::Document(MediaRef::Url {
+        url: "data:text/plain,https://files.invalid/reference".into(),
+        media_type: Some("text/plain".into()),
+    })]);
+
+    model.invoke(&(), request).await.unwrap();
+    let captured = transport.requests.lock().unwrap();
+    assert_eq!(captured.len(), 1);
+    assert!(captured[0].1.messages[0]
+        .text()
+        .contains("https://files.invalid/reference"));
 }
