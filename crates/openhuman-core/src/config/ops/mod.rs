@@ -29,6 +29,17 @@ pub(crate) fn config_save_error_with_context(
     if let Some(conflict) = config_save_conflict(&error, retryable) {
         return conflict.encode();
     }
+    format!("{context}: {error}")
+}
+
+pub(crate) fn config_save_error_with_full_context(
+    error: anyhow::Error,
+    context: &str,
+    retryable: bool,
+) -> String {
+    if let Some(conflict) = config_save_conflict(&error, retryable) {
+        return conflict.encode();
+    }
     format!("{context}: {error:#}")
 }
 
