@@ -128,13 +128,16 @@ async fn a_record_already_on_the_backend_wins_over_a_stale_file() {
 async fn a_file_that_is_not_a_credential_document_is_left_in_place() {
     install_master_key_source(Arc::new(FixedKey));
     let fx = v1_profile();
-    write(&fx.target.profile_dir.join(PROFILES_FILENAME), "[]");
+    write(
+        &fx.target.profile_dir.join(PROFILES_FILENAME),
+        r#"{"profiles":[]}"#,
+    );
     write(&fx.target.profile_dir.join(STORE_FILENAME), HTTP);
     run(&fx).await.unwrap();
     clear_master_key_source();
     assert_eq!(
         std::fs::read_to_string(fx.target.profile_dir.join(PROFILES_FILENAME)).unwrap(),
-        "[]"
+        r#"{"profiles":[]}"#
     );
     assert!(!fx.target.profile_dir.join(STORE_FILENAME).exists());
 }
