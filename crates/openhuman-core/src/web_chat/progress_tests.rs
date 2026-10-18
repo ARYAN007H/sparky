@@ -1,6 +1,6 @@
 use super::*;
 use crate::config::Config;
-use crate::web_chat::WebChannelEvent;
+use crate::web_chat::{ScopedWebEvent, WebChannelEvent};
 use std::time::Duration;
 use tinyagents_harness::progress::AgentProgress;
 use tokio::sync::broadcast::error::TryRecvError;
@@ -169,12 +169,12 @@ fn drain_test_config(tmp: &tempfile::TempDir) -> Config {
 /// events for other threads (the bus is a process-global broadcast) and
 /// tolerating broadcast lag. Panics if the channel closes first.
 async fn recv_for_thread(
-    rx: &mut tokio::sync::broadcast::Receiver<WebChannelEvent>,
+    rx: &mut tokio::sync::broadcast::Receiver<ScopedWebEvent>,
     thread_id: &str,
-) -> WebChannelEvent {
+) -> ScopedWebEvent {
     loop {
         match rx.recv().await {
-            Ok(ev) if ev.thread_id == thread_id => return ev,
+            Ok(ev) if ev.context().thread_id == thread_id => return ev,
             Ok(_) => continue,
             Err(err) => panic!("web-channel bus closed before event: {err}"),
         }
@@ -267,7 +267,7 @@ async fn stops_heartbeat_after_turn_completed() {
     loop {
         match events.try_recv() {
             Ok(ev) => assert_ne!(
-                (ev.thread_id.as_str(), ev.event.as_str()),
+                (ev.context().thread_id.as_str(), ev.event_name()),
                 (thread_id, "inference_heartbeat"),
                 "heartbeat emitted after TurnCompleted"
             ),
@@ -297,9 +297,9 @@ async fn no_heartbeat_before_turn_started() {
     loop {
         match events.try_recv() {
             Ok(ev) => assert_ne!(
-                ev.thread_id, thread_id,
+                ev.context().thread_id, thread_id,
                 "unexpected pre-turn event {} for {thread_id}",
-                ev.event
+                ev.event_name()
             ),
             Err(TryRecvError::Empty | TryRecvError::Closed) => break,
             Err(TryRecvError::Lagged(_)) => continue,
@@ -354,8 +354,8 @@ async fn stamps_monotonic_seq_on_emitted_events() {
     let mut seqs = Vec::new();
     for _ in 0..3 {
         let ev = recv_for_thread(&mut events, thread_id).await;
-        assert_eq!(ev.request_id, request_id);
-        seqs.push(ev.seq.expect("every emitted event carries a seq"));
+        assert_eq!(ev.context().request_id, request_id);
+        seqs.push(ev.context().seq.expect("every emitted event carries a seq"));
     }
     // The very first emitted event starts the per-request counter at 1.
     assert_eq!(seqs[0], 1, "seq counter starts at 1 for the request");
@@ -407,15 +407,21 @@ async fn short_narration_is_flushed_on_the_rounds_first_tool_call() {
     let interim = tokio::time::timeout(Duration::from_secs(5), async {
         loop {
             let ev = recv_for_thread(&mut bus, "thread-short-narration").await;
-            if ev.event == "chat_interim" {
+            if ev.event_name() == "chat_interim" {
                 return ev;
             }
         }
     })
     .await
     .expect("chat_interim within timeout");
-    assert_eq!(interim.full_response.as_deref(), Some("Let me check."));
-    assert_eq!(interim.round, Some(1));
+    assert!(matches!(
+        interim.wire_event(),
+        WebChannelEvent::ChatInterim {
+            full_response: Some(text),
+            round: Some(1),
+            ..
+        } if text == "Let me check."
+    ));
 }
 
 #[tokio::test]
@@ -466,9 +472,13 @@ async fn hold_text_stream_suppresses_text_delta_but_keeps_interim() {
         let mut seen = Vec::new();
         loop {
             match bus.recv().await {
-                Ok(ev) if ev.thread_id == "thread-hold" => {
-                    let done = ev.event == "chat_interim";
-                    seen.push((ev.event.clone(), ev.full_response.clone()));
+                Ok(ev) if ev.context().thread_id == "thread-hold" => {
+                    let done = ev.event_name() == "chat_interim";
+                    let full_response = match ev.wire_event() {
+                        WebChannelEvent::ChatInterim { full_response, .. } => full_response.clone(),
+                        _ => None,
+                    };
+                    seen.push((ev.event_name().to_owned(), full_response));
                     if done {
                         return seen;
                     }
@@ -514,9 +524,12 @@ mod subagent_tests {
         .unwrap();
 
         let ev = recv_for_thread(&mut events, thread_id).await;
-        assert_eq!(ev.event, "subagent_spawned");
-        let subagent = ev.subagent.expect("subagent detail present");
-        assert_eq!(subagent.parent_call_id.as_deref(), Some("call-parent-1"));
+        assert!(matches!(
+            ev.wire_event(),
+            WebChannelEvent::SubagentSpawned {
+                subagent: Some(subagent), ..
+            } if subagent.parent_call_id.as_deref() == Some("call-parent-1")
+        ));
     }
 
     /// Terminal sub-agent events (`_completed`/`_failed`/`_awaiting_user`) must
