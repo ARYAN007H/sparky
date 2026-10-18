@@ -233,25 +233,9 @@ impl SessionDriver<OpenHumanRunContext> for OpenHumanSessionDriver {
                 ));
             }
         };
-        // From here onward close, required-output repair, and durable commit
-        // can still be cancelled or fail. Keep the native terminal handle on
-        // the per-turn sidecar immediately so `on_terminal` can finalize it
-        // after Tiny persists any recoverable partial transcript.
-        sidecar
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .deferred_terminal = outcome.deferred_terminal.take();
-        let supplemental_trace = sidecar
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .deferred_terminal
-            .as_ref()
-            .map(|terminal| {
-                grounded_close::SupplementalTrace::new(
-                    terminal.events.clone(),
-                    terminal.run_id.clone(),
-                )
-            });
+        let supplemental_trace = grounded_close::SupplementalTrace::install_for_turn(
+            &sidecar, &mut outcome,
+        );
 
         if outcome.text.trim().is_empty() && outcome.tool_outcomes.is_empty() {
             return Err(driver_error(

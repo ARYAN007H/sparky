@@ -1,10 +1,12 @@
 //! Native trace export for completed TinyAgents runs.
 //!
-//! OpenHuman owns product attribution, privacy gates, local export settings,
-//! and the authenticated backend transport. TinyAgents owns the span
-//! collector, journal projection, and OTLP payload format.
+//! OpenHuman gates and sends native TinyAgents trace exports.
 
 mod export;
+
+#[cfg(test)]
+#[path = "trace_export_adoption_tests.rs"]
+mod adoption_tests;
 
 use tinyagents_harness::observability::trace_export::ExportBrand;
 

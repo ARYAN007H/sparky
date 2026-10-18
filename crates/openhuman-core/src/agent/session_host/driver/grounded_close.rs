@@ -72,6 +72,19 @@ impl SupplementalTrace {
         })
     }
 
+    pub(super) fn install_for_turn(
+        sidecar: &std::sync::Mutex<crate::agent::tinyagents::host::run_context::SessionTurnSidecar>,
+        outcome: &mut TinyagentsTurnOutcome,
+    ) -> Option<Arc<Self>> {
+        let terminal = outcome.deferred_terminal.take()?;
+        let trace = Self::new(terminal.events.clone(), terminal.run_id.clone());
+        sidecar
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .deferred_terminal = Some(terminal);
+        Some(trace)
+    }
+
     fn begin(&self, model: &str) -> (CallId, u64) {
         let n = self.next_call.fetch_add(1, Ordering::Relaxed);
         let call_id = CallId::new(format!("{}-host-supplemental-{n}", self.run_id.as_str()));

@@ -150,9 +150,7 @@ pub(crate) struct SessionTurnSidecar {
     /// iteration cap). The driver classifies it; `after_commit` carries it on
     /// `TurnCompleted` so the trace shows a stopped turn at `WARNING`.
     pub stop: Option<tinyagents_harness::turn_stop::TurnStop>,
-    /// Native journal completion is held until the session transcript commits.
-    /// The driver stores it here after post-run close/repair has succeeded;
-    /// `after_commit` emits the final typed stop before flushing the journal.
+    /// Deferred native terminal finalized after transcript durability.
     pub deferred_terminal: Option<crate::agent::tinyagents::turn_outcome::DeferredTurnTerminal>,
 }
 

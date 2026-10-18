@@ -100,7 +100,7 @@ pub(super) fn tier_gate_decision(
 /// On success returns a [`SubagentRunOutcome`] whose `output` is the
 /// final assistant text. On failure the error is suitable for stringifying
 /// into a `tool_result` block — including the two dispatch refusals, whose
-/// messages tell the model to summarise rather than delegate again.
+/// messages direct the model to summarize rather than delegate again.
 pub(crate) async fn run_subagent_direct_with_native_context(
     definition: &AgentDefinition,
     task_prompt: &str,

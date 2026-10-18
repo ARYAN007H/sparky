@@ -1,7 +1,6 @@
 //! [`EventListener`] implementation for [`OpenhumanEventBridge`] — projects
 //! each `tinyagents` [`AgentEvent`] onto an [`AgentProgress`] update (or a
-//! grep-friendly trace line for events with no UI surface), plus the
-//! prompt-cache layout diagnostic helper drained after a run.
+//! grep-friendly trace lines for events with no UI surface.
 
 use tinyagents_harness::cache::CacheLayoutEvent;
 use tinyagents_harness::events::{AgentEvent, EventListener, EventRecord};
