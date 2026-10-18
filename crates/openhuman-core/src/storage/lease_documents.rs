@@ -240,7 +240,13 @@ impl LeaseStore for DocumentLeases {
         self.declare().await?;
         let renewed = self
             .leases_at(now_ms)
-            .renew(LEASE_OWNER, &grant.key, &self.node, grant.epoch, self.ttl_ms)
+            .renew(
+                LEASE_OWNER,
+                &grant.key,
+                &self.node,
+                grant.epoch,
+                self.ttl_ms,
+            )
             .await?;
         let Some(lease) = renewed else {
             // The held entry stays: it names an epoch the record has moved

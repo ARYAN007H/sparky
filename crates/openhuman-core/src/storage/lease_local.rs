@@ -229,13 +229,7 @@ impl LeaseStore for LocalLeases {
             previous_unclean = unclean,
             "[lease] local acquired"
         );
-        held.insert(
-            key.to_string(),
-            Holding {
-                file,
-                record,
-            },
-        );
+        held.insert(key.to_string(), Holding { file, record });
         Ok(LeaseGrant {
             key: key.to_string(),
             epoch,

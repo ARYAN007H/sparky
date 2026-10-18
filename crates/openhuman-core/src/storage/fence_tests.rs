@@ -34,7 +34,6 @@ fn a_fence_covers_its_exact_scope_and_prefix_only() {
     let grant = LeaseGrant {
         key: "alice".into(),
         epoch: 1,
-        version: tinystoragedrivers::Version(1),
         expires_at_ms: 1_000,
         previous_unclean: false,
     };
@@ -53,7 +52,6 @@ fn the_local_check_refuses_inside_the_skew_margin_and_after_renewal_admits_again
     let grant = LeaseGrant {
         key: "alice".into(),
         epoch: 3,
-        version: tinystoragedrivers::Version(1),
         expires_at_ms: 30_000,
         previous_unclean: false,
     };

@@ -3,6 +3,7 @@ use super::*;
 use std::time::Duration;
 
 use crate::storage::MemoryStorage;
+use tinystoragedrivers::Precondition;
 
 const TTL: Duration = Duration::from_millis(1_000);
 
@@ -52,7 +53,6 @@ async fn renew_extends_and_keeps_the_epoch() {
     let renewed = a.renew(&grant, 900).await.unwrap();
     assert_eq!(renewed.epoch, grant.epoch);
     assert_eq!(renewed.expires_at_ms, 1_900);
-    assert!(renewed.version > grant.version);
     assert!(matches!(
         b.acquire("k", 1_500).await,
         Err(LeaseError::Held(_))
@@ -106,8 +106,11 @@ async fn bad_keys_and_corrupt_records_are_storage_errors() {
         .documents()
         .put(
             LEASE_COLLECTION,
-            "k",
-            serde_json::json!({ "owner": 7 }),
+            &tinystoragedrivers::Key::of([LEASE_OWNER, "k"])
+                .unwrap()
+                .as_str()
+                .to_string(),
+            serde_json::json!({ "holder": 7 }),
             Precondition::None,
         )
         .await
