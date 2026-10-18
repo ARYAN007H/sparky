@@ -166,7 +166,7 @@ pub async fn forget_items(config: &Config, id: &str) -> Result<usize> {
         Err(Error::Off(_)) => None,
         Err(error) => return Err(error),
     };
-    let ops = match bound {
+    let ops = match &bound {
         Some(_) => super::ops::memory_ops(config)?,
         None => MemoryOps::unconfined(),
     };

@@ -60,6 +60,8 @@ pub struct ItemsGetView {
 /// `memory_explore`.
 pub async fn explore(config: &Config, params: ExploreParams) -> Result<ExplorePage> {
     let bound = engine::resolve(config).engine()?;
+    let facet = params.facet;
+    let depth = params.path.len();
     let page = super::ops::memory_ops(config)?
         .explore(
             bound.engine.as_ref(),
@@ -74,8 +76,8 @@ pub async fn explore(config: &Config, params: ExploreParams) -> Result<ExplorePa
         .await?;
     tracing::debug!(
         engine = %bound.id,
-        facet = params.facet.as_str(),
-        depth = params.path.len(),
+        facet = facet.as_str(),
+        depth,
         buckets = page.buckets.len(),
         total = page.total,
         truncated = page.truncated,

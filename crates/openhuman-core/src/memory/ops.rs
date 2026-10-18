@@ -336,7 +336,7 @@ pub async fn store_item(config: &Config, item: StoreItem) -> Result<StoreReceipt
 /// engine indexing the item.
 pub async fn store_item_with(
     config: &Config,
-    mut item: StoreItem,
+    item: StoreItem,
     options: WriteOptions,
 ) -> Result<StoreReceipt> {
     let item = memory_ops(config)?.store_item(item)?;
