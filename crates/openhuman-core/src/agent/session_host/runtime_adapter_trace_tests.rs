@@ -50,8 +50,9 @@ impl ChatModel<()> for GatedRepairModel {
 /// cancelled once Tiny has saved the partial transcript.
 #[tokio::test]
 async fn cancellation_during_required_output_repair_finalizes_native_run() {
-    use tinyagents_harness::events::{AgentEvent, HarnessStatusStore};
+    use tinyagents_harness::events::AgentEvent;
     use tinyagents_harness::ids::ExecutionStatus;
+    use tinyagents_harness::HarnessStatusStore;
     use tinyagents_harness::terminal::TerminalReason;
 
     let scratch = tempfile::tempdir().expect("isolated workspace");
