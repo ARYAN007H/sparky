@@ -56,7 +56,7 @@ pub mod module_client;
 pub mod ops;
 pub(crate) mod processing;
 pub mod schemas;
-#[cfg(test)]
+#[cfg(all(test, feature = "modules"))]
 pub(crate) mod test_backend_route;
 pub mod tools;
 pub(crate) mod trigger_history;
