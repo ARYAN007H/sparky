@@ -117,11 +117,15 @@ pub fn is_started() -> bool {
 /// module runtime. This is a read-only snapshot; it never starts the runtime.
 #[must_use]
 pub fn is_module_serving(id: &str) -> bool {
+    let Some(record) = crate::modules::registry::find(id) else {
+        return false;
+    };
     let Some(Ok(runtime)) = RUNTIME.get() else {
         return false;
     };
     runtime.host().list().into_iter().any(|module| {
-        module.name == id
+        module.manifest.bus_name.as_str() == record.bus_name
+            && module.manifest.object_path.as_str() == record.object_path
             && module.enabled
             && matches!(
                 module.state,

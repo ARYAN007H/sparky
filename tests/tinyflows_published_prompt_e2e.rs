@@ -68,6 +68,9 @@ async fn published_module_prompts_render_through_the_normal_host_path() {
         .await
         .expect("load the same scoped Config used by the prompt dump");
     let ctx = openhuman_core::core::runtime::DispatchCtx::host_default();
+    assert!(openhuman_core::modules::runtime::is_module_serving(
+        "tinyflows"
+    ));
     let discovered = openhuman_core::skills::load_workflow_metadata_for(&ctx, &config);
     let flow = discovered
         .iter()
