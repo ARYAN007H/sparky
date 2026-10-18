@@ -192,8 +192,6 @@ fn builtin_enabled(_b: &BuiltinAgent) -> bool {
 /// `load_builtins` parses and validates the bundled archetypes using the
 /// owning `tinyagents_definition::DefinitionSet`. Workspace definitions are
 /// validated by `AgentDefinitionRegistry::load` after overrides are merged.
-/// agents that violate the contract fail the boot rather than crashing
-/// at spawn time.
 /// Parse a single [`BuiltinAgent`] triple into a finished [`AgentDefinition`].
 fn parse_builtin(b: &BuiltinAgent) -> Result<AgentDefinition> {
     // The TOML ships without `system_prompt` — serde falls back to
