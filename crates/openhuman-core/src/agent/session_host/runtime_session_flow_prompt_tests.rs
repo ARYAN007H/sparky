@@ -1,5 +1,3 @@
-use super::*;
-
 #[cfg(feature = "flows")]
 #[tokio::test]
 async fn cold_flow_prompt_uses_the_module_and_warm_resume_does_not_refetch() {
