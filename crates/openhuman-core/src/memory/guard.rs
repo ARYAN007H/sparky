@@ -24,8 +24,6 @@ use tinymemory_api::{
     Reach, RecallAnswer, RecallRequest, Result, StoreItem, StoreReceipt, WaitFor, WriteOptions,
 };
 
-use tinymemory_api::Error;
-
 /// `inner` with every stored item scrubbed first, and every call timed.
 pub struct ScrubbingEngine {
     inner: Arc<dyn MemoryEngine>,
