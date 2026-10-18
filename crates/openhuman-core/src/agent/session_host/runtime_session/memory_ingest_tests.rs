@@ -3,6 +3,56 @@ use super::*;
 use tinyagents_harness::summarization::{checkpoint_message, SummaryPlacement};
 use tinyinference_llm::ToolCall;
 
+fn external_channel_origin(
+    channel: &str,
+    message_id: &str,
+) -> crate::agent::turn_origin::AgentTurnOrigin {
+    crate::agent::turn_origin::AgentTurnOrigin::ExternalChannel {
+        channel: channel.into(),
+        sender: None,
+        sender_name: None,
+        reply_target: "chat".into(),
+        message_id: message_id.into(),
+        history_key: None,
+    }
+}
+
+#[test]
+fn logged_channel_keeps_normalized_custom_external_provider_ids() {
+    assert_eq!(
+        logged_channel(Some(&external_channel_origin(
+            "  MyCustomProvider  ",
+            "message-1"
+        ))),
+        Some("mycustomprovider".into()),
+        "an external provider remains the channel owner even when it is not in the built-in catalog"
+    );
+}
+
+#[test]
+fn logged_channel_is_none_for_non_channel_origins_none_and_cron_replays() {
+    use crate::agent::turn_origin::{AgentTurnOrigin, TrustedAutomationSource};
+
+    assert_eq!(logged_channel(None), None);
+    assert_eq!(logged_channel(Some(&AgentTurnOrigin::Cli)), None);
+    assert_eq!(logged_channel(Some(&AgentTurnOrigin::DirectChat)), None);
+    assert_eq!(logged_channel(Some(&AgentTurnOrigin::Unknown)), None);
+    assert_eq!(
+        logged_channel(Some(&AgentTurnOrigin::TrustedAutomation {
+            job_id: "job-1".into(),
+            source: TrustedAutomationSource::Cron,
+        })),
+        None
+    );
+    assert_eq!(
+        logged_channel(Some(&external_channel_origin(
+            "telegram",
+            "cron:job-1:run-1"
+        ))),
+        None
+    );
+}
+
 fn assistant_with_call(id: &str, name: &str) -> Message {
     let mut message = Message::assistant("");
     if let Message::Assistant(assistant) = &mut message {
