@@ -21,8 +21,8 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
-use tinychannels_bus::context::ChatMessage;
 use tinychannels_bus::{ChannelMessage, SendMessage};
+use tinychannels_runtime::context::ChatMessage;
 use tinyinference_llm::model::{ChatModel, ModelRequest, ModelResponse};
 use tinytools::{Tool, ToolResult};
 

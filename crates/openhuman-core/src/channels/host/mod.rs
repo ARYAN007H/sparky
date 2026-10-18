@@ -8,10 +8,11 @@ mod channel_events;
 pub(crate) mod remote_control;
 pub(crate) mod voice;
 
-pub(crate) use adapters::{ConfigAllowlistStore, OpenHumanEventSink, VoiceTranscriber};
+pub(crate) use adapters::{ConfigAllowlistStore, OpenHumanEventSink};
 #[cfg(test)]
 pub use adapters::{
     ConversationHistoryStore, CoreApprovalGate, CoreShutdownRegistry, VoiceSynthesizer,
+    VoiceTranscriber,
 };
 pub use channel_events::{ChannelApprovalSurfaceSubscriber, ChannelTurnStateSubscriber};
 

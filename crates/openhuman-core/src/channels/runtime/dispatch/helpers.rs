@@ -11,7 +11,10 @@ pub(super) use tinychannels::runtime::select_acknowledgment_reaction;
 
 pub(super) fn log_worker_join_result(result: Result<(), tokio::task::JoinError>) {
     if let Err(error) = result {
-        tracing::warn!("{}", traits::context::worker_crash_message(&error));
+        tracing::warn!(
+            "{}",
+            tinychannels_runtime::context::worker_crash_message(&error)
+        );
     }
 }
 

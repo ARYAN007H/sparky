@@ -4,6 +4,10 @@
 //! TinyChannels TinyBus module. Serialized configuration, messages, and
 //! schemas come from `tinychannels-bus`; OpenHuman retains host policy and
 //! lifecycle orchestration.
+#![allow(
+    deprecated,
+    reason = "the v21 ChannelMessage/SendMessage shims stay in use here until the single inbound path (senamakel/openhuman#136) moves the host to canonical v22 content"
+)]
 
 // Always-compiled carve-outs (see module docs).
 pub(crate) mod capabilities;
@@ -11,7 +15,8 @@ pub mod contract_schema;
 #[cfg(any(feature = "voice", feature = "channels"))]
 pub(crate) mod credentials;
 
-pub use tinychannels_bus::{Channel, ChannelSendExt, SendMessage};
+pub use tinychannels_bus::SendMessage;
+pub use tinychannels_runtime::{Channel, ChannelSendExt};
 
 #[cfg(feature = "channels")]
 pub mod bus;

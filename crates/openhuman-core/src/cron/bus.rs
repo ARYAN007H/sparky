@@ -5,13 +5,18 @@
 //! of directly constructing channel instances. The [`CronDeliverySubscriber`]
 //! picks up those events and dispatches to the appropriate channel, keeping
 //! channel construction out of the scheduler.
+#![allow(
+    deprecated,
+    reason = "the v21 ChannelMessage/SendMessage shims stay in use here until the single inbound path (senamakel/openhuman#136) moves the host to canonical v22 content"
+)]
 
 use crate::core::events::DomainEvent;
 use async_trait::async_trait;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tinybus::EventHandler;
-use tinychannels_bus::{Channel, SendMessage};
+use tinychannels_bus::SendMessage;
+use tinychannels_runtime::Channel;
 
 /// Subscribes to `CronDeliveryRequested` events and dispatches
 /// the output to the named channel.
