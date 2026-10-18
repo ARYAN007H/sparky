@@ -268,9 +268,6 @@ impl Middleware<(), crate::agent::tinyagents::host::OpenHumanRunContext>
                 .as_ref()
                 .filter(|_| !response.served_from_cache)
             {
-                guard.input_tokens += usage.input_tokens;
-                guard.output_tokens += usage.output_tokens;
-                guard.cached_input_tokens += usage.cache_read_tokens;
                 let host_usage =
                     crate::inference::provider::model::usage_info_from_response(response)
                         .unwrap_or(
