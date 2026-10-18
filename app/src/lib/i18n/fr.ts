@@ -1215,9 +1215,6 @@ const messages: TranslationMap = {
   'voice.settingsSaved': 'Paramètres vocaux enregistrés.',
   'voice.failedToLoadSettings': 'Échec du chargement des paramètres vocaux',
   'voice.failedToSaveSettings': 'Échec de la sauvegarde des paramètres vocaux',
-  'voice.debug.alwaysOn': 'Écoute permanente',
-  'voice.debug.alwaysOnDesc':
-    'Garde le microphone ouvert et envoie automatiquement ce que vous dites à l’agent, sans raccourci. Se met en pause lorsque l’écran est verrouillé.',
   'voice.providers.saved': 'Fournisseurs de voix enregistrés.',
   'voice.providers.failedToSave': 'Échec de la sauvegarde des fournisseurs vocaux',
   'voice.mode.start': 'Démarrer le chat vocal',
@@ -3579,8 +3576,6 @@ const messages: TranslationMap = {
     "Un contournement OPENHUMAN_APPROVAL_GATE=0 a été détecté mais ignoré : l'application de bureau garde toujours la porte d'approbation activée.",
 
   // Run queue
-  'notch.ready': 'Prêt',
-  'notch.listening': "J'écoute…",
 
   'orchestration.detail.stop': 'Arrêter',
 

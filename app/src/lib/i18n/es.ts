@@ -1207,9 +1207,6 @@ const messages: TranslationMap = {
   'voice.settingsSaved': 'Configuración de voz guardada.',
   'voice.failedToLoadSettings': 'No se pudo cargar la configuración de voz',
   'voice.failedToSaveSettings': 'No se pudo guardar la configuración de voz',
-  'voice.debug.alwaysOn': 'Escucha continua',
-  'voice.debug.alwaysOnDesc':
-    'Mantén el micrófono abierto y envía lo que dices al agente automáticamente, sin atajo. Se pausa cuando la pantalla está bloqueada.',
   'voice.providers.saved': 'Proveedores de voz guardados.',
   'voice.providers.failedToSave': 'No se pudieron guardar los proveedores de voz',
   'voice.mode.start': 'Iniciar chat de voz',
@@ -3566,8 +3563,6 @@ const messages: TranslationMap = {
     'Se detectó una anulación OPENHUMAN_APPROVAL_GATE=0, pero se ignoró: la aplicación de escritorio mantiene siempre activa la puerta de aprobación.',
 
   // Run queue
-  'notch.ready': 'Listo',
-  'notch.listening': 'Escuchando…',
 
   'orchestration.detail.stop': 'Detener',
 

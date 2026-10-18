@@ -1212,9 +1212,6 @@ const messages: TranslationMap = {
   'voice.settingsSaved': 'Ses ayarları kaydedildi.',
   'voice.failedToLoadSettings': 'Ses ayarları yüklenemedi',
   'voice.failedToSaveSettings': 'Ses ayarları kaydedilemedi',
-  'voice.debug.alwaysOn': 'Sürekli dinleme',
-  'voice.debug.alwaysOnDesc':
-    'Mikrofonu açık tutar ve söylediklerinizi kısayol tuşu olmadan otomatik olarak ajana gönderir. Ekran kilitlendiğinde duraklar.',
   'voice.providers.saved': 'Ses sağlayıcıları kaydedildi.',
   'voice.providers.failedToSave': 'Ses sağlayıcıları kaydedilemedi',
   'voice.mode.start': 'Sesli sohbeti başlat',
@@ -3694,8 +3691,6 @@ const messages: TranslationMap = {
   'security.approvalGateOverrideIgnored.title': 'Geçersiz kılma engellendi',
   'security.approvalGateOverrideIgnored.body':
     'Bir OPENHUMAN_APPROVAL_GATE=0 geçersiz kılması algılandı ancak yok sayıldı: masaüstü uygulaması onay kapısını her zaman açık tutar.',
-  'notch.ready': 'Hazır',
-  'notch.listening': 'Dinleniyor…',
   'codeBlock.copy': 'Kopyala',
   'codeBlock.copied': 'Kopyalandı!',
   'userErrors.dismiss': 'Kapat',

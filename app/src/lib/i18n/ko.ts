@@ -1166,9 +1166,6 @@ const messages: TranslationMap = {
   'voice.settingsSaved': '음성 설정이 저장되었습니다.',
   'voice.failedToLoadSettings': '음성 설정 로드 실패',
   'voice.failedToSaveSettings': '음성 설정 저장 실패',
-  'voice.debug.alwaysOn': '상시 청취',
-  'voice.debug.alwaysOnDesc':
-    '단축키 없이 마이크를 계속 열어 두고 말한 내용을 자동으로 에이전트에 보냅니다. 화면이 잠기면 일시 중지됩니다.',
   'voice.providers.saved': '음성 제공업체가 저장되었습니다.',
   'voice.providers.failedToSave': '음성 제공자를 저장하지 못했습니다.',
   'voice.mode.start': '음성 채팅 시작',
@@ -3456,8 +3453,6 @@ const messages: TranslationMap = {
     'OPENHUMAN_APPROVAL_GATE=0 재정의가 감지되었지만 무시되었습니다: 데스크톱 앱은 승인 게이트를 항상 켜둡니다.',
 
   // Run queue
-  'notch.ready': '준비됨',
-  'notch.listening': '듣는 중…',
 
   'orchestration.detail.stop': '중지',
 

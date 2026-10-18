@@ -2,8 +2,6 @@
  * Voice and dictation commands.
  */
 import { callCoreRpc } from '../../services/coreRpcClient';
-import { CommandResponse } from './common';
-import { ConfigSnapshot } from './config';
 
 export interface VoiceSpeechResult {
   /** Final text — cleaned by LLM post-processing when available. */
@@ -36,49 +34,11 @@ export interface VoiceStatus {
   tts_provider: string;
 }
 
-export interface VoiceServerSettings {
-  skip_cleanup: boolean;
-  min_duration_secs: number;
-  /** RMS energy threshold for silence detection. Recordings below this are
-   *  treated as silence and skipped to prevent STT hallucinations. */
-  silence_threshold: number;
-  /** Custom vocabulary words to bias the STT engine toward (names, technical terms). */
-  custom_dictionary: string[];
-  /** Phase 2: continuous always-on listening (no hotkey). Opt-in. */
-  always_on_enabled: boolean;
-  /** Hosted speech-to-text engine. There is no local option — the bundled
-   *  whisper.cpp engine was removed. */
-  stt_engine: SttEngine;
-}
-
 /** Hosted speech-to-text engines, mirroring `config::schema::SttEngine`. */
 export type SttEngine = 'backend' | 'elevenlabs' | 'openai';
 
 export async function openhumanVoiceStatus(): Promise<VoiceStatus> {
   return await callCoreRpc<VoiceStatus>({ method: 'openhuman.voice_status', params: {} });
-}
-
-export async function openhumanGetVoiceServerSettings(): Promise<
-  CommandResponse<VoiceServerSettings>
-> {
-  return await callCoreRpc<CommandResponse<VoiceServerSettings>>({
-    method: 'openhuman.config_get_voice_server_settings',
-    params: {},
-  });
-}
-
-export async function openhumanUpdateVoiceServerSettings(update: {
-  skip_cleanup?: boolean;
-  min_duration_secs?: number;
-  silence_threshold?: number;
-  custom_dictionary?: string[];
-  always_on_enabled?: boolean;
-  stt_engine?: SttEngine;
-}): Promise<CommandResponse<ConfigSnapshot>> {
-  return await callCoreRpc<CommandResponse<ConfigSnapshot>>({
-    method: 'openhuman.config_update_voice_server_settings',
-    params: update,
-  });
 }
 
 export interface VoiceProvidersUpdate {
@@ -143,3 +103,4 @@ export async function openhumanVoiceTts(
     params: { text, output_path: outputPath },
   });
 }
+

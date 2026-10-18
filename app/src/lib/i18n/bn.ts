@@ -1176,9 +1176,6 @@ const messages: TranslationMap = {
   'voice.settingsSaved': 'ভয়েস সেটিংস সংরক্ষিত।',
   'voice.failedToLoadSettings': 'ভয়েস সেটিংস লোড করতে ব্যর্থ হয়েছে',
   'voice.failedToSaveSettings': 'ভয়েস সেটিংস সংরক্ষণ করতে ব্যর্থ হয়েছে',
-  'voice.debug.alwaysOn': 'সবসময় শোনা',
-  'voice.debug.alwaysOnDesc':
-    'মাইক্রোফোন খোলা রাখুন এবং আপনি যা বলেন তা হটকি ছাড়াই স্বয়ংক্রিয়ভাবে এজেন্টের কাছে পাঠান। স্ক্রিন লক হলে থেমে যায়।',
   'voice.providers.saved': 'ভয়েস প্রদানকারী সংরক্ষিত।',
   'voice.providers.failedToSave': 'ভয়েস প্রদানকারী সংরক্ষণ করতে ব্যর্থ',
   'voice.mode.start': 'ভয়েস চ্যাট শুরু করুন',
@@ -3491,8 +3488,6 @@ const messages: TranslationMap = {
     'একটি OPENHUMAN_APPROVAL_GATE=0 ওভাররাইড সনাক্ত করা হয়েছিল কিন্তু উপেক্ষা করা হয়েছে: ডেস্কটপ অ্যাপ সর্বদা অনুমোদন গেট চালু রাখে।',
 
   // Run queue
-  'notch.ready': 'প্রস্তুত',
-  'notch.listening': 'শুনছি…',
 
   'orchestration.detail.stop': 'থামান',
 

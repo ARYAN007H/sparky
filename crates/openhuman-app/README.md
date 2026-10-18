@@ -30,7 +30,7 @@ For the user-facing tour of windows, tray and data flow, see
 |   |   fetch(url, Bearer token)|<----------|   -> (url, token)          |  |
 |   +-------------+-------------+           | session::commands (auth_*) |  |
 |                 |                         | gateway::commands          |  |
-|                 | HTTP POST /rpc          | windows, update            |  |
+|                 | HTTP POST /rpc          | windows, update   |  |
 |                 v                         +-------------+--------------+  |
 |   +---------------------------+                         |                 |
 |   | embedded core server      |<------------------------+                 |
@@ -89,7 +89,7 @@ TinyHumans backend transport (the core carries none of its own).
    (skipped on Linux when the D-Bus session bus is unreachable, because the
    plugin panics there), the opener, `external_navigation`, deep-link,
    notification and updater plugins, and managed state for the staged app
-   update and iMessage scanner registry.
+   update and the iMessage scanner registry.
 6. `setup()`: points the core at the installer's [`bundled-modules/`](bundled-modules/) resource
    directory, verifies `openhuman://` registration (Windows registry
    read-back, Linux xdg-utils), drains deep links that arrived early, removes
@@ -185,7 +185,7 @@ Platform integration:
 | [`src/external_navigation.rs`](src/external_navigation.rs) | Plugin that cancels top-level `http(s)` navigation away from the app origin and opens the URL in the default browser. |
 | [`src/native_notifications/`](src/native_notifications/) | Notification permission and delivery, real on macOS. See [`src/native_notifications/`](src/native_notifications/README.md). |
 | [`src/imessage_scanner/`](src/imessage_scanner/) | macOS: reads `chat.db` and ingests conversations into memory. See [`src/imessage_scanner/`](src/imessage_scanner/README.md). |
-| [`src/mascot_native_window.rs`](src/mascot_native_window.rs), [`src/notch_window.rs`](src/notch_window.rs) | macOS: native NSPanel plus WKWebView hosts for the floating mascot and the notch activity pill. |
+| [`src/mascot_native_window.rs`](src/mascot_native_window.rs) | macOS: native NSPanel plus WKWebView host for the floating mascot. |
 | [`src/window_state.rs`](src/window_state.rs) | Saves and restores main window position and size, with a DPI guard and work-area clamping. |
 | [`src/directory_picker.rs`](src/directory_picker.rs) | Native folder chooser for the folder memory source. |
 | [`src/workspace_paths.rs`](src/workspace_paths.rs) | Open, reveal or preview a file, only after resolving it inside the active workspace. |
@@ -232,7 +232,7 @@ The authoritative list is the `tauri::generate_handler!` call near the end of
 | Gateways (feature `gateways`) | `gateway_list`, `gateway_save`, `gateway_delete`, `gateway_activate`, `gateway_active`, `gateway_status` |
 | Session | `auth_login_with_token`, `auth_store_session`, `auth_logout`, `auth_state`, `auth_current_user`, `get_active_user_id` |
 | Updates | `check_app_update`, `download_app_update`, `install_app_update`, `apply_app_update`, `check_core_update`, `apply_core_update` |
-| App and windows | `app_quit`, `restart_app`, `set_titlebar_for_sidebar`, `mascot_window_show`, `mascot_window_hide`, `notch_window_show`, `notch_window_hide` |
+| App and windows | `app_quit`, `restart_app`, `set_titlebar_for_sidebar`, `mascot_window_show`, `mascot_window_hide` |
 | Notifications | `notification_permission_state`, `notification_permission_request`, `show_native_notification` |
 | Files and logs | `open_workspace_path`, `reveal_workspace_path`, `preview_workspace_text`, `download_artifact_to_downloads`, `pick_directory_via_dialog`, `reveal_logs_folder`, `logs_folder_path`, `reset_local_data` |
 | Integrations | `start_loopback_oauth_listener`, `stop_loopback_oauth_listener`, `mcp_resolve_binary_path`, `mcp_open_client_config`, `claude_code_login_launch` |

@@ -33,7 +33,6 @@ import SecurityBanner from './components/SecurityBanner';
 import { Toaster } from './components/ui/Toast';
 import AppWalkthrough from './components/walkthrough/AppWalkthrough';
 import { useDevSkipOnboarding } from './hooks/useDevSkipOnboarding';
-import { useNotchBootSync } from './hooks/useNotchBootSync';
 import { I18nProvider } from './lib/i18n/I18nContext';
 import {
   startNativeNotificationsService,
@@ -226,10 +225,6 @@ export function AppShellDesktop() {
     location.pathname,
     navigate,
   ]);
-
-  // Sync the notch indicator to the persisted always-on listening state once
-  // the core is ready (once per boot). Extracted to a hook so it's testable.
-  useNotchBootSync(isBootstrapping);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const navType = useNavigationType();

@@ -1328,9 +1328,6 @@ const messages: TranslationMap = {
   'voice.settingsSaved': '音声設定を保存しました。',
   'voice.failedToLoadSettings': '音声設定の読み込みに失敗しました',
   'voice.failedToSaveSettings': '音声設定の保存に失敗しました',
-  'voice.debug.alwaysOn': '常時リスニング',
-  'voice.debug.alwaysOnDesc':
-    'マイクを常時開き、ホットキーなしで発話をエージェントに自動送信します。画面ロック中は一時停止します。',
   'voice.providers.saved': '音声プロバイダーを保存しました。',
   'voice.providers.failedToSave': '音声プロバイダーの保存に失敗しました',
   'voice.mode.start': '音声チャットを開始',
@@ -4079,8 +4076,6 @@ const messages: TranslationMap = {
     'OPENHUMAN_APPROVAL_GATE=0 のオーバーライドが検出されましたが無視されました: デスクトップアプリでは承認ゲートが常に有効に保たれます。',
 
   // Run queue
-  'notch.ready': '準備完了',
-  'notch.listening': '聞き取り中…',
 
   // Code block chrome
   'codeBlock.copy': 'コピー',

@@ -65,6 +65,7 @@ allow = [
     # every login. (#900)
     "get_active_user_id",
 
+
     # =========================
     # GATEWAYS
     # =========================
@@ -127,12 +128,6 @@ allow = [
     # Floating mascot window (native NSPanel on macOS; errors elsewhere).
     "mascot_window_show",
     "mascot_window_hide",
-    # Notch activity indicator (transparent NSPanel pill, macOS). The Voice
-    # settings panel + app boot call these via `syncNotchVisibility` to mirror
-    # always-on listening state. Without these allow entries the invoke is
-    # rejected with "Command not found" and the notch never shows/hides.
-    "notch_window_show",
-    "notch_window_hide",
 
     # =========================
     # NOTIFICATIONS

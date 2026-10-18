@@ -1217,9 +1217,6 @@ const messages: TranslationMap = {
   'voice.settingsSaved': 'Spracheinstellungen gespeichert.',
   'voice.failedToLoadSettings': 'Spracheinstellungen konnten nicht geladen werden',
   'voice.failedToSaveSettings': 'Spracheinstellungen konnten nicht gespeichert werden.',
-  'voice.debug.alwaysOn': 'Dauerhaftes Zuhören',
-  'voice.debug.alwaysOnDesc':
-    'Hält das Mikrofon offen und sendet das Gesagte automatisch an den Agenten, ohne Tastenkürzel. Pausiert, wenn der Bildschirm gesperrt ist.',
   'voice.providers.saved': 'Sprachanbieter gespeichert.',
   'voice.providers.failedToSave': 'Sprachanbieter konnten nicht gespeichert werden.',
   'voice.mode.start': 'Sprachchat starten',
@@ -3601,8 +3598,6 @@ const messages: TranslationMap = {
     'Ein OPENHUMAN_APPROVAL_GATE=0-Override wurde erkannt, aber ignoriert: Die Desktop-App lässt das Genehmigungstor immer eingeschaltet.',
 
   // Run queue
-  'notch.ready': 'Bereit',
-  'notch.listening': 'Höre zu…',
 
   'orchestration.detail.stop': 'Stoppen',
 
