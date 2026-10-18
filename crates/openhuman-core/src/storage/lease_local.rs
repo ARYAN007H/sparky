@@ -23,7 +23,6 @@ use std::sync::Mutex;
 
 use async_trait::async_trait;
 use fs2::FileExt;
-use tinystoragedrivers::Version;
 
 use super::lease::{local_dir, validate_key, LeaseError, LeaseGrant, LeaseRecord, LeaseStore};
 use super::StorageError;
@@ -36,7 +35,6 @@ struct Holding {
     /// Kept open: closing it drops the lock.
     file: File,
     record: LeaseRecord,
-    version: Version,
 }
 
 /// Leases kept as file locks under one root. See the module docs.
@@ -139,7 +137,7 @@ impl LocalLeases {
         let mut held = self.held();
         let current = held
             .get(&grant.key)
-            .is_some_and(|h| h.record.epoch == grant.epoch && h.version == grant.version);
+            .is_some_and(|h| h.record.epoch == grant.epoch);
         if !current {
             tracing::info!(
                 target: "openhuman::storage::lease",
@@ -163,7 +161,6 @@ impl LeaseStore for LocalLeases {
             return Ok(LeaseGrant {
                 key: key.to_string(),
                 epoch: holding.record.epoch,
-                version: holding.version,
                 expires_at_ms: holding.record.expires_at_ms,
                 previous_unclean: false,
             });
@@ -237,13 +234,11 @@ impl LeaseStore for LocalLeases {
             Holding {
                 file,
                 record,
-                version: Version::FIRST,
             },
         );
         Ok(LeaseGrant {
             key: key.to_string(),
             epoch,
-            version: Version::FIRST,
             expires_at_ms: u64::MAX,
             previous_unclean: unclean,
         })
@@ -251,15 +246,8 @@ impl LeaseStore for LocalLeases {
 
     async fn renew(&self, grant: &LeaseGrant, _now_ms: u64) -> Result<LeaseGrant, LeaseError> {
         self.with_current(grant, |held| {
-            let holding = held.get_mut(&grant.key).ok_or(LeaseError::Lost)?;
-            holding.version = holding
-                .version
-                .next()
-                .ok_or_else(|| StorageError::backend("lease version space exhausted"))?;
-            Ok(LeaseGrant {
-                version: holding.version,
-                ..grant.clone()
-            })
+            held.get(&grant.key).ok_or(LeaseError::Lost)?;
+            Ok(grant.clone())
         })
     }
 
