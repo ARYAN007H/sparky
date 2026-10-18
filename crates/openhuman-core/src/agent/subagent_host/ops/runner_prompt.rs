@@ -1,6 +1,6 @@
 //! Scoped async preparation for typed sub-agent prompt rendering.
 
-use super::{AgentDefinition, PromptContext, SubagentRunError, load_prompt_source};
+use super::{load_prompt_source, AgentDefinition, PromptContext, SubagentRunError};
 
 /// One spawn's snapshot of the host config, loaded once by [`super::run_subagent`].
 ///

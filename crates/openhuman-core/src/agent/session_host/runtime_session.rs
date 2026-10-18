@@ -7,11 +7,11 @@
 
 #[path = "runtime_session_attachment_input.rs"]
 mod attachment_input;
-#[path = "runtime_session/prompt.rs"]
-mod prompt;
 mod memory_ingest;
 mod permanent;
 mod post_commit;
+#[path = "runtime_session/prompt.rs"]
+mod prompt;
 mod tool_rules;
 mod transcript;
 #[path = "runtime_session_turn.rs"]
