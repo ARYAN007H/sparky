@@ -242,13 +242,14 @@ impl WebIngress {
             ctx,
             &request.thread_id,
         );
-        let Some(runner) = self.runner.get().and_then(Weak::upgrade) else {
-            return;
+        let in_flight = match self.runner.get().and_then(Weak::upgrade) {
+            Some(runner) => {
+                runner
+                    .in_flight_request_id(&scope_of(ctx), &request.thread_id)
+                    .await
+            }
+            None => None,
         };
-        let scope = scope_of(ctx);
-        let in_flight = runner
-            .in_flight_request_id(&scope, &request.thread_id)
-            .await;
         if request.disposition == QueueDisposition::Interrupt {
             if let Some(cancelled) = in_flight.clone() {
                 log::info!(

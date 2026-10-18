@@ -60,10 +60,16 @@ async fn the_guardrail_refuses_an_override_attempt_and_tells_the_submitter() {
         .apply(IngressStage::Guardrail, &mut req)
         .await
         .expect("a verdict");
-    assert!(matches!(decision, IngressDecision::Reject(_)), "{decision:?}");
+    assert!(
+        matches!(decision, IngressDecision::Reject(_)),
+        "{decision:?}"
+    );
     match rx.await.expect("answered") {
         Admission::Rejected(StartChatError::Guardrail { verdict, .. }) => {
-            assert!(verdict == "block" || verdict == "review_blocked", "{verdict}");
+            assert!(
+                verdict == "block" || verdict == "review_blocked",
+                "{verdict}"
+            );
         }
         other => panic!("expected a guardrail refusal, got {other:?}"),
     }
@@ -72,7 +78,11 @@ async fn the_guardrail_refuses_an_override_attempt_and_tells_the_submitter() {
 #[tokio::test]
 async fn the_guardrail_lets_an_ordinary_message_through_silently() {
     let (policy, shared, mut rx) = policy_with_admission("ingress-ok");
-    let mut req = request("ingress-ok", "what is the weather", QueueDisposition::Interrupt);
+    let mut req = request(
+        "ingress-ok",
+        "what is the weather",
+        QueueDisposition::Interrupt,
+    );
     for stage in [IngressStage::Guardrail, IngressStage::ApprovalInterception] {
         assert_eq!(
             policy.apply(stage, &mut req).await.expect("a verdict"),
@@ -86,7 +96,11 @@ async fn the_guardrail_lets_an_ordinary_message_through_silently() {
 #[tokio::test]
 async fn text_without_upload_markers_is_not_staged() {
     let (policy, _shared, _rx) = policy_with_admission("ingress-plain");
-    let mut req = request("ingress-plain", "no files here", QueueDisposition::Interrupt);
+    let mut req = request(
+        "ingress-plain",
+        "no files here",
+        QueueDisposition::Interrupt,
+    );
     assert_eq!(
         policy
             .apply(IngressStage::StageAttachments, &mut req)
@@ -110,7 +124,10 @@ async fn an_upload_that_cannot_be_saved_refuses_the_message() {
         .apply(IngressStage::StageAttachments, &mut req)
         .await
         .expect("a verdict");
-    assert!(matches!(decision, IngressDecision::Reject(_)), "{decision:?}");
+    assert!(
+        matches!(decision, IngressDecision::Reject(_)),
+        "{decision:?}"
+    );
     assert!(matches!(
         rx.await.expect("answered"),
         Admission::Rejected(StartChatError::Other(message)) if message.contains("upload")
