@@ -52,7 +52,7 @@ Tests live in this directory as `*_tests.rs` files, e.g.
 
 ## Called by
 
-- [`web_chat/progress_bridge.rs`](../../web_chat/progress_bridge.rs): the only caller. Builds a `SpanCollector`
+- [`web_chat/progress.rs`](../../web_chat/progress.rs): the only caller. Builds a `SpanCollector`
   per run, feeds it `AgentProgress`, shadow-compares the live spans against
   `spans_from_observations` over the run journal, then calls
   `export_run_trace_from_journal` (journal available) or `export_run_trace`.

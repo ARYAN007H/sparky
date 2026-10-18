@@ -57,7 +57,7 @@
  *
  * So streaming works. That makes this spec's failure HARDER to explain, not
  * easier, and rules out the tidy "one cause, four slices" story:
- * `subagent_spawned` is published by `web_chat/progress_bridge_subagent_events.rs`
+ * `subagent_spawned` is published by `web_chat/progress_subagent.rs`
  * (`on_subagent_spawned` -> `publish_seq_stamped`) — the progress bridge, the
  * same publisher as the streaming that works. It does NOT share a publisher with
  * `plan_review_request`, which is bridged separately by `ApprovalSurfaceSubscriber`

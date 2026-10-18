@@ -14,7 +14,7 @@
 //!
 //! [`types`] holds the wire/storage shapes; they are camelCase to mirror
 //! `app/src/store/chatRuntimeSlice.ts`. `TurnStateMirror` is driven by the
-//! web-channel progress bridge (`web_chat::progress_bridge`), and snapshots
+//! web-channel progress bridge (`web_chat::progress`), and snapshots
 //! are read back through the `threads` RPC surface (`turn_state_get` /
 //! `turn_state_list` / `turn_state_history` / `turn_state_get_turn` /
 //! `turn_state_clear`). See `../README.md` for the full `threads` module

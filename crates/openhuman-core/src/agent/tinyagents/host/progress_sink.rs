@@ -20,7 +20,7 @@
 //! The obvious-looking shortcut — build a `WebChannelEvent` and publish it
 //! straight onto the web-channel bus — is wrong here. Everything that makes a
 //! web-channel progress event correct is owned by
-//! [`crate::web_chat::progress_bridge::spawn_progress_bridge`]: the
+//! [`crate::web_chat::progress::spawn_progress_bridge`]: the
 //! per-request monotonic `seq` stamp the frontend dedups on, the
 //! `TurnStateMirror` snapshot, the run-ledger upserts, the tracing span
 //! collector, and the client/thread/request routing ids that a `ProgressEvent`
@@ -157,7 +157,7 @@ struct OpenToolCall {
 ///
 /// Construct one per turn with the same sender that would otherwise be handed
 /// to `OpenHumanSessionHost::set_on_progress`, so the existing
-/// `web_chat::progress_bridge` consumer sees an identical event stream
+/// `web_chat::progress` consumer sees an identical event stream
 /// regardless of which runtime produced it.
 ///
 /// Cheap to clone-by-`Arc`: the crate's blanket
@@ -582,7 +582,7 @@ impl ProgressSink for OpenHumanProgressSink {
                 // TODO(phase4): if the runtime ever becomes the only producer
                 // of turn outcomes, this needs a real host-side failure event
                 // (a new `AgentProgress` variant plus a `chat_error` mapping in
-                // `web_chat::progress_bridge`), not a repurposed one.
+                // `web_chat::progress`), not a repurposed one.
             }
         }
     }
