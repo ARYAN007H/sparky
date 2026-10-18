@@ -29,7 +29,7 @@ async fn wait_for_event(
     timeout(Duration::from_secs(10), async {
         loop {
             match rx.recv().await {
-                Ok(event) if event.request_id == request_id && event.event == name => {
+                Ok(event) if event.context().request_id == request_id && event.event_name() == name => {
                     return event;
                 }
                 Ok(_) | Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue,
@@ -122,7 +122,7 @@ async fn queued_messages_dropped_with_their_turn_are_not_announced() {
     wait_for_event(&mut rx, &primary, "chat_cancelled").await;
     loop {
         match rx.try_recv() {
-            Ok(event) => assert_ne!(event.request_id, queued, "{}", event.event),
+            Ok(event) => assert_ne!(event.context().request_id, queued, "{}", event.event_name()),
             Err(tokio::sync::broadcast::error::TryRecvError::Lagged(_)) => continue,
             Err(_) => break,
         }
@@ -157,7 +157,7 @@ async fn a_refused_message_publishes_no_turn_events() {
             .any(|(k, _)| k == "lifecycle-refused")
     );
     while let Ok(event) = rx.try_recv() {
-        assert_ne!(event.thread_id, "lifecycle-refused", "{}", event.event);
+        assert_ne!(event.context().thread_id, "lifecycle-refused", "{}", event.event_name());
     }
 }
 
@@ -222,7 +222,7 @@ async fn a_turn_with_an_unavailable_local_provider_ends_in_one_classified_chat_e
     let error = match timeout(Duration::from_secs(75), async {
         loop {
             match rx.recv().await {
-                Ok(event) if event.request_id == request_id && event.event == "chat_error" => {
+                Ok(event) if event.context().request_id == request_id && event.event_name() == "chat_error" => {
                     return event;
                 }
                 Ok(_) | Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue,
@@ -302,9 +302,9 @@ async fn a_turn_with_an_unavailable_local_provider_ends_in_one_classified_chat_e
     );
     let extra_terminal_events = std::iter::from_fn(|| rx.try_recv().ok())
         .filter(|event| {
-            event.request_id == request_id
+            event.context().request_id == request_id
                 && matches!(
-                    event.event.as_str(),
+                    event.event_name(),
                     "chat_done" | "chat_error" | "chat_cancelled"
                 )
         })

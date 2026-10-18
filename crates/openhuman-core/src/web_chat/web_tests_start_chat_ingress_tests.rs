@@ -136,10 +136,10 @@ async fn start_chat_emits_sanitized_chat_error_on_inference_failure() {
     let recv = timeout(Duration::from_secs(20), async move {
         loop {
             let event = rx.recv().await.expect("event stream should stay open");
-            if event.event != "chat_error" {
+            if event.event_name() != "chat_error" {
                 continue;
             }
-            if event.request_id != request_id {
+            if event.context().request_id != request_id {
                 continue;
             }
             return event;

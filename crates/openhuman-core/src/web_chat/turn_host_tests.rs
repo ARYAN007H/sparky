@@ -159,8 +159,8 @@ async fn the_heartbeat_beats_only_for_a_live_turn() {
     tokio::time::sleep(Duration::from_secs(INFERENCE_HEARTBEAT_SECS + 1)).await;
     let mut names = Vec::new();
     while let Ok(event) = bus.try_recv() {
-        if event.thread_id == "host-hb-thread" {
-            names.push(event.event);
+        if event.context().thread_id == "host-hb-thread" {
+            names.push(event.event_name());
         }
     }
     assert_eq!(names[0], "inference_start");

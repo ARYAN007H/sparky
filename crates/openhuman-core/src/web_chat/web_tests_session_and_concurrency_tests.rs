@@ -675,8 +675,8 @@ async fn terminal_event(
 ) -> crate::web_chat::WebChannelEvent {
     loop {
         let event = rx.recv().await.expect("event stream should stay open");
-        if event.request_id == request_id
-            && matches!(event.event.as_str(), "chat_done" | "chat_error")
+        if event.context().request_id == request_id
+            && matches!(event.event_name(), "chat_done" | "chat_error")
         {
             return event;
         }
@@ -685,7 +685,7 @@ async fn terminal_event(
 
 /// A graceful, retryable `turn_timeout` whose user copy hides the marker.
 fn assert_turn_timeout(event: &crate::web_chat::WebChannelEvent) {
-    assert_eq!(event.event, "chat_error", "{event:?}");
+    assert_eq!(event.event_name(), "chat_error", "{event:?}");
     assert_eq!(event.error_type.as_deref(), Some("turn_timeout"));
     assert_eq!(event.error_retryable, Some(true));
     let message = event.message.clone().unwrap_or_default();

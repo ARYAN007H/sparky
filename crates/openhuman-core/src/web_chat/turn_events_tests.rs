@@ -38,7 +38,7 @@ async fn events_for(
         let mut seen = Vec::new();
         while seen.len() < count {
             match rx.recv().await {
-                Ok(event) if event.request_id == request_id => seen.push(event),
+                Ok(event) if event.context().request_id == request_id => seen.push(event),
                 Ok(_) | Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue,
                 Err(error) => panic!("bus closed: {error}"),
             }
@@ -154,7 +154,7 @@ async fn a_stopped_turn_announces_cancelled_to_the_client_that_stopped_it() {
     assert_eq!(seen[0].message.as_deref(), Some("Cancelled"));
     assert_eq!(seen[1].event, "chat_cancelled");
     assert_eq!(seen[1].cancel_reason.as_deref(), Some("user_stop"));
-    assert!(seen.iter().all(|event| event.client_id == "stopper"));
+    assert!(seen.iter().all(|event| event.context().client_id == "stopper"));
 }
 
 #[tokio::test]
@@ -213,10 +213,10 @@ async fn a_queued_message_dropped_before_it_started_is_silent() {
         loop {
             match rx.recv().await {
                 Ok(event)
-                    if event.request_id == "events-queued"
-                        || event.request_id == "events-sibling" =>
+                    if event.context().request_id == "events-queued"
+                        || event.context().request_id == "events-sibling" =>
                 {
-                    return event.request_id;
+                    return event.context().request_id;
                 }
                 Ok(_) | Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue,
                 Err(error) => panic!("bus closed: {error}"),

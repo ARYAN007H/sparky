@@ -615,8 +615,8 @@ mod tool_progress_tests {
         .unwrap();
 
         let event = recv_for_thread(&mut events, thread_id).await;
-        assert_eq!(event.event, "tool_progress");
-        assert_eq!(event.request_id, "req-tool-progress");
+        assert_eq!(event.event_name(), "tool_progress");
+        assert_eq!(event.context().request_id, "req-tool-progress");
         assert_eq!(event.tool_call_id.as_deref(), Some("call-1"));
         assert_eq!(
             event.message.as_deref(),

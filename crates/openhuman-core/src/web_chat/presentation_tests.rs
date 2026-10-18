@@ -22,7 +22,7 @@ fn single_bubble_delivery_emits_one_unsegmented_chat_done() {
     let mut mine = Vec::new();
     loop {
         match rx.try_recv() {
-            Ok(event) if event.request_id == request_id => mine.push(event),
+            Ok(event) if event.context().request_id == request_id => mine.push(event),
             Ok(_) => continue,
             Err(tokio::sync::broadcast::error::TryRecvError::Lagged(_)) => continue,
             Err(_) => break,
@@ -80,7 +80,7 @@ async fn chat_done_carries_timing_when_a_snapshot_is_supplied() {
 
     let done = loop {
         match rx.try_recv() {
-            Ok(event) if event.request_id == request_id && event.event == "chat_done" => {
+            Ok(event) if event.context().request_id == request_id && event.event_name() == "chat_done" => {
                 break event;
             }
             Ok(_) => continue,
@@ -121,7 +121,7 @@ async fn chat_done_omits_timing_when_no_snapshot_is_supplied() {
 
     let done = loop {
         match rx.try_recv() {
-            Ok(event) if event.request_id == request_id && event.event == "chat_done" => {
+            Ok(event) if event.context().request_id == request_id && event.event_name() == "chat_done" => {
                 break event;
             }
             Ok(_) => continue,
