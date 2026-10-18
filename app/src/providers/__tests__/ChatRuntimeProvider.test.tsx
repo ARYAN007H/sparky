@@ -644,7 +644,6 @@ describe('ChatRuntimeProvider — dedupe, proactive resolution, mid-turn invaria
           client_id: 'system',
           message: 'Run failed: boom',
           error_type: 'inference',
-          round: null,
         });
       });
 
@@ -666,7 +665,6 @@ describe('ChatRuntimeProvider — dedupe, proactive resolution, mid-turn invaria
           client_id: 'system',
           message: 'Run failed: boom',
           error_type: 'inference',
-          round: null,
         });
       });
 
@@ -688,7 +686,6 @@ describe('ChatRuntimeProvider — dedupe, proactive resolution, mid-turn invaria
           client_id: 'system',
           message: 'Run failed: boom',
           error_type: 'inference',
-          round: null,
         });
       });
 
@@ -711,7 +708,6 @@ describe('ChatRuntimeProvider — dedupe, proactive resolution, mid-turn invaria
             client_id: 'system',
             message: 'Run failed: boom',
             error_type: 'inference',
-            round: null,
           });
         });
 

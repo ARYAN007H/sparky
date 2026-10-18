@@ -270,5 +270,9 @@ export interface ArtifactPendingEvent extends ArtifactBase {
 
 // ── Queue and suggestions ────────────────────────────────────────────────────
 
-export type QueueItemEvent = WireEvent<'queue_item_queued'>;
-export type ChatSuggestionsEvent = WireEvent<'chat_suggestions'>;
+/** These two ride outside a request, so `request_id` may be empty or absent. */
+type OutOfRequest<T extends { request_id: string }> = Omit<T, 'request_id'> & {
+  request_id?: string;
+};
+export type QueueItemEvent = OutOfRequest<WireEvent<'queue_item_queued'>>;
+export type ChatSuggestionsEvent = OutOfRequest<WireEvent<'chat_suggestions'>>;

@@ -394,7 +394,7 @@ function chatTurnUsagePayload(event: ChatDoneEvent): {
         agentId: s.agent_id,
         inputTokens: s.input_tokens,
         outputTokens: s.output_tokens,
-        costUsd: s.cost_usd,
+        costUsd: s.cost_usd ?? null,
       })),
     };
   }
