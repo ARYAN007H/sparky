@@ -590,7 +590,10 @@ async fn manual_runs_use_each_invocations_config_and_security_snapshot() {
             "isolated config/scope child failed:\n{stdout}\n{}",
             String::from_utf8_lossy(&output.stderr)
         );
-        assert!(stdout.contains("running 1 test"), "child selected no test: {stdout}");
+        assert!(
+            stdout.contains("running 1 test"),
+            "child selected no test: {stdout}"
+        );
         assert!(
             stdout.contains("test cron::ops::delivery_tests::manual_runs_use_each_invocations_config_and_security_snapshot ... ok"),
             "the expected child test did not pass: {stdout}"
@@ -627,7 +630,9 @@ async fn manual_runs_use_each_invocations_config_and_security_snapshot() {
     let job = cron::add_shell_job(
         &first_config,
         None,
-        Schedule::Every { every_ms: 3_600_000 },
+        Schedule::Every {
+            every_ms: 3_600_000,
+        },
         "unused by the test handler",
     )
     .unwrap();
@@ -663,9 +668,15 @@ async fn manual_runs_use_each_invocations_config_and_security_snapshot() {
     let first = output(first);
     let second = output(second);
     assert_eq!(first["can_act"], false);
-    assert_eq!(first["action_dir"], first_config.action_dir.display().to_string());
+    assert_eq!(
+        first["action_dir"],
+        first_config.action_dir.display().to_string()
+    );
     assert_eq!(second["can_act"], true);
-    assert_eq!(second["action_dir"], second_config.action_dir.display().to_string());
+    assert_eq!(
+        second["action_dir"],
+        second_config.action_dir.display().to_string()
+    );
 }
 
 #[tokio::test]
