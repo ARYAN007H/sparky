@@ -128,6 +128,8 @@ pub async fn start_if_enabled(ctx: &crate::core::runtime::DispatchCtx, config: &
     // handles this shortcut via tauri-plugin-global-shortcut instead. (#2677)
     #[cfg(target_os = "macos")]
     {
+        // The native listener is the only user of the dispatch context.
+        let _ = ctx;
         log::info!(
             "{LOG_PREFIX} macOS: skipping rdev hotkey listener — \
              handled by Tauri host via tauri-plugin-global-shortcut (issue #2677)"
