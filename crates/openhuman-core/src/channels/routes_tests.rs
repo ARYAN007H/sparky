@@ -12,7 +12,7 @@ use std::sync::{Arc, Mutex};
 use std::task::{Context, Poll, Waker};
 use tinybus::EventHandler;
 use tinychannels::routes::resolve_provider_alias;
-use tinychannels_bus::context::ChatMessage;
+use tinychannels_runtime::context::ChatMessage;
 use tinychannels_bus::ChannelMessage;
 use tinytools::{Tool, ToolResult};
 

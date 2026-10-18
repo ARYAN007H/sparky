@@ -11,7 +11,8 @@ use async_trait::async_trait;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tinybus::EventHandler;
-use tinychannels_bus::{Channel, SendMessage};
+use tinychannels_bus::SendMessage;
+use tinychannels_runtime::Channel;
 
 /// Subscribes to `CronDeliveryRequested` events and dispatches
 /// the output to the named channel.

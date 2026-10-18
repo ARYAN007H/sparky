@@ -8,7 +8,7 @@ struct Recorder {
 }
 
 #[async_trait::async_trait]
-impl tinychannels_bus::Channel for Recorder {
+impl tinychannels_runtime::Channel for Recorder {
     fn name(&self) -> &str {
         "recorder"
     }
@@ -38,7 +38,7 @@ fn channel_vocabulary_is_the_contract_crates_own_types() {
     use std::any::TypeId;
     assert_eq!(
         TypeId::of::<dyn Channel>(),
-        TypeId::of::<dyn tinychannels_bus::Channel>()
+        TypeId::of::<dyn tinychannels_runtime::Channel>()
     );
     assert_eq!(
         TypeId::of::<SendMessage>(),
