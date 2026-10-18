@@ -234,22 +234,38 @@ async fn offline_snapshot_scans_every_thread_and_message_page() {
     config.memory.engine.clear();
     let workspace = config.workspace_dir.clone();
     let ctx = DispatchCtx::ambient();
-    let target_thread = store_channel_thread(
-        ctx.clone(),
-        &workspace,
+    let params = crate::channels::providers::relay::RelayInboundParams::new(
         "discord",
+        "chat-old-channel-message",
+        "sender-old-channel-message",
         "old-channel-message",
+        "hello from discord",
+    );
+    let target_thread = params.thread_id();
+    crate::threads::store::blocking::ensure_thread(
+        ctx.clone(),
+        workspace.clone(),
+        CreateConversationThread {
+            id: target_thread.clone(),
+            title: params.thread_title(),
+            created_at: "2026-01-01T00:00:00Z".into(),
+            parent_thread_id: None,
+            labels: Some(vec!["general".into()]),
+            personality_id: None,
+            working_dir: None,
+        },
     )
-    .await;
+    .await
+    .unwrap();
 
-    for index in 0..65 {
+    for index in 0..64 {
         crate::threads::store::blocking::append_message(
             ctx.clone(),
             workspace.clone(),
             target_thread.clone(),
             ConversationMessage {
-                id: format!("web-{index}"),
-                content: "later unrelated web row".into(),
+                id: format!("web-before-{index}"),
+                content: "unrelated web row before channel marker".into(),
                 message_type: "text".into(),
                 extra_metadata: json!({"scope": "web"}),
                 sender: "user".into(),
@@ -259,6 +275,36 @@ async fn offline_snapshot_scans_every_thread_and_message_page() {
         .await
         .unwrap();
     }
+    crate::threads::store::blocking::append_message(
+        ctx.clone(),
+        workspace.clone(),
+        target_thread.clone(),
+        ConversationMessage {
+            id: "user:old-channel-message".into(),
+            content: "hello from discord".into(),
+            message_type: "text".into(),
+            extra_metadata: json!({"scope": "channel", "channel": "discord"}),
+            sender: "user".into(),
+            created_at: "2099-01-01T00:00:00Z".into(),
+        },
+    )
+    .await
+    .unwrap();
+    crate::threads::store::blocking::append_message(
+        ctx.clone(),
+        workspace.clone(),
+        target_thread.clone(),
+        ConversationMessage {
+            id: "web-after-channel".into(),
+            content: "later unrelated web row".into(),
+            message_type: "text".into(),
+            extra_metadata: json!({"scope": "web"}),
+            sender: "user".into(),
+            created_at: "2099-01-01T00:00:00Z".into(),
+        },
+    )
+    .await
+    .unwrap();
     for index in 0..65 {
         crate::threads::store::blocking::ensure_thread(
             ctx.clone(),
@@ -276,6 +322,29 @@ async fn offline_snapshot_scans_every_thread_and_message_page() {
         .await
         .unwrap();
     }
+
+    let threads = crate::threads::store::blocking::list_threads(ctx.clone(), workspace.clone())
+        .await
+        .unwrap();
+    assert_eq!(threads.len(), 66);
+    assert!(threads[..64]
+        .iter()
+        .all(|thread| thread.id != target_thread));
+    assert!(threads.iter().position(|thread| thread.id == target_thread).unwrap() >= 64);
+
+    let messages = crate::threads::store::blocking::get_messages(
+        ctx.clone(),
+        workspace.clone(),
+        target_thread.clone(),
+    )
+    .await
+    .unwrap();
+    assert_eq!(messages.len(), 66);
+    assert!(messages[..64]
+        .iter()
+        .all(|message| message.extra_metadata.get("channel").is_none()));
+    assert_eq!(messages[64].extra_metadata["channel"], "discord");
+    assert!(messages[65].extra_metadata.get("channel").is_none());
 
     assert_eq!(clear_channel_memory(&config, "discord").await.unwrap(), 0);
     assert_eq!(
