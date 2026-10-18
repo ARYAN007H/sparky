@@ -16,15 +16,17 @@ async fn ptt_source_turn_completes_without_publishing_a_voice_event() {
     let workspace_dir = temp.path().join("workspace");
     let action_dir = temp.path().join("projects");
     let config_path = temp.path().join("config/config.toml");
+    let files_dir = temp.path().join("files");
     std::fs::create_dir_all(&workspace_dir).expect("create isolated workspace");
     std::fs::create_dir_all(&action_dir).expect("create isolated action directory");
+    std::fs::create_dir_all(&files_dir).expect("create isolated files directory");
     std::fs::create_dir_all(config_path.parent().unwrap()).expect("create isolated config dir");
     let mut config = crate::config::Config::default();
     config.workspace_dir = workspace_dir;
     config.action_dir = action_dir.clone();
     config.action_dir_override = Some(action_dir.clone());
     config.config_path = config_path;
-    config.files_dir_override = Some(temp.path().join("files"));
+    config.files_dir_override = Some(files_dir);
     let core_context = crate::core::runtime::CoreContext::for_test_with_config(
         crate::core::runtime::DomainSet::full(),
         config,
