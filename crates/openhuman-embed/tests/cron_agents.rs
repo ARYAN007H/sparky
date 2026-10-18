@@ -14,8 +14,8 @@ use std::time::Duration;
 use common::{chat_completion, chat_requests, offline_config, runtime, stub_backend};
 use openhuman_embed::{
     AgentDefinitionSpec, AgentSpec, AgentTurnOrigin, CronError, HostTurnTools, JobSchedule,
-    JobSpec, JobTarget, Provider, Runtime, RuntimeError, ServiceSet, Tool, ToolScopeSpec,
-    RuntimeEventKind, RuntimeEvents, TrustedAutomationSource, Workspace,
+    JobSpec, JobTarget, Provider, Runtime, RuntimeError, RuntimeEventKind, RuntimeEvents,
+    ServiceSet, Tool, ToolScopeSpec, TrustedAutomationSource, Workspace,
 };
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
