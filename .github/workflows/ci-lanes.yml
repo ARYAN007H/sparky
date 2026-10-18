@@ -27,7 +27,14 @@ on:
         required: true
       pr-number:
         type: number
-        required: true
+        required: false
+        default: 0
+      # A trusted branch ref to check out instead of the PR merge commit: the
+      # manual `workflow_dispatch` test path of ci-fast.yml. Empty for PRs.
+      ref:
+        type: string
+        required: false
+        default: ""
       base-ref:
         type: string
         required: true
@@ -56,7 +63,7 @@ jobs:
       - name: Checkout PR merge commit
         uses: tinyhumansai/.github/actions/checkout@35fa65b76c80d48779592b111837e55d9d0860d4
         with:
-          ref: refs/pull/${{ inputs.pr-number }}/merge
+          ref: ${{ inputs.ref != '' && inputs.ref || format('refs/pull/{0}/merge', inputs.pr-number) }}
           fetch-depth: 0
           submodules: recursive
           # Pin ancestry checks also inspect compile-only vendor repositories.
