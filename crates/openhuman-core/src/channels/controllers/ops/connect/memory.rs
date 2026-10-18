@@ -14,7 +14,7 @@ pub(super) async fn clear_channel_memory(
     config: &Config,
     channel_id: &str,
 ) -> anyhow::Result<usize> {
-    let forgotten = crate::memory::channels::forget_channel(config, channel_id)
+    let forgotten = crate::memory::ops::forget_channel(config, channel_id)
         .await
         .map_err(|e| anyhow::anyhow!("clear_channel_memory: {e} (code {})", e.code()))?;
     tracing::debug!(
