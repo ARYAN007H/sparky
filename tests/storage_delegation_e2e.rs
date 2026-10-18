@@ -1,10 +1,9 @@
 //! The delegation graph's durable checkpointer (`DriverCheckpointer` behind
-//! `open_delegation_checkpointer`) on every storage driver: a checkpoint is
-//! written and resumed, resumed again from a reopened backend when the driver
-//! is durable, and two agents' scopes keep their checkpoints apart.
+//! `open_delegation_checkpointer`) on a configured backend: a checkpoint is
+//! written and resumed, resumed again from a reopened backend, and two
+//! agents' scopes keep their checkpoints apart.
 //!
-//! Each driver is its own test case (see `support/storage_drivers.rs`). Its
-//! own test binary because it installs a backend into the process-wide
+//! Its own test binary because it installs a backend into the process-wide
 //! storage slot.
 
 use std::sync::Arc;
@@ -140,9 +139,9 @@ async fn the_delegation_checkpointer_resumes_and_keeps_scopes_apart() {
     assert!(local.list_threads().await.unwrap().is_empty());
     assert_eq!(plan_of(&local, "run-1").await, None);
 
-    // A durable driver resumes after the backend is reopened, as a restarted
+    // The checkpoint resumes after the backend is reopened, as a restarted
     // process would.
-    if case.driver.is_durable() {
+    {
         let url = case.url.clone();
         let reopened =
             openhuman_core::storage::block_on(

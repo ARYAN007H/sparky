@@ -3,8 +3,7 @@
 //! scope, and a call with no acting agent in single-user mode falls back to
 //! the `local` scope.
 //!
-//! Each driver is its own test case (see `support/storage_drivers.rs`). Its
-//! own test binary because it installs a backend into the process-wide
+//! Its own test binary because it installs a backend into the process-wide
 //! storage slot and boots a core.
 
 use std::sync::Arc;

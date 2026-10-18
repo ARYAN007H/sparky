@@ -15,9 +15,7 @@
 //! * no file of the workspace was modified, created or removed.
 //!
 //! Its own binary: it installs a storage backend into the process-wide slot and
-//! sets the keyring master key. Each driver is its own case
-//! (`support/storage_drivers.rs`), so the MongoDB case runs in the
-//! `storage-mongodb` workflow against the replica set.
+//! sets the keyring master key.
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -438,26 +436,6 @@ async fn import_modules(workspace: &Path) {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn a_desktop_upgrade_is_lossless_and_leaves_the_legacy_files_untouched() {
     let case = Case::open();
-    // TinyAgents' run ledger imports `sessions.db` (and appends to it) with
-    // checked batches, which a driver without `ValidatedBatch` refuses.
-    let local = case.backend().for_scope(&Scope::local()).unwrap();
-    if !local
-        .documents()
-        .capabilities()
-        .contains(Capability::ValidatedBatch)
-    {
-        // Written to the stderr handle, not with `eprintln!`, which the test
-        // harness captures for a passing test: the skip must show in the log.
-        use std::io::Write;
-        let _ = writeln!(
-            std::io::stderr(),
-            "skipped {}: the driver lacks the validated_batch capability the \
-             tinyagents run ledger needs to import sessions.db",
-            case.driver.name()
-        );
-        return;
-    }
-
     std::env::set_var("OPENHUMAN_KEYRING_BACKEND", "file");
     std::env::set_var("OPENHUMAN_KEYRING_MASTER_KEY", "33".repeat(32));
 

@@ -3,7 +3,7 @@
 //!
 //! Its own test binary because it installs a backend into the process-wide
 //! storage slot, which would reroute every other suite's stores in a shared
-//! process. Each driver runs as its own test case (see `support/storage_drivers.rs`), and the cases take turns on the slot.
+//! process. The tests take turns on the slot (see `support/storage_case.rs`).
 
 use chrono::Utc;
 use openhuman_core::config::Config;
