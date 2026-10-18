@@ -93,6 +93,32 @@ fn a_job_policy_kept_in_the_side_table_lands_on_the_job() {
 }
 
 #[test]
+fn flow_schedule_runs_use_the_derived_job_id() {
+    let (dir, config) = workspace();
+    let backend = backend();
+    import_cron(&backend, &Scope::local(), &config, dir.path(), "").unwrap();
+
+    let fixture = expected();
+    let flow = fixture["cron"]["jobs"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|job| job["job_type"] == "flow")
+        .expect("a flow-schedule fixture job");
+    let legacy_id = flow["id"].as_str().unwrap();
+    let derived_id = format!("flow:{}", flow["command"].as_str().unwrap());
+    let job = cron_store::get_job(&backend, &Scope::local(), &derived_id).unwrap();
+    assert_eq!(job.id, derived_id);
+
+    let runs = cron_store::list_runs(&backend, &Scope::local(), &derived_id).unwrap();
+    assert_eq!(
+        runs.len(),
+        fixture["cron"]["runs"][legacy_id].as_array().unwrap().len()
+    );
+    assert!(runs.iter().all(|run| run.job_id == derived_id));
+}
+
+#[test]
 fn an_import_runs_once_and_does_not_resurrect_a_deleted_flow() {
     let (_dir, config) = workspace();
     let backend = backend();

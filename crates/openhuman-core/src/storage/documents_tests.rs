@@ -47,6 +47,63 @@ fn storage_errors_name_the_domain() {
 }
 
 #[test]
+fn compare_and_swap_does_not_run_the_change_for_a_missing_document() {
+    let storage = MemoryStorage::new();
+    let repo = repo(&storage, "local");
+    let changed = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let observed = Arc::clone(&changed);
+
+    let result = repo
+        .run(|docs| async move {
+            compare_and_swap(&docs, THINGS, "missing", move |_| {
+                observed.store(true, std::sync::atomic::Ordering::SeqCst);
+                Some(json!({ "state": "closed" }))
+            })
+            .await
+        })
+        .unwrap();
+
+    assert!(result.is_none());
+    assert!(!changed.load(std::sync::atomic::Ordering::SeqCst));
+}
+
+#[test]
+fn concurrent_swaps_apply_once() {
+    let storage = MemoryStorage::new();
+    let repo = repo(&storage, "local");
+    repo.run(|docs| async move {
+        docs.put(
+            THINGS,
+            "a",
+            json!({ "state": "open" }),
+            Precondition::Absent,
+        )
+        .await
+        .map(|_| ())
+    })
+    .unwrap();
+    let winners: usize = (0..8)
+        .map(|_| {
+            let repo = repo.clone();
+            std::thread::spawn(move || {
+                repo.run(|docs| async move {
+                    compare_and_swap(&docs, THINGS, "a", |doc| {
+                        (text(doc, "state") == Some("open")).then(|| json!({ "state": "closed" }))
+                    })
+                    .await
+                })
+                .unwrap()
+                .is_some()
+            })
+        })
+        .collect::<Vec<_>>()
+        .into_iter()
+        .map(|handle| usize::from(handle.join().unwrap()))
+        .sum();
+    assert_eq!(winners, 1);
+}
+
+#[test]
 fn scopes_do_not_see_each_other() {
     let storage = MemoryStorage::new();
     repo(&storage, "alice")
