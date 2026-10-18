@@ -207,7 +207,7 @@ async fn prewarm_locked(
 
     if let Err(error) = publish_snapshot(workspace, gate, resources) {
         tracing::warn!(%error, "[skills][bundled] flow-authoring materialization failed; hiding builtin");
-        clear_snapshot(&key);
+        clear_snapshot(key);
     }
 }
 
@@ -417,7 +417,7 @@ fn materialization_matches(workspace: &Path, gate: &DiscoveryGate, snapshot: &Sn
         let Some(expected) = snapshot
             .files
             .iter()
-            .find(|file| PathBuf::from(&file.path) == *path)
+            .find(|file| Path::new(file.path.as_str()) == path.as_path())
             .map(|file| file.contents.as_str())
         else {
             return false;
