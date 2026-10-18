@@ -57,6 +57,7 @@ async fn reserved_thread_matching_uses_module_identity_boundaries() {
 async fn unavailable_channel_module_reports_error_and_queues_known_legacy_threads() {
     use tinychannels_bus::module_inbound::PrepareChannelIdentityRequest;
 
+    let _linked_module = crate::channels::module_fixture::client().await;
     let tmp = tempfile::tempdir().unwrap();
     let mut config = config_in(&tmp);
     config.modules.enabled = false;
