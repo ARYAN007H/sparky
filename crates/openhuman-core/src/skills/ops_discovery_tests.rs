@@ -375,6 +375,91 @@ async fn flow_authoring_is_hidden_when_tinyflows_component_is_disabled() {
     );
 }
 
+#[cfg(feature = "flows")]
+#[tokio::test]
+async fn module_builtin_gate_only_narrows_context_and_explicit_config() {
+    use crate::core::runtime::{ComponentSet, ContextOverlay, CoreContext, DomainSet};
+    use crate::tools::toolpacks::ToolGroups;
+
+    let workspace = tempfile::tempdir().unwrap();
+    let mut enabled_config = crate::config::Config::default();
+    enabled_config.workspace_dir = workspace.path().to_path_buf();
+    let all = ComponentSet::all();
+    let base = CoreContext::for_test_with_components(all);
+    let enabled_context = base.derive_with(
+        ContextOverlay::new(enabled_config.clone(), DomainSet::full(), ToolGroups::none())
+            .profile("shared"),
+    );
+
+    let enabled = CoreContext::scope(enabled_context, async {
+        let dispatch = crate::core::runtime::DispatchCtx::ambient();
+        crate::skills::bundled::flow_authoring::prewarm(
+            &dispatch,
+            &enabled_config,
+            None,
+        )
+        .await;
+        crate::skills::load_workflow_metadata_for(&dispatch, &enabled_config)
+    })
+    .await;
+    assert!(enabled.iter().any(|skill| skill.id() == "flow-authoring"));
+
+    let mut context_components = all;
+    context_components.tinyflows = false;
+    let context_component_context = CoreContext::for_test_with_components(context_components)
+        .derive_with(
+            ContextOverlay::new(enabled_config.clone(), DomainSet::full(), ToolGroups::none())
+                .profile("shared"),
+        );
+    let context_component_hidden = CoreContext::scope(context_component_context, async {
+        let dispatch = crate::core::runtime::DispatchCtx::ambient();
+        crate::skills::load_workflow_metadata_for(&dispatch, &enabled_config)
+    })
+    .await;
+    assert!(
+        !context_component_hidden
+            .iter()
+            .any(|skill| skill.id() == "flow-authoring"),
+        "an all-enabled Config cannot widen a context with TinyFlows disabled"
+    );
+
+    let mut narrowed_domains = DomainSet::full();
+    narrowed_domains.flows = false;
+    let context_domain_context = CoreContext::for_test_with_components(all).derive_with(
+        ContextOverlay::new(enabled_config.clone(), narrowed_domains, ToolGroups::none())
+            .profile("shared"),
+    );
+    let context_domain_hidden = CoreContext::scope(context_domain_context, async {
+        let dispatch = crate::core::runtime::DispatchCtx::ambient();
+        crate::skills::load_workflow_metadata_for(&dispatch, &enabled_config)
+    })
+    .await;
+    assert!(
+        !context_domain_hidden
+            .iter()
+            .any(|skill| skill.id() == "flow-authoring"),
+        "an all-enabled Config cannot widen a context without the Flows domain"
+    );
+
+    let mut disabled_config = enabled_config.clone();
+    disabled_config.components.tinyflows = false;
+    let config_hidden = CoreContext::scope(
+        CoreContext::for_test_with_components(all).derive_with(
+            ContextOverlay::new(enabled_config.clone(), DomainSet::full(), ToolGroups::none())
+                .profile("shared"),
+        ),
+        async {
+            let dispatch = crate::core::runtime::DispatchCtx::ambient();
+            crate::skills::load_workflow_metadata_for(&dispatch, &disabled_config)
+        },
+    )
+    .await;
+    assert!(
+        !config_hidden.iter().any(|skill| skill.id() == "flow-authoring"),
+        "a narrower supplied Config hides resources from an enabled parent context"
+    );
+}
+
 #[test]
 fn skills_component_enabled_without_context_is_on() {
     assert!(crate::skills::skills_component_enabled());
