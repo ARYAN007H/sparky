@@ -167,7 +167,10 @@ async fn a_refused_message_publishes_no_turn_events() {
 async fn a_turn_with_an_unavailable_local_provider_ends_in_one_classified_chat_error() {
     use crate::core::runtime::{context::CoreContext, DomainSet};
     let _serial = FORCED_ERROR_TEST_LOCK.lock().await;
-    use wiremock::{Mock, MockServer, ResponseTemplate, matchers::{method, path}};
+    use wiremock::{
+        matchers::{method, path},
+        Mock, MockServer, ResponseTemplate,
+    };
 
     let server = MockServer::start().await;
     // Ollama's model warm-up is part of provider setup. Keep it distinct from
@@ -244,7 +247,11 @@ async fn a_turn_with_an_unavailable_local_provider_ends_in_one_classified_chat_e
         Some("chat_error.provider_unavailable"),
         "{error:?}"
     );
-    assert_eq!(error.error_source.as_deref(), Some("provider_error"), "{error:?}");
+    assert_eq!(
+        error.error_source.as_deref(),
+        Some("provider_error"),
+        "{error:?}"
+    );
     assert_eq!(error.error_retryable, Some(true), "{error:?}");
 
     let runtime = crate::web_chat::runner::runtime(&ctx);
