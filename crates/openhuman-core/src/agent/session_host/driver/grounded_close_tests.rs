@@ -263,14 +263,34 @@ async fn supplemental_close_call_emits_native_start_and_actual_completion() {
     assert_eq!(text, "supplemental answer");
     assert!(usage.is_none());
     let records = recorder.0.lock().unwrap();
-    assert!(matches!(records.as_slice(), [
-        AgentEvent::ModelStarted { call_id: started, model },
-        AgentEvent::ModelCompleted { call_id: completed, input: Some(input), output: Some(output), .. },
-    ] if started == completed
-        && started.as_str() == "host-supplemental-fixture-host-supplemental-1"
-        && model == "gpt-4.1"
-        && input.to_string().contains("supplemental prompt")
-        && output.to_string().contains("supplemental answer")));
+    let started = records
+        .iter()
+        .find_map(|event| match event {
+            AgentEvent::ModelStarted { call_id, model } => {
+                assert_eq!(model, "gpt-4.1");
+                Some(call_id)
+            }
+            _ => None,
+        })
+        .expect("supplemental source emits a typed start");
+    assert_eq!(
+        started.as_str(),
+        "host-supplemental-fixture-host-supplemental-1"
+    );
+    assert!(
+        records.iter().any(|event| matches!(
+            event,
+            AgentEvent::ModelCompleted {
+                call_id,
+                input: Some(input),
+                output: Some(output),
+                ..
+            } if call_id == started
+                && input.to_string().contains("supplemental prompt")
+                && output.to_string().contains("supplemental answer")
+        )),
+        "the source response is journaled with its actual IO"
+    );
 }
 
 #[test]

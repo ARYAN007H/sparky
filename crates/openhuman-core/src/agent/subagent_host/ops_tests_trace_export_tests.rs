@@ -192,6 +192,16 @@ async fn prepared_child_run_is_exported_from_its_native_journal_lineage() {
             .saturating_add(1),
     );
     let spans = collector.spans();
+    let root_span = spans
+        .iter()
+        .find(|span| {
+            span.kind == tinyagents_harness::observability::trace_export::SpanKind::Turn
+                && span
+                    .attributes
+                    .get("run.id")
+                    .is_some_and(|id| id == root_run_id.as_str())
+        })
+        .expect("the root run is represented by the trace turn span");
     let child_span = spans
         .iter()
         .find(|span| {
@@ -200,8 +210,12 @@ async fn prepared_child_run_is_exported_from_its_native_journal_lineage() {
                 .is_some_and(|id| id == child_run_id.as_str())
         })
         .expect("native collector projects the actual linked child");
-    assert_eq!(child_span.attributes["parent_run_id"], root_run_id.as_str());
-    assert_eq!(child_span.attributes["root_run_id"], root_run_id.as_str());
+    assert_eq!(
+        child_span.parent_span_id.as_deref(),
+        Some(root_span.span_id.as_str())
+    );
+    assert_eq!(root_span.attributes["parent_run_id"], root_run_id.as_str());
+    assert_eq!(root_span.attributes["root_run_id"], root_run_id.as_str());
     let generation = spans
         .iter()
         .find(|span| {
