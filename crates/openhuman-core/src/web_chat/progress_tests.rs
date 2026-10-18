@@ -342,8 +342,8 @@ async fn stamps_monotonic_seq_on_emitted_events() {
         assert_eq!(ev.request_id, request_id);
         seqs.push(ev.seq.expect("every emitted event carries a seq"));
     }
-    // The very first emitted event starts the per-request counter at 0.
-    assert_eq!(seqs[0], 0, "seq counter starts at 0 for the request");
+    // The very first emitted event starts the per-request counter at 1.
+    assert_eq!(seqs[0], 1, "seq counter starts at 1 for the request");
     assert!(
         seqs.windows(2).all(|w| w[0] < w[1]),
         "emitted seqs must be strictly increasing, got {seqs:?}"
@@ -362,7 +362,7 @@ async fn short_narration_is_flushed_on_the_rounds_first_tool_call() {
         as std::sync::Arc<dyn tinyagents_session::port::TurnStates>;
     let (tx, rx) = tokio::sync::mpsc::channel(16);
     let mut bus = crate::web_chat::subscribe_web_channel_events();
-    let _handle = spawn_progress_bridge(
+    spawn_progress_bridge(
         rx,
         "client-short".into(),
         "thread-short-narration".into(),
