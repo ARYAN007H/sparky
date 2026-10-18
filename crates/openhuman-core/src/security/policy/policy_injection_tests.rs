@@ -17,6 +17,13 @@ fn command_injection_redirect_blocked() {
 }
 
 #[test]
+fn quoted_ampersand_and_redirect_literals_are_not_treated_as_operators() {
+    let p = default_policy();
+    assert!(p.is_command_allowed("echo \"A&B\""));
+    assert!(p.is_command_allowed("echo \"A>B\""));
+}
+
+#[test]
 fn command_argument_injection_blocked() {
     let p = default_policy();
     // find -exec is a common bypass
@@ -151,6 +158,13 @@ fn command_injection_tee_blocked() {
     assert!(!p.is_command_allowed("echo secret | tee /etc/crontab"));
     assert!(!p.is_command_allowed("ls | /usr/bin/tee outfile"));
     assert!(!p.is_command_allowed("tee file.txt"));
+}
+
+#[test]
+fn command_injection_process_substitution_blocked() {
+    let p = default_policy();
+    assert!(!p.is_command_allowed("cat <(echo pwned)"));
+    assert!(!p.is_command_allowed("ls >(cat /etc/passwd)"));
 }
 
 #[test]
