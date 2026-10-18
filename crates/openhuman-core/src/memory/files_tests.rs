@@ -62,7 +62,12 @@ async fn every_memory_state_file_is_owner_only() {
     let config = config_in(&tmp);
     let workspace = config.workspace_dir.clone();
 
-    crate::memory::channels::record(&workspace, "telegram", "thread-1");
+    crate::memory::deletion::enqueue(
+        &workspace,
+        crate::memory::deletion::PendingDeletion::Thread {
+            thread_id: "thread-1".into(),
+        },
+    );
     crate::memory::sources::state::update(&workspace, "src-1", |_| {});
     crate::memory::layout_migration::state::save(&workspace, &Default::default()).unwrap();
     jobs::enqueue(
