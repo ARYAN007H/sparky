@@ -35,9 +35,8 @@ fn a_run_budget_timeout_names_the_run_bound() {
 
 #[test]
 fn an_unbounded_timeout_keeps_the_owner_conversion() {
-    let error = hosted(HostedErrorKind::Timeout, None);
-    let owner = TinyAgentsError::from(error.clone());
-    let projected = run_error_from_hosted(error);
+    let owner = TinyAgentsError::from(hosted(HostedErrorKind::Timeout, None));
+    let projected = run_error_from_hosted(hosted(HostedErrorKind::Timeout, None));
 
     assert_eq!(projected.to_string(), owner.to_string());
     assert_eq!(
