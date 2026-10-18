@@ -26,6 +26,6 @@ mod plan_exit;
 // them to a disabled-error.
 mod todo;
 
-pub use plan_exit::{PlanExitTool, PLAN_EXIT_MARKER};
+pub use tinyagents_harness::tool::plan_exit::{PlanExitTool, PLAN_EXIT_MARKER};
 pub use todo::TodoTool;
 pub(crate) use todo::TodoToolDispatch;

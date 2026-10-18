@@ -3,7 +3,6 @@
 
 use std::sync::Arc;
 
-pub(crate) use crate::agent::tinyagents::turn_model_resolver::TurnModelResolver;
 use crate::core::runtime::DispatchCtx;
 
 use crate::inference::provider::model::{BuiltTurnModels, TierRoutes, TurnChatModel};
@@ -50,6 +49,17 @@ pub(crate) struct TurnModels {
 }
 
 impl TurnModels {
+    /// Bind the already selected turn routes to the harness-owned resolver.
+    pub(crate) fn resolver(&self) -> tinyagents_harness::host::PrebuiltModelResolver<()> {
+        tinyagents_harness::host::PrebuiltModelResolver::new(
+            self.primary.clone(),
+            self.routes.iter().cloned().collect::<Vec<_>>(),
+        )
+        .with_lead_model(Arc::new(tinyinference_llm::model::ErrorSlotModel::new(
+            self.primary.clone(),
+            self.error_slot.clone(),
+        )))
+    }
     /// Whether the primary provider is local / self-hosted.
     pub(crate) fn is_local(&self) -> bool {
         self.is_local

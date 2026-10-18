@@ -183,7 +183,7 @@ async fn drive_turn(
     // Wrap concrete routes before the invocation-local hosted resolver captures them.
     let turn_models = turn_models.with_budget(run_context.model_budget.as_ref());
     let hosted_model_resolver = hosted_root.as_ref().map(|_| {
-        Arc::new(crate::inference::turn_models::TurnModelResolver::from_turn_models(&turn_models))
+        Arc::new(turn_models.resolver())
             as Arc<dyn tinyagents_harness::host::ModelResolver<()>>
     });
     // The host security adapter must see the exact same `Arc`-shared instances

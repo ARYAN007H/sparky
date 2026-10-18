@@ -39,7 +39,7 @@ async fn plan_exit_does_not_flip_while_a_review_is_parked() {
     // Let the review register as parked before racing plan_exit against it.
     tokio::time::sleep(std::time::Duration::from_millis(20)).await;
 
-    let tool = PlanExitTool::new();
+    let tool = PlanExitTool::new(std::sync::Arc::new(super::super::plan_exit::mode_lookup));
     let ctx = ThreadContext(thread_id);
     let result = tool
         .execute_with_context(
@@ -92,7 +92,7 @@ async fn plan_exit_does_not_flip_while_a_review_is_parked() {
 
 #[tokio::test]
 async fn plan_exit_emits_marker() {
-    let tool = PlanExitTool::new();
+    let tool = PlanExitTool::new(std::sync::Arc::new(super::super::plan_exit::mode_lookup));
     let result = tool
         .execute(json!({ "plan": "1. Read X\n2. Edit Y" }))
         .await
@@ -105,14 +105,14 @@ async fn plan_exit_emits_marker() {
 
 #[tokio::test]
 async fn plan_exit_rejects_empty() {
-    let tool = PlanExitTool::new();
+    let tool = PlanExitTool::new(std::sync::Arc::new(super::super::plan_exit::mode_lookup));
     let result = tool.execute(json!({ "plan": "   " })).await.unwrap();
     assert!(result.is_error);
 }
 
 #[test]
 fn plan_exit_metadata() {
-    let tool = PlanExitTool::new();
+    let tool = PlanExitTool::new(std::sync::Arc::new(super::super::plan_exit::mode_lookup));
     assert_eq!(tool.name(), "plan_exit");
     assert_eq!(tool.permission_level(), PermissionLevel::None);
 }

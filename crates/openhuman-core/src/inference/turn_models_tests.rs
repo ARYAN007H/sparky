@@ -6,7 +6,8 @@ use tinyagents_harness::host::{ModelResolveRequest, ModelResolver};
 use tinyinference_llm::message::ContentBlock;
 use tinyinference_llm::model::{ChatModel, ModelRequest, ModelResponse};
 
-use super::{TurnModelResolver, TurnModels};
+use super::TurnModels;
+use tinyagents_harness::host::PrebuiltModelResolver as TurnModelResolver;
 use crate::agent::tinyagents::TurnModelSource;
 
 #[tokio::test]
@@ -240,7 +241,7 @@ async fn a_sub_agents_provider_failure_is_not_recorded_as_the_leads() {
     let models = TurnModelSource::from_model(model)
         .build("m", 0.0, None, None)
         .expect("turn models");
-    let resolver = TurnModelResolver::from_turn_models(&models);
+    let resolver = models.resolver();
     let child = resolver
         .resolve(&ModelResolveRequest::new("researcher"))
         .await
@@ -265,7 +266,7 @@ async fn a_sub_agents_success_does_not_clear_the_leads_recorded_failure() {
     let models = TurnModelSource::from_model(model)
         .build("m", 0.0, None, None)
         .expect("turn models");
-    let resolver = TurnModelResolver::from_turn_models(&models);
+    let resolver = models.resolver();
     let lead = resolver
         .resolve(&ModelResolveRequest::new("orchestrator").as_team_lead())
         .await
@@ -302,7 +303,7 @@ async fn a_sub_agents_route_failure_leaves_the_leads_slot_untouched() {
         .build("m", 0.0, None, None)
         .expect("turn models")
         .with_test_route("hint:burst", route.clone());
-    let resolver = TurnModelResolver::from_turn_models(&models);
+    let resolver = models.resolver();
 
     let lead = resolver
         .resolve(&ModelResolveRequest::new("orchestrator").as_team_lead())
@@ -348,7 +349,7 @@ async fn a_sub_agents_route_success_does_not_clear_the_leads_slot() {
         .build("m", 0.0, None, None)
         .expect("turn models")
         .with_test_route("hint:burst", route.clone());
-    let resolver = TurnModelResolver::from_turn_models(&models);
+    let resolver = models.resolver();
 
     let lead = resolver
         .resolve(&ModelResolveRequest::new("orchestrator").as_team_lead())
