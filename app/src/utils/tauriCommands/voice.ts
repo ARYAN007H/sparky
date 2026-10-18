@@ -46,22 +46,6 @@ export interface VoiceServerStatus {
   last_error: string | null;
 }
 
-export interface VoiceServerSettings {
-  auto_start: boolean;
-  hotkey: string;
-  activation_mode: 'tap' | 'push';
-  skip_cleanup: boolean;
-  min_duration_secs: number;
-  /** RMS energy threshold for silence detection. Recordings below this are
-   *  treated as silence and skipped to prevent STT hallucinations. */
-  silence_threshold: number;
-  /** Custom vocabulary words to bias the STT engine toward (names, technical terms). */
-  custom_dictionary: string[];
-  /** Hosted speech-to-text engine. There is no local option — the bundled
-   *  whisper.cpp engine was removed. */
-  stt_engine: SttEngine;
-}
-
 /** Hosted speech-to-text engines, mirroring `config::schema::SttEngine`. */
 export type SttEngine = 'backend' | 'elevenlabs' | 'openai';
 
@@ -90,15 +74,6 @@ export async function openhumanVoiceServerStart(params?: {
 export async function openhumanVoiceServerStop(): Promise<VoiceServerStatus> {
   return await callCoreRpc<VoiceServerStatus>({
     method: 'openhuman.voice_server_stop',
-    params: {},
-  });
-}
-
-export async function openhumanGetVoiceServerSettings(): Promise<
-  CommandResponse<VoiceServerSettings>
-> {
-  return await callCoreRpc<CommandResponse<VoiceServerSettings>>({
-    method: 'openhuman.config_get_voice_server_settings',
     params: {},
   });
 }

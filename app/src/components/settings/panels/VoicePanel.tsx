@@ -1,8 +1,7 @@
 import debug from 'debug';
-import { ArrowRight, AudioLines } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 
-import { cn } from '../../../lib/cn';
 import { useT } from '../../../lib/i18n/I18nContext';
 import PttSettingsPanel from '../../../pages/settings/voice/PttSettingsPanel';
 import {
@@ -20,7 +19,7 @@ import {
   type VoiceStatus,
 } from '../../../utils/tauriCommands';
 import PanelPage from '../../layout/PanelPage';
-import { Button, Card, Field, StatusLine, Switch } from '../../ui';
+import { Button, Card, Field, StatusLine } from '../../ui';
 import SettingsBackButton from '../components/SettingsBackButton';
 import { useSettingsNavigation } from '../hooks/useSettingsNavigation';
 import VoicePanelKeyModal from './VoicePanelKeyModal';

@@ -100,7 +100,6 @@ mod mascot_native_window;
 mod mcp_commands;
 mod native_notifications;
 #[cfg(target_os = "macos")]
-mod notch_window;
 mod process_kill;
 mod process_recovery;
 mod ptt_hotkeys;
@@ -1365,61 +1364,6 @@ fn mascot_native_window_is_open() -> bool {
 #[cfg(all(not(target_os = "macos"), not(target_os = "linux")))]
 fn mascot_native_window_is_open() -> bool {
     false
-}
-
-/// Dispatch a notch-panel mutation onto the app main thread.
-///
-/// The notch is a native NSPanel + WKWebView; AppKit requires it to be built
-/// and torn down on the main thread (and its `thread_local` storage lives
-/// there). Tauri runs these IPC command handlers on a worker thread, so we hop
-/// to the main thread via `run_on_main_thread`. Fire-and-forget: notch
-/// visibility is cosmetic (the frontend swallows errors), so we log the result
-/// on the main thread rather than blocking the command to propagate it back.
-#[cfg(target_os = "macos")]
-fn dispatch_notch_on_main(
-    app: AppHandle<AppRuntime>,
-    op: impl FnOnce(&AppHandle<AppRuntime>) + Send + 'static,
-) -> Result<(), String> {
-    app.clone()
-        .run_on_main_thread(move || op(&app))
-        .map_err(|e| format!("run_on_main_thread dispatch failed: {e}"))
-}
-
-/// Show the notch activity indicator. macOS only — transparent NSPanel + WKWebView
-/// anchored to the top-centre of the primary screen. Displays live voice and
-/// agent status (listening, thinking, executing) in a pill that emerges from
-/// the physical notch on supported MacBook Pros.
-#[tauri::command]
-fn notch_window_show(app: AppHandle<AppRuntime>) -> Result<(), String> {
-    log::info!("[notch-window] show requested");
-    #[cfg(target_os = "macos")]
-    {
-        dispatch_notch_on_main(app, |app| {
-            if let Err(e) = notch_window::show(app) {
-                log::warn!("[notch-window] show failed: {e}");
-            }
-        })
-    }
-    #[cfg(not(target_os = "macos"))]
-    {
-        let _ = app;
-        Ok(()) // No-op on non-macOS
-    }
-}
-
-/// Hide the notch activity indicator.
-#[tauri::command]
-fn notch_window_hide(app: AppHandle<AppRuntime>) -> Result<(), String> {
-    log::info!("[notch-window] hide requested");
-    #[cfg(target_os = "macos")]
-    {
-        dispatch_notch_on_main(app, |_app| notch_window::hide())
-    }
-    #[cfg(not(target_os = "macos"))]
-    {
-        let _ = app;
-        Ok(())
-    }
 }
 
 /// Hide or show the OS top-level main-window frame on Windows by enumerating
