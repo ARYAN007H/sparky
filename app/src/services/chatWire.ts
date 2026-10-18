@@ -37,11 +37,15 @@ type Variant<K extends Tag> = Extract<WebChannelEvent, { event: K }>;
 type NoNull<T> = { [P in keyof T]: Exclude<T[P], null> };
 type Req<T, K extends keyof T> = Omit<T, K> & { [P in K]-?: Exclude<T[P], null | undefined> };
 
-/** Wire event `K`, nulls dropped, with `R` guaranteed present. */
-export type WireEvent<K extends Tag, R extends keyof Variant<K> = never> = Req<
-  NoNull<Variant<K>>,
-  R
->;
+/**
+ * Wire event `K` as consumers see it: nulls dropped, `R` guaranteed present.
+ * The `event` tag is the Socket.IO event name, so it is not repeated in the
+ * payload type, and `client_id` (routing only) is optional for consumers.
+ */
+export type WireEvent<K extends Tag, R extends keyof Variant<K> = never> = Omit<
+  Req<NoNull<Variant<K>>, R>,
+  'event' | 'client_id'
+> & { client_id?: string };
 
 // ── Shared payloads ──────────────────────────────────────────────────────────
 
