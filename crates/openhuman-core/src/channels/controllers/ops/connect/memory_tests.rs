@@ -105,6 +105,7 @@ async fn clears_stamped_and_legacy_channel_conversations_without_mutating_legacy
     let tmp = tempfile::TempDir::new().unwrap();
     let mut config = Config::default();
     config.workspace_dir = tmp.path().to_path_buf();
+    use_linked_channel_module(&mut config).await;
     let engine = Arc::new(ReferenceEngine::new());
     crate::memory::engine::install_test_engine(&config.workspace_dir, engine.clone());
     let discord_thread = store_channel_thread(
@@ -197,6 +198,7 @@ async fn stamped_channel_forget_isolated_to_the_configured_account() {
     let mut current = Config::default();
     current.workspace_dir = current_tmp.path().to_path_buf();
     current.memory.engine.clear();
+    use_linked_channel_module(&mut current).await;
     let mut other = Config::default();
     other.workspace_dir = other_tmp.path().to_path_buf();
     other.memory.engine.clear();
@@ -240,6 +242,7 @@ async fn missing_or_corrupt_legacy_map_does_not_block_stamped_forget() {
         let tmp = tempfile::TempDir::new().unwrap();
         let mut config = Config::default();
         config.workspace_dir = tmp.path().to_path_buf();
+        use_linked_channel_module(&mut config).await;
         let engine = Arc::new(ReferenceEngine::new());
         crate::memory::engine::install_test_engine(&config.workspace_dir, engine.clone());
         let thread_id = store_channel_thread(
@@ -280,6 +283,7 @@ async fn memory_off_queues_channel_threads_from_the_canonical_thread_store() {
     let mut config = Config::default();
     config.workspace_dir = tmp.path().to_path_buf();
     config.memory.engine.clear();
+    use_linked_channel_module(&mut config).await;
     let thread_id = store_channel_thread(
         DispatchCtx::ambient(),
         &config.workspace_dir,
@@ -301,6 +305,7 @@ async fn reserved_channel_thread_id_survives_metadata_edit_without_prefix_collis
     let mut config = Config::default();
     config.workspace_dir = tmp.path().to_path_buf();
     config.memory.engine.clear();
+    use_linked_channel_module(&mut config).await;
     let ctx = DispatchCtx::ambient();
     let target = store_channel_thread(
         ctx.clone(),
@@ -354,6 +359,7 @@ async fn offline_snapshot_scans_every_thread_and_message_page() {
     let mut config = Config::default();
     config.workspace_dir = tmp.path().to_path_buf();
     config.memory.engine.clear();
+    use_linked_channel_module(&mut config).await;
     let workspace = config.workspace_dir.clone();
     let ctx = DispatchCtx::ambient();
     let params = crate::channels::providers::relay::RelayInboundParams::new(
@@ -492,6 +498,7 @@ async fn filter_failure_is_visible_and_queued_snapshot_does_not_catch_reconnecte
     let tmp = tempfile::TempDir::new().unwrap();
     let mut config = Config::default();
     config.workspace_dir = tmp.path().to_path_buf();
+    use_linked_channel_module(&mut config).await;
     let old_thread = store_channel_thread(
         DispatchCtx::ambient(),
         &config.workspace_dir,
