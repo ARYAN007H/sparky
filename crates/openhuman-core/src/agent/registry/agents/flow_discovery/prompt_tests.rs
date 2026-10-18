@@ -1,5 +1,6 @@
-use super::build;
-use crate::agent::prompts::{PromptContext, ToolCallFormat};
+use crate::agent::prompts::PromptContext;
+use crate::agent::registry::agents::flow_discovery::prompt::build;
+use tinytools_agent::dialect::ToolCallFormat;
 
 fn ctx<'a>(
     workspace: &'a std::path::Path,

@@ -1,4 +1,5 @@
 use super::*;
+use tinyagents_definition::DefinitionSource;
 
 #[test]
 fn only_dynamic_builtin_flow_definitions_use_the_bus_prompt() {
@@ -12,6 +13,9 @@ fn only_dynamic_builtin_flow_definitions_use_the_bus_prompt() {
 
         let mut definition = registry.get(id).expect("builtin flow agent").clone();
         definition.source = DefinitionSource::CustomRegistry;
+        assert!(is_bus_backed_builtin(&definition));
+
+        definition.extensions.tinyflows_prompt_owner = None;
         assert!(!is_bus_backed_builtin(&definition));
     }
 }
