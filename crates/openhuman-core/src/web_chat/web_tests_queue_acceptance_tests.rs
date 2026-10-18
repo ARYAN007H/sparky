@@ -146,16 +146,19 @@ async fn interrupt_and_parallel_bypass_the_active_turn_queue() {
 #[tokio::test]
 async fn terminal_turn_dispatches_followup_as_a_fresh_host_turn() {
     let _serial = FORCED_ERROR_TEST_LOCK.lock().await;
-    let block = make_block();
+    let workspace = tempfile::tempdir().expect("workspace");
+    let block = TestRunChatTaskBlock {
+        succeed_in: Some(workspace.path().to_path_buf()),
+        ..make_block()
+    };
     set_test_run_chat_task_block(Some(block.clone())).await;
     let thread_id = "queue-followup-terminal";
     let primary_request_id = start_parked_turn(thread_id, &block).await;
     let accepted = queue_message(thread_id, "start after terminal", "followup").await;
     assert_eq!(accepted["queued"], true);
 
-    // End the primary normally from the host test seam. The queue's follow-up
-    // lane is drained only after terminal handling, then `dispatch_followups`
-    // must route it back through `start_chat` as a fresh in-flight turn.
+    // End the primary normally from the host test seam. The runner hands the
+    // queue's follow-up lane back as a fresh turn once the primary completed.
     block.release.notify_one();
     let entries = wait_for_in_flight(|entries| {
         entries

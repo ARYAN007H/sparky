@@ -111,5 +111,7 @@ async fn a_user_cancel_under_the_fence_placeholder_id_keeps_the_callers_client()
     .await
     .expect("the cancelled turn announces itself");
     assert_eq!(seen, "profile-fence");
-    assert!(token.is_cancelled());
+    tokio::time::timeout(std::time::Duration::from_secs(5), token.cancelled())
+        .await
+        .expect("tearing the turn down reaches its watcher");
 }
