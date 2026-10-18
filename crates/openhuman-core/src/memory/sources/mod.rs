@@ -129,7 +129,7 @@ pub fn apply_add(config: &mut Config, params: &SourcesAddParams) -> Result<Memor
         None | Some("") => None,
         Some(raw) => Some(
             raw.parse::<tinymemory_api::Namespace>()
-                .map_err(|error| Error::InvalidRequest((error.to_string()).into()))?
+                .map_err(|error| Error::InvalidRequest(error.to_string()))?
                 .to_string(),
         ),
     };

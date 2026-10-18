@@ -48,12 +48,7 @@ pub fn brain_node(
     source: &BrainSource,
     item: &StoreItem,
 ) -> Result<Namespace> {
-    Ok(brain_node_with(
-        config.memory.split_github_by_repo,
-        layout,
-        source,
-        item,
-    )?)
+    brain_node_with(config.memory.split_github_by_repo, layout, source, item)
 }
 
 /// The layout the brain RPCs act on: `identity`'s.
@@ -68,7 +63,7 @@ fn brain(config: &Config, identity: &MemoryIdentity) -> Result<Brain> {
 
 fn parse_source(raw: &str) -> Result<BrainSource> {
     raw.parse()
-        .map_err(|error: tinymemory_api::Error| Error::InvalidRequest((error.to_string()).into()))
+        .map_err(|error: tinymemory_api::Error| Error::InvalidRequest(error.to_string()))
 }
 
 /// One brain source and how many documents it holds.

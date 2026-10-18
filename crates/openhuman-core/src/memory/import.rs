@@ -105,7 +105,7 @@ pub(crate) fn listed_unconfirmed(workspace_dir: &Path) -> bool {
 }
 
 fn import_error(error: &ImportError) -> Error {
-    Error::InvalidRequest((error.to_string()).into())
+    Error::InvalidRequest(error.to_string())
 }
 
 fn importer(
