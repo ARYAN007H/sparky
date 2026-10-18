@@ -128,6 +128,7 @@ async fn re_read_until_stopped(
 ) -> (
     StopReasonKind,
     String,
+    String,
     Option<tinyagents_harness::no_progress::ClassifiedStopCause>,
 ) {
     let handle = SteeringHandle::allow_all();
@@ -203,7 +204,8 @@ async fn re_read_until_stopped(
                 .await
                 .unwrap();
             let (kind, summary) = summary_from(&slot, &records);
-            return (kind, summary, ctx.take_halted_by_guard_cause());
+            let note = slot.lock().unwrap().clone().unwrap();
+            return (kind, summary, note, ctx.take_halted_by_guard_cause());
         }
     }
     panic!("the repeated reads never stopped the run");
@@ -221,12 +223,12 @@ async fn a_not_found_stop_inside_a_repeat_loop_is_summarised_as_repeating() {
         ("file_read", "src/main.rs"),
         ("file_read", "src/lbi.rs"),
     ];
-    let (kind, summary, cause) = re_read_until_stopped(&batch, 12).await;
+    let (kind, summary, note, cause) = re_read_until_stopped(&batch, 12).await;
     assert_eq!(kind, StopReasonKind::RepeatingStep, "{summary}");
     let cause = cause.expect("typed repeat-loop stop cause");
     assert_eq!(cause.class, "repeating_step");
     assert_eq!(cause.operation, "file_read");
-    assert_eq!(cause.summary, summary);
+    assert_eq!(cause.summary, note);
     assert!(
         summary.contains("kept repeating the same step"),
         "{summary}"
@@ -246,12 +248,12 @@ async fn a_repeat_guard_stop_at_admission_keeps_its_note_over_a_sibling_failure(
         ("file_read", "src/lbi.rs"),
         ("file_read", "src/lib.rs"),
     ];
-    let (kind, summary, cause) = re_read_until_stopped(&batch, 12).await;
+    let (kind, summary, note, cause) = re_read_until_stopped(&batch, 12).await;
     assert_eq!(kind, StopReasonKind::RepeatingStep, "{summary}");
     let cause = cause.expect("repeat guard owns a typed stop cause");
     assert_eq!(cause.class, "repeating_step");
     assert_eq!(cause.operation, "file_read");
-    assert_eq!(cause.summary, summary);
+    assert_eq!(cause.summary, note);
 }
 
 /// A mistyped read re-issued unchanged stops the run before the guard's
