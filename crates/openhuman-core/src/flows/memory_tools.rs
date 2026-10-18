@@ -136,7 +136,7 @@ pub fn flow_meta(flow_id: &str, extra: &[String]) -> MemoryMeta {
 pub async fn forget_matching(config: &Config, filter: MetaFilter) -> Result<usize> {
     if filter.is_empty() {
         return Err(Error::InvalidRequest((
-            "refusing to forget with an empty filter",
+            "refusing to forget with an empty filter"
         ).into()));
     }
     let bound = match crate::memory::engine::resolve(config).engine() {

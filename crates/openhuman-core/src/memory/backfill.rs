@@ -217,7 +217,7 @@ pub async fn start(
 ) -> Result<BackfillView> {
     if !params.consent {
         return Err(Error::InvalidRequest((
-            "storing past chats uploads them to the selected engine; pass consent: true",
+            "storing past chats uploads them to the selected engine; pass consent: true"
         ).into()));
     }
     let bound = engine::resolve(config).engine()?;

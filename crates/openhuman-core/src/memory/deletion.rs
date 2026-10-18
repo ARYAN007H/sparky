@@ -39,7 +39,7 @@ struct FileStore {
 }
 
 impl ListStore<PendingDeletion> for FileStore {
-    fn load(&self) -> Result<Vec<PendingDeletion>, StoreError> {
+    fn load(&self) -> std::result::Result<Vec<PendingDeletion>, StoreError> {
         let Ok(text) = std::fs::read_to_string(&self.file) else {
             return Ok(Vec::new());
         };

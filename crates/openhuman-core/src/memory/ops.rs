@@ -93,7 +93,7 @@ pub fn apply_engine_set(config: &mut Config, params: &EngineSetParams) -> Result
         // switching back needs no re-entry.
         if params.endpoint.is_some() || params.api_key.is_some() {
             return Err(Error::InvalidRequest((
-                "disabling memory takes no endpoint or API key",
+                "disabling memory takes no endpoint or API key"
             ).into()));
         }
         config.memory.engine = DISABLED_ENGINE.to_string();
@@ -130,7 +130,7 @@ pub fn apply_engine_set(config: &mut Config, params: &EngineSetParams) -> Result
             CORTEXDB_ENGINE => engine::store_cortexdb_key(config, key)?,
             TINYHUMANS_ENGINE => {
                 return Err(Error::InvalidRequest((
-                    "the tinyhumans engine uses your sign-in, not an API key",
+                    "the tinyhumans engine uses your sign-in, not an API key"
                 ).into()))
             }
             _ => return Err(Error::InvalidRequest(("this engine takes no API key").into())),
@@ -146,7 +146,7 @@ fn validate_endpoint(endpoint: &str) -> Result<()> {
         .map_err(|_| Error::InvalidRequest(("the endpoint is not a valid URL").into()))?;
     if !matches!(parsed.scheme(), "http" | "https") || parsed.host_str().is_none() {
         return Err(Error::InvalidRequest((
-            "the endpoint must be an http(s) URL with a host",
+            "the endpoint must be an http(s) URL with a host"
         ).into()));
     }
     Ok(())
@@ -422,7 +422,7 @@ pub async fn erase_all(
 ) -> Result<EraseAllView> {
     if !params.confirm {
         return Err(Error::InvalidRequest((
-            "erasing all memory needs confirm: true; nothing erased comes back",
+            "erasing all memory needs confirm: true; nothing erased comes back"
         ).into()));
     }
     let bound = bound(config)?;

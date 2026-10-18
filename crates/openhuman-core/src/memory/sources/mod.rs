@@ -73,7 +73,7 @@ pub fn normalize_target(kind: MemorySourceKind, target: &str) -> Result<String> 
                     Ok(format!("https://github.com/{owner}/{repo}"))
                 }
                 _ => Err(Error::InvalidRequest((
-                    "a GitHub target is `owner/repo` or a repository URL",
+                    "a GitHub target is `owner/repo` or a repository URL"
                 ).into())),
             }
         }

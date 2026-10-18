@@ -181,7 +181,7 @@ pub(super) fn enqueue(
             }
             if !super::user_scope::within(&item.meta().namespace, &reach.at) || reach.inherit {
                 return Err(Error::InvalidRequest((
-                    "learning namespace is outside the trusted reach",
+                    "learning namespace is outside the trusted reach"
                 ).into()));
             }
             WriteOperation::Learn {
@@ -233,7 +233,7 @@ struct FileStore {
 }
 
 impl ListStore<Entry> for FileStore {
-    fn load(&self) -> Result<Vec<Entry>, StoreError> {
+    fn load(&self) -> std::result::Result<Vec<Entry>, StoreError> {
         read_file(&self.file).map_err(|_| StoreError("queue file unreadable".into()))
     }
 
