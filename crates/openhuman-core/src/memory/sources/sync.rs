@@ -20,8 +20,8 @@ use tinymemory_integrations::sources::SourceKind;
 use crate::config::schema::{MemorySourceConfig, MemorySourceKind};
 use crate::config::Config;
 use crate::memory::engine;
-use crate::memory::error::{MemoryError, MemoryResult};
 use crate::memory::types::SourceStatus;
+use tinymemory_api::{Error, Result};
 
 use super::state;
 
@@ -43,18 +43,16 @@ fn registered(source: &MemorySourceConfig) -> RegisteredSource {
     }
 }
 
-fn host_error(error: SyncError) -> MemoryError {
+fn host_error(error: SyncError) -> Error {
     match error {
-        SyncError::Invalid(message) => MemoryError::invalid(message),
-        SyncError::Read(message) => {
-            MemoryError::Engine(format!("reading the source failed: {message}"))
-        }
-        SyncError::Engine(error) => error.into(),
+        SyncError::Invalid(message) => Error::InvalidRequest(message),
+        SyncError::Read(message) => Error::Engine(format!("reading the source failed: {message}")),
+        SyncError::Engine(error) => error,
     }
 }
 
 /// Checks `source` is readable as configured, without reading it.
-pub(super) fn validate(source: &MemorySourceConfig) -> MemoryResult<()> {
+pub(super) fn validate(source: &MemorySourceConfig) -> Result<()> {
     module::entry_for(&registered(source))
         .map(|_| ())
         .map_err(host_error)
@@ -128,12 +126,12 @@ fn syncer_for(config: &Config) -> Syncer {
 }
 
 /// Reads `source` and stores what it yields. Returns the number stored.
-pub async fn sync_one(config: &Config, source: &MemorySourceConfig) -> MemoryResult<u64> {
+pub async fn sync_one(config: &Config, source: &MemorySourceConfig) -> Result<u64> {
     engine::resolve(config).engine()?;
     run(config, source).await.map_err(host_error)
 }
 
-async fn run(config: &Config, source: &MemorySourceConfig) -> Result<u64, SyncError> {
+async fn run(config: &Config, source: &MemorySourceConfig) -> std::result::Result<u64, SyncError> {
     let bound = engine::resolve(config)
         .engine()
         .map_err(|error| SyncError::Invalid(error.to_string()))?;
@@ -163,7 +161,7 @@ pub(crate) async fn place_and_store(
     items: Vec<tinymemory_api::StoreItem>,
     (kind, source_id): (MemorySourceKind, &str),
     layout: &tinymemory_tools::MemoryLayout,
-) -> Result<u64, SyncError> {
+) -> std::result::Result<u64, SyncError> {
     let brain_source = crate::memory::brain::brain_source(kind);
     // Placing an item under its brain node is pure, so every one is placed up
     // front: the module stores `(node, item)` pairs and reports the nodes hit.
@@ -197,7 +195,7 @@ pub fn start_sync(
     ctx: &crate::core::runtime::DispatchCtx,
     config: &Config,
     id: Option<&str>,
-) -> MemoryResult<Vec<String>> {
+) -> Result<Vec<String>> {
     engine::resolve(config).engine()?;
     let claims = syncer_for(config).start(id).map_err(host_error)?;
     let mut started = Vec::new();

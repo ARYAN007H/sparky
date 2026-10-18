@@ -176,16 +176,24 @@ async fn a_shared_tree_reaches_the_module_as_a_claim() {
 #[test]
 fn errors_keep_their_wire_codes_across_the_module_boundary() {
     for error in [
-        MemoryError::Off("x".into()),
-        MemoryError::Unsupported("x".into()),
-        MemoryError::invalid("x"),
-        MemoryError::Unauthorized("x".into()),
-        MemoryError::Unavailable("x".into()),
-        MemoryError::InsufficientCredits("[USER_INSUFFICIENT_CREDITS] x".into()),
-        MemoryError::Engine("x".into()),
+        Error::Off("x".into()),
+        Error::Unsupported("x".into()),
+        Error::InvalidRequest("x".into()),
+        Error::NotFound("x".into()),
+        Error::Config("x".into()),
+        Error::Conflict("x".into()),
+        Error::Unauthorized("x".into()),
+        Error::Unavailable("x".into()),
+        Error::InsufficientCredits("hosted refusal without a code marker".into()),
+        Error::Engine("x".into()),
     ] {
         let back = from_module(to_module(error.clone()));
         assert_eq!(back.code(), error.code(), "{error:?}");
         assert_eq!(back.is_account_wide(), error.is_account_wide(), "{error:?}");
     }
+
+    let credit_error = Error::InsufficientCredits("hosted refusal without a code marker".into());
+    let back = from_module(to_module(credit_error));
+    assert!(matches!(back, Error::InsufficientCredits(_)));
+    assert!(back.is_account_wide());
 }

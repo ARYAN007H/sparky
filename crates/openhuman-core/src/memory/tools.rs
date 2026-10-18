@@ -32,10 +32,10 @@ use crate::core::bus::BUS;
 use crate::core::events::DomainEvent;
 use crate::core::runtime::DispatchCtx;
 
-use super::error::MemoryError;
 use super::ops;
 pub use super::tool_budget::is_budget_refusal;
 use super::types::{FetchParams, ForgetParams, LearnParams, RecallParams, RecallView};
+use tinymemory_api::Error;
 
 /// How many matches one `fetch` returns; the model pages on with `cursor`.
 const FETCH_TOP: usize = 5;
@@ -162,7 +162,7 @@ fn arg_str(args: &Value, key: &str) -> Option<String> {
         .map(str::to_string)
 }
 
-fn parse<T: serde::de::DeserializeOwned>(args: &Value) -> Result<T, String> {
+fn parse<T: serde::de::DeserializeOwned>(args: &Value) -> std::result::Result<T, String> {
     serde_json::from_value(args.clone()).map_err(|error| format!("invalid arguments: {error}"))
 }
 
@@ -284,7 +284,7 @@ pub async fn run_action(
 ) -> ToolResult {
     let action = arg_str(args, "action").unwrap_or_default();
     tracing::debug!(action = %action, "[memory:tool] dispatch");
-    let result: Result<Value, String> = match action.as_str() {
+    let result: std::result::Result<Value, String> = match action.as_str() {
         // The agent answers from the evidence itself, so recall writes no
         // answer of its own; and the thread the call runs in is left out of
         // recall and fetch, since its user turn is logged before the tool
@@ -417,7 +417,7 @@ fn confine(filter: &mut Option<tinymemory_api::MetaFilter>, facts: &CallFacts) {
     filter.get_or_insert_with(Default::default).reach = Some(facts.reach.clone());
 }
 
-fn render_error(error: MemoryError) -> String {
+fn render_error(error: Error) -> String {
     format!("{} ({})", error, error.code())
 }
 
@@ -503,9 +503,7 @@ impl Tool for MemoryTool {
                 .await;
             return Ok(
                 match queued.unwrap_or_else(|_| {
-                    Err(MemoryError::Unavailable(
-                        "memory write queue unavailable".into(),
-                    ))
+                    Err(Error::Unavailable("memory write queue unavailable".into()))
                 }) {
                     Ok(value) => {
                         super::tool_writes::schedule(&dispatch, self.config.clone(), &queued_root);

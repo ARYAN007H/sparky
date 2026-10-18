@@ -1,8 +1,10 @@
 use super::*;
 
 use tinymemory_api::{
-    ItemKind, LearningKind, MemoryEngine, MemoryMeta, MetaFilter, Role, StoreItem,
+    Error as MemoryApiError, ItemKind, LearningKind, MemoryEngine, MemoryMeta, MetaFilter, Role,
+    StoreItem,
 };
+use tinymemory_tools::recall::SkipReason;
 
 use crate::memory::scope::MemoryIdentity;
 use crate::memory::test_fixtures::{bind_reference, config_in, stored};
@@ -74,6 +76,33 @@ async fn run_post_turn(
 fn turn_indices_follow_the_committed_transcript() {
     assert_eq!(user_turn_index(0), 0);
     assert_eq!(user_turn_index(3), 6);
+}
+
+#[test]
+fn typed_skip_reasons_expose_only_account_wide_errors() {
+    let account_wide = [
+        MemoryApiError::Off("disabled".into()),
+        MemoryApiError::Unauthorized("bad key".into()),
+        MemoryApiError::InsufficientCredits("top up".into()),
+        MemoryApiError::Unavailable("connection refused".into()),
+    ];
+    for error in &account_wide {
+        assert_eq!(
+            account_wide_skip_reason(&SkipReason::Engine(error.clone())),
+            Some(error)
+        );
+    }
+
+    let local = [
+        MemoryApiError::InvalidRequest("bad scope".into()),
+        MemoryApiError::NotFound("item".into()),
+        MemoryApiError::Conflict("duplicate".into()),
+        MemoryApiError::Engine("corrupt index".into()),
+    ];
+    for error in local {
+        assert_eq!(account_wide_skip_reason(&SkipReason::Engine(error)), None);
+    }
+    assert_eq!(account_wide_skip_reason(&SkipReason::Empty), None);
 }
 
 #[test]
@@ -302,10 +331,7 @@ async fn an_out_of_credits_recall_tells_the_turn_memory_is_unavailable() {
     .await
     .expect("a refused recall still gives the turn a notice");
 
-    assert_eq!(
-        pack.refusal,
-        Some(crate::memory::error::INSUFFICIENT_CREDITS)
-    );
+    assert_eq!(pack.refusal, Some("INSUFFICIENT_CREDITS"));
     assert!(
         pack.markdown.contains("out of credits"),
         "{}",
@@ -335,7 +361,7 @@ async fn an_unreachable_engine_is_named_as_unreachable() {
     .await
     .expect("notice");
 
-    assert_eq!(pack.refusal, Some(crate::memory::error::UNAVAILABLE));
+    assert_eq!(pack.refusal, Some("UNAVAILABLE"));
     assert!(
         pack.markdown.contains("could not be reached"),
         "{}",
@@ -373,17 +399,19 @@ fn a_refusal_is_read_back_from_a_skipped_section() {
         skipped: vec![
             tinymemory_tools::recall::SkippedSection {
                 heading: "Learnings".into(),
-                reason: "empty".into(),
+                reason: SkipReason::Empty,
             },
             tinymemory_tools::recall::SkippedSection {
                 heading: "History".into(),
-                reason: "unauthorized: [UNAUTHORIZED] memory API fetch (HTTP 401)".into(),
+                reason: SkipReason::Engine(MemoryApiError::Unauthorized(
+                    "memory API fetch (HTTP 401)".into(),
+                )),
             },
         ],
         engine: "tinyhumans".into(),
     })];
     let refusal = refusal_of(&outcomes).expect("refusal");
-    assert_eq!(refusal.code(), crate::memory::error::UNAUTHORIZED);
+    assert_eq!(refusal.code(), "UNAUTHORIZED");
 
     let quiet = vec![Ok(ContextPack {
         markdown: String::new(),

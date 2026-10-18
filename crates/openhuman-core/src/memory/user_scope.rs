@@ -22,18 +22,18 @@
 
 use tinymemory_api::{MetaFilter, Namespace, Reach, StoreItem};
 
-use super::error::{MemoryError, MemoryResult};
 use crate::config::Config;
+use tinymemory_api::{Error, Result};
 
 /// The root `config`'s memory is confined to, in SaaS mode (`None` in single
 /// user mode). A SaaS config without a valid root is refused: neither the
 /// global root (everyone's memory) nor no confinement at all is safe.
-pub fn confinement(config: &Config) -> MemoryResult<Option<Namespace>> {
+pub fn confinement(config: &Config) -> Result<Option<Namespace>> {
     confinement_in(crate::core::runtime::is_saas(), config)
 }
 
 /// [`confinement`] as a pure function of the mode.
-pub fn confinement_in(saas: bool, config: &Config) -> MemoryResult<Option<Namespace>> {
+pub fn confinement_in(saas: bool, config: &Config) -> Result<Option<Namespace>> {
     if !saas {
         return Ok(None);
     }
@@ -45,8 +45,8 @@ pub fn confinement_in(saas: bool, config: &Config) -> MemoryResult<Option<Namesp
                 root = raw,
                 "[memory:user_scope] no valid confinement root in SaaS mode"
             );
-            Err(MemoryError::invalid(
-                "memory is unavailable: this agent has no valid memory root",
+            Err(Error::InvalidRequest(
+                ("memory is unavailable: this agent has no valid memory root").into(),
             ))
         }
     }

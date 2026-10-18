@@ -16,8 +16,8 @@ use crate::config::schema::{MemorySourceConfig, MemorySourceKind};
 use crate::config::Config;
 
 use super::engine;
-use super::error::{MemoryError, MemoryResult};
 use super::types::{SourceView, SourcesAddParams};
+use tinymemory_api::{Error, Result};
 
 pub use sync::{start_sync, sync_due, sync_one};
 
@@ -56,10 +56,10 @@ pub fn list(config: &Config) -> Vec<SourceView> {
 
 /// Normalises a target for `kind`: GitHub accepts `owner/repo` or a URL;
 /// network kinds must be http(s) URLs.
-pub fn normalize_target(kind: MemorySourceKind, target: &str) -> MemoryResult<String> {
+pub fn normalize_target(kind: MemorySourceKind, target: &str) -> Result<String> {
     let target = target.trim();
     if target.is_empty() {
-        return Err(MemoryError::invalid("target must not be empty"));
+        return Err(Error::InvalidRequest("target must not be empty".into()));
     }
     match kind {
         MemorySourceKind::Folder | MemorySourceKind::File => Ok(target.to_string()),
@@ -72,8 +72,8 @@ pub fn normalize_target(kind: MemorySourceKind, target: &str) -> MemoryResult<St
                 (Some(owner), Some(repo), None) if !owner.is_empty() && !repo.is_empty() => {
                     Ok(format!("https://github.com/{owner}/{repo}"))
                 }
-                _ => Err(MemoryError::invalid(
-                    "a GitHub target is `owner/repo` or a repository URL",
+                _ => Err(Error::InvalidRequest(
+                    ("a GitHub target is `owner/repo` or a repository URL").into(),
                 )),
             }
         }
@@ -81,22 +81,22 @@ pub fn normalize_target(kind: MemorySourceKind, target: &str) -> MemoryResult<St
     }
 }
 
-fn http_url(target: &str) -> MemoryResult<String> {
-    let url = url::Url::parse(target).map_err(|_| MemoryError::invalid("target is not a URL"))?;
+fn http_url(target: &str) -> Result<String> {
+    let url =
+        url::Url::parse(target).map_err(|_| Error::InvalidRequest("target is not a URL".into()))?;
     if !matches!(url.scheme(), "http" | "https") || url.host_str().is_none() {
-        return Err(MemoryError::invalid("target must be an http(s) URL"));
+        return Err(Error::InvalidRequest(
+            ("target must be an http(s) URL").into(),
+        ));
     }
     Ok(url.to_string())
 }
 
 /// Builds a new source from `memory_sources_add` params and appends it to
 /// `config`; the caller persists `config`.
-pub fn apply_add(
-    config: &mut Config,
-    params: &SourcesAddParams,
-) -> MemoryResult<MemorySourceConfig> {
+pub fn apply_add(config: &mut Config, params: &SourcesAddParams) -> Result<MemorySourceConfig> {
     let kind = MemorySourceKind::parse(&params.kind).ok_or_else(|| {
-        MemoryError::invalid(format!(
+        Error::InvalidRequest(format!(
             "unknown source kind `{}` (folder, file, link, github, rss)",
             params.kind.trim()
         ))
@@ -104,7 +104,7 @@ pub fn apply_add(
     let target = normalize_target(kind, &params.target)?;
     if let Some(mins) = params.schedule_mins {
         if mins < MIN_SCHEDULE_MINS {
-            return Err(MemoryError::invalid(format!(
+            return Err(Error::InvalidRequest(format!(
                 "schedule_mins must be at least {MIN_SCHEDULE_MINS}"
             )));
         }
@@ -115,7 +115,9 @@ pub fn apply_add(
         .iter()
         .any(|source| source.kind == kind && source.target == target)
     {
-        return Err(MemoryError::invalid("that source is already added"));
+        return Err(Error::InvalidRequest(
+            ("that source is already added").into(),
+        ));
     }
     let label = params
         .label
@@ -127,7 +129,7 @@ pub fn apply_add(
         None | Some("") => None,
         Some(raw) => Some(
             raw.parse::<tinymemory_api::Namespace>()
-                .map_err(|error| MemoryError::invalid(error.to_string()))?
+                .map_err(|error| Error::InvalidRequest(error.to_string()))?
                 .to_string(),
         ),
     };
@@ -158,13 +160,13 @@ pub fn apply_remove(config: &mut Config, id: &str) -> Option<MemorySourceConfig>
 /// an explicit `redact_events` cascade). Memory off is not an error here:
 /// the deletion is queued ([`crate::memory::deletion`]) and runs on the next
 /// sign-in. A failure is queued the same way, and returned.
-pub async fn forget_items(config: &Config, id: &str) -> MemoryResult<usize> {
+pub async fn forget_items(config: &Config, id: &str) -> Result<usize> {
     let pending = || crate::memory::deletion::PendingDeletion::Source {
         source_id: id.to_string(),
     };
     let bound = match engine::resolve(config).engine() {
         Ok(bound) => bound,
-        Err(MemoryError::Off(_)) => {
+        Err(Error::Off(_)) => {
             crate::memory::deletion::enqueue(&config.workspace_dir, pending());
             return Ok(0);
         }
@@ -178,7 +180,7 @@ pub async fn forget_items(config: &Config, id: &str) -> MemoryResult<usize> {
         Ok(report) => report,
         Err(error) => {
             crate::memory::deletion::enqueue(&config.workspace_dir, pending());
-            return Err(error.into());
+            return Err(error);
         }
     };
     tracing::debug!(id = %id, forgotten = report.forgotten, "[memory:sources] items forgotten");

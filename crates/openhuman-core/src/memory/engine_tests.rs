@@ -35,7 +35,7 @@ fn tinyhumans_without_a_credential_is_off() {
         Binding::On(_) => unreachable!(),
     }
     let error = resolve(&config).engine().unwrap_err();
-    assert_eq!(error.code(), super::super::error::MEMORY_OFF);
+    assert_eq!(error.code(), "MEMORY_OFF");
 }
 
 #[test]
@@ -167,7 +167,7 @@ fn a_blank_cortexdb_key_is_refused() {
     let tmp = tempfile::tempdir().unwrap();
     let config = config_in(&tmp);
     let error = store_cortexdb_key(&config, "   ").unwrap_err();
-    assert_eq!(error.code(), super::super::error::INVALID_REQUEST);
+    assert_eq!(error.code(), "INVALID_REQUEST");
 }
 
 #[test]
@@ -421,10 +421,7 @@ fn a_disabled_memory_component_binds_no_engine() {
     assert!(off_reason(resolve(&config)).contains("components"));
     assert!(!is_on(&config));
     assert!(switched_off(&config));
-    assert!(matches!(
-        bind_with_root(&config, None),
-        Err(MemoryError::Off(_))
-    ));
+    assert!(matches!(bind_with_root(&config, None), Err(Error::Off(_))));
 }
 
 #[test]

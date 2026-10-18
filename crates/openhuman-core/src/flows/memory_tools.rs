@@ -35,9 +35,9 @@ use tinytools::{PermissionLevel, Tool, ToolResult};
 use crate::agent::turn_origin::{AgentTurnOrigin, TrustedAutomationSource};
 use crate::config::Config;
 use crate::memory::types::{LearnParams, RecallParams};
-use crate::memory::{MemoryError, MemoryResult};
 use crate::security::policy::ToolOperation;
 use crate::security::SecurityPolicy;
+use tinymemory_api::{Error, Result};
 
 /// Prefix of a flow's own tag (see [`flow_tag`]).
 pub const FLOW_TAG_PREFIX: &str = "flow:";
@@ -133,15 +133,15 @@ pub fn flow_meta(flow_id: &str, extra: &[String]) -> MemoryMeta {
 
 /// Forgets every item matching `filter` (which must be non-empty). Memory
 /// off forgets nothing.
-pub async fn forget_matching(config: &Config, filter: MetaFilter) -> MemoryResult<usize> {
+pub async fn forget_matching(config: &Config, filter: MetaFilter) -> Result<usize> {
     if filter.is_empty() {
-        return Err(MemoryError::invalid(
-            "refusing to forget with an empty filter",
+        return Err(Error::InvalidRequest(
+            ("refusing to forget with an empty filter").into(),
         ));
     }
     let bound = match crate::memory::engine::resolve(config).engine() {
         Ok(bound) => bound,
-        Err(MemoryError::Off(_)) => {
+        Err(Error::Off(_)) => {
             tracing::debug!("[flows:memory] forget skipped: memory is off");
             return Ok(0);
         }
@@ -164,7 +164,7 @@ pub async fn remember_keyed(
     key: &str,
     content: &str,
     kind: LearningKind,
-) -> MemoryResult<String> {
+) -> Result<String> {
     // Fail with MEMORY_OFF before touching anything.
     crate::memory::engine::resolve(config).engine()?;
     let key_tag = flow_key_tag(flow_id, key);

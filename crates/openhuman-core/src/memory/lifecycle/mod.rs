@@ -32,8 +32,8 @@ use crate::config::schema::MemoryRecallConfig;
 use crate::config::Config;
 
 use super::engine;
-use super::error::{MemoryError, MemoryResult};
 use super::scope::ResolvedIdentity;
+use tinymemory_api::{Error, Result};
 
 /// TinyMemory's recall policy from `[memory.recall]`.
 #[must_use]
@@ -66,16 +66,16 @@ pub fn agent_memory_on(
     engine: Arc<dyn MemoryEngine>,
     config: &Config,
     identity: &ResolvedIdentity,
-) -> MemoryResult<AgentMemory> {
+) -> Result<AgentMemory> {
     Ok(
         AgentMemory::new(engine, identity.layout.clone(), &identity.agent_id)?
             .with_policy(policy(&config.memory.recall)),
     )
 }
 
-/// `identity`'s memory on the configured engine; [`MemoryError::Off`] when no
+/// `identity`'s memory on the configured engine; [`Error::Off`] when no
 /// engine is bound.
-pub fn agent_memory(config: &Config, identity: &ResolvedIdentity) -> MemoryResult<AgentMemory> {
+pub fn agent_memory(config: &Config, identity: &ResolvedIdentity) -> Result<AgentMemory> {
     let bound = engine::resolve(config).engine()?;
     agent_memory_on(bound.engine, config, identity)
 }
@@ -84,7 +84,7 @@ pub fn agent_memory(config: &Config, identity: &ResolvedIdentity) -> MemoryResul
 pub fn current_agent_memory(
     config: &Config,
     identity: &super::scope::MemoryIdentity,
-) -> MemoryResult<(AgentMemory, ResolvedIdentity)> {
+) -> Result<(AgentMemory, ResolvedIdentity)> {
     let identity = identity.resolve(config);
     let memory = agent_memory(config, &identity)?;
     Ok((memory, identity))
@@ -96,14 +96,14 @@ pub fn named_agent_memory(
     config: &Config,
     identity: &super::scope::MemoryIdentity,
     agent_id: Option<&str>,
-) -> MemoryResult<(AgentMemory, ResolvedIdentity)> {
+) -> Result<(AgentMemory, ResolvedIdentity)> {
     let mut identity = identity.resolve(config);
     if let Some(agent_id) = agent_id.map(str::trim).filter(|id| !id.is_empty()) {
         identity.agent_id = agent_id.to_string();
     }
     let memory = agent_memory(config, &identity).map_err(|error| match error {
-        MemoryError::InvalidRequest(message) => {
-            MemoryError::invalid(format!("agent `{}`: {message}", identity.agent_id))
+        Error::InvalidRequest(message) => {
+            Error::InvalidRequest(format!("agent `{}`: {message}", identity.agent_id))
         }
         other => other,
     })?;
