@@ -43,6 +43,7 @@ async fn bound_turn(tmp: &tempfile::TempDir) -> Arc<MemoryTurn> {
         "Noted: launch on March 3rd.".into(),
         Vec::new(),
         Utc::now(),
+        None,
     )
     .await;
     Arc::new(MemoryTurn {

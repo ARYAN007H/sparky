@@ -1,6 +1,6 @@
 use super::*;
 use crate::core::runtime::DispatchCtx;
-use tinyagents_session::port::{InMemorySessionStores, SessionStoreProvider};
+use tinyagents_session::port::InMemorySessionStores;
 
 struct FailingTurnStateDelete;
 
