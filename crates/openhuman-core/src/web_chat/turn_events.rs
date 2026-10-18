@@ -25,7 +25,6 @@ use super::web_errors::{
     turn_timeout_error_message, ClassifiedError,
 };
 use crate::agent::queued_turn::QueuedPayload;
-use crate::core::runtime::DispatchCtx;
 
 /// The runner's wall-clock failure, as the marker string the classifier and the
 /// Sentry policy recognise.

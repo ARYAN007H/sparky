@@ -27,7 +27,7 @@ pub fn publish_web_channel_event(event: WebChannelEvent) {
 /// the calling turn runs under, rather than the calling task's own scope.
 pub fn publish_web_channel_event_in(ctx: &DispatchCtx, mut event: WebChannelEvent) {
     if event.ts.is_none() {
-        event.ts = Some(crate::web_chat::progress_bridge::unix_epoch_ms());
+        event.ts = Some(crate::web_chat::progress::unix_epoch_ms());
     }
     event.stamp_tenant(ctx.tenant().ok());
     let _ = EVENT_BUS.send(event);

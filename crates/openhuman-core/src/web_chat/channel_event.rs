@@ -1,7 +1,7 @@
 //! The in-process form of the events the web channel publishes to connected
 //! clients.
 //!
-//! The wire vocabulary is owned by `tinychannels-bus` ([`bus_web`]): a typed,
+//! The wire vocabulary is owned by `tinychannels-bus` (`bus_web`): a typed,
 //! tagged enum plus the payload structs re-exported below. Domains still build
 //! this flat struct and hand it to
 //! [`publish_web_channel_event`](super::publish_web_channel_event) (the
@@ -215,7 +215,78 @@ pub struct WebChannelEvent {
     /// original turn's request context).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub turn_request_id: Option<String>,
-    impl From<bus_web::WebChannelEvent> for WebChannelEvent {
+    /// Time-to-first-visible timing summary, carried on `chat_done`. See
+    /// `web_chat::turn_timing`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub timing: Option<TurnTimingPayload>,
+    /// Follow-up prompt suggestions offered to the user after a turn.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub suggestions: Option<Vec<ChatSuggestion>>,
+    /// Guardrail verdict attached to a blocked/flagged turn.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub guardrail: Option<GuardrailPayload>,
+    /// Run-queue item this event reports on (queued/delivered/removed).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub queue_item: Option<QueueItemPayload>,
+    /// Session goal snapshot, carried on goal-lifecycle events. Left as a
+    /// raw `Value` because the goal shape is owned by `tinyagents-graph`,
+    /// not this crate.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub goal: Option<serde_json::Value>,
+    /// Session todo-list snapshot, carried on todo-lifecycle events. Raw
+    /// `Value` for the same reason as `goal`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub todos: Option<serde_json::Value>,
+    /// Human-readable reason a turn/queue item was cancelled.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cancel_reason: Option<String>,
+    /// Id of the turn/request that superseded this one (e.g. a steer
+    /// requeue), when applicable.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub superseded_by: Option<String>,
+    /// `Some(true)` on an `approval_request` whose park can outlive the chat
+    /// turn it is shown on (an async-delegated sub-agent). The client keeps
+    /// such a card across that turn's `chat_done` and clears it on
+    /// `approval_decided` instead. Absent for an ordinary in-turn park.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub detached: Option<bool>,
+    /// Typed content parts (media, voice notes) of `chat_done` /
+    /// `chat_message` / `proactive_message`, as the web adapter projects them.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub parts: Option<serde_json::Value>,
+}
+
+impl WebChannelEvent {
+    /// Whether a SaaS user agent's stream may carry this event: only one
+    /// stamped with that agent. An unstamped event (published outside any
+    /// agent scope) is dropped rather than guessed at.
+    pub fn belongs_to(&self, agent: &str) -> bool {
+        self.agent.as_deref() == Some(agent)
+    }
+
+    /// Whether a SaaS profile's stream may carry this event: only one stamped
+    /// with that profile. An unstamped event is dropped rather than guessed at.
+    pub fn belongs_to_profile(&self, profile: &str) -> bool {
+        self.profile.as_deref() == Some(profile)
+    }
+
+    /// Stamp the tenant whose work produced this event where the publisher
+    /// left it unset. A SaaS task with no scope (`None`) stamps nothing, so
+    /// the event reaches no user's stream.
+    pub fn stamp_tenant(&mut self, tenant: Option<crate::core::runtime::Tenant>) {
+        let Some(tenant) = tenant else {
+            return;
+        };
+        if self.agent.is_none() {
+            self.agent = tenant.agent;
+        }
+        if self.profile.is_none() {
+            self.profile = tenant.profile;
+        }
+    }
+}
+
+impl From<bus_web::WebChannelEvent> for WebChannelEvent {
     /// The wire form of a typed event is, by construction, the flat struct's
     /// serialization, so the conversion goes through it. Two spellings the
     /// typed projection cannot omit are normalised to the deployed wire: a

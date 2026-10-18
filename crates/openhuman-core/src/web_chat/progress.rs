@@ -83,7 +83,7 @@ pub(crate) struct ProgressProjection {
     /// task id -> the parent tool call that spawned it, remembered from
     /// `SubagentSpawned` so the later lifecycle events still carry it.
     subagent_parent_call_ids: HashMap<String, Option<String>>,
-    turn_state: TurnStateMirror,
+    turn_state: Option<TurnStateMirror>,
     span_collector: Option<SpanCollector>,
     journal_trace_ctx: Option<tinyagents_harness::observability::trace_export::TraceContext>,
     timing_snapshot: Option<TurnTimingSnapshot>,
@@ -120,11 +120,11 @@ impl ProgressProjection {
         .unzip();
         Self {
             surface: Surface::new(ctx, ids.clone()),
-            turn_state: TurnStateMirror::new(
+            turn_state: Some(TurnStateMirror::new(
                 turn_states,
                 ids.thread_id.clone(),
                 ids.request_id.clone(),
-            ),
+            )),
             ids,
             config,
             ctx: ctx.clone(),
@@ -201,7 +201,9 @@ impl ProgressProjection {
     /// Project one event of the turn, in order.
     pub(crate) async fn on_event(&mut self, event: AgentProgress) {
         self.events_seen += 1;
-        self.turn_state.observe(&event);
+        if let Some(mirror) = self.turn_state.as_mut() {
+            mirror.observe(&event);
+        }
         if let Some(collector) = self.span_collector.as_mut() {
             collector.record(&event, unix_epoch_ms());
         }
@@ -677,8 +679,10 @@ impl ProgressProjection {
     /// The stream is over: close the turn-state mirror, record an interrupted
     /// run if the parent never completed, and hand the run's trace to the
     /// configured sink. Best-effort and gated; never affects the turn outcome.
-    pub(crate) async fn finish(mut self) {
-        self.turn_state.finish();
+    pub(crate) async fn finish(&mut self) {
+        if let Some(mirror) = self.turn_state.take() {
+            mirror.finish();
+        }
         if !self.parent_completed {
             self.ledger().turn_interrupted(self.events_seen);
         }
