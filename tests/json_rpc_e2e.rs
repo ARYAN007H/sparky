@@ -2710,9 +2710,7 @@ fn json_rpc_cron_manual_worker_survives_caller_cancel_on_published_tinyflows() {
 }
 
 async fn json_rpc_cron_manual_worker_survives_caller_cancel_on_published_tinyflows_inner() {
-    use openhuman_core::storage::{
-        CollectionSpec, DocumentStore, Precondition, Scope, StorageBackend,
-    };
+    use openhuman_core::storage::{CollectionSpec, Precondition, Scope, StorageUrl};
     use openhuman_core::{
         config::Config,
         core::{
@@ -2788,10 +2786,11 @@ async fn json_rpc_cron_manual_worker_survives_caller_cancel_on_published_tinyflo
     };
     config.storage.url = Some(storage_url.clone());
 
-    // Install the exact backend CoreContext will use before seeding. Opening
-    // the local fallback alone is insufficient: core boot may subsequently
-    // install/rebind the configured backend, leaving a fixture in the wrong DB.
-    let backend = openhuman_core::storage::open(&storage_url)
+    // Open the exact configured backend without the host boot wrapper, which
+    // runs composed schema migrations immediately. Seed the legacy v1 rows
+    // first, then let normal CoreContext startup perform the real migration.
+    let parsed_url = StorageUrl::parse(&storage_url).expect("parse the configured storage URL");
+    let backend = tinystoragedrivers::open(&parsed_url)
         .await
         .expect("open the host's workspace storage backend");
     openhuman_core::storage::install_for_url(&storage_url, Arc::clone(&backend));
