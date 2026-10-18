@@ -133,7 +133,7 @@ pub(crate) async fn run_relay_turn(
                 tracing::warn!("relayed channel runtime limits unavailable: {error}");
                 let reply =
                     "⚠️ This chat's assistant is not available right now. Please try again later.";
-                let _ = tinychannels_bus::Channel::send(
+                let _ = tinychannels_runtime::Channel::send(
                     channel.as_ref(),
                     &crate::channels::SendMessage::new(reply, &params.chat_id),
                 )
@@ -170,7 +170,7 @@ pub(crate) async fn run_relay_turn(
             );
             let reply =
                 "⚠️ This chat's assistant is not available right now. Please try again later.";
-            let _ = tinychannels_bus::Channel::send(
+            let _ = tinychannels_runtime::Channel::send(
                 channel.as_ref(),
                 &crate::channels::SendMessage::new(reply, &params.chat_id),
             )

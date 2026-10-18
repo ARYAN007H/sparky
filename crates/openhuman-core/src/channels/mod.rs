@@ -11,7 +11,8 @@ pub mod contract_schema;
 #[cfg(any(feature = "voice", feature = "channels"))]
 pub(crate) mod credentials;
 
-pub use tinychannels_bus::{Channel, ChannelSendExt, SendMessage};
+pub use tinychannels_bus::SendMessage;
+pub use tinychannels_runtime::{Channel, ChannelSendExt};
 
 #[cfg(feature = "channels")]
 pub mod bus;

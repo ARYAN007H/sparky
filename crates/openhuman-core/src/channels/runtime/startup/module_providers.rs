@@ -14,7 +14,8 @@ use tinychannels_bus::module_runtime::{
     ChannelIngressKind, ChannelMessagePreparation, ConfiguredChannelInfo,
 };
 use tinychannels_bus::module_supervision::ChannelSupervisionPolicy;
-use tinychannels_bus::{Channel, ChannelMessage, SendMessage};
+use tinychannels_bus::{ChannelMessage, SendMessage};
+use tinychannels_runtime::Channel;
 use tinychannels_bus::{ChannelInteraction, ChannelInteractionResult};
 use tokio::sync::mpsc;
 

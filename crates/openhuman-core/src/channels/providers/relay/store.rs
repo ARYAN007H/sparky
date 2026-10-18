@@ -15,7 +15,7 @@ type ThreadLocks = Mutex<HashMap<(PathBuf, String), Arc<tokio::sync::Mutex<()>>>
 
 use chrono::Utc;
 use serde_json::json;
-use tinychannels_bus::context::ChatMessage;
+use tinychannels_runtime::context::ChatMessage;
 
 use super::params::RelayInboundParams;
 use crate::threads::store::blocking as conversations;

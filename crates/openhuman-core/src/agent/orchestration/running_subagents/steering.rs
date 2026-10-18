@@ -8,7 +8,6 @@ use tinyagents_harness::steering::SteeringCommand;
 use tinyagents_tasks::DetachedTaskRegistryError;
 use tinyinference_llm::message::Message as TaMessage;
 
-use super::cancel::now_ms;
 use super::registry::{control_admits, owner_key, registry};
 
 /// Why a steer could not be delivered.
@@ -111,16 +110,12 @@ pub async fn steer(
         .run_queue
         .push(
             lane,
-            crate::agent::queued_turn::QueuedTurn {
-                id: uuid::Uuid::new_v4().to_string(),
+            crate::agent::queued_turn::steer_message(
+                uuid::Uuid::new_v4().to_string(),
                 text,
-                client_id: "steer_subagent".to_string(),
-                thread_id: task_id.to_string(),
-                queued_at_ms: now_ms(),
-                model_override: None,
-                temperature: None,
-                locale: None,
-            },
+                "steer_subagent",
+                task_id,
+            ),
         )
         .await;
     log::info!(
@@ -180,16 +175,12 @@ pub(crate) async fn steer_control(
         .run_queue
         .push(
             lane,
-            crate::agent::queued_turn::QueuedTurn {
-                id: uuid::Uuid::new_v4().to_string(),
+            crate::agent::queued_turn::steer_message(
+                uuid::Uuid::new_v4().to_string(),
                 text,
-                client_id: "subagent_control_rpc".to_string(),
-                thread_id: task_id.to_string(),
-                queued_at_ms: now_ms(),
-                model_override: None,
-                temperature: None,
-                locale: None,
-            },
+                "subagent_control_rpc",
+                task_id,
+            ),
         )
         .await;
     log::info!(

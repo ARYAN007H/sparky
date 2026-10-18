@@ -54,6 +54,7 @@
 
 pub mod agent;
 pub mod backend;
+#[allow(deprecated, reason = "v21 ChannelMessage/SendMessage shims stay until the native channel path moves to canonical v22 content")]
 pub mod channels;
 pub mod commands;
 pub mod config;
