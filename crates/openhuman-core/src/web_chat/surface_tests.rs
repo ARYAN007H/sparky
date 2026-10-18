@@ -132,7 +132,11 @@ async fn direct_and_projected_events_keep_their_historical_wire_normalization() 
     let direct_event = next_for(&mut rx, "surface-direct-null").await;
     let direct_wire = wire(&direct_event);
     assert_eq!(direct_wire["tool_name"], "");
-    assert_eq!(direct_wire["args"], serde_json::Value::Null);
+    assert_eq!(
+        direct_wire.get("args"),
+        Some(&serde_json::Value::Null),
+        "host-authored events retain an explicit null args payload"
+    );
 
     let projected = Surface::new(
         &DispatchCtx::ambient(),
