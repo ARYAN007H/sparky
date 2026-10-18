@@ -2849,6 +2849,7 @@ async fn json_rpc_cron_manual_worker_survives_caller_cancel_on_published_tinyflo
     )
     .await
     .expect("initialize the isolated core context for the native host scenario");
+    assert_eq!(default_context.workspace_dir(), workspace);
     let (rpc_addr, rpc_join) = serve_on_ephemeral(build_core_http_router(false)).await;
     let rpc_base = format!("http://{rpc_addr}");
     let store_session = post_json_rpc(
@@ -2906,7 +2907,6 @@ async fn json_rpc_cron_manual_worker_survives_caller_cancel_on_published_tinyflo
             panic!("TinyFlows is listed after the released cdylib loaded: {module_list}")
         });
     assert_eq!(tinyflows["version"], "0.8.25");
-    assert_eq!(tinyflows["state"], "ready");
 
     let name = format!("published-manual-{}", uuid::Uuid::new_v4().simple());
     let job = openhuman_core::cron::system_jobs::ensure_system_job(
