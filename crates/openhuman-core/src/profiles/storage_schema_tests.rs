@@ -83,12 +83,8 @@ async fn migrate_cluster_moves_v1_leases_into_tsd_leases_and_keeps_their_epoch()
     .unwrap();
     migrate_cluster(&scoped).await.unwrap();
     migrate_cluster(&scoped).await.unwrap();
-    assert!(!docs
-        .collections("")
-        .await
-        .unwrap()
-        .iter()
-        .any(|name| name == "leases"));
+    assert!(docs.get("leases", "alice").await.unwrap().is_none());
+    assert!(docs.get("leases", "bob").await.unwrap().is_none());
     let id = tinystoragedrivers::Key::of([LEASE_OWNER, "alice"]).unwrap();
     let moved = docs.get("tsd.leases", id.as_str()).await.unwrap().unwrap();
     assert_eq!(

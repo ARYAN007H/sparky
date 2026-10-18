@@ -293,7 +293,12 @@ impl LeaseStore for DocumentLeases {
             "[lease] renewed"
         );
         let version = self.next_version(&grant.key, lease.epoch)?;
-        Ok(Self::grant(&grant.key, &lease, version, grant.previous_unclean))
+        Ok(Self::grant(
+            &grant.key,
+            &lease,
+            version,
+            grant.previous_unclean,
+        ))
     }
 
     async fn release(&self, grant: LeaseGrant) -> Result<(), LeaseError> {
