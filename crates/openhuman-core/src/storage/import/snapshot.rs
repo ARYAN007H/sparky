@@ -103,4 +103,3 @@ fn companion(path: &Path, suffix: &str) -> PathBuf {
     name.push(suffix);
     PathBuf::from(name)
 }
-

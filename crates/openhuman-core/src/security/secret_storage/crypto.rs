@@ -53,4 +53,3 @@ pub(super) fn hex_decode(hex: &str) -> Result<Vec<u8>, String> {
         })
         .collect()
 }
-
