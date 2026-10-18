@@ -47,7 +47,8 @@ async fn binds_the_legacy_tree_and_the_users_own() {
     assert!(scan(&AppHost::new(config.clone())).await.unwrap().needed);
 
     let placement = AppHost::new(config.clone()).placement().unwrap();
-    assert!(placement.chat_node.to_string().ends_with("ws:main"));
+    assert_eq!(placement.layout.root().to_string(), root);
+    assert_eq!(placement.chat_node.to_string(), format!("{root}/ws:main"));
     assert!(matches!(placement.flows, FlowPlacement::WithRoot));
 }
 
