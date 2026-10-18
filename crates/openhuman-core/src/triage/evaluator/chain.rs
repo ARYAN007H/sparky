@@ -400,6 +400,7 @@ fn rejection_delay_ms(rejection: BreakerRejection, now_ms: u64) -> u64 {
     }
 }
 
+#[cfg(test)]
 pub(crate) fn begin_outage_attempt(
     state: Option<&RetryState>,
     key: &str,
@@ -411,7 +412,8 @@ pub(crate) fn record_outage(
     attempt: Option<&mut PersistentFailoverAttempt<String>>,
 ) -> Option<TriageOutcome> {
     let attempt = attempt?;
-    let Some(failure) = attempt.record_failure(monotonic_ms()) else {
+    let recorded_at_ms = monotonic_ms();
+    let Some(failure) = attempt.record_failure(recorded_at_ms) else {
         return Some(TriageOutcome::Deferred {
             defer_until_ms: now_ms().saturating_add(OUTAGE_BACKOFF_BASE_MS),
             reason: "managed backend recovered during another attempt".to_string(),
@@ -419,7 +421,7 @@ pub(crate) fn record_outage(
     };
     let delay_ms = failure
         .next_attempt_ms
-        .saturating_sub(monotonic_ms())
+        .saturating_sub(recorded_at_ms)
         .min(i64::MAX as u64) as i64;
     if failure.failure_limit_reached {
         return Some(TriageOutcome::Terminal {
