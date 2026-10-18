@@ -227,6 +227,66 @@ async fn memory_off_queues_channel_threads_from_the_canonical_thread_store() {
 }
 
 #[tokio::test]
+async fn offline_snapshot_scans_every_thread_and_message_page() {
+    let tmp = tempfile::TempDir::new().unwrap();
+    let mut config = Config::default();
+    config.workspace_dir = tmp.path().to_path_buf();
+    config.memory.engine.clear();
+    let workspace = config.workspace_dir.clone();
+    let ctx = DispatchCtx::ambient();
+    let target_thread = store_channel_thread(
+        ctx.clone(),
+        &workspace,
+        "discord",
+        "old-channel-message",
+    )
+    .await;
+
+    for index in 0..65 {
+        crate::threads::store::blocking::append_message(
+            ctx.clone(),
+            workspace.clone(),
+            target_thread.clone(),
+            ConversationMessage {
+                id: format!("web-{index}"),
+                content: "later unrelated web row".into(),
+                message_type: "text".into(),
+                extra_metadata: json!({"scope": "web"}),
+                sender: "user".into(),
+                created_at: "2099-01-01T00:00:00Z".into(),
+            },
+        )
+        .await
+        .unwrap();
+    }
+    for index in 0..65 {
+        crate::threads::store::blocking::ensure_thread(
+            ctx.clone(),
+            workspace.clone(),
+            CreateConversationThread {
+                id: format!("web-thread-{index}"),
+                title: format!("web {index}"),
+                created_at: "2099-01-01T00:00:00Z".into(),
+                parent_thread_id: None,
+                labels: None,
+                personality_id: None,
+                working_dir: None,
+            },
+        )
+        .await
+        .unwrap();
+    }
+
+    assert_eq!(clear_channel_memory(&config, "discord").await.unwrap(), 0);
+    assert_eq!(
+        crate::memory::deletion::pending(&config.workspace_dir),
+        vec![crate::memory::deletion::PendingDeletion::Thread {
+            thread_id: target_thread
+        }]
+    );
+}
+
+#[tokio::test]
 async fn filter_failure_is_visible_and_queued_snapshot_does_not_catch_reconnected_threads() {
     let tmp = tempfile::TempDir::new().unwrap();
     let mut config = Config::default();
