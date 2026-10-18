@@ -191,12 +191,20 @@ impl ConfigSource for DocumentConfigSource {
             .ensure_collection(&CollectionSpec::new(CONFIG_COLLECTION))
             .await
             .context("declare the config collection")?;
+        let id = document_id(self.scope.as_str())?;
+        let current = self.docs
+            .get(CONFIG_COLLECTION, &id)
+            .await
+            .context("read the config document before writing")?;
+        let precondition = current
+            .as_ref()
+            .map_or(Precondition::Absent, |stored| stored.unchanged());
         self.docs
             .put(
                 CONFIG_COLLECTION,
-                &document_id(self.scope.as_str())?,
+                &id,
                 json!({ BODY_FIELD: sealed }),
-                Precondition::None,
+                precondition,
             )
             .await
             .context("write the config document")?;
