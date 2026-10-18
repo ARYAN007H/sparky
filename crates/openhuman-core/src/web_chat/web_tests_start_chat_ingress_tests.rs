@@ -86,12 +86,42 @@ async fn ptt_source_turn_completes_without_publishing_a_voice_event() {
     .expect("PTT turn should finish");
     assert_eq!(done.full_response.as_deref(), Some("hello from mock"));
 
+    // Subscriber dispatch is a single FIFO loop (`events/subscriber.rs`), so
+    // observing this marker proves it has handled every locally published
+    // event before the barrier, including any PTT event sent by the turn.
+    let barrier = "ptt-regression-bus-barrier-403";
+    crate::core::bus::BUS.publish(crate::core::events::DomainEvent::SystemStartup {
+        component: barrier.to_string(),
+    });
+    let matching_voice_event_seen = tokio::time::timeout(
+        std::time::Duration::from_secs(5),
+        async {
+            let mut matching_voice_event_seen = false;
+            loop {
+                let Some(event) = observed_events.recv().await else {
+                    continue;
+                };
+                if matches!(
+                    &event,
+                    crate::core::events::DomainEvent::SystemStartup { component }
+                        if component == barrier
+                ) {
+                    break matching_voice_event_seen;
+                }
+                let debug = format!("{event:?}");
+                if event.domain() == "voice"
+                    && debug.contains(thread_id)
+                    && debug.contains(&session_id.to_string())
+                {
+                    matching_voice_event_seen = true;
+                }
+            }
+        },
+    )
+    .await
+    .expect("BUS subscriber should reach the post-turn barrier");
     assert!(
-        std::iter::from_fn(|| observed_events.try_recv().ok()).all(|event| {
-            event.domain() != "voice"
-                || (!format!("{event:?}").contains(thread_id)
-                    && !format!("{event:?}").contains(&session_id.to_string()))
-        }),
+        !matching_voice_event_seen,
         "a successful source=ptt message must not publish a voice event"
     );
 }
