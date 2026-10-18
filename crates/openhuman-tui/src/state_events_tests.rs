@@ -37,7 +37,10 @@ fn every_contract_event_is_classified() {
 fn classified_tags_exist_in_the_contract() {
     let tags = contract_tags();
     for tag in REDUCED.iter().chain(IGNORED) {
-        assert!(tags.iter().any(|t| t == tag), "{tag} is not in the contract");
+        assert!(
+            tags.iter().any(|t| t == tag),
+            "{tag} is not in the contract"
+        );
     }
 }
 

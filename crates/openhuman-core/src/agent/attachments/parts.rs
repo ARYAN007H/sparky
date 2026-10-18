@@ -93,10 +93,7 @@ fn source_of(media: &MediaReference, index: usize) -> Result<&str, AttachmentPar
 ///
 /// `Text` parts join the message text. Images become `[IMAGE:…]`; video,
 /// audio and files become `[FILE:…]`. Any other part kind is refused.
-pub fn fold_into_message(
-    text: &str,
-    parts: &[ContentPart],
-) -> Result<String, AttachmentPartError> {
+pub fn fold_into_message(text: &str, parts: &[ContentPart]) -> Result<String, AttachmentPartError> {
     if parts.is_empty() {
         return Ok(text.to_string());
     }
@@ -125,7 +122,11 @@ pub fn fold_into_message(
         }
     }
     let mut out = text.trim().to_string();
-    for chunk in words.into_iter().filter(|chunk| !chunk.is_empty()).chain(markers) {
+    for chunk in words
+        .into_iter()
+        .filter(|chunk| !chunk.is_empty())
+        .chain(markers)
+    {
         if !out.is_empty() {
             out.push(' ');
         }

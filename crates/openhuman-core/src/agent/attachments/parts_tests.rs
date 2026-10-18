@@ -33,7 +33,10 @@ fn no_parts_returns_text_untouched() {
 fn images_and_files_become_markers_after_the_trimmed_text() {
     let out = fold_into_message(
         " look ",
-        &[image("data:image/png;base64,AAA"), file("https://x.test/a.pdf")],
+        &[
+            image("data:image/png;base64,AAA"),
+            file("https://x.test/a.pdf"),
+        ],
     )
     .unwrap();
     assert_eq!(
@@ -163,7 +166,9 @@ fn non_media_parts_are_unsupported() {
 
 #[test]
 fn too_many_parts_are_refused() {
-    let parts: Vec<ContentPart> = (0..33).map(|_| image("data:image/png;base64,AAA")).collect();
+    let parts: Vec<ContentPart> = (0..33)
+        .map(|_| image("data:image/png;base64,AAA"))
+        .collect();
     assert_eq!(
         fold_into_message("", &parts),
         Err(AttachmentPartError::TooMany { count: 33 })

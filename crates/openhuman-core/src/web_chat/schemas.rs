@@ -193,8 +193,9 @@ pub fn schemas(function: &str) -> ControllerSchema {
 fn handle_chat(ctx: DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
         let p = deserialize_params::<WebChatParams>(params)?;
-        let message = crate::agent::attachments::parts::fold_into_message(&p.message, &p.attachments)
-            .map_err(|e| e.to_string())?;
+        let message =
+            crate::agent::attachments::parts::fold_into_message(&p.message, &p.attachments)
+                .map_err(|e| e.to_string())?;
         // Recorded before the turn starts so it reads the new choice.
         crate::agent::tinyagents::apply_requested_effort(
             &ctx,
