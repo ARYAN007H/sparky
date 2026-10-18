@@ -112,7 +112,6 @@ impl ToolPolicyMiddleware {
 }
 
 impl ToolPolicyHostState {
-
     fn resolve_tool(&self, name: &str) -> Option<&Box<dyn Tool>> {
         self.tool_sets
             .iter()
@@ -379,11 +378,8 @@ impl ToolCallPolicy<OpenHumanRunContext> for DesktopApprovalPolicy {
             .flat_map(|set| set.iter())
             .find(|tool| tool.name() == call.name)
         {
-            crate::desktop::control::approvals_disabled_for(
-                &ctx.data.dispatch_ctx(),
-                tool.as_ref(),
-            )
-            .await
+            crate::desktop::control::approvals_disabled_for(&ctx.data.dispatch_ctx(), tool.as_ref())
+                .await
         } else {
             false
         };
