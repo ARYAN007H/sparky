@@ -29,8 +29,10 @@
 //!   node supplies its own `now_ms`). This module does not check epochs at
 //!   the protected resource; [`super::fence`] does, for storage-port writes. An epoch at `u64::MAX` cannot be advanced, so a
 //!   takeover of it fails with a storage error instead of repeating it.
-//! - **renew** extends a grant while the stored record still names its holder
-//!   and epoch. Any takeover or release since makes it [`LeaseError::Lost`].
+//! - **renew** extends a grant while it is the latest one its holder was
+//!   issued at that epoch and the stored record still names its holder and
+//!   epoch. Any takeover, release or newer grant since makes it
+//!   [`LeaseError::Lost`].
 //! - **release** marks the record `released = true` and keeps it, so the next
 //!   acquirer can tell a clean hand-over from a crash.
 //!
@@ -52,6 +54,7 @@ use std::path::PathBuf;
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
+use tinystoragedrivers::Version;
 
 use super::StorageError;
 
@@ -108,6 +111,9 @@ pub struct LeaseGrant {
     pub key: String,
     /// The epoch this grant fences with.
     pub epoch: u64,
+    /// Which grant of this epoch it is: every acquire or renew by the holder
+    /// issues the next one, and only the latest can renew or release.
+    pub version: Version,
     /// The grant is void from this instant (milliseconds) on unless renewed.
     pub expires_at_ms: u64,
     /// The acquisition replaced a record nobody released (see the module

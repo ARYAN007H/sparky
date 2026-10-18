@@ -22,7 +22,7 @@ use std::time::Duration;
 use async_trait::async_trait;
 use tinystoragedrivers::primitives::{self, Acquire, Acquisition};
 use tinystoragedrivers::{
-    CollectionSpec, DocumentStore, Fence, Filter, Key, Leases, Scope, StorageBackend,
+    CollectionSpec, DocumentStore, Fence, Filter, Key, Leases, Scope, StorageBackend, Version,
 };
 
 use super::lease::{
@@ -42,8 +42,9 @@ pub struct DocumentLeases {
     node: String,
     endpoint: Option<String>,
     ttl_ms: i64,
-    /// The epoch this instance holds per key (see the module docs).
-    held: Mutex<HashMap<String, u64>>,
+    /// The epoch this instance holds per key and the generation of its latest
+    /// grant (see the module docs): a superseded grant cannot renew.
+    held: Mutex<HashMap<String, (u64, Version)>>,
     /// Serializes `acquire` on this instance so an older completion cannot
     /// overwrite newer held state.
     acquire_gate: tokio::sync::Mutex<()>,
@@ -135,14 +136,32 @@ impl DocumentLeases {
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .get(key)
-            .copied()
+            .map(|(epoch, _)| *epoch)
     }
 
-    fn set_held(&self, key: &str, epoch: u64) {
+    /// Whether `grant` is the latest one this instance issued for its key.
+    fn is_latest(&self, grant: &LeaseGrant) -> bool {
         self.held
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .insert(key.to_string(), epoch);
+            .get(&grant.key)
+            == Some(&(grant.epoch, grant.version))
+    }
+
+    /// Issues the next generation of `epoch`'s grant for `key`.
+    fn next_version(&self, key: &str, epoch: u64) -> Result<Version, StorageError> {
+        let mut held = self
+            .held
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let version = match held.get(key) {
+            Some((held_epoch, version)) if *held_epoch == epoch => version
+                .next()
+                .ok_or_else(|| StorageError::backend("lease version space exhausted"))?,
+            _ => Version::FIRST,
+        };
+        held.insert(key.to_string(), (epoch, version));
+        Ok(version)
     }
 
     /// Drops the held entry only while it still names `epoch`, so a release
@@ -152,16 +171,22 @@ impl DocumentLeases {
             .held
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
-        if held.get(key) == Some(&epoch) {
+        if held.get(key).is_some_and(|(held, _)| *held == epoch) {
             held.remove(key);
         }
     }
 
     /// The grant for a lease tsd just wrote.
-    fn grant(key: &str, lease: &primitives::Lease, previous_unclean: bool) -> LeaseGrant {
+    fn grant(
+        key: &str,
+        lease: &primitives::Lease,
+        version: Version,
+        previous_unclean: bool,
+    ) -> LeaseGrant {
         LeaseGrant {
             key: key.to_string(),
             epoch: lease.epoch,
+            version,
             expires_at_ms: u64::try_from(lease.expires_ms).unwrap_or_default(),
             previous_unclean,
         }
@@ -200,7 +225,7 @@ impl LeaseStore for DocumentLeases {
                 lease,
                 previous_unclean,
             } => {
-                self.set_held(key, lease.epoch);
+                let version = self.next_version(key, lease.epoch)?;
                 tracing::debug!(
                     target: "openhuman::storage::lease",
                     key,
@@ -209,7 +234,7 @@ impl LeaseStore for DocumentLeases {
                     previous_unclean,
                     "[lease] acquired"
                 );
-                Ok(Self::grant(key, &lease, previous_unclean))
+                Ok(Self::grant(key, &lease, version, previous_unclean))
             }
             Acquisition::Held(record) => {
                 tracing::debug!(
@@ -227,13 +252,13 @@ impl LeaseStore for DocumentLeases {
 
     async fn renew(&self, grant: &LeaseGrant, now_ms: u64) -> Result<LeaseGrant, LeaseError> {
         validate_key(&grant.key)?;
-        if now_ms >= grant.expires_at_ms || self.held_epoch(&grant.key) != Some(grant.epoch) {
+        if now_ms >= grant.expires_at_ms || !self.is_latest(grant) {
             tracing::info!(
                 target: "openhuman::storage::lease",
                 key = %grant.key,
                 node = %self.node,
                 epoch = grant.epoch,
-                "[lease] renew refused: grant expired or not held by this instance"
+                "[lease] renew refused: grant expired or superseded"
             );
             return Err(LeaseError::Lost);
         }
@@ -267,12 +292,13 @@ impl LeaseStore for DocumentLeases {
             epoch = grant.epoch,
             "[lease] renewed"
         );
-        Ok(Self::grant(&grant.key, &lease, grant.previous_unclean))
+        let version = self.next_version(&grant.key, lease.epoch)?;
+        Ok(Self::grant(&grant.key, &lease, version, grant.previous_unclean))
     }
 
     async fn release(&self, grant: LeaseGrant) -> Result<(), LeaseError> {
         validate_key(&grant.key)?;
-        if self.held_epoch(&grant.key) != Some(grant.epoch) {
+        if !self.is_latest(&grant) {
             return Err(LeaseError::Lost);
         }
         self.declare().await?;
