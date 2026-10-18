@@ -65,7 +65,12 @@ pub async fn complete_once(
     complete_once_observed(endpoint, request, budget, None).await
 }
 
-/// Run one completion and observe the admitted provider invocation without content.
+/// Run one completion and observe each admitted provider invocation without content.
+///
+/// When `budget` is present, the explicit observer and the turn-scoped observer
+/// run inside budget admission and after gateway charge normalization. They
+/// therefore see the same authoritative charge the ledger settles. Without a
+/// budget, the explicit observer still sees normalized provider usage.
 pub async fn complete_once_observed(
     endpoint: &CompletionEndpoint,
     request: ModelRequest,
