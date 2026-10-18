@@ -1,3 +1,5 @@
+use crate::config::SttEngine;
+
 use super::*;
 
 #[tokio::test]
