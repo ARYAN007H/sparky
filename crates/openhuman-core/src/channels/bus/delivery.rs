@@ -106,6 +106,13 @@ impl ManagedTransport {
                     .send_channel_typing(&channel, &self.credential)
                     .await
             }
+            // Typed sends and canonical output events are delivered by the
+            // module's own adapters; the hosted relay transport has no route
+            // for them yet.
+            ProgressiveTransportRequest::OutputEvent { .. }
+            | ProgressiveTransportRequest::SendTyped { .. } => {
+                return ProgressiveTransportResult::Unavailable;
+            }
         };
         match result {
             Ok(value) => ProgressiveTransportResult::Success(value),
@@ -133,7 +140,7 @@ impl ManagedTransport {
             return Err(tinybus::Error::failed("callback capability unavailable"));
         };
         Ok(ChannelBackendResult::ProgressiveTransport(
-            self.execute(*request).await,
+            Box::new(self.execute(*request).await),
         ))
     }
 }
