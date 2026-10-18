@@ -159,11 +159,9 @@ fn admit_all(raw: &[String], home: Option<&Path>) -> Vec<String> {
 /// Whether granting `path` would expose a credential store under `home`.
 fn exposes_credentials(path: &Path, home: Option<&Path>) -> bool {
     let Some(home) = home else { return false };
-    path == home
-        || ["", ".ssh", ".gnupg", ".aws", ".azure", ".kube"]
-            .iter()
-            .skip(1)
-            .any(|dir| home.join(dir).starts_with(path))
+    [".ssh", ".gnupg", ".aws", ".azure", ".kube"]
+        .iter()
+        .any(|dir| home.join(dir).starts_with(path))
 }
 
 #[cfg(feature = "modules")]
