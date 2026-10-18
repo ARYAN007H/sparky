@@ -6,7 +6,10 @@ use crate::threads::store::{
 use serde_json::json;
 use std::sync::Arc;
 use tinymemory_api::conformance::ReferenceEngine;
-use tinymemory_api::{MemoryEngine, MemoryMeta, Role, SourceKind, StoreItem, Turn};
+use tinymemory_api::{
+    ItemKind, LearningKind, ListRequest, MemoryEngine, MemoryMeta, Role, SourceKind, StoreItem,
+    Turn,
+};
 
 fn conversation(thread: &str, channel: Option<&str>) -> StoreItem {
     let mut meta = MemoryMeta::from_source(SourceKind::Conversation, Some(thread.to_string()));
@@ -110,6 +113,30 @@ async fn clears_stamped_and_legacy_channel_conversations_without_mutating_legacy
         .await
         .unwrap();
     engine
+        .store(StoreItem::learning(
+            "durable preference",
+            LearningKind::Preference,
+            0.9,
+            MemoryMeta {
+                thread_id: Some(discord_thread.clone()),
+                channel: Some("discord".into()),
+                ..MemoryMeta::default()
+            },
+        ))
+        .await
+        .unwrap();
+    engine
+        .store(StoreItem::document(
+            "durable brain document",
+            MemoryMeta {
+                thread_id: Some(discord_thread.clone()),
+                channel: Some("discord".into()),
+                ..MemoryMeta::default()
+            },
+        ))
+        .await
+        .unwrap();
+    engine
         .store(conversation("telegram-current", Some("telegram")))
         .await
         .unwrap();
@@ -119,7 +146,26 @@ async fn clears_stamped_and_legacy_channel_conversations_without_mutating_legacy
     std::fs::write(&legacy_file, legacy_bytes).unwrap();
 
     assert_eq!(clear_channel_memory(&config, "discord").await.unwrap(), 2);
-    assert_eq!(engine.len(), 1, "the other channel remains");
+    assert_eq!(engine.len(), 3, "other-channel and non-conversation items remain");
+    let remaining = engine
+        .list(ListRequest {
+            filter: MetaFilter::default(),
+            limit: 100,
+            cursor: None,
+        })
+        .await
+        .unwrap()
+        .items;
+    assert!(remaining.iter().any(|item| {
+        item.kind == ItemKind::Learning && item.text == "durable preference"
+    }));
+    assert!(remaining.iter().any(|item| {
+        item.kind == ItemKind::Document && item.text == "durable brain document"
+    }));
+    assert!(remaining.iter().any(|item| {
+        item.kind == ItemKind::Conversation
+            && item.meta.thread_id.as_deref() == Some("telegram-current")
+    }));
     assert_eq!(std::fs::read(&legacy_file).unwrap(), legacy_bytes);
 }
 
