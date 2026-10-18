@@ -800,6 +800,12 @@ test("module boundary policy and checker changes arm their own scripts lane", ()
   );
   const scripts = filters.split(/^scripts:\s*$/m)[1].split(/^\S[^\n]*:/m)[0];
   for (const file of [
+    "scripts/ci/rust-coverage.sh",
+    "scripts/ci/fetch-submodule-tags.sh",
+  ]) {
+    assert.ok(scripts.includes(`'${file}'`), `${file} must run its regressions`);
+  }
+  for (const file of [
     "scripts/ci/check-module-boundaries.mjs",
     "scripts/ci/module-boundaries.json",
   ]) {
@@ -816,6 +822,12 @@ test("process-static policy and checker changes arm their own scripts lane", () 
     "utf8",
   );
   const scripts = filters.split(/^scripts:\s*$/m)[1].split(/^\S[^\n]*:/m)[0];
+  for (const file of [
+    "scripts/ci/rust-coverage.sh",
+    "scripts/ci/fetch-submodule-tags.sh",
+  ]) {
+    assert.ok(scripts.includes(`'${file}'`), `${file} must run its regressions`);
+  }
   for (const file of [
     "scripts/ci/check-process-statics.mjs",
     "scripts/ci/check-crate-chain.mjs",
@@ -938,6 +950,12 @@ test("nextest validation helpers arm Rust validation and script regressions on t
     }
   }
   const scripts = filters.split(/^scripts:\s*$/m)[1].split(/^\S[^\n]*:/m)[0];
+  for (const file of [
+    "scripts/ci/rust-coverage.sh",
+    "scripts/ci/fetch-submodule-tags.sh",
+  ]) {
+    assert.ok(scripts.includes(`'${file}'`), `${file} must run its regressions`);
+  }
   assert.ok(
     scripts.includes("'scripts/lib/**'"),
     "module-pin-inventory.mjs is covered by the shared script library glob",
