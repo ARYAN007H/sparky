@@ -102,15 +102,15 @@ fn upstream_v3_identity_pools_at_the_account_root_workspace() {
 #[test]
 fn by_default_an_agent_is_its_definition_under_the_default_root() {
     let config = Config::default();
-    let researcher = MemoryIdentity::agent("researcher").resolve(&config);
+    let researcher = tinymemory_tools::layout::identity::Identity::agent("researcher").resolve(&crate::memory::scope::identity_pins(&config));
     assert_eq!(researcher.agent_id, "researcher");
     assert_eq!(researcher.root(), &Namespace::ROOT);
     assert!(researcher.recall);
 
-    let nobody = MemoryIdentity::root().resolve(&config);
+    let nobody = tinymemory_tools::layout::identity::Identity::root().resolve(&crate::memory::scope::identity_pins(&config));
     assert_eq!(nobody.agent_id, DEFAULT_AGENT_ID);
     assert_eq!(
-        MemoryIdentity::agent("  ").resolve(&config).agent_id,
+        tinymemory_tools::layout::identity::Identity::agent("  ").resolve(&crate::memory::scope::identity_pins(&config)).agent_id,
         DEFAULT_AGENT_ID
     );
 }
@@ -118,15 +118,15 @@ fn by_default_an_agent_is_its_definition_under_the_default_root() {
 #[test]
 fn a_team_member_shares_its_teams_root() {
     let config = Config::default();
-    let writer = MemoryIdentity::team_member("acme", "writer").resolve(&config);
+    let writer = tinymemory_tools::layout::identity::Identity::team_member("acme", "writer").resolve(&crate::memory::scope::identity_pins(&config));
     assert_eq!(writer.root(), &ns("team:acme"));
     assert_eq!(writer.agent_id, "writer");
     assert_eq!(
         writer.layout.conversations("writer").unwrap(),
         ns("team:acme/agent:writer")
     );
-    let child = MemoryIdentity::team_member("acme", "lead").child("scout");
-    assert_eq!(child.resolve(&config).root(), &ns("team:acme"));
+    let child = tinymemory_tools::layout::identity::Identity::team_member("acme", "lead").child("scout");
+    assert_eq!(child.resolve(&crate::memory::scope::identity_pins(&config)).root(), &ns("team:acme"));
 }
 
 #[test]
@@ -147,12 +147,12 @@ fn a_definition_pin_beats_the_team_and_the_default() {
             ..MemoryAgentConfig::default()
         },
     );
-    let analyst = MemoryIdentity::team_member("acme", "analyst").resolve(&config);
+    let analyst = tinymemory_tools::layout::identity::Identity::team_member("acme", "analyst").resolve(&crate::memory::scope::identity_pins(&config));
     assert_eq!(analyst.agent_id, "q4-desk");
     assert_eq!(analyst.root(), &ns("project:q4"));
     assert!(!analyst.recall);
     assert_eq!(
-        MemoryIdentity::agent("broken").resolve(&config).root(),
+        tinymemory_tools::layout::identity::Identity::agent("broken").resolve(&crate::memory::scope::identity_pins(&config)).root(),
         &Namespace::ROOT,
         "an invalid root falls back to the default"
     );
@@ -172,11 +172,11 @@ fn a_host_binding_beats_everything() {
         },
     );
     for identity in [
-        MemoryIdentity::agent("researcher"),
-        MemoryIdentity::team_member("acme", "writer"),
-        MemoryIdentity::root(),
+        tinymemory_tools::layout::identity::Identity::agent("researcher"),
+        tinymemory_tools::layout::identity::Identity::team_member("acme", "writer"),
+        tinymemory_tools::layout::identity::Identity::root(),
     ] {
-        let resolved = identity.resolve(&config);
+        let resolved = identity.resolve(&crate::memory::scope::identity_pins(&config));
         assert_eq!(resolved.agent_id, "employee-7");
         assert_eq!(resolved.root(), &ns("project:acme"));
     }
@@ -184,14 +184,14 @@ fn a_host_binding_beats_everything() {
 
 #[test]
 fn a_child_stays_in_the_parents_team() {
-    let lead = MemoryIdentity::team_member("acme", "lead");
+    let lead = tinymemory_tools::layout::identity::Identity::team_member("acme", "lead");
     assert_eq!(
         lead.child("lead").child("scout"),
-        MemoryIdentity::team_member("acme", "scout")
+        tinymemory_tools::layout::identity::Identity::team_member("acme", "scout")
     );
     assert_eq!(
-        MemoryIdentity::root().child("solo"),
-        MemoryIdentity::agent("solo")
+        tinymemory_tools::layout::identity::Identity::root().child("solo"),
+        tinymemory_tools::layout::identity::Identity::agent("solo")
     );
 }
 
@@ -268,7 +268,7 @@ fn the_user_root_is_read_from_where_the_config_lives() {
 #[test]
 fn layout_v3_pools_every_agents_chats_at_ws_main() {
     let mut config = Config::default();
-    let legacy = MemoryIdentity::agent("researcher").resolve(&config);
+    let legacy = tinymemory_tools::layout::identity::Identity::agent("researcher").resolve(&crate::memory::scope::identity_pins(&config));
     assert_eq!(
         legacy.layout.conversations("researcher").unwrap(),
         ns("agent:researcher")
@@ -277,8 +277,8 @@ fn layout_v3_pools_every_agents_chats_at_ws_main() {
 
     config.memory.layout = MemoryLayoutMode::V3;
     assert!(layout_is_v3(&config));
-    let researcher = MemoryIdentity::agent("researcher").resolve(&config);
-    let coder = MemoryIdentity::agent("coder").resolve(&config);
+    let researcher = tinymemory_tools::layout::identity::Identity::agent("researcher").resolve(&crate::memory::scope::identity_pins(&config));
+    let coder = tinymemory_tools::layout::identity::Identity::agent("coder").resolve(&crate::memory::scope::identity_pins(&config));
     assert_eq!(
         researcher.layout.conversations("researcher").unwrap(),
         ns("ws:main")
@@ -288,7 +288,7 @@ fn layout_v3_pools_every_agents_chats_at_ws_main() {
     let history = researcher.layout.conversations_filter(Some("researcher"));
     assert_eq!(history.agent_id.as_deref(), Some("researcher"));
 
-    let team = MemoryIdentity::team_member("acme", "writer").resolve(&config);
+    let team = tinymemory_tools::layout::identity::Identity::team_member("acme", "writer").resolve(&crate::memory::scope::identity_pins(&config));
     assert_eq!(chat_node(&team.layout), ns("team:acme/ws:main"));
 }
 

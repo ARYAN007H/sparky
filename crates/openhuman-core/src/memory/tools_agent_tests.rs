@@ -2,7 +2,7 @@ use super::*;
 
 /// A tool context for a run that acts on memory as `identity`.
 fn tool_context_acting_as(
-    identity: crate::memory::scope::MemoryIdentity,
+    identity: tinymemory_tools::layout::identity::Identity,
 ) -> tinyagents_harness::tool::ToolExecutionContext {
     let mut host = crate::agent::tinyagents::host::OpenHumanRunContext::new();
     host.memory_identity = Some(identity);
@@ -19,7 +19,7 @@ fn tool_context_acting_as(
 #[test]
 fn gather_acts_as_the_identity_the_run_carries() {
     let config = Config::default();
-    let context = tool_context_acting_as(crate::memory::scope::MemoryIdentity::team_member(
+    let context = tool_context_acting_as(tinymemory_tools::layout::identity::Identity::team_member(
         "acme", "scout",
     ));
     let facts = CallFacts::gather(&config, Some(&context));

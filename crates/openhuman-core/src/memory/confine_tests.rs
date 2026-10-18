@@ -3,7 +3,7 @@ use super::*;
 use tinymemory_api::{LearningKind, MemoryEngine, SourceKind, SourceRef, StoreItem};
 
 use crate::memory::explore::PathStep;
-use crate::memory::scope::MemoryIdentity;
+use tinymemory_tools::layout::identity::Identity;
 use crate::memory::test_fixtures::{bind_reference, config_in};
 
 fn ns(value: &str) -> Namespace {
@@ -75,12 +75,12 @@ fn the_allowed_reach_is_the_identity_roots_subtree() {
     let tmp = tempfile::tempdir().unwrap();
     let mut config = config_in(&tmp);
     assert_eq!(
-        allowed_reach(&config, &MemoryIdentity::root()),
+        allowed_reach(&config, &tinymemory_tools::layout::identity::Identity::root()),
         Reach::subtree(Namespace::ROOT)
     );
     config.memory.root = Some("project:q4".to_string());
     assert_eq!(
-        allowed_reach(&config, &MemoryIdentity::root()),
+        allowed_reach(&config, &tinymemory_tools::layout::identity::Identity::root()),
         Reach::subtree(ns("project:q4"))
     );
 }
@@ -89,7 +89,7 @@ fn the_allowed_reach_is_the_identity_roots_subtree() {
 fn a_team_members_reach_is_its_teams_subtree() {
     let tmp = tempfile::tempdir().unwrap();
     let config = config_in(&tmp);
-    let reach = allowed_reach(&config, &MemoryIdentity::team_member("acme", "scout"));
+    let reach = allowed_reach(&config, &tinymemory_tools::layout::identity::Identity::team_member("acme", "scout"));
     assert_eq!(reach, Reach::subtree(ns("team:acme")));
 }
 
@@ -98,14 +98,14 @@ async fn list_fetch_and_recall_never_read_another_root() {
     let tmp = tempfile::tempdir().unwrap();
     let (config, mine, theirs) = two_roots(&tmp).await;
 
-    let listed = items_list(&config, &MemoryIdentity::root(), ItemsListParams::default())
+    let listed = items_list(&config, &tinymemory_tools::layout::identity::Identity::root(), ItemsListParams::default())
         .await
         .unwrap();
     assert_eq!(ids(&listed.items), std::slice::from_ref(&mine));
 
     let page = fetch(
         &config,
-        &MemoryIdentity::root(),
+        &tinymemory_tools::layout::identity::Identity::root(),
         FetchParams {
             refers_to: None,
             query: "plan".into(),
@@ -121,7 +121,7 @@ async fn list_fetch_and_recall_never_read_another_root() {
 
     let answer = recall(
         &config,
-        &MemoryIdentity::root(),
+        &tinymemory_tools::layout::identity::Identity::root(),
         RecallParams {
             refers_to: None,
             question: "secret plan".into(),
@@ -148,7 +148,7 @@ async fn a_caller_reach_into_another_root_is_refused() {
 
     let error = items_list(
         &config,
-        &MemoryIdentity::root(),
+        &tinymemory_tools::layout::identity::Identity::root(),
         ItemsListParams {
             filter: Some(elsewhere.clone()),
             ..ItemsListParams::default()
@@ -160,7 +160,7 @@ async fn a_caller_reach_into_another_root_is_refused() {
 
     let error = fetch(
         &config,
-        &MemoryIdentity::root(),
+        &tinymemory_tools::layout::identity::Identity::root(),
         FetchParams {
             refers_to: None,
             query: "plan".into(),
@@ -176,7 +176,7 @@ async fn a_caller_reach_into_another_root_is_refused() {
 
     let error = recall(
         &config,
-        &MemoryIdentity::root(),
+        &tinymemory_tools::layout::identity::Identity::root(),
         RecallParams {
             refers_to: None,
             question: "plan".into(),
@@ -200,7 +200,7 @@ async fn an_explorer_path_into_another_root_is_refused() {
 
     let error = items_list(
         &config,
-        &MemoryIdentity::root(),
+        &tinymemory_tools::layout::identity::Identity::root(),
         ItemsListParams {
             path: path.clone(),
             ..ItemsListParams::default()
@@ -212,7 +212,7 @@ async fn an_explorer_path_into_another_root_is_refused() {
 
     let error = explore(
         &config,
-        &MemoryIdentity::root(),
+        &tinymemory_tools::layout::identity::Identity::root(),
         ExploreParams {
             facet: tinymemory_api::Facet::Kind,
             path,
@@ -228,7 +228,7 @@ async fn an_explorer_path_into_another_root_is_refused() {
     // Exploring inside the root still works and counts only its items.
     let page = explore(
         &config,
-        &MemoryIdentity::root(),
+        &tinymemory_tools::layout::identity::Identity::root(),
         ExploreParams {
             facet: tinymemory_api::Facet::Kind,
             path: Vec::new(),
@@ -249,7 +249,7 @@ async fn items_get_and_forget_leave_another_roots_items_alone() {
 
     let read = items_get(
         &config,
-        &MemoryIdentity::root(),
+        &tinymemory_tools::layout::identity::Identity::root(),
         ItemsGetParams {
             ids: vec![mine.clone(), theirs.clone()],
             reach: None,
@@ -261,7 +261,7 @@ async fn items_get_and_forget_leave_another_roots_items_alone() {
 
     let error = items_get(
         &config,
-        &MemoryIdentity::root(),
+        &tinymemory_tools::layout::identity::Identity::root(),
         ItemsGetParams {
             ids: vec![theirs.clone()],
             reach: Some(Reach::subtree(Namespace::ROOT)),
@@ -273,7 +273,7 @@ async fn items_get_and_forget_leave_another_roots_items_alone() {
 
     let forgotten = forget(
         &config,
-        &MemoryIdentity::root(),
+        &tinymemory_tools::layout::identity::Identity::root(),
         ForgetParams {
             ids: vec![theirs.clone()],
             reach: None,
@@ -285,7 +285,7 @@ async fn items_get_and_forget_leave_another_roots_items_alone() {
 
     let error = forget(
         &config,
-        &MemoryIdentity::root(),
+        &tinymemory_tools::layout::identity::Identity::root(),
         ForgetParams {
             ids: vec![theirs.clone()],
             reach: Some(Reach::subtree(ns("team:other"))),
@@ -300,7 +300,7 @@ async fn items_get_and_forget_leave_another_roots_items_alone() {
     other.memory.root = Some("team:other".to_string());
     let still = items_get(
         &other,
-        &MemoryIdentity::root(),
+        &tinymemory_tools::layout::identity::Identity::root(),
         ItemsGetParams {
             ids: vec![theirs.clone()],
             reach: None,
@@ -313,7 +313,7 @@ async fn items_get_and_forget_leave_another_roots_items_alone() {
     // Its own items are forgotten as before.
     let forgotten = forget(
         &config,
-        &MemoryIdentity::root(),
+        &tinymemory_tools::layout::identity::Identity::root(),
         ForgetParams {
             ids: vec![mine],
             reach: None,
@@ -331,7 +331,7 @@ async fn learn_lands_inside_the_root_and_refuses_another() {
 
     let learned = learn(
         &config,
-        &MemoryIdentity::root(),
+        &tinymemory_tools::layout::identity::Identity::root(),
         LearnParams {
             text: "acme prefers short standups".into(),
             kind: None,
@@ -343,7 +343,7 @@ async fn learn_lands_inside_the_root_and_refuses_another() {
     .unwrap();
     let read = items_get(
         &config,
-        &MemoryIdentity::root(),
+        &tinymemory_tools::layout::identity::Identity::root(),
         ItemsGetParams {
             ids: vec![learned.id],
             reach: None,
@@ -356,7 +356,7 @@ async fn learn_lands_inside_the_root_and_refuses_another() {
 
     let error = learn(
         &config,
-        &MemoryIdentity::root(),
+        &tinymemory_tools::layout::identity::Identity::root(),
         LearnParams {
             text: "planted in another team".into(),
             kind: None,

@@ -195,8 +195,8 @@ pub fn layout_of_source(
     source: &MemorySourceConfig,
 ) -> tinymemory_tools::MemoryLayout {
     let default = || {
-        crate::memory::scope::MemoryIdentity::root()
-            .resolve(config)
+        tinymemory_tools::layout::identity::Identity::root()
+            .resolve(&crate::memory::scope::identity_pins(config))
             .layout
     };
     let Some(raw) = source
@@ -226,8 +226,8 @@ pub fn layout_of(config: &Config, source_id: &str) -> tinymemory_tools::MemoryLa
         .find(|source| source.id == source_id)
         .map_or_else(
             || {
-                crate::memory::scope::MemoryIdentity::root()
-                    .resolve(config)
+                tinymemory_tools::layout::identity::Identity::root()
+                    .resolve(&crate::memory::scope::identity_pins(config))
                     .layout
             },
             |source| layout_of_source(config, source),

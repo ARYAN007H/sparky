@@ -376,7 +376,7 @@ async fn switching_to_v3_persists_and_rebinds_the_persons_own_config() {
         "the switch rebinds"
     );
     assert!(
-        !super::super::scope::layout_is_v3(&config),
+        !super::super::config.memory.layout == crate::config::MemoryLayoutMode::V3,
         "the caller's copy is not the source of truth"
     );
 }

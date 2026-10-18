@@ -7,8 +7,8 @@
 //! every namespace, so an RPC or MCP caller could list, read and forget
 //! another root's memory (another team's, or another host-bound agent's).
 //!
-//! Every RPC resolves the identity the caller passes ([`MemoryIdentity`]; the
-//! RPC handlers pass [`MemoryIdentity::root`], the config's own root
+//! Every RPC resolves the identity the caller passes ([`tinymemory_tools::layout::identity::Identity`]; the
+//! RPC handlers pass [`tinymemory_tools::layout::identity::Identity::root`], the config's own root
 //! identity) and:
 //!
 //! - fills an unset `reach` with that identity's subtree ([`allowed_reach`]);
@@ -23,7 +23,7 @@ use crate::config::Config;
 
 use super::explore::{self, ExploreParams, ItemsGetParams, ItemsGetView};
 use super::ops;
-use super::scope::MemoryIdentity;
+use tinymemory_tools::layout::identity::Identity;
 use super::types::{
     FetchParams, FetchView, ForgetParams, ForgetView, ItemsListParams, ItemsListView, LearnParams,
     LearnView, RecallParams, RecallView,
@@ -33,8 +33,8 @@ use tinymemory_api::{Error, Result};
 /// What `identity` under `config` may read and forget: the subtree of its
 /// layout root.
 #[must_use]
-pub fn allowed_reach(config: &Config, identity: &MemoryIdentity) -> Reach {
-    Reach::subtree(identity.resolve(config).root().clone())
+pub fn allowed_reach(config: &Config, identity: &tinymemory_tools::layout::identity::Identity) -> Reach {
+    Reach::subtree(identity.resolve(&crate::memory::scope::identity_pins(config)).root().clone())
 }
 
 /// `reach` confined to `allowed`: unset becomes `allowed`, a reach within it
@@ -83,10 +83,10 @@ pub fn confine_filter(filter: Option<MetaFilter>, allowed: &Reach) -> Result<Met
 /// layout's subtree.
 pub fn confine_learn_meta(
     config: &Config,
-    identity: &MemoryIdentity,
+    identity: &tinymemory_tools::layout::identity::Identity,
     meta: Option<MemoryMeta>,
 ) -> Result<MemoryMeta> {
-    let resolved = identity.resolve(config);
+    let resolved = identity.resolve(&crate::memory::scope::identity_pins(config));
     let allowed = Reach::subtree(resolved.root().clone());
     let mut meta = meta.unwrap_or_default();
     if meta.namespace == Namespace::ROOT {
@@ -113,7 +113,7 @@ pub fn confine_learn_meta(
 /// A reach outside the caller's root, or what [`ops::recall`] returns.
 pub async fn recall(
     config: &Config,
-    identity: &MemoryIdentity,
+    identity: &tinymemory_tools::layout::identity::Identity,
     mut params: RecallParams,
 ) -> Result<RecallView> {
     params.filter = Some(confine_filter(
@@ -130,7 +130,7 @@ pub async fn recall(
 /// A reach outside the caller's root, or what [`ops::fetch`] returns.
 pub async fn fetch(
     config: &Config,
-    identity: &MemoryIdentity,
+    identity: &tinymemory_tools::layout::identity::Identity,
     mut params: FetchParams,
 ) -> Result<FetchView> {
     params.filter = Some(confine_filter(
@@ -147,7 +147,7 @@ pub async fn fetch(
 /// A namespace outside the caller's root, or what [`ops::learn`] returns.
 pub async fn learn(
     config: &Config,
-    identity: &MemoryIdentity,
+    identity: &tinymemory_tools::layout::identity::Identity,
     mut params: LearnParams,
 ) -> Result<LearnView> {
     params.meta = Some(confine_learn_meta(config, identity, params.meta)?);
@@ -162,7 +162,7 @@ pub async fn learn(
 /// A reach outside the caller's root, or what [`ops::forget`] returns.
 pub async fn forget(
     config: &Config,
-    identity: &MemoryIdentity,
+    identity: &tinymemory_tools::layout::identity::Identity,
     mut params: ForgetParams,
 ) -> Result<ForgetView> {
     params.reach = Some(confine_reach(
@@ -181,7 +181,7 @@ pub async fn forget(
 /// [`ops::items_list`] returns.
 pub async fn items_list(
     config: &Config,
-    identity: &MemoryIdentity,
+    identity: &tinymemory_tools::layout::identity::Identity,
     mut params: ItemsListParams,
 ) -> Result<ItemsListView> {
     let narrowed = explore::narrowed(params.filter.take(), &params.path)?;
@@ -201,7 +201,7 @@ pub async fn items_list(
 /// [`explore::explore`] returns.
 pub async fn explore(
     config: &Config,
-    identity: &MemoryIdentity,
+    identity: &tinymemory_tools::layout::identity::Identity,
     mut params: ExploreParams,
 ) -> Result<ExplorePage> {
     let narrowed = explore::narrowed(params.filter.take(), &params.path)?;
@@ -222,7 +222,7 @@ pub async fn explore(
 /// returns.
 pub async fn items_get(
     config: &Config,
-    identity: &MemoryIdentity,
+    identity: &tinymemory_tools::layout::identity::Identity,
     mut params: ItemsGetParams,
 ) -> Result<ItemsGetView> {
     params.reach = Some(confine_reach(
