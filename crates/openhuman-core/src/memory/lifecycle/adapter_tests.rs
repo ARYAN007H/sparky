@@ -56,20 +56,22 @@ async fn background_prefetch_records_citations_only_when_returning_the_pack() {
         .resolve(&crate::memory::scope::identity_pins(&config));
     let ctx = crate::core::runtime::DispatchCtx::ambient();
 
-    assert!(super::super::super::prefetch::pre_turn(
-        &ctx,
-        config.clone(),
-        identity.clone(),
-        "citation-thread".into(),
-        0,
-        "what colour is preferred?".into(),
-        0,
-        Utc::now(),
-        false,
-        None,
-        None,
-    )
-    .is_none());
+    assert!(
+        super::super::super::prefetch::pre_turn(
+            &ctx,
+            config.clone(),
+            identity.clone(),
+            "citation-thread".into(),
+            0,
+            "what colour is preferred?".into(),
+            0,
+            Utc::now(),
+            false,
+            None,
+            None,
+        )
+        .is_none()
+    );
     assert!(crate::web_chat::citations::take_turn_citations(&ctx, "citation-thread").is_empty());
 
     super::super::super::prefetch::settle_for_test(
@@ -96,7 +98,10 @@ async fn background_prefetch_records_citations_only_when_returning_the_pack() {
     .expect("completed prefetch pack");
     let recorded = crate::web_chat::citations::take_turn_citations(&ctx, "citation-thread");
     assert_eq!(
-        recorded.iter().map(|citation| citation.id.as_str()).collect::<Vec<_>>(),
+        recorded
+            .iter()
+            .map(|citation| citation.id.as_str())
+            .collect::<Vec<_>>(),
         pack.citations
             .iter()
             .map(|citation| citation.id.as_str())
@@ -143,8 +148,18 @@ fn memory_turn_keeps_its_core_context_without_owning_the_core() {
     };
 
     assert_eq!(turn.in_prompt().from_turn, 2);
-    assert!(std::sync::Arc::ptr_eq(turn.dispatch_ctx().core().unwrap(), &core));
-    assert_eq!(std::sync::Arc::strong_count(&core), 1, "MemoryTurn stores only a weak core");
+    assert!(std::sync::Arc::ptr_eq(
+        turn.dispatch_ctx().core().unwrap(),
+        &core
+    ));
+    assert_eq!(
+        std::sync::Arc::strong_count(&core),
+        1,
+        "MemoryTurn stores only a weak core"
+    );
     drop(core);
-    assert!(weak.upgrade().is_none(), "the turn does not retain the core lease");
+    assert!(
+        weak.upgrade().is_none(),
+        "the turn does not retain the core lease"
+    );
 }
