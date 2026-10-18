@@ -272,15 +272,18 @@ pub async fn fetch_with(
     if params.mode.is_none() && descriptor.fetch_modes.is_empty() {
         return Err(Error::Unsupported("the engine offers no fetch mode".into()));
     }
-    let request = memory_ops(config)?.fetch_request(FetchOptions {
-        query: params.query,
-        mode: params.mode,
-        filter: params.filter,
-        limit: params.limit,
-        cursor: params.cursor,
-        refers_to: time_hint(config, params.refers_to)?,
-        exclude_thread,
-    }, descriptor)?;
+    let request = memory_ops(config)?.fetch_request(
+        FetchOptions {
+            query: params.query,
+            mode: params.mode,
+            filter: params.filter,
+            limit: params.limit,
+            cursor: params.cursor,
+            refers_to: time_hint(config, params.refers_to)?,
+            exclude_thread,
+        },
+        descriptor,
+    )?;
     let page = bound.engine.fetch(request).await?;
     tracing::debug!(engine = %bound.id, hits = page.hits.len(), "[memory:ops] fetch answered");
     Ok(FetchView {

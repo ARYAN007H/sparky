@@ -227,12 +227,9 @@ fn valid_saas_identity_clamps_memory_operations_in_an_isolated_process() {
                 limit: Some(5),
                 scan_limit,
             };
-            let explored = crate::memory::explore::explore(
-                &config,
-                explore_params(Some(100)),
-            )
-            .await
-            .unwrap();
+            let explored = crate::memory::explore::explore(&config, explore_params(Some(100)))
+                .await
+                .unwrap();
             assert_eq!(explored.total, 2);
             assert!(!explored.truncated);
             assert_eq!(
