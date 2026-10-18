@@ -85,7 +85,7 @@ pub fn build_core_http_router(socketio_enabled: bool) -> Router {
     let router = router
         .fallback(not_found_handler)
         .layer(middleware::from_fn(http_request_log_middleware))
-        .layer(middleware::from_fn(
+        .route_layer(middleware::from_fn(
             crate::server::auth::rpc_auth_middleware,
         ));
     // Socket.IO is off (`--jsonrpc-only`): answer its path before the bearer
