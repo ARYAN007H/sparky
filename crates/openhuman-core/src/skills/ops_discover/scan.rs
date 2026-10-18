@@ -42,12 +42,14 @@ pub(super) fn discover_filtered(
     // first and at the lowest precedence. No trust marker is consulted: the
     // directory is core-managed and its contents were written from constants
     // compiled into this binary. See `skills::bundled`.
-    let mut builtin = match workspace_dir {
+    let builtin = match workspace_dir {
         Some(ws) if kinds.contains(&RootKind::Skill) => {
             scan_bundled_root(&crate::skills::bundled::builtin_root(ws))
         }
         _ => Vec::new(),
     };
+    #[cfg(feature = "flows")]
+    let mut builtin = builtin;
     #[cfg(feature = "flows")]
     if gate.flow_authoring_enabled() && kinds.contains(&RootKind::Skill) {
         if let (Some(workspace), Some(generation)) = (workspace_dir, flow_generation) {
