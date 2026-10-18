@@ -162,7 +162,7 @@ pub(crate) fn storage_master_key() -> Result<[u8; KEY_LEN], String> {
 
 /// Whether the storage master key can be resolved without minting a new one:
 /// an operator key (env), a host key source, an already loaded key, or an
-/// existing workspace key file. A layout migration that deletes the plaintext
+/// existing workspace key file (a host source only when it holds a key). A layout migration that deletes the plaintext
 /// credential files only imports them when this holds, because a key minted
 /// by an offline tool would not match the one the desktop later loads.
 pub(crate) fn storage_master_key_resolvable() -> bool {
@@ -172,7 +172,9 @@ pub(crate) fn storage_master_key_resolvable() -> bool {
     resolvable(
         matches!(MASTER_KEY.get(), Some(Ok(Some(_)))),
         env_set(MASTER_KEY_ENV) || env_set(MASTER_KEY_FILE_ENV),
-        key_source::installed_master_key_source().is_some(),
+        // A host source counts only when it already holds the key: an empty
+        // one would have a key minted into it by the load.
+        key_source::installed_master_key_source().is_some_and(|source| matches!(source.load(), Ok(Some(_)))),
         dir.join("keyring/master.key").is_file(),
     )
 }
