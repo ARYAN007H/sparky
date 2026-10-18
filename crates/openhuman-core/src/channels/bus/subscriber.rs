@@ -191,7 +191,7 @@ impl EventHandler<DomainEvent> for ChannelInboundSubscriber {
                                         tracing::error!("[channel-inbound] delivery failed: {error}");
                                         return;
                                     }
-                                    let full_response = full_response.as_str();
+                                    let full_response = full_response.as_deref().unwrap_or_default();
                                     // Even when the agent produced no visible
                                     // text, we must close out any draft we
                                     // already posted — otherwise the user is
