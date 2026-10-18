@@ -1,5 +1,6 @@
 use super::*;
 use crate::core::runtime::DispatchCtx;
+use crate::web_chat::ScopedWebEvent;
 use std::sync::Arc;
 
 fn ids(request_id: &str) -> TurnIds {

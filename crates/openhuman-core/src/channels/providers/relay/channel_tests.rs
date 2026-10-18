@@ -78,10 +78,8 @@ async fn send_publishes_under_the_callers_stamp_and_records_the_text() {
         }
     };
     assert_eq!(event.event_name(), CHANNEL_OUTBOUND_EVENT);
-    assert_eq!(event.agent.as_deref(), Some("u-relay-test"));
     assert!(event.belongs_to("u-relay-test"));
     assert!(!event.belongs_to("u-someone-else"));
-    assert_eq!(event.profile.as_deref(), Some("p-relay-test"));
     assert!(event.belongs_to_profile("p-relay-test"));
     assert!(!event.belongs_to_profile("p-someone-else"));
     assert_eq!(channel.sent(), vec!["reply one".to_string()]);

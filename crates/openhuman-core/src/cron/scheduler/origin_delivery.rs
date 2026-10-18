@@ -280,7 +280,7 @@ async fn deliver_to_web_thread(
         .map_err(|e| anyhow!("could not store the reply in the origin thread: {e}"))?;
 
     publish_web_channel_event(WebChannelEvent::ProactiveMessage {
-        context: crate::web_chat::channel_event::event_context(
+        context: crate::web_chat::event_context(
             "system",
             thread_id,
             request_id.clone(),

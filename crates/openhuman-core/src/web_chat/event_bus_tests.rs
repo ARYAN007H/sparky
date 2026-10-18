@@ -559,6 +559,7 @@ async fn publish_web_channel_event_preserves_an_explicit_ts() {
             client_id: "ts-probe".into(),
             thread_id: "thread-ts-stamp-probe-explicit".into(),
             request_id: "ts-probe".into(),
+            turn_request_id: None,
             seq: None,
             ts: Some(123),
         },

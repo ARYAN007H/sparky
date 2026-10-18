@@ -165,6 +165,6 @@ async fn the_heartbeat_beats_only_for_a_live_turn() {
     }
     assert_eq!(names[0], "inference_start");
     assert!(names.len() >= 2, "{names:?}");
-    assert!(names[1..].iter().all(|name| name == "inference_heartbeat"));
+    assert!(names[1..].iter().all(|name| *name == "inference_heartbeat"));
     drop(beat);
 }

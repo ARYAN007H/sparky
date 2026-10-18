@@ -62,7 +62,7 @@ impl RelayChannel {
     /// reply only to the caller's own stream.
     pub fn outbound_event(&self, message: &SendMessage) -> WebChannelEvent {
         WebChannelEvent::ChannelOutbound {
-            context: crate::web_chat::channel_event::event_context(
+            context: crate::web_chat::event_context(
                 self.client_id.clone(),
                 self.thread_id.clone(),
                 self.request_id.clone(),

@@ -671,7 +671,7 @@ async fn run_system_turn_on_thread(
             ),
             Err(error) => crate::web_chat::publish_web_channel_event(
                 crate::web_chat::WebChannelEvent::ChatError {
-                    context: crate::web_chat::channel_event::event_context(
+                    context: crate::web_chat::event_context(
                         "system",
                         thread_id.clone(),
                         run_id.clone(),

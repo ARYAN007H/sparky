@@ -128,7 +128,7 @@ pub(super) async fn finalize_flow_stream(
         }
         Err(err) => {
             crate::web_chat::publish_web_channel_event(crate::web_chat::WebChannelEvent::ChatError {
-                context: crate::web_chat::channel_event::event_context(
+                context: crate::web_chat::event_context(
                     "system",
                     target.thread_id.clone(),
                     target.request_id.clone(),

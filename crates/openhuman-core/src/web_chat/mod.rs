@@ -18,6 +18,7 @@
 //! routing envelope around those typed events for its process-wide bus.
 
 mod channel_event;
+pub(crate) use channel_event::event_context;
 mod egress_surface;
 mod event_bus;
 mod event_bus_channel;
