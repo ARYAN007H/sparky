@@ -280,7 +280,14 @@ impl FailureScopePolicy<OpenHumanRunContext> for HostFailurePolicy {
             if let Some(kind) = terminal_inference_failure_kind(heuristic) {
                 return FailureAssessment::Halt {
                     summary: terminal_inference_halt_summary(kind, &call.name, &failure_text),
-                    cause: None,
+                    cause: Some(tinyagents_harness::no_progress::ClassifiedStopCause {
+                        class: match kind {
+                            crate::inference::failure_copy::TerminalInferenceFailure::BudgetExhausted => "out_of_credits",
+                            crate::inference::failure_copy::TerminalInferenceFailure::ProviderConfig => "provider_config",
+                        }.to_owned(),
+                        operation: call.name.clone(),
+                        summary: terminal_inference_halt_summary(kind, &call.name, &failure_text),
+                    }),
                 };
             }
         }
