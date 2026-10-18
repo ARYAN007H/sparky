@@ -247,7 +247,7 @@ function runMockedCoverage(exitCode) {
       "bin/cargo",
       `#!/bin/bash
 printf '%s\\n' "$*" >> "$MOCK_CALLS"
-case "$*" in *"-p openhuman --lib --bins"*) [ "${exitCode}" = 0 ] || exit "${exitCode}" ;; esac
+case "$*" in *"-E package(=openhuman)") [ "${exitCode}" = 0 ] || exit "${exitCode}" ;; esac
 node - "$@" <<'JS'
 const fs = require('node:fs');
 const args = process.argv.slice(2);
@@ -298,8 +298,25 @@ test("private coverage executes every package configuration once and reports aft
   assert.ok(selections.every((line) => line.includes("--no-tests=fail")));
   assert.ok(
     selections.some((line) =>
-      line.includes("-p openhuman-cli --tests -E kind(test)"),
+      line.includes("-E package(=openhuman-cli) & kind(test)"),
     ),
+  );
+  // The product-feature suites differ only in their nextest filter, so Cargo
+  // resolves (and builds) the core and its dependencies once for all of them.
+  const unified = selections.filter((line) =>
+    line.includes(
+      "--features channels -p openhuman -p openhuman-embed -p openhuman-tinyhumans -p openhuman-cli --all-targets -E ",
+    ),
+  );
+  assert.equal(unified.length, 4);
+  assert.deepEqual(
+    unified.map((line) => line.slice(line.indexOf("-E ") + 3)).sort(),
+    [
+      "package(=openhuman)",
+      "package(=openhuman-cli) & kind(test)",
+      "package(=openhuman-embed)",
+      "package(=openhuman-tinyhumans)",
+    ],
   );
   assert.equal(
     calls.filter((line) => line.includes("llvm-cov report")).length,
