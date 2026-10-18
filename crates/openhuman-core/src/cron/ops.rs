@@ -192,9 +192,10 @@ pub async fn run_job_now(
         tinyflows_bus::schedule::RunJobReply::Completed {
             success, attempt, ..
         } => Ok((success, attempt.output)),
-        tinyflows_bus::schedule::RunJobReply::Refused { reason } => {
-            Err(format!("cron job '{}' was not admitted: {reason:?}", job.id))
-        }
+        tinyflows_bus::schedule::RunJobReply::Refused { reason } => Err(format!(
+            "cron job '{}' was not admitted: {reason:?}",
+            job.id
+        )),
         tinyflows_bus::schedule::RunJobReply::Accepted { .. } => {
             Err("cron module accepted a synchronous run without completing it".to_string())
         }

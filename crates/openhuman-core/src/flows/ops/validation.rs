@@ -201,7 +201,7 @@ pub fn flows_import(
     graph_json: Value,
     format: Option<String>,
 ) -> Result<Outcome<tinyflows_catalog::FlowImport>, String> {
-    use tinyflows_catalog::{FlowImport, import::n8n as n8n_import};
+    use tinyflows_catalog::{import::n8n as n8n_import, FlowImport};
 
     let requested = format
         .as_deref()

@@ -403,7 +403,7 @@ pub(crate) async fn validate_agent_refs(
 ) -> Vec<String> {
     use crate::agent::harness::host_definition::AgentDefinitionRegistry;
     use crate::agent::registry::AgentRegistryEntry;
-    use crate::flows::agent_route::{AgentRoute, route_for_agent_ref};
+    use crate::flows::agent_route::{route_for_agent_ref, AgentRoute};
 
     let mut errors = Vec::new();
     let mut harness_registry_init_attempted = false;
