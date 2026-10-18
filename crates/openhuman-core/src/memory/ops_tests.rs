@@ -295,7 +295,8 @@ async fn single_user_reads_writes_and_forgets_ancestor_and_service_memory() {
     .unwrap()
     .id
     .0;
-    let service_namespace = "ws:main/service:newsletter".parse().unwrap();
+    let service_namespace: tinymemory_api::Namespace =
+        "ws:main/service:newsletter".parse().unwrap();
     let service_id = store_item(
         &config,
         StoreItem::learning(
