@@ -19,7 +19,7 @@ use std::time::Duration;
 use async_trait::async_trait;
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
-use tinymemory_api::{Namespace, StoreItem, WriteOptions};
+use tinymemory_api::{Namespace, Reach, StoreItem, WriteOptions};
 use tinymemory_tools::confine::Policy;
 use tinymemory_tools::list_store::{ListStore, StoreError};
 use tinymemory_tools::pending::{
@@ -108,7 +108,7 @@ fn binding_of(root: Option<String>, layout_v3: bool) -> Binding {
 fn binding(config: &Config) -> Binding {
     binding_of(
         super::scope::user_root(config),
-        super::config.memory.layout == crate::config::MemoryLayoutMode::V3,
+        config.memory.layout == crate::config::MemoryLayoutMode::V3,
     )
 }
 
@@ -137,7 +137,7 @@ fn owner_prefix(config: &Config) -> String {
 fn queue_path(config: &Config, root: &Namespace) -> PathBuf {
     let partition = serde_json::to_vec(&(
         &config.memory.root,
-        super::config.memory.layout == crate::config::MemoryLayoutMode::V3,
+        config.memory.layout == crate::config::MemoryLayoutMode::V3,
         root,
     ))
     .expect("partition fields serialize");
@@ -178,7 +178,7 @@ pub(super) fn enqueue(
             if let Some(ref confinement) = confinement {
                 confinement.item(&mut item)?;
             }
-            if !reach.admits(&item.meta().namespace) || reach.inherit {
+            if !Reach::subtree(reach.at.clone()).admits(&item.meta().namespace) || reach.inherit {
                 return Err(Error::InvalidRequest(
                     ("learning namespace is outside the trusted reach").into(),
                 ));

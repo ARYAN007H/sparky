@@ -258,7 +258,7 @@ pub fn resolve(config: &Config) -> Binding {
         }
         tracing::warn!("[memory:engine] ignoring the host engine in SaaS mode");
     }
-    let root = if super::config.memory.layout == crate::config::MemoryLayoutMode::V3 {
+    let root = if config.memory.layout == crate::config::MemoryLayoutMode::V3 {
         match super::scope::user_root(config) {
             Some(root) => Some(root),
             None => return off(None, None, "sign in to use memory in its own layout"),
