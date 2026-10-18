@@ -1,7 +1,13 @@
-use std::sync::Arc;
+use std::sync::{
+    atomic::{AtomicUsize, Ordering},
+    Arc,
+};
 
 use tinymemory_api::conformance::ReferenceEngine;
-use tinymemory_api::{LearningKind, ListRequest, MemoryEngine, MemoryMeta};
+use tinymemory_api::{
+    EngineDescriptor, FetchRequest, ForgetReport, ForgetTarget, LearningKind, ListRequest,
+    MemoryEngine, MemoryMeta, RecallRequest, StoreItem, StoreReceipt,
+};
 
 use super::*;
 
@@ -48,6 +54,107 @@ fn invalid_saas_identity_keeps_the_existing_rpc_error() {
             Error::InvalidRequest(message)
                 if message == "memory is unavailable: this agent has no valid memory root"
         ));
+    }
+}
+
+#[test]
+fn invalid_saas_root_is_refused_before_store_reaches_the_engine() {
+    const CHILD: &str = "OPENHUMAN_TEST_SAAS_MEMORY_STORE_GUARD";
+    const TEST_NAME: &str = "memory::user_scope::tests::invalid_saas_root_is_refused_before_store_reaches_the_engine";
+
+    if std::env::var_os(CHILD).is_none() {
+        let status = std::process::Command::new(std::env::current_exe().unwrap())
+            .args(["--exact", TEST_NAME])
+            .env(CHILD, "1")
+            .status()
+            .unwrap();
+        assert!(status.success(), "isolated SaaS test process failed");
+        return;
+    }
+
+    crate::core::runtime::mode::lock_mode(crate::core::runtime::Mode::Saas).unwrap();
+    let tmp = tempfile::tempdir().unwrap();
+    let config = crate::memory::test_fixtures::config_in(&tmp);
+    let calls = Arc::new(AtomicUsize::new(0));
+    crate::memory::engine::install_test_engine(
+        &config.workspace_dir,
+        Arc::new(CountingEngine {
+            inner: ReferenceEngine::new(),
+            calls: calls.clone(),
+        }),
+    );
+    let item = StoreItem::learning(
+        "should not be stored",
+        LearningKind::Fact,
+        0.9,
+        MemoryMeta::default(),
+    );
+    let error = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap()
+        .block_on(crate::memory::ops::store_item(&config, item))
+        .unwrap_err();
+
+    assert!(matches!(
+        error,
+        Error::InvalidRequest(message)
+            if message == "memory is unavailable: this agent has no valid memory root"
+    ));
+    assert_eq!(calls.load(Ordering::SeqCst), 0);
+}
+
+struct CountingEngine {
+    inner: ReferenceEngine,
+    calls: Arc<AtomicUsize>,
+}
+
+#[async_trait::async_trait]
+impl MemoryEngine for CountingEngine {
+    fn descriptor(&self) -> &EngineDescriptor {
+        self.inner.descriptor()
+    }
+
+    async fn health(&self) -> tinymemory_api::EngineHealth {
+        self.calls.fetch_add(1, Ordering::SeqCst);
+        self.inner.health().await
+    }
+
+    async fn recall(
+        &self,
+        request: RecallRequest,
+    ) -> tinymemory_api::Result<tinymemory_api::RecallAnswer> {
+        self.calls.fetch_add(1, Ordering::SeqCst);
+        self.inner.recall(request).await
+    }
+
+    async fn fetch(
+        &self,
+        request: FetchRequest,
+    ) -> tinymemory_api::Result<tinymemory_api::FetchPage> {
+        self.calls.fetch_add(1, Ordering::SeqCst);
+        self.inner.fetch(request).await
+    }
+
+    async fn store(&self, item: StoreItem) -> tinymemory_api::Result<StoreReceipt> {
+        self.calls.fetch_add(1, Ordering::SeqCst);
+        self.inner.store(item).await
+    }
+
+    async fn forget(
+        &self,
+        target: ForgetTarget,
+    ) -> tinymemory_api::Result<ForgetReport> {
+        self.calls.fetch_add(1, Ordering::SeqCst);
+        self.inner.forget(target).await
+    }
+
+    async fn list(
+        &self,
+        request: ListRequest,
+    ) -> tinymemory_api::Result<tinymemory_api::ListPage> {
+        self.calls.fetch_add(1, Ordering::SeqCst);
+        self.inner.list(request).await
     }
 }
 
