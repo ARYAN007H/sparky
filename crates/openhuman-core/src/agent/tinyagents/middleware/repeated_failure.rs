@@ -13,8 +13,9 @@ use tinyagents_harness::middleware::{
     Middleware, ToolFactsLookup, ToolInvocationIdentity,
 };
 use tinyagents_harness::no_progress::{
-    classified_step, clear_recovered, ClassifiedFailureTracker, ClassifiedStep, FailurePolicy,
-    NoProgress, NoProgressTracker, RecoverableFailureLadder, ToolAttempt,
+    classified_step_with_cause, clear_recovered, ClassifiedFailureTracker,
+    ClassifiedStepWithCause, FailurePolicy, NoProgress, NoProgressTracker,
+    RecoverableFailureLadder, ToolAttempt,
 };
 use tinyagents_harness::steering::SteeringHandle;
 use tinyagents_hooks::stop::StopLatch;
@@ -410,7 +411,7 @@ impl Middleware<(), crate::agent::tinyagents::host::OpenHumanRunContext>
             if let Some((class, budget)) =
                 recovery_policy_with_effect(tool_name, &failure_text, body_level_failure, effect)
             {
-                match classified_step(
+                match classified_step_with_cause(
                     &self.classified,
                     class,
                     tool_name,
@@ -418,7 +419,8 @@ impl Middleware<(), crate::agent::tinyagents::host::OpenHumanRunContext>
                     budget,
                     &sanitized_failure(&failure_text),
                 ) {
-                    ClassifiedStep::Halt(summary) => {
+                    ClassifiedStepWithCause::Halt(cause) => {
+                        let summary = cause.summary.clone();
                         tracing::warn!(
                             tool = tool_name,
                             class,
@@ -428,16 +430,20 @@ impl Middleware<(), crate::agent::tinyagents::host::OpenHumanRunContext>
                         // An identical re-issue made while the repeat guard
                         // refuses the calls around it is a repeat loop.
                         self.stop.halt_classified(
-                            summary,
+                            summary.clone(),
                             class,
                             tool_name,
                             repeated_failure,
                             || first_error_line(&failure_text),
                         );
+                        // Keep the harness's structured stop cause alongside
+                        // the model-facing summary; finalization consumes both
+                        // independently, without parsing prose back into a class.
+                        ctx.halt_with_cause(cause);
                         self.tracker.reset();
                         return Ok(());
                     }
-                    ClassifiedStep::Nudge(generic) => {
+                    ClassifiedStepWithCause::Nudge(generic) => {
                         // The harness wording for `missing_app` is the
                         // desktop-target one; a shell command names this
                         // host's OS and shell instead.
@@ -453,7 +459,7 @@ impl Middleware<(), crate::agent::tinyagents::host::OpenHumanRunContext>
                         );
                         self.pending_nudges.push(ctx, instruction);
                     }
-                    ClassifiedStep::Within => {}
+                    ClassifiedStepWithCause::Within => {}
                 }
                 // The classified budget owns this known blocker. In particular,
                 // a different query must not reset its count or trigger a
