@@ -69,27 +69,11 @@ impl VoiceTranscriber {
         &self,
         request: tinychannels_bus::HostTranscriptionRequest,
     ) -> anyhow::Result<tinychannels_bus::HostTranscriptionResult> {
-        let provider = crate::voice::effective_stt_provider(&self.config);
-        tracing::debug!(
-            "{LOG_PREFIX} transcribe provider={provider} bytes_b64={}",
-            request.audio_base64.len()
-        );
-        let stt = crate::voice::create_stt_provider(&provider, "", &self.config)?;
-        let outcome = stt
-            .transcribe(
-                &self.config,
-                &request.audio_base64,
-                request.mime_type.as_deref(),
-                request.file_name.as_deref(),
-                request.language.as_deref(),
-            )
-            .await
-            .map_err(|e| anyhow::anyhow!(e))?;
-        Ok(tinychannels_bus::HostTranscriptionResult {
-            text: outcome.value.text,
-            language: request.language,
-            duration_secs: None,
-        })
+        super::voice::ChannelVoiceHost {
+            config: Arc::clone(&self.config),
+        }
+        .transcribe_host(request)
+        .await
     }
 }
 

@@ -6,8 +6,9 @@ use crate::config::Config;
 use std::sync::{Arc, OnceLock, Weak};
 use tinybus::{Error, Result};
 use tinychannels_bus::{
-    ChannelBackendRequest, ChannelBackendResult, HostEventPublication, HostTranscriptionRequest,
-    HostTranscriptionResult,
+    ChannelBackendRequest, ChannelBackendResult, HostEventPublication, HostSpeechSynthesisRequest,
+    HostSpeechSynthesisResult, HostTranscriptionRequest, HostTranscriptionResult,
+    HostVoiceReplyPolicy, HostVoiceReplyPolicyRequest, HostVoiceTranscriptionRequest,
 };
 use tokio::sync::mpsc;
 
@@ -52,6 +53,12 @@ impl ChannelHostCallbacks {
             return Err(Error::failed("host callback payload exceeds its limit"));
         }
         Ok(())
+    }
+
+    fn voice(&self) -> crate::channels::host::voice::ChannelVoiceHost {
+        crate::channels::host::voice::ChannelVoiceHost {
+            config: Arc::clone(&self.config),
+        }
     }
 
     fn context(&self) -> Result<Arc<ChannelRuntimeContext>> {
@@ -133,12 +140,43 @@ impl ChannelHostCallbacks {
         {
             return Err(Error::failed("transcription callback exceeds its limit"));
         }
-        crate::channels::host::VoiceTranscriber {
-            config: Arc::clone(&self.config),
+        self.voice()
+            .transcribe_host(request)
+            .await
+            .map_err(|_| Error::failed("channel transcription failed"))
+    }
+
+    async fn transcribe_voice(
+        &self,
+        request: HostVoiceTranscriptionRequest,
+    ) -> Result<HostTranscriptionResult> {
+        if serde_json::to_vec(&request).map_or(true, |bytes| bytes.len() > MAX_TRANSCRIPTION_BYTES)
+        {
+            return Err(Error::failed("transcription callback exceeds its limit"));
         }
-        .transcribe_host(request)
-        .await
-        .map_err(|_| Error::failed("channel transcription failed"))
+        self.voice()
+            .transcribe_voice(request)
+            .await
+            .map_err(|_| Error::failed("channel transcription failed"))
+    }
+
+    async fn synthesize_speech(
+        &self,
+        request: HostSpeechSynthesisRequest,
+    ) -> Result<HostSpeechSynthesisResult> {
+        Self::validate_callback_size(&request)?;
+        self.voice()
+            .synthesize_speech(request)
+            .await
+            .map_err(|_| Error::failed("channel speech synthesis failed"))
+    }
+
+    async fn get_voice_reply_policy(
+        &self,
+        request: HostVoiceReplyPolicyRequest,
+    ) -> Result<HostVoiceReplyPolicy> {
+        Self::validate_callback_size(&request)?;
+        Ok(self.voice().reply_policy(&request.scope))
     }
 
     async fn publish_event(&self, publication: HostEventPublication) -> Result<()> {

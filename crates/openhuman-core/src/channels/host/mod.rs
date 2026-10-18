@@ -6,6 +6,7 @@
 mod adapters;
 mod channel_events;
 pub(crate) mod remote_control;
+pub(crate) mod voice;
 
 pub(crate) use adapters::{ConfigAllowlistStore, OpenHumanEventSink, VoiceTranscriber};
 #[cfg(test)]

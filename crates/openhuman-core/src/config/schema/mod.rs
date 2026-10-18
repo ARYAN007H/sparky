@@ -20,8 +20,8 @@ mod cron;
 mod dashboard;
 mod desktop;
 pub use desktop::DesktopConfig;
-mod defaults;
 mod channel_voice;
+mod defaults;
 mod dictation;
 mod hooks;
 pub use hooks::HooksConfig;
@@ -81,6 +81,7 @@ pub use agent::{
 };
 pub use autonomy::AutonomyConfig;
 pub use capability_providers::{CapabilityProviderConfig, CapabilityProviderTrustState};
+pub use channel_voice::{ChannelVoiceConfig, ChannelVoiceOverride, VoiceReplyMode};
 pub use channels::{
     AuditConfig, ChannelsConfig, DingTalkConfig, DiscordConfig, EmailConfig, IMessageConfig,
     IrcConfig, LarkConfig, LarkReceiveMode, LinqConfig, MatrixConfig, MattermostConfig, QQConfig,
@@ -91,7 +92,6 @@ pub(crate) use cli_overrides::set_cli_inference_overrides;
 pub use context::{CompactionSettings, CompactionStrategy, ContextConfig};
 pub use cron::CronConfig;
 pub use dashboard::{DashboardConfig, DiagramViewerConfig, EventStreamConfig, ModelHealthConfig};
-pub use channel_voice::{ChannelVoiceConfig, ChannelVoiceOverride, VoiceReplyMode};
 pub use dictation::{DictationActivationMode, DictationConfig};
 pub use identity_cost::{
     BudgetAction, BudgetPeriod, BudgetPolicy, BudgetScope, CostConfig, ModelPricing,

@@ -88,6 +88,7 @@ pub(crate) async fn process_channel_runtime_message(
     let history_key = prepared.history_key;
     let mut envelope = prepared.envelope;
     envelope.access.delivered_via_upstream_relay = authenticated_relay;
+    crate::channels::host::voice::record_inbound_envelope(&envelope);
 
     println!(
         "  💬 [{}] from {}: {}",

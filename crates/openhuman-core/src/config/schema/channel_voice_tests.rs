@@ -23,12 +23,18 @@ fn default_mode_is_mirror() {
 
 #[test]
 fn channel_override_beats_global() {
-    assert_eq!(config().resolve_mode("telegram", "other"), VoiceReplyMode::Always);
+    assert_eq!(
+        config().resolve_mode("telegram", "other"),
+        VoiceReplyMode::Always
+    );
 }
 
 #[test]
 fn thread_override_beats_channel() {
-    assert_eq!(config().resolve_mode("telegram", "t-1"), VoiceReplyMode::Never);
+    assert_eq!(
+        config().resolve_mode("telegram", "t-1"),
+        VoiceReplyMode::Never
+    );
 }
 
 #[test]
@@ -48,6 +54,9 @@ fn parses_from_toml() {
     )
     .unwrap();
     assert_eq!(cfg.resolve_mode("slack", "z"), VoiceReplyMode::Never);
-    assert_eq!(cfg.resolve_mode("telegram", "z"), VoiceReplyMode::SpeakReply);
+    assert_eq!(
+        cfg.resolve_mode("telegram", "z"),
+        VoiceReplyMode::SpeakReply
+    );
     assert_eq!(cfg.resolve_mode("telegram", "abc"), VoiceReplyMode::Always);
 }
