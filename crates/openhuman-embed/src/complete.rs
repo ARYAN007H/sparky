@@ -433,6 +433,7 @@ pub struct Completer {
     headers: Vec<(String, String)>,
     timeout: Option<Duration>,
     observer: Option<Arc<dyn CompletionObserver>>,
+    physical_observer: Option<Arc<dyn tinyagents_harness::observability::PhysicalDispatchObserver>>,
     cancellation: crate::cancellation::Cancellation,
     budget: Option<crate::budget::ModelBudget>,
 }
@@ -456,6 +457,7 @@ impl Completer {
             route,
             timeout: None,
             observer: None,
+            physical_observer: None,
             cancellation: Default::default(),
             budget: None,
         }
@@ -492,6 +494,15 @@ impl Completer {
     /// Report every call to `observer`.
     pub fn observer(mut self, observer: Arc<dyn CompletionObserver>) -> Self {
         self.observer = Some(observer);
+        self
+    }
+
+    /// Observe each admitted provider dispatch without request or response content.
+    pub fn physical_observer(
+        mut self,
+        observer: Arc<dyn tinyagents_harness::observability::PhysicalDispatchObserver>,
+    ) -> Self {
+        self.physical_observer = Some(observer);
         self
     }
 
@@ -602,10 +613,11 @@ impl Completer {
                 call: budget.call,
             });
         // The spend ledger is an explicit argument of the call, not an ambient scope.
-        let call = openhuman_core::inference::host_runtime::ops::complete_once(
+        let call = openhuman_core::inference::host_runtime::ops::complete_once_observed(
             &endpoint,
             request.into_wire(),
             budget.as_ref(),
+            self.physical_observer.clone(),
         );
         let started = std::time::Instant::now();
         let response = call.await.map_err(|message| {
