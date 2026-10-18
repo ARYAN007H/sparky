@@ -230,27 +230,6 @@ impl WebEventView {
                 message,
                 ..
             }
-            | E::SubagentCompleted {
-                tool_name,
-                skill_id,
-                subagent,
-                message,
-                ..
-            }
-            | E::SubagentFailed {
-                tool_name,
-                skill_id,
-                subagent,
-                message,
-                ..
-            }
-            | E::SubagentAwaitingUser {
-                tool_name,
-                skill_id,
-                subagent,
-                message,
-                ..
-            }
             | E::SubagentIterationStart {
                 tool_name,
                 skill_id,
@@ -261,6 +240,36 @@ impl WebEventView {
                 view.tool_name.clone_from(tool_name);
                 view.skill_id.clone_from(skill_id);
                 view.message.clone_from(message);
+                view.subagent = subagent.as_ref().map(&subagent_view);
+            }
+            E::SubagentCompleted {
+                tool_name,
+                skill_id,
+                subagent,
+                message,
+                success,
+                ..
+            }
+            | E::SubagentFailed {
+                tool_name,
+                skill_id,
+                subagent,
+                message,
+                success,
+                ..
+            }
+            | E::SubagentAwaitingUser {
+                tool_name,
+                skill_id,
+                subagent,
+                message,
+                success,
+                ..
+            } => {
+                view.tool_name.clone_from(tool_name);
+                view.skill_id.clone_from(skill_id);
+                view.message.clone_from(message);
+                view.success.clone_from(success);
                 view.subagent = subagent.as_ref().map(&subagent_view);
             }
             E::ArtifactReady {
