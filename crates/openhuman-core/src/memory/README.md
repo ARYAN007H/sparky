@@ -70,7 +70,7 @@ its team. It is explicit, never ambient: a turn's
 `OpenHumanRunContext::memory_identity` carries it (`Identity::child` for each
 sub-agent, `team_member` from the team runtime through
 `HostTurnEnv::memory_identity`), and RPC/embed entry points construct
-`Identity::root()`. OpenHuman projects its config once into upstream
+`Identity::root()`. OpenHuman projects its config into upstream
 `IdentityPins` in [`scope.rs`](./scope.rs); `Identity::resolve(&pins)` returns
 the upstream `ResolvedIdentity` (layout root plus memory agent id), with this
 first-match precedence:
@@ -274,8 +274,8 @@ The `memory_*` RPC handlers apply TinyMemory `Confinement` with
 `Policy::Refuse`: an unset `reach` becomes the root identity's subtree, wider
 reaches return `INVALID_REQUEST`, and a `learn` with no namespace uses the
 identity's learnings node. SaaS operations use `Policy::Clamp` selected from
-the configured profile root in `ops.rs`. The agent `memory` tool keeps its
-existing trusted reach and applies the same upstream confinement methods.
+the configured profile root in `ops.rs`. The agent `memory` tool stamps its
+trusted call facts; queued writes retain that call's narrower reach.
 
 ## Layout
 

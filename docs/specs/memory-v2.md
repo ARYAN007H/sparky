@@ -39,7 +39,7 @@ is carried explicitly on every turn's run context
 dispatch for top-level agents, derived with `child` by the sub-agent runner
 for children, and handed down by the team runtime for members. RPC handlers
 and the embed facade act as the root identity. OpenHuman adapts its config to
-`IdentityPins` once in `memory::scope`; callers resolve the identity against
+`IdentityPins` in `memory::scope`; callers resolve the identity against
 those pins, first match wins:
 
 | | memory agent id | layout root |

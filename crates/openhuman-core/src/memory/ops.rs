@@ -213,11 +213,10 @@ pub async fn recall_with(
     mode: RecallMode,
     exclude_thread: Option<ThreadWindow>,
 ) -> Result<RecallView> {
-    let filter = confine_filter(config, params.filter.unwrap_or_default())?;
     let bound = bound(config)?;
     let request = RecallRequest {
         question: params.question,
-        filter,
+        filter: confine_filter(config, params.filter.unwrap_or_default())?,
         limit: clamp_limit(params.limit),
         instructions: None,
         refers_to: time_hint(config, params.refers_to)?,
@@ -251,7 +250,6 @@ pub async fn fetch_with(
     params: FetchParams,
     exclude_thread: Option<ThreadWindow>,
 ) -> Result<FetchView> {
-    let filter = confine_filter(config, params.filter.unwrap_or_default())?;
     let bound = bound(config)?;
     let descriptor = bound.engine.descriptor();
     let mode = match params.mode {
@@ -267,7 +265,7 @@ pub async fn fetch_with(
     let request = FetchRequest {
         query: params.query,
         mode,
-        filter,
+        filter: confine_filter(config, params.filter.unwrap_or_default())?,
         limit: clamp_limit(params.limit),
         cursor: params.cursor,
         beliefs: 0,
@@ -412,12 +410,12 @@ pub async fn forget(config: &Config, params: ForgetParams) -> Result<ForgetView>
             ("forget needs at least one id").into(),
         ));
     }
+    let bound = bound(config)?;
     // A SaaS user forgets only what lies in their own tree.
     let reach = match saas_confinement(config, Policy::Clamp)? {
         Some(confinement) => Some(confinement.reach(params.reach)?),
         None => params.reach,
     };
-    let bound = bound(config)?;
     let report = match reach {
         // With a reach the engine forgets by id inside it: `forget_within`
         // never looks beyond the reach for an id, where `ForgetTarget::Ids`
@@ -507,6 +505,7 @@ async fn within_reach(
 
 /// `memory_items_list`.
 pub async fn items_list(config: &Config, params: ItemsListParams) -> Result<ItemsListView> {
+    let bound = bound(config)?;
     let request = ListRequest {
         filter: confine_filter(
             config,
@@ -516,7 +515,6 @@ pub async fn items_list(config: &Config, params: ItemsListParams) -> Result<Item
         cursor: params.cursor,
     };
     request.validate()?;
-    let bound = bound(config)?;
     let page = if params.preview {
         bound.engine.list_preview(request).await?
     } else {
