@@ -45,12 +45,11 @@ fn local_ai_status_snapshot(
     // `inference_update_local_settings` call that swaps providers
     // (e.g. ollama → lm_studio) the cached value is stale, so we overlay
     // the current config's provider on the status snapshot before returning.
-    let mut snapshot = service.status();
     snapshot.provider =
-        tinyinference_local::provider::provider_from_name(&config.local_ai.provider)
+        tinyinference_local::provider::provider_from_name(&runtime.local_ai.provider)
             .as_str()
             .to_string();
-    Ok(Outcome::single_log(snapshot, "local ai status fetched"))
+    (snapshot, bootstrap_task)
 }
 
 /// Generates a summary of the provided text using local AI models.
