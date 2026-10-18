@@ -269,6 +269,9 @@ pub async fn fetch_with(
 ) -> Result<FetchView> {
     let bound = bound(config)?;
     let descriptor = bound.engine.descriptor();
+    if params.mode.is_none() && descriptor.fetch_modes.is_empty() {
+        return Err(Error::Unsupported("the engine offers no fetch mode".into()));
+    }
     let request = memory_ops(config)?.fetch_request(FetchOptions {
         query: params.query,
         mode: params.mode,
@@ -339,8 +342,9 @@ pub async fn store_item_with(
     item: StoreItem,
     options: WriteOptions,
 ) -> Result<StoreReceipt> {
-    let item = memory_ops(config)?.store_item(item)?;
+    let ops = memory_ops(config)?;
     let bound = bound(config)?;
+    let item = ops.store_item(item)?;
     let receipt = bound.engine.store_with(item, options).await?;
     super::lifecycle::prefetch::invalidate(config);
     Ok(receipt)
