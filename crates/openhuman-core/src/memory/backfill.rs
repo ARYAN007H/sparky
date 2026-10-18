@@ -303,14 +303,14 @@ async fn run(
                     .engine
                     .store_many_with(items, options)
                     .await
-                    .map_err(Error::from);
+                    ;
                 if let Err(error) = stored {
                     tracing::warn!(
                         code = error.code(),
                         "[memory:backfill] storing a batch failed; stopping"
                     );
                     file.state.phase = ImportPhase::Error;
-                    file.state.error = Some(String::from(error));
+                    file.state.error = Some(error.to_string());
                     file.state.finished_at = Some(Utc::now());
                     write_file(workspace_dir, &file);
                     return;

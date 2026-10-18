@@ -122,7 +122,7 @@ fn importer(
         Arc::new(move || consent),
     )
     .with_describe(Arc::new(|error| {
-        Error::from(error.clone()).to_string()
+        error.to_string()
     }));
     if let Some(paused) = paused {
         importer = importer.with_pause(paused);

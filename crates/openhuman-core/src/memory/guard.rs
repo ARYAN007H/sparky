@@ -68,7 +68,7 @@ impl ScrubbingEngine {
 fn outcome<T>(result: &Result<T>) -> &'static str {
     match result {
         Ok(_) => "ok",
-        Err(error) => Error::from(error.clone()).code(),
+        Err(error) => error.code(),
     }
 }
 
