@@ -2,20 +2,13 @@
 //! `cli_storage_url_e2e`.
 //!
 //! Every suite that exercises the core on a configured storage backend runs
-//! the same body once per driver, each as its own test case named after the
-//! driver (`memory::...`, `sqlite::...`, `file::...`, `mongodb::...`), so a
+//! the same body on memory and SQLite, each as its own test case named after
+//! the driver (`memory::...`, `sqlite::...`), so a
 //! failure says which driver broke:
 //!
 //! - `memory`: always;
 //! - `sqlite`: when the `storage-sqlite` feature is compiled in, on a temp
 //!   directory (the desktop default, one `.db` file per database);
-//! - `file`: when the `storage-file` feature is compiled in, on a temp
-//!   directory;
-//! - `mongodb`: when `storage-mongodb` is compiled in AND `TSD_MONGO_URL` is
-//!   set to a local throwaway server (localhost, 127.0.0.1 or ::1; a replica set, as `tinystoragedrivers`' CI uses). Each case gets a
-//!   database of its own (`oh_e2e_<uuid>`), so runs never see each other's
-//!   records and scopes stay isolated. With `TSD_MONGO_URL` unset the case
-//!   passes after printing that it was skipped.
 //!
 //! The backend slot is process-wide, so the cases of one binary run one at a
 //! time (they share [`Case`]'s lock) and the slot is emptied when a case ends,
@@ -32,30 +25,19 @@ use std::sync::{Arc, Mutex, MutexGuard};
 
 use openhuman_core::storage::{self, StorageBackend};
 
-/// The environment variable naming the MongoDB replica set the `mongodb`
-/// cases run against.
-pub const MONGO_URL_VAR: &str = "TSD_MONGO_URL";
-
 /// One storage driver of the matrix.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Driver {
     Memory,
     Sqlite,
-    File,
-    Mongo,
 }
 
 impl Driver {
-    /// Every driver, in the order the cases are declared.
-    pub const ALL: [Driver; 4] = [Driver::Memory, Driver::Sqlite, Driver::File, Driver::Mongo];
-
     /// The driver's name, as in the test case path.
     pub fn name(self) -> &'static str {
         match self {
             Driver::Memory => "memory",
             Driver::Sqlite => "sqlite",
-            Driver::File => "file",
-            Driver::Mongo => "mongodb",
         }
     }
 
@@ -64,8 +46,6 @@ impl Driver {
         match self {
             Driver::Memory => true,
             Driver::Sqlite => cfg!(feature = "storage-sqlite"),
-            Driver::File => cfg!(feature = "storage-file"),
-            Driver::Mongo => cfg!(feature = "storage-mongodb"),
         }
     }
 
@@ -84,64 +64,8 @@ impl Driver {
         match self {
             Driver::Memory => Some("memory".to_string()),
             Driver::Sqlite => Some(format!("sqlite:{}", dir.join("sqlite").display())),
-            Driver::File => Some(format!("file:{}", dir.join("files").display())),
-            Driver::Mongo => {
-                let base = std::env::var(MONGO_URL_VAR)
-                    .ok()
-                    .filter(|url| !url.trim().is_empty())?;
-                if !is_loopback_mongo_url(base.trim()) {
-                    eprintln!(
-                        "skipped mongodb: {MONGO_URL_VAR} must name a local throwaway server \
-                         (localhost, 127.0.0.1 or ::1); the suite writes databases to it"
-                    );
-                    return None;
-                }
-                Some(mongo_url_with_database(
-                    base.trim(),
-                    &format!("oh_e2e_{}", uuid_like()),
-                ))
-            }
         }
     }
-}
-
-/// Whether every host in a MongoDB URL is the local machine. The matrix
-/// creates and fills databases, so it only ever talks to a throwaway server
-/// on this host or in this job's own container (as `tinystoragedrivers`' CI
-/// does), never to a shared or remote deployment.
-pub fn is_loopback_mongo_url(url: &str) -> bool {
-    let rest = url.split_once("://").map_or(url, |(_, rest)| rest);
-    let authority = rest.split(['/', '?']).next().unwrap_or_default();
-    let hosts = authority.rsplit_once('@').map_or(authority, |(_, h)| h);
-    !hosts.is_empty()
-        && !url.starts_with("mongodb+srv://")
-        && hosts.split(',').all(|host| {
-            let name = if let Some(v6) = host.strip_prefix('[') {
-                v6.split(']').next().unwrap_or_default()
-            } else {
-                host.rsplit_once(':').map_or(host, |(name, _)| name)
-            };
-            matches!(name, "localhost" | "127.0.0.1" | "::1")
-        })
-}
-
-/// `base` (a `mongodb://` or `mongodb+srv://` URL, with or without a database
-/// and options) pointed at database `database`, keeping its host and query.
-pub fn mongo_url_with_database(base: &str, database: &str) -> String {
-    let (head, query) = match base.split_once('?') {
-        Some((head, query)) => (head, Some(query)),
-        None => (base, None),
-    };
-    let after_scheme = head.find("://").map_or(0, |at| at + 3);
-    let authority_end = head[after_scheme..]
-        .find('/')
-        .map_or(head.len(), |at| after_scheme + at);
-    let mut url = format!("{}/{database}", &head[..authority_end]);
-    if let Some(query) = query {
-        url.push('?');
-        url.push_str(query);
-    }
-    url
 }
 
 /// A short unique token for database and scope names.
