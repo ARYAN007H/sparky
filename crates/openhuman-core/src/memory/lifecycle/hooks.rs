@@ -171,6 +171,7 @@ pub(crate) async fn pre_turn_work(
     at: DateTime<Utc>,
     resumed_after_compaction: bool,
     observed_actor: Option<tinymemory_api::ObservedActor>,
+    channel: Option<String>,
 ) -> Option<TurnPack> {
     let logging = config.memory.conversations.enabled;
     if !logging && !identity.recall {
@@ -229,6 +230,7 @@ pub(crate) async fn pre_turn_work(
                 pre.in_prompt_from = in_prompt_from;
                 pre.at = Some(at);
                 pre.observed_actor = observed_actor.clone();
+                pre.channel = channel.clone();
                 let context = match date_hint {
                     Some(hint) => memory.pre_turn_dated(pre, resumed, hint).await,
                     None if resumed => memory.pre_turn_resumed(pre).await,
@@ -366,6 +368,7 @@ pub async fn post_turn(
     assistant_text: String,
     tool_calls: Vec<ToolCallSummary>,
     at: DateTime<Utc>,
+    channel: Option<String>,
 ) {
     if !config.memory.conversations.enabled {
         return;
@@ -386,6 +389,7 @@ pub async fn post_turn(
         }
     };
     let mut post = PostTurn::new(&thread_id, turn_index, text);
+    post.channel = channel;
     post.at = Some(at);
     post.tool_calls = tool_calls
         .iter()

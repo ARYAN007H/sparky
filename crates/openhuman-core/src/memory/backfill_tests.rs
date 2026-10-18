@@ -127,6 +127,7 @@ async fn stores_past_chats_once_and_skips_what_live_logging_took() {
         Utc::now(),
         false,
         None,
+        None,
     )
     .await;
 

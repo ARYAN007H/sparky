@@ -15,6 +15,84 @@ fn learn_params(text: &str) -> LearnParams {
     }
 }
 
+#[cfg(feature = "channels")]
+#[tokio::test]
+async fn reserved_thread_matching_uses_module_identity_boundaries() {
+    use tinychannels_bus::module_inbound::PrepareChannelIdentityRequest;
+
+    let client = crate::channels::module_fixture::client().await;
+    let base_for = |channel: &'static str| {
+        let client = client.clone();
+        async move {
+            crate::modules::channel_controller::prepare_identity(
+                &client,
+                PrepareChannelIdentityRequest {
+                    channel: channel.into(),
+                    sender: None,
+                    reply_target: None,
+                    thread_ts: None,
+                },
+            )
+            .await
+            .expect("linked TinyChannels module prepares its canonical base")
+            .thread_id
+        }
+    };
+    let base = base_for("discord").await;
+    let neighboring_channel = base_for("discordish").await;
+
+    assert!(is_channel_thread_id(&base, &base));
+    assert!(is_channel_thread_id(&format!("{base}/thread-1"), &base));
+    assert!(is_channel_thread_id(
+        &format!("{base}#thread:1700.001"),
+        &base
+    ));
+    assert!(!is_channel_thread_id(&format!("{base}suffix"), &base));
+    assert!(!is_channel_thread_id(&neighboring_channel, &base));
+    assert!(!is_channel_thread_id(&format!("prefix-{base}"), &base));
+}
+
+#[cfg(feature = "channels")]
+#[tokio::test]
+async fn unavailable_channel_module_reports_error_and_queues_known_legacy_threads() {
+    use tinychannels_bus::module_inbound::PrepareChannelIdentityRequest;
+
+    let _linked_module = crate::channels::module_fixture::client().await;
+    let tmp = tempfile::tempdir().unwrap();
+    let mut config = config_in(&tmp);
+    config.modules.enabled = false;
+    let legacy_thread = "legacy-discord-thread";
+    let legacy_file = config.workspace_dir.join("memory/channel_threads.json");
+    std::fs::create_dir_all(legacy_file.parent().unwrap()).unwrap();
+    std::fs::write(&legacy_file, br#"{"discord":["legacy-discord-thread"]}"#).unwrap();
+
+    let unavailable = crate::modules::channel_controller::prepare_identity(
+        &crate::modules::client(config.clone()),
+        PrepareChannelIdentityRequest {
+            channel: "discord".into(),
+            sender: None,
+            reply_target: None,
+            thread_ts: None,
+        },
+    )
+    .await
+    .err()
+    .expect("explicitly disabled module must stay unavailable");
+    assert_eq!(unavailable, tinybus::module::ModuleCallError::Unavailable);
+
+    let error = forget_channel(&config, "discord")
+        .await
+        .expect_err("an unavailable identity module must be visible to the caller");
+    assert_eq!(error.code(), "ENGINE");
+    assert!(error.to_string().contains("channel identity preparation"));
+    assert_eq!(
+        crate::memory::deletion::pending(&config.workspace_dir),
+        vec![crate::memory::deletion::PendingDeletion::Thread {
+            thread_id: legacy_thread.into()
+        }]
+    );
+}
+
 #[tokio::test]
 async fn every_engine_operation_reports_memory_off_without_an_engine() {
     let tmp = tempfile::tempdir().unwrap();
@@ -187,12 +265,14 @@ async fn forget_needs_an_id() {
 fn host_meta_wins_over_caller_meta() {
     let caller = MemoryMeta {
         thread_id: Some("forged".into()),
+        channel: Some("caller-channel".into()),
         repo: Some("owner/repo".into()),
         tags: vec!["mine".into()],
         ..MemoryMeta::default()
     };
     let host = MemoryMeta {
         thread_id: Some("t-real".into()),
+        channel: Some("telegram".into()),
         agent_id: Some("orchestrator".into()),
         tool_call: Some(ToolCallRef {
             name: "memory".into(),
@@ -217,6 +297,7 @@ fn host_meta_wins_over_caller_meta() {
     .unwrap();
     let meta = item.meta();
     assert_eq!(meta.thread_id.as_deref(), Some("t-real"));
+    assert_eq!(meta.channel.as_deref(), Some("telegram"));
     assert_eq!(meta.agent_id.as_deref(), Some("orchestrator"));
     assert_eq!(
         meta.repo.as_deref(),
@@ -239,6 +320,25 @@ fn host_meta_wins_over_caller_meta() {
         }
         other => panic!("expected a learning, got {:?}", other.kind()),
     }
+}
+
+#[test]
+fn host_metadata_none_preserves_caller_channel() {
+    let item = learning_item(
+        LearnParams {
+            text: "likes tea".into(),
+            kind: None,
+            confidence: None,
+            meta: Some(MemoryMeta {
+                channel: Some("caller-channel".into()),
+                ..MemoryMeta::default()
+            }),
+        },
+        Some(MemoryMeta::default()),
+    )
+    .unwrap();
+
+    assert_eq!(item.meta().channel.as_deref(), Some("caller-channel"));
 }
 
 #[test]
