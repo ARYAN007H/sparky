@@ -101,11 +101,6 @@ impl RepeatedToolFailureMiddleware {
         self.owner.nudge_injector()
     }
 
-    /// Inspect pending product corrections in tests.
-    #[cfg(test)]
-    pub(crate) fn take_pending_nudges(&self) -> Vec<String> {
-        self.owner.drain_pending_nudges()
-    }
 }
 
 struct HostFailurePolicy {

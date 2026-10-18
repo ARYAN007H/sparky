@@ -87,11 +87,12 @@ async fn repeated_tool_failure_pauses_only_after_the_threshold() {
         3,
         std::sync::Arc::new(std::sync::Mutex::new(None)),
     );
+    let mut context = ctx();
     // Two identical failures: below the halt threshold. The crate ladder
     // nudges (Redirect) on the second, but must NOT pause (halt) yet.
     for _ in 0..2 {
         let mut r = failing_result("flaky", "boom");
-        mw.after_tool(&mut ctx(), &(), &invocation("flaky", "flaky"), &mut r)
+        mw.after_tool(&mut context, &(), &invocation("flaky", "flaky"), &mut r)
             .await
             .unwrap();
     }
@@ -102,7 +103,7 @@ async fn repeated_tool_failure_pauses_only_after_the_threshold() {
     );
     // Third identical failure exhausts the same-strategy retries → halt.
     let mut r = failing_result("flaky", "boom");
-    mw.after_tool(&mut ctx(), &(), &invocation("flaky", "flaky"), &mut r)
+    mw.after_tool(&mut context, &(), &invocation("flaky", "flaky"), &mut r)
         .await
         .unwrap();
     assert_eq!(
@@ -302,9 +303,10 @@ async fn repeated_tool_failure_nudges_change_of_strategy_before_the_halt() {
         3,
         std::sync::Arc::new(std::sync::Mutex::new(None)),
     );
+    let mut context = ctx();
     // First identical failure: not a loop yet — no steering.
     let mut r = failing_result("read_file", "file not found");
-    mw.after_tool(&mut ctx(), &(), &invocation("read-1", "read_file"), &mut r)
+    mw.after_tool(&mut context, &(), &invocation("read-1", "read_file"), &mut r)
         .await
         .unwrap();
     assert!(
@@ -313,10 +315,10 @@ async fn repeated_tool_failure_nudges_change_of_strategy_before_the_halt() {
     );
     // Second identical failure: the nudge fires, still no halt.
     let mut r = failing_result("read_file", "file not found");
-    mw.after_tool(&mut ctx(), &(), &invocation("read-2", "read_file"), &mut r)
+    mw.after_tool(&mut context, &(), &invocation("read-2", "read_file"), &mut r)
         .await
         .unwrap();
-    let nudges = drain_nudge_messages(&mw);
+    let nudges = drain_nudge_messages(&mw, &mut context).await;
     assert_eq!(
         nudges.len(),
         1,
