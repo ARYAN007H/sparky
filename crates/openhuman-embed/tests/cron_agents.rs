@@ -15,7 +15,7 @@ use common::{chat_completion, chat_requests, offline_config, runtime, stub_backe
 use openhuman_embed::{
     AgentDefinitionSpec, AgentSpec, AgentTurnOrigin, CronError, HostTurnTools, JobSchedule,
     JobSpec, JobTarget, Provider, Runtime, RuntimeError, ServiceSet, Tool, ToolScopeSpec,
-    TrustedAutomationSource, Workspace,
+    RuntimeEventKind, RuntimeEvents, TrustedAutomationSource, Workspace,
 };
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
@@ -78,6 +78,20 @@ async fn wait_for(what: &str, mut check: impl FnMut() -> bool) {
         tokio::time::sleep(Duration::from_millis(250)).await;
     }
     panic!("timed out waiting for {what}");
+}
+
+async fn wait_for_services_changed(events: &mut RuntimeEvents, running: bool) {
+    tokio::time::timeout(Duration::from_secs(60), async {
+        loop {
+            let event = events.recv().await.expect("runtime event stream");
+            if matches!(event.kind, RuntimeEventKind::ServicesChanged { running: value } if value == running)
+            {
+                return;
+            }
+        }
+    })
+    .await
+    .unwrap_or_else(|_| panic!("timed out waiting for services running={running}"));
 }
 
 #[test]
@@ -230,11 +244,7 @@ fn background_services_drive_the_scheduler_and_stop_with_the_runtime() {
                 .build()
                 .await
                 .expect("runtime builds");
-            wait_for(
-                "the scheduler to start",
-                openhuman_core::cron::scheduler::is_running,
-            )
-            .await;
+            let mut events = runtime.events();
 
             let fired = Arc::new(Mutex::new(0usize));
             let sink = Arc::clone(&fired);
@@ -264,22 +274,11 @@ fn background_services_drive_the_scheduler_and_stop_with_the_runtime() {
 
             // Explicit control.
             runtime.stop_services();
-            wait_for("the scheduler to stop", || {
-                !openhuman_core::cron::scheduler::is_running()
-            })
-            .await;
+            wait_for_services_changed(&mut events, false).await;
             runtime.start_services().await;
-            wait_for(
-                "the scheduler to restart",
-                openhuman_core::cron::scheduler::is_running,
-            )
-            .await;
+            wait_for_services_changed(&mut events, true).await;
 
             drop(runtime);
-            wait_for("the scheduler to stop with the runtime", || {
-                !openhuman_core::cron::scheduler::is_running()
-            })
-            .await;
             let second = Runtime::builder()
                 .config(offline_config())
                 .workspace(Workspace::Ephemeral)
@@ -320,6 +319,7 @@ fn deferred_services_wait_for_the_host_so_a_due_job_finds_its_handler() {
                 .build()
                 .await
                 .expect("runtime builds");
+            let mut events = runtime.events();
 
             // Stored and due before any handler exists.
             runtime
@@ -332,8 +332,8 @@ fn deferred_services_wait_for_the_host_so_a_due_job_finds_its_handler() {
                 .unwrap();
             tokio::time::sleep(Duration::from_secs(2)).await;
             assert!(
-                !openhuman_core::cron::scheduler::is_running(),
-                "a deferred build must not start the scheduler"
+                runtime.cron().runs("deferred-tick", 10).unwrap().is_empty(),
+                "a deferred build must not run the due job"
             );
 
             let fired = Arc::new(Mutex::new(0usize));
@@ -345,21 +345,17 @@ fn deferred_services_wait_for_the_host_so_a_due_job_finds_its_handler() {
                 })
                 .unwrap();
             runtime.start_services().await;
-            wait_for(
-                "the scheduler to start",
-                openhuman_core::cron::scheduler::is_running,
-            )
-            .await;
+            wait_for_services_changed(&mut events, true).await;
             wait_for("the handler to run the due job", || {
                 *fired.lock().unwrap() > 0
             })
             .await;
 
             drop(runtime);
-            wait_for("the scheduler to stop with the runtime", || {
-                !openhuman_core::cron::scheduler::is_running()
-            })
-            .await;
+            assert!(matches!(
+                tokio::time::timeout(Duration::from_secs(5), events.recv()).await,
+                Ok(Err(openhuman_embed::EventStreamError::Closed))
+            ));
         })
         .await
         .expect("library host task did not panic");
