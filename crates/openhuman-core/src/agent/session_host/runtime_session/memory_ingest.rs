@@ -248,7 +248,9 @@ impl OpenHumanTurnPrelude {
             let Some(config) = prelude.memory_config().await else {
                 return;
             };
+            let dispatch = prelude.dispatch_ctx();
             hooks::post_turn(
+                &dispatch,
                 &config,
                 &pending.identity,
                 thread_id,
