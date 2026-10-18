@@ -6,7 +6,9 @@
 //! session's config) share one implementation. Every write is
 //! scrubbed of secrets and PII by the bound engine itself ([`super::guard`]).
 
+#[cfg(feature = "channels")]
 use std::collections::{BTreeMap, BTreeSet};
+#[cfg(feature = "channels")]
 use std::path::Path;
 
 use chrono::Utc;
@@ -412,6 +414,7 @@ pub async fn forget(config: &Config, params: ForgetParams) -> Result<ForgetView>
 /// channel map supplies thread-level fallback for turns that predate channel
 /// metadata. New turns never write that map; remove the compatibility reader
 /// after one release.
+#[cfg(feature = "channels")]
 pub async fn forget_channel(config: &Config, channel: &str) -> Result<usize> {
     let channel = channel.trim().to_ascii_lowercase();
     if channel.is_empty() {
@@ -424,10 +427,30 @@ pub async fn forget_channel(config: &Config, channel: &str) -> Result<usize> {
         Err(error) => return Err(error),
     };
 
-    // Capture the request's tenant/profile before the thread-store wrappers
-    // move their I/O to the blocking pool.
+    // Capture the request's tenant/profile before the module call and the
+    // thread-store wrappers move work off the caller's task.
     let ctx = crate::core::runtime::DispatchCtx::ambient();
-    let threads = channel_thread_snapshot(&ctx, config, &channel, legacy_threads).await?;
+    let identity = crate::modules::channel_controller::prepare_identity(
+        &crate::modules::client(config.clone()),
+        tinychannels_bus::module_inbound::PrepareChannelIdentityRequest {
+            channel: channel.clone(),
+            sender: None,
+            reply_target: None,
+            thread_ts: None,
+        },
+    )
+    .await;
+    let base_thread_id = match identity {
+        Ok(identity) => identity.thread_id,
+        Err(error) => {
+            enqueue_channel_threads(config, &legacy_threads);
+            return Err(Error::Engine(format!(
+                "channel identity preparation failed: {error}"
+            )));
+        }
+    };
+    let threads =
+        channel_thread_snapshot(&ctx, config, &channel, &base_thread_id, legacy_threads).await?;
     let Some(bound) = bound else {
         enqueue_channel_threads(config, &threads);
         tracing::debug!(channel = %channel, queued = threads.len(), "[memory:channels] channel forget queued");
@@ -480,12 +503,14 @@ pub async fn forget_channel(config: &Config, channel: &str) -> Result<usize> {
     }
 }
 
+#[cfg(feature = "channels")]
 fn channel_key(channel: &str) -> String {
     channel.trim().to_ascii_lowercase()
 }
 
 /// Reads only the legacy map written by prior releases. Corrupt JSON keeps the
 /// existing quarantine behavior; current code never creates or updates it.
+#[cfg(feature = "channels")]
 fn legacy_channel_threads(workspace: &Path, channel: &str) -> BTreeSet<String> {
     let file = workspace.join("memory").join("channel_threads.json");
     let Ok(text) = std::fs::read_to_string(&file) else {
@@ -502,16 +527,17 @@ fn legacy_channel_threads(workspace: &Path, channel: &str) -> BTreeSet<String> {
     all.get(&channel_key(channel)).cloned().unwrap_or_default()
 }
 
-fn is_channel_thread_id(thread_id: &str, channel: &str) -> bool {
-    let base = tinychannels_runtime::channel::derive_inbound_thread_id(channel, None, None, None);
-    if thread_id == base {
+#[cfg(feature = "channels")]
+fn is_channel_thread_id(thread_id: &str, base_thread_id: &str) -> bool {
+    if thread_id == base_thread_id {
         return true;
     }
     thread_id
-        .strip_prefix(&base)
+        .strip_prefix(base_thread_id)
         .is_some_and(|suffix| suffix.starts_with('/') || suffix.starts_with("#thread:"))
 }
 
+#[cfg(feature = "channels")]
 fn enqueue_channel_threads(config: &Config, threads: &BTreeSet<String>) {
     for thread_id in threads {
         super::deletion::enqueue(
@@ -523,10 +549,12 @@ fn enqueue_channel_threads(config: &Config, threads: &BTreeSet<String>) {
     }
 }
 
+#[cfg(feature = "channels")]
 async fn channel_thread_snapshot(
     ctx: &crate::core::runtime::DispatchCtx,
     config: &Config,
     channel: &str,
+    base_thread_id: &str,
     mut owned: BTreeSet<String>,
 ) -> Result<BTreeSet<String>> {
     let threads = match crate::threads::store::blocking::list_threads(
@@ -544,7 +572,7 @@ async fn channel_thread_snapshot(
         }
     };
     for thread in threads {
-        if owned.contains(&thread.id) || is_channel_thread_id(&thread.id, channel) {
+        if owned.contains(&thread.id) || is_channel_thread_id(&thread.id, base_thread_id) {
             owned.insert(thread.id);
             continue;
         }
