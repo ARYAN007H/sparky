@@ -1,4 +1,3 @@
-use super::*;
 use tinymemory_api::Error as MemoryApiError;
 
 #[test]
@@ -67,6 +66,10 @@ fn upstream_errors_keep_the_memory_rpc_wire_codes_and_messages() {
         assert_eq!(structured.data.as_ref().unwrap()["kind"], code);
         assert_eq!(structured.message, message);
         assert_eq!(structured.expected_user_state, expected_user_state);
+        assert_eq!(
+            crate::core::StructuredRpcError::decode(&structured.encode()),
+            Some(structured)
+        );
     }
 }
 
