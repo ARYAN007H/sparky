@@ -33,6 +33,7 @@ test("captured output returns when the command exits, not after a watchdog poll"
   const elapsed = Date.now() - started;
 
   assert.equal(stdout.trim(), "done");
+  assert.ok(!stderr.includes("Terminated"), `watchdog shutdown leaked noise: ${stderr}`);
   // The orphaned `sleep` of a killed watchdog used to hold stdout open until
   // the poll interval elapsed, so every captured call cost up to 20 s.
   assert.ok(elapsed < 3000, `wrapper held output open for ${elapsed} ms`);
