@@ -1,105 +1,39 @@
 use super::*;
+use crate::core::all::{assert_schema_contract, ControllerSchemaContract as Contract, SchemaFieldContract as Field};
 
 #[test]
-fn all_schemas_lists_every_controller() {
+fn wallet_schema_wire_contracts_are_preserved() {
     assert_eq!(all_wallet_controller_schemas().len(), 16);
-}
-
-#[test]
-fn all_controllers_lists_every_handler() {
     assert_eq!(all_wallet_registered_controllers().len(), 16);
-}
 
-#[test]
-fn recovery_phrase_controllers_are_registered_with_the_expected_inputs() {
-    let generate = wallet_schemas("generate_mnemonic");
-    assert_eq!(generate.namespace, "wallet");
-    assert_eq!(
-        generate
-            .inputs
-            .iter()
-            .map(|field| field.name)
-            .collect::<Vec<_>>(),
-        vec!["wordCount"]
-    );
+    let contracts: &[(&str, Option<&[&str]>, Option<usize>, &[Field])] = &[
+        ("generate_mnemonic", Some(&["wordCount"][..]), None, &[]),
+        ("validate_mnemonic", Some(&["phrase"][..]), None, &[Field { name: "phrase", required: Some(true) }]),
+        ("derive_recovery_material", Some(&["phrase"][..]), None, &[]),
+        ("tx_status", Some(&["chain", "hash", "evmNetwork"][..]), None, &[]),
+        ("status", None, Some(0), &[]),
+        ("setup", None, Some(6), &[
+            Field { name: "encryptedMnemonic", required: Some(true) },
+            Field { name: "force", required: Some(false) },
+        ]),
+        ("execute_prepared", Some(&["quoteId", "confirmed"][..]), None, &[]),
+        ("prepare_transfer", None, None, &[Field { name: "assetSymbol", required: Some(false) }]),
+    ];
+    for (function, input_order, input_count, inputs) in contracts {
+        let contract = Contract {
+            namespace: "wallet",
+            function: *function,
+            input_count: *input_count,
+            input_order: *input_order,
+            inputs: *inputs,
+            outputs: None,
+        };
+        let schema = wallet_schemas(function);
+        assert_ne!(schema.function, "unknown", "missing {}", contract.function);
+        assert_schema_contract(&schema, &contract);
+    }
 
-    let validate = wallet_schemas("validate_mnemonic");
-    assert_eq!(validate.namespace, "wallet");
-    assert_eq!(
-        validate
-            .inputs
-            .iter()
-            .map(|field| field.name)
-            .collect::<Vec<_>>(),
-        vec!["phrase"]
-    );
-    assert!(validate.inputs[0].required);
-
-    let derive = wallet_schemas("derive_recovery_material");
-    assert_eq!(
-        derive
-            .inputs
-            .iter()
-            .map(|field| field.name)
-            .collect::<Vec<_>>(),
-        vec!["phrase"]
-    );
-}
-
-#[test]
-fn tx_status_schema_takes_chain_and_hash() {
-    let schema = wallet_schemas("tx_status");
-    let names: Vec<&str> = schema.inputs.iter().map(|f| f.name).collect();
-    assert_eq!(names, vec!["chain", "hash", "evmNetwork"]);
-}
-
-#[test]
-fn removed_swap_controller_maps_to_unknown() {
-    assert_eq!(wallet_schemas("prepare_swap").function, "unknown");
-    assert_eq!(wallet_schemas("prepare_contract_call").function, "unknown");
-}
-
-#[test]
-fn status_schema_is_empty_input() {
-    let schema = wallet_schemas("status");
-    assert_eq!(schema.namespace, "wallet");
-    assert_eq!(schema.function, "status");
-    assert!(schema.inputs.is_empty());
-}
-
-#[test]
-fn setup_schema_requires_all_inputs() {
-    let schema = wallet_schemas("setup");
-    // 5 original fields + 1 optional `force` field = 6 total
-    assert_eq!(schema.inputs.len(), 6);
-    let encrypted = schema
-        .inputs
-        .iter()
-        .find(|field| field.name == "encryptedMnemonic")
-        .expect("encryptedMnemonic input present");
-    assert!(encrypted.required);
-    let force = schema
-        .inputs
-        .iter()
-        .find(|field| field.name == "force")
-        .expect("force input present");
-    assert!(!force.required, "force must be optional");
-}
-
-#[test]
-fn execute_prepared_schema_takes_quote_id_and_confirmed() {
-    let schema = wallet_schemas("execute_prepared");
-    let names: Vec<&str> = schema.inputs.iter().map(|f| f.name).collect();
-    assert_eq!(names, vec!["quoteId", "confirmed"]);
-}
-
-#[test]
-fn prepare_transfer_schema_marks_asset_symbol_optional() {
-    let schema = wallet_schemas("prepare_transfer");
-    let asset = schema
-        .inputs
-        .iter()
-        .find(|f| f.name == "assetSymbol")
-        .expect("assetSymbol input present");
-    assert!(!asset.required);
+    for removed in ["prepare_swap", "prepare_contract_call"] {
+        assert_eq!(wallet_schemas(removed).function, "unknown");
+    }
 }
