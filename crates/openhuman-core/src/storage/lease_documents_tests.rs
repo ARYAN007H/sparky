@@ -107,10 +107,9 @@ async fn bad_keys_and_corrupt_records_are_storage_errors() {
         .documents()
         .put(
             LEASE_COLLECTION,
-            &tinystoragedrivers::Key::of([LEASE_OWNER, "k"])
+            tinystoragedrivers::Key::of([LEASE_OWNER, "k"])
                 .unwrap()
-                .as_str()
-                .to_string(),
+                .as_str(),
             serde_json::json!({ "holder": 7 }),
             Precondition::None,
         )
