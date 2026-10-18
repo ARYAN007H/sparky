@@ -1,7 +1,7 @@
 //! `GET /ws/live-voice`: the authenticated live voice agent WebSocket.
 //!
-//! Same upgrade guard as `/ws/dictation` (origin allowlist plus the core bearer
-//! from the `Authorization` header or `?token=`); the session itself is
+//! Upgrade guard uses the origin allowlist plus the core bearer from the
+//! `Authorization` header or `?token=`; the session itself is
 //! `openhuman::voice::live::ws::handle_live_voice_ws`.
 
 use std::sync::Arc;
