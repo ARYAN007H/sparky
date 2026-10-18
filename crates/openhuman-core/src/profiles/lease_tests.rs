@@ -212,8 +212,11 @@ async fn renewal_keeps_the_lease_and_a_lost_lease_fences_the_profile() {
     let cancelled_for = tokio::time::timeout(Duration::from_secs(10), async {
         loop {
             match events.recv().await {
-                Ok(event) if event.event == "chat_cancelled" && event.thread_id == "t1" => {
-                    return event.client_id;
+                Ok(event)
+                    if event.event_name() == "chat_cancelled"
+                        && event.context().thread_id == "t1" =>
+                {
+                    return event.context().client_id.clone();
                 }
                 Ok(_) | Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue,
                 Err(error) => panic!("event stream closed: {error}"),
