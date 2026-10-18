@@ -38,8 +38,8 @@ async fn store_channel_thread(
 ) -> String {
     let params = crate::channels::providers::relay::RelayInboundParams::new(
         channel,
-        "chat-1",
-        "sender-1",
+        format!("chat-{message_id}"),
+        format!("sender-{message_id}"),
         message_id,
         "hello",
     );
@@ -127,46 +127,42 @@ async fn stamped_channel_forget_isolated_to_the_configured_account() {
     let other_tmp = tempfile::TempDir::new().unwrap();
     let mut current = Config::default();
     current.workspace_dir = current_tmp.path().to_path_buf();
+    current.memory.engine.clear();
     let mut other = Config::default();
     other.workspace_dir = other_tmp.path().to_path_buf();
+    other.memory.engine.clear();
     let current_ctx = account_context(&current.workspace_dir, "account-a");
     let other_ctx = account_context(&other.workspace_dir, "account-b");
-    let current_engine = Arc::new(ReferenceEngine::new());
-    let other_engine = Arc::new(ReferenceEngine::new());
-    crate::memory::engine::install_test_engine(&current.workspace_dir, current_engine.clone());
-    crate::memory::engine::install_test_engine(&other.workspace_dir, other_engine.clone());
     let current_thread = store_channel_thread(
         current_ctx.clone(),
         &current.workspace_dir,
         "discord",
-        "same-message-id",
+        "current-account",
     )
     .await;
     let other_thread = store_channel_thread(
         other_ctx.clone(),
         &other.workspace_dir,
         "discord",
-        "same-message-id",
+        "other-account",
     )
     .await;
-    current_engine
-        .store(conversation(&current_thread, Some("discord")))
-        .await
-        .unwrap();
-    other_engine
-        .store(conversation(&other_thread, Some("discord")))
-        .await
-        .unwrap();
 
     assert_eq!(
         CoreContext::scope(current_ctx.into_core().unwrap(), async {
             clear_channel_memory(&current, "discord").await.unwrap()
         })
         .await,
-        1
+        0
     );
-    assert!(current_engine.is_empty());
-    assert_eq!(other_engine.len(), 1);
+    assert_eq!(
+        crate::memory::deletion::pending(&current.workspace_dir),
+        vec![crate::memory::deletion::PendingDeletion::Thread {
+            thread_id: current_thread.clone()
+        }]
+    );
+    assert!(crate::memory::deletion::pending(&other.workspace_dir).is_empty());
+    assert_ne!(current_thread, other_thread);
 }
 
 #[tokio::test]
@@ -225,6 +221,62 @@ async fn memory_off_queues_channel_threads_from_the_canonical_thread_store() {
         crate::memory::deletion::pending(&config.workspace_dir),
         vec![crate::memory::deletion::PendingDeletion::Thread { thread_id }]
     );
+}
+
+#[tokio::test]
+async fn filter_failure_is_visible_and_queued_snapshot_does_not_catch_reconnected_threads() {
+    let tmp = tempfile::TempDir::new().unwrap();
+    let mut config = Config::default();
+    config.workspace_dir = tmp.path().to_path_buf();
+    let old_thread = store_channel_thread(
+        DispatchCtx::ambient(),
+        &config.workspace_dir,
+        "discord",
+        "before-disconnect",
+    )
+    .await;
+    crate::memory::test_fixtures::RefusingEngine::with(tinymemory_api::Error::Engine(
+        "forget failed".into(),
+    ))
+    .bind(&config);
+
+    let error = clear_channel_memory(&config, "discord")
+        .await
+        .expect_err("a failed filter forget stays visible to disconnect");
+    assert!(error.to_string().contains("clear_channel_memory"));
+    assert_eq!(
+        crate::memory::deletion::pending(&config.workspace_dir),
+        vec![crate::memory::deletion::PendingDeletion::Thread {
+            thread_id: old_thread.clone()
+        }]
+    );
+
+    let new_thread = store_channel_thread(
+        DispatchCtx::ambient(),
+        &config.workspace_dir,
+        "discord",
+        "after-reconnect",
+    )
+    .await;
+    let engine = Arc::new(ReferenceEngine::new());
+    crate::memory::engine::install_test_engine(&config.workspace_dir, engine.clone());
+    engine
+        .store(conversation(&old_thread, Some("discord")))
+        .await
+        .unwrap();
+    engine
+        .store(conversation(&new_thread, Some("discord")))
+        .await
+        .unwrap();
+
+    assert_eq!(crate::memory::deletion::drain(&config).await, 1);
+    assert_eq!(engine.len(), 1);
+    let remaining = crate::memory::test_fixtures::stored(
+        &engine,
+        tinymemory_api::MetaFilter::kinds([tinymemory_api::ItemKind::Conversation]),
+    )
+    .await;
+    assert_eq!(remaining[0].meta.thread_id.as_deref(), Some(new_thread.as_str()));
 }
 
 #[tokio::test]
