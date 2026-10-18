@@ -99,7 +99,6 @@ mod loopback_oauth;
 mod mascot_native_window;
 mod mcp_commands;
 mod native_notifications;
-#[cfg(target_os = "macos")]
 mod process_kill;
 mod process_recovery;
 mod ptt_hotkeys;
