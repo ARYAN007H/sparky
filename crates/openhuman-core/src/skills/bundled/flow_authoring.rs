@@ -198,48 +198,16 @@ async fn prewarm_locked(
         }
     };
 
-    if !valid_resource_manifest(&resources) {
-        tracing::warn!("[skills][bundled] TinyFlows returned an invalid resource manifest; hiding builtin");
-        clear_snapshot(&key);
-        return;
-    }
     if !module_is_serving() {
         tracing::warn!("[skills][bundled] TinyFlows module is not serving after ListResources; hiding builtin");
         clear_snapshot(&key);
         return;
     }
 
-    let previous = SNAPSHOTS
-        .read()
-        .ok()
-        .and_then(|snapshots| snapshots.get(&key).cloned());
-    if let Some(previous) = &previous {
-        if !materialization_matches(workspace, &gate, previous) {
-            tracing::warn!("[skills][bundled] flow-authoring disk tree changed; hiding builtin");
-            clear_snapshot(&key);
-            return;
-        }
-        if previous.files == resources {
-            return;
-        }
-    }
-
-    let generation = NEXT_GENERATION.fetch_add(1, Ordering::SeqCst);
-    if let Err(error) = materialize(workspace, gate, &resources) {
+    if let Err(error) = publish_snapshot(workspace, gate, resources) {
         tracing::warn!(%error, "[skills][bundled] flow-authoring materialization failed; hiding builtin");
         clear_snapshot(&key);
-        return;
     }
-    if let Ok(mut snapshots) = SNAPSHOTS.write() {
-        snapshots.insert(
-            key,
-            Snapshot {
-                generation,
-                files: resources,
-            },
-        );
-    }
-    crate::skills::ops_discover::invalidate_workflow_metadata_cache();
 }
 
 /// Return the current resource generation only while the owning module and
@@ -365,6 +333,44 @@ fn materialize(
     tinyskills::materialize_tree(&parent, &scope_directory(gate), &[entry])
         .map(|_| ())
         .map_err(|error| error.to_string())
+}
+
+fn publish_snapshot(
+    workspace: &Path,
+    gate: &DiscoveryGate,
+    resources: Vec<ResourceFile>,
+) -> Result<u64, String> {
+    if !valid_resource_manifest(&resources) {
+        return Err("TinyFlows returned an invalid resource manifest".to_string());
+    }
+    let key = snapshot_key(workspace, gate);
+    let previous = SNAPSHOTS
+        .read()
+        .ok()
+        .and_then(|snapshots| snapshots.get(&key).cloned());
+    if let Some(previous) = &previous {
+        if !materialization_matches(workspace, gate, previous) {
+            clear_snapshot(&key);
+            return Err("flow-authoring disk tree changed".to_string());
+        }
+        if previous.files == resources {
+            return Ok(previous.generation);
+        }
+    }
+
+    let generation = NEXT_GENERATION.fetch_add(1, Ordering::SeqCst);
+    materialize(workspace, gate, &resources)?;
+    if let Ok(mut snapshots) = SNAPSHOTS.write() {
+        snapshots.insert(
+            key,
+            Snapshot {
+                generation,
+                files: resources,
+            },
+        );
+    }
+    crate::skills::ops_discover::invalidate_workflow_metadata_cache();
+    Ok(generation)
 }
 
 fn materialization_matches(workspace: &Path, gate: &DiscoveryGate, snapshot: &Snapshot) -> bool {
