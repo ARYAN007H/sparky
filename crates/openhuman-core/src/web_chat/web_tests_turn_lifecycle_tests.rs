@@ -160,8 +160,8 @@ async fn a_refused_message_publishes_no_turn_events() {
 }
 
 /// A real turn, with no hooks: the thread's session is checked out on a
-/// context with its own config, the agent runs and fails (no provider can be
-/// reached in a test), and the turn ends in exactly one classified
+/// context with its own config, the local provider receives the inference
+/// request and drops it, and the turn ends in exactly one classified
 /// `chat_error` after which the thread is free and no session is cached.
 #[tokio::test]
 async fn a_turn_whose_provider_is_unreachable_ends_in_one_classified_chat_error() {
@@ -188,9 +188,9 @@ async fn a_turn_whose_provider_is_unreachable_ends_in_one_classified_chat_error(
         config_path: tmp.path().join("config.toml"),
         ..Default::default()
     };
-    // Fail against a deterministic local endpoint. The managed default needs
-    // a host backend transport, which this in-process test intentionally does
-    // not install.
+    // The managed default needs a host backend transport, which this
+    // in-process test intentionally does not install. Route the turn to the
+    // local mock listener instead so it exercises an actual provider failure.
     config.chat_provider = Some("ollama:qwen3:4b-instruct".to_owned());
     config.local_ai.base_url = Some(format!("http://{address}"));
     std::fs::create_dir_all(&config.workspace_dir).expect("workspace dir");
