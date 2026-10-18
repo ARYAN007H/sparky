@@ -282,7 +282,7 @@ fn team_root(team: &str) -> Namespace {
 /// # Errors
 ///
 /// Why it is not one.
-pub fn validate_root(root: &str) -> Result<(), String> {
+pub fn validate_root(root: &str) -> std::result::Result<(), String> {
     let root: Namespace = root
         .trim()
         .parse()
