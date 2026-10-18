@@ -5,7 +5,7 @@ use super::orchestration::tools::{
     SpawnAsyncSubagentTool, SpawnParallelAgentsTool, SpawnSubagentTool, SteerSubagentTool,
     WaitSubagentTool,
 };
-use super::tools::TodoTool;
+use super::tools::{PlanExitTool, TodoTool};
 use crate::config::Config;
 #[cfg(feature = "skills")]
 use crate::skills::run_workflow::{AwaitWorkflowTool, RunWorkflowTool};
