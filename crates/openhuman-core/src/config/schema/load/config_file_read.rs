@@ -3,6 +3,8 @@ use std::path::Path;
 use std::sync::{Mutex, OnceLock};
 use tokio::fs;
 
+use super::super::Config;
+
 /// Guards the "corrupted config read, resetting to defaults" warning so it
 /// fires at most once per process lifetime. Without this, a permanently
 /// non-UTF-8 config file floods telemetry with hundreds of identical
