@@ -22,6 +22,7 @@ use tinyagents_runtime::{DriverRequest, ToolSnapshot};
 
 use crate::agent::harness::tool_result_artifacts::TINYAGENTS_TOOL_RESULT_ARTIFACT_STORE;
 use crate::agent::tinyagents::host::OpenHumanRunContext;
+use crate::agent::tinyagents::NativeSubagentRunContext;
 use crate::agent::tinyagents::middleware::turn_context::TurnContextMiddleware;
 use crate::agent::tinyagents::observability::{OpenhumanEventBridge, SubagentScope};
 use crate::agent::tinyagents::tool_registration::capability_diagnostics;
@@ -108,43 +109,6 @@ pub(crate) struct TurnSpec<'a> {
     pub tool_policy: Option<ToolPolicyEnforcement>,
     pub deterministic_cacheable: bool,
     pub defer_turn_completed_to_caller: bool,
-}
-
-/// Native execution identity retained by OpenHuman's neutral sub-agent
-/// adapter. Child model/tool events use their own run-local sink; the parent
-/// sink carries only the typed child lifecycle link.
-#[derive(Clone)]
-pub(crate) struct NativeSubagentRunContext {
-    pub config: tinyagents_harness::context::RunConfig,
-    pub parent_events: EventSink,
-    pub child_events: Arc<std::sync::Mutex<Option<EventSink>>>,
-    pub child_journal: Arc<std::sync::Mutex<Option<journal::TurnJournal>>>,
-    pub name: String,
-    pub depth: usize,
-}
-
-impl NativeSubagentRunContext {
-    pub(crate) fn finalize_failed_boundary(&self) {
-        let events = self
-            .child_events
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .clone();
-        let Some(events) = events else {
-            return;
-        };
-        events.emit(tinyagents_harness::events::AgentEvent::RunFinalized {
-            run_id: self.config.run_id.clone(),
-        });
-        if let Some(journal) = self
-            .child_journal
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .as_ref()
-        {
-            journal.flush_events();
-        }
-    }
 }
 
 impl TurnSpec<'_> {
