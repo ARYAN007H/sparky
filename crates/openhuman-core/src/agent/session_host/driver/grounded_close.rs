@@ -58,6 +58,7 @@ pub(super) struct SupplementalTrace {
     run_id: RunId,
     next_call: AtomicUsize,
     actual_model: std::sync::Mutex<Option<String>>,
+    cache_hit: std::sync::atomic::AtomicBool,
 }
 
 impl SupplementalTrace {
@@ -67,6 +68,7 @@ impl SupplementalTrace {
             run_id,
             next_call: AtomicUsize::new(1),
             actual_model: std::sync::Mutex::new(None),
+            cache_hit: std::sync::atomic::AtomicBool::new(false),
         })
     }
 
@@ -99,10 +101,21 @@ impl SupplementalTrace {
         input: serde_json::Value,
         response: &tinyinference_llm::model::ModelResponse,
     ) {
+        let mut native_usage = response.usage.or(response.message.usage);
+        if response.served_from_cache {
+            if let Some(usage) = &mut native_usage {
+                usage.charged_amount = None;
+            }
+        }
+        self.cache_hit
+            .store(response.served_from_cache, Ordering::SeqCst);
+        if let Some(usage) = native_usage {
+            self.events.emit(AgentEvent::UsageRecorded { usage });
+        }
         self.events.emit(AgentEvent::ModelCompleted {
             call_id: call_id.clone(),
             started_at_ms: Some(started_at_ms),
-            usage: response.usage,
+            usage: native_usage,
             input: Some(input),
             output: Some(
                 serde_json::to_value(&response.message).unwrap_or(serde_json::Value::Null),
@@ -163,6 +176,10 @@ impl SupplementalTrace {
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .clone()
     }
+
+    fn is_cache_hit(&self) -> bool {
+        self.cache_hit.load(Ordering::SeqCst)
+    }
 }
 
 fn valid_provider_id(value: &str) -> bool {
@@ -200,8 +217,12 @@ impl RepairUsage {
             self.input_tokens += usage.input_tokens;
             self.output_tokens += usage.output_tokens;
             self.cached_input_tokens += usage.cached_input_tokens();
-            self.cost
-                .add(crate::agent::cost::call_cost(&self.pricing_model, &usage));
+            if trace.is_some_and(SupplementalTrace::is_cache_hit) {
+                self.cost.add(tinyagents_harness::cost::CallCost::Unknown);
+            } else {
+                self.cost
+                    .add(crate::agent::cost::call_cost(&self.pricing_model, &usage));
+            }
         }
     }
 }
