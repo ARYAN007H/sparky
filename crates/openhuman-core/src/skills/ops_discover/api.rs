@@ -60,9 +60,7 @@ impl DiscoveryGate {
         let parent_config = ctx.embedder_config();
         let module_selection = module_selection_fingerprint(&config.modules);
         let module_selection = match parent_config.as_ref() {
-            Some(parent)
-                if module_selection_fingerprint(&parent.modules) != module_selection =>
-            {
+            Some(parent) if module_selection_fingerprint(&parent.modules) != module_selection => {
                 None
             }
             _ => Some(module_selection),
@@ -81,9 +79,7 @@ impl DiscoveryGate {
     }
 
     fn skills_enabled(&self) -> bool {
-        cfg!(feature = "skills")
-            && self.skills_component
-            && self.skills_domain.unwrap_or(true)
+        cfg!(feature = "skills") && self.skills_component && self.skills_domain.unwrap_or(true)
     }
 
     pub(crate) fn flow_authoring_enabled(&self) -> bool {
@@ -237,11 +233,7 @@ fn load_workflow_metadata_for_domains_with_home(
         None => home_override.or_else(discovery_home_dir),
     };
     let gate = DiscoveryGate::from_config(ctx, config, domains);
-    load_workflow_metadata_with_gate(
-        &config.workspace_dir,
-        home,
-        gate,
-    )
+    load_workflow_metadata_with_gate(&config.workspace_dir, home, gate)
 }
 
 pub(super) fn load_workflow_metadata_with_gate(
@@ -336,9 +328,7 @@ fn flow_generation_for(workspace: &Path, gate: &DiscoveryGate) -> Option<u64> {
     #[cfg(feature = "flows")]
     {
         gate.flow_authoring_enabled()
-            .then(|| {
-                crate::skills::bundled::flow_authoring::generation_if_current(workspace, gate)
-            })
+            .then(|| crate::skills::bundled::flow_authoring::generation_if_current(workspace, gate))
             .flatten()
     }
     #[cfg(not(feature = "flows"))]

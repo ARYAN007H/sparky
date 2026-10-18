@@ -70,7 +70,10 @@ fn resource_snapshot_revisions_follow_changed_bus_bytes() {
 
     let updated = publish_snapshot(workspace.path(), &gate, resources("second version"))
         .expect("materialize updated resource set");
-    assert!(updated > first, "changed bus bytes advance the snapshot revision");
+    assert!(
+        updated > first,
+        "changed bus bytes advance the snapshot revision"
+    );
     let current = snapshot_for(&snapshot_key(workspace.path(), &gate), updated).expect("snapshot");
     assert!(materialization_matches(workspace.path(), &gate, &current));
     assert_eq!(current.files[1].contents, "second version");

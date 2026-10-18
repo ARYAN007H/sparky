@@ -51,13 +51,9 @@ pub(super) fn discover_filtered(
     #[cfg(feature = "flows")]
     if gate.flow_authoring_enabled() && kinds.contains(&RootKind::Skill) {
         if let (Some(workspace), Some(generation)) = (workspace_dir, flow_generation) {
-            if let Some(flow_authoring) =
-                crate::skills::bundled::flow_authoring::materialized_skill(
-                    workspace,
-                    gate,
-                    generation,
-                )
-            {
+            if let Some(flow_authoring) = crate::skills::bundled::flow_authoring::materialized_skill(
+                workspace, gate, generation,
+            ) {
                 builtin.push(flow_authoring);
             }
         }

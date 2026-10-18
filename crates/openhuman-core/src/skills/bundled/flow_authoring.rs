@@ -5,18 +5,18 @@
 //! materialization, and keeps a process snapshot so synchronous discovery can
 //! verify the disk tree without reaching across the async bus boundary.
 
+use sha2::Digest;
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, LazyLock, Mutex, RwLock};
 use std::time::Duration;
-use sha2::Digest;
 use tokio::sync::Mutex as AsyncMutex;
 
 use crate::config::Config;
 use crate::core::runtime::{DispatchCtx, DomainSet};
-use tinyskills::{MaterializeEntry, MaterializeFile, MaterializeSource, Skill, SkillScope};
 use tinyflows_bus::copilot::ResourceFile;
+use tinyskills::{MaterializeEntry, MaterializeFile, MaterializeSource, Skill, SkillScope};
 
 use super::super::ops_discover::DiscoveryGate;
 
@@ -55,11 +55,7 @@ pub(crate) fn root(workspace: &Path, gate: &DiscoveryGate) -> PathBuf {
 
 /// Schedule optional resource loading without holding up runtime bootstrap,
 /// channel construction, or the first ordinary agent turn.
-pub(crate) fn schedule_prewarm(
-    ctx: &DispatchCtx,
-    config: &Config,
-    domains: Option<DomainSet>,
-) {
+pub(crate) fn schedule_prewarm(ctx: &DispatchCtx, config: &Config, domains: Option<DomainSet>) {
     let owned_ctx = ctx.clone();
     let owned_config = config.clone();
     schedule_prewarm_operation(ctx, config, domains, async move {
@@ -135,11 +131,7 @@ fn warmup_lock(key: &SnapshotKey) -> Arc<AsyncMutex<()>> {
 /// Fetch and materialize Copilot resources when every owning capability is
 /// enabled. Failures clear the snapshot and return normally so optional module
 /// availability never blocks ordinary chat startup.
-pub(crate) async fn prewarm(
-    ctx: &DispatchCtx,
-    config: &Config,
-    domains: Option<DomainSet>,
-) {
+pub(crate) async fn prewarm(ctx: &DispatchCtx, config: &Config, domains: Option<DomainSet>) {
     let gate = DiscoveryGate::from_config(ctx, config, domains);
     if !gate.flow_authoring_enabled() {
         tracing::debug!(
@@ -209,7 +201,9 @@ async fn prewarm_locked(
     resources.sort_by(|left, right| left.path.cmp(&right.path));
 
     if !module_is_serving() {
-        tracing::warn!("[skills][bundled] TinyFlows module is not serving after ListResources; hiding builtin");
+        tracing::warn!(
+            "[skills][bundled] TinyFlows module is not serving after ListResources; hiding builtin"
+        );
         clear_snapshot(key);
         return;
     }
@@ -233,7 +227,9 @@ pub(crate) fn generation_if_current(workspace: &Path, gate: &DiscoveryGate) -> O
         .ok()
         .and_then(|snapshots| snapshots.get(&key).cloned())?;
     if !materialization_matches(workspace, gate, &snapshot) {
-        tracing::warn!("[skills][bundled] cached flow-authoring materialization changed; hiding builtin");
+        tracing::warn!(
+            "[skills][bundled] cached flow-authoring materialization changed; hiding builtin"
+        );
         clear_snapshot(&key);
         return None;
     }
@@ -253,7 +249,10 @@ pub(crate) fn materialized_skill(
         clear_snapshot(&key);
         return None;
     }
-    let skill = tinyskills::load_skill_dir(&root(workspace, gate).join(FLOW_SKILL_ID), SkillScope::Builtin)?;
+    let skill = tinyskills::load_skill_dir(
+        &root(workspace, gate).join(FLOW_SKILL_ID),
+        SkillScope::Builtin,
+    )?;
     (skill.id() == FLOW_SKILL_ID).then_some(skill)
 }
 
@@ -282,8 +281,8 @@ pub(crate) fn read_resource(
         .find(|file| file.path == requested)
         .map(|file| file.contents.as_str())
         .ok_or_else(|| "resource is not present in the current TinyFlows snapshot".to_string())?;
-    let content = tinyskills::read_resource(skill, relative_path)
-        .map_err(|error| error.to_string())?;
+    let content =
+        tinyskills::read_resource(skill, relative_path).map_err(|error| error.to_string())?;
     if content != expected {
         clear_snapshot(&key);
         return Err("flow-authoring resource bytes changed".to_string());
@@ -314,9 +313,9 @@ fn valid_resource_manifest(files: &[ResourceFile]) -> bool {
     if files.iter().any(|file| !paths.insert(file.path.as_str())) {
         return false;
     }
-    files.iter().any(|file| {
-        file.path == tinyskills::WORKFLOW_MD || file.path == tinyskills::SKILL_MD
-    })
+    files
+        .iter()
+        .any(|file| file.path == tinyskills::WORKFLOW_MD || file.path == tinyskills::SKILL_MD)
 }
 
 fn materialize(
@@ -392,9 +391,11 @@ fn materialization_matches(workspace: &Path, gate: &DiscoveryGate, snapshot: &Sn
         return false;
     }
 
-    let Some(manifest) = snapshot.files.iter().find(|file| {
-        file.path == tinyskills::WORKFLOW_MD || file.path == tinyskills::SKILL_MD
-    }) else {
+    let Some(manifest) = snapshot
+        .files
+        .iter()
+        .find(|file| file.path == tinyskills::WORKFLOW_MD || file.path == tinyskills::SKILL_MD)
+    else {
         return false;
     };
     let Some(location) = skill.location.as_deref() else {

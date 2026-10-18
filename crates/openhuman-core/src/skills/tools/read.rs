@@ -183,13 +183,9 @@ impl Tool for WorkflowReadResourceTool {
         let skill_id = read_workflow_id(&args)?;
         let relative_path = read_required_str(&args, "relative_path")?;
         let ctx = crate::core::runtime::DispatchCtx::ambient();
-        let content = read_workflow_resource_for(
-            &ctx,
-            &self.config,
-            &skill_id,
-            Path::new(&relative_path),
-        )
-        .map_err(|e| anyhow::anyhow!("read_workflow_resource: {e}"))?;
+        let content =
+            read_workflow_resource_for(&ctx, &self.config, &skill_id, Path::new(&relative_path))
+                .map_err(|e| anyhow::anyhow!("read_workflow_resource: {e}"))?;
         Ok(ToolResult::success(serde_json::to_string(&json!({
             "workflow_id": skill_id,
             "relative_path": relative_path,

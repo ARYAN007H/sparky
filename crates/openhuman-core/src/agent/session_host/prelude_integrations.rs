@@ -458,9 +458,7 @@ impl OpenHumanTurnPrelude {
         // of the old per-turn filesystem scan.
         let latest = config
             .as_deref()
-            .map(|config| {
-                crate::skills::load_workflow_metadata_for(&self.dispatch_ctx(), config)
-            })
+            .map(|config| crate::skills::load_workflow_metadata_for(&self.dispatch_ctx(), config))
             .unwrap_or_default();
         let id = |workflow: &tinyskills::Skill| {
             if workflow.dir_name.is_empty() {

@@ -390,18 +390,17 @@ async fn module_builtin_gate_only_narrows_context_and_explicit_config() {
     let all = ComponentSet::all();
     let base = CoreContext::for_test_with_components(all);
     let enabled_context = base.derive_with(
-        ContextOverlay::new(enabled_config.clone(), DomainSet::full(), ToolGroups::none())
-            .profile("shared"),
+        ContextOverlay::new(
+            enabled_config.clone(),
+            DomainSet::full(),
+            ToolGroups::none(),
+        )
+        .profile("shared"),
     );
 
     let enabled = CoreContext::scope(enabled_context, async {
         let dispatch = crate::core::runtime::DispatchCtx::ambient();
-        crate::skills::bundled::flow_authoring::prewarm(
-            &dispatch,
-            &enabled_config,
-            None,
-        )
-        .await;
+        crate::skills::bundled::flow_authoring::prewarm(&dispatch, &enabled_config, None).await;
         crate::skills::load_workflow_metadata_for(&dispatch, &enabled_config)
     })
     .await;
@@ -411,8 +410,12 @@ async fn module_builtin_gate_only_narrows_context_and_explicit_config() {
     context_components.tinyflows = false;
     let context_component_context = CoreContext::for_test_with_components(context_components)
         .derive_with(
-            ContextOverlay::new(enabled_config.clone(), DomainSet::full(), ToolGroups::none())
-                .profile("shared"),
+            ContextOverlay::new(
+                enabled_config.clone(),
+                DomainSet::full(),
+                ToolGroups::none(),
+            )
+            .profile("shared"),
         );
     let context_component_hidden = CoreContext::scope(context_component_context, async {
         let dispatch = crate::core::runtime::DispatchCtx::ambient();
@@ -452,8 +455,12 @@ async fn module_builtin_gate_only_narrows_context_and_explicit_config() {
     disabled_config.components.tinyflows = false;
     let config_hidden = CoreContext::scope(
         CoreContext::for_test_with_components(all).derive_with(
-            ContextOverlay::new(enabled_config.clone(), DomainSet::full(), ToolGroups::none())
-                .profile("shared"),
+            ContextOverlay::new(
+                enabled_config.clone(),
+                DomainSet::full(),
+                ToolGroups::none(),
+            )
+            .profile("shared"),
         ),
         async {
             let dispatch = crate::core::runtime::DispatchCtx::ambient();
@@ -462,7 +469,9 @@ async fn module_builtin_gate_only_narrows_context_and_explicit_config() {
     )
     .await;
     assert!(
-        !config_hidden.iter().any(|skill| skill.id() == "flow-authoring"),
+        !config_hidden
+            .iter()
+            .any(|skill| skill.id() == "flow-authoring"),
         "a narrower supplied Config hides resources from an enabled parent context"
     );
 
@@ -470,8 +479,12 @@ async fn module_builtin_gate_only_narrows_context_and_explicit_config() {
     modules_disabled.modules.enabled = false;
     let modules_hidden = CoreContext::scope(
         CoreContext::for_test_with_components(all).derive_with(
-            ContextOverlay::new(enabled_config.clone(), DomainSet::full(), ToolGroups::none())
-                .profile("shared"),
+            ContextOverlay::new(
+                enabled_config.clone(),
+                DomainSet::full(),
+                ToolGroups::none(),
+            )
+            .profile("shared"),
         ),
         async {
             let dispatch = crate::core::runtime::DispatchCtx::ambient();
@@ -490,8 +503,12 @@ async fn module_builtin_gate_only_narrows_context_and_explicit_config() {
     skills_disabled.skills = false;
     let skills_context_hidden = CoreContext::scope(
         CoreContext::for_test_with_components(skills_disabled).derive_with(
-            ContextOverlay::new(enabled_config.clone(), DomainSet::full(), ToolGroups::none())
-                .profile("shared"),
+            ContextOverlay::new(
+                enabled_config.clone(),
+                DomainSet::full(),
+                ToolGroups::none(),
+            )
+            .profile("shared"),
         ),
         async {
             let dispatch = crate::core::runtime::DispatchCtx::ambient();
@@ -569,7 +586,10 @@ async fn module_builtin_gate_only_narrows_context_and_explicit_config() {
         )
     })
     .await;
-    assert!(tenant_b_after_tamper.is_ok(), "tenant A tampering must not evict tenant B");
+    assert!(
+        tenant_b_after_tamper.is_ok(),
+        "tenant A tampering must not evict tenant B"
+    );
     let _ = flow_b;
 }
 

@@ -107,19 +107,16 @@ async fn published_module_prompts_render_through_the_normal_host_path() {
         "api_url = \"http://127.0.0.1:1\"\n\n[components]\nskills = true\nflows = true\ntinyflows = true\n\n[modules]\nenabled = false\n",
     )
     .expect("disabled components config");
-    let disabled_config = openhuman_core::config::Config::load_from_config_path(
-        &disabled_config_path,
-        &workspace,
-    )
-    .await
-    .expect("load disabled profile config");
+    let disabled_config =
+        openhuman_core::config::Config::load_from_config_path(&disabled_config_path, &workspace)
+            .await
+            .expect("load disabled profile config");
     let disabled = openhuman_core::skills::load_workflow_metadata_for(&ctx, &disabled_config);
     assert!(
         !disabled.iter().any(|skill| skill.id() == "flow-authoring"),
         "a profile with modules disabled cannot see the shared workspace builtin"
     );
-    let mut disabled_options =
-        openhuman_core::agent::debug::DumpPromptOptions::new("orchestrator");
+    let mut disabled_options = openhuman_core::agent::debug::DumpPromptOptions::new("orchestrator");
     disabled_options.workspace_dir_override = Some(workspace.clone());
     disabled_options.config_path_override = Some(disabled_config_path);
     let ordinary_prompt = openhuman_core::agent::debug::dump_agent_prompt(disabled_options)

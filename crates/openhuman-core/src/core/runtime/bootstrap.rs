@@ -255,11 +255,7 @@ pub(crate) async fn bootstrap_core_runtime(
     // Gated on the Skills domain (#4808 review): under `harness()`/`none()` the
     // skills controllers are absent, so their trigger subscriber must not install.
     if domains.allows(crate::core::all::DomainGroup::Skills) {
-        crate::skills::bus::ensure_triggered_workflow_subscriber_for(
-            ctx,
-            &cfg,
-            Some(domains),
-        );
+        crate::skills::bus::ensure_triggered_workflow_subscriber_for(ctx, &cfg, Some(domains));
     } else {
         log::debug!("[boot] triggered-workflow subscriber SKIPPED — Skills domain disabled");
     }

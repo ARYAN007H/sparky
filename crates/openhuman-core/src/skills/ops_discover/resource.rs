@@ -1,6 +1,6 @@
 //! OpenHuman discovery context around `tinyskills` resource reads.
 
-use super::api::{DiscoveryGate, load_workflow_metadata_with_gate};
+use super::api::{load_workflow_metadata_with_gate, DiscoveryGate};
 use std::path::Path;
 
 pub fn read_workflow_resource(
@@ -58,11 +58,9 @@ fn read_workflow_resource_with_gate(
         if !gate.flow_authoring_enabled() {
             return Err("flow-authoring is unavailable in this context".to_string());
         }
-        let generation = crate::skills::bundled::flow_authoring::generation_if_current(
-            workspace_dir,
-            &gate,
-        )
-        .ok_or_else(|| "flow-authoring resources are unavailable".to_string())?;
+        let generation =
+            crate::skills::bundled::flow_authoring::generation_if_current(workspace_dir, &gate)
+                .ok_or_else(|| "flow-authoring resources are unavailable".to_string())?;
         return crate::skills::bundled::flow_authoring::read_resource(
             workspace_dir,
             &gate,

@@ -185,12 +185,8 @@ async fn render_via_session(
     config: &Config,
     agent_id: &str,
 ) -> Result<DumpedPrompt> {
-    let mut agent = OpenHumanSessionHost::from_config_for_agent(
-        ctx,
-        config,
-        agent_id,
-    )
-    .with_context(|| format!("building session agent for `{agent_id}`"))?;
+    let mut agent = OpenHumanSessionHost::from_config_for_agent(ctx, config, agent_id)
+        .with_context(|| format!("building session agent for `{agent_id}`"))?;
 
     // Match turn-1 behaviour: fetch the user's active Composio
     // connections so the rendered prompt mirrors what the LLM actually
