@@ -710,38 +710,6 @@ impl EventListener for OpenhumanEventBridge {
 }
 
 impl OpenhumanEventBridge {
-    /// Supplemental host calls belong in the durable trace, but they are not
-    /// agent-loop iterations or live wallet updates.
-    fn project_supplemental(&self, record: &EventRecord) -> bool {
-        match &record.event {
-            AgentEvent::ModelStarted { call_id, .. }
-                if call_id.as_str().contains("-host-supplemental-") =>
-            {
-                self.supplemental_call_active
-                    .store(true, std::sync::atomic::Ordering::SeqCst);
-                true
-            }
-            AgentEvent::UsageRecorded { .. }
-                if self
-                    .supplemental_call_active
-                    .load(std::sync::atomic::Ordering::SeqCst) =>
-            {
-                true
-            }
-            AgentEvent::ModelCompleted { call_id, .. }
-            | AgentEvent::ModelFailed { call_id, .. }
-                if call_id.as_str().contains("-host-supplemental-") =>
-            {
-                self.supplemental_call_active
-                    .store(false, std::sync::atomic::Ordering::SeqCst);
-                true
-            }
-            _ => false,
-        }
-    }
-}
-
-impl OpenhumanEventBridge {
     /// The "unavailable" label/detail pair for a call the crate answered as an
     /// unknown tool, or `None` for an ordinary call.
     fn unknown_tool_display(

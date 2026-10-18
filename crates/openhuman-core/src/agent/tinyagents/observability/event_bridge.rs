@@ -14,7 +14,7 @@ use crate::progress::AgentProgress;
 use tinytools::humanize_tool_name;
 
 use super::bridge_types::{ProviderUsageCarry, SubagentScope, ToolFailureMap, ToolNameMap};
-use tinyagents_harness::events::{CallDedupe, IterationCursor, OrderedSender};
+use tinyagents_harness::events::{CallDedupe, EventRecord, IterationCursor, OrderedSender};
 
 #[derive(Default)]
 pub(super) struct BridgeState {
@@ -123,6 +123,34 @@ pub(crate) struct OpenhumanEventBridge {
     pub(super) sender: OrderedSender<AgentProgress>,
     /// The context the run acts under; usage records take their tenant from it.
     pub(super) dispatch: crate::core::runtime::DispatchCtx,
+}
+
+impl OpenhumanEventBridge {
+    /// Supplemental host calls belong in the durable trace, but are not
+    /// agent-loop iterations or live wallet updates.
+    pub(super) fn project_supplemental(&self, record: &EventRecord) -> bool {
+        match &record.event {
+            AgentEvent::ModelStarted { call_id, .. }
+                if call_id.as_str().contains("-host-supplemental-") =>
+            {
+                self.supplemental_call_active.store(true, Ordering::SeqCst);
+                true
+            }
+            AgentEvent::UsageRecorded { .. }
+                if self.supplemental_call_active.load(Ordering::SeqCst) =>
+            {
+                true
+            }
+            AgentEvent::ModelCompleted { call_id, .. }
+            | AgentEvent::ModelFailed { call_id, .. }
+                if call_id.as_str().contains("-host-supplemental-") =>
+            {
+                self.supplemental_call_active.store(false, Ordering::SeqCst);
+                true
+            }
+            _ => false,
+        }
+    }
 }
 
 impl OpenhumanEventBridge {
