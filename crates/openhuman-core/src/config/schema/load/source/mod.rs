@@ -54,6 +54,7 @@ pub(crate) struct ConfigRead {
     /// including the file a document source falls back to when the scope has
     /// no document yet: that text keeps the file's corruption recovery.
     pub from_document: bool,
+    pub document_version: Option<tinystoragedrivers::Version>,
 }
 
 /// A place a config's TOML text is read from and written to.
@@ -82,7 +83,7 @@ pub(crate) trait ConfigSource: Send + Sync {
 
     /// Replace the config text. Returns `Err` only while the previous config is
     /// still the live one, so callers may roll back in-memory state on `Err`.
-    async fn write(&self, toml: &str) -> Result<()>;
+    async fn write(&self, toml: &str, expected: Option<tinystoragedrivers::Version>) -> Result<Option<tinystoragedrivers::Version>>;
 }
 
 /// The source for the config at `config_path`.
