@@ -7,7 +7,8 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use tinybus::module::ModuleClient;
 use tinybus::EventHandler;
-use tinychannels_bus::{capabilities_for, ChannelMessage};
+use crate::channels::capabilities::capabilities_for;
+use tinychannels_bus::ChannelMessage;
 
 #[derive(Clone)]
 struct ReplyContext {

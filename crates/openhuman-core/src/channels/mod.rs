@@ -6,6 +6,7 @@
 //! lifecycle orchestration.
 
 // Always-compiled carve-outs (see module docs).
+pub(crate) mod capabilities;
 pub mod contract_schema;
 #[cfg(any(feature = "voice", feature = "channels"))]
 pub(crate) mod credentials;

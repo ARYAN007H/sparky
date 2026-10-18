@@ -499,7 +499,7 @@ fn channel_thread_title(
         // Providers whose thread_ts is only a reply target (Telegram topics)
         // share one conversation, so the title leaves it out too.
         Some(thread_ts)
-            if !tinychannels_bus::capabilities_for(channel).history_key_ignores_thread =>
+            if !crate::channels::capabilities::capabilities_for(channel).history_key_ignores_thread =>
         {
             format!("{channel} · {sender} · {reply_target} · thread {thread_ts}")
         }

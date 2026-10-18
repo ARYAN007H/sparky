@@ -70,7 +70,9 @@ impl ManagedTransport {
         request: ProgressiveTransportRequest,
     ) -> ProgressiveTransportResult {
         let result = match request {
-            ProgressiveTransportRequest::Send { channel, message } => {
+            ProgressiveTransportRequest::Send {
+                channel, message, ..
+            } => {
                 self.client
                     .send_channel_message(&channel, &self.credential, message)
                     .await
@@ -79,6 +81,7 @@ impl ManagedTransport {
                 channel,
                 message_id,
                 text,
+                ..
             } => {
                 self.client
                     .send_channel_edit(
@@ -92,12 +95,13 @@ impl ManagedTransport {
             ProgressiveTransportRequest::Delete {
                 channel,
                 message_id,
+                ..
             } => {
                 self.client
                     .send_channel_delete(&channel, &message_id, &self.credential)
                     .await
             }
-            ProgressiveTransportRequest::Typing { channel } => {
+            ProgressiveTransportRequest::Typing { channel, .. } => {
                 self.client
                     .send_channel_typing(&channel, &self.credential)
                     .await
@@ -115,7 +119,7 @@ fn request_channel(request: &ProgressiveTransportRequest) -> &str {
         ProgressiveTransportRequest::Send { channel, .. }
         | ProgressiveTransportRequest::Edit { channel, .. }
         | ProgressiveTransportRequest::Delete { channel, .. }
-        | ProgressiveTransportRequest::Typing { channel } => channel,
+        | ProgressiveTransportRequest::Typing { channel, .. } => channel,
     }
 }
 
@@ -129,7 +133,7 @@ impl ManagedTransport {
             return Err(tinybus::Error::failed("callback capability unavailable"));
         };
         Ok(ChannelBackendResult::ProgressiveTransport(
-            self.execute(request).await,
+            self.execute(*request).await,
         ))
     }
 }
