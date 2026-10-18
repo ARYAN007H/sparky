@@ -1,8 +1,8 @@
 use anyhow::Result;
 use std::path::Path;
 
-use super::impl_load::{parse_config_boxed, parse_toml_off_worker};
 use super::super::Config;
+use super::impl_load::{parse_config_boxed, parse_toml_off_worker};
 
 /// Parse the text a [`ConfigSource`](super::source::ConfigSource) returned.
 ///

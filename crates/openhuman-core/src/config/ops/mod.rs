@@ -32,14 +32,14 @@ pub(crate) fn config_save_error(error: anyhow::Error) -> String {
 
 // ── Public re-exports (preserving the flat external API) ─────────────────────
 
-pub use agent_paths::{
-    ensure_agent_dirs, ensure_usable_cwd, expand_tilde, get_agent_paths,
-    load_and_apply_agent_paths_settings, redact_home, apply_agent_paths_settings,
-};
 pub use agent::{
     add_auto_approve_tool, apply_agent_settings, apply_autonomy_settings, get_agent_settings,
     get_autonomy_settings, load_and_apply_agent_settings, load_and_apply_autonomy_settings,
     AgentPathsPatch, AgentSettingsPatch, AutonomySettingsPatch,
+};
+pub use agent_paths::{
+    apply_agent_paths_settings, ensure_agent_dirs, ensure_usable_cwd, expand_tilde,
+    get_agent_paths, load_and_apply_agent_paths_settings, redact_home,
 };
 
 pub use loader::{

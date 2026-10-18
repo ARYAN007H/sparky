@@ -291,4 +291,3 @@ pub async fn get_agent_settings(ctx: &DispatchCtx) -> Result<Outcome<serde_json:
     });
     Ok(Outcome::single_log(value, "agent settings read"))
 }
-
