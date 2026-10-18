@@ -110,6 +110,7 @@ fn removing_an_agent_releases_everything_it_held() {
                 let closing = closing.clone();
                 tokio::spawn(async move { closing.turn("write the marker").send().await })
             };
+            eprintln!("[agent_lifecycle] waiting for closing_request");
             let closing_request = eventually("closing agent to park", || {
                 closing.approvals().pending().ok()?.into_iter().next()
             })
@@ -173,6 +174,7 @@ fn removing_an_agent_releases_everything_it_held() {
                 let replacement = replacement.clone();
                 tokio::spawn(async move { replacement.turn("write the marker").send().await })
             };
+            eprintln!("[agent_lifecycle] waiting for replacement_request");
             let replacement_request = eventually("replacement to park", || {
                 replacement.approvals().pending().ok()?.into_iter().next()
             })
@@ -207,6 +209,7 @@ fn removing_an_agent_releases_everything_it_held() {
                 let parker = parker.clone();
                 tokio::spawn(async move { parker.turn("write the marker").send().await })
             };
+            eprintln!("[agent_lifecycle] waiting for request");
             let request = eventually("parker to park", || {
                 parker
                     .approvals()
