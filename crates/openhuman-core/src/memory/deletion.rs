@@ -18,14 +18,13 @@ use std::sync::{Arc, LazyLock, Mutex};
 use async_trait::async_trait;
 use tinymemory_tools::deletion::{Backoff, DeletionExecutor, DeletionQueue, Drain};
 use tinymemory_tools::list_store::{ListStore, StoreError};
-use tinymemory_tools::ops::MemoryOps;
 
 pub use tinymemory_tools::deletion::PendingDeletion;
 
 use crate::config::Config;
 
 use super::engine;
-use tinymemory_api::{Error, Result};
+use tinymemory_api::Error;
 
 fn path(workspace_dir: &Path) -> PathBuf {
     workspace_dir.join("memory").join("pending_deletions.json")
