@@ -203,7 +203,27 @@ where
             );
             cloud_safety_flagged = Some(err);
         }
-        Err(ArmError::Retryable { retry_after_ms, .. }) => {
+        Err(ArmError::Retryable {
+            retry_after_ms,
+            source,
+        }) => {
+            let reason = FailoverReason::classify(&tinyagents_harness::error::TinyAgentsError::Model(
+                format!("{source:#}"),
+            ));
+            let decision = decide(
+                reason,
+                FailoverState {
+                    retryable: true,
+                    attempts_remaining: true,
+                    larger_window_available: false,
+                },
+            );
+            if decision != FailoverDecision::RetrySame {
+                tracing::info!(
+                    failover_reason = reason.as_str(),
+                    "owner failover policy skipped a same-provider retry"
+                );
+            } else {
             // Sleep before the cloud retry. Honour Retry-After when
             // present; otherwise use a short backoff so the second
             // attempt has a real chance of finding the upstream
@@ -261,6 +281,7 @@ where
                          evaluating fallback"
                     );
                 }
+            }
             }
         }
     }
