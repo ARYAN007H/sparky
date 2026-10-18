@@ -47,6 +47,7 @@ mod render;
 mod runner;
 mod session;
 mod state;
+mod state_events;
 mod terminal;
 mod theme;
 mod ui_state;

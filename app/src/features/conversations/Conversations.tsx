@@ -50,7 +50,7 @@ import {
   ATTACHMENT_MAX_FILES,
   ATTACHMENT_MAX_IMAGES,
   attachmentMetadata,
-  buildMessageWithAttachments,
+  attachmentsToParts,
   imageMarkerCost,
   parseMessageImages,
   validateAndReadFile,
@@ -1309,7 +1309,9 @@ const Conversations = ({
     failedAttachmentsByThreadRef.current.set(sendingThreadId, pendingAttachments);
     const modelOverride = composerModelOverride ?? undefined;
     const modelClearBarrier = modelOverride === undefined ? waitForComposerModelClear() : null;
-    let messageText = buildMessageWithAttachments(trimmed, pendingAttachments);
+    // Originals ride beside the text as typed parts; the core stages them.
+    const attachmentParts = attachmentsToParts(pendingAttachments);
+    let messageText = trimmed;
     const userMessage: ThreadMessage = {
       id: `msg_${globalThis.crypto.randomUUID()}`,
       content: messageText,
@@ -1359,6 +1361,7 @@ const Conversations = ({
           threadId: sendingThreadId,
           messageId: previousFailedMessage.id,
           content: messageText,
+          attachments: attachmentParts,
         });
         setInputValue('');
         setAttachments([]);
@@ -1371,7 +1374,11 @@ const Conversations = ({
         return;
       } else {
         const persisted = await dispatch(
-          addMessageLocal({ threadId: sendingThreadId, message: userMessage })
+          addMessageLocal({
+            threadId: sendingThreadId,
+            message: userMessage,
+            attachments: attachmentParts,
+          })
         ).unwrap();
         // The core saved the originals before returning this durable reference.
         messageText = persisted.message.content;
@@ -1518,7 +1525,8 @@ const Conversations = ({
 
     const modelOverride = composerModelOverride ?? undefined;
     const modelClearBarrier = modelOverride === undefined ? waitForComposerModelClear() : null;
-    const messageText = buildMessageWithAttachments(normalized, pendingAttachments);
+    const attachmentParts = attachmentsToParts(pendingAttachments);
+    const messageText = normalized;
     // Build the full user message exactly like a normal send (content +
     // attachment metadata) so the follow-up persists identically when it is
     // flushed into the transcript on turn end. Guard `crypto.randomUUID` like
@@ -1551,6 +1559,7 @@ const Conversations = ({
       await chatSend({
         threadId,
         message: messageText,
+        attachments: attachmentParts,
         ...(modelOverride !== undefined ? { model: modelOverride } : {}),
         locale: uiLocale,
         queueMode: 'followup',
@@ -1560,7 +1569,14 @@ const Conversations = ({
       // failed send leaves the user's draft + attachments intact to retry.
       setInputValue('');
       setAttachments([]);
-      dispatch(pendingFollowupAdded({ threadId, message: followupMessage, text: messageText }));
+      dispatch(
+        pendingFollowupAdded({
+          threadId,
+          message: followupMessage,
+          text: messageText,
+          attachments: attachmentParts,
+        })
+      );
       trackAnalyticsEvent('chat_message_sent', {
         send_mode: 'followup',
         has_attachments: pendingAttachments.length > 0,

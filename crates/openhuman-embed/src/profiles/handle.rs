@@ -322,6 +322,7 @@ impl ProfileHandle {
                         sender: "user".to_string(),
                         created_at: chrono::Utc::now().to_rfc3339(),
                     },
+                    attachments: Vec::new(),
                 },
             )
             .await?;

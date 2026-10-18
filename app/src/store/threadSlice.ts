@@ -2,6 +2,7 @@ import { createAsyncThunk, createSlice, type PayloadAction } from '@reduxjs/tool
 
 import { extractWorkflowProposalFromMessages } from '../lib/workflows/workflowProposal';
 import { threadApi } from '../services/api/threadApi';
+import type { ContentPart } from '../services/chatWire';
 import { isThreadNotFoundCoreRpcError } from '../services/coreRpcClient';
 import type { Thread, ThreadMessage } from '../types/thread';
 import { IS_DEV } from '../utils/config';
@@ -252,9 +253,16 @@ async function evictStaleThread(threadId: string, dispatch: (action: any) => any
 
 export const addMessageLocal = createAsyncThunk(
   'thread/addMessageLocal',
-  async (payload: { threadId: string; message: ThreadMessage }, { dispatch, rejectWithValue }) => {
+  async (
+    payload: { threadId: string; message: ThreadMessage; attachments?: ContentPart[] },
+    { dispatch, rejectWithValue }
+  ) => {
     try {
-      const persisted = await threadApi.appendMessage(payload.threadId, payload.message);
+      const persisted = await threadApi.appendMessage(
+        payload.threadId,
+        payload.message,
+        payload.attachments
+      );
       if (payload.message.sender === 'user' && payload.message.content.trim()) {
         void dispatch(generateThreadTitleIfNeeded({ threadId: payload.threadId }))
           .unwrap()

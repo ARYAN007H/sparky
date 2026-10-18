@@ -348,9 +348,12 @@ impl TranscriptState {
                 }
                 self.finish_turn();
             }
-            other => {
-                log::trace!("[tui] state: unhandled event={other}");
-            }
+            other => match super::state_events::disposition(other) {
+                super::state_events::Disposition::Unknown => {
+                    log::debug!("[tui] state: unknown event={other} (not in the web contract)");
+                }
+                _ => log::trace!("[tui] state: ignored event={other}"),
+            },
         }
     }
 
