@@ -92,6 +92,75 @@ async fn host_authored_events_pass_through_without_a_seq() {
 }
 
 #[tokio::test]
+async fn module_projected_cancellation_closes_the_turn() {
+    let mut rx = crate::web_chat::subscribe_web_channel_events();
+    let surface = Surface::new(
+        &DispatchCtx::ambient(),
+        ids("surface-cancel"),
+        crate::config::Config::default(),
+    )
+    .await;
+    surface
+        .output(ChannelOutputEvent::Cancellation {
+            reason: Some("user_stop".into()),
+        })
+        .await;
+
+    let event = next_for(&mut rx, "surface-cancel").await;
+    assert_eq!(event.event, "chat_cancelled");
+    assert_eq!(event.seq, Some(1));
+    let state = surface.state.lock().await;
+    assert!(state.closed);
+    assert!(state.handle.is_none());
+}
+
+#[tokio::test]
+async fn dropping_a_surface_ends_its_module_owned_turn() {
+    let surface = Surface::new(
+        &DispatchCtx::ambient(),
+        ids("surface-drop-cleanup"),
+        crate::config::Config::default(),
+    )
+    .await;
+    surface
+        .output(ChannelOutputEvent::TextDelta {
+            text: "active".into(),
+            iteration: Some(1),
+        })
+        .await;
+    let (module, handle) = {
+        let state = surface.state.lock().await;
+        (
+            state.module.clone(),
+            state.handle.as_ref().unwrap().handle.clone(),
+        )
+    };
+    let cleanup_done = Arc::clone(&surface.cleanup_done);
+    drop(surface);
+    tokio::time::timeout(std::time::Duration::from_secs(5), cleanup_done.notified())
+        .await
+        .expect("drop cleanup completes");
+
+    let result: Result<tinychannels_bus::module_web_output::WebOutputEvents, _> = module
+        .call_confidential(
+            "tinychannels",
+            tinychannels_bus::methods::PROJECT_WEB_OUTPUT,
+            (ProjectWebOutput {
+                handle,
+                event: ChannelOutputEvent::TextDelta {
+                    text: "late".into(),
+                    iteration: Some(1),
+                },
+            },),
+        )
+        .await;
+    assert!(
+        result.is_err(),
+        "a dropped turn must reject later projections"
+    );
+}
+
+#[tokio::test]
 async fn the_addressing_context_names_the_turn() {
     let surface = Surface::new(
         &DispatchCtx::ambient(),

@@ -34,6 +34,7 @@ struct SurfaceState {
 #[derive(Clone)]
 pub(crate) struct Surface {
     state: Arc<tokio::sync::Mutex<SurfaceState>>,
+    cleanup_done: Arc<tokio::sync::Notify>,
     ctx: DispatchCtx,
     scope_key: String,
     ids: TurnIds,
@@ -66,6 +67,7 @@ impl Surface {
                 handle: None,
                 closed: false,
             })),
+            cleanup_done: Arc::new(tokio::sync::Notify::new()),
             ctx: ctx.clone(),
             scope_key,
             ids,
@@ -189,8 +191,11 @@ impl Surface {
 
     /// The leading narration of `round`, flushed as an interim bubble.
     pub(crate) async fn interim(&self, round: u32, text: String) {
-        self.project(ChannelOutputEvent::Clarification { prompt: text }, Some(round))
-            .await;
+        self.project(
+            ChannelOutputEvent::Clarification { prompt: text },
+            Some(round),
+        )
+        .await;
     }
 
     /// Publish a host-authored event unchanged (queue, goal, todo, or the
@@ -230,28 +235,29 @@ impl Drop for Surface {
             return;
         };
         let state = Arc::clone(&self.state);
+        let cleanup_done = Arc::clone(&self.cleanup_done);
         let request_id = self.ids.request_id.clone();
         runtime.spawn(async move {
             let mut state = state.lock().await;
             state.closed = true;
-            let Some(handle) = state.handle.take() else {
-                return;
-            };
-            if let Err(error) = state
-                .module
-                .call_confidential::<()>(
-                    "tinychannels",
-                    tinychannels_bus::methods::END_WEB_TURN,
-                    (EndWebTurn {
-                        handle: handle.handle,
-                    },),
-                )
-                .await
-            {
-                log::warn!(
-                    "[web-channel] dropped projection turn cleanup failed request_id={request_id}: {error}"
-                );
+            if let Some(handle) = state.handle.take() {
+                if let Err(error) = state
+                    .module
+                    .call_confidential::<()>(
+                        "tinychannels",
+                        tinychannels_bus::methods::END_WEB_TURN,
+                        (EndWebTurn {
+                            handle: handle.handle,
+                        },),
+                    )
+                    .await
+                {
+                    log::warn!(
+                        "[web-channel] dropped projection turn cleanup failed request_id={request_id}: {error}"
+                    );
+                }
             }
+            cleanup_done.notify_one();
         });
     }
 }
