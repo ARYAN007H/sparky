@@ -158,6 +158,21 @@ export function buildPlan({ profile, areas, env = {}, isPullRequest = true }) {
           // the generated docs/storage-schema.md.
           name: "storage-schema",
           when: rust,
+          // ex63: build the dump example in the plain build target with that
+          // build's rustEnv and the core product features, which
+          // composio-stack-regression-uninstrumented also builds the cli with,
+          // so the core is not compiled again here (default target,
+          // incremental, full debuginfo). The schema depends only on gates
+          // that are in both feature sets, so the dump is unchanged.
+          ...(ex63
+            ? {
+                env: {
+                  ...rustEnv,
+                  CARGO_BUILD_TARGET_DIR: targetDir("build"),
+                  STORAGE_SCHEMA_FEATURES: "web3,flows,skills,modules,tinymemes",
+                },
+              }
+            : {}),
           run: "node scripts/ci/check-storage-schema.mjs",
         },
         {

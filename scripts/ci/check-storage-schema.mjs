@@ -41,9 +41,25 @@ const SCOPES = new Set(['tenant', 'agent', 'module', 'cluster']);
 /** Features the dump is built with: the contributor set plus the wallet owner. */
 export const DUMP_FEATURES = 'web3';
 
+/**
+ * Features for this run. `STORAGE_SCHEMA_FEATURES` lets private CI build the
+ * dump with the feature set of an existing plain build (the core product
+ * gates), so Cargo reuses that build instead of compiling the core again. The
+ * schema is only gated on flows, skills, modules, web3 and tinymemes, all of
+ * which are in both sets, so the dump is identical; the wallet owner (web3)
+ * must be in any override.
+ */
+export function dumpFeatures(env = process.env) {
+  const features = env.STORAGE_SCHEMA_FEATURES?.trim() || DUMP_FEATURES;
+  if (!features.split(',').includes('web3')) {
+    throw new Error(`STORAGE_SCHEMA_FEATURES must include web3 (the wallet owner): ${features}`);
+  }
+  return features;
+}
+
 /** Runs the dump example and returns its JSON. */
-export function dumpSchema(root = REPO_ROOT) {
-  const run = spawnSync(
+export function dumpSchema(root = REPO_ROOT, { run: spawn = spawnSync, env = process.env } = {}) {
+  const run = spawn(
     'cargo',
     [
       'run',
@@ -55,7 +71,7 @@ export function dumpSchema(root = REPO_ROOT) {
       '--example',
       'storage_schema_dump',
       '--features',
-      DUMP_FEATURES,
+      dumpFeatures(env),
     ],
     { cwd: root, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }
   );
