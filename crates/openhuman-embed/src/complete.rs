@@ -507,10 +507,7 @@ impl Completer {
     /// With a budget, the observer receives charge-normalized usage after
     /// admission, matching the amount settled by the ledger. A refusal before
     /// provider dispatch does not produce a physical-dispatch event.
-    pub fn physical_observer(
-        mut self,
-        observer: Arc<dyn PhysicalDispatchObserver>,
-    ) -> Self {
+    pub fn physical_observer(mut self, observer: Arc<dyn PhysicalDispatchObserver>) -> Self {
         self.physical_observer = Some(observer);
         self
     }

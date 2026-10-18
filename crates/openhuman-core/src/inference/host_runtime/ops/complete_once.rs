@@ -120,9 +120,8 @@ pub async fn complete_once_observed(
     let model: std::sync::Arc<dyn ChatModel<()>> = match (budget, observer) {
         (Some(budget), observer) => budget.wrap_with_observer(model, observer),
         (None, Some(observer)) => {
-            let normalized = std::sync::Arc::new(
-                tinyagents_harness::cost::GatewayChargeModel::new(model),
-            );
+            let normalized =
+                std::sync::Arc::new(tinyagents_harness::cost::GatewayChargeModel::new(model));
             std::sync::Arc::new(
                 tinyagents_harness::observability::physical_dispatch::ObservedChatModel::new(
                     normalized, observer,

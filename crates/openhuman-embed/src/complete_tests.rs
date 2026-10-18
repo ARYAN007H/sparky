@@ -221,10 +221,7 @@ impl tinyagents_harness::observability::PhysicalDispatchObserver for PhysicalRec
 struct TurnRecorder(Mutex<Vec<tinyagents_harness::observability::turn_observer::TurnObservation>>);
 
 impl tinyagents_harness::observability::turn_observer::Observer for TurnRecorder {
-    fn on_event(
-        &self,
-        event: &tinyagents_harness::observability::turn_observer::TurnObservation,
-    ) {
+    fn on_event(&self, event: &tinyagents_harness::observability::turn_observer::TurnObservation) {
         self.0.lock().unwrap().push(event.clone());
     }
 }
@@ -262,7 +259,7 @@ async fn physical_observer_reports_content_free_provider_outcome() {
 #[tokio::test]
 async fn physical_observer_sees_the_buyer_charge_settled_by_the_budget() {
     use tinyagents_harness::observability::turn_observer::{
-        ObserverScope, TraceContent, TurnObservation, with_observer,
+        with_observer, ObserverScope, TraceContent, TurnObservation,
     };
 
     let mut reply = body("hi", "stop");
