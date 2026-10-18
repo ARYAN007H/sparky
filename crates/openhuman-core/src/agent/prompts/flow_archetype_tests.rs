@@ -71,6 +71,15 @@ async fn flow_prompt_fetch_uses_the_copilot_get_prompt_bus_member() {
             .expect("bus prompt fetch")
             .expect("flow builtin prompt");
         assert!(!text.trim().is_empty(), "{id} prompt must be nonempty");
+
+        let mut renamed = definition.clone();
+        renamed.id = format!("library_{id}");
+        let renamed_text = load_for_definition(Some(&config), &renamed)
+            .await
+            .expect("renamed builtin fetches its original prompt owner")
+            .expect("renamed flow builtin prompt");
+        assert_eq!(renamed_text, text, "actor id must not become GetPrompt key");
+
         texts.insert(id, text);
     }
     assert_ne!(texts["workflow_builder"], texts["flow_discovery"]);

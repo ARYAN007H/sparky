@@ -1,7 +1,7 @@
 //! Scoped TinyFlows archetype prompt loading for the two flow builtins.
 
 use anyhow::{anyhow, ensure, Result};
-use tinyagents_definition::{DefinitionSource, PromptSource};
+use tinyagents_definition::PromptSource;
 
 use crate::{agent::harness::host_definition::AgentDefinition, config::Config};
 
@@ -10,9 +10,7 @@ use crate::{agent::harness::host_definition::AgentDefinition, config::Config};
 /// User definitions and static/session prompt overrides keep their own source
 /// and never cause a TinyFlows module lookup, even when they reuse a builtin id.
 pub(crate) fn is_bus_backed_builtin(definition: &AgentDefinition) -> bool {
-    matches!(&definition.source, DefinitionSource::Builtin)
-        && matches!(&definition.system_prompt, PromptSource::Dynamic(()))
-        && matches!(definition.id.as_str(), "workflow_builder" | "flow_discovery")
+    prompt_owner(definition).is_some()
 }
 
 /// Prompt owner stamped by the builtin loader and preserved by cloned specs.

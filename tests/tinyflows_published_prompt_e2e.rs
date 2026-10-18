@@ -16,6 +16,7 @@ async fn published_module_prompts_render_through_the_normal_host_path() {
     let _vite_backend_guard = EnvVarGuard::unset("VITE_BACKEND_URL");
     let _api_key_guard = EnvVarGuard::unset("OPENHUMAN_BACKEND_API_KEY");
     let _session_guard = EnvVarGuard::unset("OPENHUMAN_BACKEND_SESSION_TOKEN");
+    let _storage_guard = EnvVarGuard::unset("OPENHUMAN_STORAGE_URL");
     let _source_guard = EnvVarGuard::unset("OPENHUMAN_MODULE_SOURCE");
     let _source_dir_guard = EnvVarGuard::unset("OPENHUMAN_MODULE_SOURCE_DIR");
     let _tinyflows_source_guard = EnvVarGuard::unset("OPENHUMAN_MODULE_SOURCE_TINYFLOWS");
