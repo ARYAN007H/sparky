@@ -225,7 +225,7 @@ fn per_run_trace_snapshots_keep_reused_call_ids_scoped_and_content_gated() {
     }
     captured.finish(1_110);
     assert!(
-        spans_to_ndjson(SpanEnvelope::Otel, &captured.spans()).contains("CONTENT_SENTINEL_PROMPT"),
+        spans_to_ndjson(SpanEnvelope::Otel, captured.spans()).contains("CONTENT_SENTINEL_PROMPT"),
         "content-on export retains opted-in prompt content"
     );
     let root_generation = native
