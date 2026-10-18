@@ -1,13 +1,13 @@
 //! Handing finished spans to their sink(s): the local NDJSON/log exporter and
 //! the remote Langfuse usage-data push.
 
-use crate::config::schema::AgentTracingConfig;
 use crate::config::Config;
+use crate::config::schema::AgentTracingConfig;
 
 use super::langfuse;
 use super::otlp;
 use crate::config::schema::AgentTracingBackend;
-use tinyagents_harness::observability::trace_export::serialize::{spans_to_ndjson, SpanEnvelope};
+use tinyagents_harness::observability::trace_export::serialize::{SpanEnvelope, spans_to_ndjson};
 use tinyagents_harness::observability::trace_export::{RunType, TraceContext, TraceSpan};
 
 /// Map the configured backend onto the upstream NDJSON envelope.

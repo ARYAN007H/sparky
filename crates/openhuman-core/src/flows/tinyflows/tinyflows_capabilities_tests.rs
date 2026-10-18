@@ -1,6 +1,6 @@
 use super::*;
 use crate::flows::agent_route::{
-    harness_model_default_override, route_custom_entry_lookup, route_for_agent_ref, AgentRoute,
+    AgentRoute, harness_model_default_override, route_custom_entry_lookup, route_for_agent_ref,
 };
 use crate::flows::tinyflows::caps::OpenHumanCode;
 
@@ -421,7 +421,7 @@ fn route_custom_entry_lookup_falls_back_when_no_entry_exists() {
 /// not cross, even when a third context is ambient.
 #[tokio::test]
 async fn adapters_act_for_the_context_they_were_handed_not_the_ambient_one() {
-    use crate::core::runtime::{context::CoreContext, ComponentSet, DispatchCtx, DomainSet};
+    use crate::core::runtime::{ComponentSet, DispatchCtx, DomainSet, context::CoreContext};
 
     let tmp = TempDir::new().unwrap();
     let config = test_config(&tmp);

@@ -190,15 +190,17 @@ async fn captured_agent_and_config_fn_tiers_are_not_replaced_by_parent_file() {
         &captured.workspace_dir,
         &captured.action_dir,
     );
-    assert!(enforce_current_node_tier_gate(
-        &captured_ctx,
-        &captured,
-        &captured_policy,
-        CommandClass::Write,
-        "code"
-    )
-    .await
-    .is_err());
+    assert!(
+        enforce_current_node_tier_gate(
+            &captured_ctx,
+            &captured,
+            &captured_policy,
+            CommandClass::Write,
+            "code"
+        )
+        .await
+        .is_err()
+    );
 
     // A fixed ceiling contributes independently of a disabled file tier.
     parent_file.autonomy.enabled = false;

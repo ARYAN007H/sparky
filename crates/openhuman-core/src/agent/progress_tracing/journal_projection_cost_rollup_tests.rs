@@ -262,8 +262,7 @@ fn cache_creation_tokens_reach_the_projected_generation_span() {
 }
 
 /// The answer the crate injects for an unknown tool (`unknown_tool_message`).
-const UNKNOWN_TOOL_ANSWER: &str =
-    "unknown tool `send_fax` (arguments: {\"to\":\"1234\"}): no tool \
+const UNKNOWN_TOOL_ANSWER: &str = "unknown tool `send_fax` (arguments: {\"to\":\"1234\"}): no tool \
      with that name is available to you, and calling it again will fail the same way.";
 
 /// The crate's recovered pair for an unknown tool (TOOL-11 `recover_tool_call`):

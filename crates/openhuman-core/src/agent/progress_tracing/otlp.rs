@@ -5,8 +5,8 @@
 //! resolves the backend URL and credential and posts the requests.
 
 use serde_json::Value;
-use tinyagents_harness::observability::trace_export::otlp::otlp_requests;
 use tinyagents_harness::observability::trace_export::TraceSpan;
+use tinyagents_harness::observability::trace_export::otlp::otlp_requests;
 
 use super::langfuse::{environment_for_base, ingestion_url, skip_push};
 use crate::config::Config;

@@ -12,14 +12,14 @@ use std::borrow::Cow;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use tinyflows::caps::*;
 use tinyflows::error::{EngineError, Result};
 
 use super::*;
 use crate::config::Config;
 use crate::flows::agent_route::{
-    harness_model_default_override, route_custom_entry_lookup, route_for_agent_ref, AgentRoute,
+    AgentRoute, harness_model_default_override, route_custom_entry_lookup, route_for_agent_ref,
 };
 
 /// [`AgentRunner`] backing an `agent` node's `agent_ref`. It runs the selected
@@ -461,9 +461,9 @@ impl OpenHumanAgentRunner {
             .map_err(EngineError::Capability)?
             .ok_or_else(|| {
                 EngineError::Capability(format!(
-                "agent node: unknown agent_ref '{agent_ref}' (neither a harness definition nor \
+                    "agent node: unknown agent_ref '{agent_ref}' (neither a harness definition nor \
                      a custom agent registry entry)"
-            ))
+                ))
             })?;
         if !entry.enabled {
             return Err(EngineError::Capability(format!(

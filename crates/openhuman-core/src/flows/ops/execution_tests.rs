@@ -1,6 +1,6 @@
 use super::*;
-use tinyflows::graph::ids;
 use tinyflows::graph::GraphEvent;
+use tinyflows::graph::ids;
 
 #[test]
 fn graph_observations_are_adapted_without_changing_their_wire_shape() {
@@ -29,7 +29,10 @@ fn graph_observations_are_adapted_without_changing_their_wire_shape() {
         serde_json::to_value(&engine).unwrap(),
         serde_json::to_value(&converted[0]).unwrap()
     );
-    assert_eq!(converted[0].thread_id.as_ref().map(|id| id.as_str()), Some(thread_id));
+    assert_eq!(
+        converted[0].thread_id.as_ref().map(|id| id.as_str()),
+        Some(thread_id)
+    );
     assert_eq!(converted[0].event_id.as_str(), "evt-1");
     assert_eq!(converted[0].step, 1);
     assert_eq!(converted[0].ts_ms, 1_020);

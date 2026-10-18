@@ -51,12 +51,12 @@
 //! [`export_spans`]. The collector has no I/O and no async, so the span shape
 //! is exhaustively unit-testable.
 
+mod graph_langfuse;
 /// Journal-backed projection from durable tinyagents observations.
 pub(crate) mod journal_projection;
 /// Langfuse ingestion exporter (remote push through the configured backend).
 pub(crate) mod langfuse;
 mod otlp;
-mod graph_langfuse;
 
 /// The [`SpanCollector`] state machine that folds progress events into spans.
 mod collector;

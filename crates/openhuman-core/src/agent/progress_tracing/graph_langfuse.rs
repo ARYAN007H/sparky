@@ -6,7 +6,7 @@
 
 use std::time::Duration;
 
-use serde_json::{json, Map, Value};
+use serde_json::{Map, Value, json};
 use tinyagents_graph::{GraphLangfuseExporter, GraphObservation};
 use tinyagents_harness::{LangfuseAuth, LangfuseClient, LangfuseTraceConfig};
 use tinyflows_bus::runs::FlowRunTrigger;
@@ -67,7 +67,11 @@ fn flow_otlp_requests(
     trace: LangfuseTraceConfig,
     observations: &[GraphObservation],
 ) -> tinyagents_harness::error::Result<Vec<Value>> {
-    exporter.build_otlp_requests(trace, observations, crate::agent::progress_tracing::export_brand().product)
+    exporter.build_otlp_requests(
+        trace,
+        observations,
+        crate::agent::progress_tracing::export_brand().product,
+    )
 }
 
 fn graph_otlp_requests(
@@ -118,7 +122,9 @@ pub(crate) async fn export_graph_run_trace(
         return;
     }
     let token = match direct_backend_credential(config, "flows langfuse export") {
-        Some(crate::security::credentials::session_support::BackendCredential::Session(token)) => token,
+        Some(crate::security::credentials::session_support::BackendCredential::Session(token)) => {
+            token
+        }
         _ => {
             tracing::debug!(target: LOG_TARGET, flow_id = %flow_id, "[flows] langfuse export skipped: hosted backend not available");
             return;
@@ -152,9 +158,15 @@ pub(crate) async fn export_graph_run_trace(
         &requests,
     );
     match tokio::time::timeout(PUSH_TIMEOUT, send).await {
-        Ok(Ok(())) => tracing::debug!(target: LOG_TARGET, flow_id = %flow_id, thread_id = %thread_id, observation_count = observations.len(), request_count, "[flows] pushed flow run trace to Langfuse"),
-        Ok(Err(err)) => tracing::warn!(target: LOG_TARGET, flow_id = %flow_id, thread_id = %thread_id, error = %err, "[flows] langfuse export failed (run unaffected)"),
-        Err(_) => tracing::warn!(target: LOG_TARGET, flow_id = %flow_id, thread_id = %thread_id, timeout_secs = PUSH_TIMEOUT.as_secs(), "[flows] langfuse export timed out (run unaffected)"),
+        Ok(Ok(())) => {
+            tracing::debug!(target: LOG_TARGET, flow_id = %flow_id, thread_id = %thread_id, observation_count = observations.len(), request_count, "[flows] pushed flow run trace to Langfuse")
+        }
+        Ok(Err(err)) => {
+            tracing::warn!(target: LOG_TARGET, flow_id = %flow_id, thread_id = %thread_id, error = %err, "[flows] langfuse export failed (run unaffected)")
+        }
+        Err(_) => {
+            tracing::warn!(target: LOG_TARGET, flow_id = %flow_id, thread_id = %thread_id, timeout_secs = PUSH_TIMEOUT.as_secs(), "[flows] langfuse export timed out (run unaffected)")
+        }
     }
 }
 

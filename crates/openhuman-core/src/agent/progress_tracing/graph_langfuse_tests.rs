@@ -48,15 +48,7 @@ fn sample_observations(thread_id: &str) -> Vec<GraphObservation> {
                 step: 1,
             },
         ),
-        mk(
-            3,
-            1,
-            1_050,
-            GraphEvent::NodeCompleted {
-                node,
-                step: 1,
-            },
-        ),
+        mk(3, 1, 1_050, GraphEvent::NodeCompleted { node, step: 1 }),
         mk(4, 1, 1_060, GraphEvent::StepCompleted { step: 1 }),
     ]
 }
