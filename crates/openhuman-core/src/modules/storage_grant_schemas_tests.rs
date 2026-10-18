@@ -24,9 +24,11 @@ fn every_row_has_a_valid_generated_grant() {
             .unwrap_or_else(|why| panic!("{}: {why}", row.module));
         assert!(grant.writable);
         let items = module_items(row.owner);
+        // tinyconnectors also carries its one v1 collection (see `grant_for`).
+        let v1_extra = usize::from(row.module == tinyconnectors::MODULE_ID);
         assert_eq!(
             grant.collections.len(),
-            items.collections.len(),
+            items.collections.len() + v1_extra,
             "{}",
             row.module
         );
@@ -97,5 +99,30 @@ fn tinyjuice_reaches_only_its_blob_prefix() {
         Object::Blobs,
         "Get",
         json!({"key": "other/abc"})
+    ));
+}
+
+#[test]
+fn tinyconnectors_grant_covers_the_names_the_pinned_release_writes() {
+    let grant = declared("tinyconnectors").unwrap();
+    // v1 names, written by the released module the registry pins.
+    assert!(allowed(
+        &grant,
+        Object::Documents,
+        "Get",
+        json!({"collection": "composio-user-scopes", "id": "gmail"})
+    ));
+    assert!(allowed(
+        &grant,
+        Object::Streams,
+        "Append",
+        json!({"stream": "triggers/2026-10-12", "entries": []})
+    ));
+    // v2 names, from the gitlink schema.
+    assert!(allowed(
+        &grant,
+        Object::Documents,
+        "Get",
+        json!({"collection": "connectors.user_scopes", "id": "gmail"})
     ));
 }
