@@ -453,32 +453,6 @@ impl ToolMiddleware<(), crate::agent::tinyagents::host::OpenHumanRunContext>
         call: TaToolCall,
         next: ToolHandler<'_, (), crate::agent::tinyagents::host::OpenHumanRunContext>,
     ) -> TaResult<MiddlewareToolOutcome> {
-        // OpenHuman's concrete channel permission ceiling runs before the
-        // owner policy gate and cannot be waived by the builder policy.
-        #[cfg(feature = "modules")]
-        let desktop_approval_disabled = match self.host.resolve_tool(&call.name) {
-            Some(tool) => {
-                crate::desktop::control::approvals_disabled_for(
-                    &ctx.data.dispatch_ctx(),
-                    tool.as_ref(),
-                )
-                .await
-            }
-            None => false,
-        };
-        #[cfg(not(feature = "modules"))]
-        let desktop_approval_disabled = false;
-        if let Some(message) = self
-            .host
-            .channel_permission_block(&call, desktop_approval_disabled)
-        {
-            tracing::debug!(
-                tool = call.name.as_str(),
-                channel = self.host.channel.as_str(),
-                "[tinyagents::mw] tool blocked by channel permission ceiling"
-            );
-            return Ok(MiddlewareToolOutcome::Result(TaToolResult::error(message)));
-        }
         self.gate.wrap_tool(ctx, state, call, next).await
     }
 }
