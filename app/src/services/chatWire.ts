@@ -89,9 +89,23 @@ export type ChatInferenceStartEvent = WireEvent<'inference_start'>;
 export type ChatInferenceHeartbeatEvent = WireEvent<'inference_heartbeat'>;
 export type ChatIterationStartEvent = WireEvent<'iteration_start', 'round' | 'message'>;
 
+/**
+ * Fields the schema does not carry and the current core never sends: they
+ * exist only for the segmented-delivery path and the flat-token fallback in
+ * the chat runtime, which read replayed/older-core events. Delete them with
+ * those paths.
+ */
+interface LegacyDoneFields {
+  segment_total?: number | null;
+  /** @deprecated superseded by `usage`. */
+  total_input_tokens?: number;
+  /** @deprecated superseded by `usage`. */
+  total_output_tokens?: number;
+}
+
 export type ChatDoneEvent = Omit<WireEvent<'chat_done', 'full_response'>, 'citations'> & {
   citations?: ChatCitation[] | null;
-};
+} & LegacyDoneFields;
 
 export type ChatSegmentEvent = WireEvent<
   'chat_segment',
@@ -110,6 +124,12 @@ export type ChatCancelledEvent = WireEvent<'chat_cancelled'>;
 export type ProactiveMessageEvent = WireEvent<'proactive_message', 'full_response'>;
 
 export type ExternalTransferPendingEvent = WireEvent<'external_transfer_pending'>;
+
+/** The egress descriptor the core packs into `external_transfer_pending.args`. */
+export function externalTransferProvider(event: ExternalTransferPendingEvent): string | undefined {
+  const slug = (event.args as { provider_slug?: unknown } | undefined)?.provider_slug;
+  return typeof slug === 'string' ? slug : undefined;
+}
 
 // ── Streaming ────────────────────────────────────────────────────────────────
 
@@ -160,11 +180,19 @@ export type ChatApprovalRequestEvent = Omit<
 > & { args?: Record<string, unknown> };
 
 /**
- * `approval_decided`: the terminal outcome rides `cancel_reason` on the wire
- * (`expired`, `cancelled`, or the decision echo), so `resolution` is read
- * from there rather than from a field of its own.
+ * `approval_decided` as consumers see it. The wire carries the terminal
+ * outcome in `cancel_reason` (`expired`, `cancelled`, or a decision echo);
+ * {@link decodeApprovalDecided} lifts it into `resolution`.
  */
-export type ChatApprovalDecidedEvent = WireEvent<'approval_decided'>;
+export type ChatApprovalDecidedEvent = WireEvent<'approval_decided'> & {
+  resolution?: 'expired' | 'cancelled' | string;
+};
+
+export function decodeApprovalDecided(
+  wire: WireEvent<'approval_decided'>
+): ChatApprovalDecidedEvent {
+  return { ...wire, resolution: wire.cancel_reason };
+}
 
 export type ChatPlanReviewRequestEvent = Omit<
   WireEvent<'plan_review_request', 'message'>,
@@ -197,18 +225,19 @@ export type ChatThreadGoalUpdatedEvent = Omit<WireEvent<'thread_goal_updated'>, 
   goal: ThreadGoal;
 };
 export type ChatThreadGoalClearedEvent = WireEvent<'thread_goal_cleared'>;
-export type ChatRunModeChangedEvent = WireEvent<'run_mode_changed'>;
-
 export type RunMode = 'plan' | 'build';
 
-/** The mode a `run_mode_changed` carries; the wire puts it in `message`. */
-export function runModeOf(event: ChatRunModeChangedEvent): RunMode | null {
-  return event.message === 'plan' || event.message === 'build' ? event.message : null;
-}
+/** `run_mode_changed` as consumers see it; the wire carries the mode in `message`. */
+export type ChatRunModeChangedEvent = Omit<WireEvent<'run_mode_changed'>, 'message'> & {
+  mode: RunMode;
+};
 
-/** The terminal outcome of an `approval_decided`; the wire puts it in `cancel_reason`. */
-export function approvalResolutionOf(event: ChatApprovalDecidedEvent): string | undefined {
-  return event.cancel_reason;
+/** Lift the wire's `message` into `mode`; `null` when it is not a known mode. */
+export function decodeRunModeChanged(
+  wire: WireEvent<'run_mode_changed'>
+): ChatRunModeChangedEvent | null {
+  const { message, ...rest } = wire;
+  return message === 'plan' || message === 'build' ? { ...rest, mode: message } : null;
 }
 
 // ── Artifacts ────────────────────────────────────────────────────────────────

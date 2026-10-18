@@ -541,7 +541,7 @@ export function subscribeChatEvents(listeners: ChatEventListeners): () => void {
 
   if (listeners.onApprovalDecided) {
     const cb = (payload: unknown) => {
-      const e = payload as ChatApprovalDecidedEvent;
+      const e = decodeApprovalDecided(payload as WireEvent<'approval_decided'>);
       chatLog(
         '%s thread_id=%s request_id=%s resolution=%s',
         EVENTS.approvalDecided,
@@ -602,7 +602,11 @@ export function subscribeChatEvents(listeners: ChatEventListeners): () => void {
 
   if (listeners.onRunModeChanged) {
     const cb = (payload: unknown) => {
-      const e = payload as ChatRunModeChangedEvent;
+      const e = decodeRunModeChanged(payload as WireEvent<'run_mode_changed'>);
+      if (!e) {
+        chatLog('%s dropped: unknown mode', EVENTS.runModeChanged);
+        return;
+      }
       chatLog('%s thread_id=%s mode=%s', EVENTS.runModeChanged, e.thread_id, e.mode);
       listeners.onRunModeChanged?.(e);
     };
@@ -812,7 +816,7 @@ export function subscribeChatEvents(listeners: ChatEventListeners): () => void {
         EVENTS.externalTransferPending,
         e.thread_id,
         e.request_id,
-        e.provider
+        externalTransferProvider(e)
       );
       listeners.onExternalTransferPending?.(e);
     };
