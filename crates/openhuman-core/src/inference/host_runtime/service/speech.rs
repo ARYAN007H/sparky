@@ -194,19 +194,28 @@ async fn validated_tts_output_path(
             return Ok(resolved);
         }
     }
-    Err("invalid output_path: path must be inside the workspace or local-ai models directory".into())
+    Err(
+        "invalid output_path: path must be inside the workspace or local-ai models directory"
+            .into(),
+    )
 }
 
 async fn canonicalize_path_with_missing_suffix(path: &std::path::Path) -> Result<PathBuf, String> {
     let mut ancestor = path;
     let mut missing = Vec::new();
     while tokio::fs::metadata(ancestor).await.is_err() {
-        let name = ancestor
-            .file_name()
-            .ok_or_else(|| format!("could not resolve allowed TTS path root: {}", path.display()))?;
+        let name = ancestor.file_name().ok_or_else(|| {
+            format!(
+                "could not resolve allowed TTS path root: {}",
+                path.display()
+            )
+        })?;
         missing.push(name.to_os_string());
         ancestor = ancestor.parent().ok_or_else(|| {
-            format!("could not resolve allowed TTS path root: {}", path.display())
+            format!(
+                "could not resolve allowed TTS path root: {}",
+                path.display()
+            )
         })?;
     }
     let mut resolved = tokio::fs::canonicalize(ancestor)

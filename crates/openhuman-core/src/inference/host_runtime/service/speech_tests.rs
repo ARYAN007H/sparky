@@ -17,7 +17,10 @@ async fn tts_rejects_empty_text_before_resolving_piper() {
 
     let error = tts(&service, &config, " \n\t ", None).await.unwrap_err();
 
-    assert!(error.contains("text is required"), "unexpected error: {error}");
+    assert!(
+        error.contains("text is required"),
+        "unexpected error: {error}"
+    );
 }
 
 #[tokio::test]
@@ -27,14 +30,9 @@ async fn tts_rejects_output_outside_allowed_roots() {
     let service = LocalAiService::new(&crate::inference::local_runtime_config(&config));
     let output = tmp.path().join("outside").join("speech.wav");
 
-    let error = tts(
-        &service,
-        &config,
-        "hello",
-        Some(output.to_str().unwrap()),
-    )
-    .await
-    .unwrap_err();
+    let error = tts(&service, &config, "hello", Some(output.to_str().unwrap()))
+        .await
+        .unwrap_err();
 
     assert!(error.contains("output_path"), "unexpected error: {error}");
     assert!(!output.parent().unwrap().exists());
@@ -53,13 +51,9 @@ async fn tts_output_path_allows_workspace_and_local_ai_models_roots() {
         config.workspace_dir.join("speech.wav"),
         model_root.join("speech.wav"),
     ] {
-        let resolved = validated_tts_output_path(
-            &config,
-            &runtime,
-            Some(output.to_str().unwrap()),
-        )
-        .await
-        .unwrap();
+        let resolved = validated_tts_output_path(&config, &runtime, Some(output.to_str().unwrap()))
+            .await
+            .unwrap();
         assert!(resolved.ends_with("speech.wav"));
     }
 }
@@ -71,13 +65,9 @@ async fn tts_output_path_rejects_traversal() {
     let runtime = crate::inference::local_runtime_config(&config);
     let traversal = config.workspace_dir.join("../outside/speech.wav");
 
-    let error = validated_tts_output_path(
-        &config,
-        &runtime,
-        Some(traversal.to_str().unwrap()),
-    )
-    .await
-    .unwrap_err();
+    let error = validated_tts_output_path(&config, &runtime, Some(traversal.to_str().unwrap()))
+        .await
+        .unwrap_err();
 
     assert!(error.contains("output_path"));
 }
@@ -94,13 +84,9 @@ async fn tts_output_path_rejects_symlink_escape() {
     std::os::unix::fs::symlink(&outside, &link).unwrap();
     let output = link.join("speech.wav");
 
-    let error = validated_tts_output_path(
-        &config,
-        &runtime,
-        Some(output.to_str().unwrap()),
-    )
-    .await
-    .unwrap_err();
+    let error = validated_tts_output_path(&config, &runtime, Some(output.to_str().unwrap()))
+        .await
+        .unwrap_err();
 
     assert!(error.contains("output_path"));
 }
@@ -112,13 +98,9 @@ async fn tts_output_path_keeps_always_forbidden_paths_blocked() {
     let config = enabled_config(&tmp);
     let runtime = crate::inference::local_runtime_config(&config);
 
-    let error = validated_tts_output_path(
-        &config,
-        &runtime,
-        Some("/etc/openhuman-tts-test.wav"),
-    )
-    .await
-    .unwrap_err();
+    let error = validated_tts_output_path(&config, &runtime, Some("/etc/openhuman-tts-test.wav"))
+        .await
+        .unwrap_err();
 
     assert!(error.contains("output_path"));
 }
