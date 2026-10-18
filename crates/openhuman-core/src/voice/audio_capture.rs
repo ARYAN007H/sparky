@@ -51,7 +51,7 @@ pub async fn start_recording(config: &Config) -> Result<RecordingHandle, String>
         .microphone_permission(true)
         .await
         .map_err(|e| e.to_string())?;
-    let lease = CaptureLease::reserve(config, Kind::Recording).await?;
+    let lease = CaptureLease::reserve(config).await?;
     lease.start_recording().await?;
     Ok(RecordingHandle {
         inner: Some(lease),
