@@ -3120,6 +3120,18 @@ async fn json_rpc_cron_manual_worker_survives_caller_cancel_on_published_tinyflo
         )
         .session_agent("published-cron-live-agent"),
     );
+    let operator_scope = CoreContext::scope(Arc::clone(&default_context), async {
+        openhuman_core::storage::current_scope().unwrap()
+    })
+    .await;
+    let agent_scope = CoreContext::scope(Arc::clone(&agent_context), async {
+        openhuman_core::storage::current_scope().unwrap()
+    })
+    .await;
+    assert_ne!(
+        operator_scope, agent_scope,
+        "the live-agent invocation uses a distinct document scope"
+    );
     let first_job = CoreContext::scope(Arc::clone(&default_context), async {
         openhuman_core::cron::system_jobs::ensure_system_job(
             &config,
@@ -3180,14 +3192,20 @@ async fn json_rpc_cron_manual_worker_survives_caller_cancel_on_published_tinyflo
     let second_config = config.clone();
     let second_job_id = second_job.id.clone();
     let second_context = Arc::clone(&agent_context);
-    let second = tokio::spawn(async move {
+    let mut second = tokio::spawn(async move {
         let dispatch = DispatchCtx::new(second_context);
         openhuman_core::cron::ops::run_job_now(&dispatch, &second_config, &second_job_id).await
     });
-    tokio::time::timeout(Duration::from_secs(10), scope_started_rx.recv())
-        .await
-        .expect("a distinct document scope independently starts the same job id")
-        .expect("scope handler channel remains open");
+    tokio::select! {
+        result = &mut second => panic!(
+            "a distinct document scope refused the same job id before its callback: {result:?}"
+        ),
+        started = tokio::time::timeout(Duration::from_secs(10), scope_started_rx.recv()) => {
+            started
+                .expect("a distinct document scope independently starts the same job id")
+                .expect("scope handler channel remains open");
+        }
+    }
     scope_release.add_permits(2);
     assert!(second.await.unwrap().unwrap().0);
     let (operator_runs, agent_runs) = tokio::time::timeout(Duration::from_secs(10), async {
