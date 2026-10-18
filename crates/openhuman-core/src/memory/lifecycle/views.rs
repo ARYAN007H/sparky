@@ -169,7 +169,7 @@ fn validate_build_delay_secs(value: Option<u64>) -> Result<Option<u64>> {
         .is_none()
     {
         return Err(Error::InvalidRequest((
-            "build_delay_secs must fit within the supported date range",
+            "build_delay_secs must fit within the supported date range"
         ).into()));
     }
     Ok(Some(seconds))

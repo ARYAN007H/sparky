@@ -6,7 +6,7 @@
 
 use std::path::{Path, PathBuf};
 
-use tinymemory_tools::layout_migration::{Error, Result};
+use tinymemory_tools::layout_migration::{Error as MigrationError, Result as MigrationResult};
 
 use super::{MigrationState, MigrationStateStore};
 use tinymemory_api::{Error, Result};
@@ -34,12 +34,12 @@ impl FileStateStore {
 }
 
 impl MigrationStateStore for FileStateStore {
-    fn load(&self) -> Result<MigrationState> {
-        load(&self.workspace_dir).map_err(|error| Error::State(detail(error)))
+    fn load(&self) -> MigrationResult<MigrationState> {
+        load(&self.workspace_dir).map_err(|error| MigrationError::State(detail(error)))
     }
 
-    fn save(&self, state: &MigrationState) -> Result<()> {
-        save(&self.workspace_dir, state).map_err(|error| Error::State(detail(error)))
+    fn save(&self, state: &MigrationState) -> MigrationResult<()> {
+        save(&self.workspace_dir, state).map_err(|error| MigrationError::State(detail(error)))
     }
 }
 
