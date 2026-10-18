@@ -157,7 +157,10 @@ pub(crate) fn user_text_with_markers(msg: &Message) -> String {
 /// Blocks are emitted in **source order** — prose and images interleave as the
 /// user wrote them, so a caption stays next to its image. A marker whose payload
 /// is empty or malformed is kept verbatim as text. Local references are
-/// resolved by the host model decorator before provider serialization.
+/// resolved by the host model decorator before provider serialization. If no
+/// marker is lifted, the owner helper keeps the original text (including
+/// whitespace around an empty or malformed marker); this also removes the old
+/// host helper's incidental trimming of that text.
 fn user_content_blocks(text: String) -> Vec<ContentBlock> {
     if !crate::attachments::parse(&text).1.is_empty() {
         if let Message::User(user) = user_message_from_text(&text) {
