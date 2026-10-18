@@ -658,3 +658,30 @@ async fn selected_historical_unsupported_media_url_still_fails_before_inference(
     assert!(error.to_string().contains("unsupported media URL scheme"));
     assert!(transport.requests.lock().unwrap().is_empty());
 }
+
+#[cfg(unix)]
+#[tokio::test]
+async fn typed_path_and_url_kinds_remain_distinct_for_opaque_file_sources() {
+    let temp = tempfile::tempdir().unwrap();
+    tokio::fs::write(temp.path().join("file:fixture.txt"), b"authorized path")
+        .await
+        .unwrap();
+    let config = offline_config(temp.path());
+    let transport = Arc::new(CaptureModel::new(vec![]));
+    let model = controlled_wrapper(transport.clone(), config, &[]);
+
+    let path = user_request(vec![ContentBlock::Document(MediaRef::Path {
+        path: "file:fixture.txt".into(),
+        media_type: Some("text/plain".into()),
+    })]);
+    model.invoke(&(), path).await.unwrap();
+    assert_eq!(transport.requests.lock().unwrap().len(), 1);
+
+    let url = user_request(vec![ContentBlock::Document(MediaRef::Url {
+        url: "file:fixture.txt".into(),
+        media_type: Some("text/plain".into()),
+    })]);
+    let error = model.invoke(&(), url).await.unwrap_err();
+    assert!(error.to_string().contains("unsupported media URL scheme"));
+    assert_eq!(transport.requests.lock().unwrap().len(), 1);
+}
