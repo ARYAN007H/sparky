@@ -97,3 +97,42 @@ fn host_outcome_terminal_record_round_trips_through_json_bytes() {
         Some(definition.agent_tier.as_str())
     );
 }
+
+#[test]
+fn classified_stop_cause_survives_the_neutral_subagent_projection() {
+    let definitions =
+        crate::agent_registry::host_definition::AgentDefinitionRegistry::builtins_only();
+    let definition = definitions.get("orchestrator").unwrap();
+    let cause = tinyagents_harness::no_progress::ClassifiedStopCause {
+        class: "permission".into(),
+        operation: "shell".into(),
+        summary: "permission blocked shell".into(),
+    };
+    let outcome = SubagentRunOutcome {
+        task_id: "stopped-task".into(),
+        agent_id: definition.id.clone(),
+        output: "partial progress".into(),
+        iterations: 1,
+        failure_cause: Some(cause),
+        elapsed: std::time::Duration::ZERO,
+        mode: crate::agent::subagent_host::SubagentMode::Typed,
+        status: SubagentRunStatus::Incomplete {
+            reason: "permission blocked shell".into(),
+        },
+        final_history: Vec::new(),
+        usage: SubagentUsage::default(),
+        artifact_paths: Vec::new(),
+        persistence_disposition:
+            tinyagents_orchestration::subagent::SubagentPersistenceDisposition::TerminalInserted,
+    };
+
+    let neutral = host_outcome_to_neutral(outcome, definition, &SubagentRunOptions::default());
+    assert_eq!(
+        neutral.extensions["failure_cause"],
+        serde_json::json!({
+            "class": "permission",
+            "operation": "shell",
+            "summary": "permission blocked shell",
+        })
+    );
+}
