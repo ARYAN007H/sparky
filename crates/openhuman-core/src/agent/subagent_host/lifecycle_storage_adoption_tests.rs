@@ -278,9 +278,9 @@ async fn assert_legacy_owner_terminal(format: &str) {
         serde_json::from_slice(&std::fs::read(&file).unwrap()).unwrap();
     if format == "bare" {
         record = record["outcome"].clone();
-        record["extensions"]["agent_id"] = serde_json::json!("legacy-owner");
-        record["extensions"]["elapsed_ms"] = serde_json::json!(41);
-        record["extensions"]["legacy_extra"] = serde_json::json!({"kept": true});
+        record["agent_id"] = serde_json::json!("legacy-owner");
+        record["elapsed_ms"] = serde_json::json!(41);
+        record["legacy_extra"] = serde_json::json!({"kept": true});
     } else {
         if format == "keyless" {
             record.as_object_mut().unwrap().remove("key");
