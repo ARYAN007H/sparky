@@ -41,15 +41,15 @@ async fn missing_historical_media_does_not_block_latest_valid_media() {
             })
         })
         .collect::<Vec<_>>();
+    old_content.push(ContentBlock::Document(MediaRef::Url {
+        url: "ftp://docs.example.test/old.pdf?signature=document-private".into(),
+        media_type: Some("application/pdf".into()),
+    }));
     old_content.extend((0..8).map(|index| {
         ContentBlock::Image(ImageRef {
             url: format!("deleted-prior-upload-{index}.png"),
             mime_type: Some("image/png".into()),
         })
-    }));
-    old_content.push(ContentBlock::Document(MediaRef::Url {
-        url: "ftp://docs.example.test/old.pdf?signature=document-private".into(),
-        media_type: Some("application/pdf".into()),
     }));
     let old_user = Message::User(tinyinference_llm::message::UserMessage {
         content: old_content,
