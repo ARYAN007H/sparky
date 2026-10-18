@@ -91,7 +91,10 @@ async fn a_failed_hand_over_leaves_no_marker_so_the_next_start_retries() {
     let ws = workspace_with(Some(SNAPSHOT));
     let file = legacy_file(ws.path());
     let scoped = scoped();
-    let failed = import_into(&scoped, &file, |_| async { Err(anyhow::anyhow!("bus down")) }).await;
+    let failed = import_into(&scoped, &file, |_| async {
+        Err(anyhow::anyhow!("bus down"))
+    })
+    .await;
     assert!(failed.is_err());
     let retry = import_into(&scoped, &file, |_| async { Ok(false) })
         .await
