@@ -2,9 +2,16 @@
 
 #[path = "support/published_tinyflows.rs"]
 mod published_tinyflows;
+#[path = "support/env_guard.rs"]
+mod env_guard;
+
+use env_guard::EnvVarGuard;
 
 #[tokio::test]
 async fn published_module_prompts_render_through_the_normal_host_path() {
+    let _source_guard = EnvVarGuard::unset("OPENHUMAN_MODULE_SOURCE");
+    let _source_dir_guard = EnvVarGuard::unset("OPENHUMAN_MODULE_SOURCE_DIR");
+    let _tinyflows_source_guard = EnvVarGuard::unset("OPENHUMAN_MODULE_SOURCE_TINYFLOWS");
     let (library, _) = published_tinyflows::staged_v0_8_26_module();
     let temp = tempfile::tempdir().expect("scratch directory");
     let workspace = temp.path().join("workspace");

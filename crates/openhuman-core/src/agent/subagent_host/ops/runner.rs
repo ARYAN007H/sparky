@@ -556,7 +556,7 @@ async fn load_typed_prompt_source(
 ) -> Result<String, SubagentRunError> {
     #[cfg(feature = "flows")]
     let flow_archetype_text = crate::agent::prompts::flow_archetype::load_for_definition(
-        config.as_ref().ok().map(AsRef::as_ref),
+        config.as_ref().ok().map(|config| config.as_ref()),
         definition,
     )
     .await?;
