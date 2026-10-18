@@ -1,4 +1,8 @@
 use super::*;
+use tinyagents_graph::GraphObservation;
+use tinyflows::engine::GraphObservation as FlowObservation;
+use tinyflows::observe::to_exporter_observations;
+use tinyflows_bus::runs::FlowRunTrigger as BusFlowRunTrigger;
 
 /// Builds the `TrustedAutomation { Workflow }` origin scoped around every
 /// `flows_run` / `flows_resume` invocation. See `flows_run`'s doc for why
@@ -57,17 +61,35 @@ pub(super) async fn export_run_to_langfuse(
         observation_count = observations.len(),
         "[flows] exporting flow run trace to Langfuse"
     );
-    crate::flows::tinyflows::langfuse_export::export_flow_run_trace(
+    let observations = exporter_observations(&observations);
+    crate::agent::progress_tracing::export_graph_run_trace(
         config,
         flow_name,
         flow_id,
         thread_id,
         status,
-        trigger,
+        flow_trigger(trigger),
         &observations,
     )
     .await;
 }
+
+fn exporter_observations(observations: &[FlowObservation]) -> Vec<GraphObservation> {
+    to_exporter_observations(observations)
+}
+
+fn flow_trigger(trigger: FlowRunTrigger) -> BusFlowRunTrigger {
+    match trigger {
+        FlowRunTrigger::Rpc => BusFlowRunTrigger::Rpc,
+        FlowRunTrigger::Schedule => BusFlowRunTrigger::Schedule,
+        FlowRunTrigger::AppEvent => BusFlowRunTrigger::AppEvent,
+        FlowRunTrigger::Resume => BusFlowRunTrigger::Resume,
+    }
+}
+
+#[cfg(test)]
+#[path = "execution_tests.rs"]
+mod tests;
 
 /// Executes an already-prepared, already-`running`-row-inserted flow run to a
 /// terminal state, finalizing the `flow_runs` row on every exit path.
