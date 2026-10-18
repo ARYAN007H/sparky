@@ -14,6 +14,7 @@ use tinyinference_llm::{
 
 pub(crate) fn wrap(
     ctx: &crate::core::runtime::DispatchCtx,
+    inner: Arc<dyn ChatModel<()>>,
     config: Arc<Config>,
     model: &str,
     provider: &str,
@@ -73,6 +74,7 @@ pub(crate) fn wrap(
 /// Transport support is still required for every native media block.
 pub(crate) fn wrap_injected(
     ctx: &crate::core::runtime::DispatchCtx,
+    inner: Arc<dyn ChatModel<()>>,
     config: Arc<Config>,
 ) -> Arc<dyn ChatModel<()>> {
     let profile = inner.profile().cloned().unwrap_or_default();

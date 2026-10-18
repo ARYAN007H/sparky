@@ -121,12 +121,13 @@ impl MediaSourceResolver<AttachmentAccessScope> for AttachmentModel {
             mime,
         });
         if recovered {
-            resolved = resolved.with_annotation(format!(
+            let annotation = format!(
                 "[Recovered attachment: {}; {} bytes; workspace path: {}]",
                 resolved.attachment.mime,
                 resolved.attachment.size_bytes,
                 resolved.attachment.name
-            ));
+            );
+            resolved = resolved.with_annotation(annotation);
         }
         Ok(resolved)
     }
