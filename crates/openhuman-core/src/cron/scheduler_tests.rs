@@ -174,7 +174,16 @@ async fn retryable_shell_failure_consumes_the_whole_retry_budget() {
     config.reliability.provider_backoff_ms = 200;
 
     let counter = tmp.path().join("retryable-attempts.log");
-    let job = test_job(&counting_failure_command(&counter));
+    let command = counting_failure_command(&counter);
+    let job = cron::add_shell_job(
+        &config,
+        None,
+        tinyflows_bus::schedule::types::Schedule::Every {
+            every_ms: 3_600_000,
+        },
+        &command,
+    )
+    .unwrap();
 
     let (success, output) = execute_job_now(
         &crate::core::runtime::DispatchCtx::ambient(),
@@ -228,7 +237,16 @@ async fn security_policy_block_halts_without_spending_the_retry_budget() {
     config.autonomy.level = AutonomyLevel::ReadOnly;
 
     let counter = tmp.path().join("blocked-attempts.log");
-    let job = test_job(&counting_failure_command(&counter));
+    let command = counting_failure_command(&counter);
+    let job = cron::add_shell_job(
+        &config,
+        None,
+        tinyflows_bus::schedule::types::Schedule::Every {
+            every_ms: 3_600_000,
+        },
+        &command,
+    )
+    .unwrap();
     let security =
         SecurityPolicy::from_config(&config.autonomy, &config.workspace_dir, &config.action_dir);
     // Fixture guard: if the policy still permits acting, the command would run
