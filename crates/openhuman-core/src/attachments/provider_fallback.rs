@@ -212,7 +212,7 @@ impl AttachmentModel {
         Ok((self.limit_context(text), cacheable))
     }
 
-    fn limit_context(&self, mut text: String) -> String {
+    pub(super) fn limit_context(&self, mut text: String) -> String {
         let (_, _, limit) = self.config.multimodal_files.effective_limits();
         if text.chars().count() > limit {
             text = text.chars().take(limit).collect();
@@ -221,7 +221,7 @@ impl AttachmentModel {
         text
     }
 
-    async fn image_readout(&self, mime: &str, bytes: &[u8]) -> tinyinference_llm::Result<String> {
+    pub(super) async fn image_readout(&self, mime: &str, bytes: &[u8]) -> tinyinference_llm::Result<String> {
         if bytes.is_empty() {
             return Err(tinyinference_llm::Error::Model(
                 "image reference has no bytes".into(),

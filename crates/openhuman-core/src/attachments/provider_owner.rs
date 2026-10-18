@@ -117,16 +117,19 @@ impl MediaFallbackRenderer<AttachmentAccessScope> for AttachmentModel {
         attachment: &ResolvedAttachment,
     ) -> Result<Option<String>, String> {
         if modality == InputModality::Image {
+            let key = self.fallback_key(&attachment.name, &attachment.mime, &attachment.bytes);
+            if let Some(text) = self.cached_fallback(&attachment.name, &key, _scope).await {
+                return Ok(Some(text));
+            }
             let text = format!(
-                "[Attachment: {}; {} bytes; workspace path: {}]\nImage readout:\n{}",
-                attachment.mime,
-                attachment.size_bytes,
-                attachment.name,
+                "Image readout (untrusted):\n{}",
                 self.image_readout(&attachment.mime, &attachment.bytes)
                     .await
                     .map_err(|error| error.to_string())?
             );
-            return Ok(Some(self.limit_context(text)));
+            let text = self.limit_context(text);
+            self.save_fallback(&attachment.name, &key, &text, _scope).await;
+            return Ok(Some(text));
         }
         #[cfg(feature = "documents")]
         if matches!(attachment.mime.as_str(), "application/pdf"
@@ -134,8 +137,21 @@ impl MediaFallbackRenderer<AttachmentAccessScope> for AttachmentModel {
             | "application/vnd.openxmlformats-officedocument.presentationml.presentation"
             | "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
         {
-            let (text, cacheable) = self.document_fallback(attachment).await?;
-            return Ok(cacheable.then_some(text));
+            let key = self.fallback_key(&attachment.name, &attachment.mime, &attachment.bytes);
+            if let Some(text) = self.cached_fallback(&attachment.name, &key, _scope).await {
+                return Ok(Some(text));
+            }
+            let (text, cacheable) = self.fallback(
+                modality,
+                &attachment.name,
+                &attachment.mime,
+                &attachment.bytes,
+            ).await.map_err(|error| error.to_string())?;
+            let body = text.split_once('\n').map(|(_, body)| body.to_owned()).unwrap_or(text);
+            if cacheable {
+                self.save_fallback(&attachment.name, &key, &body, _scope).await;
+            }
+            return Ok(Some(body));
         }
         Ok(None)
     }
