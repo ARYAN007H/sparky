@@ -57,7 +57,7 @@ pub(super) fn to_module(error: Error) -> lm::Error {
 /// The module's error as the host's wire taxonomy.
 pub(super) fn from_module(error: lm::Error) -> Error {
     match error {
-        lm::Error::Engine(error) => error.into(),
+        lm::Error::Engine(error) => error,
         lm::Error::Off(message) => Error::Off(message),
         lm::Error::InvalidRequest(message) => Error::InvalidRequest(message),
         lm::Error::State(message) => Error::Engine(message),
