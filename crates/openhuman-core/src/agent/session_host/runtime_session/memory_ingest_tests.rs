@@ -62,7 +62,7 @@ async fn session_pre_and_post_turn_use_the_external_channel_origin_not_event_lab
     use tinymemory_api::{ItemKind, ListRequest, MemoryEngine, MetaFilter};
 
     async fn log_turn(
-        prelude: &OpenHumanTurnPrelude,
+        prelude: &mut OpenHumanTurnPrelude,
         engine: &tinymemory_api::conformance::ReferenceEngine,
         thread_id: &str,
         origin: Option<crate::agent::turn_origin::AgentTurnOrigin>,
@@ -154,7 +154,7 @@ async fn session_pre_and_post_turn_use_the_external_channel_origin_not_event_lab
     )
     .expect("host");
     host.ensure_runtime_session().expect("runtime session");
-    let prelude = host
+    let mut prelude = host
         .runtime_state
         .lock()
         .expect("runtime state")
@@ -166,7 +166,7 @@ async fn session_pre_and_post_turn_use_the_external_channel_origin_not_event_lab
 
     let external = external_channel_origin("  MyCustomProvider  ", "message-1");
     log_turn(
-        &prelude,
+        &mut prelude,
         &engine,
         "external-channel-thread",
         Some(external),
@@ -176,7 +176,7 @@ async fn session_pre_and_post_turn_use_the_external_channel_origin_not_event_lab
 
     use crate::agent::turn_origin::{AgentTurnOrigin, TrustedAutomationSource};
     log_turn(
-        &prelude,
+        &mut prelude,
         &engine,
         "cli-thread",
         Some(AgentTurnOrigin::Cli),
@@ -184,7 +184,7 @@ async fn session_pre_and_post_turn_use_the_external_channel_origin_not_event_lab
     )
     .await;
     log_turn(
-        &prelude,
+        &mut prelude,
         &engine,
         "cron-replay-thread",
         Some(external_channel_origin("telegram", "cron:job-1:run-1")),
