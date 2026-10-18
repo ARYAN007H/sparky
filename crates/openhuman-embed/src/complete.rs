@@ -433,14 +433,19 @@ pub trait CompletionObserver: Send + Sync {
     fn on_complete(&self, trace: &CompletionTrace<'_>);
 }
 
+#[derive(Clone, Default)]
+struct CompleterObservers {
+    completion: Option<Arc<dyn CompletionObserver>>,
+    physical_dispatch: Option<Arc<dyn PhysicalDispatchObserver>>,
+}
+
 /// Runs stateless completions against one [`Route`].
 #[derive(Clone)]
 pub struct Completer {
     route: Route,
     headers: Vec<(String, String)>,
     timeout: Option<Duration>,
-    observer: Option<Arc<dyn CompletionObserver>>,
-    physical_observer: Option<Arc<dyn PhysicalDispatchObserver>>,
+    observers: Arc<CompleterObservers>,
     cancellation: crate::cancellation::Cancellation,
     budget: Option<crate::budget::ModelBudget>,
 }
@@ -451,7 +456,7 @@ impl std::fmt::Debug for Completer {
             .field("route", &self.route)
             .field("headers", &self.headers.len())
             .field("timeout", &self.timeout)
-            .field("observer", &self.observer.is_some())
+            .field("observer", &self.observers.completion.is_some())
             .finish()
     }
 }
@@ -463,8 +468,7 @@ impl Completer {
             headers: route.headers.clone(),
             route,
             timeout: None,
-            observer: None,
-            physical_observer: None,
+            observers: Arc::new(CompleterObservers::default()),
             cancellation: Default::default(),
             budget: None,
         }
@@ -500,7 +504,7 @@ impl Completer {
 
     /// Report every call to `observer`.
     pub fn observer(mut self, observer: Arc<dyn CompletionObserver>) -> Self {
-        self.observer = Some(observer);
+        Arc::make_mut(&mut self.observers).completion = Some(observer);
         self
     }
 
@@ -513,7 +517,7 @@ impl Completer {
     /// separate invocations. Transport-level compatibility retries performed
     /// inside one provider invocation remain part of its event and latency.
     pub fn physical_observer(mut self, observer: Arc<dyn PhysicalDispatchObserver>) -> Self {
-        self.physical_observer = Some(observer);
+        Arc::make_mut(&mut self.observers).physical_dispatch = Some(observer);
         self
     }
 
@@ -546,7 +550,7 @@ impl Completer {
             _ = self.cancellation.cancelled() => Err(CoreError::Cancelled { method: COMPLETE }),
             result = operation => result,
         };
-        if let Some(observer) = &self.observer {
+        if let Some(observer) = &self.observers.completion {
             observer.on_complete(&CompletionTrace {
                 request: &request,
                 outcome: result.as_ref(),
@@ -628,7 +632,7 @@ impl Completer {
             &endpoint,
             request.into_wire(),
             budget.as_ref(),
-            self.physical_observer.clone(),
+            self.observers.physical_dispatch.clone(),
         );
         let started = std::time::Instant::now();
         let response = call.await.map_err(|message| {
