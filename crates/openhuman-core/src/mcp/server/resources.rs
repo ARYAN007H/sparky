@@ -11,7 +11,7 @@
 //! | `IDENTITY.md`       | `openhuman://prompts/identity`           |
 //! | `SOUL.md`           | `openhuman://prompts/soul`               |
 //! | `USER.md`           | `openhuman://prompts/user`               |
-//! | `<id>/prompt.md`    | `openhuman://prompts/agents/<id>`        |
+//! | Agent archetype    | `openhuman://prompts/agents/<id>`        |
 //!
 //! ## Catalog parity
 //!

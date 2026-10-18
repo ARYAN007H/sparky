@@ -50,11 +50,13 @@ fn list_resources_returns_all_catalog_entries() {
 async fn flow_prompt_resource_fails_closed_when_tinyflows_is_disabled() {
     let mut config = crate::config::Config::default();
     config.components.tinyflows = false;
-    let error = read_flow_prompt(
-        &config,
-        "openhuman://prompts/agents/flow_discovery",
-        "flow_discovery",
-    )
+    let ctx = crate::core::runtime::DispatchCtx::new(
+        crate::core::runtime::CoreContext::for_test_with_config(
+            crate::core::runtime::DomainSet::full(),
+            config,
+        ),
+    );
+    let error = read_resource(&ctx, "openhuman://prompts/agents/flow_discovery")
     .await
     .expect_err("disabled TinyFlows must not expose a copied prompt");
     assert_eq!(error.code(), -32603);
@@ -107,21 +109,17 @@ fn read_resource_returns_minus_32002_for_unknown_uri() {
 #[tokio::test]
 async fn read_resource_returns_content_for_each_subagent() {
     use crate::agent::registry::agents::BUILTINS;
-    #[cfg(feature = "flows")]
     let config = crate::config::Config::default();
+    let ctx = crate::core::runtime::DispatchCtx::new(
+        crate::core::runtime::CoreContext::for_test_with_config(
+            crate::core::runtime::DomainSet::full(),
+            config,
+        ),
+    );
     for b in BUILTINS {
         let uri = format!("openhuman://prompts/agents/{}", b.id);
-        #[cfg(feature = "flows")]
-        let result = if let Some(agent_id) = flow_prompt_agent_id(&uri) {
-            read_flow_prompt(&config, &uri, agent_id)
-                .await
-                .unwrap_or_else(|_| panic!("read_resource failed for agent `{}`", b.id))
-        } else {
-            read_static_resource(&uri)
-                .unwrap_or_else(|_| panic!("read_resource failed for agent `{}`", b.id))
-        };
-        #[cfg(not(feature = "flows"))]
-        let result = read_static_resource(&uri)
+        let result = read_resource(&ctx, &uri)
+            .await
             .unwrap_or_else(|_| panic!("read_resource failed for agent `{}`", b.id));
         let text = result["contents"][0]["text"].as_str().unwrap_or("");
         assert!(
