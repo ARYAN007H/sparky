@@ -583,4 +583,3 @@ async fn a_desktop_upgrade_is_lossless_and_leaves_the_legacy_files_untouched() {
     // The user's files were only ever read.
     assert_eq!(tree(workspace), before, "the legacy files changed");
 }
-

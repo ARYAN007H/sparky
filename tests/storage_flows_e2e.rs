@@ -226,4 +226,3 @@ fn copy_tree(from: &std::path::Path, to: &std::path::Path) {
         }
     }
 }
-

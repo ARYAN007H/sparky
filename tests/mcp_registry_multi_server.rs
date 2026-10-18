@@ -6,7 +6,6 @@
 
 #![cfg(feature = "mcp")]
 
-
 use openhuman_core::config::{
     schema::{ModuleOverride, ModulesConfig},
     Config,

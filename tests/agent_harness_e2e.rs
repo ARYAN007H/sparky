@@ -11,12 +11,12 @@
 //! a false positive here — the lock IS the serialization mechanism.
 #![allow(clippy::await_holding_lock)]
 
-#[path = "support/mcp_stub_trusted.rs"]
-mod mcp_stub_trusted;
 #[path = "support/env_guard.rs"]
 mod env_guard;
 #[path = "support/linked_modules.rs"]
 mod linked_modules;
+#[path = "support/mcp_stub_trusted.rs"]
+mod mcp_stub_trusted;
 #[path = "support/scripted_stack.rs"]
 mod scripted_stack;
 #[path = "support/tinyhumans_boot.rs"]

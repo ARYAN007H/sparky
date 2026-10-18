@@ -100,7 +100,11 @@ async fn forgetting_sites_reports_how_many_went() {
 
     assert_eq!(one.unwrap()["forgotten"], 1);
     assert_eq!(every.unwrap()["forgotten"], 1);
-    assert_eq!(left.unwrap(), 0, "nothing may remain after forgetting every site");
+    assert_eq!(
+        left.unwrap(),
+        0,
+        "nothing may remain after forgetting every site"
+    );
     assert!(
         sites.join("books.test.json").exists(),
         "the imported legacy file is left untouched"

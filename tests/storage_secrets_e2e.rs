@@ -127,4 +127,3 @@ fn a_configured_backend_holds_keyring_and_credential_secrets() {
     assert!(http.get("legacy-http").unwrap().is_some());
     assert_eq!(profiles.load().unwrap().profiles.len(), 1);
 }
-

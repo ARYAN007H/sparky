@@ -578,8 +578,7 @@ fn one_runtime_hosts_independently_configured_agents() {
             // completes (see `Agent`), so wait for it rather than assuming the
             // drop is synchronous.
             common::eventually("dropped agents to release their ids", || {
-                (runtime.agent_ids() == vec!["alpha".to_string(), "beta".to_string()])
-                    .then_some(())
+                (runtime.agent_ids() == vec!["alpha".to_string(), "beta".to_string()]).then_some(())
             })
             .await;
             let _gamma_again = runtime

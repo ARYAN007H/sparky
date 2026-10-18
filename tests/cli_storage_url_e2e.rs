@@ -116,4 +116,3 @@ fn a_second_process_reads_what_a_one_shot_wrote_to_the_backend() {
         "the job lives in the backend, not in files"
     );
 }
-

@@ -31,7 +31,11 @@ fn configured_grants_pass_the_host_floor() {
         "/no/such/dir/anywhere".into(),
     ];
     let sandbox = stdio_sandbox(&config).expect("a sandbox");
-    let granted = granted.canonicalize().unwrap().to_string_lossy().into_owned();
+    let granted = granted
+        .canonicalize()
+        .unwrap()
+        .to_string_lossy()
+        .into_owned();
     assert_eq!(sandbox.read_only, vec![granted]);
 }
 
@@ -45,7 +49,13 @@ fn isolation_floor_is_required_except_for_the_macos_desktop() {
 fn a_grant_that_contains_a_credential_store_is_not_admitted() {
     let home = Path::new("/home/user");
     assert!(exposes_credentials(Path::new("/home/user"), Some(home)));
-    assert!(exposes_credentials(Path::new("/home/user/.ssh"), Some(home)));
-    assert!(!exposes_credentials(Path::new("/home/user/tools"), Some(home)));
+    assert!(exposes_credentials(
+        Path::new("/home/user/.ssh"),
+        Some(home)
+    ));
+    assert!(!exposes_credentials(
+        Path::new("/home/user/tools"),
+        Some(home)
+    ));
     assert!(!exposes_credentials(Path::new("/home/user"), None));
 }

@@ -19,8 +19,8 @@
 //! forward (`ensure_migrated` in `storage_host`).
 
 use super::storage_grants::StorageGrant;
-use tinystoragedrivers::CollectionSpec;
 use crate::storage::schema::module_items;
+use tinystoragedrivers::CollectionSpec;
 
 /// One module's row: its registry id, the schema owner that declares its
 /// storage, and secret prefixes the schema cannot name.

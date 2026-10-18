@@ -163,4 +163,3 @@ async fn the_delegation_checkpointer_resumes_and_keeps_scopes_apart() {
     assert!(AgentContextRegistry::deregister("agent-alpha", &alpha));
     assert!(AgentContextRegistry::deregister("agent-beta", &beta));
 }
-

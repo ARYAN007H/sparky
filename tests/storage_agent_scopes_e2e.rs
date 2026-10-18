@@ -284,4 +284,3 @@ async fn no_acting_agent_falls_back_to_the_local_scope() {
     );
     assert!(AgentContextRegistry::deregister("agent-gamma", &agent));
 }
-

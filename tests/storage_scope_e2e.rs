@@ -130,4 +130,3 @@ async fn background_work_visits_every_agent_scope() {
     );
     assert!(recorded.contains(&(None, Vec::new())), "{recorded:?}");
 }
-

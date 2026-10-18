@@ -518,4 +518,3 @@ async fn conditional_append_passes_through(inner: Arc<dyn StorageBackend>) {
 async fn fenced_memory_backend_passes_conditional_appends_through() {
     conditional_append_passes_through(shared()).await;
 }
-

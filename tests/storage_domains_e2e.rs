@@ -99,4 +99,3 @@ fn a_configured_backend_holds_devices_notifications_and_task_sources() {
     assert!(task_sources::list_sources(&config).unwrap().is_empty());
     assert!(workspace.path().join("storage/storage.db").exists());
 }
-

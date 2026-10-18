@@ -179,14 +179,21 @@ fn registry_stdio_servers_get_the_host_jail_and_are_never_operator_trusted() {
         .expect("tinymcp refuses stdio servers without a stdio_sandbox");
     assert!(std::path::Path::new(&sandbox.workspace).is_dir());
     assert!(sandbox.workspace.starts_with(
-        &tmp.path().canonicalize().unwrap().to_string_lossy().into_owned()
+        &tmp.path()
+            .canonicalize()
+            .unwrap()
+            .to_string_lossy()
+            .into_owned()
     ));
     assert_eq!(
         sandbox.require_process_isolation,
         super::super::host_sandbox::require_process_isolation(false)
     );
     assert!(
-        converted.servers.iter().all(|server| !server.operator_trusted),
+        converted
+            .servers
+            .iter()
+            .all(|server| !server.operator_trusted),
         "the host must not vouch for servers it did not configure as trusted"
     );
 }
