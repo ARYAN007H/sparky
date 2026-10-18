@@ -44,7 +44,7 @@ process-global `tokio::sync::broadcast` channels that the Socket.IO server in
 [`crates/openhuman-rpc`](../../../openhuman-rpc/) subscribes to and forwards. Notifications get onto
 their channel through `NotificationBridgeSubscriber` (`notifications::bridge`),
 which translates selected `DomainEvent`s; it is registered at startup from
-[`core/runtime/subscribers.rs`](../core/runtime/subscribers.rs). 
+[`core/runtime/subscribers.rs`](../core/runtime/subscribers.rs).
 
 ### Desktop control
 
