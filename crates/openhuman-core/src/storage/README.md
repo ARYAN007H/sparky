@@ -288,6 +288,15 @@ without fencing).
   (`OPENHUMAN_KEYRING_MASTER_KEY` / `_FILE`, else the OS keychain); with no
   master key they fail closed. The config encryption key stays on the
   process keyring, because `config.toml` is loaded before any agent acts.
+  The layout migration (`storage/layout/credentials.rs`) imports the profile's
+  `auth-profiles.json` and `http-credentials.json` into the `local` scope's
+  secrets, verifies the read-back, archives them (`profile/` in the archive,
+  restored beside `config.toml`) and deletes them. It skips them (files stay,
+  adopted lazily) when no master key is resolvable without minting one, or
+  the file is not JSON; a stored record that does not decrypt with the current
+  key fails the migration. The shared `secrets.enc`, `keyring/master.key` and
+  `dev-keychain.json` are process-level, outside every profile's plan, and are
+  never written into `storage.db`.
 
 ## Background work and agent scopes
 
