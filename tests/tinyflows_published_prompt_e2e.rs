@@ -9,13 +9,20 @@ use env_guard::EnvVarGuard;
 
 #[tokio::test]
 async fn published_module_prompts_render_through_the_normal_host_path() {
+    let _env_lock = env_guard::env_lock_async().await;
+    let temp = tempfile::tempdir().expect("isolated home and workspace");
+    let _home_guard = EnvVarGuard::set_to_path("HOME", temp.path());
+    let _backend_url_guard = EnvVarGuard::unset("BACKEND_URL");
+    let _vite_backend_guard = EnvVarGuard::unset("VITE_BACKEND_URL");
+    let _api_key_guard = EnvVarGuard::unset("OPENHUMAN_BACKEND_API_KEY");
+    let _session_guard = EnvVarGuard::unset("OPENHUMAN_BACKEND_SESSION_TOKEN");
     let _source_guard = EnvVarGuard::unset("OPENHUMAN_MODULE_SOURCE");
     let _source_dir_guard = EnvVarGuard::unset("OPENHUMAN_MODULE_SOURCE_DIR");
     let _tinyflows_source_guard = EnvVarGuard::unset("OPENHUMAN_MODULE_SOURCE_TINYFLOWS");
     let (library, _) = published_tinyflows::staged_v0_8_26_module();
-    let temp = tempfile::tempdir().expect("scratch directory");
     let workspace = temp.path().join("workspace");
     std::fs::create_dir_all(&workspace).expect("workspace directory");
+    let _workspace_guard = EnvVarGuard::set_to_path("OPENHUMAN_WORKSPACE", &workspace);
     let config_path = temp.path().join("config.toml");
     let quoted_library = serde_json::to_string(
         library
@@ -26,7 +33,7 @@ async fn published_module_prompts_render_through_the_normal_host_path() {
     std::fs::write(
         &config_path,
         format!(
-            "[components]\ntinyflows = true\n\n[modules]\nenabled = true\n\n[[modules.overrides]]\nid = \"tinyflows\"\npath = {quoted_library}\n"
+            "api_url = \"http://127.0.0.1:1\"\n\n[components]\ntinyflows = true\n\n[modules]\nenabled = true\n\n[[modules.overrides]]\nid = \"tinyflows\"\npath = {quoted_library}\n"
         ),
     )
     .expect("module override config");
