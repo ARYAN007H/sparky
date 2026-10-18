@@ -76,6 +76,14 @@ The public registry shape remains in core; the SDK adapter lives under
   WebSocket path with `websocket_url` (`platform/socket/ops.rs`,
   `core/runtime/services.rs`). The port migration should consume the resolved
   socket endpoint; keep `config.api_url` override behavior in the enricher.
+  The current SDK `TinyHumansClient::connect_socket()` starts from its HTTP
+  client's base URL and lets `rust_socketio` add `/socket.io/`; the resolved
+  `socket_url` already contains `/socket.io/?EIO=4&transport=websocket`. Add
+  an SDK entry point whose input is explicitly that ready-to-dial endpoint, or
+  have the adapter construct the SDK client from the control-plane origin and
+  prove the configured resolved endpoint is equivalent. The preferred design
+  is the explicit endpoint entry point so the core does not reconstruct hosted
+  URL rules.
 - Each SDK connect hop must have the current ten-second deadline covering DNS,
   TCP, TLS, and the WebSocket upgrade. Bound each redirect hop independently
   and cap redirects at three. Follow 301, 302, 307, and 308 only; resolve
@@ -201,6 +209,9 @@ known to be stale.
 
 - Add an explicit socket connection options/API that lets a caller disable
   SDK-internal reconnect and supervise one connection attempt.
+- Add an explicit-endpoint connect entry point: it accepts the already-resolved
+  Socket.IO endpoint (`/socket.io/?EIO=4&transport=websocket`) without
+  appending another path or silently deriving a different host URL.
 - Bound DNS, TCP, TLS, WebSocket upgrade, and namespace-connect handshake
   waits; make the per-attempt deadline explicit and test a silent peer.
 - Follow at most three 301/302/307/308 redirects, including relative
@@ -209,7 +220,8 @@ known to be stale.
   redirects for credential-bearing connections.
 - Expose namespace-ready and namespace-rejected outcomes separately from the
   Engine.IO WebSocket-open event, with the rejection payload preserved as
-  structured data. Preserve generic named JSON/binary events and ACK behavior.
+  structured data, and expose the server-assigned namespace id. Preserve
+  generic named JSON/binary events and ACK behavior.
 - Keep protocol/reconnect defaults for existing SDK callers compatible; the
   OpenHuman caller must be able to select single-attempt mode explicitly.
 
