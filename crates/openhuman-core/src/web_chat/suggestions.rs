@@ -36,6 +36,7 @@ use tinyinference_llm::model::ModelRequest;
 
 use crate::inference::provider;
 use crate::web_chat::{ChatSuggestion, WebChannelEvent};
+use crate::web_chat::channel_event::event_context;
 
 use super::publish_web_channel_event_in;
 
@@ -191,13 +192,13 @@ async fn generate_and_emit(
     );
     publish_web_channel_event_in(
         ctx,
-        WebChannelEvent {
-            event: "chat_suggestions".to_string(),
-            client_id: client_id.to_string(),
-            thread_id: thread_id.to_string(),
-            turn_request_id: Some(request_id.to_string()),
-            suggestions: Some(suggestions),
-            ..Default::default()
+        WebChannelEvent::ChatSuggestions {
+            context: {
+                let mut context = event_context(client_id, thread_id, "");
+                context.turn_request_id = Some(request_id.to_string());
+                context
+            },
+            suggestions,
         },
     );
 }
