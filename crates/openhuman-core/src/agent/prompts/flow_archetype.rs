@@ -1,12 +1,9 @@
 //! Scoped TinyFlows archetype prompt loading for the two flow builtins.
 
 use anyhow::{anyhow, ensure, Result};
-use tinyagents_definition::{AgentDefinition as GenericAgentDefinition, DefinitionSource, PromptSource};
+use tinyagents_definition::{DefinitionSource, PromptSource};
 
-use crate::{
-    config::Config,
-    agent::harness::host_definition::AgentDefinition,
-};
+use crate::{agent::harness::host_definition::AgentDefinition, config::Config};
 
 /// Whether `definition` is one of the bus-backed builtin flow prompt owners.
 ///

@@ -11,7 +11,7 @@ fn only_dynamic_builtin_flow_definitions_use_the_bus_prompt() {
         assert!(!is_bus_backed_builtin(&definition));
 
         let mut definition = registry.get(id).expect("builtin flow agent").clone();
-        definition.source = DefinitionSource::Workspace;
+        definition.source = DefinitionSource::CustomRegistry;
         assert!(!is_bus_backed_builtin(&definition));
     }
 }
