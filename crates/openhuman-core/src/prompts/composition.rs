@@ -1,12 +1,10 @@
 //! OpenHuman's product-specific system-prompt selection and additions.
 
 use crate::agent::prompts::types::{
-    PromptContext, PromptTier, TieredPromptPart, PROMPT_TIER_CONTEXT_MARKER,
-    PROMPT_TIER_VOLATILE_MARKER,
+    PromptContext, PromptTier, TieredPromptPart,
 };
 use crate::prompts::sections::*;
 use anyhow::{Result, anyhow};
-use std::ops::Deref;
 use std::path::Path;
 use tinyagents_harness::prompt::{DynamicPromptSection, PromptComposer};
 
@@ -140,16 +138,6 @@ impl TieredPrompt {
     }
 }
 
-impl Deref for TieredPrompt {
-    type Target = tinyagents_harness::prompt::TieredPrompt;
-
-    fn deref(&self) -> &Self::Target {
-        // The compatibility view owns the same fields, but keeping this impl
-        // absent would make the host's historical field access ambiguous.
-        unreachable!("TieredPrompt field access uses the compatibility fields")
-    }
-}
-
 /// Selects OpenHuman-owned prompt content, then delegates tier assembly to
 /// TinyAgents' `PromptComposer`.
 #[derive(Clone)]
@@ -245,6 +233,3 @@ impl SystemPromptBuilder {
     }
 }
 
-fn _dynamic_markers_are_owner_constants() -> (&'static str, &'static str) {
-    (PROMPT_TIER_CONTEXT_MARKER, PROMPT_TIER_VOLATILE_MARKER)
-}

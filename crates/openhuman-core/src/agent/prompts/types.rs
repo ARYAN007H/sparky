@@ -1,12 +1,7 @@
 //! Data types shared across the prompt-plumbing pipeline.
 //!
-//! Everything in this file is pure data (structs, enums, traits,
-//! constants). The rendering logic — section implementations,
-//! `SystemPromptBuilder`, `render_subagent_system_prompt` — lives in
-//! the sibling `mod.rs` so type edits don't pull in the whole 2 000-line
-//! renderer.
+//! Data shared by OpenHuman's agent prompt adapters.
 
-use anyhow::Result;
 use std::path::Path;
 use tinyskills::Skill as Workflow;
 use tinytools::Tool;
