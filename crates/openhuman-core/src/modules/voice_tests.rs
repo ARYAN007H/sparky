@@ -1,8 +1,8 @@
 //! Tests for the voice call client.
 //!
 //! Nothing here loads a module. What is testable without one is the part
-//! that decides what a caller does next: the intent wire contract, the
-//! mode spellings, and that the unavailable path is reached without a
+//! that decides what a caller does next: mode spellings, sample encoding, and
+//! that the unavailable path is reached without a
 //! broker. The round trips themselves are covered where they can be
 //! honest — `tinyvoice`'s own loader E2E, which drives a real module over
 //! a real broker against the published artifact.

@@ -77,13 +77,6 @@ fn hallucination_mode_wire(mode: HallucinationMode) -> &'static str {
     }
 }
 
-/// A recognised fast-path voice command, or `Unknown`.
-///
-/// The contract's own type. `Unknown` carries `#[serde(other)]` upstream, so a
-/// module newer than this host — which `is_compatible` permits, it only
-/// requires the module's minor version to be at least the host's — reports an
-/// intent this build has never heard of as `Unknown` and the utterance goes to
-/// the agent, rather than failing to decode.
 /// Recording-session vocabulary shared with the loaded TinyVoice module.
 pub use tinyvoice_bus::{
     GateVerdict, RecordingGates, SessionAction, SessionAdvance, SessionInput, SessionPhase,
