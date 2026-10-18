@@ -250,7 +250,7 @@ fn valid_saas_identity_clamps_memory_operations_in_an_isolated_process() {
             assert!(limited.truncated);
 
             let listed = items_list(&config, Default::default()).await.unwrap();
-            assert_eq!(listed.items.len(), 3);
+            assert_eq!(listed.items.len(), 4);
             assert!(listed.items.iter().any(|item| item.id.0 == own));
             assert!(!listed.items.iter().any(|item| item.id.0 == foreign));
 
