@@ -24,7 +24,6 @@ use axum::routing::{get, post};
 use axum::{Json, Router};
 use futures_util::StreamExt;
 use serde_json::{json, Value};
-use sha2::{Digest, Sha256};
 use tempfile::tempdir;
 use tinyinference_llm::message::Message;
 use tinyinference_llm::model::ModelRequest;
