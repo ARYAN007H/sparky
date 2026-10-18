@@ -26,8 +26,13 @@ use crate::inference::failure_copy::{
     recoverable_identical_halt_summary, recoverable_no_progress_halt_summary,
     terminal_inference_failure_kind, terminal_inference_halt_summary,
 };
-use tinyagents_harness::middleware::{EphemeralInstructionMiddleware, EphemeralInstructionQueue};
+use tinyagents_harness::middleware::EphemeralInstructionMiddleware;
 use tinyinference_llm::failure::is_recoverable_failure_text as is_recoverable_tool_failure;
+
+#[cfg(test)]
+use tinyagents_harness::no_progress::{
+    classified_step, ClassifiedFailureTracker, ClassifiedStep, RecoverableFailureLadder,
+};
 
 /// `after_tool`: stop (or nudge) the run when tool calls keep failing with no
 /// progress (issue #4249). The legacy tool loop's progress guard surfaced a
@@ -80,7 +85,11 @@ impl RepeatedToolFailureMiddleware {
     /// declarations ([`tinyagents_harness::middleware::tool_sets_lookup`]) rather than
     /// from tool names alone.
     pub(crate) fn with_tool_facts(self, lookup: ToolFactsLookup) -> Self {
-        *self.policy.tool_facts.lock().unwrap_or_else(|p| p.into_inner()) = Some(lookup);
+        *self
+            .policy
+            .tool_facts
+            .lock()
+            .unwrap_or_else(|p| p.into_inner()) = Some(lookup);
         self
     }
 
@@ -411,11 +420,9 @@ impl FailureScopePolicy<OpenHumanRunContext> for HostFailurePolicy {
         _result: &TaToolResult,
         error: &str,
     ) -> bool {
-        self.stop.witness().record_failure(
-            &call.name,
-            &scope.argument_fingerprint,
-            error,
-        )
+        self.stop
+            .witness()
+            .record_failure(&call.name, &scope.argument_fingerprint, error)
     }
 
     fn classified_halt(
@@ -427,13 +434,10 @@ impl FailureScopePolicy<OpenHumanRunContext> for HostFailurePolicy {
         repeated: bool,
         error: &str,
     ) {
-        self.stop.halt_classified(
-            summary.to_owned(),
-            class,
-            &call.name,
-            repeated,
-            || first_error_line(error),
-        );
+        self.stop
+            .halt_classified(summary.to_owned(), class, &call.name, repeated, || {
+                first_error_line(error)
+            });
     }
 
     fn finish_run(&self, ctx: &RunContext<OpenHumanRunContext>) {
