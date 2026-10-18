@@ -181,11 +181,11 @@ async fn prewarm_locked(
     })
     .await;
 
-    let resources = match fetched {
+    let mut resources = match fetched {
         Ok(Ok(files)) => files,
         Ok(Err(error)) => {
             tracing::warn!(%error, "[skills][bundled] flow-authoring resources unavailable; hiding builtin");
-            clear_snapshot(&key);
+            clear_snapshot(key);
             return;
         }
         Err(_) => {
@@ -193,14 +193,15 @@ async fn prewarm_locked(
                 timeout_seconds = COPILOT_RESOURCE_DEADLINE.as_secs(),
                 "[skills][bundled] flow-authoring resource prewarm timed out; hiding builtin"
             );
-            clear_snapshot(&key);
+            clear_snapshot(key);
             return;
         }
     };
+    resources.sort_by(|left, right| left.path.cmp(&right.path));
 
     if !module_is_serving() {
         tracing::warn!("[skills][bundled] TinyFlows module is not serving after ListResources; hiding builtin");
-        clear_snapshot(&key);
+        clear_snapshot(key);
         return;
     }
 
