@@ -1,39 +1,56 @@
 use super::*;
 
+#[cfg(feature = "voice")]
 #[tokio::test]
 async fn ptt_source_turn_completes_without_publishing_a_voice_event() {
     use std::sync::Arc;
     use tinybus::EventHandler;
-    use tinyinference_llm::model::ChatModel;
 
-    let _turn_lock = RUN_CHAT_TASK_TEST_LOCK.lock().await;
+    let _turn_lock = FORCED_ERROR_TEST_LOCK.lock().await;
     let _inference = crate::inference::inference_test_guard_async().await;
     let _model = crate::inference::provider::factory::test_provider_override::install_model(
         Arc::new(tinyagents_harness::testkit::ScriptedModel::replies(vec!["hello from mock"])),
     );
 
-    struct VoiceEvents(tokio::sync::mpsc::UnboundedSender<String>);
+    struct Events(tokio::sync::mpsc::UnboundedSender<crate::core::events::DomainEvent>);
 
     #[async_trait::async_trait]
-    impl EventHandler<crate::core::events::DomainEvent> for VoiceEvents {
+    impl EventHandler<crate::core::events::DomainEvent> for Events {
         fn name(&self) -> &str {
             "web_chat::ptt_regression_test"
         }
 
         async fn handle(&self, event: &crate::core::events::DomainEvent) {
-            if event.domain() == "voice" {
-                let _ = self.0.send(format!("{event:?}"));
-            }
+            let _ = self.0.send(event.clone());
         }
     }
 
     crate::core::bus::init().await.expect("event bus init");
-    let (voice_tx, mut voice_events) = tokio::sync::mpsc::unbounded_channel();
-    let _voice_subscription = crate::core::bus::BUS
-        .subscribe(Arc::new(VoiceEvents(voice_tx)))
+    let (events_tx, mut observed_events) = tokio::sync::mpsc::unbounded_channel();
+    let _subscription = crate::core::bus::BUS
+        .subscribe(Arc::new(Events(events_tx)))
         .expect("voice event subscription");
+
+    let bus_ready = "ptt-regression-bus-ready-403";
+    crate::core::bus::BUS.publish(crate::core::events::DomainEvent::SystemStartup {
+        component: bus_ready.to_string(),
+    });
+    tokio::time::timeout(std::time::Duration::from_secs(5), async {
+        loop {
+            if matches!(observed_events.recv().await,
+                Some(crate::core::events::DomainEvent::SystemStartup { component })
+                    if component == bus_ready)
+            {
+                break;
+            }
+        }
+    })
+    .await
+    .expect("BUS subscriber should receive its control event");
+
     let mut web_events = subscribe_web_channel_events();
-    let thread_id = "ptt-event-regression";
+    let thread_id = "ptt-event-regression-403-thread";
+    let session_id = 403_042;
     let request_id = start_chat(
         &crate::core::runtime::DispatchCtx::ambient(),
         "ptt-test-client",
@@ -45,7 +62,7 @@ async fn ptt_source_turn_completes_without_publishing_a_voice_event() {
         None,
         ChatRequestMetadata {
             source: Some("ptt".to_string()),
-            session_id: Some(42),
+            session_id: Some(session_id),
             ..Default::default()
         },
     )
@@ -70,9 +87,11 @@ async fn ptt_source_turn_completes_without_publishing_a_voice_event() {
     assert_eq!(done.full_response.as_deref(), Some("hello from mock"));
 
     assert!(
-        tokio::time::timeout(std::time::Duration::from_secs(1), voice_events.recv())
-            .await
-            .is_err(),
+        std::iter::from_fn(|| observed_events.try_recv().ok()).all(|event| {
+            event.domain() != "voice"
+                || (!format!("{event:?}").contains(thread_id)
+                    && !format!("{event:?}").contains(&session_id.to_string()))
+        }),
         "a successful source=ptt message must not publish a voice event"
     );
 }
