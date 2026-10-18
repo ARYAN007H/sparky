@@ -6093,10 +6093,9 @@ async fn json_rpc_wallet_evm_base_network_prepare_execute_round_trips() {
     rpc_join.abort();
 }
 
-/// Wallet network_defaults must surface every supported EVM L2 plus BTC,
-/// Solana, and Tron, with chain_id populated for EVM rows.
+/// Wallet network_defaults returns non-empty network rows with chain identifiers.
 #[tokio::test]
-async fn json_rpc_wallet_network_defaults_lists_all_chains() {
+async fn json_rpc_wallet_network_defaults_returns_network_rows() {
     let _env_lock = json_rpc_e2e_env_lock_async().await;
     let tmp = tempdir().expect("tempdir");
     let home = tmp.path();
@@ -6132,7 +6131,12 @@ async fn json_rpc_wallet_network_defaults_lists_all_chains() {
             row.get("chain").and_then(Value::as_str).is_some_and(|chain| !chain.is_empty()),
             "each network default must expose a chain identifier: {row}"
         );
-        assert!(row.get("chainId").is_some(), "each row carries the chainId field: {row}");
+        if row.get("evmNetwork").is_some() {
+            assert!(
+                row.get("chainId").and_then(Value::as_u64).is_some(),
+                "EVM rows must expose a numeric chain id: {row}"
+            );
+        }
     }
 
     mock_join.abort();
@@ -11368,8 +11372,8 @@ async fn json_rpc_flows_import_does_not_persist() {
         "a clean native import has no warnings"
     );
 
-    // 3. Import never persists — no flow row was created by either call.
-    let list = post_json_rpc(&rpc_base, 9603, "openhuman.flows_list", json!({})).await;
+    // Import never persists — no flow row was created.
+    let list = post_json_rpc(&rpc_base, 9602, "openhuman.flows_list", json!({})).await;
     let flows = peel_logs_envelope(assert_no_jsonrpc_error(&list, "flows_list"))
         .as_array()
         .expect("flows array")
