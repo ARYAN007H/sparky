@@ -119,7 +119,7 @@ async fn published_module_prompts_render_through_the_normal_host_path() {
         "a profile with modules disabled cannot see the shared workspace builtin"
     );
     let mut disabled_options =
-        openhuman_core::agent::debug::DumpPromptOptions::new("workflow_builder");
+        openhuman_core::agent::debug::DumpPromptOptions::new("orchestrator");
     disabled_options.workspace_dir_override = Some(workspace.clone());
     disabled_options.config_path_override = Some(disabled_config_path);
     let ordinary_prompt = openhuman_core::agent::debug::dump_agent_prompt(disabled_options)
