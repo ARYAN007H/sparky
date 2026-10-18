@@ -1,43 +1,33 @@
 use super::*;
+use crate::core::all::{assert_schema_contract, ControllerSchemaContract as Contract, SchemaFieldContract as Field};
 use serde_json::json;
 
 #[test]
-fn schemas_create_pairing_has_correct_shape() {
-    let s = schemas("create_pairing");
-    assert_eq!(s.namespace, "devices");
-    assert_eq!(s.function, "create_pairing");
-    assert_eq!(s.inputs.len(), 1);
-    assert_eq!(s.inputs[0].name, "label");
-    assert!(!s.inputs[0].required);
-    assert!(s.outputs.iter().any(|f| f.name == "channel_id"));
-    assert!(s.outputs.iter().any(|f| f.name == "pairing_token"));
-    assert!(s.outputs.iter().any(|f| f.name == "core_pubkey"));
-}
-
-#[test]
-fn schemas_list_has_no_inputs_and_devices_output() {
-    let s = schemas("list");
-    assert!(s.inputs.is_empty());
-    assert_eq!(s.outputs.len(), 1);
-    assert_eq!(s.outputs[0].name, "devices");
-}
-
-#[test]
-fn schemas_revoke_requires_channel_id() {
-    let s = schemas("revoke");
-    assert_eq!(s.inputs.len(), 1);
-    assert_eq!(s.inputs[0].name, "channel_id");
-    assert!(s.inputs[0].required);
-    assert_eq!(s.outputs[0].name, "success");
-}
-
-#[test]
-fn all_controller_schemas_covers_three_functions() {
-    let names: Vec<_> = all_controller_schemas()
-        .into_iter()
-        .map(|s| s.function)
-        .collect();
-    assert_eq!(names, vec!["create_pairing", "list", "revoke"]);
+fn device_schema_wire_contracts_are_preserved() {
+    let contracts = [
+        Contract {
+            namespace: "devices", function: "create_pairing", input_count: Some(1),
+            input_order: Some(&["label"]), required_input_order: None,
+            inputs: &[Field { name: "label", required: Some(false), type_debug: None }],
+            output_fields: &["channel_id", "pairing_token", "core_pubkey"], outputs: None,
+        },
+        Contract {
+            namespace: "devices", function: "list", input_count: Some(0),
+            input_order: None, required_input_order: None, inputs: &[],
+            output_fields: &[], outputs: Some(&["devices"]),
+        },
+        Contract {
+            namespace: "devices", function: "revoke", input_count: Some(1),
+            input_order: Some(&["channel_id"]), required_input_order: None,
+            inputs: &[Field { name: "channel_id", required: Some(true), type_debug: None }],
+            output_fields: &[], outputs: Some(&["success"]),
+        },
+    ];
+    let names: Vec<_> = all_controller_schemas().into_iter().map(|schema| schema.function).collect();
+    assert_eq!(names, contracts.iter().map(|contract| contract.function).collect::<Vec<_>>());
+    for contract in &contracts {
+        assert_schema_contract(&schemas(contract.function), contract);
+    }
 }
 
 #[test]
