@@ -574,6 +574,7 @@ fn one_runtime_hosts_independently_configured_agents() {
             drop(withholding_agent);
             drop(gamma);
             drop(budget_agent);
+            eprintln!("DBGIDS {:?}", runtime.agent_ids());
             assert_eq!(
                 runtime.agent_ids(),
                 vec!["alpha".to_string(), "beta".to_string()]
