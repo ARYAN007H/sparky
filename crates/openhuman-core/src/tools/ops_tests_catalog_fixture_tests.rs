@@ -144,6 +144,17 @@ fn full_tool_catalog_names() -> Vec<String> {
     names
 }
 
+/// Tool families the core does not register itself: they come from tool
+/// sources the TinyHumans layer plugs in (`tools::sources`), which a
+/// core-only lib test cannot install. The frontend fixture still lists them
+/// because the shipped product has them, so a core-only run must not read
+/// their absence as drift.
+const HOSTED_TOOL_PREFIXES: &[&str] = &["media_"];
+
+fn is_hosted_tool(name: &str) -> bool {
+    HOSTED_TOOL_PREFIXES.iter().any(|p| name.starts_with(p))
+}
+
 const REGENERATE_COMMAND: &str = "UPDATE_TOOL_CATALOG=1 cargo test -p openhuman --lib \
      --features \"$(bash scripts/ci/product-features.sh)\" \
      tools::ops::tests::catalog_fixture_tests::tool_catalog_matches_frontend_fixture";
@@ -190,7 +201,10 @@ fn tool_catalog_matches_frontend_fixture() {
     let full_product = full_product_features_enabled();
     let added: Vec<&String> = names.iter().filter(|n| !expected.contains(n)).collect();
     let removed: Vec<&String> = if full_product {
-        expected.iter().filter(|n| !names.contains(n)).collect()
+        expected
+            .iter()
+            .filter(|n| !names.contains(n) && !is_hosted_tool(n))
+            .collect()
     } else {
         Vec::new()
     };
