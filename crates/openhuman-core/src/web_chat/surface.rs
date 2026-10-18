@@ -166,8 +166,15 @@ impl Surface {
         self.end_if_needed(&mut state).await;
     }
 
-    fn publish(&self, mut event: bus_web::WebChannelEvent, interim_round: Option<u32>) {
-        event.normalize_projected_wire_fields();
+    fn publish(
+        &self,
+        mut event: bus_web::WebChannelEvent,
+        interim_round: Option<u32>,
+        projected: bool,
+    ) {
+        if projected {
+            event.normalize_projected_wire_fields();
+        }
         if let bus_web::WebChannelEvent::ChatInterim { round, .. } = &mut event {
             if round.is_none() {
                 *round = interim_round.filter(|round| *round > 0);
@@ -228,7 +235,7 @@ impl Surface {
         };
         let terminal = projected.events.iter().any(is_terminal);
         for event in projected.events {
-            self.publish(event, interim_round);
+            self.publish(event, interim_round, true);
         }
         if terminal {
             self.end_if_needed(&mut state).await;
@@ -255,7 +262,7 @@ impl Surface {
                 | bus_web::WebChannelEvent::ChatCancelled { .. }
         );
         let mut state = self.state.lock().await;
-        self.publish(event, None);
+        self.publish(event, None, false);
         if terminal {
             self.end_if_needed(&mut state).await;
         }
