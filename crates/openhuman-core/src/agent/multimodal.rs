@@ -94,10 +94,9 @@ impl TextExtractor for DocumentsTextExtractor<'_> {
     /// bounded only by what the multimodal config accepted, which is far past
     /// what a frame holds.
     ///
-    /// Every failure — an unavailable module, a damaged document, the deadline
-    /// — is reported the same way, and the caller degrades the file to a
-    /// [`FilePayload::Reference`] rather than surfacing it (which avoids Sentry
-    /// noise on broken PDFs).
+    /// Every failure — an unavailable module, a damaged document, or the
+    /// deadline — is reported to TinyAgents, which selects its built-in
+    /// metadata fallback rather than surfacing the parser error.
     #[cfg(feature = "documents")]
     async fn extract(&self, _mime: &str, bytes: &[u8]) -> Result<String, String> {
         use crate::modules::documents;
@@ -122,9 +121,8 @@ impl TextExtractor for DocumentsTextExtractor<'_> {
     }
 
     /// Disabled variant when the `documents` feature is off: no PDF parser is
-    /// compiled in, so signal failure and let the caller degrade the file to a
-    /// [`FilePayload::Reference`] — the same path a parse error or a blown
-    /// deadline takes.
+    /// compiled in, so signal failure and let TinyAgents choose its built-in
+    /// metadata fallback — the same path a parse error or timeout takes.
     #[cfg(not(feature = "documents"))]
     async fn extract(&self, _mime: &str, _bytes: &[u8]) -> Result<String, String> {
         log::debug!(
@@ -135,32 +133,6 @@ impl TextExtractor for DocumentsTextExtractor<'_> {
 }
 
 // ── Marker helpers over `TranscriptMessage` ────────────────────────────────────
-
-/// Count `[IMAGE:…]` markers in the **latest** user message only.
-///
-/// Earlier versions summed markers across every user-role message in the
-/// history, which made the per-turn `max_images` cap drift upward over a long
-/// conversation: a thread that attached three images on turn 1 already counted
-/// them again on turn 2 even when the new user message had no attachments at
-/// all. Looking only at the most recent user message matches the user's intent
-/// ("how many am I attaching THIS turn") and keeps the cap stable.
-pub fn count_image_markers(messages: &[TranscriptMessage]) -> usize {
-    latest_user_message(messages)
-        .map(|m| markers::parse_image_markers(&m.content).1.len())
-        .unwrap_or(0)
-}
-
-/// Count `[FILE:…]` markers in the **latest** user message only — same
-/// per-turn semantics as [`count_image_markers`].
-pub fn count_file_markers(messages: &[TranscriptMessage]) -> usize {
-    latest_user_message(messages)
-        .map(|m| markers::parse_file_markers(&m.content).1.len())
-        .unwrap_or(0)
-}
-
-fn latest_user_message(messages: &[TranscriptMessage]) -> Option<&TranscriptMessage> {
-    messages.iter().rev().find(|m| m.role == "user")
-}
 
 // ── Ingress ──────────────────────────────────────────────────────────────
 
