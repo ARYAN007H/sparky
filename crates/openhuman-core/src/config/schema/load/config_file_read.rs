@@ -1,9 +1,10 @@
-use anyhow::{Context, Result};
+use anyhow::Result;
 use std::path::Path;
 use std::sync::{Mutex, OnceLock};
 use tokio::fs;
 
 use super::super::Config;
+use super::branches::default_config_boxed;
 
 /// Guards the "corrupted config read, resetting to defaults" warning so it
 /// fires at most once per process lifetime. Without this, a permanently
