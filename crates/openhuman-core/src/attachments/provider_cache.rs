@@ -30,7 +30,7 @@ impl AttachmentModel {
             "no-vision".into()
         };
         let mut hash = Sha256::new();
-        hash.update(b"openhuman-file-intake-v1:pages4:edge2048:");
+        hash.update(b"openhuman-file-intake-v2:pages4:edge2048:");
         hash.update([u8::from(cfg!(feature = "documents"))]);
         #[cfg(feature = "documents")]
         hash.update(
