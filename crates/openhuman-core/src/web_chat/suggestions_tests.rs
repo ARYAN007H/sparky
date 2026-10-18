@@ -98,12 +98,15 @@ impl ChatModel<()> for ScriptedTextModel {
 }
 
 async fn drain_suggestions_event(
-    rx: &mut tokio::sync::broadcast::Receiver<WebChannelEvent>,
+    rx: &mut tokio::sync::broadcast::Receiver<crate::web_chat::ScopedWebEvent>,
     thread_id: &str,
-) -> Option<WebChannelEvent> {
+) -> Option<crate::web_chat::ScopedWebEvent> {
     loop {
         match tokio::time::timeout(Duration::from_secs(2), rx.recv()).await {
-            Ok(Ok(ev)) if ev.event == "chat_suggestions" && ev.thread_id == thread_id => {
+            Ok(Ok(ev))
+                if ev.event_name() == "chat_suggestions"
+                    && ev.context().thread_id == thread_id =>
+            {
                 return Some(ev);
             }
             Ok(Ok(_)) => continue,

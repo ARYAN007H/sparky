@@ -30,13 +30,18 @@ fn single_bubble_delivery_emits_one_unsegmented_chat_done() {
     }
     assert_eq!(mine.len(), 1, "exactly one terminal event, no chat_segment");
     let done = &mine[0];
-    assert_eq!(done.event, "chat_done");
-    assert_eq!(done.client_id, "system");
-    assert_eq!(done.thread_id, "thread-1");
-    assert_eq!(done.full_response.as_deref(), Some(text));
-    assert_eq!(done.segment_total, None);
-    assert_eq!(done.segment_index, None);
-    assert!(done.usage.is_none());
+    assert_eq!(done.event_name(), "chat_done");
+    assert_eq!(done.context().client_id, "system");
+    assert_eq!(done.context().thread_id, "thread-1");
+    assert!(matches!(
+        done.wire_event(),
+        crate::web_chat::WebChannelEvent::ChatDone {
+            full_response: Some(response),
+            usage: None,
+            parts: None,
+            ..
+        } if response == text
+    ));
 }
 
 // ── chat_done.timing ──────────────────────────────────────────────────────
@@ -92,14 +97,24 @@ async fn chat_done_carries_timing_when_a_snapshot_is_supplied() {
         }
     };
 
-    let payload = done.timing.expect("chat_done.timing must be Some");
+    let crate::web_chat::WebChannelEvent::ChatDone {
+        timing: Some(payload), ..
+    } = done.wire_event()
+    else {
+        panic!("chat_done.timing must be Some");
+    };
     assert_eq!(payload.first_token_ms, Some(120));
     assert_eq!(payload.first_tool_ms, None);
     assert_eq!(payload.total_ms, Some(2000));
     // 40 output tokens / (2000ms / 1000) = 20 tokens/sec.
     assert_eq!(payload.tokens_per_second, Some(20.0));
     // The gauge numerator travels beside the spend totals, unsummed.
-    let usage = done.usage.expect("chat_done.usage must be Some");
+    let crate::web_chat::WebChannelEvent::ChatDone {
+        usage: Some(usage), ..
+    } = done.wire_event()
+    else {
+        panic!("chat_done.usage must be Some");
+    };
     assert_eq!((usage.input_tokens, usage.context_tokens), (100, 60));
 }
 
@@ -136,7 +151,10 @@ async fn chat_done_omits_timing_when_no_snapshot_is_supplied() {
         }
     };
 
-    assert!(done.timing.is_none());
+    assert!(matches!(
+        done.wire_event(),
+        crate::web_chat::WebChannelEvent::ChatDone { timing: None, .. }
+    ));
 }
 
 // ── Delivery persists before it announces (#6034) ───────────────────────

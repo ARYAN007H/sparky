@@ -30,7 +30,7 @@ fn events() -> (Arc<Shared>, WebEvents) {
 }
 
 async fn events_for(
-    rx: &mut tokio::sync::broadcast::Receiver<WebChannelEvent>,
+    rx: &mut tokio::sync::broadcast::Receiver<crate::web_chat::ScopedWebEvent>,
     request_id: &str,
     count: usize,
 ) -> Vec<WebChannelEvent> {
@@ -98,11 +98,21 @@ async fn a_completed_turn_announces_one_chat_done_with_its_timing() {
     )
     .await;
     let done = events_for(&mut rx, "events-done", 1).await.remove(0);
-    assert_eq!(done.event, "chat_done");
-    assert_eq!(done.client_id, "starter");
-    assert_eq!(done.full_response.as_deref(), Some("all done"));
-    assert_eq!(done.timing.expect("timing").total_ms, Some(1_000));
-    assert_eq!(done.seq, None, "terminal events sit outside the seq stream");
+    assert_eq!(done.event_name(), "chat_done");
+    assert_eq!(done.context().client_id, "starter");
+    assert!(matches!(
+        done.wire_event(),
+        WebChannelEvent::ChatDone {
+            full_response: Some(text),
+            timing: Some(timing),
+            ..
+        } if text == "all done" && timing.total_ms == Some(1_000)
+    ));
+    assert_eq!(
+        done.context().seq,
+        None,
+        "terminal events sit outside the seq stream"
+    );
     assert!(shared.take("events-done").is_none(), "the slot is released");
 }
 
