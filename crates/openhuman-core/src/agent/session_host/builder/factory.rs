@@ -327,8 +327,7 @@ impl OpenHumanSessionHost {
         // unavailable (pre-startup, tests). `PromptSource::Dynamic`
         // agents install a [`DynamicPromptSection`] that re-runs the
         // builder against the live [`PromptContext`] at `build_system_prompt`
-        // time, so late `connected_integrations` land in the prompt. The flow
-        // builders receive their module-owned archetype through the context.
+        // time, so late integrations and the flow archetype land in the prompt.
         // `Inline`/`File` sources still resolve to just the archetype
         // body and get wrapped by [`SystemPromptBuilder::for_subagent`].
         let prompt_builder = match target_def {

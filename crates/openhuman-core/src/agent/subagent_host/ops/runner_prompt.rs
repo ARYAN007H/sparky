@@ -2,7 +2,7 @@
 
 use super::{AgentDefinition, PromptContext, SubagentRunError, load_prompt_source};
 
-/// One spawn's snapshot of the host config, loaded once by [`run_subagent`].
+/// One spawn's snapshot of the host config, loaded once by [`super::run_subagent`].
 ///
 /// Threading it in as a parameter keeps all prompt, model and context decisions
 /// on the same profile snapshot without giving the generic runtime file access.
