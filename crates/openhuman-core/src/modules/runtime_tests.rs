@@ -1,4 +1,4 @@
-use super::{is_module_serving, is_started, runtime};
+use super::*;
 
 /// The process-global runtime is stable within one caller runtime.
 #[tokio::test]
@@ -53,7 +53,7 @@ async fn registry_id_matches_the_live_modules_bus_address_not_package_name() {
     assert_ne!(loaded.name, record.id);
     assert!(
         is_module_serving(record.id),
-        "the registry id must report the enabled, live module despite its package name"
+        "the registry id must report the enabled, live module despite its package name; info={loaded:#?}"
     );
 }
 

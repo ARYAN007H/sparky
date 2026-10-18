@@ -354,9 +354,14 @@ async fn flow_authoring_is_hidden_when_tinyflows_component_is_disabled() {
         .expect("linked TinyFlows fixture is admitted and serving");
     let state = crate::modules::ops::state_of(crate::modules::tinyflows::MODULE_ID);
     assert_eq!(state, crate::modules::types::ModuleState::Ready);
-    assert!(crate::modules::runtime::is_module_serving(
-        crate::modules::tinyflows::MODULE_ID
-    ));
+    let module_runtime = crate::modules::runtime::runtime()
+        .await
+        .expect("module runtime should be available after Copilot proxy setup");
+    let loaded_modules = module_runtime.host().list();
+    assert!(
+        crate::modules::runtime::is_module_serving(crate::modules::tinyflows::MODULE_ID),
+        "TinyFlows registry status should resolve the admitted host snapshot: {loaded_modules:#?}"
+    );
     let visible = CoreContext::scope(enabled_ctx, async {
         let dispatch = crate::core::runtime::DispatchCtx::ambient();
         let gate = crate::skills::ops_discover::DiscoveryGate::from_config(
