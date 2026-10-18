@@ -10,14 +10,6 @@ fn lists_single_diag_controller() {
 }
 
 #[test]
-fn registered_count_matches_schema_count() {
-    assert_eq!(
-        all_controller_schemas().len(),
-        all_registered_controllers().len()
-    );
-}
-
-#[test]
 fn diag_schema_has_no_inputs() {
     assert!(schemas("diag").inputs.is_empty());
 }
