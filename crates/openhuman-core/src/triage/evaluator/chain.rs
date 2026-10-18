@@ -381,13 +381,9 @@ fn now_ms() -> i64 {
     chrono::Utc::now().timestamp_millis()
 }
 
-fn clear_outage(
-    _state: Option<&RetryState>,
-    _key: &str,
-    attempt: Option<&mut PersistentFailoverAttempt<String>>,
-) {
-    if let Some(attempt) = attempt {
-        attempt.record_success();
+fn clear_outage(state: Option<&RetryState>, key: &str, _attempt: Option<&mut PersistentFailoverAttempt<String>>) {
+    if let Some(state) = state {
+        state.reset(&key.to_string());
     }
 }
 
@@ -396,7 +392,7 @@ fn rejection_delay_ms(rejection: BreakerRejection, now_ms: u64) -> u64 {
         BreakerRejection::Backoff {
             next_attempt_ms, ..
         } => next_attempt_ms.saturating_sub(now_ms),
-        BreakerRejection::InFlight => 1_000,
+        BreakerRejection::InFlight => 30_000,
     }
 }
 
@@ -414,10 +410,7 @@ pub(crate) fn record_outage(
     let attempt = attempt?;
     let recorded_at_ms = monotonic_ms();
     let Some(failure) = attempt.record_failure(recorded_at_ms) else {
-        return Some(TriageOutcome::Deferred {
-            defer_until_ms: now_ms().saturating_add(OUTAGE_BACKOFF_BASE_MS),
-            reason: "managed backend recovered during another attempt".to_string(),
-        });
+        return None;
     };
     let delay_ms = failure
         .next_attempt_ms
