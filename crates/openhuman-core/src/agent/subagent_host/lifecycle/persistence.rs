@@ -694,8 +694,7 @@ impl tinyagents_orchestration::subagent::SubagentPersistence for OpenHumanPersis
             );
         }
         let disposition = tinyagents_orchestration::subagent::SubagentPersistence::record_terminal(
-            &super::store::LifecycleStore::before_terminal(&self.checkpoint_dir)?
-                .neutral_store()?,
+            &self.open_store(true)?,
             key,
             &durable_outcome,
             replaces,
