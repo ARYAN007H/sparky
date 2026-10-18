@@ -47,7 +47,7 @@ pub(super) fn send_message(
             log::error!("[tui] openhuman.channel_web_chat failed: {e}");
             // Surface the failure in-transcript via a synthetic chat_error so
             // the reducer clears the streaming state and shows the reason.
-            web_chat::publish_web_channel_event(WebChannelEvent {
+            web_chat::publish_web_channel_event(WebChannelEvent::ChatError {
                 context: web_chat::WebEventContext {
                     client_id: cid,
                     thread_id: tid,

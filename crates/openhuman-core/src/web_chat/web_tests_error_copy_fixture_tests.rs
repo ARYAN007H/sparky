@@ -870,13 +870,18 @@ fn provider_detail_travels_as_a_param_and_the_message_still_quotes_it() {
 fn chat_error_event_serializes_copy_key_and_params_to_literal_json() {
     let classified =
         classify_inference_error("openrouter API error (429 Too Many Requests): Retry-After: 30");
-    let event = WebChannelEvent {
-        event: "chat_error".to_string(),
+    let event = WebChannelEvent::ChatError {
+        context: crate::web_chat::WebEventContext::default(),
         message: Some(classified.message.clone()),
         error_type: Some(classified.error_type.to_string()),
+        error_source: None,
+        error_retryable: None,
+        error_retry_after_ms: None,
+        error_provider: None,
+        error_fallback_available: None,
         copy_key: Some(classified.copy_key.to_string()),
         copy_params: classified.copy_params,
-        ..Default::default()
+        guardrail: None,
     };
     let json = serde_json::to_value(&event).expect("serializes");
     assert_eq!(json["copy_key"], "chat_error.rate_limited");
@@ -888,6 +893,19 @@ fn chat_error_event_serializes_copy_key_and_params_to_literal_json() {
     assert_eq!(json["message"], classified.message);
 
     // Older emitters (cancellation, guardrail) carry neither key.
-    let bare = serde_json::to_value(WebChannelEvent::default()).expect("serializes");
+    let bare = serde_json::to_value(WebChannelEvent::ChatError {
+        context: crate::web_chat::WebEventContext::default(),
+        message: None,
+        error_type: None,
+        error_source: None,
+        error_retryable: None,
+        error_retry_after_ms: None,
+        error_provider: None,
+        error_fallback_available: None,
+        copy_key: None,
+        copy_params: None,
+        guardrail: None,
+    })
+    .expect("serializes");
     assert!(bare.get("copy_key").is_none() && bare.get("copy_params").is_none());
 }
