@@ -137,12 +137,16 @@ impl MediaSourceResolver<AttachmentAccessScope> for AttachmentModel {
                         data: source.to_owned(),
                         media_type: mime.unwrap_or_else(|| "application/octet-stream".into()),
                     },
-                    MediaSourceKind::Untyped if source.starts_with("data:")
-                        || source.starts_with("http://")
-                        || source.starts_with("https://") => MediaRef::Url {
+                    MediaSourceKind::Untyped
+                        if source.starts_with("data:")
+                            || source.starts_with("http://")
+                            || source.starts_with("https://") =>
+                    {
+                        MediaRef::Url {
                             url: source.to_owned(),
                             media_type: mime,
-                        },
+                        }
+                    }
                     MediaSourceKind::Untyped => MediaRef::Path {
                         path: source.to_owned(),
                         media_type: mime,
