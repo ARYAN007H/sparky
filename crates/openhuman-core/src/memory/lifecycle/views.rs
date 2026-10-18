@@ -91,7 +91,7 @@ fn within<T: PartialOrd + std::fmt::Display + Copy>(
     max: T,
 ) -> Result<Option<T>> {
     match value {
-        Some(value) if value < min || value > max => Err(Error::invalid(format!(
+        Some(value) if value < min || value > max => Err(Error::InvalidRequest(format!(
             "{name} must be between {min} and {max}"
         ))),
         other => Ok(other),
@@ -168,9 +168,9 @@ fn validate_build_delay_secs(value: Option<u64>) -> Result<Option<u64>> {
         .and_then(|delay| chrono::Utc::now().checked_sub_signed(delay))
         .is_none()
     {
-        return Err(Error::invalid(
+        return Err(Error::InvalidRequest((
             "build_delay_secs must fit within the supported date range",
-        ));
+        ).into()));
     }
     Ok(Some(seconds))
 }

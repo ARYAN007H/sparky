@@ -121,7 +121,7 @@ pub async fn run(config: &Config, selection: Selection) -> Result<Vec<JobRun>> {
         )
         .await
         .map_err(|error| match error {
-            QueueError::NoSuchJob(_) => Error::invalid(error.to_string()),
+            QueueError::NoSuchJob(_) => Error::InvalidRequest((error.to_string()).into()),
         })
 }
 

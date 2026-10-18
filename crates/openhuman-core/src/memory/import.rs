@@ -105,7 +105,7 @@ pub(crate) fn listed_unconfirmed(workspace_dir: &Path) -> bool {
 }
 
 fn import_error(error: &ImportError) -> Error {
-    Error::invalid(error.to_string())
+    Error::InvalidRequest((error.to_string()).into())
 }
 
 fn importer(
@@ -315,11 +315,11 @@ async fn launch(
         // Items written to the legacy tree while it is being moved would be
         // left behind there.
         if super::layout_migration::service::is_running(config) {
-            return Err(Error::invalid(if mode == Mode::Import {
+            return Err(Error::InvalidRequest((if mode == Mode::Import {
                 "memory is being organized; import once that finishes"
             } else {
                 "memory is being organized; retry once that finishes"
-            }));
+            }).into()));
         }
         RUNNING
             .lock()

@@ -630,7 +630,7 @@ pub fn read_cortexdb_key(config: &Config) -> anyhow::Result<Option<String>> {
 pub fn store_cortexdb_key(config: &Config, key: &str) -> Result<()> {
     let key = key.trim();
     if key.is_empty() {
-        return Err(Error::invalid("the API key is blank"));
+        return Err(Error::InvalidRequest(("the API key is blank").into()));
     }
     AuthService::from_config(config)
         .store_provider_token(

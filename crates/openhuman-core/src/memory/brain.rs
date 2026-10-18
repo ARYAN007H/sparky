@@ -68,7 +68,7 @@ fn brain(config: &Config, identity: &MemoryIdentity) -> Result<Brain> {
 
 fn parse_source(raw: &str) -> Result<BrainSource> {
     raw.parse()
-        .map_err(|error: tinymemory_api::Error| Error::invalid(error.to_string()))
+        .map_err(|error: tinymemory_api::Error| Error::InvalidRequest((error.to_string()).into()))
 }
 
 /// One brain source and how many documents it holds.
@@ -159,7 +159,7 @@ pub async fn search(
 ) -> Result<BrainSearchView> {
     let query = params.query.trim();
     if query.is_empty() {
-        return Err(Error::invalid("the query is blank"));
+        return Err(Error::InvalidRequest(("the query is blank").into()));
     }
     let source = params.source.as_deref().map(parse_source).transpose()?;
     let limit = super::types::clamp_limit(params.limit);
@@ -215,7 +215,7 @@ async fn ingest_path(config: &Config, path: &str) -> Result<std::path::PathBuf> 
     );
     policy.validate_path(path.trim()).await.map_err(|error| {
         tracing::warn!("[memory:brain] ingest path refused by the security policy");
-        Error::invalid(format!("cannot read the file: {error}"))
+        Error::InvalidRequest(format!("cannot read the file: {error}"))
     })
 }
 
@@ -232,16 +232,16 @@ pub async fn ingest(
             let resolved = ingest_path(config, path).await?;
             let path = resolved.as_path();
             let size = std::fs::metadata(path)
-                .map_err(|error| Error::invalid(format!("cannot read the file: {error}")))?
+                .map_err(|error| Error::InvalidRequest(format!("cannot read the file: {error}")))?
                 .len();
             if size > MAX_INGEST_BYTES {
-                return Err(Error::invalid(format!(
+                return Err(Error::InvalidRequest(format!(
                     "the file is {size} bytes; the limit is {MAX_INGEST_BYTES}"
                 )));
             }
             let bytes = tokio::fs::read(path)
                 .await
-                .map_err(|error| Error::invalid(format!("cannot read the file: {error}")))?;
+                .map_err(|error| Error::InvalidRequest(format!("cannot read the file: {error}")))?;
             let mut raw = RawDocument::new(bytes);
             if let Some(name) = path.file_name().and_then(|name| name.to_str()) {
                 raw = raw.with_filename(name);
@@ -255,12 +255,12 @@ pub async fn ingest(
                 meta,
             )
             .await
-            .map_err(|error| Error::invalid(format!("cannot convert the file: {error}")))?
+            .map_err(|error| Error::InvalidRequest(format!("cannot convert the file: {error}")))?
         }
         (None, Some(text)) => {
             tinymemory_tools::BrainDocument::new(source.unwrap_or_else(files_source), text)
         }
-        _ => return Err(Error::invalid("pass exactly one of `path` or `text`")),
+        _ => return Err(Error::InvalidRequest(("pass exactly one of `path` or `text`").into())),
     };
     if let Some(title) = params.title.filter(|title| !title.trim().is_empty()) {
         document = document.titled(title);

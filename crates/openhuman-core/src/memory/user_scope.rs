@@ -45,9 +45,9 @@ pub fn confinement_in(saas: bool, config: &Config) -> Result<Option<Namespace>> 
                 root = raw,
                 "[memory:user_scope] no valid confinement root in SaaS mode"
             );
-            Err(Error::invalid(
+            Err(Error::InvalidRequest((
                 "memory is unavailable: this agent has no valid memory root",
-            ))
+            ).into()))
         }
     }
 }

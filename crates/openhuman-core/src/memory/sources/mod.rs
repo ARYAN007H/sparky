@@ -59,7 +59,7 @@ pub fn list(config: &Config) -> Vec<SourceView> {
 pub fn normalize_target(kind: MemorySourceKind, target: &str) -> Result<String> {
     let target = target.trim();
     if target.is_empty() {
-        return Err(Error::invalid("target must not be empty"));
+        return Err(Error::InvalidRequest(("target must not be empty").into()));
     }
     match kind {
         MemorySourceKind::Folder | MemorySourceKind::File => Ok(target.to_string()),
@@ -72,9 +72,9 @@ pub fn normalize_target(kind: MemorySourceKind, target: &str) -> Result<String> 
                 (Some(owner), Some(repo), None) if !owner.is_empty() && !repo.is_empty() => {
                     Ok(format!("https://github.com/{owner}/{repo}"))
                 }
-                _ => Err(Error::invalid(
+                _ => Err(Error::InvalidRequest((
                     "a GitHub target is `owner/repo` or a repository URL",
-                )),
+                ).into())),
             }
         }
         MemorySourceKind::Link | MemorySourceKind::Rss => http_url(target),
@@ -82,9 +82,9 @@ pub fn normalize_target(kind: MemorySourceKind, target: &str) -> Result<String> 
 }
 
 fn http_url(target: &str) -> Result<String> {
-    let url = url::Url::parse(target).map_err(|_| Error::invalid("target is not a URL"))?;
+    let url = url::Url::parse(target).map_err(|_| Error::InvalidRequest(("target is not a URL").into()))?;
     if !matches!(url.scheme(), "http" | "https") || url.host_str().is_none() {
-        return Err(Error::invalid("target must be an http(s) URL"));
+        return Err(Error::InvalidRequest(("target must be an http(s) URL").into()));
     }
     Ok(url.to_string())
 }
@@ -96,7 +96,7 @@ pub fn apply_add(
     params: &SourcesAddParams,
 ) -> Result<MemorySourceConfig> {
     let kind = MemorySourceKind::parse(&params.kind).ok_or_else(|| {
-        Error::invalid(format!(
+        Error::InvalidRequest(format!(
             "unknown source kind `{}` (folder, file, link, github, rss)",
             params.kind.trim()
         ))
@@ -104,7 +104,7 @@ pub fn apply_add(
     let target = normalize_target(kind, &params.target)?;
     if let Some(mins) = params.schedule_mins {
         if mins < MIN_SCHEDULE_MINS {
-            return Err(Error::invalid(format!(
+            return Err(Error::InvalidRequest(format!(
                 "schedule_mins must be at least {MIN_SCHEDULE_MINS}"
             )));
         }
@@ -115,7 +115,7 @@ pub fn apply_add(
         .iter()
         .any(|source| source.kind == kind && source.target == target)
     {
-        return Err(Error::invalid("that source is already added"));
+        return Err(Error::InvalidRequest(("that source is already added").into()));
     }
     let label = params
         .label
@@ -127,7 +127,7 @@ pub fn apply_add(
         None | Some("") => None,
         Some(raw) => Some(
             raw.parse::<tinymemory_api::Namespace>()
-                .map_err(|error| Error::invalid(error.to_string()))?
+                .map_err(|error| Error::InvalidRequest((error.to_string()).into()))?
                 .to_string(),
         ),
     };

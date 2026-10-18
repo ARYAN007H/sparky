@@ -79,7 +79,7 @@ pub struct ItemsGetView {
 /// value the facet cannot take (blank, or an unknown kind).
 pub fn narrowed(filter: Option<MetaFilter>, path: &[PathStep]) -> Result<MetaFilter> {
     if path.len() > MAX_PATH_STEPS {
-        return Err(Error::invalid(format!(
+        return Err(Error::InvalidRequest(format!(
             "an explorer path takes at most {MAX_PATH_STEPS} steps"
         )));
     }
