@@ -5,7 +5,7 @@ use super::orchestration::tools::{
     SpawnAsyncSubagentTool, SpawnParallelAgentsTool, SpawnSubagentTool, SteerSubagentTool,
     WaitSubagentTool,
 };
-use super::tools::{PlanExitTool, TodoTool};
+use super::tools::TodoTool;
 use crate::config::Config;
 #[cfg(feature = "skills")]
 use crate::skills::run_workflow::{AwaitWorkflowTool, RunWorkflowTool};
@@ -58,7 +58,20 @@ pub(crate) fn dialogue_tools(action_dir: &Path, root_config: &Config) -> Vec<Box
         // Interactive plan-review gate: parks the live turn on a thread-scoped
         // plan the user must approve before execution (Codex/Claude plan mode).
         Box::new(crate::plan_review::RequestPlanReviewTool::new()),
-        Box::new(PlanExitTool::new()),
+        Box::new(tinyagents_harness::tool::PlanExitTool::new(std::sync::Arc::new(
+            |context| {
+                let thread_id = context.thread_id()?;
+                let dispatch_ctx = crate::agent::tinyagents::host::run_context::dispatch_ctx_for_tool(Some(context));
+                let tenant = dispatch_ctx.tenant().ok()?;
+                if crate::plan_review::gate::global()
+                    .parked_review_for_thread(&tenant, thread_id)
+                    .is_some()
+                {
+                    return None;
+                }
+                Some(crate::threads::run_mode::handle_for_thread(&dispatch_ctx, thread_id))
+            },
+        ))),
         // Workflow composition: `run_workflow` runs another workflow as a
         // subagent and (by default) waits on its result like a function call;
         // `await_workflow` re-attaches to a run that outlived its inline wait.
