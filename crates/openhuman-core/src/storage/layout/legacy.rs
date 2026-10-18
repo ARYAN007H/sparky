@@ -59,7 +59,7 @@ pub fn v1_db(target: &Target) -> std::path::PathBuf {
         .join("storage.db")
 }
 
-async fn open_v1(target: &Target) -> Result<Arc<dyn StorageBackend>, LayoutError> {
+pub(super) async fn open_v1(target: &Target) -> Result<Arc<dyn StorageBackend>, LayoutError> {
     let url = v1_url(target);
     storage::open(&url)
         .await
