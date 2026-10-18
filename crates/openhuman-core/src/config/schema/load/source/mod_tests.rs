@@ -307,6 +307,36 @@ async fn config_save_and_reload_use_the_document_on_a_shared_backend() {
 }
 
 #[tokio::test]
+async fn stale_document_config_snapshot_returns_conflict_instead_of_overwriting() {
+    let tmp = tempfile::tempdir().unwrap();
+    let storage = MemoryStorage::new();
+    let _forced = ForcedDocumentSource::new(
+        scoped(&storage, "tenant-a"),
+        Scope::new("tenant-a").unwrap(),
+        keys(3),
+    );
+    let path = tmp.path().join("config.toml");
+    let mut initial = config_at(tmp.path(), "initial");
+    initial.save().await.unwrap();
+    let mut first = Config::load_from_config_path(&path, &tmp.path().join("workspace"))
+        .await
+        .unwrap();
+    let mut stale = Config::load_from_config_path(&path, &tmp.path().join("workspace"))
+        .await
+        .unwrap();
+    first.default_model = Some("first".into());
+    stale.default_model = Some("stale".into());
+    first.save().await.unwrap();
+
+    let error = stale.save().await.unwrap_err();
+    assert!(format!("{error:#}").contains("conflict"), "{error:#}");
+    let loaded = Config::load_from_config_path(&path, &tmp.path().join("workspace"))
+        .await
+        .unwrap();
+    assert_eq!(loaded.default_model.as_deref(), Some("first"));
+}
+
+#[tokio::test]
 async fn without_a_shared_backend_config_stays_on_the_file() {
     // No forced scope and no installed backend: the file source.
     let tmp = tempfile::tempdir().unwrap();
