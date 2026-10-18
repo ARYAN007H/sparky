@@ -43,11 +43,6 @@
       "reason": "Storage schema v2 (epic #7973): the gitlink sits past the registry's released tag on the merged upstream commit carrying the uniform storage schema. Re-pin both once a release carrying it is cut; retire this entry then."
     },
     {
-      "id": "tinyflows",
-      "expect": "v0.8.23-92-gcad43f97",
-      "reason": "Storage schema v2 (epic #7973): the gitlink sits past the registry's released tag on the merged upstream commit carrying the uniform storage schema. Re-pin both once a release carrying it is cut; retire this entry then."
-    },
-    {
       "id": "tinymemes",
       "expect": "v0.4.0-9-gb3a298fc",
       "reason": "Storage schema v2 (epic #7973): the gitlink sits past the registry's released tag on the merged upstream commit carrying the uniform storage schema. Re-pin both once a release carrying it is cut; retire this entry then."
