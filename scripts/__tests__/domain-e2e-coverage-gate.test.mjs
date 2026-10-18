@@ -666,6 +666,18 @@ test('still credits a file gated on a real feature', (t) => {
 // other Rust target under tests/ still names the RPC method.
 test('counts coverage from a non-e2e root Rust test target', (t) => {
   const root = fixture(t);
+  const declaredNamespaces = [
+    'config', 'auth', 'app_state', 'connectivity', 'inference', 'agent', 'tools',
+    'tool_registry', 'approval', 'memory', 'embeddings', 'channels', 'composio', 'threads',
+  ];
+  for (const namespace of declaredNamespaces) {
+    write(root, `crates/openhuman-core/src/${namespace}/schemas.rs`, controller(namespace, 'list'));
+  }
+  write(
+    root,
+    'tests/widgets_e2e.rs',
+    declaredNamespaces.map((namespace) => `"openhuman.${namespace}_list"`).join('\n'),
+  );
   write(root, 'crates/openhuman-core/src/widgets/schemas.rs', controller('widgets', 'list'));
   write(root, 'tests/in_process/widgets_smoke.rs', 'let m = "openhuman.widgets_list";');
 
