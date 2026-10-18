@@ -142,7 +142,9 @@ fn memory_turn_keeps_its_core_context_without_owning_the_core() {
         identity,
         thread_id: "context-thread".into(),
         pack: None,
-        in_prompt_from: std::sync::Arc::new(super::super::super::window::InPromptFrom::new(2, 4)),
+        in_prompt_from: std::sync::Arc::new(
+            tinymemory_tools::lifecycle::window::InPromptFrom::new(2, 4),
+        ),
         core: Some(weak.clone()),
     };
 
