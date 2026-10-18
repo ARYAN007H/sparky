@@ -23,7 +23,9 @@ mod test_host;
 
 pub use app_host::AppHost;
 pub use service::{retry, scan, start, status, tick, StartParams};
-pub use state::{FileStateStore, StateKvMigrationStore};
+#[allow(deprecated)]
+pub use state::FileStateStore;
+pub use state::StateKvMigrationStore;
 pub use tinymemory_tools::layout_migration::{
     LayoutHost, MigrationState, MigrationStateStore, MigrationStatus, Outcome, Phase, ScanView,
     Trigger,
