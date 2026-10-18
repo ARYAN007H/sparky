@@ -1,11 +1,7 @@
 /**
  * Voice and dictation commands.
  */
-import { invoke } from '@tauri-apps/api/core';
-
 import { callCoreRpc } from '../../services/coreRpcClient';
-import { CommandResponse, isTauri } from './common';
-import { ConfigSnapshot } from './config';
 
 export interface VoiceSpeechResult {
   /** Final text — cleaned by LLM post-processing when available. */
@@ -38,60 +34,11 @@ export interface VoiceStatus {
   tts_provider: string;
 }
 
-export interface VoiceServerStatus {
-  state: 'stopped' | 'idle' | 'recording' | 'transcribing';
-  hotkey: string;
-  activation_mode: 'tap' | 'push';
-  transcription_count: number;
-  last_error: string | null;
-}
-
 /** Hosted speech-to-text engines, mirroring `config::schema::SttEngine`. */
 export type SttEngine = 'backend' | 'elevenlabs' | 'openai';
 
 export async function openhumanVoiceStatus(): Promise<VoiceStatus> {
   return await callCoreRpc<VoiceStatus>({ method: 'openhuman.voice_status', params: {} });
-}
-
-export async function openhumanVoiceServerStatus(): Promise<VoiceServerStatus> {
-  return await callCoreRpc<VoiceServerStatus>({
-    method: 'openhuman.voice_server_status',
-    params: {},
-  });
-}
-
-export async function openhumanVoiceServerStart(params?: {
-  hotkey?: string;
-  activation_mode?: 'tap' | 'push';
-  skip_cleanup?: boolean;
-}): Promise<VoiceServerStatus> {
-  return await callCoreRpc<VoiceServerStatus>({
-    method: 'openhuman.voice_server_start',
-    params: params ?? {},
-  });
-}
-
-export async function openhumanVoiceServerStop(): Promise<VoiceServerStatus> {
-  return await callCoreRpc<VoiceServerStatus>({
-    method: 'openhuman.voice_server_stop',
-    params: {},
-  });
-}
-
-export async function openhumanUpdateVoiceServerSettings(update: {
-  auto_start?: boolean;
-  hotkey?: string;
-  activation_mode?: 'tap' | 'push';
-  skip_cleanup?: boolean;
-  min_duration_secs?: number;
-  silence_threshold?: number;
-  custom_dictionary?: string[];
-  stt_engine?: SttEngine;
-}): Promise<CommandResponse<ConfigSnapshot>> {
-  return await callCoreRpc<CommandResponse<ConfigSnapshot>>({
-    method: 'openhuman.config_update_voice_server_settings',
-    params: update,
-  });
 }
 
 export interface VoiceProvidersUpdate {
@@ -157,61 +104,3 @@ export async function openhumanVoiceTts(
   });
 }
 
-/**
- * Register (or re-register) the global dictation toggle hotkey.
- */
-export async function registerDictationHotkey(shortcut: string): Promise<void> {
-  if (!isTauri()) {
-    console.debug('[dictation] registerDictationHotkey: skipped — not running in Tauri');
-    return;
-  }
-  const normalizedShortcut = shortcut
-    .trim()
-    .replace(/\bCommandOrControl\b/gi, 'CmdOrCtrl')
-    .replace(/\bCommand\b/gi, 'Cmd')
-    .replace(/\bControl\b/gi, 'Ctrl')
-    .replace(/\bOption\b/gi, 'Alt');
-
-  console.debug(
-    '[dictation] registerDictationHotkey: shortcut=%s normalized=%s',
-    shortcut,
-    normalizedShortcut
-  );
-  try {
-    await invoke<void>('register_dictation_hotkey', { shortcut: normalizedShortcut });
-  } catch (err) {
-    console.warn('[dictation] registerDictationHotkey normalized registration failed', err);
-    throw err;
-  }
-  console.debug('[dictation] registerDictationHotkey: done');
-}
-
-/**
- * Notify the overlay of a voice/STT state change from the chat prompt button.
- * Fire-and-forget — errors are logged but never propagated.
- */
-export const notifyOverlaySttState = (
-  state: 'recording_started' | 'transcription_done' | 'cancelled' | 'error',
-  text?: string
-): void => {
-  void (async () => {
-    try {
-      await callCoreRpc({ method: 'openhuman.overlay_stt_notify', params: { state, text } });
-    } catch (err: unknown) {
-      console.debug('[overlay_stt_notify] fire-and-forget error:', err);
-    }
-  })();
-};
-
-/**
- * Unregister the global dictation hotkey if one is active.
- */
-export async function unregisterDictationHotkey(): Promise<void> {
-  if (!isTauri()) {
-    console.debug('[dictation] unregisterDictationHotkey: skipped — not running in Tauri');
-    return;
-  }
-  console.debug('[dictation] unregisterDictationHotkey: invoking');
-  await invoke<void>('unregister_dictation_hotkey');
-  console.debug('[dictation] unregisterDictationHotkey: done');
-}

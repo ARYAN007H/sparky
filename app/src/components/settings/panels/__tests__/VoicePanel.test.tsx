@@ -11,7 +11,6 @@ import {
 } from '../../../../services/api/voiceSettingsApi';
 import { renderWithProviders } from '../../../../test/test-utils';
 import {
-  openhumanUpdateVoiceServerSettings,
   openhumanVoiceSetProviders,
   openhumanVoiceStatus,
   type VoiceStatus,
@@ -19,7 +18,6 @@ import {
 import VoicePanel from '../VoicePanel';
 
 vi.mock('../../../../utils/tauriCommands', () => ({
-  openhumanUpdateVoiceServerSettings: vi.fn(),
   openhumanVoiceSetProviders: vi.fn(),
   openhumanVoiceStatus: vi.fn(),
 }));
@@ -136,7 +134,6 @@ describe('VoicePanel', () => {
     expect(openhumanVoiceSetProviders).not.toHaveBeenCalledWith(
       expect.objectContaining({ [removedSettingParam]: expect.anything() })
     );
-    expect(openhumanUpdateVoiceServerSettings).not.toHaveBeenCalled();
   });
 
   // ─── Voice Routing Section ──────────────────────────────────────────────

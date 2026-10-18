@@ -17,7 +17,6 @@ import AppUpdatePrompt from './components/AppUpdatePrompt';
 import BootCheckGate from './components/BootCheckGate/BootCheckGate';
 import CommandProvider from './components/commands/CommandProvider';
 import ServiceBlockingGate from './components/daemon/ServiceBlockingGate';
-import DictationHotkeyManager from './components/DictationHotkeyManager';
 import ErrorFallbackScreen from './components/ErrorFallbackScreen';
 import KeyringConsentOverlay from './components/keyring/KeyringConsentOverlay';
 import AppSidebar from './components/layout/shell/AppSidebar';
@@ -30,7 +29,6 @@ import WindowsWindowControls, {
 import NoticeCenter from './components/notices/NoticeCenter';
 import OpenhumanLinkModal from './components/OpenhumanLinkModal';
 import PersistRehydrationScreen from './components/PersistRehydrationScreen';
-import PttHotkeyManager from './components/PttHotkeyManager';
 import SecurityBanner from './components/SecurityBanner';
 import { Toaster } from './components/ui/Toast';
 import AppWalkthrough from './components/walkthrough/AppWalkthrough';
@@ -145,8 +143,6 @@ function App() {
                               <AnalyticsPageTracker />
                               <AppShell />
                               <SecurityBanner />
-                              {!onMobile && <DictationHotkeyManager />}
-                              {!onMobile && <PttHotkeyManager />}
                               {!onMobile && <AppUpdatePrompt />}
                               <KeyringConsentOverlay />
                               <AnnouncementGate />
