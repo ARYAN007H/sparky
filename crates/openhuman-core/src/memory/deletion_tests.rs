@@ -1,6 +1,6 @@
 use super::*;
 
-use tinymemory_api::{MemoryEngine, MemoryMeta, Role, StoreItem, Turn};
+use tinymemory_api::{ItemKind, LearningKind, MemoryEngine, MemoryMeta, Role, StoreItem, Turn};
 
 use crate::memory::test_fixtures::{bind_reference, config_in, stored};
 
@@ -22,10 +22,13 @@ fn thread(id: &str) -> PendingDeletion {
 
 #[test]
 fn offline_conversation_purge_queues_exact_thread_ids_in_its_workspace() {
-    use crate::threads::store::{ensure_thread, purge_threads, CreateConversationThread};
+    use crate::threads::store::{
+        ensure_thread, purge_threads, CreateConversationThread,
+    };
 
     let tmp = tempfile::tempdir().unwrap();
-    let workspace = tmp.path().join("pre-login-workspace");
+    let config = config_in(&tmp);
+    let workspace = config.workspace_dir.clone();
     let other_workspace = tmp.path().join("other-workspace");
     let ctx = crate::core::runtime::DispatchCtx::unbound();
     let create = |id: &str| CreateConversationThread {
@@ -45,23 +48,25 @@ fn offline_conversation_purge_queues_exact_thread_ids_in_its_workspace() {
     let stats = purge_threads(&ctx, workspace.clone()).unwrap();
 
     assert_eq!(stats.thread_count, 2);
+    let mut queued = pending(&workspace);
+    queued.sort_by(|left, right| format!("{left:?}").cmp(&format!("{right:?}")));
     assert_eq!(
-        pending(&workspace),
+        queued,
         vec![thread("channel-thread-a"), thread("channel-thread-b")]
     );
     assert_eq!(pending(&other_workspace), vec![thread("other-workspace-thread")]);
-}
 
-#[tokio::test]
-async fn draining_purged_thread_deletions_keeps_learning_beliefs() {
-    use tinymemory_api::LearningKind;
-
-    let tmp = tempfile::tempdir().unwrap();
-    let config = config_in(&tmp);
-    enqueue(&config.workspace_dir, thread("purged-channel-thread"));
     let engine = bind_reference(&config);
     engine
-        .store(conversation("purged-channel-thread", "temporary transcript"))
+        .store(conversation("channel-thread-a", "temporary transcript A"))
+        .await
+        .unwrap();
+    engine
+        .store(conversation("channel-thread-b", "temporary transcript B"))
+        .await
+        .unwrap();
+    engine
+        .store(conversation("unrelated-thread", "keep this transcript"))
         .await
         .unwrap();
     engine
@@ -70,20 +75,33 @@ async fn draining_purged_thread_deletions_keeps_learning_beliefs() {
             LearningKind::Preference,
             0.9,
             MemoryMeta {
-                thread_id: Some("purged-channel-thread".to_string()),
+                thread_id: Some("channel-thread-a".to_string()),
                 ..MemoryMeta::default()
             },
         ))
         .await
         .unwrap();
 
-    assert_eq!(drain(&config).await, 1);
+    assert_eq!(drain(&config).await, 2);
 
     let left = stored(&engine, MetaFilter::default()).await;
-    assert_eq!(left.len(), 1);
-    assert_eq!(left[0].kind, ItemKind::Learning);
-    assert_eq!(left[0].text.as_deref(), Some("durable preference"));
-    assert!(pending(&config.workspace_dir).is_empty());
+    assert_eq!(left.len(), 2);
+    assert!(left.iter().any(|item| {
+        item.kind == ItemKind::Learning && item.text == "durable preference"
+    }));
+    assert!(left.iter().any(|item| {
+        item.kind == ItemKind::Conversation
+            && item.meta.thread_id.as_deref() == Some("unrelated-thread")
+    }));
+    assert!(!left.iter().any(|item| {
+        item.kind == ItemKind::Conversation
+            && matches!(
+                item.meta.thread_id.as_deref(),
+                Some("channel-thread-a" | "channel-thread-b")
+            )
+    }));
+    assert!(pending(&workspace).is_empty());
+    assert_eq!(pending(&other_workspace), vec![thread("other-workspace-thread")]);
 }
 
 #[tokio::test]
