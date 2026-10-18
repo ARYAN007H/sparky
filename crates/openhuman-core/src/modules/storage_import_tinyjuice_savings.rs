@@ -82,7 +82,8 @@ where
         return Ok(Outcome::NoSource);
     }
     let path = file.to_owned();
-    let bytes = tokio::task::spawn_blocking(move || read_regular(&path))
+    let bytes = crate::core::runtime::DispatchCtx::ambient()
+        .spawn_blocking(move || read_regular(&path))
         .await
         .context("the legacy reader panicked")??;
     let Some((_, bytes)) = bytes else {
