@@ -321,7 +321,7 @@ async fn skills_component_off_yields_no_catalogue_and_skips_bundled_install() {
     assert!(!installed, "disabled skills materialize no bundled skills");
 }
 
-#[cfg(feature = "flows")]
+#[cfg(all(feature = "flows", feature = "skills"))]
 #[tokio::test]
 async fn flow_authoring_is_hidden_when_tinyflows_component_is_disabled() {
     use crate::core::runtime::{ComponentSet, ContextOverlay, CoreContext, DomainSet};
@@ -378,7 +378,7 @@ async fn flow_authoring_is_hidden_when_tinyflows_component_is_disabled() {
     );
 }
 
-#[cfg(feature = "flows")]
+#[cfg(all(feature = "flows", feature = "skills"))]
 #[tokio::test]
 async fn module_builtin_gate_only_narrows_context_and_explicit_config() {
     use crate::core::runtime::{ComponentSet, ContextOverlay, CoreContext, DomainSet};

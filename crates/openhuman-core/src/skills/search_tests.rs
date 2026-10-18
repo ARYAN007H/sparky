@@ -98,7 +98,7 @@ fn a_hit_reports_how_many_were_searched() {
     assert!(value["hint"].is_null(), "a hit carries no miss hint");
 }
 
-#[cfg(feature = "flows")]
+#[cfg(all(feature = "flows", feature = "skills"))]
 #[tokio::test]
 async fn module_owned_flow_skill_is_findable_after_scoped_prewarm() {
     // Use TinyFlows' linked test module to exercise the same bus-owned
