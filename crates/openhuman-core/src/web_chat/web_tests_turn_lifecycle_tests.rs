@@ -262,7 +262,7 @@ async fn a_turn_with_an_unavailable_local_provider_ends_in_one_classified_chat_e
         .collect();
     assert!(
         !inference_requests.is_empty(),
-        "the intended local inference request was not observed: {requests:?}"
+        "the intended local inference request was not observed: terminal={error:?}; requests={requests:?}"
     );
     assert_eq!(
         inference_requests.len(),
