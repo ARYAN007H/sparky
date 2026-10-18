@@ -10,7 +10,6 @@
 //! | [`ops`] | Engine selection, recall, fetch, learn, forget, list, the pack preview |
 //! | [`brain`] | The shared brain: documents by source type |
 //! | [`sources`] | The `[[memory.sources]]` registry and sync into the brain (folder, file, link, github, rss, composio) |
-//! | [`channels`] | Which channel each logged thread arrived on, for forgetting a channel |
 //! | [`backfill`] | Consent-gated storing of chats from before turns were logged |
 //! | [`import`] | Consent-gated, resumable import of a v1 store |
 //! | [`tools`] | The single `memory` agent tool |
@@ -23,7 +22,6 @@ pub mod backfill;
 pub mod billing;
 pub mod brain;
 pub mod bus;
-pub mod channels;
 pub mod deletion;
 pub mod engine;
 pub mod error;

@@ -355,8 +355,9 @@ trusted call facts; queued writes retain that call's narrower reach.
   deletion workflows retain their own behavior.
 
 - `deletion::forget_thread` (`deletion.rs`): called by `threads` when a
-  thread is deleted. `channels::forget_channel` is called by `channels` on
-  disconnect.
+  thread is deleted. `ops::forget_channel` is called on channel disconnect; it
+  forgets channel-stamped turns and falls back to the previous release's
+  thread ownership data for older unstamped conversations.
 - Upstream `tinymemory_api::Error` values map at the RPC boundary ([`error.rs`](./error.rs)):
   every RPC failure carries one of `MEMORY_OFF`,
   `UNSUPPORTED`, `INVALID_REQUEST`, `UNAUTHORIZED`, `INSUFFICIENT_CREDITS`,
@@ -389,13 +390,17 @@ files under `<workspace>/memory/`, written owner-only through [`files.rs`](./fil
 | File | Owner |
 | --- | --- |
 | `jobs.json` | `lifecycle/jobs.rs` |
-| `channel_threads.json` | `channels.rs` |
 | `pending_deletions.json` | `deletion.rs` |
 | `sources_state.json` | [`sources/state.rs`](./sources/state.rs) |
 | `conversations_backfill.json` | `backfill.rs` |
 | `import_state.json` | `import.rs` |
 | `layout_migration.json` | [`layout_migration/state.rs`](./layout_migration/state.rs) |
 | `local_root.json` | `local_root.rs` |
+
+For one release, disconnect reads a valid `channel_threads.json` written by
+older versions as a read-only fallback for legacy conversations. Current code
+does not write this file. Malformed JSON keeps the existing quarantine behavior;
+remove the compatibility reader in the next release.
 
 The sources registry is `[[memory.sources]]` in `config.toml`. The CortexDB
 key is in the OS keyring. The layout migration's shared-tree claim marker
