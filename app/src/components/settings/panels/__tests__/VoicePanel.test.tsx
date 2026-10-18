@@ -94,9 +94,6 @@ describe('VoicePanel', () => {
 
     runtime = {
       settings: {
-        auto_start: false,
-        hotkey: 'Fn',
-        activation_mode: 'push',
         skip_cleanup: true,
         min_duration_secs: 0.3,
         silence_threshold: 0.002,
