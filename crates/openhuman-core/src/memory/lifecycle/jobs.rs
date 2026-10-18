@@ -63,7 +63,7 @@ impl QueueStore for FileQueueStore {
         })
     }
 
-    fn save(&self, state: &QueueState) -> Result<(), String> {
+    fn save(&self, state: &QueueState) -> std::result::Result<(), String> {
         serde_json::to_vec_pretty(state)
             .map_err(|error| error.to_string())
             .and_then(|json| {

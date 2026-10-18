@@ -162,7 +162,7 @@ fn arg_str(args: &Value, key: &str) -> Option<String> {
         .map(str::to_string)
 }
 
-fn parse<T: serde::de::DeserializeOwned>(args: &Value) -> Result<T, String> {
+fn parse<T: serde::de::DeserializeOwned>(args: &Value) -> std::result::Result<T, String> {
     serde_json::from_value(args.clone()).map_err(|error| format!("invalid arguments: {error}"))
 }
 
@@ -284,7 +284,7 @@ pub async fn run_action(
 ) -> ToolResult {
     let action = arg_str(args, "action").unwrap_or_default();
     tracing::debug!(action = %action, "[memory:tool] dispatch");
-    let result: Result<Value, String> = match action.as_str() {
+    let result: std::result::Result<Value, String> = match action.as_str() {
         // The agent answers from the evidence itself, so recall writes no
         // answer of its own; and the thread the call runs in is left out of
         // recall and fetch, since its user turn is logged before the tool

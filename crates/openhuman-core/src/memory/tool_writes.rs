@@ -574,7 +574,7 @@ struct Executor<'a> {
 
 #[async_trait]
 impl WriteExecutor for Executor<'_> {
-    async fn run(&self, operation: &WriteOperation) -> Result<(), String> {
+    async fn run(&self, operation: &WriteOperation) -> std::result::Result<(), String> {
         let config = self.config;
         let work = async {
             match operation {

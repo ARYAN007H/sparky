@@ -58,7 +58,7 @@ where
     })
 }
 
-fn parse<T: DeserializeOwned>(params: Map<String, Value>) -> std::result::Result<T, String> {
+fn parse<T: DeserializeOwned>(params: Map<String, Value>) -> std::result::std::result::Result<T, String> {
     serde_json::from_value(Value::Object(params))
         .map_err(|error| {
             StructuredRpcError::from(Error::InvalidRequest(format!("invalid params: {error}")))
