@@ -669,14 +669,22 @@ async fn run_system_turn_on_thread(
                 ctx, "system", &thread_id, &run_id, response, None,
             ),
             Err(error) => {
-                crate::web_chat::publish_web_channel_event(crate::web_chat::WebChannelEvent {
-                    event: "chat_error".to_string(),
-                    client_id: "system".to_string(),
-                    thread_id: thread_id.clone(),
-                    request_id: run_id.clone(),
+                crate::web_chat::publish_web_channel_event(crate::web_chat::WebChannelEvent::ChatError {
+                    context: crate::web_chat::channel_event::event_context(
+                        "system",
+                        thread_id.clone(),
+                        run_id.clone(),
+                    ),
                     message: Some(error.clone()),
                     error_type: Some("agent_error".to_string()),
-                    ..Default::default()
+                    error_source: None,
+                    error_retryable: None,
+                    error_retry_after_ms: None,
+                    error_provider: None,
+                    error_fallback_available: None,
+                    copy_key: None,
+                    copy_params: None,
+                    guardrail: None,
                 })
             }
         },
