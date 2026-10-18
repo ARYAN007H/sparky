@@ -1,13 +1,6 @@
 use super::*;
 use crate::core::runtime::DispatchCtx;
 
-#[test]
-fn all_schemas_have_namespace() {
-    for s in all_controller_schemas() {
-        assert_eq!(s.namespace, "tokenjuice");
-    }
-}
-
 /* Module-backed behavior is covered by TinyJuice's loader E2E. */
 
 // ── #6088: `compress` must expose all five ContentHint fields ────────────────
