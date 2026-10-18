@@ -93,7 +93,7 @@
   {
     "rule": "openhuman-task-local",
     "path": "crates/openhuman-core/src/channels/proactive.rs",
-    "line": 306,
+    "line": 228,
     "text": "let (outcome, request_id) = crate::agent::turn_origin::with_origin(",
     "occurrence": 1
   },
@@ -156,35 +156,35 @@
   {
     "rule": "openhuman-task-local",
     "path": "crates/openhuman-core/src/flows/ops/execution.rs",
-    "line": 312,
+    "line": 315,
     "text": "let run = with_origin(",
     "occurrence": 1
   },
   {
     "rule": "openhuman-task-local",
     "path": "crates/openhuman-core/src/flows/ops/resume.rs",
-    "line": 305,
+    "line": 308,
     "text": "let run = with_origin(",
     "occurrence": 1
   },
   {
     "rule": "openhuman-task-local",
     "path": "crates/openhuman-core/src/flows/tinyflows/caps/agent.rs",
-    "line": 469,
+    "line": 467,
     "text": "Box::pin(turn_origin::with_origin(",
     "occurrence": 1
   },
   {
     "rule": "openhuman-task-local",
     "path": "crates/openhuman-core/src/flows/tinyflows/caps/tier.rs",
-    "line": 118,
+    "line": 116,
     "text": "turn_origin::with_origin(",
     "occurrence": 1
   },
   {
     "rule": "openhuman-task-local",
     "path": "crates/openhuman-core/src/inference/host_runtime/ops/agent_chat.rs",
-    "line": 591,
+    "line": 592,
     "text": "let run = crate::agent::turn_origin::with_origin(",
     "occurrence": 1
   },
@@ -310,7 +310,7 @@
   {
     "rule": "openhuman-task-local",
     "path": "crates/openhuman-core/src/voice/realtime_harness/agent.rs",
-    "line": 13,
+    "line": 12,
     "text": "use crate::agent::turn_origin::{with_origin, AgentTurnOrigin};",
     "occurrence": 1
   },
@@ -331,15 +331,22 @@
   {
     "rule": "openhuman-task-local",
     "path": "crates/openhuman-core/src/web_chat/ops/system_turn.rs",
-    "line": 89,
+    "line": 88,
     "text": "let result = with_origin(origin, agent.run_single(prompt))",
     "occurrence": 1
   },
   {
     "rule": "openhuman-task-local",
-    "path": "crates/openhuman-core/src/web_chat/ops/turn_guards.rs",
-    "line": 254,
-    "text": "crate::agent::turn_origin::with_origin(",
+    "path": "crates/openhuman-core/src/web_chat/turn_host.rs",
+    "line": 40,
+    "text": "use crate::agent::turn_origin::{with_origin, AgentTurnOrigin};",
+    "occurrence": 1
+  },
+  {
+    "rule": "openhuman-task-local",
+    "path": "crates/openhuman-core/src/web_chat/turn_host.rs",
+    "line": 268,
+    "text": "let turn = Box::pin(with_origin(",
     "occurrence": 1
   },
   {
@@ -399,6 +406,118 @@
     "occurrence": 1
   },
   {
+    "rule": "tinyagents-openhuman-domain-name",
+    "path": "vendor/tinyagents/crates/tinyagents-harness/src/lib.rs",
+    "line": 162,
+    "text": "pub use progress::AgentProgress;",
+    "occurrence": 1
+  },
+  {
+    "rule": "tinyagents-openhuman-domain-name",
+    "path": "vendor/tinyagents/crates/tinyagents-harness/src/progress.rs",
+    "line": 11,
+    "text": "pub enum AgentProgress {",
+    "occurrence": 1
+  },
+  {
+    "rule": "tinyagents-openhuman-domain-name",
+    "path": "vendor/tinyagents/crates/tinyagents-harness/src/progress.rs",
+    "line": 468,
+    "text": "impl AgentProgress {",
+    "occurrence": 1
+  },
+  {
+    "rule": "tinyagents-openhuman-domain-name",
+    "path": "vendor/tinyagents/crates/tinyagents-harness/src/turn_runner/mod_tests.rs",
+    "line": 134,
+    "text": "async fn progress(&self, _request: &TurnRequest, _event: crate::progress::AgentProgress) {}",
+    "occurrence": 1
+  },
+  {
+    "rule": "tinyagents-openhuman-domain-name",
+    "path": "vendor/tinyagents/crates/tinyagents-harness/src/turn_runner/mod_tests.rs",
+    "line": 560,
+    "text": "async fn progress(&self, _request: &TurnRequest, _event: crate::progress::AgentProgress) {}",
+    "occurrence": 2
+  },
+  {
+    "rule": "tinyagents-openhuman-domain-name",
+    "path": "vendor/tinyagents/crates/tinyagents-harness/src/turn_runner/mod_tests.rs",
+    "line": 579,
+    "text": "async fn progress(&self, _request: &TurnRequest, _event: crate::progress::AgentProgress) {}",
+    "occurrence": 3
+  },
+  {
+    "rule": "tinyagents-openhuman-domain-name",
+    "path": "vendor/tinyagents/crates/tinyagents-harness/src/turn_runner/mod_tests.rs",
+    "line": 987,
+    "text": "async fn progress(&self, _request: &TurnRequest, _event: crate::progress::AgentProgress) {}",
+    "occurrence": 4
+  },
+  {
+    "rule": "tinyagents-openhuman-domain-name",
+    "path": "vendor/tinyagents/crates/tinyagents-harness/src/turn_runner/mod_tests.rs",
+    "line": 1215,
+    "text": "async fn progress(&self, _request: &TurnRequest, event: crate::progress::AgentProgress) {",
+    "occurrence": 1
+  },
+  {
+    "rule": "tinyagents-openhuman-domain-name",
+    "path": "vendor/tinyagents/crates/tinyagents-harness/src/turn_runner/mod_tests.rs",
+    "line": 1217,
+    "text": "crate::progress::AgentProgress::TurnStarted => \"progress\",",
+    "occurrence": 1
+  },
+  {
+    "rule": "tinyagents-openhuman-domain-name",
+    "path": "vendor/tinyagents/crates/tinyagents-harness/src/turn_runner/mod_tests.rs",
+    "line": 1255,
+    "text": "crate::progress::AgentProgress::TurnStarted,",
+    "occurrence": 1
+  },
+  {
+    "rule": "tinyagents-openhuman-domain-name",
+    "path": "vendor/tinyagents/crates/tinyagents-harness/src/turn_runner/mod_tests.rs",
+    "line": 1740,
+    "text": "async fn progress(&self, _request: &TurnRequest, _event: crate::progress::AgentProgress) {",
+    "occurrence": 1
+  },
+  {
+    "rule": "tinyagents-openhuman-domain-name",
+    "path": "vendor/tinyagents/crates/tinyagents-harness/src/turn_runner/mod_tests.rs",
+    "line": 1778,
+    "text": "crate::progress::AgentProgress::TurnStarted,",
+    "occurrence": 2
+  },
+  {
+    "rule": "tinyagents-openhuman-domain-name",
+    "path": "vendor/tinyagents/crates/tinyagents-harness/src/turn_runner/mod_tests.rs",
+    "line": 1982,
+    "text": "_event: crate::progress::AgentProgress,",
+    "occurrence": 1
+  },
+  {
+    "rule": "tinyagents-openhuman-domain-name",
+    "path": "vendor/tinyagents/crates/tinyagents-harness/src/turn_runner/types.rs",
+    "line": 14,
+    "text": "use crate::progress::AgentProgress;",
+    "occurrence": 1
+  },
+  {
+    "rule": "tinyagents-openhuman-domain-name",
+    "path": "vendor/tinyagents/crates/tinyagents-harness/src/turn_runner/types.rs",
+    "line": 169,
+    "text": "Progress(Box<AgentProgress>),",
+    "occurrence": 1
+  },
+  {
+    "rule": "tinyagents-openhuman-domain-name",
+    "path": "vendor/tinyagents/crates/tinyagents-harness/src/turn_runner/types.rs",
+    "line": 229,
+    "text": "async fn progress(&self, request: &TurnRequest<P>, event: AgentProgress);",
+    "occurrence": 1
+  },
+  {
     "rule": "tinyagents-tool-calling-facade",
     "path": "vendor/tinyagents/crates/tinyagents-harness/src/agent_loop/dialect.rs",
     "line": 23,
@@ -450,7 +569,7 @@
   {
     "rule": "tinyagents-tool-calling-facade",
     "path": "vendor/tinyagents/crates/tinyagents-harness/src/lib.rs",
-    "line": 128,
+    "line": 130,
     "text": "pub use tinytools_agent;",
     "occurrence": 1
   },

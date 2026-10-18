@@ -557,8 +557,11 @@ fn tap_progress(
 }
 
 /// The `inference_heartbeat` liveness beat for the turn's projection.
-fn spawn_heartbeat(projection: Arc<AsyncMutex<ProgressProjection>>) -> tokio::task::JoinHandle<()> {
-    tokio::spawn(async move {
+fn spawn_heartbeat(
+    ctx: &DispatchCtx,
+    projection: Arc<AsyncMutex<ProgressProjection>>,
+) -> tokio::task::JoinHandle<()> {
+    ctx.spawn(async move {
         let mut beat = tokio::time::interval(Duration::from_secs(INFERENCE_HEARTBEAT_SECS));
         // Wall-clock cadence: a slow turn must not produce a burst of catch-up
         // beats once it finally yields control.
