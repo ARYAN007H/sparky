@@ -243,15 +243,13 @@ impl SessionDriver<OpenHumanRunContext> for OpenHumanSessionDriver {
                 },
             ));
         }
-        // A cap pause is advisory in the harness.  Treat an exhausted loop
-        // without a usable final response as capped even if that pause arrived
-        // after the loop's own limit check.
+        // Treat an exhausted loop without a final response as capped even if
+        // the harness pause arrived after its own limit check.
         outcome.hit_cap |= outcome.text.trim().is_empty()
             && (outcome.model_calls >= self.max_iterations
                 || outcome.tool_calls >= self.max_iterations
                 || outcome.tool_outcomes.len() >= self.max_iterations);
-        // Older hosted-harness paths materialize this fallback before exposing
-        // the outcome, which leaves the raw call counters unavailable here.
+        // Older hosted-harness fallbacks leave the raw counters unavailable.
         // It is only produced when the loop exhausted a tool round without a
         // model conclusion, so normalize it to the same resumable cap state.
         let exhausted_fallback = outcome

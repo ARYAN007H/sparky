@@ -63,7 +63,6 @@ pub(super) struct OpenHumanSessionState {
     pub(super) reply_language_directive: Option<String>,
     pub(super) time_zone: Option<String>,
     prelude: Option<OpenHumanTurnPrelude>,
-    /// Deferred native terminal, finalized after transcript durability.
     active_terminal_sidecar: Option<ActiveTerminalSidecar>,
     /// The previous turn's deferred post-commit work (thread-goal
     /// accounting). The next turn awaits it before loading the goal
