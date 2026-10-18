@@ -185,7 +185,10 @@ pub(super) fn make_completion(
                                             worktree_path: None,
                                             changed_files: Vec::new(),
                                             dirty_status: None,
-                                            stop: incomplete_stop(reason),
+                                            stop: incomplete_stop(
+                                                reason,
+                                                outcome.failure_cause.clone(),
+                                            ),
                                         })
                                         .await;
                                 }
