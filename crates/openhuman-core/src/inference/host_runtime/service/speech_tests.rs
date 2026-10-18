@@ -41,7 +41,9 @@ async fn tts_rejects_output_outside_allowed_roots() {
 #[tokio::test]
 async fn tts_output_path_allows_workspace_and_local_ai_models_roots() {
     let tmp = tempfile::tempdir().unwrap();
-    let config = enabled_config(&tmp);
+    let mut config = enabled_config(&tmp);
+    config.autonomy.enabled = true;
+    config.autonomy.workspace_only = true;
     let runtime = crate::inference::local_runtime_config(&config);
     let model_root = tinyinference_local::service::paths::config_root_dir(&runtime)
         .join("models")
@@ -89,6 +91,28 @@ async fn tts_output_path_rejects_symlink_escape() {
         .unwrap_err();
 
     assert!(error.contains("output_path"));
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn tts_output_path_rejects_final_component_symlink() {
+    let tmp = tempfile::tempdir().unwrap();
+    let config = enabled_config(&tmp);
+    let runtime = crate::inference::local_runtime_config(&config);
+    let outside_file = tmp.path().join("outside.wav");
+    std::fs::write(&outside_file, b"outside target").unwrap();
+    let output = config.workspace_dir.join("speech.wav");
+    std::os::unix::fs::symlink(&outside_file, &output).unwrap();
+
+    let error = validated_tts_output_path(&config, &runtime, Some(output.to_str().unwrap()))
+        .await
+        .unwrap_err();
+
+    assert!(
+        error.contains("symbolic links"),
+        "unexpected error: {error}"
+    );
+    assert_eq!(std::fs::read(outside_file).unwrap(), b"outside target");
 }
 
 #[cfg(unix)]

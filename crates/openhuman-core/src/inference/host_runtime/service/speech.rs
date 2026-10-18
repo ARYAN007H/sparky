@@ -178,18 +178,42 @@ async fn validated_tts_output_path(
     let candidate_string = candidate
         .to_str()
         .ok_or_else(|| "invalid output_path".to_string())?;
-    let policy = crate::security::SecurityPolicy::from_config(
+    let mut policy = crate::security::SecurityPolicy::from_config(
         &config.autonomy,
         &config.workspace_dir,
         &config.action_dir,
     );
-    let resolved = policy
-        .validate_parent_path(candidate_string)
-        .await
-        .map_err(|error| format!("invalid output_path: {error}"))?;
+    policy.trusted_roots.push(crate::security::TrustedRoot {
+        path: model_root.display().to_string(),
+        access: crate::security::TrustedAccess::ReadWrite,
+    });
+    let resolved = match tokio::fs::symlink_metadata(&candidate).await {
+        Ok(metadata) if metadata.file_type().is_symlink() => {
+            return Err("invalid output_path: symbolic links are not allowed".into());
+        }
+        Ok(_) => policy.validate_path(candidate_string).await,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            policy.validate_parent_path(candidate_string).await
+        }
+        Err(error) => Err(format!("could not inspect output_path: {error}")),
+    }
+    .map_err(|error| format!("invalid output_path: {error}"))?;
 
     for root in [&config.workspace_dir, &model_root] {
-        let resolved_root = canonicalize_path_with_missing_suffix(root).await?;
+        let root_probe = root.join(".openhuman-tts-root-check");
+        let root_probe_string = root_probe
+            .to_str()
+            .ok_or_else(|| "could not resolve allowed TTS path root".to_string())?;
+        let resolved_probe = policy
+            .validate_parent_path(root_probe_string)
+            .await
+            .map_err(|error| format!("could not resolve allowed TTS path root: {error}"))?;
+        let resolved_root = resolved_probe.parent().ok_or_else(|| {
+            format!(
+                "could not resolve allowed TTS path root: {}",
+                root.display()
+            )
+        })?;
         if resolved.starts_with(&resolved_root) {
             return Ok(resolved);
         }
@@ -198,33 +222,6 @@ async fn validated_tts_output_path(
         "invalid output_path: path must be inside the workspace or local-ai models directory"
             .into(),
     )
-}
-
-async fn canonicalize_path_with_missing_suffix(path: &std::path::Path) -> Result<PathBuf, String> {
-    let mut ancestor = path;
-    let mut missing = Vec::new();
-    while tokio::fs::metadata(ancestor).await.is_err() {
-        let name = ancestor.file_name().ok_or_else(|| {
-            format!(
-                "could not resolve allowed TTS path root: {}",
-                path.display()
-            )
-        })?;
-        missing.push(name.to_os_string());
-        ancestor = ancestor.parent().ok_or_else(|| {
-            format!(
-                "could not resolve allowed TTS path root: {}",
-                path.display()
-            )
-        })?;
-    }
-    let mut resolved = tokio::fs::canonicalize(ancestor)
-        .await
-        .map_err(|error| format!("could not resolve allowed TTS path root: {error}"))?;
-    for component in missing.iter().rev() {
-        resolved.push(component);
-    }
-    Ok(resolved)
 }
 
 #[cfg(test)]
