@@ -233,9 +233,8 @@ impl SessionDriver<OpenHumanRunContext> for OpenHumanSessionDriver {
                 ));
             }
         };
-        let supplemental_trace = grounded_close::SupplementalTrace::install_for_turn(
-            &sidecar, &mut outcome,
-        );
+        let supplemental_trace =
+            grounded_close::SupplementalTrace::install_for_turn(&sidecar, &mut outcome);
 
         if outcome.text.trim().is_empty() && outcome.tool_outcomes.is_empty() {
             return Err(driver_error(

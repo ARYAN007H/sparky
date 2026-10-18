@@ -51,6 +51,7 @@ mod routes;
 mod steering_forwarder;
 pub(crate) mod tool_registration;
 mod turn_exec;
+mod turn_exec_native;
 mod turn_middleware;
 pub(crate) mod turn_model_resolver;
 mod turn_outcome;
@@ -58,7 +59,6 @@ mod turn_plan;
 pub(crate) mod turn_policy;
 mod turn_run_error;
 mod turn_run_finalize;
-mod turn_exec_native;
 mod use_skill_dispatch;
 mod verify_before_finish;
 

@@ -26,6 +26,21 @@ use std::time::{Duration, Instant};
 
 use tinyinference_llm::message::Message;
 
+pub(super) fn take_terminal_sidecar(
+    state: &std::sync::Arc<std::sync::Mutex<super::OpenHumanSessionState>>,
+    terminal: tinyagents_runtime::SessionTerminal,
+) -> Option<
+    std::sync::Arc<
+        std::sync::Mutex<crate::agent::tinyagents::host::run_context::SessionTurnSidecar>,
+    >,
+> {
+    let mut state = state
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    state.terminals.push(terminal);
+    state.active_terminal_sidecar.take()
+}
+
 pub(super) async fn finalize_deferred_terminal(
     sidecar: &std::sync::Mutex<crate::agent::tinyagents::host::run_context::SessionTurnSidecar>,
     terminal: &tinyagents_runtime::SessionTerminal,

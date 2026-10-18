@@ -876,13 +876,7 @@ impl OpenHumanSessionHost {
                 move |terminal| {
                     let state = state.clone();
                     Box::pin(async move {
-                        let sidecar = {
-                            let mut state = state
-                                .lock()
-                                .unwrap_or_else(|poisoned| poisoned.into_inner());
-                            state.terminals.push(terminal.clone());
-                            state.active_terminal_sidecar.take()
-                        };
+                        let sidecar = post_commit::take_terminal_sidecar(&state, terminal.clone());
                         if let Some(sidecar) = sidecar {
                             post_commit::finalize_deferred_terminal(&sidecar, &terminal).await;
                         }

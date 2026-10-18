@@ -87,15 +87,8 @@ pub(super) fn tier_gate_decision(
 
 /// Run a sub-agent based on its definition and a task prompt.
 ///
-/// This is the primary entry point for agent delegation. It performs the following:
-/// 1. Generates a unique `task_id` if one wasn't provided.
-/// 2. Asks the turn's
-///    explicit root-turn dispatch guard
-///    whether a delegation can still succeed, and refuses before spending
-///    anything if it cannot (#5804).
-/// 3. Reads the parent's explicit [`ParentExecutionContext`] from its run
-///    carrier.
-/// 4. Dispatches to `run_typed_mode`.
+/// Creates a task id, checks the root-turn dispatch budget, reads the parent's
+/// [`ParentExecutionContext`], then dispatches to `run_typed_mode`.
 ///
 /// On success returns a [`SubagentRunOutcome`] whose `output` is the
 /// final assistant text. On failure the error is suitable for stringifying
