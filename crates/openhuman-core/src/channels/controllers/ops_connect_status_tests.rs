@@ -2,6 +2,7 @@ use super::*;
 use std::sync::Arc;
 use tinymemory_api::conformance::ReferenceEngine;
 use tinymemory_api::{MemoryEngine, MemoryMeta, Role, SourceKind, StoreItem, Turn};
+use crate::core::runtime::{ContextOverlay, CoreContext, DispatchCtx, DomainSet};
 
 fn channel_memory_item(thread_id: &str, channel: &str) -> StoreItem {
     StoreItem::Conversation {
@@ -18,7 +19,21 @@ fn channel_memory_item(thread_id: &str, channel: &str) -> StoreItem {
     }
 }
 
-async fn store_channel_thread(config: &Config, channel: &str, id: &str) -> String {
+fn account_context(config: &Config, profile: &str) -> DispatchCtx {
+    DispatchCtx::new(
+        CoreContext::for_test(DomainSet::none(), Some(config.workspace_dir.clone())).derive_with(
+            ContextOverlay::new(config.clone(), DomainSet::full(), Default::default())
+                .profile(profile),
+        ),
+    )
+}
+
+async fn store_channel_thread(
+    ctx: DispatchCtx,
+    config: &Config,
+    channel: &str,
+    id: &str,
+) -> String {
     use crate::threads::store::{ConversationMessage, CreateConversationThread};
     use serde_json::json;
 
@@ -31,7 +46,6 @@ async fn store_channel_thread(config: &Config, channel: &str, id: &str) -> Strin
     );
     let thread_id = params.thread_id();
     let now = chrono::Utc::now().to_rfc3339();
-    let ctx = crate::core::runtime::DispatchCtx::ambient();
     crate::threads::store::blocking::ensure_thread(
         ctx.clone(),
         config.workspace_dir.clone(),
@@ -304,11 +318,21 @@ async fn disconnect_rpc_reports_zero_and_queues_when_memory_is_off() {
     });
     config.memory.engine.clear();
     config.save().await.expect("save Discord setup");
-    let thread_id = store_channel_thread(&config, "discord", "offline-message").await;
+    let tenant_ctx = account_context(&config, "offline-account");
+    let thread_id = store_channel_thread(
+        tenant_ctx.clone(),
+        &config,
+        "discord",
+        "offline-message",
+    )
+    .await;
 
-    let outcome = disconnect_channel(&config, "discord", ChannelAuthMode::BotToken, true)
-        .await
-        .expect("offline memory queues deletion");
+    let outcome = CoreContext::scope(tenant_ctx.into_core().unwrap(), async {
+        disconnect_channel(&config, "discord", ChannelAuthMode::BotToken, true)
+            .await
+            .expect("offline memory queues deletion")
+    })
+    .await;
 
     assert_eq!(outcome.value["memory_chunks_deleted"], 0);
     assert_eq!(
@@ -329,7 +353,13 @@ async fn disconnect_rpc_surfaces_memory_error_after_queuing_snapshot() {
         mention_only: false,
     });
     config.save().await.expect("save Discord setup");
-    let thread_id = store_channel_thread(&config, "discord", "failed-message").await;
+    let thread_id = store_channel_thread(
+        DispatchCtx::ambient(),
+        &config,
+        "discord",
+        "failed-message",
+    )
+    .await;
     crate::memory::test_fixtures::RefusingEngine::with(tinymemory_api::Error::Engine(
         "forget failed".into(),
     ))
