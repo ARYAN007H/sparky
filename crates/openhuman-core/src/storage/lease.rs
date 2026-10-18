@@ -55,7 +55,7 @@ use serde::{Deserialize, Serialize};
 
 use super::StorageError;
 
-pub use super::lease_documents::DocumentLeases;
+pub use super::lease_documents::{DocumentLeases, LEASE_OWNER};
 pub use super::lease_local::LocalLeases;
 
 /// The storage scope lease records live under, shared by every node.
