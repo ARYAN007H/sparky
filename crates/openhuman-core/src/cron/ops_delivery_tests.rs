@@ -286,6 +286,72 @@ async fn manual_run_projects_its_captured_job_after_the_saved_job_is_deleted() {
 }
 
 #[tokio::test]
+async fn detached_manual_run_returns_only_after_the_worker_is_running() {
+    use tokio::sync::oneshot;
+
+    crate::core::bus::init().await.unwrap();
+    let tmp = TempDir::new().unwrap();
+    let config = tests::test_config(&tmp);
+    let name = format!("detached-admission-{}", uuid::Uuid::new_v4().simple());
+    let (started_tx, started_rx) = oneshot::channel();
+    let (release_tx, release_rx) = oneshot::channel();
+    let started_tx = Arc::new(Mutex::new(Some(started_tx)));
+    let release_rx = Arc::new(Mutex::new(Some(release_rx)));
+    let _handler = crate::cron::system_job_handlers::register(
+        &name,
+        Arc::new(move |_| {
+            let started = started_tx.lock().unwrap().take();
+            let release = release_rx.lock().unwrap().take();
+            Box::pin(async move {
+                if let Some(started) = started {
+                    let _ = started.send(());
+                }
+                if let Some(release) = release {
+                    release.await.map_err(|error| error.to_string())?;
+                }
+                Ok(())
+            })
+        }),
+    );
+    let job = tests::single_flight_system_job(&config, &name);
+    let run_id = format!("detached-{}", uuid::Uuid::new_v4());
+    let dispatch = crate::core::runtime::DispatchCtx::ambient();
+    let task_config = config.clone();
+    let task_job = job.clone();
+    let task_run_id = run_id.clone();
+    let mut call = tokio::spawn(async move {
+        crate::cron::scheduler::run_job_now(
+            &dispatch,
+            &task_config,
+            task_job,
+            task_run_id,
+            false,
+            tinyflows_bus::schedule::ManualDelivery::Requested,
+        )
+        .await
+    });
+
+    tokio::time::timeout(std::time::Duration::from_secs(3), async {
+        tokio::select! {
+            result = &mut call => panic!("manual call returned before its handler started: {result:?}"),
+            started = started_rx => started.expect("handler start signal remains open"),
+        }
+    })
+    .await
+    .expect("the manual worker reaches its running state");
+    let reply = tokio::time::timeout(std::time::Duration::from_secs(3), call)
+        .await
+        .expect("confirmed running is returned promptly")
+        .unwrap()
+        .unwrap();
+    assert!(matches!(
+        reply,
+        tinyflows_bus::schedule::RunJobReply::Accepted { run_id: ref id } if id == &run_id
+    ));
+    let _ = release_tx.send(());
+}
+
+#[tokio::test]
 async fn cancelled_waiting_caller_keeps_manual_run_callback_served_until_completion() {
     use crate::core::events::DomainEvent;
     use tinybus::EventHandler;
