@@ -173,15 +173,8 @@ async fn a_turn_with_an_unavailable_local_provider_ends_in_one_classified_chat_e
     };
 
     let server = MockServer::start().await;
-    // Ollama's model warm-up is part of provider setup. Keep it distinct from
-    // the OpenAI-compatible inference request so the test proves the latter
-    // reaches the configured provider before it receives a classified error.
-    Mock::given(method("POST"))
-        .and(path("/api/chat"))
-        .respond_with(ResponseTemplate::new(200))
-        .expect(1)
-        .mount(&server)
-        .await;
+    // The session host's built-in master agent selects the coding workload,
+    // so configure that route explicitly instead of only setting chat_provider.
     Mock::given(method("POST"))
         .and(path("/v1/chat/completions"))
         .respond_with(ResponseTemplate::new(503).set_body_json(serde_json::json!({
@@ -199,7 +192,7 @@ async fn a_turn_with_an_unavailable_local_provider_ends_in_one_classified_chat_e
     // The managed default needs a host backend transport, which this
     // in-process test intentionally does not install. Route the turn to the
     // local mock server instead so it exercises an actual provider failure.
-    config.chat_provider = Some("ollama:qwen3:4b-instruct".to_owned());
+    config.coding_provider = Some("ollama:qwen3:4b-instruct".to_owned());
     config.local_ai.base_url = Some(server.uri());
     std::fs::create_dir_all(&config.workspace_dir).expect("workspace dir");
     let ctx = DispatchCtx::new(CoreContext::for_test_with_config(DomainSet::full(), config));
