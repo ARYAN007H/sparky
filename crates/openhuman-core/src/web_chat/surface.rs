@@ -25,7 +25,7 @@ pub(crate) struct TurnIds {
 }
 
 struct SurfaceState {
-    module: tinybus::module::ModuleClient,
+    module: Option<tinybus::module::ModuleClient>,
     handle: Option<WebTurnHandle>,
     closed: bool,
 }
@@ -63,7 +63,31 @@ impl Surface {
 
         Self {
             state: Arc::new(tokio::sync::Mutex::new(SurfaceState {
-                module,
+                module: Some(module),
+                handle: None,
+                closed: false,
+            })),
+            cleanup_done: Arc::new(tokio::sync::Notify::new()),
+            ctx: ctx.clone(),
+            scope_key,
+            ids,
+        }
+    }
+
+    /// A host-authored terminal event does not need a module handle when the
+    /// turn never started canonical progress.
+    pub(crate) fn host_only(ctx: &DispatchCtx, ids: TurnIds) -> Self {
+        let tenant = super::ops::tenant_of(ctx);
+        let scope_bytes =
+            serde_json::to_vec(&(tenant, &ids.client_id, &ids.thread_id, &ids.request_id))
+                .expect("web turn scope tuple is serializable");
+        let scope_key = format!(
+            "web-chat:{}",
+            hex::encode(sha2::Sha256::digest(scope_bytes))
+        );
+        Self {
+            state: Arc::new(tokio::sync::Mutex::new(SurfaceState {
+                module: None,
                 handle: None,
                 closed: false,
             })),
@@ -81,8 +105,11 @@ impl Surface {
         if let Some(handle) = &state.handle {
             return Ok(handle.handle.clone());
         }
-        let response: WebTurnHandle = state
+        let module = state
             .module
+            .as_ref()
+            .ok_or_else(|| "module client is unavailable for canonical projection".to_owned())?;
+        let response: WebTurnHandle = module
             .call_confidential(
                 "tinychannels",
                 tinychannels_bus::methods::BEGIN_WEB_TURN,
@@ -103,8 +130,14 @@ impl Surface {
         let Some(handle) = state.handle.take() else {
             return;
         };
-        if let Err(error) = state
-            .module
+        let Some(module) = state.module.as_ref() else {
+            log::warn!(
+                "[web-channel] projection handle has no module client request_id={}",
+                self.ids.request_id
+            );
+            return;
+        };
+        if let Err(error) = module
             .call_confidential::<()>(
                 "tinychannels",
                 tinychannels_bus::methods::END_WEB_TURN,
@@ -162,8 +195,14 @@ impl Surface {
                 return;
             }
         };
-        let projected: tinychannels_bus::module_web_output::WebOutputEvents = match state
-            .module
+        let Some(module) = state.module.as_ref() else {
+            log::warn!(
+                "[web-channel] output event has no module client request_id={}",
+                self.ids.request_id
+            );
+            return;
+        };
+        let projected: tinychannels_bus::module_web_output::WebOutputEvents = match module
             .call_confidential(
                 "tinychannels",
                 tinychannels_bus::methods::PROJECT_WEB_OUTPUT,
@@ -241,8 +280,8 @@ impl Drop for Surface {
             let mut state = state.lock().await;
             state.closed = true;
             if let Some(handle) = state.handle.take() {
-                if let Err(error) = state
-                    .module
+                if let Some(module) = state.module.as_ref() {
+                    if let Err(error) = module
                     .call_confidential::<()>(
                         "tinychannels",
                         tinychannels_bus::methods::END_WEB_TURN,
@@ -251,10 +290,11 @@ impl Drop for Surface {
                         },),
                     )
                     .await
-                {
-                    log::warn!(
-                        "[web-channel] dropped projection turn cleanup failed request_id={request_id}: {error}"
-                    );
+                    {
+                        log::warn!(
+                            "[web-channel] dropped projection turn cleanup failed request_id={request_id}: {error}"
+                        );
+                    }
                 }
             }
             cleanup_done.notify_one();
