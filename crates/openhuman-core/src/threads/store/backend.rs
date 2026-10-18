@@ -297,10 +297,22 @@ impl ConversationStore {
         Ok(deleted)
     }
 
-    /// Removes every thread.
+    /// Removes every thread and records its conversation-memory deletion in
+    /// this workspace's existing best-effort queue as each header is removed.
+    /// Queue persistence keeps its existing IO and process-crash limitations.
     pub fn purge_threads(&self) -> Result<ConversationPurgeStats, String> {
+        let workspace_dir = self.workspace_dir.clone();
         let stats = self.run("purge_threads", NONE, |s| async move {
-            s.purge_threads().await.map(ConversationPurgeStats::from)
+            s.purge_threads_with(move |thread_id| {
+                crate::memory::deletion::enqueue(
+                    &workspace_dir,
+                    crate::memory::deletion::PendingDeletion::Thread {
+                        thread_id: thread_id.to_owned(),
+                    },
+                );
+            })
+            .await
+            .map(ConversationPurgeStats::from)
         })?;
         self.forget_all_transcript_keys();
         Ok(stats)
