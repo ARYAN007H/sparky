@@ -60,10 +60,12 @@ the harness runs come from [`agents/`](agents/) below.
 
 Each built-in agent owns a subfolder with an `agent.toml` (id, `when_to_use`,
 model, tool scope, sandbox mode, iteration cap, tier, `omit_*` flags, parsed
-directly into `AgentDefinition`), a `prompt.md` holding the static archetype
-body, and a `prompt.rs` that `include_str!`s that body and exposes
-`pub fn build(&PromptContext) -> anyhow::Result<String>`, appending
-runtime-dependent sections (rendered tool list, workspace) to it.
+directly into `AgentDefinition`) and a `prompt.rs` that exposes
+`pub fn build(&PromptContext) -> anyhow::Result<String>`. Most builders include
+their archetype from a sibling `prompt.md`; the two flow builders receive their
+archetype text from TinyFlows Copilot through an explicit prompt context value.
+Builders append runtime-dependent sections such as the rendered tool list and
+workspace to that archetype.
 Every archetype uses the shared sub-agent turn graph.
 
 [`agents/loader.rs`](agents/loader.rs) owns the `BUILTINS` slice and

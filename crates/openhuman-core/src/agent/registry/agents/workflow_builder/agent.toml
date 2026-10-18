@@ -16,7 +16,8 @@ omit_identity = true
 omit_memory_context = true
 # Safety preamble stays OFF: authoring itself (propose/revise/dry-run/reads)
 # has zero real external effect, so the general acting guard-rails would be
-# noise there — the "propose, never persist" invariant is taught in prompt.md.
+# noise there — the "propose, never persist" invariant is taught in the
+# TinyFlows Copilot archetype.
 # The one real-effect surface, `run_flow` (a confirmed test-run of an already
 # saved flow), is gated by the `ApprovalGate` itself, not this preamble: on the
 # streaming copilot path (flows-copilot-live-run-approval, PR3) it parks behind

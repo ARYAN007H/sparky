@@ -263,8 +263,9 @@ pub fn validate_tier_hierarchy(defs: &[AgentDefinition]) -> Result<()> {
 /// Parse a single [`BuiltinAgent`] triple into a finished [`AgentDefinition`].
 fn parse_builtin(b: &BuiltinAgent) -> Result<AgentDefinition> {
     // The TOML ships without `system_prompt` — serde falls back to
-    // `defaults::empty_inline_prompt` — and the loader injects the
-    // rendered sibling `prompt.md` immediately below.
+    // `defaults::empty_inline_prompt` — and the loader installs its dynamic
+    // prompt builder below. Most builders include a sibling `prompt.md`; flow
+    // builders receive their archetype text from TinyFlows Copilot.
     let mut def: AgentDefinition = toml::from_str(b.toml)
         .with_context(|| format!("parsing built-in agent `{}` TOML", b.id))?;
 
