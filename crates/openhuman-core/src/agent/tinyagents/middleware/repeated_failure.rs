@@ -2,7 +2,8 @@
 //! keep failing with no progress, driving the crate no-progress ladder plus
 //! OpenHuman's recoverable-failure headroom and terminal-inference fast-halt.
 
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
 
@@ -10,13 +11,10 @@ use tinyagents_harness::context::RunContext;
 use tinyagents_harness::error::Result as TaResult;
 use tinyagents_harness::middleware::{
     call_effect, dispatch_target, is_repeat_call_exempt, repeat_guard_marker, CallEffect,
-    Middleware, ToolFactsLookup, ToolInvocationIdentity,
+    FailureScope, FailureScopeMiddleware, FailureScopePolicy, FailureStopKind, Middleware,
+    ToolFactsLookup, ToolInvocationIdentity,
 };
-use tinyagents_harness::no_progress::{
-    classified_step, classified_step_with_cause, clear_recovered, ClassifiedFailureTracker,
-    ClassifiedStepWithCause, FailurePolicy, NoProgress, NoProgressTracker,
-    RecoverableFailureLadder, ToolAttempt,
-};
+use tinyagents_harness::no_progress::FailurePolicy;
 use tinyagents_harness::steering::SteeringHandle;
 use tinyagents_hooks::stop::StopLatch;
 use tinyinference_llm::tool::ToolCall as TaToolCall;
