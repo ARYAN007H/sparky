@@ -31,8 +31,14 @@ pub(crate) fn run_error_from_hosted(error: HostedError) -> TinyAgentsError {
             .timeout_bound
             .map(turn_timeout_bound)
             .unwrap_or(TurnTimeoutBound::RunRemaining);
-        tracing::debug!(timeout_bound = bound.tag(), "[tinyagents] hosted turn timed out; carrying the typed bound");
-        TinyAgentsError::Timeout(format!("hosted agent invocation exceeded its {}", bound.phrase()))
+        tracing::debug!(
+            timeout_bound = bound.tag(),
+            "[tinyagents] hosted turn timed out; carrying the typed bound"
+        );
+        TinyAgentsError::Timeout(format!(
+            "hosted agent invocation exceeded its {}",
+            bound.phrase()
+        ))
     } else {
         TinyAgentsError::from(error)
     }

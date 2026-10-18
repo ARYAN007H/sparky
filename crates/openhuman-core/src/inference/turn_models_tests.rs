@@ -7,8 +7,8 @@ use tinyinference_llm::message::ContentBlock;
 use tinyinference_llm::model::{ChatModel, ModelRequest, ModelResponse};
 
 use super::TurnModels;
-use tinyagents_harness::host::PrebuiltModelResolver as TurnModelResolver;
 use crate::agent::tinyagents::TurnModelSource;
+use tinyagents_harness::host::PrebuiltModelResolver as TurnModelResolver;
 
 #[tokio::test]
 async fn role_pins_apply_when_the_primary_uses_config_routing() {

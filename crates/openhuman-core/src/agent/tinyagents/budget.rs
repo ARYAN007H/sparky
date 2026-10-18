@@ -3,10 +3,10 @@
 
 /// Product recursion ceiling shared by native and MCP delegation.
 pub(crate) const MAX_SPAWN_DEPTH: usize = 3;
+pub use tinyagents_harness::cost::ModelBudget;
 pub use tinyinference_llm::model::budget::{
     Budget, BudgetExceeded, BudgetSnapshot, CallBudget, Spend, SpendLimits,
 };
-pub use tinyagents_harness::cost::ModelBudget;
 /// Effective host depth ceiling, never wider than product policy.
 pub(crate) fn depth(context: &super::host::OpenHumanRunContext) -> usize {
     context

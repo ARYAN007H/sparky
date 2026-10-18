@@ -57,9 +57,7 @@ pub(super) fn fetch_host_scope(tool: &str, field: &str, value: &str) -> Option<S
 /// is read whole.
 pub(super) fn heuristic_text<'a>(tool: &str, failure_text: &'a str) -> &'a str {
     match tinytools::status::classify_web_fetch_status(tool, failure_text, false) {
-        Some(failure)
-            if failure.recovery == tinytools::status::FetchedSiteRecovery::Ordinary =>
-        {
+        Some(failure) if failure.recovery == tinytools::status::FetchedSiteRecovery::Ordinary => {
             failure.headline(failure_text)
         }
         _ => failure_text,
