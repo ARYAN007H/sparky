@@ -296,7 +296,7 @@ async fn manual_run_projects_its_captured_job_after_the_saved_job_is_deleted() {
 }
 
 #[tokio::test]
-async fn detached_manual_run_returns_only_after_the_worker_is_running() {
+async fn detached_manual_run_waits_for_durable_admission_after_starting() {
     use tokio::sync::oneshot;
 
     crate::core::bus::init().await.unwrap();
@@ -324,6 +324,8 @@ async fn detached_manual_run_returns_only_after_the_worker_is_running() {
         }),
     );
     let job = tests::single_flight_system_job(&config, &name);
+    let (claim_entered, claim_release) =
+        crate::cron::documents_port::pause_manual_claim_for_test(&job.id);
     let run_id = format!("detached-{}", uuid::Uuid::new_v4());
     let dispatch = crate::core::runtime::DispatchCtx::ambient();
     let task_config = config.clone();
@@ -341,14 +343,19 @@ async fn detached_manual_run_returns_only_after_the_worker_is_running() {
         .await
     });
 
-    tokio::time::timeout(std::time::Duration::from_secs(3), async {
-        tokio::select! {
-            result = &mut call => panic!("manual call returned before its handler started: {result:?}"),
-            started = started_rx => started.expect("handler start signal remains open"),
-        }
-    })
-    .await
-    .expect("the manual worker reaches its running state");
+    tokio::time::timeout(std::time::Duration::from_secs(3), claim_entered)
+        .await
+        .expect("manual claim reaches the controlled storage boundary")
+        .expect("claim gate remains open");
+    assert!(
+        !call.is_finished(),
+        "Starting is not admission while the durable claim is blocked"
+    );
+    let _ = claim_release.send(());
+    tokio::time::timeout(std::time::Duration::from_secs(3), started_rx)
+        .await
+        .expect("the worker proceeds after durable claim")
+        .expect("handler start signal remains open");
     let reply = tokio::time::timeout(std::time::Duration::from_secs(3), call)
         .await
         .expect("confirmed running is returned promptly")
@@ -497,6 +504,73 @@ async fn manual_run_claims_are_shared_within_a_scope_and_isolated_between_agents
     .await;
     assert_eq!(alpha_runs[0].run_id.as_deref(), Some(first_id.as_str()));
     assert_eq!(beta_runs[0].run_id.as_deref(), Some(beta_id.as_str()));
+}
+
+#[tokio::test]
+async fn manual_owner_reconciles_a_lost_committed_ack_before_releasing_context() {
+    use crate::core::runtime::{ContextOverlay, CoreContext, DispatchCtx, DomainSet};
+
+    crate::core::bus::init().await.unwrap();
+    let tmp = TempDir::new().unwrap();
+    let config = tests::test_config(&tmp);
+    let agent = format!("ack-retention-{}", uuid::Uuid::new_v4().simple());
+    let context = CoreContext::for_test_with_config(DomainSet::full(), config.clone()).derive_with(
+        ContextOverlay::new(
+            config.clone(),
+            DomainSet::full(),
+            crate::tools::toolpacks::ToolGroups::none(),
+        )
+        .session_agent(agent),
+    );
+    let weak = Arc::downgrade(&context);
+    let name = format!("ack-retention-job-{}", uuid::Uuid::new_v4().simple());
+    let job = CoreContext::scope(Arc::clone(&context), async {
+        tests::single_flight_system_job(&config, &name)
+    })
+    .await;
+    let _handler = crate::cron::system_job_handlers::register(
+        &name,
+        Arc::new(|_| Box::pin(async { Ok(()) })),
+    );
+    let (ack_committed, allow_lost_reply) =
+        crate::cron::scheduler::lose_next_ack_reply_after_commit_for_test(
+            config.workspace_dir.clone(),
+        );
+    let dispatch = DispatchCtx::new(Arc::clone(&context));
+    drop(context);
+
+    let result = crate::cron::scheduler::run_job_now(
+        &dispatch,
+        &config,
+        job,
+        format!("ack-run-{}", uuid::Uuid::new_v4()),
+        true,
+        tinyflows_bus::schedule::ManualDelivery::NotRequested,
+    )
+    .await
+    .expect("the completed result is delivered independently from acknowledgement");
+    assert!(matches!(
+        result,
+        tinyflows_bus::schedule::RunJobReply::Completed { success: true, .. }
+    ));
+    drop(dispatch);
+    tokio::time::timeout(std::time::Duration::from_secs(3), ack_committed)
+        .await
+        .expect("the first acknowledgement committed before its response was lost")
+        .expect("ack response loss gate remains open");
+    assert!(
+        weak.upgrade().is_some(),
+        "the callback owner retains its bound context until Ack is reconciled"
+    );
+
+    let _ = allow_lost_reply.send(());
+    tokio::time::timeout(std::time::Duration::from_secs(3), async {
+        while weak.upgrade().is_some() {
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .expect("the invocation context is released after Ack reconciliation");
 }
 
 #[tokio::test]

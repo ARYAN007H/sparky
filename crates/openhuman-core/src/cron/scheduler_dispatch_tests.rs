@@ -232,7 +232,7 @@ async fn module_scheduler_slot_is_per_store_scope_and_refuses_a_duplicate() {
 }
 
 #[tokio::test]
-async fn started_agent_scheduler_pins_its_context_only_until_stop_is_confirmed() {
+async fn started_agent_scheduler_releases_its_context_after_stop_is_confirmed() {
     use crate::core::runtime::{ContextOverlay, CoreContext, DispatchCtx, DomainSet};
 
     let tmp = TempDir::new().unwrap();

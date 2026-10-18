@@ -1,4 +1,6 @@
 use super::*;
+#[cfg(test)]
+use std::path::PathBuf;
 use tinyflows_bus::schedule::{
     AcknowledgeManualRun, ManualRunHandle, ManualRunOutcome, ManualRunRequest, ManualRunState,
     PrepareManualRun, StartManualRun, WaitManualRun,
@@ -259,17 +261,24 @@ async fn own_manual_run(
     let mut retry_delay = Duration::from_millis(20);
     loop {
         let result = match module::proxy(&config).await {
-            Ok(proxy) => {
-                proxy
-                    .call::<bool>(members::ACKNOWLEDGE_MANUAL_RUN, (&ack,))
-                    .await
-            }
+            Ok(proxy) => proxy
+                .call::<bool>(members::ACKNOWLEDGE_MANUAL_RUN, (&ack,))
+                .await
+                .map_err(|error| error.wire_message()),
             Err(error) => {
                 tracing::debug!(%error, "[cron:scheduler] retrying AcknowledgeManualRun");
                 tokio::time::sleep(retry_delay).await;
                 retry_delay = (retry_delay * 2).min(Duration::from_secs(1));
                 continue;
             }
+        };
+        #[cfg(test)]
+        let result = if result.as_ref().is_ok_and(|acknowledged| *acknowledged)
+            && wait_for_ack_reply_loss_test_gate(&config.workspace_dir).await
+        {
+            Err("simulated lost AcknowledgeManualRun reply after commit".to_string())
+        } else {
+            result
         };
         match result {
             Ok(true) => break,
@@ -297,7 +306,7 @@ async fn own_manual_run(
                 }
             }
             Err(error) => {
-                tracing::debug!(error = %error.wire_message(), "[cron:scheduler] retrying ambiguous AcknowledgeManualRun")
+                tracing::debug!(%error, "[cron:scheduler] retrying ambiguous AcknowledgeManualRun")
             }
         }
         tokio::time::sleep(retry_delay).await;
@@ -305,6 +314,59 @@ async fn own_manual_run(
     }
     drop(host);
     Ok(())
+}
+
+#[cfg(test)]
+struct AckReplyLossTestGate {
+    entered: std::sync::Mutex<Option<tokio::sync::oneshot::Sender<()>>>,
+    release: tokio::sync::Mutex<Option<tokio::sync::oneshot::Receiver<()>>>,
+}
+
+#[cfg(test)]
+static ACK_REPLY_LOSS_TEST_GATES: std::sync::LazyLock<
+    std::sync::Mutex<std::collections::HashMap<PathBuf, Arc<AckReplyLossTestGate>>>,
+> = std::sync::LazyLock::new(Default::default);
+
+#[cfg(test)]
+pub(crate) fn lose_next_ack_reply_after_commit_for_test(
+    workspace: PathBuf,
+) -> (tokio::sync::oneshot::Receiver<()>, tokio::sync::oneshot::Sender<()>) {
+    let (entered_tx, entered_rx) = tokio::sync::oneshot::channel();
+    let (release_tx, release_rx) = tokio::sync::oneshot::channel();
+    ACK_REPLY_LOSS_TEST_GATES
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .insert(
+            workspace,
+            Arc::new(AckReplyLossTestGate {
+                entered: std::sync::Mutex::new(Some(entered_tx)),
+                release: tokio::sync::Mutex::new(Some(release_rx)),
+            }),
+        );
+    (entered_rx, release_tx)
+}
+
+#[cfg(test)]
+async fn wait_for_ack_reply_loss_test_gate(workspace: &std::path::Path) -> bool {
+    let gate = ACK_REPLY_LOSS_TEST_GATES
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .remove(workspace);
+    let Some(gate) = gate else {
+        return false;
+    };
+    if let Some(entered) = gate
+        .entered
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .take()
+    {
+        let _ = entered.send(());
+    }
+    if let Some(release) = gate.release.lock().await.take() {
+        let _ = release.await;
+    }
+    true
 }
 
 /// Single poll cycle of the scheduler loop, extracted so tests can drive

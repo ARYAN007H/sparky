@@ -288,10 +288,79 @@ impl DocumentsPort {
                         }
                     }
                 }
+                #[cfg(test)]
+                pause_manual_claim_if_armed(&ops).await;
                 encode(documents.atomic_batch(ops).await?)
             }
             _ => Err(StorageError::invalid_input("unexpected document request")),
         }
+    }
+}
+
+#[cfg(test)]
+struct ManualClaimTestGate {
+    entered: std::sync::Mutex<Option<tokio::sync::oneshot::Sender<()>>>,
+    release: tokio::sync::Mutex<Option<tokio::sync::oneshot::Receiver<()>>>,
+}
+
+#[cfg(test)]
+static MANUAL_CLAIM_TEST_GATES: LazyLock<
+    std::sync::Mutex<HashMap<String, Arc<ManualClaimTestGate>>>,
+> = LazyLock::new(Default::default);
+
+#[cfg(test)]
+pub(crate) fn pause_manual_claim_for_test(
+    job_id: &str,
+) -> (tokio::sync::oneshot::Receiver<()>, tokio::sync::oneshot::Sender<()>) {
+    let (entered_tx, entered_rx) = tokio::sync::oneshot::channel();
+    let (release_tx, release_rx) = tokio::sync::oneshot::channel();
+    MANUAL_CLAIM_TEST_GATES
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .insert(
+            job_id.to_string(),
+            Arc::new(ManualClaimTestGate {
+                entered: std::sync::Mutex::new(Some(entered_tx)),
+                release: tokio::sync::Mutex::new(Some(release_rx)),
+            }),
+        );
+    (entered_rx, release_tx)
+}
+
+#[cfg(test)]
+async fn pause_manual_claim_if_armed(ops: &[WriteOp]) {
+    let job_id = ops.iter().find_map(|operation| match operation {
+        WriteOp::Put { collection, id, .. }
+            if collection == "cron.jobs"
+                && MANUAL_CLAIM_TEST_GATES
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .contains_key(id) =>
+        {
+            Some(id.clone())
+        }
+        _ => None,
+    });
+    let Some(job_id) = job_id else {
+        return;
+    };
+    let gate = MANUAL_CLAIM_TEST_GATES
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .remove(&job_id);
+    let Some(gate) = gate else {
+        return;
+    };
+    if let Some(entered) = gate
+        .entered
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .take()
+    {
+        let _ = entered.send(());
+    }
+    if let Some(release) = gate.release.lock().await.take() {
+        let _ = release.await;
     }
 }
 
