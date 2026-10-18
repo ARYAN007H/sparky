@@ -15,6 +15,10 @@ mod transcript;
 mod turn;
 pub(super) use turn::begin_turn_resume;
 
+type ActiveTerminalSidecar = std::sync::Arc<
+    std::sync::Mutex<crate::agent::tinyagents::host::run_context::SessionTurnSidecar>,
+>;
+
 use std::sync::Arc;
 
 use anyhow::Result;
@@ -59,14 +63,8 @@ pub(super) struct OpenHumanSessionState {
     pub(super) reply_language_directive: Option<String>,
     pub(super) time_zone: Option<String>,
     prelude: Option<OpenHumanTurnPrelude>,
-    /// Deferred native terminal belonging to the turn currently owned by the
-    /// runtime. The session's terminal callback drains it after partial
-    /// transcript persistence on cancellation or failure.
-    active_terminal_sidecar: Option<
-        std::sync::Arc<
-            std::sync::Mutex<crate::agent::tinyagents::host::run_context::SessionTurnSidecar>,
-        >,
-    >,
+    /// Deferred native terminal, finalized after transcript durability.
+    active_terminal_sidecar: Option<ActiveTerminalSidecar>,
     /// The previous turn's deferred post-commit work (thread-goal
     /// accounting). The next turn awaits it before loading the goal
     /// (`post_commit::await_pending`).

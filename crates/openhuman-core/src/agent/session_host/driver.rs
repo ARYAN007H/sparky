@@ -5,6 +5,7 @@
 //! complete immutable model history and tool declaration snapshot per call.
 
 mod grounded_close;
+use grounded_close::SupplementalTrace;
 
 use std::{collections::HashSet, sync::Arc, time::Instant};
 
@@ -233,8 +234,7 @@ impl SessionDriver<OpenHumanRunContext> for OpenHumanSessionDriver {
                 ));
             }
         };
-        let supplemental_trace =
-            grounded_close::SupplementalTrace::install_for_turn(&sidecar, &mut outcome);
+        let supplemental_trace = SupplementalTrace::install_for_turn(&sidecar, &mut outcome);
 
         if outcome.text.trim().is_empty() && outcome.tool_outcomes.is_empty() {
             return Err(driver_error(

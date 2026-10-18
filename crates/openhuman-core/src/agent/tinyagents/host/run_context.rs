@@ -41,12 +41,7 @@ pub(crate) fn fresh_root_run_config(kind: &str) -> tinyagents_harness::context::
 
 /// Builds an owned direct child for the neutral subagent lifecycle.
 ///
-/// The durable key is derived from `parent` *before* a child exists, preserving
-/// the parent's root id, immediate run id, and thread. `child_config.run_id`
-/// must be a durable-unique child execution id; this helper cannot prove global
-/// uniqueness for a caller-supplied value. The resulting TinyAgents and
-/// OpenHuman cancellation carriers are the same shared token, so either the
-/// lifecycle executor or host child observes cancellation across the tree.
+/// Derives lineage before creation and shares cancellation across the tree.
 pub(crate) fn direct_subagent_child(
     parent: &tinyagents_harness::context::RunContext<OpenHumanRunContext>,
     task_id: impl Into<String>,
