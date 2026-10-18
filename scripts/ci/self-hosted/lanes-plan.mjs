@@ -622,7 +622,7 @@ export function buildPlan({ profile, areas, env = {}, isPullRequest = true }) {
       "unset RUSTFLAGS; " +
       coverageSuite(
         "--manifest-path crates/openhuman-app/Cargo.toml",
-        "tauri-coverage",
+        "tauri", // the nextest report name this suite always had
       );
     // The app is a separate workspace, so its report is a second merge.
     tauriLane.checks.push(
