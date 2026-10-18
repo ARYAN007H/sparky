@@ -34,7 +34,13 @@ const KNOWN: &[(&str, &str)] = &[
 pub(crate) fn reply_note_id(request_id: &str) -> String {
     let safe: String = request_id
         .chars()
-        .map(|c| if c.is_ascii_alphanumeric() || c == '-' { c } else { '_' })
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || c == '-' {
+                c
+            } else {
+                '_'
+            }
+        })
         .collect();
     format!("reply-{safe}")
 }
@@ -49,7 +55,12 @@ pub(crate) fn is_valid_note_id(id: &str) -> bool {
 }
 
 fn extension_for_mime(mime: &str) -> &'static str {
-    let base = mime.split(';').next().unwrap_or("").trim().to_ascii_lowercase();
+    let base = mime
+        .split(';')
+        .next()
+        .unwrap_or("")
+        .trim()
+        .to_ascii_lowercase();
     match base.as_str() {
         "audio/ogg" => "ogg",
         "audio/mp4" | "audio/x-m4a" | "audio/aac" => "m4a",
@@ -88,8 +99,15 @@ pub(crate) fn store_note(
     }
     std::fs::write(root.join(format!("{id}.{ext}")), bytes)
         .map_err(|e| format!("write voice note: {e}"))?;
-    log::debug!("{LOG_PREFIX} stored id={id} ext={ext} bytes={}", bytes.len());
-    Ok(KNOWN.iter().find(|(e, _)| *e == ext).map(|(_, m)| *m).unwrap_or("audio/webm"))
+    log::debug!(
+        "{LOG_PREFIX} stored id={id} ext={ext} bytes={}",
+        bytes.len()
+    );
+    Ok(KNOWN
+        .iter()
+        .find(|(e, _)| *e == ext)
+        .map(|(_, m)| *m)
+        .unwrap_or("audio/webm"))
 }
 
 /// Reads note `id`; `Ok(None)` when no file exists.

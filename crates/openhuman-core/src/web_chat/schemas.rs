@@ -14,7 +14,8 @@ use super::ops::{
     channel_web_queue_status,
 };
 use super::types::{
-    ChatRequestMetadata, VoiceNoteReadParams, VoiceNoteStoreParams, WebCancelParams, WebChatParams, WebQueueParams, WebQueueRemoveParams,
+    ChatRequestMetadata, VoiceNoteReadParams, VoiceNoteStoreParams, WebCancelParams, WebChatParams,
+    WebQueueParams, WebQueueRemoveParams,
 };
 
 pub fn all_web_channel_controller_schemas() -> Vec<ControllerSchema> {

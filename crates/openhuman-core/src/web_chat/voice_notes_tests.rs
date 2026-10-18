@@ -68,8 +68,18 @@ fn rpc_round_trip_and_bad_base64() {
 fn synthesized_reply_is_stored_only_with_decodable_audio() {
     let tmp = tempfile::tempdir().unwrap();
     assert!(!store_synthesized_reply(tmp.path(), "r1", "", "audio/mpeg"));
-    assert!(!store_synthesized_reply(tmp.path(), "r1", "***", "audio/mpeg"));
-    assert!(store_synthesized_reply(tmp.path(), "r1", "YWJj", "audio/mpeg"));
+    assert!(!store_synthesized_reply(
+        tmp.path(),
+        "r1",
+        "***",
+        "audio/mpeg"
+    ));
+    assert!(store_synthesized_reply(
+        tmp.path(),
+        "r1",
+        "YWJj",
+        "audio/mpeg"
+    ));
     assert!(reply_note_metadata(tmp.path(), "r1").is_some());
 }
 
@@ -79,10 +89,23 @@ fn reply_mode_decides_when_the_reply_is_spoken() {
     let mut config = crate::config::Config::default();
     // Default is mirror: only a voice-note turn is answered aloud.
     assert!(!should_speak_reply(&config, "t", None, Some("keyboard")));
-    assert!(should_speak_reply(&config, "t", None, Some(VOICE_NOTE_SOURCE)));
+    assert!(should_speak_reply(
+        &config,
+        "t",
+        None,
+        Some(VOICE_NOTE_SOURCE)
+    ));
     assert!(should_speak_reply(&config, "t", Some(true), None));
     config.channel_voice.reply_mode = VoiceReplyMode::Always;
     assert!(should_speak_reply(&config, "t", None, None));
-    config.channel_voice.threads.insert("t".into(), VoiceReplyMode::Never);
-    assert!(!should_speak_reply(&config, "t", None, Some(VOICE_NOTE_SOURCE)));
+    config
+        .channel_voice
+        .threads
+        .insert("t".into(), VoiceReplyMode::Never);
+    assert!(!should_speak_reply(
+        &config,
+        "t",
+        None,
+        Some(VOICE_NOTE_SOURCE)
+    ));
 }

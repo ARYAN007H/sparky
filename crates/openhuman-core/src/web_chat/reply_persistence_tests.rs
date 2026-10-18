@@ -237,6 +237,12 @@ fn a_spoken_reply_row_points_at_its_stored_audio() {
     persist_delivered_reply(&ctx, &ws, "t-no-audio", "req-w", "Hi", &[]).ok();
 
     let messages = conversations::get_messages(&ctx, ws.clone(), "t-voice").expect("messages");
-    assert_eq!(messages[0].extra_metadata["voiceNote"]["noteId"], "reply-req-v");
-    assert_eq!(messages[0].extra_metadata["voiceNote"]["mime"], "audio/mpeg");
+    assert_eq!(
+        messages[0].extra_metadata["voiceNote"]["noteId"],
+        "reply-req-v"
+    );
+    assert_eq!(
+        messages[0].extra_metadata["voiceNote"]["mime"],
+        "audio/mpeg"
+    );
 }
