@@ -237,7 +237,7 @@ impl ListStore<Entry> for FileStore {
         read_file(&self.file).map_err(|_| StoreError("queue file unreadable".into()))
     }
 
-    fn save(&self, entries: &[Entry]) -> Result<(), StoreError> {
+    fn save(&self, entries: &[Entry]) -> std::result::Result<(), StoreError> {
         write_file(&self.file, entries).map_err(|_| StoreError("queue file unwritable".into()))
     }
 }

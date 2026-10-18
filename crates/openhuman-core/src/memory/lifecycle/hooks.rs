@@ -294,7 +294,7 @@ pub(crate) async fn pre_turn_work(
 
 /// The account-wide refusal behind a recall that came back empty, if any:
 /// the first refusing error, else the first refusing skipped section.
-fn refusal_of(outcomes: &[Result<ContextPack, Error>]) -> Option<Error> {
+fn refusal_of(outcomes: &[std::result::Result<ContextPack, Error>]) -> Option<Error> {
     let failed = outcomes.iter().find_map(|outcome| {
         outcome
             .as_ref()
