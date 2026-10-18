@@ -699,7 +699,10 @@ fn assert_turn_timeout(event: &crate::web_chat::ScopedWebEvent) {
     assert_eq!(*error_retryable, Some(true));
     let message = message.clone();
     assert!(
-        !message.as_deref().unwrap_or_default().contains("openhuman_turn_wall_clock_timeout"),
+        !message
+            .as_deref()
+            .unwrap_or_default()
+            .contains("openhuman_turn_wall_clock_timeout"),
         "internal marker must not leak into user copy: {message:?}"
     );
 }

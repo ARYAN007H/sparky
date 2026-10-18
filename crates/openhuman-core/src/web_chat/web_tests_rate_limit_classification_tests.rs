@@ -321,7 +321,8 @@ async fn start_chat_emits_structured_rate_limit_metadata_on_chat_error_event() {
     );
     assert_eq!(
         match recv.wire_event() {
-            crate::web_chat::WebChannelEvent::ChatError { error_provider, .. } => error_provider.as_deref(),
+            crate::web_chat::WebChannelEvent::ChatError { error_provider, .. } =>
+                error_provider.as_deref(),
             _ => None,
         },
         Some("openrouter"),

@@ -14,8 +14,8 @@
 use super::delivery::strip_openhuman_link_markup;
 use crate::config::Config;
 use crate::core::runtime::DispatchCtx;
-use crate::web_chat::{publish_web_channel_event, WebChannelEvent};
-use anyhow::{anyhow, Result};
+use crate::web_chat::{WebChannelEvent, publish_web_channel_event};
+use anyhow::{Result, anyhow};
 use std::path::Path;
 use {
     crate::cron::channel_bridge, tinyflows_bus::schedule::types::CronJob,
@@ -72,8 +72,8 @@ pub(crate) async fn append_to_origin_transcript(
     append: &TranscriptAppend<'_>,
 ) -> Result<(), String> {
     use tinyagents_session::transcript::{
-        append_background_message_in, BackgroundAppend, BackgroundAppendOutcome, SessionRef,
-        TranscriptMessage,
+        BackgroundAppend, BackgroundAppendOutcome, SessionRef, TranscriptMessage,
+        append_background_message_in,
     };
     let session = SessionRef::scoped(append.thread_id.to_string(), append.agent_id.to_string());
     let options = BackgroundAppend::new(
@@ -280,11 +280,7 @@ async fn deliver_to_web_thread(
         .map_err(|e| anyhow!("could not store the reply in the origin thread: {e}"))?;
 
     publish_web_channel_event(WebChannelEvent::ProactiveMessage {
-        context: crate::web_chat::event_context(
-            "system",
-            thread_id,
-            request_id.clone(),
-        ),
+        context: crate::web_chat::event_context("system", thread_id, request_id.clone()),
         full_response: Some(text.to_string()),
         message: None,
         success: Some(true),
