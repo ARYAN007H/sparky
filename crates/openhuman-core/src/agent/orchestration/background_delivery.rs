@@ -50,10 +50,10 @@ use persistence::{persist_delivery_reply, persist_then_announce};
 use super::background_completions;
 use super::busy_guard::is_busy;
 #[cfg(test)]
-use super::busy_guard::{busy, clear_busy_for_thread, TurnBusy};
+use super::busy_guard::{TurnBusy, busy, clear_busy_for_thread};
 use super::completion_notice::build_undelivered_notice;
 use super::completion_owners;
-use super::delivery_drain::{run_drain, DrainFence, DrainOutcome, RECOVERY_BUSY_POLL};
+use super::delivery_drain::{DrainFence, DrainOutcome, RECOVERY_BUSY_POLL, run_drain};
 use crate::core::runtime::CoreContext;
 
 /// Coalesce completions landing within this window into one delivery turn.
@@ -669,8 +669,8 @@ async fn run_system_turn_on_thread(
             Ok(response) => crate::web_chat::presentation::deliver_response_single_bubble(
                 ctx, "system", &thread_id, &run_id, response, None,
             ),
-            Err(error) => {
-                crate::web_chat::publish_web_channel_event(crate::web_chat::WebChannelEvent::ChatError {
+            Err(error) => crate::web_chat::publish_web_channel_event(
+                crate::web_chat::WebChannelEvent::ChatError {
                     context: crate::web_chat::channel_event::event_context(
                         "system",
                         thread_id.clone(),
@@ -686,8 +686,8 @@ async fn run_system_turn_on_thread(
                     copy_key: None,
                     copy_params: None,
                     guardrail: None,
-                })
-            }
+                },
+            ),
         },
     )
 }
