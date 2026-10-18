@@ -179,6 +179,9 @@ async fn composio_read_action_allowed_under_readonly_tier() {
 /// reads included).
 #[tokio::test]
 async fn composio_read_action_does_not_prompt_under_supervised_tier() {
+    // Reaches the connector module, whose route is process-wide: hold the module
+    // lock (before TEST_ENV_LOCK, the established order) for the whole test.
+    let _module = crate::integrations::composio::module_client::module_guard().await;
     use crate::security::AutonomyLevel;
 
     let class = classify_composio_action_for_tier("TWITTER_RECENT_SEARCH").await;
