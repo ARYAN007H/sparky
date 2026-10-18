@@ -12,9 +12,8 @@ async fn ptt_source_turn_completes_without_publishing_a_voice_event() {
     let model = Arc::new(tinyagents_harness::testkit::ScriptedModel::replies(vec![
         "hello from mock",
     ]));
-    let _model = crate::inference::provider::factory::test_provider_override::install_model(
-        Arc::clone(&model),
-    );
+    let _model =
+        crate::inference::provider::factory::test_provider_override::install_model(model.clone());
     let temp = tempfile::tempdir().expect("temporary test workspace");
     let workspace_dir = temp.path().join("workspace");
     let action_dir = temp.path().join("projects");
