@@ -178,7 +178,6 @@ impl ConfigSource for DocumentConfigSource {
             recovered: false,
             from_document: true,
             document_version: Some(document_version),
-            document_version: Some(document_version),
         })
     }
 

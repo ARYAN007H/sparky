@@ -162,6 +162,7 @@ pub(super) async fn parse_source_contents(
             .map_err(|error| {
                 anyhow::anyhow!("the config document for this scope could not be parsed: {error}")
             })?;
+        *config.document_version.lock().unwrap() = read.document_version;
         return Ok((config, false));
     }
     if read_was_recovered && contents.is_empty() {
@@ -579,7 +580,9 @@ impl Config {
             toml::to_string_pretty(&config_to_save).context("Failed to serialize config")?;
 
         tracing::debug!(source = source.label(), "[config] saving config");
-        source.write(&toml_str).await?;
+        let expected = *config_to_save.document_version.lock().unwrap();
+        let version = source.write(&toml_str, expected).await?;
+        *self.document_version.lock().unwrap() = version;
 
         Ok(())
     }
