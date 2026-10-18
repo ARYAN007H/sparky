@@ -241,8 +241,10 @@ impl CompletionRequest {
         self
     }
 
-    /// Bound each physical provider HTTP request, including repair attempts.
-    /// This leaves the logical call deadline and cancellation scope unchanged.
+    /// Bound each provider request, including structured-repair attempts.
+    /// Provider-internal compatibility retries remain within that request and
+    /// use the same timeout. This leaves the logical call deadline and
+    /// cancellation scope unchanged.
     pub fn timeout_ms(mut self, timeout_ms: u64) -> Self {
         self.timeout_ms = Some(timeout_ms);
         self
@@ -502,11 +504,14 @@ impl Completer {
         self
     }
 
-    /// Observe each admitted provider dispatch without request or response content.
+    /// Observe each admitted provider `ChatModel` invocation without request
+    /// or response content.
     ///
     /// With a budget, the observer receives charge-normalized usage after
     /// admission, matching the amount settled by the ledger. A refusal before
-    /// provider dispatch does not produce a physical-dispatch event.
+    /// provider invocation does not produce an event. Structured repairs use
+    /// separate invocations. Transport-level compatibility retries performed
+    /// inside one provider invocation remain part of its event and latency.
     pub fn physical_observer(mut self, observer: Arc<dyn PhysicalDispatchObserver>) -> Self {
         self.physical_observer = Some(observer);
         self
