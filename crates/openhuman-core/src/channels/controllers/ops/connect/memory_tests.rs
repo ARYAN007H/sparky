@@ -35,6 +35,12 @@ fn account_context(workspace: &std::path::Path, profile: &str) -> DispatchCtx {
     )
 }
 
+async fn use_linked_channel_module(config: &mut Config) {
+    config.modules.source = crate::config::schema::ModuleSourceMode::Linked;
+    config.modules.allow_download = false;
+    let _client = crate::channels::module_fixture::client().await;
+}
+
 async fn store_channel_thread(
     ctx: DispatchCtx,
     workspace: &std::path::Path,
@@ -48,7 +54,18 @@ async fn store_channel_thread(
         message_id,
         "hello",
     );
-    let thread_id = params.thread_id();
+    let identity = crate::modules::channel_controller::prepare_identity(
+        &crate::channels::module_fixture::client().await,
+        tinychannels_bus::module_inbound::PrepareChannelIdentityRequest {
+            channel: channel.to_string(),
+            sender: Some(format!("sender-{message_id}")),
+            reply_target: Some(format!("chat-{message_id}")),
+            thread_ts: None,
+        },
+    )
+    .await
+    .expect("TinyChannels module should prepare the canonical thread id");
+    let thread_id = identity.thread_id;
     let now = chrono::Utc::now().to_rfc3339();
     crate::threads::store::blocking::ensure_thread(
         ctx.clone(),
