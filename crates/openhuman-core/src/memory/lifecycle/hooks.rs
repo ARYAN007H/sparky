@@ -202,7 +202,7 @@ fn turn_hooks(
     let date_hint_model = Some(super::date_hint::model(ctx.clone(), config.clone()));
     let jobs = Arc::new(HostJobsSink {
         config: config.clone(),
-        root: identity.root(),
+        root: identity.root().clone(),
     });
     let citations = Arc::new(HostCitationSink {
         ctx: ctx.clone(),

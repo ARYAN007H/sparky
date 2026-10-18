@@ -37,6 +37,7 @@ async fn bound_turn(tmp: &tempfile::TempDir) -> Arc<MemoryTurn> {
     )
     .await;
     post_turn(
+        &crate::core::runtime::DispatchCtx::ambient(),
         &config,
         &identity,
         "t".into(),
