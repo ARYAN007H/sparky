@@ -279,15 +279,17 @@ async fn deliver_to_web_thread(
         .map_err(|e| anyhow!("origin reply persistence task failed: {e}"))?
         .map_err(|e| anyhow!("could not store the reply in the origin thread: {e}"))?;
 
-    publish_web_channel_event(WebChannelEvent {
-        event: "proactive_message".to_string(),
-        client_id: "system".to_string(),
-        thread_id: thread_id.to_string(),
-        request_id: request_id.clone(),
+    publish_web_channel_event(WebChannelEvent::ProactiveMessage {
+        context: crate::web_chat::channel_event::event_context(
+            "system",
+            thread_id,
+            request_id.clone(),
+        ),
         full_response: Some(text.to_string()),
+        message: None,
         success: Some(true),
         persisted_message_id: Some(crate::threads::store::run_reply_message_id(&request_id)),
-        ..Default::default()
+        parts: None,
     });
 
     // After the announcement: waiting out a live turn of this session must not
