@@ -161,10 +161,10 @@ async fn a_refused_message_publishes_no_turn_events() {
 
 /// A real turn, with no hooks: the thread's session is checked out on a
 /// context with its own config, the local provider receives the inference
-/// request and drops it, and the turn ends in exactly one classified
+/// request and rejects it, and the turn ends in exactly one classified
 /// `chat_error` after which the thread is free and no session is cached.
 #[tokio::test]
-async fn a_turn_whose_provider_is_unreachable_ends_in_one_classified_chat_error() {
+async fn a_turn_with_an_unavailable_local_provider_ends_in_one_classified_chat_error() {
     use crate::core::runtime::{context::CoreContext, DomainSet};
     let _serial = FORCED_ERROR_TEST_LOCK.lock().await;
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
@@ -200,7 +200,21 @@ async fn a_turn_whose_provider_is_unreachable_ends_in_one_classified_chat_error(
             .await
             .expect("read inference request");
         let _ = request_tx.send(request_line);
-        // Dropping the inference connection produces a deterministic failure.
+        let body = br#"{"error":{"message":"model is currently unavailable"}}"#;
+        let response = format!(
+            "HTTP/1.1 503 Service Unavailable\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+            body.len()
+        );
+        inference
+            .get_mut()
+            .write_all(response.as_bytes())
+            .await
+            .expect("write inference error headers");
+        inference
+            .get_mut()
+            .write_all(body)
+            .await
+            .expect("write inference error body");
     });
     let tmp = tempfile::tempdir().expect("workspace");
     let mut config = crate::config::Config {
@@ -233,10 +247,6 @@ async fn a_turn_whose_provider_is_unreachable_ends_in_one_classified_chat_error(
     .await
     .expect("the message is accepted");
 
-    let error = wait_for_event(&mut rx, &request_id, "chat_error").await;
-    assert_eq!(error.error_type.as_deref(), Some("network"));
-    assert_eq!(error.client_id, "real-client");
-    assert_eq!(error.copy_key.as_deref(), Some("chat_error.network"));
     let request = timeout(Duration::from_secs(1), request_rx)
         .await
         .expect("the local provider received the inference request")
@@ -244,6 +254,18 @@ async fn a_turn_whose_provider_is_unreachable_ends_in_one_classified_chat_error(
     assert!(
         request.starts_with("POST /v1/chat/completions "),
         "{request}"
+    );
+    let error = wait_for_event(&mut rx, &request_id, "chat_error").await;
+    assert_eq!(
+        error.error_type.as_deref(),
+        Some("provider_unavailable"),
+        "{error:?}"
+    );
+    assert_eq!(error.client_id, "real-client");
+    assert_eq!(
+        error.copy_key.as_deref(),
+        Some("chat_error.provider_unavailable"),
+        "{error:?}"
     );
 
     let runtime = crate::web_chat::runner::runtime(&ctx);
