@@ -1,3 +1,8 @@
+use anyhow::{Context, Result};
+use std::path::Path;
+use std::sync::{Mutex, OnceLock};
+use tokio::fs;
+
 /// Guards the "corrupted config read, resetting to defaults" warning so it
 /// fires at most once per process lifetime. Without this, a permanently
 /// non-UTF-8 config file floods telemetry with hundreds of identical
@@ -266,8 +271,3 @@ async fn describe_config_ownership(path: &Path) -> String {
 async fn describe_config_ownership(_path: &Path) -> String {
     String::new()
 }
-use anyhow::{Context, Result};
-use std::path::Path;
-use std::sync::{Mutex, OnceLock};
-use tokio::fs;
-
