@@ -360,6 +360,27 @@ impl FailureScopePolicy<OpenHumanRunContext> for HostFailurePolicy {
         summary
     }
 
+    fn halt_cause_for_call(
+        &self,
+        _ctx: &RunContext<OpenHumanRunContext>,
+        kind: FailureStopKind,
+        cause: Option<tinyagents_harness::no_progress::ClassifiedStopCause>,
+        error: &str,
+        call: &TaToolCall,
+    ) -> Option<tinyagents_harness::no_progress::ClassifiedStopCause> {
+        if kind == FailureStopKind::NoProgress
+            && !is_command_exit_report(error)
+            && user_actionable_escalation(&call.name, error).is_some()
+        {
+            return Some(tinyagents_harness::no_progress::ClassifiedStopCause {
+                class: "missing_connection".into(),
+                operation: call.name.clone(),
+                summary: String::new(),
+            });
+        }
+        cause
+    }
+
     fn start_batch(&self, _ctx: &RunContext<OpenHumanRunContext>) {
         self.stop.start_batch();
     }
