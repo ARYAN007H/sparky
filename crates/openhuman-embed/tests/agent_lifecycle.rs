@@ -70,7 +70,10 @@ async fn parking_agent(
             AgentSpec::new(id)
                 .provider(route(&provider, &format!("{id}-model")))
                 .access(supervised(scratch))
-                .definition(AgentDefinitionSpec::new().tools(ToolScopeSpec::HostOnly))
+                .definition(
+                    AgentDefinitionSpec::new()
+                        .tools(ToolScopeSpec::Named(vec!["write_marker".into()])),
+                )
                 .tools(move |_| {
                     HostTurnTools::advertised(vec![Box::new(WriteMarker(file.clone()))])
                 }),
