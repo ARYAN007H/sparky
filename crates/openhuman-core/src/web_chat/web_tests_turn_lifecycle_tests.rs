@@ -22,7 +22,7 @@ async fn start(client: &str, thread_id: &str, text: &str, mode: Option<&str>) ->
 }
 
 async fn wait_for_event(
-    rx: &mut tokio::sync::broadcast::Receiver<crate::web_chat::WebChannelEvent>,
+    rx: &mut tokio::sync::broadcast::Receiver<crate::web_chat::ScopedWebEvent>,
     request_id: &str,
     name: &str,
 ) -> crate::web_chat::WebChannelEvent {
@@ -60,12 +60,13 @@ async fn an_interrupting_message_supersedes_the_running_turn() {
     assert_ne!(first, second);
 
     let error = wait_for_event(&mut rx, &first, "chat_error").await;
-    assert_eq!(error.error_type.as_deref(), Some("cancelled"));
-    assert_eq!(error.message.as_deref(), Some("Cancelled by newer request"));
+    assert!(matches!(error.wire_event(), crate::web_chat::WebChannelEvent::ChatError {
+        error_type: Some(error_type), message: Some(message), ..
+    } if error_type == "cancelled" && message == "Cancelled by newer request"));
     let cancelled = wait_for_event(&mut rx, &first, "chat_cancelled").await;
-    assert_eq!(cancelled.cancel_reason.as_deref(), Some("superseded"));
-    assert_eq!(cancelled.superseded_by.as_deref(), Some(second.as_str()));
-    assert_eq!(cancelled.client_id, "second-client");
+    assert!(matches!(cancelled.wire_event(), crate::web_chat::WebChannelEvent::ChatCancelled {
+        context, cancel_reason: Some(reason), superseded_by: Some(replacement), ..
+    } if reason == "superseded" && replacement == &second && context.client_id == "second-client"));
 
     cancel_chat_scoped(&DispatchCtx::ambient(), "second-client", thread_id, None)
         .await
@@ -93,11 +94,13 @@ async fn a_stop_is_announced_once_to_the_client_that_pressed_it() {
     assert_eq!(outcome.value["request_id"], request_id);
 
     let error = wait_for_event(&mut rx, &request_id, "chat_error").await;
-    assert_eq!(error.message.as_deref(), Some("Cancelled"));
-    assert_eq!(error.client_id, "stopper");
+    assert!(matches!(error.wire_event(), crate::web_chat::WebChannelEvent::ChatError {
+        context, message: Some(message), ..
+    } if message == "Cancelled" && context.client_id == "stopper"));
     let cancelled = wait_for_event(&mut rx, &request_id, "chat_cancelled").await;
-    assert_eq!(cancelled.cancel_reason.as_deref(), Some("user_stop"));
-    assert_eq!(cancelled.superseded_by, None);
+    assert!(matches!(cancelled.wire_event(), crate::web_chat::WebChannelEvent::ChatCancelled {
+        cancel_reason: Some(reason), superseded_by: None, ..
+    } if reason == "user_stop"));
     wait_for_in_flight(|e| !e.iter().any(|(k, _)| k == thread_id)).await;
     set_test_run_chat_task_block(None).await;
 }
