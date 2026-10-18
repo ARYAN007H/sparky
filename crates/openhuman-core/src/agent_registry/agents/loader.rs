@@ -19,19 +19,20 @@
 //!
 //! 1. [`load_builtins`] walks [`BUILTINS`].
 //! 2. For each entry, parses `agent.toml` into an [`AgentDefinition`].
-//! 3. Replaces the (unset) `system_prompt` with `PromptSource::Dynamic(prompt_fn)`
+//! 3. Sets the `PromptSource::Dynamic(())` marker and stores the callback in
+//!    the host-only `extensions.prompt_builder` field.
 //! 4. Stamps `source = DefinitionSource::Builtin` and checks the folder id
 //!    matches the TOML `id`.
 //! 5. Returns the full `Vec<AgentDefinition>`, in the order listed in [`BUILTINS`].
 //!
 //! Workspace-level overrides (`$OPENHUMAN_WORKSPACE/agents/*.toml`) are
-//! handled separately by [`crate::agent::harness::definition_loader`] and merged
-//! into the global registry, where they replace built-ins on `id`
+//! handled separately by [`crate::agent_registry::host_definition::AgentDefinitionRegistry`]
+//! and merged into the global registry, where they replace built-ins on id
 //! collision.
 
 use crate::agent_registry::host_definition::{AgentDefinition, PromptBuilder};
 use anyhow::{Context, Result};
-use tinyagents_definition::{DefinitionSet, DefinitionSource, PromptSource, parse_str};
+use tinyagents_definition::{parse_str, DefinitionSet, DefinitionSource, PromptSource};
 
 /// A single built-in agent: its id plus the metadata TOML and a
 /// function-driven prompt builder.

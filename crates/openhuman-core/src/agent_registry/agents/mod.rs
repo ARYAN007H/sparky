@@ -17,8 +17,8 @@
 //!   definition. Most archetypes keep a `prompt_tests.rs` beside it.
 //!
 //! `loader.rs` holds [`BUILTINS`] and [`load_builtins`]. It delegates tier
-//! validation to `tinyagents_definition::DefinitionSet`. The slice also registers archetypes that
-//! live with other domains (`skills/*/agent/`,
+//! validation to `tinyagents_definition::DefinitionSet`. The slice also
+//! registers archetypes that live with other domains (`skills/*/agent/`,
 //! `flows/agents/`), so this directory is not the full built-in set. The
 //! package `README.md` one level up describes what each archetype does.
 
@@ -51,4 +51,4 @@ pub mod video_agent;
 #[path = "vision_agent/prompt.rs"]
 pub mod vision_agent;
 
-pub use loader::{BUILTINS, BuiltinAgent, load_builtins};
+pub use loader::{load_builtins, BuiltinAgent, BUILTINS};
