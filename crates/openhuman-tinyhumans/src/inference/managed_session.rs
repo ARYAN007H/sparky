@@ -22,8 +22,9 @@ pub(super) fn resolve_session_bearer(
     }
     let auth = AuthService::new(state_dir, secrets_encrypt);
     let profile = auth.get_profile(APP_SESSION_PROVIDER, profile_override)?;
+    // Precheck recorded JWT expiry before constructing any inference request.
     let check = classify_session_token(profile.as_ref(), chrono::Utc::now());
-    managed_bearer_for(check, operation)
+    managed_bearer(check, operation)
 }
 
 /// The bearer a classified app-session token yields for managed inference.
@@ -39,12 +40,6 @@ pub(super) fn resolve_session_bearer(
 /// mirrors the arm `resolve_backend_credential` already applies to every
 /// backend REST caller, and keeps the local credential intact.
 pub(super) fn managed_bearer(
-    check: openhuman_embed::__host::security::credentials::session_support::SessionTokenCheck,
-) -> anyhow::Result<String> {
-    managed_bearer_for(check, "openhuman_backend_model.resolve_bearer")
-}
-
-fn managed_bearer_for(
     check: openhuman_embed::__host::security::credentials::session_support::SessionTokenCheck,
     operation: &str,
 ) -> anyhow::Result<String> {
