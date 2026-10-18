@@ -11,14 +11,78 @@ use {crate::skills::ops_types::TRUST_MARKER, tinyskills::Skill as Workflow};
 
 use super::scan::{discover_filtered, ALL_ROOT_KINDS, WORKFLOW_ROOT_KINDS};
 
-/// Workspace, home, trust, and the tenant whose agent roots were scanned
-/// (`None`: a SaaS task with no scope, which scans none).
-type MetadataCacheKey = (
-    PathBuf,
-    Option<PathBuf>,
-    bool,
-    Option<crate::core::runtime::Tenant>,
-);
+/// The visibility state that the metadata cache must keep separate even when
+/// callers share one workspace directory.
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+pub(crate) struct DiscoveryGate {
+    tenant: Option<crate::core::runtime::Tenant>,
+    skills_component: bool,
+    flows_component: bool,
+    tinyflows_component: bool,
+    skills_domain: Option<bool>,
+    flows_domain: Option<bool>,
+}
+
+impl DiscoveryGate {
+    fn from_dispatch(ctx: &crate::core::runtime::DispatchCtx) -> Self {
+        let components = ctx.components();
+        let domains = ctx.domains();
+        Self {
+            tenant: ctx.tenant().ok(),
+            skills_component: components.skills,
+            flows_component: components.flows,
+            tinyflows_component: components.tinyflows,
+            skills_domain: domains.map(|domains| domains.skills),
+            flows_domain: domains.map(|domains| domains.flows),
+        }
+    }
+
+    fn from_config(
+        ctx: &crate::core::runtime::DispatchCtx,
+        config: &crate::config::Config,
+        domains: Option<crate::core::runtime::DomainSet>,
+    ) -> Self {
+        let domains = domains.or_else(|| ctx.domains());
+        Self {
+            tenant: ctx.tenant().ok(),
+            skills_component: config.components.skills,
+            flows_component: config.components.flows,
+            tinyflows_component: config.components.tinyflows,
+            skills_domain: domains.map(|domains| domains.skills),
+            flows_domain: domains.map(|domains| domains.flows),
+        }
+    }
+
+    fn skills_enabled(&self) -> bool {
+        cfg!(feature = "skills")
+            && self.skills_component
+            && self.skills_domain.unwrap_or(true)
+    }
+
+    pub(crate) fn flow_authoring_enabled(&self) -> bool {
+        cfg!(feature = "skills")
+            && cfg!(feature = "flows")
+            && cfg!(feature = "modules")
+            && self.skills_component
+            && self.flows_component
+            && self.tinyflows_component
+            && self.skills_domain.unwrap_or(true)
+            && self.flows_domain.unwrap_or(true)
+            && self.tenant.is_some()
+    }
+}
+
+/// Workspace, home, trust, and the exact tenant and narrowing gates that
+/// selected the catalogue. Two profiles can share a workspace without
+/// sharing a cached view of optional builtin resources.
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+struct MetadataCacheKey {
+    workspace: PathBuf,
+    home: Option<PathBuf>,
+    trusted: bool,
+    gate: DiscoveryGate,
+    flow_generation: Option<u64>,
+}
 static METADATA_CACHE: LazyLock<RwLock<HashMap<MetadataCacheKey, Vec<Workflow>>>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
 static METADATA_GENERATION: AtomicU64 = AtomicU64::new(0);
@@ -90,25 +154,76 @@ pub fn discovery_home_dir() -> Option<PathBuf> {
 // keep until v0.66 (review after 2027-01-11): this is the cached, ambient-user
 // discovery entry point; discover_workflows alone omits those host semantics.
 pub fn load_workflow_metadata(workspace_dir: &Path) -> Vec<Workflow> {
-    if !crate::skills::skills_component_enabled() {
+    load_workflow_metadata_with_gate(
+        workspace_dir,
+        discovery_home_dir(),
+        DiscoveryGate::from_dispatch(&crate::core::runtime::DispatchCtx::ambient()),
+    )
+}
+
+/// Discover workflow metadata using the caller's supplied configuration and
+/// dispatch identity. This is the entry point for session and host builders
+/// that already hold an explicit workspace/profile pair.
+pub fn load_workflow_metadata_for(
+    ctx: &crate::core::runtime::DispatchCtx,
+    config: &crate::config::Config,
+) -> Vec<Workflow> {
+    load_workflow_metadata_for_domains(ctx, config, None)
+}
+
+/// As [`load_workflow_metadata_for`] with the host's resolved domain set when
+/// startup has already narrowed it.
+pub(crate) fn load_workflow_metadata_for_domains(
+    ctx: &crate::core::runtime::DispatchCtx,
+    config: &crate::config::Config,
+    domains: Option<crate::core::runtime::DomainSet>,
+) -> Vec<Workflow> {
+    let home = ctx
+        .resolved()
+        .filter(|core| core.user_skill_roots())
+        .and_then(|_| dirs::home_dir());
+    load_workflow_metadata_with_gate(
+        &config.workspace_dir,
+        home,
+        DiscoveryGate::from_config(ctx, config, domains),
+    )
+}
+
+fn load_workflow_metadata_with_gate(
+    workspace_dir: &Path,
+    home: Option<PathBuf>,
+    gate: DiscoveryGate,
+) -> Vec<Workflow> {
+    if !gate.skills_enabled() {
         log::debug!("[skills][discover] load_workflow_metadata -> [] ([components] skills off)");
         return Vec::new();
     }
     let trusted = is_workspace_trusted(workspace_dir);
-    let home = discovery_home_dir();
-    let key = (
-        workspace_dir.to_path_buf(),
-        home.clone(),
+    let flow_generation = if gate.flow_authoring_enabled() {
+        crate::skills::bundled::flow_authoring::generation_if_current(workspace_dir)
+    } else {
+        None
+    };
+    let key = MetadataCacheKey {
+        workspace: workspace_dir.to_path_buf(),
+        home: home.clone(),
         trusted,
-        crate::core::runtime::DispatchCtx::ambient().tenant().ok(),
-    );
+        gate: gate.clone(),
+        flow_generation,
+    };
     if let Ok(cache) = METADATA_CACHE.read() {
         if let Some(workflows) = cache.get(&key) {
             return workflows.clone();
         }
     }
     let generation = METADATA_GENERATION.load(Ordering::SeqCst);
-    let workflows = discover_workflows_inner(home.as_deref(), Some(workspace_dir), trusted);
+    let workflows = discover_workflows_inner(
+        home.as_deref(),
+        Some(workspace_dir),
+        trusted,
+        &gate,
+        flow_generation,
+    );
     if let Ok(mut cache) = METADATA_CACHE.write() {
         if METADATA_GENERATION.load(Ordering::SeqCst) == generation {
             cache.insert(key, workflows.clone());
@@ -134,7 +249,11 @@ pub fn discover_workflows(
 ) -> Vec<Workflow> {
     #[cfg(test)]
     DISCOVERY_CALLS.with(|c| c.set(c.get() + 1));
-    discover_workflows_inner(home_dir, workspace_dir, trusted)
+    let gate = DiscoveryGate::from_dispatch(&crate::core::runtime::DispatchCtx::ambient());
+    let generation = workspace_dir
+        .filter(|_| gate.flow_authoring_enabled())
+        .and_then(crate::skills::bundled::flow_authoring::generation_if_current);
+    discover_workflows_inner(home_dir, workspace_dir, trusted, &gate, generation)
 }
 
 #[cfg(test)]
@@ -158,8 +277,17 @@ pub(crate) fn discover_workflows_inner(
     home_dir: Option<&Path>,
     workspace_dir: Option<&Path>,
     trusted: bool,
+    gate: &DiscoveryGate,
+    flow_generation: Option<u64>,
 ) -> Vec<Workflow> {
-    discover_filtered(home_dir, workspace_dir, trusted, ALL_ROOT_KINDS)
+    discover_filtered(
+        home_dir,
+        workspace_dir,
+        trusted,
+        ALL_ROOT_KINDS,
+        gate,
+        flow_generation,
+    )
 }
 
 /// Discover only automation bundles under the `workflows/` roots.
