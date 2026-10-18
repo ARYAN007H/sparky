@@ -374,6 +374,12 @@ async fn rpc_memory_handlers_apply_the_refuse_boundary_before_operations() {
     ] {
         let error = call(&config, function, params).await.unwrap_err();
         assert!(error.contains("INVALID_REQUEST"), "{function}: {error}");
+        assert!(
+            error.contains("outside this caller's memory")
+                && error.contains("team:other")
+                && error.contains("team:acme"),
+            "{function}: unexpected boundary error: {error}"
+        );
     }
 }
 
