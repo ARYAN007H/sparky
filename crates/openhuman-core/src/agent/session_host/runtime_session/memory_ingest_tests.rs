@@ -53,6 +53,152 @@ fn logged_channel_is_none_for_non_channel_origins_none_and_cron_replays() {
     );
 }
 
+#[tokio::test]
+async fn session_pre_and_post_turn_use_the_external_channel_origin_not_event_labels() {
+    use crate::memory::test_fixtures::stored;
+    use tinymemory_api::{ItemKind, ListRequest, MemoryEngine, MetaFilter};
+    use tinyagents_runtime::{
+        CommitReceipt, ResumeMode, SessionTurnOutcome, TranscriptTurnOptions,
+    };
+
+    async fn log_turn(
+        prelude: &OpenHumanTurnPrelude,
+        engine: &tinymemory_api::conformance::ReferenceEngine,
+        thread_id: &str,
+        origin: Option<crate::agent::turn_origin::AgentTurnOrigin>,
+        expected_channel: Option<&str>,
+    ) {
+        prelude.thread_id = Some(thread_id.into());
+        prelude
+            .mutable
+            .lock()
+            .expect("prelude state")
+            .pending_user_text = Some(format!("question for {thread_id}"));
+        let _pack = prelude
+            .memory_pre_turn(&[], 0, None, origin)
+            .await
+            .expect("memory turn");
+        assert_eq!(
+            prelude
+                .mutable
+                .lock()
+                .expect("prelude state")
+                .pending_memory_turn
+                .as_ref()
+                .and_then(|pending| pending.channel.as_deref()),
+            expected_channel,
+            "assistant logging retains the same normalized origin"
+        );
+
+        let receipt = CommitReceipt {
+            outcome: SessionTurnOutcome {
+                history: vec![],
+                output: Some(format!("answer for {thread_id}")),
+                interrupted: false,
+            },
+            options: TranscriptTurnOptions {
+                request_id: None,
+                thread_id: Some(thread_id.into()),
+                stream: false,
+                resume: ResumeMode::Never,
+                context: crate::agent::tinyagents::host::OpenHumanRunContext::new(),
+            },
+            transcript: None,
+        };
+        prelude.memory_post_turn(&receipt);
+
+        tokio::time::timeout(std::time::Duration::from_secs(5), async {
+            loop {
+                let items = stored(
+                    engine,
+                    MetaFilter {
+                        thread_id: Some(thread_id.into()),
+                        ..MetaFilter::kinds([ItemKind::Conversation])
+                    },
+                )
+                .await;
+                if items.len() >= 2 {
+                    assert_eq!(items.len(), 2);
+                    assert!(items
+                        .iter()
+                        .all(|item| item.meta.channel.as_deref() == expected_channel));
+                    break;
+                }
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .expect("both turns should be logged with their origin metadata");
+    }
+
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let mut config = crate::config::Config {
+        workspace_dir: tmp.path().join("workspace"),
+        action_dir: tmp.path().join("workspace"),
+        config_path: tmp.path().join("config.toml"),
+        ..Default::default()
+    };
+    config.memory.conversations.enabled = true;
+    std::fs::create_dir_all(&config.workspace_dir).expect("workspace");
+    let engine = Arc::new(tinymemory_api::conformance::ReferenceEngine::new());
+    crate::memory::engine::install_test_engine(&config.workspace_dir, engine.clone());
+
+    let mut host = crate::agent::OpenHumanSessionHost::from_config_for_agent(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        "orchestrator",
+    )
+    .expect("host");
+    host.ensure_runtime_session().expect("runtime session");
+    let prelude = host
+        .runtime_state
+        .lock()
+        .expect("runtime state")
+        .prelude
+        .clone()
+        .expect("turn prelude");
+    prelude.runtime_config = Some(Arc::new(config.clone()));
+    prelude.event_channel = "voice-event-label".into();
+
+    let external = external_channel_origin("  MyCustomProvider  ", "message-1");
+    log_turn(
+        &prelude,
+        &engine,
+        "external-channel-thread",
+        Some(external),
+        Some("mycustomprovider"),
+    )
+    .await;
+
+    use crate::agent::turn_origin::{AgentTurnOrigin, TrustedAutomationSource};
+    log_turn(&prelude, &engine, "cli-thread", Some(AgentTurnOrigin::Cli), None).await;
+    log_turn(
+        &prelude,
+        &engine,
+        "cron-replay-thread",
+        Some(external_channel_origin("telegram", "cron:job-1:run-1")),
+        None,
+    )
+    .await;
+
+    let all = engine
+        .list(ListRequest {
+            filter: MetaFilter::kinds([ItemKind::Conversation]),
+            limit: 100,
+            cursor: None,
+        })
+        .await
+        .expect("list all logged turns");
+    assert_eq!(all.items.len(), 6);
+    assert_eq!(
+        logged_channel(Some(&AgentTurnOrigin::TrustedAutomation {
+            job_id: "job-1".into(),
+            source: TrustedAutomationSource::Cron,
+        })),
+        None
+    );
+}
+
 fn assistant_with_call(id: &str, name: &str) -> Message {
     let mut message = Message::assistant("");
     if let Message::Assistant(assistant) = &mut message {
