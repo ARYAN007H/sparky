@@ -19,9 +19,7 @@ use tinymemory_api::{
     ThreadWindow, TimeHint, WriteOptions,
 };
 use tinymemory_tools::confine::{Confinement, Policy};
-use tinymemory_tools::ops::{
-    FetchOptions, LearningOptions, ListOptions, MemoryOps, RecallOptions,
-};
+use tinymemory_tools::ops::{FetchOptions, LearningOptions, ListOptions, MemoryOps, RecallOptions};
 
 use crate::config::Config;
 
