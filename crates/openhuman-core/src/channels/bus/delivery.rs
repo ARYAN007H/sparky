@@ -123,7 +123,9 @@ impl ManagedTransport {
 
 fn request_channel(request: &ProgressiveTransportRequest) -> &str {
     match request {
-        ProgressiveTransportRequest::Send { channel, .. }
+        ProgressiveTransportRequest::OutputEvent { channel, .. }
+        | ProgressiveTransportRequest::Send { channel, .. }
+        | ProgressiveTransportRequest::SendTyped { channel, .. }
         | ProgressiveTransportRequest::Edit { channel, .. }
         | ProgressiveTransportRequest::Delete { channel, .. }
         | ProgressiveTransportRequest::Typing { channel, .. } => channel,

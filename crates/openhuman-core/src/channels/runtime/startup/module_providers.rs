@@ -392,7 +392,13 @@ impl Channel for ModuleChannel {
     }
 
     fn capabilities(&self) -> tinychannels_bus::ChannelCapabilities {
-        self.interaction.capabilities
+        let legacy = self.interaction.capabilities;
+        let mut capabilities = tinychannels_bus::ChannelCapabilities::unknown();
+        capabilities.remote_control = legacy.remote_control;
+        capabilities.chat_approvals = legacy.chat_approvals;
+        capabilities.progressive_edits = legacy.progressive_edits;
+        capabilities.history_key_ignores_thread = legacy.history_key_ignores_thread;
+        capabilities
     }
 
     fn supports_reactions(&self) -> bool {
