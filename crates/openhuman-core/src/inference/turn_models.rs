@@ -53,7 +53,7 @@ impl TurnModels {
     pub(crate) fn resolver(&self) -> tinyagents_harness::host::PrebuiltModelResolver<()> {
         tinyagents_harness::host::PrebuiltModelResolver::new(
             self.primary.clone(),
-            self.routes.iter().cloned().collect::<Vec<_>>(),
+            self.routes.to_vec(),
         )
         .with_lead_model(Arc::new(tinyinference_llm::model::ErrorSlotModel::new(
             self.primary.clone(),
