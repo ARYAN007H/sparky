@@ -25,12 +25,14 @@ const watchdogEnv = {
 
 test("captured output returns when the command exits, not after a watchdog poll", () => {
   const started = Date.now();
-  const stdout = execFileSync("bash", [script, "echo", "done"], {
+  const { stdout, stderr, status } = spawnSync("bash", [script, "echo", "done"], {
     env: watchdogEnv,
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"],
   });
   const elapsed = Date.now() - started;
+
+  assert.equal(status, 0);
 
   assert.equal(stdout.trim(), "done");
   assert.ok(!stderr.includes("Terminated"), `watchdog shutdown leaked noise: ${stderr}`);
