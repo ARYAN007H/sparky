@@ -15,7 +15,7 @@
 //! is gated behind the default-ON `voice` Cargo feature. When the feature is
 //! off, [`stub`] takes its place and exposes the same public surface that
 //! always-on / other-gated callers depend on (`server`, `dictation_listener`,
-//! `streaming`, `create_stt_provider`,
+//! `create_stt_provider`,
 //! `effective_stt_provider`, `publish_ptt_transcript_committed`) with
 //! no-op / disabled-error bodies. Keeping the two surfaces in lockstep is
 //! enforced by the disabled-build check
@@ -61,13 +61,6 @@ mod types;
 pub mod local_speech;
 #[cfg(feature = "voice")]
 pub mod postprocess;
-// `streaming` (the dictation WebSocket handler) is axum-only, so it is compiled
-// only when BOTH `voice` and `http-server` are on (#5048). With `http-server`
-// off, its sole caller (the gated core HTTP router) is absent too, so nothing
-// needs `voice::streaming`.
-#[cfg(all(feature = "voice", feature = "http-server"))]
-pub mod streaming;
-
 #[cfg(feature = "voice")]
 pub use factory::{
     create_stt_provider, create_tts_provider, effective_stt_provider, effective_tts_provider,

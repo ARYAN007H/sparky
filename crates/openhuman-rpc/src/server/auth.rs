@@ -10,9 +10,6 @@
 //! - `GET /dev/connect`   — dev-only core handoff; see `server::dev_connect`
 //! - `GET /events`        — SSE stream; browser `EventSource` cannot set
 //!   headers, so the handler enforces a bind-token / bearer credential itself
-//! - `GET /ws/dictation`  — WebSocket upgrade; browser WS API cannot set
-//!   headers, so the handler enforces the bearer (header or `?token=`) +
-//!   origin itself before the upgrade (C4 / issue #1924)
 //! - `OPTIONS *`          — CORS preflight (handled by outer CORS middleware)
 //!
 //! Endpoints that accept the bearer either via header **or** `?token=…` query
@@ -97,7 +94,7 @@ fn is_public_path(path: &str) -> bool {
 /// Add new entries here only for SSE / WebSocket routes whose clients cannot
 /// send headers and that carry per-user data. The follow-up approvals stream
 /// (#1339) is the next planned addition.
-const QUERY_TOKEN_PATHS: &[&str] = &["/events/webhooks", "/ws/dictation", "/ws/live-voice"];
+const QUERY_TOKEN_PATHS: &[&str] = &["/events/webhooks", "/ws/live-voice"];
 
 /// Axum middleware: enforce `Authorization: Bearer <token>` on all protected
 /// endpoints.
