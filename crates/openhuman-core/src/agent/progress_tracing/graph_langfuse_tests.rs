@@ -1,5 +1,4 @@
 use super::*;
-use serde_json::Value;
 use tinyagents_graph::observability::GraphObservation;
 use tinyagents_graph::stream::GraphEvent;
 use tinyagents_harness::ids::{EventId, GraphId, NodeId, RunId, ThreadId};
@@ -134,4 +133,69 @@ fn flow_trace_config_uses_bus_trigger_and_flow_coordinates() {
     assert_eq!(trace.metadata["trigger"], "schedule");
     assert_eq!(trace.release.as_deref(), Some(APP_VERSION));
     assert_eq!(trace.metadata["app_version"], APP_VERSION);
+}
+
+#[test]
+fn flow_export_uses_the_backend_v4_otlp_route() {
+    let client = LangfuseClient::new(
+        "https://staging-api.tinyhumans.ai/telemetry/langfuse/ingestion",
+        LangfuseAuth::Bearer {
+            token: "token".to_string(),
+        },
+    )
+    .expect("client");
+    assert_eq!(
+        build_flow_exporter(client, "flow-1")
+            .client()
+            .otlp_endpoint(),
+        "https://staging-api.tinyhumans.ai/telemetry/langfuse/otel/v1/traces"
+    );
+}
+
+#[tokio::test]
+async fn flow_export_is_a_noop_when_usage_sharing_is_disabled() {
+    let mut config = Config::default();
+    config.observability.share_usage_data = false;
+    export_graph_run_trace(
+        &config,
+        "Daily digest",
+        "flow-1",
+        "flow:flow-1:uuid-1",
+        "completed",
+        FlowRunTrigger::Rpc,
+        &sample_observations("flow:flow-1:uuid-1"),
+    )
+    .await;
+}
+
+#[tokio::test]
+async fn flow_export_skips_api_key_credentials() {
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    let dir = tempfile::tempdir().unwrap();
+    let mut config = Config::default();
+    config.config_path = dir.path().join("config.toml");
+    config.workspace_dir = dir.path().join("workspace");
+    config.secrets.encrypt = false;
+    config.api_url = Some(format!("http://{address}"));
+    config.observability.share_usage_data = true;
+    crate::security::credentials::api_key::store_api_key(&config, "th_live_test").unwrap();
+
+    export_graph_run_trace(
+        &config,
+        "Daily digest",
+        "flow-1",
+        "flow:flow-1:uuid-1",
+        "completed",
+        FlowRunTrigger::Rpc,
+        &sample_observations("flow:flow-1:uuid-1"),
+    )
+    .await;
+
+    assert!(
+        tokio::time::timeout(std::time::Duration::from_millis(250), listener.accept())
+            .await
+            .is_err(),
+        "API-key credentials must not send a Langfuse export request"
+    );
 }
