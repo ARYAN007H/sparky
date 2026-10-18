@@ -26,6 +26,7 @@ pub use resource::{read_workflow_resource, read_workflow_resource_for};
 
 pub(crate) use api::discover_workflows_inner;
 pub(crate) use api::load_workflow_metadata_for_domains;
+pub(crate) use api::load_workflow_metadata_for_with_home;
 pub(crate) use api::invalidate_workflow_metadata_cache;
 
 #[cfg(test)]

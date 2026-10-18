@@ -203,7 +203,16 @@ pub fn load_workflow_metadata_for(
     ctx: &crate::core::runtime::DispatchCtx,
     config: &crate::config::Config,
 ) -> Vec<Workflow> {
-    load_workflow_metadata_for_domains(ctx, config, None)
+    load_workflow_metadata_for_with_home(ctx, config, None)
+}
+
+/// As [`load_workflow_metadata_for`] with a test or host-supplied user root.
+pub(crate) fn load_workflow_metadata_for_with_home(
+    ctx: &crate::core::runtime::DispatchCtx,
+    config: &crate::config::Config,
+    home_override: Option<PathBuf>,
+) -> Vec<Workflow> {
+    load_workflow_metadata_for_domains_with_home(ctx, config, None, home_override)
 }
 
 /// As [`load_workflow_metadata_for`] with the host's resolved domain set when
@@ -213,10 +222,19 @@ pub(crate) fn load_workflow_metadata_for_domains(
     config: &crate::config::Config,
     domains: Option<crate::core::runtime::DomainSet>,
 ) -> Vec<Workflow> {
+    load_workflow_metadata_for_domains_with_home(ctx, config, domains, None)
+}
+
+fn load_workflow_metadata_for_domains_with_home(
+    ctx: &crate::core::runtime::DispatchCtx,
+    config: &crate::config::Config,
+    domains: Option<crate::core::runtime::DomainSet>,
+    home_override: Option<PathBuf>,
+) -> Vec<Workflow> {
     let home = match ctx.resolved() {
-        Some(core) if core.user_skill_roots() => dirs::home_dir(),
+        Some(core) if core.user_skill_roots() => home_override.or_else(dirs::home_dir),
         Some(_) => None,
-        None => discovery_home_dir(),
+        None => home_override.or_else(discovery_home_dir),
     };
     let gate = DiscoveryGate::from_config(ctx, config, domains);
     load_workflow_metadata_with_gate(
