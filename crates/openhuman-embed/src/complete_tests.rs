@@ -217,6 +217,18 @@ impl tinyagents_harness::observability::PhysicalDispatchObserver for PhysicalRec
     }
 }
 
+#[derive(Default)]
+struct TurnRecorder(Mutex<Vec<tinyagents_harness::observability::turn_observer::TurnObservation>>);
+
+impl tinyagents_harness::observability::turn_observer::Observer for TurnRecorder {
+    fn on_event(
+        &self,
+        event: &tinyagents_harness::observability::turn_observer::TurnObservation,
+    ) {
+        self.0.lock().unwrap().push(event.clone());
+    }
+}
+
 #[tokio::test]
 async fn physical_observer_reports_content_free_provider_outcome() {
     let server = server_replying(body("hi", "stop")).await;
