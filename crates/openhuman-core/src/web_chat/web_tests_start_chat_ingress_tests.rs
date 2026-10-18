@@ -6,12 +6,15 @@ async fn ptt_source_turn_completes_without_publishing_a_voice_event() {
     use std::sync::Arc;
     use tinybus::EventHandler;
 
+    let _ = env_logger::builder().is_test(true).try_init();
     let _turn_lock = FORCED_ERROR_TEST_LOCK.lock().await;
     let _inference = crate::inference::inference_test_guard_async().await;
-    let _model =
-        crate::inference::provider::factory::test_provider_override::install_model(Arc::new(
-            tinyagents_harness::testkit::ScriptedModel::replies(vec!["hello from mock"]),
-        ));
+    let model = Arc::new(tinyagents_harness::testkit::ScriptedModel::replies(vec![
+        "hello from mock",
+    ]));
+    let _model = crate::inference::provider::factory::test_provider_override::install_model(
+        Arc::clone(&model),
+    );
     let temp = tempfile::tempdir().expect("temporary test workspace");
     let workspace_dir = temp.path().join("workspace");
     let action_dir = temp.path().join("projects");
@@ -109,7 +112,8 @@ async fn ptt_source_turn_completes_without_publishing_a_voice_event() {
                 assert_ne!(
                     (event.request_id.as_str(), event.event.as_str()),
                     (request_id.as_str(), "chat_error"),
-                    "PTT turn should complete successfully: {event:?}"
+                    "PTT turn should complete successfully: {event:?}; scripted model received {} requests",
+                    model.requests().len()
                 );
             }
         })
