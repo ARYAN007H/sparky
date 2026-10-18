@@ -74,6 +74,7 @@ fn flow_otlp_requests(
     )
 }
 
+#[cfg(test)]
 fn graph_otlp_requests(
     flow_name: &str,
     flow_id: &str,

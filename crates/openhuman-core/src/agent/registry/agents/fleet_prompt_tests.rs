@@ -60,6 +60,8 @@ fn render(def: &AgentDefinition, definitions: &[AgentDefinition]) -> String {
         workspace_dir: workspace.path(),
         model_name: "test",
         agent_id: &def.id,
+        flow_archetype_text: matches!(def.id.as_str(), "workflow_builder" | "flow_discovery")
+            .then_some("synthetic flow archetype for registry coverage"),
         tools: &[],
         workflows: &[],
         dispatcher_instructions: "",

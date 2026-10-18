@@ -257,8 +257,31 @@ impl OpenHumanTurnPrelude {
             )
             .map_err(|error| anyhow::anyhow!(error.to_string()))?
         };
+        let flow_archetype_text = if cold {
+            #[cfg(feature = "flows")]
+            {
+                match self.definition.as_deref() {
+                    Some(definition) => {
+                        crate::agent::prompts::flow_archetype::load_for_definition(
+                            self.runtime_config.as_deref(),
+                            definition,
+                        )
+                        .await?
+                    }
+                    None => None,
+                }
+            }
+            #[cfg(not(feature = "flows"))]
+            {
+                None
+            }
+        } else {
+            None
+        };
         let prefix = if cold {
-            let tiered = self.build_system_prompt_tiered()?;
+            let tiered = self.build_system_prompt_tiered_with_flow_archetype(
+                flow_archetype_text.as_deref(),
+            )?;
             Some(super::prefix_snapshot::tiered_prefix_snapshot(&tiered))
         } else {
             None
@@ -270,6 +293,13 @@ impl OpenHumanTurnPrelude {
     }
 
     fn build_system_prompt_tiered(&self) -> Result<crate::agent::prompts::TieredPrompt> {
+        self.build_system_prompt_tiered_with_flow_archetype(None)
+    }
+
+    fn build_system_prompt_tiered_with_flow_archetype(
+        &self,
+        flow_archetype_text: Option<&str>,
+    ) -> Result<crate::agent::prompts::TieredPrompt> {
         use crate::agent::prompts::{PromptContext, PromptTool};
         let surface = self
             .tool_surface
@@ -328,6 +358,7 @@ impl OpenHumanTurnPrelude {
             workspace_dir: &self.workspace_dir,
             model_name: &self.model_name,
             agent_id: &self.agent_definition_name,
+            flow_archetype_text,
             tools: &prompt_tools,
             workflows: &mutable.workflows,
             dispatcher_instructions: &instructions,

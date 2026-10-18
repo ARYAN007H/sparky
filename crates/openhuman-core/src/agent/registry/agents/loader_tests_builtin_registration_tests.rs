@@ -168,6 +168,11 @@ fn every_builtin_has_a_prompt_body() {
                     workspace_dir: std::path::Path::new("."),
                     model_name: "test",
                     agent_id: &def.id,
+                    flow_archetype_text: matches!(
+                        def.id.as_str(),
+                        "workflow_builder" | "flow_discovery"
+                    )
+                    .then_some("synthetic flow archetype for loader coverage"),
                     tools: &empty_tools,
                     workflows: &[],
                     dispatcher_instructions: "",
