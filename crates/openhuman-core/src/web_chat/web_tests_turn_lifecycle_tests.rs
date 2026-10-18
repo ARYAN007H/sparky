@@ -221,7 +221,11 @@ async fn a_turn_with_an_unavailable_local_provider_ends_in_one_classified_chat_e
     .expect("the message is accepted");
 
     let requests = server.received_requests().await.expect("captured requests");
-    let error = match timeout(Duration::from_secs(10), async {
+    // Interactive turns make five attempts with 3/6/12/24 s exponential
+    // backoff. Additive 25% jitter raises the longest backoff sequence to
+    // 56.25 s; leave margin for local setup and request handling while keeping
+    // the test bounded if the runner stops making progress.
+    let error = match timeout(Duration::from_secs(75), async {
         loop {
             match rx.recv().await {
                 Ok(event) if event.request_id == request_id && event.event == "chat_error" => {
