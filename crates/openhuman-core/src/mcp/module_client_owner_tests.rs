@@ -91,7 +91,7 @@ async fn failed_agent_cleanup_retains_the_retired_owner_and_can_retry() {
     );
     fixture.fail_close.store(false, Ordering::SeqCst);
     cleanup.finish().await.unwrap();
-    assert!(!cached(&directory).is_some());
+    assert!(cached(&directory).is_none());
     // Retrying the old completed handle cannot evict a later owner.
     let successor = Arc::new(McpConfiguredClient::new(&directory, &Config::default()).unwrap());
     lifecycle::table().insert(directory.clone(), Arc::clone(&successor));
@@ -355,7 +355,7 @@ async fn a_blocked_close_has_an_overall_cleanup_deadline_and_keeps_the_owner_for
     fixture.release_close.notify_one();
     cleanup.finish().await.unwrap();
     assert_eq!(fixture.closes.load(Ordering::SeqCst), 2);
-    assert!(!cached(&directory).is_some());
+    assert!(cached(&directory).is_none());
 }
 
 #[test]

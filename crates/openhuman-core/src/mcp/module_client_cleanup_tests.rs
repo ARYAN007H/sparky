@@ -114,11 +114,7 @@ async fn failed_cleanup_actions_retain_and_retry_cached_and_orphaned_paths() {
             std::fs::remove_dir_all(&orphan_home).is_ok() || !orphan_home.exists()
         }),
     );
-    assert!(!McpConfiguredClient::finish_cleanup(
-        &orphan_dir,
-        None,
-        reservation,
-    ));
+    assert!(!lifecycle::table().finish_cleanup(&orphan_dir, None, &reservation,));
     assert!(McpConfiguredClient::agent_close_pending(&orphan_dir));
     assert!(orphan_dir.exists());
     lifecycle::table().retry_orphaned();
