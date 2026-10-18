@@ -84,14 +84,28 @@ async fn offline_conversation_purge_queues_exact_thread_ids_in_its_workspace() {
         ))
         .await
         .unwrap();
+    engine
+        .store(StoreItem::document(
+            "durable brain document",
+            MemoryMeta {
+                thread_id: Some("channel-thread-a".to_string()),
+                channel: Some("telegram".to_string()),
+                ..MemoryMeta::default()
+            },
+        ))
+        .await
+        .unwrap();
 
     assert_eq!(drain(&config).await, 2);
 
     let left = stored(&engine, MetaFilter::default()).await;
-    assert_eq!(left.len(), 2);
+    assert_eq!(left.len(), 3);
     assert!(left
         .iter()
         .any(|item| { item.kind == ItemKind::Learning && item.text == "durable preference" }));
+    assert!(left.iter().any(|item| {
+        item.kind == ItemKind::Document && item.text == "durable brain document"
+    }));
     assert!(left.iter().any(|item| {
         item.kind == ItemKind::Conversation
             && item.meta.thread_id.as_deref() == Some("unrelated-thread")
