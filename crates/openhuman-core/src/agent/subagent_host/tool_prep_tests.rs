@@ -10,6 +10,7 @@ fn custom_delegate_is_treated_as_spawn_tool() {
 #[test]
 fn child_tool_surface_never_contains_any_spawn_or_continuation_tool() {
     let tools: Vec<Box<dyn Tool>> = [
+        "delegate",
         "spawn_subagent",
         "spawn_async_subagent",
         "spawn_parallel_agents",
