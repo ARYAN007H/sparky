@@ -194,6 +194,36 @@ async fn memory_engine_rpc_preserves_document_conflicts() {
     assert_eq!(structured.data.as_ref().unwrap()["retryable"], false);
 }
 
+#[tokio::test]
+async fn document_source_write_uses_its_last_read_revision() {
+    let tmp = tempfile::tempdir().unwrap();
+    let storage = MemoryStorage::new();
+    let path = tmp.path().join("config.toml");
+    let first = document_source(&storage, "tenant-source-cas", &path);
+    let stale = document_source(&storage, "tenant-source-cas", &path);
+
+    first.write("default_model = \"seed\"\\n").await.unwrap();
+    first.read().await.unwrap();
+    stale.read().await.unwrap();
+    first
+        .write("default_model = \"winner\"\\n")
+        .await
+        .unwrap();
+
+    let error = stale
+        .write("output_language = \"fr\"\\n")
+        .await
+        .expect_err("a source snapshot cannot overwrite a newer document revision");
+    let storage_error = error
+        .chain()
+        .find_map(|cause| cause.downcast_ref::<tinystoragedrivers::StorageError>())
+        .expect("CAS failure retains the typed storage error");
+    assert_eq!(
+        storage_error.kind(),
+        tinystoragedrivers::ErrorKind::Conflict
+    );
+}
+
 // ── Document source ──────────────────────────────────────────────────────────
 
 #[tokio::test]
