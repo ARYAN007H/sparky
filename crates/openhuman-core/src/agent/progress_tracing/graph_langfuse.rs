@@ -152,11 +152,9 @@ pub(crate) async fn export_graph_run_trace(
         }
     };
     let request_count = requests.len();
-    let send = crate::agent::progress_tracing::otlp::push_otlp_json_requests(
-        &exporter.client().otlp_endpoint(),
-        &token,
-        &requests,
-    );
+    let otlp_url = exporter.client().otlp_endpoint();
+    let send =
+        crate::agent::progress_tracing::otlp::push_otlp_json_requests(&otlp_url, &token, &requests);
     match tokio::time::timeout(PUSH_TIMEOUT, send).await {
         Ok(Ok(())) => {
             tracing::debug!(target: LOG_TARGET, flow_id = %flow_id, thread_id = %thread_id, observation_count = observations.len(), request_count, "[flows] pushed flow run trace to Langfuse")

@@ -330,7 +330,6 @@ pub struct PromptContext<'a> {
     /// absent/empty, deduplicated against the global layer (same dir), or the
     /// gate is off. Rendered after the global layer.
     pub agents_md_local: Option<String>,
-    flow_archetype_text: None,
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

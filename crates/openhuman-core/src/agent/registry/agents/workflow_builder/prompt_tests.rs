@@ -21,7 +21,6 @@ fn builder_prompt_composes_supplied_archetype_tools_and_workspace() {
         personality_roster: vec![],
         agents_md_global: None,
         agents_md_local: None,
-        flow_archetype_text: None,
     };
 
     let prompt = super::prompt::build(&context).expect("render builder prompt");
