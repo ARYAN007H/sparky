@@ -1,8 +1,8 @@
 //! Agent chat turns with the full tool-using harness.
 
+use super::envelope::AgentChatReply;
 use crate::agent::OpenHumanSessionHost;
 use crate::config::Config;
-use super::envelope::AgentChatReply;
 use crate::core::Outcome;
 
 use super::guards::{
@@ -564,4 +564,3 @@ pub async fn agent_chat_reply_for(
 #[cfg(test)]
 #[path = "session_turn_tests.rs"]
 mod tests;
-

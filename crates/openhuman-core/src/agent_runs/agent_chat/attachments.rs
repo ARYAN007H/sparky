@@ -21,14 +21,10 @@ pub(super) async fn stage_host_attachments(
         external_channel: false,
         workspace: cwd,
     };
-    let references = crate::attachments::host::stage_host(
-        attachments,
-        session_id,
-        &staging_config,
-        &scope,
-    )
-    .await
-    .map_err(|error| error.to_string())?;
+    let references =
+        crate::attachments::host::stage_host(attachments, session_id, &staging_config, &scope)
+            .await
+            .map_err(|error| error.to_string())?;
     log::debug!(
         "[inference] agent_chat staged {} host attachment(s)",
         attachments.len()

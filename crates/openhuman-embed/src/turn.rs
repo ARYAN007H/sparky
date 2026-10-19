@@ -42,8 +42,8 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use super::error::CoreError;
-use openhuman_core::core::runtime::CoreRuntime;
 use openhuman_core::agent_runs::INFERENCE_AGENT_CHAT as AGENT_CHAT;
+use openhuman_core::core::runtime::CoreRuntime;
 use openhuman_core::progress::AgentProgress;
 use openhuman_core::security::turn_origin::AgentTurnOrigin;
 
@@ -651,9 +651,7 @@ async fn dispatch(
             // allocation per turn is nothing next to the turn itself.
             let turn: futures_box::BoxFuture<'_, Result<AgentReply, CoreError>> =
                 Box::pin(async move {
-                    use openhuman_core::agent_runs::agent_chat::{
-                        agent_chat_for, AgentChatTarget,
-                    };
+                    use openhuman_core::agent_runs::agent_chat::{agent_chat_for, AgentChatTarget};
                     let mut config = inner.config.clone();
                     let route = openhuman_core::config::schema::EphemeralRoute::from_params(
                         request.inference_url,

@@ -44,4 +44,3 @@ impl AgentChatReply {
         Ok(value)
     }
 }
-

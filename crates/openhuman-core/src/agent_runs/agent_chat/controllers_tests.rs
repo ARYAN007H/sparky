@@ -4,7 +4,10 @@ use super::*;
 fn inference_agent_chat_controllers_keep_their_wire_names_and_namespace() {
     let controllers = all_registered_controllers();
     assert_eq!(controllers.len(), 2);
-    assert_eq!(controllers[0].rpc_method_name(), crate::agent_runs::INFERENCE_AGENT_CHAT);
+    assert_eq!(
+        controllers[0].rpc_method_name(),
+        crate::agent_runs::INFERENCE_AGENT_CHAT
+    );
     assert_eq!(controllers[0].schema.namespace, "inference");
     assert_eq!(controllers[0].schema.function, "agent_chat");
     assert_eq!(controllers[1].schema.function, "agent_chat_simple");
@@ -35,6 +38,12 @@ fn inference_agent_chat_parses_its_route_fields() {
     }))
     .expect("inference route params decode");
     assert_eq!(params.agent_id.as_deref(), Some("alpha"));
-    assert_eq!(params.inference_url.as_deref(), Some("https://example.test/v1"));
-    assert_eq!(params.inference_headers, vec![("x-test".into(), "value".into())]);
+    assert_eq!(
+        params.inference_url.as_deref(),
+        Some("https://example.test/v1")
+    );
+    assert_eq!(
+        params.inference_headers,
+        vec![("x-test".into(), "value".into())]
+    );
 }

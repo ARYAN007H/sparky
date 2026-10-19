@@ -1,11 +1,11 @@
 //! The lightweight provider-only agent chat variant.
 
-use crate::config::Config;
-use crate::core::Outcome;
-use crate::inference::provider as providers;
 use crate::agent_runs::agent_chat::guards::{
     enforce_user_prompt_or_reject, normalize_model_override,
 };
+use crate::config::Config;
+use crate::core::Outcome;
+use crate::inference::provider as providers;
 
 /// A simplified chat interface that does not update the base configuration.
 pub async fn agent_chat_simple(

@@ -1,7 +1,7 @@
 //! Product-facing RPC surfaces for agent runs, teams, workflows, replay, and tools.
 
-pub(crate) mod agent_teams;
 pub mod agent_chat;
+pub(crate) mod agent_teams;
 pub(crate) mod command_center;
 pub(crate) mod context_breakdown;
 pub(crate) mod replay;
@@ -11,12 +11,11 @@ mod subagent_finalize;
 pub(crate) mod workflow_runs;
 pub(crate) mod worktree_schemas;
 
+pub(crate) use agent_chat::{
+    all_inference_agent_chat_controller_schemas, all_inference_agent_chat_registered_controllers,
+};
 pub(crate) use agent_teams::{
     all_agent_team_controller_schemas, all_agent_team_registered_controllers,
-};
-pub(crate) use agent_chat::{
-    all_inference_agent_chat_controller_schemas,
-    all_inference_agent_chat_registered_controllers,
 };
 pub const INFERENCE_AGENT_CHAT: &str = "openhuman.inference_agent_chat";
 pub(crate) use command_center::{

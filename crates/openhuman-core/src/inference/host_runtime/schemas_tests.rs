@@ -11,12 +11,7 @@ fn all_schemas_use_inference_namespace_and_have_descriptions() {
 
 #[test]
 fn every_registered_key_resolves_to_non_unknown_schema() {
-    let keys = [
-        "transcribe",
-        "transcribe_bytes",
-        "tts",
-        "test_connection",
-    ];
+    let keys = ["transcribe", "transcribe_bytes", "tts", "test_connection"];
     for k in keys {
         let s = schemas(k);
         assert_eq!(s.namespace, "inference");
@@ -74,4 +69,3 @@ fn to_json_wraps_rpc_outcome() {
     let v = to_json(Outcome::single_log(serde_json::json!({"ok": true}), "l")).expect("serialize");
     assert!(v.get("logs").is_some() || v.get("result").is_some() || v.get("ok").is_some());
 }
-

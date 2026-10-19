@@ -46,7 +46,10 @@ pub(crate) fn schemas(function: &str) -> ControllerSchema {
             function: "agent_chat",
             description: "Run one-shot agent chat with optional model overrides.",
             inputs,
-            outputs: vec![json_output("response", "Agent response payload with result, logs, hit_cap, and an optional checkpoint.")],
+            outputs: vec![json_output(
+                "response",
+                "Agent response payload with result, logs, hit_cap, and an optional checkpoint.",
+            )],
         },
         "agent_chat_simple" => ControllerSchema {
             namespace: "inference",
@@ -56,7 +59,10 @@ pub(crate) fn schemas(function: &str) -> ControllerSchema {
                 required_string("message", "User message."),
                 optional_string("model_override", "Optional model override."),
                 optional_f64("temperature", "Optional temperature override."),
-                optional_string("thread_id", "Optional backend thread id for cache grouping and inference logs."),
+                optional_string(
+                    "thread_id",
+                    "Optional backend thread id for cache grouping and inference logs.",
+                ),
             ],
             outputs: vec![json_output("response", "Agent response payload.")],
         },
@@ -81,12 +87,21 @@ pub(crate) fn all_controller_schemas() -> Vec<ControllerSchema> {
 
 pub(crate) fn all_registered_controllers() -> Vec<RegisteredController> {
     vec![
-        RegisteredController { schema: schemas("agent_chat"), handler: handle_agent_chat },
-        RegisteredController { schema: schemas("agent_chat_simple"), handler: handle_agent_chat_simple },
+        RegisteredController {
+            schema: schemas("agent_chat"),
+            handler: handle_agent_chat,
+        },
+        RegisteredController {
+            schema: schemas("agent_chat_simple"),
+            handler: handle_agent_chat_simple,
+        },
     ]
 }
 
-fn handle_agent_chat(ctx: crate::core::runtime::DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+fn handle_agent_chat(
+    ctx: crate::core::runtime::DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let params = deserialize_params::<InferenceAgentChatParams>(params)?;
         let mut config = ctx.load_config().await?;
@@ -102,8 +117,11 @@ fn handle_agent_chat(ctx: crate::core::runtime::DispatchCtx, params: Map<String,
             params.common.temperature,
             params.common.thread_id,
             params.common.cwd,
-            crate::config::schema::EphemeralRoute::from_params(params.inference_url, params.api_key)
-                .map(|route| route.with_headers(params.inference_headers)),
+            crate::config::schema::EphemeralRoute::from_params(
+                params.inference_url,
+                params.api_key,
+            )
+            .map(|route| route.with_headers(params.inference_headers)),
             super::AgentChatEnv::default(),
         )
         .await?
@@ -111,7 +129,10 @@ fn handle_agent_chat(ctx: crate::core::runtime::DispatchCtx, params: Map<String,
     })
 }
 
-fn handle_agent_chat_simple(ctx: crate::core::runtime::DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
+fn handle_agent_chat_simple(
+    ctx: crate::core::runtime::DispatchCtx,
+    params: Map<String, Value>,
+) -> ControllerFuture {
     Box::pin(async move {
         let params = deserialize_params::<InferenceAgentChatParams>(params)?;
         let config = ctx.load_config().await?;
@@ -128,22 +149,44 @@ fn handle_agent_chat_simple(ctx: crate::core::runtime::DispatchCtx, params: Map<
     })
 }
 
-fn deserialize_params<T: serde::de::DeserializeOwned>(params: Map<String, Value>) -> Result<T, String> {
+fn deserialize_params<T: serde::de::DeserializeOwned>(
+    params: Map<String, Value>,
+) -> Result<T, String> {
     serde_json::from_value(Value::Object(params)).map_err(|e| format!("invalid params: {e}"))
 }
 
 fn required_string(name: &'static str, comment: &'static str) -> FieldSchema {
-    FieldSchema { name, ty: TypeSchema::String, comment, required: true }
+    FieldSchema {
+        name,
+        ty: TypeSchema::String,
+        comment,
+        required: true,
+    }
 }
 
 fn optional_string(name: &'static str, comment: &'static str) -> FieldSchema {
-    FieldSchema { name, ty: TypeSchema::Option(Box::new(TypeSchema::String)), comment, required: false }
+    FieldSchema {
+        name,
+        ty: TypeSchema::Option(Box::new(TypeSchema::String)),
+        comment,
+        required: false,
+    }
 }
 
 fn optional_f64(name: &'static str, comment: &'static str) -> FieldSchema {
-    FieldSchema { name, ty: TypeSchema::Option(Box::new(TypeSchema::F64)), comment, required: false }
+    FieldSchema {
+        name,
+        ty: TypeSchema::Option(Box::new(TypeSchema::F64)),
+        comment,
+        required: false,
+    }
 }
 
 fn json_output(name: &'static str, comment: &'static str) -> FieldSchema {
-    FieldSchema { name, ty: TypeSchema::Json, comment, required: true }
+    FieldSchema {
+        name,
+        ty: TypeSchema::Json,
+        comment,
+        required: true,
+    }
 }

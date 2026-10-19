@@ -1,6 +1,6 @@
 use super::*;
-use crate::agent_runs::agent_chat::{agent_chat_for, AgentChatEnv, AgentChatTarget};
 use crate::agent_runs::agent_chat::guards::effective_agent_chat_origin;
+use crate::agent_runs::agent_chat::{agent_chat_for, AgentChatEnv, AgentChatTarget};
 
 // ── Op-level validation / error paths (no hardware) ───────────
 
