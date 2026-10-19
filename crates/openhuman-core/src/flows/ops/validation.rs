@@ -7,7 +7,7 @@ use tinyflows_bus::{GraphValidation, ImportGraphResult, ValidateGraphRequest};
 pub(crate) use tinyflows::compat::UNSUPPORTED_NESTED_CONDITIONAL_FAN_IN;
 
 async fn validate_over_bus(
-    ctx: &DispatchCtx,
+    _ctx: &DispatchCtx,
     config: &Config,
     graph: Value,
 ) -> Result<GraphValidation, String> {
@@ -160,18 +160,25 @@ pub async fn flows_validate(
 /// Imports and validates native or n8n graph JSON through TinyFlows without
 /// persisting it.
 pub async fn flows_import(
+    ctx: &DispatchCtx,
+    config: &Config,
     graph_json: Value,
     format: Option<String>,
 ) -> Result<Outcome<tinyflows_catalog::FlowImport>, String> {
     use tinyflows_catalog::FlowImport;
-    let config = Config::default();
-    let proxy = crate::modules::tinyflows::authoring_proxy(&config).await?;
+    let requested = format.as_deref().unwrap_or("auto").trim().to_ascii_lowercase();
+    if !matches!(requested.as_str(), "auto" | "" | "native" | "tinyflows" | "n8n") {
+        return Err(format!(
+            "unknown import format '{requested}' (expected 'native' or 'n8n')"
+        ));
+    }
+    let proxy = crate::modules::tinyflows::authoring_proxy(config).await?;
     let imported: ImportGraphResult = proxy
         .call(
             tinyflows_bus::methods::IMPORT_GRAPH,
             &(tinyflows_bus::ImportGraphRequest {
                 graph: graph_json,
-                format,
+                format: Some(requested),
             },),
         )
         .await
