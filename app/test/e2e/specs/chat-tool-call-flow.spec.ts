@@ -71,7 +71,7 @@ describe('Chat tool-call lifecycle', () => {
     console.log(`${LOG_PREFIX} Teardown complete`);
   });
 
-  it('T1.1 — tool timeline entry (ToolTimelineBlock) renders during execution', async () => {
+  it('T1.1 — rendered assistant UI tool card appears during the turn', async () => {
     console.log(`${LOG_PREFIX} T1.1: navigating to /chat and opening new thread`);
     await navigateViaHash('/chat');
     await browser.waitUntil(async () => await chatMounted(), {
@@ -110,8 +110,8 @@ describe('Chat tool-call lifecycle', () => {
     expect(await textExists('Fetching example.com')).toBe(true);
   });
 
-  it('T1.2 — tool timeline entry shows tool name web_fetch', async () => {
-    console.log(`${LOG_PREFIX} T1.2: checking tool name in timeline`);
+  it('T1.2 — rendered assistant UI tool card identifies the web fetch', async () => {
+    console.log(`${LOG_PREFIX} T1.2: checking rendered tool card`);
     const cards = await renderedToolCards();
     expect(cards.some(card => card.includes('Fetching example.com'))).toBe(true);
     expect(await textExists('Fetching example.com')).toBe(true);

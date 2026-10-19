@@ -143,10 +143,10 @@ test.describe('Chat Multi Tool Round', () => {
     await expect(agentMessageText(page, CANARY_FINAL)).toBeVisible({ timeout: 50_000 });
     const cards = page.getByTestId('assistant-ui-tool-call');
     await expect(cards.filter({ hasText: 'Fetching example.com' })).toHaveCount(1);
-    await expect(cards.filter({ hasText: 'Searching the web' })).toHaveCount(1);
+    await expect(cards.filter({ hasText: /Search(?:ing|ed) the web/ })).toHaveCount(1);
     const renderedCards = await cards.allTextContents();
     const fetchIndex = renderedCards.findIndex(text => text.includes('Fetching example.com'));
-    const searchIndex = renderedCards.findIndex(text => text.includes('Searching the web'));
+    const searchIndex = renderedCards.findIndex(text => /Search(?:ing|ed) the web/.test(text));
     expect(fetchIndex).toBeGreaterThanOrEqual(0);
     expect(searchIndex).toBeGreaterThan(fetchIndex);
     await expect(agentMessageText(page, CANARY_FINAL)).toBeVisible();

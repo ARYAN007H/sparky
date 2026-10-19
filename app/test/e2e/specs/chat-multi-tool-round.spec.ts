@@ -90,7 +90,7 @@ describe('Chat multi-tool round', () => {
     console.log(`${LOG_PREFIX} Teardown complete`);
   });
 
-  it('T2.1 — agent calls tool 1 (file_read); timeline shows it', async () => {
+  it('T2.1 — agent calls tool 1 (file_read); rendered card shows it', async () => {
     console.log(`${LOG_PREFIX} T2.1: navigating to /chat, opening new thread`);
     await navigateViaHash('/chat');
     await browser.waitUntil(async () => await chatMounted(), {
@@ -129,10 +129,10 @@ describe('Chat multi-tool round', () => {
   it('T2.2 — agent calls tool 2 (grep); timeline shows 2 entries', async () => {
     console.log(`${LOG_PREFIX} T2.2: watching for grep in timeline`);
     await browser.waitUntil(
-      async () => (await renderedToolCards()).some(card => card.includes('Searching code')),
+      async () => (await renderedToolCards()).some(card => /Search(?:ing|ed) code/.test(card)),
       { timeout: 45_000, interval: 100, timeoutMsg: 'Rendered grep tool card never appeared' }
     );
-    expect(await textExists('Searching code')).toBe(true);
+    expect((await renderedToolCards()).some(card => /Search(?:ing|ed) code/.test(card))).toBe(true);
   });
 
   it('T2.3 — final answer renders after both tools complete', async () => {
@@ -149,7 +149,7 @@ describe('Chat multi-tool round', () => {
 
     const cards = await renderedToolCards();
     const fileReadIndex = cards.findIndex(card => card.includes('Read file'));
-    const grepIndex = cards.findIndex(card => card.includes('Searching code'));
+    const grepIndex = cards.findIndex(card => /Search(?:ing|ed) code/.test(card));
     expect(fileReadIndex).toBeGreaterThanOrEqual(0);
     expect(grepIndex).toBeGreaterThan(fileReadIndex);
     console.log(`${LOG_PREFIX} T2.5: passed`);
