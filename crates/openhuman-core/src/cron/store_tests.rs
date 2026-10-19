@@ -268,7 +268,8 @@ fn assert_force_next_run_updates_collection(
 
     let before_docs = std::sync::Arc::clone(&docs);
     let collections_before =
-        crate::storage::block_on_anyhow(async move { before_docs.collections("").await }).unwrap();
+        crate::storage::block_on_anyhow(async move { Ok(before_docs.collections("").await?) })
+            .unwrap();
     assert!(collections_before.contains(&collection.to_string()));
 
     let next = chrono::DateTime::<Utc>::from_timestamp_millis(456).unwrap();
