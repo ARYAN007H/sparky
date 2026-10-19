@@ -91,6 +91,8 @@ pub mod test_support;
 pub mod threads;
 #[cfg(feature = "tinymemes")]
 pub mod tinymemes;
+#[cfg(feature = "inbound-queues")]
+pub mod inbound;
 pub mod tools;
 pub mod triage;
 pub mod util;
