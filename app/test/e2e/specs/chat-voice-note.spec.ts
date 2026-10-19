@@ -7,7 +7,13 @@ import {
   getSelectedThreadId,
   waitForAssistantReplyContaining,
 } from '../helpers/chat-harness';
-import { clickElement, clickTestId, textExists, waitForTestId } from '../helpers/element-helpers';
+import {
+  clickTestId,
+  clickTestIdAtIndex,
+  countTestId,
+  textExists,
+  waitForTestId,
+} from '../helpers/element-helpers';
 import { resetApp } from '../helpers/reset-app';
 import { navigateViaHash } from '../helpers/shared-flows';
 import { setMockBehavior, startMockServer, stopMockServer } from '../mock-server';
@@ -117,10 +123,9 @@ describe('Chat voice notes', () => {
     await clickTestId('voice-note-send');
     await browser.waitUntil(async () => await textExists(TRANSCRIPT), { timeout: 20_000 });
     await waitForAssistantReplyContaining(REPLY, 60_000);
-    await browser.waitUntil(
-      async () => (await browser.$$('[data-testid="voice-note-player"]')).length === 2,
-      { timeout: 30_000 }
-    );
+    await browser.waitUntil(async () => (await countTestId('voice-note-player')) === 2, {
+      timeout: 30_000,
+    });
 
     await browser.refresh();
     await waitForApp();
@@ -131,24 +136,37 @@ describe('Chat voice notes', () => {
         window.__OPENHUMAN_STORE__?.dispatch({ type: 'thread/setSelectedThread', payload: tid }),
       threadId
     );
-    await browser.waitUntil(
-      async () => (await browser.$$('[data-testid="voice-note-player"]')).length === 2,
-      { timeout: 30_000 }
-    );
+    await browser.waitUntil(async () => (await countTestId('voice-note-player')) === 2, {
+      timeout: 30_000,
+    });
     expect(await textExists(REPLY)).toBe(true);
     await clickTestId('voice-note-transcript-toggle');
     await browser.waitUntil(async () => await textExists(TRANSCRIPT), { timeout: 5_000 });
 
-    const playButtons = await browser.$$('[data-testid="voice-note-toggle"]');
-    expect(playButtons.length).toBe(2);
-    await clickElement(playButtons[1]);
+    await browser.waitUntil(async () => (await countTestId('voice-note-toggle')) === 2, {
+      timeout: 5_000,
+    });
+    await clickTestIdAtIndex('voice-note-toggle', 0);
     await browser.waitUntil(
       async () =>
-        (await browser.$$('[data-testid="voice-note-toggle"]'))[1]
-          ?.getAttribute('aria-label')
-          .then(label => label?.toLowerCase().includes('pause')),
+        (await (await waitForTestId('voice-note-toggle')).getAttribute('aria-label'))
+          ?.toLowerCase()
+          .includes('pause'),
       { timeout: 5_000 }
     );
-    await clickElement((await browser.$$('[data-testid="voice-note-toggle"]'))[1]);
+    await clickTestIdAtIndex('voice-note-toggle', 0);
+    await clickTestIdAtIndex('voice-note-toggle', 1);
+    await browser.waitUntil(
+      async () =>
+        (await (await (await import('../helpers/element-helpers')).waitForTestIdAtIndex(
+          'voice-note-toggle',
+          1
+        )).getAttribute('aria-label'))
+          ?.getAttribute('aria-label')
+          ?.toLowerCase()
+          .includes('pause'),
+      { timeout: 5_000 }
+    );
+    await clickTestIdAtIndex('voice-note-toggle', 1);
   });
 });
