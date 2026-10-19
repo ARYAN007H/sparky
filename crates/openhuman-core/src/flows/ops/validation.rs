@@ -61,12 +61,12 @@ pub(crate) async fn config_aware_engine_compatibility_errors(
 }
 
 pub(super) async fn ensure_config_aware_engine_compatible(
+    ctx: &DispatchCtx,
     config: &Config,
     graph: &WorkflowGraph,
 ) -> Result<(), String> {
     let graph = serde_json::to_value(graph).map_err(|error| error.to_string())?;
-    match config_aware_engine_compatibility_errors(&DispatchCtx::ambient(), config, graph)
-        .await?
+    match config_aware_engine_compatibility_errors(ctx, config, graph).await?
         .into_iter()
         .next()
     {
