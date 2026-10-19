@@ -300,6 +300,9 @@ fn assert_force_next_run_updates_collection(
             456
         );
         assert_eq!(updated["next_run_ns"], json!(456_000_000));
+    } else {
+        assert!(updated.get("next_run").is_none());
+        assert!(updated.get("next_run_ns").is_none());
     }
     assert!(
         other.is_none(),
