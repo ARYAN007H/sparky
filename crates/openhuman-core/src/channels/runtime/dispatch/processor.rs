@@ -31,6 +31,7 @@ pub(crate) struct RuntimeChannelMessage {
     pub(crate) inbound_envelope: Option<ChannelInboundEnvelope>,
     pub(crate) authenticated_relay: bool,
     pub(crate) prepared_inbound: Option<tinychannels_bus::module_inbound::PreparedChannelInbound>,
+    pub(crate) imported_history: Vec<tinyagents_session::transcript::TranscriptMessage>,
 }
 
 impl RuntimeChannelMessage {
@@ -43,6 +44,7 @@ impl RuntimeChannelMessage {
             inbound_envelope: Some(inbound_envelope),
             authenticated_relay: false,
             prepared_inbound: None,
+            imported_history: Vec::new(),
         }
     }
 
@@ -56,6 +58,7 @@ impl RuntimeChannelMessage {
             inbound_envelope: Some(delivery.envelope),
             authenticated_relay: delivery.delivered_via_authenticated_relay,
             prepared_inbound: None,
+            imported_history: Vec::new(),
         }
     }
 }
@@ -67,6 +70,7 @@ impl From<ChannelMessage> for RuntimeChannelMessage {
             inbound_envelope: None,
             authenticated_relay: false,
             prepared_inbound: None,
+            imported_history: Vec::new(),
         }
     }
 }

@@ -96,6 +96,7 @@ impl HostAgent {
         progress: Option<tokio::sync::mpsc::Sender<tinyagents_harness::progress::AgentProgress>>,
         cancellation: tinyagents_harness::CancellationToken,
         turn_deadline: Option<std::time::Duration>,
+        imported_history: &[tinyagents_session::transcript::TranscriptMessage],
     ) -> anyhow::Result<String> {
         let config = self.config.clone();
         let agent_id = self.definition.id.clone();
@@ -113,6 +114,7 @@ impl HostAgent {
             memory_identity: Some(crate::memory::scope::MemoryIdentity::root().child(&agent_id)),
             ..Default::default()
         });
+        session.adopt_imported_history(imported_history)?;
         self.scope(session.run_single_with_approval(message, Some(origin), approval))
             .await
     }

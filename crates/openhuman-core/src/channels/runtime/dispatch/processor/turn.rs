@@ -45,6 +45,7 @@ pub(crate) async fn process_channel_runtime_message(
         inbound_envelope,
         authenticated_relay,
         prepared_inbound,
+        imported_history,
     } = runtime_msg;
     let prepared = match prepared_inbound {
         Some(prepared) => prepared,
@@ -454,6 +455,7 @@ pub(crate) async fn process_channel_runtime_message(
                 approval,
                 cancellation: cancellation.clone(),
                 turn_deadline: crate::agent::session_host::turn_backstop::configured_backstop(),
+                imported_history,
             },
         )),
         None if configured_agent_error.is_some() => {
@@ -479,11 +481,9 @@ pub(crate) async fn process_channel_runtime_message(
             ))
         }
         #[cfg(not(test))]
-        None => Box::pin(async {
-            Err(anyhow::anyhow!(
-                "channel turn has no configured host agent"
-            ))
-        }),
+        None => {
+            Box::pin(async { Err(anyhow::anyhow!("channel turn has no configured host agent")) })
+        }
     };
     let llm_result =
         tokio::time::timeout(Duration::from_secs(ctx.message_timeout_secs), agent_call).await;

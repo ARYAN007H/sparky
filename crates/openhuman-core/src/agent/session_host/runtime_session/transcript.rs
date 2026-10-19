@@ -30,7 +30,7 @@ impl OpenHumanSessionHost {
             .clone()
     }
 
-    pub(super) fn runtime_transcript_meta(&self) -> TranscriptMeta {
+    pub(in crate::agent::session_host) fn runtime_transcript_meta(&self) -> TranscriptMeta {
         let now = chrono::Utc::now().to_rfc3339();
         TranscriptMeta {
             agent_name: self.agent_definition_name.clone(),

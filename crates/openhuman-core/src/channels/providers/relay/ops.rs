@@ -3,15 +3,15 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use super::channel::RelayChannel;
 use super::params::RelayInboundParams;
 use super::store::{self, Recorded};
 use crate::channels::context::MAX_CHANNEL_HISTORY;
 use crate::channels::runtime::{
-    build_channel_turn_parts, prepare_runtime_limits, process_channel_runtime_message,
-    runtime_context, PromptToolDescs,
+    PromptToolDescs, build_channel_turn_parts, prepare_runtime_limits,
+    process_channel_runtime_message, runtime_context,
 };
 use crate::config::Config;
 use crate::core::Outcome;
@@ -199,8 +199,9 @@ pub(crate) async fn run_relay_turn(
     runtime.relay_thread = Some(thread_id.clone());
     let ctx = Arc::new(runtime);
 
-    // The thread is the conversation's memory: seed the pipeline's per-chat
-    // history from it, since this runtime context lives for one message.
+    // The relay's legacy conversation rows are imported into the selected
+    // agent's durable session on its first resume. Subsequent calls are
+    // idempotent and existing session history remains authoritative.
     let message = params.to_channel_message();
     let prepared = match crate::modules::channel_controller::prepare_inbound(
         &crate::modules::client(config.clone()),
@@ -221,7 +222,7 @@ pub(crate) async fn run_relay_turn(
             return channel.sent();
         }
     };
-    match store::prior_turns(
+    let imported_history = match store::prior_turns(
         &dispatch_ctx,
         &workspace_dir,
         &thread_id,
@@ -230,19 +231,22 @@ pub(crate) async fn run_relay_turn(
     )
     .await
     {
-        Ok(prior) if !prior.is_empty() => {
-            ctx.conversation_histories
-                .lock()
-                .unwrap_or_else(|e| e.into_inner())
-                .insert(prepared.history_key.clone(), prior);
-        }
-        Ok(_) => {}
+        Ok(prior) => prior
+            .into_iter()
+            .map(|row| match row.role.as_str() {
+                "user" => tinyagents_session::transcript::TranscriptMessage::user(row.content),
+                "assistant" => {
+                    tinyagents_session::transcript::TranscriptMessage::assistant(row.content)
+                }
+                _ => unreachable!("prior_turns only returns user and assistant rows"),
+            })
+            .collect(),
         Err(error) => tracing::warn!(
             thread_id = %thread_id,
             %error,
             "[channels::relay] could not read the thread's history; running without it"
         ),
-    }
+    };
 
     tracing::debug!(
         channel = %params.channel,
@@ -252,6 +256,7 @@ pub(crate) async fn run_relay_turn(
     );
     let mut runtime_message = crate::channels::runtime::RuntimeChannelMessage::from(message);
     runtime_message.prepared_inbound = Some(prepared);
+    runtime_message.imported_history = imported_history;
     let turn = process_channel_runtime_message(ctx, runtime_message);
     if let Some(context) = dispatch_ctx.core() {
         crate::core::runtime::CoreContext::scope(

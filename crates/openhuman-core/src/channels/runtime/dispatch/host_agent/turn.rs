@@ -31,6 +31,8 @@ pub(crate) struct HostChannelTurn {
     pub(crate) approval: crate::security::approval::ApprovalTurnContext,
     pub(crate) cancellation: tinyagents_harness::CancellationToken,
     pub(crate) turn_deadline: Option<std::time::Duration>,
+    /// Legacy SaaS relay history to adopt into the durable session once.
+    pub(crate) imported_history: Vec<tinyagents_session::transcript::TranscriptMessage>,
 }
 
 /// Run `turn` as `host`: its definition and host tools, inside its context,
@@ -50,6 +52,7 @@ pub(crate) async fn run_host_agent_turn(
         approval,
         cancellation,
         turn_deadline,
+        imported_history,
     } = turn;
     let mut config = host.config.clone();
     let profile_ceiling = host
@@ -90,6 +93,7 @@ pub(crate) async fn run_host_agent_turn(
             progress,
             cancellation,
             turn_deadline,
+            &imported_history,
         )
         .await?;
     Ok(AgentTurnResponse::with_resolved_route(

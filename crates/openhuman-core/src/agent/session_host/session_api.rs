@@ -9,12 +9,30 @@
 
 use anyhow::Result;
 use tinyagents_runtime::{ResumeMode, TurnOptions};
+use tinyagents_session::transcript::TranscriptMessage;
 
 use crate::agent::tinyagents::host::OpenHumanRunContext;
 
 use super::OpenHumanSessionHost;
 
 impl OpenHumanSessionHost {
+    /// Install imported conversation rows once, before the first turn binds
+    /// this durable session. Empty imports do not reserve a session, and a
+    /// transcript already written by a prior turn always wins unchanged.
+    pub(crate) fn adopt_imported_history(&self, messages: &[TranscriptMessage]) -> Result<bool> {
+        if messages.is_empty() {
+            return Ok(false);
+        }
+        let Some(session) = self.session.as_ref() else {
+            return Ok(false);
+        };
+        self.session_locator().adopt_messages_if_absent(
+            session,
+            self.runtime_transcript_meta(),
+            messages,
+        )
+    }
+
     /// Load this session's durable history now, before any turn runs.
     ///
     /// A turn resumes on its own, so this exists for hosts that want the
