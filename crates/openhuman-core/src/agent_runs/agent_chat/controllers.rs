@@ -109,15 +109,15 @@ fn handle_agent_chat(ctx: crate::core::runtime::DispatchCtx, params: Map<String,
 
 fn handle_agent_chat_simple(ctx: crate::core::runtime::DispatchCtx, params: Map<String, Value>) -> ControllerFuture {
     Box::pin(async move {
-        let params = deserialize_params::<AgentChatParams>(params)?;
+        let params = deserialize_params::<InferenceAgentChatParams>(params)?;
         let config = ctx.load_config().await?;
         crate::inference::host_runtime::ops::agent_chat_simple(
             &ctx,
             &config,
-            &params.message,
-            params.model_override,
-            params.temperature,
-            params.thread_id,
+            &params.common.message,
+            params.common.model_override,
+            params.common.temperature,
+            params.common.thread_id,
         )
         .await?
         .into_cli_compatible_json()
