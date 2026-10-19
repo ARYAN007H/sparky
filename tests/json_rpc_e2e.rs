@@ -8235,6 +8235,91 @@ async fn channels_status_reflects_managed_dm_credential_e2e() {
     rpc_join.abort();
 }
 
+/// Credential channel descriptions are consumed by the setup form to build
+/// its credential fields. Keep the email and Yuanbao field contracts reachable
+/// through the same JSON-RPC surface used by the app.
+#[tokio::test]
+async fn credential_channel_describe_fields_are_wired_over_json_rpc_e2e() {
+    let _env_lock = json_rpc_e2e_env_lock_async().await;
+    let tmp = tempdir().expect("tempdir");
+    let home = tmp.path();
+    let openhuman_home = home.join(".openhuman");
+
+    let _home_guard = EnvVarGuard::set_to_path("HOME", home);
+    let _workspace_guard = EnvVarGuard::unset("OPENHUMAN_WORKSPACE");
+    let _backend_url_guard = EnvVarGuard::unset("BACKEND_URL");
+    let _vite_backend_guard = EnvVarGuard::unset("VITE_BACKEND_URL");
+
+    let (mock_addr, mock_join) = serve_on_ephemeral(mock_upstream_router()).await;
+    let mock_origin = format!("http://{}", mock_addr);
+    write_min_config(&openhuman_home, &mock_origin);
+
+    let (rpc_addr, rpc_join) = serve_on_ephemeral(build_core_http_router(false)).await;
+    let rpc_base = format!("http://{}", rpc_addr);
+
+    for (id, channel, required_fields, optional_default) in [
+        (7004, "email", vec!["imap_host", "username", "password", "smtp_host"], Some(("smtp_tls", true))),
+        (7005, "yuanbao", vec!["app_key", "app_secret"], None),
+    ] {
+        let response = post_json_rpc(
+            &rpc_base,
+            id,
+            "openhuman.channels_describe",
+            json!({ "channel": channel }),
+        )
+        .await;
+        let outer = assert_no_jsonrpc_error(&response, "channels_describe credential channel");
+        let description = peel_logs_envelope(outer.get("result").unwrap_or(outer));
+        assert_eq!(
+            description.get("id").and_then(Value::as_str),
+            Some(channel),
+            "unexpected channel description: {description}"
+        );
+        let api_key = description
+            .get("auth_modes")
+            .and_then(Value::as_array)
+            .and_then(|modes| modes.iter().find(|mode| mode.get("mode").and_then(Value::as_str) == Some("api_key")))
+            .unwrap_or_else(|| panic!("{channel} has no api_key auth mode: {description}"));
+        let fields = api_key
+            .get("fields")
+            .and_then(Value::as_array)
+            .unwrap_or_else(|| panic!("{channel} api_key mode has no fields: {api_key}"));
+        let keys = fields
+            .iter()
+            .filter_map(|field| field.get("key").and_then(Value::as_str))
+            .collect::<Vec<_>>();
+        for required in required_fields {
+            assert!(
+                keys.contains(&required),
+                "{channel} description omits setup field {required}: {description}"
+            );
+            assert_eq!(
+                fields
+                    .iter()
+                    .find(|field| field.get("key").and_then(Value::as_str) == Some(required))
+                    .and_then(|field| field.get("required"))
+                    .and_then(Value::as_bool),
+                Some(true),
+                "{channel} field {required} must be required: {description}"
+            );
+        }
+        if let Some((key, expected)) = optional_default {
+            assert_eq!(
+                fields
+                    .iter()
+                    .find(|field| field.get("key").and_then(Value::as_str) == Some(key))
+                    .and_then(|field| field.get("default_bool"))
+                    .and_then(Value::as_bool),
+                Some(expected),
+                "{channel} should describe the default for {key}: {description}"
+            );
+        }
+    }
+
+    mock_join.abort();
+    rpc_join.abort();
+}
+
 /// Regression guard for issue #1289: `openhuman.voice_cloud_transcribe`
 /// must stay registered in the controller registry and reachable via
 /// JSON-RPC dispatch.
