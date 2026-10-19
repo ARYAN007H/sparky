@@ -625,3 +625,7 @@ mod prelude_integrations;
 #[cfg(test)]
 #[path = "runtime_session_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "runtime_session_prompt_tests.rs"]
+mod prompt_tests;
