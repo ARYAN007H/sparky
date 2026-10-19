@@ -9,6 +9,27 @@ fn test_config_in(tmp: &TempDir) -> Config {
 }
 
 #[test]
+fn model_targets_come_from_the_callers_configured_cloud_providers() {
+    let config = Config {
+        cloud_providers: vec![crate::config::schema::CloudProviderCreds {
+            id: "p_custom_test".into(),
+            slug: "custom-test".into(),
+            label: "Custom Test Provider".into(),
+            endpoint: "https://inference.example.test/v1".into(),
+            auth_style: crate::config::schema::AuthStyle::None,
+            default_model: None,
+        }],
+        ..Config::default()
+    };
+
+    let report = run_models(&config, false).expect("doctor model listing should succeed");
+
+    assert_eq!(report.entries.len(), 1);
+    assert_eq!(report.entries[0].provider, "custom-test");
+    assert_eq!(report.entries[0].outcome, ModelProbeOutcome::Skipped);
+}
+
+#[test]
 fn config_validation_warns_no_channels() {
     let config = Config::default();
     let mut items = vec![];
