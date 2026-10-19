@@ -3,16 +3,28 @@ use super::*;
 use chrono::Utc;
 use tinymemory_api::{LearningKind, MemoryEngine, MemoryMeta, StoreItem};
 
-use crate::memory::lifecycle::hooks::{self, PreTurnInput};
-use crate::memory::scope::MemoryIdentity;
+use crate::memory::lifecycle::hooks::pre_turn_work;
 use crate::memory::test_fixtures::{bind_reference, config_in};
+
+#[test]
+fn policy_set_accepts_fields_reported_by_policy_get() {
+    let _params: PolicySetParams = serde_json::from_value(serde_json::json!({
+        "date_hint": true,
+        "compaction_timeout_ms": 12_000,
+        "build_delay_secs": 900,
+    }))
+    .unwrap();
+}
 
 #[test]
 fn the_policy_round_trips_and_refuses_out_of_range_values() {
     let mut config = Config::default();
     let view = policy_view(&config);
     assert!(view.log_conversations);
-    assert_eq!(view.agent_id, scope::DEFAULT_AGENT_ID);
+    assert_eq!(
+        view.agent_id,
+        tinymemory_tools::layout::identity::DEFAULT_AGENT_ID
+    );
     assert_eq!(view.root, "root");
     assert!(!view.host_bound);
 
@@ -35,6 +47,21 @@ fn the_policy_round_trips_and_refuses_out_of_range_values() {
     assert_eq!(view.recall.team_limit, 0);
     assert_eq!(view.recall.build_beliefs_every, 0);
 
+    apply_policy_set(
+        &mut config,
+        &PolicySetParams {
+            date_hint: Some(true),
+            compaction_timeout_ms: Some(12_000),
+            build_delay_secs: Some(900),
+            ..PolicySetParams::default()
+        },
+    )
+    .unwrap();
+    let view = policy_view(&config);
+    assert!(view.recall.date_hint);
+    assert_eq!(view.recall.compaction_timeout_ms, 12_000);
+    assert_eq!(view.recall.build_delay_secs, 900);
+
     for bad in [
         PolicySetParams {
             budget_tokens: Some(10),
@@ -48,11 +75,35 @@ fn the_policy_round_trips_and_refuses_out_of_range_values() {
             pre_turn_timeout_ms: Some(0),
             ..PolicySetParams::default()
         },
+        PolicySetParams {
+            build_delay_secs: Some(u64::MAX),
+            ..PolicySetParams::default()
+        },
+        PolicySetParams {
+            build_delay_secs: Some(i64::MAX as u64),
+            ..PolicySetParams::default()
+        },
+        PolicySetParams {
+            build_delay_secs: Some(10_000_000_000_000),
+            ..PolicySetParams::default()
+        },
     ] {
-        assert!(matches!(
-            apply_policy_set(&mut config, &bad),
-            Err(MemoryError::InvalidRequest(_))
-        ));
+        let before = serde_json::to_value(&config).unwrap();
+        let log_conversations = !config.memory.conversations.enabled;
+        let recall_enabled = !config.memory.recall.enabled;
+        let result = apply_policy_set(
+            &mut config,
+            &PolicySetParams {
+                log_conversations: Some(log_conversations),
+                recall_enabled: Some(recall_enabled),
+                ..bad
+            },
+        );
+        assert!(matches!(result, Err(Error::InvalidRequest(_))));
+        assert!(
+            serde_json::to_value(&config).unwrap() == before,
+            "invalid policy update must be atomic"
+        );
     }
     config.memory.agent_id = Some("employee-7".into());
     assert!(policy_view(&config).host_bound);
@@ -72,26 +123,26 @@ async fn the_preview_reads_without_logging_and_agents_are_listed() {
         ))
         .await
         .unwrap();
-    let writer = scope::MemoryIdentity::agent("writer").resolve(&config);
-    hooks::pre_turn(
+    let writer = tinymemory_tools::layout::identity::Identity::agent("writer")
+        .resolve(&crate::memory::scope::identity_pins(&config));
+    pre_turn_work(
         &crate::core::runtime::DispatchCtx::ambient(),
         &config,
         &writer,
-        PreTurnInput {
-            thread_id: "t".into(),
-            turn_index: 0,
-            user_text: "draft the invoice email".into(),
-            in_prompt_from: 0,
-            at: Utc::now(),
-            resumed_after_compaction: false,
-            observed_actor: None,
-        },
+        "t".into(),
+        0,
+        "draft the invoice email".into(),
+        0,
+        Utc::now(),
+        false,
+        None,
+        None,
     )
     .await;
 
     let turn = pack_preview(
         &config,
-        &MemoryIdentity::root(),
+        &tinymemory_tools::layout::identity::Identity::root(),
         PackPreviewParams {
             query: Some("when do invoices go out?".into()),
             agent_id: Some("writer".into()),
@@ -106,14 +157,19 @@ async fn the_preview_reads_without_logging_and_agents_are_listed() {
 
     let session = pack_preview(
         &config,
-        &MemoryIdentity::root(),
+        &tinymemory_tools::layout::identity::Identity::root(),
         PackPreviewParams::default(),
     )
     .await
     .unwrap();
     assert_eq!(session.mode, "session");
 
-    let agents = agents_list(&config, &MemoryIdentity::root()).await.unwrap();
+    let agents = agents_list(
+        &config,
+        &tinymemory_tools::layout::identity::Identity::root(),
+    )
+    .await
+    .unwrap();
     assert_eq!(
         agents.agents,
         [AgentCount {

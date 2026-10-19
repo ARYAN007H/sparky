@@ -26,6 +26,11 @@ fn classified_halt_returns_partial_work_without_provider_usage() {
         wrap_up_injected: false,
         truncated: false,
         breaker_halt: Some("Stopping after 1 attempt(s): failure class `permission` still blocks operation `search` on `catalog`. Resolve this blocker before retrying.".into()),
+        failure_cause: Some(tinyagents_harness::no_progress::ClassifiedStopCause {
+            class: "permission".into(),
+            operation: "search".into(),
+            summary: "permission blocks search".into(),
+        }),
         tool_outcomes: vec![
             ToolCallOutcome { call_id: "a".into(), name: "list".into(), arguments: serde_json::json!({}), success: true, content: "three items".into(), duration_ms: 1 },
             ToolCallOutcome { call_id: "b".into(), name: "search".into(), arguments: serde_json::json!({}), success: false, content: "403 Forbidden".into(), duration_ms: 1 },
@@ -217,6 +222,7 @@ fn blank_outcome(truncated: bool) -> TinyagentsTurnOutcome {
         hit_cap: false,
         wrap_up_injected: false,
         breaker_halt: None,
+        failure_cause: None,
         truncated,
         compaction: None,
         tool_outcomes: Vec::new(),

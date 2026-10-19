@@ -24,9 +24,9 @@ use crate::agent::tinyagents::{
 };
 use crate::agent::turn_origin::AgentTurnOrigin;
 use tinyagents_definition::SandboxMode;
-use tinyagents_harness::middleware::StopHook;
 use tinyagents_harness::store::InMemoryStore as ToolResultArtifactIndexStore;
 use tinyagents_harness::turn_outcome::{ToolCallOutcome, ToolOutcomeSink};
+use tinyagents_hooks::stop::StopHook;
 use tinyinference_llm::model::ResolvedModelRoute;
 
 /// Allocate a durable-unique root [`RunConfig`](tinyagents_harness::context::RunConfig).
@@ -308,7 +308,7 @@ pub struct OpenHumanRunContext {
     /// Context-preparation sources already consumed in this turn.
     pub prepared_context_sources: Arc<Vec<AgentContextPreparedSource>>,
     /// Who the run acts as on memory; `None` is the root identity.
-    pub memory_identity: Option<crate::memory::scope::MemoryIdentity>,
+    pub memory_identity: Option<tinymemory_tools::layout::identity::Identity>,
     /// The context the turn runs under, read by tools, middleware and the
     /// provider factory instead of the ambient scope. Children inherit it.
     pub core: Option<std::sync::Weak<crate::core::runtime::CoreContext>>,

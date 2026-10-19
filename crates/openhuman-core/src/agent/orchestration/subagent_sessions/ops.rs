@@ -94,6 +94,32 @@ pub fn upsert_running(
     let _guard = store_write_lock()
         .lock()
         .map_err(|_| "subagent session store lock poisoned".to_string())?;
+    if let Some(reuse) = reuse {
+        let selector = upsert.selector.clone();
+        let worker_thread_id = upsert.worker_thread_id.clone();
+        let display_name = upsert.display_name.clone();
+        let task_id = upsert.task_id.clone();
+        if let Some(updated) =
+            store.update_session(&reuse.subagent_session_id, move |session, now| {
+                session.parent_session = selector.parent_session.clone();
+                session.parent_thread_id = selector.parent_thread_id.clone();
+                session.worker_thread_id = worker_thread_id
+                    .clone()
+                    .or_else(|| session.worker_thread_id.clone());
+                session.display_name = display_name
+                    .clone()
+                    .or_else(|| session.display_name.clone());
+                session.current_task_id = Some(task_id.clone());
+                session.status = DurableSubagentStatus::Running;
+                session.reusable = true;
+                session.latest_error = None;
+                session.updated_at = now.clone();
+                session.last_used_at = now;
+            })?
+        {
+            return Ok(updated);
+        }
+    }
     let mut sessions = store.load()?;
     let now = chrono::Utc::now().to_rfc3339();
     let session_id = reuse
@@ -154,10 +180,12 @@ pub fn mark_finished(
     run_status: &SubagentRunStatus,
     history: Vec<TranscriptMessage>,
 ) -> Result<(), String> {
-    let updated = update_session(store, subagent_session_id, |session, now| {
-        session.current_task_id = Some(task_id.to_string());
-        session.status = DurableSubagentStatus::from_run_status(run_status);
-        session.latest_history = Some(history);
+    let task_id = task_id.to_owned();
+    let status = DurableSubagentStatus::from_run_status(run_status);
+    let updated = update_session(store, subagent_session_id, move |session, now| {
+        session.current_task_id = Some(task_id.clone());
+        session.status = status;
+        session.latest_history = Some(history.clone());
         session.latest_error = None;
         session.updated_at = now.clone();
         session.last_used_at = now;
@@ -177,10 +205,11 @@ pub fn mark_failed(
     task_id: &str,
     error: String,
 ) -> Result<(), String> {
-    let updated = update_session(store, subagent_session_id, |session, now| {
-        session.current_task_id = Some(task_id.to_string());
+    let task_id = task_id.to_owned();
+    let updated = update_session(store, subagent_session_id, move |session, now| {
+        session.current_task_id = Some(task_id.clone());
         session.status = DurableSubagentStatus::Failed;
-        session.latest_error = Some(error);
+        session.latest_error = Some(error.clone());
         session.updated_at = now.clone();
         session.last_used_at = now;
     })?;
@@ -238,22 +267,14 @@ fn update_session<F>(
     update: F,
 ) -> Result<bool, String>
 where
-    F: FnOnce(&mut DurableSubagentSession, String),
+    F: FnMut(&mut DurableSubagentSession, String) + Send + 'static,
 {
     let _guard = store_write_lock()
         .lock()
         .map_err(|_| "subagent session store lock poisoned".to_string())?;
-    let mut sessions = store.load()?;
-    let now = chrono::Utc::now().to_rfc3339();
-    if let Some(session) = sessions
-        .iter_mut()
-        .find(|session| session.subagent_session_id == subagent_session_id)
-    {
-        update(session, now);
-        store.save(&sessions)?;
-        return Ok(true);
-    }
-    Ok(false)
+    store
+        .update_session(subagent_session_id, update)
+        .map(|updated| updated.is_some())
 }
 
 fn store_write_lock() -> &'static Mutex<()> {

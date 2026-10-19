@@ -220,7 +220,6 @@ pub(crate) async fn run_subagent_direct(
                 });
             }
         }
-
         let parent = options
             .run_context
             .parent
@@ -241,7 +240,6 @@ pub(crate) async fn run_subagent_direct(
         // Acts on memory as a child of its parent: same team, own definition.
         let acting = options.run_context.memory_identity.take().unwrap_or_default();
         options.run_context.memory_identity = Some(acting.child(&definition.id));
-
         // Runtime spawn-hierarchy (tier) gate — defense-in-depth alongside the
         // depth gate above. The loader validates *declared* `subagents` pairs
         // statically at boot (`validate_tier_hierarchy`), but dynamic, custom,
@@ -254,7 +252,6 @@ pub(crate) async fn run_subagent_direct(
             .as_deref()
             .and_then(|reg| reg.get(&parent.agent_definition_id));
         tier_gate_decision(parent_def, definition, &parent.agent_definition_id, &task_id)?;
-
         // Configured `subagentStart` hooks — the last gate before a spawn costs
         // anything. Placed after the tier gate so a spawn the graph already
         // forbids never reaches a user script, and before config load so a
@@ -361,7 +358,6 @@ pub(crate) async fn run_subagent_direct(
         if let Some(dispatch) = options.run_context.dispatch.as_deref() {
             dispatch.record_subagent_elapsed(started.elapsed());
         }
-
         let mut outcome = run_result?;
 
         // Commit the completed subtree before the soft, awaited artifact
@@ -898,7 +894,7 @@ async fn run_typed_mode(
         );
     }
 
-    let (output, iterations, agg_usage, early_exit_tool, hit_cap, breaker_halt) =
+    let (output, iterations, agg_usage, early_exit_tool, hit_cap, breaker_halt, failure_cause) =
         super::graph::run_subagent_via_graph(
             subagent_source.clone(),
             &model,
@@ -966,7 +962,10 @@ async fn run_typed_mode(
             reason = %reason,
             "[subagent_host] child halted by circuit breaker; reporting Incomplete (#4466)"
         );
-        crate::agent::subagent_host::types::SubagentRunStatus::Incomplete { reason }
+        crate::agent::subagent_host::types::SubagentRunStatus::Incomplete {
+            reason,
+            failure_cause,
+        }
     } else if hit_cap {
         // The tinyagents run stopped at the model-call cap with work still
         // pending (graph summarized a resumable checkpoint into `output`).
@@ -975,6 +974,7 @@ async fn run_typed_mode(
         // or re-spinning the identical delegation (#4096).
         crate::agent::subagent_host::types::SubagentRunStatus::Incomplete {
             reason: tinyagents_harness::turn_stop::SUBAGENT_ITERATION_CAP_REASON.into(),
+            failure_cause: None,
         }
     } else {
         // A clean final response. (An `ask_user_clarification` early-exit is

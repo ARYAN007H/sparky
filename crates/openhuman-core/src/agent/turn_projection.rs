@@ -1,8 +1,8 @@
 //! Host projection of harness turn-stop facts.
 //!
-//! The vocabulary (`TurnStop`, `TurnStopKind`, the breaker-note parsing) is
-//! owned by `tinyagents_harness::turn_stop`. OpenHuman keeps only the product
-//! mapping of a stop note without a failure class to its stop-reason key
+//! The typed stop vocabulary and classified causes are owned by
+//! `tinyagents_harness::turn_stop`. OpenHuman keeps only the product mapping
+//! of a stop note without typed classification to its stop-reason key
 //! ([`StopReasonKind`](crate::agent::session_host::stop_summary::StopReasonKind)).
 
 use crate::agent::tinyagents::host::LastTurnUsage;
@@ -20,6 +20,13 @@ pub fn breaker_stop(note: &str) -> TurnStop {
     TurnStop::breaker(note, stop_fallback_class)
 }
 
+/// Project a classifier-owned stop cause without recovering facts from text.
+pub fn breaker_stop_with_cause(
+    cause: tinyagents_harness::no_progress::ClassifiedStopCause,
+) -> TurnStop {
+    TurnStop::from_classified_cause(cause)
+}
+
 /// [`TurnStop::classify`] with the OpenHuman stop-reason fallback.
 pub fn classify_stop(
     breaker_halt: Option<&str>,
@@ -27,6 +34,23 @@ pub fn classify_stop(
     hit_cap: bool,
 ) -> Option<TurnStop> {
     TurnStop::classify(breaker_halt, wind_down, hit_cap, stop_fallback_class)
+}
+
+/// Typed-aware variant for stops whose harness run carries a classified cause.
+/// The human-readable halt note remains presentation data and is never parsed.
+pub fn classify_stop_with_cause(
+    breaker_halt: Option<&str>,
+    failure_cause: Option<tinyagents_harness::no_progress::ClassifiedStopCause>,
+    wind_down: bool,
+    hit_cap: bool,
+) -> Option<TurnStop> {
+    TurnStop::classify_with_cause(
+        breaker_halt,
+        failure_cause,
+        wind_down,
+        hit_cap,
+        stop_fallback_class,
+    )
 }
 
 /// [`TurnStop::from_incomplete_reason`] with the OpenHuman stop-reason fallback.

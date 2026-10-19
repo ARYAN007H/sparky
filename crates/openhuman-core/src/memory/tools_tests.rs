@@ -3,7 +3,6 @@ use super::*;
 fn ambient() -> DispatchCtx {
     DispatchCtx::ambient()
 }
-use crate::memory::scope::MemoryIdentity;
 use crate::memory::test_fixtures::{bind_reference, config_in, stored};
 use std::path::{Path, PathBuf};
 use tinymemory_api::{ItemKind, MetaFilter, Namespace};
@@ -28,7 +27,10 @@ fn facts() -> CallFacts {
         thread_id: Some("thread-tool-1".into()),
         agent_id: Some("orchestrator".into()),
         tool_call_id: Some("call-9".into()),
-        ..CallFacts::of(&Config::default(), &MemoryIdentity::agent("orchestrator"))
+        ..CallFacts::of(
+            &Config::default(),
+            &tinymemory_tools::layout::identity::Identity::agent("orchestrator"),
+        )
     }
 }
 
@@ -36,7 +38,10 @@ fn facts() -> CallFacts {
 fn facts_of(agent_id: &str) -> CallFacts {
     CallFacts {
         thread_id: Some(format!("thread-{agent_id}")),
-        ..CallFacts::of(&Config::default(), &MemoryIdentity::agent(agent_id))
+        ..CallFacts::of(
+            &Config::default(),
+            &tinymemory_tools::layout::identity::Identity::agent(agent_id),
+        )
     }
 }
 
@@ -188,10 +193,10 @@ async fn recall_fetch_and_forget_round_trip_and_recall_records_citations() {
     )
     .await;
     assert!(!recalled.is_error, "{}", text(&recalled));
-    let cites = take_turn_citations(&ambient(), "thread-citations");
+    let cites = crate::web_chat::citations::take_turn_citations(&ambient(), "thread-citations");
     assert!(cites.iter().any(|c| c.id == id), "{cites:?}");
     assert!(
-        take_turn_citations(&ambient(), "thread-citations").is_empty(),
+        crate::web_chat::citations::take_turn_citations(&ambient(), "thread-citations").is_empty(),
         "draining empties the thread's citations"
     );
 
@@ -332,7 +337,10 @@ async fn learnings_are_shared_under_a_root_and_a_team_root_is_kept_apart() {
     let engine = bind_reference(&config);
     let member = || CallFacts {
         thread_id: Some("thread-team".into()),
-        ..CallFacts::of(&config, &MemoryIdentity::team_member("acme", "writer"))
+        ..CallFacts::of(
+            &config,
+            &tinymemory_tools::layout::identity::Identity::team_member("acme", "writer"),
+        )
     };
     let learn = |facts: CallFacts, text: &'static str| {
         let config = config.clone();

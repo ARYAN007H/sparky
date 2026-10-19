@@ -5,11 +5,51 @@ use super::*;
 /// The host's in-flight subagent runs of one agent context.
 pub(super) type HostInFlightMap = AsyncMutex<HashMap<HostLifecycleKey, Arc<HostInFlight>>>;
 
+pub(super) const CLASSIFIED_STOP_CAUSE_EXTENSION: &str = "openhuman.classified_stop_cause";
+
+pub(super) fn encode_classified_stop_cause(
+    cause: &tinyagents_harness::no_progress::ClassifiedStopCause,
+) -> serde_json::Value {
+    let stop = crate::agent::turn_projection::breaker_stop_with_cause(cause.clone());
+    serde_json::json!({
+        "class": stop.failure_class.as_deref(),
+        "operation": stop.operation,
+    })
+}
+
+pub(super) fn decode_classified_stop_cause(
+    value: &serde_json::Value,
+    summary: &str,
+) -> Option<tinyagents_harness::no_progress::ClassifiedStopCause> {
+    Some(tinyagents_harness::no_progress::ClassifiedStopCause {
+        class: value.get("class")?.as_str()?.to_string(),
+        operation: value.get("operation")?.as_str()?.to_string(),
+        summary: summary.to_string(),
+    })
+}
+
+pub(super) fn incomplete_run_status(
+    reason: String,
+    extensions: &std::collections::BTreeMap<String, serde_json::Value>,
+) -> SubagentRunStatus {
+    let failure_cause = extensions
+        .get(CLASSIFIED_STOP_CAUSE_EXTENSION)
+        .and_then(|value| decode_classified_stop_cause(value, &reason));
+    SubagentRunStatus::Incomplete {
+        reason,
+        failure_cause,
+    }
+}
+
 pub(super) fn host_outcome_to_neutral(
     outcome: SubagentRunOutcome,
     definition: &crate::agent::harness::host_definition::AgentDefinition,
     options: &SubagentRunOptions,
 ) -> SubagentOutcome {
+    let failure_cause = match &outcome.status {
+        SubagentRunStatus::Incomplete { failure_cause, .. } => failure_cause.clone(),
+        _ => None,
+    };
     let status = match outcome.status {
         SubagentRunStatus::Completed => SubagentOutcomeKind::Completed,
         SubagentRunStatus::AwaitingUser { question, .. } => {
@@ -40,12 +80,12 @@ pub(super) fn host_outcome_to_neutral(
                 },
             })
         }
-        SubagentRunStatus::Incomplete { reason } => {
+        SubagentRunStatus::Incomplete { reason, .. } => {
             SubagentOutcomeKind::Incomplete(SubagentIncomplete::new(reason))
         }
         SubagentRunStatus::Cancelled => SubagentOutcomeKind::Cancelled,
     };
-    SubagentOutcome {
+    let mut neutral = SubagentOutcome {
         task_id: outcome.task_id,
         output: outcome.output,
         history: outcome
@@ -82,5 +122,18 @@ pub(super) fn host_outcome_to_neutral(
             })
             .collect(),
         ..SubagentOutcome::cancelled(String::new())
+    };
+    if let Some(cause) = failure_cause {
+        // Keep only the SDK-normalized class and operation; the human-readable
+        // summary may contain private tool or URL details.
+        neutral.extensions.insert(
+            CLASSIFIED_STOP_CAUSE_EXTENSION.into(),
+            encode_classified_stop_cause(&cause),
+        );
     }
+    neutral
 }
+
+#[cfg(test)]
+#[path = "lifecycle_outcome_tests.rs"]
+mod tests;

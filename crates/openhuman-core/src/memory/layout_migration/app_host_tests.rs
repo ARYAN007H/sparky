@@ -47,7 +47,8 @@ async fn binds_the_legacy_tree_and_the_users_own() {
     assert!(scan(&AppHost::new(config.clone())).await.unwrap().needed);
 
     let placement = AppHost::new(config.clone()).placement().unwrap();
-    assert!(placement.chat_node.to_string().ends_with("ws:main"));
+    assert_eq!(placement.layout.root().to_string(), "root");
+    assert_eq!(placement.chat_node.to_string(), "ws:main");
     assert!(matches!(placement.flows, FlowPlacement::WithRoot));
 }
 
@@ -55,11 +56,11 @@ async fn binds_the_legacy_tree_and_the_users_own() {
 fn places_into_the_v3_layout_before_the_switch() {
     let tmp = tempfile::tempdir().unwrap();
     let config = signed_in(&tmp);
-    assert!(!crate::memory::scope::layout_is_v3(&config));
+    assert!(config.memory.layout != crate::config::MemoryLayoutMode::V3);
     let mut v3 = config.clone();
     v3.memory.layout = crate::config::MemoryLayoutMode::V3;
-    let legacy = crate::memory::scope::MemoryIdentity::root()
-        .resolve(&config)
+    let legacy = tinymemory_tools::layout::identity::Identity::root()
+        .resolve(&crate::memory::scope::identity_pins(&config))
         .layout;
     let placement = AppHost::new(config.clone()).placement().unwrap();
     assert_ne!(placement.layout, legacy, "chats are pooled at ws:main");
@@ -122,7 +123,7 @@ async fn the_switch_writes_the_migrated_persons_own_config_fresh() {
     let saved = Config::load_from_config_path(&snapshot.config_path, &snapshot.workspace_dir)
         .await
         .unwrap();
-    assert!(crate::memory::scope::layout_is_v3(&saved));
+    assert_eq!(saved.memory.layout, crate::config::MemoryLayoutMode::V3);
     assert_eq!(saved.memory.agent_id.as_deref(), Some("changed-later"));
 }
 
@@ -176,16 +177,24 @@ async fn a_shared_tree_reaches_the_module_as_a_claim() {
 #[test]
 fn errors_keep_their_wire_codes_across_the_module_boundary() {
     for error in [
-        MemoryError::Off("x".into()),
-        MemoryError::Unsupported("x".into()),
-        MemoryError::invalid("x"),
-        MemoryError::Unauthorized("x".into()),
-        MemoryError::Unavailable("x".into()),
-        MemoryError::InsufficientCredits("[USER_INSUFFICIENT_CREDITS] x".into()),
-        MemoryError::Engine("x".into()),
+        Error::Off("x".into()),
+        Error::Unsupported("x".into()),
+        Error::InvalidRequest("x".into()),
+        Error::NotFound("x".into()),
+        Error::Config("x".into()),
+        Error::Conflict("x".into()),
+        Error::Unauthorized("x".into()),
+        Error::Unavailable("x".into()),
+        Error::InsufficientCredits("hosted refusal without a code marker".into()),
+        Error::Engine("x".into()),
     ] {
         let back = from_module(to_module(error.clone()));
         assert_eq!(back.code(), error.code(), "{error:?}");
         assert_eq!(back.is_account_wide(), error.is_account_wide(), "{error:?}");
     }
+
+    let credit_error = Error::InsufficientCredits("hosted refusal without a code marker".into());
+    let back = from_module(to_module(credit_error));
+    assert!(matches!(back, Error::InsufficientCredits(_)));
+    assert!(back.is_account_wide());
 }

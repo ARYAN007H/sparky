@@ -13,7 +13,7 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-use std::cell::RefCell;
+use std::sync::Mutex;
 
 use tinyagents_graph::parallel::{parse_relative_claim_paths, ClaimConflict, ClaimPathError};
 use tinyagents_orchestration::parallel::WorkerDispatchMode;
@@ -55,6 +55,24 @@ pub(crate) enum ParallelTaskRejectionKind {
     UnknownAgent,
     OutsideAllowlist,
     RequiresIsolation,
+}
+
+#[derive(Default)]
+struct RejectionKinds(Mutex<HashMap<usize, ParallelTaskRejectionKind>>);
+
+impl RejectionKinds {
+    fn insert(&self, index: usize, kind: ParallelTaskRejectionKind) {
+        self.0
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .insert(index, kind);
+    }
+
+    fn into_inner(self) -> HashMap<usize, ParallelTaskRejectionKind> {
+        self.0
+            .into_inner()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+    }
 }
 
 pub(crate) struct ParallelTaskRejection {
@@ -234,7 +252,7 @@ struct AdmitPayload {
 struct SpawnParallelPolicy<'a> {
     parent: &'a ParentExecutionContext,
     /// Rejection kind per input index (the module carries only the sentence).
-    kinds: RefCell<HashMap<usize, ParallelTaskRejectionKind>>,
+    kinds: RejectionKinds,
 }
 
 impl SpawnParallelPolicy<'_> {
@@ -244,7 +262,7 @@ impl SpawnParallelPolicy<'_> {
         kind: ParallelTaskRejectionKind,
         message: String,
     ) -> AdmissionVerdict {
-        self.kinds.borrow_mut().insert(index, kind);
+        self.kinds.insert(index, kind);
         AdmissionVerdict::Reject(message)
     }
 }
@@ -319,7 +337,7 @@ pub(crate) fn prepare_spawn_parallel_tasks_from_defs(
     );
     let policy = SpawnParallelPolicy {
         parent,
-        kinds: RefCell::new(HashMap::new()),
+        kinds: RejectionKinds::default(),
     };
     let staged = plan.stage(&policy);
     let kinds = policy.kinds.into_inner();
@@ -392,3 +410,7 @@ fn shared_workspace_conflict_message(agent_id: &str, conflict: &ClaimConflict) -
         ),
     }
 }
+
+#[cfg(test)]
+#[path = "staging_tests.rs"]
+mod tests;

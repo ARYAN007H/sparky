@@ -18,8 +18,7 @@
 //! team's). A `reach` in the model's filter is overwritten.
 
 use crate::tools::schema_cache::static_schema;
-use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use async_trait::async_trait;
 use serde_json::{json, Value};
@@ -33,82 +32,13 @@ use crate::core::bus::BUS;
 use crate::core::events::DomainEvent;
 use crate::core::runtime::DispatchCtx;
 
-use super::error::MemoryError;
 use super::ops;
 pub use super::tool_budget::is_budget_refusal;
-use super::types::{
-    FetchParams, ForgetParams, LearnParams, RecallParams, RecallView, TurnCitation,
-};
-
-/// Most citations kept per thread between two drains.
-const MAX_TURN_CITATIONS: usize = 20;
+use super::types::{FetchParams, ForgetParams, LearnParams, RecallParams, RecallView};
+use tinymemory_api::Error;
 
 /// How many matches one `fetch` returns; the model pages on with `cursor`.
 const FETCH_TOP: usize = 5;
-
-type TurnCitations = Mutex<HashMap<String, Vec<TurnCitation>>>;
-
-/// Citations `recall` produced during a thread's in-flight turn, drained by
-/// the chat surface once the turn returns ([`take_turn_citations`]).
-fn turn_citations(ctx: &DispatchCtx) -> Arc<TurnCitations> {
-    crate::core::runtime::slot_for::<TurnCitations>(ctx)
-}
-
-fn record_turn_citations(
-    ctx: &DispatchCtx,
-    thread_id: &str,
-    citations: &[tinymemory_api::Citation],
-) {
-    if citations.is_empty() {
-        return;
-    }
-    let citations_by_thread = turn_citations(ctx);
-    let mut all = citations_by_thread
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner);
-    let entry = all.entry(thread_id.to_string()).or_default();
-    for citation in citations {
-        if entry.len() >= MAX_TURN_CITATIONS {
-            break;
-        }
-        if !entry.iter().any(|existing| existing.id == citation.id.0) {
-            entry.push(TurnCitation::from(citation));
-        }
-    }
-}
-
-/// Records `citations` for `thread_id`'s in-flight turn: what the turn's
-/// memory pack cited (`lifecycle::hooks::pre_turn`), beside what `recall`
-/// cites.
-pub fn record_pack_citations(ctx: &DispatchCtx, thread_id: &str, citations: Vec<TurnCitation>) {
-    if citations.is_empty() {
-        return;
-    }
-    let citations_by_thread = turn_citations(ctx);
-    let mut all = citations_by_thread
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner);
-    let entry = all.entry(thread_id.to_string()).or_default();
-    for citation in citations {
-        if entry.len() >= MAX_TURN_CITATIONS {
-            break;
-        }
-        if !entry.iter().any(|existing| existing.id == citation.id) {
-            entry.push(citation);
-        }
-    }
-}
-
-/// Drains the citations `recall` and the turn's pack produced for
-/// `thread_id` since the last drain.
-#[must_use]
-pub fn take_turn_citations(ctx: &DispatchCtx, thread_id: &str) -> Vec<TurnCitation> {
-    turn_citations(ctx)
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner)
-        .remove(thread_id)
-        .unwrap_or_default()
-}
 
 /// The tool's name.
 pub const MEMORY_TOOL_NAME: &str = "memory";
@@ -168,9 +98,14 @@ impl CallFacts {
             crate::agent::tinyagents::host::run_context::memory_identity_for_tool(context)
                 .unwrap_or_else(|| {
                     crate::agent::tinyagents::host::run_context::parent_agent_id_for_tool(context)
-                        .map_or_else(super::scope::MemoryIdentity::root, |parent_agent_id| {
-                            super::scope::MemoryIdentity::agent(&parent_agent_id)
-                        })
+                        .map_or_else(
+                            tinymemory_tools::layout::identity::Identity::root,
+                            |parent_agent_id| {
+                                tinymemory_tools::layout::identity::Identity::agent(
+                                    &parent_agent_id,
+                                )
+                            },
+                        )
                 });
         Self {
             workspace: Some(workspace.display().to_string()),
@@ -189,8 +124,8 @@ impl CallFacts {
     /// The facts of a call made by `identity` under `config`, with no run
     /// context.
     #[must_use]
-    pub fn of(config: &Config, identity: &super::scope::MemoryIdentity) -> Self {
-        let resolved = identity.resolve(config);
+    pub fn of(config: &Config, identity: &tinymemory_tools::layout::identity::Identity) -> Self {
+        let resolved = identity.resolve(&crate::memory::scope::identity_pins(config));
         Self {
             agent_id: Some(resolved.agent_id.clone()),
             namespace: resolved.layout.learnings().clone(),
@@ -232,7 +167,7 @@ fn arg_str(args: &Value, key: &str) -> Option<String> {
         .map(str::to_string)
 }
 
-fn parse<T: serde::de::DeserializeOwned>(args: &Value) -> Result<T, String> {
+fn parse<T: serde::de::DeserializeOwned>(args: &Value) -> std::result::Result<T, String> {
     serde_json::from_value(args.clone()).map_err(|error| format!("invalid arguments: {error}"))
 }
 
@@ -354,7 +289,7 @@ pub async fn run_action(
 ) -> ToolResult {
     let action = arg_str(args, "action").unwrap_or_default();
     tracing::debug!(action = %action, "[memory:tool] dispatch");
-    let result: Result<Value, String> = match action.as_str() {
+    let result: std::result::Result<Value, String> = match action.as_str() {
         // The agent answers from the evidence itself, so recall writes no
         // answer of its own; and the thread the call runs in is left out of
         // recall and fetch, since its user turn is logged before the tool
@@ -369,7 +304,11 @@ pub async fn run_action(
                     .await
                     .map(|view| {
                         if let Some(thread_id) = facts.thread_id.as_deref() {
-                            record_turn_citations(ctx, thread_id, &view.citations);
+                            crate::web_chat::citations::record_recall_citations(
+                                ctx,
+                                thread_id,
+                                &view.citations,
+                            );
                         }
                         BUS.publish(DomainEvent::MemoryRecalled {
                             query: question,
@@ -483,7 +422,7 @@ fn confine(filter: &mut Option<tinymemory_api::MetaFilter>, facts: &CallFacts) {
     filter.get_or_insert_with(Default::default).reach = Some(facts.reach.clone());
 }
 
-fn render_error(error: MemoryError) -> String {
+fn render_error(error: Error) -> String {
     format!("{} ({})", error, error.code())
 }
 
@@ -569,9 +508,7 @@ impl Tool for MemoryTool {
                 .await;
             return Ok(
                 match queued.unwrap_or_else(|_| {
-                    Err(MemoryError::Unavailable(
-                        "memory write queue unavailable".into(),
-                    ))
+                    Err(Error::Unavailable("memory write queue unavailable".into()))
                 }) {
                     Ok(value) => {
                         super::tool_writes::schedule(&dispatch, self.config.clone(), &queued_root);

@@ -12,9 +12,9 @@ use tinymemory_tools::prefetch::{Limits, PrefetchRuntime, Prefetcher, WorkerPool
 
 use crate::config::Config;
 use crate::core::runtime::{slot_for, DispatchCtx};
-use crate::memory::scope::ResolvedIdentity;
+use tinymemory_tools::layout::identity::ResolvedIdentity;
 
-use super::hooks::{self, PreTurnInput, TurnPack};
+use super::hooks::{self, TurnPack};
 
 const MAX_PACK_BYTES: usize = 64 * 1024;
 static WORKERS: LazyLock<WorkerPool> = LazyLock::new(|| WorkerPool::new(8));
@@ -55,24 +55,53 @@ struct Key {
 }
 
 impl Key {
-    fn new(config: &Config, identity: &ResolvedIdentity, thread: &str, compaction: bool) -> Self {
-        let mut fingerprint = std::collections::hash_map::DefaultHasher::new();
-        // Keep only the digest, never serialized settings or credentials.
-        serde_json::to_value(config)
-            .ok()
-            .and_then(|value| serde_json::to_vec(&value).ok())
-            .unwrap_or_default()
-            .hash(&mut fingerprint);
-        config.config_path.hash(&mut fingerprint);
-        config.action_dir.hash(&mut fingerprint);
+    /// `config_fingerprint` is supplied by the host so the cache key can
+    /// later consume the host's config generation directly (e.g. TurnCache).
+    fn with_fingerprint(
+        config: &Config,
+        config_fingerprint: u64,
+        identity: &ResolvedIdentity,
+        thread: &str,
+        compaction: bool,
+    ) -> Self {
         Self {
             workspace: config.workspace_dir.clone(),
-            config: fingerprint.finish(),
+            config: config_fingerprint,
             identity: identity.clone(),
             thread: thread.to_owned(),
             compaction,
         }
     }
+
+    #[cfg(test)]
+    fn new(config: &Config, identity: &ResolvedIdentity, thread: &str, compaction: bool) -> Self {
+        Self::with_fingerprint(
+            config,
+            memory_config_fingerprint(config),
+            identity,
+            thread,
+            compaction,
+        )
+    }
+}
+
+/// Fingerprints only memory settings that affect recall and its sources. The
+/// full Config is large and unrelated settings must not invalidate turn packs.
+fn memory_config_fingerprint(config: &Config) -> u64 {
+    let mut fingerprint = std::collections::hash_map::DefaultHasher::new();
+    config.memory.hash(&mut fingerprint);
+    config.config_path.hash(&mut fingerprint);
+    config.action_dir.hash(&mut fingerprint);
+    config.api_url.hash(&mut fingerprint);
+    config.inference_url.hash(&mut fingerprint);
+    config.api_key.hash(&mut fingerprint);
+    config.components.memory.hash(&mut fingerprint);
+    config.default_model.hash(&mut fingerprint);
+    config.chat_provider.hash(&mut fingerprint);
+    config.memory_provider.hash(&mut fingerprint);
+    config.model_routes.hash(&mut fingerprint);
+    config.time_zone().hash(&mut fingerprint);
+    fingerprint.finish()
 }
 
 struct Cache(Prefetcher<Key, TurnPack>);
@@ -147,18 +176,30 @@ pub(crate) fn pre_turn(
     ctx: &DispatchCtx,
     config: Arc<Config>,
     identity: ResolvedIdentity,
-    input: PreTurnInput,
+    thread_id: String,
+    turn_index: u32,
+    user_text: String,
+    in_prompt_from: u32,
+    at: chrono::DateTime<chrono::Utc>,
+    resumed_after_compaction: bool,
+    observed_actor: Option<tinymemory_api::ObservedActor>,
     channel: Option<String>,
 ) -> Option<TurnPack> {
     if !config.memory.conversations.enabled && !identity.recall {
         return None;
     }
     let cache = cache(ctx);
-    let key = Key::new(&config, &identity, &input.thread_id, false);
+    let key = Key::with_fingerprint(
+        &config,
+        memory_config_fingerprint(&config),
+        &identity,
+        &thread_id,
+        false,
+    );
     let pack = identity.recall.then(|| completed(&cache, &key)).flatten();
     tracing::debug!(thread_id = %key.thread, agent_id = %key.identity.agent_id, cache_hit = pack.is_some(), "[memory:prefetch] pre_turn cache");
     if let Some(pack) = &pack {
-        crate::memory::tools::record_pack_citations(ctx, &input.thread_id, pack.citations.clone());
+        hooks::deliver_citations(ctx, &config, &identity, &thread_id, pack);
     }
     let dispatch = ctx.clone();
     enqueue(
@@ -167,18 +208,20 @@ pub(crate) fn pre_turn(
         guard_turn_work(
             &config.clone(),
             Box::pin(dispatch.clone().enter(async move {
-                if config.memory.conversations.enabled {
-                    if let Some(channel) = channel {
-                        let workspace = config.workspace_dir.clone();
-                        let thread = input.thread_id.clone();
-                        let _ = dispatch
-                            .spawn_blocking(move || {
-                                crate::memory::channels::record(&workspace, &channel, &thread)
-                            })
-                            .await;
-                    }
-                }
-                hooks::pre_turn_work(&dispatch, &config, &identity, input).await
+                hooks::pre_turn_work(
+                    &dispatch,
+                    &config,
+                    &identity,
+                    thread_id,
+                    turn_index,
+                    user_text,
+                    in_prompt_from,
+                    at,
+                    resumed_after_compaction,
+                    observed_actor,
+                    channel,
+                )
+                .await
             })),
         ),
     );
@@ -210,14 +253,20 @@ pub(crate) fn compaction(
         return None;
     }
     let cache = cache(ctx);
-    let key = Key::new(&config, &identity, &thread, true);
-    let pack = completed(&cache, &key)
-        .or_else(|| completed(&cache, &Key::new(&config, &identity, &thread, false)));
+    let fingerprint = memory_config_fingerprint(&config);
+    let key = Key::with_fingerprint(&config, fingerprint, &identity, &thread, true);
+    let pack = completed(&cache, &key).or_else(|| {
+        completed(
+            &cache,
+            &Key::with_fingerprint(&config, fingerprint, &identity, &thread, false),
+        )
+    });
+    let dispatch = ctx.clone();
     enqueue(
         cache,
         key,
         Box::pin(ctx.enter(async move {
-            hooks::compaction_work(&config, &identity, &thread, dropped).await
+            hooks::compaction_work(&dispatch, &config, &identity, &thread, dropped).await
         })),
     );
     pack.map(cached_notice)
@@ -232,7 +281,13 @@ pub(crate) async fn settle_for_test(
     compaction: bool,
 ) {
     let cache = cache(ctx);
-    let key = Key::new(config, identity, thread, compaction);
+    let key = Key::with_fingerprint(
+        config,
+        memory_config_fingerprint(config),
+        identity,
+        thread,
+        compaction,
+    );
     tokio::time::timeout(Duration::from_secs(2), async {
         while !cache.0.is_idle(&key) {
             tokio::task::yield_now().await;

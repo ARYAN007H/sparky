@@ -24,8 +24,6 @@ use tinymemory_api::{
     Reach, RecallAnswer, RecallRequest, Result, StoreItem, StoreReceipt, WaitFor, WriteOptions,
 };
 
-use super::error::MemoryError;
-
 /// `inner` with every stored item scrubbed first, and every call timed.
 pub struct ScrubbingEngine {
     inner: Arc<dyn MemoryEngine>,
@@ -68,7 +66,7 @@ impl ScrubbingEngine {
 fn outcome<T>(result: &Result<T>) -> &'static str {
     match result {
         Ok(_) => "ok",
-        Err(error) => MemoryError::from(error.clone()).code(),
+        Err(error) => error.code(),
     }
 }
 

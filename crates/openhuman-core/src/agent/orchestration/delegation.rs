@@ -169,7 +169,7 @@ pub(crate) async fn run_subagent_delegation_with_parent_context(
                                     checkpoint.is_some(),
                                 ));
                             }
-                            SubagentRunStatus::Incomplete { reason } => {
+                            SubagentRunStatus::Incomplete { reason, .. } => {
                                 return Err(format!(
                                     "delegation stage {stage:?} stopped incomplete: {reason}"
                                 ));

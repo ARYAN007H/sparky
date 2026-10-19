@@ -495,7 +495,7 @@ impl SpawnAsyncSubagentTool {
                                         .await;
                                 }
                             }
-                            SubagentRunStatus::Incomplete { ref reason } => {
+                            SubagentRunStatus::Incomplete { ref reason, ref failure_cause } => {
                                 // Async sub-agent stopped short (stuck halt / iteration
                                 // cap). Mark the session finished and deliver the PARTIAL
                                 // progress back to the parent, framed so it is not
@@ -564,7 +564,7 @@ impl SpawnAsyncSubagentTool {
                                             worktree_path: None,
                                             changed_files: Vec::new(),
                                             dirty_status: None,
-                                            stop: incomplete_stop(reason),
+                                            stop: incomplete_stop(reason, failure_cause.as_ref()),
                                         })
                                         .await;
                                 }

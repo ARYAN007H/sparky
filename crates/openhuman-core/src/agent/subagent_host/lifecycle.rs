@@ -369,7 +369,7 @@ impl OpenHumanSubagentHost {
         })
         .map_err(map_lifecycle_error)?;
         let request = if continuation {
-            SubagentRequest::continue_with_key(task_key.clone(), child, request, input, None)
+            SubagentRequest::continue_with_task_key(task_key.clone(), child, request, input, None)
         } else {
             // `direct_subagent_child` derives the same key for the host's
             // durable lookup; this constructor independently proves that the
@@ -996,9 +996,9 @@ fn outcome_to_host(
             options: None,
             checkpoint: None,
         },
-        SubagentOutcomeKind::Incomplete(incomplete) => SubagentRunStatus::Incomplete {
-            reason: incomplete.reason,
-        },
+        SubagentOutcomeKind::Incomplete(incomplete) => {
+            outcome::incomplete_run_status(incomplete.reason, &outcome.extensions)
+        }
         SubagentOutcomeKind::Cancelled => SubagentRunStatus::Cancelled,
     };
     host.status = status;

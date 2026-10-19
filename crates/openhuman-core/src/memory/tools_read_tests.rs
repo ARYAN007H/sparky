@@ -2,7 +2,6 @@
 //! and fetch leave the calling thread out.
 
 use super::*;
-use crate::memory::scope::MemoryIdentity;
 use crate::memory::test_fixtures::{bind_reference, config_in};
 use tinymemory_api::MemoryEngine;
 
@@ -10,7 +9,10 @@ fn facts() -> CallFacts {
     CallFacts {
         thread_id: Some("thread-tool-1".into()),
         agent_id: Some("orchestrator".into()),
-        ..CallFacts::of(&Config::default(), &MemoryIdentity::agent("orchestrator"))
+        ..CallFacts::of(
+            &Config::default(),
+            &tinymemory_tools::layout::identity::Identity::agent("orchestrator"),
+        )
     }
 }
 
@@ -119,7 +121,7 @@ async fn recall_returns_evidence_and_leaves_the_calling_thread_out() {
         out.get("answer").is_none(),
         "recall writes no answer of its own"
     );
-    let cites = take_turn_citations(&DispatchCtx::ambient(), &live);
+    let cites = crate::web_chat::citations::take_turn_citations(&DispatchCtx::ambient(), &live);
     assert_eq!(cites.len(), 1, "{cites:?}");
 }
 

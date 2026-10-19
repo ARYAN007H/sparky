@@ -10,13 +10,14 @@ use tinyagents_harness::context::RunContext;
 use tinyagents_harness::error::Result as TaResult;
 use tinyagents_harness::middleware::{
     call_effect, dispatch_target, is_repeat_call_exempt, repeat_guard_marker, CallEffect,
-    Middleware, StopLatch, ToolFactsLookup, ToolInvocationIdentity,
+    Middleware, ToolFactsLookup, ToolInvocationIdentity,
 };
 use tinyagents_harness::no_progress::{
     classified_step, clear_recovered, ClassifiedFailureTracker, ClassifiedStep, FailurePolicy,
     NoProgress, NoProgressTracker, RecoverableFailureLadder, ToolAttempt,
 };
 use tinyagents_harness::steering::SteeringHandle;
+use tinyagents_hooks::stop::StopLatch;
 use tinyinference_llm::tool::ToolCall as TaToolCall;
 use tinytools::ToolResult as TaToolResult;
 
@@ -124,6 +125,14 @@ impl RepeatedToolFailureMiddleware {
             call_effects: std::sync::Mutex::new(std::collections::HashMap::new()),
             tool_facts: None,
         }
+    }
+
+    /// Return typed classified facts only while this middleware still owns
+    /// the halt note recorded for the current run.
+    pub(crate) fn current_classified_cause(
+        &self,
+    ) -> Option<tinyagents_harness::no_progress::ClassifiedStopCause> {
+        self.stop.current_classified_cause()
     }
 
     /// Judge each call's side effect from the registered tools' own
@@ -293,8 +302,11 @@ impl Middleware<(), crate::agent::tinyagents::host::OpenHumanRunContext>
         &self,
         _ctx: &mut RunContext<crate::agent::tinyagents::host::OpenHumanRunContext>,
         _state: &(),
-        _run: &mut tinyagents_harness::middleware::AgentRun,
+        run: &mut tinyagents_harness::middleware::AgentRun,
     ) -> TaResult<()> {
+        if run.failure_cause.is_none() {
+            run.failure_cause = self.stop.current_classified_cause();
+        }
         self.stop.finish_run();
         Ok(())
     }

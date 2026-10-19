@@ -220,9 +220,9 @@ pub mod seams {
     pub use openhuman_core::agent::stop_hooks::BudgetStopHook;
     pub use tinyagents_harness::cost::TurnCost;
     pub use tinyagents_harness::middleware::{PolicyDecision, ToolCallPolicy};
-    pub use tinyagents_harness::middleware::{StopDecision, StopHook};
-    /// Product cost snapshot passed to harness-owned stop policies.
-    pub type TurnState<'a> = tinyagents_harness::middleware::TurnState<'a, TurnCost>;
+    pub use tinyagents_hooks::stop::{StopDecision, StopHook};
+    /// Product cost snapshot passed to TinyAgents stop policies.
+    pub type TurnState<'a> = tinyagents_hooks::stop::TurnState<'a, TurnCost>;
     pub use openhuman_core::core::all::{ControllerExtension, DomainGroup};
     pub use openhuman_core::core::server_launcher::{HostBoot, ServeRequest, ServerLauncher};
     pub use openhuman_core::security::SecurityPolicy;

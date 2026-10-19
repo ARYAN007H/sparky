@@ -27,17 +27,15 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use serde_json::json;
-use tinymemory_api::{
-    Citation, ForgetTarget, LearningKind, MemoryMeta, MetaFilter, SourceKind, SourceRef,
-};
+use tinymemory_api::{Citation, LearningKind, MemoryMeta, MetaFilter, SourceKind, SourceRef};
 use tinytools::{PermissionLevel, Tool, ToolResult};
 
 use crate::agent::turn_origin::{AgentTurnOrigin, TrustedAutomationSource};
 use crate::config::Config;
-use crate::memory::types::{ForgetParams, ItemsListParams, LearnParams, RecallParams};
-use crate::memory::{MemoryError, MemoryResult};
+use crate::memory::types::{ForgetParams, ItemsListParams, LearnParams, RecallParams, MAX_LIMIT};
 use crate::security::policy::ToolOperation;
 use crate::security::SecurityPolicy;
+use tinymemory_api::{Error, Result};
 
 /// Prefix of a flow's own tag (see [`flow_tag`]).
 pub const FLOW_TAG_PREFIX: &str = "flow:";
@@ -99,19 +97,13 @@ pub fn flow_key_of(meta: &MemoryMeta) -> Option<&str> {
 /// The filter matching every item `flow_id` wrote.
 #[must_use]
 pub fn flow_filter(flow_id: &str) -> MetaFilter {
-    MetaFilter {
-        tags_any: vec![flow_tag(flow_id)],
-        ..MetaFilter::default()
-    }
+    MetaFilter::tags_any([flow_tag(flow_id)])
 }
 
 /// The filter matching every flow-written item, of any flow.
 #[must_use]
 pub fn cross_flow_filter() -> MetaFilter {
-    MetaFilter {
-        tags_any: vec![FLOWS_TAG.to_string()],
-        ..MetaFilter::default()
-    }
+    MetaFilter::tags_any([FLOWS_TAG])
 }
 
 /// Host metadata for an item `flow_id` writes: `source.kind = agent` with the
@@ -133,38 +125,34 @@ pub fn flow_meta(flow_id: &str, extra: &[String]) -> MemoryMeta {
 
 /// Forgets every item matching `filter` (which must be non-empty). Memory
 /// off forgets nothing.
-pub async fn forget_matching(config: &Config, filter: MetaFilter) -> MemoryResult<usize> {
+pub async fn forget_matching(config: &Config, filter: MetaFilter) -> Result<usize> {
     if filter.is_empty() {
-        return Err(MemoryError::invalid(
-            "refusing to forget with an empty filter",
+        return Err(Error::InvalidRequest(
+            ("refusing to forget with an empty filter").into(),
         ));
     }
-    let bound = match crate::memory::engine::resolve(config).engine() {
-        Ok(bound) => bound,
-        Err(MemoryError::Off(_)) => {
+    match crate::memory::ops::forget_filter(config, filter).await {
+        Ok(forgotten) => Ok(forgotten),
+        Err(Error::Off(_)) => {
             tracing::debug!("[flows:memory] forget skipped: memory is off");
-            return Ok(0);
+            Ok(0)
         }
-        Err(error) => return Err(error),
-    };
-    let report = bound.engine.forget(ForgetTarget::Filter(filter)).await?;
-    tracing::debug!(
-        engine = %bound.id,
-        forgotten = report.forgotten,
-        "[flows:memory] forgot items by tag filter"
-    );
-    Ok(report.forgotten)
+        Err(error) => Err(error),
+    }
 }
 
 /// Stores `content` as `flow_id`'s value for `key`, replacing an earlier
-/// value under the same key. Returns the stored item's id.
+/// value under the same key. It snapshots matching ids, stores the new value,
+/// and only then forgets the old snapshot, so a failed write preserves the
+/// previous value and concurrent writes after the snapshot survive. Returns
+/// the stored item's id.
 pub async fn remember_keyed(
     config: &Config,
     flow_id: &str,
     key: &str,
     content: &str,
     kind: LearningKind,
-) -> MemoryResult<String> {
+) -> Result<String> {
     // Fail with MEMORY_OFF before touching anything.
     crate::memory::engine::resolve(config).engine()?;
     let key_tag = flow_key_tag(flow_id, key);
@@ -177,11 +165,8 @@ pub async fn remember_keyed(
         let page = crate::memory::ops::items_list(
             config,
             ItemsListParams {
-                filter: Some(MetaFilter {
-                    tags_any: vec![key_tag.clone()],
-                    ..MetaFilter::default()
-                }),
-                limit: Some(crate::memory::types::MAX_LIMIT),
+                filter: Some(MetaFilter::tags_any([key_tag.clone()])),
+                limit: Some(MAX_LIMIT),
                 cursor,
                 ..ItemsListParams::default()
             },

@@ -46,7 +46,7 @@ use crate::config::Config;
 use crate::security::credentials::session_support::resolve_backend_credential;
 use crate::security::credentials::{AuthService, DEFAULT_AUTH_PROFILE_NAME};
 
-use super::error::{MemoryError, MemoryResult};
+use tinymemory_api::{Error, Result};
 
 /// Engine id of CortexDB behind the TinyHumans backend.
 pub const TINYHUMANS_ENGINE: &str = tinymemory_integrations::cortex::TINYHUMANS_ENGINE_ID;
@@ -95,11 +95,11 @@ pub enum Binding {
 }
 
 impl Binding {
-    /// The bound engine, or [`MemoryError::Off`].
-    pub fn engine(self) -> MemoryResult<BoundEngine> {
+    /// The bound engine, or [`Error::Off`].
+    pub fn engine(self) -> Result<BoundEngine> {
         match self {
             Self::On(bound) => Ok(bound),
-            Self::Off { reason, .. } => Err(MemoryError::Off(reason)),
+            Self::Off { reason, .. } => Err(Error::Off(reason)),
         }
     }
 
@@ -258,7 +258,7 @@ pub fn resolve(config: &Config) -> Binding {
         }
         tracing::warn!("[memory:engine] ignoring the host engine in SaaS mode");
     }
-    let root = if super::scope::layout_is_v3(config) {
+    let root = if config.memory.layout == crate::config::MemoryLayoutMode::V3 {
         match super::scope::user_root(config) {
             Some(root) => Some(root),
             None => return off(None, None, "sign in to use memory in its own layout"),
@@ -280,9 +280,9 @@ pub fn resolve(config: &Config) -> Binding {
 /// Memory is off for `config`, or an embedding host's (or a test's)
 /// installed engine is bound, which has one layout of its own and cannot be
 /// bound below a scope root.
-pub fn bind_with_root(config: &Config, root: Option<&str>) -> MemoryResult<BoundEngine> {
+pub fn bind_with_root(config: &Config, root: Option<&str>) -> Result<BoundEngine> {
     if !config.components.memory {
-        return Err(MemoryError::Off(COMPONENT_OFF_REASON.to_string()));
+        return Err(Error::Off(COMPONENT_OFF_REASON.to_string()));
     }
     #[cfg(test)]
     {
@@ -305,7 +305,7 @@ pub fn bind_with_root(config: &Config, root: Option<&str>) -> MemoryResult<Bound
         if one_engine {
             return match root {
                 None => resolve(config).engine(),
-                Some(_) => Err(MemoryError::Engine(
+                Some(_) => Err(Error::Engine(
                     "the installed test engine cannot be bound below a scope root".to_string(),
                 )),
             };
@@ -332,14 +332,14 @@ pub(crate) fn host_binding_with<T>(
     saas: bool,
     host: Option<T>,
     root: Option<&str>,
-) -> MemoryResult<Option<T>> {
+) -> Result<Option<T>> {
     let host = if admits_host_engine_with(saas) {
         host
     } else {
         None
     };
     if host.is_some() && root.is_some() {
-        return Err(MemoryError::Engine(
+        return Err(Error::Engine(
             "the host's memory engine cannot be bound below a scope root".to_string(),
         ));
     }
@@ -415,7 +415,7 @@ fn rooted(
     let Some(root) = root else {
         return (settings, "|root=legacy".to_string());
     };
-    let actor = super::scope::actor_of_root(root);
+    let actor = tinymemory_tools::layout::identity::actor_of_root(root);
     let retired = legacy_read.then(|| actor.clone());
     let fingerprint = format!(
         "|root={root}|tenant={tenant}|retired={}",
@@ -627,10 +627,10 @@ pub fn read_cortexdb_key(config: &Config) -> anyhow::Result<Option<String>> {
 }
 
 /// Stores the CortexDB API key in the credential store (never in config).
-pub fn store_cortexdb_key(config: &Config, key: &str) -> MemoryResult<()> {
+pub fn store_cortexdb_key(config: &Config, key: &str) -> Result<()> {
     let key = key.trim();
     if key.is_empty() {
-        return Err(MemoryError::invalid("the API key is blank"));
+        return Err(Error::InvalidRequest("the API key is blank".into()));
     }
     AuthService::from_config(config)
         .store_provider_token(
@@ -640,16 +640,16 @@ pub fn store_cortexdb_key(config: &Config, key: &str) -> MemoryResult<()> {
             HashMap::new(),
             true,
         )
-        .map_err(|error| MemoryError::Engine(format!("storing the API key failed: {error}")))?;
+        .map_err(|error| Error::Engine(format!("storing the API key failed: {error}")))?;
     tracing::debug!("[memory:engine] cortexdb key stored");
     Ok(())
 }
 
 /// Removes the stored CortexDB API key.
-pub fn clear_cortexdb_key(config: &Config) -> MemoryResult<bool> {
+pub fn clear_cortexdb_key(config: &Config) -> Result<bool> {
     AuthService::from_config(config)
         .remove_profile(MEMORY_CORTEXDB_KEY_NAME, DEFAULT_AUTH_PROFILE_NAME)
-        .map_err(|error| MemoryError::Engine(format!("removing the API key failed: {error}")))
+        .map_err(|error| Error::Engine(format!("removing the API key failed: {error}")))
 }
 
 /// Whether the engine `id` has a credential available.

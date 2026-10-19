@@ -61,6 +61,7 @@ use std::fmt;
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Deserializer, Serialize};
+pub use tinymemory_integrations::sources::{MemorySourceConfig, MemorySourceKind};
 
 /// Keychain entry name of the CortexDB API key.
 pub const MEMORY_CORTEXDB_KEY_NAME: &str = "memory-cortexdb";
@@ -70,7 +71,7 @@ pub const DEFAULT_MEMORY_ENGINE: &str = "tinyhumans";
 
 /// A legacy backend is retained only long enough to recognize migration input;
 /// its debug representation must not expose user-provided configuration text.
-#[derive(Clone, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Deserialize, PartialEq, Eq, Hash)]
 pub(crate) struct LegacyBackend(String);
 
 impl fmt::Debug for LegacyBackend {
@@ -86,7 +87,7 @@ fn is_true(value: &bool) -> bool {
 }
 
 /// The `[memory]` section.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema, Hash)]
 #[serde(default)]
 pub struct MemoryConfig {
     /// The selected engine id (`tinyhumans` or `cortexdb`), or `none` when memory is disabled.
@@ -165,7 +166,7 @@ pub struct MemoryConfig {
 }
 
 /// `[memory] layout`: where memory sits on the engine.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema, Hash)]
 #[serde(rename_all = "lowercase")]
 pub enum MemoryLayoutMode {
     /// The shared `app:tinymemory` tree, as before layout v3.
@@ -185,7 +186,7 @@ impl MemoryLayoutMode {
 }
 
 /// `[memory.agents.<definition>]`: one agent definition's memory.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema, Hash)]
 #[serde(default)]
 pub struct MemoryAgentConfig {
     /// The memory agent id this definition acts as; unset is the definition
@@ -252,7 +253,7 @@ impl MemoryConfig {
 }
 
 /// `[memory.engines.<id>]`.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema, Hash)]
 #[serde(default)]
 pub struct MemoryEngineSettings {
     /// Base URL of the engine; unset uses the engine's default.
@@ -261,7 +262,7 @@ pub struct MemoryEngineSettings {
 }
 
 /// `[memory.conversations]`.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema, Hash)]
 #[serde(default)]
 pub struct MemoryConversationsConfig {
     /// Whether every turn is logged to the acting agent's conversations.
@@ -285,7 +286,7 @@ pub const DEFAULT_BUILD_DELAY_SECS: u64 = 300;
 
 /// `[memory.recall]`: the context pack injected before every turn, and the
 /// lifecycle's budgets. Mirrors `tinymemory_tools::RecallPolicy`.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema, Hash)]
 #[serde(default)]
 pub struct MemoryRecallConfig {
     /// Whether a pack is recalled and injected before every turn.
@@ -335,78 +336,6 @@ impl Default for MemoryRecallConfig {
             build_delay_secs: DEFAULT_BUILD_DELAY_SECS,
         }
     }
-}
-
-/// What a document source reads. The `composio` kind was removed: a saved
-/// entry of that kind is dropped at load.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum MemorySourceKind {
-    /// A local directory, walked recursively.
-    Folder,
-    /// One local file.
-    File,
-    /// One web page.
-    Link,
-    /// A GitHub repository (`owner/repo` or URL).
-    Github,
-    /// An RSS or Atom feed.
-    Rss,
-}
-
-impl MemorySourceKind {
-    /// Every kind, in display order.
-    pub const ALL: [Self; 5] = [
-        Self::Folder,
-        Self::File,
-        Self::Link,
-        Self::Github,
-        Self::Rss,
-    ];
-
-    /// Wire name.
-    #[must_use]
-    pub fn as_str(self) -> &'static str {
-        match self {
-            Self::Folder => "folder",
-            Self::File => "file",
-            Self::Link => "link",
-            Self::Github => "github",
-            Self::Rss => "rss",
-        }
-    }
-
-    /// Parses a wire name.
-    #[must_use]
-    pub fn parse(raw: &str) -> Option<Self> {
-        Self::ALL
-            .into_iter()
-            .find(|kind| kind.as_str().eq_ignore_ascii_case(raw.trim()))
-    }
-}
-
-/// One `[[memory.sources]]` entry: what to read and how often. Sync state
-/// (last run, status, item count) is runtime state kept in the workspace,
-/// not here.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-pub struct MemorySourceConfig {
-    /// Stable id.
-    pub id: String,
-    /// What the source reads.
-    pub kind: MemorySourceKind,
-    /// Path, URL, `owner/repo` or feed URL.
-    pub target: String,
-    /// Display label.
-    #[serde(default)]
-    pub label: String,
-    /// Minutes between scheduled syncs; unset means on demand only.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub schedule_mins: Option<u32>,
-    /// The layout root the source's documents are filed under
-    /// (`team:acme`); unset files them under the configured root, shared by
-    /// every agent there.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub namespace: Option<String>,
 }
 
 /// Decodes `[[memory.sources]]` one entry at a time, dropping (and logging)
