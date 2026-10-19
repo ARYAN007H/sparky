@@ -74,6 +74,7 @@ impl From<ChannelMessage> for RuntimeChannelMessage {
     }
 }
 
+pub(crate) use admit::AdmittedInbound;
 #[cfg(test)]
 pub(crate) use approval::channel_has_approval_surface;
 pub(crate) use turn::{process_channel_message, process_channel_runtime_message};
