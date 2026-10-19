@@ -87,13 +87,27 @@ fn malformed_agent_request_ids_are_rejected() {
     assert!(valid_agent_request_id("client-request-1"));
 }
 
+#[test]
+fn tombstone_capacity_overflow_fails_closed_instead_of_evicting_cancelled_ids() {
+    let mut registry = AgentRunRegistry::default();
+    for index in 0..4_097 {
+        registry.cancel(format!("cancelled-{index}"));
+    }
+
+    let result = registry.admit(
+        "cancelled-4096".into(),
+        state(),
+        tokio_util::sync::CancellationToken::new(),
+    );
+
+    assert!(result.is_err());
+}
+
 #[tokio::test]
 async fn agent_run_rejects_an_identity_from_another_bound_run() {
     let temp = tempfile::TempDir::new().unwrap();
-    let binding = super::super::binding_tests::binding(
-        crate::core::runtime::DispatchCtx::unbound(),
-        &temp,
-    );
+    let binding =
+        super::super::binding_tests::binding(crate::core::runtime::DispatchCtx::unbound(), &temp);
     let service = CapsHostService::new(Arc::new(binding));
     let member = tinybus::MemberName::new(runs::caps::AGENT_RUN).unwrap();
     let error = tinybus::service::Interface::call(

@@ -307,6 +307,8 @@ async fn serving_caps_host_advertises_v2_without_replacing_other_peer_manifest_e
         other_interface,
         tinybus::Version::new(4, 2, 0),
     ));
+    let prior_name = original.name.clone();
+    let prior_version = original.version.clone();
     let prior_consumes = original.consumes.clone();
     connection
         .announce(&original)
@@ -330,6 +332,8 @@ async fn serving_caps_host_advertises_v2_without_replacing_other_peer_manifest_e
         .provided(&caps_interface)
         .expect("CapsHost is advertised");
     assert_eq!(caps_host.speaks, tinybus::Version::new(2, 0, 0));
+    assert_eq!(announced.name, prior_name);
+    assert_eq!(announced.version, prior_version);
     assert!(
         announced
             .provides
