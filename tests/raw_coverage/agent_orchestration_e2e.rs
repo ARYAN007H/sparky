@@ -1,6 +1,6 @@
 //! JSON-RPC E2E coverage for the agent-orchestration controllers that no e2e
 //! target reached: durable workflow-run `stop` / `resume`, the command
-//! center's `agent_work_control`, `agent_team_list` / `agent_team_close`, the
+//! center's `agent_work_control`, the
 //! detached sub-agent controls (`subagent_cancel` / `subagent_steer`).
 //!
 //! Every case boots the real Axum JSON-RPC router over HTTP against an

@@ -210,8 +210,8 @@ other `Subagent*` variants. Spawn depth is capped by
 `DetachedTaskRegistry` and can be steered through the shared
 `SteeringRegistry` ([`tinyagents/host/steering.rs`](./tinyagents/host/steering.rs)).
 
-`orchestration/` is the larger control plane on top of that: agent teams,
-the command center, declarative workflow runs, git worktrees for parallel
+`orchestration/` is the larger control plane on top of that: the command
+center, declarative workflow runs, git worktrees for parallel
 coding workers, and background completion delivery. See
 [orchestration/README.md](orchestration/README.md) and
 [subagent_host/README.md](subagent_host/README.md).
@@ -367,7 +367,6 @@ All controllers register under `DomainGroup::Agent` in [`core/all.rs`](../core/a
 | `session_import` | `../storage/import/` | `run` |
 | `agent_work` | [`orchestration/command_center`](./orchestration/command_center/) | `list`, `control` |
 | `workflow_run` | [`orchestration/workflow_runs`](./orchestration/workflow_runs/) | `list_definitions`, `list`, `get`, `start`, `stop`, `resume` |
-| `agent_team` | [`orchestration/agent_teams`](./orchestration/agent_teams/) | `create`, `list`, `get`, `assign_task`, `claim_task`, `message_member`, `list_messages`, `complete_task`, `shutdown_member`, `close`, `start_member` |
 | `worktree` | [`orchestration/worktree_schemas.rs`](./orchestration/worktree_schemas.rs) | `list`, `status`, `diff`, `remove` |
 | `subagent` | [`orchestration/subagent_control.rs`](./orchestration/subagent_control.rs) | `cancel`, `steer` for running sub-agents |
 

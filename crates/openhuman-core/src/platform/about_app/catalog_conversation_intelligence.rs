@@ -328,7 +328,7 @@ Capability {
         name: "Per-Agent Memory",
         domain: "memory",
         category: CapabilityCategory::Intelligence,
-        description: "Every agent keeps its own conversations (one memory id per agent, by default its definition id) while learnings and the brain are shared by every agent under the same memory root. An agent team gets a root of its own, and a host that runs OpenHuman agents (an embedder, a coordinating product) can bind each agent to its own memory id and root.",
+        description: "Every agent keeps its own conversations (one memory id per agent, by default its definition id) while learnings and the brain are shared by every agent under the same memory root. A host that runs OpenHuman agents (an embedder, a coordinating product) can bind each agent to its own memory id and root.",
         how_to: "Automatic for every agent turn. Configure with [memory] agent_id / root (host binding), [memory.agents.<id>] agent_id / root / recall, or AgentSpec::memory(MemoryBinding) when embedding. Programmatic: openhuman.memory_agents_list (RPC).",
         status: CapabilityStatus::Beta,
         privacy: MEMORY_TO_REMOTE_ENGINE,
