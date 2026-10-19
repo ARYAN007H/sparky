@@ -9,7 +9,7 @@
 //! call. That agreement is this file's job.
 
 use super::*;
-use crate::tools::implementations::presentation::types::SlideRequest;
+use crate::tools::implementations::presentation::types::{GeneratePresentationInput, SlideRequest};
 use tinydocs_bus::spec::presentation::{PresentationSpec, SlideImage};
 
 fn slide(title: &str) -> SlideRequest {
@@ -115,13 +115,13 @@ fn a_slide_with_no_resolved_images_declares_none() {
 }
 
 #[test]
-fn a_short_images_argument_leaves_later_slides_imageless() {
-    // Defensive: `images` is indexed by slide, and a caller that passes a
-    // shorter vector must not panic or shift images onto the wrong slide.
-    let images = vec![vec![resolved(&[5u8; 4], None)]];
+fn resolved_images_stay_aligned_with_their_slides() {
+    // A failed image reference can leave a slide empty while later slides
+    // retain their own independently resolved images.
+    let images = vec![vec![], vec![resolved(&[5u8; 4], None)]];
     let (deck, payload) = build_request(&spec(input(vec![slide("A"), slide("B")]), images));
-    assert_eq!(deck.slides[0].images.len(), 1);
-    assert!(deck.slides[1].images.is_empty());
+    assert!(deck.slides[0].images.is_empty());
+    assert_eq!(deck.slides[1].images.len(), 1);
     assert_eq!(payload.len(), 4);
 }
 

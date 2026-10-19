@@ -194,6 +194,22 @@ async fn request_preflight_counts_failed_image_references_before_resolution() {
     assert_rejected_before_image_resolution(args, "8 images total").await;
 }
 
+#[tokio::test]
+async fn request_preflight_checks_failed_reference_captions_before_resolution() {
+    let args = json!({
+        "title": "Deck",
+        "slides": [{
+            "title": "Slide",
+            "bullets": ["valid"],
+            "images": [{
+                "source": { "type": "file", "path": "missing.png" },
+                "caption": "x".repeat(MAX_TEXT_CHARS + 1)
+            }]
+        }]
+    });
+    assert_rejected_before_image_resolution(args, "caption").await;
+}
+
 #[test]
 fn resolved_presentation_uses_bus_validation_and_preserves_its_limit_error() {
     let input = GeneratePresentationInput {
@@ -212,7 +228,7 @@ fn resolved_presentation_uses_bus_validation_and_preserves_its_limit_error() {
             .collect(),
     };
     let images = vec![Vec::new(); input.slides.len()];
-    let spec = super::types::to_bus_spec(&input, &images).expect("one image list per slide");
+    let spec = super::types::to_bus_spec(&input, images).expect("one image list per slide");
 
     let error = spec
         .validate()
