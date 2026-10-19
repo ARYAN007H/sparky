@@ -271,7 +271,7 @@ pub struct OpenHumanRunContext {
     pub model_budget: Option<super::super::budget::ModelBudget>,
     /// Host admission policy shared by this run and its synchronous descendants.
     pub dispatch_admission:
-        Option<Arc<super::super::budget::PhysicalDispatchAdmission>>,
+        Option<Arc<dyn super::super::budget::PhysicalDispatchAdmission>>,
     /// The response format and output cap this root turn asks of every model
     /// call, and the slot its final call is reported into. Carried explicitly
     /// from the caller (`agent_chat`) through the session; children never
