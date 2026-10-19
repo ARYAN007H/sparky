@@ -8,8 +8,8 @@ mod provider_server;
 mod transcribe_tts;
 
 pub(super) use provider_server::{
-    handle_voice_list_models, handle_voice_set_providers,
-    handle_voice_test_provider, handle_voice_update_provider_settings,
+    handle_voice_list_models, handle_voice_set_providers, handle_voice_test_provider,
+    handle_voice_update_provider_settings,
 };
 pub(super) use transcribe_tts::{
     handle_voice_reply_synthesize, handle_voice_status, handle_voice_stt_dispatch,

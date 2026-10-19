@@ -4,10 +4,10 @@ use crate::core::all::RegisteredController;
 use crate::core::{ControllerSchema, FieldSchema, TypeSchema};
 
 use super::handlers::{
-    handle_voice_list_models, handle_voice_reply_synthesize,
-    handle_voice_set_providers, handle_voice_status, handle_voice_stt_dispatch,
-    handle_voice_test_provider, handle_voice_transcribe, handle_voice_transcribe_bytes,
-    handle_voice_tts, handle_voice_tts_dispatch, handle_voice_update_provider_settings,
+    handle_voice_list_models, handle_voice_reply_synthesize, handle_voice_set_providers,
+    handle_voice_status, handle_voice_stt_dispatch, handle_voice_test_provider,
+    handle_voice_transcribe, handle_voice_transcribe_bytes, handle_voice_tts,
+    handle_voice_tts_dispatch, handle_voice_update_provider_settings,
 };
 use super::helpers::{json_output, optional_bool, optional_string, required_string};
 

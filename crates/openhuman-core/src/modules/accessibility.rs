@@ -98,7 +98,6 @@ impl AccessibilityClient {
         self.call(methods::ACCESSIBILITY_REQUEST_PERMISSION, (kind,), false)
             .await
     }
-
 }
 
 fn decode<T: DeserializeOwned>(raw: serde_json::Value) -> Result<T, AccessibilityError> {

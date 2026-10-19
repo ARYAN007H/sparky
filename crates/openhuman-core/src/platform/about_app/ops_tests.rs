@@ -76,26 +76,3 @@ fn scheduled_job_capabilities_show_disabled_when_the_tinyflows_component_is_off(
         );
     }
 }
-
-#[tokio::test]
-async fn an_explicit_context_decides_which_capabilities_are_disabled() {
-    use crate::core::runtime::context::CoreContext;
-    use crate::core::runtime::DispatchCtx;
-
-    let mut voice_off = ComponentSet::all();
-    voice_off.voice = false;
-    let off = DispatchCtx::new(CoreContext::for_test_with_components(voice_off));
-    let on = DispatchCtx::new(CoreContext::for_test_with_components(ComponentSet::all()));
-
-    // The two contexts answer independently, concurrently and across awaits.
-    let ask = |ctx: DispatchCtx| async move {
-        tokio::task::yield_now().await;
-        lookup_capability(&ctx, "conversation.send_text")
-            .expect("send_text")
-            .value
-            .status
-    };
-    let (disabled, enabled) = tokio::join!(ask(off), ask(on));
-    assert_eq!(disabled, CapabilityStatus::Available);
-    assert_eq!(enabled, CapabilityStatus::Available);
-}

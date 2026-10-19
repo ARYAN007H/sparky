@@ -4,7 +4,9 @@ use super::*;
 #[tokio::test]
 async fn permissions_without_a_loader_are_explicitly_unavailable() {
     assert!(matches!(
-        AccessibilityClient::new(&Config::default()).permissions().await,
+        AccessibilityClient::new(&Config::default())
+            .permissions()
+            .await,
         Err(AccessibilityError::Bus(ModuleCallError::Unavailable))
     ));
 }

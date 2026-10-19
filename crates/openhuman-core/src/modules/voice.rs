@@ -61,7 +61,9 @@ where
         .call(method, args)
         .await
         .map_err(|error| match error.wire_name() {
-            name if name.contains("ModuleUnavailable") => VoiceCallError::Unavailable(error.to_string()),
+            name if name.contains("ModuleUnavailable") => {
+                VoiceCallError::Unavailable(error.to_string())
+            }
             _ => VoiceCallError::Failed(error.to_string()),
         })
 }
