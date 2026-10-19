@@ -238,10 +238,8 @@ fn classifications_are_bounded() {
 async fn a_redelivered_accepted_turn_is_not_decided_twice() {
     // The module's callback deadline passed while the first triage was still
     // deciding; it redelivers the same turn. One decision, one apply.
-    let triage = ScriptedTriage::new([
-        decision(TriageAction::React),
-        decision(TriageAction::React),
-    ]);
+    let triage =
+        ScriptedTriage::new([decision(TriageAction::React), decision(TriageAction::React)]);
     let deliverer = deliverer(&triage);
     for attempt in [1, 2] {
         let response = deliverer
@@ -252,7 +250,11 @@ async fn a_redelivered_accepted_turn_is_not_decided_twice() {
     assert_eq!(triage.runs(), 1, "the redelivery was triaged again");
     let _ = triage.until_applied(1, Duration::from_secs(5)).await;
     tokio::time::sleep(Duration::from_millis(50)).await;
-    assert_eq!(triage.applied().len(), 1, "the redelivery was applied again");
+    assert_eq!(
+        triage.applied().len(),
+        1,
+        "the redelivery was applied again"
+    );
 }
 
 #[test]

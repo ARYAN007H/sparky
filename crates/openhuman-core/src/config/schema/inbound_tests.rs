@@ -22,9 +22,15 @@ fn a_partial_section_keeps_the_other_defaults() {
 #[test]
 fn the_triage_timeout_stays_under_the_module_callback_deadline() {
     let mut c = InboundConfig::default();
-    assert_eq!(c.triage_timeout().as_millis(), u128::from(MAX_TRIAGE_TIMEOUT_MS));
+    assert_eq!(
+        c.triage_timeout().as_millis(),
+        u128::from(MAX_TRIAGE_TIMEOUT_MS)
+    );
     c.triage_timeout_ms = 90_000;
-    assert_eq!(c.triage_timeout().as_millis(), u128::from(MAX_TRIAGE_TIMEOUT_MS));
+    assert_eq!(
+        c.triage_timeout().as_millis(),
+        u128::from(MAX_TRIAGE_TIMEOUT_MS)
+    );
     c.triage_timeout_ms = 0;
     assert_eq!(c.triage_timeout().as_millis(), 1);
     c.triage_timeout_ms = 5_000;

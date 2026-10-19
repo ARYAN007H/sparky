@@ -187,16 +187,21 @@ impl EventHandler<DomainEvent> for ComposioTriggerSubscriber {
         // persists it, rejects a redelivery of the same trigger, paces a
         // flood, and calls the host back (`Deliver`) to triage it, retrying a
         // deferred triage then. Off or unavailable, triage runs directly.
-        let config = ctx.load_config().await.ok();
-        route_trigger(
-            ctx,
-            config,
-            envelope,
-            Arc::new(RemoteTriage),
-            #[cfg(feature = "inbound-queues")]
-            None,
-        )
-        .await;
+        // Its own task: the hand-off may wait for the module's first load and
+        // retries an unanswered ingest, which must never hold up this
+        // subscriber's loop (a stalled loop lags and loses broadcast events).
+        tokio::spawn(async move {
+            let config = ctx.load_config().await.ok();
+            route_trigger(
+                ctx,
+                config,
+                envelope,
+                Arc::new(RemoteTriage),
+                #[cfg(feature = "inbound-queues")]
+                None,
+            )
+            .await;
+        });
     }
 }
 

@@ -129,34 +129,36 @@ impl EventHandler<DomainEvent> for WebhookRequestSubscriber {
                         payload,
                     );
                     // With the inbound event queues on, the request is queued
-                    // (persisted, deduplicated by correlation id, paced) and
-                    // triaged when the module delivers it, a deferral retried
-                    // then; the 202 below is the only response. Off or
-                    // unavailable, triage runs directly as before.
-                    let config = ctx.load_config().await.ok();
-                    let queued = route_agent_trigger(
-                        config,
-                        &envelope,
-                        &correlation_id,
-                        #[cfg(feature = "inbound-queues")]
-                        None,
-                    )
-                    .await;
-                    if !queued {
-                        triage_agent_directly(
-                            ctx,
-                            envelope,
-                            correlation_id.clone(),
-                            Arc::new(crate::triage::RemoteTriage),
-                        );
-                    }
+                    // (persisted, deduplicated per request, paced) and triaged
+                    // when the module delivers it, a deferral retried then;
+                    // the 202 below is the only response. Off or unavailable,
+                    // triage runs directly as before and its result follows
+                    // as a second response. Its own task, so neither the
+                    // module's first load nor a resent ingest holds up this
+                    // subscriber's loop.
+                    let corr = correlation_id.clone();
+                    tokio::spawn(async move {
+                        let config = ctx.load_config().await.ok();
+                        let queued = route_agent_trigger(
+                            config,
+                            &envelope,
+                            &corr,
+                            #[cfg(feature = "inbound-queues")]
+                            None,
+                        )
+                        .await;
+                        if !queued {
+                            triage_agent_directly(
+                                ctx,
+                                envelope,
+                                corr,
+                                Arc::new(crate::triage::RemoteTriage),
+                            );
+                        }
+                    });
                     // Return 202 Accepted immediately so the event handler
                     // doesn't block the broadcast channel.
-                    let message = if queued {
-                        "Queued for agent triage"
-                    } else {
-                        "Agent triage started"
-                    };
+                    let message = "Agent triage accepted";
                     let resp = WebhookResponseData {
                         correlation_id: correlation_id.clone(),
                         status_code: 202,
