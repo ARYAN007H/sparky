@@ -11,27 +11,28 @@ async fn handle_runtime_command_routes_configured_provider_slug_and_alias() {
     use crate::config::schema::{AuthStyle, CloudProviderCreds};
 
     let mut ctx = runtime_context(PathBuf::from("/tmp"));
-    let config = crate::config::Config {
-        cloud_providers: vec![
-            CloudProviderCreds {
-                id: "p_custom_route_123".into(),
-                slug: "custom-route".into(),
-                label: "Human Friendly Name".into(),
-                endpoint: "https://provider.example.test/v1".into(),
-                auth_style: AuthStyle::Bearer,
-                default_model: None,
-            },
-            CloudProviderCreds {
-                id: "p_managed_123".into(),
-                slug: "openhuman".into(),
-                label: "Managed Backend".into(),
-                endpoint: "https://api.openhuman.ai/v1".into(),
-                auth_style: AuthStyle::OpenhumanJwt,
-                default_model: None,
-            },
-        ],
-        ..crate::config::Config::default()
-    };
+    crate::channels::module_fixture::client().await;
+    let mut config = crate::config::Config::default();
+    config.modules.allow_download = false;
+    config.modules.source = crate::config::schema::ModuleSourceMode::Linked;
+    config.cloud_providers = vec![
+        CloudProviderCreds {
+            id: "p_custom_route_123".into(),
+            slug: "custom-route".into(),
+            label: "Human Friendly Name".into(),
+            endpoint: "https://provider.example.test/v1".into(),
+            auth_style: AuthStyle::Bearer,
+            default_model: None,
+        },
+        CloudProviderCreds {
+            id: "p_managed_123".into(),
+            slug: "openhuman".into(),
+            label: "Managed Backend".into(),
+            endpoint: "https://api.openhuman.ai/v1".into(),
+            auth_style: AuthStyle::OpenhumanJwt,
+            default_model: None,
+        },
+    ];
     ctx.config = Some(Arc::new(config));
     let channel_impl = Arc::new(RecordingChannel::default());
     let channel: Arc<dyn Channel> = channel_impl.clone();
