@@ -1,6 +1,6 @@
 use super::{
     channel_connection_update_payload, event_alias, origin_is_allowed_with_extra,
-    publish_companion_state_changed, subscribe_companion_state_changed,
+    publish_companion_state_changed, stamp_replay_timestamp, subscribe_companion_state_changed,
 };
 
 #[test]
@@ -13,6 +13,25 @@ fn companion_state_transport_delivers_payload_to_bridge() {
     });
     assert!(publish_companion_state_changed(payload.clone()) >= 1);
     assert_eq!(rx.try_recv().expect("payload delivered"), payload);
+}
+
+#[test]
+fn replay_timestamp_is_stored_in_the_typed_event_context() {
+    let mut event = crate::core_host::web_chat::approval_request_event(
+        "request-1",
+        "read_file",
+        "inspect the document",
+        &serde_json::json!({}),
+        "thread-1",
+        "client-1",
+        None,
+        None,
+        false,
+    );
+
+    stamp_replay_timestamp(&mut event);
+
+    assert!(event.context().ts.is_some());
 }
 
 #[test]

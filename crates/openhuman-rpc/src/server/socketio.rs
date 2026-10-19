@@ -1256,7 +1256,7 @@ fn replay_parked_approval(socket: &SocketRef, thread_id: &str) {
         // Replay is a fresh emit to a newly-joined socket, not a resend of the
         // original event, so stamp `ts` with "now" (same clock as
         // `publish_web_channel_event`) rather than leaving it unset.
-        event.ts = Some(crate::core_host::web_chat::unix_epoch_ms());
+        stamp_replay_timestamp(&mut event);
         let Ok(payload) = serde_json::to_value(&event) else {
             continue;
         };
@@ -1289,7 +1289,7 @@ fn replay_parked_plan_review(socket: &SocketRef, thread_id: &str) {
         row.tool_call_id.as_deref(),
         row.expires_at.as_deref(),
     );
-    event.ts = Some(crate::core_host::web_chat::unix_epoch_ms());
+    stamp_replay_timestamp(&mut event);
     let Ok(payload) = serde_json::to_value(&event) else {
         return;
     };
@@ -1305,6 +1305,10 @@ fn emit_with_aliases(socket: &SocketRef, name: &str, payload: &serde_json::Value
     if let Some(alias) = event_alias(name) {
         let _ = socket.emit(alias, payload);
     }
+}
+
+fn stamp_replay_timestamp(event: &mut crate::core_host::web_chat::WebChannelEvent) {
+    event.context_mut().ts = Some(crate::core_host::web_chat::unix_epoch_ms());
 }
 
 // Every test here names a gated fn (`channel_connection_update_payload`,
