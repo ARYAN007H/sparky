@@ -151,6 +151,24 @@ fn chat_done_without_prior_deltas_still_shows_full_response() {
 }
 
 #[test]
+fn channel_outbound_finishes_turn_with_its_final_response() {
+    let mut state = TranscriptState::new(CLIENT);
+    state.begin_user_turn("hi");
+    state.apply_event(&text_delta("partial"));
+    state.apply_event(&ev(
+        "channel_outbound",
+        serde_json::json!({"full_response":"final reply"}),
+    ));
+    let assistant = state
+        .entries()
+        .iter()
+        .find(|entry| entry.kind == EntryKind::Assistant)
+        .expect("channel_outbound carries the delivered assistant reply");
+    assert_eq!(assistant.text, "final reply");
+    assert!(!state.is_streaming());
+}
+
+#[test]
 fn chat_error_pushes_error_entry_and_ends_stream() {
     let mut s = TranscriptState::new(CLIENT);
     s.begin_user_turn("hi");
@@ -367,7 +385,8 @@ fn child_activity_accumulates_output_and_failed_status_in_one_record() {
         state.apply_event(&ev(
             event,
             serde_json::json!({
-                "skill_id":"task","request_id":"turn","delta":delta,"message":"Timed out"
+                "skill_id":null,"request_id":"turn","delta":delta,"message":"Timed out",
+                "subagent":{"task_id":"task"}
             }),
         ));
     }

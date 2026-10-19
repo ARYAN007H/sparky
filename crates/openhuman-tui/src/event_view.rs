@@ -82,11 +82,24 @@ impl WebEventView {
             E::ChatCancelled { cancel_reason, .. } => {
                 view.message.clone_from(cancel_reason);
             }
-            E::TextDelta { delta, .. }
-            | E::ThinkingDelta { delta, .. }
-            | E::SubagentTextDelta { delta, .. }
-            | E::SubagentThinkingDelta { delta, .. } => {
+            E::TextDelta { delta, .. } | E::ThinkingDelta { delta, .. } => {
                 view.delta.clone_from(delta);
+            }
+            E::SubagentTextDelta {
+                delta,
+                skill_id,
+                subagent,
+                ..
+            }
+            | E::SubagentThinkingDelta {
+                delta,
+                skill_id,
+                subagent,
+                ..
+            } => {
+                view.delta.clone_from(delta);
+                view.skill_id.clone_from(skill_id);
+                view.subagent = subagent.as_ref().map(&subagent_view);
             }
             E::IterationStart { message, .. } | E::RunModeChanged { message, .. } => {
                 view.message.clone_from(message);

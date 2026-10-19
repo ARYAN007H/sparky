@@ -304,9 +304,10 @@ impl TranscriptState {
                     format!("artifact · {status}{suffix}"),
                 ));
             }
-            "chat_done" => {
+            "chat_done" | "channel_outbound" => {
                 log::debug!(
-                    "[tui] state: chat_done full_response={}",
+                    "[tui] state: {} full_response={}",
+                    ev.event,
                     ev.full_response.is_some()
                 );
                 // `full_response` is authoritative — it replaces whatever the

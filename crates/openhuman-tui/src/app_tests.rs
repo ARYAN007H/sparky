@@ -150,7 +150,7 @@ fn failed_account_thread_replacement_rejects_old_and_unscoped_activity() {
         handle_web_event(
             &web_event(json!({
                 "event":"text_delta","client_id":"client","thread_id":thread,
-                "delta":"old secret"
+                "request_id":"old-turn","delta":"old secret"
             })),
             &mut state,
             &mut ui,

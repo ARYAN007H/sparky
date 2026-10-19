@@ -30,6 +30,7 @@ const REDUCED: &[&str] = &[
     "artifact_ready",
     "artifact_failed",
     "chat_done",
+    "channel_outbound",
     "chat_error",
 ];
 

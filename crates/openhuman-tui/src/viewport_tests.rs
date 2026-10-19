@@ -164,7 +164,8 @@ fn changing_an_old_tools_height_updates_prefix_lookup_without_rebuilding_history
     let mut state = TranscriptState::new("test");
     let event = |name: &str, fields: serde_json::Value| {
         let mut value = serde_json::json!({
-            "event":name,"client_id":"test","tool_call_id":"old","tool_name":"tool"
+            "event":name,"client_id":"test","thread_id":"thread","request_id":"turn",
+            "tool_call_id":"old","tool_name":"tool"
         });
         value
             .as_object_mut()
