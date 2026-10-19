@@ -91,15 +91,13 @@ impl ConfigContextOverlay {
 
         let child_value = serde_json::to_value(child)?;
         for path in PROFILE_OWNED_PATHS {
-            let value = value_at_path(&child_value, *path)
-                .cloned()
-                .ok_or_else(|| anyhow::anyhow!("profile-owned config path is missing"))?;
+            // Some owned defaults are omitted by serde (for example Legacy
+            // memory layout). Record absence as an explicit removal so a
+            // refreshed document cannot override the profile's default.
+            let value = value_at_path(&child_value, *path).cloned();
             let path: Vec<String> = path.iter().map(|part| (*part).to_string()).collect();
             changes.retain(|change| !change.path.starts_with(&path));
-            changes.push(Change {
-                path,
-                value: Some(value),
-            });
+            changes.push(Change { path, value });
         }
 
         let runtime = RuntimeBindings::capture(child);
