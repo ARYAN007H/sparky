@@ -57,7 +57,8 @@ async fn start_mock_servers() -> MockServers {
             post(send_message),
         )
         .route("/botsession-restart-token/sendChatAction", post(ok))
-        .route("/botsession-restart-token/getMe", post(get_me))
+        .route("/botsession-restart-token/deleteWebhook", post(ok))
+        .route("/botsession-restart-token/getMe", get(get_me))
         .with_state(Arc::clone(&state));
     let inference_app = Router::new()
         .route("/v1/chat/completions", post(chat_completion))

@@ -14,6 +14,63 @@ use tinychannels_bus::module_progressive::{
 };
 use tinychannels_bus::{ChannelBackendRequest, ChannelBackendResult, SendMessage};
 
+#[tokio::test]
+async fn module_inbound_envelope_reaches_host_dispatch_with_identity_intact() {
+    let (dispatch, mut received) = tokio::sync::mpsc::channel(1);
+    let callback = ChannelHostCallbacks::new(
+        &crate::core::runtime::DispatchCtx::host_default(),
+        Arc::new(crate::config::Config::default()),
+        Arc::new(OnceLock::new()),
+        Arc::new(OnceLock::from(Arc::new(HashMap::new()))),
+        None,
+        dispatch,
+    );
+    let envelope = tinychannels_bus::ChannelInboundEnvelope {
+        channel: tinychannels_bus::ChannelRef {
+            id: "telegram".into(),
+            account_id: Some("telegram:bot-a".into()),
+        },
+        message_id: "telegram_42_10".into(),
+        conversation: tinychannels_bus::ConversationRef {
+            kind: tinychannels_bus::ConversationKind::Dm,
+            id: "42".into(),
+            ..Default::default()
+        },
+        sender: tinychannels_bus::SenderRef {
+            id: "42".into(),
+            name: Some("Ada".into()),
+            ..Default::default()
+        },
+        text: "native Telegram inbound".into(),
+        parts: vec![tinychannels_bus::ContentPart::Text {
+            text: "native Telegram inbound".into(),
+            markdown_dialect: None,
+        }],
+        ..Default::default()
+    };
+
+    callback
+        .deliver_inbound(
+            "telegram:bot-a".into(),
+            serde_json::to_value(&envelope).expect("encode native envelope"),
+        )
+        .await
+        .expect("native envelope should be accepted by host callback");
+
+    let runtime_message = received
+        .try_recv()
+        .expect("native envelope should enter the channel dispatch queue");
+    assert!(runtime_message.message.channel.is_empty());
+    let received_envelope = runtime_message
+        .inbound_envelope
+        .expect("typed source envelope must reach module preparation");
+    assert_eq!(received_envelope.channel, envelope.channel);
+    assert_eq!(received_envelope.conversation, envelope.conversation);
+    assert_eq!(received_envelope.sender, envelope.sender);
+    assert_eq!(received_envelope.message_id, envelope.message_id);
+    assert_eq!(received_envelope.text, envelope.text);
+}
+
 #[derive(Default)]
 struct RecordingOutputObserver {
     seen: tokio::sync::Mutex<Vec<(String, String, String, u64)>>,
