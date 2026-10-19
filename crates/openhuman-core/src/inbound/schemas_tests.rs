@@ -4,10 +4,10 @@ use super::*;
 
 #[test]
 fn every_function_has_a_schema_and_a_controller() {
-    let schemas = all_controller_schemas();
-    let names: Vec<&str> = schemas.iter().map(|schema| schema.function).collect();
+    let all = all_controller_schemas();
+    let names: Vec<&str> = all.iter().map(|schema| schema.function).collect();
     assert_eq!(names, vec!["stats", "dead", "redrive"]);
-    assert!(schemas.iter().all(|schema| schema.namespace == "inbound"));
+    assert!(all.iter().all(|schema| schema.namespace == "inbound"));
     let controllers = all_registered_controllers();
     assert_eq!(controllers.len(), 3);
     assert_eq!(schemas("unknown").function, "unknown");
