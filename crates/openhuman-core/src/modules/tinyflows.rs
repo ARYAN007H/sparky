@@ -222,6 +222,34 @@ mod imp {
         served
     }
 
+    /// Serve one callback interface on the module runtime and return an RAII
+    /// registration for it. The token is created inside the spawned task so
+    /// cancellation of the caller cannot leave an unowned interface behind.
+    pub(crate) async fn serve_registered(
+        path: String,
+        object: impl tinybus::service::Interface + 'static,
+    ) -> Result<ServedObjectRegistration, String> {
+        let runtime = runtime::runtime()
+            .await
+            .map_err(|error| format!("the module bus is unavailable: {error}"))?;
+        let connection = runtime.connection().clone();
+        runtime
+            .spawn(async move {
+                let object_path = ObjectPath::new(&path).map_err(|error| error.to_string())?;
+                connection
+                    .request_name(HOST_BUS_NAME)
+                    .await
+                    .map_err(|error| error.to_string())?;
+                connection
+                    .serve_at(object_path, object)
+                    .await
+                    .map_err(|error| error.to_string())?;
+                Ok(ServedObjectRegistration(path))
+            })
+            .await
+            .map_err(|error| format!("serving the host object did not finish: {error}"))?
+    }
+
     /// Serve two interfaces at one object path and return an RAII token for
     /// their shared registration. The token is created on the module runtime
     /// task, so if the caller is cancelled while this operation is in flight,
@@ -305,7 +333,7 @@ pub(crate) use imp::serve_pair_after_first;
 #[cfg(feature = "modules")]
 pub(crate) use imp::{
     authoring_proxy, catalog_proxy, copilot_invoke_proxy, copilot_proxy, proxy, run_proxy, serve,
-    serve_pair, unserve,
+    serve_pair, serve_registered, unserve,
 };
 
 #[cfg(not(feature = "modules"))]
@@ -353,6 +381,13 @@ mod imp {
         Err("scheduled jobs are unavailable: this build has no module loader".to_string())
     }
 
+    pub(crate) async fn serve_registered(
+        _path: String,
+        _object: impl tinybus::service::Interface + 'static,
+    ) -> Result<ServedObjectRegistration, String> {
+        Err("scheduled jobs are unavailable: this build has no module loader".to_string())
+    }
+
     pub(crate) async fn serve_pair(
         _path: String,
         _first: impl tinybus::service::Interface + 'static,
@@ -367,7 +402,7 @@ mod imp {
 #[cfg(not(feature = "modules"))]
 pub(crate) use imp::{
     authoring_proxy, catalog_proxy, copilot_invoke_proxy, copilot_proxy, proxy, run_proxy, serve,
-    serve_pair, unserve,
+    serve_pair, serve_registered, unserve,
 };
 
 /// Whether the module can serve in this build and configuration (the switch
