@@ -95,12 +95,9 @@ runtime-wide".
 
 Every agent turn runs through the published [`tinyagents`](https://crates.io/crates/tinyagents) harness. There are three entry points: `Agent::turn`, the channel and CLI bus path, and `run_subagent`. All of them go through the adapter seam in [`crates/openhuman-core/src/agent/tinyagents/`](https://github.com/tinyhumansai/openhuman/tree/main/crates/openhuman-core/src/agent/tinyagents) (`TurnSpec::run`). Context trimming is `MessageTrimMiddleware`, and cancellation is the tinyagents steering channel. Policy stop hooks (budget, thread-goal and iteration caps) use the upstream `tinyagents-hooks` `StopHookMiddleware` and pause the run on the first stop vote. The channel route forwards live `AgentProgress` like the chat route. The shared `TurnProgress` seam lives in `agent/session_host/tool_progress.rs`.
 
-Multi-agent orchestration runs on the tinyagents graph layer, through `tinyagents-orchestration`'s `parallel` module, the host `spawn_parallel` adapter and the shared `graph::orchestration` `TaskStore` lifecycle primitives re-exported from [`orchestration/mod.rs`](https://github.com/tinyhumansai/openhuman/blob/main/crates/openhuman-core/src/agent/orchestration/mod.rs):
-
-- [`orchestration/delegation.rs`](https://github.com/tinyhumansai/openhuman/blob/main/crates/openhuman-core/src/agent/orchestration/delegation.rs) is a `plan → execute ⇄ review → finalize` `CompiledGraph`. It has conditional routing, `RecursionPolicy`, a durable `FileCheckpointer`, a `CancellationToken` and a `GraphTracingSink`.
-- The workflow phase engine fans each phase's agents out on the graph (`with_max_concurrency`). The durable `WorkflowRun` ledger stays the source of truth for resume.
-- `spawn_parallel_agents` runs its fan-out through the host `spawn_parallel` adapter over `tinyagents_orchestration::parallel`.
-- The detached-sub-agent registry is backed by a typed `TaskStore` lifecycle ledger (Pending, Running, then Completed, Failed or Cancelled).
+Multi-agent execution uses TinyAgents' `parallel` module and the host
+`spawn_parallel_agents` adapter. Detached sub-agent tasks retain host policy,
+progress, and product projections; TinyAgents owns the generic task lifecycle.
 
 ## TinyAgents crate: features and compatibility
 
@@ -411,8 +408,7 @@ Other built-ins are never chat delegates:
 
 | Archetype                              | Who runs it                                                                                                  |
 | -------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| `planner`, `critic`                    | Only the `parallel_research_cross_check` workflow-run template (decompose and research = `planner`, cross_check = `critic`). |
-| `summarizer`                           | The harness, to compress oversized tool results; also the synthesize phase of that workflow-run template.  |
+| `summarizer`                           | The harness, to compress oversized tool results. |
 | `trigger_triage` / `trigger_reactor`   | Classifying an incoming external event, and the lightweight reaction to one.                               |
 | `morning_briefing`                     | Cron: the daily digest, on a named read-only tool belt.                                                     |
 
@@ -646,15 +642,13 @@ direct `tinyagents-orchestration::subagent` lifecycle. There is no
 | ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `mod.rs`                                          | The runner (`TurnSpec::run`): installs the native `ChatModel`, host tool adapters, and middleware on an `AgentHarness`; runs one turn; caps output through `MaxTokensModel` (`inference/provider/model.rs`); mirrors progress; forwards steering; and pauses gracefully at the model-call cap. |
 | `mod.rs` / `model.rs` / `tools.rs` / `convert.rs` | `RunPolicy` / `ChatModel` / `Tool` / message adapters (incl. unknown-tool policy and out-of-band reasoning forwarding).                                                                                                                                                        |
-| `observability.rs`                                | Harness `AgentEvent` → `AgentProgress` + cost; `GraphTracingSink` for graph events.                                                                                                                                                                                            |
+| `observability.rs`                                | Harness `AgentEvent` → `AgentProgress` + cost.                                                                                                                                                                                            |
 | `orchestration.rs`                                | Re-exported `graph::orchestration` task-store types; map-reduce fanout uses the TinyAgents SDK surface directly.                                                                                                                                                           |
 | `delegation.rs`                                   | The durable `plan → execute ⇄ review → finalize` delegation graph (production worker wired in `orchestration::delegation`), checkpointed via TinyAgents' own `SqliteCheckpointer`.    |
 
-Orchestration on graphs (`crates/openhuman-core/src/agent/orchestration/`):
-
-- Workflow phase DAG (`workflow_runs/engine.rs`) runs on a `dispatch ⇄ run_phase → done` conditional-routing graph; each phase fans its agents out via `graph::parallel::map_reduce`. The durable `workflow_runs` row stays the source of truth (controllers + resume read it).
-- Multi-stage delegation (`orchestration::delegation` + the `delegate` tool) runs `delegation.rs`, checkpointed to the session DB.
-- Detached sub-agents (`running_subagents.rs`) use TinyAgents `DetachedTaskRegistry` for ownership-aware snapshots, wait/timeout, steering lookup, cooperative cancellation, hard abort, and terminal cleanup. OpenHuman retains durable task-store projection, product/session metadata, RPC and delivery semantics, and the `RunQueue` compatibility fallback.
+Orchestration in `crates/openhuman-core/src/agent/orchestration/` adapts
+detached sub-agent execution, worktree isolation, progress, and product
+projections. TinyAgents owns generic task lifecycle and parallel fanout.
 
 Deliberately kept off the crate's primitives (these are design decisions, not gaps):
 
@@ -664,7 +658,7 @@ Deliberately kept off the crate's primitives (these are design decisions, not ga
   product checkpoint/session projection. It implements the TinyAgents
   planner/executor/persistence traits directly. The neutral driver, not a
   host-local runner, owns lifecycle sequencing and task-key coalescing.
-- Durable run ledgers (`workflow_runs`, `command_center`, `subagent_sessions`) stay on openhuman SQLite/JSON until their controller projections and restart semantics are mapped onto TinyAgents task/status/journal records.
+- Command-center and sub-agent-session projections remain host-owned; generic detached task lifecycle is owned by TinyAgents.
 
 > TinyAgents ships harness store/cache/session primitives (`harness::store` with JSONL append stores, `harness::cache`, `harness::subagent`, lineage-aware status), graph task stores, the detached runtime registry, and conformance contracts. The session shell and product-specific sub-agent build/delivery pipeline remain OpenHuman-owned.
 
