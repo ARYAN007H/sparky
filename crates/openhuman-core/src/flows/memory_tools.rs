@@ -137,9 +137,9 @@ pub async fn forget_matching(config: &Config, filter: MetaFilter) -> Result<usiz
         Ok(forgotten) => Ok(forgotten),
         Err(Error::Off(_)) => {
             tracing::debug!("[flows:memory] forget skipped: memory is off");
-            return Ok(0);
+            Ok(0)
         }
-        Err(error) => return Err(error),
+        Err(error) => Err(error),
     }
 }
 
