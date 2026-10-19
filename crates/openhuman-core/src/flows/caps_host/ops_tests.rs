@@ -31,6 +31,17 @@ fn workflow_origin(job_id: &str, require_approval: bool) -> AgentTurnOrigin {
     }
 }
 
+fn agent_test_config(tmp: &tempfile::TempDir) -> Config {
+    let config = Config {
+        workspace_dir: tmp.path().join("workspace"),
+        action_dir: tmp.path().join("workspace"),
+        config_path: tmp.path().join("config.toml"),
+        ..Config::default()
+    };
+    std::fs::create_dir_all(&config.workspace_dir).unwrap();
+    config
+}
+
 #[path = "ops_schema_and_structured_output_tests.rs"]
 mod schema_and_structured_output_tests;
 #[path = "ops_tier_gate_and_timeouts_tests.rs"]

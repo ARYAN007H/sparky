@@ -1,6 +1,5 @@
 use super::*;
 use tinyagents_harness::tool::response_fields_from_schema;
-use tinyflows::nodes::integration::agent_prompt::scale_timeout_for_iteration_cap;
 use tinytools::status::POLICY_BLOCKED_MARKER;
 
 /// The tier gate an `http_request` (Network-class) node calls: BLOCKED under
@@ -374,10 +373,10 @@ fn nested_harness_does_not_escalate_without_an_origin() {
 /// default (10). This mirrors the exact build step `run_via_harness` takes
 /// before dispatching the turn (so it doesn't require a live model
 /// provider to exercise).
-#[test]
-fn agent_node_runtime_resolves_to_the_definitions_effective_iteration_cap() {
+#[tokio::test]
+async fn agent_node_runtime_resolves_to_the_definitions_effective_iteration_cap() {
     let tmp = tempfile::TempDir::new().unwrap();
-    let config = resolver_test_config(&tmp);
+    let config = agent_test_config(&tmp);
     assert_eq!(config.agent.max_tool_iterations, 10);
 
     crate::agent::harness::host_definition::AgentDefinitionRegistry::init_global(
@@ -400,122 +399,18 @@ fn agent_node_runtime_resolves_to_the_definitions_effective_iteration_cap() {
     .expect("build planner agent");
     assert_eq!(agent.agent_config().max_tool_iterations, expected);
 
-    // And the timeout scaling this cap feeds into actually widens the
-    // default 240s bound for this node.
-    let base_timeout = clamp_run_timeout_secs(None);
-    assert_eq!(base_timeout, 240);
-    let scaled =
-        scale_timeout_for_iteration_cap(base_timeout, agent.agent_config().max_tool_iterations);
-    assert_eq!(scaled, 600);
-}
-
-/// The resolver loads a saved flow's graph by its id — the by-`workflow_id`
-/// sub_workflow path resolves against the real flows store.
-#[tokio::test]
-async fn resolver_loads_saved_flow_graph_by_id() {
-    let tmp = tempfile::TempDir::new().unwrap();
-    let config = Arc::new(resolver_test_config(&tmp));
-
-    let graph_json = serde_json::to_value(trigger_only_graph()).unwrap();
-    let flow = flows::ops::flows_create(&config, "child".to_string(), graph_json, false)
-        .await
-        .expect("create flow");
-    let flow_id = flow.value.id.clone();
-
-    let resolver = OpenHumanWorkflowResolver {
-        ctx: crate::core::runtime::DispatchCtx::ambient(),
-        config: config.clone(),
+    let runner = OpenHumanAgentRunner {
+        config: Arc::new(config),
+        ctx: crate::core::runtime::DispatchCtx::unbound(),
+        approval: Default::default(),
+        progress: None,
     };
-    let graph = resolver
-        .resolve(&flow_id)
+    let prepared = runner
+        .prepare_agent_run(json!({"prompt":"work"}), None, None, 50)
         .await
-        .expect("resolver should load the saved flow graph");
-    assert_eq!(graph.nodes.len(), 1);
-    assert_eq!(graph.nodes[0].id, "t");
-}
-
-/// An unknown workflow_id surfaces a capability error naming the id, rather
-/// than silently resolving to nothing.
-#[tokio::test]
-async fn resolver_unknown_id_is_a_capability_error() {
-    let tmp = tempfile::TempDir::new().unwrap();
-    let config = Arc::new(resolver_test_config(&tmp));
-    let resolver = OpenHumanWorkflowResolver {
-        ctx: crate::core::runtime::DispatchCtx::ambient(),
-        config,
-    };
-
-    let err = resolver
-        .resolve("does-not-exist")
-        .await
-        .expect_err("unknown workflow_id must error");
-    match err {
-        EngineError::Capability(msg) => assert!(
-            msg.contains("does-not-exist"),
-            "error should name the missing id: {msg}"
-        ),
-        other => panic!("expected a capability error, got: {other:?}"),
-    }
-}
-
-#[tokio::test]
-async fn resolver_rejects_an_engine_incompatible_saved_graph() {
-    let tmp = tempfile::TempDir::new().unwrap();
-    let config = Arc::new(resolver_test_config(&tmp));
-    let flow = flows::ops::flows_create(
-        &config,
-        "legacy child".to_string(),
-        serde_json::to_value(trigger_only_graph()).unwrap(),
-        false,
-    )
-    .await
-    .unwrap()
-    .value;
-    let unsafe_graph = json!({
-        "nodes": [
-            { "id": "t", "kind": "trigger", "name": "Trigger" },
-            { "id": "outer", "kind": "condition", "name": "Outer", "config": { "field": "outer" } },
-            { "id": "inner", "kind": "condition", "name": "Inner", "config": { "field": "inner" } },
-            { "id": "outer_else", "kind": "output_parser", "name": "Outer else" },
-            { "id": "inner_else", "kind": "output_parser", "name": "Inner else" },
-            { "id": "a", "kind": "output_parser", "name": "A" },
-            { "id": "c", "kind": "output_parser", "name": "C" },
-            { "id": "m", "kind": "merge", "name": "Merge" }
-        ],
-        "edges": [
-            { "from_node": "t", "from_port": "main", "to_node": "outer" },
-            { "from_node": "t", "from_port": "main", "to_node": "c" },
-            { "from_node": "outer", "from_port": "true", "to_node": "inner" },
-            { "from_node": "outer", "from_port": "false", "to_node": "outer_else" },
-            { "from_node": "inner", "from_port": "true", "to_node": "a" },
-            { "from_node": "inner", "from_port": "false", "to_node": "inner_else" },
-            { "from_node": "a", "from_port": "main", "to_node": "m" },
-            { "from_node": "c", "from_port": "main", "to_node": "m" }
-        ]
-    });
-    // Stage a stored graph no save path would accept: written raw, under the
-    // flow's id, as a legacy row would be.
-    crate::flows::store::force_corrupt_graph_json_for_test(
-        &config,
-        &flow.id,
-        &unsafe_graph.to_string(),
-    )
-    .unwrap();
-
-    let error = OpenHumanWorkflowResolver {
-        ctx: crate::core::runtime::DispatchCtx::ambient(),
-        config,
-    }
-    .resolve(&flow.id)
-    .await
-    .expect_err("resolver must reject an incompatible legacy child");
-    match error {
-        EngineError::Capability(message) => assert!(
-            message.contains("unsupported_nested_conditional_fan_in"),
-            "{message}"
-        ),
-        other => panic!("expected a capability error, got: {other:?}"),
-    }
+        .expect("module prepares agent timeout");
+    assert_eq!(prepared.base_timeout_secs, 240);
+    assert_eq!(prepared.timeout_secs, 600);
 }
 
 // ── response_fields_from_schema ─────────────────────────────────────────

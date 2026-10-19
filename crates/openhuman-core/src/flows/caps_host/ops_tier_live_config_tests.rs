@@ -307,7 +307,7 @@ async fn code_adapter_observes_file_backed_tier_changes_between_calls() {
 
     let err = code
         .run(
-            tinyflows::caps::CodeLanguage::JavaScript,
+            tinyflows_bus::runs::CodeLanguage::JavaScript,
             "return 1;",
             json!([]),
         )

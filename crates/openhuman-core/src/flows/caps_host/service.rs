@@ -29,6 +29,13 @@ impl CapsHostService {
         let progress_state = Arc::clone(&state);
         let progress = tokio::spawn(async move {
             while let Some(event) = progress_rx.recv().await {
+                if let crate::agent::progress::AgentProgress::TurnCompleted {
+                    stop: Some(stop),
+                    ..
+                } = &event
+                {
+                    progress_state.lock().await.turn_stop = Some(stop.clone());
+                }
                 let Some((kind, text)) = progress_event(event) else {
                     continue;
                 };
@@ -50,7 +57,11 @@ impl CapsHostService {
 
         let mut config = request.config.clone();
         if let (Some(model), Some(object)) = (
-            request.model.model.as_ref(),
+            request
+                .model
+                .model
+                .as_ref()
+                .or(request.agent.model.as_ref()),
             config.as_object_mut(),
         ) && object.get("model").and_then(Value::as_str).is_none()
         {
@@ -77,6 +88,44 @@ impl CapsHostService {
         state.done = true;
         match result {
             Ok(raw) => {
+                let turn_stop = state.turn_stop.clone();
+                let stop = match turn_stop.as_ref() {
+                    None => runs::StopReason::Finished,
+                    Some(stop)
+                        if stop.kind
+                            == tinyagents_harness::turn_stop::TurnStopKind::IterationCap =>
+                    {
+                        runs::StopReason::LimitStop {
+                            limit: "max_steps".to_owned(),
+                        }
+                    }
+                    Some(stop)
+                        if stop.kind == tinyagents_harness::turn_stop::TurnStopKind::WindDown =>
+                    {
+                        runs::StopReason::Paused {
+                            token: None,
+                            reason: "wall_clock".to_owned(),
+                            payload: json!({
+                                "kind": stop.kind.as_str(),
+                                "failure_class": stop.failure_class.as_ref().map(|class| class.as_str()),
+                                "operation": stop.operation.as_deref(),
+                            }),
+                        }
+                    }
+                    Some(stop) => {
+                        let class = stop
+                            .failure_class
+                            .as_ref()
+                            .map(|class| class.as_str())
+                            .unwrap_or("unknown");
+                        let operation = stop.operation.as_deref().unwrap_or("unknown");
+                        let error = format!(
+                            "agent run stopped by classified failure ({class}, {operation})"
+                        );
+                        state.error = Some(error.clone());
+                        return Err(error);
+                    }
+                };
                 let text = raw
                     .as_str()
                     .map(str::to_owned)
@@ -94,7 +143,7 @@ impl CapsHostService {
                     })
                     .collect();
                 state.outcome = Some(runs::AgentRunOutcome {
-                    stop: runs::StopReason::Finished,
+                    stop,
                     text,
                     json,
                     raw,

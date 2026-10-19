@@ -83,6 +83,7 @@ pub(crate) struct AgentRunState {
     pub(crate) events: Vec<tinyflows_bus::runs::AgentProgressEvent>,
     pub(crate) outcome: Option<tinyflows_bus::runs::AgentRunOutcome>,
     pub(crate) error: Option<String>,
+    pub(crate) turn_stop: Option<tinyagents_harness::turn_stop::TurnStop>,
     pub(crate) done: bool,
 }
 
@@ -130,7 +131,7 @@ fn max_parallel_harness_agents(raw: Option<&str>) -> usize {
 }
 
 impl OpenHumanAgentRunner {
-    async fn prepare_agent_run(
+    pub(crate) async fn prepare_agent_run(
         &self,
         request: Value,
         entry_model: Option<&str>,
