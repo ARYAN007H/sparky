@@ -2,7 +2,7 @@
 //!
 //! `spawn_web_channel_bridge` spawns one forwarding task per source. Domain
 //! broadcast channels: web-chat events (`openhuman::web_chat`), dictation hotkeys
-//! and transcription results (`openhuman::voice::dictation_listener`), core notifications
+//! and transcription results (the live-voice transport), core notifications
 //! (`openhuman::desktop::notifications`), and shell companion state
 //! (`COMPANION_STATE_BUS`). `DomainEvent`s read off `openhuman::core::bus::BUS`:
 //! session expiry, MCP setup secret requests, memory sync and tree-build
@@ -591,28 +591,7 @@ pub fn spawn_web_channel_bridge(io: SocketIo) {
 
     // 2. Dictation hotkey events → broadcast to all connected clients.
     tokio::spawn(async move {
-        let mut rx = crate::core_host::voice::dictation_listener::subscribe_dictation_events();
-        loop {
-            let event = match rx.recv().await {
-                Ok(event) => event,
-                Err(tokio::sync::broadcast::error::RecvError::Lagged(skipped)) => {
-                    log::warn!("[socketio] dropped {skipped} events due to lag");
-                    continue;
-                }
-                Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
-            };
 
-            if let Ok(payload) = serde_json::to_value(&event) {
-                log::debug!(
-                    "[socketio] broadcast dictation:{} to all clients",
-                    event.event_type
-                );
-                // Support both colon and underscore versions for compatibility with different frontends.
-                let _ = io.emit("dictation:toggle", &payload);
-                let _ = io.emit("dictation_toggle", &payload);
-            }
-        }
-        log::debug!("[socketio] dictation bridge stopped");
     });
 
     // Shell companion state → broadcast to all clients. The main renderer also
@@ -799,28 +778,7 @@ pub fn spawn_web_channel_bridge(io: SocketIo) {
 
     // 5. Transcription results → broadcast to all connected clients.
     tokio::spawn(async move {
-        let mut rx = crate::core_host::voice::dictation_listener::subscribe_transcription_results();
-        loop {
-            let text = match rx.recv().await {
-                Ok(text) => text,
-                Err(tokio::sync::broadcast::error::RecvError::Lagged(skipped)) => {
-                    log::warn!(
-                        "[socketio] dropped {} transcription events due to lag",
-                        skipped
-                    );
-                    continue;
-                }
-                Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
-            };
 
-            log::debug!(
-                "[socketio] broadcast dictation:transcription ({} chars) to all clients",
-                text.len()
-            );
-            let payload = serde_json::json!({ "text": text });
-            let _ = io_transcription.emit("dictation:transcription", &payload);
-        }
-        log::debug!("[socketio] transcription bridge stopped");
     });
 
     // 8. Memory sync stage + tree-build progress → broadcast to all clients
