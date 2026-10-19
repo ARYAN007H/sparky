@@ -200,7 +200,7 @@ async fn screen_input_redacts_credentials_without_changing_screening_policy() {
     .collect();
     let text = format!("credential={secret}");
     let outcome = gate
-        .screen_input(text, ContentOrigin::User)
+        .screen_input(&text, ContentOrigin::User)
         .await
         .unwrap();
     let ScreenOutcome::Redacted(redacted) = outcome else {
