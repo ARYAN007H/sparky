@@ -9,8 +9,8 @@ use tinystoragedrivers::secrets::{KeyProvider, crypto};
 use tinystoragedrivers::{CollectionSpec, DocumentStore, Precondition};
 
 use super::{
-    ConfigRead, ConfigSource, ConfigSourceAnchor, FileConfigSource, apply_bootstrap,
-    strip_bootstrap,
+    ConfigRead, ConfigSource, ConfigSourceAnchor, DocumentBackendIdentity, FileConfigSource,
+    apply_bootstrap, strip_bootstrap,
 };
 use crate::storage::Scope;
 
@@ -40,7 +40,7 @@ pub(crate) struct DocumentConfigSource {
     keys: Arc<dyn KeyProvider>,
     file: FileConfigSource,
     observed_version: Mutex<Option<tinystoragedrivers::Version>>,
-    backend_identity: usize,
+    backend_identity: DocumentBackendIdentity,
 }
 
 impl DocumentConfigSource {
@@ -49,7 +49,7 @@ impl DocumentConfigSource {
         scope: Scope,
         keys: Arc<dyn KeyProvider>,
         file: FileConfigSource,
-        backend_identity: usize,
+        backend_identity: DocumentBackendIdentity,
     ) -> Self {
         Self {
             docs,

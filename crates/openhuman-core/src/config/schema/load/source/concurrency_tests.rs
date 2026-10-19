@@ -209,7 +209,7 @@ async fn config_snapshot_cannot_be_saved_into_a_different_tenant_scope() {
         let docs = Arc::clone(scoped(&storage, "tenant-source-b").documents());
         let stored = docs
             .get(
-                super::super::CONFIG_COLLECTION,
+                super::super::storage_schema::CONFIG_COLLECTION,
                 &super::super::storage_schema::document_id("tenant-source-b").unwrap(),
             )
             .await
@@ -259,28 +259,45 @@ async fn config_snapshot_cannot_be_saved_into_a_different_tenant_scope() {
 #[tokio::test]
 async fn config_snapshot_is_bound_to_its_backend_instance() {
     let tmp = tempfile::tempdir().unwrap();
-    let storage = MemoryStorage::new();
-    let seed = config_at(tmp.path(), "same-backend");
-    let stale = {
+    let path = tmp.path().join("config.toml");
+    let workspace = tmp.path().join("workspace");
+    let storage_a = MemoryStorage::new();
+    let storage_b = MemoryStorage::new();
+    let config_a = {
         let _source = ForcedDocumentSource::new(
-            scoped(&storage, "tenant-backend-instance"),
-            Scope::new("tenant-backend-instance").unwrap(),
+            scoped(&storage_a, "tenant-same-anchor"),
+            Scope::new("tenant-same-anchor").unwrap(),
             keys(14),
         );
-        seed.save().await.unwrap();
-        Config::load_from_config_path(&seed.config_path, &seed.workspace_dir)
-            .await
-            .unwrap()
+        config_at(tmp.path(), "backend-a").save().await.unwrap();
+        Config::load_from_config_path(&path, &workspace).await.unwrap()
     };
+    let (config_b, version_b) = {
+        let _source = ForcedDocumentSource::new(
+            scoped(&storage_b, "tenant-same-anchor"),
+            Scope::new("tenant-same-anchor").unwrap(),
+            keys(14),
+        );
+        config_at(tmp.path(), "backend-b").save().await.unwrap();
+        let config = Config::load_from_config_path(&path, &workspace).await.unwrap();
+        let version = config.document_snapshot.lock().unwrap().version;
+        (config, version)
+    };
+    let version_a = config_a.document_snapshot.lock().unwrap().version;
+    assert_eq!(version_a, version_b, "fixture uses colliding document versions");
+    let anchor_a = config_a.document_snapshot.lock().unwrap().anchor.clone();
+    let anchor_b = config_b.document_snapshot.lock().unwrap().anchor.clone();
+    assert_ne!(anchor_a, anchor_b, "source anchors retain backend identity");
+
     let error = {
         let _source = ForcedDocumentSource::new(
-            scoped(&storage, "tenant-backend-instance"),
-            Scope::new("tenant-backend-instance").unwrap(),
+            scoped(&storage_b, "tenant-same-anchor"),
+            Scope::new("tenant-same-anchor").unwrap(),
             keys(14),
         );
-        let mut stale = stale;
-        stale.default_model = Some("must-not-cross-backend-instance".into());
-        stale.save().await.unwrap_err()
+        let mut from_a = config_a;
+        from_a.default_model = Some("must-not-cross-backend-instance".into());
+        from_a.save().await.unwrap_err()
     };
     assert_typed_conflict(error);
 }
