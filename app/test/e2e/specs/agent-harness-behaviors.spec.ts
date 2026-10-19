@@ -266,7 +266,7 @@ describe('agent harness behaviors', () => {
       ])
     );
 
-    const threadId = await startNewThread();
+    await startNewThread();
     await sendPrompt('please write then update the approve file');
 
     const card = await $('[role="alertdialog"]');
@@ -283,13 +283,8 @@ describe('agent harness behaviors', () => {
 
   it('surfaces a subagent clarification question and accepts the user reply', async function () {
     this.timeout(120_000);
-    // NOTE: the full pause/resume `continue_subagent` cycle is covered by
-    // `chat-harness-subagent-continue.spec.ts` (and the Rust
-    // `subagent_clarification_flow` test). The real `task_id` is dynamic and the
-    // mock replays forced responses verbatim (no templating — see
-    // `scripts/mock-api/routes/llm.mjs:622-639`), so this browser test verifies
-    // the user-visible contract only: the clarification question is shown, the
-    // user can reply, and the next turn completes.
+    // Keep the question, reply affordance, and visible completion in the browser;
+    // Rust owns the underlying clarification and continuation semantics.
     setMockBehavior(
       'llmForcedResponses',
       JSON.stringify([
