@@ -113,6 +113,43 @@ test("the mock runner rejects a filter that matches no JSON-RPC test", () => {
   }
 });
 
+test("a filter may skip individual JSON-RPC targets when another target matches", () => {
+  const root = mkdtempSync(join(tmpdir(), "product-enumeration-filter-hit-"));
+  try {
+    const cargo = join(root, "cargo");
+    writeFileSync(
+      cargo,
+      `#!/bin/bash
+if [[ " $* " == *" --list "* ]]; then
+  if [[ " $* " == *" --test json_rpc_threads_e2e "* ]]; then echo "matching_case: test"; else echo "other_case: test"; fi
+  exit 0
+fi
+printf "%s\\n" "$*" >> "$TEST_RAN"
+`,
+      { mode: 0o755 },
+    );
+    const ran = join(root, "ran");
+    const result = spawnSync(
+      "bash",
+      [
+        "-c",
+        'set -euo pipefail\ncargo_test() { "$TEST_CARGO" "$@"; }\n' +
+          body +
+          '\nJSON_RPC_E2E_FILTER=matching_case run_json_rpc_e2e\n',
+      ],
+      {
+        encoding: "utf8",
+        env: { ...process.env, TEST_CARGO: cargo, TEST_RAN: ran },
+      },
+    );
+    assert.equal(result.status, 0, result.stdout + result.stderr);
+    assert.match(readFileSync(ran, "utf8"), /--test json_rpc_threads_e2e matching_case/);
+    assert.equal(readFileSync(ran, "utf8").trim().split("\n").length, 1);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("released TinyHosts contract callers match the declared libtest module", () => {
   const moduleSource = readFileSync(
     new URL("../../crates/openhuman-core/src/hosting/mod.rs", import.meta.url),
