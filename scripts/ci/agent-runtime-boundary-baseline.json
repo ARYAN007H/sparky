@@ -64,13 +64,6 @@
   },
   {
     "rule": "openhuman-task-local",
-    "path": "crates/openhuman-core/src/agent_runs/schemas.rs",
-    "line": 438,
-    "text": "crate::agent::turn_origin::with_origin(",
-    "occurrence": 1
-  },
-  {
-    "rule": "openhuman-task-local",
     "path": "crates/openhuman-core/src/agent/tools/delegate.rs",
     "line": 254,
     "text": ".with_thread_id(tool_context.and_then(ToolRunContext::thread_id));",
@@ -88,6 +81,13 @@
     "path": "crates/openhuman-core/src/agent/turn_origin.rs",
     "line": 364,
     "text": "pub fn current_request_id() -> Option<String> {",
+    "occurrence": 1
+  },
+  {
+    "rule": "openhuman-task-local",
+    "path": "crates/openhuman-core/src/agent_runs/schemas.rs",
+    "line": 438,
+    "text": "crate::agent::turn_origin::with_origin(",
     "occurrence": 1
   },
   {
@@ -197,20 +197,6 @@
   },
   {
     "rule": "openhuman-task-local",
-    "path": "crates/openhuman-core/src/inference/provider/openhuman_backend_model_calls.rs",
-    "line": 51,
-    "text": "with_thread_id(apply_reasoning_hint(request), self.thread_id.as_deref()),",
-    "occurrence": 1
-  },
-  {
-    "rule": "openhuman-task-local",
-    "path": "crates/openhuman-core/src/inference/provider/openhuman_backend_model_calls.rs",
-    "line": 78,
-    "text": "with_thread_id(apply_reasoning_hint(request), self.thread_id.as_deref()),",
-    "occurrence": 2
-  },
-  {
-    "rule": "openhuman-task-local",
     "path": "crates/openhuman-core/src/inference/provider/openhuman_backend_model.rs",
     "line": 141,
     "text": "pub fn with_thread_id(mut self, thread_id: Option<impl AsRef<str>>) -> Self {",
@@ -225,17 +211,17 @@
   },
   {
     "rule": "openhuman-task-local",
-    "path": "crates/openhuman-core/src/integrations/composio/bus/trigger_subscriber.rs",
-    "line": 10,
-    "text": "use crate::agent::turn_origin::with_origin;",
+    "path": "crates/openhuman-core/src/inference/provider/openhuman_backend_model_calls.rs",
+    "line": 51,
+    "text": "with_thread_id(apply_reasoning_hint(request), self.thread_id.as_deref()),",
     "occurrence": 1
   },
   {
     "rule": "openhuman-task-local",
-    "path": "crates/openhuman-core/src/integrations/composio/bus/trigger_subscriber.rs",
-    "line": 198,
-    "text": "if let Err(e) = with_origin(origin, apply_decision(&ctx, run, &envelope)).await",
-    "occurrence": 1
+    "path": "crates/openhuman-core/src/inference/provider/openhuman_backend_model_calls.rs",
+    "line": 78,
+    "text": "with_thread_id(apply_reasoning_hint(request), self.thread_id.as_deref()),",
+    "occurrence": 2
   },
   {
     "rule": "openhuman-task-local",
@@ -281,16 +267,23 @@
   },
   {
     "rule": "openhuman-task-local",
-    "path": "crates/openhuman-core/src/skills/webhooks/bus.rs",
-    "line": 321,
+    "path": "crates/openhuman-core/src/skills/webhooks/ops.rs",
+    "line": 172,
     "text": "crate::agent::turn_origin::with_origin(",
     "occurrence": 1
   },
   {
     "rule": "openhuman-task-local",
-    "path": "crates/openhuman-core/src/skills/webhooks/ops.rs",
-    "line": 172,
-    "text": "crate::agent::turn_origin::with_origin(",
+    "path": "crates/openhuman-core/src/triage/runner.rs",
+    "line": 25,
+    "text": "use crate::security::turn_origin::with_origin;",
+    "occurrence": 1
+  },
+  {
+    "rule": "openhuman-task-local",
+    "path": "crates/openhuman-core/src/triage/runner.rs",
+    "line": 78,
+    "text": "with_origin(origin, apply_decision(ctx, run, envelope)).await",
     "occurrence": 1
   },
   {
@@ -372,6 +365,14 @@
   },
   {
     "rule": "openhuman-upstream-reexport",
+    "path": "crates/openhuman-embed/src/lib.rs",
+    "line": 224,
+    "text": "pub use tinyagents_hooks::stop::{StopDecision, StopHook};",
+    "occurrence": 1,
+    "reason": "Issue7929 explicitly keeps embed re-exports of the hook types under their public names; implementation belongs to tinyagents-hooks."
+  },
+  {
+    "rule": "openhuman-upstream-reexport",
     "path": "crates/openhuman-embed/src/observe.rs",
     "line": 7,
     "text": "pub use tinyagents_harness::observability::turn_observer::{",
@@ -397,6 +398,14 @@
     "line": 209,
     "text": "pub struct ToolRegistry<State: Send + Sync, Ctx: Send + Sync> {",
     "occurrence": 1
+  },
+  {
+    "rule": "tinyagents-moved-symbol-alias",
+    "path": "vendor/tinyagents/crates/tinyagents-runtime/src/hooks.rs",
+    "line": 122,
+    "text": "pub type SessionHookFuture<'a, T> = tinyagents_hooks::SessionHookFuture<'a, T, RuntimeError>;",
+    "occurrence": 1,
+    "reason": "Runtime binds its own RuntimeError to the generic hooks future; moving this binding into hooks would create a dependency cycle."
   },
   {
     "rule": "tinyagents-tool-calling-facade",
@@ -456,16 +465,16 @@
   },
   {
     "rule": "tinyagents-tool-calling-facade",
-    "path": "vendor/tinyagents/crates/tinyagents-harness/src/tool/prompt_relaxed_tests.rs",
-    "line": 12,
-    "text": "use tinytools_agent::repair::json::{normalize_leaked_quote_tokens, quote_bare_keys};",
+    "path": "vendor/tinyagents/crates/tinyagents-harness/src/tool/prompt.rs",
+    "line": 21,
+    "text": "use tinytools_agent::repair::json::recover_whole_object;",
     "occurrence": 1
   },
   {
     "rule": "tinyagents-tool-calling-facade",
-    "path": "vendor/tinyagents/crates/tinyagents-harness/src/tool/prompt.rs",
-    "line": 21,
-    "text": "use tinytools_agent::repair::json::recover_whole_object;",
+    "path": "vendor/tinyagents/crates/tinyagents-harness/src/tool/prompt_relaxed_tests.rs",
+    "line": 12,
+    "text": "use tinytools_agent::repair::json::{normalize_leaked_quote_tokens, quote_bare_keys};",
     "occurrence": 1
   },
   {
@@ -534,6 +543,14 @@
   {
     "rule": "tinyagents-upstream-reexport",
     "path": "vendor/tinyagents/crates/tinyagents-runtime/src/lib.rs",
+    "line": 10,
+    "text": "pub use tinyagents_hooks::command as command_hooks;",
+    "occurrence": 1,
+    "reason": "tinyagents470 explicitly requires the runtime command_hooks compatibility re-export for one release."
+  },
+  {
+    "rule": "tinyagents-upstream-reexport",
+    "path": "vendor/tinyagents/crates/tinyagents-runtime/src/lib.rs",
     "line": 33,
     "text": "pub use tinyagents_session::transcript::TranscriptPartial;",
     "occurrence": 1
@@ -551,29 +568,5 @@
     "line": 68,
     "text": "pub use tinyagents_harness::store::{AppendStore, Store};",
     "occurrence": 1
-  },
-  {
-    "rule": "openhuman-upstream-reexport",
-    "path": "crates/openhuman-embed/src/lib.rs",
-    "line": 224,
-    "text": "pub use tinyagents_hooks::stop::{StopDecision, StopHook};",
-    "occurrence": 1,
-    "reason": "Issue7929 explicitly keeps embed re-exports of the hook types under their public names; implementation belongs to tinyagents-hooks."
-  },
-  {
-    "rule": "tinyagents-moved-symbol-alias",
-    "path": "vendor/tinyagents/crates/tinyagents-runtime/src/hooks.rs",
-    "line": 122,
-    "text": "pub type SessionHookFuture<'a, T> = tinyagents_hooks::SessionHookFuture<'a, T, RuntimeError>;",
-    "occurrence": 1,
-    "reason": "Runtime binds its own RuntimeError to the generic hooks future; moving this binding into hooks would create a dependency cycle."
-  },
-  {
-    "rule": "tinyagents-upstream-reexport",
-    "path": "vendor/tinyagents/crates/tinyagents-runtime/src/lib.rs",
-    "line": 10,
-    "text": "pub use tinyagents_hooks::command as command_hooks;",
-    "occurrence": 1,
-    "reason": "tinyagents470 explicitly requires the runtime command_hooks compatibility re-export for one release."
   }
 ]
