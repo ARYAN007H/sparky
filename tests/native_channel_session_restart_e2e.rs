@@ -9,7 +9,7 @@
 //! linked TinyChannels module implementation so it exercises the native
 //! Telegram listener rather than a host-side REST adapter.
 
-use std::collections::{HashMap, VecDeque};
+use std::collections::VecDeque;
 use std::fs::File;
 use std::path::Path;
 use std::process::{Child, Command, Stdio};
@@ -372,10 +372,26 @@ async fn wait_healthy(base: &str, process: &mut CoreProcess, log_path: &Path) {
 }
 
 async fn wait_for_completion(state: &MockState, count: usize) {
-    wait_until("model request", || {
-        state.completions.lock().expect("model requests").len() >= count
-    })
-    .await;
+    let deadline = Instant::now() + Duration::from_secs(45);
+    while state.completions.lock().expect("model requests").len() < count {
+        if Instant::now() >= deadline {
+            let model_requests = state.completions.lock().expect("model requests").len();
+            let offsets = state
+                .update_offsets
+                .lock()
+                .expect("Telegram offsets")
+                .clone();
+            let sent_messages = state
+                .sent_messages
+                .lock()
+                .expect("Telegram sent messages")
+                .len();
+            panic!(
+                "timed out waiting for model request {count}; observed {model_requests} model requests, Telegram offsets {offsets:?}, and {sent_messages} outbound messages"
+            );
+        }
+        sleep(Duration::from_millis(50)).await;
+    }
     wait_until("final Telegram reply", || {
         state
             .sent_messages
