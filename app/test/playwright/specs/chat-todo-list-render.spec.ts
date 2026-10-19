@@ -5,10 +5,10 @@
  * There are two renders of the same vendored element and they are not the same
  * claim:
  *
- *   PINNED   `Conversations.tsx:1658` — `data-testid="todo-checklist"`, fed by
+ *   PINNED   `TurnTaskCards.tsx` — `data-testid="todo-checklist"`, fed by
  *            `useThreadTodos` off the live `thread_todos_changed` event. One
  *            per thread, always current.
- *   SNAPSHOT `aui/TodoListPart.tsx:76` — one per `todo` tool call in the
+ *   SNAPSHOT `aui/TodoListPart.tsx:89` — one per `todo` tool call in the
  *            transcript, fed by that call's own `args`/`result`
  *            (`TodoListPart.tsx:62-66` is explicit that these are different
  *            sources).
@@ -96,18 +96,15 @@ const RULES = [
 ];
 
 /**
- * Every rendered todo list, pinned and snapshot alike. `data-slot` is the
- * element's own attribute (`todo-list.tsx:46`), so this finds the real
- * component rather than a wrapper that happens to carry a test id.
+ * Every rendered todo UI surface: a pinned task card or per-call receipt.
  */
 const allTodoSurfaces = (page: Page): Locator =>
   page.locator('[data-testid="todo-checklist"], [data-testid="todo-receipt"]');
 
 /** The pinned, always-current list above the composer. */
 /**
- * The per-tool-call snapshots in the transcript. The pinned render is the only
- * one given a test id (`Conversations.tsx:1659`), so excluding it leaves
- * exactly the `TodoListPart` renders.
+ * The per-tool-call transcript snapshots. Each `TodoListPart` has its own
+ * receipt wrapper; the pinned task cards use the separate `todo-checklist` id.
  */
 const snapshotReceipts = (page: Page): Locator => page.getByTestId('todo-receipt');
 
@@ -125,7 +122,7 @@ async function expandSnapshotReceipts(page: Page): Promise<void> {
 
 /**
  * One list's item states, in list order, as the element publishes them to
- * assistive technology (`todo-list.tsx:82`).
+ * assistive technology (`todo-list.tsx:126`).
  *
  * Reads the DOM directly rather than through a tolerant helper: a helper that
  * shrugged off a missing span would turn "the element stopped reporting its

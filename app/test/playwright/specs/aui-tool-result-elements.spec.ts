@@ -101,8 +101,20 @@ async function scriptToolCall(
  * "the first button in the card" — an earlier revision clicked by button order
  * and silently opened nothing.
  */
+async function openActivityGroup(page: Page): Promise<Locator> {
+  const group = page.locator('[data-slot="tool-group-root"]').last();
+  await expect(group, 'the assistant response has no activity disclosure').toBeVisible({
+    timeout: 30_000,
+  });
+  const trigger = group.locator('[data-slot="tool-group-trigger"]');
+  if ((await trigger.getAttribute('aria-expanded')) === 'false') await trigger.click();
+  await expect(trigger).toHaveAttribute('aria-expanded', 'true', { timeout: 10_000 });
+  return group;
+}
+
 async function openToolCall(page: Page, expectedLabel: string | RegExp): Promise<Locator> {
-  const card = page.getByTestId('assistant-ui-tool-call').filter({ hasText: expectedLabel });
+  const group = await openActivityGroup(page);
+  const card = group.getByTestId('assistant-ui-tool-call').filter({ hasText: expectedLabel });
   await expect(
     card.first(),
     `the round settled but produced no tool card matching ${String(expectedLabel)} — ` +
@@ -276,9 +288,8 @@ test.describe('assistant-ui tool-result elements', () => {
     ]);
 
     await sendTurn(page, threadId, 'AUI-DOC-CASE write up the infrastructure review');
-    const toolCard = await openToolCall(page, /Document|document/);
-
-    const card = toolCard.locator('[data-slot="artifact-card"]').first();
+    const group = await openActivityGroup(page);
+    const card = group.locator('[data-slot="artifact-card"]').last();
     await expect(card).toBeVisible({ timeout: 20_000 });
 
     // The point of this assertion. `DocumentArtifactCall` resolves the title as
