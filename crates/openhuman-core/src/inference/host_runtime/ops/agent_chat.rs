@@ -435,7 +435,8 @@ pub async fn agent_chat_reply_for_controlled(
                 "[inference] agent_chat untrusted input on a host-only agent; guard skipped"
             );
         }
-        _ => enforce_user_prompt_or_reject(message, "local_ai.ops.agent_chat")?,
+        _ => enforce_user_prompt_or_reject(message, "local_ai.ops.agent_chat")
+            .map_err(anyhow::Error::msg)?,
     }
 
     // TAURI-RUST-RS: an upstream caller (frontend, JSON-RPC client) can pass
@@ -460,7 +461,7 @@ pub async fn agent_chat_reply_for_controlled(
         .as_deref()
         .map(str::trim)
         .filter(|id| !id.is_empty());
-    let turn_cwd = resolve_turn_cwd(cwd)?;
+    let turn_cwd = resolve_turn_cwd(cwd).map_err(anyhow::Error::msg)?;
     // The turn's context: the host environment's bound one, else the task's.
     let turn_ctx = crate::core::runtime::DispatchCtx::from_weak(env.host.core.as_ref());
     let mut agent = match turn_cwd.as_ref() {
@@ -481,14 +482,16 @@ pub async fn agent_chat_reply_for_controlled(
                 root.display()
             );
             let mut agent =
-                build_turn_agent(&turn_ctx, &scoped, &target, turn_session_id, temperature)?;
+                build_turn_agent(&turn_ctx, &scoped, &target, turn_session_id, temperature)
+                    .map_err(anyhow::Error::msg)?;
             // Also thread it as the turn's workspace descriptor so acting tools
             // that read `ToolExecutionContext::workspace` (shell) resolve their
             // default cwd here, and so spawned sub-agents inherit the same root.
             agent.set_workspace_descriptor(Some(tinytools::WorkspaceDescriptor::new(root.clone())));
             agent
         }
-        None => build_turn_agent(&turn_ctx, config, &target, turn_session_id, temperature)?,
+        None => build_turn_agent(&turn_ctx, config, &target, turn_session_id, temperature)
+            .map_err(anyhow::Error::msg)?,
     };
     // Thread-correct resume. `OpenHumanSessionHost::turn` would otherwise auto-load the
     // newest transcript for the agent *name*, which is another thread's
@@ -530,8 +533,7 @@ pub async fn agent_chat_reply_for_controlled(
                 &staging_config,
                 &scope,
             )
-            .await
-            .map_err(|e| e.to_string())?;
+            .await?;
             log::debug!(
                 "[inference] agent_chat staged {} host attachment(s)",
                 attachments.len()
@@ -546,7 +548,9 @@ pub async fn agent_chat_reply_for_controlled(
         ..
     } = target
     {
-        agent.set_untrusted_input(true).map_err(|e| e.to_string())?;
+        agent
+            .set_untrusted_input(true)
+            .map_err(anyhow::Error::msg)?;
     }
     // A seeded turn replaces resume rather than adding to it.
     //
@@ -564,9 +568,7 @@ pub async fn agent_chat_reply_for_controlled(
     } = target
     {
         agent.clear_history();
-        agent
-            .seed_resume_from_messages(seed.to_vec(), message)
-            .map_err(|e| e.to_string())?;
+        agent.seed_resume_from_messages(seed.to_vec(), message)?;
         agent.set_next_turn_overrides(crate::agent::session_host::TurnOverrides {
             suppress_transcript_autoload: true,
             ..Default::default()
