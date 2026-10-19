@@ -29,6 +29,23 @@ pub fn classify_stop(
     TurnStop::classify(breaker_halt, wind_down, hit_cap, stop_fallback_class)
 }
 
+/// Typed-aware variant for stops whose harness run carries a classified cause.
+/// The human-readable halt note remains presentation data and is never parsed.
+pub fn classify_stop_with_cause(
+    breaker_halt: Option<&str>,
+    failure_cause: Option<tinyagents_harness::no_progress::ClassifiedStopCause>,
+    wind_down: bool,
+    hit_cap: bool,
+) -> Option<TurnStop> {
+    TurnStop::classify_with_cause(
+        breaker_halt,
+        failure_cause,
+        wind_down,
+        hit_cap,
+        stop_fallback_class,
+    )
+}
+
 /// [`TurnStop::from_incomplete_reason`] with the OpenHuman stop-reason fallback.
 pub fn stop_from_incomplete(reason: &str) -> TurnStop {
     TurnStop::from_incomplete_reason(reason, stop_fallback_class)

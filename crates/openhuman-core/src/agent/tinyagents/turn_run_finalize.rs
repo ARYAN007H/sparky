@@ -163,8 +163,13 @@ pub(super) async fn finalize_turn_outcome(
     // A run the harness stopped (breaker / cap) is traced as stopped, not as a
     // clean completion. No deadline wind-down on this path: only the session
     // turn carries one, and it records the stop through its sidecar.
-    let stop =
-        crate::agent::turn_projection::classify_stop(breaker_halt.as_deref(), false, hit_cap);
+    let failure_cause = run.failure_cause.clone();
+    let stop = crate::agent::turn_projection::classify_stop_with_cause(
+        breaker_halt.as_deref(),
+        failure_cause.clone(),
+        false,
+        hit_cap,
+    );
     if let Some(stop) = stop.as_ref().filter(|_| turn_completed_sink.is_some()) {
         tracing::debug!(
             model,
@@ -292,6 +297,7 @@ pub(super) async fn finalize_turn_outcome(
         hit_cap,
         wrap_up_injected,
         breaker_halt,
+        failure_cause,
         truncated,
         tool_outcomes,
         compaction,
