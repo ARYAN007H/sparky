@@ -17,10 +17,19 @@
 //! module's own `EnsureCollection` is answered without touching the backend
 //! when it repeats the declared spec, and refused otherwise. `DropCollection`
 //! is never allowed.
+//!
+//! Queues are host-declared too. A grant with a [`QueueManifest`] serves the
+//! `Queues` object: the host declares the manifest's queues on the module's
+//! scope, and the bound server refuses any queue the manifest does not name
+//! (`NotFound`) and any `EnsureQueue` that disagrees with the declared spec
+//! (`Conflict`). A grant without one still answers `Features` (all false), so
+//! every module's storage connect succeeds, and refuses every other selector.
 
 use std::collections::BTreeSet;
+use std::sync::Arc;
 
 use serde_json::Value;
+use tinystoragedrivers::queue::QueueManifest;
 use tinystoragedrivers::CollectionSpec;
 
 pub(crate) use tinystoragedrivers_client::Object;
@@ -33,6 +42,7 @@ pub(crate) fn is_selector(object: Object, selector: &str) -> bool {
         Object::Streams => wire::is_streams_selector(selector),
         Object::Blobs => wire::is_blobs_selector(selector),
         Object::Secrets => wire::is_secrets_selector(selector),
+        Object::Queues => wire::is_queues_selector(selector),
     }
 }
 
