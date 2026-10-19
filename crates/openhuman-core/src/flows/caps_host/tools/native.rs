@@ -90,27 +90,16 @@ impl crate::tools::native_ops::flow_backend::FlowPolicyHooks for NativeFlowPolic
         audit_id: Option<&str>,
         result: &std::result::Result<Value, String>,
     ) {
-        let Some(id) = audit_id else {
-            return;
-        };
-        let Some(gate) = crate::security::approval::ApprovalGate::try_global() else {
-            return;
-        };
-        let execution = if result.is_ok() {
-            crate::security::approval::ExecutionOutcome::Success
-        } else {
-            crate::security::approval::ExecutionOutcome::Failure
-        };
-        let error = result
+        let audit_result = result
             .as_ref()
-            .err()
-            .map(|body| EngineError::Capability(body.clone()).to_string());
+            .map(|_| ())
+            .map_err(|body| EngineError::Capability(body.clone()));
         tracing::debug!(
             target: "flows",
-            audit_id = %id,
+            audit_id = ?audit_id,
             success = result.is_ok(),
             "[flows] recording native tool execution outcome on the approval audit trail"
         );
-        gate.record_execution(id, execution, error.as_deref());
+        super::super::close_audit(audit_id, &audit_result);
     }
 }

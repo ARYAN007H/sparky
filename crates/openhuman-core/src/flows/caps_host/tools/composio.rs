@@ -50,18 +50,11 @@ impl FlowCallPolicy for FlowPolicy {
         }
     }
     fn record(&self, audit_id: &str, result: &std::result::Result<Value, String>) {
-        if let Some(gate) = crate::security::approval::ApprovalGate::try_global() {
-            let outcome = if result.is_ok() {
-                crate::security::approval::ExecutionOutcome::Success
-            } else {
-                crate::security::approval::ExecutionOutcome::Failure
-            };
-            let display_error = result
-                .as_ref()
-                .err()
-                .map(|message| capability_error_display(message));
-            gate.record_execution(audit_id, outcome, display_error.as_deref());
-        }
+        let audit_result = result
+            .as_ref()
+            .map(|_| ())
+            .map_err(|message| capability_error_display(message));
+        super::super::close_audit(Some(audit_id), &audit_result);
     }
 }
 

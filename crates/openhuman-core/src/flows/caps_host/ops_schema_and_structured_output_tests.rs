@@ -1,5 +1,6 @@
 use super::*;
 use crate::inference::provider::is_raw_passthrough_model;
+use serde_json::json;
 
 #[test]
 fn raw_provider_models_override_the_role_default() {
