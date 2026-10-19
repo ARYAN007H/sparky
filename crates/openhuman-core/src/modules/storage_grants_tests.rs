@@ -8,6 +8,7 @@ fn grant() -> StorageGrant {
         blob_prefixes: vec!["files/".into()],
         secret_prefixes: vec!["token.".into()],
         writable: true,
+        queues: None,
     }
 }
 
@@ -455,11 +456,12 @@ fn only_mutating_selectors_ask_for_the_write_fence() {
 #[test]
 fn the_write_selectors_track_the_contract_selector_sets() {
     use tinystoragedrivers_bus as wire;
-    let all: [(Object, &[&str]); 4] = [
+    let all: [(Object, &[&str]); 5] = [
         (Object::Documents, &wire::DOCUMENTS_SELECTORS),
         (Object::Streams, &wire::STREAMS_SELECTORS),
         (Object::Blobs, &wire::BLOBS_SELECTORS),
         (Object::Secrets, &wire::SECRETS_SELECTORS),
+        (Object::Queues, &wire::QUEUES_SELECTORS),
     ];
     let mut writes: Vec<String> = Vec::new();
     for (object, selectors) in all {
@@ -485,6 +487,14 @@ fn the_write_selectors_track_the_contract_selector_sets() {
             "Documents.Delete",
             "Documents.DeleteWhere",
             "Documents.Put",
+            "Queues.Ack",
+            "Queues.EnsureQueue",
+            "Queues.Enqueue",
+            "Queues.Extend",
+            "Queues.Nack",
+            "Queues.Purge",
+            "Queues.Receive",
+            "Queues.Redrive",
             "Secrets.Delete",
             "Secrets.Set",
             "Streams.Append",

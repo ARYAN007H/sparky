@@ -73,6 +73,7 @@ fn grant(collection: &str) -> StorageGrant {
         blob_prefixes: vec!["files/".into()],
         secret_prefixes: vec!["token.".into()],
         writable: true,
+        queues: None,
     }
 }
 
