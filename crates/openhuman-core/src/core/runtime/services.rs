@@ -146,7 +146,7 @@ pub(crate) async fn start_selected_services(
     // a background service — runs can be started without cron in the
     // ServiceSet, so their orphans must be reconcilable without it too.
     if ctx.domains().flows {
-        spawn_flows_boot_reconcile();
+        spawn_flows_boot_reconcile(std::sync::Arc::clone(ctx));
     }
     if services.channels {
         if let Some(handle) = spawn_channels_service(&crate::core::runtime::DispatchCtx::new(
@@ -230,16 +230,22 @@ pub fn spawn_update_scheduler() -> tokio::task::JoinHandle<()> {
 /// safe at any point in boot — the sweep's own `PROCESS_RUN_FLOOR` guard means
 /// it can never touch a run this process started, so it carries no ordering
 /// requirement against the cron scheduler or any agent turn.
-pub fn spawn_flows_boot_reconcile() {
+pub fn spawn_flows_boot_reconcile(
+    ctx: std::sync::Arc<crate::core::runtime::CoreContext>,
+) {
     #[cfg(feature = "flows")]
     {
         log::debug!("[flows] boot reconcile: scheduling orphaned-run sweep");
-        tokio::spawn(async {
+        tokio::spawn(async move {
             log::debug!("[flows] boot reconcile: loading config");
             match crate::config::Config::load_or_init().await {
                 Ok(config) => {
-                    let swept =
-                        crate::flows::ops::sweep_orphaned_running_runs_on_boot(&config).await;
+                    let dispatch = crate::core::runtime::DispatchCtx::new(ctx);
+                    let swept = crate::flows::recovery::sweep_orphaned_runs_on_boot(
+                        &dispatch,
+                        &config,
+                    )
+                    .await;
                     // Logged unconditionally: a silent success and a task that
                     // never ran are otherwise indistinguishable in a boot log.
                     log::debug!("[flows] boot reconcile: completed; reconciled_runs={swept}");

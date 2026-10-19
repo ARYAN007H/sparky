@@ -1,79 +1,37 @@
 use super::*;
 use crate::inference::provider::is_raw_passthrough_model;
-use tinyflows::nodes::integration::agent_prompt;
 
-// ── resolve_completion_model raw/BYOK passthrough (issue #4598) ───────────
 #[test]
-fn resolve_completion_model_forwards_raw_byok_node_model_verbatim() {
-    // A raw/BYOK id maps to the `chat` role, so the role resolves to the
-    // default model — but the pinned id is what the user selected and must
-    // be the model the completion runs on.
-    assert_eq!(
-        agent_prompt::resolve_completion_model(
-            Some("claude-opus-4"),
-            "chat-v1".to_string(),
-            is_raw_passthrough_model
-        ),
-        "claude-opus-4"
-    );
-    assert_eq!(
-        agent_prompt::resolve_completion_model(
-            Some("deepseek-v4-pro"),
-            "chat-v1".to_string(),
-            is_raw_passthrough_model
-        ),
-        "deepseek-v4-pro"
-    );
+fn raw_provider_models_override_the_role_default() {
+    for raw in ["claude-opus-4", "deepseek-v4-pro"] {
+        assert!(is_raw_passthrough_model(raw));
+        assert_eq!(
+            resolve_host_model(Some(raw), "chat-v1".to_owned()),
+            raw
+        );
+    }
 }
 
 #[test]
-fn resolve_completion_model_leaves_managed_tier_and_hint_node_models_untouched() {
-    // Managed tiers and every `hint:*` alias keep the role-resolved model.
+fn managed_model_tiers_keep_the_provider_resolved_model() {
+    for tier in ["chat-v1", "hint:reasoning", "hint:garbage"] {
+        assert_eq!(
+            resolve_host_model(Some(tier), "reasoning-v1".to_owned()),
+            "reasoning-v1"
+        );
+    }
     assert_eq!(
-        agent_prompt::resolve_completion_model(
-            Some("chat-v1"),
-            "chat-v1".to_string(),
-            is_raw_passthrough_model
-        ),
+        resolve_host_model(None, "chat-v1".to_owned()),
         "chat-v1"
     );
     assert_eq!(
-        agent_prompt::resolve_completion_model(
-            Some("hint:reasoning"),
-            "reasoning-v1".to_string(),
-            is_raw_passthrough_model
-        ),
-        "reasoning-v1"
-    );
-    assert_eq!(
-        agent_prompt::resolve_completion_model(
-            Some("hint:garbage"),
-            "reasoning-v1".to_string(),
-            is_raw_passthrough_model
-        ),
-        "reasoning-v1"
-    );
-    // No pinned model, or a whitespace-only pin, keeps the resolved default.
-    assert_eq!(
-        agent_prompt::resolve_completion_model(
-            None,
-            "chat-v1".to_string(),
-            is_raw_passthrough_model
-        ),
-        "chat-v1"
-    );
-    assert_eq!(
-        agent_prompt::resolve_completion_model(
-            Some("   "),
-            "chat-v1".to_string(),
-            is_raw_passthrough_model
-        ),
+        resolve_host_model(Some("   "), "chat-v1".to_owned()),
         "chat-v1"
     );
 }
 
 #[test]
-fn crate_model_response_preserves_flow_completion_contract() {
+fn provider_response_preserves_the_flow_completion_contract() {
     use tinyinference_llm::message::{AssistantMessage, ContentBlock};
     use tinyinference_llm::model::ModelResponse;
     use tinyinference_llm::tool::ToolCall;
@@ -120,5 +78,3 @@ fn crate_model_response_preserves_flow_completion_contract() {
     assert_eq!(value["usage"]["charged_amount_usd"], 0.125);
     assert_eq!(value["reasoning_content"], "private chain");
 }
-
-// ── build_agent_result improvements (issue #5151) ────────────────────

@@ -17,6 +17,13 @@ use crate::inference::provider::{
 use crate::modules::tinyflows as module;
 use tinyinference_llm::model::ModelRequest;
 
+pub(crate) fn resolve_host_model(node_model: Option<&str>, provider_model: String) -> String {
+    match node_model.filter(|model| is_raw_passthrough_model(model)) {
+        Some(model) => model.to_owned(),
+        None => provider_model,
+    }
+}
+
 /// [`LlmProvider`] adapter over OpenHuman's inference stack
 /// (`crates/openhuman-core/src/inference/provider/`).
 ///
@@ -116,10 +123,7 @@ impl OpenHumanLlm {
                 .map_err(|e| EngineError::Capability(e.to_string()))?;
         // `create_chat_provider` handed back the role's default model. If the node
         // pinned a raw/BYOK id, forward it verbatim instead (issue #4598).
-        let model = match node_model.filter(|model| is_raw_passthrough_model(model)) {
-            Some(model) => model.to_owned(),
-            None => model,
-        };
+        let model = resolve_host_model(node_model, model);
 
         let mut model_request = ModelRequest::new(
             messages
