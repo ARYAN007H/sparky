@@ -584,7 +584,7 @@ async fn prompt_and_declared_tools(
         .clone()
         .expect("prelude");
     let prompt = host
-        .render_current_turn_prompt()
+        .build_system_prompt()
         .expect("current-turn system prompt");
     let snapshot = prelude
         .prepare(true)
@@ -613,7 +613,7 @@ async fn debug_prompt_matches_the_system_prompt_sent_on_a_cold_turn() {
     host.ensure_runtime_session().expect("runtime session");
 
     let dumped = host
-        .render_current_turn_prompt()
+        .build_system_prompt()
         .expect("debug prompt surface");
     host.run_single("hello").await.expect("scripted turn");
     let request = model.requests().into_iter().next().expect("model request");

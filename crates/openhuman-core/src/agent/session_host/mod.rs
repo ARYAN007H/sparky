@@ -46,6 +46,7 @@ mod resume_bound_session_tests;
 mod runtime;
 mod runtime_session;
 pub(crate) mod stop_summary;
+mod turn;
 // `pub(crate)` since issue #6014: the tool-call-cap instruction is now appended
 // inside the loop by `tinyagents::middleware::FinalCallWrapUpMiddleware`, so the
 // harness-assembly site has to name it. It stays the one definition — the whole
