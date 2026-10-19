@@ -258,9 +258,7 @@ describe('Chat todos and goals', () => {
     await browser.waitUntil(
       async () => {
         const current = await readSelectedThreadSnapshot();
-        return Boolean(
-          current.threadId && current.hasUserMessage && current.hasAssistantMessage
-        );
+        return Boolean(current.threadId && current.hasUserMessage && current.hasAssistantMessage);
       },
       {
         timeout: 15_000,
