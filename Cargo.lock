@@ -9780,7 +9780,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2 0.10.9",
- "thiserror 2.0.20",
+ "tinystoragedrivers-schema",
  "tokio",
  "ulid",
  "zstd 0.13.3",
@@ -9820,10 +9820,22 @@ dependencies = [
  "futures-util",
  "http",
  "object_store",
+ "quick-xml 0.41.0",
+ "reqwest 0.13.5",
+ "serde",
  "tinystoragedrivers-core",
  "tokio",
  "tokio-util",
  "url",
+]
+
+[[package]]
+name = "tinystoragedrivers-schema"
+version = "1.0.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror 2.0.20",
 ]
 
 [[package]]
