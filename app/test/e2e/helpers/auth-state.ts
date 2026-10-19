@@ -18,5 +18,5 @@ export function authStateValue(state: { result?: unknown }): AuthStateResponse {
     throw new Error('auth_get_state returned no boolean isAuthenticated field');
   }
 
-  return value as AuthStateResponse;
+  return value as unknown as AuthStateResponse;
 }
