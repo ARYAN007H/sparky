@@ -133,6 +133,26 @@ pub async fn complete_once_controlled(
         budget.ledger.clone(),
         budget.call,
     ));
+    if admission.is_none() {
+        let model: std::sync::Arc<dyn ChatModel<()>> = match (budget, observer) {
+            (Some(budget), observer) => budget.wrap_with_observer(model, observer),
+            (None, Some(observer)) => {
+                let normalized = std::sync::Arc::new(
+                    tinyagents_harness::cost::GatewayChargeModel::new(model),
+                );
+                std::sync::Arc::new(
+                    tinyagents_harness::observability::physical_dispatch::ObservedChatModel::new(
+                        normalized, observer,
+                    ),
+                )
+            }
+            (None, None) => model,
+        };
+        return model
+            .invoke(&(), request)
+            .await
+            .map_err(tinyagents_harness::cost::ControlledDispatchError::Model);
+    }
     let controlled = tinyagents_harness::cost::ControlledChatModel::new(
         model,
         tinyagents_harness::cost::DispatchModelOptions::new()
