@@ -17,6 +17,21 @@ fn http_credential_lookup_trims_the_module_parsed_name() {
 }
 
 #[test]
+fn parsed_credential_lookup_distinguishes_absent_empty_and_padded_names() {
+    let (_dir, store) = http_cred_store();
+    store
+        .upsert(&HttpCredential::bearer("payments", "sk_live_secret"))
+        .unwrap();
+
+    assert!(resolve_http_credential(&store, None).unwrap().is_none());
+    assert!(resolve_http_credential(&store, Some("   ")).is_err());
+    let credential = resolve_http_credential(&store, Some(" payments "))
+        .expect("padded host lookup succeeds")
+        .expect("the host trims a padded ID to the existing credential");
+    assert_eq!(credential.name, "payments");
+}
+
+#[test]
 fn unknown_parsed_credential_name_fails_closed() {
     let (_dir, store) = http_cred_store();
     assert!(resolve_http_credential(&store, Some("ghost")).is_err());
