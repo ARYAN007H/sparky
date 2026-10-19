@@ -13,6 +13,7 @@ import {
   createRecordSplitter,
   ensureAllPullRequestsLinked,
   extractPullRequestNumbers,
+  groupPullRequestsByHighlight,
   parseArgs,
   parseGitHubRepoFromRemote,
   parseGitLog,
@@ -100,6 +101,19 @@ test('contributor credits use PR authors instead of merge authors', () => {
   assert.deepEqual(contributors, [
     { name: 'new-contributor', commits: 2, prs: [100, 102], isNew: true },
     { name: 'returning-contributor', commits: 1, prs: [101], isNew: false },
+  ]);
+});
+
+test('release highlights do not classify removed desktop voice controls as current voice features', () => {
+  const groups = groupPullRequestsByHighlight([
+    { number: 1, title: 'Remove the dictation hotkey', labels: [] },
+    { number: 2, title: 'Retire the desktop notch', labels: [] },
+    { number: 3, title: 'Improve speech transcription', labels: [] },
+  ]);
+
+  assert.deepEqual(groups.map(({ title, pullRequests }) => [title, pullRequests.map(({ number }) => number)]), [
+    ['🎙️ Voice & desktop control', [3]],
+    ['🧩 Integrations, UI & developer foundations', [1, 2]],
   ]);
 });
 
