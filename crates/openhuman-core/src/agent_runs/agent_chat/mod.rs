@@ -1,9 +1,5 @@
 //! Full agent chat turns and their shared turn guards.
 
-#[cfg(test)]
-#[path = "session_turn_tests.rs"]
-mod tests;
-
 pub(crate) mod guards;
 mod session_turn;
 

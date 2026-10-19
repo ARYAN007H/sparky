@@ -11,7 +11,6 @@ mod tests;
 mod agent_chat_simple;
 mod complete_once;
 mod runtime_ops;
-mod turn_guards;
 
 pub use agent_chat_simple::agent_chat_simple;
 pub use complete_once::{complete_once, CompletionEndpoint};
@@ -23,6 +22,6 @@ pub use runtime_ops::{
 #[cfg(test)]
 use crate::config::Config;
 #[cfg(test)]
-use turn_guards::{
+use crate::agent_runs::agent_chat::guards::{
     effective_agent_chat_origin, grant_turn_cwd, normalize_model_override, resolve_turn_cwd,
 };

@@ -13,7 +13,7 @@ use {
     tinyinference_local::status::LocalAiTtsResult,
 };
 
-use super::turn_guards::enforce_user_prompt_or_reject;
+use crate::agent_runs::agent_chat::guards::enforce_user_prompt_or_reject;
 
 /// Returns the current operational status of the local AI stack.
 pub async fn local_ai_status(config: &Config) -> Result<Outcome<LocalAiStatus>, String> {
