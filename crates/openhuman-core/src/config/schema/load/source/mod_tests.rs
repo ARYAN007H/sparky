@@ -29,6 +29,7 @@ fn document_source_keyed(
         Scope::new(scope).unwrap(),
         keys,
         FileConfigSource::new(file),
+        Arc::as_ptr(scoped(storage, scope).documents()) as *const () as usize,
     )
 }
 

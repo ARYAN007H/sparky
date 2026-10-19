@@ -144,7 +144,7 @@ async fn config_snapshot_cannot_be_saved_into_a_different_tenant_scope() {
         let config = Config::load_from_config_path(&path, &workspace)
             .await
             .unwrap();
-        let version = *config.document_version.lock().unwrap();
+        let version = config.document_snapshot.lock().unwrap().version;
         (config, version)
     };
 
@@ -158,7 +158,7 @@ async fn config_snapshot_cannot_be_saved_into_a_different_tenant_scope() {
         let config = Config::load_from_config_path(&path, &workspace)
             .await
             .unwrap();
-        let version = *config.document_version.lock().unwrap();
+        let version = config.document_snapshot.lock().unwrap().version;
         let docs = Arc::clone(scoped(&storage, "tenant-source-b").documents());
         let stored = docs
             .get(
