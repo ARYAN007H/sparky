@@ -210,10 +210,9 @@ async fn typed_cause_without_halt_note_still_closes_and_keeps_operation() {
         close.output
     );
     assert_eq!(close.usage.model_calls, 0);
-    assert_eq!(
-        scripted.call_count(),
-        0,
-        "typed cause closes deterministically"
+    assert!(
+        scripted.requests().is_empty(),
+        "typed cause closes deterministically without calling the provider"
     );
 
     let stop = crate::agent::session_host::stop_summary::classify_stop_with_cause(
