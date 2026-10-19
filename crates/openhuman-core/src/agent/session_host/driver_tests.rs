@@ -343,7 +343,10 @@ fn synthesized_block_is_appended_once_and_replaces_the_final_row() {
         required_keys: vec!["status".into()],
     };
     let mut output = "Done.".to_string();
-    let mut history = vec![Message::user("go"), Message::assistant("Done.")];
+    let mut history = vec![
+        Message::user("go with [REDACTED] credential"),
+        Message::assistant("Done."),
+    ];
 
     append_synthesized_block(&mut output, &mut history, &contract);
     assert!(tinyagents_harness::config::output_satisfies_contract(
@@ -353,6 +356,11 @@ fn synthesized_block_is_appended_once_and_replaces_the_final_row() {
         history.len(),
         2,
         "the final row is replaced, not duplicated"
+    );
+    assert_eq!(
+        history[0].text(),
+        "go with [REDACTED] credential",
+        "required-output repair keeps the screened user prefix"
     );
 
     let once = output.clone();

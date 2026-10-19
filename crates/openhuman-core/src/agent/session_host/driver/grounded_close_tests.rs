@@ -71,7 +71,7 @@ async fn grounded_close_uses_the_selected_model_and_keeps_verifier_out_of_contex
     let history = vec![
         Message::User(UserMessage {
             content: vec![
-                ContentBlock::Text("inspect ".into()),
+                ContentBlock::Text("inspect [REDACTED] ".into()),
                 ContentBlock::Image(ImageRef {
                     url: "data:image/png;base64,AAAA".into(),
                     mime_type: Some("image/png".into()),
@@ -148,6 +148,14 @@ async fn grounded_close_uses_the_selected_model_and_keeps_verifier_out_of_contex
         &requests[0].messages[..expected_history.len()],
         expected_history,
         "close requests preserve the transcript roundtrip for attachments, reasoning and tool rows"
+    );
+    assert!(
+        requests
+            .iter()
+            .all(|request| request.messages.iter().any(|message| {
+                matches!(message, Message::User(_)) && message.text().contains("[REDACTED]")
+            })),
+        "grounded close keeps the screened prefix on every follow-up request"
     );
 }
 

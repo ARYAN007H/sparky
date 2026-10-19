@@ -329,11 +329,12 @@ async fn review_blocked_input_is_not_persisted() {
     let root = tempfile::tempdir().expect("tempdir");
     let locator = memory_locator();
     let model = Arc::new(
-        tinyagents_harness::testkit::ScriptedModel::replies(vec!["unexpected reply"])
-            .with_profile(tinyinference_llm::model::ModelProfile {
+        tinyagents_harness::testkit::ScriptedModel::replies(vec!["unexpected reply"]).with_profile(
+            tinyinference_llm::model::ModelProfile {
                 tool_calling: true,
                 ..Default::default()
-            }),
+            },
+        ),
     );
     let chat_model: Arc<dyn tinyinference_llm::model::ChatModel<()>> = model.clone();
     let mut host = crate::agent::SessionHostBuilder::new()
@@ -352,7 +353,10 @@ async fn review_blocked_input_is_not_persisted() {
         .await;
 
     assert!(outcome.is_err(), "review verdict must block the turn");
-    assert!(model.requests().is_empty(), "blocked input reached inference");
+    assert!(
+        model.requests().is_empty(),
+        "blocked input reached inference"
+    );
     assert!(
         locator.root_for_thread("thread-review-blocked").is_none(),
         "blocked input was persisted"
