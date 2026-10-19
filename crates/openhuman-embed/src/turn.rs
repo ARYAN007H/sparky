@@ -663,7 +663,7 @@ async fn dispatch(
             let turn: futures_box::BoxFuture<'_, Result<AgentReply, CoreError>> =
                 Box::pin(async move {
                     use openhuman_core::inference::host_runtime::ops::{
-                        AgentChatTarget, agent_chat_for,
+                        AgentChatTarget, agent_chat_reply_for_controlled,
                     };
                     let mut config = inner.config.clone();
                     let route = openhuman_core::config::schema::EphemeralRoute::from_params(
@@ -683,7 +683,7 @@ async fn dispatch(
                         observer: options.observer.as_ref(),
                         attachments: &options.attachments,
                     };
-                    let outcome = agent_chat_for(
+                    let outcome = agent_chat_reply_for_controlled(
                         &mut config,
                         target,
                         &request.message,
@@ -694,7 +694,8 @@ async fn dispatch(
                         route,
                         options.chat_env,
                     )
-                    .await;
+                    .await
+                    .map(|reply| reply.into_outcome());
                     // The shape preserves provider charges and root-call totals
                     // absent from normalized session usage. Overlay before both
                     // meter and outcome reads, retaining child/session metadata.
