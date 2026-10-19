@@ -102,4 +102,3 @@ async fn a_trigger_handled_as_an_agent_uses_the_agent_config() {
         .clone();
     assert_eq!(seen, std::path::PathBuf::from("/tmp/flows-trigger-agent"));
 }
-

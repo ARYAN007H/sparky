@@ -170,7 +170,10 @@ pub(crate) async fn start_run(
             }
         };
     if started.run_id != run_id {
-        session::remove(&session);
+        // A malformed acknowledgement does not prove the module failed to
+        // admit the requested actor. Keep both callbacks served until the
+        // owner-scoped PollRun stream gives us a terminal answer.
+        session.start_polling(proxy);
         return Err("TinyFlows admitted a different run id".to_string());
     }
     if started.already_running {
@@ -325,8 +328,22 @@ pub(crate) async fn resume_and_wait(
     {
         Ok(resumed) => resumed,
         Err(error) => {
-            if inserted {
+            // A remote method error is a definitive ResumeRun rejection (a
+            // stale-graph refusal may already have committed a terminal
+            // event, which must still pass through PollRun). Transport and
+            // decode errors are ambiguous: the module may have admitted the
+            // actor before the acknowledgement was lost, so retain the fresh
+            // callback and poll its durable cursor.
+            let uncertain = !matches!(&error, tinybus::Error::MethodFailed { .. });
+            if uncertain {
+                session.replace_flow(candidate.flow.clone()).await;
+                session.replace_bindings(Arc::clone(&candidate));
+            }
+            let terminal = session.drain(&proxy, true).await.unwrap_or(false);
+            if terminal || (inserted && !uncertain) {
                 session::remove(&session);
+            } else if inserted || uncertain {
+                session.start_polling(proxy);
             }
             return Err(error.wire_message());
         }
