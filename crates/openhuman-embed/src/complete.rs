@@ -636,6 +636,17 @@ impl Completer {
         let endpoint = self.checked_endpoint(&request)?;
         let format = request.response_format.clone();
         let model = request.model.clone();
+        let wire_request = request.into_wire();
+        if let Err(message) =
+            openhuman_core::inference::host_runtime::ops::validate_complete_once_request(
+                &wire_request,
+            )
+        {
+            return Err(CoreError::Rpc {
+                method: COMPLETE,
+                message,
+            });
+        }
         log::debug!(
             "[embed] complete start method={COMPLETE} model={model} messages={} timeout_ms={:?}",
             request.messages.len(),
@@ -651,7 +662,7 @@ impl Completer {
         // The spend ledger is an explicit argument of the call, not an ambient scope.
         let call = openhuman_core::inference::host_runtime::ops::complete_once_controlled(
             &endpoint,
-            request.into_wire(),
+            wire_request,
             budget.as_ref(),
             self.observers.physical_dispatch.clone(),
             self.dispatch_admission.clone(),
@@ -666,7 +677,9 @@ impl Completer {
                         usage: None,
                     };
                 }
-                error => error.to_string(),
+                tinyagents_harness::cost::ControlledDispatchError::Model(source) => {
+                    format!("complete_once: {source}")
+                }
             };
             if let Some(source) = budget.as_ref().and_then(|budget| budget.ledger.refusal()) {
                 return CoreError::BudgetExceeded {

@@ -797,7 +797,7 @@ async fn provider_failure_keeps_the_complete_once_prefix() {
         .expect_err("a provider failure must preserve the legacy completion context");
 
     assert!(
-        matches!(error, CoreError::Rpc { message, .. } if message.starts_with("complete_once: model error:")),
+        matches!(&error, CoreError::Rpc { message, .. } if message.starts_with("complete_once: model error:")),
         "{error:?}"
     );
 }

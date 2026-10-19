@@ -18,7 +18,8 @@ pub use agent_chat::{
     agent_chat_simple, AgentChatEnv, AgentChatReply, AgentChatTarget,
 };
 pub use complete_once::{
-    complete_once, complete_once_controlled, complete_once_observed, CompletionEndpoint,
+    complete_once, complete_once_controlled, complete_once_observed,
+    validate_complete_once_request, CompletionEndpoint,
 };
 pub use runtime_ops::{
     local_ai_prompt, local_ai_status, local_ai_summarize, local_ai_transcribe,

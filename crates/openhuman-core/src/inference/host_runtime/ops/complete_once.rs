@@ -79,9 +79,47 @@ pub async fn complete_once_observed(
         std::sync::Arc<dyn tinyagents_harness::observability::PhysicalDispatchObserver>,
     >,
 ) -> Result<ModelResponse, String> {
+    if let Err(message) = validate_complete_once_request(&request) {
+        return Err(message);
+    }
     complete_once_controlled(endpoint, request, budget, observer, None)
         .await
-        .map_err(|error| error.to_string())
+        .map_err(|error| match error {
+            tinyagents_harness::cost::ControlledDispatchError::Model(source) => {
+                format!("complete_once: {source}")
+            }
+            tinyagents_harness::cost::ControlledDispatchError::Admission(source) => {
+                source.to_string()
+            }
+        })
+}
+
+/// Validate the stateless completion request before dispatching it.
+///
+/// The legacy string facade returns these operation-level messages verbatim;
+/// separating preflight from provider errors preserves that contract without
+/// inspecting formatted error text.
+pub fn validate_complete_once_request(request: &ModelRequest) -> Result<(), String> {
+    if !request.tools.is_empty() {
+        return Err(
+            "complete_once: tools are not supported on a stateless completion; use an agent turn"
+                .to_string(),
+        );
+    }
+    // `provider_options` is forwarded untouched, so a `tools` key there would
+    // reach the provider even though `request.tools` is empty above. The typed
+    // request fields own these keys.
+    if let Some(key) = reserved_provider_option(&request.provider_options) {
+        return Err(format!(
+            "complete_once: provider_options may not set `{key}`; use the typed request fields"
+        ));
+    }
+    request
+        .model
+        .as_deref()
+        .filter(|model| !model.trim().is_empty())
+        .map(|_| ())
+        .ok_or_else(|| "complete_once: request.model is required".to_string())
 }
 
 /// Run one completion with optional neutral physical-call admission.
@@ -94,34 +132,13 @@ pub async fn complete_once_controlled(
     >,
     admission: Option<std::sync::Arc<dyn tinyagents_harness::cost::PhysicalDispatchAdmission>>,
 ) -> Result<ModelResponse, tinyagents_harness::cost::ControlledDispatchError> {
-    if !request.tools.is_empty() {
-        return Err(tinyagents_harness::cost::ControlledDispatchError::Model(tinyinference_llm::Error::Validation(
-            "complete_once: tools are not supported on a stateless completion; use an agent turn"
-                .to_string())));
-    }
-    // `provider_options` is forwarded untouched, so a `tools` key there would
-    // reach the provider even though `request.tools` is empty above. The typed
-    // request fields own these keys.
-    if let Some(key) = reserved_provider_option(&request.provider_options) {
+    if let Err(message) = validate_complete_once_request(&request) {
         return Err(tinyagents_harness::cost::ControlledDispatchError::Model(
-            tinyinference_llm::Error::Validation(format!(
-                "complete_once: provider_options may not set `{key}`; use the typed request fields"
-            )),
+            tinyinference_llm::Error::Validation(message),
         ));
     }
     // Blank is refused, but the id itself goes out exactly as the caller named it.
-    let model_id = request
-        .model
-        .as_deref()
-        .filter(|model| !model.trim().is_empty())
-        .ok_or_else(|| {
-            tinyagents_harness::cost::ControlledDispatchError::Model(
-                tinyinference_llm::Error::Validation(
-                    "complete_once: request.model is required".to_string(),
-                ),
-            )
-        })?
-        .to_string();
+    let model_id = request.model.as_deref().unwrap().to_string();
 
     let mut model = OpenAiModel::new(endpoint.api_key.clone())
         .with_base_url(endpoint.base_url.clone())
