@@ -175,12 +175,14 @@ async fn independent_host_bundles_share_and_project_the_persisted_winner() {
         .run(&cancelled_parent, "produce a report".into())
         .await
     });
+    eprintln!("DBG waiting for waiters");
     tokio::time::timeout(std::time::Duration::from_secs(5), async {
         while leader_entry.waiter_count() != 2 {
             tokio::task::yield_now().await;
         }
     })
     .await
+    .map_err(|e| { eprintln!("DBG waiter_count={} execs={}", leader_entry.waiter_count(), executions.load(std::sync::atomic::Ordering::SeqCst)); e })
     .expect("both independent host bundles join the leader's flight");
 
     observer_cancellation.cancel();
