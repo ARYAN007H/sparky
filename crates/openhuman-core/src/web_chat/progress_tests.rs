@@ -181,7 +181,7 @@ async fn recv_for_thread(
     }
 }
 
-fn spawn_test_bridge(
+async fn spawn_test_bridge(
     thread_id: &str,
     request_id: &str,
 ) -> tokio::sync::mpsc::Sender<AgentProgress> {
@@ -190,10 +190,11 @@ fn spawn_test_bridge(
         request_id,
         Duration::from_secs(INFERENCE_HEARTBEAT_SECS),
     )
+    .await
     .0
 }
 
-fn spawn_test_bridge_with_interval(
+async fn spawn_test_bridge_with_interval(
     thread_id: &str,
     request_id: &str,
     heartbeat_interval: Duration,
@@ -201,6 +202,7 @@ fn spawn_test_bridge_with_interval(
     tokio::sync::mpsc::Sender<AgentProgress>,
     tokio::task::JoinHandle<()>,
 ) {
+    let _module = crate::channels::module_fixture::client().await;
     let (tx, rx) = tokio::sync::mpsc::channel::<AgentProgress>(16);
     let dir = tempfile::tempdir().expect("tempdir");
     let store = std::sync::Arc::new(tinyagents_session::port::InMemoryTurnStates::default())
