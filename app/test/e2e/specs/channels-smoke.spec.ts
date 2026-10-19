@@ -17,10 +17,21 @@ import { waitForApp } from '../helpers/app-helpers';
 import { textExists, waitForText } from '../helpers/element-helpers';
 import { resetApp } from '../helpers/reset-app';
 import { navigateViaHash } from '../helpers/shared-flows';
-import { connectTelegramBot, disconnectTelegramBot } from '../helpers/telegram';
+import {
+  connectTelegramBot,
+  disconnectTelegramBot,
+  getTelegramChannelStatus,
+} from '../helpers/telegram';
 import { startMockServer, stopMockServer } from '../mock-server';
 
 const USER_ID = 'e2e-channels-smoke';
+
+async function telegramRowStatus(): Promise<string | null> {
+  return (await browser.execute(() => {
+    const row = document.querySelector('[data-testid="skill-row-channel-telegram"]');
+    return row?.querySelector('[data-slot="badge"]')?.textContent?.trim() ?? null;
+  })) as string | null;
+}
 
 describe('Channels page smoke (Telegram + Discord)', () => {
   before(async function beforeSuite() {
@@ -58,10 +69,18 @@ describe('Channels page smoke (Telegram + Discord)', () => {
     // Known-disconnected baseline, so the "Connected" assertion below cannot
     // be satisfied by state left over from an earlier spec.
     await disconnectTelegramBot();
+    const baseline = await getTelegramChannelStatus();
+    if (!baseline || baseline.connected) {
+      throw new Error(`precondition: Telegram RPC status should be disconnected: ${JSON.stringify(baseline)}`);
+    }
     await navigateViaHash('/channels');
     await waitForText('Telegram', 15_000);
-    if (await textExists('Connected')) {
-      throw new Error('precondition: Telegram should not already read Connected');
+    await browser.waitUntil(async () => (await telegramRowStatus()) === 'Not configured', {
+      timeout: 15_000,
+      timeoutMsg: `Telegram row did not show its disconnected status; saw ${await telegramRowStatus()}`,
+    });
+    if (await telegramRowStatus() === 'Connected') {
+      throw new Error('precondition: Telegram row should not already read Connected');
     }
 
     const connected = await connectTelegramBot({ botToken: '111111:e2e-channels-smoke-token' });
@@ -71,17 +90,24 @@ describe('Channels page smoke (Telegram + Discord)', () => {
     await navigateViaHash('/chat');
     await navigateViaHash('/channels');
     await waitForText('Telegram', 15_000);
-    await waitForText('Connected', 20_000);
+    await browser.waitUntil(async () => (await telegramRowStatus()) === 'Connected', {
+      timeout: 20_000,
+      timeoutMsg: `Telegram row did not show Connected; saw ${await telegramRowStatus()}`,
+    });
+    const connectedStatus = await getTelegramChannelStatus();
+    expect(connectedStatus?.connected).toBe(true);
 
     await disconnectTelegramBot();
     await navigateViaHash('/chat');
     await navigateViaHash('/channels');
     await waitForText('Telegram', 15_000);
-    await browser.waitUntil(async () => !(await textExists('Connected')), {
+    await browser.waitUntil(async () => (await telegramRowStatus()) === 'Not configured', {
       timeout: 20_000,
       timeoutMsg:
-        'the channel surface still reads Connected after channels_disconnect — the status ' +
+        'the Telegram channel row still reads Connected after channels_disconnect — the status ' +
         'badge is not reflecting the live channel state',
     });
+    const disconnectedStatus = await getTelegramChannelStatus();
+    expect(disconnectedStatus?.connected).toBe(false);
   });
 });
