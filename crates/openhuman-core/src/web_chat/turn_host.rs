@@ -16,19 +16,19 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
+use tinyagents_harness::CancellationToken;
 use tinyagents_harness::run_queue::RunQueue;
 use tinyagents_harness::turn_runner::{
     QueueDisposition, TurnHost, TurnRequest, TurnResult, TurnSession, TurnSignal, WorkTracker,
 };
-use tinyagents_harness::CancellationToken;
 use tinyinference_llm::failure::is_empty_provider_response_text;
-use tokio::sync::{mpsc, watch, Mutex as AsyncMutex};
+use tokio::sync::{Mutex as AsyncMutex, mpsc, watch};
 
 use super::ops::{self, BudgetCorrelation};
-use super::progress::{ProgressProjection, INFERENCE_HEARTBEAT_SECS};
+use super::progress::{INFERENCE_HEARTBEAT_SECS, ProgressProjection};
 use super::runner::{Admission, Shared};
 use super::session::{
-    checkin_session_agent, checkout_session_agent, normalize_model_override, CheckoutPolicy,
+    CheckoutPolicy, checkin_session_agent, checkout_session_agent, normalize_model_override,
 };
 use super::surface::TurnIds;
 use super::turn_activity::TurnActivity;
@@ -37,7 +37,7 @@ use super::web_errors::{
     inference_budget_exceeded_user_message, is_inference_budget_exceeded_error,
 };
 use crate::agent::queued_turn::QueuedPayload;
-use crate::agent::turn_origin::{with_origin, AgentTurnOrigin};
+use crate::agent::turn_origin::{AgentTurnOrigin, with_origin};
 use crate::core::events::DomainEvent;
 use crate::core::runtime::DispatchCtx;
 use tinyagents_harness::progress::AgentProgress;
@@ -271,7 +271,7 @@ impl WebHost {
             agent.run_single_with_approval(&request.text, Some(origin), approval),
         ));
         let outcome = turn.await;
-        let mut result = match outcome {
+        let result = match outcome {
             Ok(response) => {
                 // A successful turn proves the thread's balance is usable, so
                 // drop any stale budget-exhausted signal before it could
@@ -296,6 +296,8 @@ impl WebHost {
                 .await
             }
         };
+        #[cfg(feature = "tinymemes")]
+        let mut result = result;
         #[cfg(feature = "tinymemes")]
         let turn_elapsed = turn_started.elapsed();
 
