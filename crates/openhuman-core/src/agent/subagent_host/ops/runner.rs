@@ -361,7 +361,6 @@ pub(crate) async fn run_subagent_direct(
         if let Some(dispatch) = options.run_context.dispatch.as_deref() {
             dispatch.record_subagent_elapsed(started.elapsed());
         }
-
         let mut outcome = run_result?;
 
         // Commit the completed subtree before the soft, awaited artifact
