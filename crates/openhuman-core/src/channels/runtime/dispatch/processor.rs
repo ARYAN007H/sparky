@@ -3,6 +3,8 @@
 //! Contains:
 //! * [`channel_has_approval_surface`] — gate controlling per-channel approval
 //!   context scoping.
+//! * [`admit`] — preparation, the received event, and the runtime-command and
+//!   approval-reply intercepts that run before any debounce.
 //! * [`try_route_approval_reply`] (in [`approval`]) — intercepts yes/no
 //!   approval replies before dispatching a fresh agent turn.
 //! * [`process_channel_message`] — full per-message pipeline: typing, ACK
@@ -14,6 +16,7 @@
 //!   [`process_channel_runtime_message`] with a bounded set of host workers
 //!   and joins them when the inbound queue closes.
 
+mod admit;
 mod approval;
 mod bus_turn;
 mod turn;
