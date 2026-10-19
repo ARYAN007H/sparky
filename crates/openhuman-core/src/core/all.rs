@@ -522,6 +522,11 @@ fn build_registered_controllers() -> Vec<GroupedController> {
     push(
         &mut controllers,
         DomainGroup::Inference,
+        crate::agent_runs::all_inference_agent_chat_registered_controllers(),
+    );
+    push(
+        &mut controllers,
+        DomainGroup::Inference,
         crate::inference::all_local_inference_registered_controllers(),
     );
     // Embedding provider configuration and embed RPC.
