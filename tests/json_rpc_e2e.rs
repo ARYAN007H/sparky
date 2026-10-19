@@ -8560,13 +8560,10 @@ async fn public_paths_accessible_without_token() {
     // headers, etc.). The invariant here is that the auth middleware does NOT
     // reject them with 401.
     //
-    // NOTE: `/events` and `/ws/dictation` enforce their own credential inside
-    // the handler (bind token / bearer / `?token=`), so an unauthenticated GET
-    // to those returns 401 from the HANDLER (not the middleware). `/events`
-    // requires a `client_id` query param, so an empty request is rejected by
-    // Axum's extractor (400) before the handler's own auth runs — it stays in
-    // this `!= 401` group. `/ws/dictation` is asserted separately below now
-    // that it is authenticated at the upgrade boundary (C4 / issue #1924).
+    // NOTE: `/events` enforces its own credential inside the handler, so an
+    // unauthenticated GET returns 401 from the HANDLER (not the middleware).
+    // It requires a `client_id` query param, so an empty request is rejected
+    // by Axum's extractor (400) before the handler's own auth runs.
     for path in ["/events"] {
         let resp = client
             .get(format!("{base}{path}"))
@@ -8581,9 +8578,7 @@ async fn public_paths_accessible_without_token() {
         );
     }
 
-    // `/ws/dictation` is now authenticated at the upgrade boundary (C4 /
-    // issue #1924): an unauthenticated request (no bearer header, no
-    // `?token=`) must be rejected with 401 by the handler before any upgrade.
+    // The removed dictation socket must fall through to the normal 404.
     let resp = client
         .get(format!("{base}/ws/dictation"))
         .send()
@@ -8591,8 +8586,8 @@ async fn public_paths_accessible_without_token() {
         .unwrap_or_else(|e| panic!("GET /ws/dictation: {e}"));
     assert_eq!(
         resp.status(),
-        StatusCode::UNAUTHORIZED,
-        "/ws/dictation must reject unauthenticated upgrades with 401 (got {})",
+        StatusCode::NOT_FOUND,
+        "removed /ws/dictation endpoint must return 404 (got {})",
         resp.status()
     );
 
@@ -12217,13 +12212,10 @@ async fn json_rpc_channel_web_chat_with_speak_reply_invokes_reply_speech_inner()
 
 // ── Model resolution and voice settings ─────────────────────────────────
 
-/// E2E: voice-server settings round-trip over JSON-RPC — Phase 2 always-on
-/// toggle + "Hey Tiny" wake word. Regression guard for the bug where the
-/// Settings toggle silently did nothing because `always_on_enabled` was absent
-/// from the `update_voice_server_settings` controller param schema (rejected as
-/// "unknown param 'always_on_enabled'" before reaching the handler).
+/// E2E: retired always-on voice parameters are rejected while supported voice
+/// settings continue to round-trip over JSON-RPC.
 #[tokio::test]
-async fn json_rpc_voice_server_settings_roundtrip_always_on_and_wake_word() {
+async fn json_rpc_voice_server_settings_rejects_retired_always_on_params() {
     let _env_lock = json_rpc_e2e_env_lock_async().await;
     let tmp = tempdir().expect("tempdir");
     let home = tmp.path();
@@ -12240,7 +12232,6 @@ async fn json_rpc_voice_server_settings_roundtrip_always_on_and_wake_word() {
     let rpc_base = format!("http://{}", rpc_addr);
     tokio::time::sleep(Duration::from_millis(100)).await;
 
-    // GET defaults — wake_word "Hey Tiny", always-on off.
     let initial = post_json_rpc(
         &rpc_base,
         7401,
@@ -12249,53 +12240,56 @@ async fn json_rpc_voice_server_settings_roundtrip_always_on_and_wake_word() {
     )
     .await;
     let initial_outer = assert_no_jsonrpc_error(&initial, "get_voice_server_settings initial");
-    assert_eq!(
-        initial_outer
-            .get("result")
-            .and_then(|r| r.get("always_on_enabled"))
-            .and_then(Value::as_bool),
-        Some(false),
-        "default always_on_enabled should be false, envelope: {initial_outer}"
-    );
-    assert_eq!(
-        initial_outer
-            .get("result")
-            .and_then(|r| r.get("wake_word"))
-            .and_then(Value::as_str),
-        Some("Hey Tiny"),
-        "default wake_word should be 'Hey Tiny', envelope: {initial_outer}"
-    );
+    let initial_result = initial_outer.get("result").unwrap();
+    for retired in ["always_on_enabled", "wake_word"] {
+        assert!(
+            initial_result.get(retired).is_none(),
+            "retired voice setting {retired} was returned: {initial_outer}"
+        );
+    }
 
-    // UPDATE — change the wake word and pass `always_on_enabled` (the param that
-    // used to be rejected). Kept false so the test never opens a real mic.
-    let update = post_json_rpc(
+    let retired_update = post_json_rpc(
         &rpc_base,
         7402,
         "openhuman.config_update_voice_server_settings",
-        json!({ "always_on_enabled": false, "wake_word": "Computer" }),
+        json!({ "always_on_enabled": false }),
     )
     .await;
-    assert_no_jsonrpc_error(
-        &update,
-        "update_voice_server_settings (always_on_enabled + wake_word)",
+    let error = assert_jsonrpc_error(
+        &retired_update,
+        "update_voice_server_settings retired always_on_enabled",
+    );
+    assert!(
+        error["message"]
+            .as_str()
+            .is_some_and(|message| message.contains("unknown param 'always_on_enabled'")),
+        "retired parameter should use the standard unknown-param error: {error}"
     );
 
-    // GET again — wake word persisted, no error.
-    let after = post_json_rpc(
+    let update = post_json_rpc(
         &rpc_base,
         7403,
+        "openhuman.config_update_voice_server_settings",
+        json!({ "hotkey": "F13", "min_duration_secs": 0.4 }),
+    )
+    .await;
+    assert_no_jsonrpc_error(&update, "update_voice_server_settings supported fields");
+
+    let after = post_json_rpc(
+        &rpc_base,
+        7404,
         "openhuman.config_get_voice_server_settings",
         json!({}),
     )
     .await;
     let after_outer = assert_no_jsonrpc_error(&after, "get_voice_server_settings after update");
-    assert_eq!(
-        after_outer
-            .get("result")
-            .and_then(|r| r.get("wake_word"))
-            .and_then(Value::as_str),
-        Some("Computer"),
-        "wake_word should persist, envelope: {after_outer}"
+    assert_eq!(after_outer["result"]["hotkey"], "F13");
+    let min_duration_secs = after_outer["result"]["min_duration_secs"]
+        .as_f64()
+        .expect("min_duration_secs should be numeric");
+    assert!(
+        (min_duration_secs - 0.4).abs() < 1e-6,
+        "supported min_duration_secs update should round-trip: {min_duration_secs}"
     );
 
     rpc_join.abort();

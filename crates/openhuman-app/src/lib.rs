@@ -124,7 +124,7 @@ use tauri_plugin_notification::NotificationExt;
 use tauri_plugin_deep_link::DeepLinkExt;
 
 #[cfg(target_os = "macos")]
-use objc2_app_kit::NSWindowTitleVisibility;
+use objc2_app_kit::{NSWindow, NSWindowTitleVisibility};
 
 // Use Tauri's upstream native WebView runtime on every desktop platform.
 pub(crate) type AppRuntime = tauri::Wry;

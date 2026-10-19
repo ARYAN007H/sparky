@@ -104,7 +104,6 @@ outermost to innermost:
 | `GET /events` | SSE filtered by `client_id` | bearer header, or a one-shot bind token from `core.events_subscribe_token` |
 | `GET /events/webhooks` | webhook debug SSE | bearer header or `?token=` |
 | `GET /events/domain` | every `DomainEvent` as SSE, for the live event log | bearer |
-| `GET /ws/dictation` | dictation WebSocket | bearer header or `?token=`, plus origin check |
 | `GET /ws/live-voice` | live voice agent WebSocket | bearer header or `?token=`, plus origin check |
 | `GET /oauth/mcp/callback` | MCP browser OAuth redirect target | public; the one-time `state` is the guard |
 | `GET /dev/connect` | debug handoff to a loopback Vite renderer | public; guarded in the handler |
@@ -183,7 +182,6 @@ Server to client, `spawn_web_channel_bridge` spawns one forwarding task per
 source: web-chat events (`web_chat::subscribe_web_channel_events`, sent to
 the initiating client's room and the `thread:<id>` room, not broadcast),
 dictation hotkeys and transcription results (`voice::dictation_listener`),
-overlay attention bubbles (`desktop::overlay::subscribe_attention_events`),
 core notifications (`desktop::notifications`), and companion state. It also
 forwards a set of `DomainEvent`s read off `BUS`: session expiry, MCP setup
 secret requests, memory sync and tree-build progress, channel listener

@@ -4,10 +4,7 @@ use super::*;
 async fn missing_module_never_starts_a_local_microphone() {
     let mut config = Config::default();
     config.modules.enabled = false;
-    let error = CaptureLease::reserve(&config, Kind::Recording)
-        .await
-        .err()
-        .unwrap();
+    let error = CaptureLease::reserve(&config).await.err().unwrap();
     assert!(error.contains("MODULE_CALL_REPORTED"));
 }
 
@@ -15,7 +12,7 @@ async fn missing_module_never_starts_a_local_microphone() {
 async fn unavailable_cleanup_retains_the_lease_for_retry() {
     let port = Arc::new(Fixture::default());
     port.fail_cleanup.store(true, Ordering::SeqCst);
-    let lease = fixture_lease(port.clone(), Kind::Recording);
+    let lease = fixture_lease(port.clone());
     assert!(lease.close().await.is_err());
     assert!(!lease.state.closed.load(Ordering::SeqCst));
     port.fail_cleanup.store(false, Ordering::SeqCst);
@@ -34,7 +31,7 @@ async fn unavailable_cleanup_retains_the_lease_for_retry() {
 #[tokio::test]
 async fn finishing_reads_bounded_output_and_uses_module_metrics() {
     let port = Arc::new(Fixture::default());
-    let lease = fixture_lease(port.clone(), Kind::Recording);
+    let lease = fixture_lease(port.clone());
     let result = lease.finish().await.unwrap();
     assert_eq!(result.wav_bytes, vec![7; READ_BYTES + 2]);
     assert_eq!(result.sample_count, (READ_BYTES + 2 - 44) / 2);
@@ -50,7 +47,7 @@ async fn finishing_reads_bounded_output_and_uses_module_metrics() {
 async fn cancelled_finish_releases_the_known_recording_and_output() {
     let port = Arc::new(Fixture::default());
     port.block_finish.store(true, Ordering::SeqCst);
-    let lease = fixture_lease(port.clone(), Kind::Recording);
+    let lease = fixture_lease(port.clone());
     let state = lease.state.clone();
     let task = tokio::spawn(async move { lease.finish().await });
     port.entered.notified().await;
@@ -61,16 +58,6 @@ async fn cancelled_finish_releases_the_known_recording_and_output() {
     let calls = port.calls.lock().unwrap();
     assert!(calls.contains(&methods::RECORDING_CANCEL));
     assert!(calls.contains(&methods::RELEASE_AUDIO_OUTPUT));
-}
-
-#[tokio::test]
-async fn closed_stream_cannot_poll_or_restart_after_sign_out() {
-    let port = Arc::new(Fixture::default());
-    let lease = fixture_lease(port.clone(), Kind::Stream);
-    lease.close().await.unwrap();
-    assert!(lease.poll().await.is_err());
-    assert!(lease.start_stream().await.is_err());
-    assert_eq!(*port.calls.lock().unwrap(), vec![methods::CAPTURE_STOP]);
 }
 
 #[derive(Default)]
@@ -140,13 +127,12 @@ impl Port for Fixture {
         }
     }
 }
-fn fixture_lease(port: Arc<Fixture>, kind: Kind) -> CaptureLease {
+fn fixture_lease(port: Arc<Fixture>) -> CaptureLease {
     CaptureLease {
         state: Arc::new(State {
             id: 0,
             port,
             handle: CaptureHandle("lease".into()),
-            kind,
             closed: AtomicBool::new(false),
             serial: tokio::sync::Mutex::new(()),
         }),
@@ -194,7 +180,6 @@ async fn capture_never_retries_through_an_unattested_bus() {
             id: 0,
             port: Arc::new(BusPort(crate::modules::ops::fixture_client(proxy))),
             handle: CaptureHandle("lease".into()),
-            kind: Kind::Recording,
             closed: AtomicBool::new(false),
             serial: tokio::sync::Mutex::new(()),
         }),
@@ -210,14 +195,17 @@ async fn a_reservation_finishing_after_sign_out_is_closed_before_start() {
     let port = Arc::new(Fixture::default());
     port.block_reserve.store(true, Ordering::SeqCst);
     let task_port = port.clone();
-    let task =
-        tokio::spawn(async move { CaptureLease::reserve_with_port(task_port, Kind::Stream).await });
+    let task = tokio::spawn(async move { CaptureLease::reserve_with_port(task_port).await });
     port.entered.notified().await;
-    Kind::Stream.generation().fetch_add(1, Ordering::SeqCst);
+    RECORDING_GENERATION.fetch_add(1, Ordering::SeqCst);
     port.release_reserve.notify_one();
     assert!(task.await.unwrap().is_err());
     assert_eq!(
         *port.calls.lock().unwrap(),
-        vec![methods::RESERVE_CAPTURE, methods::CAPTURE_STOP]
+        vec![
+            methods::RESERVE_CAPTURE,
+            methods::RECORDING_CANCEL,
+            methods::RELEASE_AUDIO_OUTPUT,
+        ]
     );
 }

@@ -118,44 +118,6 @@ pub struct VoiceServerConfig {
     /// recognition of names, technical terms, and domain-specific vocabulary.
     #[serde(default)]
     pub custom_dictionary: Vec<String>,
-
-    /// Phase 2 — always-on listening. When true, the voice server keeps the
-    /// microphone open continuously and segments utterances with
-    /// voice-activity detection (VAD) instead of requiring a hotkey press.
-    /// Off by default: always-on listening has obvious privacy weight, so it
-    /// is strictly opt-in.
-    #[serde(default)]
-    pub always_on_enabled: bool,
-
-    /// VAD speech-onset threshold (peak RMS energy). A frame whose RMS rises
-    /// above this is treated as the start of speech. Slightly higher than the
-    /// hotkey `silence_threshold` because an always-open mic must reject more
-    /// ambient noise before opening an utterance.
-    #[serde(default = "default_vad_onset_threshold")]
-    pub vad_onset_threshold: f32,
-
-    /// VAD hangover: how long (milliseconds) RMS must stay below the onset
-    /// threshold before the current utterance is considered finished. Prevents
-    /// chopping an utterance on natural mid-sentence pauses.
-    #[serde(default = "default_vad_hangover_ms")]
-    pub vad_hangover_ms: u32,
-
-    /// Minimum speech duration (milliseconds) for a segment to be emitted.
-    /// Shorter blips (a cough, a door) are discarded before transcription.
-    #[serde(default = "default_vad_min_speech_ms")]
-    pub vad_min_speech_ms: u32,
-
-    /// Hard ceiling (seconds) on a single always-on utterance. Forces a flush
-    /// so a continuous noise source can't grow an unbounded recording.
-    #[serde(default = "default_vad_max_utterance_secs")]
-    pub vad_max_utterance_secs: f32,
-
-    /// Wake word for always-on mode. An utterance is only delivered to the agent
-    /// when its transcript contains this phrase; the phrase is stripped and the
-    /// remainder is sent as the command. Empty = no wake word (deliver every
-    /// utterance). Default "Hey Tiny".
-    #[serde(default = "default_wake_word")]
-    pub wake_word: String,
 }
 
 fn default_hotkey() -> String {
@@ -170,26 +132,6 @@ fn default_silence_threshold() -> f32 {
     0.002
 }
 
-fn default_vad_onset_threshold() -> f32 {
-    0.01
-}
-
-fn default_vad_hangover_ms() -> u32 {
-    800
-}
-
-fn default_vad_min_speech_ms() -> u32 {
-    300
-}
-
-fn default_vad_max_utterance_secs() -> f32 {
-    30.0
-}
-
-fn default_wake_word() -> String {
-    "Hey Tiny".to_string()
-}
-
 impl Default for VoiceServerConfig {
     fn default() -> Self {
         Self {
@@ -201,12 +143,6 @@ impl Default for VoiceServerConfig {
             min_duration_secs: default_min_duration(),
             silence_threshold: default_silence_threshold(),
             custom_dictionary: Vec::new(),
-            always_on_enabled: false,
-            vad_onset_threshold: default_vad_onset_threshold(),
-            vad_hangover_ms: default_vad_hangover_ms(),
-            vad_min_speech_ms: default_vad_min_speech_ms(),
-            vad_max_utterance_secs: default_vad_max_utterance_secs(),
-            wake_word: default_wake_word(),
         }
     }
 }

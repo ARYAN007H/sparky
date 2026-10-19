@@ -11,9 +11,9 @@ use std::sync::{
 use tinybus::module::ModuleClient;
 use tinyvoice_bus::{
     capture::{
-        AudioOutput, CaptureBatch, CaptureError, CaptureHandle, CapturePollRequest, CaptureResult,
-        CaptureStream, MicrophonePermission, ReadAudioRequest, RecordingFinishRequest,
-        RecordingStartRequest, RecordingSummary, RecordingSummaryRequest,
+        AudioOutput, CaptureError, CaptureHandle, CaptureResult, MicrophonePermission,
+        ReadAudioRequest, RecordingFinishRequest, RecordingStartRequest, RecordingSummary,
+        RecordingSummaryRequest,
     },
     names::methods,
 };
@@ -22,24 +22,10 @@ const MODULE: &str = "tinyvoice";
 const READ_BYTES: usize = 256 * 1024;
 const MAX_OUTPUT_BYTES: usize = 32 * 1024 * 1024;
 static RECORDING_GENERATION: AtomicU64 = AtomicU64::new(0);
-static STREAM_GENERATION: AtomicU64 = AtomicU64::new(0);
 static NEXT_ID: AtomicU64 = AtomicU64::new(1);
 static LEASES: LazyLock<Mutex<HashMap<u64, Arc<State>>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
 static HOOK: AtomicBool = AtomicBool::new(false);
-#[derive(Clone, Copy, PartialEq, Eq)]
-pub(super) enum Kind {
-    Recording,
-    Stream,
-}
-impl Kind {
-    fn generation(self) -> &'static AtomicU64 {
-        match self {
-            Self::Recording => &RECORDING_GENERATION,
-            Self::Stream => &STREAM_GENERATION,
-        }
-    }
-}
 #[async_trait::async_trait]
 trait Port: Send + Sync {
     async fn call(
@@ -66,7 +52,6 @@ struct State {
     id: u64,
     port: Arc<dyn Port>,
     handle: CaptureHandle,
-    kind: Kind,
     closed: AtomicBool,
     serial: tokio::sync::Mutex<()>,
 }
@@ -92,22 +77,14 @@ impl State {
         if self.closed.load(Ordering::SeqCst) {
             return Ok(());
         }
-        match self.kind {
-            Kind::Recording => {
-                cleanup_result(
-                    self.call::<()>(methods::RECORDING_CANCEL, (&self.handle,))
-                        .await?,
-                )?;
-                cleanup_result(
-                    self.call::<()>(methods::RELEASE_AUDIO_OUTPUT, (&self.handle,))
-                        .await?,
-                )?;
-            }
-            Kind::Stream => cleanup_result(
-                self.call::<()>(methods::CAPTURE_STOP, (&self.handle,))
-                    .await?,
-            )?,
-        }
+        cleanup_result(
+            self.call::<()>(methods::RECORDING_CANCEL, (&self.handle,))
+                .await?,
+        )?;
+        cleanup_result(
+            self.call::<()>(methods::RELEASE_AUDIO_OUTPUT, (&self.handle,))
+                .await?,
+        )?;
         self.mark_closed();
         Ok(())
     }
@@ -124,12 +101,12 @@ pub(super) struct CaptureLease {
     state: Arc<State>,
 }
 impl CaptureLease {
-    pub(super) async fn reserve(config: &Config, kind: Kind) -> Result<Self, String> {
+    pub(super) async fn reserve(config: &Config) -> Result<Self, String> {
         let port: Arc<dyn Port> = Arc::new(BusPort(crate::modules::client(config.clone())));
-        Self::reserve_with_port(port, kind).await
+        Self::reserve_with_port(port).await
     }
-    async fn reserve_with_port(port: Arc<dyn Port>, kind: Kind) -> Result<Self, String> {
-        let generation = kind.generation().load(Ordering::SeqCst);
+    async fn reserve_with_port(port: Arc<dyn Port>) -> Result<Self, String> {
+        let generation = RECORDING_GENERATION.load(Ordering::SeqCst);
         let reply = port
             .call(
                 methods::RESERVE_CAPTURE,
@@ -146,7 +123,6 @@ impl CaptureLease {
             id: NEXT_ID.fetch_add(1, Ordering::Relaxed),
             port,
             handle: handle.map_err(capture_error)?,
-            kind,
             closed: AtomicBool::new(false),
             serial: tokio::sync::Mutex::new(()),
         });
@@ -156,7 +132,7 @@ impl CaptureLease {
             .insert(state.id, state.clone());
         register_shutdown();
         let lease = Self { state };
-        if generation != kind.generation().load(Ordering::SeqCst) {
+        if generation != RECORDING_GENERATION.load(Ordering::SeqCst) {
             lease.close().await?;
             return Err("capture cancelled during lifecycle change".into());
         }
@@ -180,52 +156,6 @@ impl CaptureLease {
             return Err(malformed());
         }
         Ok(())
-    }
-    pub(super) async fn start_stream(&self) -> Result<CaptureStream, String> {
-        let _serial = self.state.serial.lock().await;
-        self.state.check_open()?;
-        let stream: CaptureStream = self
-            .state
-            .call(
-                methods::CAPTURE_START,
-                (RecordingStartRequest {
-                    permission: MicrophonePermission::Granted,
-                    handle: Some(self.state.handle.clone()),
-                },),
-            )
-            .await?
-            .map_err(capture_error)?;
-        if stream.handle != self.state.handle
-            || stream.format.source_rate == 0
-            || stream.format.channels == 0
-        {
-            return Err(malformed());
-        }
-        Ok(stream)
-    }
-    pub(super) async fn poll(&self) -> Result<CaptureBatch, String> {
-        let _serial = self.state.serial.lock().await;
-        self.state.check_open()?;
-        let batch: CaptureBatch = self
-            .state
-            .call(
-                methods::CAPTURE_POLL,
-                (CapturePollRequest {
-                    handle: self.state.handle.clone(),
-                    max_chunks: 2,
-                },),
-            )
-            .await?
-            .map_err(capture_error)?;
-        if batch.chunks.len() > 2
-            || batch.chunks.iter().any(|chunk| {
-                chunk.samples.len() > 32_768
-                    || chunk.samples.iter().any(|sample| !sample.is_finite())
-            })
-        {
-            return Err(malformed());
-        }
-        Ok(batch)
     }
     pub(super) async fn finish(&self) -> Result<RecordingResult, String> {
         let _serial = self.state.serial.lock().await;
@@ -344,22 +274,11 @@ fn cleanup_result(result: CaptureResult<()>) -> Result<(), String> {
 }
 /// Release every retained capture lease on sign-out, including failed Drop cleanup.
 pub(crate) async fn close_all() -> Result<(), String> {
-    close_kind(None).await
-}
-pub(super) async fn close_streams() -> Result<(), String> {
-    close_kind(Some(Kind::Stream)).await
-}
-async fn close_kind(kind: Option<Kind>) -> Result<(), String> {
-    for candidate in [Kind::Recording, Kind::Stream] {
-        if kind.is_none_or(|kind| kind == candidate) {
-            candidate.generation().fetch_add(1, Ordering::SeqCst);
-        }
-    }
+    RECORDING_GENERATION.fetch_add(1, Ordering::SeqCst);
     let states: Vec<_> = LEASES
         .lock()
         .expect("capture lease registry poisoned")
         .values()
-        .filter(|state| kind.is_none_or(|kind| kind == state.kind))
         .cloned()
         .collect();
     let mut failure = None;
@@ -379,7 +298,6 @@ fn register_shutdown() {
     });
 }
 pub(crate) async fn shutdown_capture() {
-    super::always_on::shutdown().await;
     HOOK.store(false, Ordering::SeqCst);
     if let Err(error) = close_all().await {
         log::warn!("[voice_capture] shutdown cleanup pending: {error}");

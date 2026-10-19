@@ -2,9 +2,7 @@
 //!
 //! `spawn_web_channel_bridge` spawns one forwarding task per source. Domain
 //! broadcast channels: web-chat events (`openhuman::web_chat`), dictation hotkeys
-//! and transcription results (`openhuman::voice::dictation_listener`), overlay
-//! attention bubbles (`openhuman::desktop::overlay::subscribe_attention_events`,
-//! see `desktop/overlay/README.md`), core notifications
+//! and transcription results (`openhuman::voice::dictation_listener`), core notifications
 //! (`openhuman::desktop::notifications`), and shell companion state
 //! (`COMPANION_STATE_BUS`). `DomainEvent`s read off `openhuman::core::bus::BUS`:
 //! session expiry, MCP setup secret requests, memory sync and tree-build
@@ -583,7 +581,6 @@ pub fn spawn_web_channel_bridge(io: SocketIo) {
         log::debug!("[socketio] web_channel bridge stopped");
     });
 
-    let io_overlay = io.clone();
     let io_notify = io.clone();
     let io_transcription = io.clone();
     let io_auth = io.clone();
@@ -642,35 +639,10 @@ pub fn spawn_web_channel_bridge(io: SocketIo) {
         log::debug!("[socketio] companion state bridge stopped");
     });
 
-    // 3. Overlay attention events → broadcast to all clients.
-    tokio::spawn(async move {
-        let mut rx = crate::core_host::desktop::overlay::subscribe_attention_events();
-        loop {
-            let event = match rx.recv().await {
-                Ok(event) => event,
-                Err(tokio::sync::broadcast::error::RecvError::Lagged(skipped)) => {
-                    log::warn!("[socketio] dropped {skipped} events due to lag");
-                    continue;
-                }
-                Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
-            };
-
-            if let Ok(payload) = serde_json::to_value(&event) {
-                log::debug!(
-                    "[socketio] broadcast overlay:attention source={:?}",
-                    event.source
-                );
-                let _ = io_overlay.emit("overlay:attention", &payload);
-                let _ = io_overlay.emit("overlay_attention", &payload);
-            }
-        }
-        log::debug!("[socketio] overlay attention bridge stopped");
-    });
-
     // 4. Core notification events → broadcast to all connected clients so
     //    the in-app notification center picks them up regardless of which
-    //    chat session is active. Pattern mirrors the overlay attention
-    //    bridge above — fire-and-forget, no per-client routing.
+    //    chat session is active. This is a fire-and-forget broadcast with no
+    //    per-client routing.
     tokio::spawn(async move {
         let mut rx = crate::core_host::desktop::notifications::subscribe_core_notifications();
         loop {
