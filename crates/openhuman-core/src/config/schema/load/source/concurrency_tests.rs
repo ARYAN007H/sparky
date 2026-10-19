@@ -296,7 +296,10 @@ async fn external_config_conflict_refresh_keeps_derived_runtime_overrides() {
     assert!(crate::core::StructuredRpcError::decode(&later_conflict).is_some());
 
     let after_later_conflict = CoreContext::scope(grandchild.clone(), async {
-        DispatchCtx::new(grandchild.clone()).load_config().await.unwrap()
+        DispatchCtx::new(grandchild.clone())
+            .load_config()
+            .await
+            .unwrap()
     })
     .await;
     assert_eq!(
