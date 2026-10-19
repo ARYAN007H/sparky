@@ -35,7 +35,7 @@ pub use storage::StorageConfig;
 pub mod profile_layout;
 pub use profile_layout::{users_dir, ProfileLayout};
 mod identity_cost;
-mod load;
+pub(crate) mod load;
 pub(crate) use load::config_from_toml_str;
 pub(crate) use load::source::storage_schema::storage_schema as config_storage_schema;
 pub use load::{
