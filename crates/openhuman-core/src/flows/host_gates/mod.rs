@@ -13,3 +13,7 @@ pub(crate) use upload_paths::validate_upload_paths;
 #[cfg(test)]
 #[path = "mod_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "agent_refs_tests.rs"]
+mod agent_refs_tests;
