@@ -5,7 +5,7 @@
 //! made its poll frame ~440 KB on top of the agent tower (#6379).
 
 use super::super::Config;
-use super::dirs::{ConfigResolutionSource, default_action_dir, resolve_action_dir};
+use super::dirs::{default_action_dir, resolve_action_dir, ConfigResolutionSource};
 use super::env::EnvLookup;
 use super::impl_load::migration_source;
 use super::migrate::{

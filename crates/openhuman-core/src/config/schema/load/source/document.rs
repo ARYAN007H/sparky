@@ -2,20 +2,20 @@
 
 use std::sync::{Arc, Mutex};
 
-use anyhow::{Context, Result, anyhow};
+use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
 use serde_json::json;
-use tinystoragedrivers::secrets::{KeyProvider, crypto};
+use tinystoragedrivers::secrets::{crypto, KeyProvider};
 use tinystoragedrivers::{CollectionSpec, DocumentStore, Precondition};
 
 use super::{
-    ConfigRead, ConfigSource, ConfigSourceAnchor, DocumentBackendIdentity, FileConfigSource,
-    apply_bootstrap, strip_bootstrap,
+    apply_bootstrap, strip_bootstrap, ConfigRead, ConfigSource, ConfigSourceAnchor,
+    DocumentBackendIdentity, FileConfigSource,
 };
 use crate::storage::Scope;
 
-pub(crate) use super::storage_schema::CONFIG_COLLECTION;
 use super::storage_schema::document_id;
+pub(crate) use super::storage_schema::CONFIG_COLLECTION;
 
 /// The document field holding the encrypted TOML body (`enc2:` hex).
 const BODY_FIELD: &str = "toml_enc";

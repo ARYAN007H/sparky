@@ -1,9 +1,9 @@
 //! Tests for the surrounding module.
 
 use super::{
-    AuthStyle, BUILTIN_CLOUD_PROVIDERS, builtin_cloud_supports_responses_api, endpoint_host,
-    endpoint_host_is_chat_completions_only, host_is_builtin_cloud_provider, is_builtin_cloud_slug,
-    is_slug_reserved,
+    builtin_cloud_supports_responses_api, endpoint_host, endpoint_host_is_chat_completions_only,
+    host_is_builtin_cloud_provider, is_builtin_cloud_slug, is_slug_reserved, AuthStyle,
+    BUILTIN_CLOUD_PROVIDERS,
 };
 
 #[test]
@@ -275,11 +275,9 @@ fn generated_provider_ids_sanitize_and_bound_the_slug_prefix() {
     assert!(id.starts_with("p_provider_with_spaces_"));
     let suffix = id.rsplit('_').next().expect("suffix");
     assert_eq!(suffix.len(), 5);
-    assert!(
-        suffix
-            .chars()
-            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit())
-    );
+    assert!(suffix
+        .chars()
+        .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit()));
 }
 
 #[test]

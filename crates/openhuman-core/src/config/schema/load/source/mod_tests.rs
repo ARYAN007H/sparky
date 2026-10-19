@@ -3,7 +3,7 @@ use super::*;
 use crate::config::Config;
 use crate::storage::{MemoryStorage, Scope, ScopedStorage, StorageBackend};
 use std::sync::Arc;
-use tinystoragedrivers::secrets::{DerivedKeys, KeyProvider, crypto};
+use tinystoragedrivers::secrets::{crypto, DerivedKeys, KeyProvider};
 use zeroize::Zeroizing;
 
 fn keys(byte: u8) -> Arc<dyn KeyProvider> {
