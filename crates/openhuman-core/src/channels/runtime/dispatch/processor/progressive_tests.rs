@@ -41,3 +41,46 @@ fn native_tool_progress_keeps_correlation_and_display_metadata() {
             && detail == "README.md"
     ));
 }
+
+#[test]
+fn progressive_delivery_status_rejects_partial_or_unsupported_terminal_results() {
+    use tinychannels_bus::module_progressive::{ProgressiveOutputFailure, ProgressiveResult};
+
+    let receipt = tinychannels_bus::channel::MessageReceipt {
+        primary_platform_message_id: Some("provider-message-9".into()),
+        ..Default::default()
+    };
+    let delivered = ProgressiveResult::DeliveryOutcome {
+        outcome: Box::new(tinychannels_bus::channel::ChannelSendOutcome {
+            receipt: receipt.clone(),
+            error: None,
+        }),
+    };
+    assert!(delivery_succeeded(&delivered));
+    assert!(matches!(
+        delivered,
+        ProgressiveResult::DeliveryOutcome { outcome }
+            if outcome.receipt.primary_platform_message_id.as_deref() == Some("provider-message-9")
+    ));
+
+    let partial = ProgressiveResult::DeliveryBatch {
+        outcomes: vec![tinychannels_bus::channel::ChannelSendOutcome {
+            receipt,
+            error: Some(tinychannels_bus::channel::ChannelSendError {
+                kind: tinychannels_bus::channel::SendErrorKind::Transient,
+                sent_before_error: true,
+                ..Default::default()
+            }),
+        }],
+        unsupported: Vec::new(),
+        failure: Some(ProgressiveOutputFailure::ProviderTransport),
+    };
+    assert!(!delivery_succeeded(&partial));
+
+    let unsupported = ProgressiveResult::DeliveryUnsupported {
+        parts: vec![tinychannels_bus::channel::OutboundContentPart::Text {
+            text: "retained content".into(),
+        }],
+    };
+    assert!(!delivery_succeeded(&unsupported));
+}
