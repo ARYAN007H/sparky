@@ -204,3 +204,7 @@ pub(crate) async fn register(
         },
     })
 }
+
+#[cfg(test)]
+#[path = "authoring_host_tests.rs"]
+mod tests;

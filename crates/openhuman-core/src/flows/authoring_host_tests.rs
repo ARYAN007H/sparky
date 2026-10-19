@@ -1,0 +1,130 @@
+use super::*;
+use serde_json::json;
+
+fn nested_conditional_fan_in() -> Value {
+    json!({
+        "nodes": [
+            {"id":"start","kind":"trigger","name":"Start"},
+            {"id":"outer","kind":"condition","name":"Outer","config":{"field":"outer"}},
+            {"id":"inner","kind":"condition","name":"Inner","config":{"field":"inner"}},
+            {"id":"outer_else","kind":"output_parser","name":"Outer else"},
+            {"id":"inner_else","kind":"output_parser","name":"Inner else"},
+            {"id":"a","kind":"output_parser","name":"A"},
+            {"id":"c","kind":"output_parser","name":"C"},
+            {"id":"merge","kind":"merge","name":"Merge"}
+        ],
+        "edges": [
+            {"from_node":"start","to_node":"outer"},
+            {"from_node":"start","to_node":"c"},
+            {"from_node":"outer","from_port":"true","to_node":"inner"},
+            {"from_node":"outer","from_port":"false","to_node":"outer_else"},
+            {"from_node":"inner","from_port":"true","to_node":"a"},
+            {"from_node":"inner","from_port":"false","to_node":"inner_else"},
+            {"from_node":"a","to_node":"merge"},
+            {"from_node":"c","to_node":"merge"}
+        ]
+    })
+}
+
+#[tokio::test]
+async fn saved_workflow_callback_uses_its_captured_profile_over_the_bus() {
+    use crate::core::runtime::{ContextOverlay, CoreContext, DispatchCtx, DomainSet};
+    use crate::tools::toolpacks::ToolGroups;
+
+    let tmp = tempfile::tempdir().expect("temporary workspace");
+    let mut config = Config::default();
+    config.workspace_dir = tmp.path().join("workspace");
+    config.action_dir = config.workspace_dir.clone();
+    config.config_path = tmp.path().join("config.toml");
+    std::fs::create_dir_all(&config.workspace_dir).unwrap();
+
+    let root = CoreContext::for_test_with_config(DomainSet::full(), config.clone());
+    let alice = root.derive_with(
+        ContextOverlay::new(config.clone(), DomainSet::full(), ToolGroups::default())
+            .profile("authoring-alice"),
+    );
+    let bob = root.derive_with(
+        ContextOverlay::new(config.clone(), DomainSet::full(), ToolGroups::default())
+            .profile("authoring-bob"),
+    );
+    let shared_id = "same-child-id";
+    for (core, graph) in [(&alice, nested_conditional_fan_in()), (&bob, json!({
+        "nodes": [{"id":"start","kind":"trigger","name":"Start"}],
+        "edges": []
+    }))] {
+        let core = Arc::clone(core);
+        let config = config.clone();
+        CoreContext::scope(core, async move {
+            let graph = tinyflows::migrate::deserialize_graph(graph).unwrap();
+            let mut flow = crate::flows::store::create_flow(
+                &config,
+                "scoped child".into(),
+                graph,
+                false,
+                false,
+            )
+            .unwrap();
+            flow.id = shared_id.into();
+            crate::flows::store::upsert_flow(&config, &flow).unwrap();
+        })
+        .await;
+    }
+
+    let alice_registration =
+        register(Arc::new(config.clone()), DispatchCtx::new(Arc::clone(&alice)))
+            .await
+            .unwrap();
+    let bob_registration = register(Arc::new(config.clone()), DispatchCtx::new(Arc::clone(&bob)))
+        .await
+        .unwrap();
+    let proxy = crate::modules::tinyflows::authoring_proxy(&config)
+        .await
+        .unwrap();
+    let candidate = json!({
+        "nodes": [
+            {"id":"start","kind":"trigger","name":"Start"},
+            {"id":"child","kind":"sub_workflow","name":"Child","config":{"workflow_id":shared_id}}
+        ],
+        "edges": [{"from_node":"start","to_node":"child"}]
+    });
+    let alice_request = tinyflows_bus::ValidateGraphRequest {
+        graph: candidate.clone(),
+        host: Some(alice_registration.authoring.clone()),
+    };
+    let bob_request = tinyflows_bus::ValidateGraphRequest {
+        graph: candidate,
+        host: Some(bob_registration.authoring.clone()),
+    };
+
+    // Each bus call runs while the opposite profile is ambient. Only the
+    // callback's captured DispatchCtx can select the correct saved child.
+    let (alice_report, bob_report) = tokio::join!(
+        CoreContext::scope(Arc::clone(&bob), async {
+            proxy
+                .call::<tinyflows_bus::GraphValidation>(
+                    tinyflows_bus::methods::VALIDATE_GRAPH,
+                    &(alice_request,),
+                )
+                .await
+                .unwrap()
+        }),
+        CoreContext::scope(Arc::clone(&alice), async {
+            proxy
+                .call::<tinyflows_bus::GraphValidation>(
+                    tinyflows_bus::methods::VALIDATE_GRAPH,
+                    &(bob_request,),
+                )
+                .await
+                .unwrap()
+        })
+    );
+    assert!(
+        alice_report
+            .errors
+            .iter()
+            .any(|error| error.code == "unsupported_nested_conditional_fan_in"),
+        "Alice must resolve her incompatible child: {:?}",
+        alice_report.errors
+    );
+    assert!(bob_report.errors.is_empty(), "Bob's safe child: {:?}", bob_report.errors);
+}
