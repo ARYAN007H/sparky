@@ -268,6 +268,7 @@ run_json_rpc_e2e_suite() {
     json_rpc_mcp_e2e json_rpc_inference_e2e json_rpc_auth_security_e2e
     json_rpc_config_e2e json_rpc_agent_team_e2e json_rpc_web_chat_e2e
     json_rpc_misc_e2e)
+  if [[ "${suite:-}" =~ ^json_rpc_.*_e2e$ ]]; then targets=("$suite"); fi
   for target in "${targets[@]}"; do
     if ! listing="$("$CARGO_BIN" test --manifest-path Cargo.toml --features "$PRODUCT_FEATURES" --test "$target" -- --list)"; then
       echo "[rust-e2e] ERROR: could not enumerate ${target}; refusing to run an empty or partial list." >&2
@@ -343,7 +344,7 @@ run_in_process_modules() {
 }
 
 for suite in "${SUITES[@]}"; do
-  if [ "$suite" = "json_rpc_e2e" ]; then
+  if [ "$suite" = "json_rpc_e2e" ] || [[ "$suite" =~ ^json_rpc_.*_e2e$ ]]; then
     run_json_rpc_e2e_suite
     continue
   fi
