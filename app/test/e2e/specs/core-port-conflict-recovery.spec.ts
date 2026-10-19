@@ -29,7 +29,7 @@
  * this E2E harness can observe.
  */
 import { waitForApp } from '../helpers/app-helpers';
-import { textExists, waitForText } from '../helpers/element-helpers';
+import { textExists } from '../helpers/element-helpers';
 import { startMockServer, stopMockServer } from '../mock-server';
 
 const DEFAULT_CORE_PORT = Number(process.env.OPENHUMAN_CORE_PORT ?? 7788);

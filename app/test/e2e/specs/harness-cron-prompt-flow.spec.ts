@@ -36,7 +36,6 @@
  */
 import { waitForApp } from '../helpers/app-helpers';
 import {
-  approvePendingToolCall,
   chatMounted,
   clickByTitle,
   clickSend,
@@ -51,7 +50,6 @@ import { resetApp } from '../helpers/reset-app';
 import { navigateViaHash } from '../helpers/shared-flows';
 import {
   clearRequestLog,
-  getRequestLog,
   resetMockBehavior,
   setMockBehavior,
   startMockServer,
