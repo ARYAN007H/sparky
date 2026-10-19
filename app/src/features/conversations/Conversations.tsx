@@ -1317,7 +1317,6 @@ const Conversations = ({
     // Originals ride beside the text as typed parts; the core stages them.
     const attachmentParts = attachmentsToParts(pendingAttachments);
     let messageText = trimmed;
-    let persistedUserMessage: ThreadMessage | null = null;
     const userMessage: ThreadMessage = {
       id: `msg_${globalThis.crypto.randomUUID()}`,
       content: messageText,
@@ -1352,7 +1351,6 @@ const Conversations = ({
       if (retryingUnchangedMessage) {
         // The core already has this exact prompt from the failed attempt.
         messageText = previousFailedMessage.content;
-        persistedUserMessage = previousFailedMessage;
       } else if (previousFailedMessage) {
         // A corrected retry must replace the already-persisted failed prompt;
         // appending it would leave both prompts in the transcript. The edit
@@ -1389,7 +1387,6 @@ const Conversations = ({
         ).unwrap();
         // The core saved the originals before returning this durable reference.
         messageText = persisted.message.content;
-        persistedUserMessage = persisted.message;
         persistedFailedMessageByThreadRef.current.set(sendingThreadId, persisted.message);
       }
     } catch (error) {
@@ -1439,28 +1436,12 @@ const Conversations = ({
       const requestId = await chatSend({
         threadId: sendingThreadId,
         message: messageText,
-        ...(opts?.voicePart
-          ? { attachments: [...attachmentParts, opts.voicePart] }
-          : attachmentParts.length
-            ? { attachments: attachmentParts }
-            : {}),
+        ...(opts?.voicePart ? { attachments: [opts.voicePart] } : {}),
         ...(modelOverride !== undefined ? { model: modelOverride } : {}),
         locale: uiLocale,
         reasoningEffort: composerReasoningEffort,
         ...(opts?.voiceNote ? { source: VOICE_NOTE_SOURCE } : {}),
       });
-      if (requestId && persistedUserMessage) {
-        try {
-          await threadApi.updateMessage(sendingThreadId, persistedUserMessage.id, {
-            ...persistedUserMessage.extraMetadata,
-            requestId,
-          });
-        } catch (error) {
-          // Keep the accepted turn alive if the UI-only correlation stamp
-          // cannot be persisted; legacy projection remains conservative.
-          console.warn('[voice-note] could not persist user-turn correlation', error);
-        }
-      }
       trackAnalyticsEvent('chat_message_sent', {
         send_mode: opts?.voiceNote ? 'voice_note' : 'standard',
         has_attachments: pendingAttachments.length > 0,
@@ -1527,7 +1508,12 @@ const Conversations = ({
     if (!transcript) throw new Error(t('voiceNote.transcribeFailed'));
     const noteId = `vn_${globalThis.crypto.randomUUID().replace(/-/g, '')}`;
     const { mime } = await storeVoiceNote(noteId, draft.blob);
-    const voicePart = await voiceNoteContentPart(draft.blob, draft.durationMs, draft.waveform);
+    const voicePart = await voiceNoteContentPart(
+      noteId,
+      draft.blob,
+      draft.durationMs,
+      draft.waveform
+    );
     await handleSendMessage(transcript, {
       voiceNote: { noteId, mime, durationMs: draft.durationMs, waveform: draft.waveform },
       voicePart,

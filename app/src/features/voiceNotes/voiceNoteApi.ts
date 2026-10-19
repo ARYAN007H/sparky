@@ -50,6 +50,7 @@ export function bytesToBase64(bytes: Uint8Array): string {
 
 /** Keep the recorded media on the typed web-chat wire beside its transcript. */
 export async function voiceNoteContentPart(
+  noteId: string,
   blob: Blob,
   durationMs: number,
   waveform: number[]
@@ -64,6 +65,7 @@ export async function voiceNoteContentPart(
       waveform,
       pushToTalk: false,
       media: {
+        opaqueId: noteId,
         url: `data:${mime};base64,${bytesToBase64(bytes)}`,
         kind: 'audio',
         contentType: mime,
