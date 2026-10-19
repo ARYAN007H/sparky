@@ -71,15 +71,28 @@ llvm_cov_embed() {
 # each unit by its resolved feature set, and the core's feature graph differs
 # per selected package set (core alone, embed/tinyhumans, and the cli, which
 # drops the core's `default` alias), so separate `-p` invocations each compile
-# the core and its dependencies again. With the same packages, `--all-targets`
-# and `--features` on every invocation, the first suite builds them once and
-# the rest find them fresh. Suites, reports and execution order are unchanged;
+# the core and its dependencies again. With the same packages, targets and
+# `--features` on every invocation, the first suite builds them once and the
+# rest find them fresh. Suites, reports and execution order are unchanged;
 # each filter selects what the old per-package arguments built and ran:
-#   core        its only target is the lib (`--lib --bins`)
-#   embed       `--all-targets`
-#   tinyhumans  `--all-targets`
-#   cli         `--tests -E 'kind(test)'` (integration targets only)
-UNIFIED_PRODUCT_ARGS=(-p openhuman -p openhuman-embed -p openhuman-tinyhumans -p openhuman-cli --all-targets)
+#   core        its lib and bins' unit tests
+#   embed       lib, bins and integration tests
+#   tinyhumans  lib, bins and integration tests
+#   cli         `-E 'kind(test)'` (integration targets only)
+#
+# Targets are `--tests`, not `--all-targets`, under nextest. Examples and
+# benches only compile: nextest runs none of them, so they produce no profile,
+# yet every example links the whole instrumented core (about as large as a test
+# binary; embed alone has 26, and it builds twice, product and default
+# features) and stays on the scratch disk until the report. They add no lcov
+# either: cargo-llvm-cov ignores `examples/` paths, and clippy `--all-targets`
+# already compiles them. The cargo runner keeps `--all-targets`.
+if [ "${OH_COV_RUNNER:-cargo}" = "nextest" ]; then
+  SUITE_TARGETS=(--tests)
+else
+  SUITE_TARGETS=(--all-targets)
+fi
+UNIFIED_PRODUCT_ARGS=(-p openhuman -p openhuman-embed -p openhuman-tinyhumans -p openhuman-cli "${SUITE_TARGETS[@]}")
 FILTER_CORE='package(=openhuman)'
 FILTER_EMBED='package(=openhuman-embed)'
 FILTER_TINYHUMANS='package(=openhuman-tinyhumans)'
@@ -299,27 +312,27 @@ if [ "${OH_COV_RUNNER:-cargo}" = "nextest" ]; then
   suite "openhuman-embed" llvm_cov --no-report --no-fail-fast \
     "${UNIFIED_PRODUCT_ARGS[@]}" -E "${FILTER_EMBED}"
 else
-  suite "openhuman-embed" llvm_cov_embed --no-report --no-fail-fast -p openhuman-embed --all-targets
+  suite "openhuman-embed" llvm_cov_embed --no-report --no-fail-fast -p openhuman-embed "${SUITE_TARGETS[@]}"
 fi
-suite "openhuman-rpc" llvm_cov_package --no-report --no-fail-fast -p openhuman-rpc --all-targets \
+suite "openhuman-rpc" llvm_cov_package --no-report --no-fail-fast -p openhuman-rpc "${SUITE_TARGETS[@]}" \
   --features storage-sqlite
 if [ "${OH_COV_RUNNER:-cargo}" = "nextest" ]; then
   suite "openhuman-tinyhumans" llvm_cov --no-report --no-fail-fast \
     "${UNIFIED_PRODUCT_ARGS[@]}" -E "${FILTER_TINYHUMANS}"
 else
-  suite "openhuman-tinyhumans" llvm_cov_product_facade --no-report --no-fail-fast -p openhuman-tinyhumans --all-targets
+  suite "openhuman-tinyhumans" llvm_cov_product_facade --no-report --no-fail-fast -p openhuman-tinyhumans "${SUITE_TARGETS[@]}"
 fi
 if [ "${OH_COV_RUNNER:-cargo}" = "nextest" ]; then
   # Contributor/default features are distinct from product features. Keep both
   # configurations instrumented rather than dropping the default-only surface.
   suite "openhuman-embed (default)" llvm_cov_package --no-report --no-fail-fast -p openhuman-embed --all-targets
-  suite "openhuman-tinyhumans (default)" llvm_cov_package --no-report --no-fail-fast -p openhuman-tinyhumans --all-targets
+  suite "openhuman-tinyhumans (default)" llvm_cov_package --no-report --no-fail-fast -p openhuman-tinyhumans "${SUITE_TARGETS[@]}"
 fi
 # The terminal frontend builds the core a third time (default features, not the
 # product set). It is on by default and on in the PR lane; OH_COV_TUI=0 is an
 # opt-out for local runs.
 if [ "${OH_COV_TUI:-1}" = "1" ]; then
-  suite "openhuman-tui" llvm_cov_package --no-report --no-fail-fast -p openhuman-tui --all-targets
+  suite "openhuman-tui" llvm_cov_package --no-report --no-fail-fast -p openhuman-tui "${SUITE_TARGETS[@]}"
 else
   log "skipping openhuman-tui (OH_COV_TUI=${OH_COV_TUI})"
 fi
