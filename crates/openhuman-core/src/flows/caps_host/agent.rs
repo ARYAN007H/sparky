@@ -420,7 +420,6 @@ impl OpenHumanAgentRunner {
             node_model = node_model.as_deref().unwrap_or("<definition-default>"),
             default_model = effective.default_model.as_deref().unwrap_or("<config-default>"),
             effective_iteration_cap,
-            explicit_timeout_secs = requested_timeout_secs.is_some(),
             base_timeout_secs,
             timeout_secs,
             prompt_len = prompt.len(),

@@ -56,6 +56,13 @@ impl CapsHostService {
         });
 
         let mut config = request.config.clone();
+        if let Some(object) = config.as_object_mut()
+            && object.get("timeout_secs").and_then(Value::as_u64).is_none()
+        {
+            if let Some(timeout) = request.agent.limits.agent_timeout_secs {
+                object.insert("timeout_secs".to_owned(), Value::from(timeout));
+            }
+        }
         if let (Some(model), Some(object)) = (
             request
                 .model
@@ -346,6 +353,10 @@ impl CapsHostService {
         let binding = Arc::clone(&self.0);
         binding
             .within(async move {
+                crate::agent::harness::host_definition::AgentDefinitionRegistry::init_global(
+                    &binding.config.workspace_dir,
+                )
+                .map_err(|error| error.to_string())?;
                 let registry = crate::agent::harness::host_definition::AgentDefinitionRegistry::current();
                 registry
                     .and_then(|registry| registry.get(&id).cloned())
@@ -360,6 +371,10 @@ impl CapsHostService {
         let binding = Arc::clone(&self.0);
         binding
             .within(async move {
+                crate::agent::harness::host_definition::AgentDefinitionRegistry::init_global(
+                    &binding.config.workspace_dir,
+                )
+                .map_err(|error| error.to_string())?;
                 let registry = crate::agent::harness::host_definition::AgentDefinitionRegistry::current();
                 registry
                     .map(|registry| registry.list().into_iter().cloned().map(to_bus_agent_definition).collect())
