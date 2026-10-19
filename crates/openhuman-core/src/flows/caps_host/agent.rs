@@ -73,6 +73,17 @@ pub struct OpenHumanAgentRunner {
     /// The run's approval context (flow run correlation), handed to the gate
     /// with every acting dispatch.
     pub approval: crate::security::approval::ApprovalTurnContext,
+    /// Run-scoped event stream consumed by `CapsHost.AgentEvents`.
+    pub progress: Option<tokio::sync::mpsc::Sender<crate::agent::progress::AgentProgress>>,
+}
+
+/// Bounded callback state for one in-flight host agent turn.
+#[derive(Default)]
+pub(crate) struct AgentRunState {
+    pub(crate) events: Vec<tinyflows_bus::runs::AgentProgressEvent>,
+    pub(crate) outcome: Option<tinyflows_bus::runs::AgentRunOutcome>,
+    pub(crate) error: Option<String>,
+    pub(crate) done: bool,
 }
 
 /// Process-wide ceiling on **simultaneous harness agent turns started by flow
@@ -375,6 +386,7 @@ impl OpenHumanAgentRunner {
             ))
         })?;
         agent.set_agent_definition_name(agent_ref.to_string());
+        agent.set_on_progress(self.progress.clone());
 
         // Issue #4868 — the session builder now stamps `agent_ref`'s own
         // `effective_max_iterations()` onto the agent (instead of the global
