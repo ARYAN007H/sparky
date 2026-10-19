@@ -208,7 +208,7 @@ impl Docs {
         mut update: F,
     ) -> Result<Option<DurableSubagentSession>>
     where
-        F: FnMut(&mut DurableSubagentSession, String) + Send,
+        F: FnMut(&mut DurableSubagentSession, String) + Send + 'static,
     {
         let id = key_of(subagent_session_id)?;
         let updated = self.0.run(|docs| async move {

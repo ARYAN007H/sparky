@@ -180,9 +180,11 @@ pub fn mark_finished(
     run_status: &SubagentRunStatus,
     history: Vec<TranscriptMessage>,
 ) -> Result<(), String> {
+    let task_id = task_id.to_owned();
+    let status = DurableSubagentStatus::from_run_status(run_status);
     let updated = update_session(store, subagent_session_id, |session, now| {
-        session.current_task_id = Some(task_id.to_string());
-        session.status = DurableSubagentStatus::from_run_status(run_status);
+        session.current_task_id = Some(task_id.clone());
+        session.status = status;
         session.latest_history = Some(history.clone());
         session.latest_error = None;
         session.updated_at = now.clone();
@@ -203,8 +205,9 @@ pub fn mark_failed(
     task_id: &str,
     error: String,
 ) -> Result<(), String> {
+    let task_id = task_id.to_owned();
     let updated = update_session(store, subagent_session_id, |session, now| {
-        session.current_task_id = Some(task_id.to_string());
+        session.current_task_id = Some(task_id.clone());
         session.status = DurableSubagentStatus::Failed;
         session.latest_error = Some(error.clone());
         session.updated_at = now.clone();
@@ -264,7 +267,7 @@ fn update_session<F>(
     update: F,
 ) -> Result<bool, String>
 where
-    F: FnMut(&mut DurableSubagentSession, String) + Send,
+    F: FnMut(&mut DurableSubagentSession, String) + Send + 'static,
 {
     let _guard = store_write_lock()
         .lock()

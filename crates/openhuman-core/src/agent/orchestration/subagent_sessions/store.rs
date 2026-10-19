@@ -63,7 +63,7 @@ impl SubagentSessionStore {
         update: F,
     ) -> Result<Option<DurableSubagentSession>, String>
     where
-        F: FnMut(&mut DurableSubagentSession, String) + Send,
+        F: FnMut(&mut DurableSubagentSession, String) + Send + 'static,
     {
         let docs = super::store_documents::current(&self.workspace_dir)
             .map_err(|err| format!("{err:#}"))?;
