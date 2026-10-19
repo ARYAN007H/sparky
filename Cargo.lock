@@ -5603,6 +5603,7 @@ dependencies = [
  "tinyagents-definition",
  "tinyagents-graph",
  "tinyagents-harness",
+ "tinyagents-hooks",
  "tinyagents-session",
  "tinybus",
  "tinyflows-bus",
