@@ -127,7 +127,7 @@ async function readSelectedThreadSnapshot(): Promise<{
   threadId: string | null;
   messageCount: number;
   hasUserMessage: boolean;
-  hasAssistantMessage: boolean;
+  hasAgentMessage: boolean;
 }> {
   return (await browser.execute(() => {
     const winAny = window as unknown as { __OPENHUMAN_STORE__?: { getState: () => unknown } };
@@ -135,7 +135,7 @@ async function readSelectedThreadSnapshot(): Promise<{
       | {
           thread?: {
             selectedThreadId?: string | null;
-            messagesByThreadId?: Record<string, Array<{ sender?: string }>>;
+            messagesByThreadId?: Record<string, Array<{ sender?: 'user' | 'agent' }>>;
           };
         }
       | undefined;
@@ -145,13 +145,13 @@ async function readSelectedThreadSnapshot(): Promise<{
       threadId,
       messageCount: messages.length,
       hasUserMessage: messages.some(message => message.sender === 'user'),
-      hasAssistantMessage: messages.some(message => message.sender === 'assistant'),
+      hasAgentMessage: messages.some(message => message.sender === 'agent'),
     };
   })) as {
     threadId: string | null;
     messageCount: number;
     hasUserMessage: boolean;
-    hasAssistantMessage: boolean;
+    hasAgentMessage: boolean;
   };
 }
 
