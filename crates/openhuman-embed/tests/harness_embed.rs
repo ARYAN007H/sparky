@@ -25,6 +25,24 @@ use serde_json::json;
 use wiremock::matchers::{any, method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
+/// A runtime whose drop waits at most `RUNTIME_SHUTDOWN` for blocking work.
+struct BoundedRuntime(Option<tokio::runtime::Runtime>);
+
+impl std::ops::Deref for BoundedRuntime {
+    type Target = tokio::runtime::Runtime;
+    fn deref(&self) -> &Self::Target {
+        self.0.as_ref().expect("runtime is alive until drop")
+    }
+}
+
+impl Drop for BoundedRuntime {
+    fn drop(&mut self) {
+        if let Some(runtime) = self.0.take() {
+            runtime.shutdown_timeout(RUNTIME_SHUTDOWN);
+        }
+    }
+}
+
 const REPLY: &str = "harness-embed-ok";
 
 /// How long the mock provider holds every reply.
@@ -73,7 +91,7 @@ const CONCURRENT_BUDGET: std::time::Duration = std::time::Duration::from_secs(90
 fn a_harness_runs_a_turn_against_the_provider_it_was_given() {
     let _ = env_logger::builder().is_test(true).try_init();
 
-    let runtime = runtime();
+    let runtime = BoundedRuntime(Some(runtime()));
     // Every turn opens the MCP client, which asks TinyBox for the jail's
     // toolchain grants. Where the module is not already staged (a local run,
     // unlike the lanes' `OPENHUMAN_MODULE_PATH`) that downloads it from GitHub
@@ -111,23 +129,26 @@ fn a_harness_runs_a_turn_against_the_provider_it_was_given() {
                 .await;
 
             let harness = std::sync::Arc::new(
-                bounded("building the harness", Harness::builder()
-                    .config(config)
-                    .workspace(Workspace::Ephemeral)
-                    .backend_url(backend.uri())
-                    .provider(
-                        Provider::openai_compatible(
-                            format!("{}/v1", provider_server.uri()),
-                            "sk-test",
+                bounded(
+                    "building the harness",
+                    Harness::builder()
+                        .config(config)
+                        .workspace(Workspace::Ephemeral)
+                        .backend_url(backend.uri())
+                        .provider(
+                            Provider::openai_compatible(
+                                format!("{}/v1", provider_server.uri()),
+                                "sk-test",
+                            )
+                            .model("harness-embed-model"),
                         )
-                        .model("harness-embed-model"),
-                    )
-                    // Read-only: the turn has no business acting, and this keeps the
-                    // test from depending on the approval gate's timing.
-                    .access(Access::readonly())
-                    .build()
-                    .await
-                    .expect("harness builds"),
+                        // Read-only: the turn has no business acting, and this keeps the
+                        // test from depending on the approval gate's timing.
+                        .access(Access::readonly())
+                        .build(),
+                )
+                .await
+                .expect("harness builds"),
             );
 
             // The workspace is the harness's own, not the operator's.
@@ -163,7 +184,9 @@ fn a_harness_runs_a_turn_against_the_provider_it_was_given() {
                 "a library harness must not bind an RPC listener"
             );
 
-            let first = harness.run("Say the magic word.").await.expect("turn runs");
+            let first = bounded("the first turn", harness.run("Say the magic word."))
+                .await
+                .expect("turn runs");
             assert!(
                 first.reply.contains(REPLY),
                 "reply {:?} does not carry the provider's response",
@@ -183,12 +206,12 @@ fn a_harness_runs_a_turn_against_the_provider_it_was_given() {
             );
 
             // Continuing a conversation reuses the caller's session id verbatim.
-            let second = harness
-                .turn("And again.")
-                .session(&first.session_id)
-                .send()
-                .await
-                .expect("second turn runs");
+            let second = bounded(
+                "the second turn",
+                harness.turn("And again.").session(&first.session_id).send(),
+            )
+            .await
+            .expect("second turn runs");
             assert_eq!(second.session_id, first.session_id);
 
             // One core must support many live agents. The delayed provider makes
@@ -279,11 +302,12 @@ fn a_harness_runs_a_turn_against_the_provider_it_was_given() {
             // Dropping the agent only schedules its MCP close, and the deferred
             // close keeps the ephemeral workspace until it is acknowledged;
             // removing the agent awaits the close first.
-            harness
-                .runtime()
-                .remove_agent("harness")
-                .await
-                .expect("the harness agent is removed and its cleanup acknowledged");
+            bounded(
+                "removing the harness agent",
+                harness.runtime().remove_agent("harness"),
+            )
+            .await
+            .expect("the harness agent is removed and its cleanup acknowledged");
             drop(harness);
             assert!(
                 !workspace_dir.exists(),
