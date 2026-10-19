@@ -125,3 +125,47 @@ async fn agent_run_rejects_an_identity_from_another_bound_run() {
 
     assert!(error.to_string().contains("different workflow run"));
 }
+
+#[tokio::test]
+async fn late_agent_run_after_cancel_ack_returns_cancelled_handle_without_starting_work() {
+    let temp = tempfile::TempDir::new().unwrap();
+    let binding = super::super::binding_tests::binding(
+        crate::core::runtime::DispatchCtx::unbound(),
+        &temp,
+    );
+    let service = CapsHostService::new(Arc::new(binding));
+    let cancel_member = tinybus::MemberName::new(runs::caps::AGENT_CANCEL).unwrap();
+    let run_member = tinybus::MemberName::new(runs::caps::AGENT_RUN).unwrap();
+    let events_member = tinybus::MemberName::new(runs::caps::AGENT_EVENTS).unwrap();
+
+    tinybus::service::Interface::call(
+        &service,
+        &cancel_member,
+        serde_json::json!([{"client_request_id":"request-1"}]),
+    )
+    .await
+    .unwrap();
+    let handle = tinybus::service::Interface::call(
+        &service,
+        &run_member,
+        serde_json::json!([{
+            "client_request_id":"request-1",
+            "agent":{"id":"agent"},
+            "config":{}
+        }]),
+    )
+    .await
+    .unwrap()["handle"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let error = tinybus::service::Interface::call(
+        &service,
+        &events_member,
+        serde_json::json!([{"handle":handle,"cursor":0}]),
+    )
+    .await
+    .unwrap_err();
+
+    assert!(error.to_string().contains("cancelled before admission"));
+}

@@ -254,15 +254,7 @@ impl RunSession {
                 .await
                 .map_err(|error| error.wire_message())?;
             for event in page.events {
-                if event.seq <= self.cursor() {
-                    continue;
-                }
-                self.cursor
-                    .store(event.seq, std::sync::atomic::Ordering::Release);
-                if project {
-                    projection::project(self, &event).await;
-                    self.publish(event);
-                }
+                self.consume(&event, project).await;
             }
             if page.done {
                 return Ok(true);
@@ -273,6 +265,22 @@ impl RunSession {
             self.cursor
                 .store(page.next_cursor, std::sync::atomic::Ordering::Release);
         }
+    }
+
+    /// Advance the owner-scoped cursor for one unseen event, then project and
+    /// fan it out exactly once. Private module event kinds still advance the
+    /// cursor even when OpenHuman has no public event for them.
+    pub(super) async fn consume(&self, event: &RunEvent, project: bool) -> bool {
+        if event.seq <= self.cursor() {
+            return false;
+        }
+        self.cursor
+            .store(event.seq, std::sync::atomic::Ordering::Release);
+        if project {
+            projection::project(self, event).await;
+            self.publish(event.clone());
+        }
+        true
     }
 }
 
@@ -322,3 +330,7 @@ pub(crate) fn remove(session: &Arc<RunSession>) {
         sessions.remove(&key);
     }
 }
+
+#[cfg(test)]
+#[path = "session_tests.rs"]
+mod tests;
