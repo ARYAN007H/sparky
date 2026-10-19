@@ -416,15 +416,6 @@ impl Config {
         }
         let mut config_to_save = self.clone();
         super::super::cli_overrides::restore_persisted_inference_fields(&mut config_to_save);
-        let overlay_base_after_save =
-            if update_snapshot && self.context_overlay.lock().unwrap().is_some() {
-                Some(
-                    serde_json::to_value(&config_to_save)
-                        .context("Failed to snapshot persisted config")?,
-                )
-            } else {
-                None
-            };
         // A document source seals the whole body under the scope's data key;
         // the process-local field key would make it unreadable on another node.
         // A config seeded from the local file (or saved by a migration before
@@ -468,13 +459,6 @@ impl Config {
             version,
             anchor: Some(source_anchor.clone()),
         };
-        if let Some(base) = overlay_base_after_save {
-            let existing_overlay = { self.context_overlay.lock().unwrap().clone() };
-            if let Some(overlay) = existing_overlay {
-                let advanced = overlay.with_base(base);
-                *self.context_overlay.lock().unwrap() = Some(std::sync::Arc::new(advanced));
-            }
-        }
 
         if let Some(snapshot) = self
             .context_snapshot

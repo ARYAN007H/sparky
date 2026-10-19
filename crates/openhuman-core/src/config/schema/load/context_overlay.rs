@@ -13,7 +13,6 @@ use std::sync::Arc;
 
 #[derive(Clone)]
 pub(crate) struct ConfigContextOverlay {
-    base: Value,
     changes: Vec<Change>,
     runtime: RuntimeBindings,
 }
@@ -53,33 +52,22 @@ impl std::fmt::Debug for ConfigContextOverlay {
 }
 
 impl ConfigContextOverlay {
-    pub(crate) fn with_base(&self, base: Value) -> Self {
-        let mut advanced = self.clone();
-        advanced.base = base;
-        advanced
-    }
-
     pub(crate) fn derive(parent: &Config, child: &Config) -> anyhow::Result<Arc<Self>> {
         let inherited = parent.context_overlay.lock().unwrap().clone();
-        let (base, mut changes) = match inherited.as_ref() {
-            Some(overlay) => (overlay.base.clone(), overlay.changes.clone()),
-            None => (serde_json::to_value(parent)?, Vec::new()),
-        };
+        let mut changes = inherited
+            .as_ref()
+            .map(|overlay| overlay.changes.clone())
+            .unwrap_or_default();
         let parent_value = serde_json::to_value(parent)?;
         let target = serde_json::to_value(child)?;
         diff_values(&parent_value, &target, &mut Vec::new(), &mut changes);
 
         let runtime = RuntimeBindings::capture(child);
-        Ok(Arc::new(Self {
-            base,
-            changes,
-            runtime,
-        }))
+        Ok(Arc::new(Self { changes, runtime }))
     }
 
     pub(crate) fn reapply(&self, fresh: &Config) -> anyhow::Result<Config> {
-        let fresh_persisted = serde_json::to_value(fresh)?;
-        let mut value = fresh_persisted.clone();
+        let mut value = serde_json::to_value(fresh)?;
         for change in &self.changes {
             apply_change(&mut value, &change.path, change.value.clone());
         }
@@ -90,7 +78,6 @@ impl ConfigContextOverlay {
             std::sync::Mutex::new(fresh.document_snapshot.lock().unwrap().clone());
         result.context_snapshot = fresh.context_snapshot.clone();
         result.context_overlay = std::sync::Mutex::new(Some(Arc::new(Self {
-            base: fresh_persisted,
             changes: self.changes.clone(),
             runtime: self.runtime.clone(),
         })));
