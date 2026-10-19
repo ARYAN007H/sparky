@@ -181,6 +181,10 @@ pub async fn install_from_config(config: &crate::config::Config) -> Result<(), S
 
 /// Construct explicit access over the shared process-wide loader.
 pub(super) fn client(config: &crate::config::Config) -> tinybus::module::ModuleClient {
+    #[cfg(test)]
+    if let Some(client) = module_stub::rpc_client(config) {
+        return client;
+    }
     crate::modules::client(config.clone())
 }
 
