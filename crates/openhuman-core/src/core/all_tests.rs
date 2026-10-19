@@ -36,6 +36,14 @@ fn grouped(controllers: Vec<RegisteredController>) -> Vec<GroupedController> {
         .collect()
 }
 
+fn independent_registered_schema_contract(schema: &ControllerSchema) -> Result<(), String> {
+    if schema.method_name() == "wallet.setup" {
+        required_fields_contract(schema, &["encryptedMnemonic"])
+    } else {
+        Ok(())
+    }
+}
+
 #[test]
 fn validate_registry_rejects_duplicate_namespace_function() {
     let declared = [schema("dup", "fn", vec![]), schema("dup", "fn", vec![])];
@@ -126,13 +134,11 @@ fn registered_controller_schemas_are_consistent_and_serializable() {
         );
         assert!(!schema.outputs.is_empty(), "{method} has no output fields");
 
-        if method == "wallet.setup" {
-            assert_eq!(
-                required_fields_contract(schema, &["encryptedMnemonic"]),
-                Ok(()),
-                "wallet.setup required-input contract"
-            );
-        }
+        assert_eq!(
+            independent_registered_schema_contract(schema),
+            Ok(()),
+            "{method} independent schema contract"
+        );
 
         let serialized = serde_json::to_value(schema).expect("controller schema serializes");
         let serialized_inputs = serialized["inputs"]
@@ -179,6 +185,26 @@ fn registered_controller_schemas_are_consistent_and_serializable() {
             );
         }
     }
+}
+
+#[cfg(feature = "web3")]
+#[test]
+fn registered_wallet_schema_contract_rejects_missing_encrypted_mnemonic() {
+    let actual = all_registered_controllers()
+        .into_iter()
+        .map(|controller| controller.schema)
+        .find(|schema| schema.method_name() == "wallet.setup")
+        .expect("wallet.setup is registered with web3 enabled");
+    assert_eq!(independent_registered_schema_contract(&actual), Ok(()));
+
+    let mut schema = actual;
+    schema
+        .inputs
+        .retain(|input| input.name != "encryptedMnemonic");
+
+    assert!(independent_registered_schema_contract(&schema)
+        .unwrap_err()
+        .contains("is missing required input `encryptedMnemonic`"));
 }
 
 #[test]
