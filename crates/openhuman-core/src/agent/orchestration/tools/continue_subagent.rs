@@ -553,7 +553,7 @@ impl ContinueSubagentTool {
                         }
                         Ok(ToolResult::success(outcome.output))
                     }
-                    SubagentRunStatus::Incomplete { reason } => {
+                    SubagentRunStatus::Incomplete { reason, failure_cause } => {
                         // The continued sub-agent stopped short again (stuck halt
                         // / iteration cap). Hand back the partial progress framed
                         // as incomplete rather than a clean success (#4096).
@@ -591,7 +591,7 @@ impl ContinueSubagentTool {
                                         worktree_path: None,
                                         changed_files: Vec::new(),
                                         dirty_status: None,
-                                        stop: incomplete_stop(reason),
+                                        stop: incomplete_stop(reason, failure_cause.as_ref()),
                                     })
                                     .await;
                             }
@@ -613,6 +613,7 @@ impl ContinueSubagentTool {
                             &outcome.agent_id,
                             &outcome.task_id,
                             reason,
+                            failure_cause.as_ref(),
                             envelope,
                         ))
                     }
