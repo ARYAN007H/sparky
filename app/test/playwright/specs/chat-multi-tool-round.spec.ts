@@ -137,7 +137,7 @@ test.describe('Chat Multi Tool Round', () => {
     await setMockBehavior('llmStreamChunkDelayMs', '10');
 
     await openChat(page);
-    const threadId = await createNewThread(page);
+    await createNewThread(page);
     await sendMessage(page, PROMPT);
 
     await expect(agentMessageText(page, CANARY_FINAL)).toBeVisible({ timeout: 50_000 });
