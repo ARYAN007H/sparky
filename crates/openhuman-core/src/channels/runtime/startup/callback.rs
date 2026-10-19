@@ -302,7 +302,9 @@ impl ChannelHostCallbacks {
                 .as_deref()
                 .ok_or_else(|| Error::failed("progressive output turn identity is required"))?;
             if let Some(observer) = &self.output_observer {
-                observer.observe(channel, conversation, turn_id, *sequence, event).await?;
+                observer
+                    .observe(channel, conversation, turn_id, *sequence, event)
+                    .await?;
             }
             return Ok(ProgressiveTransportResult::Acknowledged);
         }

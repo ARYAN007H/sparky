@@ -587,4 +587,3 @@ impl ModuleChannel {
         }
     }
 }
-

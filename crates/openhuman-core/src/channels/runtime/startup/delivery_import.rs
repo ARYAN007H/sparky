@@ -19,11 +19,11 @@ use std::collections::BTreeMap;
 use std::path::Path;
 use std::sync::Arc;
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use sha2::Digest;
 use tinychannels_bus::module_delivery::{
-    DeliveryQueueEntry, DeliveryTerminalResult, DELIVERY_PENDING_CAPACITY, DELIVERY_RECORD_BYTES,
-    DELIVERY_RESULT_CAPACITY, DELIVERY_RESULT_TTL_SECONDS,
+    DELIVERY_PENDING_CAPACITY, DELIVERY_RECORD_BYTES, DELIVERY_RESULT_CAPACITY,
+    DELIVERY_RESULT_TTL_SECONDS, DeliveryQueueEntry, DeliveryTerminalResult,
 };
 use tinystoragedrivers::{CollectionSpec, DocumentStore, ErrorKind, Precondition};
 
@@ -148,7 +148,7 @@ async fn import_into(docs: &Arc<dyn DocumentStore>, workspace: &Path) -> anyhow:
                 return Err(anyhow::anyhow!(
                     "write {collection} record: {:?}",
                     error.kind()
-                ))
+                ));
             }
         }
     }
