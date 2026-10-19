@@ -1,5 +1,8 @@
 use super::*;
-use crate::core::all::{assert_schema_controller_parity, expect_schema_fields, expect_schema_identity, expect_schema_input_order, expect_schema_output_names, expect_schema_required_inputs};
+use crate::core::all::{
+    assert_schema_controller_parity, expect_schema_fields, expect_schema_identity,
+    expect_schema_input_order, expect_schema_output_names, expect_schema_required_inputs,
+};
 use serde_json::json;
 
 #[test]
@@ -18,11 +21,7 @@ fn flow_schema_wire_contracts_are_preserved() {
         ("resume", &["id", "thread_id"][..], &["approvals"][..]),
         ("list_runs", &[][..], &["limit"][..]),
         ("get_run", &["run_id"][..], &[][..]),
-        (
-            "build",
-            &["mode"][..],
-            &["thread_id", "request_id"][..],
-        ),
+        ("build", &["mode"][..], &["thread_id", "request_id"][..]),
         ("build_cancel", &["thread_id"][..], &["request_id"][..]),
         ("discover", &[][..], &["thread_id", "request_id"][..]),
     ];
@@ -32,7 +31,10 @@ fn flow_schema_wire_contracts_are_preserved() {
         expect_schema_required_inputs(&schema, required);
         expect_schema_fields(
             &schema,
-            &optional.iter().map(|name| (*name, Some(false))).collect::<Vec<_>>(),
+            &optional
+                .iter()
+                .map(|name| (*name, Some(false)))
+                .collect::<Vec<_>>(),
         );
     }
     let run = schemas("run");
@@ -202,53 +204,33 @@ fn read_required_errors_when_missing() {
     assert!(err.contains("missing required param 'id'"));
 }
 
-// ── R-m7: parse_draft_update_flow_id ─────────────────────────────────────
-
+// R-m7: absent leaves the link untouched; null/blank explicitly unlink.
+// Invalid types must not silently become an explicit unlink.
 #[test]
-fn parse_draft_update_flow_id_absent_leaves_link_untouched() {
-    let params = Map::new();
-    assert_eq!(parse_draft_update_flow_id(&params).unwrap(), None);
-}
-
-#[test]
-fn parse_draft_update_flow_id_null_is_an_explicit_unlink() {
-    let mut params = Map::new();
-    params.insert("flow_id".to_string(), Value::Null);
-    assert_eq!(parse_draft_update_flow_id(&params).unwrap(), Some(None));
-}
-
-#[test]
-fn parse_draft_update_flow_id_string_links_to_that_flow() {
-    let mut params = Map::new();
-    params.insert("flow_id".to_string(), Value::String("flow-123".to_string()));
-    assert_eq!(
-        parse_draft_update_flow_id(&params).unwrap(),
-        Some(Some("flow-123".to_string()))
-    );
-}
-
-#[test]
-fn parse_draft_update_flow_id_empty_string_is_an_explicit_unlink() {
-    let mut params = Map::new();
-    params.insert("flow_id".to_string(), Value::String("   ".to_string()));
-    assert_eq!(parse_draft_update_flow_id(&params).unwrap(), Some(None));
-}
-
-// Regression for R-m7: a number must be REJECTED, not silently coerced
-// into `Some(None)` (an explicit unlink) the way `Value::as_str()`
-// returning `None` on a type mismatch used to produce.
-#[test]
-fn parse_draft_update_flow_id_rejects_a_number() {
-    let mut params = Map::new();
-    params.insert("flow_id".to_string(), Value::from(42));
-    let err = parse_draft_update_flow_id(&params).unwrap_err();
-    assert!(err.contains("invalid 'flow_id'"), "{err}");
-}
-
-#[test]
-fn parse_draft_update_flow_id_rejects_an_object() {
-    let mut params = Map::new();
-    params.insert("flow_id".to_string(), serde_json::json!({ "id": "flow-1" }));
-    let err = parse_draft_update_flow_id(&params).unwrap_err();
-    assert!(err.contains("invalid 'flow_id'"), "{err}");
+fn draft_update_flow_link_preserves_all_three_states_and_rejects_wrong_types() {
+    for (case, input, expected) in [
+        ("absent leaves link untouched", None, None),
+        ("null explicitly unlinks", Some(Value::Null), Some(None)),
+        (
+            "string links flow",
+            Some(json!("flow-123")),
+            Some(Some("flow-123".to_string())),
+        ),
+        ("blank explicitly unlinks", Some(json!("   ")), Some(None)),
+    ] {
+        let mut params = Map::new();
+        if let Some(input) = input {
+            params.insert("flow_id".into(), input);
+        }
+        assert_eq!(
+            parse_draft_update_flow_id(&params).unwrap(),
+            expected,
+            "{case}"
+        );
+    }
+    for (case, input) in [("number", json!(42)), ("object", json!({"id":"flow-1"}))] {
+        let params = Map::from_iter([("flow_id".into(), input)]);
+        let err = parse_draft_update_flow_id(&params).unwrap_err();
+        assert!(err.contains("invalid 'flow_id'"), "{case}: {err}");
+    }
 }

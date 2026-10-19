@@ -97,14 +97,6 @@ fn read_required_and_non_empty_helpers_preserve_errors_and_trimming() {
 }
 
 #[test]
-fn read_optional_returns_none_on_missing_or_null() {
-    let mut m = Map::new();
-    assert_eq!(read_optional::<String>(&m, "k").unwrap(), None);
-    m.insert("k".into(), Value::Null);
-    assert_eq!(read_optional::<String>(&m, "k").unwrap(), None);
-}
-
-#[test]
 fn read_optional_helpers_preserve_typed_values_and_errors() {
     let mut m = Map::new();
     assert_eq!(read_optional::<String>(&m, "k").unwrap(), None);
