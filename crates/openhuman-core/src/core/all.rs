@@ -845,9 +845,6 @@ pub fn namespace_description(namespace: &str) -> Option<&'static str> {
         "workflow_run" => Some(
             "Durable dynamic workflow runs — declarative multi-agent definitions and the read surface over persisted runs.",
         ),
-        "agent_team" => Some(
-            "Durable agent-team coordination: teams, members, dependency-aware task claiming, and teammate messaging.",
-        ),
         "tool_registry" => Some(
             "Read-only discovery for MCP stdio tools and controller-backed tools, including routes, schemas, version, allowed agents, and health.",
         ),

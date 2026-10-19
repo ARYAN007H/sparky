@@ -8,20 +8,6 @@
   },
   {
     "rule": "openhuman-task-local",
-    "path": "crates/openhuman-core/src/agent/orchestration/agent_teams/runtime.rs",
-    "line": 191,
-    "text": "let inherited_origin = crate::agent::turn_origin::capture();",
-    "occurrence": 1
-  },
-  {
-    "rule": "openhuman-task-local",
-    "path": "crates/openhuman-core/src/agent/orchestration/agent_teams/runtime.rs",
-    "line": 193,
-    "text": "crate::agent::turn_origin::with_inherited_origin(",
-    "occurrence": 1
-  },
-  {
-    "rule": "openhuman-task-local",
     "path": "crates/openhuman-core/src/agent/orchestration/ops.rs",
     "line": 416,
     "text": "let handle = tokio::spawn(crate::agent::turn_origin::propagate(async move {",
