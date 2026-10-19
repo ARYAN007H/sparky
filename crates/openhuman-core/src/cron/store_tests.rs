@@ -259,7 +259,7 @@ fn assert_force_next_run_updates_collection(collection: &str, other_collection: 
     })
     .unwrap();
 
-    let next = Utc.timestamp_millis_opt(456).single().unwrap();
+    let next = chrono::DateTime::<Utc>::from_timestamp_millis(456).unwrap();
     force_next_run_for_test(&config, "seeded-job", next).unwrap();
 
     let (updated, other, collections) = crate::storage::block_on_anyhow(async {
