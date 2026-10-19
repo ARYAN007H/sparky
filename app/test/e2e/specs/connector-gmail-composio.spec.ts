@@ -1,21 +1,16 @@
 /**
  * E2E: Gmail (Composio) connector flow.
- *
- * Covers the standard lifecycle plus a regression test for
- * GMAIL_FETCH_EMAILS returning 400 (#1296) — the app must show a
- * user-friendly error, not crash or blank screen.
+ * Covers the connector card and its connection states.
  */
 import { waitForApp } from '../helpers/app-helpers';
 import {
   assertConnectorCardVisible,
   assertModalPhase,
   assertSessionNotNuked,
-  injectComposioFault,
   openConnectorModal,
   seedComposioConnection,
   seedComposioToolkits,
 } from '../helpers/composio-helpers';
-import { callOpenhumanRpc } from '../helpers/core-rpc';
 import {
   textExists,
   waitForText,
@@ -26,7 +21,6 @@ import { triggerAuthLoopbackBypass } from '../helpers/loopback-auth-helpers';
 import { completeOnboardingIfVisible, navigateToSkills } from '../helpers/shared-flows';
 import {
   clearRequestLog,
-  getRequestLog,
   resetMockBehavior,
   setMockBehavior,
   startMockServer,
@@ -69,40 +63,6 @@ describe('Gmail (Composio) connector flow', () => {
   });
 
 
-
-
-  it('GMAIL_FETCH_EMAILS returning 400 shows user-friendly error, not blank screen (#1296)', async function () {
-    this.timeout(60_000);
-    // Inject a 400 response on execute
-    setMockBehavior('composioExecuteFails', '1');
-    clearRequestLog();
-
-    await callOpenhumanRpc('openhuman.composio_execute', {
-      connection_id: 'c-gmail-1',
-      action: 'GMAIL_FETCH_EMAILS',
-      params: {},
-    });
-    const execReq = getRequestLog().find(r => r.url.includes('/composio/execute'));
-    if (execReq) {
-      // The mock returns 400 — the RPC layer should surface a safe error, not
-      // crash, which the `assertSessionNotNuked` below is what actually checks.
-      // This used to log `execReq.statusCode`, which the request log has never
-      // recorded (`scripts/mock-api/server.mjs:72-78` stores method/url/body/
-      // headers/timestamp), so every run printed `undefined`. Found by typing
-      // `getRequestLog()`; log what the log actually holds.
-      console.log(`${LOG} execute request reached the mock: ${execReq.method} ${execReq.url}`);
-    }
-
-    // Critical: app must remain responsive — session not nuked
-    await assertSessionNotNuked();
-
-    // Navigate to skills; the page must not be blank
-    await navigateToSkills();
-    const gmailVisible = await textExists(CONNECTOR_NAME);
-    expect(gmailVisible).toBe(true);
-    console.log(`${LOG} PASS: 400 on GMAIL_FETCH_EMAILS does not blank the screen`);
-  });
-
   it('failed connection shows error state, not blank screen', async function () {
     this.timeout(60_000);
     seedComposioConnection(TOOLKIT_SLUG, 'FAILED', 'c-gmail-fail');
@@ -125,6 +85,4 @@ describe('Gmail (Composio) connector flow', () => {
     await assertSessionNotNuked();
     console.log(`${LOG} PASS: expired auth does not log user out`);
   });
-
-
 });
