@@ -51,8 +51,22 @@ describe('Settings - Account Preferences', function () {
       await clickText('Replace wallet', 10_000);
       await clickText('I understand, replace my wallet', 10_000);
     }
+    await clickText('Reveal recovery phrase', 10_000);
     await waitForText('Copy to Clipboard', 15_000);
+    await browser.waitUntil(
+      async () =>
+        await browser.execute(() => {
+          const checkbox = document.querySelector<HTMLInputElement>('#mnemonic-confirm-checkbox');
+          return checkbox !== null && !checkbox.disabled;
+        }),
+      { timeout: 5_000, interval: 100, timeoutMsg: 'recovery phrase consent stayed disabled after reveal' }
+    );
     await clickSelector('input[type="checkbox"]');
+    expect(
+      await browser.execute(
+        () => document.querySelector<HTMLInputElement>('#mnemonic-confirm-checkbox')?.checked
+      )
+    ).toBe(true);
     await clickText('Save Recovery Phrase', 10_000);
 
     await waitForText('Recovery phrase saved', 20_000);
