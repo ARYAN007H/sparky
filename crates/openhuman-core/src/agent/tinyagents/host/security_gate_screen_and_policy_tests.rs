@@ -1,4 +1,5 @@
 use super::*;
+use tinyinference_llm::message::Message;
 
 #[tokio::test]
 async fn injection_payloads_are_blocked_from_every_origin() {
