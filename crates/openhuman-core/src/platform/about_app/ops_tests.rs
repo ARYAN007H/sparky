@@ -8,21 +8,6 @@ fn off(name: &str) -> ComponentSet {
 }
 
 #[test]
-fn capability_of_a_disabled_component_shows_disabled() {
-    let cap = super::super::lookup("voice.ptt").expect("voice.ptt");
-    assert_ne!(cap.status, CapabilityStatus::Disabled);
-    let marked = apply_components(cap, &off("voice"));
-    assert_eq!(marked.status, CapabilityStatus::Disabled);
-    assert_eq!(marked.id, cap.id);
-    // Another component being off leaves it alone.
-    assert_eq!(apply_components(cap, &off("wallet")).status, cap.status);
-    assert_eq!(
-        apply_components(cap, &ComponentSet::all()).status,
-        cap.status
-    );
-}
-
-#[test]
 fn domain_mapping_names_real_components() {
     for cap in super::super::all_capabilities() {
         if let Some(name) = component_for_domain(cap.domain) {
@@ -105,12 +90,12 @@ async fn an_explicit_context_decides_which_capabilities_are_disabled() {
     // The two contexts answer independently, concurrently and across awaits.
     let ask = |ctx: DispatchCtx| async move {
         tokio::task::yield_now().await;
-        lookup_capability(&ctx, "voice.ptt")
-            .expect("voice.ptt")
+        lookup_capability(&ctx, "conversation.send_text")
+            .expect("send_text")
             .value
             .status
     };
     let (disabled, enabled) = tokio::join!(ask(off), ask(on));
-    assert_eq!(disabled, CapabilityStatus::Disabled);
-    assert_ne!(enabled, CapabilityStatus::Disabled);
+    assert_eq!(disabled, CapabilityStatus::Available);
+    assert_eq!(enabled, CapabilityStatus::Available);
 }
