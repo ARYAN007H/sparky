@@ -864,10 +864,16 @@ impl OpenHumanSessionHost {
                         );
                         options.run_context.data.memory_turn = memory_turn;
                         request.input = user_message_from_text(&enriched);
+                        // Imported conversations can already be durable while
+                        // lacking the prefix that the first host turn must
+                        // commit. The runtime exposes that distinction
+                        // separately from `resumed`; only an authoritative or
+                        // inferred frozen prefix suppresses prompt preparation.
+                        let needs_prefix = !view.prefix_is_frozen;
                         let mut preparation =
-                            prelude.prepare(new_session).await.map_err(|error| {
-                                tinyagents_runtime::RuntimeError::Driver(error.to_string())
-                            })?;
+                            prelude.prepare(new_session || needs_prefix).await.map_err(
+                                |error| tinyagents_runtime::RuntimeError::Driver(error.to_string()),
+                            )?;
                         prelude.refresh_permanent_prefix(&mut preparation, view.prefix);
                         if turn.overrides.suppress_tools {
                             // One-off tool-less turn: must not become the
