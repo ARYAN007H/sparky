@@ -64,7 +64,7 @@ impl SttEngine {
 }
 
 /// Persisted STT routing fallback for voice providers.
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
 #[serde(default)]
 pub struct VoiceServerConfig {
     /// Which hosted engine transcribes audio. See [`SttEngine`]. An explicit
@@ -72,14 +72,6 @@ pub struct VoiceServerConfig {
     /// wins — this field is what the `"cloud"`/unset case resolves to.
     #[serde(default)]
     pub stt_engine: SttEngine,
-}
-
-impl Default for VoiceServerConfig {
-    fn default() -> Self {
-        Self {
-            stt_engine: SttEngine::default(),
-        }
-    }
 }
 
 #[cfg(test)]

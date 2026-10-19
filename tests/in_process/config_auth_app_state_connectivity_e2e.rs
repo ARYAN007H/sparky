@@ -28,7 +28,7 @@ use openhuman_core::config::schema::{
 };
 use openhuman_core::config::{
     clear_active_user, default_projects_dir, pre_login_user_dir, read_active_user_id,
-    user_openhuman_dir, write_active_user_id, Config, DaemonConfig, DictationActivationMode,
+    user_openhuman_dir, write_active_user_id, Config, DaemonConfig,
     UpdateRestartStrategy,
 };
 use openhuman_core::core::events::DomainEvent;

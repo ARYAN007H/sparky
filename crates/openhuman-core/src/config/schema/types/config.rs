@@ -489,8 +489,6 @@ pub struct Config {
     #[serde(default)]
     pub update: UpdateConfig,
 
-    #[serde(default)]
-
     /// Whether the user has completed the **React UI** onboarding flow.
     ///
     /// Set by `OnboardingOverlay.tsx::handleDone` and the multi-step
