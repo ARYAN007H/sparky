@@ -221,8 +221,11 @@ fn attached_tools_survive_clones_and_session_resume() {
                 .expect("the new session's durable tool catalogue");
             let tool_names = declared_tools
                 .iter()
-                .filter_map(|tool| tool["function"]["name"].as_str())
+                .filter_map(|tool| tool["name"].as_str())
                 .collect::<Vec<_>>();
+            if !tool_names.contains(&"hivemind_message") || !tool_names.contains(&"hivemind_list") {
+                eprintln!("durable tool declarations: {declared_tools:#?}");
+            }
             assert!(
                 tool_names.contains(&"hivemind_message") && tool_names.contains(&"hivemind_list"),
                 "the new session must persist the updated permanent-tool catalogue"
