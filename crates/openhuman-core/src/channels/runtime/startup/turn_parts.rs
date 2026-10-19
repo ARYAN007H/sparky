@@ -237,11 +237,13 @@ pub(crate) fn runtime_context(
     config: &Config,
     parts: ChannelTurnParts,
     channels_by_name: Arc<HashMap<String, Arc<dyn crate::channels::Channel>>>,
+    module_objects: Arc<HashMap<String, tinybus::module::ModuleObjectClient>>,
     message_timeout_secs: u64,
 ) -> ChannelRuntimeContext {
     ChannelRuntimeContext {
         relay_thread: None,
         channels_by_name,
+        module_objects,
         turn_model_source: None,
         default_provider: Arc::new(parts.provider_name),
         tools_registry: parts.tools_registry,

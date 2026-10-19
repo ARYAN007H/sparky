@@ -38,6 +38,9 @@ pub(crate) struct ChannelRuntimeContext {
     /// use their existing per-sender history and have no relay thread.
     pub(crate) relay_thread: Option<String>,
     pub(crate) channels_by_name: Arc<HashMap<String, Arc<dyn super::Channel>>>,
+    /// Compiled TinyChannels objects for configured providers. Host channel
+    /// runners use these objects for module-owned progressive output.
+    pub(crate) module_objects: Arc<HashMap<String, tinybus::module::ModuleObjectClient>>,
     /// Injected model source used only by tests and bespoke channel hosts.
     /// Production contexts carry `config` and construct crate-native sources.
     pub(crate) turn_model_source: Option<TurnModelSource>,

@@ -173,6 +173,15 @@ impl ModuleChannelRuntime {
         Arc::clone(&self.channels)
     }
 
+    pub(super) fn module_objects(&self) -> Arc<HashMap<String, ModuleObjectClient>> {
+        Arc::new(
+            self.infos
+                .iter()
+                .map(|info| (info.name.clone(), self.lease.object().clone()))
+                .collect(),
+        )
+    }
+
     pub(super) async fn runtime_limits(
         &self,
         timeout_secs: u64,
