@@ -4,9 +4,17 @@
 //! Registry-installed servers (`mcp.json`, the registry RPCs) are never
 //! operator-trusted, so tinymcp starts them inside a TinyBox jail. With
 //! tinymcp 0.19.5 the host declares best-effort enforcement, which macOS
-//! Seatbelt satisfies, and tinybox v0.1.40 ships the Linux bubblewrap backend
-//! that EX63 (bubblewrap 0.13.1) runs, so the tests on the registry path start
-//! the stub jailed on both platforms and no longer need this helper.
+//! Seatbelt satisfies, so the tests on the registry path start the stub jailed
+//! there and do not need this helper.
+//!
+//! Linux does not: `mcp::host_sandbox` asks for network access (`allow_net`)
+//! together with process isolation, and tinybox v0.1.40's
+//! `native_jail::prepare` refuses that by design, since a bubblewrap jail
+//! sharing the host network namespace reports `Process`, not `Kernel`. The
+//! registry-path tests are therefore `#[ignore]`d on Linux: registry stdio MCP
+//! servers need network, and TinyBox refuses a network-sharing jail for
+//! untrusted code until it has isolated networking
+//! (https://github.com/tinyhumansai/tinybox/issues/109).
 //!
 //! The trusted stub is still needed only where a test is not on the registry
 //! path: it declares the Cargo-built stub in the operator-owned `config.toml`
