@@ -80,6 +80,12 @@ impl WorkspaceBinding {
     }
 }
 
+fn bind_workspace(session: &mut OpenHumanSessionHost, binding: WorkspaceBinding) {
+    if let Some(workspace) = binding.update() {
+        session.set_workspace_descriptor(workspace);
+    }
+}
+
 /// Shared agent-domain execution port used by web and external-channel hosts.
 pub(crate) struct AgentTurnHost;
 
@@ -104,9 +110,7 @@ impl AgentTurnHost {
             .turn_deadline
             .map(tinyagents_harness::turn_deadline::TurnDeadline::starting_now);
         session.set_host_env(host_env);
-        if let Some(workspace) = request.workspace.update() {
-            session.set_workspace_descriptor(workspace);
-        }
+        bind_workspace(session, request.workspace);
 
         // Keep the large agent future behind a pointer while the origin scope
         // is active. The origin is explicit and independent from RPC metadata.
