@@ -85,6 +85,14 @@ fn tinymcp_reaches_its_v2_collections_stream_and_secrets() {
 #[test]
 fn tinyjuice_reaches_only_its_blob_prefix() {
     let grant = declared("tinyjuice").unwrap();
+    assert_eq!(
+        grant
+            .collections
+            .iter()
+            .map(|collection| collection.name.as_str())
+            .collect::<Vec<_>>(),
+        ["juice.savings"]
+    );
     assert!(allowed(
         &grant,
         Object::Documents,
