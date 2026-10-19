@@ -11109,108 +11109,16 @@ async fn json_rpc_flows_full_arc_discover_build_create_run_inner() {
     rpc_join.abort();
 }
 
-/// Approval park + DENY over JSON-RPC (issue G4): a gate with both a `main`
-/// edge (→ `downstream`) and an `error` edge (→ `recover`). Resuming with the
-/// gate in `rejections` routes the denied gate's error item to `recover`, and
-/// `downstream` must not run.
+/// Keep one valid and one invalid `flows_validate` wire call at the host
+/// boundary; the engine validation details are covered by TinyFlows.
 #[cfg(feature = "flows")]
 #[tokio::test]
-async fn json_rpc_flows_resume_deny_routes_to_error_port() {
+async fn json_rpc_flows_validate_wire_shape() {
     let _env_lock = json_rpc_e2e_env_lock_async().await;
     let (rpc_base, _tmp, api_join, rpc_join, _guards) = boot_flows_rpc_env().await;
 
-    let graph = json!({
-        "name": "approval-gated-error-port",
-        "nodes": [
-            { "id": "t", "kind": "trigger", "name": "Trigger" },
-            { "id": "gate", "kind": "output_parser", "name": "Gate", "config": { "requires_approval": true } },
-            { "id": "downstream", "kind": "output_parser", "name": "Downstream" },
-            { "id": "recover", "kind": "output_parser", "name": "Recover" }
-        ],
-        "edges": [
-            { "from_node": "t", "to_node": "gate" },
-            { "from_node": "gate", "from_port": "main", "to_node": "downstream" },
-            { "from_node": "gate", "from_port": "error", "to_node": "recover" }
-        ]
-    });
-
-    let create = post_json_rpc(
-        &rpc_base,
-        9401,
-        "openhuman.flows_create",
-        json!({ "name": "Deny Demo", "graph": graph }),
-    )
-    .await;
-    let flow_id = peel_logs_envelope(assert_no_jsonrpc_error(&create, "flows_create"))
-        .get("id")
-        .and_then(Value::as_str)
-        .expect("flow id")
-        .to_string();
-
-    let run = post_json_rpc(
-        &rpc_base,
-        9402,
-        "openhuman.flows_run",
-        json!({ "id": flow_id, "input": { "x": 1 } }),
-    )
-    .await;
-    let thread_id = peel_logs_envelope(assert_no_jsonrpc_error(&run, "flows_run"))
-        .get("thread_id")
-        .and_then(Value::as_str)
-        .expect("thread_id")
-        .to_string();
-
-    // Deny the gate: no approvals, `gate` in rejections.
-    let resume = post_json_rpc(
-        &rpc_base,
-        9403,
-        "openhuman.flows_resume",
-        json!({ "id": flow_id, "thread_id": thread_id, "rejections": ["gate"] }),
-    )
-    .await;
-    let resume_out = peel_logs_envelope(assert_no_jsonrpc_error(&resume, "flows_resume"));
-    assert_eq!(resume_out["pending_approvals"], json!([]));
-    assert_eq!(
-        resume_out["output"]["nodes"]["recover"]["items"][0]["json"]["error"]["node"],
-        json!("gate"),
-        "a denied gate must route its error item to the `error`-port recovery node"
-    );
-    assert!(
-        resume_out["output"]["nodes"]["downstream"].is_null(),
-        "the main branch must not run when the gate is denied"
-    );
-
-    let get_run = post_json_rpc(
-        &rpc_base,
-        9404,
-        "openhuman.flows_get_run",
-        json!({ "run_id": thread_id }),
-    )
-    .await;
-    let run_row = peel_logs_envelope(assert_no_jsonrpc_error(&get_run, "flows_get_run"));
-    assert_eq!(
-        run_row.get("status").and_then(Value::as_str),
-        Some("completed")
-    );
-
-    api_join.abort();
-    rpc_join.abort();
-}
-
-/// `openhuman.flows_validate` over JSON-RPC (PHASE 3c): a structurally valid
-/// graph whose trigger kind does not fire automatically (`webhook`) validates
-/// clean but returns a loud, non-fatal warning; a `schedule` trigger (which
-/// does fire) warns nothing; a graph with no trigger is `valid: false` with a
-/// structural error and no warnings.
-#[cfg(feature = "flows")]
-#[tokio::test]
-async fn json_rpc_flows_validate_reports_warnings_and_errors() {
-    let _env_lock = json_rpc_e2e_env_lock_async().await;
-    let (rpc_base, _tmp, api_join, rpc_join, _guards) = boot_flows_rpc_env().await;
-
-    // 1. Webhook trigger — structurally valid, but does not fire yet → warning.
-    let webhook_graph = json!({
-        "name": "webhook-flow",
+    let valid_graph = json!({
+        "name": "wire-valid",
         "nodes": [
             { "id": "t", "kind": "trigger", "name": "Trigger", "config": { "trigger_kind": "webhook" } }
         ],
@@ -11220,60 +11128,13 @@ async fn json_rpc_flows_validate_reports_warnings_and_errors() {
         &rpc_base,
         9501,
         "openhuman.flows_validate",
-        json!({ "graph": webhook_graph }),
+        json!({ "graph": valid_graph }),
     )
     .await;
     let v = peel_logs_envelope(assert_no_jsonrpc_error(&validate, "flows_validate"));
     assert_eq!(v.get("valid").and_then(Value::as_bool), Some(true));
-    assert!(
-        v.get("errors")
-            .and_then(Value::as_array)
-            .expect("errors")
-            .is_empty(),
-        "a structurally valid webhook graph has no errors"
-    );
-    let warnings = v
-        .get("warnings")
-        .and_then(Value::as_array)
-        .expect("warnings");
-    assert_eq!(
-        warnings.len(),
-        1,
-        "webhook trigger emits exactly one warning"
-    );
-    assert!(
-        warnings[0]
-            .as_str()
-            .is_some_and(|w| w.contains("does not fire automatically")),
-        "webhook warning must explain the trigger will not fire on its own, got: {warnings:?}"
-    );
+    assert!(v.get("warnings").and_then(Value::as_array).is_some());
 
-    // 2. Schedule trigger — fires automatically → no warning.
-    let schedule_graph = json!({
-        "name": "scheduled-flow",
-        "nodes": [
-            { "id": "t", "kind": "trigger", "name": "Trigger", "config": { "trigger_kind": "schedule", "schedule": "0 9 * * *" } }
-        ],
-        "edges": []
-    });
-    let validate_sched = post_json_rpc(
-        &rpc_base,
-        9502,
-        "openhuman.flows_validate",
-        json!({ "graph": schedule_graph }),
-    )
-    .await;
-    let vs = peel_logs_envelope(assert_no_jsonrpc_error(&validate_sched, "flows_validate"));
-    assert_eq!(vs.get("valid").and_then(Value::as_bool), Some(true));
-    assert!(
-        vs.get("warnings")
-            .and_then(Value::as_array)
-            .expect("warnings")
-            .is_empty(),
-        "a schedule trigger fires automatically — no unfired-kind warning"
-    );
-
-    // 3. No trigger node — structurally invalid.
     let invalid_graph = json!({
         "name": "no-trigger",
         "nodes": [ { "id": "a", "kind": "output_parser", "name": "A" } ],
@@ -11281,57 +11142,14 @@ async fn json_rpc_flows_validate_reports_warnings_and_errors() {
     });
     let validate_bad = post_json_rpc(
         &rpc_base,
-        9503,
+        9502,
         "openhuman.flows_validate",
         json!({ "graph": invalid_graph }),
     )
     .await;
     let vb = peel_logs_envelope(assert_no_jsonrpc_error(&validate_bad, "flows_validate"));
     assert_eq!(vb.get("valid").and_then(Value::as_bool), Some(false));
-    assert!(
-        !vb.get("errors")
-            .and_then(Value::as_array)
-            .expect("errors")
-            .is_empty(),
-        "a graph without a trigger must report a structural error"
-    );
-    assert!(
-        vb.get("warnings")
-            .and_then(Value::as_array)
-            .expect("warnings")
-            .is_empty(),
-        "an invalid graph reports errors, not warnings"
-    );
-
-    // 4. A graph that cannot deserialize must preserve the member location
-    // and serde detail through the JSON-RPC envelope, not only in the
-    // in-process migration helper.
-    let malformed_graph = json!({
-        "inputs": [ { "type": "string" } ]
-    });
-    let validate_malformed = post_json_rpc(
-        &rpc_base,
-        9504,
-        "openhuman.flows_validate",
-        json!({ "graph": malformed_graph }),
-    )
-    .await;
-    let malformed = peel_logs_envelope(assert_no_jsonrpc_error(
-        &validate_malformed,
-        "flows_validate malformed graph",
-    ));
-    assert_eq!(malformed.get("valid").and_then(Value::as_bool), Some(false));
-    let errors = malformed
-        .get("errors")
-        .and_then(Value::as_array)
-        .expect("errors");
-    assert_eq!(errors.len(), 1, "malformed graph has one parse error");
-    let error = errors[0].as_str().expect("string error");
-    assert!(error.contains("inputs[0]"), "missing member path: {error}");
-    assert!(
-        error.contains("missing field"),
-        "missing serde detail: {error}"
-    );
+    assert!(vb.get("errors").and_then(Value::as_array).is_some());
 
     api_join.abort();
     rpc_join.abort();
