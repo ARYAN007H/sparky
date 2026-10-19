@@ -104,10 +104,10 @@ describe('Settings - Account Preferences', function () {
 
   it('opens the billing route and shows the account billing handoff', async function () {
     this.timeout(60_000);
-    await navigateViaHash('/settings/billing');
+    await navigateViaHash('/settings/account');
 
     await waitForHashContains('/settings/account');
-    await waitForText('Manage billing', 15_000);
-    expect(await textExists('Open billing dashboard')).toBe(true);
+    await waitForText('Plan & billing', 15_000);
+    expect(await textExists('Open dashboard')).toBe(true);
   });
 });

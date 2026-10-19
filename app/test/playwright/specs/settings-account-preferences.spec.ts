@@ -174,6 +174,7 @@ test.describe('Settings - Account Preferences', () => {
 
     await expect(page.getByTestId('account-panel')).toBeVisible();
     await expect(page.getByTestId('account-open-billing')).toBeVisible();
-    await expect(page.getByText(/Manage your subscription and payment method/)).toBeVisible();
+    await expect(page.getByText('Plan & billing')).toBeVisible();
+    await expect(page.getByText('Manage your subscription, credits, and invoices')).toBeVisible();
   });
 });
