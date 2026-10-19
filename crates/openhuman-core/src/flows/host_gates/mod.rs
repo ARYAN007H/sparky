@@ -11,5 +11,5 @@ pub(crate) use tool_contracts::{toolkit_has_curated_catalog, validate_tool_contr
 pub(crate) use upload_paths::validate_upload_paths;
 
 #[cfg(test)]
-#[path = "tests.rs"]
+#[path = "mod_tests.rs"]
 mod tests;

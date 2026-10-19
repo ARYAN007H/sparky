@@ -75,6 +75,16 @@ fn ws3_tool_call_graph(slug: &str, connection_ref: Option<&str>) -> WorkflowGrap
     }))
 }
 
+fn upload_graph(path: Value) -> WorkflowGraph {
+    graph(json!({
+        "nodes": [
+            {"id":"t","kind":"trigger","name":"Manual"},
+            {"id":"up","kind":"tool_call","name":"Upload","config":{"slug":"oh:storage_upload_file","args":{"path":path}}}
+        ],
+        "edges": [{"from_node":"t","to_node":"up"}]
+    }))
+}
+
 #[tokio::test]
 async fn validate_tool_contracts_rejects_a_hallucinated_slug() {
     seed_live_catalog_cache("slack", vec![seeded_slack_send_contract()]);
