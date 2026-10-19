@@ -375,6 +375,18 @@ impl Config {
     /// Save into `source`. The loader also uses it to rewrite the local
     /// bootstrap file when a document-backed load recovered it.
     pub(super) async fn save_to(&self, source: &dyn super::source::ConfigSource) -> Result<()> {
+        let source_anchor = source.anchor();
+        let expected_snapshot = self.document_snapshot.lock().unwrap().clone();
+        if expected_snapshot
+            .anchor
+            .as_ref()
+            .is_some_and(|anchor| anchor != &source_anchor)
+        {
+            return Err(tinystoragedrivers::StorageError::conflict(
+                "config snapshot belongs to a different persistence source",
+            )
+            .into());
+        }
         let mut config_to_save = self.clone();
         super::super::cli_overrides::restore_persisted_inference_fields(&mut config_to_save);
         // A document source seals the whole body under the scope's data key;
@@ -398,10 +410,36 @@ impl Config {
             toml::to_string_pretty(&config_to_save).context("Failed to serialize config")?;
 
         tracing::debug!(source = source.label(), "[config] saving config");
-        let expected = *config_to_save.document_version.lock().unwrap();
+        let expected = expected_snapshot.version;
         let version = source.write_versioned(&toml_str, expected).await?;
-        *self.document_version.lock().unwrap() = version;
+        *self.document_snapshot.lock().unwrap() = super::ConfigDocumentSnapshot {
+            version,
+            anchor: Some(source_anchor.clone()),
+        };
+
+        if let Some(snapshot) = self
+            .context_snapshot
+            .as_ref()
+            .and_then(std::sync::Weak::upgrade)
+        {
+            let mut current = snapshot.lock().unwrap();
+            let current_state = current.document_snapshot.lock().unwrap().clone();
+            if current_state == expected_snapshot {
+                let mut published = self.clone();
+                *published.document_snapshot.lock().unwrap() = super::ConfigDocumentSnapshot {
+                    version,
+                    anchor: Some(source_anchor),
+                };
+                *current = published;
+            }
+        }
 
         Ok(())
+    }
+}
+
+impl Config {
+    pub(crate) fn bind_context_snapshot(snapshot: &std::sync::Arc<std::sync::Mutex<Config>>) {
+        snapshot.lock().unwrap().context_snapshot = Some(std::sync::Arc::downgrade(snapshot));
     }
 }
