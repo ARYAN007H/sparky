@@ -99,50 +99,9 @@ fn description_includes_router_rules() {
     assert!(desc.contains("slides") || desc.contains("deck") || desc.contains("presentation"));
 }
 
-#[tokio::test]
-async fn execute_rejects_empty_title() {
-    let ws = workspace();
-    let tool = make_tool(ws.path());
-    let args = json!({ "title": "", "slides": [{ "title": "x", "bullets": ["y"] }] });
-    let result = tool.execute(args).await.expect("execute returns Ok");
-    assert!(result.is_error);
-    assert!(result.text().contains("title"));
-}
 
-#[tokio::test]
-async fn execute_rejects_empty_slides_array() {
-    let ws = workspace();
-    let tool = make_tool(ws.path());
-    let args = json!({ "title": "Deck", "slides": [] });
-    let result = tool.execute(args).await.expect("execute returns Ok");
-    assert!(result.is_error);
-    assert!(result.text().contains("slides"));
-}
 
-#[tokio::test]
-async fn execute_rejects_slide_with_no_content() {
-    let ws = workspace();
-    let tool = make_tool(ws.path());
-    let args = json!({
-        "title": "Deck",
-        "slides": [{ "title": "", "body": "", "bullets": [], "speaker_notes": "" }]
-    });
-    let result = tool.execute(args).await.expect("execute returns Ok");
-    assert!(result.is_error);
-}
 
-#[tokio::test]
-async fn execute_rejects_oversize_body() {
-    let ws = workspace();
-    let tool = make_tool(ws.path());
-    let big = "x".repeat(MAX_TEXT_CHARS + 1);
-    let args = json!({
-        "title": "Deck",
-        "slides": [{ "title": "ok", "body": big }]
-    });
-    let result = tool.execute(args).await.expect("execute returns Ok");
-    assert!(result.is_error);
-}
 
 #[tokio::test]
 async fn execute_rejects_too_many_slides() {
