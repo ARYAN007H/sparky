@@ -40,7 +40,7 @@ pub(super) async fn parse_source_contents(
         };
         return Ok((config, true));
     }
-    let (config, recovered) = Box::pin(parse_config_boxed(config_path, contents)).await?;
+    let (config, recovered) = Box::pin(parse_config_boxed(config_path, contents)).await;
     *config.document_snapshot.lock().unwrap() = super::super::ConfigDocumentSnapshot {
         version: read.document_version,
         anchor: Some(read.source_anchor.clone()),

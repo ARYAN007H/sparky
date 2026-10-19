@@ -425,7 +425,7 @@ impl Config {
             let mut current = snapshot.lock().unwrap();
             let current_state = current.document_snapshot.lock().unwrap().clone();
             if current_state == expected_snapshot {
-                let mut published = self.clone();
+                let published = self.clone();
                 *published.document_snapshot.lock().unwrap() =
                     super::super::ConfigDocumentSnapshot {
                         version,
