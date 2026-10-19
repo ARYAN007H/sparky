@@ -222,11 +222,19 @@ pub async fn update_settings(
     let new_model = model
         .clone()
         .unwrap_or_else(|| config.memory.embedding_model.clone());
+    // Resolve the provider string exactly as it will be persisted so the
+    // signature reported to callers describes the saved configuration.
+    let effective_provider = match &custom_endpoint {
+        Some(ep) if new_provider == "custom" || new_provider.starts_with("custom:") => {
+            format!("custom:{ep}")
+        }
+        _ => new_provider.clone(),
+    };
     // `new_dims`/`new_sig` are recomputed after the Custom
     // verification probe auto-detects the endpoint's real vector length
     // (issue #4056), so they must be mutable.
     let mut new_dims = dimensions.unwrap_or(config.memory.embedding_dimensions);
-    let mut new_sig = format_embedding_signature(&new_provider, &new_model, new_dims);
+    let mut new_sig = format_embedding_signature(&effective_provider, &new_model, new_dims);
 
     let mut sig_changed = new_sig != old_sig;
 
@@ -245,12 +253,6 @@ pub async fn update_settings(
     // embedding-capable by construction, and probing `managed`/`cloud`
     // pre-login would false-fail. Resolve the provider string exactly as it
     // will be stored so the probe targets the real endpoint.
-    let effective_provider = match &custom_endpoint {
-        Some(ep) if new_provider == "custom" || new_provider.starts_with("custom:") => {
-            format!("custom:{ep}")
-        }
-        _ => new_provider.clone(),
-    };
     if effective_provider.starts_with("custom:") {
         // Probe dimension-agnostically for non-`text-embedding-3-*` models so the
         // user's guessed `dimensions` can't fail an otherwise-valid endpoint; the
@@ -361,7 +363,7 @@ pub async fn update_settings(
                     "{LOG_PREFIX} update_settings auto-detected custom embedding dimension from probe"
                 );
                 new_dims = detected_dims;
-                new_sig = format_embedding_signature(&new_provider, &new_model, new_dims);
+                new_sig = format_embedding_signature(&effective_provider, &new_model, new_dims);
                 sig_changed = new_sig != old_sig;
             }
             tracing::debug!(
@@ -433,3 +435,7 @@ pub async fn update_settings(
         )],
     ))
 }
+
+#[cfg(test)]
+#[path = "settings_tests.rs"]
+mod tests;
