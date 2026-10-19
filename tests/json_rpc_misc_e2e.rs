@@ -1093,15 +1093,6 @@ async fn skills_uninstall_rpc_e2e() {
 // Auth middleware tests
 // ---------------------------------------------------------------------------
 
-/// POST /rpc without any Authorization header → 401 with error=unauthorized.
-
-/// Task-sources CRUD + status + dry-run over JSON-RPC.
-///
-/// Exercises `openhuman.task_sources_{add,list,get,update,remove,status,
-/// list_tasks,preview_filter}` against an isolated HOME workspace. The
-/// fetch/preview paths require no network here: with no signed-in
-/// Composio session, `preview_filter` returns a clean JSON-RPC error
-/// rather than hanging.
 /// Task-sources CRUD + status + dry-run over JSON-RPC.
 ///
 /// Exercises `openhuman.task_sources_{add,list,get,update,remove,status,
@@ -1406,11 +1397,6 @@ async fn json_rpc_task_sources_fetch_pipeline_e2e() {
 
     rpc_join.abort();
 }
-
-/// Full lifecycle over JSON-RPC for the `workflows` namespace:
-/// create → list → read → phase → uninstall. Workflows are scaffolded under
-/// the user-scope root (`$HOME/.openhuman/workflows/<slug>/`), which the temp
-/// `HOME` isolates per-test.
 
 /// E2E: the retired dictation and voice-server config methods are absent from
 /// the JSON-RPC surface.
