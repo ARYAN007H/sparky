@@ -28,13 +28,13 @@ impl std::fmt::Debug for ConfigContextOverlay {
 impl ConfigContextOverlay {
     pub(crate) fn derive(parent: &Config, child: &Config) -> anyhow::Result<Arc<Self>> {
         let inherited = parent.context_overlay.lock().unwrap().clone();
-        let base = match inherited.as_ref() {
-            Some(overlay) => overlay.base.clone(),
-            None => serde_json::to_value(parent)?,
+        let (base, mut changes) = match inherited.as_ref() {
+            Some(overlay) => (overlay.base.clone(), overlay.changes.clone()),
+            None => (serde_json::to_value(parent)?, Vec::new()),
         };
+        let parent_value = serde_json::to_value(parent)?;
         let target = serde_json::to_value(child)?;
-        let mut changes = Vec::new();
-        diff_values(&base, &target, &mut Vec::new(), &mut changes);
+        diff_values(&parent_value, &target, &mut Vec::new(), &mut changes);
 
         let mut runtime = child.clone();
         runtime.context_overlay = std::sync::Mutex::new(None);
