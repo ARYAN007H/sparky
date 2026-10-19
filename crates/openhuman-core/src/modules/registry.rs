@@ -53,12 +53,12 @@ mod records_voice;
 
 use crate::modules::types::ModuleRecord;
 use records_computer::TINYCOMPUTER;
-#[cfg(feature = "inbound-queues")]
-use records_eventqueues::TINYEVENTQUEUES;
 #[cfg(feature = "documents")]
 use records_docs_wallet::TINYDOCS;
 #[cfg(feature = "web3")]
 use records_docs_wallet::TINYWALLET;
+#[cfg(feature = "inbound-queues")]
+use records_eventqueues::TINYEVENTQUEUES;
 #[cfg(feature = "modules")]
 use records_extra::TINYBOX;
 use records_extra::TINYCHANNELS;

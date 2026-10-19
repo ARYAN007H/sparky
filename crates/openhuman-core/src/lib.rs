@@ -68,6 +68,8 @@ pub mod flows;
 pub mod hooks;
 #[cfg(feature = "hosting")]
 pub mod hosting;
+#[cfg(feature = "inbound-queues")]
+pub mod inbound;
 pub mod inference;
 pub mod integrations;
 pub mod mcp;
@@ -91,8 +93,6 @@ pub mod test_support;
 pub mod threads;
 #[cfg(feature = "tinymemes")]
 pub mod tinymemes;
-#[cfg(feature = "inbound-queues")]
-pub mod inbound;
 pub mod tools;
 pub mod triage;
 pub mod util;

@@ -37,7 +37,10 @@ fn require(config: &Config) -> Result<(), String> {
 /// # Errors
 ///
 /// The component is off, or the module is unavailable or failed the call.
-pub async fn stats(config: &Config, client: &ModuleClient) -> Result<Outcome<StatsResponse>, String> {
+pub async fn stats(
+    config: &Config,
+    client: &ModuleClient,
+) -> Result<Outcome<StatsResponse>, String> {
     require(config)?;
     let stats = event_queues::stats(client)
         .await

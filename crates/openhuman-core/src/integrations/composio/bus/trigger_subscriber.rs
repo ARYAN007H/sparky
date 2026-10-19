@@ -254,67 +254,67 @@ pub(super) fn triage_directly(
     runner: Arc<dyn TriageRunner>,
 ) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
-            match runner.run(&ctx, &envelope).await {
-                Ok(TriageOutcome::Decision(run)) => {
-                    // Remote payload: a Composio trigger body is
-                    // attacker-influenceable, so the runner applies the decision
-                    // under the remote-trigger origin (#5634), inside this task.
-                    if let Err(e) = runner.apply(&ctx, run, &envelope).await {
-                        tracing::error!(
-                            label = %envelope.display_label,
-                            error = %e,
-                            "[composio][triage] apply_decision failed"
-                        );
-                    }
-                }
-                Ok(TriageOutcome::Deferred {
-                    defer_until_ms,
-                    reason,
-                }) => {
-                    // Tiered fallback exhausted both arms. The direct path has
-                    // no scheduler of its own, so the deferral is logged and
-                    // dropped; with the inbound event queues on (the default)
-                    // triggers do not come here: `Deliver` retries a deferral
-                    // at `defer_until_ms` (crate::inbound::deliver).
-                    tracing::warn!(
+        match runner.run(&ctx, &envelope).await {
+            Ok(TriageOutcome::Decision(run)) => {
+                // Remote payload: a Composio trigger body is
+                // attacker-influenceable, so the runner applies the decision
+                // under the remote-trigger origin (#5634), inside this task.
+                if let Err(e) = runner.apply(&ctx, run, &envelope).await {
+                    tracing::error!(
                         label = %envelope.display_label,
-                        defer_until_ms = defer_until_ms,
-                        reason = %reason,
-                        "[composio][triage] run_triage deferred"
-                    );
-                }
-                Ok(TriageOutcome::Terminal { reason }) => {
-                    tracing::warn!(
-                        label = %envelope.display_label,
-                        reason = %reason,
-                        "[composio][triage] run_triage reached terminal state"
-                    );
-                }
-                Err(e) => {
-                    // Route through the central observability classifier
-                    // so user-config / budget-exhausted / provider-state
-                    // rollups from `reliable.rs` (e.g. `The model
-                    // \`<id>\` may not be available on your provider …`)
-                    // get demoted to info-level breadcrumbs instead of
-                    // surfacing as raw Sentry errors. Previously this
-                    // call used `tracing::error!` directly and bypassed
-                    // the classifier — 10.7k events / 14d on self-hosted
-                    // Sentry TAURI-RUST-1V, dominated by
-                    // ProviderConfigRejection-class rollups whose inner
-                    // attempts the provider layer already demoted.
-                    let detail = format!(
-                        "[composio][triage] run_triage failed (label={}): {e:#}",
-                        envelope.display_label
-                    );
-                    crate::core::observability::report_error_or_expected(
-                        detail.as_str(),
-                        "composio",
-                        "trigger_triage",
-                        &[("label", envelope.display_label.as_str())],
+                        error = %e,
+                        "[composio][triage] apply_decision failed"
                     );
                 }
             }
-        })
+            Ok(TriageOutcome::Deferred {
+                defer_until_ms,
+                reason,
+            }) => {
+                // Tiered fallback exhausted both arms. The direct path has
+                // no scheduler of its own, so the deferral is logged and
+                // dropped; with the inbound event queues on (the default)
+                // triggers do not come here: `Deliver` retries a deferral
+                // at `defer_until_ms` (crate::inbound::deliver).
+                tracing::warn!(
+                    label = %envelope.display_label,
+                    defer_until_ms = defer_until_ms,
+                    reason = %reason,
+                    "[composio][triage] run_triage deferred"
+                );
+            }
+            Ok(TriageOutcome::Terminal { reason }) => {
+                tracing::warn!(
+                    label = %envelope.display_label,
+                    reason = %reason,
+                    "[composio][triage] run_triage reached terminal state"
+                );
+            }
+            Err(e) => {
+                // Route through the central observability classifier
+                // so user-config / budget-exhausted / provider-state
+                // rollups from `reliable.rs` (e.g. `The model
+                // \`<id>\` may not be available on your provider …`)
+                // get demoted to info-level breadcrumbs instead of
+                // surfacing as raw Sentry errors. Previously this
+                // call used `tracing::error!` directly and bypassed
+                // the classifier — 10.7k events / 14d on self-hosted
+                // Sentry TAURI-RUST-1V, dominated by
+                // ProviderConfigRejection-class rollups whose inner
+                // attempts the provider layer already demoted.
+                let detail = format!(
+                    "[composio][triage] run_triage failed (label={}): {e:#}",
+                    envelope.display_label
+                );
+                crate::core::observability::report_error_or_expected(
+                    detail.as_str(),
+                    "composio",
+                    "trigger_triage",
+                    &[("label", envelope.display_label.as_str())],
+                );
+            }
+        }
+    })
 }
 
 /// Returns `true` when `OPENHUMAN_TRIGGER_TRIAGE_DISABLED` is set to a

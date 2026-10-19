@@ -49,7 +49,9 @@ impl Resolved {
     #[must_use]
     pub fn max_attempts(&self, lane: Lane) -> Option<u32> {
         let queue = &self.pipeline.lanes.get(lane).queue;
-        self.manifest.get(queue).map(|declared| declared.max_attempts)
+        self.manifest
+            .get(queue)
+            .map(|declared| declared.max_attempts)
     }
 }
 
@@ -75,7 +77,10 @@ pub fn shipped() -> Resolved {
 /// a queue URL that is not `storage`, `amqp://…` or `amqps://…`.
 pub fn resolve(config: &Config) -> Result<Resolved, String> {
     let queues = read_or(config.inbound.queues_path.as_deref(), SHIPPED_QUEUES_JSON)?;
-    let pipeline = read_or(config.inbound.pipeline_path.as_deref(), SHIPPED_PIPELINE_JSON)?;
+    let pipeline = read_or(
+        config.inbound.pipeline_path.as_deref(),
+        SHIPPED_PIPELINE_JSON,
+    )?;
     resolve_texts(&queues, &pipeline, config.inbound.queue_url.as_deref())
 }
 

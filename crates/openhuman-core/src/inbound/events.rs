@@ -183,7 +183,13 @@ pub fn webhook(
         payload: envelope.payload.clone(),
         received_at_ms: envelope.received_at.timestamp_millis(),
     };
-    event(source.clone(), id_or_fresh(correlation_id), source, raw, envelope)
+    event(
+        source.clone(),
+        id_or_fresh(correlation_id),
+        source,
+        raw,
+        envelope,
+    )
 }
 
 /// The envelope an inbound event was queued from, or `None` for an event

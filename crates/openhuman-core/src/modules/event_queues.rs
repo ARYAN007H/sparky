@@ -50,9 +50,16 @@ pub async fn stats(client: &ModuleClient) -> Result<StatsResponse, ModuleCallErr
 /// # Errors
 ///
 /// As [`ingest`].
-pub async fn list_dead(client: &ModuleClient, limit: u32) -> Result<Vec<DeadItem>, ModuleCallError> {
+pub async fn list_dead(
+    client: &ModuleClient,
+    limit: u32,
+) -> Result<Vec<DeadItem>, ModuleCallError> {
     let response: ListDeadResponse = client
-        .call(MODULE_ID, methods::LIST_DEAD, (ListDeadRequest::new(limit),))
+        .call(
+            MODULE_ID,
+            methods::LIST_DEAD,
+            (ListDeadRequest::new(limit),),
+        )
         .await?;
     Ok(response.dead)
 }

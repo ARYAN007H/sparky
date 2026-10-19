@@ -64,13 +64,12 @@ pub(crate) async fn install(connection: &tinybus::Connection) -> tinybus::Result
             crate::config::schema::InboundConfig::default().triage_timeout_ms
         }
     };
-    let deliverer = Deliverer::new(
-        Arc::new(LiveTriage),
-        ctx,
-        Duration::from_millis(timeout_ms),
-    );
+    let deliverer = Deliverer::new(Arc::new(LiveTriage), ctx, Duration::from_millis(timeout_ms));
     connection
-        .serve_at(ObjectPath::new(PATH)?, InboundHost::new(Arc::new(deliverer)))
+        .serve_at(
+            ObjectPath::new(PATH)?,
+            InboundHost::new(Arc::new(deliverer)),
+        )
         .await?;
     connection.request_name(NAME).await?;
     tracing::debug!("[inbound] serving the tinyeventqueues host callbacks");
