@@ -4,8 +4,8 @@
 //! selects how this payload is consumed. OpenHuman retains the web and
 //! orchestration metadata needed to dispatch a deferred follow-up turn.
 
-use tinyagents_harness::turn_runner::{QueueDisposition, RequeuePayload, ScopeKey, TurnRequest};
 use std::sync::Arc;
+use tinyagents_harness::turn_runner::{QueueDisposition, RequeuePayload, ScopeKey, TurnRequest};
 
 /// The host metadata one OpenHuman turn carries through TinyAgents' turn
 /// runner and its run queue: which client asked, the per-message model and

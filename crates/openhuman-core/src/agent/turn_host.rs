@@ -6,7 +6,7 @@
 
 use std::{sync::Arc, time::Duration};
 
-use tinyagents_harness::{CancellationToken, run_queue::RunQueue};
+use tinyagents_harness::{run_queue::RunQueue, CancellationToken};
 use tokio::sync::mpsc;
 
 use crate::{
@@ -15,7 +15,7 @@ use crate::{
         queued_turn::QueuedTurn,
         session_host::OpenHumanSessionHost,
         turn_env::HostTurnEnv,
-        turn_origin::{AgentTurnOrigin, with_origin},
+        turn_origin::{with_origin, AgentTurnOrigin},
     },
     security::approval::ApprovalTurnContext,
 };
@@ -102,4 +102,3 @@ impl AgentTurnHost {
         .await
     }
 }
-
