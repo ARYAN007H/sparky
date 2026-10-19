@@ -10,7 +10,7 @@ use tinychannels_bus::channel::{
     ChannelOutboundMessage, ChannelSendOutcome, MessageReceipt, OutboundContentPart,
 };
 use tinychannels_bus::module_progressive::{
-    ProgressiveTransportRequest, ProgressiveTransportResult,
+    ChannelOutputEvent, ProgressiveTransportRequest, ProgressiveTransportResult,
 };
 use tinychannels_bus::{ChannelBackendRequest, ChannelBackendResult, SendMessage};
 
@@ -151,6 +151,7 @@ fn callback_for_channels(
             Arc::new(crate::config::Config::default()),
             context_slot,
             progressive_slot,
+            None,
             dispatch,
         ),
         context,
@@ -322,4 +323,36 @@ async fn native_progressive_transport_rejects_unconfigured_account_without_provi
     );
     assert!(first_account.sent.lock().await.is_empty());
     assert!(second_account.sent.lock().await.is_empty());
+}
+
+#[tokio::test]
+async fn native_progressive_output_event_is_acknowledged_by_optional_host_observer() {
+    let (callback, _context) = callback_for_channels(HashMap::new(), HashMap::new());
+    let result = callback
+        .dispatch_controller_backend(ChannelBackendRequest::ProgressiveTransport(Box::new(
+            ProgressiveTransportRequest::OutputEvent {
+                channel: "telegram:bot-b".into(),
+                turn_id: Some("turn-13".into()),
+                channel_ref: Some(tinychannels_bus::ChannelRef {
+                    id: "telegram".into(),
+                    account_id: Some("telegram:bot-b".into()),
+                }),
+                conversation: Some(tinychannels_bus::ConversationRef {
+                    id: "chat-42".into(),
+                    thread_id: Some("topic-9".into()),
+                    ..Default::default()
+                }),
+                sequence: 4,
+                event: Box::new(ChannelOutputEvent::TextDelta {
+                    text: "working".into(),
+                    iteration: Some(1),
+                }),
+            },
+        )))
+        .await
+        .expect("an unobserved native progress event is accepted by the host");
+    let ChannelBackendResult::ProgressiveTransport(result) = result else {
+        panic!("expected progressive transport result");
+    };
+    assert!(matches!(*result, ProgressiveTransportResult::Acknowledged));
 }

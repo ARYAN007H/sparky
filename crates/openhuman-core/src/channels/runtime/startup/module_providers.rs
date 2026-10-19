@@ -79,6 +79,7 @@ impl ModuleChannelRuntime {
             Arc::clone(&config),
             context,
             Arc::clone(&progressive_channels),
+            None,
             dispatch,
         );
         let lease = ChannelRuntimeLease::open(client.clone(), callback)

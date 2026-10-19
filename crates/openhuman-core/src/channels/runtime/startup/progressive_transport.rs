@@ -180,7 +180,7 @@ impl ProgressiveChannelTransport for ModuleChannel {
                     .map_err(|_| tinybus::Error::failed("progressive typing callback failed"))?;
                 Ok(Result::Acknowledged)
             }
-            Request::OutputEvent { .. } => Ok(Result::Unavailable),
+            Request::OutputEvent { .. } => Ok(Result::Acknowledged),
         }
     }
 }

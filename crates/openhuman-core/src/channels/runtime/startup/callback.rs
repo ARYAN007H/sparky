@@ -30,6 +30,18 @@ pub(super) trait ProgressiveChannelTransport: Send + Sync {
     ) -> Result<ProgressiveTransportResult>;
 }
 
+#[async_trait::async_trait]
+pub(super) trait ProgressiveOutputObserver: Send + Sync {
+    async fn observe(
+        &self,
+        channel: &tinychannels_bus::ChannelRef,
+        conversation: &tinychannels_bus::ConversationRef,
+        turn_id: &str,
+        sequence: u64,
+        event: &tinychannels_bus::module_progressive::ChannelOutputEvent,
+    ) -> Result<()>;
+}
+
 /// Callbacks capture one immutable host config and a weak runtime context.
 /// The weak reference avoids a cycle from runtime context -> module channel ->
 /// lease -> TinyBus connection -> callback -> runtime context.
@@ -40,6 +52,7 @@ pub(super) struct ChannelHostCallbacks {
     cancellation: tokio_util::sync::CancellationToken,
     context: Arc<OnceLock<Weak<ChannelRuntimeContext>>>,
     progressive_channels: Arc<OnceLock<Arc<HashMap<String, Arc<dyn ProgressiveChannelTransport>>>>>,
+    output_observer: Option<Arc<dyn ProgressiveOutputObserver>>,
     dispatch: mpsc::Sender<RuntimeChannelMessage>,
 }
 
@@ -51,6 +64,7 @@ impl ChannelHostCallbacks {
         progressive_channels: Arc<
             OnceLock<Arc<HashMap<String, Arc<dyn ProgressiveChannelTransport>>>>,
         >,
+        output_observer: Option<Arc<dyn ProgressiveOutputObserver>>,
         dispatch: mpsc::Sender<RuntimeChannelMessage>,
     ) -> Self {
         Self {
@@ -63,6 +77,7 @@ impl ChannelHostCallbacks {
             cancellation: crate::channels::runtime::session::channel_session(),
             context,
             progressive_channels,
+            output_observer,
             dispatch,
         }
     }
@@ -269,41 +284,27 @@ impl ChannelHostCallbacks {
         request: ProgressiveTransportRequest,
     ) -> Result<ProgressiveTransportResult> {
         if let ProgressiveTransportRequest::OutputEvent {
-            channel_ref: Some(channel),
-            conversation: Some(conversation),
-            turn_id: Some(turn_id),
+            channel_ref,
+            conversation,
+            turn_id,
             sequence,
             event,
             ..
         } = &request
         {
-            let event_kind = serde_json::to_value(event.as_ref())
-                .ok()
-                .and_then(|value| {
-                    value
-                        .get("type")
-                        .and_then(serde_json::Value::as_str)
-                        .map(str::to_owned)
-                })
-                .ok_or_else(|| Error::failed("invalid progressive output event"))?;
-            let publication = crate::core::events::DomainEvent::ChannelOutputObserved {
-                channel: channel.clone(),
-                conversation: conversation.clone(),
-                turn_id: turn_id.clone(),
-                sequence: *sequence,
-                event_kind,
-            };
-            let publish = async {
-                crate::core::bus::BUS.publish(publication);
-                Ok(ProgressiveTransportResult::Acknowledged)
-            };
-            return match &self.core_context {
-                Some(core_context) => {
-                    crate::core::runtime::CoreContext::scope(Arc::clone(core_context), publish)
-                        .await
-                }
-                None => publish.await,
-            };
+            let channel = channel_ref
+                .as_ref()
+                .ok_or_else(|| Error::failed("progressive output channel identity is required"))?;
+            let conversation = conversation.as_ref().ok_or_else(|| {
+                Error::failed("progressive output conversation identity is required")
+            })?;
+            let turn_id = turn_id
+                .as_deref()
+                .ok_or_else(|| Error::failed("progressive output turn identity is required"))?;
+            if let Some(observer) = &self.output_observer {
+                observer.observe(channel, conversation, turn_id, *sequence, event).await?;
+            }
+            return Ok(ProgressiveTransportResult::Acknowledged);
         }
         let (channel, channel_ref) = match &request {
             ProgressiveTransportRequest::OutputEvent {
