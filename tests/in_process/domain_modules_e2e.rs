@@ -434,8 +434,7 @@ async fn config_agent_tools_and_threads_mutation_paths_round_trip() {
         Some(&json!("updated"))
     );
     assert_eq!(
-        data(&update_message, "threads_message_update")
-            .pointer("/extraMetadata/verified"),
+        data(&update_message, "threads_message_update").pointer("/extraMetadata/verified"),
         Some(&json!(true)),
         "boolean metadata must remain boolean in the projected message"
     );
