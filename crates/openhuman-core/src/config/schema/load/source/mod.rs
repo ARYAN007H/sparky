@@ -94,6 +94,22 @@ pub(crate) enum ConfigSourceAnchor {
     },
 }
 
+pub(crate) fn normalized_path(path: &Path) -> std::path::PathBuf {
+    let mut normalized = std::path::PathBuf::new();
+    for component in path.components() {
+        match component {
+            std::path::Component::CurDir => {}
+            std::path::Component::ParentDir => {
+                if !normalized.pop() {
+                    normalized.push(component.as_os_str());
+                }
+            }
+            other => normalized.push(other.as_os_str()),
+        }
+    }
+    normalized
+}
+
 /// A place a config's TOML text is read from and written to.
 #[async_trait]
 pub(crate) trait ConfigSource: Send + Sync {

@@ -41,7 +41,7 @@ impl ConfigSource for FileConfigSource {
     }
 
     fn anchor(&self) -> super::ConfigSourceAnchor {
-        super::ConfigSourceAnchor::File(self.path.clone())
+        super::ConfigSourceAnchor::File(super::normalized_path(&self.path))
     }
 
     async fn exists(&self) -> Result<bool> {

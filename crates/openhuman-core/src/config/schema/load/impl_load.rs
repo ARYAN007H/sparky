@@ -399,7 +399,8 @@ impl Config {
             (
                 Some(super::source::ConfigSourceAnchor::File(path)),
                 super::source::ConfigSourceAnchor::Document { .. }
-            ) if path == &self.config_path && expected_snapshot.version.is_none()
+            ) if path == &super::source::normalized_path(&self.config_path)
+                && expected_snapshot.version.is_none()
         );
         if update_snapshot
             && expected_snapshot.anchor.as_ref().is_some_and(|anchor| {
