@@ -144,9 +144,9 @@ async fn transcript_projection_includes_voice_metadata_from_persisted_thread_row
     )
     .await
     .unwrap();
-    for (id, content, sender, note_id) in [
-        ("user-voice", "hello", "user", "recording-1"),
-        ("assistant-voice", "hi there", "agent", "reply-1"),
+    for (id, content, sender, note_id, request_id) in [
+        ("user-voice", "hello", "user", "recording-1", None),
+        ("assistant-voice", "hi there", "agent", "reply-1", Some("req-1")),
     ] {
         blocking::append_message(
             ctx.clone(),
@@ -156,7 +156,13 @@ async fn transcript_projection_includes_voice_metadata_from_persisted_thread_row
                 id: id.into(),
                 content: content.into(),
                 message_type: "text".into(),
-                extra_metadata: json!({"voiceNote": {"noteId": note_id, "durationMs": 5000}}),
+                extra_metadata: {
+                    let mut metadata = json!({"voiceNote": {"noteId": note_id, "durationMs": 5000}});
+                    if let Some(request_id) = request_id {
+                        metadata["requestId"] = json!(request_id);
+                    }
+                    metadata
+                },
                 sender: sender.into(),
                 created_at: "2026-10-15T00:00:02Z".into(),
             },
