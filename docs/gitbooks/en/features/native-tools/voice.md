@@ -7,17 +7,16 @@ icon: microphone
 
 # Voice
 
-You can talk to OpenHuman instead of typing. Dictation, spoken replies and the live voice agent are part of the core, not a plugin.
+Voice is an optional core capability. The Cargo `voice` feature is off in contributor builds and on in the desktop product; the runtime component is enabled by default. Dictation, spoken replies and the live voice agent use the same core voice domain.
 
 ## Speech-to-text
 
-- **Hotkey.** Push-to-talk and toggle modes.
-- **Audio capture.** Cross-platform mic capture with voice-activity detection.
+- **Audio capture.** Microphone capture with voice-activity detection when you start dictation.
 - **Streaming transcription.** Words appear as you speak.
 - **Hallucination filter.** Strips known artifacts such as "Thanks for watching" and phrases invented from silence.
 - **Postprocessing.** Punctuation, capitalization and dictation cleanup.
 
-Dictation can replace the active text input on your desktop, or go straight into a chat with the agent.
+Dictation can replace the active text input or go straight into a chat with the agent. Desktop global dictation and push-to-talk hotkeys are no longer part of the product.
 
 ## Text-to-speech
 

@@ -106,14 +106,15 @@ test('contributor credits use PR authors instead of merge authors', () => {
 
 test('release highlights do not classify removed desktop voice controls as current voice features', () => {
   const groups = groupPullRequestsByHighlight([
-    { number: 1, title: 'Remove the dictation hotkey', labels: [] },
-    { number: 2, title: 'Retire the desktop notch', labels: [] },
-    { number: 3, title: 'Improve speech transcription', labels: [] },
+    { number: 1, title: 'Remove the push-to-talk hotkey', labels: [] },
+    { number: 2, title: 'Retire the notch window', labels: [] },
+    { number: 3, title: 'Remove wake word support', labels: [] },
+    { number: 4, title: 'Improve speech transcription', labels: [] },
   ]);
 
   assert.deepEqual(groups.map(({ title, pullRequests }) => [title, pullRequests.map(({ number }) => number)]), [
-    ['🎙️ Voice & desktop control', [3]],
-    ['🧩 Integrations, UI & developer foundations', [1, 2]],
+    ['🎙️ Voice & hands-free control', [4]],
+    ['🧩 Integrations, UI & developer foundations', [1, 2, 3]],
   ]);
 });
 
