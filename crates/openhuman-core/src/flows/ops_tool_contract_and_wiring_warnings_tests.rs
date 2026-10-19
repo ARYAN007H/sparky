@@ -424,3 +424,51 @@ async fn graph_wiring_warnings_suggests_the_probed_split_out_path_when_schema_is
         graph_wiring_warnings(&config, &fixed).await
     );
 }
+
+#[tokio::test]
+async fn graph_wiring_warnings_resolves_a_separated_action_slug_alias() {
+    seed_live_catalog_cache("googledrive", vec![seeded_alias_contract()]);
+    let g = graph(json!({
+        "nodes": [
+            { "id": "t", "kind": "trigger", "name": "Manual" },
+            { "id": "find", "kind": "tool_call", "name": "Find",
+              "config": { "slug": "GOOGLE_DRIVE_FIND_FILE", "args": {} } },
+            { "id": "split", "kind": "split_out", "name": "Split",
+              "config": { "path": "json.data.wrong" } },
+            { "id": "shape", "kind": "transform", "name": "Shape",
+              "config": { "set": { "file": "=nodes.find.item.json.data.wrong" } } }
+        ],
+        "edges": [
+            { "from_node": "t", "to_node": "find" },
+            { "from_node": "find", "to_node": "split" },
+            { "from_node": "find", "to_node": "shape" }
+        ]
+    }));
+
+    let warnings = graph_wiring_warnings(&Config::default(), &g).await;
+
+    assert_eq!(
+        warnings.len(),
+        2,
+        "alias should reach both wiring checks: {warnings:?}"
+    );
+    assert!(
+        warnings
+            .iter()
+            .any(|warning| warning.contains("json.data.files")),
+        "{warnings:?}"
+    );
+    assert!(
+        warnings.iter().any(|warning| warning.contains("wrong")),
+        "{warnings:?}"
+    );
+}
+
+/// (Codex feedback on this PR) `notion` ships a static curated catalog
+/// (`catalog_for_toolkit`), so at RUNTIME `flow_tool_allowed`'s Path A
+/// hard-rejects any slug `find_curated` doesn't recognize — even a real,
+/// live action. Without this check, a real-but-uncurated action for a
+/// statically-catalogued toolkit would pass authoring/save here and then
+/// fail every single run as "tool not permitted". Uses its own toolkit key
+/// (`notion`, not `slack`/`gmail`) since it seeds different `is_curated`
+/// content than every other test sharing those keys.
