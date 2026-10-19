@@ -81,6 +81,12 @@ fn contract_names() -> Vec<(&'static str, &'static str, &'static str)> {
         tinymemes_bus::STATE_INTERFACE,
         tinymemes_bus::STATE_PATH,
     ));
+    #[cfg(feature = "inbound-queues")]
+    names.push((
+        "tinyeventqueues",
+        tinyeventqueues_bus::INTERFACE,
+        tinyeventqueues_bus::OBJECT_PATH,
+    ));
     names
 }
 
