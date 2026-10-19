@@ -57,7 +57,7 @@ use self::types::{
 
 /// Generation timeout. `ppt-rs` typically completes the full 64-slide
 /// cap in well under a second; the 30 s ceiling is a defensive bound
-/// against pathological inputs slipping past `validate_input` and
+/// against pathological inputs slipping past bus spec validation and
 /// the worst-case `spawn_blocking` thread-acquisition latency on a
 /// saturated runtime.
 const GENERATION_TIMEOUT: Duration = Duration::from_secs(30);
