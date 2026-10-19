@@ -394,8 +394,6 @@ pub(crate) fn bootstrap_job_plan(services: &ServiceSet) -> BootstrapJobPlan {
         // flag.
         module_preload: services.integrations,
     }
-    #[cfg(not(feature = "flows"))]
-    let _ = ctx;
 }
 
 /// Starts legacy bootstrap loops that predate [`ServiceSet`].
