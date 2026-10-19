@@ -28,6 +28,37 @@ fn ordinary_agent_chat_still_ignores_inference_only_fields() {
 }
 
 #[test]
+fn common_agent_chat_params_preserve_success_and_invalid_message_errors() {
+    let success = serde_json::json!({
+        "message": "hello",
+        "model_override": "gpt",
+        "temperature": 0.2
+    });
+    let params: AgentChatParams =
+        deserialize_params(success.as_object().unwrap().clone()).expect("valid common params");
+    assert_eq!(params.message, "hello");
+    assert_eq!(params.model_override.as_deref(), Some("gpt"));
+    assert_eq!(params.temperature, Some(0.2));
+
+    let invalid = serde_json::json!({ "message": true });
+    let error = deserialize_params::<AgentChatParams>(invalid.as_object().unwrap().clone())
+        .expect_err("message must remain a string");
+    assert!(error.starts_with("invalid params:"));
+}
+
+#[test]
+fn inference_agent_chat_agent_id_defaults_to_none() {
+    let without: InferenceAgentChatParams =
+        serde_json::from_value(serde_json::json!({ "message": "hello" })).expect("decodes");
+    assert!(without.agent_id.is_none());
+    let with: InferenceAgentChatParams = serde_json::from_value(
+        serde_json::json!({ "message": "hello", "agent_id": "alpha" }),
+    )
+    .expect("decodes with agent id");
+    assert_eq!(with.agent_id.as_deref(), Some("alpha"));
+}
+
+#[test]
 fn inference_agent_chat_parses_its_route_fields() {
     let params: InferenceAgentChatParams = serde_json::from_value(serde_json::json!({
         "message": "hello",

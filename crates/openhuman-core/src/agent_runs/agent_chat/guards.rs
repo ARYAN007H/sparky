@@ -7,7 +7,7 @@ use crate::security::prompt_injection::{
     enforce_prompt_input, PromptEnforcementAction, PromptEnforcementContext,
 };
 
-pub(crate) fn prompt_guard_user_message(action: PromptEnforcementAction) -> &'static str {
+fn prompt_guard_user_message(action: PromptEnforcementAction) -> &'static str {
     match action {
         PromptEnforcementAction::Allow => "Message accepted.",
         PromptEnforcementAction::Blocked => {
@@ -72,7 +72,7 @@ pub(crate) fn enforce_user_prompt_or_reject(
 /// it a cwd every shell and file call fails against, so this rejects loudly
 /// instead. The path is canonicalized so symlinked and `..`-containing inputs
 /// compare equal to the paths the security policy derives from it.
-pub(crate) fn resolve_turn_cwd(cwd: Option<String>) -> Result<Option<std::path::PathBuf>, String> {
+pub(super) fn resolve_turn_cwd(cwd: Option<String>) -> Result<Option<std::path::PathBuf>, String> {
     let Some(raw) = cwd else { return Ok(None) };
     let trimmed = raw.trim();
     if trimmed.is_empty() {
@@ -98,7 +98,7 @@ pub(crate) fn resolve_turn_cwd(cwd: Option<String>) -> Result<Option<std::path::
 ///
 /// Only ever called on a *clone* of the config, on the `cwd`-present branch —
 /// the no-`cwd` path is untouched, and nothing process-global is mutated.
-pub(crate) fn grant_turn_cwd(config: &mut Config, root: &std::path::Path) {
+pub(super) fn grant_turn_cwd(config: &mut Config, root: &std::path::Path) {
     let path = root.to_string_lossy().to_string();
     if config.autonomy.trusted_roots.iter().any(|r| r.path == path) {
         return;
@@ -130,9 +130,13 @@ pub(crate) fn grant_turn_cwd(config: &mut Config, root: &std::path::Path) {
 /// [`is_user_authored`](crate::security::turn_origin::AgentTurnOrigin::is_user_authored)
 /// reads `false` for it and the conversation autosave would silently drop a
 /// real user message.
-pub(crate) fn effective_agent_chat_origin(
+pub(super) fn effective_agent_chat_origin(
     ctx: &crate::core::runtime::DispatchCtx,
 ) -> crate::security::turn_origin::AgentTurnOrigin {
     ctx.turn_origin_or_scoped()
         .unwrap_or(crate::security::turn_origin::AgentTurnOrigin::DirectChat)
 }
+
+#[cfg(test)]
+#[path = "guards_tests.rs"]
+mod tests;

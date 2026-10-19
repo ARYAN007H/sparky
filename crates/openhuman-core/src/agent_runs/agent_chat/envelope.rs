@@ -44,3 +44,7 @@ impl AgentChatReply {
         Ok(value)
     }
 }
+
+#[cfg(test)]
+#[path = "envelope_tests.rs"]
+mod tests;
