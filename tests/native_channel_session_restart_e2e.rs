@@ -18,6 +18,7 @@ use std::time::{Duration, Instant};
 
 use axum::extract::State;
 use axum::http::StatusCode;
+use axum::response::{IntoResponse, Response};
 use axum::routing::post;
 use axum::{Json, Router};
 use serde_json::{json, Value};
@@ -85,6 +86,7 @@ async fn serve(app: Router) -> (String, JoinHandle<()>) {
 }
 
 async fn get_updates(State(state): State<Arc<MockState>>, Json(body): Json<Value>) -> Json<Value> {
+    sleep(Duration::from_millis(25)).await;
     let offset = body
         .get("offset")
         .and_then(Value::as_i64)
@@ -126,23 +128,38 @@ async fn get_me() -> Json<Value> {
     Json(json!({ "ok": true, "result": { "id": 9, "is_bot": true, "username": "test_bot" } }))
 }
 
-async fn chat_completion(
-    State(state): State<Arc<MockState>>,
-    Json(body): Json<Value>,
-) -> (StatusCode, Json<Value>) {
+async fn chat_completion(State(state): State<Arc<MockState>>, Json(body): Json<Value>) -> Response {
     let index = {
         let mut completions = state.completions.lock().expect("model requests");
         completions.push(body.clone());
         completions.len()
     };
+    let message = json!({
+        "role": "assistant",
+        "content": format!("mock reply {index}")
+    });
+    if body.get("stream").and_then(Value::as_bool).unwrap_or(false) {
+        let mut delta = json!({ "role": "assistant" });
+        delta["content"] = message["content"].clone();
+        let stream = format!(
+            "data: {}\n\ndata: {}\n\ndata: [DONE]\n\n",
+            json!({ "choices": [{ "index": 0, "delta": delta }] }),
+            json!({ "choices": [{ "index": 0, "delta": {}, "finish_reason": "stop" }] })
+        );
+        return (
+            [(axum::http::header::CONTENT_TYPE, "text/event-stream")],
+            stream,
+        )
+            .into_response();
+    }
     let response = json!({
         "choices": [{
             "index": 0,
-            "message": { "role": "assistant", "content": format!("mock reply {index}") },
+            "message": message,
             "finish_reason": "stop"
         }]
     });
-    (StatusCode::OK, Json(response))
+    (StatusCode::OK, Json(response)).into_response()
 }
 
 fn message_update(update_id: i64, message_id: i64, text: &str) -> Value {
@@ -245,6 +262,21 @@ fn start_core(
         .env_remove("OPENHUMAN_MODE")
         .env_remove("OPENHUMAN_BACKEND_API_KEY")
         .env_remove("OPENHUMAN_BACKEND_SESSION_TOKEN")
+        .envs(
+            [
+                "SANDBOX",
+                "CONNECTORS",
+                "HOSTING",
+                "MEMES",
+                "COMPUTER",
+                "SEARCH",
+                "DOCUMENTS",
+                "WALLET",
+                "JUICE",
+                "VOICE",
+            ]
+            .map(|name| (format!("OPENHUMAN_COMPONENT_{name}"), "0")),
+        )
         .stdout(Stdio::from(stdout))
         .stderr(Stdio::from(stderr))
         .spawn()
