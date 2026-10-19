@@ -4,7 +4,7 @@ use tiny_artifacts::{ArtifactKind, ArtifactStatus as RecordStatus, ArtifactStore
 
 use super::*;
 use crate::artifacts::store::get_artifact;
-use crate::artifacts::tiny_store::{stored_file_path, versioned_store};
+use crate::artifacts::tiny_store::versioned_store;
 use crate::artifacts::types::{ArtifactKind as CardKind, ArtifactStatus as CardStatus};
 
 fn temp_dirs() -> (PathBuf, PathBuf) {
