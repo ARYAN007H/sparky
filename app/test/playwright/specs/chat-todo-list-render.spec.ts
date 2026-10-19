@@ -173,9 +173,10 @@ test.describe('Todo list render', () => {
 
     // Control: no list of either kind before the agent writes one, so the
     // assertions below are about something that appeared.
-    await expect(allTodoSurfaces(page), 'a todo surface was on screen before any write').toHaveCount(
-      0
-    );
+    await expect(
+      allTodoSurfaces(page),
+      'a todo surface was on screen before any write'
+    ).toHaveCount(0);
 
     const threadId = await waitForSelectedThreadId(page);
     const before = (await upstreamBodies()).length;
@@ -287,10 +288,10 @@ test.describe('Todo list render', () => {
       })
       .toBeGreaterThan(before + 1);
 
-    await expect(settledPinnedCard(page), 'the rejected write hid the previous task card').toHaveCount(
-      1,
-      { timeout: 30_000 }
-    );
+    await expect(
+      settledPinnedCard(page),
+      'the rejected write hid the previous task card'
+    ).toHaveCount(1, { timeout: 30_000 });
     const states = await itemStates(settledPinnedCard(page).first());
     expect(await itemTexts(settledPinnedCard(page).first())).toEqual([...STEPS]);
     expect(states).toEqual(['pending', 'pending', 'pending']);

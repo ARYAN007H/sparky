@@ -42,20 +42,20 @@ test("ignores inert text but scans executable template interpolations", () => {
   ]);
 });
 
-test('ignores regex literals without letting their delimiters hide executable calls', () => {
+test("ignores regex literals without letting their delimiters hide executable calls", () => {
   const source = [
     'const quote = /"/;',
     "test.skip('missing after quote regex');",
-    'const backtick = /`/;',
-    'this.skip();',
-    'const fakeCall = /test.skip\\(foo\\)/;',
-    'const commentStart = /\\/\\//;',
-    'const blockCommentStart = /\\/\\*/;',
+    "const backtick = /`/;",
+    "this.skip();",
+    "const fakeCall = /test.skip\\(foo\\)/;",
+    "const commentStart = /\\/\\//;",
+    "const blockCommentStart = /\\/\\*/;",
     `test.skip('tracked'); // ${url}`,
-  ].join('\n');
+  ].join("\n");
 
   assert.deepEqual(untrackedSkipLines(source), [
     "2: test.skip('missing after quote regex');",
-    '4: this.skip();',
+    "4: this.skip();",
   ]);
 });
