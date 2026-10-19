@@ -211,8 +211,7 @@ describe('Voice mode — Human tab capture & error mapping', () => {
   // ---------------------------------------------------------------------------
   // 6.1 — Human tab renders with MicComposer in idle state.
   //
-  // Checks that the Human tab mounts, shows the "Push to Talk" label in the
-  // mascot header, and the MicComposer idle button (aria-label="Start recording"
+  // Checks that the Human tab mounts the MicComposer idle button (aria-label="Start recording"
   // / visible label "Tap and speak") is present.
   // ---------------------------------------------------------------------------
   it('6.1 — Human tab renders with MicComposer in idle state', async () => {
