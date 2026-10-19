@@ -438,6 +438,50 @@ async fn flows_run_finished_event_skips_pending_approval_and_fires_once_on_resum
 
 #[tokio::test]
 async fn flows_run_persists_live_steps_with_status_and_timing() {
+    use crate::core::bus::BUS;
+    use crate::core::events::DomainEvent;
+    use async_trait::async_trait;
+    use std::sync::{Arc, Mutex};
+    use tinybus::EventHandler;
+
+    #[derive(Default)]
+    struct ProgressCollector {
+        events: Arc<Mutex<Vec<(String, String, String)>>>,
+    }
+
+    #[async_trait]
+    impl EventHandler<DomainEvent> for ProgressCollector {
+        fn name(&self) -> &str {
+            "test::flows::module_run_progress_collector"
+        }
+
+        fn domains(&self) -> Option<&[&str]> {
+            Some(&["cron"])
+        }
+
+        async fn handle(&self, event: &DomainEvent) {
+            if let DomainEvent::FlowRunProgress {
+                run_id,
+                node_id,
+                status,
+            } = event
+            {
+                self.events
+                    .lock()
+                    .unwrap()
+                    .push((run_id.clone(), node_id.clone(), status.clone()));
+            }
+        }
+    }
+
+    BUS.init().await.expect("bus init");
+    let progress = Arc::new(Mutex::new(Vec::new()));
+    let _progress_subscription = BUS
+        .subscribe(Arc::new(ProgressCollector {
+            events: Arc::clone(&progress),
+        }))
+        .expect("progress subscriber installed");
+
     let tmp = TempDir::new().unwrap();
     let config = test_config(&tmp);
     let created = flows_create(
@@ -464,8 +508,8 @@ async fn flows_run_persists_live_steps_with_status_and_timing() {
     let row = flows_get_run(&config, &thread_id).await.unwrap();
     assert_eq!(row.value.status, "completed");
 
-    // The non-trigger node 'p' was observed live: it carries a real status +
-    // timing that only the live observer (not post-hoc reconstruction) sets.
+    // The module's durable RunStep event writes real status and timing for the
+    // non-trigger node; host progress is projected from the same ordered stream.
     let p = row
         .value
         .steps
@@ -478,8 +522,8 @@ async fn flows_run_persists_live_steps_with_status_and_timing() {
         "a live-observed step should carry executor timing"
     );
 
-    // The trigger node emits no `on_step_finish`; `settle_steps` fills it in
-    // from the post-hoc reconstruction, so it carries no live status.
+    // The trigger node is reconstructed by the module's run summary and has no
+    // executor status of its own.
     let t = row
         .value
         .steps
@@ -488,8 +532,32 @@ async fn flows_run_persists_live_steps_with_status_and_timing() {
         .expect("the trigger step should be reconstructed at settle");
     assert!(
         t.status.is_none(),
-        "the trigger step is reconstructed post-hoc, not observed live"
+        "the trigger step has no executor status"
     );
+
+    let mut projected = Vec::new();
+    for _ in 0..20 {
+        projected = progress
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|(run_id, node_id, _)| run_id == &thread_id && node_id == "p")
+            .map(|(_, _, status)| status.clone())
+            .collect::<Vec<_>>();
+        if projected.iter().any(|status| status == "success") {
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(25)).await;
+    }
+    let running = projected
+        .iter()
+        .position(|status| status == "running")
+        .expect("PollRun step_started event projects running status");
+    let settled = projected
+        .iter()
+        .position(|status| status == "success")
+        .expect("PollRun step event projects its settled status");
+    assert!(running < settled, "module step events keep their order");
 }
 
 // ── flows_cancel_run (issue G4) ───────────────────────────────────────────
