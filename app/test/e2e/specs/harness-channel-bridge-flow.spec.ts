@@ -204,7 +204,7 @@ async function navigateChatAndSend(prompt: string): Promise<void> {
 
 describe('Harness - Cross-channel bridge flow', () => {
   before(function () {
-    this.skip();
+    this.skip(); // https://github.com/senamakel/openhuman/issues/233 — this Telegram-owned spec is scheduled for the channel test-ownership cleanup.
   });
   // Track whether Telegram connect succeeded so we can skip Telegram-dependent
   // assertions gracefully when WS-A/WS-B infra is not yet in place.
@@ -410,7 +410,7 @@ describe('Harness - Cross-channel bridge flow', () => {
           `Telegram listener requires a core restart after channels_connect. The web-chat ` +
           `Composio path is covered by harness-composio-tool-flow in this shard.`
       );
-      this.skip();
+      this.skip(); // https://github.com/senamakel/tinychannels/issues/42 — Telegram listener restart remains upstream-owned.
     }
 
     // Canned Gmail messages the mock Composio execute will return.
