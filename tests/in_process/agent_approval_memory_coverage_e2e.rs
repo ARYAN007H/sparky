@@ -734,7 +734,10 @@ async fn memory_engine_status_explains_why_memory_is_off_when_signed_out() {
         "an off engine must say why: {status}"
     );
     assert_eq!(
-        status.get("fetch_modes").and_then(Value::as_array).map(Vec::len),
+        status
+            .get("fetch_modes")
+            .and_then(Value::as_array)
+            .map(Vec::len),
         Some(0),
         "an off engine offers no fetch modes: {status}"
     );
@@ -758,9 +761,11 @@ async fn memory_engine_status_explains_why_memory_is_off_when_signed_out() {
         .iter()
         .filter_map(|engine| engine.get("id").and_then(Value::as_str))
         .collect();
-    assert!(ids.contains(&"tinyhumans") && ids.contains(&"cortexdb"), "{ids:?}");
+    assert!(
+        ids.contains(&"tinyhumans") && ids.contains(&"cortexdb"),
+        "{ids:?}"
+    );
 }
-
 
 #[tokio::test]
 async fn agent_definitions_and_validation_are_exposed_over_rpc() {
@@ -863,4 +868,3 @@ async fn agent_definitions_and_validation_are_exposed_over_rpc() {
 
     harness.join.abort();
 }
-

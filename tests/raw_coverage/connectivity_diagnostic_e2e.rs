@@ -174,4 +174,3 @@ async fn connectivity_diag_rpc_reports_live_listener_port_and_process() {
 
     harness.rpc_join.abort();
 }
-

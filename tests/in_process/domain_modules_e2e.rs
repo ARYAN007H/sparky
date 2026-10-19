@@ -180,10 +180,11 @@ embedding_model = "local-embedding"
     .await;
     let engine = payload(&engine, "memory_engine_get");
     assert_eq!(engine.get("status").and_then(Value::as_str), Some("off"));
-    assert!(engine
-        .get("reason")
-        .and_then(Value::as_str)
-        .is_some_and(|reason| reason.contains("legacy memory backend")),
+    assert!(
+        engine
+            .get("reason")
+            .and_then(Value::as_str)
+            .is_some_and(|reason| reason.contains("legacy memory backend")),
         "expected legacy migration reason, got: {engine}"
     );
 
@@ -201,10 +202,16 @@ embedding_model = "local-embedding"
         .expect("read migrated config");
     let saved_config: toml::Value = toml::from_str(&saved).unwrap();
     assert!(
-        !saved_config["memory"].as_table().unwrap().contains_key("backend"),
+        !saved_config["memory"]
+            .as_table()
+            .unwrap()
+            .contains_key("backend"),
         "legacy key must not be persisted in [memory]: {saved}"
     );
-    assert!(saved.contains("engine = \"\""), "off state must be persisted: {saved}");
+    assert!(
+        saved.contains("engine = \"\""),
+        "off state must be persisted: {saved}"
+    );
 
     harness.join.abort();
 }
@@ -925,7 +932,6 @@ async fn mcp_tool_description_scan_flags_injection_and_spares_ordinary_prose() {
     );
 }
 
-
 #[tokio::test]
 async fn composio_direct_mode_api_key_and_static_catalogs_round_trip() {
     let _lock = env_lock_async().await;
@@ -1059,7 +1065,6 @@ async fn composio_direct_mode_api_key_and_static_catalogs_round_trip() {
     composio_join.abort();
 }
 
-
 async fn serve_composio_direct_fixtures() -> (
     String,
     Arc<AtomicUsize>,
@@ -1152,20 +1157,90 @@ async fn composio_controller_validation_rejects_malformed_params_over_rpc() {
     let _lock = env_lock_async().await;
     let harness = setup().await;
     let cases = [
-        (60, "openhuman.composio_authorize", json!({}), "missing required param 'toolkit'"),
-        (61, "openhuman.composio_delete_connection", json!({ "connection_id": " " }), "'connection_id' must not be empty"),
-        (62, "openhuman.composio_list_tools", json!({ "toolkits": "gmail" }), "invalid 'toolkits'"),
-        (63, "openhuman.composio_execute", json!({}), "missing required param 'tool'"),
-        (64, "openhuman.composio_create_trigger", json!({ "slug": " " }), "'slug' must not be empty"),
-        (65, "openhuman.composio_get_user_profile", json!({}), "missing required param 'connection_id'"),
-        (66, "openhuman.composio_list_available_triggers", json!({ "toolkit": " " }), "'toolkit' must not be empty"),
-        (67, "openhuman.composio_enable_trigger", json!({ "connection_id": " ", "slug": "GMAIL_NEW_GMAIL_MESSAGE" }), "'connection_id' must not be empty"),
-        (68, "openhuman.composio_disable_trigger", json!({}), "missing required param 'trigger_id'"),
-        (69, "openhuman.composio_set_api_key", json!({ "api_key": "" }), "'api_key' must not be empty"),
-        (70, "openhuman.composio_list_github_repos", json!({ "connection_id": 42 }), "invalid params"),
-        (71, "openhuman.composio_list_trigger_history", json!({ "limit": "many" }), "invalid params"),
-        (72, "openhuman.composio_list_triggers", json!({ "toolkit": 12 }), "invalid params"),
-        (73, "openhuman.composio_enable_trigger", json!({ "connection_id": "conn-1", "slug": " " }), "'slug' must not be empty"),
+        (
+            60,
+            "openhuman.composio_authorize",
+            json!({}),
+            "missing required param 'toolkit'",
+        ),
+        (
+            61,
+            "openhuman.composio_delete_connection",
+            json!({ "connection_id": " " }),
+            "'connection_id' must not be empty",
+        ),
+        (
+            62,
+            "openhuman.composio_list_tools",
+            json!({ "toolkits": "gmail" }),
+            "invalid 'toolkits'",
+        ),
+        (
+            63,
+            "openhuman.composio_execute",
+            json!({}),
+            "missing required param 'tool'",
+        ),
+        (
+            64,
+            "openhuman.composio_create_trigger",
+            json!({ "slug": " " }),
+            "'slug' must not be empty",
+        ),
+        (
+            65,
+            "openhuman.composio_get_user_profile",
+            json!({}),
+            "missing required param 'connection_id'",
+        ),
+        (
+            66,
+            "openhuman.composio_list_available_triggers",
+            json!({ "toolkit": " " }),
+            "'toolkit' must not be empty",
+        ),
+        (
+            67,
+            "openhuman.composio_enable_trigger",
+            json!({ "connection_id": " ", "slug": "GMAIL_NEW_GMAIL_MESSAGE" }),
+            "'connection_id' must not be empty",
+        ),
+        (
+            68,
+            "openhuman.composio_disable_trigger",
+            json!({}),
+            "missing required param 'trigger_id'",
+        ),
+        (
+            69,
+            "openhuman.composio_set_api_key",
+            json!({ "api_key": "" }),
+            "'api_key' must not be empty",
+        ),
+        (
+            70,
+            "openhuman.composio_list_github_repos",
+            json!({ "connection_id": 42 }),
+            "invalid params",
+        ),
+        (
+            71,
+            "openhuman.composio_list_trigger_history",
+            json!({ "limit": "many" }),
+            "invalid params",
+        ),
+        (
+            72,
+            "openhuman.composio_list_triggers",
+            json!({ "toolkit": 12 }),
+            "invalid params",
+        ),
+        (
+            73,
+            "openhuman.composio_enable_trigger",
+            json!({ "connection_id": "conn-1", "slug": " " }),
+            "'slug' must not be empty",
+        ),
     ];
 
     for (id, method, params, expected) in cases {
@@ -1181,8 +1256,18 @@ async fn composio_controller_validation_rejects_malformed_params_over_rpc() {
     }
 
     for (id, method, params, expected) in [
-        (74, "openhuman.composio_get_user_scopes", json!({}), "missing required param 'toolkit'"),
-        (75, "openhuman.composio_set_user_scopes", json!({}), "missing required param 'toolkit'"),
+        (
+            74,
+            "openhuman.composio_get_user_scopes",
+            json!({}),
+            "missing required param 'toolkit'",
+        ),
+        (
+            75,
+            "openhuman.composio_set_user_scopes",
+            json!({}),
+            "missing required param 'toolkit'",
+        ),
     ] {
         let response = rpc(&harness.rpc_base, id, method, params).await;
         let message = err(&response, method)
@@ -1203,10 +1288,16 @@ async fn composio_controller_validation_rejects_malformed_params_over_rpc() {
 
 fn assert_registered_dispatch(value: &Value, method: &str) {
     let Some(error) = value.get("error") else {
-        assert!(value.get("result").is_some(), "{method}: malformed JSON-RPC response: {value}");
+        assert!(
+            value.get("result").is_some(),
+            "{method}: malformed JSON-RPC response: {value}"
+        );
         return;
     };
-    let message = error.get("message").and_then(Value::as_str).unwrap_or_default();
+    let message = error
+        .get("message")
+        .and_then(Value::as_str)
+        .unwrap_or_default();
     assert!(
         !message.starts_with("unknown method:"),
         "{method} was not registered: {message}"
@@ -1219,15 +1310,29 @@ async fn tools_return_provider_unavailable_errors_without_attempting_network_acc
     let harness = setup().await;
 
     for (id, method, params) in [
-        (80, "openhuman.tools_web_search", json!({ "query": "worker b", "max_results": 1 })),
-        (81, "openhuman.tools_web_answer", json!({ "query": "worker b" })),
-        (82, "openhuman.tools_searxng_search", json!({ "query": "worker b", "max_results": 1 })),
+        (
+            80,
+            "openhuman.tools_web_search",
+            json!({ "query": "worker b", "max_results": 1 }),
+        ),
+        (
+            81,
+            "openhuman.tools_web_answer",
+            json!({ "query": "worker b" }),
+        ),
+        (
+            82,
+            "openhuman.tools_searxng_search",
+            json!({ "query": "worker b", "max_results": 1 }),
+        ),
     ] {
         let response = rpc(&harness.rpc_base, id, method, params).await;
         let message = err(&response, method)
             .get("message")
             .and_then(Value::as_str)
-            .unwrap_or_else(|| panic!("{method}: expected provider-unavailable error, got {response}"));
+            .unwrap_or_else(|| {
+                panic!("{method}: expected provider-unavailable error, got {response}")
+            });
         assert!(
             message.contains("No web search provider is available"),
             "{method} should report the configured missing provider without dialing a service: {message}"
@@ -1240,7 +1345,13 @@ async fn approval_rpc_validates_decisions_when_no_gate_is_installed() {
     let _lock = env_lock_async().await;
     let harness = setup().await;
 
-    let pending = rpc(&harness.rpc_base, 90, "openhuman.approval_list_pending", json!({})).await;
+    let pending = rpc(
+        &harness.rpc_base,
+        90,
+        "openhuman.approval_list_pending",
+        json!({}),
+    )
+    .await;
     assert!(ok(&pending, "approval_list_pending").is_array());
     let recent = rpc(
         &harness.rpc_base,
@@ -1252,16 +1363,41 @@ async fn approval_rpc_validates_decisions_when_no_gate_is_installed() {
     assert!(ok(&recent, "approval_list_recent_decisions").is_array());
 
     for (id, method, params, expected) in [
-        (92, "openhuman.approval_list_recent_decisions", json!({ "limit": "3" }), "expected unsigned integer"),
-        (93, "openhuman.approval_decide", json!({ "request_id": "test-request", "decision": "maybe" }), "invalid 'decision'"),
-        (94, "openhuman.approval_decide", json!({ "decision": "deny" }), "missing required param 'request_id'"),
-        (95, "openhuman.approval_decide", json!({ "request_id": "test-request", "decision": "deny" }), "approval gate is not installed"),
+        (
+            92,
+            "openhuman.approval_list_recent_decisions",
+            json!({ "limit": "3" }),
+            "expected unsigned integer",
+        ),
+        (
+            93,
+            "openhuman.approval_decide",
+            json!({ "request_id": "test-request", "decision": "maybe" }),
+            "invalid 'decision'",
+        ),
+        (
+            94,
+            "openhuman.approval_decide",
+            json!({ "decision": "deny" }),
+            "missing required param 'request_id'",
+        ),
+        (
+            95,
+            "openhuman.approval_decide",
+            json!({ "request_id": "test-request", "decision": "deny" }),
+            "approval gate is not installed",
+        ),
     ] {
         let response = rpc(&harness.rpc_base, id, method, params).await;
         let message = err(&response, method)
             .get("message")
             .and_then(Value::as_str)
-            .unwrap_or_else(|| panic!("{method}: expected structured validation error, got {response}"));
-        assert!(message.contains(expected), "{method}: expected `{expected}`, got `{message}`");
+            .unwrap_or_else(|| {
+                panic!("{method}: expected structured validation error, got {response}")
+            });
+        assert!(
+            message.contains(expected),
+            "{method}: expected `{expected}`, got `{message}`"
+        );
     }
 }

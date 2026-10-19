@@ -196,4 +196,3 @@ async fn inference_settings_and_oauth_validation_round_trip_over_rpc() {
 
     harness.join.abort();
 }
-
