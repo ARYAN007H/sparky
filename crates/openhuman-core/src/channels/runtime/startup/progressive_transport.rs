@@ -38,9 +38,11 @@ impl ProgressiveChannelTransport for ModuleChannel {
                         .map(|reference| reference.id.clone())
                         .unwrap_or_default(),
                     channel_ref,
+                    thread_id: conversation
+                        .as_ref()
+                        .and_then(|reference| reference.thread_id.clone()),
                     conversation_ref: conversation,
                     reply_to_id: None,
-                    thread_id: None,
                     turn_id,
                     idempotency_key: idempotency_key.unwrap_or_default(),
                     parts,
@@ -87,13 +89,18 @@ impl ProgressiveChannelTransport for ModuleChannel {
                 turn_id,
                 channel_ref,
                 conversation,
-                message_id: _,
+                message_id,
                 receipt,
                 text,
             } => {
                 let Some(receipt) = receipt else {
                     return Ok(Result::Unavailable);
                 };
+                if !receipt_matches_scope(&receipt, channel_ref.as_ref(), conversation.as_ref())
+                    || !receipt_contains_message(&receipt, &message_id)
+                {
+                    return Ok(Result::Unavailable);
+                }
                 let channel_id = channel_ref
                     .as_ref()
                     .map(|reference| reference.id.clone())
@@ -106,10 +113,7 @@ impl ProgressiveChannelTransport for ModuleChannel {
                     idempotency_key: format!(
                         "progressive-edit:{}:{}",
                         turn_id.as_deref().unwrap_or("unscoped"),
-                        receipt
-                            .primary_platform_message_id
-                            .as_deref()
-                            .unwrap_or("unknown")
+                        message_id
                     ),
                     channel_id,
                     conversation_id,
@@ -149,10 +153,21 @@ impl ProgressiveChannelTransport for ModuleChannel {
                     Err(error) => Err(error),
                 }
             }
-            Request::Delete { receipt, .. } => {
+            Request::Delete {
+                channel_ref,
+                conversation,
+                message_id,
+                receipt,
+                ..
+            } => {
                 let Some(receipt) = receipt else {
                     return Ok(Result::Unavailable);
                 };
+                if !receipt_matches_scope(&receipt, channel_ref.as_ref(), conversation.as_ref())
+                    || !receipt_contains_message(&receipt, &message_id)
+                {
+                    return Ok(Result::Unavailable);
+                }
                 match self
                     .object
                     .call_confidential::<ChannelInteractionResult>(
@@ -183,4 +198,32 @@ impl ProgressiveChannelTransport for ModuleChannel {
             Request::OutputEvent { .. } => Ok(Result::Acknowledged),
         }
     }
+}
+
+fn receipt_matches_scope(
+    receipt: &tinychannels_bus::channel::MessageReceipt,
+    channel: Option<&tinychannels_bus::ChannelRef>,
+    conversation: Option<&tinychannels_bus::ConversationRef>,
+) -> bool {
+    receipt.channel.as_ref().is_none_or(|receipt_channel| {
+        channel.is_some_and(|channel| {
+            receipt_channel.id == channel.id
+                && receipt_channel.account_id == channel.account_id
+        })
+    }) && receipt
+        .conversation
+        .as_ref()
+        .is_none_or(|receipt_conversation| {
+            conversation.is_some_and(|conversation| {
+                receipt_conversation.id == conversation.id
+                    && receipt_conversation.thread_id == conversation.thread_id
+                    && receipt_conversation.topic_id == conversation.topic_id
+            })
+        })
+}
+
+fn receipt_contains_message(receipt: &tinychannels_bus::channel::MessageReceipt, id: &str) -> bool {
+    receipt.primary_platform_message_id.as_deref() == Some(id)
+        || receipt.platform_message_ids.iter().any(|message_id| message_id == id)
+        || receipt.parts.iter().any(|part| part.platform_message_id == id)
 }
