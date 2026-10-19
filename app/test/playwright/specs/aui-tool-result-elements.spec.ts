@@ -281,8 +281,8 @@ test.describe('assistant-ui tool-result elements', () => {
     ]);
 
     await sendTurn(page, threadId, PROMPT);
+    await waitForTurnCompletion(page, threadId);
     if (progress) {
-      await waitForTurnCompletion(page, threadId);
       console.log(
         '[epic235 edit progress]',
         JSON.stringify({
