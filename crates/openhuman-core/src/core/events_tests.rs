@@ -420,6 +420,33 @@ fn all_variants_have_correct_domain() {
             },
             "notification",
         ),
+        // Inbound event queues
+        (
+            DomainEvent::InboundEventDropped {
+                source: "composio:gmail".into(),
+                event_id: "e1".into(),
+                reason: "duplicate".into(),
+            },
+            "inbound",
+        ),
+        (
+            DomainEvent::InboundDeferred {
+                source: "composio:gmail".into(),
+                event_id: "e1".into(),
+                defer_until_ms: 1_000,
+                reason: "local model busy".into(),
+            },
+            "inbound",
+        ),
+        (
+            DomainEvent::InboundDeadLettered {
+                source: "webhook:t1".into(),
+                event_id: "c1".into(),
+                attempt: 5,
+                detail: "terminal".into(),
+            },
+            "inbound",
+        ),
         // System
         (
             DomainEvent::SystemStartup {
@@ -994,4 +1021,28 @@ fn the_workspace_switch_announcement_is_not_itself_workspace_bound() {
     assert_eq!(event.workspace_dir(), None);
     assert_eq!(event.variant_name(), "ActiveWorkspaceChanged");
     assert_eq!(DomainEvent::domain(&event), "system");
+}
+
+#[test]
+fn inbound_events_name_themselves() {
+    let dropped = DomainEvent::InboundEventDropped {
+        source: "s".into(),
+        event_id: "e".into(),
+        reason: "noise".into(),
+    };
+    assert_eq!(dropped.variant_name(), "InboundEventDropped");
+    let deferred = DomainEvent::InboundDeferred {
+        source: "s".into(),
+        event_id: "e".into(),
+        defer_until_ms: 1,
+        reason: "r".into(),
+    };
+    assert_eq!(deferred.variant_name(), "InboundDeferred");
+    let dead = DomainEvent::InboundDeadLettered {
+        source: "s".into(),
+        event_id: "e".into(),
+        attempt: 1,
+        detail: "d".into(),
+    };
+    assert_eq!(dead.variant_name(), "InboundDeadLettered");
 }
