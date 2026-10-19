@@ -5265,6 +5265,21 @@ async fn json_rpc_rejects_non_object_params_with_clear_error() {
     let (mock_addr, mock_join) = serve_on_ephemeral(mock_upstream_router()).await;
     let mock_origin = format!("http://{}", mock_addr);
     write_min_config(&openhuman_home, &mock_origin);
+    for config_path in [
+        openhuman_home.join("config.toml"),
+        openhuman_home.join("users/local/config.toml"),
+    ] {
+        use std::io::Write as _;
+        let mut config = std::fs::OpenOptions::new()
+            .append(true)
+            .open(config_path)
+            .expect("open seeded config");
+        writeln!(
+            config,
+            "\n[[voice_providers]]\nslug = \"e2e-stt\"\nendpoint = \"http://127.0.0.1:9\""
+        )
+        .expect("append test STT provider");
+    }
 
     let (rpc_addr, rpc_join) = serve_on_ephemeral(build_core_http_router(false)).await;
     let rpc_base = format!("http://{}", rpc_addr);
@@ -8063,20 +8078,15 @@ async fn voice_stt_dispatch_reaches_handler_and_rejects_invalid_audio_structural
         &rpc_base,
         1,
         "openhuman.voice_stt_dispatch",
-        json!({ "audio_base64": "not base64", "mime_type": "audio/wav" }),
+        json!({ "provider": "e2e-stt", "audio_base64": "not base64", "mime_type": "audio/wav" }),
     )
     .await;
-    let error = response
-        .get("error")
-        .map(Value::to_string)
-        .unwrap_or_default();
+    assert_eq!(response["error"]["code"], json!(-32000), "{response}");
     assert!(
-        !error.is_empty(),
-        "invalid audio must return a structured RPC error: {response}"
-    );
-    assert!(
-        !error.to_ascii_lowercase().contains("unknown method"),
-        "voice_stt_dispatch must reach its handler: {response}"
+        response["error"]["message"]
+            .as_str()
+            .is_some_and(|message| message.contains("[voice-factory] base64 decode error")),
+        "voice STT handler must reject malformed audio before making a provider request: {response}"
     );
 
     mock_join.abort();
