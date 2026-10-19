@@ -188,6 +188,10 @@ async fn external_config_conflict_refresh_keeps_derived_runtime_overrides() {
     let mut runtime_config = Config::load_from_config_path(&seed.config_path, &seed.workspace_dir)
         .await
         .unwrap();
+    assert!(runtime_config.mcp_client.enabled);
+    assert!(!runtime_config.autonomy.enabled);
+    assert!(runtime_config.memory.agent_id.is_none());
+    assert!(runtime_config.composio.host_credential.is_none());
     runtime_config.memory.agent_id = Some("runtime-memory-agent".into());
     runtime_config.memory.root = Some("team:runtime".into());
     runtime_config.mcp_client.enabled = false;
