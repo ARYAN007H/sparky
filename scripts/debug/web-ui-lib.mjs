@@ -48,6 +48,15 @@ export function startCoreChild(startChild, core, corePort, launchSpec) {
   );
 }
 
+/** Navigate an authenticated scripted session to chat when Home has no composer. */
+export async function ensureSignedInChat(page, appOrigin) {
+  const composer = page.getByRole("textbox", { name: "Message input" });
+  if (!(await composer.isVisible().catch(() => false))) {
+    await page.goto(`${appOrigin}/#/chat`);
+  }
+  await composer.waitFor({ state: "visible", timeout: 120_000 });
+}
+
 export const USAGE = `Usage: pnpm debug web [options]
 
 Boots a throwaway stack — mock backend, a fresh \`openhuman-core serve\` on a
