@@ -1707,7 +1707,7 @@ fn is_provider_user_state_message(lower: &str) -> bool {
         return true;
     }
 
-    // OPENHUMAN-TAURI-YJ: `inference/provider/models/catalog_listing.rs::list_models` probed a
+    // OPENHUMAN-TAURI-YJ: `inference/provider/models/catalog_listing.rs::list_configured_models` probed a
     // user-configured custom-provider's `/models` endpoint and the upstream
     // server returned 404. Wire shape emitted at `ops.rs:118-122`:
     //
@@ -1727,7 +1727,7 @@ fn is_provider_user_state_message(lower: &str) -> bool {
     //   - 400: typically request-shape bugs in OUR client; must escalate.
     //   - 429 / 5xx: transient — handled by other matchers / retry policy.
     //
-    // No `inference/provider/models/catalog_listing.rs::list_models` other than this site emits
+    // No `inference/provider/models/catalog_listing.rs::list_configured_models` other than this site emits
     // the `provider returned NNN` prefix (verified via grep), so the prefix
     // alone is a sufficient anchor.
     //

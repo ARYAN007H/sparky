@@ -27,6 +27,29 @@ fn model_targets_come_from_the_callers_configured_cloud_providers() {
     assert_eq!(report.entries.len(), 1);
     assert_eq!(report.entries[0].provider, "custom-test");
     assert_eq!(report.entries[0].outcome, ModelProbeOutcome::Skipped);
+
+    let other_config = Config {
+        cloud_providers: vec![crate::config::schema::CloudProviderCreds {
+            id: "p_other_test".into(),
+            slug: "other-test".into(),
+            label: "Other Test Provider".into(),
+            endpoint: "https://other.example.test/v1".into(),
+            auth_style: crate::config::schema::AuthStyle::None,
+            default_model: None,
+        }],
+        ..Config::default()
+    };
+    let other_report = run_models(&other_config, false)
+        .expect("doctor model listing should use each call's config");
+    assert_eq!(other_report.entries.len(), 1);
+    assert_eq!(other_report.entries[0].provider, "other-test");
+}
+
+#[test]
+fn model_targets_without_configured_providers_keep_empty_error() {
+    let err = run_models(&Config::default(), false)
+        .expect_err("empty provider configuration should retain the existing error");
+    assert_eq!(err.to_string(), "No providers available for model probing");
 }
 
 #[test]

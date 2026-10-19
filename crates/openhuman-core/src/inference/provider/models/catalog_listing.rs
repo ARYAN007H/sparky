@@ -7,8 +7,6 @@ use super::super::openai_codex::resolve_openai_codex_routing;
 use super::{
     local_runtime::synthesize_local_runtime_entry, openrouter::validate_openrouter_api_key,
 };
-use crate::config::schema::cloud_providers::AuthStyle;
-use crate::config::Config;
 use tinyinference_core::sanitize::sanitize_api_error;
 use tinyinference_llm::catalog::{
     append_query_param, endpoint_hosts_models_listing, is_openrouter_provider,

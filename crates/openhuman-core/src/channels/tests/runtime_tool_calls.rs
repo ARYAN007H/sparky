@@ -8,7 +8,6 @@ use super::common::{
     IterativeToolModel, MockPriceTool, ModelCaptureModel, RecordingChannel,
     TelegramRecordingChannel, ToolCallingModel,
 };
-use crate::inference::provider;
 use std::collections::HashMap;
 use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};

@@ -7,7 +7,6 @@ use super::super::Channel;
 use super::common::{use_real_agent_handler, RecordingChannel, SlowModel};
 use crate::agent::bus::{mock_agent_run_turn, AgentTurnRequest, AgentTurnResponse};
 use crate::core::events::DomainEvent;
-use crate::inference::provider;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
