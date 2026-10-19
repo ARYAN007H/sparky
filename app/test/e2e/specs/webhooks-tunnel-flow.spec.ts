@@ -36,6 +36,7 @@ describe('Webhook controller surface and retired-route coverage', () => {
     expect(atShell).toBe(true);
   });
 
+  // Rust coverage does not exercise tunnel RPCs through the router/backend.
   it('exposes backend tunnel CRUD', async () => {
     const listed = await callOpenhumanRpc('openhuman.webhooks_list_tunnels', {});
     expect(listed.ok).toBe(true);

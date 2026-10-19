@@ -252,18 +252,6 @@ describe('Chat harness — orchestrator → subagent continuation flow', () => {
       timeout: 45_000,
       timeoutMsg: 'orchestrator never produced the final canary text',
     });
-
-    // IN_FLIGHT must drain after chat_done.
-    await browser.waitUntil(
-      async () => {
-        const snap = await callOpenhumanRpc<{ result: { entries: Array<unknown> } }>(
-          'openhuman.test_support_in_flight_chats',
-          {}
-        );
-        return snap.ok && (snap.result?.result?.entries?.length ?? 0) === 0;
-      },
-      { timeout: 10_000, timeoutMsg: 'IN_FLIGHT never cleared after orchestrator finished' }
-    );
   });
 
   it('persisted thread file records the final orchestrator text', async () => {

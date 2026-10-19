@@ -1,9 +1,7 @@
 /**
  * E2E: Discord (Composio) connector flow.
  *
- * Critical regression (#2285): clicking the Discord connector card must NOT
- * log the user out, even if the card click triggers a failed auth attempt.
- * `assertSessionNotNuked` is called at every test boundary.
+ * Covers Discord connector-card and connection-state UI.
  */
 import { waitForApp } from '../helpers/app-helpers';
 import {

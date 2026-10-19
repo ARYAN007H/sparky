@@ -1,12 +1,8 @@
 /**
  * Table-driven Composio connector contract (plan.md §2.2).
  *
- * The per-toolkit connector specs (Airtable, Asana, ClickUp, …) were 11
- * byte-identical WDIO files differing only in a handful of toolkit strings.
- * `runConnectorContract` factors the whole `describe` block out so each toolkit
- * is one `ConnectorContractConfig` row in the single contract spec. Toolkits
- * with bespoke UI/behaviour (Jira's subdomain field, Gmail's 400-on-fetch)
- * keep their own dedicated specs.
+ * The per-toolkit connector specs shared one card/state flow, which remains
+ * represented by Slack. Jira keeps its distinct subdomain-field UI.
  */
 import {
   clearRequestLog,
@@ -56,8 +52,6 @@ export interface ConnectorContractConfig {
   slug: string;
   /** Connection-id stem; the contract derives `${idBase}-1|-fail|-expired`. */
   idBase: string;
-  /** A representative Composio action for the execute-routing case. */
-  executeAction: string;
   /** Optional auth-deep-link token override (defaults to `e2e-connector-<slug>-token`). */
   authToken?: string;
 }

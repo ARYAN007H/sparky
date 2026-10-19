@@ -1,9 +1,7 @@
 /**
  * E2E: GitHub Composio connector flow.
  *
- * Covers the standard connector lifecycle (card visibility, connect, connected
- * state, RPC routing, execute, error/expired states, disconnect) plus a
- * trigger-catalog assertion specific to GitHub.
+ * Covers GitHub connector-card and connection-state UI.
  *
  * All backend calls are served by the mock server — no live GitHub account
  * is required.

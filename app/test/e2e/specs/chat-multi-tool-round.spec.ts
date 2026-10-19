@@ -11,7 +11,6 @@
  *   T2.1 — first tool (file_read) appears in the timeline
  *   T2.2 — second tool (grep) also appears; timeline has 2 entries
  *   T2.3 — final answer renders after both tools complete
- *   T2.4 — mock received ≥ 3 LLM completion calls
  *   T2.5 — tool timeline has 2 entries in correct order (file_read before grep)
  */
 import { waitForApp } from '../helpers/app-helpers';

@@ -1,5 +1,5 @@
 /**
- * E2E: Gmail (Composio) connector flow.
+ * E2E: Gmail (Composio) connector-card and connection-state UI.
  * Covers the connector card and its connection states.
  */
 import { waitForApp } from '../helpers/app-helpers';
