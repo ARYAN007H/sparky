@@ -15,6 +15,9 @@ use tokio::time::Instant;
 /// quiet window but is still serialized.
 pub const MAX_TRACKED_KEYS: usize = 2048;
 
+/// Longest window or wait the debouncer arms; longer settings are clamped.
+pub const MAX_WINDOW: Duration = Duration::from_secs(365 * 24 * 60 * 60);
+
 /// What the debouncer needs to know about a buffered item.
 pub trait DebounceItem {
     /// Size counted against [`DebounceSettings::max_batch_chars`].
@@ -203,14 +206,14 @@ impl<K: Eq + Hash + Clone, T: DebounceItem> KeyedDebouncer<K, T> {
                         chars: 0,
                         media: false,
                         quiet_at: now,
-                        deadline: now + settings.effective_max_wait(),
+                        deadline: after(now, settings.effective_max_wait()),
                     }
                 });
                 open.media |= item.carries_media();
                 open.chars = open.chars.saturating_add(item_chars);
                 open.items.push(item);
                 let window = settings.window(open.media);
-                open.quiet_at = (now + window).min(open.deadline);
+                open.quiet_at = after(now, window).min(open.deadline);
                 if window.is_zero() {
                     counters.seal_open(lane, now);
                 }
@@ -320,6 +323,10 @@ impl<K: Eq + Hash + Clone, T: DebounceItem> KeyedDebouncer<K, T> {
     pub fn is_empty(&self) -> bool {
         self.lanes.is_empty()
     }
+}
+
+fn after(now: Instant, window: Duration) -> Instant {
+    now.checked_add(window.min(MAX_WINDOW)).unwrap_or(now)
 }
 
 #[cfg(test)]

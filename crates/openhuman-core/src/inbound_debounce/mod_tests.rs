@@ -308,3 +308,24 @@ fn immediate_settings_and_default_constructor() {
     assert!(d.is_empty());
     assert_eq!(d.next_wakeup(), None);
 }
+
+#[test]
+fn oversized_windows_are_clamped_instead_of_overflowing() {
+    let t0 = Instant::now();
+    let huge = DebounceSettings {
+        debounce: Duration::MAX,
+        media_debounce: Duration::MAX,
+        max_wait: Duration::MAX,
+        ..settings()
+    };
+    let mut d = Debouncer::new();
+    assert_eq!(d.push("k", text("a"), &huge, t0), Push::Opened);
+    assert_eq!(d.push("k", media("b"), &huge, t0), Push::Buffered);
+    let wakeup = d.next_wakeup().expect("open window has a wakeup");
+    assert!(wakeup > t0 && wakeup <= t0 + MAX_WINDOW);
+    assert!(d.poll_ready(ms(t0, 60_000)).is_empty());
+    d.flush_all(t0);
+    let ready = d.poll_ready(t0);
+    assert_eq!(ready.len(), 1);
+    assert_eq!(texts(&ready[0].1), ["a", "b"]);
+}

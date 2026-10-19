@@ -26,6 +26,8 @@ from `channels/runtime/dispatch/processor.rs`; other hosts reach it through
   `debounce` otherwise.
 - A batch never waits past `first push + max_wait`. `max_wait` is raised to
   at least the longer of the two windows.
+- Windows and waits longer than `MAX_WINDOW` (one year) are clamped, so an
+  oversized setting can never overflow the deadline arithmetic.
 - A zero window seals the item at once, so `DebounceSettings::immediate()`
   gives one batch per item while still serializing each key.
 
