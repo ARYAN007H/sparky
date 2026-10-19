@@ -104,8 +104,6 @@ const allTodoSurfaces = (page: Page): Locator =>
   page.locator('[data-testid="todo-checklist"], [data-testid="todo-receipt"]');
 
 /** The pinned, always-current list above the composer. */
-const pinnedList = (page: Page): Locator => page.getByTestId('todo-checklist');
-
 /**
  * The per-tool-call snapshots in the transcript. The pinned render is the only
  * one given a test id (`Conversations.tsx:1659`), so excluding it leaves
@@ -226,10 +224,12 @@ test.describe('Todo list render', () => {
     await expandSnapshotReceipts(page);
     await expect(snapshotReceipts(page)).toHaveCount(1);
     await expect
-      .poll(async () => itemStates(snapshotLists(page).first()), { timeout: 30_000 })
+      .poll(async () => itemStates(snapshotReceipts(page).first()), { timeout: 30_000 })
       .toEqual(['active', 'pending', 'pending']);
 
-    expect(await upstreamBodies()).toHaveLengthGreaterThan(firstWriteRequestCount + 1);
+    await expect
+      .poll(async () => (await upstreamBodies()).length, { timeout: 60_000 })
+      .toBeGreaterThan(firstWriteRequestCount + 1);
 
     const secondWriteRequestCount = (await upstreamBodies()).length;
     await sendTurn(page, threadId, 'TODOADVANCE keep going');
