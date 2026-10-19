@@ -5441,6 +5441,7 @@ dependencies = [
  "tinyagents-definition",
  "tinyagents-graph",
  "tinyagents-harness",
+ "tinyagents-hooks",
  "tinyagents-live",
  "tinyagents-orchestration",
  "tinyagents-registry",
