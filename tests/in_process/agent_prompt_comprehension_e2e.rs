@@ -639,7 +639,7 @@ async fn run_case_inner(case: Case) {
 
     match case.entry {
         Entry::Summarizer => {
-            use openhuman_core::inference::host_runtime::ops::{agent_chat_for, AgentChatTarget};
+            use openhuman_core::agent_runs::agent_chat::{agent_chat_for, AgentChatTarget};
             let mut config = openhuman_core::config::Config::load_or_init()
                 .await
                 .unwrap();
