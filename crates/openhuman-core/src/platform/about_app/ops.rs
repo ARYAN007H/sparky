@@ -9,7 +9,7 @@ use crate::core::runtime::{ComponentSet, DispatchCtx};
 /// The `[components]` name backing a capability domain, if one does.
 pub fn component_for_domain(domain: &str) -> Option<&'static str> {
     Some(match domain {
-        "flows" | "workflow_runs" => "flows",
+        "flows" => "flows",
         "memory" => "memory",
         "channels" => "channels",
         "voice" => "voice",

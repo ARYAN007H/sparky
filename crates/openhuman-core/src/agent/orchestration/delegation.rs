@@ -202,9 +202,6 @@ pub(crate) async fn run_subagent_delegation_with_parent_context(
                 // review policy while the generic tool owns graph lifecycle mechanics.
                 ..DelegationConfig::default()
             };
-            delegation_config.event_sink = Some(Arc::new(tinyagents_graph::GraphTracingSink::new(
-                "delegation:graph",
-            )));
             delegation_config
         };
     let result_agent_id = invocation_agent_id.clone();

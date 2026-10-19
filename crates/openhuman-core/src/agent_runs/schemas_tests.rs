@@ -97,6 +97,30 @@ fn host_graph_topology_projection_keeps_delegation_only() {
 }
 
 #[tokio::test]
+async fn registry_snapshot_omits_retired_graphs_and_keeps_delegation() {
+    let result = handle_registry_snapshot(DispatchCtx::process_default(), Map::new())
+        .await
+        .expect("registry snapshot is available");
+    let components = result
+        .get("components")
+        .and_then(Value::as_array)
+        .expect("component snapshot");
+    let ids: Vec<_> = components
+        .iter()
+        .filter_map(|component| component.get("id").and_then(Value::as_str))
+        .collect();
+    assert!(ids.contains(&"delegation"), "snapshot ids: {ids:?}");
+    assert!(
+        !ids.iter().any(|id| id.starts_with("agent_teams:")),
+        "snapshot includes a retired team graph: {ids:?}"
+    );
+    assert!(
+        !ids.iter().any(|id| id.starts_with("workflow_runs:")),
+        "snapshot includes a retired workflow graph: {ids:?}"
+    );
+}
+
+#[tokio::test]
 async fn reload_and_definition_handlers_cover_missing_registry_paths() {
     let reload = handle_reload_definitions(DispatchCtx::process_default(), Map::new())
         .await
