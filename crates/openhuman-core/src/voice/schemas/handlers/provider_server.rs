@@ -35,6 +35,7 @@ pub(crate) fn handle_voice_set_providers(
             validate_stt_provider(stt)?;
             config.local_ai.stt_provider = stt.to_string();
             config.stt_provider = Some(stt.to_string());
+            sync_legacy_stt_engine(&mut config, stt);
         }
         if let Some(tts) = p
             .tts_provider
@@ -188,6 +189,7 @@ pub(crate) fn handle_voice_update_provider_settings(
                 // Sync to legacy field so voice_status / voice_stt_dispatch
                 // pick up the change without waiting for a restart.
                 config.local_ai.stt_provider = trimmed.to_string();
+                sync_legacy_stt_engine(&mut config, trimmed);
             }
         }
 
@@ -234,6 +236,15 @@ pub(crate) fn handle_voice_update_provider_settings(
             "tts_provider": config.tts_provider,
         }))
     })
+}
+
+/// Keep the persisted engine fallback aligned when a known provider is chosen.
+/// Custom `slug:model` routing remains in `stt_provider` and leaves the legacy
+/// fallback untouched.
+fn sync_legacy_stt_engine(config: &mut crate::config::Config, provider: &str) {
+    if let Some(engine) = crate::config::SttEngine::parse(provider) {
+        config.voice_server.stt_engine = engine;
+    }
 }
 
 pub(crate) fn handle_voice_list_models(
