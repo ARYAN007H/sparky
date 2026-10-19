@@ -28,8 +28,15 @@ pub(crate) struct CapsHostBinding {
     pub(crate) run_id: String,
     pub(crate) security: Arc<crate::security::SecurityPolicy>,
     pub(crate) approval: crate::security::approval::ApprovalTurnContext,
+    pub(crate) cancellation: tokio_util::sync::CancellationToken,
     pub(crate) agent_runs:
         tokio::sync::Mutex<HashMap<String, Arc<tokio::sync::Mutex<AgentRunState>>>>,
+}
+
+impl Drop for CapsHostRegistration {
+    fn drop(&mut self) {
+        self._binding.cancellation.cancel();
+    }
 }
 
 impl CapsHostBinding {
@@ -85,6 +92,7 @@ pub(crate) async fn serve(
         run_id,
         security,
         approval,
+        cancellation: tokio_util::sync::CancellationToken::new(),
         agent_runs: tokio::sync::Mutex::new(HashMap::new()),
     });
     let path = format!(
