@@ -57,7 +57,24 @@ pub async fn flows_create(
     graph_json: Value,
     require_approval: bool,
 ) -> Result<Outcome<Flow>, String> {
-    let graph = validate_and_migrate_graph(&crate::core::runtime::DispatchCtx::ambient(), config, graph_json).await?;
+    flows_create_with_context(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        config,
+        name,
+        graph_json,
+        require_approval,
+    )
+    .await
+}
+
+pub(crate) async fn flows_create_with_context(
+    ctx: &crate::core::runtime::DispatchCtx,
+    config: &Config,
+    name: String,
+    graph_json: Value,
+    require_approval: bool,
+) -> Result<Outcome<Flow>, String> {
+    let graph = validate_and_migrate_graph(ctx, config, graph_json).await?;
 
     // Rule 1: automatic triggers create DISABLED — the user must arm them
     // explicitly.

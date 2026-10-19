@@ -73,7 +73,31 @@ pub async fn flows_update(
     require_approval: Option<bool>,
     expected_version: Option<String>,
 ) -> Result<Outcome<Flow>, String> {
+    flows_update_with_context(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        config,
+        id,
+        name,
+        graph_json,
+        require_approval,
+        expected_version,
+        disarm_automatic,
+    )
+    .await
+}
+
+pub(crate) async fn flows_update_with_context(
+    ctx: &crate::core::runtime::DispatchCtx,
+    config: &Config,
+    id: &str,
+    name: Option<String>,
+    graph_json: Option<Value>,
+    require_approval: Option<bool>,
+    expected_version: Option<String>,
+    disarm_automatic: bool,
+) -> Result<Outcome<Flow>, String> {
     flows_update_inner(
+        ctx,
         config,
         id,
         name,
@@ -86,6 +110,7 @@ pub async fn flows_update(
 }
 
 async fn flows_update_inner(
+    ctx: &crate::core::runtime::DispatchCtx,
     config: &Config,
     id: &str,
     name: Option<String>,
@@ -103,12 +128,12 @@ async fn flows_update_inner(
     let graph_changed = graph_json.is_some();
     let graph = match graph_json {
         Some(raw) => {
-            let graph = validate_and_migrate_graph(&crate::core::runtime::DispatchCtx::ambient(), config, raw).await?;
+            let graph = validate_and_migrate_graph(ctx, config, raw).await?;
             graph
         }
         None => {
             validate_and_migrate_graph(
-                &crate::core::runtime::DispatchCtx::ambient(),
+                ctx,
                 config,
                 serde_json::to_value(&existing.graph).map_err(|error| error.to_string())?,
             )
