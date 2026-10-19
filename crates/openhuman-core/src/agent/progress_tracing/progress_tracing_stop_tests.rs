@@ -24,6 +24,16 @@ fn root(spans: &[TraceSpan]) -> &TraceSpan {
         .expect("turn span")
 }
 
+fn classified_breaker_stop() -> tinyagents_harness::turn_stop::TurnStop {
+    crate::agent::turn_projection::breaker_stop_with_cause(
+        tinyagents_harness::no_progress::ClassifiedStopCause {
+            class: "uncertain_side_effect".into(),
+            operation: "web_answer_tool".into(),
+            summary: BREAKER_NOTE.into(),
+        },
+    )
+}
+
 fn exported_level(spans: &[TraceSpan], name: &str) -> Option<String> {
     let payloads = otlp_requests(
         spans,
@@ -57,7 +67,7 @@ fn a_breaker_stopped_turn_closes_at_warning_with_stop_attributes() {
         (
             AgentProgress::TurnCompleted {
                 iterations: 4,
-                stop: Some(crate::agent::turn_projection::breaker_stop(BREAKER_NOTE)),
+                stop: Some(classified_breaker_stop()),
             },
             50,
         ),
@@ -169,7 +179,7 @@ fn a_stopped_subagent_span_closes_at_warning_with_stop_attributes() {
         (
             subagent_completed(
                 "t-stop",
-                Some(crate::agent::turn_projection::breaker_stop(BREAKER_NOTE)),
+                Some(classified_breaker_stop()),
             ),
             40,
         ),

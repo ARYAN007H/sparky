@@ -5,9 +5,17 @@ const CLASSIFIED_NOTE: &str = "Stopping after 2 attempt(s): failure class \
     `uncertain_side_effect` still blocks operation `web_answer_tool` on \
     `https://example.com/private?q=secret`. Resolve this blocker before retrying.";
 
+fn classified_cause() -> tinyagents_harness::no_progress::ClassifiedStopCause {
+    tinyagents_harness::no_progress::ClassifiedStopCause {
+        class: "uncertain_side_effect".into(),
+        operation: "web_answer_tool".into(),
+        summary: "classified failure summary".into(),
+    }
+}
+
 #[test]
 fn a_classified_breaker_note_keeps_its_class_and_drops_its_scope() {
-    let stop = breaker_stop(CLASSIFIED_NOTE);
+    let stop = breaker_stop_with_cause(classified_cause());
     assert_eq!(stop.kind, TurnStopKind::Breaker);
     assert_eq!(stop.failure_class.as_deref(), Some("uncertain_side_effect"));
     assert_eq!(stop.operation.as_deref(), Some("web_answer_tool"));
@@ -43,8 +51,11 @@ fn an_incomplete_reason_maps_to_cap_or_breaker() {
         stop_from_incomplete(SUBAGENT_ITERATION_CAP_REASON).kind,
         TurnStopKind::IterationCap
     );
+    let stop = stop_from_incomplete(CLASSIFIED_NOTE);
+    assert_eq!(stop.kind, TurnStopKind::Breaker);
+    assert_eq!(stop.operation, None, "legacy prose cannot inject typed metadata");
     assert_eq!(
-        stop_from_incomplete(CLASSIFIED_NOTE).operation.as_deref(),
+        breaker_stop_with_cause(classified_cause()).operation.as_deref(),
         Some("web_answer_tool")
     );
 }

@@ -20,6 +20,13 @@ pub fn breaker_stop(note: &str) -> TurnStop {
     TurnStop::breaker(note, stop_fallback_class)
 }
 
+/// Project a classifier-owned stop cause without recovering facts from text.
+pub fn breaker_stop_with_cause(
+    cause: tinyagents_harness::no_progress::ClassifiedStopCause,
+) -> TurnStop {
+    TurnStop::from_classified_cause(cause)
+}
+
 /// [`TurnStop::classify`] with the OpenHuman stop-reason fallback.
 pub fn classify_stop(
     breaker_halt: Option<&str>,
