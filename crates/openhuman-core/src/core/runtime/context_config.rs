@@ -28,7 +28,8 @@ pub(super) fn record_context_config_overlay(
     if let Some(config_overlay) = config_overlay {
         match config_overlay {
             Ok(config_overlay) => {
-                overlay.config.runtime_state.context_overlay = std::sync::Mutex::new(Some(config_overlay));
+                overlay.config.runtime_state.context_overlay =
+                    std::sync::Mutex::new(Some(config_overlay));
             }
             Err(error) => {
                 log::warn!("[core-context] unable to record derived config overrides: {error}")

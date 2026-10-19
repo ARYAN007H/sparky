@@ -428,7 +428,12 @@ async fn config_snapshot_cannot_be_saved_into_a_different_tenant_scope() {
         let config = Config::load_from_config_path(&path, &workspace)
             .await
             .unwrap();
-        let version = config.runtime_state.document_snapshot.lock().unwrap().version;
+        let version = config
+            .runtime_state
+            .document_snapshot
+            .lock()
+            .unwrap()
+            .version;
         (config, version)
     };
 
@@ -442,7 +447,12 @@ async fn config_snapshot_cannot_be_saved_into_a_different_tenant_scope() {
         let config = Config::load_from_config_path(&path, &workspace)
             .await
             .unwrap();
-        let version = config.runtime_state.document_snapshot.lock().unwrap().version;
+        let version = config
+            .runtime_state
+            .document_snapshot
+            .lock()
+            .unwrap()
+            .version;
         let docs = Arc::clone(scoped(&storage, "tenant-source-b").documents());
         let stored = docs
             .get(
@@ -521,16 +531,38 @@ async fn config_snapshot_is_bound_to_its_backend_instance() {
         let config = Config::load_from_config_path(&path, &workspace)
             .await
             .unwrap();
-        let version = config.runtime_state.document_snapshot.lock().unwrap().version;
+        let version = config
+            .runtime_state
+            .document_snapshot
+            .lock()
+            .unwrap()
+            .version;
         (config, version)
     };
-    let version_a = config_a.runtime_state.document_snapshot.lock().unwrap().version;
+    let version_a = config_a
+        .runtime_state
+        .document_snapshot
+        .lock()
+        .unwrap()
+        .version;
     assert_eq!(
         version_a, version_b,
         "fixture uses colliding document versions"
     );
-    let anchor_a = config_a.runtime_state.document_snapshot.lock().unwrap().anchor.clone();
-    let anchor_b = config_b.runtime_state.document_snapshot.lock().unwrap().anchor.clone();
+    let anchor_a = config_a
+        .runtime_state
+        .document_snapshot
+        .lock()
+        .unwrap()
+        .anchor
+        .clone();
+    let anchor_b = config_b
+        .runtime_state
+        .document_snapshot
+        .lock()
+        .unwrap()
+        .anchor
+        .clone();
     assert_ne!(anchor_a, anchor_b, "source anchors retain backend identity");
 
     let error = {
@@ -557,7 +589,13 @@ async fn a_file_snapshot_can_seed_an_absent_document_after_storage_bootstrap() {
         .await
         .unwrap();
     assert!(matches!(
-        snapshot.runtime_state.document_snapshot.lock().unwrap().anchor.clone(),
+        snapshot
+            .runtime_state
+            .document_snapshot
+            .lock()
+            .unwrap()
+            .anchor
+            .clone(),
         Some(ConfigSourceAnchor::File(_))
     ));
 

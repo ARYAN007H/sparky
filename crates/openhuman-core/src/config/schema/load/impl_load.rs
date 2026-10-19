@@ -471,18 +471,25 @@ impl Config {
         if !update_snapshot {
             return Ok(());
         }
-        *self.runtime_state.document_snapshot.lock().unwrap() = super::super::ConfigDocumentSnapshot {
-            version,
-            anchor: Some(source_anchor.clone()),
-        };
+        *self.runtime_state.document_snapshot.lock().unwrap() =
+            super::super::ConfigDocumentSnapshot {
+                version,
+                anchor: Some(source_anchor.clone()),
+            };
 
         if let Some(snapshot) = self
-            .runtime_state.context_snapshot
+            .runtime_state
+            .context_snapshot
             .as_ref()
             .and_then(std::sync::Weak::upgrade)
         {
             let mut current = snapshot.lock().unwrap();
-            let current_state = current.runtime_state.document_snapshot.lock().unwrap().clone();
+            let current_state = current
+                .runtime_state
+                .document_snapshot
+                .lock()
+                .unwrap()
+                .clone();
             if current_state == expected_snapshot {
                 let published = self.clone();
                 *published.runtime_state.document_snapshot.lock().unwrap() =

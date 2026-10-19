@@ -112,8 +112,14 @@ impl ConfigContextOverlay {
         let mut result: Config = serde_json::from_value(value)?;
         copy_runtime_bindings(fresh, &mut result);
         self.runtime.apply(&mut result);
-        result.runtime_state.document_snapshot =
-            std::sync::Mutex::new(fresh.runtime_state.document_snapshot.lock().unwrap().clone());
+        result.runtime_state.document_snapshot = std::sync::Mutex::new(
+            fresh
+                .runtime_state
+                .document_snapshot
+                .lock()
+                .unwrap()
+                .clone(),
+        );
         result.runtime_state.context_snapshot = fresh.runtime_state.context_snapshot.clone();
         result.runtime_state.context_overlay = std::sync::Mutex::new(Some(Arc::new(Self {
             changes: self.changes.clone(),
@@ -137,8 +143,20 @@ const PROFILE_OWNED_PATHS: &[&[&str]] = &[
 ];
 
 fn same_source(parent: &Config, child: &Config) -> bool {
-    let parent_anchor = parent.runtime_state.document_snapshot.lock().unwrap().anchor.clone();
-    let child_anchor = child.runtime_state.document_snapshot.lock().unwrap().anchor.clone();
+    let parent_anchor = parent
+        .runtime_state
+        .document_snapshot
+        .lock()
+        .unwrap()
+        .anchor
+        .clone();
+    let child_anchor = child
+        .runtime_state
+        .document_snapshot
+        .lock()
+        .unwrap()
+        .anchor
+        .clone();
     match (&parent_anchor, &child_anchor) {
         (Some(parent), Some(child)) => parent == child,
         (None, None) => {

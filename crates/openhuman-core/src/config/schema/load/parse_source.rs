@@ -26,24 +26,27 @@ pub(super) async fn parse_source_contents(
             .map_err(|error| {
                 anyhow::anyhow!("the config document for this scope could not be parsed: {error}")
             })?;
-        *config.runtime_state.document_snapshot.lock().unwrap() = super::super::ConfigDocumentSnapshot {
-            version: read.document_version,
-            anchor: Some(read.source_anchor.clone()),
-        };
+        *config.runtime_state.document_snapshot.lock().unwrap() =
+            super::super::ConfigDocumentSnapshot {
+                version: read.document_version,
+                anchor: Some(read.source_anchor.clone()),
+            };
         return Ok((config, false));
     }
     if read_was_recovered && contents.is_empty() {
         let config = super::branches::default_config_boxed();
-        *config.runtime_state.document_snapshot.lock().unwrap() = super::super::ConfigDocumentSnapshot {
-            version: read.document_version,
-            anchor: Some(read.source_anchor.clone()),
-        };
+        *config.runtime_state.document_snapshot.lock().unwrap() =
+            super::super::ConfigDocumentSnapshot {
+                version: read.document_version,
+                anchor: Some(read.source_anchor.clone()),
+            };
         return Ok((config, true));
     }
     let (config, recovered) = Box::pin(parse_config_boxed(config_path, contents)).await;
-    *config.runtime_state.document_snapshot.lock().unwrap() = super::super::ConfigDocumentSnapshot {
-        version: read.document_version,
-        anchor: Some(read.source_anchor.clone()),
-    };
+    *config.runtime_state.document_snapshot.lock().unwrap() =
+        super::super::ConfigDocumentSnapshot {
+            version: read.document_version,
+            anchor: Some(read.source_anchor.clone()),
+        };
     Ok((config, recovered))
 }
