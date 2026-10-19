@@ -71,7 +71,12 @@ fn a_queue_call_without_a_queue_name_is_malformed() {
         Err(Denied::Malformed)
     );
     assert_eq!(
-        authorize(&with_queues(), Object::Queues, "Pop", &json!({"queue": "inbox"})),
+        authorize(
+            &with_queues(),
+            Object::Queues,
+            "Pop",
+            &json!({"queue": "inbox"})
+        ),
         Err(Denied::Malformed)
     );
 }
@@ -123,13 +128,24 @@ fn a_read_only_grant_may_inspect_queues_but_not_lease_or_enqueue() {
     };
     for selector in ["Stats", "DeadLetters"] {
         assert!(
-            authorize(&read_only, Object::Queues, selector, &json!({"queue": "inbox"})).is_ok(),
+            authorize(
+                &read_only,
+                Object::Queues,
+                selector,
+                &json!({"queue": "inbox"})
+            )
+            .is_ok(),
             "{selector}"
         );
     }
     for selector in ["Receive", "Enqueue", "Ack", "Redrive", "Purge"] {
         assert_eq!(
-            authorize(&read_only, Object::Queues, selector, &json!({"queue": "inbox"})),
+            authorize(
+                &read_only,
+                Object::Queues,
+                selector,
+                &json!({"queue": "inbox"})
+            ),
             Err(Denied::ReadOnly),
             "{selector}"
         );

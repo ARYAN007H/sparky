@@ -33,7 +33,11 @@ struct Peers {
 async fn peers() -> Peers {
     let bus = MemoryBus::new();
     Broker::new().spawn(bus.clone());
-    let connect = || async { Connection::connect(bus.connect().await.unwrap()).await.unwrap() };
+    let connect = || async {
+        Connection::connect(bus.connect().await.unwrap())
+            .await
+            .unwrap()
+    };
     let service = connect().await;
     let queued = connect().await;
     let plain = connect().await;
@@ -49,8 +53,14 @@ async fn peers() -> Peers {
         keys_ready: AtomicBool::new(true),
     });
     let directory = Directory(HashMap::from([
-        (queued.unique_name().unwrap().as_str().to_string(), "alpha".to_string()),
-        (plain.unique_name().unwrap().as_str().to_string(), "beta".to_string()),
+        (
+            queued.unique_name().unwrap().as_str().to_string(),
+            "alpha".to_string(),
+        ),
+        (
+            plain.unique_name().unwrap().as_str().to_string(),
+            "beta".to_string(),
+        ),
     ]));
     let host = Arc::new(StorageHost::new(
         Arc::new(directory),
@@ -137,8 +147,5 @@ async fn a_module_without_a_queue_grant_connects_but_is_denied_queues() {
         .enqueue("inbox", &[NewMessage::new(json!({}))])
         .await
         .unwrap_err();
-    assert!(
-        error.to_string().contains("object-not-granted"),
-        "{error}"
-    );
+    assert!(error.to_string().contains("object-not-granted"), "{error}");
 }

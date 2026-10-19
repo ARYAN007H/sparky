@@ -417,15 +417,17 @@ impl StorageHost {
             // The queue port of a document backend keeps its messages in the
             // storage layer's own collections; declare them on this scope
             // before the server takes its first `Queues` call.
-            tinystoragedrivers::queue::ensure(&storage).await.map_err(|error| {
-                tracing::warn!(
-                    target: "openhuman::storage_host",
-                    module,
-                    %error,
-                    "[storage_host] could not declare the queue collections"
-                );
-                BindError::Backend(StorageKind::Backend)
-            })?;
+            tinystoragedrivers::queue::ensure(&storage)
+                .await
+                .map_err(|error| {
+                    tracing::warn!(
+                        target: "openhuman::storage_host",
+                        module,
+                        %error,
+                        "[storage_host] could not declare the queue collections"
+                    );
+                    BindError::Backend(StorageKind::Backend)
+                })?;
             tracing::debug!(
                 target: "openhuman::storage_host",
                 module,

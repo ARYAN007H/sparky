@@ -257,10 +257,10 @@ pub(crate) fn authorize(
     // module with no queue grant still connects: it learns it has no features
     // and every other `Queues` selector is refused below.
     if object == Object::Queues && selector == "Features" && !grant.has_object(object) {
-        return Ok(Plan::Answer(serde_json::to_value(
-            tinystoragedrivers_bus::QueueFeaturesReply::default(),
-        )
-        .map_err(|_| Denied::Malformed)?));
+        return Ok(Plan::Answer(
+            serde_json::to_value(tinystoragedrivers_bus::QueueFeaturesReply::default())
+                .map_err(|_| Denied::Malformed)?,
+        ));
     }
     if !grant.has_object(object) {
         return Err(Denied::Object);
