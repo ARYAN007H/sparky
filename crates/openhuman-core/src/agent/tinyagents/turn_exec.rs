@@ -338,13 +338,8 @@ async fn drive_turn(
     }
     // `session_kv_store` self-gates on the dual-write flag (config default ON +
     // env kill switch), returning `None` when disabled or unresolvable.
-    // Heap-allocate config-loading setup state here: nested delegates poll on
-    // their parent's stack even when TurnSpec itself is boxed.
-    let dispatch_ctx = run_context.dispatch_ctx();
-    if let Some(session_kv) = Box::pin(crate::storage::import::live::session_kv_store(
-        &dispatch_ctx,
-    ))
-    .await
+    if let Some(session_kv) =
+        crate::storage::import::live::session_kv_store(&run_context.dispatch_ctx()).await
     {
         stores.get_or_insert_with(StoreRegistry::new).register(
             crate::storage::import::live::TINYAGENTS_SESSION_KV_STORE,
@@ -524,14 +519,10 @@ async fn drive_turn(
         stream: streaming,
         controls,
     };
-    // Heap-allocate the planning future: nested delegates poll this turn on
-    // their parent's stack even while earlier states await setup work.
-    let mut prepared = Box::pin(driver.prepare(request))
-        .await
-        .map_err(|failure| {
-            tracing::error!(error = %failure.error, "[tinyagents] turn driver could not prepare the turn");
-            anyhow::anyhow!("{}", failure.error)
-        })?;
+    let mut prepared = driver.prepare(request).await.map_err(|failure| {
+        tracing::error!(error = %failure.error, "[tinyagents] turn driver could not prepare the turn");
+        anyhow::anyhow!("{}", failure.error)
+    })?;
     let steering =
         prepared.run_context.steering.clone().ok_or_else(|| {
             anyhow::anyhow!("turn driver prepared a run without a steering handle")

@@ -26,19 +26,20 @@ async fn continue_subagent_resumes_paused_job_through_shared_driver() {
         .insert("ask_user_clarification".into());
     let live =
         crate::agent::orchestration::tools::live_parent_run_context("continue-paused-e2e", parent);
-    let paused = Box::pin(SpawnSubagentTool::new().execute_with_live_parent_context(
-        json!({
-            "agent_id": "task_manager_agent",
-            "prompt": "Investigate the pause-resume fixture",
-            "model": "test-model",
-            "blocking": true
-        }),
-        None,
-        live.data.child(),
-        Some(&live),
-    ))
-    .await
-    .expect("initial spawn");
+    let paused = SpawnSubagentTool::new()
+        .execute_with_live_parent_context(
+            json!({
+                "agent_id": "task_manager_agent",
+                "prompt": "Investigate the pause-resume fixture",
+                "model": "test-model",
+                "blocking": true
+            }),
+            None,
+            live.data.child(),
+            Some(&live),
+        )
+        .await
+        .expect("initial spawn");
     assert!(!paused.is_error, "{}", paused.output());
     assert_eq!(provider.calls.load(std::sync::atomic::Ordering::SeqCst), 1);
     let task_id = paused
@@ -62,8 +63,8 @@ async fn continue_subagent_resumes_paused_job_through_shared_driver() {
         .expect("initial pause is registered in shared Jobs");
     assert_eq!(paused_job.status, SubAgentJobStatus::AwaitingInput);
 
-    let resumed = Box::pin(
-        ContinueSubagentTool::new().execute_with_live_parent_context(
+    let resumed = ContinueSubagentTool::new()
+        .execute_with_live_parent_context(
             json!({
                 "task_id": task_id,
                 "agent_id": "task_manager_agent",
@@ -72,10 +73,9 @@ async fn continue_subagent_resumes_paused_job_through_shared_driver() {
             None,
             live.data.child(),
             Some(&live),
-        ),
-    )
-    .await
-    .expect("continue");
+        )
+        .await
+        .expect("continue");
     assert!(!resumed.is_error, "{}", resumed.output());
     assert!(provider.saw("Inspect the README and continue."));
     assert_eq!(provider.calls.load(std::sync::atomic::Ordering::SeqCst), 2);
