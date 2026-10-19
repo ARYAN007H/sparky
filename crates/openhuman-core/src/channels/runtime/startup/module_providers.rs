@@ -32,9 +32,9 @@ pub(super) struct ModuleChannelRuntime {
 }
 
 #[derive(Clone)]
-struct ModuleChannel {
-    name: String,
-    object: ModuleObjectClient,
+pub(super) struct ModuleChannel {
+    pub(super) name: String,
+    pub(super) object: ModuleObjectClient,
     interaction: tinychannels_bus::ChannelInteractionInfo,
     relay: Option<tinychannels_bus::module_relay::RelayReservation>,
     relay_fronted: bool,
@@ -568,7 +568,7 @@ impl ModuleChannel {
         Ok(())
     }
 
-    async fn interact(&self, interaction: ChannelInteraction) -> anyhow::Result<()> {
+    pub(super) async fn interact(&self, interaction: ChannelInteraction) -> anyhow::Result<()> {
         match self
             .object
             .call_confidential::<ChannelInteractionResult>(

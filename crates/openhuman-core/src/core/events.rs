@@ -353,17 +353,6 @@ pub enum DomainEvent {
         /// `workspace_dir` does not match their own workspace binding.
         workspace_dir: std::path::PathBuf,
     },
-    /// A native channel turn emitted one canonical progress observation.
-    /// The payload is deliberately content-free; the provider module owns
-    /// user-facing delivery and this event only gives host observers a
-    /// scoped lifecycle signal.
-    ChannelOutputObserved {
-        channel: tinychannels_bus::ChannelRef,
-        conversation: tinychannels_bus::ConversationRef,
-        turn_id: String,
-        sequence: u64,
-        event_kind: String,
-    },
     /// A reaction event was received from a channel transport.
     ChannelReactionReceived {
         channel: String,
@@ -1390,7 +1379,6 @@ impl DomainEvent {
             Self::ChannelInboundMessage { .. }
             | Self::ChannelMessageReceived { .. }
             | Self::ChannelMessageProcessed { .. }
-            | Self::ChannelOutputObserved { .. }
             | Self::ChannelReactionReceived { .. }
             | Self::ChannelReactionSent { .. }
             | Self::ChannelConnected { .. }
@@ -1524,7 +1512,6 @@ impl DomainEvent {
             Self::ChannelInboundMessage { .. } => "ChannelInboundMessage",
             Self::ChannelMessageReceived { .. } => "ChannelMessageReceived",
             Self::ChannelMessageProcessed { .. } => "ChannelMessageProcessed",
-            Self::ChannelOutputObserved { .. } => "ChannelOutputObserved",
             Self::ChannelReactionReceived { .. } => "ChannelReactionReceived",
             Self::ChannelReactionSent { .. } => "ChannelReactionSent",
             Self::ChannelConnected { .. } => "ChannelConnected",
@@ -1630,10 +1617,6 @@ impl DomainEvent {
             | Self::AgentOrchestrationCompleted { agent_id, .. }
             | Self::AgentOrchestrationFailed { agent_id, .. } => Some(agent_id.as_str()),
             Self::ChannelMessageReceived { channel, .. }
-            | Self::ChannelOutputObserved {
-                channel: tinychannels_bus::ChannelRef { id: channel, .. },
-                ..
-            }
             | Self::ChannelConnected { channel, .. }
             | Self::ChannelDisconnected { channel, .. } => Some(channel.as_str()),
             Self::ToolExecutionStarted { tool_name, .. }
