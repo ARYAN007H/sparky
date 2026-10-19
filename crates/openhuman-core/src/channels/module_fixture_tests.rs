@@ -58,8 +58,9 @@ async fn concurrent_linked_module_client_requests_share_the_ready_fixture() {
 #[tokio::test]
 async fn linked_module_accepts_confidential_web_projection_begin() {
     let module = client().await;
-    let handle: tinychannels_bus::module_web_output::WebTurnHandle = proxy
+    let handle: tinychannels_bus::module_web_output::WebTurnHandle = module
         .call_confidential(
+            "tinychannels",
             tinychannels_bus::methods::BEGIN_WEB_TURN,
             (tinychannels_bus::module_web_output::BeginWebTurn {
                 scope_key: "fixture-web-chat:begin".into(),
@@ -74,8 +75,9 @@ async fn linked_module_accepts_confidential_web_projection_begin() {
         .await
         .unwrap_or_else(|error| panic!("confidential web projection begin failed: {error:?}"));
 
-    proxy
+    module
         .call_confidential::<()>(
+            "tinychannels",
             tinychannels_bus::methods::END_WEB_TURN,
             (tinychannels_bus::module_web_output::EndWebTurn {
                 handle: handle.handle,
