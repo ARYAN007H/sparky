@@ -32,11 +32,11 @@ pub use turn_handler::handle_voice_harness_turn;
 use crate::progress::AgentProgress;
 #[cfg(test)]
 use prompt::{
-    VOICE_READBACK_PREFIX, is_answerable_prompt, is_content_free, messages_to_history_pairs,
-    readback_payload, should_arm_speak_back, spoken_delta,
+    is_answerable_prompt, is_content_free, messages_to_history_pairs, readback_payload,
+    should_arm_speak_back, spoken_delta, VOICE_READBACK_PREFIX,
 };
 #[cfg(test)]
-use turn_handler::{VOICE_HANDOFF_LINES, next_handoff_line};
+use turn_handler::{next_handoff_line, VOICE_HANDOFF_LINES};
 
 #[cfg(test)]
 #[path = "realtime_harness_tests.rs"]

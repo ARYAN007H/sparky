@@ -8,9 +8,9 @@ use log::{info, warn};
 use crate::config::Config;
 use tinyvoice_bus::hotkey::ActivationMode;
 
-use super::LOG_PREFIX;
 use super::runtime::VoiceServer;
 use super::types::{ServerState, VoiceServerConfig};
+use super::LOG_PREFIX;
 
 /// Global voice server instance, lazily initialized.
 static VOICE_SERVER: once_cell::sync::OnceCell<Arc<VoiceServer>> = once_cell::sync::OnceCell::new();

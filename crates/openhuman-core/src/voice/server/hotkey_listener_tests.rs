@@ -198,7 +198,7 @@ async fn listener_fixture() -> (
     ListenerFixture,
     tinybus::Connection,
 ) {
-    use tinybus::{Connection, ObjectPath, broker::Broker, transport::memory::MemoryBus};
+    use tinybus::{broker::Broker, transport::memory::MemoryBus, Connection, ObjectPath};
     let bus = MemoryBus::new();
     Broker::new().spawn(bus.clone());
     let service = Connection::connect(bus.connect().await.unwrap())
@@ -271,16 +271,14 @@ async fn lost_start_reply_recovers_the_lease_before_releasing_admission_fixture(
         .lose_start_reply
         .store(true, std::sync::atomic::Ordering::SeqCst);
     fixture.allow_start.notify_one();
-    assert!(
-        start_globe_with_client(
-            &crate::core::runtime::DispatchCtx::default(),
-            client,
-            Push,
-            &CancellationToken::new()
-        )
-        .await
-        .is_err()
-    );
+    assert!(start_globe_with_client(
+        &crate::core::runtime::DispatchCtx::default(),
+        client,
+        Push,
+        &CancellationToken::new()
+    )
+    .await
+    .is_err());
     tokio::time::timeout(
         std::time::Duration::from_secs(5),
         fixture.stopped.notified(),

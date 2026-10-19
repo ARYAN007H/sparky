@@ -14,8 +14,8 @@ use tokio::sync::Mutex;
 use crate::config::Config;
 use crate::modules::voice::{RecorderSession, SessionAdvance, SessionInput};
 
-use super::LOG_PREFIX;
 use super::types::ServerState;
+use super::LOG_PREFIX;
 
 /// A recording session plus the phase mirror it keeps current.
 #[derive(Clone)]

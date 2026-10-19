@@ -8,7 +8,7 @@ use std::sync::{Arc, LazyLock, Mutex};
 use std::time::Duration;
 
 use log::{info, warn};
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use tokio::sync::Semaphore;
 
 use crate::progress::AgentProgress;
@@ -175,9 +175,7 @@ pub async fn handle_voice_harness_turn(
     // answer nothing — and its empty reply surfaced in chat as a failure notice
     // the user never asked for.
     if is_content_free(&prompt) {
-        info!(
-            "[voice-harness] ignoring content-free turn correlation={correlation_id} prompt={prompt:?}"
-        );
+        info!("[voice-harness] ignoring content-free turn correlation={correlation_id} prompt={prompt:?}");
         emit_event(
             "voice:harness:delta",
             json!({ "correlationId": correlation_id, "text": VOICE_SILENT_REPLY }),
@@ -194,9 +192,7 @@ pub async fn handle_voice_harness_turn(
     // Deduplicate a re-delivered turn (relay retry) before doing any work. Owned
     // so it can move into the background continuation and track the real turn.
     let Some(in_flight) = InFlightGuard::claim(&correlation_id) else {
-        warn!(
-            "[voice-harness] duplicate turn correlation={correlation_id} already in flight — dropping"
-        );
+        warn!("[voice-harness] duplicate turn correlation={correlation_id} already in flight — dropping");
         return;
     };
 
@@ -256,9 +252,7 @@ pub async fn handle_voice_harness_turn(
                     if should_arm_speak_back(&turn_prompt) {
                         deliver_voice_result_to_chat(&turn_cid, reply, true);
                     } else {
-                        info!(
-                            "[voice-harness] deferred read-back turn carries no new content; skipping chat delivery correlation={turn_cid}"
-                        );
+                        info!("[voice-harness] deferred read-back turn carries no new content; skipping chat delivery correlation={turn_cid}");
                     }
                 }
                 Err(err) => {
@@ -350,9 +344,7 @@ pub async fn handle_voice_harness_turn(
             // takes the chat-delivery path. The forwarder is left running to keep
             // draining progress — any late deltas reach a settled relay turn and
             // are dropped harmlessly.
-            info!(
-                "[voice-harness] ack deadline reached, handing off to chat correlation={correlation_id}"
-            );
+            info!("[voice-harness] ack deadline reached, handing off to chat correlation={correlation_id}");
             // If the turn never said anything of its own, the caller has heard only
             // the relay's filler. Ending there sounds like the assistant lost the
             // thread, so say the answer is still coming — it is, on both delivery

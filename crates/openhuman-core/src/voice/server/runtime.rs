@@ -4,8 +4,8 @@
 //! means lives in the `tinyvoice` module; this loop reports facts to it
 //! (`SessionAdvance`) and performs the action it answers with.
 
-use std::sync::Arc;
 use std::sync::atomic::Ordering;
+use std::sync::Arc;
 
 use log::{debug, info, warn};
 use tokio::sync::Mutex;
@@ -17,11 +17,11 @@ use crate::modules::voice::{RecorderSession, SessionAction, SessionInput};
 use crate::voice::audio_capture::{self, RecordingHandle};
 use tinyvoice_bus::hotkey::{ActivationMode, HotkeyEvent};
 
-use super::LOG_PREFIX;
 use super::hotkey_listener::start_hotkey_listener;
 use super::pipeline::{capture_expected_app_name, process_recording_bg};
 use super::recorder::Recorder;
 use super::types::{ServerState, VoiceServerConfig, VoiceServerStatus};
+use super::LOG_PREFIX;
 
 type RecordingSetupReceiver =
     tokio::sync::oneshot::Receiver<Result<(RecordingHandle, Option<String>), String>>;
