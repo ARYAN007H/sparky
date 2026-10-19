@@ -248,7 +248,7 @@ async fn ingest_keeps_the_legacy_oversized_file_error() {
     let tmp = tempfile::tempdir().unwrap();
     let config = config_in(&tmp);
     bind_reference(&config);
-    let path = config.workspace_dir.join("oversized.bin");
+    let path = tmp.path().join("oversized.bin");
     let size = MAX_INGEST_BYTES + 1;
     std::fs::File::create(&path)
         .unwrap()
