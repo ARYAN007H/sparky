@@ -1,9 +1,8 @@
 //! Deterministic, offline measurements of the real viewport and TestBackend renderer.
 use super::{render, state::TranscriptState, ui_state::UiState, viewport::ViewportCache};
-use openhuman_rpc::embed::chat_surface::WebChannelEvent;
-use tinychannels_bus::web::WebEventContext;
-use ratatui::{backend::TestBackend, Terminal};
-use serde_json::{json, Value};
+use openhuman_rpc::embed::chat_surface::{WebChannelEvent, WebEventContext};
+use ratatui::{Terminal, backend::TestBackend};
+use serde_json::{Value, json};
 use std::{hint::black_box, time::Instant};
 
 const SAMPLES: usize = 200;
@@ -51,13 +50,13 @@ pub(crate) fn run() -> anyhow::Result<()> {
             });
             let streaming = measure(|_| {
                 state.apply_event(&WebChannelEvent::TextDelta {
-                        context: WebEventContext {
-                            client_id: "benchmark".into(),
-                            ..Default::default()
-                        },
-                        delta: Some(" streamed token".into()),
-                        delta_kind: None,
-                        round: None,
+                    context: WebEventContext {
+                        client_id: "benchmark".into(),
+                        ..Default::default()
+                    },
+                    delta: Some(" streamed token".into()),
+                    delta_kind: None,
+                    round: None,
                 });
                 black_box(cache.rows(&state, width - 4, height - 9, 0));
             });

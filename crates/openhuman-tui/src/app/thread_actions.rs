@@ -1,5 +1,6 @@
 //! Conversation send, cancel and session loading.
 use super::*;
+use openhuman_rpc::embed::chat_surface::WebChannelEvent;
 
 /// Queue a chat turn on the current thread. Fire-and-forget: the reply streams
 /// back over the web-channel bus and is folded in by the reducer.

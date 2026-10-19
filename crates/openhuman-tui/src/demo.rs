@@ -4,8 +4,7 @@ use super::cockpit::{Overlay, OverlayKind};
 use super::state::TranscriptState;
 use super::ui_state::{AppTab, UiState};
 use crossterm::event::{self, Event, KeyCode, KeyModifiers};
-use openhuman_rpc::embed::chat_surface::WebChannelEvent;
-use tinychannels_bus::web::WebEventContext;
+use openhuman_rpc::embed::chat_surface::{WebChannelEvent, WebEventContext};
 
 pub fn sample() -> TranscriptState {
     let mut state = TranscriptState::new("preview");
@@ -72,7 +71,7 @@ pub fn sample() -> TranscriptState {
         skill_id: Some("child-1".into()),
         success: Some(true),
         round: None,
-        subagent: Some(tinychannels_bus::web::WebSubagentProgressDetail {
+        subagent: Some(openhuman_rpc::embed::chat_surface::SubagentProgressDetail {
             task_id: Some("child-1".into()),
             display_name: Some("Explore".into()),
             elapsed_ms: Some(840),
