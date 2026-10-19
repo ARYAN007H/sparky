@@ -5,6 +5,43 @@ use tinyagents_harness::progress::AgentProgress;
 use tinychannels_bus::module_progressive::ChannelOutputEvent;
 use tokio::sync::mpsc;
 
+pub(super) async fn open_native_reply(
+    ctx: &crate::channels::context::ChannelRuntimeContext,
+    envelope: &tinychannels_bus::channel::ChannelInboundEnvelope,
+    turn_id: &str,
+) -> anyhow::Result<Option<std::sync::Arc<NativeProgressiveReply>>> {
+    let object = ctx
+        .module_objects
+        .get(&envelope.channel.id)
+        .or_else(|| ctx.module_objects.values().next())
+        .cloned();
+    let Some(object) = object else {
+        return Ok(None);
+    };
+    let reply = NativeProgressiveReply::open(
+        object,
+        envelope.channel.clone(),
+        envelope.conversation.clone(),
+        turn_id.to_owned(),
+        std::time::Duration::from_secs(3_660),
+    )
+    .await?;
+    Ok(Some(std::sync::Arc::new(reply)))
+}
+
+pub(super) async fn finish_native_reply(
+    reply: &Option<std::sync::Arc<NativeProgressiveReply>>,
+    text: &str,
+) -> bool {
+    let Some(reply) = reply else {
+        return false;
+    };
+    if let Err(error) = reply.finish(text).await {
+        tracing::error!("[dispatch] native progressive final delivery failed: {error}");
+    }
+    true
+}
+
 pub(super) fn spawn_native_progress(
     mut events: mpsc::Receiver<AgentProgress>,
     reply: std::sync::Arc<NativeProgressiveReply>,
