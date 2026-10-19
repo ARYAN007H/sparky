@@ -30,11 +30,14 @@ async fn discovered_parent_config_is_used_to_record_agent_overrides() {
     agent_config.autonomy.enabled = true;
     agent_config.mcp_client.enabled = false;
     agent_config.memory.agent_id = Some("runtime-agent-memory".into());
-    let child = parent.derive_with(ContextOverlay::new(
-        agent_config,
-        DomainSet::full(),
-        crate::tools::toolpacks::ToolGroups::none(),
-    ));
+    let child = parent.derive_with_parent_config(
+        &base,
+        ContextOverlay::new(
+            agent_config,
+            DomainSet::full(),
+            crate::tools::toolpacks::ToolGroups::none(),
+        ),
+    );
 
     let mut external = Config::load_from_config_path(&seed.config_path, &seed.workspace_dir)
         .await

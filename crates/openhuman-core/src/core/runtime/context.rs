@@ -364,7 +364,30 @@ impl CoreContext {
     /// The workspace binding is anchored to `overlay.config.workspace_dir`, so
     /// an agent with its own workspace subdirectory resolves its own memory
     /// binding lazily, exactly as an embedder-supplied config does at boot.
-    pub fn derive_with(&self, mut overlay: ContextOverlay) -> Arc<CoreContext> {
+    pub fn derive_with(&self, overlay: ContextOverlay) -> Arc<CoreContext> {
+        let parent_config = self.latest_embedder_config();
+        self.derive_with_parent_config_inner(parent_config.as_ref(), overlay)
+    }
+
+    /// Derive a child using the exact parent configuration it was built from.
+    ///
+    /// This is used by embedders that load their config after core boot: the
+    /// context may intentionally have no published embedder snapshot, while
+    /// the child still needs the correct baseline for conflict-refresh
+    /// overrides.
+    pub fn derive_with_parent_config(
+        &self,
+        parent_config: &crate::config::Config,
+        overlay: ContextOverlay,
+    ) -> Arc<CoreContext> {
+        self.derive_with_parent_config_inner(Some(parent_config), overlay)
+    }
+
+    fn derive_with_parent_config_inner(
+        &self,
+        parent_config: Option<&crate::config::Config>,
+        mut overlay: ContextOverlay,
+    ) -> Arc<CoreContext> {
         // Clamped to what this context can already dispatch. A derived
         // overlay may only narrow: callers outside this crate (embed's
         // `Runtime::agent`, for one) already refuse a spec that names a
@@ -412,9 +435,9 @@ impl CoreContext {
             }
         };
         let agent = self.agent.derive(&mut overlay);
-        if let Some(parent_config) = self.latest_embedder_config() {
+        if let Some(parent_config) = parent_config {
             match crate::config::schema::load::context_overlay::ConfigContextOverlay::derive(
-                &parent_config,
+                parent_config,
                 &overlay.config,
             ) {
                 Ok(config_overlay) => {

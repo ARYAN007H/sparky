@@ -53,6 +53,12 @@ impl std::fmt::Debug for ConfigContextOverlay {
 
 impl ConfigContextOverlay {
     pub(crate) fn derive(parent: &Config, child: &Config) -> anyhow::Result<Arc<Self>> {
+        let parent_anchor = parent.document_snapshot.lock().unwrap().anchor.clone();
+        let child_anchor = child.document_snapshot.lock().unwrap().anchor.clone();
+        anyhow::ensure!(
+            parent_anchor == child_anchor,
+            "cannot derive config overrides from different persistence sources"
+        );
         let inherited = parent.context_overlay.lock().unwrap().clone();
         let mut changes = inherited
             .as_ref()
