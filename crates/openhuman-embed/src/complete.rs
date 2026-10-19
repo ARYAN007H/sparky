@@ -636,6 +636,11 @@ impl Completer {
         let endpoint = self.checked_endpoint(&request)?;
         let format = request.response_format.clone();
         let model = request.model.clone();
+        log::debug!(
+            "[embed] complete start method={COMPLETE} model={model} messages={} timeout_ms={:?}",
+            request.messages.len(),
+            request.timeout_ms
+        );
         let wire_request = request.into_wire();
         if let Err(message) =
             openhuman_core::inference::host_runtime::ops::validate_complete_once_request(
@@ -647,11 +652,6 @@ impl Completer {
                 message,
             });
         }
-        log::debug!(
-            "[embed] complete start method={COMPLETE} model={model} messages={} timeout_ms={:?}",
-            request.messages.len(),
-            request.timeout_ms
-        );
         let budget = self
             .budget
             .as_ref()
