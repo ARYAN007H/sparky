@@ -11,7 +11,7 @@
 //! | --- | --- |
 //! | `validation` | migrate/validate a raw graph, engine compatibility, `flows_validate` / `flows_import` |
 //! | `builder_gates` | the author-time hard-gate stack, `strict_gate`, `build_builder_proposal` |
-//! | `wiring_warnings` | advisory Composio wiring / output-field / `split_out.path` warnings |
+//! | `wiring_warnings` | TinyFlows output and split-path advisories via the scoped host contract callback |
 //! | `inference_readiness` | B45 provider-connectivity evaluation + probe cache |
 //! | `host_gates` | OpenHuman checks served to TinyFlows for one authoring call |
 //! | `definitions` | create / duplicate / get / list / delete + saved-graph lookups |

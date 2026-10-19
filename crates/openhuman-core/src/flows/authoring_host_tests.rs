@@ -29,6 +29,7 @@ fn nested_conditional_fan_in() -> Value {
 #[tokio::test]
 async fn saved_workflow_callback_uses_its_captured_profile_over_the_bus() {
     use crate::core::runtime::{ContextOverlay, CoreContext, DispatchCtx, DomainSet};
+    use crate::integrations::composio::catalog::{seed_live_catalog_cache, ToolContract};
     use crate::tools::toolpacks::ToolGroups;
 
     let tmp = tempfile::tempdir().expect("temporary workspace");
@@ -88,6 +89,84 @@ async fn saved_workflow_callback_uses_its_captured_profile_over_the_bus() {
     let proxy = crate::modules::tinyflows::authoring_proxy(&config)
         .await
         .unwrap();
+
+    // Exercise the released native WiringWarnings operation with the actual
+    // OpenHuman LookupToolContract callbacks. Each call runs while the other
+    // profile is ambient; the ResolveWorkflow assertions below separately
+    // verify that these registered callbacks retain their captured profile.
+    for (toolkit, slug, output_field) in [
+        ("authoringalice", "AUTHORINGALICE_ACTION", "alice_field"),
+        ("authoringbob", "AUTHORINGBOB_ACTION", "bob_field"),
+    ] {
+        seed_live_catalog_cache(
+            toolkit,
+            vec![ToolContract {
+                slug: slug.into(),
+                toolkit: toolkit.into(),
+                description: None,
+                required_args: vec![],
+                input_schema: None,
+                output_fields: vec![output_field.into()],
+                output_schema: None,
+                primary_array_path: None,
+                is_curated: true,
+            }],
+        );
+    }
+    let alice_warnings_request = tinyflows_bus::WiringWarningsRequest {
+        graph: json!({
+            "nodes": [
+                {"id":"source","kind":"tool_call","name":"Alice action","config":{"slug":"AUTHORINGALICE_ACTION"}},
+                {"id":"sink","kind":"transform","name":"Sink","config":{"set":{"value":"=nodes.source.item.json.data.unknown"}}}
+            ],
+            "edges": [{"from_node":"source","to_node":"sink"}]
+        }),
+        host: alice_registration.authoring.clone(),
+    };
+    let bob_warnings_request = tinyflows_bus::WiringWarningsRequest {
+        graph: json!({
+            "nodes": [
+                {"id":"source","kind":"tool_call","name":"Bob action","config":{"slug":"AUTHORINGBOB_ACTION"}},
+                {"id":"sink","kind":"transform","name":"Sink","config":{"set":{"value":"=nodes.source.item.json.data.unknown"}}}
+            ],
+            "edges": [{"from_node":"source","to_node":"sink"}]
+        }),
+        host: bob_registration.authoring.clone(),
+    };
+    let (alice_warnings, bob_warnings) = tokio::join!(
+        CoreContext::scope(Arc::clone(&bob), async {
+            proxy
+                .call::<Vec<String>>(
+                    tinyflows_bus::methods::WIRING_WARNINGS,
+                    &(alice_warnings_request,),
+                )
+                .await
+                .unwrap()
+        }),
+        CoreContext::scope(Arc::clone(&alice), async {
+            proxy
+                .call::<Vec<String>>(
+                    tinyflows_bus::methods::WIRING_WARNINGS,
+                    &(bob_warnings_request,),
+                )
+                .await
+                .unwrap()
+        })
+    );
+    assert!(
+        alice_warnings
+            .iter()
+            .any(|warning| warning.contains("AUTHORINGALICE_ACTION")
+                && warning.contains("alice_field")),
+        "native WiringWarnings should use Alice's registered contract callback: {alice_warnings:?}"
+    );
+    assert!(
+        bob_warnings
+            .iter()
+            .any(|warning| warning.contains("AUTHORINGBOB_ACTION") && warning.contains("bob_field")),
+        "native WiringWarnings should use Bob's registered contract callback: {bob_warnings:?}"
+    );
+
     let candidate = json!({
         "nodes": [
             {"id":"start","kind":"trigger","name":"Start"},
