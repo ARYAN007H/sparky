@@ -13,7 +13,8 @@ async fn resolver_lookup_rejects_an_incompatible_saved_child() {
     )
     .unwrap();
 
-    let error = load_engine_compatible_flow_graph(&config, &child.id).await
+    let error = load_engine_compatible_flow_graph(&config, &child.id)
+        .await
         .expect_err("resolver lookup must reject an unsafe legacy child");
     assert!(
         error.contains(UNSUPPORTED_NESTED_CONDITIONAL_FAN_IN),
@@ -43,7 +44,8 @@ async fn resolver_lookup_rejects_an_incompatible_saved_grandchild() {
     )
     .unwrap();
 
-    let error = load_engine_compatible_flow_graph(&config, &child.id).await
+    let error = load_engine_compatible_flow_graph(&config, &child.id)
+        .await
         .expect_err("resolver lookup must reject an unsafe saved grandchild");
     assert!(
         error.contains(UNSUPPORTED_NESTED_CONDITIONAL_FAN_IN),
@@ -56,7 +58,12 @@ async fn resolver_lookup_rejects_an_incompatible_saved_grandchild() {
 
 #[tokio::test]
 async fn flows_validate_returns_stable_nested_conditional_fan_in_error() {
-    let outcome = flows_validate(&crate::core::runtime::DispatchCtx::ambient(), &Config::default(), nested_conditional_fan_in_graph()).await;
+    let outcome = flows_validate(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &Config::default(),
+        nested_conditional_fan_in_graph(),
+    )
+    .await;
     assert!(!outcome.value.valid);
     assert_eq!(outcome.value.error_details.len(), 1);
     assert_eq!(

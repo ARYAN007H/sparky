@@ -104,7 +104,9 @@ async fn flows_import_uses_the_tinyflows_authoring_module_in_a_cold_process() {
         );
         assert!(
             child_output.contains("running 1 test")
-                && child_output.contains("flows_import_uses_the_tinyflows_authoring_module_in_a_cold_process ... ok")
+                && child_output.contains(
+                    "flows_import_uses_the_tinyflows_authoring_module_in_a_cold_process ... ok"
+                )
                 && child_output.contains("1 passed; 0 failed"),
             "child must prove exactly one test ran:\n{child_output}"
         );
@@ -347,7 +349,7 @@ fn graph(value: Value) -> WorkflowGraph {
 
 fn seed_app_session_for_gate_test(tmp: &TempDir) {
     use crate::security::credentials::{
-        AuthService, APP_SESSION_PROVIDER, DEFAULT_AUTH_PROFILE_NAME,
+        APP_SESSION_PROVIDER, AuthService, DEFAULT_AUTH_PROFILE_NAME,
     };
     // `verify_session_active` reads from `config.config_path.parent()`, which
     // `test_config` sets to `tmp.path()` itself (distinct from
@@ -370,7 +372,7 @@ fn seed_app_session_for_gate_test(tmp: &TempDir) {
 // so none of this touches a live Composio backend.
 
 use crate::integrations::composio::catalog::{
-    seed_live_catalog_cache, seed_probe_cache, ProbedOutputSample, ToolContract,
+    ProbedOutputSample, ToolContract, seed_live_catalog_cache, seed_probe_cache,
 };
 
 fn seeded_slack_send_contract() -> ToolContract {

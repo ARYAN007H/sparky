@@ -4,7 +4,7 @@ use super::tests_support::*;
 use super::*;
 use crate::config::Config;
 use crate::flows::ops;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use tempfile::TempDir;
 use tinytools::{PermissionLevel, Tool};
 
@@ -37,7 +37,7 @@ fn valid_graph() -> Value {
 // share a toolkit key (same discipline the pre-fix required-args/response-
 // fields caches already required).
 
-use crate::integrations::composio::catalog::{seed_live_catalog_cache, ToolContract};
+use crate::integrations::composio::catalog::{ToolContract, seed_live_catalog_cache};
 
 fn seeded_gmail_send_contract() -> ToolContract {
     ToolContract {

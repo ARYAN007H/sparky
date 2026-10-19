@@ -103,7 +103,12 @@ async fn flows_update_inner(
     let graph_changed = graph_json.is_some();
     let graph = match graph_json {
         Some(raw) => {
-            let graph = validate_and_migrate_graph(&crate::core::runtime::DispatchCtx::ambient(), config, raw).await?;
+            let graph = validate_and_migrate_graph(
+                &crate::core::runtime::DispatchCtx::ambient(),
+                config,
+                raw,
+            )
+            .await?;
             graph
         }
         None => {

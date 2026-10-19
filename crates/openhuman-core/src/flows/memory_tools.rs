@@ -36,8 +36,8 @@ use crate::agent::turn_origin::{AgentTurnOrigin, TrustedAutomationSource};
 use crate::config::Config;
 use crate::memory::types::{ForgetParams, ItemsListParams, LearnParams, RecallParams};
 use crate::memory::{MemoryError, MemoryResult};
-use crate::security::policy::ToolOperation;
 use crate::security::SecurityPolicy;
+use crate::security::policy::ToolOperation;
 
 /// Prefix of a flow's own tag (see [`flow_tag`]).
 pub const FLOW_TAG_PREFIX: &str = "flow:";
@@ -369,7 +369,7 @@ impl Tool for FlowMemoryRecallTool {
             other => {
                 return Ok(ToolResult::error(format!(
                     "Unknown scope '{other}': expected 'flow' or 'flows'"
-                )))
+                )));
             }
         };
         #[allow(clippy::cast_possible_truncation)]
@@ -387,7 +387,7 @@ impl Tool for FlowMemoryRecallTool {
                 Err(error) => {
                     return Ok(ToolResult::error(format!(
                         "Flow memory recall failed: {error}"
-                    )))
+                    )));
                 }
             };
         tracing::debug!(
@@ -540,7 +540,7 @@ impl Tool for FlowMemoryRememberTool {
                 Err(error) => {
                     return Ok(ToolResult::error(format!(
                         "Failed to store flow memory: {error}"
-                    )))
+                    )));
                 }
             };
         match remember_keyed(&config, &flow_id, key, content, kind).await {

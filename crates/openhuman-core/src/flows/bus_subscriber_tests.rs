@@ -436,9 +436,10 @@ async fn retention_cap_forgets_the_oldest_digests() {
     assert_eq!(enforce_retention_cap(&config, "f-cap", 2).await.unwrap(), 2);
     let kept = stored_digests(&config, "f-cap").await;
     assert_eq!(kept.len(), 2);
-    assert!(kept
-        .iter()
-        .all(|hit| hit.text.contains("digest 2") || hit.text.contains("digest 3")));
+    assert!(
+        kept.iter()
+            .all(|hit| hit.text.contains("digest 2") || hit.text.contains("digest 3"))
+    );
 }
 
 #[test]
@@ -585,9 +586,11 @@ async fn dedup_commit_treats_completed_with_warnings_as_success() {
         .unwrap()
         .expect("completed_with_warnings must still commit");
     assert_eq!(committed, json!(["x"]));
-    assert!(store::kv_get(&config, &namespace, "dedup:dd:tentative")
-        .unwrap()
-        .is_none());
+    assert!(
+        store::kv_get(&config, &namespace, "dedup:dd:tentative")
+            .unwrap()
+            .is_none()
+    );
 }
 
 #[tokio::test]

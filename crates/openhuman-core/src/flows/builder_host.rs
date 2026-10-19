@@ -4,7 +4,7 @@ use std::future::Future;
 use std::sync::Arc;
 
 use serde::de::DeserializeOwned;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use tinybus::Result as BusResult;
 use tinyflows_bus::copilot::{self, CopilotHost, PortOperation};
 

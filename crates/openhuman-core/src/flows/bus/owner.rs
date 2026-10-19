@@ -12,7 +12,7 @@ use std::sync::{LazyLock, Mutex};
 
 use crate::config::Config;
 use crate::core::runtime::DispatchCtx;
-use crate::storage::agents::{find_owner, within_agent, within_agent_ctx, LookupFailed};
+use crate::storage::agents::{LookupFailed, find_owner, within_agent, within_agent_ctx};
 
 /// Flows whose owner this process has resolved (`None` = `local`).
 static OWNERS: LazyLock<Mutex<HashMap<String, Option<String>>>> = LazyLock::new(Default::default);
@@ -63,7 +63,7 @@ async fn resolve(
                 return Err(LookupFailed {
                     agent: owner,
                     error,
-                })
+                });
             }
             Some(Ok(false)) | None => forget(flow_id),
         }

@@ -37,7 +37,7 @@ use std::collections::HashSet;
 use std::sync::{Arc, LazyLock};
 
 use chrono::Utc;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use tinyflows::model::{NodeKind, TriggerKind, WorkflowGraph};
 use tinyflows::triggers::graph_trigger_warnings;
 // The save/run safety predicates are `tinyflows-catalog`'s: whether a graph
@@ -50,7 +50,7 @@ pub(crate) use tinyflows_catalog::graph_policy::{
 };
 use tokio_util::sync::CancellationToken;
 
-use crate::agent::turn_origin::{with_origin, AgentTurnOrigin, TrustedAutomationSource};
+use crate::agent::turn_origin::{AgentTurnOrigin, TrustedAutomationSource, with_origin};
 use crate::config::Config;
 use crate::core::Outcome;
 use crate::flows::bus;

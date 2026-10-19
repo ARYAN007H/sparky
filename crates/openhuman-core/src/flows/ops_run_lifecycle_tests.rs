@@ -3,17 +3,19 @@ use super::*;
 fn insert_parked_run(config: &Config, flow_id: &str, run_id: &str) {
     let now = Utc::now().to_rfc3339();
     store::insert_flow_run(config, run_id, flow_id, run_id, &now).unwrap();
-    assert!(store::finish_flow_run(
-        config,
-        run_id,
-        "pending_approval",
-        &now,
-        &[],
-        &["gate".into()],
-        None,
-        Some("parked-graph"),
-    )
-    .unwrap());
+    assert!(
+        store::finish_flow_run(
+            config,
+            run_id,
+            "pending_approval",
+            &now,
+            &[],
+            &["gate".into()],
+            None,
+            Some("parked-graph"),
+        )
+        .unwrap()
+    );
 }
 
 #[tokio::test]

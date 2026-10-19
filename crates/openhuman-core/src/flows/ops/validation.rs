@@ -11,7 +11,8 @@ async fn validate_over_bus(
     config: &Config,
     graph: Value,
 ) -> Result<GraphValidation, String> {
-    let registration = crate::flows::authoring_host::register(Arc::new(config.clone()), ctx.clone()).await?;
+    let registration =
+        crate::flows::authoring_host::register(Arc::new(config.clone()), ctx.clone()).await?;
     let proxy = crate::modules::tinyflows::authoring_proxy(config).await?;
     proxy
         .call(
@@ -124,7 +125,9 @@ pub async fn flows_validate(
             "flow validation failed",
         );
     }
-    let graph: WorkflowGraph = match report.graph.ok_or_else(|| "TinyFlows validation returned no graph".to_string())
+    let graph: WorkflowGraph = match report
+        .graph
+        .ok_or_else(|| "TinyFlows validation returned no graph".to_string())
         .and_then(|graph| serde_json::from_value(graph).map_err(|error| error.to_string()))
     {
         Ok(graph) => graph,
@@ -166,8 +169,15 @@ pub async fn flows_import(
     format: Option<String>,
 ) -> Result<Outcome<tinyflows_catalog::FlowImport>, String> {
     use tinyflows_catalog::FlowImport;
-    let requested = format.as_deref().unwrap_or("auto").trim().to_ascii_lowercase();
-    if !matches!(requested.as_str(), "auto" | "" | "native" | "tinyflows" | "n8n") {
+    let requested = format
+        .as_deref()
+        .unwrap_or("auto")
+        .trim()
+        .to_ascii_lowercase();
+    if !matches!(
+        requested.as_str(),
+        "auto" | "" | "native" | "tinyflows" | "n8n"
+    ) {
         return Err(format!(
             "unknown import format '{requested}' (expected 'native' or 'n8n')"
         ));
@@ -192,7 +202,10 @@ pub async fn flows_import(
         .and_then(|graph| serde_json::from_value(graph).map_err(|error| error.to_string()))?;
     let mut warnings = imported.warnings;
     warnings.extend(graph_trigger_warnings(&graph));
-    Ok(Outcome::single_log(FlowImport { graph, warnings }, "flow imported"))
+    Ok(Outcome::single_log(
+        FlowImport { graph, warnings },
+        "flow imported",
+    ))
 }
 
 /// Compatibility diagnostics for a portable Copilot graph payload.

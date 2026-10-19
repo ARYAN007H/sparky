@@ -81,11 +81,13 @@ async fn dry_run_supervised_runs_against_mock_and_labels_sandbox() {
     let parsed: Value = serde_json::from_str(&result.output()).unwrap();
     assert_eq!(parsed["sandbox"], true);
     assert_eq!(parsed["ok"], true);
-    assert!(parsed["note"]
-        .as_str()
-        .unwrap()
-        .to_lowercase()
-        .contains("sandbox"));
+    assert!(
+        parsed["note"]
+            .as_str()
+            .unwrap()
+            .to_lowercase()
+            .contains("sandbox")
+    );
 }
 
 #[tokio::test]

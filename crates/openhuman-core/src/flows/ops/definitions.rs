@@ -57,7 +57,12 @@ pub async fn flows_create(
     graph_json: Value,
     require_approval: bool,
 ) -> Result<Outcome<Flow>, String> {
-    let graph = validate_and_migrate_graph(&crate::core::runtime::DispatchCtx::ambient(), config, graph_json).await?;
+    let graph = validate_and_migrate_graph(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        config,
+        graph_json,
+    )
+    .await?;
 
     // Rule 1: automatic triggers create DISABLED — the user must arm them
     // explicitly.
@@ -182,7 +187,8 @@ pub(crate) async fn load_engine_compatible_flow_graph(
 ) -> Result<Option<WorkflowGraph>, String> {
     let graph = load_flow_graph(config, id)?;
     if let Some(graph) = graph.as_ref() {
-        ensure_config_aware_engine_compatible(config, graph).await
+        ensure_config_aware_engine_compatible(config, graph)
+            .await
             .map_err(|error| format!("workflow_id '{id}' is engine-incompatible: {error}"))?;
     }
     Ok(graph)

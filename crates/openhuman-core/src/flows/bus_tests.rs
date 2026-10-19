@@ -186,7 +186,9 @@ async fn dedup_nodes_are_read_from_the_explicit_contexts_config() {
         assert_eq!(ids, vec![expected.to_string()]);
     }
     // The registered config has no such flow: it is never consulted.
-    assert!(subscriber
-        .dedup_node_ids(&DispatchCtx::unbound(), "shared-flow")
-        .is_empty());
+    assert!(
+        subscriber
+            .dedup_node_ids(&DispatchCtx::unbound(), "shared-flow")
+            .is_empty()
+    );
 }
