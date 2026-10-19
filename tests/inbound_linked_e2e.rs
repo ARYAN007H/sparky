@@ -89,7 +89,7 @@ async fn linked_tinyeventqueues_queues_dedupes_and_delivers_a_composio_trigger()
                 .iter()
                 .filter(|queue| queue.queue.starts_with("teq.lane."))
                 .any(|queue| queue.leased + queue.delayed > 0);
-            let settled = stats.counts.delivered + stats.counts.dead > 0;
+            let settled = stats.outcomes.delivered + stats.outcomes.dead > 0;
             if lanes_touched || settled {
                 return stats;
             }
