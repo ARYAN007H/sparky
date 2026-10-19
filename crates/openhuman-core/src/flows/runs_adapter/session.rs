@@ -8,7 +8,6 @@ use tinyflows_bus::runs::{self, RunEvent};
 use tinyflows_catalog::{Flow, types::FlowRunTrigger};
 
 use crate::config::Config;
-use crate::flows::catalog_storage::CatalogStorageRegistration;
 use crate::modules::tinyflows as module;
 
 use super::{RunBindings, projection};
@@ -34,7 +33,7 @@ impl RunKey {
 /// module event cursor. The poller is the only reader that advances this cursor;
 /// synchronous callers receive copies through independent channels.
 pub(crate) struct RunSession {
-    pub(super) bindings: tokio::sync::RwLock<Arc<RunBindings>>,
+    pub(super) bindings: std::sync::RwLock<Arc<RunBindings>>,
     pub(super) config: Arc<Config>,
     pub(super) flow: tokio::sync::RwLock<Flow>,
     pub(super) trigger: Mutex<FlowRunTrigger>,
@@ -59,7 +58,7 @@ impl RunSession {
     ) -> Arc<Self> {
         Arc::new(Self {
             run_id: bindings.run_id.clone(),
-            bindings: tokio::sync::RwLock::new(bindings),
+            bindings: std::sync::RwLock::new(bindings),
             config,
             flow: tokio::sync::RwLock::new(flow),
             trigger: Mutex::new(trigger),
@@ -122,7 +121,10 @@ impl RunSession {
     }
 
     pub(super) async fn replace_bindings(&self, bindings: Arc<RunBindings>) {
-        *self.bindings.write().await = bindings;
+        *self
+            .bindings
+            .write()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = bindings;
     }
 
     pub(super) async fn replace_flow(&self, flow: Flow) {
@@ -168,7 +170,12 @@ impl RunSession {
         let _poll = self.poll_lock.lock().await;
         loop {
             let cursor = self.cursor();
-            let bindings = Arc::clone(&self.bindings.read().await);
+            let bindings = Arc::clone(
+                &self
+                    .bindings
+                    .read()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner),
+            );
             let request = runs::RunControlRequest {
                 storage: bindings.storage(),
                 run_id: self.run_id.clone(),
@@ -204,8 +211,8 @@ impl RunSession {
 pub(crate) fn insert(session: Arc<RunSession>) -> Result<(), String> {
     let bindings = session
         .bindings
-        .try_read()
-        .map_err(|_| "run bindings are being updated".to_string())?;
+        .read()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
     let key = RunKey::new(&bindings.storage(), &session.run_id);
     let mut sessions = SESSIONS
         .lock()
@@ -226,9 +233,10 @@ pub(crate) fn get(storage: &tinyflows_bus::catalog::CatalogStorage, run_id: &str
 }
 
 pub(crate) fn remove(session: &Arc<RunSession>) {
-    let Some(bindings) = session.bindings.try_read().ok() else {
-        return;
-    };
+    let bindings = session
+        .bindings
+        .read()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
     let key = RunKey::new(&bindings.storage(), &session.run_id);
     let mut sessions = SESSIONS
         .lock()
