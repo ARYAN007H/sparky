@@ -136,6 +136,7 @@ async fn independent_host_bundles_share_and_project_the_persisted_winner() {
         &leader_parent.data.dispatch_ctx(),
         &checkpoint_dir,
     );
+    eprintln!("DBG leader key {:?} follower key {:?}", task_key, SubagentTaskKey::from_context(&follower_parent, "cross-bundle-task", None));
     let leader_definition = definition.clone();
     let leader_options = options.clone();
     let leader = tokio::spawn(async move {
