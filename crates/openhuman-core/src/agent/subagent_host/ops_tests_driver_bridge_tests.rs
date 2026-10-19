@@ -136,7 +136,6 @@ async fn independent_host_bundles_share_and_project_the_persisted_winner() {
         &leader_parent.data.dispatch_ctx(),
         &checkpoint_dir,
     );
-    eprintln!("DBG leader key {:?} follower key {:?}", task_key, SubagentTaskKey::from_context(&follower_parent, "cross-bundle-task", None));
     let leader_definition = definition.clone();
     let leader_options = options.clone();
     let leader = tokio::spawn(async move {
@@ -155,11 +154,9 @@ async fn independent_host_bundles_share_and_project_the_persisted_winner() {
     let cancelled_context = options.run_context.clone();
     let cancelled_options = options.clone();
     let follower = tokio::spawn(async move {
-        let r = crate::agent::subagent_host::OpenHumanSubagentHost::new(definition, options)
+        crate::agent::subagent_host::OpenHumanSubagentHost::new(definition, options)
             .run(&follower_parent, "produce a report".into())
-            .await;
-        eprintln!("DBG follower ended early: {:?}", r.as_ref().map(|o| o.output.clone()).map_err(|e| e.to_string()));
-        r
+            .await
     });
     let mut cancelled_parent = cancelled_context.into_tinyagents(
         tinyagents_harness::context::RunConfig::new("cross-bundle-parent")
@@ -176,14 +173,12 @@ async fn independent_host_bundles_share_and_project_the_persisted_winner() {
         .run(&cancelled_parent, "produce a report".into())
         .await
     });
-    eprintln!("DBG waiting for waiters");
     tokio::time::timeout(std::time::Duration::from_secs(5), async {
         while leader_entry.waiter_count() != 2 {
             tokio::task::yield_now().await;
         }
     })
     .await
-    .map_err(|e| { eprintln!("DBG waiter_count={} execs={}", leader_entry.waiter_count(), executions.load(std::sync::atomic::Ordering::SeqCst)); e })
     .expect("both independent host bundles join the leader's flight");
 
     observer_cancellation.cancel();
