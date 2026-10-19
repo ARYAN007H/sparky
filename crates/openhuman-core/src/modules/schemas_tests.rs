@@ -82,7 +82,7 @@ async fn forgetting_sites_reports_how_many_went() {
     let workspace = config.workspace_dir.clone();
     let ctx = CoreContext::for_test_with_config(DomainSet::full(), config);
 
-    let (one, every, left) = CoreContext::scope(ctx.clone(), async {
+    let (one, every) = CoreContext::scope(ctx.clone(), async {
         let mut one = Map::new();
         one.insert(
             "site".to_string(),
