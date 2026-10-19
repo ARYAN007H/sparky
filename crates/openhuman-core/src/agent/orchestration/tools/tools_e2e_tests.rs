@@ -456,7 +456,6 @@ async fn continue_subagent_without_checkpoint_or_durable_session_names_the_roste
     );
 }
 
-#[tokio::test]
 fn parent_context(
     workspace_dir: &Path,
     model: Arc<dyn ChatModel<()>>,

@@ -248,7 +248,6 @@ async fn config_delegate_dispatch_preserves_tool_failure_in_shared_jobs() {
 }
 
 #[test]
-#[test]
 fn ask_clarification_tool_is_the_harness_tool() {
     let tool = AskClarificationTool::new();
     assert_eq!(tool.name(), "ask_user_clarification");
