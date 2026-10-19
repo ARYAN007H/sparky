@@ -49,8 +49,6 @@ pub struct VoiceServerSettingsPatch {
     pub min_duration_secs: Option<f32>,
     pub silence_threshold: Option<f32>,
     pub custom_dictionary: Option<Vec<String>>,
-    pub always_on_enabled: Option<bool>,
-    pub wake_word: Option<String>,
     /// Hosted STT engine name — `"backend"` / `"elevenlabs"` / `"openai"`
     /// (the `"cloud"` / `"openhuman"` aliases also resolve to backend).
     pub stt_engine: Option<String>,
@@ -463,8 +461,6 @@ pub async fn get_voice_server_settings(
         "min_duration_secs": config.voice_server.min_duration_secs,
         "silence_threshold": config.voice_server.silence_threshold,
         "custom_dictionary": config.voice_server.custom_dictionary,
-        "always_on_enabled": config.voice_server.always_on_enabled,
-        "wake_word": config.voice_server.wake_word,
         "stt_engine": config.voice_server.stt_engine,
     });
     Ok(Outcome::new(
@@ -511,12 +507,6 @@ pub async fn load_and_apply_voice_server_settings(
     }
     if let Some(custom_dictionary) = update.custom_dictionary {
         config.voice_server.custom_dictionary = custom_dictionary;
-    }
-    if let Some(always_on_enabled) = update.always_on_enabled {
-        config.voice_server.always_on_enabled = always_on_enabled;
-    }
-    if let Some(wake_word) = update.wake_word {
-        config.voice_server.wake_word = wake_word.trim().to_string();
     }
     if let Some(engine) = update.stt_engine {
         // Reject rather than silently defaulting: an unknown engine name means

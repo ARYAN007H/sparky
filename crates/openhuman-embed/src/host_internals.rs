@@ -414,9 +414,6 @@ pub mod desktop {
     pub mod notifications {
         pub use openhuman_core::desktop::notifications::subscribe_core_notifications;
     }
-    pub mod overlay {
-        pub use openhuman_core::desktop::overlay::subscribe_attention_events;
-    }
 }
 
 pub mod mcp {

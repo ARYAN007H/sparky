@@ -3,8 +3,7 @@
 The voice domain is everything in the core that turns speech into text or text
 into speech. It owns the `voice` RPC namespace (transcription, synthesis,
 provider settings, availability), the hotkey dictation server that records,
-transcribes and pastes text into the focused app, opt-in always-on listening,
-agent reply speech with mascot lip-sync visemes, and live two-way voice
+transcribes and pastes text into the focused app, agent reply speech with mascot lip-sync visemes, and live two-way voice
 sessions with the agent. The frontend, the Tauri shell, channels and web chat
 all call into it.
 
@@ -122,16 +121,6 @@ under a newer one. `global_server` registers the singleton that the
 `voice.server_*` RPCs observe; `run_standalone` (used by the CLI) builds an
 isolated, unregistered `VoiceServer` on purpose.
 
-### Always-on listening
-
-[`always_on/`](./always_on/) keeps the microphone open and uses VAD to cut the stream into
-utterances, so no hotkey is needed (see [always_on/README.md](always_on/README.md)).
-It is opt-in through `config.voice_server.always_on_enabled` and pauses while
-the screen is locked (macOS only; other platforms have no lock signal yet).
-Each utterance is transcribed through the factory, checked against the wake
-word, and either handled by a local intent fast path or published to the agent
-through `dictation_listener::publish_transcription`.
-
 ### Broadcast channels and events
 
 [`dictation_listener.rs`](./dictation_listener.rs) owns two process-global `tokio::sync::broadcast`
@@ -232,7 +221,6 @@ one chat and the meet bot use, then streams the reply back as
 | [`postprocess.rs`](./postprocess.rs) | Config adapter for LLM transcript cleanup (`cleanup_transcription`). |
 | [`reply_speech.rs`](./reply_speech.rs) | Agent reply synthesis through the backend speech endpoint (`synthesize_reply`, `ReplySpeechOptions`). |
 | [`server.rs`](./server.rs), [`server/`](./server/) | The `VoiceServer` dictation runtime: hotkey loop, recording lifecycle, gates, delivery, global singleton. [README](server/README.md). |
-| [`always_on.rs`](./always_on.rs), [`always_on/`](./always_on/) | VAD-driven continuous listening, screen-lock pause, wake word and intent routing. [README](always_on/README.md). |
 | [`audio_capture.rs`](./audio_capture.rs) | Microphone recording to 16 kHz mono WAV (`start_recording`, `RecordingHandle`, `RecordingResult`, `list_input_devices`) with peak RMS and the host microphone-permission policy. The `cpal` stream is `tinyvoice::capture`. |
 | [`dictation_listener.rs`](./dictation_listener.rs) | The two broadcast channels and host event-forwarding lifecycle over TinyVoice's native listener. |
 | [`bus.rs`](./bus.rs) | `publish_ptt_transcript_committed`. |
@@ -258,9 +246,6 @@ one chat and the meet bot use, then streams the reply back as
   (`ops.rs`) are the business operations behind the core RPCs.
 - `VoiceServer` ([`server/runtime.rs`](./server/runtime.rs)) with `global_server`, `try_global_server`,
   `start_if_enabled` and `run_standalone` ([`server/singleton.rs`](./server/singleton.rs)).
-- `always_on::start_if_enabled` / `always_on::stop` start and stop continuous
-  listening; the config controller calls `start_if_enabled` again after
-  voice-server settings are saved.
 - `synthesize_reply` ([`reply_speech.rs`](./reply_speech.rs)) and `transcribe_cloud`
   ([`cloud_transcribe.rs`](./cloud_transcribe.rs)) are the direct hosted-backend entry points.
 - `handle_live_voice_ws` ([`live/ws.rs`](./live/ws.rs)) is the WebSocket handler
@@ -303,8 +288,8 @@ error from the stub.
 There is no `store.rs`. Settings live in the shared TOML `Config` and are
 written through the config domain: `config.local_ai.{stt,tts}_provider`,
 `config.local_ai.{stt_model_id,tts_voice_id}`, top-level
-`config.{stt,tts}_provider`, `config.voice_server.*` (`stt_engine`,
-`always_on_enabled`, `wake_word`, hotkey, gates), `config.voice_providers` (the
+`config.{stt,tts}_provider`, `config.voice_server.*` (STT engine,
+hotkey, and recording gates), `config.voice_providers` (the
 registry, typed in `config/schema/voice_providers.rs`) and `[voice_live]`. The
 dictation server keeps only in-memory state (state machine, transcription
 count, rolling recent-transcript buffer) behind a `OnceCell` singleton.
@@ -345,9 +330,8 @@ Callers outside this folder include `core/all.rs` (controller and CLI
 registration), `web_chat/run_task.rs` (reply speech, PTT events),
 `channels/host/adapters.rs` (channel STT and reply synthesis),
 `security/credentials/ops/gated_services.rs` (starts and stops the dictation
-server, listener and always-on mode when gating credentials change),
-`config/schemas/controllers/voice.rs`, `desktop/overlay/`,
-`inference/host_runtime/service/speech.rs` and `crates/openhuman-app/src/lib.rs` (asserts
+server and listener when gating credentials change),
+`config/schemas/controllers/voice.rs`, `inference/host_runtime/service/speech.rs` and `crates/openhuman-app/src/lib.rs` (asserts
 `VOICE_COMPILED_IN`).
 
 ## Gotchas
@@ -355,7 +339,7 @@ server, listener and always-on mode when gating credentials change),
 - The desktop product enables `voice` explicitly; contributor defaults leave
   it off. `pub mod voice` always compiles as a facade. With the feature off, [`stub.rs`](./stub.rs) replaces the real modules and mirrors
   the surface other code depends on (`server`, `dictation_listener`,
-  `always_on`, `streaming`, `live::ws`, `reply_speech`, `cloud_transcribe`,
+  `streaming`, `live::ws`, `reply_speech`, `cloud_transcribe`,
   `cli`, `create_stt_provider`, `effective_stt_provider`, `SttProvider`,
   `publish_ptt_transcript_committed`) with no-op or disabled-error bodies.
   Signature drift is caught by the disabled build

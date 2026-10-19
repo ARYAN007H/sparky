@@ -2,7 +2,7 @@
 //!
 //! Compiled only when the `voice` Cargo feature is OFF (see the gate in
 //! [`super`]). It mirrors the subset of the real `voice` public surface that
-//! always-on / other-gated callers depend on, with no-op / disabled-error
+//! other-gated callers depend on, with no-op / disabled-error
 //! bodies so the crate still compiles, boots, and serves `/rpc` without the
 //! voice domain.
 //!
@@ -172,23 +172,6 @@ pub mod dictation_listener {
 
     /// No-op: nothing to stop.
     pub async fn stop() {}
-}
-
-// ---------------------------------------------------------------------------
-// always_on::{start_if_enabled, stop}
-// ---------------------------------------------------------------------------
-
-pub mod always_on {
-    use crate::config::Config;
-
-    /// No-op: always-on listening does not exist when voice is disabled.
-    pub async fn start_if_enabled(_ctx: &crate::core::runtime::DispatchCtx, _config: &Config) {}
-
-    /// No-op: nothing to stop.
-    pub fn stop() {}
-
-    /// No-op: no module capture leases exist when voice is disabled.
-    pub async fn shutdown() {}
 }
 
 // `live::ws::handle_live_voice_ws`: with voice off there are no live

@@ -51,8 +51,7 @@ pub async fn start_credential_gated_services(
     // constraint is voice-server → standalone-dictation-listener (they contend
     // for the single rdev global listener on macOS). Previously each was
     // `.await`ed in series, so their cold-start costs SUMMED: the local-AI
-    // bootstrap (Ollama/embeddings) + the Windows WASAPI microphone init
-    // (a synchronous readiness handshake in `always_on::spawn_capture_thread`)
+    // bootstrap (Ollama/embeddings) + voice startup
     // stacked into the ~10s stall users hit before hotkeys/commands were usable
     // — worst on Windows (#3490). Worse,
     // the hotkey/command registration (steps 2–3) sat
@@ -66,8 +65,7 @@ pub async fn start_credential_gated_services(
     // panic in one service is logged on join and never aborts the others.
 
     // Unit tests must not launch the real login-gated background services: they
-    // include detached, long-lived continuous audio capture that outlives the
-    // test that spawned it and interleaves with the
+    // include detached listeners that outlive the test that spawned them and interleave with the
     // shared process state (HOME / active_user.toml) of the parallel `cargo
     // test` run. Once startup became concurrent (#3490) that interleaving made
     // the session-isolation tests order-dependent. `cfg!(test)` is compiled out
@@ -147,28 +145,6 @@ pub async fn start_credential_gated_services(
         ));
     }
 
-    // 3b. Always-on listening (Phase 2): continuous mic + VAD → STT → agent.
-    //     Its cold WASAPI init (`always_on::spawn_capture_thread`) is the
-    //     Windows-specific blocker; it now runs the blocking capture-readiness
-    //     handshake on the blocking pool (see `always_on::start_if_enabled`), so
-    //     on its own task it neither stalls an async worker nor the hotkey /
-    //     command registration above.
-    {
-        let config = config.clone();
-        let ctx = ctx.clone();
-        tasks.push((
-            "always_on",
-            tokio::spawn(async move {
-                let step = std::time::Instant::now();
-                crate::voice::always_on::start_if_enabled(&ctx, &config).await;
-                log::debug!(
-                    "[services] always-on listening started ({} ms)",
-                    step.elapsed().as_millis()
-                );
-            }),
-        ));
-    }
-
     let total = tasks.len();
     let mut failed = 0usize;
     for (name, task) in tasks {
@@ -217,7 +193,6 @@ pub async fn stop_credential_gated_services(
     crate::voice::dictation_listener::stop().await;
 
     // 6. Disable delivery and release module-owned microphone/output leases.
-    crate::voice::always_on::shutdown().await;
     #[cfg(feature = "voice")]
     if let Err(error) = crate::voice::capture_lease::close_all().await {
         log::warn!("[services] voice capture cleanup pending: {error}");

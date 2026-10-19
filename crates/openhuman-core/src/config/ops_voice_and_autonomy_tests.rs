@@ -54,8 +54,6 @@ async fn load_and_apply_voice_server_settings_rejects_invalid_activation_mode() 
         min_duration_secs: None,
         silence_threshold: None,
         custom_dictionary: None,
-        always_on_enabled: None,
-        wake_word: None,
         stt_engine: None,
     };
     let err = load_and_apply_voice_server_settings(&DispatchCtx::process_default(), patch)
@@ -111,8 +109,6 @@ async fn load_and_apply_voice_server_settings_accepts_valid_modes_and_clamps() {
         min_duration_secs: Some(-5.0),
         silence_threshold: Some(-1.0),
         custom_dictionary: Some(vec!["term".into()]),
-        always_on_enabled: Some(true),
-        wake_word: Some("Hey Tiny".to_string()),
         stt_engine: Some("elevenlabs".into()),
     };
     let outcome = load_and_apply_voice_server_settings(&DispatchCtx::process_default(), patch)
@@ -154,8 +150,6 @@ async fn load_and_apply_voice_server_settings_rejects_unknown_stt_engine() {
         min_duration_secs: None,
         silence_threshold: None,
         custom_dictionary: None,
-        always_on_enabled: None,
-        wake_word: None,
         // The removed local engine is the case that matters: an old client
         // could still send it.
         stt_engine: Some("whisper".into()),

@@ -500,7 +500,6 @@ async fn start_credential_gated_services_completes_with_all_services_disabled() 
     // touching the mic, a model, the screen, or the network.
     config.local_ai.runtime_enabled = false;
     config.voice_server.auto_start = false;
-    config.voice_server.always_on_enabled = false;
 
     // Bound the wait so a serial-blocking regression (or a hung join) fails the
     // test instead of hanging CI. Every service no-ops, so this resolves almost

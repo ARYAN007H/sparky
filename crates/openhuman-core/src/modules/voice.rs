@@ -12,8 +12,7 @@
 //! this address space — a call is a channel send and a JSON hop, not IPC.
 //!
 //! So there is no per-call budget to protect and nothing here is too hot to go
-//! over the bus, including the VAD, which runs as a
-//! [`VadSession`] driven from the always-on capture loop.
+//! over the bus, including the hotkey-driven recording session state machine.
 //!
 //! **What stays on this side is decided by the audio callback, not by cost.**
 //! `cpal` delivers on a realtime thread where blocking is a dropout, so the
@@ -78,25 +77,16 @@ fn hallucination_mode_wire(mode: HallucinationMode) -> &'static str {
     }
 }
 
-/// A recognised fast-path voice command, or `Unknown`.
-///
-/// The contract's own type. `Unknown` carries `#[serde(other)]` upstream, so a
-/// module newer than this host — which `is_compatible` permits, it only
-/// requires the module's minor version to be at least the host's — reports an
-/// intent this build has never heard of as `Unknown` and the utterance goes to
-/// the agent, rather than failing to decode.
-pub use tinyvoice_bus::VoiceIntent;
-
 /// Recording-session vocabulary shared with the loaded TinyVoice module.
 pub use tinyvoice_bus::{
     GateVerdict, RecordingGates, SessionAction, SessionAdvance, SessionInput, SessionPhase,
-    SessionStatus, UtteranceDisposition,
+    SessionStatus,
 };
 
 /// Native capture lease types shared with the loaded TinyVoice module.
 pub use tinyvoice_bus::capture::{
-    CaptureBatch, CaptureError, CaptureFormat, CaptureHandle, CapturePollRequest, CaptureResult,
-    CaptureStream, MicrophonePermission, RawChunk, RecordingFinishRequest, RecordingStartRequest,
+    CaptureError, CaptureHandle, CaptureResult, MicrophonePermission, RecordingFinishRequest,
+    RecordingStartRequest,
 };
 
 /// Hotkey lifecycle types shared with the loaded TinyVoice module.
@@ -105,67 +95,6 @@ pub use tinyvoice_bus::hotkey::{
     HotkeyHandle, HotkeyHandleRequest, HotkeyReadRequest, HotkeyReply, HotkeyRequest,
     HotkeyReserveRequest, HotkeySource, HotkeyStartRequest, HotkeyState, SequencedHostFact,
 };
-
-/// Classify a command transcript into a fast-path intent.
-///
-/// The transcript should already have had its wake word removed by
-/// [`extract_command`].
-///
-/// # Errors
-///
-/// [`VoiceCallError`] when the module is unavailable or the call fails. A
-/// caller should treat that as [`VoiceIntent::Unknown`] and hand the transcript
-/// to the agent — the fast path is an optimisation, and losing it costs a round
-/// trip rather than the request.
-pub async fn route(config: &Config, transcript: &str) -> Result<VoiceIntent, VoiceCallError> {
-    let json: String = call(config, methods::ROUTE, (transcript,)).await?;
-    let intent: VoiceIntent = serde_json::from_str(&json)
-        .map_err(|e| VoiceCallError::Failed(format!("could not decode intent: {e}")))?;
-    Ok(clamped(intent))
-}
-
-/// Bring payloads back inside the range the executors assume.
-///
-/// The module already clamps a spoken volume to `0..=100`, so in practice this
-/// changes nothing. It runs anyway because the value is decoded from a wire
-/// payload, and `percent` is interpolated straight into an `osascript` command
-/// by `voice::always_on::execute_intent`. A value the host never checked
-/// reaching a shell command is the shape of bug worth spending three lines to
-/// make impossible, rather than one that depends on a remote clamp staying
-/// correct.
-///
-/// It is a free function rather than an inherent method because the type is
-/// the contract's now, and this is host policy: the contract describes what a
-/// module may say, not what this host is willing to act on.
-#[must_use]
-fn clamped(intent: VoiceIntent) -> VoiceIntent {
-    match intent {
-        VoiceIntent::SetVolume { percent } if percent > 100 => {
-            VoiceIntent::SetVolume { percent: 100 }
-        }
-        other => other,
-    }
-}
-
-/// Sequence a transcript through the wake-word gate.
-///
-/// The module decides whether an utterance is ignored, a command with the wake
-/// phrase stripped, or a bare wake word; the host only acts on the answer.
-///
-/// # Errors
-///
-/// [`VoiceCallError`] when the module is unavailable or the call fails. The
-/// caller must treat that as "ignore": this gate keeps a passing conversation
-/// out of the assistant, so it fails closed.
-pub async fn sequence_utterance(
-    config: &Config,
-    transcript: &str,
-    wake_word: &str,
-) -> Result<UtteranceDisposition, VoiceCallError> {
-    let json: String = call(config, methods::SEQUENCE_UTTERANCE, (transcript, wake_word)).await?;
-    serde_json::from_str(&json)
-        .map_err(|e| VoiceCallError::Failed(format!("could not decode disposition: {e}")))
-}
 
 /// Apply the pre-transcription recording gates (minimum duration, silence).
 ///
@@ -247,140 +176,13 @@ pub async fn prepare_capture(
     decode_audio(&wav)
 }
 
-/// Frame mono `f32` samples as a 16-bit PCM WAV file.
-///
-/// # Errors
-///
-/// [`VoiceCallError`] when the module is unavailable or the call fails.
-pub async fn encode_wav(
-    config: &Config,
-    samples: &[f32],
-    sample_rate: u32,
-) -> Result<Vec<u8>, VoiceCallError> {
-    let encoded = encode_samples(samples);
-    let wav: String = call(config, methods::ENCODE_WAV, (encoded, sample_rate)).await?;
-    decode_audio(&wav)
-}
-
-/// Tuning for a VAD session.
-///
-/// The contract's own type. There is no `from_server_config` on it and there
-/// should not be: a crate that any host can link cannot know what *this* host
-/// persists, so that mapping stays here as [`vad_config_from_server_config`].
-pub use tinyvoice_bus::vad::VadConfig;
-
-/// Build VAD tuning from the persisted voice-server config.
-///
-/// A free function rather than an inherent method because [`VadConfig`] is the
-/// contract's type. The unit conversion is the reason this exists at all:
-/// OpenHuman persists the utterance ceiling in seconds and the module speaks
-/// milliseconds.
-#[must_use]
-pub fn vad_config_from_server_config(c: &crate::config::VoiceServerConfig) -> VadConfig {
-    VadConfig {
-        onset_threshold: c.vad_onset_threshold,
-        hangover_ms: c.vad_hangover_ms,
-        min_speech_ms: c.vad_min_speech_ms,
-        // Config stores seconds; the module speaks milliseconds. Clamped to at
-        // least 1ms so a zero or negative setting cannot make every utterance
-        // close on its first frame.
-        max_utterance_ms: (c.vad_max_utterance_secs * 1000.0).round().max(1.0) as u32,
-    }
-}
-
-/// What the segmenter reported, and at which frame.
-///
-/// The contract splits these in two — [`VadEvent`] is what happened,
-/// [`IndexedVadEvent`] pairs it with the frame — where this host used to carry
-/// one enum with `frame` repeated in every variant. The JSON is identical
-/// either way: `IndexedVadEvent` flattens its event, so the wire still reads
-/// `{"frame": 3, "kind": "speech_start"}`.
-pub use tinyvoice_bus::vad::{IndexedVadEvent, VadEvent};
-
-/// A live VAD session held by the module.
-///
-/// Not `Drop`-based: releasing it needs an async bus call, and a `Drop` impl
-/// cannot await. Call [`close`](Self::close) when the capture loop stops. A
-/// leaked session costs one map entry in the module until the process exits,
-/// and the module caps how many can accumulate.
-#[derive(Debug, Clone, Copy)]
-pub struct VadSession {
-    id: u64,
-}
-
-impl VadSession {
-    /// Open a session with the given tuning.
-    ///
-    /// # Errors
-    ///
-    /// [`VoiceCallError`] when the module is unavailable or the config is
-    /// rejected.
-    pub async fn open(config: &Config, vad: VadConfig) -> Result<Self, VoiceCallError> {
-        let json = serde_json::to_string(&vad)
-            .map_err(|e| VoiceCallError::Failed(format!("could not encode VAD config: {e}")))?;
-        let id: u64 = call(config, methods::VAD_OPEN, (json,)).await?;
-        Ok(Self { id })
-    }
-
-    /// Push a batch of frame energies and collect whatever the segmenter says.
-    ///
-    /// Frame indices in the returned events are relative to `energies`.
-    ///
-    /// # Errors
-    ///
-    /// [`VoiceCallError`] when the module is unavailable, the session is not
-    /// open, or `frame_ms` is zero.
-    pub async fn push(
-        &self,
-        config: &Config,
-        frame_ms: u32,
-        energies: &[f32],
-    ) -> Result<Vec<IndexedVadEvent>, VoiceCallError> {
-        let json: String = call(config, methods::VAD_PUSH, (self.id, frame_ms, energies)).await?;
-        serde_json::from_str(&json)
-            .map_err(|e| VoiceCallError::Failed(format!("could not decode VAD events: {e}")))
-    }
-
-    /// Whether the session is currently inside an utterance.
-    ///
-    /// # Errors
-    ///
-    /// [`VoiceCallError`] when the module is unavailable or the session is not
-    /// open.
-    pub async fn is_speaking(&self, config: &Config) -> Result<bool, VoiceCallError> {
-        call(config, methods::VAD_IS_SPEAKING, (self.id,)).await
-    }
-
-    /// Abort any in-flight utterance without emitting an event.
-    ///
-    /// The privacy hook: called when the screen locks or capture is revoked, so
-    /// a partial utterance is dropped rather than completed and transcribed.
-    ///
-    /// # Errors
-    ///
-    /// [`VoiceCallError`] when the module is unavailable or the session is not
-    /// open.
-    pub async fn reset(&self, config: &Config) -> Result<(), VoiceCallError> {
-        call(config, methods::VAD_RESET, (self.id,)).await
-    }
-
-    /// Release the session. Closing one that is already gone is not an error.
-    ///
-    /// # Errors
-    ///
-    /// [`VoiceCallError`] only when the module itself is unreachable.
-    pub async fn close(&self, config: &Config) -> Result<(), VoiceCallError> {
-        call(config, methods::VAD_CLOSE, (self.id,)).await
-    }
-}
-
 /// A hotkey-driven recording session held by the module.
 ///
 /// The module owns the hotkey -> record -> finish state machine (phase,
 /// generation guard, setup / stop-intent buffering). The host reports facts as
 /// [`SessionInput`]s and performs the one [`SessionAction`] each answer names.
 ///
-/// Not `Drop`-based, for the same reason as [`VadSession`]: call
+/// Not `Drop`-based: call
 /// [`close`](Self::close) when the server stops.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct RecorderSession {
@@ -444,48 +246,6 @@ impl RecorderSession {
     }
 }
 
-/// Downmix and resample a raw capture buffer to 16 kHz mono samples.
-///
-/// The sibling of [`prepare_capture`] for a live loop, which needs samples to
-/// measure and accumulate rather than a finished container.
-///
-/// # Errors
-///
-/// [`VoiceCallError`], including a `Failed` when `samples` is not a whole
-/// number of frames for `channels`.
-pub async fn prepare_frames(
-    config: &Config,
-    samples: &[f32],
-    source_rate: u32,
-    channels: u16,
-) -> Result<Vec<f32>, VoiceCallError> {
-    let encoded: String = call(
-        config,
-        methods::PREPARE_FRAMES,
-        (encode_samples(samples), source_rate, channels),
-    )
-    .await?;
-    decode_samples(&encoded)
-}
-
-/// Root-mean-square energy of each fixed-size frame in a buffer.
-///
-/// # Errors
-///
-/// [`VoiceCallError`] when the module is unavailable or `frame_len` is zero.
-pub async fn frame_energies(
-    config: &Config,
-    samples: &[f32],
-    frame_len: u32,
-) -> Result<Vec<f32>, VoiceCallError> {
-    call(
-        config,
-        methods::FRAME_ENERGIES,
-        (encode_samples(samples), frame_len),
-    )
-    .await
-}
-
 /// Load the voice module if it is not already serving.
 ///
 /// Callers do not have to invoke this — every operation above does it — but a
@@ -517,44 +277,6 @@ pub async fn reserve_capture(
         },),
     )
     .await
-}
-
-/// Start module-owned continuous capture under a known reservation.
-pub async fn start_capture(
-    config: &Config,
-    handle: CaptureHandle,
-    permission: MicrophonePermission,
-) -> Result<CaptureResult<CaptureStream>, VoiceCallError> {
-    call(
-        config,
-        methods::CAPTURE_START,
-        (RecordingStartRequest {
-            permission,
-            handle: Some(handle),
-        },),
-    )
-    .await
-}
-
-/// Read at most two native audio chunks in one bounded bus request.
-pub async fn poll_capture(
-    config: &Config,
-    request: CapturePollRequest,
-) -> Result<CaptureResult<CaptureBatch>, VoiceCallError> {
-    call(config, methods::CAPTURE_POLL, (request,)).await
-}
-
-/// Stop one capture stream and wait for native resource cleanup.
-pub async fn stop_capture(
-    config: &Config,
-    handle: CaptureHandle,
-) -> Result<CaptureResult<()>, VoiceCallError> {
-    call(config, methods::CAPTURE_STOP, (handle,)).await
-}
-
-/// Shut down all capture leases and wait for their native cleanup.
-pub async fn shutdown_capture(config: &Config) -> Result<CaptureResult<()>, VoiceCallError> {
-    call(config, methods::CAPTURE_SHUTDOWN, ()).await
 }
 
 /// Reserve a native or host-fed hotkey listener before startup.

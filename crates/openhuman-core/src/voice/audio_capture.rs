@@ -1,5 +1,5 @@
 //! Host recording policy over module-owned native capture and audio preparation.
-use super::capture_lease::{CaptureLease, Kind};
+use super::capture_lease::CaptureLease;
 use crate::config::Config;
 /// Sample rate of the TinyVoice output contract (mono 16 kHz PCM).
 pub(crate) const TARGET_SAMPLE_RATE: u32 = 16_000;
@@ -51,7 +51,7 @@ pub async fn start_recording(config: &Config) -> Result<RecordingHandle, String>
         .microphone_permission(true)
         .await
         .map_err(|e| e.to_string())?;
-    let lease = CaptureLease::reserve(config, Kind::Recording).await?;
+    let lease = CaptureLease::reserve(config).await?;
     lease.start_recording().await?;
     Ok(RecordingHandle {
         inner: Some(lease),
