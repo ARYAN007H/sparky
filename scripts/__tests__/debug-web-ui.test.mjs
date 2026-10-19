@@ -27,6 +27,7 @@ test("coreLaunchSpec isolates the core from operator credentials, storage, and d
     workspace: "/private/run/workspace",
     mockUrl: "http://127.0.0.1:18500",
     token: "test-core-token",
+    logLevel: "info",
   });
   const finalChildEnv = mergeChildEnv(inheritedEnv, spec.env);
   assert.deepEqual(
