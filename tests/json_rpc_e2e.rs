@@ -9227,10 +9227,6 @@ async fn mcp_clients_lifecycle() {
 /// `mcp_clients_config_set` with a `command` pointing at the stub binary, which
 /// is how a user adds any server now — the registry is browse-only.
 #[tokio::test]
-#[cfg_attr(
-    target_os = "linux",
-    ignore = "Temporary on Linux: registry-installed servers are never operator-trusted, so the jail must start the stub. tinymcp 0.19.5 (https://github.com/tinyhumansai/tinymcp/pull/126) lets the host declare best-effort enforcement, which macOS Seatbelt uses; Linux still needs a TinyBox backend with real process isolation, which has not shipped."
-)]
 async fn mcp_clients_declare_connect_tool_call_happy_path() {
     let _env_lock = json_rpc_e2e_env_lock_async().await;
     let tmp = tempdir().expect("tempdir");
@@ -9406,10 +9402,6 @@ async fn mcp_clients_declare_connect_tool_call_happy_path() {
 /// survives and answers again, then retire it by dropping it from `mcp.json`
 /// and prove neither the install nor a call to it is left behind.
 #[tokio::test]
-#[cfg_attr(
-    target_os = "linux",
-    ignore = "Temporary on Linux: registry-installed servers are never operator-trusted, so the jail must start the stub. tinymcp 0.19.5 (https://github.com/tinyhumansai/tinymcp/pull/126) lets the host declare best-effort enforcement, which macOS Seatbelt uses; Linux still needs a TinyBox backend with real process isolation, which has not shipped."
-)]
 async fn mcp_clients_reconfigure_then_retire_over_rpc() {
     let _env_lock = json_rpc_e2e_env_lock_async().await;
     let tmp = tempdir().expect("tempdir");

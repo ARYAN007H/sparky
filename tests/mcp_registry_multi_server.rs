@@ -120,10 +120,6 @@ async fn disconnect(config: &Config, server_id: &str) {
 }
 
 #[tokio::test]
-#[cfg_attr(
-    target_os = "linux",
-    ignore = "Temporary on Linux: registry-installed servers are never operator-trusted, so the jail must start the stub. tinymcp 0.19.5 (https://github.com/tinyhumansai/tinymcp/pull/126) lets the host declare best-effort enforcement, which macOS Seatbelt uses; Linux still needs a TinyBox backend with real process isolation, which has not shipped."
-)]
 async fn two_servers_same_tool_name_no_collision() {
     let (_workspace, config) = fresh_workspace_config();
     let servers = Map::from_iter([
@@ -185,10 +181,6 @@ async fn two_servers_same_tool_name_no_collision() {
 }
 
 #[tokio::test]
-#[cfg_attr(
-    target_os = "linux",
-    ignore = "Temporary on Linux: registry-installed servers are never operator-trusted, so the jail must start the stub. tinymcp 0.19.5 (https://github.com/tinyhumansai/tinymcp/pull/126) lets the host declare best-effort enforcement, which macOS Seatbelt uses; Linux still needs a TinyBox backend with real process isolation, which has not shipped."
-)]
 async fn tool_calls_route_to_the_correct_server() {
     let (_workspace, config) = fresh_workspace_config();
     let servers = Map::from_iter([
@@ -212,10 +204,6 @@ async fn tool_calls_route_to_the_correct_server() {
 }
 
 #[tokio::test]
-#[cfg_attr(
-    target_os = "linux",
-    ignore = "Temporary on Linux: registry-installed servers are never operator-trusted, so the jail must start the stub. tinymcp 0.19.5 (https://github.com/tinyhumansai/tinymcp/pull/126) lets the host declare best-effort enforcement, which macOS Seatbelt uses; Linux still needs a TinyBox backend with real process isolation, which has not shipped."
-)]
 async fn failed_connect_does_not_block_healthy_peer() {
     let (_workspace, config) = fresh_workspace_config();
     let servers = Map::from_iter([
@@ -270,10 +258,6 @@ async fn failed_connect_does_not_block_healthy_peer() {
 }
 
 #[tokio::test]
-#[cfg_attr(
-    target_os = "linux",
-    ignore = "Temporary on Linux: registry-installed servers are never operator-trusted, so the jail must start the stub. tinymcp 0.19.5 (https://github.com/tinyhumansai/tinymcp/pull/126) lets the host declare best-effort enforcement, which macOS Seatbelt uses; Linux still needs a TinyBox backend with real process isolation, which has not shipped."
-)]
 async fn disabled_server_contributes_no_tools_to_agent_surface() {
     let (_workspace, config) = fresh_workspace_config();
     let servers = Map::from_iter([
