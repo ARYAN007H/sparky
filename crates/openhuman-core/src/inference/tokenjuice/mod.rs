@@ -387,7 +387,7 @@ async fn detect_with_config(
     content: String,
     hint: tinyjuice_bus::types::ContentHint,
 ) -> Result<String, String> {
-    client(&config)
+    client(config)
         .call("tinyjuice", methods::DETECT, (content, hint))
         .await
         .map_err(|error| error.to_string())
@@ -408,13 +408,13 @@ async fn compress_with_config(
     content: String,
     hint: tinyjuice_bus::types::ContentHint,
 ) -> Result<tinyjuice_bus::types::CompressedOutput, String> {
-    install_from_config(&config).await?;
-    let response: tinyjuice_bus::types::CompressedOutput = client(&config)
+    install_from_config(config).await?;
+    let response: tinyjuice_bus::types::CompressedOutput = client(config)
         .call("tinyjuice", methods::COMPRESS, (content, hint))
         .await
         .map_err(|error| error.to_string())?;
     savings::record(
-        &client(&config),
+        &client(config),
         response.compressor,
         (response.original_bytes as u64).div_ceil(4),
         (response.compacted_bytes as u64).div_ceil(4),
@@ -438,8 +438,8 @@ async fn retrieve_with_config(
     token: String,
     range: Option<tinyjuice_bus::wire::RetrieveRange>,
 ) -> Result<Option<String>, String> {
-    install_from_config(&config).await?;
-    client(&config)
+    install_from_config(config).await?;
+    client(config)
         .call("tinyjuice", methods::RETRIEVE, (token, range))
         .await
         .map_err(|error| error.to_string())
@@ -455,8 +455,8 @@ pub async fn cache_stats() -> Result<tinyjuice_bus::wire::CacheStats, String> {
 async fn cache_stats_with_config(
     config: &crate::config::Config,
 ) -> Result<tinyjuice_bus::wire::CacheStats, String> {
-    install_from_config(&config).await?;
-    client(&config)
+    install_from_config(config).await?;
+    client(config)
         .call("tinyjuice", methods::CACHE_STATS, ())
         .await
         .map_err(|error| error.to_string())

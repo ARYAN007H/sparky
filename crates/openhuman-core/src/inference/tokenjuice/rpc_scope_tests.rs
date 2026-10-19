@@ -59,6 +59,11 @@ impl JuiceFixture {
             bytes: 12,
         })
     }
+
+    async fn savings_stats(&self) -> tinybus::Result<tinyjuice_bus::savings::SavingsAggregate> {
+        self.0.methods.lock().unwrap().push("SavingsStats".into());
+        Ok(tinyjuice_bus::savings::SavingsAggregate::default())
+    }
 }
 
 async fn fixture() -> (tinybus::Proxy, Connection, Arc<Calls>) {
@@ -207,12 +212,20 @@ async fn tokenjuice_rpcs_use_their_derived_config_for_module_calls_and_install()
                 &seen_configs,
             )
             .await;
+            invoke_for_config(
+                contexts[index].clone(),
+                "savings_stats",
+                serde_json::json!({}),
+                &configs[index],
+                &seen_configs,
+            )
+            .await;
         }
     })
     .await;
 
     let methods = calls.methods.lock().unwrap();
-    for method in ["Detect", "Compress", "CacheStats", "Retrieve"] {
+    for method in ["Detect", "Compress", "Retrieve", "SavingsStats"] {
         assert_eq!(
             methods
                 .iter()
@@ -222,6 +235,14 @@ async fn tokenjuice_rpcs_use_their_derived_config_for_module_calls_and_install()
             "{method} reached the TinyBus client once per derived context"
         );
     }
+    assert_eq!(
+        methods
+            .iter()
+            .filter(|actual| actual.as_str() == "CacheStats")
+            .count(),
+        4,
+        "cache statistics and savings statistics each query TinyJuice per caller"
+    );
     drop(methods);
     let installs = calls.installs.lock().unwrap();
     for (index, config) in configs.iter().enumerate() {
