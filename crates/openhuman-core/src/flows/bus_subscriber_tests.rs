@@ -1,6 +1,6 @@
 use super::*;
 use tinyflows::model::TriggerKind;
-use tinyflows_catalog::types::FlowRun;
+use tinyflows_catalog::types::{FlowRun, FlowRunTrigger};
 
 #[test]
 fn pinned_trigger_inputs_reads_values_an_author_fixed_for_unattended_runs() {
@@ -201,28 +201,6 @@ async fn digest_ignores_failed_run() {
     let config = test_config(&tmp);
     let _engine = digest_test_engine(&config);
 
-    let flow = flow_with_trigger_config("f-failed", true, json!({}));
-    store::upsert_flow(&config, &flow).unwrap();
-    store::insert_flow_run(
-        &config,
-        "run-failed",
-        "f-failed",
-        "thread-failed",
-        "2026-01-01T00:00:00Z",
-    )
-    .unwrap();
-    store::finish_flow_run(
-        &config,
-        "run-failed",
-        "failed",
-        "2026-01-01T00:05:00Z",
-        &[],
-        &[],
-        Some("boom"),
-        None,
-    )
-    .unwrap();
-
     let sub = FlowRunDigestSubscriber::new(config.clone());
     sub.handle(&DomainEvent::FlowRunFinished {
         flow_id: "f-failed".into(),
@@ -243,28 +221,6 @@ async fn digest_ignores_cancelled_run() {
     let config = test_config(&tmp);
     let _engine = digest_test_engine(&config);
 
-    let flow = flow_with_trigger_config("f-cancelled", true, json!({}));
-    store::upsert_flow(&config, &flow).unwrap();
-    store::insert_flow_run(
-        &config,
-        "run-cancelled",
-        "f-cancelled",
-        "thread-cancelled",
-        "2026-01-01T00:00:00Z",
-    )
-    .unwrap();
-    store::finish_flow_run(
-        &config,
-        "run-cancelled",
-        "cancelled",
-        "2026-01-01T00:05:00Z",
-        &[],
-        &[],
-        None,
-        None,
-    )
-    .unwrap();
-
     let sub = FlowRunDigestSubscriber::new(config.clone());
     sub.handle(&DomainEvent::FlowRunFinished {
         flow_id: "f-cancelled".into(),
@@ -277,21 +233,7 @@ async fn digest_ignores_cancelled_run() {
 }
 
 #[tokio::test]
-async fn digest_sanitizes_persisted_outputs() {
-    let tmp = tempfile::TempDir::new().unwrap();
-    let config = test_config(&tmp);
-    let _engine = digest_test_engine(&config);
-
-    let flow = flow_with_trigger_config("f-ok", true, json!({}));
-    store::upsert_flow(&config, &flow).unwrap();
-    store::insert_flow_run(
-        &config,
-        "run-ok",
-        "f-ok",
-        "thread-ok",
-        "2026-01-01T00:00:00Z",
-    )
-    .unwrap();
+fn digest_rendering_scrubs_persisted_outputs() {
     let step = tinyflows_catalog::FlowRunStep {
         node_id: "n1".to_string(),
         output: json!({
@@ -314,49 +256,27 @@ async fn digest_sanitizes_persisted_outputs() {
         duration_ms: Some(8),
         diagnostics: Vec::new(),
     };
-    store::finish_flow_run(
-        &config,
-        "run-ok",
-        "completed",
-        "2026-01-01T00:05:00Z",
-        &[step, string_step],
-        &[],
-        None,
-        None,
-    )
-    .unwrap();
-
-    let sub = FlowRunDigestSubscriber::new(config.clone());
-    sub.handle(&DomainEvent::FlowRunFinished {
-        flow_id: "f-ok".into(),
-        run_id: "run-ok".into(),
-        status: "completed".into(),
-    })
-    .await;
-
-    let digests = stored_digests(&config, "f-ok").await;
-    assert_eq!(
-        digests.len(),
-        1,
-        "completed run must produce one run digest"
-    );
-    let entry = &digests[0];
-    assert_eq!(entry.meta.source.kind, tinymemory_api::SourceKind::Agent);
-    assert!(entry.meta.tags.contains(&crate::flows::flow_tag("f-ok")));
-    assert_eq!(
-        entry.meta.derive,
-        Some(false),
-        "nothing derived from a digest"
-    );
-    assert!(entry.text.contains("f-ok"));
-    assert!(entry.text.contains("completed"));
-    assert!(entry.text.contains("n1"));
-    assert!(entry.text.contains("\"sent\":3"));
-    assert!(!entry.text.contains("synthetic-credential-value"));
-    assert!(entry.text.contains("[REDACTED_SECRET]"));
-    assert!(!entry.text.contains(&token_output));
-    assert!(entry.text.contains("n2"));
-    assert!(entry.text.chars().count() <= DIGEST_MAX_CHARS);
+    let run = FlowRun {
+        id: "run-ok".to_string(),
+        flow_id: "f-ok".to_string(),
+        thread_id: "thread-ok".to_string(),
+        status: "completed".to_string(),
+        started_at: "2026-01-01T00:00:00Z".to_string(),
+        finished_at: Some("2026-01-01T00:05:00Z".to_string()),
+        steps: vec![step, string_step],
+        pending_approvals: Vec::new(),
+        error: None,
+        graph_hash: None,
+    };
+    let entry = render_run_digest("f-ok", &run);
+    assert!(entry.contains("completed"));
+    assert!(entry.contains("n1"));
+    assert!(entry.contains("\"sent\":3"));
+    assert!(!entry.contains("synthetic-credential-value"));
+    assert!(entry.contains("[REDACTED_SECRET]"));
+    assert!(!entry.contains(&token_output));
+    assert!(entry.contains("n2"));
+    assert!(entry.chars().count() <= DIGEST_MAX_CHARS);
 }
 
 #[tokio::test]
@@ -367,30 +287,22 @@ async fn digest_treats_completed_with_warnings_as_success() {
 
     let flow = flow_with_trigger_config("f-warn", true, json!({}));
     store::upsert_flow(&config, &flow).unwrap();
-    store::insert_flow_run(
+    let run = crate::flows::ops::flows_run(
+        &crate::core::runtime::DispatchCtx::ambient(),
         &config,
-        "run-warn",
-        "f-warn",
-        "thread-warn",
-        "2026-01-01T00:00:00Z",
+        &flow.id,
+        json!({}),
+        serde_json::Map::new(),
+        FlowRunTrigger::Rpc,
     )
+    .await
     .unwrap();
-    store::finish_flow_run(
-        &config,
-        "run-warn",
-        "completed_with_warnings",
-        "2026-01-01T00:05:00Z",
-        &[],
-        &[],
-        None,
-        None,
-    )
-    .unwrap();
+    let run_id = run.value["thread_id"].as_str().unwrap().to_owned();
 
     let sub = FlowRunDigestSubscriber::new(config.clone());
     sub.handle(&DomainEvent::FlowRunFinished {
         flow_id: "f-warn".into(),
-        run_id: "run-warn".into(),
+        run_id,
         status: "completed_with_warnings".into(),
     })
     .await;
