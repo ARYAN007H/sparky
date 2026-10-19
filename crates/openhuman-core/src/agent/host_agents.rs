@@ -65,11 +65,9 @@ impl HostAgent {
         let definition = AgentDefinitionRegistry::current()
             .and_then(|registry| registry.get(agent_id).cloned())
             .or_else(|| {
-                crate::agent::harness::host_definition::AgentDefinitionRegistry::from_config(
-                    &config,
-                )
-                .ok()
-                .and_then(|registry| registry.get(agent_id).cloned())
+                AgentDefinitionRegistry::load(&config.workspace_dir)
+                    .ok()
+                    .and_then(|registry| registry.get(agent_id).cloned())
             })
             .ok_or_else(|| anyhow::anyhow!("agent definition `{agent_id}` is unavailable"))?;
         let context = dispatch
@@ -103,14 +101,7 @@ impl HostAgent {
         cancellation: tinyagents_harness::CancellationToken,
         turn_deadline: Option<std::time::Duration>,
     ) -> anyhow::Result<String> {
-        let mut config = self.config.clone();
-        if let Some(ceiling) = crate::channels::runtime::dispatch::host_agent::posture::tool_ceiling(&origin) {
-            crate::channels::runtime::dispatch::host_agent::posture::cap_channel(
-                &mut config,
-                channel,
-                ceiling,
-            );
-        }
+        let config = self.config.clone();
         let agent_id = self.definition.id.clone();
         let mut session = self.session_host(&config, Some(session_key))?;
         session.set_thread_id(Some(session_key));
