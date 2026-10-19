@@ -11,18 +11,19 @@
 
 use std::sync::Arc;
 
-use async_trait::async_trait;
 use serde_json::{json, Value};
-use tinyflows::caps::*;
-use tinyflows::error::{EngineError, Result};
 
 use super::*;
 use crate::config::{Config, HttpRequestConfig};
 use crate::security::credentials::{HttpCredential, HttpCredentialsStore};
 use crate::security::SecurityPolicy;
 use crate::tools::http_request_tool;
+use crate::modules::tinyflows as module;
 use tinybox_bus::CommandClass;
 use tinytools::Tool as _;
+
+use super::{close_audit, enforce_current_node_tier_gate, enforce_node_tier_gate, gate_call_for_tier};
+use super::{EngineError, Result};
 
 /// [`HttpClient`] adapter over `HttpRequestTool`
 /// (`tinytools_std::network::HttpRequestTool`, built by `tools/impl/network/host.rs`). Allowlist + DNS-rebind
