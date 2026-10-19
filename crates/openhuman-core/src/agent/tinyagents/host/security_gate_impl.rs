@@ -54,12 +54,8 @@ impl SecurityGate for OpenHumanSecurityGate {
     /// The reason string carries the verdict and the rule codes only — never
     /// the screened text, which is the thing suspected of being hostile.
     ///
-    /// TODO(phase4): no [`ScreenOutcome::Redacted`] is ever returned. Producing
-    /// one needs a free-text redactor; `tinymemory_api::safety::scan` detects spans but
-    /// returns no rewritten string, and `approval::redact::scrub_paths` is
-    /// private and shaped for JSON argument maps. Either lift a public
-    /// `redact_text(&str) -> String` out of `approval::redact` or add one to
-    /// `tinymemory_api::safety`, then map "PII found, injection clean" to `Redacted`.
+    /// Credential patterns are rewritten by TinyInference's shared scrubber,
+    /// which is also used by OpenHuman's credential-scrub middleware.
     async fn screen_input(&self, text: &str, origin: ContentOrigin) -> TaResult<ScreenOutcome> {
         if !self.screens_input {
             return Ok(ScreenOutcome::Pass);
@@ -83,7 +79,14 @@ impl SecurityGate for OpenHumanSecurityGate {
         );
 
         match decision.action {
-            PromptEnforcementAction::Allow => Ok(ScreenOutcome::Pass),
+            PromptEnforcementAction::Allow => {
+                let redacted = tinyinference_core::sanitize::scrub_credentials(text);
+                if redacted == text {
+                    Ok(ScreenOutcome::Pass)
+                } else {
+                    Ok(ScreenOutcome::Redacted(redacted))
+                }
+            }
             PromptEnforcementAction::Blocked | PromptEnforcementAction::ReviewBlocked => {
                 let codes: Vec<&str> = decision.reasons.iter().map(|r| r.code.as_str()).collect();
                 tracing::warn!(
