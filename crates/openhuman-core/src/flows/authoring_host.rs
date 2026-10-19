@@ -239,13 +239,13 @@ impl DraftPromotionCallbacks {
             .await;
         Ok(match response {
             Ok(response) => response,
-            Err(message) => catalog::SavePromotedDraftResponse::Error(
-                catalog::DraftPromotionFailure {
+            Err(message) => {
+                catalog::SavePromotedDraftResponse::Error(catalog::DraftPromotionFailure {
                     code: "workflow_save_failed".into(),
                     message,
                     details: None,
-                },
-            ),
+                })
+            }
         })
     }
 }

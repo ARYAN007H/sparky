@@ -33,10 +33,7 @@
 
 use std::sync::Arc;
 
-use async_trait::async_trait;
 use serde_json::{json, Value};
-use tinyflows::caps::MemoryProvider;
-use tinyflows::error::{EngineError, Result};
 
 #[cfg(test)]
 use crate::agent::turn_origin;
@@ -176,40 +173,6 @@ impl OpenHumanMemory {
             return Err(EngineError::Capability(reason));
         }
         Ok(audit_id)
-    }
-
-    /// Closes out the approval audit row opened by [`Self::tier_gate_write`]
-    /// (E-m1): unlike the http/code/Composio node paths, this used to
-    /// discard the request id (`_audit_id`) and never call
-    /// `record_execution`, so an approved `remember`/`forget` left its audit
-    /// row stuck open with no terminal Success/Failure outcome. A no-op when
-    /// `audit_id` is `None` (no gate installed, or the decision never
-    /// prompted). Takes `success`/`error` rather than a `Result` so callers
-    /// don't need `EngineError: Clone` to both record the outcome and
-    /// propagate the original error.
-    fn record_write_execution(
-        op: &str,
-        audit_id: Option<&str>,
-        success: bool,
-        error: Option<&str>,
-    ) {
-        let Some(id) = audit_id else { return };
-        let Some(gate) = ApprovalGate::try_global() else {
-            return;
-        };
-        let exec = if success {
-            ExecutionOutcome::Success
-        } else {
-            ExecutionOutcome::Failure
-        };
-        tracing::debug!(
-            target: "flows",
-            op,
-            audit_id = %id,
-            success,
-            "{LOG_PREFIX} write: recording execution outcome on the approval audit trail"
-        );
-        gate.record_execution(id, exec, error);
     }
 
     /// Shapes one result row. Text that did not come from a plain agent
@@ -403,16 +366,7 @@ impl MemoryProvider for OpenHumanMemory {
             remember_keyed(&self.config, &flow_id, key, &content, LearningKind::Fact)
                 .await
                 .map_err(|e| capability_error("remember", &e));
-        Self::record_write_execution(
-            "remember",
-            audit_id.as_deref(),
-            store_result.is_ok(),
-            store_result
-                .as_ref()
-                .err()
-                .map(ToString::to_string)
-                .as_deref(),
-        );
+        super::close_audit(audit_id.as_deref(), &store_result);
         store_result?;
 
         tracing::debug!(
@@ -455,16 +409,7 @@ impl MemoryProvider for OpenHumanMemory {
         let forget_result = forget_matching(&self.config, filter)
             .await
             .map_err(|e| capability_error("forget", &e));
-        Self::record_write_execution(
-            "forget",
-            audit_id.as_deref(),
-            forget_result.is_ok(),
-            forget_result
-                .as_ref()
-                .err()
-                .map(ToString::to_string)
-                .as_deref(),
-        );
+        super::close_audit(audit_id.as_deref(), &forget_result);
         let removed = forget_result?;
 
         tracing::debug!(
