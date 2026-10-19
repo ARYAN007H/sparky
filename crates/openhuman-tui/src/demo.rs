@@ -59,10 +59,13 @@ pub fn sample() -> TranscriptState {
         context: context(),
         delta: Some("Checked the command, login, and tool-call surfaces.\nMouse targets use the displayed layout.".into()),
         delta_kind: None,
-        tool_call_id: None,
-        tool_name: None,
         skill_id: Some("child-1".into()),
         round: None,
+        subagent: Some(openhuman_rpc::embed::chat_surface::SubagentProgressDetail {
+            task_id: Some("child-1".into()),
+            display_name: Some("Explore".into()),
+            ..Default::default()
+        }),
     });
     state.apply_event(&WebChannelEvent::SubagentCompleted {
         context: context(),
