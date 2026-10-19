@@ -74,6 +74,21 @@ fn video_and_audio_ride_the_file_marker() {
 }
 
 #[test]
+fn typed_voice_notes_are_staged_as_their_audio_media() {
+    let part = ContentPart::VoiceNote {
+        voice_note: tinychannels_bus::VoiceNote {
+            media: media("data:audio/wav;base64,AAA"),
+            duration_ms: Some(5000),
+            ..Default::default()
+        },
+    };
+    assert_eq!(
+        fold_into_message("heard words", &[part]).unwrap(),
+        "heard words [FILE:data:audio/wav;base64,AAA]"
+    );
+}
+
+#[test]
 fn text_parts_join_the_message_before_markers() {
     let parts = [
         image("data:image/png;base64,AAA"),

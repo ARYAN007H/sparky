@@ -7,6 +7,7 @@
  * store, so one reader serves both directions.
  */
 import { callCoreRpc } from '../../services/coreRpcClient';
+import type { ContentPart } from '../../services/chatWire';
 import { openhumanVoiceTranscribeBytes } from '../../utils/tauriCommands/voice';
 
 /** `extraMetadata.voiceNote` as persisted on a thread row. */
@@ -45,6 +46,33 @@ export function bytesToBase64(bytes: Uint8Array): string {
     binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
   }
   return btoa(binary);
+}
+
+/** Keep the recorded media on the typed web-chat wire beside its transcript. */
+export async function voiceNoteContentPart(
+  blob: Blob,
+  durationMs: number,
+  waveform: number[]
+): Promise<ContentPart> {
+  const bytes = new Uint8Array(await blob.arrayBuffer());
+  const mime = blob.type || 'audio/webm';
+  return {
+    kind: 'voice_note',
+    voiceNote: {
+      codec: mime,
+      durationMs,
+      waveform,
+      pushToTalk: false,
+      media: {
+        url: `data:${mime};base64,${bytesToBase64(bytes)}`,
+        kind: 'audio',
+        contentType: mime,
+        codec: mime,
+        durationMs,
+        sizeBytes: bytes.length,
+      },
+    },
+  };
 }
 
 export function base64ToBytes(b64: string): Uint8Array {
