@@ -1,12 +1,12 @@
 use super::{
-    channel_connection_update_payload, event_alias, origin_is_allowed_with_extra,
-    emit_web_channel_event, publish_companion_state_changed, stamp_replay_timestamp,
+    channel_connection_update_payload, emit_web_channel_event, event_alias,
+    origin_is_allowed_with_extra, publish_companion_state_changed, stamp_replay_timestamp,
     subscribe_companion_state_changed,
 };
 
 use crate::core_host::web_chat::{ScopedWebEvent, WebChannelEvent, WebEventContext};
 use engineioxide::Packet;
-use socketioxide::{extract::SocketRef, SocketIo};
+use socketioxide::{SocketIo, extract::SocketRef};
 
 #[test]
 fn companion_state_transport_delivers_payload_to_bridge() {
@@ -103,7 +103,10 @@ async fn web_events_reach_client_and_thread_rooms_once_with_compat_aliases() {
     initiator.join("thread:thread-1").expect("join thread room");
 
     let (_reconnected_tx, mut reconnected_rx) = io.new_dummy_sock("/", ()).await;
-    let _ = reconnected_rx.recv().await.expect("reconnected peer connects");
+    let _ = reconnected_rx
+        .recv()
+        .await
+        .expect("reconnected peer connects");
     let reconnected = connected_rx.recv().await.expect("reconnected peer socket");
     reconnected
         .join("thread:thread-1")
@@ -134,11 +137,20 @@ async fn web_events_reach_client_and_thread_rooms_once_with_compat_aliases() {
     let initiator_packets = receive_messages(&mut initiator_rx, 2).await;
     let reconnected_packets = receive_messages(&mut reconnected_rx, 2).await;
     assert_eq!(event_names(&initiator_packets), ["chat_done", "chat:done"]);
-    assert_eq!(event_names(&reconnected_packets), ["chat_done", "chat:done"]);
-    assert!(initiator_packets.iter().all(|payload| payload["full_response"] == "finished"));
-    assert!(reconnected_packets
-        .iter()
-        .all(|payload| payload["thread_id"] == "thread-1"));
+    assert_eq!(
+        event_names(&reconnected_packets),
+        ["chat_done", "chat:done"]
+    );
+    assert!(
+        initiator_packets
+            .iter()
+            .all(|payload| payload["full_response"] == "finished")
+    );
+    assert!(
+        reconnected_packets
+            .iter()
+            .all(|payload| payload["thread_id"] == "thread-1")
+    );
     assert_no_message(&mut unrelated_rx).await;
 
     let delta = ScopedWebEvent::new(WebChannelEvent::TextDelta {
@@ -148,8 +160,9 @@ async fn web_events_reach_client_and_thread_rooms_once_with_compat_aliases() {
             request_id: "request-1".into(),
             ..Default::default()
         },
-        delta: "token".into(),
-        iteration: 1,
+        delta: Some("token".into()),
+        delta_kind: None,
+        round: None,
     });
     emit_web_channel_event(&io, delta);
 
@@ -173,8 +186,10 @@ async fn receive_messages(
             .expect("expected event packet before timeout")
             .expect("socket stays connected");
         if let Packet::Message(message) = packet {
-            let packet: Vec<serde_json::Value> = serde_json::from_str(&message)
-                .unwrap_or_else(|error| panic!("invalid Socket.IO event packet {message:?}: {error}"));
+            let packet: Vec<serde_json::Value> =
+                serde_json::from_str(&message).unwrap_or_else(|error| {
+                    panic!("invalid Socket.IO event packet {message:?}: {error}")
+                });
             assert_eq!(packet.len(), 2, "event packet has name and payload");
             messages.push(packet[1].clone());
         }
@@ -185,13 +200,22 @@ async fn receive_messages(
 fn event_names(payloads: &[serde_json::Value]) -> Vec<&str> {
     payloads
         .iter()
-        .map(|payload| payload["event"].as_str().expect("typed event discriminator"))
+        .map(|payload| {
+            payload["event"]
+                .as_str()
+                .expect("typed event discriminator")
+        })
         .collect()
 }
 
 async fn assert_no_message(rx: &mut tokio::sync::mpsc::Receiver<Packet>) {
-    while let Ok(Some(packet)) = tokio::time::timeout(std::time::Duration::from_millis(30), rx.recv()).await {
-        assert!(!matches!(packet, Packet::Message(_)), "unrelated room received event: {packet:?}");
+    while let Ok(Some(packet)) =
+        tokio::time::timeout(std::time::Duration::from_millis(30), rx.recv()).await
+    {
+        assert!(
+            !matches!(packet, Packet::Message(_)),
+            "unrelated room received event: {packet:?}"
+        );
     }
 }
 
