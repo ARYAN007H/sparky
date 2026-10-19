@@ -10,7 +10,12 @@ use crate::env_guard::EnvVarGuard;
 use crate::rpc_harness::serve_rpc;
 use crate::rpc_harness::{ok, payload, rpc, schema, write_min_config};
 
+use axum::extract::State;
+use axum::routing::get;
+use axum::{Json, Router};
 use serde_json::{json, Value};
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
 use tempfile::{tempdir, TempDir};
 
 struct TestHarness {
@@ -918,4 +923,165 @@ async fn mcp_tool_description_scan_flags_injection_and_spares_ordinary_prose() {
         "a scan hit must carry a rule code — the drop is published with the code \
          only, never the offending text: {hit:?}"
     );
+}
+
+
+#[tokio::test]
+async fn composio_direct_mode_api_key_and_static_catalogs_round_trip() {
+    let _lock = env_lock_async().await;
+    let harness = setup().await;
+    let (composio_base, composio_hits, composio_join) = serve_composio_direct_fixtures().await;
+    let _composio_v2_guard = EnvVarGuard::set("OPENHUMAN_COMPOSIO_DIRECT_BASE_V2", &composio_base);
+    let _composio_v3_guard = EnvVarGuard::set("OPENHUMAN_COMPOSIO_DIRECT_BASE_V3", &composio_base);
+
+    let capabilities = rpc(
+        &harness.rpc_base,
+        10,
+        "openhuman.composio_list_capabilities",
+        json!({}),
+    )
+    .await;
+    let capability_rows = payload(&capabilities, "composio_list_capabilities")
+        .get("capabilities")
+        .and_then(Value::as_array)
+        .expect("capabilities array");
+    assert!(
+        capability_rows.iter().any(|row| {
+            row.get("toolkit").and_then(Value::as_str) == Some("gmail")
+                || row.get("toolkit").and_then(Value::as_str) == Some("github")
+        }),
+        "static capability matrix should expose common toolkits: {capability_rows:?}"
+    );
+
+    let agent_ready = rpc(
+        &harness.rpc_base,
+        11,
+        "openhuman.composio_list_agent_ready_toolkits",
+        json!({}),
+    )
+    .await;
+    let ready_toolkits = payload(&agent_ready, "composio_list_agent_ready_toolkits")
+        .get("toolkits")
+        .and_then(Value::as_array)
+        .expect("agent-ready toolkits");
+    assert!(
+        ready_toolkits
+            .iter()
+            .any(|toolkit| toolkit.as_str() == Some("gmail")),
+        "gmail should remain in the agent-ready catalog: {ready_toolkits:?}"
+    );
+
+    let mode0 = rpc(
+        &harness.rpc_base,
+        12,
+        "openhuman.composio_get_mode",
+        json!({}),
+    )
+    .await;
+    assert_eq!(
+        payload(&mode0, "composio_get_mode initial")
+            .get("api_key_set")
+            .and_then(Value::as_bool),
+        Some(false)
+    );
+
+    let set = rpc(
+        &harness.rpc_base,
+        13,
+        "openhuman.composio_set_api_key",
+        json!({
+            "api_key": "cmp_worker_c_test_key",
+            "activate_direct": true
+        }),
+    )
+    .await;
+    assert_eq!(
+        payload(&set, "composio_set_api_key")
+            .get("mode")
+            .and_then(Value::as_str),
+        Some("direct")
+    );
+    assert_eq!(
+        composio_hits.load(Ordering::SeqCst),
+        1,
+        "saving a direct-mode API key should validate the candidate key against the v3 mock"
+    );
+
+    let mode1 = rpc(
+        &harness.rpc_base,
+        14,
+        "openhuman.composio_get_mode",
+        json!({}),
+    )
+    .await;
+    assert_eq!(
+        payload(&mode1, "composio_get_mode direct")
+            .get("api_key_set")
+            .and_then(Value::as_bool),
+        Some(true)
+    );
+    assert_eq!(
+        payload(&mode1, "composio_get_mode direct")
+            .get("mode")
+            .and_then(Value::as_str),
+        Some("direct")
+    );
+
+    let toolkits = rpc(
+        &harness.rpc_base,
+        15,
+        "openhuman.composio_list_toolkits",
+        json!({}),
+    )
+    .await;
+    assert!(
+        payload(&toolkits, "composio_list_toolkits direct")
+            .get("toolkits")
+            .and_then(Value::as_array)
+            .expect("toolkits array")
+            .is_empty(),
+        "direct mode should not call the backend tenant allowlist"
+    );
+
+    let cleared = rpc(
+        &harness.rpc_base,
+        16,
+        "openhuman.composio_clear_api_key",
+        json!({}),
+    )
+    .await;
+    assert_eq!(
+        payload(&cleared, "composio_clear_api_key")
+            .get("mode")
+            .and_then(Value::as_str),
+        Some("backend")
+    );
+    composio_join.abort();
+}
+
+
+async fn serve_composio_direct_fixtures() -> (
+    String,
+    Arc<AtomicUsize>,
+    tokio::task::JoinHandle<Result<(), std::io::Error>>,
+) {
+    async fn connected_accounts(State(hits): State<Arc<AtomicUsize>>) -> Json<Value> {
+        hits.fetch_add(1, Ordering::SeqCst);
+        Json(json!({
+            "items": []
+        }))
+    }
+
+    let hits = Arc::new(AtomicUsize::new(0));
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+        .await
+        .expect("bind composio fixture listener");
+    let addr = listener
+        .local_addr()
+        .expect("composio fixture listener addr");
+    let app = Router::new()
+        .route("/connected_accounts", get(connected_accounts))
+        .with_state(hits.clone());
+    let join = tokio::spawn(async move { axum::serve(listener, app).await });
+    (format!("http://{addr}"), hits, join)
 }
