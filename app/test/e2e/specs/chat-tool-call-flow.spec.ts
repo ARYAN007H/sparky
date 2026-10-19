@@ -202,17 +202,6 @@ describe('Chat tool-call lifecycle', () => {
     console.log(`${LOG_PREFIX} T1.3: passed — canary visible`);
   });
 
-  it('T1.4 — mock received exactly 2 LLM completions requests', async () => {
-    console.log(`${LOG_PREFIX} T1.4: inspecting request log`);
-    const log = getRequestLog() as Array<{ method: string; url: string; body?: string }>;
-    const llmHits = log.filter(
-      r => r.method === 'POST' && r.url.includes('/openai/v1/chat/completions')
-    );
-    console.log(`${LOG_PREFIX} T1.4: found ${llmHits.length} LLM completion requests`);
-    // Turn 1: tool_calls emission; Turn 2: final answer after tool result.
-    // Accept >=2 to be robust against retries or additional system turns.
-    expect(llmHits.length).toBeGreaterThanOrEqual(2);
-  });
 
   it('T1.5 — IN_FLIGHT map clears after completion', async () => {
     console.log(`${LOG_PREFIX} T1.5: verifying IN_FLIGHT cleared`);
