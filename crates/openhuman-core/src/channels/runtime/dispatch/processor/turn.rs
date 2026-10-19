@@ -88,6 +88,13 @@ pub(crate) async fn process_channel_runtime_message(
     let mut envelope = prepared.envelope;
     envelope.access.delivered_via_upstream_relay = authenticated_relay;
     crate::channels::host::voice::record_inbound_envelope(&envelope);
+    let native_reply = match super::progressive::open_native_reply(&ctx, &envelope, &msg.id).await {
+        Ok(reply) => reply,
+        Err(error) => {
+            tracing::error!("[dispatch] native progressive output could not start: {error}");
+            return;
+        }
+    };
 
     let tenant = match ctx.dispatch_ctx().tenant() {
         Ok(tenant) => tenant,
@@ -268,12 +275,13 @@ pub(crate) async fn process_channel_runtime_message(
     // refused rather than routed through a second execution graph.
 
     // Determine if this channel supports streaming draft updates
-    let use_streaming = target_channel
+    let use_streaming = native_reply.is_none()
+        && target_channel
         .as_ref()
         .is_some_and(|ch| ch.supports_draft_updates());
 
     // Set up streaming channel if supported
-    let (progress_tx, progress_rx) = if use_streaming {
+    let (progress_tx, progress_rx) = if native_reply.is_some() || use_streaming {
         let (tx, rx) = tokio::sync::mpsc::channel::<AgentProgress>(64);
         (Some(tx), Some(rx))
     } else {
@@ -303,7 +311,11 @@ pub(crate) async fn process_channel_runtime_message(
     };
 
     // Spawn a task to forward streaming progress to draft updates
-    let draft_updater = if let (Some(mut rx), Some(draft_id_ref), Some(channel_ref)) = (
+    let draft_updater = if let Some(reply) = native_reply.clone() {
+        progress_rx.map(|rx| {
+            AbortOnDropHandle::new(super::progressive::spawn_native_progress(rx, reply))
+        })
+    } else if let (Some(mut rx), Some(draft_id_ref), Some(channel_ref)) = (
         progress_rx,
         draft_message_id.as_deref(),
         target_channel.as_ref(),
