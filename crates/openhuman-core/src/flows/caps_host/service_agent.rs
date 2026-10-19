@@ -68,13 +68,17 @@ pub(crate) async fn run_agent(
         approval: binding.approval.clone(),
         progress: Some(progress_tx),
     };
-    let result = binding
-        .within(async move {
+    let scope = Arc::clone(&binding);
+    let cancellation = binding.cancellation.clone();
+    let turn = scope.within(async move {
             runner
                 .run_agent(&agent_ref, config, connection.as_deref())
                 .await
-        })
-        .await;
+        });
+    let result = tokio::select! {
+        _ = cancellation.cancelled() => Err("workflow run was cancelled".to_owned()),
+        result = turn => result.map_err(|error| error.to_string()),
+    };
     let _ = progress.await;
 
     let mut state = state.lock().await;
