@@ -327,12 +327,16 @@ jobs:
                       --features "${CLI_FEATURES}" --test "${target}" \
                       "${test_name}" -- --exact --test-threads=1
                   done
+                elif [[ "${module}" =~ ^(config|auth|app_state|connectivity)_e2e$ ]]; then
+                  bash scripts/ci-cancel-aware.sh cargo test -p openhuman-cli \
+                    --features "${CLI_FEATURES}" --test "${target}" -- \
+                    "${module}::" --test-threads=1
                 else
                   bash scripts/ci-cancel-aware.sh cargo test -p openhuman-cli \
                     --features "${CLI_FEATURES}" --test "${target}" -- "${module}::"
                 fi
               done < <(in_process_modules)
-            elif [ "${target}" = "json_rpc_e2e" ]; then
+            elif [[ "${target}" =~ ^json_rpc_.*_e2e$ ]]; then
               # JSON-RPC E2E cases change process-global provider routes and
               # environment. A single parallel libtest process lets one case
               # leak its route into another; run each case in a fresh process,
