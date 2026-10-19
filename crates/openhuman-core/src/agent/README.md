@@ -211,8 +211,8 @@ other `Subagent*` variants. Spawn depth is capped by
 `SteeringRegistry` ([`tinyagents/host/steering.rs`](./tinyagents/host/steering.rs)).
 
 `orchestration/` is the larger control plane on top of that: the command
-center, declarative workflow runs, git worktrees for parallel
-coding workers, and background completion delivery. See
+center, git worktrees for parallel coding workers, and background completion
+delivery. See
 [orchestration/README.md](orchestration/README.md) and
 [subagent_host/README.md](subagent_host/README.md).
 
@@ -221,7 +221,7 @@ coding workers, and background completion delivery. See
 An `AgentDefinition` ([`../agent_registry/host_definition.rs`](../agent_registry/host_definition.rs), vocabulary in `tinyagents-definition`) is an archetype: id, tier,
 prompt source, model spec, `ToolScope`, `SandboxMode`, iteration policy and
 allowed sub-agents. Built-ins live in `../agent_registry/agents/<id>/` as an
-`agent.toml` plus `prompt.md` (orchestrator, planner, critic, summarizer,
+`agent.toml` plus `prompt.md` (orchestrator, summarizer,
 trigger_triage, trigger_reactor, vision_agent and others). Custom
 definitions are TOML files under `<workspace>/agents/*.toml`, with
 `~/.openhuman/agents/*.toml` as a fallback (`tinyagents_definition::DefinitionSet::load_dirs`, driven from [`../agent_registry/host_definition.rs`](../agent_registry/host_definition.rs)).
@@ -366,7 +366,6 @@ All controllers register under `DomainGroup::Agent` in [`core/all.rs`](../core/a
 | `run_ledger` | `../sessions/` | `list`, `get`, `events` |
 | `session_import` | `../storage/import/` | `run` |
 | `agent_work` | [`orchestration/command_center`](./orchestration/command_center/) | `list`, `control` |
-| `workflow_run` | [`orchestration/workflow_runs`](./orchestration/workflow_runs/) | `list_definitions`, `list`, `get`, `start`, `stop`, `resume` |
 | `worktree` | [`orchestration/worktree_schemas.rs`](./orchestration/worktree_schemas.rs) | `list`, `status`, `diff`, `remove` |
 | `subagent` | [`orchestration/subagent_control.rs`](./orchestration/subagent_control.rs) | `cancel`, `steer` for running sub-agents |
 
