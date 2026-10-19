@@ -3,6 +3,7 @@ use super::*;
 use tinymemory_tools::layout::placement::file_into;
 
 use tinymemory_api::{ItemKind, MemoryMeta, MetaFilter};
+use tinymemory_integrations::brain::MAX_INGEST_BYTES;
 
 use crate::memory::test_fixtures::{bind_reference, config_in, stored};
 

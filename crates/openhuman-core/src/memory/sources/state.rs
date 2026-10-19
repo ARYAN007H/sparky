@@ -9,7 +9,7 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::sync::{LazyLock, Mutex};
 
-pub use tinymemory_integrations::sources::{SourceState, SourceStatus};
+use tinymemory_integrations::sources::{SourceState, SourceStatus};
 
 /// Serialises state-file read-modify-writes in this process.
 static LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));

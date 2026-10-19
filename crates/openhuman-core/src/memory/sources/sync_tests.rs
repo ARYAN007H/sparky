@@ -1,6 +1,7 @@
 use super::*;
 use crate::memory::sources::state;
 use crate::memory::test_fixtures::{bind_reference, config_in, stored};
+use tinymemory_integrations::sources::{SourceState, SourceStatus};
 use tinymemory_api::{ItemKind, MetaFilter};
 
 fn folder_source(id: &str, dir: &std::path::Path, mins: Option<u32>) -> MemorySourceConfig {
@@ -28,7 +29,7 @@ fn notes(config: &Config, n: usize) -> PathBuf {
     dir
 }
 
-async fn wait_for_idle(config: &Config, id: &str) -> state::SourceState {
+async fn wait_for_idle(config: &Config, id: &str) -> SourceState {
     for _ in 0..400 {
         if let Some(state) = state::load(&config.workspace_dir).get(id) {
             if state.status != SourceStatus::Syncing {

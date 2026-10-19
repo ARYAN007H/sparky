@@ -1,4 +1,5 @@
 use super::*;
+use tinymemory_integrations::sources::SourceStatus;
 
 #[test]
 fn corrupt_source_state_file_is_set_aside() {

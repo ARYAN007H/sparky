@@ -11,7 +11,7 @@ use tinymemory_api::{
     Citation, EngineDescriptor, FetchMode, Hit, LearningKind, MemoryMeta, MetaFilter,
 };
 use tinymemory_integrations::import::ImportState;
-pub use tinymemory_integrations::sources::SourceStatus;
+use tinymemory_integrations::sources::SourceStatus;
 
 use crate::config::schema::MemorySourceKind;
 

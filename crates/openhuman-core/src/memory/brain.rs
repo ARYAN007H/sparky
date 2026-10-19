@@ -12,9 +12,10 @@
 
 use serde::{Deserialize, Serialize};
 use tinymemory_api::{Error, Hit, Namespace, StoreItem, WriteOptions};
+use tinymemory_integrations::brain::MAX_INGEST_BYTES;
 use tinymemory_integrations::documents::RawDocument;
 use tinymemory_tools::layout::placement::{brain_node_with, files_source};
-use tinymemory_tools::{Brain, BrainSource, MemoryLayout};
+use tinymemory_tools::{Brain, BrainSource, BrainSourcesView, MemoryLayout};
 
 use crate::config::Config;
 use crate::config::schema::MemorySourceKind;
@@ -22,11 +23,6 @@ use crate::config::schema::MemorySourceKind;
 use super::engine;
 use super::lifecycle::jobs;
 use tinymemory_api::Result;
-
-pub use tinymemory_tools::{BrainSourceCount, BrainSourcesView};
-
-/// Largest file `memory_brain_ingest` reads, in bytes.
-pub const MAX_INGEST_BYTES: u64 = tinymemory_integrations::brain::MAX_INGEST_BYTES;
 
 /// The brain source a synced item belongs to: the connector it came from,
 /// so removing it erases one source. GitHub to `github`, links and feeds to
