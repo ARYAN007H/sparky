@@ -8,6 +8,41 @@ fn custom_delegate_is_treated_as_spawn_tool() {
 }
 
 #[test]
+fn child_tool_surface_never_contains_any_spawn_or_continuation_tool() {
+    let spawn_names = tinyagents_definition::SPAWN_TOOL_NAMES
+        .iter()
+        .copied()
+        .chain([
+            "delegate",
+            "delegate_graph",
+            "delegate_researcher",
+            "continue_subagent",
+        ])
+        .collect::<Vec<_>>();
+    for name in &spawn_names {
+        assert!(
+            crate::agent::tinyagents::is_subagent_spawn_or_delegate_tool(name),
+            "shared spawn predicate missed {name}"
+        );
+    }
+    let tools: Vec<Box<dyn Tool>> = spawn_names
+        .into_iter()
+        .map(|name| Box::new(NamedTool(name)) as Box<dyn Tool>)
+        .collect();
+
+    let indices = filter_tool_indices(&tools, &ToolScope::Wildcard, &[], None);
+
+    assert!(
+        indices.is_empty(),
+        "child tool surface retained: {:?}",
+        indices
+            .iter()
+            .map(|&index| tools[index].name())
+            .collect::<Vec<_>>()
+    );
+}
+
+#[test]
 fn unprefixed_delegate_name_overrides_are_treated_as_spawn_tools() {
     // Most synthesised delegation tools use an unprefixed
     // `delegate_name` override (`plan`, `manage_tasks`, `create_image`, …).

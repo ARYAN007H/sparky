@@ -129,18 +129,16 @@ fn on_belt(def: &AgentDefinition, tool: &str) -> bool {
     }
 }
 
-/// Can `def` call `tool`? Its belt, less what it disallows and what the pack
-/// table withholds from it — plus `use_skill`, which the harness advertises
-/// whenever the pack table withheld something (`strip_packed_from_visible`).
+/// Can this built-in definition call `tool` from its own (root) tool belt?
+/// Child-run spawn stripping is checked separately during child tool prep;
+/// here a parent definition such as the orchestrator may call its registered
+/// spawn and continuation tools.
 fn can_call(def: &AgentDefinition, tool: &str, universe: &BTreeSet<String>) -> bool {
     use crate::tools::toolpacks::ops::is_withheld_from;
     if tool == tinyagents_harness::tool::packs::USE_SKILL {
         return universe
             .iter()
             .any(|n| on_belt(def, n) && is_withheld_from(&def.id, n));
-    }
-    if crate::agent::tinyagents::is_subagent_spawn_or_delegate_tool(tool) {
-        return false;
     }
     on_belt(def, tool)
         && !def.disallowed_tools.iter().any(|n| n == tool)

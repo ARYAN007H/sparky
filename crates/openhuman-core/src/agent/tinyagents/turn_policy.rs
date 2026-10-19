@@ -154,22 +154,15 @@ pub(crate) fn tool_call_limit(max_iterations: usize, cap: Option<usize>) -> usiz
 /// True when `name` is a sub-agent spawn/delegation tool that a **child** run
 /// must never be able to invoke (issue #4452), re-asserted at registration as
 /// defense-in-depth so a misconfigured allowlist cannot reintroduce sub-agent
-/// spawning into a nested run. Kept local to this seam (rather than importing
-/// the `pub(super)` runner helper) so the invariant travels with the
-/// registration site that enforces it.
-///
-/// **This is a strict subset of the caller-side strip**, not a mirror of it
-/// (issue #6157). `subagent_host::tool_prep::is_subagent_spawn_tool` also
-/// resolves each archetype's `delegate_name` override through the definition
-/// registry — `manage_tasks`, `create_image`, `setup_skills`, … — none of which
-/// carry the `delegate_` prefix this match relies on. Matching them here would
-/// put a registry lookup on the per-tool registration loop, so the caller
-/// stays responsible for the override names: every path that feeds `allowed`
-/// runs `is_subagent_spawn_tool` first, including the dynamic per-spawn tools
-/// (`subagent_host::ops::runner`). Widen this predicate in lockstep if that
-/// ever stops being true.
+/// spawning into a nested run. It shares TinyAgents' canonical spawn names and
+/// the host's fixed delegation controls; the caller-side strip additionally
+/// resolves unprefixed `delegate_name` overrides through the registry.
 pub(crate) fn is_subagent_spawn_or_delegate_tool(name: &str) -> bool {
-    name == "spawn_subagent" || name.starts_with("delegate_") || name == "spawn_worker_thread"
+    const HOST_SPAWN_TOOL_NAMES: &[&str] = &["delegate", "continue_subagent"];
+
+    tinyagents_definition::SPAWN_TOOL_NAMES.contains(&name)
+        || HOST_SPAWN_TOOL_NAMES.contains(&name)
+        || name.starts_with("delegate_")
 }
 
 #[cfg(test)]
