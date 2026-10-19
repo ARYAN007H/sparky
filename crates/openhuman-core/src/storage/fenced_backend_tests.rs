@@ -8,7 +8,6 @@ use crate::storage::MemoryStorage;
 use serde_json::json;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
-use tinystoragedrivers::BlobReader;
 
 #[path = "fenced_blob_stream_tests.rs"]
 mod blob_stream_tests;

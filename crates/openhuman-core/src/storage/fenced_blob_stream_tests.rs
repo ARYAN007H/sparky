@@ -160,6 +160,171 @@ impl BlobStore for CountingBlobs {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+enum StreamRejection {
+    BeforeRead,
+    AfterOneByte,
+    BackendError,
+}
+
+#[derive(Debug)]
+struct RejectingFencedStreams {
+    inner: Arc<dyn BlobStore>,
+    rejection: StreamRejection,
+}
+
+impl RejectingFencedStreams {
+    async fn reject(&self, mut reader: BlobReader) -> Result<BlobMeta> {
+        use tokio::io::AsyncReadExt;
+
+        match self.rejection {
+            StreamRejection::BeforeRead => {}
+            StreamRejection::AfterOneByte => {
+                let mut byte = [0];
+                reader.read_exact(&mut byte).await.map_err(|error| {
+                    StorageError::backend("test reader failed").with_source(error)
+                })?;
+            }
+            StreamRejection::BackendError => {
+                return Err(StorageError::backend("native stream error"));
+            }
+        }
+        Err(StorageError::unsupported(
+            Capability::Fencing,
+            "test native stream operation cannot be fenced",
+        ))
+    }
+}
+
+#[async_trait]
+impl BlobStore for RejectingFencedStreams {
+    fn max_key_len(&self) -> usize {
+        self.inner.max_key_len()
+    }
+
+    fn capabilities(&self) -> Capabilities {
+        self.inner.capabilities()
+    }
+
+    async fn put(&self, key: &str, bytes: Vec<u8>, content_type: Option<&str>) -> Result<BlobMeta> {
+        self.inner.put(key, bytes, content_type).await
+    }
+
+    async fn put_stream(
+        &self,
+        _: &str,
+        reader: BlobReader,
+        _: u64,
+        _: Option<&str>,
+    ) -> Result<BlobMeta> {
+        self.reject(reader).await
+    }
+
+    async fn put_expiring(
+        &self,
+        key: &str,
+        bytes: Vec<u8>,
+        content_type: Option<&str>,
+        ttl: Duration,
+    ) -> Result<BlobMeta> {
+        self.inner
+            .put_expiring(key, bytes, content_type, ttl)
+            .await
+    }
+
+    async fn put_stream_expiring(
+        &self,
+        _: &str,
+        reader: BlobReader,
+        _: u64,
+        _: Option<&str>,
+        _: Duration,
+    ) -> Result<BlobMeta> {
+        self.reject(reader).await
+    }
+
+    async fn get_stream(&self, key: &str) -> Result<Option<BlobStream>> {
+        self.inner.get_stream(key).await
+    }
+
+    async fn presign_get(&self, key: &str, ttl: Duration) -> Result<String> {
+        self.inner.presign_get(key, ttl).await
+    }
+
+    async fn presign_put(&self, key: &str, ttl: Duration) -> Result<String> {
+        self.inner.presign_put(key, ttl).await
+    }
+
+    async fn get(&self, key: &str) -> Result<Option<Blob>> {
+        self.inner.get(key).await
+    }
+
+    async fn get_range(&self, key: &str, range: Range<u64>) -> Result<Option<Vec<u8>>> {
+        self.inner.get_range(key, range).await
+    }
+
+    async fn head(&self, key: &str) -> Result<Option<BlobMeta>> {
+        self.inner.head(key).await
+    }
+
+    async fn delete(&self, key: &str) -> Result<bool> {
+        self.inner.delete(key).await
+    }
+
+    async fn list(&self, prefix: &str) -> Result<Vec<BlobMeta>> {
+        self.inner.list(prefix).await
+    }
+}
+
+#[derive(Debug)]
+struct StreamFallbackBackend {
+    inner: Arc<dyn StorageBackend>,
+    blobs: Arc<CountingBlobs>,
+    rejection: StreamRejection,
+}
+
+impl StreamFallbackBackend {
+    fn scoped(
+        &self,
+        scope: &Scope,
+        scoped: &ScopedStorage,
+        blobs: Arc<dyn BlobStore>,
+    ) -> ScopedStorage {
+        ScopedStorage::new(
+            scope.clone(),
+            scoped.driver(),
+            Arc::clone(scoped.documents()),
+            Arc::clone(scoped.streams()),
+            blobs,
+        )
+    }
+}
+
+#[async_trait]
+impl StorageBackend for StreamFallbackBackend {
+    fn driver(&self) -> &'static str {
+        self.inner.driver()
+    }
+
+    fn capabilities(&self) -> Capabilities {
+        self.inner.capabilities()
+    }
+
+    fn for_scope(&self, scope: &Scope) -> Result<ScopedStorage> {
+        let scoped = self.inner.for_scope(scope)?;
+        Ok(self.scoped(scope, &scoped, Arc::clone(&self.blobs) as Arc<dyn BlobStore>))
+    }
+
+    fn for_scope_fenced(&self, scope: &Scope, fence: &tinystoragedrivers::Fence) -> Result<ScopedStorage> {
+        let scoped = self.inner.for_scope_fenced(scope, fence)?;
+        let blobs: Arc<dyn BlobStore> = Arc::new(RejectingFencedStreams {
+            inner: Arc::clone(&self.blobs) as Arc<dyn BlobStore>,
+            rejection: self.rejection,
+        });
+        Ok(self.scoped(scope, &scoped, blobs))
+    }
+}
+
 #[derive(Debug)]
 struct LogicalReader {
     remaining: u64,
@@ -314,6 +479,85 @@ async fn stale_blob_stream_is_refused_before_the_reader_is_polled(expiring: bool
         0,
         "a stale epoch must be refused before the upload reader is consumed"
     );
+}
+
+async fn write_with_fenced_stream_rejection(
+    rejection: StreamRejection,
+    expiring: bool,
+) -> (Result<BlobMeta>, Arc<AtomicU64>, Arc<CountingBlobs>) {
+    let blobs = Arc::new(CountingBlobs::default());
+    let backend: Arc<dyn StorageBackend> = Arc::new(StreamFallbackBackend {
+        inner: Arc::new(MemoryStorage::new()),
+        blobs: Arc::clone(&blobs),
+        rejection,
+    });
+    let node = Node::new("node-a", &backend);
+    node.take("alice").await;
+    let bytes_read = Arc::new(AtomicU64::new(0));
+    let reader = LogicalReader {
+        remaining: 3,
+        bytes_read: Arc::clone(&bytes_read),
+    };
+    let scoped = node.scoped("profile:alice");
+    let blobs_view = scoped.blobs();
+    let outcome = if expiring {
+        blobs_view
+            .put_stream_expiring(
+                "fallback",
+                Box::pin(reader),
+                3,
+                None,
+                Duration::from_secs(30),
+            )
+            .await
+    } else {
+        blobs_view
+            .put_stream("fallback", Box::pin(reader), 3, None)
+            .await
+    };
+    (outcome, bytes_read, blobs)
+}
+
+#[tokio::test]
+async fn unsupported_fenced_streams_fall_back_only_before_the_first_poll() {
+    for expiring in [false, true] {
+        let (outcome, bytes_read, inner) =
+            write_with_fenced_stream_rejection(StreamRejection::BeforeRead, expiring).await;
+        assert!(outcome.is_ok());
+        assert_eq!(bytes_read.load(Ordering::SeqCst), 3);
+        assert_eq!(inner.stream_puts.load(Ordering::SeqCst), u64::from(!expiring));
+        assert_eq!(
+            inner.expiring_stream_puts.load(Ordering::SeqCst),
+            u64::from(expiring)
+        );
+    }
+}
+
+#[tokio::test]
+async fn partially_consumed_fenced_streams_are_not_retried() {
+    for expiring in [false, true] {
+        let (outcome, bytes_read, inner) =
+            write_with_fenced_stream_rejection(StreamRejection::AfterOneByte, expiring).await;
+        assert_eq!(
+            outcome.unwrap_err().kind(),
+            ErrorKind::Unsupported(Capability::Fencing)
+        );
+        assert_eq!(bytes_read.load(Ordering::SeqCst), 1);
+        assert_eq!(inner.stream_puts.load(Ordering::SeqCst), 0);
+        assert_eq!(inner.expiring_stream_puts.load(Ordering::SeqCst), 0);
+    }
+}
+
+#[tokio::test]
+async fn non_fencing_stream_errors_are_not_retried() {
+    for expiring in [false, true] {
+        let (outcome, bytes_read, inner) =
+            write_with_fenced_stream_rejection(StreamRejection::BackendError, expiring).await;
+        assert_eq!(outcome.unwrap_err().kind(), ErrorKind::Backend);
+        assert_eq!(bytes_read.load(Ordering::SeqCst), 0);
+        assert_eq!(inner.stream_puts.load(Ordering::SeqCst), 0);
+        assert_eq!(inner.expiring_stream_puts.load(Ordering::SeqCst), 0);
+    }
 }
 
 #[tokio::test]
