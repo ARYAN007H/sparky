@@ -971,6 +971,39 @@ pub enum DomainEvent {
         routed: bool,
     },
 
+    // ── Inbound event queues ────────────────────────────────────────────
+    /// The inbound event queues ended an event without delivering it: a
+    /// redelivery of an event already taken, a gate or noise filter, or an
+    /// invalid envelope. `source` is the module source (`composio:<toolkit>`,
+    /// `webhook:<tunnel>`); `event_id` is the source's own id.
+    InboundEventDropped {
+        source: String,
+        event_id: String,
+        /// The module's reason, snake case (e.g. `duplicate`, `noise`).
+        reason: String,
+    },
+    /// Triage of a queued inbound event asked to run again later; the queue
+    /// redelivers it at `defer_until_ms` instead of dropping it.
+    InboundDeferred {
+        source: String,
+        event_id: String,
+        /// Unix epoch milliseconds the triage asked to run again at.
+        defer_until_ms: i64,
+        /// Already scrubbed; safe to log.
+        reason: String,
+    },
+    /// A queued inbound event will not be delivered: triage reached a terminal
+    /// state, or the delivery ran out of attempts. It is parked in the
+    /// dead-letter queue (`inbound.dead`, `inbound.redrive`).
+    InboundDeadLettered {
+        source: String,
+        event_id: String,
+        /// The delivery attempt that gave up.
+        attempt: u32,
+        /// Already scrubbed; safe to log.
+        detail: String,
+    },
+
     // ── Device pairing ──────────────────────────────────────────────────
     /// A mobile device completed the X25519 handshake and is now paired.
     DevicePaired {
@@ -1406,6 +1439,10 @@ impl DomainEvent {
 
             Self::NotificationIngested { .. } | Self::NotificationTriaged { .. } => "notification",
 
+            Self::InboundEventDropped { .. }
+            | Self::InboundDeferred { .. }
+            | Self::InboundDeadLettered { .. } => "inbound",
+
             Self::DevicePaired { .. }
             | Self::DeviceRevoked { .. }
             | Self::DevicePeerOnline { .. }
@@ -1530,6 +1567,9 @@ impl DomainEvent {
             Self::TriggerEscalationFailed { .. } => "TriggerEscalationFailed",
             Self::NotificationIngested { .. } => "NotificationIngested",
             Self::NotificationTriaged { .. } => "NotificationTriaged",
+            Self::InboundEventDropped { .. } => "InboundEventDropped",
+            Self::InboundDeferred { .. } => "InboundDeferred",
+            Self::InboundDeadLettered { .. } => "InboundDeadLettered",
             Self::DevicePaired { .. } => "DevicePaired",
             Self::DeviceRevoked { .. } => "DeviceRevoked",
             Self::DevicePeerOnline { .. } => "DevicePeerOnline",
