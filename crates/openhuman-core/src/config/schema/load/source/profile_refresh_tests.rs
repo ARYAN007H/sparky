@@ -10,8 +10,7 @@ async fn profile_context_conflict_refresh_keeps_host_owned_restrictions() {
         keys(16),
     );
     let operator = CoreContext::for_test(DomainSet::full(), None);
-    let mut saas = crate::core::runtime::SaasConfig::new(tmp.path());
-    saas.max_tool_iterations = Some(4);
+    let saas = crate::core::runtime::SaasConfig::new(tmp.path());
     let host = crate::profiles::ProfileHost::new(saas, operator);
     let id = crate::profiles::ProfileId::for_user(
         "profile-refresh",
@@ -32,7 +31,11 @@ async fn profile_context_conflict_refresh_keeps_host_owned_restrictions() {
     assert!(initial.autonomy.enabled);
     assert!(initial.autonomy.workspace_only);
     assert_eq!(initial.memory.agent_id.as_deref(), Some(id.as_str()));
-    assert_eq!(initial.agent.max_tool_iterations_override, Some(4));
+    assert_eq!(
+        initial.memory.layout,
+        crate::config::schema::MemoryLayoutMode::Legacy
+    );
+    assert_eq!(initial.agent.max_tool_iterations_override, None);
     CoreContext::scope(context.clone(), initial.save())
         .await
         .unwrap();
@@ -52,6 +55,7 @@ async fn profile_context_conflict_refresh_keeps_host_owned_restrictions() {
     external.autonomy.workspace_only = false;
     external.memory.agent_id = Some("external-agent".into());
     external.memory.root = Some("team:external".into());
+    external.memory.layout = crate::config::schema::MemoryLayoutMode::V3;
     external.agent.max_tool_iterations_override = Some(99);
     external.agent.channel_permissions.clear();
     external.save().await.unwrap();
@@ -77,7 +81,11 @@ async fn profile_context_conflict_refresh_keeps_host_owned_restrictions() {
     assert!(refreshed.autonomy.enabled);
     assert!(refreshed.autonomy.workspace_only);
     assert_eq!(refreshed.memory.agent_id.as_deref(), Some(id.as_str()));
-    assert_eq!(refreshed.agent.max_tool_iterations_override, Some(4));
+    assert_eq!(
+        refreshed.memory.layout,
+        crate::config::schema::MemoryLayoutMode::Legacy
+    );
+    assert_eq!(refreshed.agent.max_tool_iterations_override, None);
     assert!(!refreshed.agent.channel_permissions.is_empty());
     let nested = context.derive_with(ContextOverlay::new(
         refreshed,
@@ -123,4 +131,3 @@ async fn profile_context_conflict_refresh_keeps_host_owned_restrictions() {
     );
     assert!(!nested_refreshed.agent.channel_permissions.is_empty());
 }
-

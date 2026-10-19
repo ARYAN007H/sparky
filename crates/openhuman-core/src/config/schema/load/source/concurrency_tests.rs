@@ -625,6 +625,5 @@ fn assert_typed_conflict(error: anyhow::Error) {
     );
 }
 
-
 #[path = "profile_refresh_tests.rs"]
 mod profile_refresh_tests;
