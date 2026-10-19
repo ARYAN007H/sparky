@@ -57,8 +57,7 @@ pub async fn flows_create(
     graph_json: Value,
     require_approval: bool,
 ) -> Result<Outcome<Flow>, String> {
-    let graph = validate_and_migrate_graph(graph_json)?;
-    ensure_config_aware_engine_compatible(config, &graph)?;
+    let graph = validate_and_migrate_graph(&crate::core::runtime::DispatchCtx::ambient(), config, graph_json).await?;
 
     // Rule 1: automatic triggers create DISABLED — the user must arm them
     // explicitly.
