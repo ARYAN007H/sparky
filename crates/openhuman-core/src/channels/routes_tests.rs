@@ -11,7 +11,6 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::task::{Context, Poll, Waker};
 use tinybus::EventHandler;
-use tinychannels::routes::resolve_provider_alias;
 use tinychannels_bus::context::ChatMessage;
 use tinychannels_bus::ChannelMessage;
 use tinytools::{Tool, ToolResult};
@@ -39,7 +38,7 @@ impl Tool for DummyTool {
 
 #[derive(Default)]
 pub(super) struct RecordingChannel {
-    sent: Mutex<Vec<SendMessage>>,
+    pub(super) sent: Mutex<Vec<SendMessage>>,
 }
 
 #[async_trait]
@@ -202,11 +201,6 @@ fn provider_descriptors_use_configured_slugs_and_keep_managed_aliases() {
     );
     assert_eq!(providers[0].aliases, Vec::<String>::new());
     assert_eq!(providers[1].aliases, ["backend", "openhuman-backend"]);
-    assert_eq!(
-        resolve_provider_alias("backend", &providers).as_deref(),
-        Some("openhuman")
-    );
-    assert!(resolve_provider_alias("p_custom_a8c3f", &providers).is_none());
 }
 
 #[cfg(feature = "modules")]

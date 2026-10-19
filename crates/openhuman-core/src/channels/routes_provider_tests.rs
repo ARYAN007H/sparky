@@ -1,7 +1,7 @@
 use super::tests::{runtime_context, RecordingChannel};
 use super::*;
 use crate::channels::context::conversation_history_key;
-use crate::channels::{Channel, SendMessage};
+use crate::channels::Channel;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tinychannels_bus::ChannelMessage;
