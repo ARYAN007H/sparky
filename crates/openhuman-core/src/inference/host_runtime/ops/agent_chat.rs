@@ -391,6 +391,35 @@ pub async fn agent_chat_reply_for(
     route: Option<crate::config::schema::EphemeralRoute>,
     env: AgentChatEnv,
 ) -> Result<AgentChatReply, String> {
+    agent_chat_reply_for_controlled(
+        config,
+        target,
+        message,
+        model_override,
+        temperature,
+        thread_id,
+        cwd,
+        route,
+        env,
+    )
+    .await
+    .map_err(|error| error.to_string())
+}
+
+/// [`agent_chat_reply_for`] while retaining typed host-policy errors for
+/// callers that need to distinguish dispatch refusal from provider failure.
+#[allow(clippy::too_many_arguments)]
+pub async fn agent_chat_reply_for_controlled(
+    config: &mut Config,
+    target: AgentChatTarget<'_>,
+    message: &str,
+    model_override: Option<String>,
+    temperature: Option<f64>,
+    thread_id: Option<String>,
+    cwd: Option<String>,
+    route: Option<crate::config::schema::EphemeralRoute>,
+    env: AgentChatEnv,
+) -> anyhow::Result<AgentChatReply> {
     match target {
         AgentChatTarget::Definition {
             untrusted_input: true,
@@ -398,7 +427,9 @@ pub async fn agent_chat_reply_for(
             ..
         } => {
             if !host_only {
-                return Err("untrusted_input is only allowed on a host-only agent".to_string());
+                return Err(anyhow::anyhow!(
+                    "untrusted_input is only allowed on a host-only agent"
+                ));
             }
             log::debug!(
                 "[inference] agent_chat untrusted input on a host-only agent; guard skipped"
@@ -618,7 +649,7 @@ pub async fn agent_chat_reply_for(
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner) = agent.last_turn_usage();
     }
-    let text = outcome.map_err(|e| e.to_string())?;
+    let text = outcome?;
     let hit_cap = agent.last_turn_hit_cap();
     if hit_cap {
         log::info!("[inference] agent_chat turn paused at its iteration cap; reporting hit_cap");
