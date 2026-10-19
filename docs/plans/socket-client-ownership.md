@@ -47,8 +47,10 @@ unavailable result for calls that require the hosted connection.
 
 `openhuman-tinyhumans::register_all` adds one idempotent socket registration.
 The public registry shape remains in core; the SDK adapter lives under
-`crates/openhuman-tinyhumans/src/socket/`. Do not add SDK re-exports to
-`openhuman-embed::__host` beyond the registration types required for this port.
+`crates/openhuman-tinyhumans/src/socket/`. Do not add SDK imports,
+dependencies, or re-exports to core or `openhuman-embed`. Only SDK-independent
+core port registration types may cross `openhuman-embed::__host` for use by
+`openhuman-tinyhumans`.
 
 ## Lifecycle, credentials, endpoint, and redirect constraints
 
