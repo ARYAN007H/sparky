@@ -6,9 +6,7 @@ use super::*;
 /// reload/diff instead of silently clobbering; other variants are plain text.
 fn map_flow_update_error(e: tinyflows_bus::catalog::FlowUpdateError) -> String {
     match e {
-        tinyflows_bus::catalog::FlowUpdateError::NotFound { .. } => {
-            "flow not found".to_string()
-        }
+        tinyflows_bus::catalog::FlowUpdateError::NotFound { .. } => "flow not found".to_string(),
         tinyflows_bus::catalog::FlowUpdateError::VersionConflict { message, current } => {
             serde_json::to_string(&json!({
                 "code": "version_conflict",

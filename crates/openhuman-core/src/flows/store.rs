@@ -14,9 +14,7 @@ use tinyflows_bus::catalog::{
     ListRevisionsRequest, ListWorkflowsResult, PutWorkflowRequest, PutWorkflowResponse,
     SetEnabledRequest, Workflow, WorkflowRevision,
 };
-use tinyflows_catalog::{
-    Flow, FlowRevision, FlowSuggestion, SuggestionStatus,
-};
+use tinyflows_catalog::{Flow, FlowRevision, FlowSuggestion, SuggestionStatus};
 
 use crate::config::Config;
 use crate::modules::tinyflows as module;
@@ -243,33 +241,34 @@ pub fn update_flow_graph(
     force_disarm_if_automatic: bool,
     expected_updated_at: Option<&str>,
 ) -> std::result::Result<Flow, BusUpdateError> {
-    let storage = super::catalog_storage::register_blocking(config)
-        .map_err(|error| BusUpdateError::Store {
+    let storage = super::catalog_storage::register_blocking(config).map_err(|error| {
+        BusUpdateError::Store {
             message: error.to_string(),
-        })?;
+        }
+    })?;
     let request = PutWorkflowRequest::Update {
         storage,
         id: id.to_owned(),
         name,
-        graph: serde_json::to_value(graph)
-            .map_err(|error| BusUpdateError::Store {
-                message: error.to_string(),
-            })?,
+        graph: serde_json::to_value(graph).map_err(|error| BusUpdateError::Store {
+            message: error.to_string(),
+        })?,
         require_approval,
         expected_version: expected_updated_at.map(str::to_owned),
         force_disarm_automatic: force_disarm_if_automatic,
     };
     let response: PutWorkflowResponse =
-        call_catalog(config, catalog::members::PUT_WORKFLOW, (request,))
-            .map_err(|error| BusUpdateError::Store {
-                message: error.to_string(),
-            })?;
-    match response {
-        PutWorkflowResponse::Ok(result) => flow_from_wire(result.workflow).map_err(|error| {
+        call_catalog(config, catalog::members::PUT_WORKFLOW, (request,)).map_err(|error| {
             BusUpdateError::Store {
                 message: error.to_string(),
             }
-        }),
+        })?;
+    match response {
+        PutWorkflowResponse::Ok(result) => {
+            flow_from_wire(result.workflow).map_err(|error| BusUpdateError::Store {
+                message: error.to_string(),
+            })
+        }
         PutWorkflowResponse::Error(error) => Err(error),
     }
 }
