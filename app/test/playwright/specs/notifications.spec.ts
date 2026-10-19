@@ -7,14 +7,6 @@ import {
   waitForAppReady,
 } from '../helpers/core-rpc';
 
-function getUnreadCount(stats: Record<string, unknown>): number {
-  for (const key of ['unread_count', 'unread', 'total_unread']) {
-    const value = stats[key];
-    if (typeof value === 'number') return value;
-  }
-  return 0;
-}
-
 async function waitForNotificationsSections(page: Page): Promise<void> {
   await expect(page.getByTestId('integration-notifications-section')).toBeVisible();
   await expect(page.getByTestId('system-events-section')).toBeVisible();
