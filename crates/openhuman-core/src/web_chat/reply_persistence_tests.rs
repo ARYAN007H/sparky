@@ -111,13 +111,15 @@ fn an_empty_reply_is_not_stored() {
     )
     .expect("no error");
     assert!(!stored, "an empty reply reports that nothing was stored");
-    assert!(conversations::get_messages(
-        &crate::core::runtime::DispatchCtx::ambient(),
-        ws.clone(),
-        "t-3"
-    )
-    .expect("messages")
-    .is_empty());
+    assert!(
+        conversations::get_messages(
+            &crate::core::runtime::DispatchCtx::ambient(),
+            ws.clone(),
+            "t-3"
+        )
+        .expect("messages")
+        .is_empty()
+    );
 }
 
 #[test]
