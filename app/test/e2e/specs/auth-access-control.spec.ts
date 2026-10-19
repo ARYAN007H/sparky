@@ -24,6 +24,7 @@
 import { waitForApp, waitForAppReady, waitForAuthBootstrap } from '../helpers/app-helpers';
 import { callOpenhumanRpc, expectRpcOk } from '../helpers/core-rpc';
 import { triggerAuthDeepLink } from '../helpers/deep-link-helpers';
+import { authStateValue, type AuthStateResponse } from '../helpers/auth-state';
 import {
   clickButton,
   clickText,
@@ -193,23 +194,6 @@ async function performFullLogin(token = 'e2e-test-token') {
     throw new Error('Full login did not reach Home page');
   }
   console.log(`[AuthAccess] Home page confirmed: found "${homeText}"`);
-}
-
-/**
- * `AuthStateResponse` — `crates/openhuman-core/src/security/credentials/responses.rs`.
- *
- * `credential` is `skip_serializing_if = "Option::is_none"` on the Rust side,
- * so it is absent (not null) when signed out.
- */
-interface AuthStateResponse {
-  isAuthenticated: boolean;
-  userId?: string | null;
-  credential?: 'session' | 'api-key' | 'local';
-}
-
-function authStateValue(state: { result?: unknown }): AuthStateResponse {
-  const raw = (state.result ?? {}) as { value?: AuthStateResponse } & AuthStateResponse;
-  return raw.value ?? raw;
 }
 
 // ===========================================================================
