@@ -200,9 +200,11 @@ fn attached_tools_survive_clones_and_session_resume() {
             let has_frozen_prompt = durable_system
                 .iter()
                 .any(|content| content.contains("FROZEN_HOST_PROMPT"));
-            let has_permanent_tools_message = durable_system
-                .iter()
-                .any(|content| content.contains("openhuman-permanent-tools"));
+            let has_permanent_tools_message = durable_system.iter().any(|content| {
+                content.contains("openhuman-permanent-tools")
+                    && content.contains("hivemind_message")
+                    && content.contains("hivemind_list")
+            });
             if !has_frozen_prompt || !has_permanent_tools_message {
                 eprintln!("durable system messages: {durable_system:#?}");
             }
