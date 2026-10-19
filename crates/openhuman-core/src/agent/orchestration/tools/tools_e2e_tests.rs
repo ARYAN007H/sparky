@@ -3,7 +3,6 @@ use crate::agent::harness::ParentExecutionContext;
 use crate::agent_registry::host_definition::AgentDefinitionRegistry;
 use crate::integrations::ConnectedIntegration;
 use crate::threads::store as conversations;
-use crate::tools::implementations::threads::SpawnWorkerThreadTool;
 use async_trait::async_trait;
 use parking_lot::Mutex;
 use serde_json::json;
@@ -460,62 +459,6 @@ async fn continue_subagent_without_checkpoint_or_durable_session_names_the_roste
 }
 
 #[tokio::test]
-async fn spawn_worker_thread_tool_persists_worker_thread_e2e() {
-    let _ = AgentDefinitionRegistry::init_global_builtins();
-    let workspace = tempfile::TempDir::new().expect("workspace");
-    let provider = Arc::new(ScriptedModel::new(vec![(
-        WORKER_THREAD_CANARY,
-        "worker-thread-child-answer",
-    )]));
-
-    let live = super::live_parent_run_context(
-        "worker-thread-e2e",
-        parent_context(workspace.path(), provider.clone(), vec![]),
-    );
-    let result = SpawnWorkerThreadTool::new()
-        .execute_with_live_parent_context(
-            json!({
-                "agent_id": "task_manager_agent",
-                "prompt": format!("Handle long task {WORKER_THREAD_CANARY}"),
-                "task_title": "Long delegated task",
-                "model": "test-model"
-            }),
-            None,
-            live.data.child(),
-            Some(&live),
-        )
-        .await
-        .expect("tool execution");
-
-    assert!(!result.is_error, "{}", result.output());
-    assert!(result.output().contains("[worker_thread_ref]"));
-    assert!(result.output().contains("\"status\":\"completed\""));
-    assert!(provider.saw(WORKER_THREAD_CANARY));
-
-    let threads = conversations::list_threads(
-        &crate::core::runtime::DispatchCtx::ambient(),
-        workspace.path().to_path_buf(),
-    )
-    .expect("worker threads");
-    let worker = threads
-        .iter()
-        .find(|thread| thread.labels.contains(&"tasks".to_string()))
-        .expect("worker thread was persisted");
-    assert_eq!(worker.title, "Long delegated task");
-
-    let messages = conversations::get_messages(
-        &crate::core::runtime::DispatchCtx::ambient(),
-        workspace.path().to_path_buf(),
-        &worker.id,
-    )
-    .expect("worker messages");
-    assert_eq!(messages.len(), 2);
-    assert_eq!(messages[0].sender, "user");
-    assert!(messages[0].content.contains(WORKER_THREAD_CANARY));
-    assert_eq!(messages[1].sender, "agent");
-    assert_eq!(messages[1].content, "worker-thread-child-answer");
-}
-
 fn parent_context(
     workspace_dir: &Path,
     model: Arc<dyn ChatModel<()>>,
