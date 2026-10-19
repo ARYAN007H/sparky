@@ -1,9 +1,4 @@
-//! Raw-line oriented E2E coverage for the connectivity domain.
-//!
-//! The public JSON-RPC surface is intentionally small (`connectivity_diag`),
-//! while the module also owns embedded-core port selection. These tests drive
-//! both through exported production APIs so the E2E lcov captures the real
-//! success and error branches.
+//! JSON-RPC coverage for the connectivity diagnostics surface.
 
 use crate::env_guard::EnvVarGuard;
 use std::net::SocketAddr;
@@ -27,11 +22,6 @@ struct TestHarness {
     _guards: Vec<EnvVarGuard>,
     rpc_base: String,
     rpc_join: tokio::task::JoinHandle<Result<(), std::io::Error>>,
-}
-
-fn env_lock() -> tokio::sync::MutexGuard<'static, ()> {
-    let mutex = ENV_LOCK.get_or_init(|| tokio::sync::Mutex::new(()));
-    mutex.blocking_lock()
 }
 
 async fn env_lock_async() -> tokio::sync::MutexGuard<'static, ()> {
