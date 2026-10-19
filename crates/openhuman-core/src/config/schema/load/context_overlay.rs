@@ -91,12 +91,13 @@ impl ConfigContextOverlay {
 
         let child_value = serde_json::to_value(child)?;
         for path in PROFILE_OWNED_PATHS {
-            let value = value_at_path(&child_value, path)
+            let value = value_at_path(&child_value, *path)
                 .cloned()
                 .ok_or_else(|| anyhow::anyhow!("profile-owned config path is missing"))?;
-            changes.retain(|change| !change.path.starts_with(path));
+            let path: Vec<String> = path.iter().map(|part| (*part).to_string()).collect();
+            changes.retain(|change| !change.path.starts_with(&path));
             changes.push(Change {
-                path: path.iter().map(|part| (*part).to_string()).collect(),
+                path,
                 value: Some(value),
             });
         }
