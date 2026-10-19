@@ -1,5 +1,5 @@
-use super::*;
 use super::super::{OpenHumanRunContext, SubagentUsageEntry};
+use super::*;
 use std::sync::Arc;
 
 #[test]
