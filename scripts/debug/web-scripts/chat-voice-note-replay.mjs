@@ -33,13 +33,13 @@ export default async function voiceNoteReplay({ page, mock, log, screenshot }) {
   let typedVoiceNoteSent = false;
   let threadId = null;
   let rpcUrl;
-  let rpcAuthorization;
+  let rpcAuthorizationPromise;
   page.on("request", (request) => {
     if (!request.url().endsWith("/rpc")) return;
     rpcUrl = request.url();
-    void request
+    rpcAuthorizationPromise = request
       .allHeaders()
-      .then((headers) => (rpcAuthorization = headers.authorization));
+      .then((headers) => headers.authorization);
     try {
       const body = JSON.parse(request.postData() ?? "{}");
       if (body.method !== "openhuman.channel_web_chat") return;
@@ -49,6 +49,7 @@ export default async function voiceNoteReplay({ page, mock, log, screenshot }) {
         params.attachments?.some(
           (part) =>
             part.kind === "voice_note" &&
+            part.voiceNote?.media?.opaqueId &&
             part.voiceNote?.media?.url?.startsWith("data:audio/wav;base64,") &&
             part.voiceNote?.durationMs > 0,
         );
@@ -205,6 +206,7 @@ export default async function voiceNoteReplay({ page, mock, log, screenshot }) {
     .getByTestId("voice-note-player")
     .nth(1)
     .waitFor({ state: "visible", timeout: 30_000 });
+  const rpcAuthorization = await rpcAuthorizationPromise;
   if (!rpcUrl || !rpcAuthorization)
     throw new Error("could not capture the signed local core RPC endpoint");
   const transcriptResponse = await page.request.post(rpcUrl, {
