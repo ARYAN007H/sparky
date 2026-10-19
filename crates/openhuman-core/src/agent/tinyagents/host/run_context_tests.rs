@@ -461,6 +461,27 @@ fn detached_child_inherits_the_parent_dispatch_admission() {
     ));
 }
 
+#[test]
+fn independently_created_root_turns_have_isolated_dispatch_refusal_sidecars() {
+    let first = OpenHumanRunContext::new();
+    let second = OpenHumanRunContext::new();
+    let refusal = crate::agent::tinyagents::budget::DispatchRefusal::new(
+        crate::agent::tinyagents::budget::DispatchRefusalReason::CallLimit,
+    );
+
+    assert!(!Arc::ptr_eq(
+        &first.session_sidecar,
+        &second.session_sidecar
+    ));
+    first.session_sidecar.lock().unwrap().dispatch_refusal = Some(refusal);
+    assert!(second
+        .session_sidecar
+        .lock()
+        .unwrap()
+        .dispatch_refusal
+        .is_none());
+}
+
 struct TestAdmission;
 
 #[async_trait::async_trait]

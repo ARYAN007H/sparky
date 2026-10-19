@@ -148,18 +148,27 @@ impl OpenHumanSessionHost {
         let outcome = match Box::pin(turn).await {
             Ok(outcome) => outcome,
             Err(error) => {
-                let refusal = session_sidecar
-                    .lock()
-                    .unwrap_or_else(std::sync::PoisonError::into_inner)
-                    .dispatch_refusal
-                    .take();
-                if let Some(refusal) = refusal {
-                    return Err(anyhow::Error::new(refusal));
-                }
-                return Err(anyhow::anyhow!(error.to_string()));
+                return Err(runtime_turn_error(error, &session_sidecar));
             }
         };
         Ok(outcome.output.unwrap_or_default())
+    }
+}
+
+fn runtime_turn_error(
+    error: tinyagents_runtime::RuntimeError,
+    sidecar: &std::sync::Arc<
+        std::sync::Mutex<crate::agent::tinyagents::host::run_context::SessionTurnSidecar>,
+    >,
+) -> anyhow::Error {
+    let refusal = sidecar
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .dispatch_refusal
+        .take();
+    match refusal {
+        Some(refusal) => anyhow::Error::new(refusal),
+        None => anyhow::anyhow!(error.to_string()),
     }
 }
 
@@ -174,3 +183,7 @@ pub(in crate::agent::session_host) fn begin_turn_resume(
     }
     state.active_turn_overrides = overrides;
 }
+
+#[cfg(test)]
+#[path = "runtime_session_turn_tests.rs"]
+mod tests;
