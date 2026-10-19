@@ -1697,7 +1697,6 @@ async fn credentials_public_ops_cover_service_and_missing_session_error_paths() 
     };
     config.secrets.encrypt = false;
     config.local_ai.runtime_enabled = false;
-    config.voice_server.auto_start = false;
     std::fs::create_dir_all(config.config_path.parent().expect("config parent"))
         .expect("create config parent");
 

@@ -468,11 +468,6 @@ pub mod profiles {
 }
 
 pub mod voice {
-    pub mod dictation_listener {
-        pub use openhuman_core::voice::dictation_listener::{
-            subscribe_dictation_events, subscribe_transcription_results,
-        };
-    }
     // Where feature unification differs between embed and core, rpc still names
     // the live-voice path; embed supplies a socket-dropping stand-in.
     pub mod live {

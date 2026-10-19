@@ -6,17 +6,13 @@ use crate::modules::types::{LoadPolicy, ModuleRecord, PlatformAsset, SourceSpec}
 #[cfg(feature = "voice")]
 /// The `tinyvoice` module: the host-agnostic half of the voice pipeline.
 ///
-/// Hotkey-driven capture-side audio work (downmix, resample, silence gate,
-/// WAV framing) and STT hallucination detection.
+/// STT hallucination detection used by the voice transcription pipeline.
 ///
-/// Lazy: voice dictation is opt-in, so a session that never records should not
-/// pay a download or a `dlopen`.
-///
-/// Devices and audio processing live in the compiled module. Hosts poll bounded
-/// capture batches and apply product permission, privacy and transcription policy.
+/// Lazy: transcript screening loads the module only when voice transcription
+/// needs it.
 pub(crate) const TINYVOICE: ModuleRecord = ModuleRecord {
     id: "tinyvoice",
-    description: "Hotkey capture, hallucination detection, capture audio",
+    description: "Voice transcript hallucination detection",
     bus_name: tinyvoice_bus::names::BUS_NAME,
     object_path: tinyvoice_bus::names::OBJECT_PATH,
     version: "0.3.2",
