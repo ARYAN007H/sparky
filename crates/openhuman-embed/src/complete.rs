@@ -658,14 +658,16 @@ impl Completer {
         );
         let started = std::time::Instant::now();
         let response = call.await.map_err(|error| {
-            if let tinyagents_harness::cost::ControlledDispatchError::Admission(source) = error {
-                return CoreError::DispatchAdmission {
-                    method: COMPLETE,
-                    source,
-                    usage: None,
-                };
-            }
-            let message = error.to_string();
+            let message = match error {
+                tinyagents_harness::cost::ControlledDispatchError::Admission(source) => {
+                    return CoreError::DispatchAdmission {
+                        method: COMPLETE,
+                        source,
+                        usage: None,
+                    };
+                }
+                error => error.to_string(),
+            };
             if let Some(source) = budget.as_ref().and_then(|budget| budget.ledger.refusal()) {
                 return CoreError::BudgetExceeded {
                     method: COMPLETE,
