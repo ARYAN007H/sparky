@@ -866,5 +866,5 @@ async fn agent_definitions_and_validation_are_exposed_over_rpc() {
         "agent_server_status should return an object: {status}"
     );
 
-    harness.join.abort();
+    harness._rpc_join.abort();
 }
