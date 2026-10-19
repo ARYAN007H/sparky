@@ -396,6 +396,8 @@ tinyagents-harness = { path = "../../vendor/tinyagents/crates/tinyagents-harness
 tinyagents-definition = { path = "../../vendor/tinyagents/crates/tinyagents-definition" }
 tinyagents-session = { path = "../../vendor/tinyagents/crates/tinyagents-session" }
 tinydocs-bus = { path = "../../vendor/tinydocs/crates/tinydocs-bus" }
+# `inbound_linked_e2e` names the ingest dispositions from the contract.
+tinyeventqueues-bus = { path = "../../vendor/tinyeventqueues/crates/tinyeventqueues-bus" }
 tinysearch-bus = { path = "../../vendor/tinysearch/crates/tinysearch-bus" }
 tinybus = { path = "../../vendor/tinybus/crates/tinybus", default-features = false, features = ["macros", "uds"] }
 tinychannels = { version = "0.1", features = ["relay-websocket", "email"] }
