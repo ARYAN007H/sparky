@@ -287,7 +287,7 @@ test.describe('Settings - Feature Preferences', () => {
 
     await expect(page.getByText('Mascot Voice')).toBeVisible();
     test.skip(
-      // https://github.com/tinyhumansai/openhuman/issues/1762
+      /* https://github.com/tinyhumansai/openhuman/issues/1762 */
       (await page
         .locator('[data-testid="mascot-voice-select"] option[value="__custom__"]')
         .count()) === 0,
@@ -296,7 +296,7 @@ test.describe('Settings - Feature Preferences', () => {
 
     await page.getByTestId('mascot-voice-select').selectOption('__custom__');
     test.skip(
-      // https://github.com/tinyhumansai/openhuman/issues/1762
+      /* https://github.com/tinyhumansai/openhuman/issues/1762 */
       (await page.getByTestId('mascot-voice-input').count()) === 0,
       'custom mascot voice input did not appear after selecting __custom__'
     );

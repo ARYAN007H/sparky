@@ -226,7 +226,7 @@ test.describe('Chat transcript stick-to-bottom', () => {
 
     const overflowing = await scrollState(page);
     test.skip(
-      // https://github.com/tinyhumansai/openhuman/issues/6563
+      /* https://github.com/tinyhumansai/openhuman/issues/6563 */
       overflowing.scrollHeight <= overflowing.clientHeight + 200,
       'transcript did not overflow enough to scroll — viewport too tall for this fixture'
     );
@@ -293,7 +293,7 @@ test.describe('Chat transcript stick-to-bottom', () => {
 
     const first = await scrollState(page);
     test.skip(
-      // https://github.com/tinyhumansai/openhuman/issues/6563
+      /* https://github.com/tinyhumansai/openhuman/issues/6563 */
       first.scrollHeight <= first.clientHeight + 200,
       'transcript did not overflow enough to scroll — viewport too tall for this fixture'
     );
@@ -387,7 +387,7 @@ test.describe('Chat transcript stick-to-bottom', () => {
 
     const overflowing = await scrollState(page);
     test.skip(
-      // https://github.com/tinyhumansai/openhuman/issues/6563
+      /* https://github.com/tinyhumansai/openhuman/issues/6563 */
       overflowing.scrollHeight <= overflowing.clientHeight + 200,
       'transcript did not overflow enough to scroll — viewport too tall for this fixture'
     );
