@@ -5,8 +5,8 @@ use std::sync::Arc;
 use serde_json::{Value, json};
 use tinyflows_bus::runs;
 
-use super::agent::{AgentRunState, OpenHumanAgentRunner};
-use super::binding::CapsHostBinding;
+use super::super::agent::{AgentRunState, OpenHumanAgentRunner};
+use super::super::binding::CapsHostBinding;
 
 pub(crate) async fn run_agent(
     binding: Arc<CapsHostBinding>,
