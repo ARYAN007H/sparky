@@ -81,7 +81,6 @@ pub async fn flows_update(
         graph_json,
         require_approval,
         expected_version,
-        false,
     )
     .await
 }
