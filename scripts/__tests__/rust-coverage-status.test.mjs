@@ -252,6 +252,7 @@ node - "$@" <<'JS'
 const fs = require('node:fs');
 const args = process.argv.slice(2);
 if (args[0] === 'metadata') console.log(JSON.stringify({ packages: [] }));
+if (args[0] === 'llvm-cov' && args[1] === 'show-env') console.log('export CARGO_LLVM_COV_TARGET_DIR=target');
 if (args[0] === 'nextest' && args[1] === 'list') {
   console.log(JSON.stringify({ 'rust-suites': { active: { 'binary-name': 'active', testcases: { active: { ignored: false, 'filter-match': { status: 'matches' } } } } } }));
 }
