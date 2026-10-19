@@ -338,6 +338,8 @@ async fn drive_turn(
     }
     // `session_kv_store` self-gates on the dual-write flag (config default ON +
     // env kill switch), returning `None` when disabled or unresolvable.
+    // Heap-allocate config-loading setup state here: nested delegates poll on
+    // their parent's stack even when TurnSpec itself is boxed.
     let dispatch_ctx = run_context.dispatch_ctx();
     if let Some(session_kv) = Box::pin(crate::storage::import::live::session_kv_store(
         &dispatch_ctx,
