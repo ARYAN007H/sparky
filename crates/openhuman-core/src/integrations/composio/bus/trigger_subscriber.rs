@@ -271,10 +271,11 @@ pub(super) fn triage_directly(
                     defer_until_ms,
                     reason,
                 }) => {
-                    // Tiered fallback exhausted both arms; the caller
-                    // surface (composio bus) has no scheduler of its
-                    // own — log and drop. The next composio fire will
-                    // re-enter the chain.
+                    // Tiered fallback exhausted both arms. The direct path has
+                    // no scheduler of its own, so the deferral is logged and
+                    // dropped; with the inbound event queues on (the default)
+                    // triggers do not come here: `Deliver` retries a deferral
+                    // at `defer_until_ms` (crate::inbound::deliver).
                     tracing::warn!(
                         label = %envelope.display_label,
                         defer_until_ms = defer_until_ms,
@@ -325,3 +326,7 @@ pub(super) fn triage_disabled() -> bool {
         Some("1") | Some("true") | Some("TRUE") | Some("yes") | Some("YES")
     )
 }
+
+#[cfg(test)]
+#[path = "trigger_subscriber_tests.rs"]
+mod tests;
