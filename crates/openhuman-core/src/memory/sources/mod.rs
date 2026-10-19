@@ -10,7 +10,7 @@
 pub mod state;
 mod sync;
 
-use tinymemory_integrations::sources::SourceSpec;
+use tinymemory_integrations::sources::{Error as SourceError, SourceSpec};
 use tinymemory_tools::ops::MemoryOps;
 
 use crate::config::schema::{MemorySourceConfig, MemorySourceKind};
@@ -24,6 +24,13 @@ pub use sync::{start_sync, sync_due, sync_one};
 
 /// Fewest minutes between scheduled syncs of one source (the module's).
 pub use tinymemory_integrations::sources::sync::MIN_SCHEDULE_MINS;
+
+fn source_spec_error(error: SourceError) -> Error {
+    match error {
+        SourceError::Invalid(message) => Error::InvalidRequest(message),
+        error => Error::InvalidRequest(error.to_string()),
+    }
+}
 
 /// The view of `source` with its sync state.
 #[must_use]
@@ -58,7 +65,7 @@ pub fn list(config: &Config) -> Vec<SourceView> {
 /// Normalises a target for `kind` using TinyMemory's source rules.
 pub fn normalize_target(kind: MemorySourceKind, target: &str) -> Result<String> {
     SourceSpec::normalize_target(kind, target)
-        .map_err(|error| Error::InvalidRequest(error.to_string()))
+        .map_err(source_spec_error)
 }
 
 /// Builds a new source from `memory_sources_add` params and appends it to
@@ -78,7 +85,7 @@ pub fn apply_add(config: &mut Config, params: &SourcesAddParams) -> Result<Memor
     };
     let target = spec
         .validate_new(&config.memory.sources)
-        .map_err(|error| Error::InvalidRequest(error.to_string()))?;
+        .map_err(source_spec_error)?;
     let label = params
         .label
         .as_deref()
@@ -87,7 +94,7 @@ pub fn apply_add(config: &mut Config, params: &SourcesAddParams) -> Result<Memor
         .map_or_else(|| target.clone(), str::to_string);
     let namespace = spec
         .namespace()
-        .map_err(|error| Error::InvalidRequest(error.to_string()))?
+        .map_err(source_spec_error)?
         .map(|namespace| namespace.to_string());
     let source = MemorySourceConfig {
         id: format!("src-{}", uuid::Uuid::new_v4().simple()),
