@@ -303,6 +303,33 @@ async fn config_snapshot_is_bound_to_its_backend_instance() {
 }
 
 #[tokio::test]
+async fn a_file_snapshot_can_seed_an_absent_document_after_storage_bootstrap() {
+    let tmp = tempfile::tempdir().unwrap();
+    let path = tmp.path().join("config.toml");
+    let workspace = tmp.path().join("workspace");
+    let mut file_config = config_at(tmp.path(), "file-seed");
+    file_config.save().await.unwrap();
+    let mut snapshot = Config::load_from_config_path(&path, &workspace)
+        .await
+        .unwrap();
+    assert!(matches!(
+        snapshot.document_snapshot.lock().unwrap().anchor.clone(),
+        Some(ConfigSourceAnchor::File(_))
+    ));
+
+    let storage = MemoryStorage::new();
+    let _source = ForcedDocumentSource::new(
+        scoped(&storage, "tenant-file-bootstrap"),
+        Scope::new("tenant-file-bootstrap").unwrap(),
+        keys(15),
+    );
+    snapshot.default_model = Some("imported-to-document".into());
+    snapshot.save().await.unwrap();
+    let loaded = Config::load_from_config_path(&path, &workspace).await.unwrap();
+    assert_eq!(loaded.default_model.as_deref(), Some("imported-to-document"));
+}
+
+#[tokio::test]
 async fn document_source_write_uses_its_last_read_revision() {
     let tmp = tempfile::tempdir().unwrap();
     let storage = MemoryStorage::new();

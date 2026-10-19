@@ -439,7 +439,15 @@ impl Config {
         } else {
             None
         };
-        let version = source.write_versioned(&toml_str, expected).await?;
+        let version = match source.write_versioned(&toml_str, expected).await {
+            Ok(version) => version,
+            Err(error) => {
+                if is_document_conflict(&error) {
+                    self.refresh_context_after_conflict(&expected_snapshot).await;
+                }
+                return Err(error);
+            }
+        };
         if !update_snapshot {
             return Ok(());
         }
@@ -468,6 +476,55 @@ impl Config {
 
         Ok(())
     }
+
+    async fn refresh_context_after_conflict(
+        &self,
+        expected: &super::super::ConfigDocumentSnapshot,
+    ) {
+        let Some(snapshot) = self
+            .context_snapshot
+            .as_ref()
+            .and_then(std::sync::Weak::upgrade)
+        else {
+            return;
+        };
+        let (config_path, workspace_dir, runtime) = {
+            let current = snapshot.lock().unwrap();
+            if *current.document_snapshot.lock().unwrap() != *expected {
+                return;
+            }
+            (current.config_path.clone(), current.workspace_dir.clone(), current.clone())
+        };
+        let Ok(mut refreshed) = Self::load_from_config_path(&config_path, &workspace_dir).await
+        else {
+            return;
+        };
+        if refreshed.document_snapshot.lock().unwrap().anchor != expected.anchor {
+            return;
+        }
+        refreshed.profile_providers = runtime.profile_providers.clone();
+        refreshed.workspace_dir = runtime.workspace_dir;
+        refreshed.action_dir = runtime.action_dir;
+        refreshed.config_path = runtime.config_path;
+        refreshed.cli_inference_snapshot = runtime.cli_inference_snapshot;
+        refreshed.recovered_from_corruption = runtime.recovered_from_corruption;
+        refreshed.ephemeral_route = runtime.ephemeral_route;
+        refreshed.resolved_endpoints = runtime.resolved_endpoints;
+        refreshed.context_snapshot = Some(std::sync::Arc::downgrade(&snapshot));
+
+        let mut current = snapshot.lock().unwrap();
+        if *current.document_snapshot.lock().unwrap() == *expected {
+            *current = refreshed;
+        }
+    }
+}
+
+fn is_document_conflict(error: &anyhow::Error) -> bool {
+    error.chain().any(|cause| {
+        cause
+            .downcast_ref::<tinystoragedrivers::StorageError>()
+            .is_some_and(|error| error.kind() == tinystoragedrivers::ErrorKind::Conflict)
+    })
 }
 
 impl Config {
