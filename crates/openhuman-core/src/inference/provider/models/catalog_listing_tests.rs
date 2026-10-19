@@ -1,9 +1,11 @@
 use super::*;
-
 use super::catalog_listing::list_configured_models_from_config;
+use super::local_runtime::synthesize_local_runtime_entry;
+use crate::config::schema::cloud_providers::{AuthStyle, CloudProviderCreds};
+use crate::config::Config;
+use axum::http::StatusCode;
 use crate::inference::provider::model_listing_test_support::{
-    configure_generic_workspace, configure_openrouter_workspace, spawn_openrouter_probe_server,
-    spawn_static_models_server,
+    configure_generic_workspace, spawn_static_models_server,
 };
 
 #[tokio::test]
@@ -49,7 +51,7 @@ async fn list_models_uses_provider_ca_bundle_client() {
     let mut config = configure_generic_workspace(&tmp, endpoint).await;
     config.cloud_provider_ca_certs.insert(
         "generic-test".into(),
-        include_str!("../../util/tls/test-ca.pem").into(),
+        include_str!("../../../util/tls/test-ca.pem").into(),
     );
 
     let outcome = list_configured_models_from_config("generic-test", &config)

@@ -302,7 +302,7 @@ async fn publish_backend_session_expired_emits_sanitized_session_expired() {
         "sanitize_api_error must redact the sk- token in the reason: {reason}"
     );
     assert!(
-        !reason.contains(secret),
+        !reason.contains(&secret),
         "raw secret must not survive into the SessionExpired reason: {reason}"
     );
 }

@@ -14,7 +14,6 @@ use std::sync::{
     Arc, Mutex,
 };
 use tempfile::TempDir;
-use tinyinference_core::sanitize::{sanitize_api_error, MAX_API_ERROR_CHARS};
 
 #[derive(Clone)]
 pub(crate) struct ModelProbeState {

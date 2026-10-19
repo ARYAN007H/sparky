@@ -1,4 +1,5 @@
-use super::models::catalog_listing::resolve_local_runtime_key;
+use super::*;
+use catalog_listing::resolve_local_runtime_key;
 use crate::config::Config;
 
 #[test]

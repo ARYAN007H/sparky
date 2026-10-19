@@ -1,10 +1,13 @@
 use super::*;
-
 use super::catalog_listing::list_configured_models_from_config;
+use crate::config::schema::cloud_providers::AuthStyle;
+use axum::http::StatusCode;
 use crate::inference::provider::model_listing_test_support::{
     configure_generic_workspace, configure_openrouter_workspace, spawn_openrouter_probe_server,
     spawn_static_models_server,
 };
+use std::sync::atomic::Ordering as AtomicOrdering;
+use tinyinference_core::sanitize::{sanitize_api_error, MAX_API_ERROR_CHARS};
 
 #[test]
 fn list_configured_models_accepts_slug() {
