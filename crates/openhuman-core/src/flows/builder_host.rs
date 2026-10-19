@@ -193,7 +193,7 @@ impl FlowsHost {
                     wire!(ops::wiring_warnings_json(&config, payload).await?)
                 }
                 PortOperation::GatesApprovalManifest => {
-                    wire!(ops::approval_manifest_json(&config, payload).await?)
+                    wire!(ops::approval_manifest_json(&context, &config, payload).await?)
                 }
             };
             Ok(value)

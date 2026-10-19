@@ -128,7 +128,7 @@ pub(in crate::flows::schemas) fn handle_approval_manifest(
             .filter(|s| !s.trim().is_empty())
             .map(str::to_string);
         let graph = params.get("graph").filter(|v| !v.is_null()).cloned();
-        to_json(ops::flows_approval_manifest(&config, id.as_deref(), graph).await?)
+        to_json(ops::flows_approval_manifest(&ctx, &config, id.as_deref(), graph).await?)
     })
 }
 
