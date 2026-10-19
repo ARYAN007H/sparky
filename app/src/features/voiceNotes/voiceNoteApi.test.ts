@@ -82,6 +82,16 @@ describe('voiceNoteApi', () => {
     await expect(readVoiceNote('gone')).resolves.toBeNull();
   });
 
+  it('unwraps the core Outcome envelope when reading persisted note audio', async () => {
+    rpc.callCoreRpc.mockResolvedValue({
+      logs: ['voice note read'],
+      result: { note_id: 'n', audio_base64: 'AQID', mime: 'audio/wav' },
+    });
+    const blob = await readVoiceNote('n');
+    expect(blob?.type).toBe('audio/wav');
+    expect(blob?.size).toBe(3);
+  });
+
   it('transcribes with the recording extension and prefers cleaned text', async () => {
     voice.openhumanVoiceTranscribeBytes.mockResolvedValue({
       text: ' hello ',
