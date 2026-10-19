@@ -128,6 +128,62 @@ async fn sequential_config_rpcs_use_the_latest_context_snapshot() {
 }
 
 #[tokio::test]
+async fn config_snapshot_cannot_be_saved_into_a_different_tenant_scope() {
+    let tmp = tempfile::tempdir().unwrap();
+    let storage = MemoryStorage::new();
+    let path = tmp.path().join("config.toml");
+    let workspace = tmp.path().join("workspace");
+
+    let mut from_tenant_a = {
+        let _source = ForcedDocumentSource::new(
+            scoped(&storage, "tenant-source-a"),
+            Scope::new("tenant-source-a").unwrap(),
+            keys(12),
+        );
+        config_at(tmp.path(), "tenant-a").save().await.unwrap();
+        Config::load_from_config_path(&path, &workspace)
+            .await
+            .unwrap()
+    };
+
+    {
+        let _source = ForcedDocumentSource::new(
+            scoped(&storage, "tenant-source-b"),
+            Scope::new("tenant-source-b").unwrap(),
+            keys(12),
+        );
+        config_at(tmp.path(), "tenant-b").save().await.unwrap();
+    }
+
+    from_tenant_a.default_model = Some("must-not-cross-tenant-boundary".into());
+    let error = {
+        let _source = ForcedDocumentSource::new(
+            scoped(&storage, "tenant-source-b"),
+            Scope::new("tenant-source-b").unwrap(),
+            keys(12),
+        );
+        from_tenant_a.save().await.unwrap_err()
+    };
+    let storage_error = error
+        .chain()
+        .find_map(|cause| cause.downcast_ref::<tinystoragedrivers::StorageError>())
+        .expect("a save into a different source returns a typed conflict");
+    assert_eq!(storage_error.kind(), tinystoragedrivers::ErrorKind::Conflict);
+
+    let tenant_b = {
+        let _source = ForcedDocumentSource::new(
+            scoped(&storage, "tenant-source-b"),
+            Scope::new("tenant-source-b").unwrap(),
+            keys(12),
+        );
+        Config::load_from_config_path(&path, &workspace)
+            .await
+            .unwrap()
+    };
+    assert_eq!(tenant_b.default_model.as_deref(), Some("tenant-b"));
+}
+
+#[tokio::test]
 async fn document_source_write_uses_its_last_read_revision() {
     let tmp = tempfile::tempdir().unwrap();
     let storage = MemoryStorage::new();
