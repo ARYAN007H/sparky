@@ -55,6 +55,39 @@ async fn concurrent_linked_module_client_requests_share_the_ready_fixture() {
     assert!(third.fixture_proxy().is_some());
 }
 
+#[tokio::test]
+async fn linked_module_accepts_confidential_web_projection_begin() {
+    let proxy = client()
+        .await
+        .fixture_proxy()
+        .expect("the linked module fixture should expose its proxy");
+    let handle: tinychannels_bus::module_web_output::WebTurnHandle = proxy
+        .call_confidential(
+            tinychannels_bus::methods::BEGIN_WEB_TURN,
+            (tinychannels_bus::module_web_output::BeginWebTurn {
+                scope_key: "fixture-web-chat:begin".into(),
+                context: tinychannels_bus::web::WebEventContext {
+                    client_id: "fixture-client".into(),
+                    thread_id: "fixture-thread".into(),
+                    request_id: "fixture-request".into(),
+                    ..Default::default()
+                },
+            },),
+        )
+        .await
+        .unwrap_or_else(|error| panic!("confidential web projection begin failed: {error:?}"));
+
+    proxy
+        .call_confidential::<()>(
+            tinychannels_bus::methods::END_WEB_TURN,
+            (tinychannels_bus::module_web_output::EndWebTurn {
+                handle: handle.handle,
+            },),
+        )
+        .await
+        .expect("the linked module should end its web projection turn");
+}
+
 /// Temporarily install in-memory storage for module callbacks in isolated tests.
 pub(crate) struct MemoryStorageGuard {
     previous: Option<Arc<dyn crate::storage::StorageBackend>>,
