@@ -275,14 +275,21 @@ async fn tokenjuice_rpcs_use_their_derived_config_for_module_calls_and_install()
 
     let methods = calls.methods.lock().unwrap();
     for method in ["Detect", "Compress", "CacheStats", "Retrieve"] {
-        for _ in 0..2 {
-            assert_eq!(
-                methods.iter().filter(|actual| actual.as_str() == method).count(),
-                2,
-                "{method} reached the TinyBus client once per derived context"
-            );
-        }
+        assert_eq!(
+            methods.iter().filter(|actual| actual.as_str() == method).count(),
+            2,
+            "{method} reached the TinyBus client once per derived context"
+        );
     }
+    assert_eq!(
+        methods
+            .iter()
+            .filter(|actual| actual.as_str() == "ImportSavings")
+            .count(),
+        2,
+        "legacy savings from both caller workspaces reached TinyBus"
+    );
+    drop(methods);
     let installs = calls.installs.lock().unwrap();
     for (index, config) in configs.iter().enumerate() {
         let disk_root = config.workspace_dir.join(".tokenjuice/ccr");
@@ -297,13 +304,17 @@ async fn tokenjuice_rpcs_use_their_derived_config_for_module_calls_and_install()
             "Install must carry workspace and option values from derived config {index}"
         );
         let profile = ["juice-profile-a", "juice-profile-b"][index];
+    }
+    drop(installs);
+    for (index, config) in configs.iter().enumerate() {
+        let profile = ["juice-profile-a", "juice-profile-b"][index];
         assert!(
             savings_imported(&config.workspace_dir, Some(profile)).await,
             "legacy savings import must complete in the caller's profile scope"
         );
         assert!(
             !savings_imported(&config.workspace_dir, None).await,
-            "legacy savings import must not write into the operator's module scope"
+            "legacy savings import must not write into the controlled operator scope"
         );
     }
 }
