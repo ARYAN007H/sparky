@@ -17,6 +17,7 @@ import { callOpenhumanRpc } from '../helpers/core-rpc';
 import { triggerAuthDeepLink } from '../helpers/deep-link-helpers';
 import {
   clickButton,
+  clickSelector,
   dumpAccessibilityTree,
   textExists,
   waitForWebView,
@@ -112,7 +113,11 @@ describe.skip(// https://github.com/senamakel/openhuman/issues/236
     );
     expect(voiceStatusMessage).not.toBeNull();
 
-    await clickButton('Switch to text', 10_000);
+    if (supportsExecuteScript()) {
+      await clickSelector('button[aria-label="Switch to text"]', 10_000);
+    } else {
+      await clickButton('Switch to text', 10_000);
+    }
     const textRestored = await waitForAnyText(['How can I help', 'Threads', 'New'], 10_000);
     expect(textRestored).not.toBeNull();
   });
