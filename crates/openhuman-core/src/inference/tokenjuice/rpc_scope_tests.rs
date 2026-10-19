@@ -1,10 +1,8 @@
 use super::*;
 use std::sync::{Arc, Mutex};
 
-use crate::core::runtime::{
-    ContextOverlay, CoreContext, DispatchCtx, DomainSet,
-};
-use tinybus::{broker::Broker, transport::memory::MemoryBus, Connection, ObjectPath};
+use crate::core::runtime::{ContextOverlay, CoreContext, DispatchCtx, DomainSet};
+use tinybus::{Connection, ObjectPath, broker::Broker, transport::memory::MemoryBus};
 
 #[derive(Default)]
 struct Calls {
@@ -102,7 +100,8 @@ async fn fixture() -> (tinybus::Proxy, Arc<Calls>) {
 }
 
 fn derived_context(base: &Arc<CoreContext>, config: Config, profile: &str) -> DispatchCtx {
-    let overlay = ContextOverlay::new(config, DomainSet::full(), Default::default()).profile(profile);
+    let overlay =
+        ContextOverlay::new(config, DomainSet::full(), Default::default()).profile(profile);
     DispatchCtx::new(base.derive_with(overlay))
 }
 
@@ -171,12 +170,7 @@ async fn tokenjuice_rpcs_use_their_derived_config_for_module_calls_and_install()
             serde_json::json!({ "content": "alpha" }),
         )
         .await;
-        invoke(
-            contexts[1].clone(),
-            "cache_stats",
-            serde_json::json!({}),
-        )
-        .await;
+        invoke(contexts[1].clone(), "cache_stats", serde_json::json!({})).await;
         invoke(
             contexts[1].clone(),
             "retrieve",
@@ -204,7 +198,10 @@ async fn tokenjuice_rpcs_use_their_derived_config_for_module_calls_and_install()
     }
     let methods = calls.methods.lock().unwrap();
     for method in ["Detect", "Compress", "CacheStats", "Retrieve"] {
-        assert!(methods.iter().any(|actual| actual == method), "{method} reached the TinyBus client");
+        assert!(
+            methods.iter().any(|actual| actual == method),
+            "{method} reached the TinyBus client"
+        );
     }
     let installs = calls.installs.lock().unwrap();
     for (index, config) in configs.iter().enumerate() {
@@ -214,7 +211,8 @@ async fn tokenjuice_rpcs_use_their_derived_config_for_module_calls_and_install()
             installs.iter().any(|request| {
                 request.disk_tier_root.as_deref() == Some(disk_root.to_string_lossy().as_ref())
                     && request.options.repl_save_dir.as_deref() == Some(save_root.as_path())
-                    && request.options.min_bytes_to_compress == config.tokenjuice.min_bytes_to_compress
+                    && request.options.min_bytes_to_compress
+                        == config.tokenjuice.min_bytes_to_compress
             }),
             "Install must carry workspace and option values from derived config {index}"
         );
