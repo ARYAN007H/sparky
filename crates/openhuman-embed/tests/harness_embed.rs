@@ -43,7 +43,7 @@ const PROVIDER_DELAY: std::time::Duration = std::time::Duration::from_secs(2);
 /// on a shared hosted runner spent, failing a run that had not serialized at
 /// all (#6758). The floor is now 200 s, so this budget can absorb an
 /// instrumented run and still catch a serialized one by a factor of two.
-const CONCURRENT_BUDGET: std::time::Duration = std::time::Duration::from_secs(15);
+const CONCURRENT_BUDGET: std::time::Duration = std::time::Duration::from_secs(90);
 
 #[test]
 fn a_harness_runs_a_turn_against_the_provider_it_was_given() {
