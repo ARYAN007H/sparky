@@ -50,7 +50,7 @@ export function startCoreChild(startChild, core, corePort, launchSpec) {
 
 /** Whether a logged core RPC auth state reports an authenticated credential. */
 export function isCoreAuthenticated(authState) {
-  return authState?.isAuthenticated === true;
+  return authState?.result?.isAuthenticated === true;
 }
 
 /** Navigate an authenticated scripted session to chat when Home has no composer. */
