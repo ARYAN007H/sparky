@@ -182,6 +182,7 @@ test("the full product runner enumerates and runs each JSON-RPC target once", ()
     const script = [
       "set -euo pipefail",
       `RUN_LOG='${log}'`,
+      "connectors_module_path=fixture hosts_dir=fixture",
       'cargo_test() {\n  printf "CARGO\\t%s\\n" "$*" >> "$RUN_LOG"\n  local previous= target= arg\n  for arg in "$@"; do\n    if [ "$previous" = "--test" ]; then target="$arg"; fi\n    previous="$arg"\n  done\n  if [[ " $* " == *" -- --list "* ]]; then printf "%s_case: test\\n" "$target"; fi\n}',
       'integration_test_targets() { printf "%s\\n" ' + JSON_RPC_TARGETS.join(" ") + "; }",
       "run_build_only_reaper_test() { :; }",
