@@ -149,6 +149,18 @@ pub(crate) async fn register(
         .map_err(|error| format!("CatalogStorage registration task did not finish: {error}"))?
 }
 
+/// Register from the existing synchronous flow store API.
+pub(crate) fn register_blocking(config: &Config) -> anyhow::Result<WireStorage> {
+    let context = DispatchCtx::ambient();
+    let config = config.clone();
+    crate::storage::block_on_anyhow(async move {
+        register(&context, &config)
+            .await
+            .map(|registration| registration.storage())
+            .map_err(anyhow::Error::msg)
+    })
+}
+
 #[cfg(test)]
 async fn pause_before_cache_insert(path: &str) {
     let gate = REGISTRATION_GATES

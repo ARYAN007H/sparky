@@ -7,6 +7,7 @@
 
 use anyhow::{Result, anyhow};
 use serde::{Serialize, de::DeserializeOwned};
+use serde_json::Value;
 use std::path::PathBuf;
 use tinyflows_bus::catalog::{
     self, DeleteWorkflowResult, FlowUpdateError as BusUpdateError, GetRevisionRequest,
@@ -19,7 +20,6 @@ use tinyflows_catalog::{
 };
 
 use crate::config::Config;
-use crate::core::runtime::DispatchCtx;
 use crate::modules::tinyflows as module;
 
 /// Retained only for callers that display the legacy workflow folder path.
@@ -32,13 +32,8 @@ where
     T: DeserializeOwned + Send + 'static,
     A: Serialize + Send + 'static,
 {
-    let context = DispatchCtx::ambient();
     let config = config.clone();
     crate::storage::block_on_anyhow(async move {
-        let _registration =
-            super::catalog_storage::register(&context, &config)
-                .await
-                .map_err(anyhow::Error::msg)?;
         let proxy = module::catalog_proxy(&config)
             .await
             .map_err(anyhow::Error::msg)?;
@@ -64,19 +59,13 @@ fn flow_from_wire(workflow: Workflow) -> Result<Flow> {
     })
 }
 
-fn flow_to_wire(flow: &Flow) -> Result<Workflow> {
-    Ok(Workflow {
-        id: flow.id.clone(),
-        name: flow.name.clone(),
-        enabled: flow.enabled,
-        graph: serde_json::to_value(&flow.graph)
-            .map_err(|error| anyhow!("encode workflow graph: {error}"))?,
-        created_at: flow.created_at.clone(),
-        updated_at: flow.updated_at.clone(),
-        last_run_at: flow.last_run_at.clone(),
-        last_status: flow.last_status.clone(),
-        require_approval: flow.require_approval,
-    })
+
+fn roundtrip<T, U>(value: T) -> Result<U>
+where
+    T: Serialize,
+    U: DeserializeOwned,
+{
+    serde_json::from_value(serde_json::to_value(value)?).map_err(Into::into)
 }
 
 fn update_error_from_wire(error: BusUpdateError) -> FlowUpdateError {
@@ -102,19 +91,57 @@ fn put_result(response: PutWorkflowResponse) -> Result<Flow> {
 }
 
 /// Save a workflow through the module's Catalog contract.
+#[cfg(test)]
 pub fn upsert_flow(config: &Config, flow: &Flow) -> Result<()> {
+    test_seed_flow(config, flow)
+}
+
+#[cfg(test)]
+fn test_seed_flow(config: &Config, flow: &Flow) -> Result<()> {
     let storage = super::catalog_storage::register_blocking(config)?;
-    let request = PutWorkflowRequest::Update {
-        storage,
+    let _: ListWorkflowsResult = call_catalog(
+        config,
+        catalog::members::LIST_WORKFLOWS,
+        (storage.clone(),),
+    )?;
+    let created_ms = chrono::DateTime::parse_from_rfc3339(&flow.created_at)
+        .map(|date| date.timestamp_millis())
+        .unwrap_or(0);
+    let updated_ms = chrono::DateTime::parse_from_rfc3339(&flow.updated_at)
+        .map(|date| date.timestamp_millis())
+        .unwrap_or(created_ms);
+    let mut doc = serde_json::json!({
+        "name": flow.name,
+        "graph": flow.graph,
+        "enabled": flow.enabled,
+        "created_ms": created_ms,
+        "updated_ms": updated_ms,
+        "require_approval": flow.require_approval,
+        "revision": 1,
+        "incarnation": uuid::Uuid::new_v4().to_string(),
+    });
+    if let Some(status) = &flow.last_status {
+        doc["last_status"] = Value::String(status.clone());
+    }
+    if let Some(last_run_at) = &flow.last_run_at {
+        if let Ok(date) = chrono::DateTime::parse_from_rfc3339(last_run_at) {
+            doc["last_run_ms"] = Value::from(date.timestamp_millis());
+        }
+    }
+    let request = catalog::DocPutRequest {
+        collection: "flows.definitions".into(),
         id: flow.id.clone(),
-        name: flow.name.clone(),
-        graph: serde_json::to_value(&flow.graph)?,
-        require_approval: flow.require_approval,
-        expected_version: None,
-        force_disarm_automatic: false,
+        doc,
+        precondition: catalog::CatalogDocumentPrecondition::None,
+        schema: 2,
+        expires_ms: None,
+        created_ms: Some(created_ms),
     };
-    let response: PutWorkflowResponse = call_catalog(config, catalog::members::PUT_WORKFLOW, (request,))?;
-    put_result(response)?;
+    let _: catalog::CatalogStorageReply = call_catalog(
+        config,
+        catalog::storage::PUT,
+        (request,),
+    )?;
     Ok(())
 }
 
@@ -266,7 +293,7 @@ pub fn list_revisions(config: &Config, flow_id: &str, limit: usize) -> Result<Ve
     )?;
     revisions
         .into_iter()
-        .map(|revision| serde_json::from_value(serde_json::to_value(revision)?).map_err(Into::into))
+        .map(roundtrip)
         .collect()
 }
 
@@ -288,7 +315,7 @@ pub fn revision_by_id(
         (request,),
     )?;
     revision
-        .map(|revision| serde_json::from_value(serde_json::to_value(revision)?).map_err(Into::into))
+        .map(roundtrip)
         .transpose()
 }
 
@@ -298,8 +325,8 @@ pub fn upsert_suggestions(config: &Config, suggestions: &[FlowSuggestion]) -> Re
     let suggestions = suggestions
         .iter()
         .cloned()
-        .map(|suggestion| serde_json::from_value(serde_json::to_value(suggestion).unwrap_or(Value::Null)))
-        .collect::<std::result::Result<Vec<catalog::FlowSuggestion>, _>>()?;
+        .map(roundtrip)
+        .collect::<Result<Vec<catalog::FlowSuggestion>>>()?;
     let request = catalog::UpsertSuggestionsRequest {
         storage,
         suggestions,
@@ -315,7 +342,7 @@ pub fn list_suggestions(
 ) -> Result<Vec<FlowSuggestion>> {
     let storage = super::catalog_storage::register_blocking(config)?;
     let status: Option<catalog::SuggestionStatus> = status
-        .map(|status| serde_json::from_value(serde_json::to_value(status).unwrap_or(Value::Null)))
+        .map(roundtrip)
         .transpose()?;
     let request = catalog::ListSuggestionsRequest {
         storage,
@@ -326,7 +353,7 @@ pub fn list_suggestions(
         call_catalog(config, catalog::members::LIST_SUGGESTIONS, (request,))?;
     suggestions
         .into_iter()
-        .map(|suggestion| serde_json::from_value(serde_json::to_value(suggestion)?).map_err(Into::into))
+        .map(roundtrip)
         .collect()
 }
 
@@ -337,8 +364,7 @@ pub fn set_suggestion_status(
     status: SuggestionStatus,
 ) -> Result<bool> {
     let storage = super::catalog_storage::register_blocking(config)?;
-    let status: catalog::SuggestionStatus =
-        serde_json::from_value(serde_json::to_value(status)?)?;
+    let status: catalog::SuggestionStatus = roundtrip(status)?;
     let request = catalog::SetSuggestionStatusRequest {
         storage,
         id: id.to_owned(),
