@@ -84,9 +84,10 @@ impl SessionDriver<OpenHumanRunContext> for OpenHumanSessionDriver {
         // request history. Scrub user text before every early snapshot/return
         // path so cancellation cannot persist a credential the provider gate
         // has already redacted.
-        if !request.run_context.data.untrusted_input_turn {
-            scrub_user_history(&mut request.history);
-        }
+        scrub_user_history(
+            &mut request.history,
+            !request.run_context.data.untrusted_input_turn,
+        );
         // Heal a head persisted before #6721 was fixed, before anything reads
         // the history: this turn then commits a clean generation.
         repair_orphaned_tool_head(&mut request.history);
@@ -516,7 +517,10 @@ impl SessionDriver<OpenHumanRunContext> for OpenHumanSessionDriver {
     }
 }
 
-fn scrub_user_history(history: &mut [Message]) {
+fn scrub_user_history(history: &mut [Message], enabled: bool) {
+    if !enabled {
+        return;
+    }
     for message in history {
         if let Message::User(user) = message {
             for block in &mut user.content {
