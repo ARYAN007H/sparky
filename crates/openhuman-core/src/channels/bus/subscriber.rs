@@ -94,7 +94,7 @@ impl EventHandler<DomainEvent> for ChannelInboundSubscriber {
         let thread_id = identity.thread_id;
         let client_id = identity.client_id;
 
-        let mut event_rx = crate::web_chat::subscribe_web_channel_events();
+        let event_rx = crate::web_chat::subscribe_web_channel_events();
         let reply =
             match ModuleProgressiveReply::open(config, channel.clone(), session.clone()).await {
                 Ok(reply) => reply,

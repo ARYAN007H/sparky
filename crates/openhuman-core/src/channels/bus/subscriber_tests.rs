@@ -89,10 +89,13 @@ async fn backend_channel_wait_does_not_cut_off_a_live_turn_after_180_seconds() {
     tokio::join!(producer, consumer);
     crate::web_chat::set_test_run_chat_task_block(None).await;
 
-    assert_eq!(
-        *sink.progress.lock().unwrap(),
-        vec![ProgressiveEvent::TextDelta("still working".into())]
-    );
+    let progress = sink.progress.lock().unwrap();
+    assert_eq!(progress.len(), 1);
+    assert!(matches!(
+        progress.first(),
+        Some(ProgressiveEvent::TextDelta(text)) if text == "still working"
+    ));
+    drop(progress);
     assert_eq!(
         *sink.finalized.lock().unwrap(),
         vec!["parked reply".to_string()],
