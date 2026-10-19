@@ -85,6 +85,9 @@ async fn memory_engine_rpc_preserves_document_conflicts() {
     assert_eq!(structured.data.as_ref().unwrap()["retryable"], false);
 }
 
+#[path = "revision_loader_tests.rs"]
+mod revision_loader_tests;
+
 #[tokio::test]
 async fn sequential_config_rpcs_use_the_latest_context_snapshot() {
     let tmp = tempfile::tempdir().unwrap();
