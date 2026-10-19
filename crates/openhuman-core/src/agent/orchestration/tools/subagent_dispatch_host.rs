@@ -27,9 +27,7 @@ pub(crate) struct DelegationDispatch {
 }
 
 enum DelegationDispatchKind {
-    Archetype {
-        agent_id: String,
-    },
+    Archetype { agent_id: String },
 }
 
 impl DelegationDispatch {

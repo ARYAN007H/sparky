@@ -599,7 +599,9 @@ async fn prompt_and_declared_tools(
 async fn debug_prompt_matches_the_system_prompt_sent_on_a_cold_turn() {
     let _ = crate::agent_registry::host_definition::AgentDefinitionRegistry::init_global_builtins();
     let action_dir = tempfile::tempdir().expect("tempdir");
-    let model = Arc::new(tinyagents_harness::testkit::ScriptedModel::replies(vec!["ok"]));
+    let model = Arc::new(tinyagents_harness::testkit::ScriptedModel::replies(vec![
+        "ok",
+    ]));
     let model_for_host: Arc<dyn tinyinference_llm::model::ChatModel<()>> = model.clone();
     let mut host = crate::agent::SessionHostBuilder::new()
         .chat_model(model_for_host)
@@ -636,7 +638,10 @@ async fn debug_prompt_matches_the_system_prompt_sent_on_a_cold_turn() {
         .collect::<String>();
 
     assert_no_goal_tools(&sent, &ToolSnapshot::default());
-    assert_eq!(dumped, sent, "debug dump must equal the real cold-turn system prompt");
+    assert_eq!(
+        dumped, sent,
+        "debug dump must equal the real cold-turn system prompt"
+    );
 }
 
 fn assert_no_goal_tools(prompt: &str, snapshot: &ToolSnapshot) {
