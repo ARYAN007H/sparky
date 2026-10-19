@@ -65,8 +65,10 @@ function toolCall(id: string, name: string, args: string) {
   return { content: '', toolCalls: [{ id, name, arguments: args }] };
 }
 
-const FORCED_RESPONSES = [
-  // Turn 1: record the objective, then write the plan.
+const TURN_1_RESPONSES = [
+  // One agent turn may make several primary model requests as tools run.
+  // Keep this queue scoped to the first user message so later turns retain
+  // their own observable intermediate state.
   toolCall(
     'call_goal_set_1',
     'goal_set',
@@ -74,9 +76,15 @@ const FORCED_RESPONSES = [
   ),
   toolCall('call_todo_1', 'todo', todoArgs(0)),
   { content: 'Plan written; starting on the changelog.' },
+];
+
+const TURN_2_RESPONSES = [
   // Turn 2: three done, working the fourth.
   toolCall('call_todo_2', 'todo', todoArgs(3)),
   { content: 'Three steps done.' },
+];
+
+const TURN_3_RESPONSES = [
   // Turn 3: everything done, goal closed.
   toolCall('call_todo_3', 'todo', todoArgs(5)),
   toolCall('call_goal_complete_1', 'goal_complete', JSON.stringify({})),
@@ -104,7 +112,9 @@ async function readGoal(): Promise<{ status: string; objective: string } | null>
   return (await browser.execute(() => {
     const el = document.querySelector('[data-testid="todo-checklist"]');
     if (!el) return null;
-    const label = el.querySelector('button');
+    // TaskCard puts the objective in its flexing label span. Whole-button
+    // text also includes the screen-reader state and the trailing meta label.
+    const label = el.querySelector('button > span.flex-1');
     return {
       status: el.getAttribute('data-state') ?? '',
       objective: (label?.textContent ?? '').trim(),
@@ -153,9 +163,8 @@ describe('Chat todos and goals', () => {
     await waitForApp();
     await resetApp(USER_ID);
 
-    setMockBehavior('llmForcedResponses', JSON.stringify(FORCED_RESPONSES));
     setMockBehavior('llmStreamChunkDelayMs', '10');
-    console.log(`${LOG_PREFIX} Setup complete — ${FORCED_RESPONSES.length} forced responses`);
+    console.log(`${LOG_PREFIX} Setup complete — per-turn forced responses ready`);
   });
 
   after(async () => {
@@ -180,6 +189,7 @@ describe('Chat todos and goals', () => {
 
     const socketReady = await waitForSocketConnected(30_000);
     if (!socketReady) console.warn(`${LOG_PREFIX} socket not connected — send may fail`);
+    setMockBehavior('llmForcedResponses', JSON.stringify(TURN_1_RESPONSES));
     await sendTurn('Write the v2 release notes, in five steps.');
 
     await waitForTestId('todo-checklist', 45_000);
@@ -210,6 +220,7 @@ describe('Chat todos and goals', () => {
   });
 
   it('G1.3 — a later write moves the checklist on', async () => {
+    setMockBehavior('llmForcedResponses', JSON.stringify(TURN_2_RESPONSES));
     await sendTurn('continue');
     await waitForProgress(3, 5);
     await waitForGoalStatus('waiting');
@@ -228,6 +239,7 @@ describe('Chat todos and goals', () => {
   });
 
   it('G1.4 — the final turn completes every item and marks the task card done', async () => {
+    setMockBehavior('llmForcedResponses', JSON.stringify(TURN_3_RESPONSES));
     await sendTurn('finish it');
     await waitForProgress(5, 5);
     await browser.waitUntil(async () => (await readGoal())?.status === 'done', {
