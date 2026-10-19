@@ -1,13 +1,18 @@
 use super::*;
 use crate::core::all::{
-    expect_schema_fields, expect_schema_identity, expect_schema_input_order,
-    expect_schema_required_inputs, required_input_contract,
+    assert_schema_controller_parity, expect_schema_fields, expect_schema_identity, expect_schema_input_order,
+    expect_schema_required_inputs, required_fields_contract,
 };
 
 #[test]
 fn wallet_schema_wire_contracts_are_preserved() {
     assert_eq!(all_wallet_controller_schemas().len(), 16);
     assert_eq!(all_wallet_registered_controllers().len(), 16);
+    assert_schema_controller_parity(
+        &all_wallet_controller_schemas(),
+        &all_wallet_registered_controllers(),
+        "setup",
+    );
 
     for (function, inputs) in [
         ("generate_mnemonic", &["wordCount"][..]),
@@ -61,7 +66,7 @@ fn required_input_contract_rejects_removed_or_optional_encrypted_mnemonic() {
         "fixed contract field must exist before mutation"
     );
     assert_eq!(
-        required_input_contract(schema, &["encryptedMnemonic"]),
+        required_fields_contract(schema, &["encryptedMnemonic"]),
         Ok(()),
         "real registered wallet.setup schema satisfies the independent oracle"
     );
@@ -70,9 +75,9 @@ fn required_input_contract_rejects_removed_or_optional_encrypted_mnemonic() {
     removed
         .inputs
         .retain(|input| input.name != "encryptedMnemonic");
-    assert!(required_input_contract(&removed, &["encryptedMnemonic"])
+    assert!(required_fields_contract(&removed, &["encryptedMnemonic"])
         .unwrap_err()
-        .contains("expected [\"encryptedMnemonic\"], got []"));
+        .contains("is missing required input `encryptedMnemonic`"));
 
     let mut optional = schema.clone();
     optional
@@ -81,7 +86,7 @@ fn required_input_contract_rejects_removed_or_optional_encrypted_mnemonic() {
         .find(|input| input.name == "encryptedMnemonic")
         .expect("asserted field exists")
         .required = false;
-    assert!(required_input_contract(&optional, &["encryptedMnemonic"])
+    assert!(required_fields_contract(&optional, &["encryptedMnemonic"])
         .unwrap_err()
-        .contains("expected [\"encryptedMnemonic\"], got []"));
+        .contains("input `encryptedMnemonic` is not required"));
 }

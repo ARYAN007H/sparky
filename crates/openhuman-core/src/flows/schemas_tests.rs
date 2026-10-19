@@ -1,5 +1,5 @@
 use super::*;
-use crate::core::all::{expect_schema_fields, expect_schema_input_order, expect_schema_output_names, expect_schema_required_inputs};
+use crate::core::all::{expect_schema_fields, expect_schema_identity, expect_schema_input_order, expect_schema_output_names, expect_schema_required_inputs};
 use serde_json::json;
 
 #[test]
@@ -23,7 +23,7 @@ fn flow_schema_wire_contracts_are_preserved() {
     ];
     for (function, required, optional) in contracts {
         let schema = schemas(function);
-        assert_eq!(schema.namespace, "flows", "{function} namespace");
+        expect_schema_identity(&schema, "flows", function);
         expect_schema_required_inputs(&schema, required);
         expect_schema_fields(
             &schema,

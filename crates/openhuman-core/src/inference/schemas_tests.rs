@@ -1,9 +1,15 @@
 use super::*;
+use crate::core::all::assert_schema_controller_parity;
 use crate::core::runtime::DispatchCtx;
 
 use crate::core::TypeSchema;
 #[test]
 fn inference_schema_function_names_are_stable() {
+    assert_schema_controller_parity(
+        &all_controller_schemas(),
+        &all_registered_controllers(),
+        "status",
+    );
     let functions: Vec<&str> = all_controller_schemas()
         .into_iter()
         .map(|schema| schema.function)

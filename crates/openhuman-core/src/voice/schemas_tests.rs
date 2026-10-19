@@ -1,4 +1,5 @@
 use super::*;
+use crate::core::all::expect_schema_required_inputs;
 use crate::core::runtime::DispatchCtx;
 use serde_json::json;
 
@@ -69,6 +70,8 @@ fn voice_schema_wire_contracts_are_preserved() {
             );
         }
     }
+    expect_schema_required_inputs(&voice_schemas("voice_server_start"), &[]);
+    expect_schema_required_inputs(&voice_schemas("voice_update_provider_settings"), &[]);
     let registered: Vec<_> = all_voice_registered_controllers()
         .into_iter()
         .map(|controller| controller.schema.function)

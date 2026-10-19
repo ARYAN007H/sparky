@@ -1260,6 +1260,28 @@ pub(crate) fn required_input_contract(
 }
 
 #[cfg(test)]
+pub(crate) fn required_fields_contract(
+    schema: &ControllerSchema,
+    required: &[&str],
+) -> Result<(), String> {
+    for name in required {
+        let Some(field) = schema.inputs.iter().find(|field| field.name == *name) else {
+            return Err(format!(
+                "{}.{} is missing required input `{name}`",
+                schema.namespace, schema.function
+            ));
+        };
+        if !field.required {
+            return Err(format!(
+                "{}.{} input `{name}` is not required",
+                schema.namespace, schema.function
+            ));
+        }
+    }
+    Ok(())
+}
+
+#[cfg(test)]
 pub(crate) fn expect_schema_input_order(schema: &ControllerSchema, inputs: &[&str]) {
     let actual: Vec<_> = schema.inputs.iter().map(|field| field.name).collect();
     assert_eq!(

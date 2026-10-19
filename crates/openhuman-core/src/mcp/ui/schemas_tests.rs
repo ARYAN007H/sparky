@@ -1,14 +1,18 @@
 use super::*;
-use crate::core::all::{expect_schema_fields, expect_schema_identity};
+use crate::core::all::{
+    assert_schema_controller_parity, expect_schema_identity, expect_schema_required_inputs,
+};
 use crate::core::runtime::DispatchCtx;
 
 #[test]
 fn mcp_ui_schema_contracts_are_preserved() {
     let schema = schemas("tool_call");
     expect_schema_identity(&schema, "mcp_ui", "tool_call");
-    expect_schema_fields(
-        &schema,
-        &[("server_id", Some(true)), ("tool_name", Some(true))],
+    expect_schema_required_inputs(&schema, &["server_id", "tool_name"]);
+    assert_schema_controller_parity(
+        &all_controller_schemas(),
+        &all_registered_controllers(),
+        "tool_call",
     );
 }
 

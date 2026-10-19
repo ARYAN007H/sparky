@@ -1,5 +1,15 @@
 use super::*;
 use crate::core::runtime::DispatchCtx;
+use crate::core::all::assert_schema_controller_parity;
+
+#[test]
+fn subsystem_catalog_matches_registered_controllers() {
+    assert_schema_controller_parity(
+        &all_controller_schemas(),
+        &all_registered_controllers(),
+        "status",
+    );
+}
 
 #[tokio::test]
 async fn handler_returns_a_subsystems_array_containing_the_memory_slot() {

@@ -122,7 +122,7 @@ fn registered_controller_schemas_are_consistent_and_serializable() {
 
         if method == "openhuman.wallet_setup" {
             assert_eq!(
-                required_input_contract(schema, &["encryptedMnemonic"]),
+                required_fields_contract(schema, &["encryptedMnemonic"]),
                 Ok(()),
                 "wallet.setup required-input contract"
             );

@@ -1,4 +1,14 @@
 use super::*;
+use crate::core::all::assert_schema_controller_parity;
+
+#[test]
+fn runtime_schema_catalog_matches_registered_controllers() {
+    assert_schema_controller_parity(
+        &all_controller_schemas(),
+        &all_registered_controllers(),
+        "agent_chat",
+    );
+}
 
 #[test]
 fn every_registered_key_resolves_to_non_unknown_schema() {
