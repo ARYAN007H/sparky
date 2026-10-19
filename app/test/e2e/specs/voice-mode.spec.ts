@@ -233,10 +233,9 @@ describe('Voice mode — Human tab capture & error mapping', () => {
     expect(await textExists('Voice mode')).toBe(true);
     await clickButton('Voice mode');
     expect(await textExists('Tap and speak')).toBe(true);
-    // The switch is icon-only: "Switch to text" is its accessible name, not
-    // visible text. Exercise it through the accessibility helper and verify
-    // that the text composer returns.
-    await clickButton('Switch to text', 10_000);
+    // The switch is icon-only: its accessible name is not visible DOM text,
+    // so target the button's label instead of the text-search helper.
+    await clickSelector('button[aria-label="Switch to text"]', 10_000);
     expect(await waitForAnyText(['How can I help', 'Threads', 'New'], 10_000)).not.toBeNull();
   });
 

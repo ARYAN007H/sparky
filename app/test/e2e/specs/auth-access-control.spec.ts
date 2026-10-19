@@ -22,9 +22,9 @@
  * have been built with VITE_BACKEND_URL pointing there.
  */
 import { waitForApp, waitForAppReady, waitForAuthBootstrap } from '../helpers/app-helpers';
+import { type AuthStateResponse, authStateValue } from '../helpers/auth-state';
 import { callOpenhumanRpc, expectRpcOk } from '../helpers/core-rpc';
 import { triggerAuthDeepLink } from '../helpers/deep-link-helpers';
-import { authStateValue, type AuthStateResponse } from '../helpers/auth-state';
 import {
   clickButton,
   clickText,

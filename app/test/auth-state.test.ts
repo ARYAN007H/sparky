@@ -20,4 +20,10 @@ describe('authStateValue', () => {
     expect(state.isAuthenticated).toBe(true);
     expect(state.credential).toBe('session');
   });
+
+  it('rejects unrecognized RPC shapes instead of treating missing auth as signed out', () => {
+    expect(() => authStateValue({ result: { logs: ['session state fetched'] } })).toThrow(
+      'auth_get_state returned no boolean isAuthenticated field'
+    );
+  });
 });
