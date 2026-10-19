@@ -54,6 +54,27 @@ fn reply_metadata_exists_only_after_the_reply_audio_is_stored() {
 }
 
 #[test]
+fn synthesized_reply_metadata_preserves_its_viseme_timeline() {
+    let tmp = tempfile::tempdir().unwrap();
+    assert!(store_synthesized_reply(
+        tmp.path(),
+        "request-1",
+        "YWJj",
+        "audio/mpeg"
+    ));
+
+    let meta = reply_note_metadata(tmp.path(), "request-1").unwrap();
+    assert_eq!(
+        meta["visemes"],
+        serde_json::json!([
+            {"viseme": "aa", "start_ms": 0, "end_ms": 120},
+            {"viseme": "PP", "start_ms": 120, "end_ms": 220}
+        ]),
+        "replayed assistant audio needs the original TTS timeline for mascot lip-sync"
+    );
+}
+
+#[test]
 fn rpc_round_trip_and_bad_base64() {
     let tmp = tempfile::tempdir().unwrap();
     let out = store_from_rpc(tmp.path(), "rt", "audio/webm", "YWJj").unwrap();
