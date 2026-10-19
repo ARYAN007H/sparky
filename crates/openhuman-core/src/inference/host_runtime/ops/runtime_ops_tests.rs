@@ -5,13 +5,15 @@ use std::sync::{
 };
 use tinyinference_local::service::{LocalAiService, RuntimeConfig};
 
-async fn spawn_blocked_counting_endpoint() -> (
-    String,
-    Arc<AtomicUsize>,
-    tokio::sync::oneshot::Receiver<()>,
-    tokio::sync::oneshot::Sender<()>,
-    tokio::task::JoinHandle<()>,
-) {
+struct BlockedEndpoint {
+    base_url: String,
+    hits: Arc<AtomicUsize>,
+    accepted: tokio::sync::oneshot::Receiver<()>,
+    release: tokio::sync::oneshot::Sender<()>,
+    server: tokio::task::JoinHandle<()>,
+}
+
+async fn spawn_blocked_counting_endpoint() -> BlockedEndpoint {
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let addr = listener.local_addr().unwrap();
     let hits = Arc::new(AtomicUsize::new(0));
@@ -34,47 +36,47 @@ async fn spawn_blocked_counting_endpoint() -> (
             drop(stream);
         }
     });
-    (
-        format!("http://127.0.0.1:{}", addr.port()),
+    BlockedEndpoint {
+        base_url: format!("http://127.0.0.1:{}", addr.port()),
         hits,
-        accepted_rx,
-        release_tx,
-        task,
-    )
+        accepted: accepted_rx,
+        release: release_tx,
+        server: task,
+    }
 }
 
 #[tokio::test]
 async fn local_ai_status_poll_burst_coalesces_probe_and_preserves_current_provider() {
-    let (base_url, hits, accepted, release, server) = spawn_blocked_counting_endpoint().await;
+    let endpoint = spawn_blocked_counting_endpoint().await;
     let initial_runtime = RuntimeConfig::default();
     let service = Arc::new(LocalAiService::new(&initial_runtime));
     let mut current_runtime = initial_runtime;
     current_runtime.local_ai.runtime_enabled = true;
     current_runtime.local_ai.opt_in_confirmed = true;
     current_runtime.local_ai.provider = "lm_studio".to_string();
-    current_runtime.local_ai.base_url = Some(base_url);
+    current_runtime.local_ai.base_url = Some(endpoint.base_url.clone());
 
     let (snapshot, first_task) =
         local_ai_status_snapshot(Arc::clone(&service), current_runtime.clone());
     assert_eq!(snapshot.provider, "lm_studio");
     let first_task = first_task.expect("first poll schedules a probe");
-    accepted.await.unwrap();
+    endpoint.accepted.await.unwrap();
 
     for _ in 1..8 {
         let (_, task) = local_ai_status_snapshot(Arc::clone(&service), current_runtime.clone());
         assert!(task.is_none(), "polls during a probe coalesce");
     }
-    assert_eq!(hits.load(Ordering::SeqCst), 1);
+    assert_eq!(endpoint.hits.load(Ordering::SeqCst), 1);
 
-    release.send(()).unwrap();
+    endpoint.release.send(()).unwrap();
     first_task.await.unwrap();
-    assert_eq!(hits.load(Ordering::SeqCst), 1);
+    assert_eq!(endpoint.hits.load(Ordering::SeqCst), 1);
 
     let (_, retry_task) = local_ai_status_snapshot(service, current_runtime);
     retry_task
         .expect("poll after an unreachable result schedules a fresh probe")
         .await
         .unwrap();
-    assert_eq!(hits.load(Ordering::SeqCst), 2);
-    server.abort();
+    assert_eq!(endpoint.hits.load(Ordering::SeqCst), 2);
+    endpoint.server.abort();
 }
