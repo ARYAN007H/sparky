@@ -238,9 +238,9 @@ pub fn spawn_flows_boot_reconcile(
         log::debug!("[flows] boot reconcile: scheduling orphaned-run sweep");
         tokio::spawn(async move {
             log::debug!("[flows] boot reconcile: loading config");
-            match crate::config::Config::load_or_init().await {
+            let dispatch = crate::core::runtime::DispatchCtx::new(ctx);
+            match dispatch.load_config().await {
                 Ok(config) => {
-                    let dispatch = crate::core::runtime::DispatchCtx::new(ctx);
                     let swept = crate::flows::recovery::sweep_orphaned_runs_on_boot(
                         &dispatch,
                         &config,
