@@ -84,7 +84,6 @@ async fn scenario() {
         .unwrap();
     let observed = observed.lock().unwrap();
     assert_eq!(observed.len(), 4);
-    eprintln!("tool hook shell output: {:?}", observed[1]["output"]);
     assert!(observed[1]["output"]
         .as_str()
         .unwrap()
