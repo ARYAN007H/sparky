@@ -97,10 +97,7 @@ export async function readVoiceNote(noteId: string): Promise<Blob | null> {
   const response = await callCoreRpc<
     | { audio_base64?: string | null; mime?: string | null }
     | { result?: { audio_base64?: string | null; mime?: string | null } }
-  >({
-    method: 'openhuman.channel_web_voice_note_read',
-    params: { note_id: noteId },
-  });
+  >({ method: 'openhuman.channel_web_voice_note_read', params: { note_id: noteId } });
   const result = unwrapVoiceNoteResult(response);
   if (!result?.audio_base64) return null;
   const bytes = base64ToBytes(result.audio_base64);
