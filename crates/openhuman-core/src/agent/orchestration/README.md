@@ -1,16 +1,15 @@
 # orchestration
 
 `agent::orchestration` is the control plane for coordinating multiple agent
-workers from one parent session: agent teams, background command-center views,
-declarative multi-phase workflows, git-worktree isolation for parallel coding
-workers, and the tool surface LLMs call to spawn/steer/wait-on sub-agents. The
+workers from one parent session: background command-center views, declarative
+multi-phase workflows, git-worktree isolation for parallel coding workers, and
+the tool surface LLMs call to spawn/steer/wait-on sub-agents. The
 lower-level `agent::harness` remains the execution engine: prompt
 construction, policy-filtered tools, model selection, and the sub-agent run
 loop itself.
 
-The generic coordination model lives in `tinyagents-orchestration`: team and
-workflow types, validation, run-ledger services, workflow execution, member
-prompt construction, message watermark delivery, and parallel task
+The generic coordination model lives in `tinyagents-orchestration`: workflow
+types, validation, run-ledger services, workflow execution, and parallel task
 staging/fanout. OpenHuman imports those APIs directly. This module retains the
 product adapters: Config and root-parent construction, model/tool selection,
 `run_subagent`, progress and BUS events, RPC/tool formatting, and OpenHuman's
@@ -21,10 +20,9 @@ worktree policy.
 - Register, wait on, and cancel child agent runs ([`ops.rs`](./ops.rs),
   `AgentOrchestrationSession`) as thin wrappers over TinyAgents'
   `DetachedTaskRegistry`, including its ordered batch wait and shared deadline.
-- Host adapters for durable teams and workflows: RPC schemas, root-parent
-  worker execution, model selection, durable lifecycle CAS, and BUS/progress
-  integration. Their host-neutral types, storage services, workflow scheduling,
-  prompt composition, and delivery bookkeeping are in `tinyagents-orchestration`.
+- Host adapters for workflows: RPC schemas, root-parent worker execution, model
+  selection, durable lifecycle CAS, and BUS/progress integration. Their generic
+  types, storage services, and scheduling are in `tinyagents-orchestration`.
 - A read-only command-center view over background agent runs plus stop/retry/
   continue/follow-up control verbs (`command_center/`).
 - OpenHuman's `OpenHumanWorktreeIsolation` adapter and RPC surface; generic
@@ -56,10 +54,6 @@ worktree policy.
 - `ops.rs` / [`types.rs`](./types.rs): `AgentOrchestrationSession`, `OrchestrationError`,
   `AgentSnapshot`, `OrchestrationTaskStatus`, `SpawnAgentRequest`/`Response`,
   `WaitAgentOptions`/`Response`.
-- `agent_teams/`: OpenHuman's member-worker adapter for TinyAgents'
-  `TeamService::start_member_with_started`. The host supplies Config, the root
-  parent context, model/tool execution and product failure events; the owner
-  handles claim, active state, completion, and token-scoped cleanup.
 - `command_center/`: read-only grouped view of background agent runs
   (`ops.rs`) plus stop/retry/continue/follow-up transitions (`control.rs`).
 - `workflow_runs/`: OpenHuman's workflow RPC and executor adapters. The
@@ -168,16 +162,15 @@ removed rather than kept under new names:
   types are `GitWorktreeBaseRef`, `GitWorktreeError`, and
   `GitWorktreeStatus` from `tinyagents_harness::workspace`.
 - Controller schema/registration pairs re-exported from `mod.rs`:
-  `all_agent_team_*`, `all_command_center_*`, `all_workflow_run_*`,
+  `all_command_center_*`, `all_workflow_run_*`,
   `all_worktree_*`, `all_subagent_control_*`.
 
 ## RPC
 
-Five controller pairs are registered in `crate::core::all`:
+Four controller pairs are registered in `crate::core::all`:
 
 | Namespace | Source | Methods |
 | --- | --- | --- |
-| `agent_team` | `agent_runs::agent_teams::{all_agent_team_controller_schemas, all_agent_team_registered_controllers}` | `create`, `list`, `get`, `assign_task`, `claim_task`, `message_member`, `list_messages`, `complete_task`, `shutdown_member`, `close`, `start_member` |
 | `agent_work` | `agent_runs::command_center::{all_command_center_controller_schemas, all_command_center_registered_controllers}` | `list`, `control` |
 | `workflow_run` | `agent_runs::workflow_runs::{all_workflow_run_controller_schemas, all_workflow_run_registered_controllers}` | `list_definitions`, `list`, `get`, `start`, `stop`, `resume` |
 | `worktree` | `agent_runs::worktree_schemas::{all_controller_schemas, all_registered_controllers}` | `list`, `status`, `diff`, `remove` |
@@ -214,7 +207,7 @@ races it against the inherited cancellation token. Execution itself routes throu
 ## Persistence
 
 - `tinyagents_session::run_ledger`: the `agent_runs`,
-  `agent_teams`/`agent_team_members`/`agent_team_tasks`, and `workflow_runs`
+  `workflow_runs`
   tables plus the shared `run_events` log, backed by
   `{workspace}/session_db/sessions.db` (see [`sessions/mod.rs`](../../sessions/mod.rs)). Every
   spawn path (`spawn_subagent`, `spawn_async_subagent`,
@@ -249,10 +242,10 @@ what the harness exposes to the child.
   `definition::{AgentDefinition, AgentDefinitionRegistry}`.
 - `tinyagents_graph::orchestration`: `DetachedTaskRegistry`,
   `OrchestrationTaskStatus`, `TaskId`.
-- `tinyagents_session::run_ledger`: durable storage for teams, workflow runs,
-  and agent run rows.
+- `tinyagents_session::run_ledger`: durable storage for workflow runs and agent
+  run rows.
 - `tinyagents_graph`: the graph engine used for workflow phase scheduling,
-  agent-team routing, and parallel map/reduce fanout.
+  and parallel map/reduce fanout.
 - `core::bus::BUS`: `DomainEvent::AgentOrchestration*` /
   `Subagent*` publication and subscription.
 - `web_chat::progress_bridge`: the per-turn progress-channel counterpart to
@@ -268,8 +261,7 @@ what the harness exposes to the child.
 
 ## Notes
 
-- Namespace `agent_team` is distinct from the existing `team` domain (backend
-  org/team membership); `workflow_run` is distinct from the `workflows`
+- Namespace `workflow_run` is distinct from the `workflows`
   domain (SKILL.md/WORKFLOW.md bundle discovery).
 - `wait_agents` prunes an entry once it observes a terminal status. Every
   in-tree caller spawns and waits exactly once.
