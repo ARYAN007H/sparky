@@ -302,11 +302,8 @@ impl Middleware<(), crate::agent::tinyagents::host::OpenHumanRunContext>
         &self,
         _ctx: &mut RunContext<crate::agent::tinyagents::host::OpenHumanRunContext>,
         _state: &(),
-        run: &mut tinyagents_harness::middleware::AgentRun,
+        _run: &mut tinyagents_harness::middleware::AgentRun,
     ) -> TaResult<()> {
-        if run.failure_cause.is_none() {
-            run.failure_cause = self.stop.current_classified_cause();
-        }
         self.stop.finish_run();
         Ok(())
     }

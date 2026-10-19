@@ -1,8 +1,8 @@
 //! Host projection of harness turn-stop facts.
 //!
-//! The vocabulary (`TurnStop`, `TurnStopKind`, the breaker-note parsing) is
-//! owned by `tinyagents_harness::turn_stop`. OpenHuman keeps only the product
-//! mapping of a stop note without a failure class to its stop-reason key
+//! The typed stop vocabulary and classified causes are owned by
+//! `tinyagents_harness::turn_stop`. OpenHuman keeps only the product mapping
+//! of a stop note without typed classification to its stop-reason key
 //! ([`StopReasonKind`](crate::agent::session_host::stop_summary::StopReasonKind)).
 
 use crate::agent::tinyagents::host::LastTurnUsage;
