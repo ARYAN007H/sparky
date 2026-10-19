@@ -1,6 +1,7 @@
 //! One trusted `CapsHost` callback object for a single TinyFlows run.
 
 use std::{collections::HashMap, sync::Arc};
+use std::future::Future;
 
 use crate::config::Config;
 use crate::core::runtime::DispatchCtx;
@@ -29,6 +30,21 @@ pub(crate) struct CapsHostBinding {
     pub(crate) approval: crate::security::approval::ApprovalTurnContext,
     pub(crate) agent_runs:
         tokio::sync::Mutex<HashMap<String, Arc<tokio::sync::Mutex<AgentRunState>>>>,
+}
+
+impl CapsHostBinding {
+    /// Re-enter the request's captured tenant, identity and turn origin for a
+    /// bus callback that runs on the module runtime.
+    pub(crate) async fn within<F: Future>(&self, future: F) -> F::Output {
+        match self.ctx.core() {
+            Some(context) => crate::core::runtime::CoreContext::scope(
+                Arc::clone(context),
+                future,
+            )
+            .await,
+            None => future.await,
+        }
+    }
 }
 
 impl CapsHostRegistration {
