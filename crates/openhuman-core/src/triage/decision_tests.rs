@@ -18,6 +18,13 @@ fn rejects_react_without_prompt() {
 }
 
 #[test]
+fn rejects_non_parseable_json() {
+    let reply = "{\"action\": not_a_string}";
+    let err = parse_triage_decision(reply).unwrap_err();
+    assert!(matches!(err, ParseError::InvalidJson(_)));
+}
+
+#[test]
 fn owner_relaxed_json_recovery_preserves_action_normalization() {
     let reply = "{action: \"DROP\", reason: \"recovered\",}";
     let decision = parse_triage_decision(reply).unwrap();

@@ -269,6 +269,22 @@ const BUDGET_ROUNDS: usize = 7;
 const BUDGET_CALLS: usize = 12;
 
 #[tokio::test]
+async fn a_linked_wrap_up_budget_notice_silences_the_check() {
+    let rounds = BUDGET_ROUNDS;
+    let (checks, text) = drive_with(
+        rounds,
+        "lookup",
+        false,
+        Some("orchestrator"),
+        WrapUp::Linked,
+        BUDGET_CALLS,
+    )
+    .await;
+    assert_eq!(checks, 0, "a budget notice said finish; no re-verify turn");
+    assert_eq!(text, "draft");
+}
+
+#[tokio::test]
 async fn an_unlinked_wrap_up_does_not_silence_the_check() {
     let (checks, _) = drive_with(
         BUDGET_ROUNDS,

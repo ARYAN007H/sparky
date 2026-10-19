@@ -58,6 +58,10 @@ fn parse_callback_input_accepts_raw_query_string() {
 fn parse_callback_input_rejects_blank_invalid_and_missing_state() {
     let blank = parse_callback_input("   ").unwrap_err();
     assert!(blank.contains("required"));
+
+    let missing_state =
+        parse_callback_input("http://127.0.0.1:1455/auth/callback?code=abc").unwrap_err();
+    assert!(missing_state.contains("state"));
 }
 
 #[test]
