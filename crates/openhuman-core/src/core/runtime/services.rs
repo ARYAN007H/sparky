@@ -229,9 +229,7 @@ pub fn spawn_update_scheduler() -> tokio::task::JoinHandle<()> {
 /// safe at any point in boot — the module's boot-floor and live-actor guards
 /// keep it off runs this process owns, so it carries no ordering requirement
 /// against the cron scheduler or any agent turn.
-pub fn spawn_flows_boot_reconcile(
-    ctx: std::sync::Arc<crate::core::runtime::CoreContext>,
-) {
+pub fn spawn_flows_boot_reconcile(ctx: std::sync::Arc<crate::core::runtime::CoreContext>) {
     #[cfg(feature = "flows")]
     {
         log::debug!("[flows] boot reconcile: scheduling orphaned-run sweep");
@@ -240,11 +238,9 @@ pub fn spawn_flows_boot_reconcile(
             let dispatch = crate::core::runtime::DispatchCtx::new(ctx);
             match dispatch.load_config().await {
                 Ok(config) => {
-                    let swept = crate::flows::recovery::sweep_orphaned_runs_on_boot(
-                        &dispatch,
-                        &config,
-                    )
-                    .await;
+                    let swept =
+                        crate::flows::recovery::sweep_orphaned_runs_on_boot(&dispatch, &config)
+                            .await;
                     // Logged unconditionally: a silent success and a task that
                     // never ran are otherwise indistinguishable in a boot log.
                     log::debug!("[flows] boot reconcile: completed; reconciled_runs={swept}");
