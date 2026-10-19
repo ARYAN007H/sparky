@@ -200,10 +200,11 @@ delete event handlers, schemas, manager consumers, or product-policy tests.
 ## Filed follow-up issues
 
 These issues were filed and linked under `tinyhumansai/openhuman#8089`. The SDK
-contract issue is [tinyhumansai/sdk#2](https://github.com/senamakel/sdk/issues/2);
+contract issue is [senamakel/sdk#2](https://github.com/senamakel/sdk/issues/2);
 the dependent OpenHuman adapter issue is
 [senamakel/openhuman#420](https://github.com/senamakel/openhuman/issues/420).
-The SDK issue must land upstream first; OpenHuman can then update its SDK
+The SDK issue must land upstream first; its implementation PR must target the
+canonical `tinyhumansai/sdk` repository. OpenHuman can then update its SDK
 gitlink and implement the adapter/port move in a separate leaf.
 
 ### Filed SDK issue: make SocketConnection suitable for a supervised host
@@ -277,7 +278,7 @@ adapter/core port.
 
 ```markdown
 Parent: tinyhumansai/openhuman#8089
-Depends on: [tinyhumansai/sdk#2](https://github.com/senamakel/sdk/issues/2),
+Depends on: [senamakel/sdk#2](https://github.com/senamakel/sdk/issues/2),
 the single-attempt SocketConnection contract being available upstream and
 pinned by the TinyHumans SDK submodule.
 
