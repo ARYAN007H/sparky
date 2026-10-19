@@ -350,20 +350,9 @@ impl CoreContext {
         Self::current().is_none_or(|ctx| ctx.user_skill_roots())
     }
 
-    /// A child context sharing this one's host identity, with its own config,
-    /// domain set, tool groups and skill-root policy.
-    ///
-    /// **No boot runs.** No stores are initialised, no registry, gate or live
-    /// policy is (re)installed, and the process default context is untouched.
-    /// The child is only useful inside [`CoreContext::scope`] (or
-    /// `CoreRuntime::invoke_in` / `run_in`), where every reader that goes
-    /// through [`CoreContext::current`] — the config loader, the DomainSet
-    /// dispatch gate, the tool-group filter, skill discovery — sees the
-    /// overlay instead of the parent.
-    ///
-    /// The workspace binding is anchored to `overlay.config.workspace_dir`, so
-    /// an agent with its own workspace subdirectory resolves its own memory
-    /// binding lazily, exactly as an embedder-supplied config does at boot.
+    /// Derive a child with its own config and narrowed tool/runtime surfaces.
+    /// The child shares host identity but does not boot stores or alter the
+    /// process default; scoped readers observe its config and policy.
     pub fn derive_with(&self, overlay: ContextOverlay) -> Arc<CoreContext> {
         let parent_config = self.latest_embedder_config();
         self.derive_with_parent_config_inner(parent_config.as_ref(), overlay)
