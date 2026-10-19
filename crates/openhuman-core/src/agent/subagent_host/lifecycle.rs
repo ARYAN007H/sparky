@@ -997,8 +997,17 @@ fn outcome_to_host(
             checkpoint: None,
         },
         SubagentOutcomeKind::Incomplete(incomplete) => SubagentRunStatus::Incomplete {
+            failure_cause: outcome
+                .extensions
+                .get(super::lifecycle_outcome::CLASSIFIED_STOP_CAUSE_EXTENSION)
+                .and_then(|value| {
+                    Some(tinyagents_harness::no_progress::ClassifiedStopCause {
+                        class: value.get("class")?.as_str()?.to_string(),
+                        operation: value.get("operation")?.as_str()?.to_string(),
+                        summary: incomplete.reason.clone(),
+                    })
+                }),
             reason: incomplete.reason,
-            failure_cause: None,
         },
         SubagentOutcomeKind::Cancelled => SubagentRunStatus::Cancelled,
     };

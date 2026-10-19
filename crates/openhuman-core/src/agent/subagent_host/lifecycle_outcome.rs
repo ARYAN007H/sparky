@@ -5,7 +5,7 @@ use super::*;
 /// The host's in-flight subagent runs of one agent context.
 pub(super) type HostInFlightMap = AsyncMutex<HashMap<HostLifecycleKey, Arc<HostInFlight>>>;
 
-const CLASSIFIED_STOP_CAUSE_EXTENSION: &str = "openhuman.classified_stop_cause";
+pub(super) const CLASSIFIED_STOP_CAUSE_EXTENSION: &str = "openhuman.classified_stop_cause";
 
 pub(super) fn host_outcome_to_neutral(
     outcome: SubagentRunOutcome,
