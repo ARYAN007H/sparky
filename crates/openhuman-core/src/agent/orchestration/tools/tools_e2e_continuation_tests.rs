@@ -26,8 +26,7 @@ async fn continue_subagent_resumes_paused_job_through_shared_driver() {
         .insert("ask_user_clarification".into());
     let live =
         crate::agent::orchestration::tools::live_parent_run_context("continue-paused-e2e", parent);
-    let paused = SpawnSubagentTool::new()
-        .execute_with_live_parent_context(
+    let paused = Box::pin(SpawnSubagentTool::new().execute_with_live_parent_context(
             json!({
                 "agent_id": "task_manager_agent",
                 "prompt": "Investigate the pause-resume fixture",
@@ -37,8 +36,8 @@ async fn continue_subagent_resumes_paused_job_through_shared_driver() {
             None,
             live.data.child(),
             Some(&live),
-        )
-        .await
+        ))
+    .await
         .expect("initial spawn");
     assert!(!paused.is_error, "{}", paused.output());
     assert_eq!(provider.calls.load(std::sync::atomic::Ordering::SeqCst), 1);
@@ -63,8 +62,7 @@ async fn continue_subagent_resumes_paused_job_through_shared_driver() {
         .expect("initial pause is registered in shared Jobs");
     assert_eq!(paused_job.status, SubAgentJobStatus::AwaitingInput);
 
-    let resumed = ContinueSubagentTool::new()
-        .execute_with_live_parent_context(
+    let resumed = Box::pin(ContinueSubagentTool::new().execute_with_live_parent_context(
             json!({
                 "task_id": task_id,
                 "agent_id": "task_manager_agent",
@@ -73,8 +71,8 @@ async fn continue_subagent_resumes_paused_job_through_shared_driver() {
             None,
             live.data.child(),
             Some(&live),
-        )
-        .await
+        ))
+    .await
         .expect("continue");
     assert!(!resumed.is_error, "{}", resumed.output());
     assert!(provider.saw("Inspect the README and continue."));
