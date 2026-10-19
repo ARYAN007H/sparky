@@ -428,8 +428,8 @@ async fn builder_proposal_rejects_an_incompatible_saved_child_reference() {
     assert!(error.contains("saved-child"), "{error}");
 }
 
-#[test]
-fn referenced_child_compatibility_stops_at_saved_workflow_cycles() {
+#[tokio::test]
+async fn referenced_child_compatibility_stops_at_saved_workflow_cycles() {
     let tmp = TempDir::new().unwrap();
     let config = test_config(&tmp);
     let flow_a = store::create_flow(
@@ -472,7 +472,14 @@ fn referenced_child_compatibility_stops_at_saved_workflow_cycles() {
     .unwrap();
 
     let candidate = structurally_valid_graph(referenced_child_graph(&flow_a.id));
-    assert!(referenced_workflow_compatibility_errors(&config, &candidate).is_empty());
+    assert!(config_aware_engine_compatibility_errors(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        serde_json::to_value(candidate).unwrap(),
+    )
+    .await
+    .unwrap()
+    .is_empty());
 }
 
 // ── core-managed drafts (F5) ─────────────────────────────────────────────────
