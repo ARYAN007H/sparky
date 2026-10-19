@@ -595,7 +595,6 @@ async fn prompt_and_declared_tools(
     (prompt, snapshot)
 }
 
-
 fn assert_no_goal_tools(prompt: &str, snapshot: &ToolSnapshot) {
     for name in THREAD_GOAL_TOOLS {
         assert!(!prompt.contains(name), "{name} leaked into the prompt");

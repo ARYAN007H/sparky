@@ -48,4 +48,3 @@ async fn debug_prompt_matches_the_system_prompt_sent_on_a_cold_turn() {
         "debug dump must equal the real cold-turn system prompt"
     );
 }
-
