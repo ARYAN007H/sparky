@@ -57,6 +57,10 @@ pub(crate) enum Step {
     Answer(TriageOutcome),
     /// Defer until `after_ms` after the triage that answers it.
     DeferFor(i64),
+    /// Fail the triage with this message.
+    Fail(&'static str),
+    /// Never answer (until the caller's timeout).
+    Hang,
 }
 
 impl From<TriageOutcome> for Step {
@@ -119,13 +123,21 @@ impl TriageRunner for ScriptedTriage {
     ) -> anyhow::Result<TriageOutcome> {
         self.runs.fetch_add(1, Ordering::SeqCst);
         let next = self.script.lock().unwrap().pop_front();
+        match next {
+            Some(Step::Fail(message)) => return Err(anyhow::anyhow!(message)),
+            Some(Step::Hang) => {
+                tokio::time::sleep(Duration::from_secs(3600)).await;
+                return Err(anyhow::anyhow!("hung"));
+            }
+            _ => {}
+        }
         Ok(match next {
             Some(Step::Answer(outcome)) => outcome,
             Some(Step::DeferFor(after_ms)) => TriageOutcome::Deferred {
                 defer_until_ms: chrono::Utc::now().timestamp_millis() + after_ms,
                 reason: "scripted deferral".to_owned(),
             },
-            None => decision_outcome(TriageAction::Acknowledge),
+            Some(Step::Fail(_) | Step::Hang) | None => decision_outcome(TriageAction::Acknowledge),
         })
     }
 
