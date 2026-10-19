@@ -89,7 +89,9 @@ if [[ "$*" == *"test -p openhuman --lib"* ]]; then
   echo PRIVATE-XDG-CACHE
 fi
 if [[ "$*" == *"--test in_process_all"* ]]; then
-  if [[ "$*" =~ --\ (config|auth|app_state|connectivity)_e2e:: ]] && [[ "$*" == *"--test-threads=1"* ]]; then
+  if [[ "$*" == *"config_e2e::"* || "$*" == *"auth_e2e::"* ||
+        "$*" == *"app_state_e2e::"* || "$*" == *"connectivity_e2e::"* ]] &&
+     [[ "$*" == *"--test-threads=1"* ]]; then
     echo SERIAL-SPLIT-IN-PROCESS-MODULE
   elif [[ "$*" == *"--skip domain_modules_e2e::cron_update_applies_a_partial_patch_without_clobbering_unset_fields"* &&
         "$*" == *"--skip domain_modules_e2e::mcp_audit_list_dispatches_internally_and_stays_out_of_the_schema_dump"* &&
