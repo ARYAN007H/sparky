@@ -492,7 +492,7 @@ impl ProgressProjection {
 /// For turns that run outside the turn runner (the Flow Canvas copilot's
 /// builder and scout turns) and want the same live stream a chat turn has.
 pub(crate) fn spawn_progress_bridge(
-    mut rx: tokio::sync::mpsc::Receiver<AgentProgress>,
+    rx: tokio::sync::mpsc::Receiver<AgentProgress>,
     client_id: String,
     thread_id: String,
     request_id: String,
@@ -501,6 +501,31 @@ pub(crate) fn spawn_progress_bridge(
     config: Config,
     dispatch_ctx: DispatchCtx,
 ) {
+    let _ = spawn_progress_bridge_with_heartbeat_interval(
+        rx,
+        client_id,
+        thread_id,
+        request_id,
+        turn_state_store,
+        metadata,
+        config,
+        dispatch_ctx,
+        std::time::Duration::from_secs(INFERENCE_HEARTBEAT_SECS),
+    );
+}
+
+#[allow(clippy::too_many_arguments)]
+fn spawn_progress_bridge_with_heartbeat_interval(
+    mut rx: tokio::sync::mpsc::Receiver<AgentProgress>,
+    client_id: String,
+    thread_id: String,
+    request_id: String,
+    turn_state_store: std::sync::Arc<dyn TurnStates>,
+    metadata: ChatRequestMetadata,
+    config: Config,
+    dispatch_ctx: DispatchCtx,
+    heartbeat_interval: std::time::Duration,
+) -> tokio::task::JoinHandle<()> {
     dispatch_ctx.clone().spawn(async move {
         let ids = TurnIds {
             client_id,
@@ -509,8 +534,7 @@ pub(crate) fn spawn_progress_bridge(
         };
         let mut projection =
             ProgressProjection::new(&dispatch_ctx, ids, metadata, config, turn_state_store).await;
-        let mut beat =
-            tokio::time::interval(std::time::Duration::from_secs(INFERENCE_HEARTBEAT_SECS));
+        let mut beat = tokio::time::interval(heartbeat_interval);
         beat.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
         beat.tick().await;
         enum Next {
@@ -538,7 +562,7 @@ pub(crate) fn spawn_progress_bridge(
             }
         }
         projection.finish().await;
-    });
+    })
 }
 
 #[cfg(test)]

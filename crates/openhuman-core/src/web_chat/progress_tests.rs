@@ -185,6 +185,22 @@ fn spawn_test_bridge(
     thread_id: &str,
     request_id: &str,
 ) -> tokio::sync::mpsc::Sender<AgentProgress> {
+    spawn_test_bridge_with_interval(
+        thread_id,
+        request_id,
+        Duration::from_secs(INFERENCE_HEARTBEAT_SECS),
+    )
+    .0
+}
+
+fn spawn_test_bridge_with_interval(
+    thread_id: &str,
+    request_id: &str,
+    heartbeat_interval: Duration,
+) -> (
+    tokio::sync::mpsc::Sender<AgentProgress>,
+    tokio::task::JoinHandle<()>,
+) {
     let (tx, rx) = tokio::sync::mpsc::channel::<AgentProgress>(16);
     let dir = tempfile::tempdir().expect("tempdir");
     let store = std::sync::Arc::new(tinyagents_session::port::InMemoryTurnStates::default())
@@ -192,7 +208,7 @@ fn spawn_test_bridge(
     // Keep the tempdir alive for the bridge task's lifetime by leaking it —
     // a test-only allocation; the OS reclaims it on process exit.
     std::mem::forget(dir);
-    spawn_progress_bridge(
+    let task = spawn_progress_bridge_with_heartbeat_interval(
         rx,
         "client-hb-4270".to_string(),
         thread_id.to_string(),
@@ -201,46 +217,65 @@ fn spawn_test_bridge(
         ChatRequestMetadata::default(),
         Config::default(),
         crate::core::runtime::DispatchCtx::ambient(),
+        heartbeat_interval,
     );
-    tx
+    (tx, task)
 }
 
 /// Repro-gone guard: once a turn is in flight, the bridge emits a periodic
 /// `inference_heartbeat` even though no other progress event has streamed —
 /// this is the signal the FE silence timer rearms on to avoid the false
 /// "no response after 2 minutes" timeout (#4270).
-#[tokio::test(start_paused = true)]
+#[tokio::test]
 async fn emits_inference_heartbeat_while_turn_in_flight() {
+    let _module = crate::channels::module_fixture::client().await;
     let mut events = crate::web_chat::subscribe_web_channel_events();
     let thread_id = "thread-hb-emit-4270";
     let request_id = "req-hb-emit-4270";
-    let tx = spawn_test_bridge(thread_id, request_id);
+    let (tx, task) =
+        spawn_test_bridge_with_interval(thread_id, request_id, Duration::from_millis(50));
 
     // Turn begins — arms the liveness beat.
     tx.send(AgentProgress::TurnStarted).await.unwrap();
 
-    // inference_start first, then a heartbeat after the interval elapses
-    // (the paused clock auto-advances while the test awaits the bus).
-    let start = recv_for_thread(&mut events, thread_id).await;
+    // Keep real time for TinyBus RPC deadlines; the injected short cadence
+    // avoids waiting the production 20 seconds.
+    let start = tokio::time::timeout(
+        Duration::from_secs(10),
+        recv_for_thread(&mut events, thread_id),
+    )
+    .await
+    .expect("inference start should reach the web event bus");
     assert_eq!(start.event_name(), "inference_start");
 
-    let beat = recv_for_thread(&mut events, thread_id).await;
+    let beat = tokio::time::timeout(
+        Duration::from_secs(10),
+        recv_for_thread(&mut events, thread_id),
+    )
+    .await
+    .expect("the active turn should emit its heartbeat");
     assert_eq!(beat.event_name(), "inference_heartbeat");
     assert_eq!(beat.context().thread_id, thread_id);
     assert_eq!(beat.context().request_id, request_id);
 
     drop(tx);
+    tokio::time::timeout(Duration::from_secs(5), task)
+        .await
+        .expect("the bridge should stop after its progress sender closes")
+        .expect("the bridge task should complete");
 }
 
 /// Lifecycle: once `TurnCompleted` lands the bridge stops beating, so a beat
 /// can't race the channel close after the FE has already cleared its timer
 /// on `chat_done`/`chat_error`. Exercises the `turn_active = false` arm and
 /// the channel-closed `break`.
-#[tokio::test(start_paused = true)]
+#[tokio::test]
 async fn stops_heartbeat_after_turn_completed() {
+    let _module = crate::channels::module_fixture::client().await;
     let mut events = crate::web_chat::subscribe_web_channel_events();
     let thread_id = "thread-hb-stop-4270";
-    let tx = spawn_test_bridge(thread_id, "req-hb-stop-4270");
+    let (tx, task) =
+        spawn_test_bridge_with_interval(thread_id, "req-hb-stop-4270", Duration::from_millis(50));
 
     tx.send(AgentProgress::TurnStarted).await.unwrap();
     // Drain through the first heartbeat to prove the turn was beating.
@@ -254,15 +289,10 @@ async fn stops_heartbeat_after_turn_completed() {
     tx.send(AgentProgress::turn_completed(1)).await.unwrap();
     drop(tx);
 
-    // Let the bridge process TurnCompleted + observe the closed channel.
-    for _ in 0..8 {
-        tokio::task::yield_now().await;
-    }
-    // Advance well past several intervals — no further beats must appear.
-    tokio::time::advance(Duration::from_secs(INFERENCE_HEARTBEAT_SECS * 4)).await;
-    for _ in 0..8 {
-        tokio::task::yield_now().await;
-    }
+    tokio::time::timeout(Duration::from_secs(5), task)
+        .await
+        .expect("the bridge should stop after TurnCompleted and channel close")
+        .expect("the bridge task should complete");
 
     loop {
         match events.try_recv() {
@@ -280,18 +310,17 @@ async fn stops_heartbeat_after_turn_completed() {
 /// Gate check: before `TurnStarted` the bridge must NOT beat — otherwise a
 /// beat could land before the FE has armed its timer. Exercises the
 /// `turn_active == false` branch of the heartbeat tick.
-#[tokio::test(start_paused = true)]
+#[tokio::test]
 async fn no_heartbeat_before_turn_started() {
+    let _module = crate::channels::module_fixture::client().await;
     let mut events = crate::web_chat::subscribe_web_channel_events();
     let thread_id = "thread-hb-gate-4270";
-    let tx = spawn_test_bridge(thread_id, "req-hb-gate-4270");
+    let (tx, task) =
+        spawn_test_bridge_with_interval(thread_id, "req-hb-gate-4270", Duration::from_millis(25));
 
-    // Advance well past several heartbeat intervals with no TurnStarted.
-    tokio::time::advance(Duration::from_secs(INFERENCE_HEARTBEAT_SECS * 4)).await;
-    // Let the bridge task run its (no-op) heartbeat ticks.
-    for _ in 0..8 {
-        tokio::task::yield_now().await;
-    }
+    // Real time avoids expiring TinyBus' RPC deadline under Tokio's paused
+    // clock while still crossing several short heartbeat intervals.
+    tokio::time::sleep(Duration::from_millis(100)).await;
 
     // No event of any kind should have been published for this thread.
     loop {
@@ -308,6 +337,10 @@ async fn no_heartbeat_before_turn_started() {
     }
 
     drop(tx);
+    tokio::time::timeout(Duration::from_secs(5), task)
+        .await
+        .expect("the bridge should stop after its progress sender closes")
+        .expect("the bridge task should complete");
 }
 
 /// Every event the bridge emits carries an additive per-request monotonic
