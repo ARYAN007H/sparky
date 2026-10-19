@@ -43,29 +43,12 @@ const FORCED_RESPONSES = [
   { content: `Here is the fetched content: ${CANARY_FINAL}` },
 ];
 
-interface RuntimeSnapshot {
-  timelineIds: string[];
-  timelineNames: string[];
-}
-
-async function snapshotRuntime(threadId: string): Promise<RuntimeSnapshot> {
-  const winSnapshot = await browser.execute((tid: string) => {
-    const winAny = window as unknown as { __OPENHUMAN_STORE__?: { getState: () => unknown } };
-    const state = winAny.__OPENHUMAN_STORE__?.getState() as
-      | {
-          chatRuntime?: {
-            toolTimelineByThread?: Record<string, Array<{ id?: string; name?: string }>>;
-          };
-        }
-      | undefined;
-    const timeline = state?.chatRuntime?.toolTimelineByThread?.[tid] ?? [];
-    return {
-      timelineIds: timeline.map((e: { id?: string }) => e?.id ?? ''),
-      timelineNames: timeline.map((e: { name?: string }) => e?.name ?? ''),
-    };
-  }, threadId);
-
-  return winSnapshot as { timelineIds: string[]; timelineNames: string[] };
+async function renderedToolCards(): Promise<string[]> {
+  return (await browser.execute(() =>
+    Array.from(document.querySelectorAll<HTMLElement>('[data-testid="assistant-ui-tool-call"]')).map(
+      card => card.innerText
+    )
+  )) as string[];
 }
 
 describe('Chat tool-call lifecycle', () => {
@@ -116,63 +99,22 @@ describe('Chat tool-call lifecycle', () => {
       })
     ).toBe(true);
 
-    // Poll for a tool timeline entry while the LLM processes the tool_calls turn.
-    let sawToolTimeline = false;
-    let sawFinalAnswer = false;
-    const deadline = Date.now() + 45_000;
-    while (Date.now() < deadline) {
-      const snap = await snapshotRuntime(threadId);
-      if (snap.timelineIds.length > 0 || snap.timelineNames.length > 0) {
-        sawToolTimeline = true;
-        console.log(
-          `${LOG_PREFIX} T1.1: tool timeline appeared — ids: ${snap.timelineIds.join(', ')}, names: ${snap.timelineNames.join(', ')}`
-        );
-        break;
+    await browser.waitUntil(
+      async () => (await renderedToolCards()).some(card => card.includes('Fetching example.com')),
+      {
+        timeout: 45_000,
+        interval: 100,
+        timeoutMsg: 'Rendered web_fetch tool card never appeared',
       }
-      // Also check if the final answer arrived (tool timeline may have already cleared
-      // if the whole turn was faster than our polling interval).
-      if (await textExists(CANARY_FINAL)) {
-        sawFinalAnswer = true;
-        console.log(`${LOG_PREFIX} T1.1: final answer arrived before first timeline poll`);
-        break;
-      }
-      await browser.pause(200);
-    }
-
-    // The timeline entry is the primary signal, but if the full turn completed
-    // before our first poll we still accept the final-answer path.
-    const finalArrived = sawFinalAnswer || (await textExists(CANARY_FINAL));
-    expect(sawToolTimeline || finalArrived).toBe(true);
-    console.log(
-      `${LOG_PREFIX} T1.1: passed (sawTimeline=${sawToolTimeline}, finalArrived=${finalArrived})`
     );
+    expect(await textExists('Fetching example.com')).toBe(true);
   });
 
   it('T1.2 — tool timeline entry shows tool name web_fetch', async () => {
     console.log(`${LOG_PREFIX} T1.2: checking tool name in timeline`);
-    const threadId = await getSelectedThreadId();
-    expect(typeof threadId).toBe('string');
-
-    // The name may have already been recorded; if not, wait until it lands.
-    let toolName = '';
-    const deadline = Date.now() + 20_000;
-    while (Date.now() < deadline) {
-      const snap = await snapshotRuntime(threadId as string);
-      const webFetchName = snap.timelineNames.find(n => n.includes('web_fetch'));
-      if (webFetchName) {
-        toolName = webFetchName;
-        break;
-      }
-      // If timeline cleared but CANARY is present the tool ran successfully.
-      if (await textExists(CANARY_FINAL)) {
-        console.log(`${LOG_PREFIX} T1.2: canary visible, timeline may have cleared — acceptable`);
-        toolName = 'web_fetch'; // known from forced response config
-        break;
-      }
-      await browser.pause(250);
-    }
-    expect(toolName).toContain('web_fetch');
-    console.log(`${LOG_PREFIX} T1.2: passed — tool name: ${toolName}`);
+    const cards = await renderedToolCards();
+    expect(cards.some(card => card.includes('Fetching example.com'))).toBe(true);
+    expect(await textExists('Fetching example.com')).toBe(true);
   });
 
   it('T1.3 — final answer with canary text renders in the DOM', async () => {

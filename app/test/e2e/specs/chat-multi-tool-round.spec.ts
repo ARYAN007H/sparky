@@ -57,27 +57,12 @@ const FORCED_RESPONSES = [
   { content: `Found the content using both tools: ${CANARY_FINAL}` },
 ];
 
-interface ToolTimelineSnapshot {
-  ids: string[];
-  names: string[];
-}
-
-async function getToolTimeline(threadId: string): Promise<ToolTimelineSnapshot> {
-  return (await browser.execute((tid: string) => {
-    const winAny = window as unknown as { __OPENHUMAN_STORE__?: { getState: () => unknown } };
-    const state = winAny.__OPENHUMAN_STORE__?.getState() as
-      | {
-          chatRuntime?: {
-            toolTimelineByThread?: Record<string, Array<{ id?: string; name?: string }>>;
-          };
-        }
-      | undefined;
-    const timeline = state?.chatRuntime?.toolTimelineByThread?.[tid] ?? [];
-    return {
-      ids: timeline.map((e: { id?: string }) => e?.id ?? ''),
-      names: timeline.map((e: { name?: string }) => e?.name ?? ''),
-    };
-  }, threadId)) as ToolTimelineSnapshot;
+async function renderedToolCards(): Promise<string[]> {
+  return (await browser.execute(() =>
+    Array.from(document.querySelectorAll<HTMLElement>('[data-testid="assistant-ui-tool-call"]')).map(
+      card => card.innerText
+    )
+  )) as string[];
 }
 
 describe('Chat multi-tool round', () => {
@@ -133,57 +118,21 @@ describe('Chat multi-tool round', () => {
       })
     ).toBe(true);
 
-    // Watch for file_read to appear in the timeline.
-    let sawFileRead = false;
-    let sawFinal = false;
-    const deadline = Date.now() + 45_000;
-    while (Date.now() < deadline) {
-      const snap = await getToolTimeline(threadId);
-      if (snap.names.some(n => n.includes('file_read'))) {
-        sawFileRead = true;
-        console.log(`${LOG_PREFIX} T2.1: file_read in timeline — names: ${snap.names.join(', ')}`);
-        break;
-      }
-      if (await textExists(CANARY_FINAL)) {
-        sawFinal = true;
-        console.log(`${LOG_PREFIX} T2.1: final answer arrived (tools may have already cycled)`);
-        break;
-      }
-      await browser.pause(200);
-    }
-
-    const finalArrived = await textExists(CANARY_FINAL);
-    expect(sawFileRead || sawFinal || finalArrived).toBe(true);
+    await browser.waitUntil(
+      async () => (await renderedToolCards()).some(card => card.includes('Read file')),
+      { timeout: 45_000, interval: 100, timeoutMsg: 'Rendered file_read tool card never appeared' }
+    );
+    expect(await textExists('Read file')).toBe(true);
     console.log(`${LOG_PREFIX} T2.1: passed`);
   });
 
   it('T2.2 — agent calls tool 2 (grep); timeline shows 2 entries', async () => {
     console.log(`${LOG_PREFIX} T2.2: watching for grep in timeline`);
-    let sawGrep = false;
-    let maxEntries = 0;
-    const deadline = Date.now() + 45_000;
-    while (Date.now() < deadline) {
-      const snap = await getToolTimeline(threadId);
-      if (snap.names.some(n => n.includes('grep'))) {
-        sawGrep = true;
-        maxEntries = Math.max(maxEntries, snap.names.length);
-        console.log(
-          `${LOG_PREFIX} T2.2: grep in timeline — names: ${snap.names.join(', ')}, count: ${snap.names.length}`
-        );
-        break;
-      }
-      if (snap.names.length > maxEntries) maxEntries = snap.names.length;
-      if (await textExists(CANARY_FINAL)) {
-        console.log(`${LOG_PREFIX} T2.2: final answer arrived before grep poll`);
-        break;
-      }
-      await browser.pause(200);
-    }
-
-    const finalArrived = await textExists(CANARY_FINAL);
-    // Either we saw grep in the live timeline, or the entire turn already finished.
-    expect(sawGrep || finalArrived).toBe(true);
-    console.log(`${LOG_PREFIX} T2.2: passed (sawGrep=${sawGrep}, maxEntries=${maxEntries})`);
+    await browser.waitUntil(
+      async () => (await renderedToolCards()).some(card => card.includes('Searching code')),
+      { timeout: 45_000, interval: 100, timeoutMsg: 'Rendered grep tool card never appeared' }
+    );
+    expect(await textExists('Searching code')).toBe(true);
   });
 
   it('T2.3 — final answer renders after both tools complete', async () => {
@@ -198,37 +147,11 @@ describe('Chat multi-tool round', () => {
   it('T2.5 — tool timeline has 2 entries (file_read before grep)', async () => {
     console.log(`${LOG_PREFIX} T2.5: verifying timeline order`);
 
-    // After IN_FLIGHT clears the timeline snapshot may have already been
-    // pruned by the runtime (entries are removed once complete in some
-    // configurations). We accept having seen both names at any point.
-    const snap = await getToolTimeline(threadId);
-    console.log(
-      `${LOG_PREFIX} T2.5: final timeline — names: ${snap.names.join(', ')}, ids: ${snap.ids.join(', ')}`
-    );
-
-    // The tool names may already have been pruned when the final answer renders.
-    // This test verifies ordinal correctness if both entries are still present.
-    if (snap.names.length >= 2) {
-      const fileReadIndex = snap.names.findIndex(n => n.includes('file_read'));
-      const grepIndex = snap.names.findIndex(n => n.includes('grep'));
-      if (fileReadIndex !== -1 && grepIndex !== -1) {
-        expect(fileReadIndex).toBeLessThan(grepIndex);
-        console.log(
-          `${LOG_PREFIX} T2.5: order confirmed — file_read[${fileReadIndex}] < grep[${grepIndex}]`
-        );
-      } else {
-        console.log(
-          `${LOG_PREFIX} T2.5: one or both tools already pruned from timeline — relying on T2.3`
-        );
-      }
-    } else {
-      console.log(
-        `${LOG_PREFIX} T2.5: timeline has ${snap.names.length} entries after completion — tools pruned`
-      );
-    }
-
-    // Primary assertion: the full turn produced the canary (tools ran in order).
-    expect(await textExists(CANARY_FINAL)).toBe(true);
+    const cards = await renderedToolCards();
+    const fileReadIndex = cards.findIndex(card => card.includes('Read file'));
+    const grepIndex = cards.findIndex(card => card.includes('Searching code'));
+    expect(fileReadIndex).toBeGreaterThanOrEqual(0);
+    expect(grepIndex).toBeGreaterThan(fileReadIndex);
     console.log(`${LOG_PREFIX} T2.5: passed`);
   });
 });
