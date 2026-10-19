@@ -395,6 +395,121 @@ enabled = true
     harness.rpc_join.abort();
 }
 
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn tool_registry_entries_include_connected_mcp_client_tools() {
+    let tmp = tempdir().expect("tempdir");
+    let config = Config {
+        workspace_dir: tmp.path().to_path_buf(),
+        ..Config::default()
+    };
+    let server = install_test_mcp_server(&config, &test_mcp_server()).await;
+    openhuman_core::mcp::registry::ops::mcp_clients_set_enabled(
+        &config,
+        server.server_id.clone(),
+        true,
+    )
+    .await
+    .expect("enable test MCP server");
+    let tools = connections::connect(&config, &server)
+        .await
+        .expect("connect test mcp server");
+    assert_eq!(tools.first().map(|tool| tool.name.as_str()), Some("echo"));
+
+    // A second workspace, so that scoping is what the assertions below actually
+    // test. With one workspace open, `registry_entries()` and the config-scoped
+    // form agree, and this case would keep passing if the forwarding regressed.
+    let other_tmp = tempdir().expect("second tempdir");
+    let other_config = Config {
+        workspace_dir: other_tmp.path().to_path_buf(),
+        ..Config::default()
+    };
+    let other_server = install_test_mcp_server(&other_config, &test_mcp_server()).await;
+    openhuman_core::mcp::registry::ops::mcp_clients_set_enabled(
+        &other_config,
+        other_server.server_id.clone(),
+        true,
+    )
+    .await
+    .expect("enable second test MCP server");
+    connections::connect(&other_config, &other_server)
+        .await
+        .expect("connect second test mcp server");
+
+    // Config-scoped, not ambient: this case connects through
+    // `host::for_config(&config)`, keyed by its own tempdir. `registry_entries()`
+    // resolves through the process default instead, which returns a lone host
+    // but `None` once another case in this binary has opened a second one — so
+    // the ambient form reports nothing connected here purely because of who
+    // else ran first.
+    let entries = registry_entries_for_config(&config);
+    let client_entry = entries
+        .iter()
+        .find(|entry| entry.tool_id == format!("mcp-client::{}::echo", server.server_id))
+        .expect("connected mcp client entry");
+    assert_eq!(client_entry.name, "echo");
+    assert_eq!(client_entry.route["protocol"], json!("mcp-client"));
+    assert_eq!(client_entry.route["server_id"], json!(server.server_id));
+    assert!(client_entry.tags.iter().any(|tag| tag == "mcp_client"));
+
+    // The other workspace's server must NOT leak in. This is the assertion that
+    // fails if a config-scoped lookup falls back to the process default.
+    assert!(
+        !entries
+            .iter()
+            .any(|entry| entry.tool_id == format!("mcp-client::{}::echo", other_server.server_id)),
+        "entries for one workspace must not include another workspace's server"
+    );
+
+    // Symmetrically, from the second workspace's side.
+    let other_entries = registry_entries_for_config(&other_config);
+    assert!(other_entries
+        .iter()
+        .any(|entry| entry.tool_id == format!("mcp-client::{}::echo", other_server.server_id)));
+    assert!(!other_entries
+        .iter()
+        .any(|entry| entry.tool_id == format!("mcp-client::{}::echo", server.server_id)));
+
+    // Config-scoped for the same reason as the lookup above: this connection
+    // lives in the host keyed by `config`'s workspace, and the by-id form
+    // resolves through the process default.
+    assert!(connections::disconnect_for_config(&config, &server.server_id).await);
+    assert!(connections::disconnect_for_config(&other_config, &other_server.server_id).await);
+}
+
+#[tokio::test]
+async fn tool_registry_diagnostics_reports_config_and_audit_store_failures() {
+    let _lock = env_lock_async().await;
+    let tmp = tempdir().expect("tempdir");
+    let workspace_file = tmp.path().join("workspace-file");
+    std::fs::write(&workspace_file, "not a directory").expect("workspace sentinel");
+    let _workspace_guard = EnvVarGuard::set_to_path("OPENHUMAN_WORKSPACE", &workspace_file);
+
+    let err = openhuman_core::tools::registry::ops::diagnostics()
+        .await
+        .expect_err("workspace file should prevent config load");
+    assert!(err.contains("failed to load config for tool registry diagnostics"));
+
+    // The write audit lives in the TinyMCP module (605ca6e841), which picks its
+    // storage provider once per process at load, so a broken workspace no
+    // longer reaches it. Fail it at the module seam instead; storage failures
+    // inside the audit are covered by tinymcp's `storage/failing.rs`.
+    let mut broken_audit_config = Config {
+        workspace_dir: workspace_file,
+        ..Config::default()
+    };
+    broken_audit_config.modules.enabled = false;
+    let diagnostics =
+        openhuman_core::tools::registry::ops::diagnostics_for_config(&broken_audit_config).await;
+    assert!(diagnostics.value.mcp_write_audit.enabled);
+    assert_eq!(diagnostics.value.mcp_write_audit.recent_rows, None);
+    assert!(diagnostics
+        .value
+        .mcp_write_audit
+        .last_error
+        .as_deref()
+        .is_some_and(|error| error.contains("MCP module unavailable")));
+}
+
 #[tokio::test]
 async fn approval_schema_handlers_validate_params_and_surface_empty_gate_state() {
     let schemas = all_approval_controller_schemas();
