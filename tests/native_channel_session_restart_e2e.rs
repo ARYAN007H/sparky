@@ -397,19 +397,25 @@ async fn wait_for_completion(state: &MockState, count: usize) {
         }
         sleep(Duration::from_millis(50)).await;
     }
-    wait_until("final Telegram reply", || {
-        state
+    let deadline = Instant::now() + Duration::from_secs(45);
+    loop {
+        let sent_messages = state
             .sent_messages
             .lock()
             .expect("Telegram sent messages")
-            .iter()
-            .any(|body| {
-                body["text"]
-                    .as_str()
-                    .is_some_and(|text| text.contains(&format!("mock reply {count}")))
-            })
-    })
-    .await;
+            .clone();
+        if sent_messages.iter().any(|body| {
+            body["text"]
+                .as_str()
+                .is_some_and(|text| text.contains(&format!("mock reply {count}")))
+        }) {
+            break;
+        }
+        if Instant::now() >= deadline {
+            panic!("timed out waiting for final Telegram reply {count}; captured outbound bodies: {sent_messages:#?}");
+        }
+        sleep(Duration::from_millis(50)).await;
+    }
 }
 
 fn model_saw_user_text(request: &Value, text: &str) -> bool {
