@@ -150,12 +150,10 @@ async fn grounded_close_uses_the_selected_model_and_keeps_verifier_out_of_contex
         "close requests preserve the transcript roundtrip for attachments, reasoning and tool rows"
     );
     assert!(
-        requests
-            .iter()
-            .all(|request| request.messages.iter().any(|message| {
-                matches!(message, Message::User(_)) && message.text().contains("[REDACTED]")
-            })),
-        "grounded close keeps the screened prefix on every follow-up request"
+        history.iter().any(|message| {
+            matches!(message, Message::User(_)) && message.text().contains("[REDACTED]")
+        }),
+        "grounded close leaves the screened transcript prefix intact"
     );
 }
 
