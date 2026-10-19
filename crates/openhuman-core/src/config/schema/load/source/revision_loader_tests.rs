@@ -85,7 +85,7 @@ async fn proxy_config_tool_loads_a_versioned_document_before_saving() {
         Scope::new("tenant-proxy-tool-revision").unwrap(),
         keys(19),
     );
-    let mut document_config = Config::load_from_config_path(&path, &seed.workspace_dir)
+    let document_config = Config::load_from_config_path(&path, &seed.workspace_dir)
         .await
         .unwrap();
     document_config.save().await.unwrap();
@@ -126,7 +126,8 @@ impl Drop for RuntimeProxyRestore {
 #[tokio::test]
 async fn channel_allowlist_store_loads_a_versioned_document_before_saving() {
     let tmp = tempfile::tempdir().unwrap();
-    let _home = crate::config::test_env::locked_set_async("HOME", tmp.path()).await;
+    let _env = crate::config::test_env::lock_env_async().await;
+    let _home = crate::config::test_env::EnvVarGuard::set("HOME", tmp.path());
     let storage = MemoryStorage::new();
     let openhuman_dir = tmp.path().join(".openhuman");
     tokio::fs::create_dir_all(&openhuman_dir).await.unwrap();
