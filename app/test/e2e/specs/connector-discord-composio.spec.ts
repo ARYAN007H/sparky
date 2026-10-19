@@ -140,7 +140,7 @@ describe('Discord (Composio) connector flow', () => {
   // TODO(#6396): the Connections UI migration made modal discovery flaky on
   // Linux Wry; retain the other Discord session-safety coverage meanwhile.
   it.skip(// https://github.com/tinyhumansai/openhuman/issues/6396
-    'expired auth shows Reconnect button and does not log user out', async function () {
+  'expired auth shows Reconnect button and does not log user out', async function () {
     this.timeout(60_000);
     seedComposioConnection(TOOLKIT_SLUG, 'EXPIRED', 'c-discord-expired');
     await navigateToSkills();

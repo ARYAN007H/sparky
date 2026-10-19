@@ -231,7 +231,7 @@ test.describe('Managed OpenRouter catalog in the model picker', () => {
   // names ("selection and persistence"), and relaxing it would hide exactly the
   // regression it exists to catch.
   test.skip(// https://github.com/tinyhumansai/openhuman/issues/6395
-    'a composer pick is the global default and survives a fresh page', async ({ page }) => {
+  'a composer pick is the global default and survives a fresh page', async ({ page }) => {
     // The picker writes `default_model` through the core, so a brand-new page
     // (new composer state, same core) still resolves and shows the pinned
     // model — the pick is not a per-session override.
@@ -284,7 +284,7 @@ test.describe('Managed OpenRouter catalog in the model picker', () => {
   // decision, not a test edit, so the case is left skipped rather than
   // rewritten to match whichever behaviour happens to ship today.
   test.skip(// https://github.com/tinyhumansai/openhuman/issues/6395
-    'an empty catalog renders no model rows and cannot be submitted', async ({ page }) => {
+  'an empty catalog renders no model rows and cannot be submitted', async ({ page }) => {
     // Models the real backend with OPENROUTER_PASSTHROUGH_ENABLED off: it
     // returns an empty set with HTTP 200, not an error. The managed pane must
     // degrade to its pre-#6201 appearance rather than surfacing a failure.

@@ -190,7 +190,7 @@ test.describe.skip(// https://github.com/tinyhumansai/openhuman/issues/6398
 });
 
 test.describe.skip(// https://github.com/tinyhumansai/openhuman/issues/6398
-  'Connector modal — Escape', () => {
+'Connector modal — Escape', () => {
   test('Escape closes the dialog', async ({ page }) => {
     const dialog = await openConnectDialog(page);
     await page.keyboard.press('Escape');
@@ -238,7 +238,7 @@ test.describe.skip(// https://github.com/tinyhumansai/openhuman/issues/6398
 });
 
 test.describe.skip(// https://github.com/tinyhumansai/openhuman/issues/6398
-  'Connector modal — accessible shape', () => {
+'Connector modal — accessible shape', () => {
   test('is a labelled modal dialog, not a bare overlay', async ({ page }) => {
     const dialog = await openConnectDialog(page);
     // A screen reader needs both of these to announce it as a dialog and read
