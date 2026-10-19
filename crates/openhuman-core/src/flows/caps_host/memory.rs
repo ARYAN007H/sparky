@@ -45,7 +45,7 @@ use crate::flows::{
 };
 use crate::memory::types::{FetchParams, RecallParams};
 use crate::security::approval::{
-    redact_args, summarize_action, ApprovalGate, ExecutionOutcome, GateOutcome,
+    redact_args, summarize_action, GateOutcome,
 };
 use crate::security::SecurityPolicy;
 use tinybox_bus::CommandClass;
@@ -53,7 +53,7 @@ use tinymemory_api::wrap_untrusted_for_agent;
 use tinymemory_api::Error;
 use tinymemory_api::{Hit, LearningKind, MemoryMeta, MetaFilter, SourceKind};
 
-use super::caps::{enforce_current_node_tier_gate, gate_call_for_tier};
+use super::{enforce_current_node_tier_gate, gate_call_for_tier, EngineError, Result};
 
 /// Stable `tracing` grep prefix for every log line this adapter emits. Never
 /// logs memory *content* or PII — only operation names, scopes, resolved
@@ -206,8 +206,7 @@ fn capability_error(op: &str, error: &Error) -> EngineError {
     EngineError::Capability(format!("memory node: {op} failed: {error}"))
 }
 
-#[async_trait]
-impl MemoryProvider for OpenHumanMemory {
+impl OpenHumanMemory {
     /// Backs both `recall` and `search`. `recall` returns the engine's
     /// synthesised `answer` plus its citations as `results`; `search` returns
     /// raw ranked hits as `results`. Each row is `{ id, key, text, score,
