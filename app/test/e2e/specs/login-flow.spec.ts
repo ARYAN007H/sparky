@@ -29,7 +29,6 @@
  * have been built with VITE_BACKEND_URL pointing there.
  */
 import { waitForApp, waitForAppReady, waitForAuthBootstrap } from '../helpers/app-helpers';
-import { callOpenhumanRpc, expectRpcOk } from '../helpers/core-rpc';
 import { buildBypassJwt, triggerAuthDeepLink, triggerDeepLink } from '../helpers/deep-link-helpers';
 import {
   dumpAccessibilityTree,
@@ -76,34 +75,6 @@ async function waitForAnyText(candidates, timeout = 15_000) {
     await browser.pause(500);
   }
   return null;
-}
-
-/**
- * `AuthStateResponse` — `crates/openhuman-core/src/security/credentials/responses.rs`.
- *
- * Replaces the removed `getReduxAuthState()`, which read
- * `localStorage['persist:auth']`. There is no `auth` reducer in
- * `app/src/store/index.ts`, so that key was never written and every read
- * returned null.
- */
-interface AuthStateResponse {
-  isAuthenticated: boolean;
-  userId?: string | null;
-  credential?: 'session' | 'api-key' | 'local';
-}
-
-function authStateValue(state: { result?: unknown }): AuthStateResponse {
-  const raw = (state.result ?? {}) as {
-    value?: AuthStateResponse & { is_authenticated?: boolean; user_id?: string | null };
-    is_authenticated?: boolean;
-    user_id?: string | null;
-  } & AuthStateResponse;
-  const value = raw.value ?? raw;
-  return {
-    ...value,
-    isAuthenticated: value.isAuthenticated ?? value.is_authenticated ?? false,
-    userId: value.userId ?? value.user_id,
-  };
 }
 
 // Track whether onboarding was walked through in the UI so Phase 3 can
