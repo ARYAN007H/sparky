@@ -90,27 +90,22 @@ async function readChecklist(): Promise<Array<[string, string]>> {
   })) as Array<[string, string]>;
 }
 
-/** The checklist header's completed/total counters, or null when absent. */
+/** The current task-card checklist's completed/total item counts. */
 async function readProgress(): Promise<{ completed: number; total: number } | null> {
+  const items = await readChecklist();
+  if (!items.length) return null;
+  return { completed: items.filter(([, status]) => status === 'done').length, total: items.length };
+}
+
+/** The shipped task card's state + objective, or null when no card is shown. */
+async function readGoal(): Promise<{ status: string; objective: string } | null> {
   return (await browser.execute(() => {
     const el = document.querySelector('[data-testid="todo-checklist"]');
     if (!el) return null;
+    const label = el.querySelector('button');
     return {
-      completed: Number(el.getAttribute('data-todo-completed') ?? -1),
-      total: Number(el.getAttribute('data-todo-total') ?? -1),
-    };
-  })) as { completed: number; total: number } | null;
-}
-
-/** The goal banner's status + objective, or null when no banner is shown. */
-async function readGoal(): Promise<{ status: string; objective: string } | null> {
-  return (await browser.execute(() => {
-    const el = document.querySelector('[data-testid="goal-banner"]');
-    if (!el) return null;
-    const objective = el.querySelector('[data-testid="goal-objective"]');
-    return {
-      status: el.getAttribute('data-goal-status') ?? '',
-      objective: (objective?.textContent ?? '').trim(),
+      status: el.getAttribute('data-state') ?? '',
+      objective: (label?.textContent ?? '').trim(),
     };
   })) as { status: string; objective: string } | null;
 }
@@ -141,9 +136,6 @@ async function sendTurn(message: string) {
 }
 
 describe('Chat todos and goals', () => {
-  before(function () {
-    this.skip();
-  });
   let threadId: string;
 
   before(async () => {
@@ -181,11 +173,11 @@ describe('Chat todos and goals', () => {
     if (!socketReady) console.warn(`${LOG_PREFIX} socket not connected — send may fail`);
     await sendTurn('Write the v2 release notes, in five steps.');
 
-    await waitForTestId('goal-banner', 45_000);
+    await waitForTestId('todo-checklist', 45_000);
     const goal = await readGoal();
-    console.log(`${LOG_PREFIX} G1.1: banner — ${JSON.stringify(goal)}`);
+    console.log(`${LOG_PREFIX} G1.1: task card — ${JSON.stringify(goal)}`);
     expect(goal?.objective).toBe(OBJECTIVE);
-    expect(goal?.status).toBe('active');
+    expect(['working', 'waiting']).toContain(goal?.status);
   });
 
   it('G1.2 — the checklist renders all five items with their statuses', async () => {
@@ -198,7 +190,7 @@ describe('Chat todos and goals', () => {
       STEPS.map(step => expect.stringContaining(step))
     );
     expect(items.map(([, status]) => status)).toEqual([
-      'in_progress',
+      'active',
       'pending',
       'pending',
       'pending',
@@ -213,31 +205,31 @@ describe('Chat todos and goals', () => {
     const items = await readChecklist();
     console.log(`${LOG_PREFIX} G1.3: items — ${JSON.stringify(items)}`);
     expect(items.map(([, status]) => status)).toEqual([
-      'completed',
-      'completed',
-      'completed',
-      'in_progress',
+      'done',
+      'done',
+      'done',
+      'active',
       'pending',
     ]);
     // The goal is untouched by a todo write.
-    expect((await readGoal())?.status).toBe('active');
+    expect(['working', 'waiting']).toContain((await readGoal())?.status);
   });
 
-  it('G1.4 — the final turn completes every item and closes the goal', async () => {
+  it('G1.4 — the final turn completes every item and marks the task card done', async () => {
     await sendTurn('finish it');
     await waitForProgress(5, 5);
-    await browser.waitUntil(async () => (await readGoal())?.status === 'complete', {
+    await browser.waitUntil(async () => (await readGoal())?.status === 'done', {
       timeout: 45_000,
       timeoutMsg: `goal never turned complete; last: ${JSON.stringify(await readGoal())}`,
     });
 
     const items = await readChecklist();
     expect(items.map(([, status]) => status)).toEqual([
-      'completed',
-      'completed',
-      'completed',
-      'completed',
-      'completed',
+      'done',
+      'done',
+      'done',
+      'done',
+      'done',
     ]);
     expect(await textExists(CANARY_FINAL)).toBe(true);
     console.log(`${LOG_PREFIX} G1.4: passed — all five done, goal complete`);
