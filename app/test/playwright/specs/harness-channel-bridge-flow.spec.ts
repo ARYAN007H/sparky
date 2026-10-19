@@ -148,5 +148,4 @@ test.describe('Harness - Cross-channel bridge flow', () => {
       agentMessageText(page, /I created a daily 9am standup reminder for you\./i)
     ).toBeVisible();
   });
-
 });

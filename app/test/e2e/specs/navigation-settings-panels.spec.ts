@@ -19,11 +19,7 @@
 import { waitForApp, waitForAppReady } from '../helpers/app-helpers';
 import { textExists } from '../helpers/element-helpers';
 import { resetApp } from '../helpers/reset-app';
-import {
-  navigateToHome,
-  navigateViaHash,
-  waitForHomePage,
-} from '../helpers/shared-flows';
+import { navigateToHome, navigateViaHash, waitForHomePage } from '../helpers/shared-flows';
 import { startMockServer, stopMockServer } from '../mock-server';
 
 const LOG_PREFIX = '[navigation-settings-panels]';
@@ -64,10 +60,7 @@ const PANELS: PanelCheck[] = [
     hash: '/settings/developer-options',
     markers: ['Developer', 'Debug', 'Advanced', 'Settings', 'Logs'],
   },
-  {
-    hash: '/settings/account',
-    markers: ['Plan & billing', 'Open dashboard'],
-  },
+  { hash: '/settings/account', markers: ['Plan & billing', 'Open dashboard'] },
   {
     // N2.7 — appearance panel
     hash: '/settings/appearance',

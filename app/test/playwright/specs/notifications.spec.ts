@@ -110,5 +110,4 @@ test.describe('Notifications', () => {
     await expect(page.getByRole('heading', { name: 'Alerts', exact: true })).toBeVisible();
     await expect(page.getByText('No alerts yet').first()).toBeVisible();
   });
-
 });

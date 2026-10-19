@@ -20,11 +20,7 @@ import { waitForApp, waitForAppReady } from '../helpers/app-helpers';
 import { textExists, waitForTestId } from '../helpers/element-helpers';
 import { isTauriDriver } from '../helpers/platform';
 import { resetApp } from '../helpers/reset-app';
-import {
-  navigateToHome,
-  navigateViaHash,
-  waitForHomePage,
-} from '../helpers/shared-flows';
+import { navigateToHome, navigateViaHash, waitForHomePage } from '../helpers/shared-flows';
 import { startMockServer, stopMockServer } from '../mock-server';
 
 const LOG_PREFIX = '[user-journey-settings-round-trip]';

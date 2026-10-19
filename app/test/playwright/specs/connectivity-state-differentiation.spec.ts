@@ -24,7 +24,9 @@ test.describe('Connectivity state differentiation', () => {
   // transient reconnect label cannot be asserted deterministically here;
   // selector behavior has focused store coverage.
 
-  test('shows device-offline copy (not backend-only) when window fires offline', async ({ page }) => {
+  test('shows device-offline copy (not backend-only) when window fires offline', async ({
+    page,
+  }) => {
     await setDeviceOffline(page, true);
     await expect(page.getByText('Your device is offline right now')).toBeVisible();
   });

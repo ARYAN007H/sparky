@@ -217,5 +217,4 @@ test.describe('Harness - Search tool-flow', () => {
     expect(llmHits.length).toBeGreaterThanOrEqual(2);
     expect(await toolTimelineIncludes(page, threadId!, 'web_search_tool')).toBe(true);
   });
-
 });

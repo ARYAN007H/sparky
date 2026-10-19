@@ -225,13 +225,7 @@ describe('Chat todos and goals', () => {
     });
 
     const items = await readChecklist();
-    expect(items.map(([, status]) => status)).toEqual([
-      'done',
-      'done',
-      'done',
-      'done',
-      'done',
-    ]);
+    expect(items.map(([, status]) => status)).toEqual(['done', 'done', 'done', 'done', 'done']);
     expect(await textExists(CANARY_FINAL)).toBe(true);
     console.log(`${LOG_PREFIX} G1.4: passed — all five done, goal complete`);
   });

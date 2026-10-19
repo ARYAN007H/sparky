@@ -55,10 +55,7 @@ import { waitForApp } from '../helpers/app-helpers';
 import { textExists } from '../helpers/element-helpers';
 import { supportsExecuteScript } from '../helpers/platform';
 import { resetApp } from '../helpers/reset-app';
-import {
-  dismissWalkthroughIfVisible,
-  navigateViaHash,
-} from '../helpers/shared-flows';
+import { dismissWalkthroughIfVisible, navigateViaHash } from '../helpers/shared-flows';
 import { startMockServer, stopMockServer } from '../mock-server';
 
 const USER_ID = 'e2e-guided-tour-gates';
@@ -198,7 +195,9 @@ describe('Guided tour — gates and resume behaviour (#1215)', function () {
       expect(await waitForTourTooltip()).toBe(true);
       expect(await textExists('1 of 10')).toBe(true);
       expect(
-        await browser.execute(() => document.querySelector('[data-walkthrough="home-card"]') !== null)
+        await browser.execute(
+          () => document.querySelector('[data-walkthrough="home-card"]') !== null
+        )
       ).toBe(true);
     });
 
@@ -211,10 +210,7 @@ describe('Guided tour — gates and resume behaviour (#1215)', function () {
       await browser.waitUntil(
         async () =>
           String(await browser.execute(() => window.location.hash)).includes('/connections'),
-        {
-          timeout: 15_000,
-          timeoutMsg: 'tour did not navigate to /connections after three steps',
-        }
+        { timeout: 15_000, timeoutMsg: 'tour did not navigate to /connections after three steps' }
       );
       expect(
         await browser.execute(
@@ -281,8 +277,6 @@ describe('Guided tour — gates and resume behaviour (#1215)', function () {
       // The data-walkthrough attribute must exist for Joyride to focus the step.
       expect(chatPanel).toBe(true);
     });
-
-
   });
 
   // ── Scenario 3: Resume after relaunch ─────────────────────────────────────

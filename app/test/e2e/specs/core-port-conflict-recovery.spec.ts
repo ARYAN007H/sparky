@@ -88,5 +88,4 @@ describe('Core port conflict recovery', () => {
     stepLog('app reached usable state', { onHome });
     expect(onHome).toBe(true);
   });
-
 });
