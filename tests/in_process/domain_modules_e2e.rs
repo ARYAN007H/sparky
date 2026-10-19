@@ -1085,3 +1085,110 @@ async fn serve_composio_direct_fixtures() -> (
     let join = tokio::spawn(async move { axum::serve(listener, app).await });
     (format!("http://{addr}"), hits, join)
 }
+
+#[tokio::test]
+async fn channels_controller_validation_and_hosted_registration_are_checked_over_rpc() {
+    let _lock = env_lock_async().await;
+    let harness = setup().await;
+
+    for (id, method) in [
+        (40, "openhuman.channels_test"),
+        (43, "openhuman.channels_discord_list_channels"),
+        (44, "openhuman.channels_discord_check_permissions"),
+        (45, "openhuman.channels_send_message"),
+        (46, "openhuman.channels_send_reaction"),
+        (47, "openhuman.channels_create_thread"),
+        (48, "openhuman.channels_update_thread"),
+        (49, "openhuman.channels_list_threads"),
+    ] {
+        let response = rpc(&harness.rpc_base, id, method, json!({})).await;
+        let message = err(&response, method)
+            .get("message")
+            .and_then(Value::as_str)
+            .unwrap_or_else(|| panic!("{method}: error must have a message: {response}"));
+        assert!(
+            message.contains("missing required param"),
+            "{method} should reject missing required params before outward calls: {message}"
+        );
+    }
+
+    let guilds = rpc(
+        &harness.rpc_base,
+        52,
+        "openhuman.channels_discord_list_guilds",
+        json!({}),
+    )
+    .await;
+    assert_registered_dispatch(&guilds, "openhuman.channels_discord_list_guilds");
+
+    let hosted_layer_installed = crate::tinyhumans_boot::is_booted();
+    for (id, method) in [
+        (50, "openhuman.channels_telegram_login_start"),
+        (51, "openhuman.channels_discord_link_start"),
+        (41, "openhuman.channels_telegram_login_check"),
+        (42, "openhuman.channels_discord_link_check"),
+    ] {
+        let response = rpc(&harness.rpc_base, id, method, json!({})).await;
+        let message = response
+            .pointer("/error/message")
+            .and_then(Value::as_str)
+            .unwrap_or_default();
+        if hosted_layer_installed {
+            assert!(
+                !message.contains("unknown method"),
+                "{method} must be registered once the hosted transport is installed: {response}"
+            );
+        } else {
+            assert!(
+                message.contains("unknown method"),
+                "{method} must be absent from a core without the hosted transport: {response}"
+            );
+        }
+    }
+}
+
+#[tokio::test]
+async fn composio_controller_validation_rejects_malformed_params_over_rpc() {
+    let _lock = env_lock_async().await;
+    let harness = setup().await;
+    let cases = [
+        (60, "openhuman.composio_authorize", json!({}), "missing required param 'toolkit'"),
+        (61, "openhuman.composio_delete_connection", json!({ "connection_id": " " }), "'connection_id' must not be empty"),
+        (62, "openhuman.composio_list_tools", json!({ "toolkits": "gmail" }), "invalid 'toolkits'"),
+        (63, "openhuman.composio_execute", json!({}), "missing required param 'tool'"),
+        (64, "openhuman.composio_create_trigger", json!({ "slug": " " }), "'slug' must not be empty"),
+        (65, "openhuman.composio_get_user_profile", json!({}), "missing required param 'connection_id'"),
+        (66, "openhuman.composio_list_available_triggers", json!({ "toolkit": " " }), "'toolkit' must not be empty"),
+        (67, "openhuman.composio_enable_trigger", json!({ "connection_id": " ", "slug": "GMAIL_NEW_GMAIL_MESSAGE" }), "'connection_id' must not be empty"),
+        (68, "openhuman.composio_disable_trigger", json!({}), "missing required param 'trigger_id'"),
+        (69, "openhuman.composio_set_api_key", json!({ "api_key": "" }), "'api_key' must not be empty"),
+        (70, "openhuman.composio_list_github_repos", json!({ "connection_id": 42 }), "invalid params"),
+        (71, "openhuman.composio_list_trigger_history", json!({ "limit": "many" }), "invalid params"),
+        (72, "openhuman.composio_list_triggers", json!({ "toolkit": 12 }), "invalid params"),
+        (73, "openhuman.composio_enable_trigger", json!({ "connection_id": "conn-1", "slug": " " }), "'slug' must not be empty"),
+    ];
+
+    for (id, method, params, expected) in cases {
+        let response = rpc(&harness.rpc_base, id, method, params).await;
+        let message = err(&response, method)
+            .get("message")
+            .and_then(Value::as_str)
+            .unwrap_or_else(|| panic!("{method}: error must have a message: {response}"));
+        assert!(
+            message.contains(expected),
+            "{method} should reject malformed params with `{expected}`, got: {message}"
+        );
+    }
+}
+
+fn assert_registered_dispatch(value: &Value, method: &str) {
+    let Some(error) = value.get("error") else {
+        assert!(value.get("result").is_some(), "{method}: malformed JSON-RPC response: {value}");
+        return;
+    };
+    let message = error.get("message").and_then(Value::as_str).unwrap_or_default();
+    assert!(
+        !message.starts_with("unknown method:"),
+        "{method} was not registered: {message}"
+    );
+}
