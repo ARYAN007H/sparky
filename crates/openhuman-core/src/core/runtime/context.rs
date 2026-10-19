@@ -424,11 +424,26 @@ impl CoreContext {
             }
         };
         let agent = self.agent.derive(&mut overlay);
-        if let Some(parent_config) = parent_config {
-            match crate::config::schema::load::context_overlay::ConfigContextOverlay::derive(
-                parent_config,
-                &overlay.config,
-            ) {
+        let config_overlay = if let Some(profile_id) = overlay.profile.as_deref() {
+            let parent_profile_config = (self.profile() == Some(profile_id))
+                .then_some(parent_config)
+                .flatten();
+            Some(
+                crate::config::schema::load::context_overlay::ConfigContextOverlay::derive_profile(
+                    parent_profile_config,
+                    &overlay.config,
+                ),
+            )
+        } else {
+            parent_config.map(|parent_config| {
+                crate::config::schema::load::context_overlay::ConfigContextOverlay::derive(
+                    parent_config,
+                    &overlay.config,
+                )
+            })
+        };
+        if let Some(config_overlay) = config_overlay {
+            match config_overlay {
                 Ok(config_overlay) => {
                     overlay.config.context_overlay = std::sync::Mutex::new(Some(config_overlay));
                 }
