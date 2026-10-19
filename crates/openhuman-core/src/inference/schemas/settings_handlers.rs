@@ -110,7 +110,7 @@ pub(super) fn handle_inference_status(
 ) -> ControllerFuture {
     Box::pin(async move {
         let config = ctx.load_config().await?;
-        to_json(crate::inference::rpc::inference_status(&config).await?)
+        to_json(crate::inference::ops::inference_status(&config).await?)
     })
 }
 
@@ -119,7 +119,7 @@ pub(super) fn handle_inference_get_client_config(
     _params: Map<String, Value>,
 ) -> ControllerFuture {
     Box::pin(
-        async move { to_json(crate::inference::rpc::inference_get_client_config(&ctx).await?) },
+        async move { to_json(crate::inference::ops::inference_get_client_config(&ctx).await?) },
     )
 }
 
@@ -257,7 +257,7 @@ pub(super) fn handle_inference_update_model_settings(
             memory_provider: update.memory_provider,
             embeddings_provider: update.embeddings_provider,
         };
-        to_json(crate::inference::rpc::inference_update_model_settings(&ctx, patch).await?)
+        to_json(crate::inference::ops::inference_update_model_settings(&ctx, patch).await?)
     })
 }
 
@@ -283,7 +283,7 @@ pub(super) fn handle_inference_update_local_settings(
             usage_embeddings: update.usage_embeddings,
             api_key: update.api_key,
         };
-        to_json(crate::inference::rpc::inference_update_local_settings(&ctx, patch).await?)
+        to_json(crate::inference::ops::inference_update_local_settings(&ctx, patch).await?)
     })
 }
 
@@ -293,7 +293,7 @@ pub(super) fn handle_inference_list_models(
 ) -> ControllerFuture {
     Box::pin(async move {
         let request = deserialize_params::<InferenceListModelsParams>(params)?;
-        to_json(crate::inference::rpc::inference_list_models(&request.provider_id).await?)
+        to_json(crate::inference::ops::inference_list_models(&request.provider_id).await?)
     })
 }
 
@@ -301,7 +301,7 @@ pub(super) fn handle_inference_provider_auth_errors(
     _ctx: DispatchCtx,
     _params: Map<String, Value>,
 ) -> ControllerFuture {
-    Box::pin(async move { to_json(crate::inference::rpc::inference_provider_auth_errors().await?) })
+    Box::pin(async move { to_json(crate::inference::ops::inference_provider_auth_errors().await?) })
 }
 
 pub(super) fn handle_inference_diagnostics(
@@ -310,7 +310,7 @@ pub(super) fn handle_inference_diagnostics(
 ) -> ControllerFuture {
     Box::pin(async move {
         let config = ctx.load_config().await?;
-        to_json(crate::inference::rpc::inference_diagnostics(&config).await?)
+        to_json(crate::inference::ops::inference_diagnostics(&config).await?)
     })
 }
 

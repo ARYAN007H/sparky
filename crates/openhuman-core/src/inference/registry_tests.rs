@@ -130,23 +130,25 @@ async fn a_registered_catalog_answers_the_model_listing_for_its_provider() {
             limits: None,
         },
     );
-    let listing = crate::inference::provider::ops::list_configured_models_from_config(
-        "fake-catalog",
-        &Config::default(),
-    )
-    .await;
+    let listing =
+        crate::inference::provider::models::catalog_listing::list_configured_models_from_config(
+            "fake-catalog",
+            &Config::default(),
+        )
+        .await;
     unregister_catalog("fake-catalog");
     assert_eq!(listing.unwrap().value["models"][0]["id"], "registered");
 }
 
 #[tokio::test]
 async fn without_a_catalog_an_unknown_provider_still_errors() {
-    let error = crate::inference::provider::ops::list_configured_models_from_config(
-        "fake-catalog",
-        &Config::default(),
-    )
-    .await
-    .unwrap_err();
+    let error =
+        crate::inference::provider::models::catalog_listing::list_configured_models_from_config(
+            "fake-catalog",
+            &Config::default(),
+        )
+        .await
+        .unwrap_err();
     assert!(error.contains("no cloud provider"));
 }
 
@@ -230,8 +232,11 @@ async fn a_registered_catalog_receives_the_entrys_provider_key() {
         ..Config::default()
     };
     let listing =
-        crate::inference::provider::ops::list_configured_models_from_config("p_ephemeral", &config)
-            .await;
+        crate::inference::provider::models::catalog_listing::list_configured_models_from_config(
+            "p_ephemeral",
+            &config,
+        )
+        .await;
     unregister_catalog(PROVIDER_OPENHUMAN);
     listing.unwrap();
     assert_eq!(seen.lock().unwrap().as_str(), "entry-key");

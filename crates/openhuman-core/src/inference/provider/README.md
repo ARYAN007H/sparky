@@ -60,10 +60,10 @@ previously `providers/` (pre-consolidation single-crate layout); see
 - `crate::inference::auth_error_registry`: surfaces OpenHuman per-provider auth errors
   back to the UI.
 - `crate::core::bus` (`BUS.publish`) / `crate::core::events::DomainEvent`:
-  `ops/http_error.rs::publish_backend_session_expired` and
+  `http_error.rs::publish_backend_session_expired` and
   the registered managed model (`openhuman-tinyhumans`) publish `DomainEvent::SessionExpired` when the
   managed backend reports an auth failure, so the credentials layer can
-  clear/refresh the session; [`ops/http_error.rs`](./ops/http_error.rs) also publishes
+  clear/refresh the session; [`http_error.rs`](./http_error.rs) also publishes
   `DomainEvent::ProviderApiKeyRejected` the first time a BYO key is rejected.
 - `crate::mcp::server::local` (via the vendored `claude_code` driver), the Claude Code
   provider points the sandboxed `claude` subprocess at the in-process MCP
@@ -85,11 +85,10 @@ consumers: the agent harness ([`agent/session_host/builder/factory.rs`](../../ag
 
 ## Sub-modules
 
-- `ops/`: `http_error` (HTTP error
-  classification, Sentry routing, `api_error`), `models`
-  (`list_configured_models`), `provider_factory` (`ProviderRuntimeOptions`,
-  `list_providers`).
-  Preserves the original `pub use ops::*` contract split out of a single `ops.rs`.
+- [`http_error.rs`](./http_error.rs) owns provider HTTP error classification,
+  Sentry routing, and `api_error`; [`models/`](./models/) owns model catalog
+  listing and local-runtime entries. Delegation's `ProviderRuntimeOptions`
+  live with [`tools/delegate.rs`](../tools/delegate.rs).
 - Claude Code CLI provider: `tinyagents_harness::providers::claude_code` in [`vendor/tinyagents`](../../../../../vendor/tinyagents/); see the [Claude Code provider guide](../../../../../docs/gitbooks/en/developing/providers/claude-code.md).
 
 ## Tests
@@ -98,9 +97,8 @@ consumers: the agent harness ([`agent/session_host/builder/factory.rs`](../../ag
   [`factory_egress_fallback_tests.rs`](./factory_egress_fallback_tests.rs), [`factory_route_resolution_tests.rs`](./factory_route_resolution_tests.rs),
   [`factory_test_provider_override_tests.rs`](./factory_test_provider_override_tests.rs): provider-string parsing, access
   gates, and model construction.
-- [`ops_tests.rs`](./ops_tests.rs), [`ops_tests_error_suppression_tests.rs`](./ops_tests_error_suppression_tests.rs),
-  [`ops_tests_models_parsing_tests.rs`](./ops_tests_models_parsing_tests.rs), [`ops/http_error_tests.rs`](./ops/http_error_tests.rs), [`ops/models_tests.rs`](./ops/models_tests.rs): error
-  classification and model listing.
+- [`http_error_tests.rs`](./http_error_tests.rs), [`models/mod_tests.rs`](./models/mod_tests.rs),
+  and provider model-listing tests: error classification and model listing.
 - Claude Code provider tests live with the provider in
   [`vendor/tinyagents/crates/tinyagents-harness/src/providers/claude_code/`](../../../../../vendor/tinyagents/crates/tinyagents-harness/src/providers/claude_code/).
 - [`openhuman_backend_model_tests.rs`](./openhuman_backend_model_tests.rs): managed host transport; reusable provider

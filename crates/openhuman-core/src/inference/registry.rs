@@ -7,7 +7,7 @@
 //! | --- | --- | --- |
 //! | chat models | `provider::factory` (every managed-provider construction) | [`ChatModelEntry`] |
 //! | embeddings | `embedding_host::factory` (the managed embedding model) | [`EmbeddingFactory`] |
-//! | model catalogs | `provider::ops::models::catalog_listing`, `provider::factory::discovery` | [`CatalogEntry`] |
+//! | model catalogs | `provider::models::catalog_listing`, `provider::factory::discovery` | [`CatalogEntry`] |
 //!
 //! The id is the provider id the core already routes on (the managed provider
 //! is [`PROVIDER_OPENHUMAN`](crate::inference::provider::factory::PROVIDER_OPENHUMAN)).

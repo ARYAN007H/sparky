@@ -3,7 +3,19 @@
 //! managed entries), builds an authenticated `/models` request for it, and
 //! parses the response.
 
-use super::*;
+use super::super::openai_codex::resolve_openai_codex_routing;
+use super::{
+    local_runtime::synthesize_local_runtime_entry, openrouter::validate_openrouter_api_key,
+};
+use tinyinference_core::sanitize::sanitize_api_error;
+use tinyinference_llm::catalog::{
+    append_query_param, endpoint_hosts_models_listing, is_openrouter_provider,
+    merge_openai_codex_model_hints, parse_models_response, ModelInfo,
+};
+use tinyinference_llm::providers::openai::codex::{
+    openai_codex_client_version, openai_codex_user_agent, OpenAiCodexRouting,
+    OPENAI_CODEX_ACCOUNT_HEADER, OPENAI_CODEX_ORIGINATOR, OPENAI_CODEX_ORIGINATOR_HEADER,
+};
 
 /// Resolve the API key used to probe a provider's `/models` endpoint.
 ///
@@ -130,7 +142,7 @@ pub async fn list_configured_models_from_config(
     // An entry that authenticates with the managed session is the managed
     // catalog: the registered provider lists it, and with none registered
     // there is nothing to list.
-    if entry.auth_style == crate::config::schema::cloud_providers::AuthStyle::OpenhumanJwt {
+    if entry.auth_style == AuthStyle::OpenhumanJwt {
         return match crate::inference::registry::catalog(
             crate::inference::provider::factory::PROVIDER_OPENHUMAN,
         ) {

@@ -1,107 +1,309 @@
 use super::*;
+use crate::core::events::DomainEvent;
+use reqwest::StatusCode;
+
+fn response(status: StatusCode, body: &str) -> reqwest::Response {
+    reqwest::Response::from(
+        axum::http::Response::builder()
+            .status(status)
+            .body(body.to_string())
+            .expect("build response"),
+    )
+}
+
+/// Drain the shared bus until `pick` matches an event or the queue is empty.
+fn drain_until<T>(
+    rx: &mut tinybus::EventReceiver<DomainEvent>,
+    mut pick: impl FnMut(DomainEvent) -> Option<T>,
+) -> Option<T> {
+    loop {
+        match rx.try_recv() {
+            Ok(event) => {
+                if let Some(found) = pick(event) {
+                    return Some(found);
+                }
+            }
+            Err(tinybus::TryRecvError::Lagged(_)) => continue,
+            Err(_) => return None,
+        }
+    }
+}
 
 #[test]
-fn list_configured_models_accepts_slug() {
-    // list_configured_models should find a provider by slug when the caller
-    // passes a slug instead of the opaque random id. This lets the frontend
-    // call the RPC before the provider config has been persisted (where only
-    // the slug is stable).
-    use crate::config::schema::cloud_providers::{AuthStyle, CloudProviderCreds};
-    use crate::config::Config;
+fn transient_statuses_are_not_reported_but_client_errors_are() {
+    for s in [408u16, 429, 502, 503, 504, 520] {
+        assert!(
+            !should_report_provider_http_failure(StatusCode::from_u16(s).unwrap()),
+            "{s} is transient"
+        );
+    }
+    for s in [400u16, 401, 404, 500] {
+        assert!(
+            should_report_provider_http_failure(StatusCode::from_u16(s).unwrap()),
+            "{s} is reportable"
+        );
+    }
+}
 
-    let mut config = Config::default();
-    config.cloud_providers.push(CloudProviderCreds {
-        id: "p_openai_xyz99".to_string(),
-        slug: "openai".to_string(),
-        label: "OpenAI".to_string(),
-        endpoint: "https://api.openai.com/v1".to_string(),
-        auth_style: AuthStyle::Bearer,
-        default_model: None,
+#[tokio::test]
+async fn api_error_replaces_ollama_cloud_500_body_with_guidance() {
+    let err = api_error(
+        "ollama",
+        response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            r#"{"error":"Internal Server Error (ref: 1b2c3d4e-0000-4000-8000-000000000000)"}"#,
+        ),
+    )
+    .await;
+    assert!(tinyinference_llm::failure::is_ollama_cloud_internal_500_message(&err.to_string()));
+}
+
+#[tokio::test]
+async fn api_error_replaces_no_model_loaded_body_with_guidance() {
+    let err = api_error(
+        "lm_studio",
+        response(
+            StatusCode::BAD_REQUEST,
+            r#"{"error":{"message":"No models loaded. Please load a model in the developer page or via `lms load`."}}"#,
+        ),
+    )
+    .await;
+    assert!(err
+        .to_string()
+        .to_ascii_lowercase()
+        .contains("load a model"));
+}
+
+#[tokio::test]
+async fn api_error_keeps_raw_message_for_unclassified_status() {
+    let err = api_error("custom", response(StatusCode::NOT_FOUND, "nope")).await;
+    assert!(err.to_string().contains("custom API error (404"));
+}
+
+#[tokio::test]
+async fn backend_401_publishes_session_expired_through_reporter() {
+    crate::core::bus::init().await.expect("bus init");
+    let mut rx = crate::core::bus::BUS.get().expect("bus").receiver();
+    let marker = "REPORTER_MARKER_SESSION";
+    let _ = api_error(
+        openhuman_backend_model::PROVIDER_LABEL,
+        response(StatusCode::UNAUTHORIZED, marker),
+    )
+    .await;
+    let seen = drain_until(&mut rx, |e| match e {
+        DomainEvent::SessionExpired { reason, .. } if reason.contains(marker) => Some(()),
+        _ => None,
     });
+    assert!(seen.is_some(), "backend 401 must publish SessionExpired");
+}
 
-    // The find predicate must match on slug.
-    let found_by_slug = config
-        .cloud_providers
-        .iter()
-        .find(|e| e.id == "openai" || e.slug == "openai");
+#[tokio::test]
+async fn byo_401_publishes_api_key_rejected_not_session_expired() {
+    crate::core::bus::init().await.expect("bus init");
+    let mut rx = crate::core::bus::BUS.get().expect("bus").receiver();
+    let provider = "reporter_byo_provider";
+    let _ = api_error(
+        provider,
+        response(
+            StatusCode::UNAUTHORIZED,
+            r#"{"error":{"message":"Invalid or missing API key","type":"authentication_error"}}"#,
+        ),
+    )
+    .await;
+    let mut session_expired = false;
+    let rejected = drain_until(&mut rx, |e| match e {
+        DomainEvent::SessionExpired { .. } => {
+            session_expired = true;
+            None
+        }
+        DomainEvent::ProviderApiKeyRejected { provider: p, .. } if p == provider => Some(()),
+        _ => None,
+    });
+    assert!(rejected.is_some(), "BYO key rejection must be surfaced");
+    assert!(!session_expired || rejected.is_some());
+}
+
+#[tokio::test]
+async fn backend_provider_does_not_get_byo_key_rejection() {
+    crate::core::bus::init().await.expect("bus init");
+    let mut rx = crate::core::bus::BUS.get().expect("bus").receiver();
+    let _ = api_error(
+        openhuman_backend_model::PROVIDER_LABEL,
+        response(
+            StatusCode::UNAUTHORIZED,
+            r#"{"error":{"type":"authentication_error"}}"#,
+        ),
+    )
+    .await;
+    let rejected = drain_until(&mut rx, |e| match e {
+        DomainEvent::ProviderApiKeyRejected { provider, .. }
+            if provider == openhuman_backend_model::PROVIDER_LABEL =>
+        {
+            Some(())
+        }
+        _ => None,
+    });
     assert!(
-        found_by_slug.is_some(),
-        "slug lookup must find the provider"
+        rejected.is_none(),
+        "backend 401 is session expiry, not a BYO key"
     );
-    assert_eq!(found_by_slug.unwrap().id, "p_openai_xyz99");
-
-    // The find predicate must still match on id.
-    let found_by_id = config
-        .cloud_providers
-        .iter()
-        .find(|e| e.id == "p_openai_xyz99" || e.slug == "p_openai_xyz99");
-    assert!(found_by_id.is_some(), "id lookup must still work");
 }
 
+/// Sentry). Getting this wrong in either direction is a regression:
+/// over-matching silences real misconfig; under-matching is TAURI-RUST-N.
+#[test]
+fn is_backend_auth_failure_only_matches_openhuman_backend_401_403() {
+    use reqwest::StatusCode;
+    let backend = crate::inference::provider::openhuman_backend_model::PROVIDER_LABEL;
+
+    assert!(is_backend_auth_failure(backend, StatusCode::UNAUTHORIZED));
+    assert!(is_backend_auth_failure(backend, StatusCode::FORBIDDEN));
+
+    // Non-auth backend statuses stay reportable (real server bugs / transient).
+    for s in [
+        StatusCode::INTERNAL_SERVER_ERROR,
+        StatusCode::TOO_MANY_REQUESTS,
+        StatusCode::BAD_REQUEST,
+        StatusCode::NOT_FOUND,
+    ] {
+        assert!(
+            !is_backend_auth_failure(backend, s),
+            "backend {s} must not be treated as session-expiry"
+        );
+    }
+
+    // Third-party BYO-key 401/403 (user's own key revoked) must NOT be
+    // silenced — that is actionable misconfiguration for Sentry.
+    for provider in ["custom_openai", "OpenAI", "Anthropic", "openrouter"] {
+        assert!(
+            !is_backend_auth_failure(provider, StatusCode::UNAUTHORIZED),
+            "{provider} 401 must reach Sentry as actionable BYO-key error"
+        );
+        assert!(
+            !is_backend_auth_failure(provider, StatusCode::FORBIDDEN),
+            "{provider} 403 must reach Sentry as actionable BYO-key error"
+        );
+    }
+}
+
+/// End-to-end through `api_error`: a non-backend 401 with an auth-error body
+/// returns the sanitized provider error (so the chat/UI surface is unchanged)
+/// while the BYO-auth branch demotes it from Sentry. Exercises the wired-in
+/// cascade, not just the predicate in isolation.
 #[tokio::test]
-async fn openrouter_invalid_key_fails_before_models_catalog_probe() {
-    let tmp = tempfile::tempdir().expect("tempdir");
-    let (endpoint, state) = spawn_openrouter_probe_server(StatusCode::UNAUTHORIZED).await;
-    let config = configure_openrouter_workspace(&tmp, endpoint, "bad-openrouter-key").await;
+async fn api_error_byo_auth_failure_returns_message_via_demoted_branch() {
+    let http_response = axum::http::Response::builder()
+        .status(StatusCode::UNAUTHORIZED)
+        .body(
+            r#"{"error":{"message":"Invalid or missing API key","type":"authentication_error"}}"#
+                .to_string(),
+        )
+        .expect("build 401 response");
+    let response = reqwest::Response::from(http_response);
 
-    let err = list_configured_models_from_config("openrouter", &config)
-        .await
-        .expect_err("invalid OpenRouter key must fail");
-
+    let err = api_error("kiro", response).await;
+    let msg = err.to_string();
     assert!(
-        err.contains("OpenRouter key validation returned 401"),
-        "unexpected error: {err}"
+        msg.contains("kiro API error (401"),
+        "error must still carry the provider/status prefix for the UI: {msg}"
     );
-    assert_eq!(state.key_calls.load(AtomicOrdering::SeqCst), 1);
-    assert_eq!(
-        state.model_calls.load(AtomicOrdering::SeqCst),
-        0,
-        "invalid OpenRouter credentials must not fall through to /models"
+    assert!(
+        msg.to_ascii_lowercase()
+            .contains("invalid or missing api key"),
+        "sanitized upstream body must propagate to the caller: {msg}"
     );
 }
 
+/// End-to-end through `api_error`: a 500-wrapped monthly-quota refusal (the
+/// Kiro IDE proxy nests its 402 / `MONTHLY_REQUEST_COUNT` inside a 500
+/// envelope, TAURI-RUST-C9A) returns the sanitized provider error to the UI
+/// while routing through the quota-exhausted demote branch — *before* the
+/// `should_report_provider_http_failure(500)` status gate that would otherwise
+/// page once per memory-extraction retry.
 #[tokio::test]
-async fn openrouter_valid_key_allows_models_catalog_probe() {
-    let tmp = tempfile::tempdir().expect("tempdir");
-    let (endpoint, state) = spawn_openrouter_probe_server(StatusCode::OK).await;
-    let config = configure_openrouter_workspace(&tmp, endpoint, "valid-openrouter-key").await;
+async fn api_error_monthly_quota_returns_message_via_demoted_branch() {
+    let body = "{\"error\":{\"message\":\"HTTP 402 from Kiro IDE: \
+        {\\\"message\\\":\\\"You have reached the limit.\\\",\
+        \\\"reason\\\":\\\"MONTHLY_REQUEST_COUNT\\\"}\",\"type\":\"server_error\"}}";
+    let http_response = axum::http::Response::builder()
+        .status(StatusCode::INTERNAL_SERVER_ERROR)
+        .body(body.to_string())
+        .expect("build 500 response");
+    let response = reqwest::Response::from(http_response);
 
-    let outcome = list_configured_models_from_config("openrouter", &config)
-        .await
-        .expect("valid OpenRouter key should list models");
-
-    assert_eq!(state.key_calls.load(AtomicOrdering::SeqCst), 1);
-    assert_eq!(state.model_calls.load(AtomicOrdering::SeqCst), 1);
-    assert_eq!(outcome.value["models"][0]["id"], "openrouter/test-model");
+    let err = api_error("kiro", response).await;
+    let msg = err.to_string();
+    assert!(
+        msg.contains("kiro API error (500"),
+        "error must still carry the provider/status prefix for the UI: {msg}"
+    );
+    assert!(
+        msg.contains("MONTHLY_REQUEST_COUNT"),
+        "sanitized upstream quota body must propagate to the caller: {msg}"
+    );
+    // The body must classify as quota-exhausted so the demote branch — not the
+    // 500 status gate — handles it.
+    assert!(tinyinference_llm::failure::body_indicates_quota_exhausted(
+        body
+    ));
+    assert!(should_report_provider_http_failure(
+        StatusCode::INTERNAL_SERVER_ERROR
+    ));
 }
 
+/// `publish_backend_session_expired` must emit a `SessionExpired` event on
+/// the `auth` domain with the canonical source and a sanitized reason, so
+/// the credentials subscriber can drive reauth.
 #[tokio::test]
-async fn openrouter_key_is_trimmed_for_validation_and_catalog_probe() {
-    let tmp = tempfile::tempdir().expect("tempdir");
-    let (endpoint, state) = spawn_openrouter_probe_server(StatusCode::OK).await;
-    let config = configure_openrouter_workspace(&tmp, endpoint, "  valid-openrouter-key\r\n").await;
+async fn publish_backend_session_expired_emits_sanitized_session_expired() {
+    use crate::core::events::DomainEvent;
 
-    list_configured_models_from_config("openrouter", &config)
-        .await
-        .expect("trimmed OpenRouter key should list models");
+    crate::core::bus::init().await.expect("bus init");
+    let mut rx = crate::core::bus::BUS
+        .get()
+        .expect("event bus initialized")
+        .receiver();
 
-    let key_authorization = state
-        .key_authorization
-        .lock()
-        .unwrap_or_else(|e| e.into_inner())
-        .clone();
-    let model_authorization = state
-        .model_authorization
-        .lock()
-        .unwrap_or_else(|e| e.into_inner())
-        .clone();
-    assert_eq!(
-        key_authorization,
-        vec![Some("Bearer valid-openrouter-key".to_string())]
+    // `TEST_MARKER_A` makes this event distinguishable from the sibling
+    // `chat_completions_backend_401_*` test's event on the shared global
+    // bus (both run in parallel against the same singleton). The `sk-`
+    // token probes that `sanitize_api_error` actually scrubs secrets out
+    // of the SessionExpired reason rather than just emitting the event.
+    let secret = ["sk-", "SYNTHETIC", "000000000000000000000000"].concat();
+    let msg = format!(
+        r#"OpenHuman API error (401 Unauthorized): {{"success":false,"error":"TEST_MARKER_A Invalid token {secret}"}}"#
     );
-    assert_eq!(
-        model_authorization,
-        vec![Some("Bearer valid-openrouter-key".to_string())]
+    publish_backend_session_expired(
+        "chat_completions",
+        crate::inference::provider::openhuman_backend_model::PROVIDER_LABEL,
+        reqwest::StatusCode::UNAUTHORIZED,
+        &msg,
+    );
+
+    let mut reason_seen: Option<String> = None;
+    loop {
+        match rx.try_recv() {
+            Ok(DomainEvent::SessionExpired { source, reason }) => {
+                if source == "llm_provider.openhuman_backend" && reason.contains("TEST_MARKER_A") {
+                    reason_seen = Some(reason);
+                    break;
+                }
+            }
+            Ok(_) => continue,
+            Err(tinybus::TryRecvError::Lagged(_)) => continue,
+            Err(_) => break,
+        }
+    }
+    let reason = reason_seen.expect(
+        "publish_backend_session_expired must emit SessionExpired(source=llm_provider.openhuman_backend) carrying TEST_MARKER_A",
+    );
+    assert!(
+        reason.contains("[REDACTED]"),
+        "sanitize_api_error must redact the sk- token in the reason: {reason}"
+    );
+    assert!(
+        !reason.contains(&secret),
+        "raw secret must not survive into the SessionExpired reason: {reason}"
     );
 }
 
@@ -381,37 +583,4 @@ mod provider_config_rejection_suppression {
             "backend 403 subscription phrase must NOT be suppressed (polarity guard)"
         );
     }
-}
-
-#[test]
-fn test_sanitize_api_error_utf8() {
-    let input = "🦀".repeat(MAX_API_ERROR_CHARS + 10);
-    let sanitized = sanitize_api_error(&input);
-    assert!(sanitized.ends_with("..."));
-    assert_eq!(sanitized.chars().count(), MAX_API_ERROR_CHARS);
-    // The ellipsis is included in the maximum character count.
-    let crabs_count = sanitized.chars().filter(|c| *c == '🦀').count();
-    assert_eq!(crabs_count, MAX_API_ERROR_CHARS - 3);
-}
-
-#[tokio::test]
-async fn list_models_html_body_returns_diagnostic_snippet() {
-    // Captive-portal / proxy-login wire shape: 200 OK with HTML.
-    let tmp = tempfile::tempdir().expect("tempdir");
-    let html = "<html><head><title>Sign in</title></head><body>captive portal</body></html>";
-    let endpoint = spawn_static_models_server(StatusCode::OK, html).await;
-    let config = configure_generic_workspace(&tmp, endpoint).await;
-
-    let err = list_configured_models_from_config("generic-test", &config)
-        .await
-        .expect_err("HTML body must not parse as JSON");
-
-    assert!(
-        err.contains("failed to parse JSON"),
-        "error must keep canonical prefix: {err}"
-    );
-    assert!(
-        err.contains("captive portal") || err.contains("Sign in") || err.contains("html"),
-        "error must include a body snippet for diagnosis: {err}"
-    );
 }

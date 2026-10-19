@@ -562,7 +562,7 @@ pub async fn run_pending(config: &mut Config) {
     //
     // The symptom is not subtle now that #6201 lists the managed OpenRouter
     // catalog in the model picker: `inference_list_models("openhuman")` fails
-    // its lookup in `inference::provider::ops::models` before any HTTP request
+    // its lookup in `inference::provider::models::catalog_listing` before any HTTP request
     // is made, the picker renders "Could not load models from this provider.",
     // and the failure reaches Sentry through `rpc.invoke_method` — the same
     // string `is_unknown_provider_user_config` was written to keep out of it.

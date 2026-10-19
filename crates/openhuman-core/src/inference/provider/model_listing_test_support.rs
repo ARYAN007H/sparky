@@ -1,4 +1,3 @@
-use super::*;
 use crate::config::schema::cloud_providers::{AuthStyle, CloudProviderCreds};
 use crate::config::Config;
 use crate::security::credentials::AuthService;
@@ -15,15 +14,14 @@ use std::sync::{
     Arc, Mutex,
 };
 use tempfile::TempDir;
-use tinyinference_core::sanitize::{sanitize_api_error, MAX_API_ERROR_CHARS};
 
 #[derive(Clone)]
-struct ModelProbeState {
-    key_status: StatusCode,
-    key_calls: Arc<AtomicUsize>,
-    model_calls: Arc<AtomicUsize>,
-    key_authorization: Arc<Mutex<Vec<Option<String>>>>,
-    model_authorization: Arc<Mutex<Vec<Option<String>>>>,
+pub(crate) struct ModelProbeState {
+    pub(crate) key_status: StatusCode,
+    pub(crate) key_calls: Arc<AtomicUsize>,
+    pub(crate) model_calls: Arc<AtomicUsize>,
+    pub(crate) key_authorization: Arc<Mutex<Vec<Option<String>>>>,
+    pub(crate) model_authorization: Arc<Mutex<Vec<Option<String>>>>,
 }
 
 async fn openrouter_key_handler(
@@ -81,7 +79,9 @@ fn authorization_header(headers: &HeaderMap) -> Option<String> {
         .map(|value| value.to_string())
 }
 
-async fn spawn_openrouter_probe_server(key_status: StatusCode) -> (String, ModelProbeState) {
+pub(crate) async fn spawn_openrouter_probe_server(
+    key_status: StatusCode,
+) -> (String, ModelProbeState) {
     let state = ModelProbeState {
         key_status,
         key_calls: Arc::new(AtomicUsize::new(0)),
@@ -103,7 +103,11 @@ async fn spawn_openrouter_probe_server(key_status: StatusCode) -> (String, Model
     (format!("http://{addr}"), state)
 }
 
-async fn configure_openrouter_workspace(tmp: &TempDir, endpoint: String, token: &str) -> Config {
+pub(crate) async fn configure_openrouter_workspace(
+    tmp: &TempDir,
+    endpoint: String,
+    token: &str,
+) -> Config {
     let mut config = Config {
         config_path: tmp.path().join("config.toml"),
         workspace_dir: tmp.path().join("workspace"),
@@ -152,7 +156,7 @@ async fn static_models_handler(State(s): State<StaticResponse>) -> Response {
     (s.status, s.body).into_response()
 }
 
-async fn spawn_static_models_server(status: StatusCode, body: &'static str) -> String {
+pub(crate) async fn spawn_static_models_server(status: StatusCode, body: &'static str) -> String {
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
         .await
         .expect("bind");
@@ -166,7 +170,7 @@ async fn spawn_static_models_server(status: StatusCode, body: &'static str) -> S
     format!("http://{addr}")
 }
 
-async fn configure_generic_workspace(tmp: &TempDir, endpoint: String) -> Config {
+pub(crate) async fn configure_generic_workspace(tmp: &TempDir, endpoint: String) -> Config {
     // Non-`openrouter` slug so the OpenRouter pre-validation path is
     // skipped and the test hits `/models` directly.
     let mut config = Config {
@@ -187,8 +191,3 @@ async fn configure_generic_workspace(tmp: &TempDir, endpoint: String) -> Config 
     config.save().await.expect("save config");
     config
 }
-
-#[path = "ops_tests_error_suppression_tests.rs"]
-mod error_suppression_tests;
-#[path = "ops_tests_models_parsing_tests.rs"]
-mod models_parsing_tests;

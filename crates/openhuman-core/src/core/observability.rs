@@ -102,7 +102,7 @@ pub enum ExpectedErrorKind {
     /// tier alias leaked to a provider that only speaks its native ids
     /// (#2079), an unknown / stale model pin (#2202), or a model-specific
     /// temperature constraint (#2076 — Moonshot Kimi K2). The provider
-    /// HTTP layer (`providers::ops::api_error`) already demotes its own
+    /// HTTP layer (`provider::http_error::api_error`) already demotes its own
     /// per-attempt event; this catches the *re-report* when the same
     /// error is raised again by `agent.run_single` /
     /// `web_channel.run_chat_task` under `domain=agent` / `web_channel`.
@@ -517,7 +517,7 @@ pub fn expected_error_kind(message: &str) -> Option<ExpectedErrorKind> {
     }
     // TAURI-RUST-8FQ — the OpenAI ChatGPT/Codex OAuth access token expired with
     // no usable refresh token. The provider HTTP layer
-    // (`provider::ops::api_error` / `chat_via_responses`) already demotes its
+    // (`provider::http_error::api_error` / `chat_via_responses`) already demotes its
     // own per-attempt event, but the same `anyhow::bail!` string re-raises here
     // at the RPC boundary (`jsonrpc` → `report_error_or_expected`); route it to
     // the shared `ProviderUserState` bucket so the re-report is demoted too
@@ -911,7 +911,7 @@ fn is_embedding_model_rejected(lower: &str) -> bool {
 /// The canonical OpenHuman session-expired wire shapes:
 ///
 /// - `"OpenHuman API error (401 Unauthorized): {…\"Session expired. Please
-///   log in again.\"…}"` — emitted by `providers::ops::api_error` from the
+///   log in again.\"…}"` — emitted by `provider::http_error::api_error` from the
 ///   OpenHuman backend and re-raised through `agent::run_single` /
 ///   `web_chat::run_chat_task` (OPENHUMAN-TAURI-26). The
 ///   `"session expired"` substring anchors the match to the OpenHuman
@@ -1388,7 +1388,7 @@ fn is_channel_supervisor_restart_message(lower: &str) -> bool {
 /// scheduler tick handlers — under a different `domain` tag, escaping the
 /// provider-scoped filter and producing one Sentry event per failed turn.
 ///
-/// The canonical wire format from `providers::ops::api_error` is:
+/// The canonical wire format from `provider::http_error::api_error` is:
 /// `"<provider> API error (<status>): <sanitized>"` — e.g.
 /// `"OpenHuman API error (504 Gateway Timeout): error code: 504"`. Pin the
 /// match to that exact `"api error (<status>"` prefix so an unrelated message
@@ -1707,7 +1707,7 @@ fn is_provider_user_state_message(lower: &str) -> bool {
         return true;
     }
 
-    // OPENHUMAN-TAURI-YJ: `inference/provider/ops.rs::list_models` probed a
+    // OPENHUMAN-TAURI-YJ: `inference/provider/models/catalog_listing.rs::list_configured_models` probed a
     // user-configured custom-provider's `/models` endpoint and the upstream
     // server returned 404. Wire shape emitted at `ops.rs:118-122`:
     //
@@ -1727,7 +1727,7 @@ fn is_provider_user_state_message(lower: &str) -> bool {
     //   - 400: typically request-shape bugs in OUR client; must escalate.
     //   - 429 / 5xx: transient — handled by other matchers / retry policy.
     //
-    // No `inference/provider/ops.rs::list_models` other than this site emits
+    // No `inference/provider/models/catalog_listing.rs::list_configured_models` other than this site emits
     // the `provider returned NNN` prefix (verified via grep), so the prefix
     // alone is a sufficient anchor.
     //
@@ -2546,7 +2546,7 @@ pub fn report_warning_message(message: &str, domain: &str, operation: &str, extr
 /// that the reliable-provider layer already handles via retry + fallback.
 ///
 /// The primary suppression lives at the call site
-/// (`crate::inference::provider::ops::should_report_provider_http_failure`),
+/// (`crate::inference::provider::http_error::should_report_provider_http_failure`),
 /// which short-circuits transient codes before `report_error` ever fires.
 /// This helper is intended for use inside the `sentry::ClientOptions`
 /// `before_send` hook as defense-in-depth — it catches any future call

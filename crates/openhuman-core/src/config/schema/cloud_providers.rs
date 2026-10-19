@@ -270,7 +270,7 @@ impl Default for CloudProviderCreds {
 /// never reaches `make_cloud_provider_by_slug`. When no `cloud_providers`
 /// row exists (config drift, upgrade from a build that only persisted
 /// `config.local_ai.base_url`, flush-vs-probe race),
-/// `inference::provider::ops::list_configured_models`
+/// `inference::provider::models::catalog_listing::list_configured_models`
 /// falls back to a synthetic entry via `synthesize_local_runtime_entry`
 /// (Sentry TAURI-RUST-28Z fix). The same fallback applies to `lmstudio`.
 pub fn is_slug_reserved(s: &str) -> bool {

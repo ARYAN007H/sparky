@@ -137,7 +137,7 @@ pub(crate) fn make_openhuman_backend_model(
 /// [`Config`] (the configured `delegate` tool): `model` is used verbatim, with
 /// no tier translation and no egress emission, exactly as that tool always did.
 pub(crate) fn make_openhuman_backend_model_for_options(
-    options: &crate::inference::provider::ProviderRuntimeOptions,
+    options: &crate::tools::delegate::ProviderRuntimeOptions,
     model: &str,
     thread_id: Option<&str>,
 ) -> anyhow::Result<ManagedChatModel> {

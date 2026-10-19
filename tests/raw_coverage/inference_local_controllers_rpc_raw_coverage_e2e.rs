@@ -275,7 +275,7 @@ async fn inference_tts_controller_covers_disabled_missing_binary_and_stubbed_syn
         let piper = write_stub_piper(scripts.path(), "stub-piper", &transcript);
         let _piper_guard = EnvVarGuard::set("PIPER_BIN", &piper);
 
-        let out_path = tmp.path().join("nested").join("speech.wav");
+        let out_path = config.workspace_dir.join("nested").join("speech.wav");
         let spoken = call(
             tts,
             json!({

@@ -137,6 +137,8 @@ use tinyinference_llm::providers::openai::AuthStyle as CompatAuthStyle;
 
 /// Sentinel meaning "use the OpenHuman backend session JWT".
 pub const PROVIDER_OPENHUMAN: &str = "openhuman";
+/// Provider id used for the managed OpenHuman inference backend.
+pub const INFERENCE_BACKEND_ID: &str = PROVIDER_OPENHUMAN;
 /// Prefix for Ollama-local providers: `"ollama:<model>"`.
 pub const OLLAMA_PROVIDER_PREFIX: &str = "ollama:";
 /// Prefix for LM Studio-local providers: `"lmstudio:<model>"`.

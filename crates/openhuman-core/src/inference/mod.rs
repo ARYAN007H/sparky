@@ -38,7 +38,6 @@ mod schemas;
 pub mod tokenjuice;
 pub mod turn_models;
 
-pub use ops as rpc;
 pub use schemas::{
     all_controller_schemas as all_inference_controller_schemas,
     all_registered_controllers as all_inference_registered_controllers, INFERENCE_AGENT_CHAT,
