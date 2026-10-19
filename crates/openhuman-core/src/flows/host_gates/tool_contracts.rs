@@ -40,13 +40,7 @@ use tinyflows::model::{NodeKind, WorkflowGraph};
 /// (Part 2c/2d) — those degrade gracefully because a binding to an unknown
 /// field can't be proven wrong, whereas a nonexistent slug or a missing
 /// required arg are both provably broken.
-/// Whether OpenHuman ships a STATIC curated catalog for `toolkit`. This is the
-/// exact condition both [`validate_tool_contracts`]'s curation gate and
-/// `tinyflows::caps::flow_tool_allowed`'s runtime Path A use to decide a toolkit
-/// is a hard curated-only allowlist: for such a toolkit a real-but-uncurated
-/// action is rejected on EVERY real run, so the author-time gate and the early
-/// builder-tool warnings (`get_tool_contract` / `search_tool_catalog`) must all
-/// agree on it — one home for the check so they cannot drift.
+/// Enforces the host's curated-only, live-action and argument-shape policy.
 pub(crate) async fn validate_tool_contracts(config: &Config, graph: &WorkflowGraph) -> Vec<String> {
     use crate::integrations::composio::contract::validation::{
         validate_tool_contract_nodes, ToolContractNode,

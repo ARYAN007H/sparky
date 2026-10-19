@@ -42,6 +42,26 @@ fn seeded_slack_send_contract() -> ToolContract {
     }
 }
 
+fn seeded_slack_send_message_contract_with_schema() -> ToolContract {
+    ToolContract {
+        slug: "SLACKARGNAMETEST_SEND_MESSAGE".to_string(),
+        toolkit: "slackargnametest".to_string(),
+        description: None,
+        required_args: vec![],
+        input_schema: Some(json!({
+            "type": "object",
+            "properties": {
+                "channel": { "type": "string" },
+                "markdown_text": { "type": "string" }
+            }
+        })),
+        output_fields: vec![],
+        output_schema: None,
+        primary_array_path: None,
+        is_curated: false,
+    }
+}
+
 fn ws3_flow_conn(toolkit: &str, id: &str) -> FlowConnection {
     FlowConnection {
         connection_ref: format!("composio:{toolkit}:{id}"),

@@ -48,9 +48,13 @@ impl Callbacks {
 impl Callbacks {
     async fn resolve_workflow(&self, workflow_id: String) -> BusResult<Option<Value>> {
         let config = Arc::clone(&self.config);
+        let context = self.context.clone();
         self.in_context(async move {
-            ops::load_flow_graph(&config, &workflow_id)
-                .map(|graph| graph.map(|graph| serde_json::to_value(graph).expect("graph serializes")))
+            let graph = context
+                .spawn_blocking(move || ops::load_flow_graph(&config, &workflow_id))
+                .await
+                .map_err(|error| format!("workflow resolver task failed: {error}"))??;
+            Ok(graph.map(|graph| serde_json::to_value(graph).expect("graph serializes")))
         })
         .await
         .map_err(|error| tinybus::Error::failed(error))
