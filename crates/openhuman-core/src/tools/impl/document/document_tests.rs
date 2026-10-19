@@ -108,7 +108,11 @@ async fn execute_rejects_too_many_sections() {
     let args = json!({ "title": "Big doc", "sections": sections });
     let result = tool.execute(args).await.expect("execute returns Ok");
     assert!(result.is_error);
-    assert!(result.text().contains(&MAX_SECTIONS.to_string()));
+    assert!(
+        result.text().contains(&format!("must contain ≤ {MAX_SECTIONS} sections")),
+        "the tool should preserve the bus limit in its error: {}",
+        result.text()
+    );
 }
 
 #[tokio::test]
