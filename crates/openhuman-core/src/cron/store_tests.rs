@@ -237,3 +237,52 @@ fn a_patch_over_the_bus_keeps_the_agent_definition_it_does_not_mention() {
         Some("teeny")
     );
 }
+
+fn assert_force_next_run_updates_collection(collection: &str, other_collection: &str) {
+    use serde_json::json;
+    use tinystoragedrivers::{CollectionSpec, Precondition};
+
+    let tmp = TempDir::new().unwrap();
+    let config = test_config(&tmp);
+    let opened = crate::storage::local::open("cron::store-test", &config.workspace_dir).unwrap();
+    let docs = std::sync::Arc::clone(opened.scoped().unwrap().documents());
+    crate::storage::block_on_anyhow(async {
+        docs.ensure_collection(&CollectionSpec::new(collection)).await?;
+        docs.put(
+            collection,
+            "seeded-job",
+            json!({ "next_run_ms": 123, "marker": "keep-me" }),
+            Precondition::Absent,
+        )
+        .await?;
+        anyhow::Ok(())
+    })
+    .unwrap();
+
+    let next = Utc.timestamp_millis_opt(456).single().unwrap();
+    force_next_run_for_test(&config, "seeded-job", next).unwrap();
+
+    let (updated, other, collections) = crate::storage::block_on_anyhow(async {
+        Ok((
+            docs.get(collection, "seeded-job").await?,
+            docs.get(other_collection, "seeded-job").await?,
+            docs.collections("").await?,
+        ))
+    })
+    .unwrap();
+    let updated = updated.expect("seeded document remains present").doc;
+    assert_eq!(updated["next_run_ms"], json!(456));
+    assert_eq!(updated["marker"], json!("keep-me"));
+    assert!(other.is_none(), "helper must not create or write {other_collection}");
+    assert_eq!(collections, vec![collection.to_string()]);
+}
+
+#[test]
+fn force_next_run_updates_current_cron_jobs_collection() {
+    assert_force_next_run_updates_collection("cron.jobs", "cron_jobs");
+}
+
+#[test]
+fn force_next_run_updates_legacy_cron_jobs_collection() {
+    assert_force_next_run_updates_collection("cron_jobs", "cron.jobs");
+}
