@@ -146,9 +146,7 @@ impl ProgressiveChannelTransport for ModuleChannel {
                             Some(tinychannels_bus::channel::SendErrorKind::NotFound) => {
                                 Ok(Result::MessageGone)
                             }
-                            Some(error) if error.unsupported => {
-                                Ok(Result::EditUnsupported)
-                            }
+                            Some(error) if error.unsupported => Ok(Result::EditUnsupported),
                             _ => Ok(Result::Outcome(outcome)),
                         }
                     }
@@ -212,8 +210,7 @@ fn receipt_matches_scope(
 ) -> bool {
     receipt.channel.as_ref().is_none_or(|receipt_channel| {
         channel.is_some_and(|channel| {
-            receipt_channel.id == channel.id
-                && receipt_channel.account_id == channel.account_id
+            receipt_channel.id == channel.id && receipt_channel.account_id == channel.account_id
         })
     }) && receipt
         .conversation
@@ -229,6 +226,12 @@ fn receipt_matches_scope(
 
 fn receipt_contains_message(receipt: &tinychannels_bus::channel::MessageReceipt, id: &str) -> bool {
     receipt.primary_platform_message_id.as_deref() == Some(id)
-        || receipt.platform_message_ids.iter().any(|message_id| message_id == id)
-        || receipt.parts.iter().any(|part| part.platform_message_id == id)
+        || receipt
+            .platform_message_ids
+            .iter()
+            .any(|message_id| message_id == id)
+        || receipt
+            .parts
+            .iter()
+            .any(|part| part.platform_message_id == id)
 }

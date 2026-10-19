@@ -278,7 +278,6 @@ impl ChannelHostCallbacks {
             }
         }
     }
-
 }
 
 impl ChannelHostCallbacks {

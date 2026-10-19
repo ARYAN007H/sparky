@@ -1,5 +1,5 @@
-use super::{ProgressiveChannelTransport, ProgressiveOutputObserver};
 use super::*;
+use super::{ProgressiveChannelTransport, ProgressiveOutputObserver};
 
 use crate::channels::Channel;
 use crate::channels::context::ChannelRuntimeContext;
@@ -108,7 +108,7 @@ impl ProgressiveChannelTransport for RecordingChannel {
     ) -> Result<ProgressiveTransportResult> {
         self.progressive_requests.lock().await.push(request.clone());
         let ProgressiveTransportRequest::SendTyped {
-            channel,
+            channel: _channel,
             turn_id,
             channel_ref,
             conversation,
@@ -120,7 +120,10 @@ impl ProgressiveChannelTransport for RecordingChannel {
             return Ok(ProgressiveTransportResult::Unavailable);
         };
         let outbound = tinychannels_bus::channel::ChannelOutboundMessage {
-            channel_id: channel,
+            channel_id: channel_ref
+                .as_ref()
+                .map(|reference| reference.id.clone())
+                .unwrap_or_else(|| _channel.clone()),
             conversation_id: conversation
                 .as_ref()
                 .map(|reference| reference.id.clone())
@@ -229,7 +232,7 @@ async fn native_progressive_transport_dispatches_typed_content_through_configure
     let result = callback
         .dispatch_controller_backend(ChannelBackendRequest::ProgressiveTransport(Box::new(
             ProgressiveTransportRequest::SendTyped {
-                channel: "telegram".into(),
+                channel: "telegram:chat-42".into(),
                 turn_id: Some("turn-11".into()),
                 channel_ref: Some(tinychannels_bus::ChannelRef {
                     id: "telegram".into(),
@@ -271,6 +274,7 @@ async fn native_progressive_transport_dispatches_typed_content_through_configure
     assert!(other_account.sent.lock().await.is_empty());
     let sent = selected_account.sent.lock().await;
     assert_eq!(sent.len(), 1);
+    assert_eq!(sent[0].channel_id, "telegram");
     assert_eq!(sent[0].channel_ref.as_ref().unwrap().id, "telegram");
     assert_eq!(
         sent[0].channel_ref.as_ref().unwrap().account_id.as_deref(),
@@ -371,10 +375,7 @@ async fn native_progressive_output_event_is_acknowledged_by_optional_host_observ
     let observer = Arc::new(RecordingOutputObserver::default());
     let adapter = Arc::new(RecordingChannel::new("telegram:bot-b"));
     let (callback, _context) = callback_for_channels(
-        HashMap::from([(
-            "telegram:bot-b".into(),
-            adapter.clone() as Arc<dyn Channel>,
-        )]),
+        HashMap::from([("telegram:bot-b".into(), adapter.clone() as Arc<dyn Channel>)]),
         HashMap::from([(
             "telegram:bot-b".into(),
             adapter.clone() as Arc<dyn ProgressiveChannelTransport>,
@@ -410,7 +411,100 @@ async fn native_progressive_output_event_is_acknowledged_by_optional_host_observ
     assert!(matches!(*result, ProgressiveTransportResult::Acknowledged));
     assert_eq!(
         *observer.seen.lock().await,
-        [("telegram:bot-b".into(), "chat-42".into(), "turn-13".into(), 4)]
+        [(
+            "telegram:bot-b".into(),
+            "chat-42".into(),
+            "turn-13".into(),
+            4
+        )]
     );
     assert!(adapter.progressive_requests.lock().await.is_empty());
+}
+
+fn output_event_request(
+    account: Option<&str>,
+    conversation_id: Option<&str>,
+    turn_id: Option<&str>,
+) -> ChannelBackendRequest {
+    ChannelBackendRequest::ProgressiveTransport(Box::new(
+        ProgressiveTransportRequest::OutputEvent {
+            channel: "telegram:chat-42".into(),
+            turn_id: turn_id.map(str::to_owned),
+            channel_ref: account.map(|account_id| tinychannels_bus::ChannelRef {
+                id: "telegram".into(),
+                account_id: Some(account_id.into()),
+            }),
+            conversation: conversation_id.map(|id| tinychannels_bus::ConversationRef {
+                id: id.into(),
+                ..Default::default()
+            }),
+            sequence: 5,
+            event: Box::new(ChannelOutputEvent::TextDelta {
+                text: "progress".into(),
+                iteration: None,
+            }),
+        },
+    ))
+}
+
+#[tokio::test]
+async fn native_progressive_output_event_validates_scope_without_observer() {
+    let adapter = Arc::new(RecordingChannel::new("telegram:bot-b"));
+    let (callback, _) = callback_for_channels(
+        HashMap::from([("telegram:bot-b".into(), adapter.clone() as Arc<dyn Channel>)]),
+        HashMap::from([(
+            "telegram:bot-b".into(),
+            adapter as Arc<dyn ProgressiveChannelTransport>,
+        )]),
+        None,
+    );
+    let valid = callback
+        .dispatch_controller_backend(output_event_request(
+            Some("telegram:bot-b"),
+            Some("chat-42"),
+            Some("turn-14"),
+        ))
+        .await
+        .expect("module output events are acknowledged when no host observer is installed");
+    assert!(matches!(
+        valid,
+        ChannelBackendResult::ProgressiveTransport(result)
+            if matches!(*result, ProgressiveTransportResult::Acknowledged)
+    ));
+
+    for invalid in [
+        output_event_request(Some("telegram:missing"), Some("chat-42"), Some("turn-14")),
+        output_event_request(Some("telegram:bot-b"), None, Some("turn-14")),
+        output_event_request(Some("telegram:bot-b"), Some("chat-42"), None),
+    ] {
+        assert!(
+            callback.dispatch_controller_backend(invalid).await.is_err(),
+            "output event scope must be validated even without an observer"
+        );
+    }
+}
+
+#[tokio::test]
+async fn native_progressive_output_event_validates_scope_before_observer() {
+    let observer = Arc::new(RecordingOutputObserver::default());
+    let adapter = Arc::new(RecordingChannel::new("telegram:bot-b"));
+    let (callback, _) = callback_for_channels(
+        HashMap::from([("telegram:bot-b".into(), adapter.clone() as Arc<dyn Channel>)]),
+        HashMap::from([(
+            "telegram:bot-b".into(),
+            adapter as Arc<dyn ProgressiveChannelTransport>,
+        )]),
+        Some(observer.clone() as Arc<dyn ProgressiveOutputObserver>),
+    );
+    for invalid in [
+        output_event_request(Some("telegram:missing"), Some("chat-42"), Some("turn-14")),
+        output_event_request(Some("telegram:bot-b"), None, Some("turn-14")),
+        output_event_request(Some("telegram:bot-b"), Some("chat-42"), None),
+    ] {
+        assert!(
+            callback.dispatch_controller_backend(invalid).await.is_err(),
+            "invalid output event scope must be rejected before observation"
+        );
+    }
+    assert!(observer.seen.lock().await.is_empty());
 }
