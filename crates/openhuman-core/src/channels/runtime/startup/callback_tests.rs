@@ -62,7 +62,16 @@ fn callback_for(
     channel: Arc<RecordingChannel>,
 ) -> (ChannelHostCallbacks, Arc<ChannelRuntimeContext>) {
     let mut channels = HashMap::new();
-    channels.insert(channel.name().to_owned(), channel as Arc<dyn Channel>);
+    channels.insert(
+        channel.name().to_owned(),
+        channel as Arc<dyn Channel>,
+    );
+    callback_for_channels(channels)
+}
+
+fn callback_for_channels(
+    channels: HashMap<String, Arc<dyn Channel>>,
+) -> (ChannelHostCallbacks, Arc<ChannelRuntimeContext>) {
     let context = Arc::new(ChannelRuntimeContext {
         relay_thread: None,
         channels_by_name: Arc::new(channels),
@@ -181,4 +190,52 @@ async fn native_progressive_transport_dispatches_typed_content_through_configure
     // Sequence and segment are represented in the module's idempotency key.
     assert_eq!(sent[0].idempotency_key, "turn-11:3:1");
     assert_eq!(sent[0].parts, parts);
+}
+
+#[tokio::test]
+async fn native_progressive_transport_rejects_unconfigured_account_without_provider_fallback() {
+    let first_account = Arc::new(RecordingChannel::default());
+    let second_account = Arc::new(RecordingChannel::default());
+    let channels: HashMap<String, Arc<dyn Channel>> = HashMap::from([
+        (
+            "telegram:bot-a".into(),
+            first_account.clone() as Arc<dyn Channel>,
+        ),
+        (
+            "telegram:bot-b".into(),
+            second_account.clone() as Arc<dyn Channel>,
+        ),
+    ]);
+    let (callback, _context) = callback_for_channels(channels);
+
+    let result = callback
+        .dispatch_controller_backend(ChannelBackendRequest::ProgressiveTransport(Box::new(
+            ProgressiveTransportRequest::SendTyped {
+                channel: "telegram:chat-42".into(),
+                turn_id: Some("turn-12".into()),
+                channel_ref: Some(tinychannels_bus::ChannelRef {
+                    id: "telegram".into(),
+                    account_id: Some("telegram:bot-missing".into()),
+                }),
+                conversation: Some(tinychannels_bus::ConversationRef {
+                    id: "chat-42".into(),
+                    ..Default::default()
+                }),
+                sequence: Some(0),
+                segment_index: Some(0),
+                idempotency_key: Some("turn-12:0:0".into()),
+                parts: vec![OutboundContentPart::Content {
+                    part: tinychannels_bus::ContentPart::Text {
+                        text: "must not cross accounts".into(),
+                        markdown_dialect: None,
+                    },
+                }],
+                text: "must not cross accounts".into(),
+            },
+        )))
+        .await;
+
+    assert!(result.is_err(), "an unknown explicit account must fail closed");
+    assert!(first_account.sent.lock().await.is_empty());
+    assert!(second_account.sent.lock().await.is_empty());
 }
