@@ -23,6 +23,15 @@ export interface VoiceNoteMeta {
 /** `source` the composer stamps on a turn that began as a voice note. */
 export const VOICE_NOTE_SOURCE = 'voice_note';
 
+/** Unwrap the core's Outcome `{ logs, result }` wire envelope for note RPCs. */
+function unwrapVoiceNoteResult<T>(value: T | { result?: T }): T {
+  if (value && typeof value === 'object' && 'result' in value) {
+    const result = (value as { result?: T }).result;
+    if (result && typeof result === 'object') return result;
+  }
+  return value as T;
+}
+
 export function extensionForMime(mime: string): string {
   if (mime.includes('ogg')) return 'ogg';
   if (mime.includes('mp4')) return 'm4a';
@@ -75,19 +84,24 @@ export function readVoiceNoteMeta(extraMetadata: unknown): VoiceNoteMeta | null 
 export async function storeVoiceNote(noteId: string, blob: Blob): Promise<{ mime: string }> {
   const bytes = new Uint8Array(await blob.arrayBuffer());
   const mime = blob.type || 'audio/webm';
-  const result = await callCoreRpc<{ mime?: string }>({
+  const response = await callCoreRpc<{ mime?: string } | { result?: { mime?: string } }>({
     method: 'openhuman.channel_web_voice_note_store',
     params: { note_id: noteId, audio_base64: bytesToBase64(bytes), mime },
   });
+  const result = unwrapVoiceNoteResult(response);
   return { mime: result?.mime ?? mime };
 }
 
 /** Fetch a stored note's audio; `null` when the core has none. */
 export async function readVoiceNote(noteId: string): Promise<Blob | null> {
-  const result = await callCoreRpc<{ audio_base64?: string | null; mime?: string | null }>({
+  const response = await callCoreRpc<
+    | { audio_base64?: string | null; mime?: string | null }
+    | { result?: { audio_base64?: string | null; mime?: string | null } }
+  >({
     method: 'openhuman.channel_web_voice_note_read',
     params: { note_id: noteId },
   });
+  const result = unwrapVoiceNoteResult(response);
   if (!result?.audio_base64) return null;
   const bytes = base64ToBytes(result.audio_base64);
   return new Blob([bytes as BlobPart], { type: result.mime || 'audio/webm' });
