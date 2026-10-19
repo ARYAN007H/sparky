@@ -245,7 +245,7 @@ impl ProfileHandle {
                     return Ok(ChatReply {
                         thread_id: thread_id.to_string(),
                         request_id,
-                        text: full_response.clone(),
+                        text: chat_reply_text(full_response.clone()),
                     });
                 }
                 WebChannelEvent::ChatError {
@@ -259,7 +259,7 @@ impl ProfileHandle {
                         error_type
                     );
                     return Err(ProfileError::Turn {
-                        message: message.clone(),
+                        message: chat_failure_message(message.clone()),
                         error_type: error_type.clone(),
                     });
                 }
@@ -353,3 +353,15 @@ impl ProfileHandle {
         Ok(())
     }
 }
+
+fn chat_reply_text(full_response: Option<String>) -> String {
+    full_response.unwrap_or_default()
+}
+
+fn chat_failure_message(message: Option<String>) -> String {
+    message.unwrap_or_else(|| "The turn failed without an error message.".to_string())
+}
+
+#[cfg(test)]
+#[path = "handle_tests.rs"]
+mod tests;
