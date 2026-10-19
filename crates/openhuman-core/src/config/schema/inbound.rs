@@ -15,19 +15,23 @@
 //! | `queues_path` | a `queues.json` replacing the shipped one |
 //! | `pipeline_path` | a `pipeline.json` replacing the shipped one |
 //! | `queue_url` | where the queues live: `storage` (default) or a broker URL |
-//! | `triage_timeout_ms` | how long one delivered event's triage may take |
+//! | `triage_timeout_ms` | how long one delivered event's triage may take (at most 25 s) |
 
 use std::path::PathBuf;
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-/// Default bound on one delivered event's triage: below the module's shortest
-/// lane lease (two minutes), so a slow triage retries rather than racing a
-/// redelivery of the same turn.
-pub const DEFAULT_TRIAGE_TIMEOUT_MS: u64 = 90_000;
+/// The longest one delivered event's triage may take. The module waits 30 s
+/// for a host callback before it treats the delivery as failed and retries
+/// it; a triage still running then would decide (and act) a second time on
+/// the redelivery. Staying under that deadline keeps one decision per turn.
+pub const MAX_TRIAGE_TIMEOUT_MS: u64 = 25_000;
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+/// Default bound on one delivered event's triage: [`MAX_TRIAGE_TIMEOUT_MS`].
+pub const DEFAULT_TRIAGE_TIMEOUT_MS: u64 = MAX_TRIAGE_TIMEOUT_MS;
+
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(default)]
 pub struct InboundConfig {
     /// Route Composio triggers and agent webhooks through the inbound event
@@ -44,8 +48,34 @@ pub struct InboundConfig {
     /// (only in builds with the storage `rabbitmq` driver). Never logged.
     pub queue_url: Option<String>,
     /// How long one delivered event's triage may take, in milliseconds,
-    /// before the delivery is retried.
+    /// before the delivery is retried. Capped at [`MAX_TRIAGE_TIMEOUT_MS`];
+    /// read when the host callbacks are served (the next core start).
     pub triage_timeout_ms: u64,
+}
+
+impl InboundConfig {
+    /// [`Self::triage_timeout_ms`], capped below the module's callback
+    /// deadline.
+    #[must_use]
+    pub fn triage_timeout(&self) -> std::time::Duration {
+        std::time::Duration::from_millis(self.triage_timeout_ms.clamp(1, MAX_TRIAGE_TIMEOUT_MS))
+    }
+}
+
+impl std::fmt::Debug for InboundConfig {
+    /// Redacts credentials: a broker URL carries the broker password.
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("InboundConfig")
+            .field("enabled", &self.enabled)
+            .field("queues_path", &self.queues_path)
+            .field("pipeline_path", &self.pipeline_path)
+            .field(
+                "queue_url",
+                &self.queue_url.as_deref().map(super::storage::redact_url),
+            )
+            .field("triage_timeout_ms", &self.triage_timeout_ms)
+            .finish()
+    }
 }
 
 impl Default for InboundConfig {

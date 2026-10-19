@@ -7,7 +7,6 @@
 //! back off until it is served.
 
 use std::sync::Arc;
-use std::time::Duration;
 
 use tinybus::ObjectPath;
 use tinyeventqueues_bus::names::host::{INTERFACE as NAME, OBJECT_PATH as PATH};
@@ -57,18 +56,16 @@ impl InboundHost {
 /// Serve the callbacks on `connection`, triaging under the host's own context.
 pub(crate) async fn install(connection: &tinybus::Connection) -> tinybus::Result<()> {
     let ctx = DispatchCtx::host_default();
-    let timeout_ms = match ctx.load_config().await {
-        Ok(config) => config.inbound.triage_timeout_ms,
+    // Read once, when the callbacks are served: a change takes effect on the
+    // next core start.
+    let timeout = match ctx.load_config().await {
+        Ok(config) => config.inbound.triage_timeout(),
         Err(error) => {
             tracing::debug!(error = %error, "[inbound] config unavailable; default triage timeout");
-            crate::config::schema::InboundConfig::default().triage_timeout_ms
+            crate::config::schema::InboundConfig::default().triage_timeout()
         }
     };
-    let deliverer = Deliverer::new(
-        Arc::new(RemoteTriage),
-        ctx,
-        Duration::from_millis(timeout_ms),
-    );
+    let deliverer = Deliverer::new(Arc::new(RemoteTriage), ctx, timeout);
     connection
         .serve_at(
             ObjectPath::new(PATH)?,

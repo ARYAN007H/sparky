@@ -18,3 +18,26 @@ fn a_partial_section_keeps_the_other_defaults() {
     assert_eq!(c.queues_path, Some(PathBuf::from("/etc/oh/queues.json")));
     assert_eq!(c.triage_timeout_ms, DEFAULT_TRIAGE_TIMEOUT_MS);
 }
+
+#[test]
+fn the_triage_timeout_stays_under_the_module_callback_deadline() {
+    let mut c = InboundConfig::default();
+    assert_eq!(c.triage_timeout().as_millis(), u128::from(MAX_TRIAGE_TIMEOUT_MS));
+    c.triage_timeout_ms = 90_000;
+    assert_eq!(c.triage_timeout().as_millis(), u128::from(MAX_TRIAGE_TIMEOUT_MS));
+    c.triage_timeout_ms = 0;
+    assert_eq!(c.triage_timeout().as_millis(), 1);
+    c.triage_timeout_ms = 5_000;
+    assert_eq!(c.triage_timeout().as_millis(), 5_000);
+}
+
+#[test]
+fn debug_redacts_the_broker_credentials() {
+    let c = InboundConfig {
+        queue_url: Some("amqp://user:hunter2@broker.internal/vhost".into()),
+        ..InboundConfig::default()
+    };
+    let shown = format!("{c:?}");
+    assert!(!shown.contains("hunter2"), "{shown}");
+    assert!(shown.contains("broker.internal"), "{shown}");
+}
