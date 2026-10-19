@@ -99,6 +99,72 @@ async function scriptToolCall(
   await setMockBehavior('llmStreamChunkDelayMs', '10');
 }
 
+function captureToolProgress(page: Page): { events: Record<string, unknown>[] } {
+  const events: Record<string, unknown>[] = [];
+  page.on('websocket', socket => {
+    socket.on('framereceived', ({ payload }) => {
+      if (typeof payload !== 'string') return;
+      const frame = payload.slice(payload.indexOf('['));
+      try {
+        const decoded: unknown = JSON.parse(frame);
+        if (!Array.isArray(decoded) || typeof decoded[0] !== 'string') return;
+        const name = decoded[0];
+        if (name !== 'tool_call' && name !== 'tool_result') return;
+        const data = decoded[1];
+        if (!data || typeof data !== 'object') return;
+        const event = data as Record<string, unknown>;
+        events.push({
+          name,
+          request_id: event.request_id,
+          round: event.round,
+          tool_call_id: event.tool_call_id,
+          tool_name: event.tool_name,
+          success: event.success,
+        });
+      } catch {
+        // Engine.IO control frames and non-JSON packets carry no tool progress.
+      }
+    });
+  });
+  return { events };
+}
+
+async function captureToolTimeline(page: Page, threadId: string): Promise<unknown> {
+  return page.evaluate(id => {
+    const store = (
+      window as unknown as {
+        __OPENHUMAN_STORE__?: {
+          getState?: () => {
+            chatRuntime?: {
+              toolTimelineByThread?: Record<
+                string,
+                Array<{
+                  id: string;
+                  name: string;
+                  status: string;
+                  round: number;
+                  requestId?: string;
+                  argsBuffer?: string;
+                  result?: string;
+                }>
+              >;
+            };
+          };
+        };
+      }
+    ).__OPENHUMAN_STORE__;
+    return store?.getState?.().chatRuntime?.toolTimelineByThread?.[id]?.map(row => ({
+      id: row.id,
+      name: row.name,
+      status: row.status,
+      round: row.round,
+      requestId: row.requestId,
+      argsLength: row.argsBuffer?.length ?? 0,
+      resultLength: row.result?.length ?? 0,
+    }));
+  }, threadId);
+}
+
 /**
  * Wait for the round to have produced a tool card at all, then open it.
  *
@@ -263,6 +329,7 @@ test.describe('assistant-ui tool-result elements', () => {
     page,
   }) => {
     const threadId = await openChat(page);
+    const progress = process.env.EPIC235_CAPTURE_TOOL_PROGRESS ? captureToolProgress(page) : null;
     // `ToolDataView` renders `DataTable` only for a non-empty array of plain
     // objects that share one key set and hold only primitives
     // (`ToolDataView.tsx:isFlatObjectArray`). `result` is one of the semantic
@@ -293,6 +360,13 @@ test.describe('assistant-ui tool-result elements', () => {
     await setMockBehavior('llmStreamChunkDelayMs', '10');
 
     await sendTurn(page, threadId, 'AUI-TABLE-CASE list my repositories');
+    if (progress) {
+      await expect(page.getByTestId('agent-message').last()).toContainText('Tool result received.');
+      console.log(
+        '[epic235 tool progress]',
+        JSON.stringify({ events: progress.events, timeline: await captureToolTimeline(page, threadId) })
+      );
+    }
     const card = await openToolCall(
       page,
       /GITHUB_LIST_REPOSITORIES_FOR_THE_AUTHENTICATED_USER|repositor/i
