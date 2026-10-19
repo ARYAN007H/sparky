@@ -29,7 +29,7 @@ pub use registry::{all_voice_controller_schemas, all_voice_registered_controller
 
 #[cfg(test)]
 use helpers::{
-    deserialize_params, generate_silent_wav, to_json, validate_stt_provider, validate_tts_provider,
+    deserialize_params, generate_silent_wav, validate_stt_provider, validate_tts_provider,
 };
 #[cfg(test)]
 use params::{
@@ -38,8 +38,6 @@ use params::{
     VoiceUpdateProviderSettingsParams,
 };
 
-#[cfg(test)]
-use crate::core::Outcome;
 #[cfg(test)]
 use serde_json::Map;
 #[cfg(test)]

@@ -15,15 +15,19 @@ fn fixture() -> (RegisteredController, ControllerParamContract) {
             function: "read",
             description: "Read a fixture.",
             inputs: vec![crate::core::FieldSchema {
-                name: "id", ty: crate::core::TypeSchema::String,
-                comment: "Fixture identifier.", required: true,
+                name: "id",
+                ty: crate::core::TypeSchema::String,
+                comment: "Fixture identifier.",
+                required: true,
             }],
             outputs: vec![],
         },
         handler,
     };
     let contract = ControllerParamContract {
-        method: "fixture.read", required: &["id"], handler,
+        method: "fixture.read",
+        required: &["id"],
+        handler,
         examples: vec![serde_json::json!({"id":"example"})],
         parse: |params| match params.get("id").and_then(Value::as_str) {
             Some("example") => Ok(()),
@@ -42,13 +46,24 @@ fn explicit_example_reaches_pure_parser_without_executing_handler() {
 #[test]
 fn contract_inventory_rejects_missing_extra_duplicate_and_empty_rows() {
     let (controller, contract) = fixture();
-    assert!(verify_parameter_contracts(std::slice::from_ref(&controller), &[])
-        .unwrap_err().contains("missing contract"));
-    assert!(verify_parameter_contracts(&[], std::slice::from_ref(&contract))
-        .unwrap_err().contains("extra contract"));
-    assert!(verify_parameter_contracts(&[controller], &[contract.clone(), contract])
-        .unwrap_err().contains("duplicate contract"));
-    assert!(verify_parameter_contracts(&[], &[]).unwrap_err().contains("empty"));
+    assert!(
+        verify_parameter_contracts(std::slice::from_ref(&controller), &[])
+            .unwrap_err()
+            .contains("missing contract")
+    );
+    assert!(
+        verify_parameter_contracts(&[], std::slice::from_ref(&contract))
+            .unwrap_err()
+            .contains("extra contract")
+    );
+    assert!(
+        verify_parameter_contracts(&[controller], &[contract.clone(), contract])
+            .unwrap_err()
+            .contains("duplicate contract")
+    );
+    assert!(verify_parameter_contracts(&[], &[])
+        .unwrap_err()
+        .contains("empty"));
 }
 
 #[test]
@@ -56,10 +71,16 @@ fn contract_rejects_each_removed_or_optional_required_declaration() {
     let (controller, contract) = fixture();
     for remove in [true, false] {
         let mut broken = controller.clone();
-        if remove { broken.schema.inputs.clear(); }
-        else { broken.schema.inputs[0].required = false; }
-        assert!(verify_parameter_contracts(&[broken], std::slice::from_ref(&contract))
-            .unwrap_err().contains("required inputs mismatch"));
+        if remove {
+            broken.schema.inputs.clear();
+        } else {
+            broken.schema.inputs[0].required = false;
+        }
+        assert!(
+            verify_parameter_contracts(&[broken], std::slice::from_ref(&contract))
+                .unwrap_err()
+                .contains("required inputs mismatch")
+        );
     }
 }
 
@@ -68,18 +89,62 @@ fn callback_identity_and_explicit_example_failures_are_not_hidden() {
     let (controller, contract) = fixture();
     let mut broken = contract.clone();
     broken.handler = other_handler;
-    assert!(verify_parameter_contracts(std::slice::from_ref(&controller), &[broken])
-        .unwrap_err().contains("handler identity"));
+    assert!(
+        verify_parameter_contracts(std::slice::from_ref(&controller), &[broken])
+            .unwrap_err()
+            .contains("handler identity")
+    );
     let mut broken = contract.clone();
     broken.examples.clear();
-    assert!(verify_parameter_contracts(std::slice::from_ref(&controller), &[broken])
-        .unwrap_err().contains("no examples"));
+    assert!(
+        verify_parameter_contracts(std::slice::from_ref(&controller), &[broken])
+            .unwrap_err()
+            .contains("no examples")
+    );
     let mut broken = contract.clone();
     broken.examples = vec![serde_json::json!({"id":"wrong"})];
-    assert!(verify_parameter_contracts(std::slice::from_ref(&controller), &[broken])
-        .unwrap_err().contains("pure parser"));
+    assert!(
+        verify_parameter_contracts(std::slice::from_ref(&controller), &[broken])
+            .unwrap_err()
+            .contains("pure parser")
+    );
     let mut broken = contract;
     broken.examples = vec![serde_json::json!({"id":7})];
     assert!(verify_parameter_contracts(&[controller], &[broken])
-        .unwrap_err().contains("schema rejects example"));
+        .unwrap_err()
+        .contains("schema rejects example"));
+}
+
+#[test]
+fn duplicate_controller_and_schema_identity_failures_are_rejected() {
+    let (controller, contract) = fixture();
+    assert!(verify_parameter_contracts(
+        &[controller.clone(), controller.clone()],
+        std::slice::from_ref(&contract)
+    )
+    .unwrap_err()
+    .contains("duplicate controller"));
+    let mut broken = controller.schema.clone();
+    broken.function = "other";
+    assert!(verify_parameter_schema(&broken, &contract)
+        .unwrap_err()
+        .contains("method identity"));
+    let mut broken = controller.schema;
+    broken.description = " ";
+    assert!(verify_parameter_schema(&broken, &contract)
+        .unwrap_err()
+        .contains("no description"));
+}
+
+#[test]
+fn examples_must_be_objects_and_satisfy_schema_before_decoding() {
+    let (controller, mut contract) = fixture();
+    contract.examples = vec![Value::Null];
+    assert!(verify_parameter_schema(&controller.schema, &contract)
+        .unwrap_err()
+        .contains("not an object"));
+    contract.examples = vec![serde_json::json!({})];
+    assert!(verify_parameter_schema(&controller.schema, &contract)
+        .unwrap_err()
+        .contains("schema rejects example"));
 }

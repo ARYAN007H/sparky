@@ -148,22 +148,34 @@ fn registered_wallet_schema_contract_rejects_missing_encrypted_mnemonic() {
 /// Built-in/internal snapshots avoid ambient DomainSet filtering and global
 /// hosted-extension mutation. Hosted/RPC contracts belong to their own crates.
 fn builtin_controller_snapshot() -> Vec<RegisteredController> {
-    registry().iter().chain(internal_registry())
-        .map(|grouped| grouped.controller.clone()).collect()
+    registry()
+        .iter()
+        .chain(internal_registry())
+        .map(|grouped| grouped.controller.clone())
+        .collect()
 }
 
-fn representative_parameter_contracts() -> (Vec<RegisteredController>, Vec<ControllerParamContract>) {
-    let controllers = builtin_controller_snapshot().into_iter().filter(|controller| {
-        controller.schema.namespace == "voice"
-            || matches!(controller.schema.method_name().as_str(),
-                "mcp_clients.registry_get" | "modules.computer_status")
-    }).collect();
-    let mut contracts = vec![
+fn representative_parameter_contracts() -> (Vec<RegisteredController>, Vec<ControllerParamContract>)
+{
+    let controllers = builtin_controller_snapshot()
+        .into_iter()
+        .filter(|controller| {
+            controller.schema.namespace == "voice"
+                || matches!(
+                    controller.schema.method_name().as_str(),
+                    "mcp_clients.registry_get" | "modules.computer_status"
+                )
+        })
+        .collect();
+    let contracts = vec![
         crate::mcp::registry::registry_get_parameter_contract(),
         crate::modules::schemas::computer_status_parameter_contract(),
     ];
     #[cfg(feature = "voice")]
-    contracts.extend(crate::voice::parameter_contracts());
+    let contracts = contracts
+        .into_iter()
+        .chain(crate::voice::parameter_contracts())
+        .collect();
     (controllers, contracts)
 }
 
@@ -179,19 +191,30 @@ fn every_covered_required_declaration_rejects_removal_and_optional_mutants() {
     verify_parameter_contracts(&controllers, &contracts).unwrap();
     let mut mutations = 0;
     for contract in &contracts {
-        let actual = controllers.iter().find(|controller|
-            controller.schema.method_name() == contract.method).unwrap();
+        let actual = controllers
+            .iter()
+            .find(|controller| controller.schema.method_name() == contract.method)
+            .unwrap();
         for required in contract.required {
             for remove in [true, false] {
                 let mut broken = actual.schema.clone();
                 if remove {
                     broken.inputs.retain(|field| field.name != *required);
                 } else {
-                    broken.inputs.iter_mut().find(|field| field.name == *required)
-                        .expect("positive contract requires this field").required = false;
+                    broken
+                        .inputs
+                        .iter_mut()
+                        .find(|field| field.name == *required)
+                        .expect("positive contract requires this field")
+                        .required = false;
                 }
-                assert!(verify_parameter_schema(&broken, contract).unwrap_err()
-                    .contains("required inputs mismatch"), "{} required {required}", contract.method);
+                assert!(
+                    verify_parameter_schema(&broken, contract)
+                        .unwrap_err()
+                        .contains("required inputs mismatch"),
+                    "{} required {required}",
+                    contract.method
+                );
                 mutations += 1;
             }
         }
@@ -202,11 +225,18 @@ fn every_covered_required_declaration_rejects_removal_and_optional_mutants() {
 #[test]
 fn real_contract_inventory_rejects_a_missing_and_an_extra_row() {
     let (controllers, mut contracts) = representative_parameter_contracts();
-    let removed = contracts.pop().expect("representative contracts are nonempty");
-    assert!(verify_parameter_contracts(&controllers, &contracts).unwrap_err()
+    let removed = contracts
+        .pop()
+        .expect("representative contracts are nonempty");
+    assert!(verify_parameter_contracts(&controllers, &contracts)
+        .unwrap_err()
         .contains("missing contract"));
     contracts.push(removed.clone());
-    contracts.push(ControllerParamContract { method: "unregistered.fixture", ..removed });
-    assert!(verify_parameter_contracts(&controllers, &contracts).unwrap_err()
+    contracts.push(ControllerParamContract {
+        method: "unregistered.fixture",
+        ..removed
+    });
+    assert!(verify_parameter_contracts(&controllers, &contracts)
+        .unwrap_err()
         .contains("extra contract"));
 }

@@ -46,7 +46,9 @@ pub(crate) fn verify_parameter_contracts(
     for (method, controller) in registered {
         let contract = by_method[method.as_str()];
         if !std::ptr::fn_addr_eq(controller.handler, contract.handler) {
-            return Err(format!("{method} handler identity differs from its contract"));
+            return Err(format!(
+                "{method} handler identity differs from its contract"
+            ));
         }
         verify_parameter_schema(&controller.schema, contract)?;
     }
@@ -58,7 +60,10 @@ pub(crate) fn verify_parameter_schema(
     contract: &ControllerParamContract,
 ) -> Result<(), String> {
     if schema.method_name() != contract.method {
-        return Err(format!("{} contract method identity differs", contract.method));
+        return Err(format!(
+            "{} contract method identity differs",
+            contract.method
+        ));
     }
     if schema.description.trim().is_empty() {
         return Err(format!("{} has no description", contract.method));
@@ -68,14 +73,20 @@ pub(crate) fn verify_parameter_schema(
         return Err(format!("{} has no examples", contract.method));
     }
     for (index, example) in contract.examples.iter().enumerate() {
-        let params = example.as_object().ok_or_else(|| {
-            format!("{} example {index} is not an object", contract.method)
-        })?;
+        let params = example
+            .as_object()
+            .ok_or_else(|| format!("{} example {index} is not an object", contract.method))?;
         validate_params(schema, params).map_err(|error| {
-            format!("{} schema rejects example {index}: {error}", contract.method)
+            format!(
+                "{} schema rejects example {index}: {error}",
+                contract.method
+            )
         })?;
         (contract.parse)(params.clone()).map_err(|error| {
-            format!("{} pure parser rejects example {index}: {error}", contract.method)
+            format!(
+                "{} pure parser rejects example {index}: {error}",
+                contract.method
+            )
         })?;
     }
     Ok(())

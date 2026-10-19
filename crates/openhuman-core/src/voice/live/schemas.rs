@@ -185,7 +185,6 @@ pub fn live_controller_schemas() -> Vec<ControllerSchema> {
 #[path = "schemas_tests.rs"]
 mod tests;
 
-
 fn parse_params<T: serde::de::DeserializeOwned>(params: Map<String, Value>) -> Result<T, String> {
     serde_json::from_value(Value::Object(params)).map_err(|e| format!("invalid params: {e}"))
 }

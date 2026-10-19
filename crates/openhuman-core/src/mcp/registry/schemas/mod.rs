@@ -18,8 +18,7 @@ pub use registry::{all_controller_schemas, all_registered_controllers, schemas};
 // batch) reaches these through `use super::*`, mirroring the flat scope it
 // had when `include!` spliced everything into one file.
 #[cfg(test)]
-use params::{read_optional_u32, read_required, type_name};
-
+use params::{read_optional_u32, read_required};
 
 #[cfg(test)]
 pub(crate) fn registry_get_parameter_contract() -> crate::core::all::ControllerParamContract {

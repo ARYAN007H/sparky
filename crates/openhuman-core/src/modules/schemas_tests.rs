@@ -130,13 +130,15 @@ async fn a_blank_or_unreadable_site_forgets_nothing() {
     }
 }
 
-
 #[test]
 fn computer_status_load_keeps_permissive_false_default() {
     assert!(!super::computer_status_load(&Map::new()));
     for (value, expected) in [
-        (Value::Null, false), (serde_json::json!("true"), false),
-        (serde_json::json!(1), false), (Value::Bool(false), false), (Value::Bool(true), true),
+        (Value::Null, false),
+        (serde_json::json!("true"), false),
+        (serde_json::json!(1), false),
+        (Value::Bool(false), false),
+        (Value::Bool(true), true),
     ] {
         let params = Map::from_iter([("load".into(), value)]);
         assert_eq!(super::computer_status_load(&params), expected);

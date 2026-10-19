@@ -100,14 +100,18 @@ fn read_optional_u32_rejects_negative() {
 
 // ── type_name ─────────────────────────────────────────────────────────────
 
-
 #[test]
 fn registry_get_shared_parser_preserves_value_and_validation_errors() {
     let valid = Map::from_iter([("qualified_name".into(), json!("example/server"))]);
-    assert_eq!(super::handlers::parse_registry_get(&valid).unwrap(), "example/server");
-    assert!(super::handlers::parse_registry_get(&Map::new()).unwrap_err()
+    assert_eq!(
+        super::handlers::parse_registry_get(&valid).unwrap(),
+        "example/server"
+    );
+    assert!(super::handlers::parse_registry_get(&Map::new())
+        .unwrap_err()
         .contains("missing required param 'qualified_name'"));
     let invalid = Map::from_iter([("qualified_name".into(), json!(42))]);
-    assert!(super::handlers::parse_registry_get(&invalid).unwrap_err()
+    assert!(super::handlers::parse_registry_get(&invalid)
+        .unwrap_err()
         .contains("invalid 'qualified_name'"));
 }

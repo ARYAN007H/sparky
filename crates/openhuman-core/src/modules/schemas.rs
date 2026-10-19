@@ -330,7 +330,6 @@ fn string_param(params: &Map<String, Value>, key: &str) -> Option<String> {
 #[path = "schemas_tests.rs"]
 mod tests;
 
-
 fn computer_status_load(params: &Map<String, Value>) -> bool {
     params.get("load").and_then(Value::as_bool).unwrap_or(false)
 }
@@ -341,7 +340,14 @@ pub(crate) fn computer_status_parameter_contract() -> crate::core::all::Controll
         method: "modules.computer_status",
         required: &[],
         handler: handle_computer_status,
-        examples: vec![serde_json::json!({}),serde_json::json!({"load":false}),serde_json::json!({"load":true})],
-        parse: |params| { let _ = computer_status_load(&params); Ok(()) },
+        examples: vec![
+            serde_json::json!({}),
+            serde_json::json!({"load":false}),
+            serde_json::json!({"load":true}),
+        ],
+        parse: |params| {
+            let _ = computer_status_load(&params);
+            Ok(())
+        },
     }
 }

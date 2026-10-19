@@ -205,7 +205,6 @@ pub(super) fn handle_registry_settings_set(
     })
 }
 
-
 pub(super) fn parse_registry_get(params: &Map<String, Value>) -> Result<String, String> {
     read_required(params, "qualified_name")
 }
