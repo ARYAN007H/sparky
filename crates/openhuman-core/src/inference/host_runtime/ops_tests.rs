@@ -1,4 +1,6 @@
 use super::*;
+use crate::agent_runs::agent_chat::{agent_chat_for, AgentChatEnv, AgentChatTarget};
+use crate::agent_runs::agent_chat::guards::effective_agent_chat_origin;
 
 // ── Op-level validation / error paths (no hardware) ───────────
 
@@ -308,7 +310,6 @@ async fn effective_origin_keeps_an_embedder_scoped_label() {
 /// touched, not a silent fall-through to the orchestrator.
 #[tokio::test]
 async fn agent_chat_for_rejects_an_unknown_agent_id() {
-    use crate::inference::host_runtime::ops::{agent_chat_for, AgentChatTarget};
     let tmp = tempfile::tempdir().unwrap();
     let mut config = test_config(&tmp);
     std::fs::create_dir_all(&config.workspace_dir).unwrap();
@@ -322,7 +323,7 @@ async fn agent_chat_for_rejects_an_unknown_agent_id() {
         None,
         None,
         None,
-        crate::inference::host_runtime::ops::AgentChatEnv::default(),
+        AgentChatEnv::default(),
     )
     .await
     .expect_err("an unknown agent id must be refused");
@@ -336,7 +337,6 @@ async fn agent_chat_for_rejects_an_unknown_agent_id() {
 /// `agent_chat`, so the delegating wrapper and the explicit call agree.
 #[test]
 fn agent_chat_target_default_is_the_orchestrator() {
-    use crate::inference::host_runtime::ops::AgentChatTarget;
     let target = AgentChatTarget::Orchestrator;
     let copy = target;
     assert!(matches!(copy, AgentChatTarget::Orchestrator));
