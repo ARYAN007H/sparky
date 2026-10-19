@@ -128,6 +128,50 @@ async fn sequential_config_rpcs_use_the_latest_context_snapshot() {
 }
 
 #[tokio::test]
+async fn external_config_conflict_refreshes_the_context_before_the_next_read() {
+    let tmp = tempfile::tempdir().unwrap();
+    let storage = MemoryStorage::new();
+    let _forced = ForcedDocumentSource::new(
+        scoped(&storage, "tenant-refresh-config-rpc"),
+        Scope::new("tenant-refresh-config-rpc").unwrap(),
+        keys(13),
+    );
+    let seed = config_at(tmp.path(), "initial");
+    seed.save().await.unwrap();
+    let config = Config::load_from_config_path(&seed.config_path, &seed.workspace_dir)
+        .await
+        .unwrap();
+    let ctx = CoreContext::for_test_with_config(DomainSet::full(), config);
+
+    let mut external = Config::load_from_config_path(&seed.config_path, &seed.workspace_dir)
+        .await
+        .unwrap();
+    external.default_model = Some("external-winner".into());
+    external.save().await.unwrap();
+
+    let controller = crate::core::all::all_registered_controllers()
+        .into_iter()
+        .find(|controller| controller.rpc_method_name() == "openhuman.config_update_model_settings")
+        .expect("config model settings RPC is registered");
+    let conflict = CoreContext::scope(ctx.clone(), async {
+        (controller.handler)(
+            DispatchCtx::new(ctx.clone()),
+            json!({"default_temperature": 0.8}).as_object().unwrap().clone(),
+        )
+        .await
+        .unwrap_err()
+    })
+    .await;
+    assert!(crate::core::StructuredRpcError::decode(&conflict).is_some());
+
+    let refreshed = CoreContext::scope(ctx.clone(), async {
+        DispatchCtx::new(ctx.clone()).load_config().await.unwrap()
+    })
+    .await;
+    assert_eq!(refreshed.default_model.as_deref(), Some("external-winner"));
+}
+
+#[tokio::test]
 async fn config_snapshot_cannot_be_saved_into_a_different_tenant_scope() {
     let tmp = tempfile::tempdir().unwrap();
     let storage = MemoryStorage::new();
