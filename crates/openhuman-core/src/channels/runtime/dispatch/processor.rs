@@ -95,7 +95,9 @@ pub(crate) use turn::{process_channel_message, process_channel_runtime_message};
 /// Admitted messages are debounced per conversation (`history_key`): a burst
 /// becomes one turn, and messages that arrive while a conversation's turn is
 /// running are collected into one follow-up turn. At most
-/// `max_in_flight_messages` turns run at once.
+/// `max_in_flight_messages` turns run at once, and the loop stops receiving
+/// while [`intake_budget`] admitted messages are waiting for a turn, so a
+/// sustained sender is held back by the bounded inbound queue.
 pub(crate) async fn run_message_dispatch_loop(
     rx: tokio::sync::mpsc::Receiver<RuntimeChannelMessage>,
     ctx: Arc<ChannelRuntimeContext>,
@@ -103,12 +105,14 @@ pub(crate) async fn run_message_dispatch_loop(
     debounce: InboundDebounceConfig,
 ) {
     let max_in_flight = max_in_flight_messages.max(1);
+    let budget = intake_budget(max_in_flight, &debounce);
+    let mut held: usize = 0;
     let mut rx = rx;
     let mut inbound_open = true;
     let mut next_seq: u64 = 0;
     let mut admitting = JoinSet::new();
     let mut admit_seqs: HashMap<tokio::task::Id, u64> = HashMap::new();
-    let mut admitted = InOrder::new();
+    let mut admission_order = InOrder::new();
     let mut turns = JoinSet::new();
     let mut turn_keys: HashMap<tokio::task::Id, String> = HashMap::new();
     let mut typing = JoinSet::new();
@@ -121,6 +125,7 @@ pub(crate) async fn run_message_dispatch_loop(
                 break;
             };
             let batch_len = batch.len();
+            held = held.saturating_sub(batch_len);
             match merge_channel_batch(batch) {
                 Some(admitted) => {
                     tracing::debug!(
@@ -128,6 +133,7 @@ pub(crate) async fn run_message_dispatch_loop(
                         message_id = %admitted.msg.id,
                         batch_len,
                         in_flight = turns.len() + 1,
+                        held,
                         "[dispatch][debounce] starting turn"
                     );
                     let handle = turns.spawn(run_admitted_turn(Arc::clone(&ctx), admitted));
@@ -150,7 +156,9 @@ pub(crate) async fn run_message_dispatch_loop(
 
         let wakeup = debouncer.next_wakeup();
         tokio::select! {
-            received = rx.recv(), if inbound_open && admitting.len() < max_in_flight => {
+            received = rx.recv(), if inbound_open
+                && admitting.len() < max_in_flight
+                && admitting.len() + admission_order.waiting() + held < budget => {
                 match received {
                     Some(message) => {
                         let seq = next_seq;
@@ -177,7 +185,8 @@ pub(crate) async fn run_message_dispatch_loop(
                     }
                 };
                 if let Some(seq) = admit_seqs.remove(&id) {
-                    for (seq, inbound) in admitted.finish(seq, result) {
+                    for (seq, inbound) in admission_order.finish(seq, result) {
+                        held += 1;
                         buffer_admitted(&ctx, &debounce, &mut debouncer, &mut typing, seq, inbound);
                     }
                 }
@@ -204,6 +213,12 @@ pub(crate) async fn run_message_dispatch_loop(
         }
         ready.extend(debouncer.poll_ready(now));
     }
+}
+
+/// Admitted messages the loop holds before it stops receiving: a full batch
+/// for every turn worker.
+fn intake_budget(max_in_flight: usize, debounce: &InboundDebounceConfig) -> usize {
+    max_in_flight.saturating_mul(debounce.max_batch_messages.max(1))
 }
 
 fn buffer_admitted(

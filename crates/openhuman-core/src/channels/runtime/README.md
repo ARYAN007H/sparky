@@ -44,7 +44,10 @@ capped at 10 s) become one turn, and a typing indicator starts when the window
 opens. A conversation never runs two turns at once: messages that arrive while
 its turn runs are collected into one follow-up turn that sees the first turn's
 history. Different conversations still run in parallel up to the module's
-in-flight limit. When the inbound queue closes, every buffered message is
+in-flight limit. The loop holds at most one full batch per turn worker
+(`max_batch_messages` × in-flight limit) of admitted messages waiting for a
+turn; past that it stops receiving, so the bounded inbound queue pushes back
+on senders instead of memory growing. When the inbound queue closes, every buffered message is
 flushed before the loop returns.
 
 The always-on `ChannelInboundSubscriber` handles hosted-channel messages
