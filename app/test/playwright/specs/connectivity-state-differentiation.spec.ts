@@ -9,7 +9,7 @@ async function setDeviceOffline(page: import('@playwright/test').Page, offline: 
   }, offline);
 }
 
-test.describe('Connectivity state differentiation (issue #1527)', () => {
+test.describe('Connectivity state differentiation', () => {
   test.beforeEach(async ({ page }, testInfo) => {
     const testSlug = testInfo.title.toLowerCase().replace(/[^a-z0-9]+/g, '-');
     await bootAuthenticatedPage(page, 'pw-connectivity-diff-' + testSlug, '/home');
@@ -19,11 +19,10 @@ test.describe('Connectivity state differentiation (issue #1527)', () => {
     await setDeviceOffline(page, false);
   });
 
-  // `backend-only` is the browser's Socket.IO link to the local core. A 503
-  // from the hosted backend does not drive this state; selector behavior has
-  // focused store coverage.
-
-  test.skip('shows reconnecting status after socket is force-disconnected server-side', async () => {}); // https://github.com/tinyhumansai/openhuman/issues/1527
+  // `backend-only` is the browser's Socket.IO link to the local core. The mock
+  // immediately accepts reconnects after a server-side disconnect, so the
+  // transient reconnect label cannot be asserted deterministically here;
+  // selector behavior has focused store coverage.
 
   test('shows device-offline copy (not backend-only) when window fires offline', async ({ page }) => {
     await setDeviceOffline(page, true);
