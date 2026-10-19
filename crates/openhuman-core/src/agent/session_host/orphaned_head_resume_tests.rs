@@ -252,6 +252,35 @@ async fn credential_redaction_survives_resume() {
     assert!(!persisted_json.contains(&secret));
     assert!(persisted_json.contains(&redacted));
 
+    // Exercise the transcript generation boundary used by compaction: the
+    // sealed source remains intact and the successor's carried context keeps
+    // the screened row, without reintroducing the original input.
+    let session_ref = tinyagents_session::transcript::SessionRef::scoped(
+        "thread-credential-redaction",
+        persisted.meta.agent_id.clone().expect("host agent identity"),
+    );
+    let (successor, compacted) = locator
+        .begin_generation(&session_ref, persisted.meta.clone())
+        .expect("begin compacted generation");
+    compacted
+        .replace(&persisted.messages)
+        .expect("write carried context");
+    let generations = locator.session_chain(&successor);
+    assert_eq!(generations.len(), 2);
+    for generation in generations {
+        let transcript = locator
+            .read_session_transcript(&generation)
+            .expect("generation transcript");
+        let messages = transcript
+            .read_session()
+            .expect("read generation")
+            .expect("generation contents")
+            .messages;
+        let generation_json = serde_json::to_string(&messages).expect("serialize generation");
+        assert!(!generation_json.contains(&secret));
+        assert!(generation_json.contains(&redacted));
+    }
+
     let mut resumed = new_host();
     resumed.set_thread_id(Some("thread-credential-redaction"));
     assert!(resumed.resume_bound_session().await.unwrap());
