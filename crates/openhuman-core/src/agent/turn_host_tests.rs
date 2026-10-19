@@ -2,10 +2,7 @@ use super::*;
 
 #[test]
 fn workspace_binding_clears_a_previous_turns_workspace() {
-    let previous = tinytools::WorkspaceDescriptor::new("/previous/thread");
-
     assert_eq!(WorkspaceBinding::Clear.update(), Some(None));
-    assert!(previous.root.ends_with("/previous/thread"));
 }
 
 #[test]
