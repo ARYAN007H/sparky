@@ -297,7 +297,7 @@ fn start_core(
         .env("OPENHUMAN_CORE_TOKEN", RPC_TOKEN)
         .env(
             "RUST_LOG",
-            "tinychannels=debug,tinychannels_module=debug,openhuman_core::channels=debug",
+            "tinychannels=debug,tinychannels_module=debug,tinystoragedrivers=debug,openhuman_core::channels=debug",
         )
         .env("OPENHUMAN_MODEL", "mock:session-model")
         .env("OPENHUMAN_BACKEND_API_KEY", MOCK_API_KEY)
