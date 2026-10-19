@@ -488,7 +488,7 @@ async fn scenario() {
             .accepted
     );
     tokio::time::timeout(Duration::from_secs(30), async {
-        while events.recv().await.unwrap().event != "channel_outbound" {}
+        while events.recv().await.unwrap().event_name() != "channel_outbound" {}
     })
     .await
     .unwrap();
