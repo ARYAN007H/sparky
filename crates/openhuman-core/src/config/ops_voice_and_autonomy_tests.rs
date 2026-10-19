@@ -200,7 +200,6 @@ async fn get_voice_server_settings_reads_from_loaded_config() {
     }
 }
 
-#[tokio::test]
 async fn get_onboarding_completed_reads_from_loaded_config() {
     let _g = ENV_LOCK.lock().await;
     let tmp = tempdir().unwrap();

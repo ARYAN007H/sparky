@@ -197,7 +197,6 @@ All methods are in the `config` namespace and are registered by [`core/all.rs`](
 | Privacy and search | `get_privacy_mode`, `set_privacy_mode`, `get_search_settings`, `update_search_settings` |
 | Browser | `update_browser_settings`, `set_browser_allow_all` |
 | Integrations | `get_composio_trigger_settings`, `update_composio_trigger_settings` |
-| Voice | `get_dictation_settings`, `update_dictation_settings`, `get_voice_server_settings`, `update_voice_server_settings` |
 | Onboarding and UI | `get_onboarding_completed`, `set_onboarding_completed`, `workspace_onboarding_flag_exists`, `workspace_onboarding_flag_set`, `get_analytics_settings`, `update_analytics_settings`, `get_user_timezone`, `update_user_timezone` |
 
 The `workspace` namespace (`file_read`, `file_write`, `file_reset`) is registered separately from
