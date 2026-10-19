@@ -53,6 +53,83 @@ pub struct HostAgent {
 }
 
 impl HostAgent {
+    /// Resolve a config-owned agent into the same trusted carrier used for
+    /// embedder-owned agents. Channel entry points use this after routing has
+    /// selected an agent; the caller still supplies the untrusted origin and
+    /// approval context at execution time.
+    pub(crate) fn from_config(
+        dispatch: &DispatchCtx,
+        config: Config,
+        agent_id: &str,
+    ) -> anyhow::Result<Self> {
+        let definition = AgentDefinitionRegistry::current()
+            .and_then(|registry| registry.get(agent_id).cloned())
+            .or_else(|| {
+                crate::agent::harness::host_definition::AgentDefinitionRegistry::from_config(
+                    &config,
+                )
+                .ok()
+                .and_then(|registry| registry.get(agent_id).cloned())
+            })
+            .ok_or_else(|| anyhow::anyhow!("agent definition `{agent_id}` is unavailable"))?;
+        let context = dispatch
+            .core()
+            .cloned()
+            .ok_or_else(|| anyhow::anyhow!("agent turn has no core context"))?;
+        Ok(Self {
+            definition,
+            config,
+            host_tools: None,
+            context,
+            hooks: Default::default(),
+        })
+    }
+
+    /// Execute one durable, externally-authored turn with the resolved host
+    /// agent's context and hooks. `session_key` is the trusted caller's
+    /// canonical conversation identity (already scoped by tenant/provider/
+    /// account/conversation); TinyAgents adds the agent id through
+    /// `set_thread_id` when it binds the SessionRef.
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) async fn run_external_channel_turn(
+        self,
+        session_key: &str,
+        event_session_id: &str,
+        channel: &str,
+        message: &str,
+        origin: crate::agent::turn_origin::AgentTurnOrigin,
+        approval: crate::security::approval::ApprovalTurnContext,
+        progress: Option<tokio::sync::mpsc::Sender<tinyagents_harness::progress::AgentProgress>>,
+        cancellation: tinyagents_harness::CancellationToken,
+        turn_deadline: Option<std::time::Duration>,
+    ) -> anyhow::Result<String> {
+        let mut config = self.config.clone();
+        if let Some(ceiling) = crate::channels::runtime::dispatch::host_agent::posture::tool_ceiling(&origin) {
+            crate::channels::runtime::dispatch::host_agent::posture::cap_channel(
+                &mut config,
+                channel,
+                ceiling,
+            );
+        }
+        let agent_id = self.definition.id.clone();
+        let mut session = self.session_host(&config, Some(session_key))?;
+        session.set_thread_id(Some(session_key));
+        session.set_event_context(event_session_id, channel);
+        session.set_on_progress(progress);
+        session.set_host_env(crate::agent::turn_env::HostTurnEnv {
+            hooks: self.hooks.clone(),
+            core: Some(Arc::downgrade(&self.context)),
+            cancellation: Some(cancellation),
+            turn_deadline: turn_deadline
+                .map(tinyagents_harness::turn_deadline::TurnDeadline::starting_now),
+            approval: approval.clone(),
+            memory_identity: Some(crate::memory::scope::MemoryIdentity::root().child(agent_id)),
+            ..Default::default()
+        });
+        self.scope(session.run_single_with_approval(message, Some(origin), approval))
+            .await
+    }
+
     /// Build a session for this agent from `config` -- normally a clone of
     /// [`HostAgent::config`] carrying a driver's overrides.
     ///
