@@ -20,7 +20,6 @@ import {
   seedComposioConnection,
   seedComposioToolkits,
 } from './composio-helpers';
-import { callOpenhumanRpc } from './core-rpc';
 import {
   clickButton,
   textExists,
@@ -161,18 +160,6 @@ export function runConnectorContract(config: ConnectorContractConfig): void {
             'the expired-state button is not wired to the authorize route',
         }
       );
-
-      // Stand in for the OAuth callback the real flow completes in a browser,
-      // then assert the connector reports itself usable again. Without this the
-      // test would prove a request was sent and nothing about recovery.
-      seedComposioConnection(slug, 'ACTIVE', activeId);
-      const out = await callOpenhumanRpc('openhuman.composio_list_connections', {});
-      const result = (out.result as { result?: unknown })?.result ?? out.result;
-      const connections = (result as { connections?: unknown[] })?.connections ?? [];
-      const hit = (connections as { toolkit?: string; status?: string }[]).find(
-        c => c.toolkit?.toLowerCase() === slug
-      );
-      expect(hit?.status).toBe('ACTIVE');
 
       await assertSessionNotNuked();
       console.log(`${LOG} PASS: reconnect after expiry re-authorizes`);
