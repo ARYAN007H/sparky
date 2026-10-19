@@ -145,9 +145,7 @@ impl ProgressiveChannelTransport for ModuleChannel {
                     Ok(_) => Err(tinybus::Error::failed(
                         "channel returned an invalid edit result",
                     )),
-                    Err(error) => Err(tinybus::Error::failed(format!(
-                        "channel edit callback failed: {error}"
-                    ))),
+                    Err(error) => Err(sanitize_module_error("edit", error)),
                 }
             }
             Request::Delete {
@@ -180,9 +178,7 @@ impl ProgressiveChannelTransport for ModuleChannel {
                     Ok(_) => Err(tinybus::Error::failed(
                         "channel returned an invalid delete result",
                     )),
-                    Err(error) => Err(tinybus::Error::failed(format!(
-                        "channel delete callback failed: {error}"
-                    ))),
+                    Err(error) => Err(sanitize_module_error("delete", error)),
                 }
             }
             Request::Typing { conversation, .. } => {
@@ -197,6 +193,10 @@ impl ProgressiveChannelTransport for ModuleChannel {
             Request::OutputEvent { .. } => Ok(Result::Acknowledged),
         }
     }
+}
+
+fn sanitize_module_error(operation: &str, _source: impl std::fmt::Display) -> tinybus::Error {
+    tinybus::Error::failed(format!("channel {operation} callback failed"))
 }
 
 fn map_edit_outcome(

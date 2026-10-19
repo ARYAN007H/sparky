@@ -26,6 +26,18 @@ fn forbidden_edit_error_is_preserved_instead_of_reported_as_unsupported() {
 }
 
 #[test]
+fn module_callback_error_does_not_expose_provider_details() {
+    let error = sanitize_module_error(
+        "edit",
+        "request failed for https://api.invalid/bot?token=SECRET",
+    );
+
+    assert!(error.to_string().contains("channel edit callback failed"));
+    assert!(!error.to_string().contains("SECRET"));
+    assert!(!error.to_string().contains("api.invalid"));
+}
+
+#[test]
 fn receipt_scope_requires_exact_channel_and_full_conversation_identity() {
     use tinychannels_bus::channel::{types::ConversationKind, MessageReceipt};
     use tinychannels_bus::{ChannelRef, ConversationRef};
