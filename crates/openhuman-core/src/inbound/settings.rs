@@ -157,7 +157,7 @@ pub fn module_config(config: &Config) -> Value {
 /// The queues the storage host grants the module: the manifest it was
 /// configured with and where they live.
 #[must_use]
-pub fn queue_grant() -> Option<QueueGrant> {
+pub(crate) fn queue_grant() -> Option<QueueGrant> {
     let resolved = current();
     Some(QueueGrant {
         manifest: Arc::clone(&resolved.manifest),

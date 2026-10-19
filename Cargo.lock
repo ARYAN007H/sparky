@@ -5459,6 +5459,7 @@ dependencies = [
  "tinycomputer-bus",
  "tinyconnectors-bus",
  "tinydocs-bus",
+ "tinyeventqueues-bus",
  "tinyflows",
  "tinyflows-bus",
  "tinyflows-catalog",
@@ -9100,6 +9101,15 @@ dependencies = [
  "tinydocs",
  "tinydocs-bus",
  "tokio",
+]
+
+[[package]]
+name = "tinyeventqueues-bus"
+version = "0.1.1"
+dependencies = [
+ "serde",
+ "serde_json",
+ "tinystoragedrivers-core",
 ]
 
 [[package]]

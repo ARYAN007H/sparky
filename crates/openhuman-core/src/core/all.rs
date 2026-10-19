@@ -342,6 +342,14 @@ fn build_registered_controllers() -> Vec<GroupedController> {
         DomainGroup::Flows,
         crate::flows::all_flows_registered_controllers(),
     );
+    // Inbound event queues: depths, dead letters, redrive (`[components]
+    // eventqueues`; the handlers answer COMPONENT_DISABLED when it is off).
+    #[cfg(feature = "inbound-queues")]
+    push(
+        &mut controllers,
+        DomainGroup::Automation,
+        crate::inbound::all_inbound_registered_controllers(),
+    );
     // Proactive task ingestion from external tools (github/notion/linear/clickup)
     push(
         &mut controllers,
@@ -789,6 +797,9 @@ pub fn namespace_description(namespace: &str) -> Option<&'static str> {
             "Connectivity diagnostics for the local sidecar, listening port, and backend Socket.IO state.",
         ),
         "cron" => Some("Manage scheduled jobs and run history."),
+        "inbound" => Some(
+            "Inbound event queues: depths and outcome counts, dead letters and redrive.",
+        ),
         "flows" => Some("Create, store, and run automation workflows."),
         "dashboard" => {
             Some("Operator-facing dashboard aggregations: per-model health comparison rows.")

@@ -35,4 +35,5 @@ pub use schemas::{
     all_controller_schemas as all_inbound_controller_schemas,
     all_registered_controllers as all_inbound_registered_controllers,
 };
-pub use settings::{active, module_config, queue_grant};
+pub(crate) use settings::queue_grant;
+pub use settings::{active, module_config};
