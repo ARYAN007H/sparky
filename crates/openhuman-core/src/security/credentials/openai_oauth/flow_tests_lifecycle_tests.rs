@@ -55,7 +55,7 @@ fn parse_callback_input_accepts_raw_query_string() {
 }
 
 #[test]
-fn parse_callback_input_rejects_blank_invalid_and_missing_state() {
+fn parse_callback_input_rejects_blank_and_missing_state() {
     let blank = parse_callback_input("   ").unwrap_err();
     assert!(blank.contains("required"));
 

@@ -18,6 +18,31 @@ fn rejects_react_without_prompt() {
 }
 
 #[test]
+fn parses_valid_react_and_escalate_decisions_with_host_fields() {
+    let cases = [
+        (
+            r#"{"action":"react","target_agent":"trigger_reactor","prompt":"send acknowledgement","reason":"one-step response"}"#,
+            TriageAction::React,
+            "trigger_reactor",
+            "send acknowledgement",
+        ),
+        (
+            r#"{"action":"escalate","target_agent":"orchestrator","prompt":"draft a reply","reason":"complex request"}"#,
+            TriageAction::Escalate,
+            "orchestrator",
+            "draft a reply",
+        ),
+    ];
+
+    for (reply, expected_action, expected_target, expected_prompt) in cases {
+        let decision = parse_triage_decision(reply).expect("valid host decision");
+        assert_eq!(decision.action, expected_action);
+        assert_eq!(decision.target_agent.as_deref(), Some(expected_target));
+        assert_eq!(decision.prompt.as_deref(), Some(expected_prompt));
+    }
+}
+
+#[test]
 fn rejects_non_parseable_json() {
     let reply = "{\"action\": not_a_string}";
     let err = parse_triage_decision(reply).unwrap_err();
