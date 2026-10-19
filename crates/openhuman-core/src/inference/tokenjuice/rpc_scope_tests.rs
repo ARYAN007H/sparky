@@ -1,6 +1,7 @@
 use super::*;
 use std::sync::{Arc, Mutex};
 
+use crate::config::Config;
 use crate::core::runtime::{ContextOverlay, CoreContext, DispatchCtx, DomainSet};
 use tinybus::{broker::Broker, transport::memory::MemoryBus, Connection, ObjectPath};
 
@@ -130,14 +131,33 @@ fn profile_config(workspace: &std::path::Path, threshold: usize) -> Config {
     config
 }
 
+struct WorkspaceEnvGuard(Option<std::ffi::OsString>);
+
+impl WorkspaceEnvGuard {
+    fn set(workspace: &std::path::Path) -> Self {
+        let previous = std::env::var_os("OPENHUMAN_WORKSPACE");
+        std::env::set_var("OPENHUMAN_WORKSPACE", workspace);
+        Self(previous)
+    }
+}
+
+impl Drop for WorkspaceEnvGuard {
+    fn drop(&mut self) {
+        if let Some(previous) = self.0.take() {
+            std::env::set_var("OPENHUMAN_WORKSPACE", previous);
+        } else {
+            std::env::remove_var("OPENHUMAN_WORKSPACE");
+        }
+    }
+}
+
 #[tokio::test]
 async fn tokenjuice_rpcs_use_their_derived_config_for_module_calls_and_install() {
     let _env_guard = crate::config::TEST_ENV_LOCK.lock().await;
     let operator = tempfile::tempdir().unwrap();
     let operator_workspace = operator.path().join("workspace");
     std::fs::create_dir_all(&operator_workspace).unwrap();
-    let previous_workspace = std::env::var_os("OPENHUMAN_WORKSPACE");
-    std::env::set_var("OPENHUMAN_WORKSPACE", &operator_workspace);
+    let _workspace_env = WorkspaceEnvGuard::set(&operator_workspace);
 
     let workspaces = [tempfile::tempdir().unwrap(), tempfile::tempdir().unwrap()];
     let configs = [
@@ -157,7 +177,7 @@ async fn tokenjuice_rpcs_use_their_derived_config_for_module_calls_and_install()
         proxy,
         configs: Arc::clone(&seen_configs),
     };
-    let result = module_stub::with_rpc_client(client_fixture, async {
+    module_stub::with_rpc_client(client_fixture, async {
         invoke(
             contexts[0].clone(),
             "detect",
@@ -179,13 +199,6 @@ async fn tokenjuice_rpcs_use_their_derived_config_for_module_calls_and_install()
         .await;
     })
     .await;
-
-    if let Some(previous) = previous_workspace {
-        std::env::set_var("OPENHUMAN_WORKSPACE", previous);
-    } else {
-        std::env::remove_var("OPENHUMAN_WORKSPACE");
-    }
-    result;
 
     let captured = seen_configs.lock().unwrap();
     for (index, config) in configs.iter().enumerate() {
