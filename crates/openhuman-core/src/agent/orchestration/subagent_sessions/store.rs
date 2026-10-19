@@ -61,7 +61,7 @@ impl SubagentSessionStore {
         &self,
         subagent_session_id: &str,
         update: F,
-    ) -> Result<bool, String>
+    ) -> Result<Option<DurableSubagentSession>, String>
     where
         F: FnMut(&mut DurableSubagentSession, String) + Send,
     {

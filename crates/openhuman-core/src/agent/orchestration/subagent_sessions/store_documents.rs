@@ -206,14 +206,14 @@ impl Docs {
         &self,
         subagent_session_id: &str,
         mut update: F,
-    ) -> Result<bool>
+    ) -> Result<Option<DurableSubagentSession>>
     where
         F: FnMut(&mut DurableSubagentSession, String) + Send,
     {
         let id = key_of(subagent_session_id)?;
         self.0.run(|docs| async move {
             let repo = tinystoragedrivers::Repo::<Value>::new(&docs, SESSIONS)?;
-            repo.update(&id, move |current| {
+            let updated = repo.update(&id, move |current| {
                 let Some(current) = current else {
                     return Ok(None);
                 };
@@ -222,8 +222,13 @@ impl Docs {
                 update(&mut session, chrono::Utc::now().to_rfc3339());
                 Ok(Some(serde_json::to_value(StoredSession::from(&session))?))
             })
-            .await
-            .map(|updated| updated.is_some())
+            .await?;
+            updated
+                .map(|(stored, _)| {
+                    serde_json::from_value::<StoredSession>(stored)
+                        .map(DurableSubagentSession::from)
+                })
+                .transpose()
         })
     }
 

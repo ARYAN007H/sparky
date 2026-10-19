@@ -243,7 +243,9 @@ where
     let _guard = store_write_lock()
         .lock()
         .map_err(|_| "subagent session store lock poisoned".to_string())?;
-    store.update_session(subagent_session_id, update)
+    store
+        .update_session(subagent_session_id, update)
+        .map(|updated| updated.is_some())
 }
 
 fn store_write_lock() -> &'static Mutex<()> {
