@@ -1,10 +1,16 @@
 use super::*;
 use crate::core::all::{
-    expect_schema_fields, expect_schema_identity, expect_schema_required_inputs,
+    assert_schema_controller_parity, expect_schema_fields, expect_schema_identity,
+    expect_schema_required_inputs,
 };
 
 #[test]
 fn credential_schema_wire_contracts_are_preserved() {
+    assert_schema_controller_parity(
+        &all_controller_schemas(),
+        &all_registered_controllers(),
+        "set_credential",
+    );
     let key_contracts = [
         ("auth_get_state", "get_state"),
         ("auth_get_session_token", "get_session_token"),
