@@ -31,6 +31,10 @@ pub mod route;
 mod schemas;
 pub mod settings;
 
+#[cfg(test)]
+#[path = "linked_fixture.rs"]
+pub(crate) mod fixture;
+
 pub use schemas::{
     all_controller_schemas as all_inbound_controller_schemas,
     all_registered_controllers as all_inbound_registered_controllers,
