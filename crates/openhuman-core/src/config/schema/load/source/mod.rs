@@ -140,12 +140,15 @@ pub(crate) fn for_config(config_path: &Path) -> Result<Box<dyn ConfigSource>> {
     if !crate::storage::installed_is_shared() {
         return Ok(Box::new(file));
     }
-    let resolved = crate::storage::current_scoped().and_then(|scoped| {
-        let scope = crate::storage::current_scope()?;
-        Ok(scoped.map(|scoped| (scoped, scope)))
+    let resolved = crate::storage::current_scope().map(|scope| {
+        crate::storage::installed().map(|backend| {
+            let identity = std::sync::Arc::as_ptr(&backend) as *const () as usize;
+            let scoped = backend.for_scope(&scope);
+            scoped.map(|scoped| (scoped, scope, identity))
+        })
     });
     match resolved {
-        Ok(Some((scoped, scope))) => {
+        Ok(Some(Ok((scoped, scope, identity)))) => {
             let keys = crate::storage::secrets::keys()
                 .map_err(|error| anyhow::anyhow!("config document key: {error}"))?;
             Ok(Box::new(DocumentConfigSource::new(
@@ -153,10 +156,11 @@ pub(crate) fn for_config(config_path: &Path) -> Result<Box<dyn ConfigSource>> {
                 scope,
                 keys,
                 file,
-                crate::storage::installed().map_or(0, |backend| Arc::as_ptr(&backend) as *const () as usize),
+                identity,
             )))
         }
         Ok(None) => Ok(Box::new(file)),
+        Ok(Some(Err(error))) => Err(error.into()),
         Err(error) => {
             tracing::debug!(
                 error = %error,
