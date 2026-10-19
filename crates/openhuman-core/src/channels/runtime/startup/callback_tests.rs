@@ -31,6 +31,8 @@ async fn module_inbound_envelope_reaches_host_dispatch_with_identity_intact() {
             account_id: Some("telegram:bot-a".into()),
         },
         message_id: "telegram_42_10".into(),
+        reply_to_id: Some("telegram_42_9".into()),
+        timestamp_unix_ms: Some(1_800_000_000_000),
         conversation: tinychannels_bus::ConversationRef {
             kind: tinychannels_bus::ConversationKind::Dm,
             id: "42".into(),
@@ -69,6 +71,7 @@ async fn module_inbound_envelope_reaches_host_dispatch_with_identity_intact() {
         .try_recv()
         .expect("native envelope should enter the channel dispatch queue");
     assert!(runtime_message.message.channel.is_empty());
+    assert!(!runtime_message.authenticated_relay);
     let received_envelope = runtime_message
         .inbound_envelope
         .expect("typed source envelope must reach module preparation");
