@@ -26,6 +26,19 @@ async fn validate_over_bus(
         .map_err(|error| error.wire_message())
 }
 
+/// Returns the owner's migrated graph for callers that need parsing/migration
+/// without applying the host's save or execution policy.
+pub(super) async fn migrate_over_bus(
+    ctx: &DispatchCtx,
+    config: &Config,
+    graph: Value,
+) -> Result<Value, String> {
+    validate_over_bus(ctx, config, graph)
+        .await?
+        .graph
+        .ok_or_else(|| "TinyFlows validation returned no graph".to_string())
+}
+
 fn is_engine_compatibility_error(code: &str) -> bool {
     matches!(
         code,
@@ -159,7 +172,7 @@ pub async fn flows_validate(
             );
         }
     };
-    let warnings = graph_trigger_warnings(&graph);
+    let warnings = report.warnings;
     Outcome::single_log(
         FlowValidation {
             valid: true,
@@ -211,8 +224,7 @@ pub async fn flows_import(
         .graph
         .ok_or_else(|| "TinyFlows import returned no graph".to_string())
         .and_then(|graph| serde_json::from_value(graph).map_err(|error| error.to_string()))?;
-    let mut warnings = imported.warnings;
-    warnings.extend(graph_trigger_warnings(&graph));
+    let warnings = imported.warnings;
     Ok(Outcome::single_log(
         FlowImport { graph, warnings },
         "flow imported",
