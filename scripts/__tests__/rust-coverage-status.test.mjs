@@ -355,7 +355,7 @@ test("instrumented CLI inventory is cancellation-aware and reuses llvm-cov's env
   );
 });
 
-test("CLI inventory sends product features only to nextest, preserving instrumentation", () => {
+test("CLI inventory lists llvm-cov's own build instead of instrumenting a second copy", () => {
   const source = fs.readFileSync(runner, "utf8");
   const start = source.indexOf("    cli_inventory() (");
   const end = source.indexOf("\n    )", start);
@@ -375,10 +375,11 @@ test("CLI inventory sends product features only to nextest, preserving instrumen
         for arg in "$@"; do
           [[ "$arg" != --features ]] || { echo 'show-env rejects --features' >&2; return 64; }
         done
-        printf '%s\\n' 'export INVENTORY_INSTRUMENTED=1' 'export CARGO_TARGET_DIR=instrumented-target'
+        printf '%s\\n' 'export INVENTORY_INSTRUMENTED=1' 'export CARGO_TARGET_DIR=instrumented-target' 'export CARGO_LLVM_COV_TARGET_DIR=cov-target'
       elif [[ "$*" == *"nextest list"* ]]; then
-        [[ "$*" == *"--features channels,modules -p openhuman -p openhuman-embed -p openhuman-tinyhumans -p openhuman-cli --all-targets -E package(=openhuman-cli) & kind(test)"* ]] || return 65
+        [[ "$*" == *"--features channels,modules --target-dir cov-target/llvm-cov-target -p openhuman -p openhuman-embed -p openhuman-tinyhumans -p openhuman-cli --all-targets -E package(=openhuman-cli) & kind(test)"* ]] || return 65
         [[ "$INVENTORY_INSTRUMENTED" == 1 && "$CARGO_TARGET_DIR" == instrumented-target && "$CARGO_BUILD_TARGET_DIR" == preserved-target ]] || return 66
+        [[ "$LLVM_PROFILE_FILE" == */ci-out/nextest/cli-inventory-profraw/* ]] || return 68
       else return 67
       fi
     }`,
