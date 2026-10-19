@@ -152,6 +152,7 @@ fn callback_for_channels(
     let context = Arc::new(ChannelRuntimeContext {
         relay_thread: None,
         channels_by_name: Arc::new(channels),
+        module_objects: Arc::new(HashMap::new()),
         turn_model_source: None,
         default_provider: Arc::new("test-provider".into()),
         tools_registry: Arc::new(Vec::new()),
