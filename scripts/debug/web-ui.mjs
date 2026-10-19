@@ -22,6 +22,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 import {
   devConnectUrl,
+  ensureSignedInChat,
   coreLaunchSpec,
   freePort,
   isLoopback,
@@ -159,13 +160,7 @@ async function signIn(page, rpc, appOrigin) {
     timeoutMs: 120_000,
     what: "the core's authenticated state after mock sign-in",
   });
-  const composer = page.getByRole("textbox", { name: "Message input" });
-  if (!(await composer.isVisible().catch(() => false))) {
-    // Authenticated users now land on Home by default; scripted browser flows
-    // need the chat route to exercise the same signed-in shell consistently.
-    await page.goto(`${appOrigin}/#/chat`);
-  }
-  await composer.waitFor({ state: "visible", timeout: 120_000 });
+  await ensureSignedInChat(page, appOrigin);
 }
 
 async function main() {
