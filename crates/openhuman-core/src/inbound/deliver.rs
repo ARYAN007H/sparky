@@ -5,16 +5,25 @@
 //!
 //! | triage outcome | delivery answer |
 //! | --- | --- |
-//! | a decision | `Accepted`; the decision is applied in its own task |
+//! | a decision, applied (or still applying at the budget) | `Accepted` |
+//! | a decision whose apply failed within the budget | `Retry` with the queue's back-off |
 //! | `Deferred { defer_until_ms }` | `Retry { after_ms: defer_until_ms - now }` |
 //! | `Terminal` | `Rejected` (dead-lettered, redrivable) |
 //! | an error, or the triage timeout | `Retry` with the queue's back-off |
 //!
 //! So a deferred triage is redelivered when it asked to run again instead of
 //! being dropped, and a failed one backs off and dead-letters after the lane's
-//! attempts. Acknowledging once triage has decided, not once the agent has
-//! finished, keeps a long agent run (an approval can wait ten minutes) from
-//! outliving the turn's lease and being delivered twice.
+//! attempts.
+//!
+//! The decision is applied while the delivery waits, within the delivery's
+//! budget (what the module's 30 s callback deadline leaves after triage). An
+//! apply that fails inside the budget is retried like a failed triage, so a
+//! failed agent dispatch stays recoverable (and dead-letters, redrivable,
+//! after the lane's attempts). An apply still running at the budget (a long
+//! agent run, an approval that can wait ten minutes) is acknowledged and left
+//! to finish in its own task: holding the turn longer would outlive the
+//! callback deadline and have it delivered twice. A failure after that point
+//! is reported, not retried.
 //!
 //! A digest turn (many events folded together) is triaged once, as one
 //! envelope listing them. `ClassifySalience` runs the same triage for a
@@ -49,6 +58,10 @@ const CLASSIFIED_TTL_MS: i64 = 10 * 60 * 1_000;
 
 /// How many accepted turns are remembered against a redelivery.
 const ACCEPTED_CAPACITY: usize = 1_024;
+
+/// How long one delivery may take in all: under the module's 30 s callback
+/// deadline, so its answer is never lost to the deadline.
+const DELIVERY_BUDGET: Duration = Duration::from_secs(28);
 
 /// The salience class of a triage action.
 #[must_use]
@@ -109,6 +122,18 @@ impl Accepted {
     }
 }
 
+/// How applying a decision ended, as far as the delivery waited.
+#[derive(Debug)]
+enum Applied {
+    /// Applied.
+    Done,
+    /// Still applying when the delivery's budget ran out; it finishes on its
+    /// own.
+    Running,
+    /// Failed inside the budget.
+    Failed(String),
+}
+
 /// What a delivery needs from its surroundings.
 pub struct Deliverer {
     runner: Arc<dyn TriageRunner>,
@@ -116,6 +141,7 @@ pub struct Deliverer {
     timeout: Duration,
     now_ms: fn() -> i64,
     max_attempts: Box<dyn Fn(Lane) -> Option<u32> + Send + Sync>,
+    budget: Duration,
     classified: Mutex<Classified>,
     accepted: Mutex<Accepted>,
 }
@@ -143,6 +169,7 @@ impl Deliverer {
             timeout,
             now_ms: system_now_ms,
             max_attempts: Box::new(|lane| super::settings::current().max_attempts(lane)),
+            budget: DELIVERY_BUDGET,
             classified: Mutex::new(Classified::default()),
             accepted: Mutex::new(Accepted::default()),
         }
@@ -152,6 +179,13 @@ impl Deliverer {
     #[must_use]
     pub fn with_clock(mut self, now_ms: fn() -> i64) -> Self {
         self.now_ms = now_ms;
+        self
+    }
+
+    /// Bound one delivery by `budget` instead of [`DELIVERY_BUDGET`] (tests).
+    #[must_use]
+    pub fn with_budget(mut self, budget: Duration) -> Self {
+        self.budget = budget;
         self
     }
 
@@ -211,6 +245,7 @@ impl Deliverer {
 
     /// Deliver one due turn.
     pub async fn deliver(&self, request: DeliverRequest) -> DeliverResponse {
+        let started = tokio::time::Instant::now();
         let turn = request.turn;
         if self.accepted().contains(&turn.turn_id) {
             // The module redelivered a turn whose decision is already being
@@ -248,9 +283,16 @@ impl Deliverer {
                     attempt = turn.attempt,
                     "[inbound] delivered; applying the decision"
                 );
-                self.accepted().remember(&turn.turn_id);
-                self.apply(run, envelope);
-                DeliverStatus::Accepted
+                let remaining = self.budget.saturating_sub(started.elapsed());
+                match self.apply(run, envelope, remaining).await {
+                    Applied::Done | Applied::Running => {
+                        self.accepted().remember(&turn.turn_id);
+                        DeliverStatus::Accepted
+                    }
+                    Applied::Failed(error) => {
+                        self.retry(&turn, None, &format!("apply failed: {error}"))
+                    }
+                }
             }
             Ok(Ok(TriageOutcome::Deferred {
                 defer_until_ms,
@@ -322,15 +364,16 @@ impl Deliverer {
         }
     }
 
-    /// Apply `run` in its own task, so the delivery answers once triage has
-    /// decided rather than once the agent has finished.
-    fn apply(&self, run: TriageRun, envelope: TriggerEnvelope) {
+    /// Apply `run` in its own task and wait for it for at most `within`.
+    async fn apply(&self, run: TriageRun, envelope: TriggerEnvelope, within: Duration) -> Applied {
         let runner = Arc::clone(&self.runner);
         let ctx = self.ctx.clone();
-        tokio::spawn(async move {
-            if let Err(error) = runner.apply(&ctx, run, &envelope).await {
-                // The turn is already acknowledged: make the failure visible
-                // through the observability classifier, as the direct path does.
+        let label = envelope.display_label.clone();
+        let mut task = tokio::spawn(async move {
+            let applied = runner.apply(&ctx, run, &envelope).await;
+            if let Err(error) = &applied {
+                // Reported here, wherever the delivery stands: inside the
+                // budget the turn is retried, after it this is the only trace.
                 let detail = format!(
                     "[inbound] apply_decision failed (label={}): {error:#}",
                     envelope.display_label
@@ -342,7 +385,20 @@ impl Deliverer {
                     &[("label", envelope.display_label.as_str())],
                 );
             }
+            applied.map_err(|error| format!("{error:#}"))
         });
+        match tokio::time::timeout(within, &mut task).await {
+            Ok(Ok(Ok(()))) => Applied::Done,
+            Ok(Ok(Err(error))) => Applied::Failed(error),
+            Ok(Err(join)) => Applied::Failed(format!("apply task ended: {join}")),
+            Err(_) => {
+                tracing::info!(
+                    label = %label,
+                    "[inbound] decision still applying at the delivery budget; acknowledging"
+                );
+                Applied::Running
+            }
+        }
     }
 
     /// Ask the queues to deliver `turn` again; when this was its last attempt
