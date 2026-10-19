@@ -26,11 +26,19 @@ pub(super) async fn parse_source_contents(
             .map_err(|error| {
                 anyhow::anyhow!("the config document for this scope could not be parsed: {error}")
             })?;
-        *config.document_version.lock().unwrap() = read.document_version;
+        *config.document_snapshot.lock().unwrap() = super::super::ConfigDocumentSnapshot {
+            version: read.document_version,
+            anchor: Some(read.source_anchor.clone()),
+        };
         return Ok((config, false));
     }
     if read_was_recovered && contents.is_empty() {
         return Ok((super::branches::default_config_boxed(), true));
     }
-    Ok(Box::pin(parse_config_boxed(config_path, contents)).await)
+    let (config, recovered) = Box::pin(parse_config_boxed(config_path, contents)).await?;
+    *config.document_snapshot.lock().unwrap() = super::super::ConfigDocumentSnapshot {
+        version: read.document_version,
+        anchor: Some(read.source_anchor.clone()),
+    };
+    Ok((config, recovered))
 }
