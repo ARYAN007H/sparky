@@ -16,7 +16,10 @@ fn cron_schema_wire_contracts_are_preserved() {
         .iter()
         .map(|schema| schema.function)
         .collect();
-    assert_eq!(functions, ["add", "list", "update", "remove", "run", "runs"]);
+    assert_eq!(
+        functions,
+        ["add", "list", "update", "remove", "run", "runs"]
+    );
 
     for (function, required) in [
         ("add", &["schedule"][..]),

@@ -20,7 +20,19 @@ fn update_schema_contracts_and_registration_are_preserved() {
     }
     let apply = schemas("apply");
     expect_schema_identity(&apply, "update", "apply");
-    expect_schema_fields(&apply, &[("download_url", Some(true)), ("asset_name", Some(true)), ("staging_dir", Some(false))]);
-    let required: Vec<_> = apply.inputs.iter().filter(|field| field.required).map(|field| field.name).collect();
+    expect_schema_fields(
+        &apply,
+        &[
+            ("download_url", Some(true)),
+            ("asset_name", Some(true)),
+            ("staging_dir", Some(false)),
+        ],
+    );
+    let required: Vec<_> = apply
+        .inputs
+        .iter()
+        .filter(|field| field.required)
+        .map(|field| field.name)
+        .collect();
     assert!(required.contains(&"download_url") && required.contains(&"asset_name"));
 }

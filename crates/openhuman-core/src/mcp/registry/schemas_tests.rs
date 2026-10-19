@@ -1,11 +1,11 @@
 use super::*;
 use serde_json::json;
 
-use serde_json::{Map, Value};
 use crate::core::all::{
     assert_schema_controller_parity, expect_schema_fields, expect_schema_identity,
     expect_schema_input_order, expect_schema_output_names, expect_schema_required_inputs,
 };
+use serde_json::{Map, Value};
 
 #[test]
 fn registry_schema_contracts_are_preserved() {
@@ -20,8 +20,15 @@ fn registry_schema_contracts_are_preserved() {
     assert_eq!(schemas.len(), 17);
     let functions: Vec<_> = schemas.iter().map(|s| s.function).collect();
     for name in [
-        "config_get", "config_set", "list_tools", "update_env", "registry_settings_get",
-        "registry_settings_set", "set_enabled", "detect_auth", "oauth_begin",
+        "config_get",
+        "config_set",
+        "list_tools",
+        "update_env",
+        "registry_settings_get",
+        "registry_settings_set",
+        "set_enabled",
+        "detect_auth",
+        "oauth_begin",
     ] {
         assert!(functions.contains(&name), "missing mcp_clients.{name}");
     }

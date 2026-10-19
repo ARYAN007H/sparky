@@ -64,7 +64,11 @@ fn notification_schema_contracts_are_preserved() {
         ("by_provider", TypeSchema::Map(Box::new(TypeSchema::I64))),
         ("by_action", TypeSchema::Map(Box::new(TypeSchema::I64))),
     ] {
-        let field = stats.outputs.iter().find(|field| field.name == name).unwrap();
+        let field = stats
+            .outputs
+            .iter()
+            .find(|field| field.name == name)
+            .unwrap();
         assert_eq!(field.ty, ty, "stats.{name}");
         assert!(field.required, "stats.{name}");
     }

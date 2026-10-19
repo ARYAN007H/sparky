@@ -1,7 +1,7 @@
 use super::*;
 use crate::core::all::{
-    assert_schema_controller_parity, expect_schema_fields, expect_schema_identity, expect_schema_input_order,
-    required_fields_contract,
+    assert_schema_controller_parity, expect_schema_fields, expect_schema_identity,
+    expect_schema_input_order, required_fields_contract,
 };
 
 #[test]

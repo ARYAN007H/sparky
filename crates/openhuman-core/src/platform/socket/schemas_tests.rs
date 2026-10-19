@@ -16,10 +16,23 @@ fn socket_schema_contracts_are_preserved() {
         .iter()
         .map(|schema| schema.function)
         .collect();
-    assert_eq!(functions, ["connect", "disconnect", "state", "emit", "connect_with_session"]);
+    assert_eq!(
+        functions,
+        [
+            "connect",
+            "disconnect",
+            "state",
+            "emit",
+            "connect_with_session"
+        ]
+    );
     for schema in all_controller_schemas() {
         assert_eq!(schema.namespace, "socket");
-        assert!(!schema.outputs.is_empty(), "{} output fields", schema.function);
+        assert!(
+            !schema.outputs.is_empty(),
+            "{} output fields",
+            schema.function
+        );
     }
     for (function, required) in [
         ("connect", &["url", "token"][..]),

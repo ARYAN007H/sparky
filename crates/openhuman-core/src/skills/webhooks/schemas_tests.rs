@@ -15,10 +15,22 @@ fn webhook_schema_contracts_are_preserved() {
         ("list_registrations", &[][..], &[][..]),
         ("list_logs", &[][..], &["limit"][..]),
         ("clear_logs", &[][..], &[][..]),
-        ("register_echo", &["tunnel_uuid"][..], &["tunnel_name", "backend_tunnel_id"][..]),
+        (
+            "register_echo",
+            &["tunnel_uuid"][..],
+            &["tunnel_name", "backend_tunnel_id"][..],
+        ),
         ("unregister_echo", &["tunnel_uuid"][..], &[][..]),
-        ("register_agent", &["tunnel_uuid"][..], &["agent_id", "tunnel_name", "backend_tunnel_id"][..]),
-        ("trigger_agent", &["caller_id"][..], &["source", "reason", "payload"][..]),
+        (
+            "register_agent",
+            &["tunnel_uuid"][..],
+            &["agent_id", "tunnel_name", "backend_tunnel_id"][..],
+        ),
+        (
+            "trigger_agent",
+            &["caller_id"][..],
+            &["source", "reason", "payload"][..],
+        ),
     ];
     for (function, required, optional) in contracts {
         let schema = schemas(function);
@@ -26,12 +38,18 @@ fn webhook_schema_contracts_are_preserved() {
         expect_schema_required_inputs(&schema, required);
         expect_schema_fields(
             &schema,
-            &optional.iter().map(|name| (*name, Some(false))).collect::<Vec<_>>(),
+            &optional
+                .iter()
+                .map(|name| (*name, Some(false)))
+                .collect::<Vec<_>>(),
         );
     }
     expect_schema_input_order(&schemas("list_logs"), &["limit"]);
     expect_schema_output_names(&schemas("list_registrations"), &["result"]);
-    assert!(matches!(schemas("list_registrations").outputs[0].ty, TypeSchema::Json));
+    assert!(matches!(
+        schemas("list_registrations").outputs[0].ty,
+        TypeSchema::Json
+    ));
     for function in ["register_echo", "register_agent"] {
         let schema = schemas(function);
         for name in if function == "register_echo" {
@@ -39,8 +57,14 @@ fn webhook_schema_contracts_are_preserved() {
         } else {
             &["agent_id", "tunnel_name", "backend_tunnel_id"][..]
         } {
-            let field = schema.inputs.iter().find(|field| field.name == *name).unwrap();
-            assert!(matches!(&field.ty, TypeSchema::Option(inner) if matches!(**inner, TypeSchema::String)));
+            let field = schema
+                .inputs
+                .iter()
+                .find(|field| field.name == *name)
+                .unwrap();
+            assert!(
+                matches!(&field.ty, TypeSchema::Option(inner) if matches!(**inner, TypeSchema::String))
+            );
         }
     }
     let limit = &schemas("list_logs").inputs[0].ty;
@@ -70,4 +94,3 @@ fn deserialize_params_reports_invalid_params_errors() {
         "expected 'invalid params' prefix, got: {err}"
     );
 }
-

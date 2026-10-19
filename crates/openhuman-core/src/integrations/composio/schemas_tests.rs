@@ -104,4 +104,3 @@ fn read_optional_helpers_preserve_typed_values_and_errors() {
     let err = read_optional::<Vec<String>>(&m, "toolkits").unwrap_err();
     assert!(err.contains("invalid 'toolkits'"));
 }
-

@@ -1,6 +1,6 @@
 use super::*;
-use crate::core::runtime::DispatchCtx;
 use crate::core::all::assert_schema_controller_parity;
+use crate::core::runtime::DispatchCtx;
 
 #[test]
 fn subsystem_catalog_matches_registered_controllers() {

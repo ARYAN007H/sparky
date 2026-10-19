@@ -112,8 +112,14 @@ fn registered_controller_schemas_are_consistent_and_serializable() {
         let schema = &controller.schema;
         let method = schema.method_name();
         assert!(methods.insert(method.clone()), "duplicate method {method}");
-        assert!(!schema.namespace.trim().is_empty(), "{method} has no namespace");
-        assert!(!schema.function.trim().is_empty(), "{method} has no function name");
+        assert!(
+            !schema.namespace.trim().is_empty(),
+            "{method} has no namespace"
+        );
+        assert!(
+            !schema.function.trim().is_empty(),
+            "{method} has no function name"
+        );
         assert!(
             !schema.description.trim().is_empty(),
             "{method} has no description"

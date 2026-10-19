@@ -27,14 +27,30 @@ fn voice_schema_wire_contracts_are_preserved() {
     }
     let fields: &[(&str, &[(&str, bool)])] = &[
         ("voice_transcribe", &[("audio_path", true)]),
-        ("voice_transcribe_bytes", &[("audio_bytes", true), ("extension", false)]),
+        (
+            "voice_transcribe_bytes",
+            &[("audio_bytes", true), ("extension", false)],
+        ),
         ("voice_tts", &[("text", true), ("output_path", false)]),
-        ("voice_update_provider_settings", &[("voice_providers", false), ("stt_provider", false), ("tts_provider", false)]),
+        (
+            "voice_update_provider_settings",
+            &[
+                ("voice_providers", false),
+                ("stt_provider", false),
+                ("tts_provider", false),
+            ],
+        ),
         ("voice_list_models", &[("provider_id", true)]),
-        ("voice_test_provider", &[("workload", true), ("provider", true)]),
+        (
+            "voice_test_provider",
+            &[("workload", true), ("provider", true)],
+        ),
     ];
     for (key, expected) in fields {
-        let expected: Vec<_> = expected.iter().map(|(name, required)| (*name, Some(*required))).collect();
+        let expected: Vec<_> = expected
+            .iter()
+            .map(|(name, required)| (*name, Some(*required)))
+            .collect();
         expect_schema_fields(&voice_schemas(key), &expected);
     }
     assert!(voice_schemas("voice_status").inputs.is_empty());
