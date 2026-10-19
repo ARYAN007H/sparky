@@ -26,8 +26,7 @@ import { type AuthStateResponse, authStateValue } from '../helpers/auth-state';
 import { callOpenhumanRpc, expectRpcOk } from '../helpers/core-rpc';
 import { triggerAuthDeepLink } from '../helpers/deep-link-helpers';
 import {
-  clickButton,
-  clickText,
+  clickTestId,
   dumpAccessibilityTree,
   hasAppChrome,
   textExists,
@@ -376,47 +375,10 @@ describe('Auth & Access Control', () => {
     // on /settings/account).
     await navigateViaHash('/settings/account');
 
-    // Click "Log out" via JS — the settings menu item text is "Log out"
-    // with description "Sign out of your account"
-    const loggedOut = await browser.execute(() => {
-      const allElements = document.querySelectorAll('*');
-      for (const el of allElements) {
-        const text = el.textContent?.trim() || '';
-        if (text === 'Log out') {
-          const clickable = el.closest(
-            'button, [role="button"], a, [class*="MenuItem"]'
-          ) as HTMLElement;
-          if (clickable) {
-            clickable.click();
-            return 'clicked-parent';
-          }
-          (el as HTMLElement).click();
-          return 'clicked-self';
-        }
-      }
-      return null;
-    });
-
-    if (!loggedOut) {
-      // Fallback: try XPath text search
-      const logoutCandidates = ['Log out', 'Logout', 'Sign out'];
-      let found = false;
-      for (const text of logoutCandidates) {
-        if (await textExists(text)) {
-          await clickText(text, 10_000);
-          console.log(`[AuthAccess] Clicked "${text}" via XPath`);
-          found = true;
-          break;
-        }
-      }
-      if (!found) {
-        const tree = await dumpAccessibilityTree();
-        console.log('[AuthAccess] Logout button not found. Tree:\n', tree.slice(0, 4000));
-        throw new Error('Could not find logout button in Settings');
-      }
-    } else {
-      console.log(`[AuthAccess] Logout: ${loggedOut}`);
-    }
+    // The card also has a noninteractive "Log out" label, so target the
+    // actual action button by its stable test id rather than matching text.
+    await clickTestId('settings-nav-logout', 10_000);
+    console.log('[AuthAccess] Logout action button clicked');
 
     // Wait for either the optional confirmation dialog or the authoritative
     // core logout state. A fixed delay could inspect the core before the
