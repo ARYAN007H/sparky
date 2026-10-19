@@ -97,7 +97,7 @@ pub async fn apply_browser_settings(
         browser.learn_from_tasks = learn;
     }
     config.browser = browser;
-    config.save().await.map_err(|e| e.to_string())?;
+    config.save().await.map_err(super::config_save_error)?;
     // Tools built before the switch hold the config they were built with.
     #[cfg(feature = "modules")]
     if let Some(learn) = update.learn_from_tasks {
@@ -153,7 +153,7 @@ pub async fn apply_analytics_settings(
     if let Some(enabled) = update.enabled {
         config.observability.analytics_enabled = enabled;
     }
-    config.save().await.map_err(|e| e.to_string())?;
+    config.save().await.map_err(super::config_save_error)?;
     let snapshot = snapshot_config_json(config)?;
     Ok(Outcome::new(
         snapshot,
@@ -191,7 +191,7 @@ pub async fn apply_user_timezone(
     };
     if let Err(error) = config.save().await {
         config.user_timezone = previous;
-        return Err(error.to_string());
+        return Err(super::config_save_error(error));
     }
     let chosen = config.user_timezone.as_deref().unwrap_or("device");
     log::info!("[config] user time zone set: {chosen}");
@@ -332,7 +332,7 @@ pub async fn set_onboarding_completed(
     let was_completed = config.onboarding_completed;
     config.onboarding_completed = value;
 
-    config.save().await.map_err(|e| e.to_string())?;
+    config.save().await.map_err(super::config_save_error)?;
 
     if value && !was_completed {
         tracing::debug!(
