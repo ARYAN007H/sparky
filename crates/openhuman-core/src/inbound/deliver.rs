@@ -1,0 +1,309 @@
+//! The host side of the queues' callbacks: `Deliver` and `ClassifySalience`.
+//!
+//! `Deliver` hands the host one due turn. For a trigger turn the host rebuilds
+//! the envelope the event was queued with and runs triage on it:
+//!
+//! | triage outcome | delivery answer |
+//! | --- | --- |
+//! | a decision | `Accepted`; the decision is applied in its own task |
+//! | `Deferred { defer_until_ms }` | `Retry { after_ms: defer_until_ms - now }` |
+//! | `Terminal` | `Rejected` (dead-lettered, redrivable) |
+//! | an error, or the triage timeout | `Retry` with the queue's back-off |
+//!
+//! So a deferred triage is redelivered when it asked to run again instead of
+//! being dropped, and a failed one backs off and dead-letters after the lane's
+//! attempts. Acknowledging once triage has decided, not once the agent has
+//! finished, keeps a long agent run (an approval can wait ten minutes) from
+//! outliving the turn's lease and being delivered twice.
+//!
+//! A digest turn (many events folded together) is triaged once, as one
+//! envelope listing them. `ClassifySalience` runs the same triage for a
+//! borderline event and maps the action to a salience class; the decision is
+//! kept for the event's delivery so it is not triaged twice.
+
+use std::collections::{HashMap, VecDeque};
+use std::sync::{Arc, Mutex};
+use std::time::Duration;
+
+use tinyeventqueues_bus::{
+    ClassifySalienceRequest, ClassifySalienceResponse, DeliverRequest, DeliverResponse,
+    DeliverStatus, InboundEvent, Lane, SalienceClass, Turn,
+};
+
+use super::events::{digest_envelope, envelope_of};
+use crate::core::bus::BUS;
+use crate::core::events::DomainEvent;
+use crate::core::runtime::DispatchCtx;
+use crate::triage::{TriageAction, TriageOutcome, TriageRun, TriageRunner, TriggerEnvelope};
+
+/// How many classifications are kept for their delivery.
+const CLASSIFIED_CAPACITY: usize = 256;
+
+/// The salience class of a triage action.
+#[must_use]
+pub fn class_of(action: TriageAction) -> SalienceClass {
+    match action {
+        TriageAction::Drop => SalienceClass::Noise,
+        TriageAction::Acknowledge => SalienceClass::Fyi,
+        TriageAction::React => SalienceClass::Actionable,
+        TriageAction::Escalate => SalienceClass::Urgent,
+    }
+}
+
+/// Decisions made while classifying, waiting for their event's delivery.
+#[derive(Debug, Default)]
+struct Classified {
+    runs: HashMap<String, TriageRun>,
+    order: VecDeque<String>,
+}
+
+impl Classified {
+    fn keep(&mut self, key: String, run: TriageRun) {
+        if self.runs.insert(key.clone(), run).is_none() {
+            self.order.push_back(key);
+        }
+        while self.order.len() > CLASSIFIED_CAPACITY {
+            if let Some(oldest) = self.order.pop_front() {
+                self.runs.remove(&oldest);
+            }
+        }
+    }
+
+    fn take(&mut self, key: &str) -> Option<TriageRun> {
+        let run = self.runs.remove(key)?;
+        self.order.retain(|kept| kept != key);
+        Some(run)
+    }
+}
+
+/// What a delivery needs from its surroundings.
+pub struct Deliverer {
+    runner: Arc<dyn TriageRunner>,
+    ctx: DispatchCtx,
+    timeout: Duration,
+    now_ms: fn() -> i64,
+    max_attempts: Box<dyn Fn(Lane) -> Option<u32> + Send + Sync>,
+    classified: Mutex<Classified>,
+}
+
+impl std::fmt::Debug for Deliverer {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Deliverer")
+            .field("timeout", &self.timeout)
+            .finish_non_exhaustive()
+    }
+}
+
+fn system_now_ms() -> i64 {
+    chrono::Utc::now().timestamp_millis()
+}
+
+impl Deliverer {
+    /// A deliverer that triages with `runner` under `ctx`, giving one triage
+    /// `timeout`, and reads each lane's attempts from the configured queues.
+    #[must_use]
+    pub fn new(runner: Arc<dyn TriageRunner>, ctx: DispatchCtx, timeout: Duration) -> Self {
+        Self {
+            runner,
+            ctx,
+            timeout,
+            now_ms: system_now_ms,
+            max_attempts: Box::new(|lane| super::settings::current().max_attempts(lane)),
+            classified: Mutex::new(Classified::default()),
+        }
+    }
+
+    /// Use `now_ms` for the clock (tests).
+    #[must_use]
+    pub fn with_clock(mut self, now_ms: fn() -> i64) -> Self {
+        self.now_ms = now_ms;
+        self
+    }
+
+    /// Read each lane's attempts from `max_attempts` (tests).
+    #[must_use]
+    pub fn with_max_attempts(
+        mut self,
+        max_attempts: impl Fn(Lane) -> Option<u32> + Send + Sync + 'static,
+    ) -> Self {
+        self.max_attempts = Box::new(max_attempts);
+        self
+    }
+
+    fn classified(&self) -> std::sync::MutexGuard<'_, Classified> {
+        self.classified
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+    }
+
+    /// Classify a borderline event by triaging it.
+    ///
+    /// # Errors
+    ///
+    /// The event is not a trigger, or triage did not decide in time; the
+    /// queues then keep the class its score gave it.
+    pub async fn classify(
+        &self,
+        request: ClassifySalienceRequest,
+    ) -> Result<ClassifySalienceResponse, String> {
+        let event = request.event;
+        let envelope = envelope_of(&event).ok_or("not an inbound trigger")?;
+        match tokio::time::timeout(self.timeout, self.runner.run(&self.ctx, &envelope)).await {
+            Ok(Ok(TriageOutcome::Decision(run))) => {
+                let class = class_of(run.decision.action);
+                tracing::debug!(
+                    source = %event.source,
+                    event_id = %event.event_id,
+                    score = request.score,
+                    class = ?class,
+                    "[inbound] classified"
+                );
+                self.classified().keep(event.dedupe_key(), run);
+                Ok(ClassifySalienceResponse::new(class))
+            }
+            Ok(Ok(_)) => Err("triage did not decide".to_owned()),
+            Ok(Err(error)) => Err(format!("triage failed: {error}")),
+            Err(_) => Err("triage timed out".to_owned()),
+        }
+    }
+
+    /// Deliver one due turn.
+    pub async fn deliver(&self, request: DeliverRequest) -> DeliverResponse {
+        let turn = request.turn;
+        let (envelope, first) = match self.envelope(&turn) {
+            Ok(found) => found,
+            Err(detail) => {
+                tracing::warn!(turn = %turn.turn_id, detail = %detail, "[inbound] undeliverable turn");
+                self.dead(&turn, &detail);
+                return DeliverResponse::new(DeliverStatus::Rejected { detail });
+            }
+        };
+        let cached = first
+            .as_ref()
+            .and_then(|event| self.classified().take(&event.dedupe_key()));
+        let outcome = match cached {
+            Some(run) => Ok(Ok(TriageOutcome::Decision(run))),
+            None => tokio::time::timeout(self.timeout, self.runner.run(&self.ctx, &envelope)).await,
+        };
+        let status = match outcome {
+            Ok(Ok(TriageOutcome::Decision(run))) => {
+                tracing::info!(
+                    turn = %turn.turn_id,
+                    label = %envelope.display_label,
+                    action = %run.decision.action.as_str(),
+                    attempt = turn.attempt,
+                    "[inbound] delivered; applying the decision"
+                );
+                self.apply(run, envelope);
+                DeliverStatus::Accepted
+            }
+            Ok(Ok(TriageOutcome::Deferred {
+                defer_until_ms,
+                reason,
+            })) => {
+                let wait = u64::try_from(defer_until_ms - (self.now_ms)()).unwrap_or(0);
+                tracing::info!(
+                    turn = %turn.turn_id,
+                    label = %envelope.display_label,
+                    defer_until_ms,
+                    after_ms = wait,
+                    reason = %reason,
+                    "[inbound] triage deferred; retrying then"
+                );
+                for event in &turn.events {
+                    BUS.publish(DomainEvent::InboundDeferred {
+                        source: event.source.clone(),
+                        event_id: event.event_id.clone(),
+                        defer_until_ms,
+                        reason: reason.clone(),
+                    });
+                }
+                self.retry(&turn, Some(wait), &reason)
+            }
+            Ok(Ok(TriageOutcome::Terminal { reason })) => {
+                tracing::warn!(
+                    turn = %turn.turn_id,
+                    label = %envelope.display_label,
+                    reason = %reason,
+                    "[inbound] triage terminal; dead-lettering"
+                );
+                self.dead(&turn, &reason);
+                DeliverStatus::Rejected { detail: reason }
+            }
+            Ok(Err(error)) => {
+                let detail = format!(
+                    "[inbound] triage failed (label={}): {error:#}",
+                    envelope.display_label
+                );
+                crate::core::observability::report_error_or_expected(
+                    detail.as_str(),
+                    "inbound",
+                    "deliver_triage",
+                    &[("label", envelope.display_label.as_str())],
+                );
+                self.retry(&turn, None, "triage failed")
+            }
+            Err(_) => {
+                tracing::warn!(
+                    turn = %turn.turn_id,
+                    label = %envelope.display_label,
+                    timeout_ms = self.timeout.as_millis() as u64,
+                    "[inbound] triage timed out; retrying"
+                );
+                self.retry(&turn, None, "triage timed out")
+            }
+        };
+        DeliverResponse::new(status)
+    }
+
+    /// The envelope to triage for `turn`, and its one event when it has one.
+    fn envelope(&self, turn: &Turn) -> Result<(TriggerEnvelope, Option<InboundEvent>), String> {
+        match turn.events.as_slice() {
+            [] => Err("turn carries no events".to_owned()),
+            [event] if !turn.is_digest() => envelope_of(event)
+                .map(|envelope| (envelope, Some(event.clone())))
+                .ok_or_else(|| format!("{} is not an inbound trigger", event.source)),
+            _ => Ok((digest_envelope(turn), None)),
+        }
+    }
+
+    /// Apply `run` in its own task, so the delivery answers once triage has
+    /// decided rather than once the agent has finished.
+    fn apply(&self, run: TriageRun, envelope: TriggerEnvelope) {
+        let runner = Arc::clone(&self.runner);
+        let ctx = self.ctx.clone();
+        tokio::spawn(async move {
+            if let Err(error) = runner.apply(&ctx, run, &envelope).await {
+                tracing::error!(
+                    label = %envelope.display_label,
+                    error = %error,
+                    "[inbound] apply_decision failed"
+                );
+            }
+        });
+    }
+
+    /// Ask the queues to deliver `turn` again; when this was its last attempt
+    /// the queues dead-letter it instead, so say so.
+    fn retry(&self, turn: &Turn, after_ms: Option<u64>, why: &str) -> DeliverStatus {
+        if (self.max_attempts)(turn.lane).is_some_and(|max| turn.attempt >= max) {
+            self.dead(turn, &format!("{why}; attempts exhausted"));
+        }
+        DeliverStatus::Retry { after_ms }
+    }
+
+    fn dead(&self, turn: &Turn, detail: &str) {
+        for event in &turn.events {
+            BUS.publish(DomainEvent::InboundDeadLettered {
+                source: event.source.clone(),
+                event_id: event.event_id.clone(),
+                attempt: turn.attempt,
+                detail: detail.to_owned(),
+            });
+        }
+    }
+}
+
+#[cfg(test)]
+#[path = "deliver_tests.rs"]
+mod tests;
