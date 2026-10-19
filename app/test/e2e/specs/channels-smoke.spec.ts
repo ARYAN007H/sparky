@@ -34,30 +34,8 @@ describe('Channels page smoke (Telegram + Discord)', () => {
     await stopMockServer();
   });
 
-  it.skip('renders Telegram and Discord channel panels in not-connected state', async function () {
-    this.timeout(90_000);
-    await navigateViaHash('/channels');
-
-    await waitForText('Channels', 15_000);
-    await waitForText('Telegram', 15_000);
-    await waitForText('Discord', 15_000);
-
-    expect(await textExists('Connect')).toBe(true);
-
-    const clicked = await browser.execute(() => {
-      const buttons = Array.from(document.querySelectorAll<HTMLButtonElement>('button'));
-      const discordBtn = buttons.find(b => b.textContent?.includes('Discord'));
-      if (discordBtn) {
-        discordBtn.click();
-        return true;
-      }
-      return false;
-    });
-    expect(clicked).toBe(true);
-
-    await browser.pause(500);
-    expect(await textExists('Connect')).toBe(true);
-  });
+  // The former not-connected smoke only asserted fallback definitions and a
+  // generic Connect button, so it passed without proving channel RPC wiring.
 
   /**
    * 10.5.2 — the unified surface must distinguish a connected channel from a
@@ -74,7 +52,7 @@ describe('Channels page smoke (Telegram + Discord)', () => {
    * connected/disconnected pair is the assertion: a badge stuck on one value
    * would satisfy either half alone.
    */
-  it.skip('reflects a connected channel and returns to disconnected after disconnect (10.5.2)', async function () {
+  it('reflects a connected channel and returns to disconnected after disconnect (10.5.2)', async function () {
     this.timeout(120_000);
 
     // Known-disconnected baseline, so the "Connected" assertion below cannot

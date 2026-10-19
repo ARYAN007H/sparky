@@ -138,12 +138,6 @@ describe('Navigation — settings sub-panels', () => {
     await verifyPanelLoaded(panel);
   });
 
-  it.skip('N2.2 — /settings/connections loads (removed in PR #2550)', async () => {
-    // Route was deleted as part of the OAuth loopback + settings cleanup
-    // (PR #2550). Kept as a `.skip` so the numbering N2.1..N2.9 still
-    // reads consistently with the spec list.
-  });
-
   it('N2.3 — /settings/memory-data loads', async () => {
     const panel = PANELS[2];
     console.log(`${LOG_PREFIX} N2.3: navigating to ${panel.hash}`);
@@ -165,7 +159,7 @@ describe('Navigation — settings sub-panels', () => {
     await verifyPanelLoaded(panel);
   });
 
-  it.skip('N2.6 — /settings/billing loads', async () => {
+  it('N2.6 — /settings/billing redirects to the account billing surface', async () => {
     console.log(`${LOG_PREFIX} N2.6: navigating to /settings/billing`);
     // Use the dedicated helper which includes its own content verification.
     await navigateToBilling();
