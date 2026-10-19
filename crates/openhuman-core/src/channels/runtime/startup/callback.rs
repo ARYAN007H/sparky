@@ -69,6 +69,10 @@ impl ChannelHostCallbacks {
     }
 }
 
+#[cfg(test)]
+#[path = "callback_tests.rs"]
+mod tests;
+
 #[tinybus::interface(name = "ai.tinyhumans.tinychannels.ChannelsHost")]
 impl ChannelHostCallbacks {
     async fn deliver_inbound(&self, channel: String, message: serde_json::Value) -> Result<()> {

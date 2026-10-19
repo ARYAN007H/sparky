@@ -1,8 +1,8 @@
 use super::*;
 
+use crate::channels::Channel;
 use crate::channels::context::ChannelRuntimeContext;
 use crate::channels::runtime::dispatch::RuntimeChannelMessage;
-use crate::channels::Channel;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex, OnceLock, Weak};
 use tinychannels_bus::channel::{
@@ -148,8 +148,19 @@ async fn native_progressive_transport_dispatches_typed_content_through_configure
     );
     let sent = channel.sent.lock().await;
     assert_eq!(sent.len(), 1);
-    assert_eq!(sent[0].channel_ref.as_ref().unwrap().account_id.as_deref(), Some("bot-account-a"));
-    assert_eq!(sent[0].conversation_ref.as_ref().unwrap().thread_id.as_deref(), Some("topic-9"));
+    assert_eq!(
+        sent[0].channel_ref.as_ref().unwrap().account_id.as_deref(),
+        Some("bot-account-a")
+    );
+    assert_eq!(
+        sent[0]
+            .conversation_ref
+            .as_ref()
+            .unwrap()
+            .thread_id
+            .as_deref(),
+        Some("topic-9")
+    );
     assert_eq!(sent[0].turn_id.as_deref(), Some("turn-11"));
     assert_eq!(sent[0].idempotency_key, "turn-11:3:1");
     assert_eq!(sent[0].parts, parts);
