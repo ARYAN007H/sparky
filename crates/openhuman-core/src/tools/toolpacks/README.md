@@ -23,8 +23,8 @@ constructed and executable but unadvertised: the agent sees one small tool,
   `callable_pack_ids` all read this table. The `pub(crate)`
   `DELIBERATELY_UNPACKED_FLEET_TOOLS` list names the delegation family that is
   kept *off* packs because it is used on almost every turn;
-  `agent/orchestration/tools/collapsed_delegation.rs` collapses that family
-  into `delegate_to` instead and explains the trade.
+  Tool packs withhold their schemas from the model until a matching pack is
+  requested; hidden synthesized tools remain registered for dispatch.
 - `tools::UseSkillTool` (`USE_SKILL = "use_skill"`) is the one always-on proxy
   tool. Called with `skill` alone it renders that pack's tool schemas into the
   conversation; with `skill` + `tool` + `args` it resolves the real tool
