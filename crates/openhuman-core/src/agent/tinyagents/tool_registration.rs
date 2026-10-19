@@ -666,6 +666,13 @@ pub(crate) fn capability_diagnostics(
     diagnostics
 }
 
+/// Graph descriptors that remain part of OpenHuman's host capability surface.
+/// Team and workflow graphs were used only by the retired graph-workflow
+/// feature; delegation remains live for sub-agent orchestration.
+pub(crate) fn host_graph_topologies() -> Vec<tinyagents_graph::GraphTopologyReport> {
+    tinyagents_orchestration::topology::all_graph_topologies()
+}
+
 
 #[cfg(test)]
 #[path = "tool_registration_tests.rs"]

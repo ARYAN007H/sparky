@@ -2726,6 +2726,19 @@ async fn json_rpc_protocol_auth_and_agent_hello_inner() {
         post_json_rpc(&rpc_base, 10_000, "openhuman.agent_team_list", json!({})).await;
     assert_unknown_method(&retired_team_method, "openhuman.agent_team_list");
 
+    for (id, method) in [
+        (10_001, "openhuman.workflow_run_list_definitions"),
+        (10_002, "openhuman.workflow_run_list"),
+        (10_003, "openhuman.workflow_run_get"),
+        (10_004, "openhuman.workflow_run_start"),
+        (10_005, "openhuman.workflow_run_stop"),
+        (10_006, "openhuman.workflow_run_resume"),
+        (10_007, "openhuman.agent_graph_topologies"),
+    ] {
+        let retired_method = post_json_rpc(&rpc_base, id, method, json!({})).await;
+        assert_unknown_method(&retired_method, method);
+    }
+
     // --- auth: session state (no JWT yet) ---
     let state_before = post_json_rpc(&rpc_base, 3, "openhuman.auth_get_state", json!({})).await;
     let state_outer = assert_no_jsonrpc_error(&state_before, "get_state");
