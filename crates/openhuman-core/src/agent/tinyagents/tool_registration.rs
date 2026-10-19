@@ -622,7 +622,7 @@ pub(crate) fn capability_diagnostics(
     project_descriptors(
         &mut registry,
         ComponentKind::Graph,
-        tinyagents_orchestration::topology::all_graph_topologies()
+        host_graph_topologies()
             .into_iter()
             .map(|report| report.name),
     );
@@ -671,6 +671,11 @@ pub(crate) fn capability_diagnostics(
 /// feature; delegation remains live for sub-agent orchestration.
 pub(crate) fn host_graph_topologies() -> Vec<tinyagents_graph::GraphTopologyReport> {
     tinyagents_orchestration::topology::all_graph_topologies()
+        .into_iter()
+        .filter(|report| {
+            !report.name.starts_with("agent_teams:") && !report.name.starts_with("workflow_runs:")
+        })
+        .collect()
 }
 
 
