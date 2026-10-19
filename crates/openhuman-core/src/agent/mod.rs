@@ -80,15 +80,17 @@ pub mod tools;
 pub mod triage;
 /// Explicit per-turn host environment handed to the session an entry point runs.
 pub mod turn_env;
+/// Trusted host execution shared by web, native channels and other inbound
+/// surfaces. Presentation and delivery remain adapters at each surface.
+pub(crate) mod turn_host;
 /// Turn-origin task-local — explicit trust/routing label scoped by every
 /// entry point that invokes the agent (web chat, channel runtime, cron,
 /// background jobs, CLI). Read by the approval gate to make
 /// origin-aware decisions rather than inferring trust from the absence of
 /// a chat approval context.
 pub mod turn_origin;
-/// Trusted host execution shared by web, native channels and other inbound
-/// surfaces. Presentation and delivery remain adapters at each surface.
-pub(crate) mod turn_host;
+/// Shared idle and backstop policy for top-level agent turns.
+pub(crate) mod turn_policy;
 /// How a turn that reached the completion path was stopped early (breaker,
 /// deadline wind-down, iteration cap), carried to traces and parent tools.
 pub mod turn_projection;
