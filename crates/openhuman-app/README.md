@@ -30,7 +30,7 @@ For the user-facing tour of windows, tray and data flow, see
 |   |   fetch(url, Bearer token)|<----------|   -> (url, token)          |  |
 |   +-------------+-------------+           | session::commands (auth_*) |  |
 |                 |                         | gateway::commands          |  |
-|                 | HTTP POST /rpc          | windows, update   |  |
+|                 | HTTP POST /rpc          | windows, updater  |  |
 |                 v                         +-------------+--------------+  |
 |   +---------------------------+                         |                 |
 |   | embedded core server      |<------------------------+                 |
