@@ -11,7 +11,7 @@
  *   N2.3 — /settings/memory-data (redirects to the Memory page's Brain chip)
  *   N2.4 — /settings/intelligence (redirects to the Memory page)
  *   N2.5 — /settings/developer-options
- *   N2.6 — /settings/billing
+ *   N2.6 — /settings/account billing handoff
  *   N2.7 — /settings/appearance
  *   N2.8 — /settings/tools
  *   N2.9 — back navigation to /home returns home content
@@ -19,12 +19,7 @@
 import { waitForApp, waitForAppReady } from '../helpers/app-helpers';
 import { textExists } from '../helpers/element-helpers';
 import { resetApp } from '../helpers/reset-app';
-import {
-  navigateToBilling,
-  navigateToHome,
-  navigateViaHash,
-  waitForHomePage,
-} from '../helpers/shared-flows';
+import { navigateToHome, navigateViaHash, waitForHomePage } from '../helpers/shared-flows';
 import { startMockServer, stopMockServer } from '../mock-server';
 
 const LOG_PREFIX = '[navigation-settings-panels]';
@@ -35,8 +30,6 @@ interface PanelCheck {
   hash: string;
   /** Candidate strings — any one match confirms the panel loaded. */
   markers: string[];
-  /** Use the navigateToBilling helper (has its own verification). */
-  useBillingHelper?: boolean;
 }
 
 const PANELS: PanelCheck[] = [
@@ -67,11 +60,7 @@ const PANELS: PanelCheck[] = [
     hash: '/settings/developer-options',
     markers: ['Developer', 'Debug', 'Advanced', 'Settings', 'Logs'],
   },
-  {
-    hash: '/settings/billing',
-    markers: ['Billing', 'Plan', 'Subscription', 'Usage'],
-    useBillingHelper: true,
-  },
+  { hash: '/settings/account', markers: ['Plan & billing', 'Open dashboard'] },
   {
     // N2.7 — appearance panel
     hash: '/settings/appearance',
@@ -138,12 +127,6 @@ describe('Navigation — settings sub-panels', () => {
     await verifyPanelLoaded(panel);
   });
 
-  it.skip('N2.2 — /settings/connections loads (removed in PR #2550)', async () => {
-    // Route was deleted as part of the OAuth loopback + settings cleanup
-    // (PR #2550). Kept as a `.skip` so the numbering N2.1..N2.9 still
-    // reads consistently with the spec list.
-  });
-
   it('N2.3 — /settings/memory-data loads', async () => {
     const panel = PANELS[2];
     console.log(`${LOG_PREFIX} N2.3: navigating to ${panel.hash}`);
@@ -165,10 +148,11 @@ describe('Navigation — settings sub-panels', () => {
     await verifyPanelLoaded(panel);
   });
 
-  it.skip('N2.6 — /settings/billing loads', async () => {
-    console.log(`${LOG_PREFIX} N2.6: navigating to /settings/billing`);
-    // Use the dedicated helper which includes its own content verification.
-    await navigateToBilling();
+  it('N2.6 — /settings/account billing handoff loads', async () => {
+    const panel = PANELS[5];
+    console.log(`${LOG_PREFIX} N2.6: navigating to ${panel.hash}`);
+    await navigateViaHash(panel.hash);
+    await verifyPanelLoaded(panel);
     console.log(`${LOG_PREFIX} N2.6: passed`);
   });
 

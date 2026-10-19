@@ -223,9 +223,6 @@ async function sendPrompt(prompt: string): Promise<void> {
 }
 
 describe('agent harness behaviors', () => {
-  before(function () {
-    this.skip();
-  });
   before(async function beforeSuite() {
     this.timeout(120_000);
     await startMockServer();

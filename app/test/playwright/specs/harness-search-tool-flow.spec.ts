@@ -142,10 +142,6 @@ async function toolTimelineIncludes(
 }
 
 test.describe('Harness - Search tool-flow', () => {
-  test.skip(
-    true,
-    'file_read prompt flow is sandbox-fixture dependent; filesystem coverage is authoritative'
-  );
   test.beforeEach(async ({ page }) => {
     await resetMock();
     await openChat(page);
@@ -220,38 +216,5 @@ test.describe('Harness - Search tool-flow', () => {
     );
     expect(llmHits.length).toBeGreaterThanOrEqual(2);
     expect(await toolTimelineIncludes(page, threadId!, 'web_search_tool')).toBe(true);
-  });
-
-  test('file_read prompt completes the two-turn sequence', async ({ page }) => {
-    const CANARY = 'canary-file-read-e5f6';
-    const FILE_SNIPPET = 'OpenHuman is an AI assistant for communities';
-    const forced = [
-      {
-        content: '',
-        toolCalls: [
-          {
-            id: 'call_file_read_1',
-            name: 'file_read',
-            arguments: JSON.stringify({ path: '/workspace/README.md' }),
-          },
-        ],
-      },
-      { content: `The README says: ${FILE_SNIPPET}. ${CANARY}` },
-    ];
-    await setMockBehavior('llmForcedResponses', JSON.stringify(forced));
-    await setMockBehavior('llmStreamChunkDelayMs', '10');
-
-    const threadId = await selectedThreadId(page);
-    expect(threadId).not.toBeNull();
-    await sendMessage(page, 'read the README');
-    await expect(agentMessageText(page, CANARY)).toBeVisible({ timeout: 60_000 });
-    await expect(agentMessageText(page, /OpenHuman is an AI assistant/i)).toBeVisible();
-
-    const log = await requests();
-    const llmHits = log.filter(
-      request => request.method === 'POST' && request.url.includes('/chat/completions')
-    );
-    expect(llmHits.length).toBeGreaterThanOrEqual(2);
-    expect(await toolTimelineIncludes(page, threadId!, 'file_read')).toBe(true);
   });
 });

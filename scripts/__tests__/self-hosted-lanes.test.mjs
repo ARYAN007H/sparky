@@ -304,8 +304,13 @@ test("the storage area runs host suites on memory and sqlite and compiles option
     );
     const lane = plan.lanes.find((l) => l.name === "storage-drivers");
     assert.equal(lane.active, true, profile);
-    for (const check of lane.checks.filter((c) => c.name !== "storage-feature-compile")) {
-      assert.match(check.run, /--features (?:session-store,)?storage-sqlite(?:\s|$)/);
+    for (const check of lane.checks.filter(
+      (c) => c.name !== "storage-feature-compile",
+    )) {
+      assert.match(
+        check.run,
+        /--features (?:session-store,)?storage-sqlite(?:\s|$)/,
+      );
     }
     assert.equal(
       lane.checks.find((c) => c.name === "storage-feature-compile").run,
@@ -355,6 +360,32 @@ test("hosted matrix only spins up groups with active lanes", () => {
     buildPlan({ profile: "hosted", areas: { ...NONE, installPs1: true } }),
   );
   assert.equal(pester.find((g) => g.group === "pester").container, "");
+});
+
+test("a browser-spec-only change runs the full-inventory skip guard without scripts area", () => {
+  const frontendOnly = buildPlan({
+    profile: "hosted",
+    areas: { ...NONE, frontend: true },
+  });
+  assert.equal(
+    frontendOnly.lanes
+      .find((lane) => lane.name === "frontend")
+      .checks.find((check) => check.name === "browser-test-skip-guard").run,
+    "node scripts/ci/check-browser-test-skips.mjs",
+  );
+  assert.equal(
+    frontendOnly.lanes.find((lane) => lane.name === "scripts-self-tests")
+      ?.active ?? false,
+    false,
+  );
+
+  const filters = fs.readFileSync(
+    path.join(repoRoot, ".github/ci-paths-filter.yml"),
+    "utf8",
+  );
+  const frontendFilter = filters.split("\nscripts:\n")[0];
+  assert.match(frontendFilter, /'app\/test\/\*\*'/);
+  assert.match(frontendFilter, /'scripts\/ci\/check-browser-test-skips\.mjs'/);
 });
 
 test("private lanes reuse checkout targets, preserve mold through RUSTFLAGS resets, and omit wrappers", () => {

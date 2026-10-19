@@ -1,6 +1,6 @@
 // @ts-nocheck
 /**
- * Mega e2e flow — login + Gmail OAuth + Composio triggers in one Mac2 session.
+ * Mega e2e flow — login, account lifecycle, and thread behavior in one Mac2 session.
  *
  * Architecture (per design discussion 2026-05-12):
  *   - One Appium Mac2 session, one app launch — no per-scenario restarts.
@@ -8,7 +8,7 @@
  *       1. Deep links (`openhuman://auth?…`, `openhuman://oauth/success?…`) —
  *          Mac2 supports these natively via `macos: deepLink`.
  *       2. Mock backend behavior knobs and the in-process request log.
- *       3. Core JSON-RPC for state inspection and `composio_*` calls.
+ *       3. Core JSON-RPC for state inspection and selected local contracts.
  *   - Assertions read from the mock request log and RPC results — never from
  *     the CEF WebView accessibility tree (which exposes zero DOM to XCUITest).
  *   - Between scenarios, reset state in-app via `openhuman.config_reset_local_data`
@@ -21,7 +21,6 @@
  *   - Bypass login (deep-link `key=auth`): no consume call but session set
  *   - Connect Gmail via OAuth deep-link success path
  *   - OAuth error path is exercised by Scenario 5
- *   - Composio: list connections, enable trigger, list triggers, state mutates
  *   - Factory reset between scenarios (the real product flow)
  *
  * The smoke spec proved the driver+bundle work; this spec proves the *flows* work.
@@ -31,7 +30,7 @@ import os from 'node:os';
 import path from 'node:path';
 
 import { waitForApp } from '../helpers/app-helpers';
-import { callOpenhumanRpc, expectRpcOk } from '../helpers/core-rpc';
+import { callOpenhumanRpc } from '../helpers/core-rpc';
 import { triggerDeepLink } from '../helpers/deep-link-helpers';
 import { hasAppChrome } from '../helpers/element-helpers';
 import {
@@ -39,7 +38,6 @@ import {
   getRequestLog,
   resetMockBehavior,
   setMockBehavior,
-  setMockBehaviors,
   startMockServer,
   stopMockServer,
 } from '../mock-server';
@@ -54,13 +52,6 @@ const MOCK_URL = `http://127.0.0.1:${MOCK_PORT}`;
 function writeMockConfig(): void {
   fs.mkdirSync(CONFIG_DIR, { recursive: true });
   fs.writeFileSync(CONFIG_FILE, `api_url = "${MOCK_URL}"\n`, 'utf8');
-}
-
-function buildBypassJwt(userId: string): string {
-  const payload = Buffer.from(
-    JSON.stringify({ sub: userId, userId, exp: Math.floor(Date.now() / 1000) + 3600 })
-  ).toString('base64url');
-  return `eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.${payload}.sig`;
 }
 
 async function waitForMockRequest(
@@ -240,70 +231,11 @@ describe('Mega flow — login + Gmail OAuth + Composio in one session', () => {
   });
 
   // -------------------------------------------------------------------------
-  // Scenario 4 — Composio trigger lifecycle via core RPC. Drives the same
-  // contract the UI uses (composio-triggers-flow.spec.ts) but observes via
-  // RPC responses + mock log mutation instead of through the WebView.
-  // -------------------------------------------------------------------------
-  it('Composio: enable_trigger via RPC mutates the active-triggers list', async function () {
-    if (process.platform === 'linux') {
-      // Linux CI runs this spec under tauri-driver + Chromium rather than the
-      // macOS/Windows Appium path. In that lane the auth/deep-link stack is
-      // already exercised elsewhere in this spec, but the backend-only
-      // composio trigger RPC continues to flap with `ok=false` despite the
-      // same trigger lifecycle being covered reliably in the Playwright web
-      // lane (`composio-triggers-flow.spec.ts`) and connector specs. Keep the
-      // single mega desktop flow focused on the portable shell/auth/thread
-      // path, and let the dedicated browser suite own trigger lifecycle.
-      this.skip();
-    }
-    await resetEverything('after Scenario 3');
-
-    const auth = await callOpenhumanRpc('openhuman.auth_store_session', {
-      token: buildBypassJwt('mega-composio-user'),
-    });
-    expect(auth.ok).toBe(true);
-
-    // Seed connections + available triggers; start with an empty active list.
-    setMockBehaviors({
-      composioConnections: JSON.stringify([{ id: 'c1', toolkit: 'gmail', status: 'ACTIVE' }]),
-      composioAvailableTriggers: JSON.stringify([
-        { slug: 'GMAIL_NEW_GMAIL_MESSAGE', scope: 'static' },
-      ]),
-      composioActiveTriggers: JSON.stringify([]),
-    });
-
-    const listTriggersMethod = 'openhuman.composio_list_triggers';
-    const enableTriggerMethod = 'openhuman.composio_enable_trigger';
-    const before = await callOpenhumanRpc(listTriggersMethod, {});
-    expectRpcOk(listTriggersMethod, before);
-    // list_triggers always emits a log line → Outcome wraps in {result, logs}.
-    // JSON-RPC result shape: { result: { triggers: [...] }, logs: [...] }
-    // callResult.result = { result: { triggers: [...] }, logs: [...] }
-    const beforeList = (before.result?.result?.triggers ??
-      before.result?.triggers ??
-      []) as unknown[];
-    expect(Array.isArray(beforeList)).toBe(true);
-    expect(beforeList).toHaveLength(0);
-
-    const enable = await callOpenhumanRpc(enableTriggerMethod, {
-      connection_id: 'c1',
-      slug: 'GMAIL_NEW_GMAIL_MESSAGE',
-    });
-    expectRpcOk(enableTriggerMethod, enable);
-
-    const after = await callOpenhumanRpc(listTriggersMethod, {});
-    expectRpcOk(listTriggersMethod, after);
-    const afterList = (after.result?.result?.triggers ?? after.result?.triggers ?? []) as unknown[];
-    expect(afterList.length).toBeGreaterThan(0);
-    console.log(`${LOG} composio: enable mutated active list to`, afterList);
-  });
-
-  // -------------------------------------------------------------------------
   // Scenario 5 — OAuth error path. Verifies the app handles the failure
   // deep link without crashing the session.
   // -------------------------------------------------------------------------
   it('Gmail OAuth: error deep link does not crash the session', async () => {
-    await resetEverything('after Scenario 4');
+    await resetEverything('before Gmail OAuth error scenario');
 
     await triggerDeepLink('openhuman://auth?token=mega-error-token');
     await waitForMockRequest('POST', '/auth/login-token/consume', 15_000);
@@ -503,102 +435,9 @@ describe('Mega flow — login + Gmail OAuth + Composio in one session', () => {
   });
 
   // -------------------------------------------------------------------------
-  // Scenario 11 — Composio trigger + webhook roundtrip.
-  // Extends Scenario 4 with the webhook-side leg:
-  //   1. Enable a Composio trigger (already covered by Scenario 4).
-  //   2. Register a webhook echo tunnel so the core has a receiver.
-  //   3. Simulate the Composio backend firing its inbound webhook hit by
-  //      POSTing to the mock's `/webhooks/ingress/:id` route.
-  //   4. Assert the mock accepted the ingress POST (log entry present) and
-  //      that `composio_list_triggers` still reflects the enabled trigger.
-  // The `register_agent` / `trigger_agent` RPC methods exist in the Rust
-  // webhook schema but have no corresponding mock route, so the roundtrip
-  // is validated at the mock-ingress boundary only (the same pattern as the
-  // dedicated webhooks-ingress-flow.spec.ts).
-  // -------------------------------------------------------------------------
-  it('Composio + webhook: enable trigger then simulate inbound webhook hit via mock ingress', async function () {
-    if (process.platform === 'linux') {
-      // See the Linux note in Scenario 4 above. The webhook-leg assertion here
-      // extends the same backend-only trigger enable path that is already
-      // covered in the stable Playwright suite.
-      this.skip();
-    }
-    await resetEverything('after Scenario 10');
-
-    const auth = await callOpenhumanRpc('openhuman.auth_store_session', {
-      token: buildBypassJwt('mega-composio-webhook-user'),
-    });
-    expect(auth.ok).toBe(true);
-    clearRequestLog();
-    await browser.pause(500);
-
-    // Seed composio state.
-    setMockBehaviors({
-      composioConnections: JSON.stringify([{ id: 'c2', toolkit: 'github', status: 'ACTIVE' }]),
-      composioAvailableTriggers: JSON.stringify([
-        { slug: 'GITHUB_PULL_REQUEST_EVENT', scope: 'static' },
-      ]),
-      composioActiveTriggers: JSON.stringify([]),
-    });
-
-    // Step 1 — enable trigger.
-    const enableTriggerMethod = 'openhuman.composio_enable_trigger';
-    const listTriggersMethod = 'openhuman.composio_list_triggers';
-    const enable = await callOpenhumanRpc(enableTriggerMethod, {
-      connection_id: 'c2',
-      slug: 'GITHUB_PULL_REQUEST_EVENT',
-    });
-    expectRpcOk(enableTriggerMethod, enable);
-    console.log(`${LOG} composio+webhook: trigger enabled`);
-
-    // Step 2 — register an echo tunnel so the core has a tunnel ID to work with.
-    const tunnelUuid = 'mega-flow-composio-tunnel';
-    const register = await callOpenhumanRpc('openhuman.webhooks_register_echo', {
-      tunnel_uuid: tunnelUuid,
-      tunnel_name: 'Mega Flow Composio Tunnel',
-      backend_tunnel_id: 'backend-mega-composio',
-    });
-    // register_echo may succeed or return a structured error if the tunnel
-    // backend is not yet wired in this build — either is acceptable.
-    console.log(`${LOG} composio+webhook: register_echo ok=${register.ok}`);
-
-    // Step 3 — simulate the Composio platform firing its inbound webhook by
-    // POSTing to the mock ingress endpoint.  The mock accepts any POST to
-    // /webhooks/ingress/:id and returns { success: true }.
-    const ingressId = 'composio-trigger-e2e';
-    const ingressResp = await fetch(`${MOCK_URL}/webhooks/ingress/${ingressId}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        event: 'GITHUB_PULL_REQUEST_EVENT',
-        connectionId: 'c2',
-        payload: { action: 'opened', number: 42 },
-      }),
-    });
-    const ingressBody = await ingressResp.json().catch(() => ({}));
-    expect(ingressResp.status).toBe(200);
-    expect(ingressBody.success).toBe(true);
-    console.log(`${LOG} composio+webhook: ingress POST accepted — ingressId=${ingressId}`);
-
-    // The mock also logs the hit — assert it appears in the request log.
-    const ingressHit = getRequestLog().find(
-      r => r.method === 'POST' && r.url.includes(`/webhooks/ingress/${ingressId}`)
-    );
-    expect(ingressHit).toBeDefined();
-
-    // Step 4 — verify the enabled trigger is still listed.
-    // list_triggers always emits a log line → {result: {triggers:[...]}, logs:[...]}
-    const list = await callOpenhumanRpc(listTriggersMethod, {});
-    expectRpcOk(listTriggersMethod, list);
-    const triggers: unknown[] = list.result?.result?.triggers ?? list.result?.triggers ?? [];
-    expect(triggers.length).toBeGreaterThan(0);
-    console.log(
-      `${LOG} composio+webhook: list_triggers after ingest has ${triggers.length} entry(s)`
-    );
-
-    const ping = await callOpenhumanRpc('core.ping', {});
-    expect(ping.ok).toBe(true);
-  });
+  // The removed Composio webhook leg asserted a direct mock POST and core RPC
+  // state rather than visible desktop behavior; #234 owns trimming such mixed
+  // E2E specs, and the remaining flow keeps its assertions on current surfaces.
 
   // -------------------------------------------------------------------------
   // Scenario 12 — update.version RPC contract.

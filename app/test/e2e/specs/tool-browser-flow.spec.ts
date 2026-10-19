@@ -35,10 +35,8 @@ const USER_ID = 'e2e-tool-browser';
  *    action. The exact action-enum schema is pinned by the BrowserTool Rust
  *    unit test.
  *
- * Future: when the harness gains a deterministic mock-LLM that emits
- * structured `tool_calls`, the `it.skip` block below can flip into a real
- * end-to-end browser-open assertion (with the open path stubbed via a
- * runtime adapter) without touching the rest of this file.
+ * The browser-open execution contract is covered at the tool owner layer;
+ * this spec stays focused on the host's registry and transport boundaries.
  */
 function stepLog(message: string, context?: unknown): void {
   const stamp = new Date().toISOString();
@@ -173,13 +171,5 @@ describe('System tools — Browser (open URL + automation registry)', () => {
     expect(browserTool).toBeDefined();
     expect(browserTool?.description?.toLowerCase()).toContain('snapshot');
     expect(browserTool?.description?.toLowerCase()).not.toContain('screenshot');
-  });
-
-  it.skip('(future #68) chat tool_calls drive `browser_open https://example.com` via mock LLM', () => {
-    // Tracked alongside skill-execution-flow's `it.skip` for the same reason:
-    // requires a deterministic mock-LLM that emits structured tool_calls AND
-    // a stub for the Brave open path so the test does not shell out on the
-    // user's machine. The validation/allowlist path itself is covered by
-    // `crates/openhuman-core/src/tools/impl/browser/browser_open_tests.rs::*`.
   });
 });

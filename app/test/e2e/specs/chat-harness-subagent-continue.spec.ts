@@ -172,7 +172,7 @@ async function snapshotRuntime(threadId: string): Promise<RuntimeSnapshot> {
 
 describe('Chat harness — orchestrator → subagent continuation flow', () => {
   before(function () {
-    this.skip();
+    this.skip(); // https://github.com/tinyhumansai/openhuman/issues/6389 — desktop final-synthesis failure still needs reproduction.
   });
   before(async function beforeSuite() {
     this.timeout(120_000);
