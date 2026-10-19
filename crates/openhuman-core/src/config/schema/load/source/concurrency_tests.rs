@@ -262,6 +262,16 @@ async fn external_config_conflict_refresh_keeps_derived_runtime_overrides() {
     })
     .await;
 
+    let saved_context_config = CoreContext::scope(ctx.clone(), async {
+        DispatchCtx::new(ctx.clone()).load_config().await.unwrap()
+    })
+    .await;
+    let grandchild = ctx.derive_with(ContextOverlay::new(
+        saved_context_config,
+        DomainSet::full(),
+        crate::tools::toolpacks::ToolGroups::none(),
+    ));
+
     let mut later_external = Config::load_from_config_path(&seed.config_path, &seed.workspace_dir)
         .await
         .unwrap();
@@ -271,9 +281,9 @@ async fn external_config_conflict_refresh_keeps_derived_runtime_overrides() {
     later_external.mcp_client.enabled = true;
     later_external.autonomy.enabled = false;
     later_external.save().await.unwrap();
-    let later_conflict = CoreContext::scope(ctx.clone(), async {
+    let later_conflict = CoreContext::scope(grandchild.clone(), async {
         (controller.handler)(
-            DispatchCtx::new(ctx.clone()),
+            DispatchCtx::new(grandchild.clone()),
             json!({"default_temperature": 0.7})
                 .as_object()
                 .unwrap()
@@ -285,8 +295,8 @@ async fn external_config_conflict_refresh_keeps_derived_runtime_overrides() {
     .await;
     assert!(crate::core::StructuredRpcError::decode(&later_conflict).is_some());
 
-    let after_later_conflict = CoreContext::scope(ctx.clone(), async {
-        DispatchCtx::new(ctx.clone()).load_config().await.unwrap()
+    let after_later_conflict = CoreContext::scope(grandchild.clone(), async {
+        DispatchCtx::new(grandchild.clone()).load_config().await.unwrap()
     })
     .await;
     assert_eq!(
