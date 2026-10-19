@@ -179,7 +179,7 @@ test("config/auth in-process integration tests run serially in both full runners
     );
     assert.match(
       source.slice(start, end),
-      /config_auth_app_state_connectivity_e2e[\s\S]*?--test-threads=1/,
+      /(config|auth|app_state|connectivity)_e2e[\s\S]*?--test-threads=1/,
       `${runner} serializes auth RPC fixtures that share process-wide listeners`,
     );
   }

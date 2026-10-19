@@ -59,7 +59,7 @@ for (const [description, listing, code] of [
         assert.equal(result.status, 0, result.stdout + result.stderr);
         assert.match(
           readFileSync(ran, "utf8"),
-          /--test json_rpc_e2e scenario_a -- --exact --test-threads=1/,
+          /--test json_rpc_misc_e2e scenario_a -- --exact --test-threads=1/,
         );
       } else {
         assert.notEqual(result.status, 0, result.stdout + result.stderr);
