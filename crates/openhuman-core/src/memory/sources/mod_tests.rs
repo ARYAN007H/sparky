@@ -56,11 +56,7 @@ fn normalize_target_accepts_each_kinds_shape() {
 #[test]
 fn normalize_target_rejects_malformed_targets() {
     for (kind, target, expected) in [
-        (
-            MemorySourceKind::Folder,
-            "   ",
-            "target must not be empty",
-        ),
+        (MemorySourceKind::Folder, "   ", "target must not be empty"),
         (
             MemorySourceKind::Github,
             "just-one-part",
