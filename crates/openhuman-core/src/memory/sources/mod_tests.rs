@@ -183,7 +183,10 @@ fn add_validates_kind_schedule_and_target() {
     let namespace_error = apply_add(&mut config, &namespace_params).unwrap_err();
     match namespace_error {
         tinymemory_api::Error::InvalidRequest(message) => {
-            assert_eq!(message, "`bogus` is not a namespace segment kind")
+            assert_eq!(
+                message,
+                "invalid request: `bogus` is not a namespace segment kind"
+            )
         }
         error => panic!("invalid namespace returned unexpected error: {error:?}"),
     }
