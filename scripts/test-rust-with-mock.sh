@@ -240,10 +240,8 @@ run_raw_coverage_modules() {
     # Most Composio raw-coverage modules explicitly exercise the absent-module
     # path. These groups verify the host-to-module round trip, so inject the
     # pinned connector only for their processes.
-    if { [ "$module" = "composio_credentials_state_raw_coverage_e2e" ] ||
-         [ "$module" = "composio_tools_direct_raw_coverage_e2e" ] ||
-         [ "$module" = "tools_composio_large_round25_raw_coverage_e2e" ]; } &&
-       true; then
+    if [ "$module" = "composio_direct_client_e2e" ] ||
+       [ "$module" = "composio_direct_tools_e2e" ]; then
       OPENHUMAN_MODULE_PATH="$connectors_module_path" \
         cargo_test --test raw_coverage_all -- "${module}::" --test-threads=1 "$@"
     elif [ "$module" = "automation_scheduling_e2e" ]; then
