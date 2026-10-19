@@ -2,6 +2,11 @@
  * Fixture-based self-tests for check-storage-owner.mjs
  *
  * Run with: node --test scripts/ci/__tests__/check-storage-owner.test.mjs
+ *
+ * Cargo metadata dep_kinds format:
+ *   - Normal dep: { kind: "normal" } or absent (treated as normal)
+ *   - Build dep:  { kind: "build" }
+ *   - Dev dep:    { kind: "dev" }
  */
 
 import { checkMetadata } from '../check-storage-owner.mjs';
@@ -12,10 +17,10 @@ const REGISTRY = 'registry+https://github.com/rust-lang/crates.io-index';
 const tsd_git = (tag) => `git+https://github.com/tinyhumansai/tinystoragedrivers?tag=${tag}#`;
 
 // ---------------------------------------------------------------------------
-// Helper builders
+// Helper builders — dep_kinds uses "normal" (string), not null
 // ---------------------------------------------------------------------------
 
-/** Package with source=null (path crate, first-party). */
+/** Path crate (first-party, source = null). */
 const pathPkg = (name, version, manifest, deps = []) => ({
   id: `${name} ${version}`,
   name,
@@ -25,7 +30,7 @@ const pathPkg = (name, version, manifest, deps = []) => ({
   dependencies: deps,
 });
 
-/** Package from a registry. */
+/** Registry crate. */
 const regPkg = (name, version, manifest, deps = []) => ({
   id: `${name} ${version} ${REGISTRY}`,
   name,
@@ -35,7 +40,7 @@ const regPkg = (name, version, manifest, deps = []) => ({
   dependencies: deps,
 });
 
-/** Package from a git source. */
+/** Git crate. */
 const gitPkg = (name, version, manifest, git_source, deps = []) => ({
   id: `${name} ${version} ${git_source}`,
   name,
@@ -45,13 +50,18 @@ const gitPkg = (name, version, manifest, git_source, deps = []) => ({
   dependencies: deps,
 });
 
+/** Normal dep_kinds entry. */
+const NORMAL = [{ kind: 'normal' }];
+/** Build dep_kinds entry. */
+const BUILD = [{ kind: 'build' }];
+
 /** Resolve node for a path crate. */
 const pathNode = (name, version, deps) => ({
   id: `${name} ${version}`,
   deps: deps.map(([dep_name, dep_ver, dep_source]) => ({
     name: dep_name,
     pkg: dep_source ? `${dep_name} ${dep_ver} ${dep_source}` : `${dep_name} ${dep_ver}`,
-    dep_kinds: [{ kind: null }],
+    dep_kinds: NORMAL,
   })),
 });
 
@@ -61,7 +71,7 @@ const regNode = (name, version, deps) => ({
   deps: deps.map(([dep_name, dep_ver, dep_source]) => ({
     name: dep_name,
     pkg: dep_source ? `${dep_name} ${dep_ver} ${dep_source}` : `${dep_name} ${dep_ver}`,
-    dep_kinds: [{ kind: null }],
+    dep_kinds: NORMAL,
   })),
 });
 
@@ -171,6 +181,7 @@ const vendored_ok_fixture = {
 
 // ---------------------------------------------------------------------------
 // Fixture: aws-sdk-s3 reached directly from non-allowlisted crate → must FAIL
+// openhuman-rpc (path) -> aws-sdk-s3 (registry)
 // ---------------------------------------------------------------------------
 
 const aws_s3_fixture = {

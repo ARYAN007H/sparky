@@ -184,7 +184,7 @@ export function checkEngineClosure(metadata, roots) {
         // dep_kinds may be absent (defaults to normal per cargo convention).
         const dep_kinds = dep.dep_kinds ?? [{ kind: null }];
         const has_normal_or_build = dep_kinds.some(
-          dk => dk.kind === undefined || dk.kind === null || dk.kind === 'build'
+          dk => dk.kind === undefined || dk.kind === 'normal' || dk.kind === 'build'
         );
         if (!has_normal_or_build) continue;
 
