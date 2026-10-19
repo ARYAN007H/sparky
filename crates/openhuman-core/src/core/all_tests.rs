@@ -112,10 +112,21 @@ fn registered_controller_schemas_are_consistent_and_serializable() {
         let schema = &controller.schema;
         let method = schema.method_name();
         assert!(methods.insert(method.clone()), "duplicate method {method}");
+        assert!(!schema.namespace.trim().is_empty(), "{method} has no namespace");
+        assert!(!schema.function.trim().is_empty(), "{method} has no function name");
         assert!(
             !schema.description.trim().is_empty(),
             "{method} has no description"
         );
+        assert!(!schema.outputs.is_empty(), "{method} has no output fields");
+
+        if method == "openhuman.wallet_setup" {
+            assert_eq!(
+                required_input_contract(schema, &["encryptedMnemonic"]),
+                Ok(()),
+                "wallet.setup required-input contract"
+            );
+        }
 
         let serialized = serde_json::to_value(schema).expect("controller schema serializes");
         let serialized_inputs = serialized["inputs"]
