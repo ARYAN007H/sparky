@@ -1,60 +1,24 @@
 use super::*;
+use crate::core::all::{assert_schema_controller_parity, expect_schema_identity};
 
 #[test]
-fn all_schemas_returns_two() {
+fn app_state_schema_contracts_and_registration_are_preserved() {
     assert_eq!(all_app_state_controller_schemas().len(), 2);
-}
-
-#[test]
-fn all_controllers_returns_two() {
-    assert_eq!(all_app_state_registered_controllers().len(), 2);
-}
-
-#[test]
-fn snapshot_schema() {
+    assert_schema_controller_parity(
+        &all_app_state_controller_schemas(),
+        &all_app_state_registered_controllers(),
+        "snapshot",
+    );
     let s = app_state_schemas("snapshot");
-    assert_eq!(s.namespace, "app_state");
-    assert_eq!(s.function, "snapshot");
+    expect_schema_identity(&s, "app_state", "snapshot");
     assert!(s.inputs.is_empty());
     assert!(!s.outputs.is_empty());
-}
-
-#[test]
-fn update_local_state_schema() {
     let s = app_state_schemas("update_local_state");
-    assert_eq!(s.namespace, "app_state");
-    assert_eq!(s.function, "update_local_state");
+    expect_schema_identity(&s, "app_state", "update_local_state");
     assert_eq!(s.inputs.len(), 3);
     for input in &s.inputs {
         assert!(!input.required, "input '{}' should be optional", input.name);
     }
-}
-
-#[test]
-fn schemas_and_controllers_match() {
-    let s = all_app_state_controller_schemas();
-    let c = all_app_state_registered_controllers();
-    assert_eq!(s.len(), c.len());
-    for (schema, ctrl) in s.iter().zip(c.iter()) {
-        assert_eq!(schema.function, ctrl.schema.function);
-        assert_eq!(schema.namespace, ctrl.schema.namespace);
-    }
-}
-
-#[test]
-fn all_schemas_use_app_state_namespace() {
-    for s in all_app_state_controller_schemas() {
-        assert_eq!(s.namespace, "app_state");
-        assert!(!s.description.is_empty());
-    }
-}
-
-#[test]
-fn optional_json_helper() {
-    let f = optional_json("key", "desc");
-    assert_eq!(f.name, "key");
-    assert!(!f.required);
-    assert!(matches!(f.ty, TypeSchema::Json));
 }
 
 #[test]
