@@ -20,7 +20,10 @@ impl Drop for Server {
 }
 
 fn rpc(base: &str, method: &str, params: Value) -> Value {
-    reqwest::blocking::Client::new()
+    reqwest::blocking::Client::builder()
+        .timeout(Duration::from_secs(10))
+        .build()
+        .unwrap()
         .post(format!("{base}/rpc"))
         .bearer_auth(TOKEN)
         .json(&json!({"jsonrpc":"2.0","id":1,"method":method,"params":params}))
@@ -52,7 +55,10 @@ fn answer_not_found(stream: &mut TcpStream) {
 }
 
 fn wait_healthy(server: &mut Server, base: &str) {
-    let client = reqwest::blocking::Client::new();
+    let client = reqwest::blocking::Client::builder()
+        .timeout(Duration::from_secs(3))
+        .build()
+        .unwrap();
     let deadline = Instant::now() + Duration::from_secs(120);
     loop {
         if client
@@ -95,6 +101,8 @@ fn legacy_voice_settings_boot_without_starting_retired_listeners() {
     let workspace = tmp.path().join("workspace");
     std::fs::create_dir_all(&workspace).unwrap();
     write_legacy_config(&workspace.join("config.toml"));
+    let dotenv_path = tmp.path().join("empty.env");
+    std::fs::write(&dotenv_path, "").unwrap();
 
     let backend = TcpListener::bind("127.0.0.1:0").unwrap();
     let backend_url = format!("http://{}", backend.local_addr().unwrap());
@@ -110,9 +118,11 @@ fn legacy_voice_settings_boot_without_starting_retired_listeners() {
     let mut command = Command::new(env!("CARGO_BIN_EXE_openhuman-core"));
     command
         .args(["serve", "--port", &port.to_string()])
+        .current_dir(&workspace)
         .env("HOME", tmp.path())
         .env("USERPROFILE", tmp.path())
         .env("OPENHUMAN_WORKSPACE", &workspace)
+        .env("OPENHUMAN_DOTENV_PATH", &dotenv_path)
         .env("OPENHUMAN_CORE_TOKEN", TOKEN)
         .env("OPENHUMAN_KEYRING_BACKEND", "file")
         .env("BACKEND_URL", backend_url)
@@ -157,7 +167,8 @@ fn legacy_voice_settings_boot_without_starting_retired_listeners() {
         .lines()
         .filter(|line| {
             let line = line.to_ascii_lowercase();
-            ((line.contains("dictation listener") || line.contains("hotkey listener"))
+            (line.contains("[voice::") && line.contains("start"))
+                || ((line.contains("dictation listener") || line.contains("hotkey listener"))
                 && line.contains("start"))
                 || (line.contains("always-on") && line.contains("voice") && line.contains("start"))
                 || (line.contains("capture listener") && line.contains("start"))
