@@ -76,6 +76,7 @@ pub struct CoreContext {
     /// phase 2 of the pluggable-core work (`core::runtime`) introduced for exactly this
     /// migration — lets that loader prefer it without any handler changing.
     embedder_config: Option<crate::config::Config>,
+    latest_embedder_config: Option<Arc<std::sync::Mutex<crate::config::Config>>>,
     /// Per-tool-group disclosure for this context (see
     /// [`ToolGroups`](crate::tools::toolpacks::ToolGroups)).
     ///
@@ -232,6 +233,11 @@ impl CoreContext {
         // Kept for the context: `preloaded_config` is consumed below, and the
         // whole point is that handlers can reach it after boot.
         let embedder_config = preloaded_config.clone();
+        let latest_embedder_config = embedder_config.clone().map(|config| {
+            let snapshot = Arc::new(std::sync::Mutex::new(config));
+            crate::config::Config::bind_context_snapshot(&snapshot);
+            snapshot
+        });
         let loaded = match preloaded_config {
             // A supplied config is authoritative: no disk read, no env overlay,
             // and no `Err` arm to reach, because there was nothing to fail.
@@ -280,6 +286,7 @@ impl CoreContext {
             tool_groups,
             components,
             embedder_config,
+            latest_embedder_config,
             user_skill_roots: true,
             extensions: Default::default(),
             turn_origin: None,
@@ -405,6 +412,10 @@ impl CoreContext {
             }
         };
         let agent = self.agent.derive(&mut overlay);
+        let latest_embedder_config = Some(Arc::new(std::sync::Mutex::new(overlay.config.clone())));
+        if let Some(snapshot) = &latest_embedder_config {
+            crate::config::Config::bind_context_snapshot(snapshot);
+        }
         Arc::new(CoreContext {
             host_kind: self.host_kind,
             workspace_binding: RwLock::new(shared_binding),
@@ -412,6 +423,7 @@ impl CoreContext {
             tool_groups: overlay.tool_groups,
             components: self.components,
             embedder_config: Some(overlay.config),
+            latest_embedder_config,
             user_skill_roots: overlay.user_skill_roots,
             extensions: self.extensions.clone(),
             turn_origin: self.turn_origin.clone(),
@@ -484,7 +496,14 @@ impl CoreContext {
     ///
     /// The read path for `config::ops::load_config_with_timeout`.
     pub fn current_embedder_config() -> Option<crate::config::Config> {
-        Self::current().and_then(|ctx| ctx.embedder_config.clone())
+        Self::current().and_then(|ctx| ctx.latest_embedder_config())
+    }
+
+    pub(crate) fn latest_embedder_config(&self) -> Option<crate::config::Config> {
+        let snapshot = self.latest_embedder_config.as_ref()?;
+        let mut config = snapshot.lock().ok()?.clone();
+        config.context_snapshot = Some(Arc::downgrade(snapshot));
+        Some(config)
     }
 
     /// Read the embedder-supplied config for the current dispatch without
@@ -493,7 +512,11 @@ impl CoreContext {
     pub fn with_current_embedder_config<R>(
         f: impl FnOnce(&crate::config::Config) -> R,
     ) -> Option<R> {
-        Self::current().and_then(|ctx| ctx.embedder_config.as_ref().map(f))
+        Self::current().and_then(|ctx| {
+            let snapshot = ctx.latest_embedder_config.as_ref()?;
+            let config = snapshot.lock().ok()?;
+            Some(f(&config))
+        })
     }
 
     /// Rebind the process default context to the current active user's
