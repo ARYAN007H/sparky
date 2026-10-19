@@ -79,26 +79,38 @@ pub async fn complete_once_observed(
         std::sync::Arc<dyn tinyagents_harness::observability::PhysicalDispatchObserver>,
     >,
 ) -> Result<ModelResponse, String> {
+    complete_once_controlled(endpoint, request, budget, observer, None)
+        .await
+        .map_err(|error| error.to_string())
+}
+
+/// Run one completion with optional neutral physical-call admission.
+pub async fn complete_once_controlled(
+    endpoint: &CompletionEndpoint,
+    request: ModelRequest,
+    budget: Option<&crate::agent::tinyagents::budget::ModelBudget>,
+    observer: Option<std::sync::Arc<dyn tinyagents_harness::observability::PhysicalDispatchObserver>>,
+    admission: Option<std::sync::Arc<dyn tinyagents_harness::cost::PhysicalDispatchAdmission>>,
+) -> Result<ModelResponse, tinyagents_harness::cost::ControlledDispatchError> {
     if !request.tools.is_empty() {
-        return Err(
+        return Err(tinyagents_harness::cost::ControlledDispatchError::Model(tinyinference_llm::Error::Validation(
             "complete_once: tools are not supported on a stateless completion; use an agent turn"
-                .to_string(),
-        );
+                .to_string())));
     }
     // `provider_options` is forwarded untouched, so a `tools` key there would
     // reach the provider even though `request.tools` is empty above. The typed
     // request fields own these keys.
     if let Some(key) = reserved_provider_option(&request.provider_options) {
-        return Err(format!(
+        return Err(tinyagents_harness::cost::ControlledDispatchError::Model(tinyinference_llm::Error::Validation(format!(
             "complete_once: provider_options may not set `{key}`; use the typed request fields"
-        ));
+        ))));
     }
     // Blank is refused, but the id itself goes out exactly as the caller named it.
     let model_id = request
         .model
         .as_deref()
         .filter(|model| !model.trim().is_empty())
-        .ok_or_else(|| "complete_once: request.model is required".to_string())?
+        .ok_or_else(|| tinyagents_harness::cost::ControlledDispatchError::Model(tinyinference_llm::Error::Validation("complete_once: request.model is required".to_string())))?
         .to_string();
 
     let mut model = OpenAiModel::new(endpoint.api_key.clone())
@@ -117,23 +129,18 @@ pub async fn complete_once_observed(
     );
 
     let model: std::sync::Arc<dyn ChatModel<()>> = std::sync::Arc::new(model);
-    let model: std::sync::Arc<dyn ChatModel<()>> = match (budget, observer) {
-        (Some(budget), observer) => budget.wrap_with_observer(model, observer),
-        (None, Some(observer)) => {
-            let normalized =
-                std::sync::Arc::new(tinyagents_harness::cost::GatewayChargeModel::new(model));
-            std::sync::Arc::new(
-                tinyagents_harness::observability::physical_dispatch::ObservedChatModel::new(
-                    normalized, observer,
-                ),
-            )
-        }
-        (None, None) => model,
-    };
-    model
-        .invoke(&(), request)
-        .await
-        .map_err(|e| format!("complete_once: {e}"))
+    let monetary_budget = budget.map(|budget| tinyagents_harness::cost::ModelBudget::new(
+        budget.ledger.child(crate::agent::tinyagents::budget::SpendLimits::default()),
+        budget.call,
+    ));
+    let controlled = tinyagents_harness::cost::ControlledChatModel::new(
+        model,
+        tinyagents_harness::cost::DispatchModelOptions::new()
+            .monetary_budget(monetary_budget)
+            .observer(observer)
+            .admission(admission),
+    );
+    controlled.invoke_controlled(&(), request).await
 }
 
 /// Body keys that `provider_options` may not carry: the tool surface (which
