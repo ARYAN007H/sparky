@@ -19,7 +19,7 @@ use std::time::{Duration, Instant};
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
-use axum::routing::post;
+use axum::routing::{get, post};
 use axum::{Json, Router};
 use serde_json::{json, Value};
 use tokio::task::JoinHandle;
@@ -64,6 +64,9 @@ async fn start_mock_servers() -> MockServers {
         .with_state(Arc::clone(&state));
     let inference_app = Router::new()
         .route("/v1/chat/completions", post(chat_completion))
+        .route("/v1/models", get(models))
+        .route("/auth/me", get(auth_me))
+        .route("/settings", get(auth_me))
         .with_state(Arc::clone(&state));
     let (telegram, telegram_task) = serve(telegram_app).await;
     let (inference, inference_task) = serve(inference_app).await;
@@ -126,6 +129,14 @@ async fn send_message(State(state): State<Arc<MockState>>, Json(body): Json<Valu
 
 async fn ok() -> Json<Value> {
     Json(json!({ "ok": true, "result": true }))
+}
+
+async fn models() -> Json<Value> {
+    Json(json!({ "data": [{ "id": "session-model", "object": "model" }] }))
+}
+
+async fn auth_me() -> Json<Value> {
+    Json(json!({ "id": "loopback-user", "email": "loopback@example.test" }))
 }
 
 async fn get_me() -> Json<Value> {
@@ -358,9 +369,9 @@ async fn wait_for_completion(state: &MockState, count: usize) {
 
 fn model_saw_user_text(request: &Value, text: &str) -> bool {
     request["messages"].as_array().is_some_and(|messages| {
-        messages.iter().any(|message| {
-            message["role"] == "user" && message["content"].as_str() == Some(text)
-        })
+        messages
+            .iter()
+            .any(|message| message["role"] == "user" && message["content"].as_str() == Some(text))
     })
 }
 
