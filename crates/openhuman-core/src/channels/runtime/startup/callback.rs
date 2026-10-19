@@ -6,12 +6,14 @@ use crate::config::Config;
 use std::collections::HashMap;
 use std::sync::{Arc, OnceLock, Weak};
 use tinybus::{Error, Result};
+use tinychannels_bus::module_progressive::{
+    ProgressiveTransportRequest, ProgressiveTransportResult,
+};
 use tinychannels_bus::{
     ChannelBackendRequest, ChannelBackendResult, HostEventPublication, HostSpeechSynthesisRequest,
     HostSpeechSynthesisResult, HostTranscriptionRequest, HostTranscriptionResult,
     HostVoiceReplyPolicy, HostVoiceReplyPolicyRequest, HostVoiceTranscriptionRequest,
 };
-use tinychannels_bus::module_progressive::{ProgressiveTransportRequest, ProgressiveTransportResult};
 use tokio::sync::mpsc;
 
 const MAX_CALLBACK_BYTES: usize = 128 * 1024;
@@ -46,7 +48,9 @@ impl ChannelHostCallbacks {
         ctx: &crate::core::runtime::DispatchCtx,
         config: Arc<Config>,
         context: Arc<OnceLock<Weak<ChannelRuntimeContext>>>,
-        progressive_channels: Arc<OnceLock<Arc<HashMap<String, Arc<dyn ProgressiveChannelTransport>>>>>,
+        progressive_channels: Arc<
+            OnceLock<Arc<HashMap<String, Arc<dyn ProgressiveChannelTransport>>>>,
+        >,
         dispatch: mpsc::Sender<RuntimeChannelMessage>,
     ) -> Self {
         Self {
@@ -250,9 +254,7 @@ impl ChannelHostCallbacks {
             ChannelBackendRequest::ProgressiveTransport(request) => self
                 .dispatch_progressive_transport(*request)
                 .await
-                .map(|result| {
-                    ChannelBackendResult::ProgressiveTransport(Box::new(result))
-                }),
+                .map(|result| ChannelBackendResult::ProgressiveTransport(Box::new(result))),
             request => {
                 crate::channels::controllers::OpenHumanChannelBackend::new((*self.config).clone())
                     .dispatch_callback(request)
@@ -266,15 +268,74 @@ impl ChannelHostCallbacks {
         &self,
         request: ProgressiveTransportRequest,
     ) -> Result<ProgressiveTransportResult> {
+        if let ProgressiveTransportRequest::OutputEvent {
+            channel_ref: Some(channel),
+            conversation: Some(conversation),
+            turn_id: Some(turn_id),
+            sequence,
+            event,
+            ..
+        } = &request
+        {
+            let event_kind = serde_json::to_value(event.as_ref())
+                .ok()
+                .and_then(|value| {
+                    value
+                        .get("type")
+                        .and_then(serde_json::Value::as_str)
+                        .map(str::to_owned)
+                })
+                .ok_or_else(|| Error::failed("invalid progressive output event"))?;
+            let publication = crate::core::events::DomainEvent::ChannelOutputObserved {
+                channel: channel.clone(),
+                conversation: conversation.clone(),
+                turn_id: turn_id.clone(),
+                sequence: *sequence,
+                event_kind,
+            };
+            let publish = async {
+                crate::core::bus::BUS.publish(publication);
+                Ok(ProgressiveTransportResult::Acknowledged)
+            };
+            return match &self.core_context {
+                Some(core_context) => {
+                    crate::core::runtime::CoreContext::scope(Arc::clone(core_context), publish)
+                        .await
+                }
+                None => publish.await,
+            };
+        }
         let (channel, channel_ref) = match &request {
-            ProgressiveTransportRequest::OutputEvent { channel, channel_ref, .. }
-            | ProgressiveTransportRequest::Send { channel, channel_ref, .. }
-            | ProgressiveTransportRequest::SendTyped { channel, channel_ref, .. }
-            | ProgressiveTransportRequest::Edit { channel, channel_ref, .. }
-            | ProgressiveTransportRequest::Delete { channel, channel_ref, .. }
-            | ProgressiveTransportRequest::Typing { channel, channel_ref, .. } => {
-                (channel.as_str(), channel_ref.as_ref())
+            ProgressiveTransportRequest::OutputEvent {
+                channel,
+                channel_ref,
+                ..
             }
+            | ProgressiveTransportRequest::Send {
+                channel,
+                channel_ref,
+                ..
+            }
+            | ProgressiveTransportRequest::SendTyped {
+                channel,
+                channel_ref,
+                ..
+            }
+            | ProgressiveTransportRequest::Edit {
+                channel,
+                channel_ref,
+                ..
+            }
+            | ProgressiveTransportRequest::Delete {
+                channel,
+                channel_ref,
+                ..
+            }
+            | ProgressiveTransportRequest::Typing {
+                channel,
+                channel_ref,
+                ..
+            } => (channel.as_str(), channel_ref.as_ref()),
         };
         self.progressive_channel(channel, channel_ref)?
             .dispatch_progressive(request)
@@ -299,11 +360,14 @@ impl ChannelHostCallbacks {
             .get(account)
             .cloned()
             .ok_or_else(|| Error::failed("configured channel account is unavailable"))?;
-        let configured_provider = tinychannels_bus::capabilities::provider_id(adapter.configured_name());
+        let configured_provider =
+            tinychannels_bus::capabilities::provider_id(adapter.configured_name());
         if configured_provider != reference.id
             || tinychannels_bus::capabilities::provider_id(channel) != reference.id
         {
-            return Err(Error::failed("configured channel account does not match request"));
+            return Err(Error::failed(
+                "configured channel account does not match request",
+            ));
         }
         Ok(adapter)
     }

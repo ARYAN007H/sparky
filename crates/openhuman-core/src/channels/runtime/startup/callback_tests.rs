@@ -1,3 +1,4 @@
+use super::ProgressiveChannelTransport;
 use super::*;
 
 use crate::channels::Channel;
@@ -67,8 +68,53 @@ impl Channel for RecordingChannel {
     }
 }
 
+#[async_trait::async_trait]
+impl ProgressiveChannelTransport for RecordingChannel {
+    fn configured_name(&self) -> &str {
+        &self.name
+    }
+
+    async fn dispatch_progressive(
+        &self,
+        request: ProgressiveTransportRequest,
+    ) -> Result<ProgressiveTransportResult> {
+        let ProgressiveTransportRequest::SendTyped {
+            channel,
+            turn_id,
+            channel_ref,
+            conversation,
+            idempotency_key,
+            parts,
+            ..
+        } = request
+        else {
+            return Ok(ProgressiveTransportResult::Unavailable);
+        };
+        let outbound = tinychannels_bus::channel::ChannelOutboundMessage {
+            channel_id: channel,
+            conversation_id: conversation
+                .as_ref()
+                .map(|reference| reference.id.clone())
+                .unwrap_or_default(),
+            channel_ref,
+            conversation_ref: conversation,
+            reply_to_id: None,
+            thread_id: None,
+            turn_id,
+            idempotency_key: idempotency_key.unwrap_or_default(),
+            parts,
+        };
+        let outcome = self
+            .send_typed_with_receipt(&outbound)
+            .await
+            .map_err(|_| Error::failed("test channel send failed"))?;
+        Ok(ProgressiveTransportResult::Outcome(Box::new(outcome)))
+    }
+}
+
 fn callback_for_channels(
     channels: HashMap<String, Arc<dyn Channel>>,
+    progressive_channels: HashMap<String, Arc<dyn ProgressiveChannelTransport>>,
 ) -> (ChannelHostCallbacks, Arc<ChannelRuntimeContext>) {
     let context = Arc::new(ChannelRuntimeContext {
         relay_thread: None,
@@ -96,12 +142,15 @@ fn callback_for_channels(
     });
     let context_slot: Arc<OnceLock<Weak<ChannelRuntimeContext>>> = Arc::new(OnceLock::new());
     assert!(context_slot.set(Arc::downgrade(&context)).is_ok());
+    let progressive_slot = Arc::new(OnceLock::new());
+    assert!(progressive_slot.set(Arc::new(progressive_channels)).is_ok());
     let (dispatch, _receiver) = tokio::sync::mpsc::channel::<RuntimeChannelMessage>(1);
     (
         ChannelHostCallbacks::new(
             &crate::core::runtime::DispatchCtx::host_default(),
             Arc::new(crate::config::Config::default()),
             context_slot,
+            progressive_slot,
             dispatch,
         ),
         context,
@@ -122,7 +171,18 @@ async fn native_progressive_transport_dispatches_typed_content_through_configure
             selected_account.clone() as Arc<dyn Channel>,
         ),
     ]);
-    let (callback, _context) = callback_for_channels(channels);
+    let progressive_channels: HashMap<String, Arc<dyn ProgressiveChannelTransport>> =
+        HashMap::from([
+            (
+                "telegram:bot-a".into(),
+                other_account.clone() as Arc<dyn ProgressiveChannelTransport>,
+            ),
+            (
+                "telegram:bot-b".into(),
+                selected_account.clone() as Arc<dyn ProgressiveChannelTransport>,
+            ),
+        ]);
+    let (callback, _context) = callback_for_channels(channels, progressive_channels);
     let parts = vec![OutboundContentPart::Content {
         part: tinychannels_bus::ContentPart::Image {
             media: tinychannels_bus::MediaReference {
@@ -216,7 +276,18 @@ async fn native_progressive_transport_rejects_unconfigured_account_without_provi
             second_account.clone() as Arc<dyn Channel>,
         ),
     ]);
-    let (callback, _context) = callback_for_channels(channels);
+    let progressive_channels: HashMap<String, Arc<dyn ProgressiveChannelTransport>> =
+        HashMap::from([
+            (
+                "telegram:bot-a".into(),
+                first_account.clone() as Arc<dyn ProgressiveChannelTransport>,
+            ),
+            (
+                "telegram:bot-b".into(),
+                second_account.clone() as Arc<dyn ProgressiveChannelTransport>,
+            ),
+        ]);
+    let (callback, _context) = callback_for_channels(channels, progressive_channels);
 
     let result = callback
         .dispatch_controller_backend(ChannelBackendRequest::ProgressiveTransport(Box::new(
