@@ -71,7 +71,10 @@ pub(crate) enum WorkspaceBinding {
 }
 
 impl WorkspaceBinding {
-    fn apply(self, current: Option<tinytools::WorkspaceDescriptor>) -> Option<tinytools::WorkspaceDescriptor> {
+    fn apply(
+        self,
+        current: Option<tinytools::WorkspaceDescriptor>,
+    ) -> Option<tinytools::WorkspaceDescriptor> {
         match self {
             Self::Preserve => current,
             Self::Clear => None,
@@ -104,9 +107,7 @@ impl AgentTurnHost {
             .turn_deadline
             .map(tinyagents_harness::turn_deadline::TurnDeadline::starting_now);
         session.set_host_env(host_env);
-        let workspace = request
-            .workspace
-            .apply(session.live_workspace_descriptor());
+        let workspace = request.workspace.apply(session.live_workspace_descriptor());
         session.set_workspace_descriptor(workspace);
 
         // Keep the large agent future behind a pointer while the origin scope
