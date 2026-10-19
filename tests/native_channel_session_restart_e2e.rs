@@ -9,7 +9,7 @@
 //! linked TinyChannels module implementation so it exercises the native
 //! Telegram listener rather than a host-side REST adapter.
 
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 use std::fs::File;
 use std::path::Path;
 use std::process::{Child, Command, Stdio};
@@ -24,6 +24,10 @@ use axum::{Json, Router};
 use serde_json::{json, Value};
 use tokio::task::JoinHandle;
 use tokio::time::sleep;
+
+use openhuman_core::security::credentials::{
+    AuthService, APP_SESSION_PROVIDER, DEFAULT_AUTH_PROFILE_NAME,
+};
 
 const BOT_TOKEN: &str = "session-restart-token";
 const RPC_TOKEN: &str = "native-session-restart-rpc-token";
@@ -219,12 +223,23 @@ default_model = "session-model"
     std::fs::write(openhuman_dir.join("config.toml"), config).expect("write config");
     // Core config resolution uses the operator profile when no identity has
     // been established, while workspace state is independently pinned here.
-    let parsed: openhuman_core::config::Config =
+    let mut parsed: openhuman_core::config::Config =
         toml::from_str(&config).expect("mock config matches the core schema");
+    parsed.config_path = openhuman_dir.join("config.toml");
+    parsed.workspace_dir = workspace.to_path_buf();
     assert_eq!(
         parsed.channels_config.telegram.as_ref().unwrap().bot_token,
         BOT_TOKEN
     );
+    AuthService::from_config(&parsed)
+        .store_provider_token(
+            APP_SESSION_PROVIDER,
+            DEFAULT_AUTH_PROFILE_NAME,
+            "loopback-test-session",
+            HashMap::new(),
+            true,
+        )
+        .expect("seed session for custom-provider access gate");
 }
 
 struct CoreProcess(Child);
@@ -256,9 +271,16 @@ fn start_core(
         .env("OPENHUMAN_WORKSPACE", workspace)
         .env("OPENHUMAN_CORE_TOKEN", RPC_TOKEN)
         .env("OPENHUMAN_TELEGRAM_BOT_API_BASE", telegram)
+        .env("OPENHUMAN_COMPONENT_CHANNELS", "1")
         .env("OPENHUMAN_MODULE_SOURCE", "linked")
+        .env(
+            "OPENHUMAN_STORAGE_URL",
+            format!("sqlite:{}", workspace.join("sessions.db").display()),
+        )
         .env("OPENHUMAN_KEYRING_MASTER_KEY", "44".repeat(32))
         .env_remove("OPENHUMAN_KEYRING_MASTER_KEY_FILE")
+        .env_remove("OPENHUMAN_MODULE_PATH")
+        .env_remove("OPENHUMAN_MODULE_SOURCE_DIR")
         .env_remove("OPENHUMAN_MODE")
         .env_remove("OPENHUMAN_BACKEND_API_KEY")
         .env_remove("OPENHUMAN_BACKEND_SESSION_TOKEN")
