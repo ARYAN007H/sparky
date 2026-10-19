@@ -66,6 +66,10 @@ async fn proxy_config_tool_loads_a_versioned_document_before_saving() {
     let _env = crate::config::test_env::lock_env_async().await;
     let previous_proxy = crate::config::runtime_proxy_config();
     let _restore = RuntimeProxyRestore(previous_proxy);
+    let _proxy_env = crate::config::test_env::EnvVarGuard::set(
+        "OPENHUMAN_HTTP_PROXY",
+        "http://environment-proxy.invalid:7890",
+    );
     let tmp = tempfile::tempdir().unwrap();
     let storage = MemoryStorage::new();
     let path = tmp.path().join("config.toml");
@@ -77,6 +81,8 @@ async fn proxy_config_tool_loads_a_versioned_document_before_saving() {
         action_dir: workspace,
         ..Config::default()
     };
+    seed.proxy.enabled = true;
+    seed.proxy.http_proxy = Some("http://persisted-proxy.invalid:8080".into());
     seed.save().await.unwrap();
     let _forced = ForcedDocumentSource::new(
         scoped(&storage, "tenant-proxy-tool-revision"),
@@ -96,24 +102,17 @@ async fn proxy_config_tool_loads_a_versioned_document_before_saving() {
             ..Default::default()
         }),
     );
-    let result = tool
-        .execute(json!({
-            "action": "set",
-            "enabled": true,
-            "scope": "openhuman",
-            "http_proxy": "http://127.0.0.1:7890"
-        }))
-        .await
-        .unwrap();
+    let result = tool.execute(json!({ "action": "disable" })).await.unwrap();
     assert!(!result.is_error, "{}", result.output());
 
-    let saved = Config::load_from_config_path(&path, &seed.workspace_dir)
-        .await
-        .unwrap();
+    let saved_source = for_config(&path).unwrap();
+    let saved = saved_source.read().await.unwrap();
+    let saved = crate::config::schema::config_from_toml_str(&saved.contents).unwrap();
     assert_eq!(
         saved.proxy.http_proxy.as_deref(),
-        Some("http://127.0.0.1:7890")
+        Some("http://persisted-proxy.invalid:8080")
     );
+    assert!(!saved.proxy.enabled);
 }
 
 struct RuntimeProxyRestore(crate::config::ProxyConfig);
