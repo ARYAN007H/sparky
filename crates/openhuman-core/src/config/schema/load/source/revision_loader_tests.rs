@@ -158,7 +158,7 @@ async fn channel_allowlist_store_loads_a_versioned_document_before_saving() {
         Scope::new("tenant-channel-allowlist-revision").unwrap(),
         keys(20),
     );
-    let mut document_config = Config::load_from_config_path(&config_path, &workspace_dir)
+    let document_config = Config::load_from_config_path(&config_path, &workspace_dir)
         .await
         .unwrap();
     document_config.save().await.unwrap();
