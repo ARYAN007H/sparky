@@ -12284,7 +12284,13 @@ async fn json_rpc_voice_server_settings_rejects_retired_always_on_params() {
     .await;
     let after_outer = assert_no_jsonrpc_error(&after, "get_voice_server_settings after update");
     assert_eq!(after_outer["result"]["hotkey"], "F13");
-    assert_eq!(after_outer["result"]["min_duration_secs"], 0.4);
+    let min_duration_secs = after_outer["result"]["min_duration_secs"]
+        .as_f64()
+        .expect("min_duration_secs should be numeric");
+    assert!(
+        (min_duration_secs - 0.4).abs() < 1e-6,
+        "supported min_duration_secs update should round-trip: {min_duration_secs}"
+    );
 
     rpc_join.abort();
 }
