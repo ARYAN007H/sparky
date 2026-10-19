@@ -238,7 +238,10 @@ fn a_patch_over_the_bus_keeps_the_agent_definition_it_does_not_mention() {
     );
 }
 
-fn assert_force_next_run_updates_collection(collection: 'static str, other_collection: 'static str) {
+fn assert_force_next_run_updates_collection(
+    collection: &'static str,
+    other_collection: &'static str,
+) {
     use serde_json::json;
     use tinystoragedrivers::{CollectionSpec, Precondition};
 
