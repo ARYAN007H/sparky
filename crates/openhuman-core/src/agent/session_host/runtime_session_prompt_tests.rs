@@ -42,7 +42,16 @@ async fn debug_prompt_matches_the_system_prompt_sent_on_a_cold_turn() {
         })
         .collect::<String>();
 
-    assert_no_goal_tools(&sent, &ToolSnapshot::default());
+    for goal_tool in ["goal_get", "goal_set", "goal_complete"] {
+        assert!(
+            !sent.contains(goal_tool),
+            "{goal_tool} leaked into the actual system prompt"
+        );
+        assert!(
+            !request.tools.iter().any(|tool| tool.name == goal_tool),
+            "{goal_tool} leaked into the actual tool declarations"
+        );
+    }
     assert_eq!(
         dumped, sent,
         "debug dump must equal the real cold-turn system prompt"
