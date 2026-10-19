@@ -40,6 +40,10 @@ impl ConfigSource for FileConfigSource {
         "file"
     }
 
+    fn anchor(&self) -> super::ConfigSourceAnchor {
+        super::ConfigSourceAnchor::File(self.path.clone())
+    }
+
     async fn exists(&self) -> Result<bool> {
         fs::try_exists(&self.path)
             .await
@@ -53,6 +57,7 @@ impl ConfigSource for FileConfigSource {
             recovered,
             from_document: false,
             document_version: None,
+            source_anchor: self.anchor(),
         })
     }
 

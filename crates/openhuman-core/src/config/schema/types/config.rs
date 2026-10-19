@@ -57,7 +57,10 @@ pub struct Config {
     /// Revision of the shared config document this snapshot was loaded from.
     #[serde(skip)]
     #[schemars(skip)]
-    pub(crate) document_version: std::sync::Mutex<Option<tinystoragedrivers::Version>>,
+    pub(crate) document_snapshot: std::sync::Mutex<super::config_snapshot::DocumentSnapshot>,
+    #[serde(skip)]
+    #[schemars(skip)]
+    pub(crate) context_snapshot: Option<std::sync::Weak<std::sync::Mutex<Config>>>,
     /// Immutable operator provider binding, absent from the user wire format.
     #[serde(skip)]
     #[schemars(skip)]

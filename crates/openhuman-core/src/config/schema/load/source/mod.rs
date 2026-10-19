@@ -55,6 +55,14 @@ pub(crate) struct ConfigRead {
     /// no document yet: that text keeps the file's corruption recovery.
     pub from_document: bool,
     pub document_version: Option<tinystoragedrivers::Version>,
+    pub source_anchor: ConfigSourceAnchor,
+}
+
+/// Identity of the exact persistence target a config snapshot was read from.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum ConfigSourceAnchor {
+    File(std::path::PathBuf),
+    Document { backend: usize, scope: String, id: String },
 }
 
 /// A place a config's TOML text is read from and written to.
@@ -62,6 +70,7 @@ pub(crate) struct ConfigRead {
 pub(crate) trait ConfigSource: Send + Sync {
     /// A short, stable name for logs: `file` or `document`.
     fn label(&self) -> &'static str;
+    fn anchor(&self) -> ConfigSourceAnchor;
 
     /// Whether the source holds a config at all.
     ///
@@ -125,6 +134,7 @@ pub(crate) fn for_config(config_path: &Path) -> Result<Box<dyn ConfigSource>> {
             forced.scope,
             forced.keys,
             file,
+            std::sync::Arc::as_ptr(forced.scoped.documents()) as *const () as usize,
         )));
     }
     if !crate::storage::installed_is_shared() {
@@ -143,6 +153,7 @@ pub(crate) fn for_config(config_path: &Path) -> Result<Box<dyn ConfigSource>> {
                 scope,
                 keys,
                 file,
+                crate::storage::installed().map_or(0, |backend| Arc::as_ptr(&backend) as *const () as usize),
             )))
         }
         Ok(None) => Ok(Box::new(file)),

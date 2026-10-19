@@ -8,7 +8,7 @@ use serde_json::json;
 use tinystoragedrivers::secrets::{crypto, KeyProvider};
 use tinystoragedrivers::{CollectionSpec, DocumentStore, Precondition};
 
-use super::{apply_bootstrap, strip_bootstrap, ConfigRead, ConfigSource, FileConfigSource};
+use super::{apply_bootstrap, strip_bootstrap, ConfigRead, ConfigSource, ConfigSourceAnchor, FileConfigSource};
 use crate::storage::Scope;
 
 use super::storage_schema::document_id;
@@ -37,6 +37,7 @@ pub(crate) struct DocumentConfigSource {
     keys: Arc<dyn KeyProvider>,
     file: FileConfigSource,
     observed_version: Mutex<Option<tinystoragedrivers::Version>>,
+    backend_identity: usize,
 }
 
 impl DocumentConfigSource {
@@ -45,6 +46,7 @@ impl DocumentConfigSource {
         scope: Scope,
         keys: Arc<dyn KeyProvider>,
         file: FileConfigSource,
+        backend_identity: usize,
     ) -> Self {
         Self {
             docs,
@@ -52,6 +54,7 @@ impl DocumentConfigSource {
             keys,
             file,
             observed_version: Mutex::new(None),
+            backend_identity,
         }
     }
 
@@ -135,6 +138,14 @@ impl ConfigSource for DocumentConfigSource {
         "document"
     }
 
+    fn anchor(&self) -> ConfigSourceAnchor {
+        ConfigSourceAnchor::Document {
+            backend: self.backend_identity,
+            scope: self.scope.as_str().to_owned(),
+            id: document_id(self.scope.as_str()).expect("validated scope has a document id"),
+        }
+    }
+
     fn encrypts_body(&self) -> bool {
         true
     }
@@ -162,7 +173,7 @@ impl ConfigSource for DocumentConfigSource {
             tracing::debug!(scope = %self.scope.as_str(), "[config] no config document; reading the file");
             let read = self.file.read().await?;
             *self.observed_version.lock().unwrap() = None;
-            return Ok(read);
+            return Ok(ConfigRead { source_anchor: self.anchor(), ..read });
         };
         // Bootstrap tables come from the file, whatever the document says.
         // Through the file source, so its corruption recovery (a `.bak`, a
@@ -184,6 +195,7 @@ impl ConfigSource for DocumentConfigSource {
             recovered: false,
             from_document: true,
             document_version: Some(document_version),
+            source_anchor: self.anchor(),
         };
         *self.observed_version.lock().unwrap() = Some(document_version);
         Ok(read)
