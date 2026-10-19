@@ -1,6 +1,6 @@
 use super::*;
-use crate::core::runtime::DispatchCtx;
 use crate::core::TypeSchema;
+use crate::core::runtime::DispatchCtx;
 use serde_json::json;
 
 #[test]
@@ -30,21 +30,26 @@ fn schemas_expose_expected_inputs_and_unknown_fallback() {
     assert_eq!(chat.namespace, "agent");
     assert_eq!(chat.inputs.len(), 5);
     assert!(matches!(chat.inputs[1].ty, TypeSchema::Option(_)));
-    assert!(chat
-        .inputs
-        .iter()
-        .any(|input| input.name == "thread_id" && !input.required));
+    assert!(
+        chat.inputs
+            .iter()
+            .any(|input| input.name == "thread_id" && !input.required)
+    );
 
     let triage = schemas("triage_evaluate");
     assert_eq!(triage.inputs.len(), 7);
-    assert!(triage
-        .inputs
-        .iter()
-        .any(|input| input.name == "payload" && input.required));
-    assert!(triage
-        .inputs
-        .iter()
-        .any(|input| input.name == "dry_run" && !input.required));
+    assert!(
+        triage
+            .inputs
+            .iter()
+            .any(|input| input.name == "payload" && input.required)
+    );
+    assert!(
+        triage
+            .inputs
+            .iter()
+            .any(|input| input.name == "dry_run" && !input.required)
+    );
 
     let unknown = schemas("nope");
     assert_eq!(unknown.function, "unknown");
@@ -125,11 +130,13 @@ async fn reload_and_definition_handlers_cover_missing_registry_paths() {
         .await
         .expect("reload handler should always succeed");
     assert_eq!(reload.get("status").and_then(Value::as_str), Some("noop"));
-    assert!(reload
-        .get("note")
-        .and_then(Value::as_str)
-        .unwrap()
-        .contains("Restart"));
+    assert!(
+        reload
+            .get("note")
+            .and_then(Value::as_str)
+            .unwrap()
+            .contains("Restart")
+    );
 
     let list_result = handle_list_definitions(DispatchCtx::process_default(), Map::new()).await;
     match list_result {

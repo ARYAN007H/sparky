@@ -17,13 +17,13 @@
 //! `--agent orchestrator` for the orchestrator prompt; otherwise pass
 //! any built-in or workspace-custom agent id (e.g. `orchestrator`, `researcher`).
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use std::path::PathBuf;
 
 use crate::agent_registry::host_definition::AgentDefinitionRegistry;
-use crate::core::agent_cli::debug::prompt_size::{render_text, PromptSizeReport};
+use crate::core::agent_cli::debug::prompt_size::{PromptSizeReport, render_text};
 use crate::core::agent_cli::debug::{
-    dump_agent_prompt, dump_all_agent_prompts, write_prompt_dumps, DumpPromptOptions, DumpedPrompt,
+    DumpPromptOptions, DumpedPrompt, dump_agent_prompt, dump_all_agent_prompts, write_prompt_dumps,
 };
 
 pub(crate) mod debug;
@@ -424,9 +424,10 @@ fn parse_dump_flags(args: &[String]) -> Result<DumpFlags> {
 
 fn run_dump_prompt(args: &[String]) -> Result<()> {
     let flags = parse_dump_flags(args)?;
-    let agent = flags.agent.clone().ok_or_else(|| {
-        anyhow!("--agent <id> is required (e.g. `orchestrator`, `researcher`)")
-    })?;
+    let agent = flags
+        .agent
+        .clone()
+        .ok_or_else(|| anyhow!("--agent <id> is required (e.g. `orchestrator`, `researcher`)"))?;
 
     init_quiet_logging(flags.verbose);
 
