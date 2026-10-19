@@ -1091,9 +1091,15 @@ describe('session expiry fixes (#5868)', () => {
   });
 
   it('refreshes the snapshot when an expiry lands during deep-link suppression', async () => {
+    resetCoreStateStore();
+    setActiveUserId(null);
     vi.mocked(coreStateApi.fetchCoreAppSnapshot)
+      .mockReset()
       .mockResolvedValueOnce(makeSnapshot({ userId: 'u1', sessionToken: 'tok1' }))
       .mockResolvedValueOnce(makeSnapshot({ userId: null, sessionToken: null, isAuthenticated: false }));
+    vi.mocked(coreStateApi.listTeams).mockReset().mockResolvedValue([]);
+    vi.mocked(coreStateApi.getTeamMembers).mockReset().mockResolvedValue([]);
+    vi.mocked(coreStateApi.getTeamInvites).mockReset().mockResolvedValue([]);
     vi.mocked(tauriCommands.logout).mockReset();
     vi.mocked(tauriCommands.logout).mockResolvedValue(undefined as never);
 
@@ -1121,6 +1127,44 @@ describe('session expiry fixes (#5868)', () => {
 
     await waitFor(() => expect(screen.getByTestId('token').textContent).toBe('none'));
     expect(vi.mocked(coreStateApi.fetchCoreAppSnapshot)).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(tauriCommands.logout)).not.toHaveBeenCalled();
+  });
+
+  it('keeps the current session when a stale expiry lands during deep-link suppression', async () => {
+    resetCoreStateStore();
+    setActiveUserId(null);
+    vi.mocked(coreStateApi.fetchCoreAppSnapshot)
+      .mockReset()
+      .mockResolvedValueOnce(makeSnapshot({ userId: 'u1', sessionToken: 'tok1' }))
+      .mockResolvedValueOnce(makeSnapshot({ userId: 'u1', sessionToken: 'tok1' }));
+    vi.mocked(coreStateApi.listTeams).mockReset().mockResolvedValue([]);
+    vi.mocked(coreStateApi.getTeamMembers).mockReset().mockResolvedValue([]);
+    vi.mocked(coreStateApi.getTeamInvites).mockReset().mockResolvedValue([]);
+    vi.mocked(tauriCommands.logout).mockReset();
+    vi.mocked(tauriCommands.logout).mockResolvedValue(undefined as never);
+
+    render(
+      <CoreStateProvider>
+        <Consumer />
+      </CoreStateProvider>
+    );
+    await waitFor(() => expect(screen.getByTestId('token').textContent).toBe('tok1'));
+
+    await act(async () => {
+      window.dispatchEvent(
+        new CustomEvent('core-state:suppress-reauth', { detail: { until: Date.now() + 30_000 } })
+      );
+      window.dispatchEvent(
+        new CustomEvent('openhuman:session-expired', {
+          detail: { source: 'shell.auth/me', reason: 'confirmed' },
+        })
+      );
+    });
+
+    await waitFor(() =>
+      expect(vi.mocked(coreStateApi.fetchCoreAppSnapshot)).toHaveBeenCalledTimes(2)
+    );
+    expect(screen.getByTestId('token').textContent).toBe('tok1');
     expect(vi.mocked(tauriCommands.logout)).not.toHaveBeenCalled();
   });
 
