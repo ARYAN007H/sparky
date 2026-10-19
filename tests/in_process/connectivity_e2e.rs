@@ -115,4 +115,3 @@ fn api_config_url_resolution_classifies_backend_and_inference_paths() {
     std::env::set_var(VITE_APP_ENV_VAR, " Production ");
     assert_eq!(app_env_from_env().as_deref(), Some("production"));
 }
-

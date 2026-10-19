@@ -1673,4 +1673,3 @@ async fn config_auto_approve_public_helper_persists_once_and_is_idempotent() {
         1
     );
 }
-

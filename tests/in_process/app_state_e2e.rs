@@ -332,4 +332,3 @@ async fn app_state_snapshot_quarantines_unreadable_local_state_path() {
 
     harness.join.abort();
 }
-
