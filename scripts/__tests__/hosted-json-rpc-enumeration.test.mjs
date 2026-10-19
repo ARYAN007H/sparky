@@ -47,7 +47,7 @@ function runCoreStep(mode) {
     writeFileSync(
       join(root, "bin/cargo"),
       `#!/bin/bash
-if [[ "$*" =~ --test\ json_rpc_[[:alnum:]_]+_e2e ]]; then
+if [[ "$*" == *"--test json_rpc_"*"_e2e"* ]]; then
   [[ "$*" == *"--features voice,bin-tools"* ]] || exit 0
   if [[ "$*" == *"--list"* ]]; then
     case "$FIXTURE_MODE" in
