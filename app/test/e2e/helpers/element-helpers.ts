@@ -417,7 +417,9 @@ export async function countTestId(testId: string): Promise<number> {
   if (!isTauriDriver()) {
     throw new Error(`countTestId is only supported on tauri-driver: ${testId}`);
   }
-  return await (await browser.$$(testIdSelector(testId))).length;
+  return await (
+    await browser.$$(testIdSelector(testId))
+  ).length;
 }
 
 /** Click an indexed repeated test-id control through the shared click path. */
