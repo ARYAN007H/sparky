@@ -13,8 +13,7 @@
 //! | `builder_gates` | the author-time hard-gate stack, `strict_gate`, `build_builder_proposal` |
 //! | `wiring_warnings` | advisory Composio wiring / output-field / `split_out.path` warnings |
 //! | `inference_readiness` | B45 provider-connectivity evaluation + probe cache |
-//! | `tool_contract_gate` | live-catalog slug / required-arg / arg-name gate |
-//! | `connection_ref_gate` | WS3 `connection_ref` toolkit + existence gate |
+//! | `host_gates` | OpenHuman checks served to TinyFlows for one authoring call |
 //! | `definitions` | create / duplicate / get / list / delete + saved-graph lookups |
 //! | `updates` | update / history / rollback with optimistic concurrency |
 //! | `triggers` | enable/disable, trigger binding, boot reconciliation, trigger warnings |
@@ -64,9 +63,6 @@ use tinyflows_catalog::types::{
 };
 use {tinyflows_catalog::Flow, tinyflows_catalog::FlowRun};
 
-// Keep the test-facing stage operation available at the domain's existing
-// internal path while the implementation lives under its owner module.
-pub(crate) use crate::flows::host_gates::validate_tool_contracts;
 
 /// Overall safety bound on a single `flows_run` / `flows_resume`. Individual
 /// capabilities have their own timeouts (HTTP, sandbox), but a hung LLM/tool

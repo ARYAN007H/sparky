@@ -1,4 +1,5 @@
 use super::*;
+use crate::flows::host_gates::validate_tool_contracts;
 use crate::integrations::composio::catalog::{seed_live_catalog_cache, ToolContract};
 
 fn seeded_alias_contract() -> ToolContract {
