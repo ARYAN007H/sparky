@@ -64,9 +64,12 @@ describe('voiceNoteApi', () => {
   });
 
   it('stores a recording through the core and reports the stored mime', async () => {
-    rpc.callCoreRpc.mockResolvedValue({ mime: 'audio/webm' });
+    rpc.callCoreRpc.mockResolvedValue({
+      logs: ['voice note stored'],
+      result: { note_id: 'vn_1', mime: 'audio/wav' },
+    });
     const blob = new Blob([new Uint8Array([1, 2, 3])], { type: 'audio/webm' });
-    await expect(storeVoiceNote('vn_1', blob)).resolves.toEqual({ mime: 'audio/webm' });
+    await expect(storeVoiceNote('vn_1', blob)).resolves.toEqual({ mime: 'audio/wav' });
     expect(rpc.callCoreRpc).toHaveBeenCalledWith({
       method: 'openhuman.channel_web_voice_note_store',
       params: { note_id: 'vn_1', audio_base64: 'AQID', mime: 'audio/webm' },
