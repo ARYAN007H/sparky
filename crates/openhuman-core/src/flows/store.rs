@@ -27,7 +27,7 @@ pub fn dir(config: &Config) -> PathBuf {
     config.workspace_dir.join("flows")
 }
 
-fn call_catalog<T, A>(config: &Config, member: &'static str, args: A) -> Result<T>
+pub(crate) fn call_catalog<T, A>(config: &Config, member: &'static str, args: A) -> Result<T>
 where
     T: DeserializeOwned + Send + 'static,
     A: Serialize + Send + 'static,
@@ -60,7 +60,7 @@ fn flow_from_wire(workflow: Workflow) -> Result<Flow> {
 }
 
 
-fn roundtrip<T, U>(value: T) -> Result<U>
+pub(crate) fn roundtrip<T, U>(value: T) -> Result<U>
 where
     T: Serialize,
     U: DeserializeOwned,
