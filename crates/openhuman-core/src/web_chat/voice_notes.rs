@@ -141,10 +141,12 @@ pub(crate) fn reply_note_metadata(workspace: &Path, request_id: &str) -> Option<
         let mut metadata = json!({ "noteId": id, "mime": mime });
         let viseme_path = root.join(format!("{id}.visemes.json"));
         if let Ok(bytes) = std::fs::read(viseme_path) {
-            if let Ok(frames) = serde_json::from_slice::<Vec<tinyinference_voice::VisemeFrame>>(&bytes)
-                && !frames.is_empty()
+            if let Ok(frames) =
+                serde_json::from_slice::<Vec<tinyinference_voice::VisemeFrame>>(&bytes)
             {
-                metadata["visemes"] = json!(frames);
+                if !frames.is_empty() {
+                    metadata["visemes"] = json!(frames);
+                }
             }
         }
         Some(metadata)
