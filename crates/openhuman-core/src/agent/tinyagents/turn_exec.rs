@@ -524,10 +524,14 @@ async fn drive_turn(
         stream: streaming,
         controls,
     };
-    let mut prepared = driver.prepare(request).await.map_err(|failure| {
-        tracing::error!(error = %failure.error, "[tinyagents] turn driver could not prepare the turn");
-        anyhow::anyhow!("{}", failure.error)
-    })?;
+    // Heap-allocate the planning future: nested delegates poll this turn on
+    // their parent's stack even while earlier states await setup work.
+    let mut prepared = Box::pin(driver.prepare(request))
+        .await
+        .map_err(|failure| {
+            tracing::error!(error = %failure.error, "[tinyagents] turn driver could not prepare the turn");
+            anyhow::anyhow!("{}", failure.error)
+        })?;
     let steering =
         prepared.run_context.steering.clone().ok_or_else(|| {
             anyhow::anyhow!("turn driver prepared a run without a steering handle")
