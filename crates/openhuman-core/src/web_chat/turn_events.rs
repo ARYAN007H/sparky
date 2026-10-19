@@ -19,10 +19,10 @@ use tinychannels_bus::web as bus_web;
 
 use super::runner::{CancelNote, Shared};
 use super::surface::{Surface, TurnIds};
-use super::turn_close::{StopCause, StoppedTurn, close_reply};
+use super::turn_close::{close_reply, StopCause, StoppedTurn};
 use super::web_errors::{
-    ClassifiedError, classify_inference_error, is_outer_backstop_timeout, turn_idle_error_message,
-    turn_timeout_error_message,
+    classify_inference_error, is_outer_backstop_timeout, turn_idle_error_message,
+    turn_timeout_error_message, ClassifiedError,
 };
 use crate::agent::queued_turn::QueuedPayload;
 
@@ -425,7 +425,12 @@ impl EventSink<QueuedPayload> for WebEvents {
         // announced as a turn, so its being dropped is silent too.
         let never_started = self.shared.was_queued(&request.request_id);
         let (projection, done, note, _session_lease) = match slot {
-            Some(slot) => (slot.projection, slot.result, slot.cancel, slot.session_lease),
+            Some(slot) => (
+                slot.projection,
+                slot.result,
+                slot.cancel,
+                slot.session_lease,
+            ),
             None => (None, None, None, None),
         };
         if never_started && !matches!(event, TerminalEvent::Completed { .. }) {

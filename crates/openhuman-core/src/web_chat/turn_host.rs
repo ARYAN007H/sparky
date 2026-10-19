@@ -112,7 +112,8 @@ impl WebHost {
         )
         .await
         .map_err(|()| "agent session lease was cancelled".to_owned())?;
-        self.shared.with(id, |slot| slot.session_lease = Some(lease));
+        self.shared
+            .with(id, |slot| slot.session_lease = Some(lease));
         // A follow-up the runner dispatches after its predecessor finished was
         // admitted when it was queued; one started directly still has its
         // admission to answer.

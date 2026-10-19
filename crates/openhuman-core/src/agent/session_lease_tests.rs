@@ -13,7 +13,10 @@ async fn independent_runners_serialize_the_same_tenant_agent_session() {
         async move { SessionLease::acquire(key, Some(&cancellation)).await }
     });
     tokio::task::yield_now().await;
-    assert!(!waiting.is_finished(), "same identity must wait for checkout");
+    assert!(
+        !waiting.is_finished(),
+        "same identity must wait for checkout"
+    );
 
     drop(first);
     let second = tokio::time::timeout(std::time::Duration::from_secs(1), waiting)

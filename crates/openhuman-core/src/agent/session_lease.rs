@@ -5,7 +5,10 @@
 //! the host boundary, keyed by the complete tenant, agent, and canonical
 //! session identity.
 
-use std::{collections::HashMap, sync::{Arc, LazyLock, Mutex, Weak}};
+use std::{
+    collections::HashMap,
+    sync::{Arc, LazyLock, Mutex, Weak},
+};
 
 use tinyagents_harness::CancellationToken;
 use tokio::sync::{Mutex as AsyncMutex, OwnedMutexGuard};
@@ -18,8 +21,16 @@ pub(crate) struct SessionLeaseKey {
 }
 
 impl SessionLeaseKey {
-    pub(crate) fn new(tenant: impl Into<String>, agent: impl Into<String>, session: impl Into<String>) -> Self {
-        Self { tenant: tenant.into(), agent: agent.into(), session: session.into() }
+    pub(crate) fn new(
+        tenant: impl Into<String>,
+        agent: impl Into<String>,
+        session: impl Into<String>,
+    ) -> Self {
+        Self {
+            tenant: tenant.into(),
+            agent: agent.into(),
+            session: session.into(),
+        }
     }
 }
 
@@ -38,7 +49,9 @@ impl SessionLease {
         cancellation: Option<&CancellationToken>,
     ) -> Result<Self, ()> {
         let lock = {
-            let mut leases = LEASES.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+            let mut leases = LEASES
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner());
             leases.retain(|_, lock| lock.strong_count() > 0);
             if let Some(lock) = leases.get(&key).and_then(Weak::upgrade) {
                 lock
