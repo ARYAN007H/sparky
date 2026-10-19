@@ -32,12 +32,18 @@ pub(crate) struct CopilotToolCatalog {
 impl CopilotToolCatalog {
     /// Load the tools the compiled module serves for this host configuration.
     pub(crate) fn load(config: Arc<Config>) -> Result<Self, String> {
-        // Tool registration is synchronous, so this metadata-only call uses
-        // the storage blocking bridge. It carries the supplied Config
-        // explicitly and does not make a host callback or resolve tenant data;
-        // actual tool calls below take their authority from ToolRunContext.
-        let node_kinds = serde_json::to_value(crate::flows::all_node_kind_contracts())
-            .map_err(|error| format!("could not encode workflow node contracts: {error}"))?
+        // Tool registration is synchronous, so fetch module-owned metadata
+        // through the storage blocking bridge. This call carries the supplied
+        // config and resolves no tenant data; tool calls take their authority
+        // from ToolRunContext.
+        let call_config = Arc::clone(&config);
+        let node_kinds = crate::storage::block_on_anyhow(async move {
+            crate::flows::all_node_kind_contracts(&call_config)
+                .await
+                .map_err(anyhow::Error::msg)
+        })
+        .map_err(|error| format!("could not load workflow node contracts: {error}"))
+        .and_then(|contracts| serde_json::to_value(contracts).map_err(|error| error.to_string()))?
             .as_array()
             .cloned()
             .ok_or_else(|| "workflow node contracts were not an array".to_string())?;
