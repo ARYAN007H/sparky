@@ -21,9 +21,12 @@ stt_engine = "elevenlabs"
         .await
         .expect("setting the backend provider should succeed");
 
-    let config = crate::config::Config::load_from_config_path(&config_path, dir.path())
-        .await
-        .unwrap();
+    let config = crate::config::Config::load_from_config_path(
+        &config_path,
+        &dir.path().join("workspace"),
+    )
+    .await
+    .unwrap();
     assert_eq!(config.voice_server.stt_engine, crate::config::SttEngine::Backend);
     assert_eq!(crate::voice::effective_stt_provider(&config), "cloud");
 

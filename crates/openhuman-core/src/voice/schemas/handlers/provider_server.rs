@@ -418,3 +418,7 @@ pub(crate) fn handle_voice_test_provider(
         }
     })
 }
+
+#[cfg(test)]
+#[path = "provider_server_tests.rs"]
+mod tests;
