@@ -475,20 +475,17 @@ impl TranscriptState {
                     .or_else(|| item.get("content"))
                     .and_then(serde_json::Value::as_str)
                     .unwrap_or_default();
-                let duration_ms = item
-                    .pointer("/extraMetadata/voiceNote/durationMs")
-                    .and_then(serde_json::Value::as_u64);
-                let text = duration_ms
-                    .map(|ms| format!("[voice note {}] {content}", format_short_duration(ms)))
-                    .unwrap_or_else(|| content.to_string());
+                let text = label_voice_note(content, item);
                 self.entries.push(Entry::new(EntryKind::User, text));
             }
-            Some("assistantMessage") => self.entries.push(Entry::new(
-                EntryKind::Assistant,
-                item.get("content")
+            Some("assistantMessage") => {
+                let content = item
+                    .get("content")
                     .and_then(serde_json::Value::as_str)
-                    .unwrap_or_default(),
-            )),
+                    .unwrap_or_default();
+                let text = label_voice_note(content, item);
+                self.entries.push(Entry::new(EntryKind::Assistant, text));
+            }
             Some("reasoning") => self.entries.push(Entry::new(
                 EntryKind::Thinking,
                 item.get("text")
@@ -602,6 +599,27 @@ impl TranscriptState {
             _ => {}
         }
     }
+}
+
+fn label_voice_note(content: &str, item: &serde_json::Value) -> String {
+    let Some(voice_note) = item.pointer("/extraMetadata/voiceNote") else {
+        return content.to_string();
+    };
+    let has_note_id = voice_note
+        .get("noteId")
+        .and_then(serde_json::Value::as_str)
+        .is_some_and(|note_id| !note_id.is_empty());
+    if !has_note_id {
+        return content.to_string();
+    }
+
+    let label = voice_note
+        .get("durationMs")
+        .and_then(serde_json::Value::as_u64)
+        .map(format_short_duration)
+        .map(|duration| format!("[voice note {duration}]"))
+        .unwrap_or_else(|| "[voice note]".to_string());
+    format!("{label} {content}")
 }
 
 fn format_short_duration(ms: u64) -> String {

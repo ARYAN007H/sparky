@@ -296,8 +296,14 @@ fn projected_spoken_replies_show_voice_note_and_known_duration_labels() {
             }
         ]}}
     }));
-    assert_eq!(state.entries()[0].text, "[voice note 0:09] I will remind you.");
-    assert_eq!(state.entries()[1].text, "[voice note] I can say that aloud.");
+    assert_eq!(
+        state.entries()[0].text,
+        "[voice note 0:09] I will remind you."
+    );
+    assert_eq!(
+        state.entries()[1].text,
+        "[voice note] I can say that aloud."
+    );
 }
 
 #[test]
