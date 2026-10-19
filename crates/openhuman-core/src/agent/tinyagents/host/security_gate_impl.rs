@@ -3,6 +3,7 @@ use tinyagents_harness::error::Result as TaResult;
 use tinyagents_harness::host::security_gate::{
     ContentOrigin, GateDecision, ScreenOutcome, SecurityGate, ToolCallRequest,
 };
+use tinyinference_llm::message::{ContentBlock, Message};
 
 use super::OpenHumanSecurityGate;
 use crate::security::prompt_injection::{
@@ -108,5 +109,47 @@ impl SecurityGate for OpenHumanSecurityGate {
                 )))
             }
         }
+    }
+}
+
+impl OpenHumanSecurityGate {
+    /// Screens only the newly appended user row before the session driver
+    /// snapshots its seed history. This uses the same gate implementation and
+    /// outcome handling as the hosted harness, so a redaction is durable and a
+    /// block cannot fall back to the raw row on cancellation.
+    pub(crate) async fn screen_new_user_row(
+        &self,
+        history: &mut [Message],
+    ) -> TaResult<(bool, Option<String>)> {
+        let Some(Message::User(user)) = history.last_mut() else {
+            return Ok((false, None));
+        };
+        for block in &mut user.content {
+            match block {
+                ContentBlock::Text(text) | ContentBlock::Thinking { text, .. } => {
+                    match self.screen_input(text, ContentOrigin::User).await? {
+                        ScreenOutcome::Pass => {}
+                        ScreenOutcome::Redacted(redacted) => *text = redacted,
+                        ScreenOutcome::Block { reason } => return Ok((true, Some(reason))),
+                    }
+                }
+                ContentBlock::Json(value) | ContentBlock::ProviderExtension(value) => {
+                    let rendered = value.to_string();
+                    match self
+                        .screen_input(&rendered, ContentOrigin::User)
+                        .await?
+                    {
+                        ScreenOutcome::Pass => {}
+                        ScreenOutcome::Redacted(redacted) => {
+                            *value = serde_json::from_str(&redacted)
+                                .unwrap_or(serde_json::Value::String(redacted));
+                        }
+                        ScreenOutcome::Block { reason } => return Ok((true, Some(reason))),
+                    }
+                }
+                _ => {}
+            }
+        }
+        Ok((true, None))
     }
 }
