@@ -49,6 +49,16 @@ pub struct OpenHumanLlm {
 
 impl OpenHumanLlm {
     pub(crate) async fn complete(&self, request: Value, conn: Option<&str>) -> Result<Value> {
+        self.complete_with_format_request(request.clone(), request, conn)
+            .await
+    }
+
+    pub(crate) async fn complete_with_format_request(
+        &self,
+        request: Value,
+        format_request: Value,
+        conn: Option<&str>,
+    ) -> Result<Value> {
         if let Some(c) = conn {
             // B1 does not resolve `connection_ref` to a specific BYOK account —
             // `create_chat_provider` picks the configured provider for `role`.
@@ -150,7 +160,7 @@ impl OpenHumanLlm {
             .call(
                 tinyflows_bus::portability::methods::FORMAT_LLM_COMPLETE,
                 &(tinyflows_bus::portability::FormatLlmComplete {
-                    request,
+                    request: format_request,
                     response: host_response,
                 },),
             )

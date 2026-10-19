@@ -119,6 +119,52 @@ fn max_parallel_harness_agents(raw: Option<&str>) -> usize {
 }
 
 impl OpenHumanAgentRunner {
+    async fn prepare_agent_run(
+        &self,
+        request: Value,
+        entry_model: Option<&str>,
+        system_prompt: Option<&str>,
+        effective_iteration_cap: u32,
+    ) -> Result<tinyflows_bus::portability::PreparedAgentRun> {
+        let proxy = module::portability_proxy(&self.config)
+            .await
+            .map_err(EngineError::Capability)?;
+        proxy
+            .call(
+                tinyflows_bus::portability::methods::PREPARE_AGENT_RUN,
+                &(tinyflows_bus::portability::PrepareAgentRun {
+                    request,
+                    entry_model: entry_model.map(str::to_owned),
+                    system_prompt: system_prompt.map(str::to_owned),
+                    effective_iteration_cap,
+                },),
+            )
+            .await
+            .map_err(|error| EngineError::Capability(error.to_string()))
+    }
+
+    async fn format_agent_result(
+        &self,
+        agent_ref: &str,
+        request: Value,
+        final_text: String,
+    ) -> Result<Value> {
+        let proxy = module::portability_proxy(&self.config)
+            .await
+            .map_err(EngineError::Capability)?;
+        proxy
+            .call(
+                tinyflows_bus::portability::methods::FORMAT_AGENT_RUN,
+                &(tinyflows_bus::portability::FormatAgentRun {
+                    agent_ref: agent_ref.to_owned(),
+                    request,
+                    final_text,
+                },),
+            )
+            .await
+            .map_err(|error| EngineError::Capability(error.to_string()))
+    }
+
     pub(crate) async fn run_agent(
         &self,
         agent_ref: &str,
@@ -294,7 +340,10 @@ impl OpenHumanAgentRunner {
         // Model precedence for a harness node: node `config.model` > the
         // custom registry entry's own `model` pin (if any) > the definition's
         // own default.
-        let node_model = resolve_node_model(&request, entry_model);
+        let initial = self
+            .prepare_agent_run(request.clone(), entry_model, None, 0)
+            .await?;
+        let node_model = initial.model.clone();
 
         // Apply the override the cron way (`run_agent_job`): a cloned `Config`
         // with a new `default_model`, so we never mutate the shared config or
@@ -327,11 +376,6 @@ impl OpenHumanAgentRunner {
         })?;
         agent.set_agent_definition_name(agent_ref.to_string());
 
-        let prompt = build_harness_run_prompt(&request);
-
-        let requested_timeout_secs = request.get("timeout_secs").and_then(Value::as_u64);
-        let base_timeout_secs = clamp_run_timeout_secs(requested_timeout_secs);
-
         // Issue #4868 — the session builder now stamps `agent_ref`'s own
         // `effective_max_iterations()` onto the agent (instead of the global
         // default of 10), so `code_executor`/`tools_agent`/etc. can run up to
@@ -345,8 +389,17 @@ impl OpenHumanAgentRunner {
         // 120s) and must be honored as-is, never scaled up just because the
         // agent's iteration cap is high — see `resolve_run_timeout_secs`.
         let effective_iteration_cap = agent.agent_config().max_tool_iterations;
-        let timeout_secs =
-            resolve_run_timeout_secs(requested_timeout_secs, effective_iteration_cap);
+        let prepared = self
+            .prepare_agent_run(
+                request.clone(),
+                entry_model,
+                None,
+                u32::try_from(effective_iteration_cap).unwrap_or(u32::MAX),
+            )
+            .await?;
+        let prompt = prepared.prompt;
+        let base_timeout_secs = prepared.base_timeout_secs;
+        let timeout_secs = prepared.timeout_secs;
 
         tracing::debug!(
             target: "flows",
@@ -438,7 +491,7 @@ impl OpenHumanAgentRunner {
                 }
             };
 
-        Ok(build_agent_result(agent_ref, &final_text, &request))
+        self.format_agent_result(agent_ref, request, final_text).await
     }
 
     /// Persona-shaping single-completion fallback for a custom
@@ -481,23 +534,23 @@ impl OpenHumanAgentRunner {
         // when the node didn't pin one. The completion itself runs through the
         // same provider path as a plain agent turn (OpenHumanLlm::complete), so
         // structured-output / envelope behavior is identical.
-        let mut request = request;
-        if let Some(system_prompt) = entry.system_prompt.as_deref().filter(|s| !s.is_empty()) {
-            prepend_system_message(&mut request, system_prompt);
-        }
-        if let Some(model) = entry.model.as_deref().filter(|s| !s.is_empty()) {
-            if request.get("model").and_then(Value::as_str).is_none() {
-                if let Value::Object(map) = &mut request {
-                    map.insert("model".to_string(), Value::String(model.to_string()));
-                }
-            }
-        }
-
+        let prepared = self
+            .prepare_agent_run(
+                request.clone(),
+                entry.model.as_deref(),
+                entry.system_prompt.as_deref(),
+                0,
+            )
+            .await?;
+        let completion_request = json!({
+            "prompt": prepared.prompt,
+            "model": prepared.model,
+        });
         OpenHumanLlm {
             ctx: self.ctx.clone(),
             config: self.config.clone(),
         }
-        .complete(request, conn)
+        .complete_with_format_request(completion_request, request, conn)
         .await
     }
 }
