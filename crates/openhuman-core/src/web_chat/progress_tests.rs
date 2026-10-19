@@ -230,12 +230,11 @@ async fn spawn_test_bridge_with_interval(
 /// "no response after 2 minutes" timeout (#4270).
 #[tokio::test]
 async fn emits_inference_heartbeat_while_turn_in_flight() {
-    let _module = crate::channels::module_fixture::client().await;
     let mut events = crate::web_chat::subscribe_web_channel_events();
     let thread_id = "thread-hb-emit-4270";
     let request_id = "req-hb-emit-4270";
     let (tx, task) =
-        spawn_test_bridge_with_interval(thread_id, request_id, Duration::from_millis(50));
+        spawn_test_bridge_with_interval(thread_id, request_id, Duration::from_millis(50)).await;
 
     // Turn begins — arms the liveness beat.
     tx.send(AgentProgress::TurnStarted).await.unwrap();
@@ -273,11 +272,14 @@ async fn emits_inference_heartbeat_while_turn_in_flight() {
 /// the channel-closed `break`.
 #[tokio::test]
 async fn stops_heartbeat_after_turn_completed() {
-    let _module = crate::channels::module_fixture::client().await;
     let mut events = crate::web_chat::subscribe_web_channel_events();
     let thread_id = "thread-hb-stop-4270";
-    let (tx, task) =
-        spawn_test_bridge_with_interval(thread_id, "req-hb-stop-4270", Duration::from_millis(50));
+    let (tx, task) = spawn_test_bridge_with_interval(
+        thread_id,
+        "req-hb-stop-4270",
+        Duration::from_millis(50),
+    )
+    .await;
 
     tx.send(AgentProgress::TurnStarted).await.unwrap();
     // Drain through the first heartbeat to prove the turn was beating.
