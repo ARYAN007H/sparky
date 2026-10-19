@@ -114,11 +114,18 @@ pub struct StorageGrant {
     pub secret_prefixes: Vec<String>,
     /// Whether the module may write; `false` makes every grant read-only.
     pub writable: bool,
+    /// The queues the module may use, as a manifest the host declares on the
+    /// module's scope when it binds; `None` grants no `Queues` object.
+    pub queues: Option<Arc<QueueManifest>>,
 }
 
 /// Collection names no grant may hold: the encrypted secret documents and the
 /// storage layer's own `_`-prefixed records.
 const RESERVED_COLLECTIONS: [&str; 1] = [tinystoragedrivers::secrets::DEFAULT_COLLECTION];
+
+/// The storage layer's own collections (queue messages, leases, migrations).
+/// A module reaches the queue collections only through the `Queues` object.
+const RESERVED_COLLECTION_PREFIX: &str = "tsd.";
 
 impl StorageGrant {
     /// The schema the host ensures when it binds the module.
@@ -137,6 +144,7 @@ impl StorageGrant {
         for spec in &self.collections {
             if spec.name.is_empty()
                 || spec.name.starts_with('_')
+                || spec.name.starts_with(RESERVED_COLLECTION_PREFIX)
                 || RESERVED_COLLECTIONS.contains(&spec.name.as_str())
             {
                 return Err("a granted collection name is empty or reserved".into());
