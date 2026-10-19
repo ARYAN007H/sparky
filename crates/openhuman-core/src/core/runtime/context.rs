@@ -424,34 +424,7 @@ impl CoreContext {
             }
         };
         let agent = self.agent.derive(&mut overlay);
-        let config_overlay = if let Some(profile_id) = overlay.profile.as_deref() {
-            let parent_profile_config = (self.profile() == Some(profile_id))
-                .then_some(parent_config)
-                .flatten();
-            Some(
-                crate::config::schema::load::context_overlay::ConfigContextOverlay::derive_profile(
-                    parent_profile_config,
-                    &overlay.config,
-                ),
-            )
-        } else {
-            parent_config.map(|parent_config| {
-                crate::config::schema::load::context_overlay::ConfigContextOverlay::derive(
-                    parent_config,
-                    &overlay.config,
-                )
-            })
-        };
-        if let Some(config_overlay) = config_overlay {
-            match config_overlay {
-                Ok(config_overlay) => {
-                    overlay.config.context_overlay = std::sync::Mutex::new(Some(config_overlay));
-                }
-                Err(error) => {
-                    log::warn!("[core-context] unable to record derived config overrides: {error}")
-                }
-            }
-        }
+        config_access::record_context_config_overlay(self.profile(), parent_config, &mut overlay);
         overlay.config.context_snapshot = None;
         let latest_embedder_config = Some(Arc::new(std::sync::Mutex::new(overlay.config.clone())));
         if let Some(snapshot) = &latest_embedder_config {

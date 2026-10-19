@@ -1,6 +1,41 @@
 use std::sync::Arc;
 
-use super::CoreContext;
+use super::{ContextOverlay, CoreContext};
+
+pub(super) fn record_context_config_overlay(
+    parent_profile: Option<&str>,
+    parent_config: Option<&crate::config::Config>,
+    overlay: &mut ContextOverlay,
+) {
+    let config_overlay = if let Some(profile_id) = overlay.profile.as_deref() {
+        let parent_profile_config = (parent_profile == Some(profile_id))
+            .then_some(parent_config)
+            .flatten();
+        Some(
+            crate::config::schema::load::context_overlay::ConfigContextOverlay::derive_profile(
+                parent_profile_config,
+                &overlay.config,
+            ),
+        )
+    } else {
+        parent_config.map(|parent_config| {
+            crate::config::schema::load::context_overlay::ConfigContextOverlay::derive(
+                parent_config,
+                &overlay.config,
+            )
+        })
+    };
+    if let Some(config_overlay) = config_overlay {
+        match config_overlay {
+            Ok(config_overlay) => {
+                overlay.config.context_overlay = std::sync::Mutex::new(Some(config_overlay));
+            }
+            Err(error) => {
+                log::warn!("[core-context] unable to record derived config overrides: {error}")
+            }
+        }
+    }
+}
 
 impl CoreContext {
     /// The embedder-supplied config for the current dispatch, if there is one.
