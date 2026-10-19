@@ -193,7 +193,7 @@ where
 
     // A pending checkpoint may have been created before this compatibility
     // gate shipped, so resume is an independent authoritative boundary.
-    if let Err(error) = ensure_config_aware_engine_compatible(config, &flow.graph) {
+    if let Err(error) = ensure_config_aware_engine_compatible(config, &flow.graph).await {
         before_refusal_settle();
         let settled_by_us =
             super::run_management::settle_parked_run(config, thread_id, flow_id, "failed", &error)

@@ -228,7 +228,7 @@ pub(super) fn prepare_flow_run(
     // Author-time validation cannot protect definitions persisted by an older
     // OpenHuman build. Re-check immediately before compilation so an upgrade
     // fails explicitly instead of silently committing incomplete merge data.
-    if let Err(error) = ensure_config_aware_engine_compatible(config, &flow.graph) {
+    if let Err(error) = ensure_config_aware_engine_compatible(config, &flow.graph).await {
         tracing::warn!(
             target: "flows",
             flow_id = %flow_id,

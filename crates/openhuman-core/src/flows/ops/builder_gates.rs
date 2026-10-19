@@ -81,14 +81,32 @@ pub(crate) async fn run_builder_gates(
     // Provider connectivity (B45) is deliberately NOT a stage: it is an advisory
     // `inference_status` on the proposal payload and a run-time rejection, so a
     // graph that is only "not runnable yet" can still be shown to the user.
-    let host = OpenHumanBuilderGateHost { ctx, config };
-    match tinyflows::gates::builder_failures(
-        graph,
-        &host,
-        &[crate::flows::tinyflows::caps::NATIVE_TOOL_PREFIX],
+    let host = match crate::flows::authoring_host::register(
+        std::sync::Arc::new(config.clone()),
+        ctx.clone(),
     )
     .await
     {
+        Ok(host) => host,
+        Err(error) => return vec![format!("builder gate could not complete: {error}")],
+    };
+    let result = async {
+        let proxy = crate::modules::tinyflows::authoring_proxy(config).await?;
+        let graph = serde_json::to_value(graph).map_err(|error| error.to_string())?;
+        proxy
+            .call::<Vec<String>>(
+                tinyflows_bus::methods::BUILDER_FAILURES,
+                &(
+                    graph,
+                    host.authoring.clone(),
+                    vec![crate::flows::tinyflows::caps::NATIVE_TOOL_PREFIX.to_string()],
+                ),
+            )
+            .await
+            .map_err(|error| error.wire_message())
+    }
+    .await;
+    match result {
         Ok(failures) => failures,
         Err(error) => {
             tracing::warn!(
@@ -98,52 +116,6 @@ pub(crate) async fn run_builder_gates(
             );
             vec![format!("builder gate could not complete: {error}")]
         }
-    }
-}
-
-/// Host side of the builder gate stack: the four `HostGateStage`s and the
-/// saved-workflow lookup the compatibility walk needs.
-struct OpenHumanBuilderGateHost<'a> {
-    ctx: &'a DispatchCtx,
-    config: &'a Config,
-}
-
-#[async_trait::async_trait]
-impl tinyflows::caps::WorkflowResolver for OpenHumanBuilderGateHost<'_> {
-    async fn resolve(&self, workflow_id: &str) -> tinyflows::error::Result<WorkflowGraph> {
-        let config = self.config.clone();
-        let id = workflow_id.to_string();
-        let loaded = tokio::task::spawn_blocking(move || load_flow_graph(&config, &id))
-            .await
-            .map_err(|e| tinyflows::error::EngineError::Capability(e.to_string()))?;
-        match loaded {
-            Ok(Some(graph)) => Ok(graph),
-            Ok(None) => Err(tinyflows::error::EngineError::Capability(format!(
-                "no saved workflow '{workflow_id}'"
-            ))),
-            Err(e) => Err(tinyflows::error::EngineError::Capability(e.to_string())),
-        }
-    }
-}
-
-#[async_trait::async_trait]
-impl tinyflows::gates::BuilderGateHost for OpenHumanBuilderGateHost<'_> {
-    async fn check(
-        &self,
-        stage: tinyflows::gates::HostGateStage,
-        graph: &WorkflowGraph,
-    ) -> tinyflows::error::Result<Vec<String>> {
-        use tinyflows::gates::HostGateStage;
-        Ok(match stage {
-            HostGateStage::ToolPolicy => validate_upload_paths(graph),
-            HostGateStage::AgentReferences => {
-                validate_agent_refs(self.ctx, self.config, graph).await
-            }
-            HostGateStage::Connections => {
-                validate_connection_refs(self.ctx, self.config, graph).await
-            }
-            HostGateStage::ToolContracts => validate_tool_contracts(self.config, graph).await,
-        })
     }
 }
 
@@ -161,15 +133,9 @@ pub(crate) async fn strict_gate(
     config: &Config,
     graph_json: &Value,
 ) -> Result<(), String> {
-    let graph = tinyflows::migrate::deserialize_graph(graph_json.clone())?;
-    let structural = tinyflows::validate::validate_all(&graph);
-    if !structural.is_empty() {
-        let messages: Vec<String> = structural.iter().map(ToString::to_string).collect();
-        return Err(format!(
-            "strict validation failed — the graph is structurally invalid:\n{}",
-            messages.join("\n")
-        ));
-    }
+    let graph = validate_and_migrate_graph(ctx, config, graph_json.clone())
+        .await
+        .map_err(|error| format!("strict validation failed — the graph is structurally invalid:\n{error}"))?;
     let gate_errors = run_builder_gates(ctx, config, &graph).await;
     if !gate_errors.is_empty() {
         return Err(format!(
@@ -310,7 +276,7 @@ pub(crate) async fn build_builder_proposal_json(
     draft_id: Option<String>,
     flow_id: Option<String>,
 ) -> Result<Value, String> {
-    let graph = tinyflows::migrate::deserialize_graph(graph)?;
+    let graph = validate_and_migrate_graph(ctx, config, graph).await?;
     build_builder_proposal(
         ctx,
         config,
@@ -332,7 +298,7 @@ pub(crate) async fn run_builder_gates_json(
     config: &Config,
     graph: Value,
 ) -> Result<Vec<String>, String> {
-    let graph = tinyflows::migrate::deserialize_graph(graph)?;
+    let graph = validate_and_migrate_graph(ctx, config, graph).await?;
     Ok(run_builder_gates(ctx, config, &graph).await)
 }
 
