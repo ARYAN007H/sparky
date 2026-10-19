@@ -30,12 +30,13 @@ impl ProgressiveReplySink for RecordingReply {
 #[tokio::test(start_paused = true)]
 async fn backend_channel_wait_does_not_cut_off_a_live_turn_after_180_seconds() {
     let _serial = crate::web_chat::RUN_CHAT_TASK_TEST_LOCK.lock().await;
+    let workspace = tempfile::tempdir().expect("temporary workspace");
     let block = crate::web_chat::TestRunChatTaskBlock {
         started: Default::default(),
         dropped: Default::default(),
         release: Default::default(),
         max_park_for: Duration::from_secs(300),
-        succeed_in: Some(tempfile::tempdir().expect("temporary workspace").keep()),
+        succeed_in: Some(workspace.path().to_path_buf()),
     };
     crate::web_chat::set_test_run_chat_task_block(Some(block.clone())).await;
 
