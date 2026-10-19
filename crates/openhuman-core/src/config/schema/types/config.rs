@@ -8,6 +8,12 @@ use std::path::PathBuf;
 
 use crate::config::schema::*;
 
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub(crate) struct ConfigDocumentSnapshot {
+    pub version: Option<tinystoragedrivers::Version>,
+    pub anchor: Option<super::load::source::ConfigSourceAnchor>,
+}
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
 pub struct ModelRegistryEntry {
     pub id: String,
@@ -57,7 +63,7 @@ pub struct Config {
     /// Revision of the shared config document this snapshot was loaded from.
     #[serde(skip)]
     #[schemars(skip)]
-    pub(crate) document_snapshot: std::sync::Mutex<super::config_snapshot::DocumentSnapshot>,
+    pub(crate) document_snapshot: std::sync::Mutex<ConfigDocumentSnapshot>,
     #[serde(skip)]
     #[schemars(skip)]
     pub(crate) context_snapshot: Option<std::sync::Weak<std::sync::Mutex<Config>>>,
