@@ -756,9 +756,10 @@ async fn dispatch(
                             },
                         });
                     }
-                    outcome
-                        .map(|outcome| (outcome.value, Some(report)))
-                        .map_err(|error| map_agent_chat_error(error, report.usage))
+                    match outcome {
+                        Ok(outcome) => Ok((outcome.value, Some(report))),
+                        Err(error) => Err(map_agent_chat_error(error, report.usage)),
+                    }
                 });
             agent
                 .lifecycle
@@ -766,6 +767,26 @@ async fn dispatch(
                 .await
         }
     }
+}
+
+fn map_agent_chat_error(
+    error: anyhow::Error,
+    usage: Option<tinyagents_harness::middleware::ResponseUsage>,
+) -> CoreError {
+    if let Some(refusal) = error.downcast_ref::<crate::budget::DispatchRefusal>() {
+        return CoreError::DispatchAdmission {
+            method: AGENT_CHAT,
+            source: *refusal,
+            usage: usage.map(|spent| crate::complete::CompletionUsage {
+                input_tokens: spent.input_tokens,
+                output_tokens: spent.output_tokens,
+                cached_tokens: spent.cached_tokens,
+                reasoning_tokens: spent.reasoning_tokens,
+                cost_usd: spent.cost_usd,
+            }),
+        };
+    }
+    CoreError::from_rpc_string(AGENT_CHAT, error.to_string())
 }
 
 fn validate_route(request: &TurnRequest) -> Result<(), CoreError> {
