@@ -85,14 +85,14 @@ pub mod tinyhumans_boot;
 /// lock: suites hold [`SHARED_ENV_LOCK`] through their own `env_lock()`.
 #[path = "support/env_guard.rs"]
 pub mod env_guard;
+/// A loopback Streamable HTTP MCP server for tests that exercise the real
+/// TinyMCP client without involving stdio trust or sandbox policy.
+#[path = "support/local_mcp_http.rs"]
+pub mod local_mcp_http;
 /// The RPC bearer and JSON-RPC helpers some suites share (see `support/`).
 #[path = "support/rpc_auth.rs"]
 pub mod rpc_auth;
 #[path = "support/rpc_harness.rs"]
 pub mod rpc_harness;
-/// A loopback Streamable HTTP MCP server for tests that exercise the real
-/// TinyMCP client without involving stdio trust or sandbox policy.
-#[path = "support/local_mcp_http.rs"]
-pub mod local_mcp_http;
 
 include!(concat!(env!("OUT_DIR"), "/raw_coverage_mods.rs"));
