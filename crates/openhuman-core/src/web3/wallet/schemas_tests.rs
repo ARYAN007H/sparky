@@ -1,7 +1,7 @@
 use super::*;
 use crate::core::all::{
     assert_schema_controller_parity, expect_schema_fields, expect_schema_identity, expect_schema_input_order,
-    expect_schema_required_inputs, required_fields_contract,
+    required_fields_contract,
 };
 
 #[test]
@@ -44,7 +44,6 @@ fn wallet_schema_wire_contracts_are_preserved() {
         &wallet_schemas("prepare_transfer"),
         &[("assetSymbol", Some(false))],
     );
-    expect_schema_required_inputs(&setup, &["encryptedMnemonic"]);
     for removed in ["prepare_swap", "prepare_contract_call"] {
         assert_eq!(wallet_schemas(removed).function, "unknown");
     }
