@@ -1,0 +1,259 @@
+//! Owner-scoped run sessions and the single monotonic PollRun reader.
+
+use std::collections::HashMap;
+use std::sync::{Arc, LazyLock, Mutex};
+use std::time::Duration;
+
+use tinyflows_bus::runs::{self, RunEvent};
+use tinyflows_catalog::{Flow, types::FlowRunTrigger};
+
+use crate::config::Config;
+use crate::flows::catalog_storage::CatalogStorageRegistration;
+use crate::modules::tinyflows as module;
+
+use super::{RunBindings, projection};
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub(crate) struct RunKey {
+    destination: String,
+    object_path: String,
+    run_id: String,
+}
+
+impl RunKey {
+    pub(crate) fn new(storage: &tinyflows_bus::catalog::CatalogStorage, run_id: &str) -> Self {
+        Self {
+            destination: storage.callback.destination.clone(),
+            object_path: storage.callback.object_path.clone(),
+            run_id: run_id.to_owned(),
+        }
+    }
+}
+
+/// One live or parked run session, bound to a stable owner address and one
+/// module event cursor. The poller is the only reader that advances this cursor;
+/// synchronous callers receive copies through independent channels.
+pub(crate) struct RunSession {
+    pub(super) bindings: tokio::sync::RwLock<Arc<RunBindings>>,
+    pub(super) config: Arc<Config>,
+    pub(super) flow: tokio::sync::RwLock<Flow>,
+    pub(super) trigger: Mutex<FlowRunTrigger>,
+    pub(super) run_id: String,
+    cursor: std::sync::atomic::AtomicU64,
+    poll_lock: tokio::sync::Mutex<()>,
+    watchers: Mutex<Vec<tokio::sync::mpsc::UnboundedSender<RunEvent>>>,
+    started: std::sync::atomic::AtomicBool,
+    observations: Mutex<Vec<tinyagents_graph::GraphObservation>>,
+}
+
+static SESSIONS: LazyLock<Mutex<HashMap<RunKey, Arc<RunSession>>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
+
+impl RunSession {
+    pub(super) fn new(
+        bindings: Arc<RunBindings>,
+        config: Arc<Config>,
+        flow: Flow,
+        trigger: FlowRunTrigger,
+        cursor: u64,
+    ) -> Arc<Self> {
+        Arc::new(Self {
+            run_id: bindings.run_id.clone(),
+            bindings: tokio::sync::RwLock::new(bindings),
+            config,
+            flow: tokio::sync::RwLock::new(flow),
+            trigger: Mutex::new(trigger),
+            cursor: std::sync::atomic::AtomicU64::new(cursor),
+            poll_lock: tokio::sync::Mutex::new(()),
+            watchers: Mutex::new(Vec::new()),
+            started: std::sync::atomic::AtomicBool::new(false),
+            observations: Mutex::new(Vec::new()),
+        })
+    }
+
+    pub(crate) fn subscribe(&self) -> tokio::sync::mpsc::UnboundedReceiver<RunEvent> {
+        let (sender, receiver) = tokio::sync::mpsc::unbounded_channel();
+        self.watchers
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .push(sender);
+        receiver
+    }
+
+    pub(super) fn publish(&self, event: RunEvent) {
+        self.watchers
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .retain(|watcher| watcher.send(event.clone()).is_ok());
+    }
+
+    pub(super) fn add_observation(&self, observation: tinyagents_graph::GraphObservation) {
+        self.observations
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .push(observation);
+    }
+
+    pub(super) fn take_observations(&self) -> Vec<tinyagents_graph::GraphObservation> {
+        std::mem::take(
+            &mut *self
+                .observations
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner),
+        )
+    }
+
+    pub(super) fn cursor(&self) -> u64 {
+        self.cursor.load(std::sync::atomic::Ordering::Acquire)
+    }
+
+    pub(super) fn set_trigger(&self, trigger: FlowRunTrigger) {
+        *self
+            .trigger
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = trigger;
+    }
+
+    pub(super) fn trigger(&self) -> FlowRunTrigger {
+        *self
+            .trigger
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+    }
+
+    pub(super) async fn replace_bindings(&self, bindings: Arc<RunBindings>) {
+        *self.bindings.write().await = bindings;
+    }
+
+    pub(super) async fn replace_flow(&self, flow: Flow) {
+        *self.flow.write().await = flow;
+    }
+
+    /// Start the one PollRun task for this process/run owner.
+    pub(super) fn start_polling(self: &Arc<Self>, proxy: tinybus::Proxy) {
+        if self
+            .started
+            .swap(true, std::sync::atomic::Ordering::AcqRel)
+        {
+            return;
+        }
+        let session = Arc::clone(self);
+        tokio::spawn(async move {
+            loop {
+                match session.drain(&proxy, true).await {
+                    Ok(true) => {
+                        remove(&session);
+                        return;
+                    }
+                    Ok(false) => tokio::time::sleep(Duration::from_millis(50)).await,
+                    Err(error) => {
+                        tracing::warn!(
+                            target: "flows",
+                            run_id = %session.run_id,
+                            error = %error,
+                            "[flows] PollRun failed; retrying the owner-scoped cursor"
+                        );
+                        tokio::time::sleep(Duration::from_millis(250)).await;
+                    }
+                }
+            }
+        });
+    }
+
+    /// Poll all currently available pages. The lock prevents a resume waiter
+    /// and the background projector from reading and publishing one sequence
+    /// twice. `project=false` is used only to prime a process-restarted parked
+    /// run before admitting its resume.
+    pub(super) async fn drain(&self, proxy: &tinybus::Proxy, project: bool) -> Result<bool, String> {
+        let _poll = self.poll_lock.lock().await;
+        loop {
+            let cursor = self.cursor();
+            let bindings = Arc::clone(&self.bindings.read().await);
+            let request = runs::RunControlRequest {
+                storage: bindings.storage(),
+                run_id: self.run_id.clone(),
+                cursor,
+            };
+            let page: runs::PollRun = proxy
+                .call(runs::methods::POLL_RUN, (request,))
+                .await
+                .map_err(|error| error.wire_message())?;
+            for event in page.events {
+                if event.seq <= self.cursor() {
+                    continue;
+                }
+                self.cursor
+                    .store(event.seq, std::sync::atomic::Ordering::Release);
+                if project {
+                    projection::project(self, &event).await;
+                    self.publish(event);
+                }
+            }
+            if page.done {
+                return Ok(true);
+            }
+            if page.next_cursor <= cursor {
+                return Ok(false);
+            }
+            self.cursor
+                .store(page.next_cursor, std::sync::atomic::Ordering::Release);
+        }
+    }
+}
+
+pub(crate) fn insert(session: Arc<RunSession>) -> Result<(), String> {
+    let bindings = session
+        .bindings
+        .try_read()
+        .map_err(|_| "run bindings are being updated".to_string())?;
+    let key = RunKey::new(&bindings.storage(), &session.run_id);
+    let mut sessions = SESSIONS
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    if sessions.contains_key(&key) {
+        return Err(format!("flow run '{}' already has a host session", session.run_id));
+    }
+    sessions.insert(key, session);
+    Ok(())
+}
+
+pub(crate) fn get(storage: &tinyflows_bus::catalog::CatalogStorage, run_id: &str) -> Option<Arc<RunSession>> {
+    SESSIONS
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .get(&RunKey::new(storage, run_id))
+        .cloned()
+}
+
+pub(crate) fn remove(session: &Arc<RunSession>) {
+    let Some(bindings) = session.bindings.try_read().ok() else {
+        return;
+    };
+    let key = RunKey::new(&bindings.storage(), &session.run_id);
+    let mut sessions = SESSIONS
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    if sessions
+        .get(&key)
+        .is_some_and(|current| Arc::ptr_eq(current, session))
+    {
+        sessions.remove(&key);
+    }
+}
+
+pub(crate) fn get_by_key(key: &RunKey) -> Option<Arc<RunSession>> {
+    SESSIONS
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .get(key)
+        .cloned()
+}
+
+pub(crate) fn sessions() -> Vec<Arc<RunSession>> {
+    SESSIONS
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .values()
+        .cloned()
+        .collect()
+}
