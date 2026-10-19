@@ -134,7 +134,7 @@ async fn config_snapshot_cannot_be_saved_into_a_different_tenant_scope() {
     let path = tmp.path().join("config.toml");
     let workspace = tmp.path().join("workspace");
 
-    let mut from_tenant_a = {
+    let (from_tenant_a, tenant_a_version) = {
         let _source = ForcedDocumentSource::new(
             scoped(&storage, "tenant-source-a"),
             Scope::new("tenant-source-a").unwrap(),
@@ -158,10 +158,11 @@ async fn config_snapshot_cannot_be_saved_into_a_different_tenant_scope() {
         let config = Config::load_from_config_path(&path, &workspace)
             .await
             .unwrap();
-        *config.document_version.lock().unwrap()
+        let version = *config.document_version.lock().unwrap();
+        version
     };
-    assert_eq!(from_tenant_a.1, tenant_b_version);
-    let (mut from_tenant_a, _) = from_tenant_a;
+    assert_eq!(tenant_a_version, tenant_b_version);
+    let mut from_tenant_a = from_tenant_a;
 
     from_tenant_a.default_model = Some("must-not-cross-tenant-boundary".into());
     let error = {
