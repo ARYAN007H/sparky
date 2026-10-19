@@ -150,6 +150,7 @@ pub(crate) struct SessionTurnSidecar {
     pub deferred_terminal: Option<crate::agent::tinyagents::turn_outcome::DeferredTurnTerminal>,
 }
 
+#[path = "dispatch_control.rs"]
 mod dispatch_control;
 pub use dispatch_control::{decide_dispatch, DispatchDecision, DispatchInputs, TurnDispatchState};
 
