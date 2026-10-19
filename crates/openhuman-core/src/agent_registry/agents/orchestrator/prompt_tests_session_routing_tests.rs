@@ -61,7 +61,7 @@ fn the_withheld_block_renders_for_a_renamed_session_with_a_filter() {
     // A packed delegate no Cargo feature gates must always render with its
     // route; this is the row that pins the block in every build profile.
     assert!(
-        block.contains("`tasks` (manage_tasks"),
+        block.contains("`tasks` (`manage_tasks`"),
         "a packed delegate must render with its route:\n{block}"
     );
     // `make_presentation` is a `documents`-gated skill: under `default` it is
@@ -69,7 +69,7 @@ fn the_withheld_block_renders_for_a_renamed_session_with_a_filter() {
     // reads as a broken block (which is how openhuman#6507 came to be filed
     // and retracted). Assert it exactly when the feature is on, and assert its
     // absence when it is off, so the expectation tracks the build profile.
-    let presentation_row = block.contains("`documents` (make_presentation");
+    let presentation_row = block.contains("`documents` (`make_presentation`");
     assert_eq!(
         presentation_row,
         cfg!(feature = "documents"),
