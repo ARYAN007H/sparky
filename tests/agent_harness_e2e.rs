@@ -119,10 +119,6 @@ fn tool_call_completion(name: &str, arguments: Value) -> Value {
     }]})
 }
 
-fn error_completion(status: u16, message: &str) -> Value {
-    json!({ "status": status, "error": message })
-}
-
 /// True when any captured upstream request carries the engine's unknown-tool
 /// result (`tinyagents-harness` `agent_loop/tools.rs`: "unknown tool `name`
 /// (arguments: …); valid tools: […]"). Matched case-insensitively on purpose:
