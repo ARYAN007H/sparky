@@ -291,6 +291,10 @@ run_json_rpc_e2e() {
     json_rpc_mcp_e2e json_rpc_inference_e2e json_rpc_auth_security_e2e
     json_rpc_config_e2e json_rpc_agent_team_e2e json_rpc_web_chat_e2e
     json_rpc_misc_e2e)
+  if [[ "${1:-}" =~ ^json_rpc_.*_e2e$ ]]; then
+    targets=("$1")
+    shift
+  fi
   for target in "${targets[@]}"; do
     if ! listing="$(cargo_test --test "$target" -- --list)"; then
       echo "[test-rust-with-mock] ERROR: could not enumerate ${target}; refusing an empty or partial list." >&2
@@ -371,7 +375,7 @@ run_full_suite() {
     elif [ "$target" = "in_process_all" ]; then
       run_in_process_modules "$@"
     elif [[ "$target" =~ ^json_rpc_.*_e2e$ ]]; then
-      run_json_rpc_e2e "$@"
+      run_json_rpc_e2e "$target" "$@"
     elif [ "$target" = "tinymcp_storage_smoke_e2e" ]; then
       OPENHUMAN_MODULE_PATH="$tinymcp_dir${OPENHUMAN_MODULE_PATH:+:$OPENHUMAN_MODULE_PATH}" \
         cargo_test --features e2e-test-support --test "$target" -- "$@"
@@ -423,6 +427,13 @@ elif [ "$#" -ge 2 ] && [ "$1" = "--test" ] && [ "$2" = "json_rpc_e2e" ]; then
     shift
   fi
   run_json_rpc_e2e "$@"
+elif [ "$#" -ge 2 ] && [ "$1" = "--test" ] && [[ "$2" =~ ^json_rpc_.*_e2e$ ]]; then
+  target="$2"
+  shift 2
+  if [ "${1:-}" = "--" ]; then
+    shift
+  fi
+  run_json_rpc_e2e "$target" "$@"
 elif [ "$#" -ge 2 ] && [ "$1" = "--test" ] && [ "$2" = "mcp_registry_e2e" ]; then
   shift 2
   if [ "${1:-}" = "--" ]; then
