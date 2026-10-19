@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { VoiceNotePlayer } from './VoiceNotePlayer';
@@ -106,6 +106,57 @@ describe('VoiceNotePlayer', () => {
     await waitFor(() => expect(onPlayback.mock.calls.at(-1)?.[0].detail.active).toBe(true));
     unmount();
     expect(onPlayback.mock.calls.at(-1)?.[0].detail.active).toBe(false);
+    window.removeEventListener('voice-note-mascot', onPlayback);
+  });
+
+  it('keeps mascot playback silenced if a paused audio element reports a late timeupdate', async () => {
+    const onPlayback = vi.fn();
+    window.addEventListener('voice-note-mascot', onPlayback);
+    render(
+      <VoiceNotePlayer
+        src="blob:reply"
+        mascotPlayback
+        visemes={[{ viseme: 'aa', start_ms: 0, end_ms: 500 }]}
+      />
+    );
+    fireEvent.click(screen.getByTestId('voice-note-toggle'));
+    await waitFor(() => expect(onPlayback.mock.calls.at(-1)?.[0].detail.active).toBe(true));
+    const audio = FakeAudio.last!;
+    audio.pause();
+    audio.currentTime = 0.2;
+    audio.emit('timeupdate');
+    expect(onPlayback.mock.calls.at(-1)?.[0].detail.active).toBe(false);
+    window.removeEventListener('voice-note-mascot', onPlayback);
+  });
+
+  it('samples reply visemes during playback between media timeupdate events', async () => {
+    let frame: FrameRequestCallback | undefined;
+    const cancel = vi.fn();
+    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+      frame = callback;
+      return 1;
+    });
+    vi.stubGlobal('cancelAnimationFrame', cancel);
+    const onPlayback = vi.fn();
+    window.addEventListener('voice-note-mascot', onPlayback);
+    render(
+      <VoiceNotePlayer
+        src="blob:reply"
+        mascotPlayback
+        visemes={[
+          { viseme: 'aa', start_ms: 0, end_ms: 100 },
+          { viseme: 'PP', start_ms: 100, end_ms: 500 },
+        ]}
+      />
+    );
+    fireEvent.click(screen.getByTestId('voice-note-toggle'));
+    await waitFor(() => expect(frame).toBeTypeOf('function'));
+    const audio = FakeAudio.last!;
+    audio.currentTime = 0.25;
+    act(() => frame?.(16));
+    expect(onPlayback.mock.calls.at(-1)?.[0].detail).toMatchObject({ active: true, viseme: 'PP' });
+    audio.pause();
+    expect(cancel).toHaveBeenCalled();
     window.removeEventListener('voice-note-mascot', onPlayback);
   });
 

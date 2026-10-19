@@ -13,6 +13,7 @@ import {
   countTestId,
   textExists,
   waitForTestId,
+  waitForTestIdAtIndex,
 } from '../helpers/element-helpers';
 import { resetApp } from '../helpers/reset-app';
 import { navigateViaHash } from '../helpers/shared-flows';
@@ -158,11 +159,7 @@ describe('Chat voice notes', () => {
     await clickTestIdAtIndex('voice-note-toggle', 1);
     await browser.waitUntil(
       async () =>
-        (await (await (await import('../helpers/element-helpers')).waitForTestIdAtIndex(
-          'voice-note-toggle',
-          1
-        )).getAttribute('aria-label'))
-          ?.getAttribute('aria-label')
+        (await (await waitForTestIdAtIndex('voice-note-toggle', 1)).getAttribute('aria-label'))
           ?.toLowerCase()
           .includes('pause'),
       { timeout: 5_000 }
