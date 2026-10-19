@@ -298,7 +298,7 @@ download, its `dlopen`, or its resident memory.
 | --- | --- | --- |
 | [`documents.rs`](documents.rs) | `tinydocs` | `generate_docx`, `generate_pptx`, `extract_text`, bounded `extract_document`, complete `convert_markdown`, `inspect_image`, and `render_pdf`. Inbound bytes ride a TinyBus stream; held results are pulled with `ReadOutput` and released. Feature `documents`. |
 | [`wallet.rs`](wallet.rs) | `tinywallet` | Typed wallet, Web3, ERC-20 encoding, and x402 calls. Key material goes only to confidential calls to an attested module whose digest is pinned by the registry (`attested_proxy`). Feature `web3`. |
-| [`voice.rs`](voice.rs) | `tinyvoice` | Hallucination checks, hotkey recording sessions, and capture preparation. Every call returns a `VoiceCallError` the caller falls back from. Feature `voice`. |
+| [`voice.rs`](voice.rs) | `tinyvoice` | Transcript hallucination screening for speech-to-text results. An unavailable module lets the transcript pass through. Feature `voice`. |
 | [`desktop.rs`](desktop.rs) | `tinycomputer` | The shared proxy for TinyComputer: loads it with an 8 second bound, reinitializes it when its configuration fingerprint changes, and exposes `call`, `permissions`, `state`, `jev_ready`. |
 | [`computer_config.rs`](computer_config.rs) | `tinycomputer` | The private configuration: `jev` (decision model), `planner` (planner, rescue and output models), `browser` (Chrome path), `trace_path`. Rebuilt from `[computer]` and stored credentials on every call; `OPENHUMAN_COMPUTER_TRACE` turns tracing on. |
 | [`computer.rs`](computer.rs) | `tinycomputer` | `status` for the Computer settings page: lifecycle state, configured routes, and optionally what the module reports through `Describe`. |

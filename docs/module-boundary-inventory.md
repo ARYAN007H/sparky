@@ -23,7 +23,7 @@ copying its implementation into a host, or accepting weaker isolation.
 | tinywallet | none in normal/build host dependencies | tinywallet-bus | core wallet/web3/x402 | Complete: v0.20.0 contract 1.14 adds mnemonic word-count validation to module-owned mnemonic derivation, native transactions, Web3 quotes/execution, ERC-20 encoding, and x402 payment parsing/budgets/ledger. OpenHuman retains encrypted-key custody, authenticated transport, explicit approval, and lifecycle orchestration |
 | tinybox | tinybox-core (test-only) | tinybox-bus | core sandbox and security, desktop gateways | Host cutover uses TinyBox v0.1.28 (contract 1.18); the host calls members only through `tinybox_bus::names` constants and uses `tinybox_bus::CommandClass` directly (no host copy or re-export). It covers for sandbox/resource lifecycle, collected and supervised execution, jailed and native shell execution (unsandboxed, cron and the `shell` tool run through `StartNativeShellExec`; core has no shell selection or spawn of its own), standalone Docker policy validation (`ValidateDockerPolicy`), Docker control, local grants (`ResolveLocalGrants`; the host re-applies `is_always_forbidden` to the reply), file transfer and port forwarding. Host authorization and the security floor remain in OpenHuman |
 | tinycomputer | none | tinycomputer-bus | core voice, paste/focus and permission checks | Permission, focus, paste and Globe listener operations use the module; native thread and target rules remain covered |
-| tinyvoice | None | tinyvoice-bus | core voice capture/hotkeys | Module-owned devices, recording and continuous capture, bounded audio reads/batches, explicit lease cleanup; computer module permission decisions |
+| tinyvoice | None | tinyvoice-bus | core voice transcript screening | Module-owned audio capabilities remain available through the published contract; OpenHuman currently uses it only for transcript hallucination screening |
 | tinyruntime | tinyruntime-pyserver | tinyruntime-bus | core Python worker, optional TinyJuice ML | Excluded from this migration: TinyRuntime is being removed separately |
 | tinydocs / tinymemory | none | tinydocs-bus | core memory converter and file sources | Bus DocumentConverter replaces OfficeConverter, including XLSX and existing PDF/DOCX/PPTX format coverage; ingestion metadata remains host-owned; `[components].documents = false` refuses `ensure_loaded("tinydocs")` and the `documents` tool group, makes the converter answer `COMPONENT_DISABLED:documents`, and degrades attachment ingest to a note |
 | tinysearch | none observed | tinysearch-bus (v0.5.0, contract 2.2) | core module search proxy; error classification (`errors::Category`), role helpers and route/presentation config types live in tinysearch-bus; render text/markdown and provider labels live in `tinysearch_bus::{render,labels}`, core keeps the UI-metadata projection (`search/render.rs`) | Preserve existing bus adapter; enforce contract and host dependency graphs |
@@ -333,13 +333,13 @@ leases on cancellation, sign-out and shutdown. Failed cleanup stays registered
 for retry. Microphone authorization remains a TinyComputer call; the host does
 not link TinyVoice or CPAL. The existing hotkey adapter remains module-backed.
 
-TinyVoice v0.3.0 (contract 1.10) owns wake-word sequencing (`SequenceUtterance`),
-the pre-transcription recording gates (`GateRecording`) and the hotkey recording
-state machine (`SessionOpen` / `SessionAdvance` / `SessionStatus` /
-`SessionClose`). The always-on adapter and `voice/server` call them by contract
-constant; the host keeps only native recording setup, transcription, text
-delivery and the Globe composition, and reports each fact to the session and
-performs the one action it answers with (openhuman#7587).
+TinyVoice v0.3.0 (contract 1.10) added wake-word sequencing
+(`SequenceUtterance`), pre-transcription recording gates (`GateRecording`) and
+the hotkey recording state machine (`SessionOpen` / `SessionAdvance` /
+`SessionStatus` / `SessionClose`). This records the earlier host integration
+stage (openhuman#7587). OpenHuman now calls TinyVoice only for transcript
+hallucination screening; the published optional contract remains unchanged for
+other consumers.
 
 This cut removes the `tinyvoice` and `cpal` host exceptions, leaving nine
 implementation exceptions for Channels, MCP, Box and Wallet. The resolved

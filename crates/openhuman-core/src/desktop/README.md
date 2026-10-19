@@ -18,7 +18,7 @@ The members are independent. They share a host-facing role, not a data model.
 Each one meets the frontend in one of two ways:
 
 ```text
-             React shell / notch window / browser SPA
+             React shell / mascot window / browser SPA
                |                         ^
      JSON-RPC  |                         |  Socket.IO
   (openhuman.*)|                         |  (openhuman-rpc server/socketio.rs)
@@ -109,9 +109,9 @@ Method names are `openhuman.<namespace>_<function>`.
 
 ## Boundaries
 
-- Windows, tray, notch window, and OS integration belong to the Tauri shell
-  (`crates/openhuman-app/`). The notch window host is
-  [`crates/openhuman-app/src/notch_window.rs`](../../../openhuman-app/src/notch_window.rs).
+- Windows, tray, mascot window, and OS integration belong to the Tauri shell
+  (`crates/openhuman-app/`). The mascot window host is
+  [`crates/openhuman-app/src/mascot_native_window.rs`](../../../openhuman-app/src/mascot_native_window.rs).
 - Socket.IO forwarding belongs to [`crates/openhuman-rpc/src/server/socketio.rs`](../../../openhuman-rpc/src/server/socketio.rs).
 - OS accessibility (AX and IOKit FFI, the Swift helper, focus, permissions,
   the Globe key) executes inside the compiled TinyComputer module in

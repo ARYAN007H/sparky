@@ -30,7 +30,7 @@ setStoreForApiClient(() => getCoreStateSnapshot().snapshot.sessionToken);
 // window label, so the Rust shell appends `?window=mascot` to the URL it
 // loads. Detect it via the URL param so we can skip `getCurrentWindow()`
 // — which would either throw or hit the IPC-bootstrap gap that
-// `tauriRuntimeAvailable() (= the hardened `isTauri()`) now guards
+// `tauriRuntimeAvailable()` (the hardened `isTauri()` check) now guards
 // against by reading `window.__TAURI_INTERNALS__.invoke`.
 const urlWindowParam = (() => {
   try {

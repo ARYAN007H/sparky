@@ -189,9 +189,8 @@ broadcast to every client, most under both a colon- and an
 underscore-separated name (`workspace:changed` and `workspace_changed`).
 
 `COMPANION_STATE_BUS` and `publish_companion_state_changed` are a
-transport-only seam for the shell's companion: the native macOS notch
-WKWebView has no Tauri IPC bridge and connects to this Socket.IO endpoint
-directly.
+transport-only seam for companion clients that receive lifecycle state over
+Socket.IO, separate from the main renderer's Tauri event.
 
 ## Layout
 

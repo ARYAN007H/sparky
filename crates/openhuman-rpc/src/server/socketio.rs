@@ -11,11 +11,9 @@
 //! connected client, most under both a colon- and an underscore-separated
 //! event name for frontend compatibility. `COMPANION_STATE_BUS` is a broadcast
 //! channel dedicated to shell-originated companion lifecycle events: the
-//! companion implementation itself lives in the Tauri shell, but the native
-//! macOS notch WKWebView has no Tauri IPC bridge and connects to the
-//! embedded core's Socket.IO endpoint directly, so this module keeps a
-//! transport-only seam for it rather than reintroducing a core-side
-//! companion domain.
+//! companion implementation itself lives in the Tauri shell; companion
+//! clients that use Socket.IO receive lifecycle state through this
+//! transport-only seam rather than a core-side companion domain.
 //!
 //! The socketioxide/axum transport bodies (the actual `SocketIo` server,
 //! connection handlers, and `spawn_web_channel_bridge`) are gated behind the
@@ -37,7 +35,7 @@ use socketioxide::SocketIo;
 use crate::core_host::web_chat::{GuardrailPayload, WebChannelEvent};
 
 /// Shell-originated companion lifecycle events that still need to reach
-/// Socket.IO-only surfaces such as the native macOS notch WKWebView.
+/// Companion clients that receive lifecycle state through Socket.IO.
 static COMPANION_STATE_BUS: once_cell::sync::Lazy<tokio::sync::broadcast::Sender<Value>> =
     once_cell::sync::Lazy::new(|| {
         let (tx, _rx) = tokio::sync::broadcast::channel(64);
@@ -46,10 +44,9 @@ static COMPANION_STATE_BUS: once_cell::sync::Lazy<tokio::sync::broadcast::Sender
 
 /// Publish a shell-side companion state payload for Socket.IO clients.
 ///
-/// The companion implementation lives in the Tauri shell, but the notch
-/// WKWebView has no Tauri IPC bridge and connects directly to the embedded
-/// core's Socket.IO endpoint. Keeping this transport-only seam here avoids
-/// reintroducing the removed core companion domain.
+/// The companion implementation lives in the Tauri shell. Keeping this
+/// transport-only seam here avoids reintroducing the removed core companion
+/// domain.
 pub fn publish_companion_state_changed(payload: Value) -> usize {
     COMPANION_STATE_BUS.send(payload).unwrap_or_default()
 }
@@ -585,9 +582,8 @@ pub fn spawn_web_channel_bridge(io: SocketIo) {
     let io_companion = io.clone();
     let io_workspace = io.clone();
 
-    // Shell companion state → broadcast to all clients. The main renderer also
-    // receives a Tauri event directly; this path preserves the Socket.IO-only
-    // native notch surface.
+    // Shell companion state → broadcast to Socket.IO clients. The main
+    // renderer also receives a Tauri event directly.
     tokio::spawn(async move {
         let mut rx = subscribe_companion_state_changed();
         loop {

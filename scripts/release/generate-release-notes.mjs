@@ -657,7 +657,7 @@ export function groupPullRequestsByHighlight(pullRequests) {
   const groups = [
     {
       title: '🎙️ Voice & hands-free control',
-      keywords: ['voice', 'push-to-talk', 'ptt', 'wake word', 'notch', 'vad', 'stt', 'desktop control', 'automate', 'accessibility', 'vision'],
+      keywords: ['voice', 'vad', 'stt', 'desktop control', 'automate', 'accessibility', 'vision'],
       summary:
         'Voice and hands-free control get more useful across the desktop, with always-on listening, global push-to-talk, faster command routing, and stronger automation paths for interacting with apps.',
       pullRequests: [],
