@@ -451,7 +451,7 @@ fn child_inherits_the_same_physical_dispatch_admission() {
 }
 
 #[test]
-fn detached_child_retains_the_parent_dispatch_admission() {
+fn detached_child_inherits_the_parent_dispatch_admission() {
     let admission: Arc<dyn crate::agent::tinyagents::budget::PhysicalDispatchAdmission> =
         Arc::new(TestAdmission);
     let parent = OpenHumanRunContext {
