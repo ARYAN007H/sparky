@@ -140,7 +140,7 @@ fn an_equal_millisecond_live_close_persists_and_a_stale_snapshot_cannot_reopen_i
         .load()
         .unwrap()
         .into_iter()
-        .find(|record| record.subagent_session_id == "equal-ms-close")
+        .find(|record| record.subagent_session_id == original.subagent_session_id)
         .expect("session remains stored");
     assert_eq!(closed.status, DurableSubagentStatus::Closed);
     assert!(!closed.reusable);

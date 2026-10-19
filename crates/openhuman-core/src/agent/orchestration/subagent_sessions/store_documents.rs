@@ -228,11 +228,11 @@ impl Docs {
             .await
             .map(|updated| updated.map(|(value, _)| value))
         })?;
-        updated
+        Ok(updated
             .map(|value| {
                 serde_json::from_value::<StoredSession>(value).map(DurableSubagentSession::from)
             })
-            .transpose()
+            .transpose()?)
     }
 
     /// Whether the one-time legacy file import finished in this scope.
