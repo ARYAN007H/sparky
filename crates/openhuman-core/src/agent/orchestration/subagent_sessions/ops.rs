@@ -182,7 +182,7 @@ pub fn mark_finished(
 ) -> Result<(), String> {
     let task_id = task_id.to_owned();
     let status = DurableSubagentStatus::from_run_status(run_status);
-    let updated = update_session(store, subagent_session_id, |session, now| {
+    let updated = update_session(store, subagent_session_id, move |session, now| {
         session.current_task_id = Some(task_id.clone());
         session.status = status;
         session.latest_history = Some(history.clone());
@@ -206,7 +206,7 @@ pub fn mark_failed(
     error: String,
 ) -> Result<(), String> {
     let task_id = task_id.to_owned();
-    let updated = update_session(store, subagent_session_id, |session, now| {
+    let updated = update_session(store, subagent_session_id, move |session, now| {
         session.current_task_id = Some(task_id.clone());
         session.status = DurableSubagentStatus::Failed;
         session.latest_error = Some(error.clone());
