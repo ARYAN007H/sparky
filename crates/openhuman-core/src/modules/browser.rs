@@ -41,6 +41,10 @@ pub(crate) const CHROME_PATH_HINT: &str = "Chrome could not be started from the 
 
 /// How TinyComputer says no Chrome was found: agent-browser's own words
 /// before TinyComputer 0.11, and the module's since.
+/// Where Chrome puts a tab whose navigation failed
+/// (`chrome-error://chromewebdata/`).
+const CHROME_ERROR_SCHEME: &str = "chrome-error:";
+
 const CHROME_MISSING: &[&str] = &["chrome not found", "no chrome or chromium was found"];
 
 /// How TinyComputer says the browser binary it was given would not start, or
