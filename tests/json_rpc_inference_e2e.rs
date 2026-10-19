@@ -155,7 +155,6 @@ async fn json_rpc_inference_status_reports_unreachable_without_spawning_a_runtim
     rpc_join.abort();
 }
 
-
 #[tokio::test]
 async fn json_rpc_local_ai_lm_studio_settings_and_prompt() {
     let _env_lock = json_rpc_e2e_env_lock_async().await;
@@ -286,7 +285,6 @@ async fn json_rpc_local_ai_lm_studio_settings_and_prompt() {
     rpc_join.abort();
 }
 
-
 #[tokio::test]
 async fn json_rpc_local_ai_ollama_settings_can_be_cleared_over_rpc() {
     let _env_lock = json_rpc_e2e_env_lock_async().await;
@@ -337,7 +335,6 @@ async fn json_rpc_local_ai_ollama_settings_can_be_cleared_over_rpc() {
     mock_join.abort();
     rpc_join.abort();
 }
-
 
 #[tokio::test]
 async fn json_rpc_inference_namespace_lm_studio_prompt_and_status() {
@@ -508,7 +505,6 @@ async fn json_rpc_inference_namespace_lm_studio_prompt_and_status() {
     rpc_join.abort();
 }
 
-
 #[tokio::test]
 async fn json_rpc_inference_prompt_requires_external_ollama_runtime_when_unreachable() {
     let _env_lock = json_rpc_e2e_env_lock_async().await;
@@ -643,7 +639,6 @@ async fn voice_status_returns_availability() {
     rpc_join.abort();
 }
 
-
 #[tokio::test]
 async fn voice_live_settings_round_trip_over_json_rpc() {
     let _env_lock = json_rpc_e2e_env_lock_async().await;
@@ -734,7 +729,6 @@ async fn voice_live_settings_round_trip_over_json_rpc() {
     rpc_join.abort();
 }
 
-
 #[tokio::test]
 async fn voice_cloud_transcribe_registered_e2e() {
     let _env_lock = json_rpc_e2e_env_lock_async().await;
@@ -810,7 +804,6 @@ async fn voice_cloud_transcribe_registered_e2e() {
 // server subprocess — the `FakeMcpTransport` in `client/mod.rs` covers that
 // path at unit level. The spawn path is guarded behind a trait so tests can
 // inject fakes without touching the filesystem.
-
 
 /// #5947 — `validate_only` is a dry run for **stt**, not only for tts.
 ///
@@ -923,4 +916,3 @@ fn graph_binding_to_undeclared_agent_field() -> Value {
         ]
     })
 }
-
