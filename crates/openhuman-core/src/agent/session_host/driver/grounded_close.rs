@@ -234,7 +234,7 @@ pub(super) struct GroundedClose {
 /// Keeping this separate from the model-driven repair path guarantees zero
 /// additional provider calls once its recovery budget is exhausted.
 fn classified_halt_close(outcome: &TinyagentsTurnOutcome) -> Option<GroundedClose> {
-    let reason = outcome.breaker_halt.as_deref()?;
+    let reason = outcome.breaker_halt.as_deref().unwrap_or_default();
     if outcome.failure_cause.is_none() && !reason.starts_with("Stopping after ") {
         return None;
     }

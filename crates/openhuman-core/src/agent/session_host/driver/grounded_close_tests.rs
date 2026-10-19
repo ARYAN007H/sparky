@@ -179,6 +179,34 @@ fn unrecognized_typed_class_does_not_fall_back_to_english_halt_phrases() {
     );
 }
 
+#[test]
+fn typed_cause_without_halt_note_still_closes_and_keeps_operation() {
+    let mut outcome = classified_halt("", "provider_config");
+    outcome.breaker_halt = None;
+    outcome.tool_outcomes.clear();
+
+    let close = classified_halt_close(&outcome).expect("typed cause closes without a note");
+    assert!(
+        close.output.contains("configured model or provider rejected"),
+        "summary uses typed provider_config cause even without a note: {}",
+        close.output
+    );
+    assert_eq!(close.usage.model_calls, 0);
+
+    let stop = crate::agent::session_host::stop_summary::classify_stop_with_cause(
+        None,
+        outcome.failure_cause,
+        false,
+        false,
+    )
+    .expect("typed cause is still projected to the session stop");
+    assert_eq!(
+        stop.failure_class.as_ref().map(|class| class.as_str()),
+        Some("provider_config")
+    );
+    assert_eq!(stop.operation.as_deref(), Some("search"));
+}
+
 /// The host adapter delegates generation and verification to TinyAgents while
 /// retaining its selected model, temperature, output cap and billing gauge.
 #[tokio::test]
