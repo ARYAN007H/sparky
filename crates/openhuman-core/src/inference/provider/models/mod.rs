@@ -5,8 +5,5 @@ pub(crate) mod local_runtime;
 mod openrouter;
 
 #[cfg(test)]
-pub(super) use catalog_listing::resolve_local_runtime_key;
-
-#[cfg(test)]
-#[path = "../models_tests.rs"]
+#[path = "mod_tests.rs"]
 mod tests;
