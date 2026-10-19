@@ -41,7 +41,7 @@ tinyagents-harness <--- tinyagents-session
    |                       |
 tinyagents-runtime --------+
    ^
-tinyagents-orchestration::{subagent,teams,workflow}
+tinyagents-orchestration::{subagent,workflow}
    ^
 OpenHuman agent/{session_host,subagent_host,orchestration/**}
 ```
