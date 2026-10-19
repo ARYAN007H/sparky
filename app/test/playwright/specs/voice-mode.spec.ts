@@ -83,11 +83,11 @@ test.describe('Voice mode integration', () => {
     await expect(page.getByTestId('chat-message-input')).toBeVisible();
   });
 
-  test('legacy Human route redirects to the shipped chat microphone composer', async ({ page }) => {
+  test('Human route shows the shipped live voice controls', async ({ page }) => {
     await page.goto('/#/human');
-    await expect(page).toHaveURL(/#\/chat$/);
-    await expect(page.getByRole('button', { name: 'Voice mode' })).toBeVisible();
-    await expect(page.getByTestId('chat-message-input')).toBeVisible();
+    await expect(page).toHaveURL(/#\/human$/);
+    await expect(page.getByTestId('live-voice-controls')).toBeVisible();
+    await expect(page.getByTestId('live-voice-start')).toBeVisible();
   });
 
   test('mic failure never inserts a beep placeholder as a user message', async ({ page }) => {

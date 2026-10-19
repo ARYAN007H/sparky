@@ -285,7 +285,7 @@ test.describe('Settings - Feature Preferences', () => {
   test('persists the custom mascot voice override on the voice panel', async ({ page }) => {
     await openAuthenticatedRoute(page, 'pw-settings-mascot-voice', '/settings/face');
 
-    await expect(page.getByText('Mascot Voice')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Voice', exact: true })).toBeVisible();
     const customVoiceOption = page.locator(
       '[data-testid="mascot-voice-select"] option[value="__custom__"]'
     );

@@ -33,6 +33,8 @@
  * generated document titles. They remain separate from grouped task insights.
  */
 import { expect, type Locator, type Page, test } from '@playwright/test';
+import { mkdir, writeFile } from 'node:fs/promises';
+import path from 'node:path';
 
 import {
   resetMock,
@@ -49,6 +51,18 @@ import {
 } from '../helpers/core-rpc';
 
 const USER_ID = 'pw-aui-tool-result-elements';
+const GITHUB_REPOSITORY_ACTION = 'GITHUB_LIST_REPOSITORIES_FOR_THE_AUTHENTICATED_USER';
+
+function makeComposioTool(name: string) {
+  return {
+    type: 'function',
+    function: {
+      name,
+      description: 'List repositories for the authenticated user',
+      parameters: { type: 'object', properties: {} },
+    },
+  };
+}
 
 async function openChat(page: Page): Promise<string> {
   await bootAuthenticatedPage(page, USER_ID, '/chat');
@@ -152,6 +166,7 @@ test.describe('assistant-ui tool-result elements', () => {
       'composioConnections',
       JSON.stringify([{ id: 'conn-github', toolkit: 'github', status: 'ACTIVE' }])
     );
+    await setMockBehavior('composioTools', JSON.stringify([makeComposioTool(GITHUB_REPOSITORY_ACTION)]));
   });
 
   // ── elements/code-diff.tsx ────────────────────────────────────────────
@@ -161,6 +176,11 @@ test.describe('assistant-ui tool-result elements', () => {
   }) => {
     const threadId = await openChat(page);
     const PROMPT = 'AUI-DIFF-CASE raise the retry count and the timeout';
+    const actionDir = process.env.OPENHUMAN_ACTION_DIR;
+    if (!actionDir) throw new Error('The web E2E session did not provide OPENHUMAN_ACTION_DIR');
+    const fixturePath = path.join(actionDir, 'e2e/aui/diff-subject.ts');
+    await mkdir(path.dirname(fixturePath), { recursive: true });
+    await writeFile(fixturePath, 'const retries = 1;\nconst timeoutMs = 500;\n');
     await scriptToolCall('AUI-DIFF-CASE', [
       {
         name: 'edit',
@@ -245,7 +265,7 @@ test.describe('assistant-ui tool-result elements', () => {
     // (`ToolDataView.tsx:isFlatObjectArray`). `result` is one of the semantic
     // keys it unwraps to before deciding, so this payload reaches the table.
     await setMockBehavior(
-      'composioExecuteResponse_GITHUB_LIST_REPOS',
+      `composioExecuteResponse_${GITHUB_REPOSITORY_ACTION}`,
       JSON.stringify({
         result: [
           { repo_name: 'openhuman', open_issues: 42, archived: false },
@@ -254,11 +274,11 @@ test.describe('assistant-ui tool-result elements', () => {
       })
     );
     await scriptToolCall('AUI-TABLE-CASE', [
-      { name: 'GITHUB_LIST_REPOS', arguments: { limit: 2 } },
+      { name: GITHUB_REPOSITORY_ACTION, arguments: { limit: 2 } },
     ]);
 
     await sendTurn(page, threadId, 'AUI-TABLE-CASE list my repositories');
-    const card = await openToolCall(page, /GITHUB_LIST_REPOS|repositor/i);
+    const card = await openToolCall(page, /GITHUB_LIST_REPOSITORIES_FOR_THE_AUTHENTICATED_USER|repositor/i);
 
     const table = card.locator('[data-slot="data-table"]').first();
     await expect(table).toBeVisible({ timeout: 20_000 });
