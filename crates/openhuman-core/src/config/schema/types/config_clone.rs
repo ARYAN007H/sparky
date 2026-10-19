@@ -16,9 +16,7 @@ impl Clone for Config {
                 self.document_snapshot.lock().unwrap().clone(),
             ),
             context_snapshot: self.context_snapshot.clone(),
-            context_overlay: std::sync::Mutex::new(
-                self.context_overlay.lock().unwrap().clone(),
-            ),
+            context_overlay: std::sync::Mutex::new(self.context_overlay.lock().unwrap().clone()),
             profile_providers: self.profile_providers.clone(),
             workspace_dir: self.workspace_dir.clone(),
             action_dir: self.action_dir.clone(),

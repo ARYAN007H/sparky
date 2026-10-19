@@ -246,6 +246,95 @@ async fn external_config_conflict_refresh_keeps_derived_runtime_overrides() {
 }
 
 #[tokio::test]
+async fn nested_context_refresh_does_not_pin_a_previous_external_value() {
+    let tmp = tempfile::tempdir().unwrap();
+    let storage = MemoryStorage::new();
+    let _forced = ForcedDocumentSource::new(
+        scoped(&storage, "tenant-refresh-nested-overlay"),
+        Scope::new("tenant-refresh-nested-overlay").unwrap(),
+        keys(15),
+    );
+    let seed = config_at(tmp.path(), "initial");
+    seed.save().await.unwrap();
+    let base = Config::load_from_config_path(&seed.config_path, &seed.workspace_dir)
+        .await
+        .unwrap();
+    let parent = CoreContext::for_test_with_config(DomainSet::full(), base.clone());
+    let mut first_config = base;
+    first_config.memory.root = Some("team:runtime".into());
+    let first_context = parent.derive_with(ContextOverlay::new(
+        first_config,
+        DomainSet::full(),
+        crate::tools::toolpacks::ToolGroups::none(),
+    ));
+
+    let controller = crate::core::all::all_registered_controllers()
+        .into_iter()
+        .find(|controller| controller.rpc_method_name() == "openhuman.config_update_model_settings")
+        .expect("config model settings RPC is registered");
+    let mut external = Config::load_from_config_path(&seed.config_path, &seed.workspace_dir)
+        .await
+        .unwrap();
+    external.default_model = Some("external-first".into());
+    external.save().await.unwrap();
+    let first_conflict = CoreContext::scope(first_context.clone(), async {
+        (controller.handler)(
+            DispatchCtx::new(first_context.clone()),
+            json!({"default_temperature": 0.8})
+                .as_object()
+                .unwrap()
+                .clone(),
+        )
+        .await
+        .unwrap_err()
+    })
+    .await;
+    assert!(crate::core::StructuredRpcError::decode(&first_conflict).is_some());
+
+    let after_first_refresh = CoreContext::scope(first_context.clone(), async {
+        DispatchCtx::new(first_context.clone())
+            .load_config()
+            .await
+            .unwrap()
+    })
+    .await;
+    let nested = first_context.derive_with(ContextOverlay::new(
+        after_first_refresh,
+        DomainSet::full(),
+        crate::tools::toolpacks::ToolGroups::none(),
+    ));
+
+    external = Config::load_from_config_path(&seed.config_path, &seed.workspace_dir)
+        .await
+        .unwrap();
+    external.default_model = Some("external-second".into());
+    external.save().await.unwrap();
+    let second_conflict = CoreContext::scope(nested.clone(), async {
+        (controller.handler)(
+            DispatchCtx::new(nested.clone()),
+            json!({"default_temperature": 0.7})
+                .as_object()
+                .unwrap()
+                .clone(),
+        )
+        .await
+        .unwrap_err()
+    })
+    .await;
+    assert!(crate::core::StructuredRpcError::decode(&second_conflict).is_some());
+
+    let refreshed = CoreContext::scope(nested.clone(), async {
+        DispatchCtx::new(nested.clone())
+            .load_config()
+            .await
+            .unwrap()
+    })
+    .await;
+    assert_eq!(refreshed.default_model.as_deref(), Some("external-second"));
+    assert_eq!(refreshed.memory.root.as_deref(), Some("team:runtime"));
+}
+
+#[tokio::test]
 async fn config_snapshot_cannot_be_saved_into_a_different_tenant_scope() {
     let tmp = tempfile::tempdir().unwrap();
     let storage = MemoryStorage::new();

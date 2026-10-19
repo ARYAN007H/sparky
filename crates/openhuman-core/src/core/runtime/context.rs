@@ -418,12 +418,11 @@ impl CoreContext {
                 &overlay.config,
             ) {
                 Ok(config_overlay) => {
-                    overlay.config.context_overlay =
-                        std::sync::Mutex::new(Some(config_overlay));
+                    overlay.config.context_overlay = std::sync::Mutex::new(Some(config_overlay));
                 }
-                Err(error) => log::warn!(
-                    "[core-context] unable to record derived config overrides: {error}"
-                ),
+                Err(error) => {
+                    log::warn!("[core-context] unable to record derived config overrides: {error}")
+                }
             }
         }
         overlay.config.context_snapshot = None;

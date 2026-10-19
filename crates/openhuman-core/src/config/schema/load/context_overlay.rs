@@ -54,9 +54,8 @@ impl ConfigContextOverlay {
         let mut result: Config = serde_json::from_value(value)?;
         copy_runtime_bindings(fresh, &mut result);
         copy_runtime_bindings(&self.runtime, &mut result);
-        result.document_snapshot = std::sync::Mutex::new(
-            fresh.document_snapshot.lock().unwrap().clone(),
-        );
+        result.document_snapshot =
+            std::sync::Mutex::new(fresh.document_snapshot.lock().unwrap().clone());
         result.context_snapshot = fresh.context_snapshot.clone();
         result.context_overlay = std::sync::Mutex::new(Some(Arc::new(self.clone())));
         Ok(result)
@@ -137,4 +136,3 @@ pub(crate) fn copy_runtime_bindings(source: &Config, target: &mut Config) {
     target.search.gemini_route = source.search.gemini_route.clone();
     target.search.host_credentials = source.search.host_credentials.clone();
 }
-

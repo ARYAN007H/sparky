@@ -69,8 +69,9 @@ pub struct Config {
     pub(crate) context_snapshot: Option<std::sync::Weak<std::sync::Mutex<Config>>>,
     #[serde(skip)]
     #[schemars(skip)]
-    pub(crate) context_overlay:
-        std::sync::Mutex<Option<std::sync::Arc<super::super::load::context_overlay::ConfigContextOverlay>>>,
+    pub(crate) context_overlay: std::sync::Mutex<
+        Option<std::sync::Arc<super::super::load::context_overlay::ConfigContextOverlay>>,
+    >,
     /// Immutable operator provider binding, absent from the user wire format.
     #[serde(skip)]
     #[schemars(skip)]
