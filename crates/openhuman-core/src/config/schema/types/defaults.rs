@@ -27,6 +27,7 @@ impl Default for Config {
         Self {
             document_snapshot: std::sync::Mutex::new(Default::default()),
             context_snapshot: None,
+            context_overlay: std::sync::Mutex::new(None),
             profile_providers: None,
             workspace_dir: openhuman_dir.join("workspace"),
             action_dir: crate::config::default_action_dir(),
