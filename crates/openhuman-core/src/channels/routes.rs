@@ -256,3 +256,7 @@ pub(crate) async fn handle_runtime_command_if_needed(
 #[cfg(test)]
 #[path = "routes_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "routes_provider_tests.rs"]
+mod provider_tests;
