@@ -27,9 +27,8 @@ fn turn_plan_preserves_the_host_retry_policy_in_the_run_policy() {
         None,
         None,
     );
-    let host_policy = crate::agent::tinyagents::turn_policy::run_policy_for_provider(
-        10, false, false, None,
-    );
+    let host_policy =
+        crate::agent::tinyagents::turn_policy::run_policy_for_provider(10, false, false, None);
 
     assert_eq!(policy.retry, host_policy.retry);
     assert_eq!(
