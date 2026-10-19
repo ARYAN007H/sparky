@@ -234,6 +234,12 @@ path = "../../tests/storage_default_import_e2e.rs"
 required-features = ["storage-sqlite"]
 
 [[test]]
+# Boots the shipped host on a legacy voice config and proves old listeners stay off.
+name = "legacy_voice_config_boot_e2e"
+path = "../../tests/legacy_voice_config_boot_e2e.rs"
+required-features = ["voice"]
+
+[[test]]
 # Builds a whole pre-storage desktop workspace (every legacy per-domain DB and
 # JSON/JSONL file the importers read), imports it on each driver and checks the
 # result is lossless with the legacy files untouched. Its own binary: it
