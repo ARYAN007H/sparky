@@ -254,7 +254,7 @@ describe('Mega flow — login + Gmail OAuth + Composio in one session', () => {
       // lane (`composio-triggers-flow.spec.ts`) and connector specs. Keep the
       // single mega desktop flow focused on the portable shell/auth/thread
       // path, and let the dedicated browser suite own trigger lifecycle.
-      this.skip();
+      this.skip(); // https://github.com/senamakel/openhuman/issues/234 — mixed RPC/backend trigger leg is outside the surviving UI assertion scope.
     }
     await resetEverything('after Scenario 3');
 
@@ -521,7 +521,7 @@ describe('Mega flow — login + Gmail OAuth + Composio in one session', () => {
       // See the Linux note in Scenario 4 above. The webhook-leg assertion here
       // extends the same backend-only trigger enable path that is already
       // covered in the stable Playwright suite.
-      this.skip();
+      this.skip(); // https://github.com/senamakel/openhuman/issues/234 — mixed RPC/backend webhook leg is outside the surviving UI assertion scope.
     }
     await resetEverything('after Scenario 10');
 

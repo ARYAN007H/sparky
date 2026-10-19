@@ -59,7 +59,7 @@ describe('Agent teams live coordination surface', () => {
     this.timeout(90_000);
     if (!supportsExecuteScript()) {
       stepLog('Skipping suite on Mac2 — Intelligence pane not mapped');
-      this.skip();
+      this.skip(); // https://github.com/senamakel/openhuman/issues/433 — Mac2 cannot map the Intelligence pane yet.
     }
 
     stepLog('starting mock server');
