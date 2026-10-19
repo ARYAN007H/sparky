@@ -22,6 +22,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 import {
   devConnectUrl,
+  coreLaunchSpec,
   freePort,
   isLoopback,
   mergeChildEnv,
@@ -162,25 +163,13 @@ async function main() {
   await mockModule.startMockServer(mockPort);
   log(`mock backend   ${mockUrl}`);
 
-  startChild(
-    "core",
-    core,
-    ["serve", "--port", String(corePort)],
-    {
-      OPENHUMAN_WORKSPACE: workspace,
-      OPENHUMAN_DOTENV_PATH: emptyDotenv,
-      OPENHUMAN_CORE_TOKEN: token,
-      BACKEND_URL: mockUrl,
-      VITE_BACKEND_URL: mockUrl,
-      OPENHUMAN_COMPOSIO_MODE: "disabled",
-      OPENHUMAN_SANDBOX: "off",
-      OPENHUMAN_BACKEND_API_KEY: null,
-      OPENHUMAN_BACKEND_SESSION_TOKEN: null,
-      OPENHUMAN_STORAGE_URL: null,
-      RUST_LOG: process.env.RUST_LOG ?? "info",
-    },
+  const coreLaunch = coreLaunchSpec(process.env, {
     workspace,
-  );
+    mockUrl,
+    token,
+    logLevel: process.env.RUST_LOG ?? "info",
+  });
+  startChild("core", core, ["serve", "--port", String(corePort)], coreLaunch.env, coreLaunch.cwd);
   await waitFor(async () => (await fetch(`http://127.0.0.1:${corePort}/health`)).ok, {
     timeoutMs: 120_000,
     what: "the core's /health",

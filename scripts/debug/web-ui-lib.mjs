@@ -2,6 +2,7 @@
 // `scripts/__tests__/debug-web-ui.test.mjs` can cover them without booting a
 // browser, a core or Vite.
 import net from "node:net";
+import path from "node:path";
 
 /** Merge child overrides into an inherited environment; null explicitly unsets a key. */
 export function mergeChildEnv(parent, overrides) {
@@ -11,6 +12,26 @@ export function mergeChildEnv(parent, overrides) {
     else env[key] = value;
   }
   return env;
+}
+
+/** Isolated environment and working directory for the throwaway core process. */
+export function coreLaunchSpec(parentEnv, { workspace, mockUrl, token, logLevel = "info" }) {
+  return {
+    cwd: workspace,
+    env: mergeChildEnv(parentEnv, {
+      OPENHUMAN_WORKSPACE: workspace,
+      OPENHUMAN_DOTENV_PATH: path.join(workspace, "empty.env"),
+      OPENHUMAN_CORE_TOKEN: token,
+      BACKEND_URL: mockUrl,
+      VITE_BACKEND_URL: mockUrl,
+      OPENHUMAN_COMPOSIO_MODE: "disabled",
+      OPENHUMAN_SANDBOX: "off",
+      OPENHUMAN_BACKEND_API_KEY: null,
+      OPENHUMAN_BACKEND_SESSION_TOKEN: null,
+      OPENHUMAN_STORAGE_URL: null,
+      RUST_LOG: logLevel,
+    }),
+  };
 }
 
 export const USAGE = `Usage: pnpm debug web [options]
