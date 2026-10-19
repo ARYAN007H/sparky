@@ -197,12 +197,23 @@ custom_dictionary = ["OpenHuman"]
     let config = Config::load_from_config_path(&config_path, &workspace)
         .await
         .unwrap();
-    assert_eq!(config.voice_server.stt_engine, crate::config::schema::SttEngine::Elevenlabs);
+    assert_eq!(
+        config.voice_server.stt_engine,
+        crate::config::schema::SttEngine::Elevenlabs
+    );
     config.save().await.unwrap();
 
-    let saved: toml::Value = toml::from_str(&std::fs::read_to_string(config_path).unwrap()).unwrap();
+    let saved: toml::Value =
+        toml::from_str(&std::fs::read_to_string(config_path).unwrap()).unwrap();
     let voice_server = saved["voice_server"].as_table().unwrap();
-    assert_eq!(voice_server.len(), 1, "only the active engine setting should remain");
+    assert_eq!(
+        voice_server.len(),
+        1,
+        "only the active engine setting should remain"
+    );
     assert_eq!(voice_server["stt_engine"].as_str(), Some("elevenlabs"));
-    assert!(saved.get("dictation").is_none(), "retired dictation data must be dropped on save");
+    assert!(
+        saved.get("dictation").is_none(),
+        "retired dictation data must be dropped on save"
+    );
 }

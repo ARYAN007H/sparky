@@ -18,12 +18,13 @@ async fn choosing_backend_resets_a_legacy_nondefault_stt_engine() {
         .await
         .expect("setting the backend provider should succeed");
 
-    let persisted = crate::config::Config::load_from_config_path(
-        &config.config_path,
-        &config.workspace_dir,
-    )
-    .await
-    .unwrap();
-    assert_eq!(persisted.voice_server.stt_engine, crate::config::SttEngine::Backend);
+    let persisted =
+        crate::config::Config::load_from_config_path(&config.config_path, &config.workspace_dir)
+            .await
+            .unwrap();
+    assert_eq!(
+        persisted.voice_server.stt_engine,
+        crate::config::SttEngine::Backend
+    );
     assert_eq!(crate::voice::effective_stt_provider(&persisted), "cloud");
 }

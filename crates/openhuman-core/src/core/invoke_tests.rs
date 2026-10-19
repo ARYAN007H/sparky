@@ -294,7 +294,10 @@ async fn invoke_retired_dictation_settings_method_returns_unknown_error() {
     )
     .await
     .expect_err("retired dictation settings method must be unknown");
-    assert!(err.contains("unknown method"), "got: {err}");
+    assert!(
+        err.starts_with(crate::core::dispatch::UNKNOWN_METHOD_PREFIX),
+        "got: {err}"
+    );
 }
 
 #[tokio::test]
