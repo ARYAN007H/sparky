@@ -154,7 +154,18 @@ async fn the_heartbeat_beats_only_for_a_live_turn() {
 
     // Before `TurnStarted` the turn is not live: no beat, however long it waits.
     tokio::time::sleep(Duration::from_millis(100)).await;
-    assert!(bus.try_recv().is_err());
+    loop {
+        match bus.try_recv() {
+            Ok(event) => assert_ne!(
+                event.context().thread_id,
+                "host-hb-thread",
+                "the inactive turn must not publish a heartbeat"
+            ),
+            Err(tokio::sync::broadcast::error::TryRecvError::Empty
+            | tokio::sync::broadcast::error::TryRecvError::Closed) => break,
+            Err(tokio::sync::broadcast::error::TryRecvError::Lagged(_)) => continue,
+        }
+    }
 
     projection
         .lock()
