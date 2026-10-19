@@ -116,8 +116,7 @@ async fn execute_rejects_too_many_slides() {
     );
 }
 
-#[tokio::test]
-async fn request_preflight_rejects_before_image_resolution_or_artifact_creation() {
+async fn assert_rejected_before_image_resolution(args: serde_json::Value, expected: &str) {
     use std::sync::atomic::{AtomicUsize, Ordering};
 
     struct CountingResolver(AtomicUsize);
@@ -134,7 +133,30 @@ async fn request_preflight_rejects_before_image_resolution_or_artifact_creation(
         }
     }
 
-    let invalid_text = json!({
+    let ws = workspace();
+    let tool = make_tool(ws.path());
+    let resolver = CountingResolver(AtomicUsize::new(0));
+    let result = tool
+        .run_with_resolver(args, None, &DispatchCtx::ambient(), &resolver)
+        .await
+        .expect("run returns tool result");
+
+    assert!(
+        result.is_error,
+        "invalid request should fail: {}",
+        result.text()
+    );
+    assert!(result.text().contains(expected), "{}", result.text());
+    assert_eq!(resolver.0.load(Ordering::SeqCst), 0, "image resolution ran");
+    assert!(
+        !ws.path().join("Files").exists(),
+        "invalid request created the artifact output directory"
+    );
+}
+
+#[tokio::test]
+async fn request_preflight_rejects_invalid_text_before_image_resolution() {
+    let args = json!({
         "title": " ",
         "slides": [{
             "title": "Slide",
@@ -142,13 +164,23 @@ async fn request_preflight_rejects_before_image_resolution_or_artifact_creation(
             "images": [{ "source": { "type": "file", "path": "missing.png" } }]
         }]
     });
-    let too_many_slides = json!({
+    assert_rejected_before_image_resolution(args, "title").await;
+}
+
+#[tokio::test]
+async fn request_preflight_rejects_too_many_slides_before_image_resolution() {
+    let args = json!({
         "title": "Deck",
         "slides": (0..=MAX_SLIDES)
             .map(|i| json!({ "title": format!("Slide {i}"), "bullets": ["valid"] }))
             .collect::<Vec<_>>()
     });
-    let too_many_failed_references = json!({
+    assert_rejected_before_image_resolution(args, "64 slides").await;
+}
+
+#[tokio::test]
+async fn request_preflight_counts_failed_image_references_before_resolution() {
+    let args = json!({
         "title": "Deck",
         "slides": [{
             "title": "Slide",
@@ -159,32 +191,7 @@ async fn request_preflight_rejects_before_image_resolution_or_artifact_creation(
             })).collect::<Vec<_>>()
         }]
     });
-
-    for (args, expected) in [
-        (invalid_text, "title"),
-        (too_many_slides, "64 slides"),
-        (too_many_failed_references, "8 images total"),
-    ] {
-        let ws = workspace();
-        let tool = make_tool(ws.path());
-        let resolver = CountingResolver(AtomicUsize::new(0));
-        let result = tool
-            .run_with_resolver(args, None, &DispatchCtx::ambient(), &resolver)
-            .await
-            .expect("run returns tool result");
-
-        assert!(
-            result.is_error,
-            "invalid request should fail: {}",
-            result.text()
-        );
-        assert!(result.text().contains(expected), "{}", result.text());
-        assert_eq!(resolver.0.load(Ordering::SeqCst), 0, "image resolution ran");
-        assert!(
-            !ws.path().join("Files").exists(),
-            "invalid request created the artifact output directory"
-        );
-    }
+    assert_rejected_before_image_resolution(args, "8 images total").await;
 }
 
 #[test]
