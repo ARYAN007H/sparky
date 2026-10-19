@@ -196,9 +196,10 @@ impl CapsHostService {
             state.error = Some("agent request was cancelled before admission".to_owned());
             state.done = true;
         }
+        let handle = admission.entry.handle.clone();
         if admission.start_task {
             let task_binding = Arc::clone(&binding);
-            let entry = admission.entry;
+            let entry = admission.entry.clone();
             tokio::spawn(async move {
                 let _ = service_agent::run_agent(
                     task_binding,
@@ -209,9 +210,7 @@ impl CapsHostService {
                 .await;
             });
         }
-        Ok(runs::AgentRunHandle {
-            handle: admission.entry.handle,
-        })
+        Ok(runs::AgentRunHandle { handle })
     }
 
     async fn agent_cancel(

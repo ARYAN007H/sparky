@@ -12,7 +12,14 @@ pub(crate) async fn run_agent(
     binding: Arc<CapsHostBinding>,
     request: runs::AgentRunRequest,
     state: Arc<tokio::sync::Mutex<AgentRunState>>,
+    cancellation: tokio_util::sync::CancellationToken,
 ) -> Result<runs::AgentRunOutcome, String> {
+    if cancellation.is_cancelled() {
+        let mut state = state.lock().await;
+        state.error = Some("agent run was cancelled".to_owned());
+        state.done = true;
+        return Err("agent run was cancelled".to_owned());
+    }
     let (progress_tx, mut progress_rx) = tokio::sync::mpsc::channel(128);
     let progress_state = Arc::clone(&state);
     let progress = tokio::spawn(async move {
@@ -69,13 +76,13 @@ pub(crate) async fn run_agent(
         progress: Some(progress_tx),
     };
     let scope = Arc::clone(&binding);
-    let cancellation = binding.cancellation.clone();
     let turn = scope.within(async move {
             runner
                 .run_agent(&agent_ref, config, connection.as_deref())
                 .await
         });
     let result = tokio::select! {
+        biased;
         _ = cancellation.cancelled() => Err("workflow run was cancelled".to_owned()),
         result = turn => result.map_err(|error| error.to_string()),
     };
