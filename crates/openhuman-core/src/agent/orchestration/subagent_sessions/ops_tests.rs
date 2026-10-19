@@ -125,12 +125,15 @@ fn an_equal_millisecond_live_close_persists_and_a_stale_snapshot_cannot_reopen_i
     let stale_snapshot = docs.load().unwrap();
 
     with_override(docs.clone(), || {
-        let mut closed = original.clone();
-        closed.status = DurableSubagentStatus::Closed;
-        closed.reusable = false;
-        // The old whole-list writer skips this live transition because its
-        // stored and incoming millisecond timestamps are equal.
-        store.save(&[closed]).unwrap();
+        store
+            .update_session(&original.subagent_session_id, |current, _now| {
+                current.status = DurableSubagentStatus::Closed;
+                current.reusable = false;
+                // Leave updated_at untouched to force an equal `_ms` live
+                // transition deterministically, without a sleep or clock shim.
+            })
+            .unwrap()
+            .expect("the session is updated");
 
         // A whole-list snapshot at the same timestamp must not reopen it.
         store.save(&stale_snapshot).unwrap();
