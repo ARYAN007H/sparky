@@ -21,20 +21,20 @@ use tinyagents_runtime::turn_driver::{
 use tinyagents_runtime::{DriverRequest, ToolSnapshot};
 
 use crate::agent::harness::tool_result_artifacts::TINYAGENTS_TOOL_RESULT_ARTIFACT_STORE;
-use crate::agent::tinyagents::NativeSubagentRunContext;
 use crate::agent::tinyagents::host::OpenHumanRunContext;
 use crate::agent::tinyagents::middleware::turn_context::TurnContextMiddleware;
 use crate::agent::tinyagents::observability::{OpenhumanEventBridge, SubagentScope};
 use crate::agent::tinyagents::tool_registration::capability_diagnostics;
 use crate::agent::tinyagents::turn_middleware::{
-    TurnMiddlewareInputs, TurnWiring, install_turn_middleware,
+    install_turn_middleware, TurnMiddlewareInputs, TurnWiring,
 };
 use crate::agent::tinyagents::turn_outcome::TinyagentsTurnOutcome;
 use crate::agent::tinyagents::turn_plan::{
-    OpenHumanTurnPlanner, enforce_registry_diagnostics, turn_models_for_plan, turn_run_policy,
+    enforce_registry_diagnostics, turn_models_for_plan, turn_run_policy, OpenHumanTurnPlanner,
 };
 use crate::agent::tinyagents::turn_run_error::map_turn_run_error;
 use crate::agent::tinyagents::turn_run_finalize::finalize_turn_outcome;
+use crate::agent::tinyagents::NativeSubagentRunContext;
 use crate::agent::tinyagents::{journal, routes, steering_forwarder};
 use crate::inference::turn_models::TurnModels;
 use tinyagents_harness::events::EventSink;
@@ -338,8 +338,11 @@ async fn drive_turn(
     }
     // `session_kv_store` self-gates on the dual-write flag (config default ON +
     // env kill switch), returning `None` when disabled or unresolvable.
-    if let Some(session_kv) =
-        crate::storage::import::live::session_kv_store(&run_context.dispatch_ctx()).await
+    let dispatch_ctx = run_context.dispatch_ctx();
+    if let Some(session_kv) = Box::pin(crate::storage::import::live::session_kv_store(
+        &dispatch_ctx,
+    ))
+    .await
     {
         stores.get_or_insert_with(StoreRegistry::new).register(
             crate::storage::import::live::TINYAGENTS_SESSION_KV_STORE,
