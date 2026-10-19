@@ -557,10 +557,8 @@ pub fn attach_socketio() -> (socketioxide::layer::SocketIoLayer, SocketIo) {
 ///
 /// This function sets up event bridges:
 /// 1. **Web Channel Bridge**: Forwards chat-related events (messages, tool calls) to specific clients.
-/// 2. **Dictation Bridge**: Forwards hotkey events to all clients.
 /// 3. **Overlay Bridge**: Forwards attention bubble events to all clients.
 /// 4. **Core Notification Bridge**: Forwards core notification events to all clients.
-/// 5. **Transcription Bridge**: Forwards real-time speech-to-text results to all clients.
 pub fn spawn_web_channel_bridge(io: SocketIo) {
     // 1. Web channel events → per-client rooms.
     let io_web = io.clone();
@@ -582,17 +580,11 @@ pub fn spawn_web_channel_bridge(io: SocketIo) {
     });
 
     let io_notify = io.clone();
-    let io_transcription = io.clone();
     let io_auth = io.clone();
     let io_memory_sync = io.clone();
     let io_channel_status = io.clone();
     let io_companion = io.clone();
     let io_workspace = io.clone();
-
-    // 2. Dictation hotkey events → broadcast to all connected clients.
-    tokio::spawn(async move {
-
-    });
 
     // Shell companion state → broadcast to all clients. The main renderer also
     // receives a Tauri event directly; this path preserves the Socket.IO-only
@@ -618,7 +610,7 @@ pub fn spawn_web_channel_bridge(io: SocketIo) {
         log::debug!("[socketio] companion state bridge stopped");
     });
 
-    // 4. Core notification events → broadcast to all connected clients so
+    // 3. Core notification events → broadcast to all connected clients so
     //    the in-app notification center picks them up regardless of which
     //    chat session is active. This is a fire-and-forget broadcast with no
     //    per-client routing.
@@ -647,7 +639,7 @@ pub fn spawn_web_channel_bridge(io: SocketIo) {
         log::debug!("[socketio] core_notification bridge stopped");
     });
 
-    // 6. SessionExpired events → broadcast to all clients so the UI can
+    // 5. SessionExpired events → broadcast to all clients so the UI can
     //    proactively tear down user-scoped state and route to onboarding
     //    instead of waiting for the next poll to discover the JWT is gone.
     //    Subscribes to the global event bus and filters for
@@ -776,12 +768,7 @@ pub fn spawn_web_channel_bridge(io: SocketIo) {
         log::debug!("[socketio] workspace_changed bridge stopped");
     });
 
-    // 5. Transcription results → broadcast to all connected clients.
-    tokio::spawn(async move {
-
-    });
-
-    // 8. Memory sync stage + tree-build progress → broadcast to all clients
+    // 6. Memory sync stage + tree-build progress → broadcast to all clients
     //    so the UI can show real-time progress bars and refresh the graph.
     tokio::spawn(async move {
         let bus = {
@@ -938,7 +925,7 @@ pub fn spawn_web_channel_bridge(io: SocketIo) {
         log::debug!("[socketio] memory_sync bridge stopped");
     });
 
-    // 10. Channel listener health → broadcast `channel:connection-updated` to
+    // 8. Channel listener health → broadcast `channel:connection-updated` to
     //     all clients so the Messaging tab reflects the *live* connection state
     //     instead of a stale, credential-presence-only "Connected" (issue
     //     #3712). The supervised listener publishes `ChannelConnected` when it
