@@ -161,6 +161,11 @@ impl StorageGrant {
         if prefixes.into_iter().any(String::is_empty) {
             return Err("a granted prefix is empty".into());
         }
+        if let Some(manifest) = &self.queues {
+            manifest
+                .validate()
+                .map_err(|_| String::from("the granted queue manifest is invalid"))?;
+        }
         Ok(())
     }
 
@@ -170,6 +175,7 @@ impl StorageGrant {
             Object::Streams => !self.stream_prefixes.is_empty(),
             Object::Blobs => !self.blob_prefixes.is_empty(),
             Object::Secrets => !self.secret_prefixes.is_empty(),
+            Object::Queues => self.queues.is_some(),
         }
     }
 
@@ -244,8 +250,17 @@ pub(crate) fn authorize(
                 "ttl": false,
                 "max_key_len": 0,
             }))),
-            Object::Streams | Object::Secrets => Err(Denied::Object),
+            Object::Streams | Object::Secrets | Object::Queues => Err(Denied::Object),
         };
+    }
+    // `BusStorage::connect` asks every module's host for queue features, so a
+    // module with no queue grant still connects: it learns it has no features
+    // and every other `Queues` selector is refused below.
+    if object == Object::Queues && selector == "Features" && !grant.has_object(object) {
+        return Ok(Plan::Answer(serde_json::to_value(
+            tinystoragedrivers_bus::QueueFeaturesReply::default(),
+        )
+        .map_err(|_| Denied::Malformed)?));
     }
     if !grant.has_object(object) {
         return Err(Denied::Object);
@@ -259,6 +274,7 @@ pub(crate) fn authorize(
         Object::Streams => streams(grant, selector, request),
         Object::Blobs => blobs(grant, selector, request),
         Object::Secrets => secrets(grant, selector, request),
+        Object::Queues => queues(selector, request),
     }?;
     Ok(match plan {
         Plan::Forward { target, filter, .. } => Plan::Forward {
@@ -282,6 +298,17 @@ fn is_write(object: Object, selector: &str) -> bool {
             "Append" | "AppendBatch" | "AppendBatchIfOffset" | "TruncateBefore" | "DeleteStream"
         ) | (Object::Blobs, "Put" | "PutStream" | "Delete" | "PresignPut")
             | (Object::Secrets, "Set" | "Delete")
+            | (
+                Object::Queues,
+                "EnsureQueue"
+                    | "Enqueue"
+                    | "Receive"
+                    | "Ack"
+                    | "Nack"
+                    | "Extend"
+                    | "Redrive"
+                    | "Purge"
+            )
     )
 }
 
@@ -439,6 +466,15 @@ pub(crate) fn filter_reply(grant: &StorageGrant, filter: ReplyFilter, reply: Val
                 .collect(),
         ),
         (_, reply) => reply,
+    }
+}
+
+/// `Queues` selectors. The target is the request's queue; the bound server
+/// (holding the grant's manifest) refuses a queue the manifest does not name.
+fn queues(selector: &str, request: &Value) -> Result<Plan, Denied> {
+    match selector {
+        "Features" => Ok(forward("")),
+        _ => Ok(forward(text(request, "queue")?)),
     }
 }
 
