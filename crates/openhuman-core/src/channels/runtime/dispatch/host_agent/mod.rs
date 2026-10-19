@@ -29,7 +29,31 @@ use tinychannels_bus as traits;
 pub(crate) mod posture;
 mod turn;
 
-pub(crate) use turn::{run_host_agent_turn, seed_rows, HostChannelTurn};
+pub(crate) use turn::{run_host_agent_turn, HostChannelTurn};
+
+/// Resolve the config-owned target selected for an unbound channel into the
+/// same trusted host-agent carrier used by channel bindings. The effective
+/// provider/model remain the channel's configured route.
+pub(crate) async fn configured_agent(
+    ctx: &ChannelRuntimeContext,
+    channel: &str,
+    route: &crate::channels::context::ChannelRouteSelection,
+) -> Result<HostAgent, String> {
+    let dispatch = ctx.dispatch_ctx();
+    let mut config = match &ctx.config {
+        Some(config) => config.as_ref().clone(),
+        None => dispatch.load_config().await.map_err(|error| error.to_string())?,
+    };
+    let scoping = super::routing::resolve_target_agent(channel).await;
+    let agent_id = scoping
+        .target_agent_id
+        .unwrap_or_else(|| "orchestrator".to_string());
+    config.chat_provider = Some(route.provider.clone());
+    config.default_model = Some(route.model.clone());
+    config.default_temperature = ctx.temperature;
+    config.multimodal_files = crate::config::MultimodalFileConfig::for_untrusted_channel_input();
+    HostAgent::from_config(&dispatch, config, &agent_id).map_err(|error| error.to_string())
+}
 
 /// What a channel's binding resolves to for one message.
 pub(crate) enum HostRoute {
