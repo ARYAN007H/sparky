@@ -33,7 +33,12 @@ pub(super) async fn parse_source_contents(
         return Ok((config, false));
     }
     if read_was_recovered && contents.is_empty() {
-        return Ok((super::branches::default_config_boxed(), true));
+        let config = super::branches::default_config_boxed();
+        *config.document_snapshot.lock().unwrap() = super::super::ConfigDocumentSnapshot {
+            version: read.document_version,
+            anchor: Some(read.source_anchor.clone()),
+        };
+        return Ok((config, true));
     }
     let (config, recovered) = Box::pin(parse_config_boxed(config_path, contents)).await?;
     *config.document_snapshot.lock().unwrap() = super::super::ConfigDocumentSnapshot {
