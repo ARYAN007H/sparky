@@ -40,6 +40,49 @@ test("ensureSignedInChat opens the canonical chat route from an authenticated ho
   assert.equal(navigatedTo, "http://localhost:1420/#/chat");
 });
 
+test("ensureSignedInChat keeps an existing composer on its current route", async () => {
+  let waited = false;
+  const page = {
+    getByRole: () => ({
+      isVisible: async () => true,
+      waitFor: async ({ state, timeout }) => {
+        assert.equal(state, "visible");
+        assert.equal(timeout, 120_000);
+        waited = true;
+      },
+    }),
+    goto: async () =>
+      assert.fail("a visible chat composer should not navigate"),
+  };
+
+  await ensureSignedInChat(page, "http://localhost:1420");
+  assert.equal(waited, true);
+});
+
+test("ensureSignedInChat propagates its bounded composer wait failure", async () => {
+  const timeout = new Error("composer did not appear");
+  let navigatedTo;
+  const page = {
+    getByRole: () => ({
+      isVisible: async () => false,
+      waitFor: async ({ state, timeout: timeoutMs }) => {
+        assert.equal(state, "visible");
+        assert.equal(timeoutMs, 120_000);
+        throw timeout;
+      },
+    }),
+    goto: async (url) => {
+      navigatedTo = url;
+    },
+  };
+
+  await assert.rejects(
+    ensureSignedInChat(page, "http://localhost:1420"),
+    (error) => error === timeout,
+  );
+  assert.equal(navigatedTo, "http://localhost:1420/#/chat");
+});
+
 test("coreLaunchSpec isolates the core from operator credentials, storage, and dotenv", () => {
   const inheritedEnv = {
     OPENHUMAN_BACKEND_API_KEY: "inherited",
