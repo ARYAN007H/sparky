@@ -214,5 +214,11 @@ async fn recovery_restores_the_bootstrap_file_when_document_cas_conflicts() {
     let restored = tokio::fs::read_to_string(&recovered.config_path)
         .await
         .unwrap();
-    assert!(restored.contains("sqlite:/bootstrap-from-recovered-file"));
+    let restored: toml::Value = toml::from_str(&restored).unwrap();
+    let storage_url = restored["storage"]["url"].as_str().unwrap();
+    let openhuman_dir = recovered.config_path.parent().unwrap();
+    let restored_url = crate::security::secret_storage::SecretStore::new(openhuman_dir, true)
+        .decrypt(storage_url)
+        .unwrap();
+    assert_eq!(restored_url, "sqlite:/bootstrap-from-recovered-file");
 }
