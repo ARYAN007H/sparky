@@ -74,6 +74,9 @@ mod announcement_notes;
 mod artifact_wiring;
 
 #[cfg(test)]
+#[path = "imported_history_tests.rs"]
+mod imported_history_tests;
+#[cfg(test)]
 mod orphaned_head_resume_tests;
 #[cfg(test)]
 mod response_shape_turn_tests;
