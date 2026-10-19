@@ -80,48 +80,19 @@ fn deserialize_params_and_helpers_cover_success_and_failure_paths() {
 }
 
 #[tokio::test]
-async fn graph_topologies_handler_exports_structural_reports() {
-    let result = handle_graph_topologies(DispatchCtx::process_default(), Map::new())
-        .await
-        .expect("topology export is infallible");
-    let graphs = result
-        .get("graphs")
-        .and_then(Value::as_array)
-        .expect("graphs array");
-    assert!(!graphs.is_empty(), "at least one custom graph is exported");
-    for g in graphs {
-        assert!(g.get("name").and_then(Value::as_str).is_some());
-        assert_eq!(g.get("ok").and_then(Value::as_bool), Some(true));
-        assert!(g
-            .get("mermaid")
-            .and_then(Value::as_str)
-            .unwrap()
-            .contains("flowchart"));
-        assert!(
-            g.get("topology").map(|t| !t.is_null()).unwrap_or(false),
-            "topology embeds as structured JSON"
-        );
-    }
-    let names: Vec<_> = graphs
-        .iter()
-        .filter_map(|g| g.get("name").and_then(Value::as_str))
+fn host_graph_topology_projection_keeps_delegation_only() {
+    let names: Vec<_> = tinyagents_orchestration::topology::all_graph_topologies()
+        .into_iter()
+        .map(|report| report.name)
         .collect();
-    assert!(names.contains(&"delegation"), "saw {names:?}");
+    assert!(names.contains(&"delegation".to_owned()), "saw {names:?}");
     assert!(
-        names.contains(&"workflow_runs:scheduler_preview"),
-        "saw {names:?}"
+        !names.iter().any(|name| name.starts_with("agent_teams:")),
+        "retired team graphs must not be projected: {names:?}"
     );
-    let agents = result
-        .get("agents")
-        .and_then(Value::as_array)
-        .expect("agents array");
-    let orchestrator = agents
-        .iter()
-        .find(|agent| agent.get("id").and_then(Value::as_str) == Some("orchestrator"))
-        .expect("orchestrator graph resolution");
-    assert_eq!(
-        orchestrator.get("graph").and_then(Value::as_str),
-        Some("default")
+    assert!(
+        !names.iter().any(|name| name.starts_with("workflow_runs:")),
+        "retired workflow graphs must not be projected: {names:?}"
     );
 }
 
