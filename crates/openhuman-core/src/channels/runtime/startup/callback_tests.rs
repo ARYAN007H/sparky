@@ -17,6 +17,7 @@ use tinychannels_bus::{ChannelBackendRequest, ChannelBackendResult, SendMessage}
 struct RecordingChannel {
     name: String,
     sent: tokio::sync::Mutex<Vec<ChannelOutboundMessage>>,
+    progressive_requests: tokio::sync::Mutex<Vec<ProgressiveTransportRequest>>,
 }
 
 impl RecordingChannel {
@@ -24,6 +25,7 @@ impl RecordingChannel {
         Self {
             name: name.into(),
             sent: tokio::sync::Mutex::new(Vec::new()),
+            progressive_requests: tokio::sync::Mutex::new(Vec::new()),
         }
     }
 }
@@ -78,6 +80,7 @@ impl ProgressiveChannelTransport for RecordingChannel {
         &self,
         request: ProgressiveTransportRequest,
     ) -> Result<ProgressiveTransportResult> {
+        self.progressive_requests.lock().await.push(request.clone());
         let ProgressiveTransportRequest::SendTyped {
             channel,
             turn_id,
@@ -261,6 +264,17 @@ async fn native_progressive_transport_dispatches_typed_content_through_configure
     // Sequence and segment are represented in the module's idempotency key.
     assert_eq!(sent[0].idempotency_key, "turn-11:3:1");
     assert_eq!(sent[0].parts, parts);
+    let requests = selected_account.progressive_requests.lock().await;
+    let ProgressiveTransportRequest::SendTyped {
+        sequence,
+        segment_index,
+        ..
+    } = &requests[0]
+    else {
+        panic!("expected the typed progressive request");
+    };
+    assert_eq!(*sequence, Some(3));
+    assert_eq!(*segment_index, Some(1));
 }
 
 #[tokio::test]
