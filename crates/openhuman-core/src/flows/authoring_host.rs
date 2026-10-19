@@ -109,13 +109,13 @@ impl Callbacks {
 }
 
 #[tinybus::interface(name = "ai.tinyhumans.tinyflows.ApprovalManifestHost")]
-impl Callbacks {
+impl ApprovalCallbacks {
     async fn classify_manifest_candidates(
         &self,
         request: ClassifyManifestCandidatesRequest,
     ) -> BusResult<catalog::ClassifyManifestCandidatesResponse> {
-        let config = Arc::clone(&self.config);
-        self.in_context(async move {
+        let config = Arc::clone(&self.0.config);
+        self.0.in_context(async move {
             use crate::flows::tinyflows::caps::classify_composio_action_for_tier;
             use crate::security::{GateDecision, SecurityPolicy};
             use tinybox_bus::CommandClass;
@@ -166,6 +166,9 @@ impl Callbacks {
     }
 }
 
+#[derive(Clone)]
+struct ApprovalCallbacks(Callbacks);
+
 /// A callback registration whose lifetime is bounded by one authoring call.
 pub(crate) struct Registration {
     _registration: module::ServedObjectRegistration,
@@ -183,7 +186,12 @@ pub(crate) async fn register(
         context,
         runtime: tokio::runtime::Handle::try_current().ok(),
     };
-    let registration = module::serve_pair(path.clone(), callbacks.clone(), callbacks).await?;
+    let registration = module::serve_pair(
+        path.clone(),
+        callbacks.clone(),
+        ApprovalCallbacks(callbacks),
+    )
+    .await?;
     Ok(Registration {
         _registration: registration,
         authoring: AuthoringHost {
