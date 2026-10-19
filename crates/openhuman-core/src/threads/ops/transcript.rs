@@ -34,10 +34,11 @@ pub async fn transcript_get(
     let locator = transcript_store(ctx, &thread_id).await?.locator();
     let cursor = request.cursor.clone();
     let limit = request.limit;
+    let page_thread_id = thread_id.clone();
     let mut page = tokio::task::spawn_blocking(move || {
         tinyagents_session::transcript::view::get_page_in(
             locator.as_ref(),
-            &thread_id,
+            &page_thread_id,
             None,
             cursor.as_deref(),
             limit,
