@@ -284,7 +284,13 @@ pub async fn flows_required_connections(
     config: &Config,
     graph_json: Value,
 ) -> Result<Outcome<Value>, String> {
-    let graph = tinyflows::migrate::deserialize_graph(graph_json)?;
+    let graph: tinyflows::model::WorkflowGraph = super::validation::migrate_over_bus(
+        ctx,
+        config,
+        graph_json,
+    )
+    .await
+    .and_then(|graph| serde_json::from_value(graph).map_err(|error| error.to_string()))?;
     let required = compute_required_connections(ctx, config, &graph).await;
     Ok(Outcome::single_log(
         json!({ "required_connections": required }),

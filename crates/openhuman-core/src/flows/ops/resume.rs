@@ -93,7 +93,9 @@ async fn current_workflow_for_resume(
         .await
         .map_err(|error| error.wire_message())?;
     let workflow = workflow.ok_or_else(|| format!("flow '{flow_id}' not found"))?;
-    let graph = tinyflows::migrate::deserialize_graph(workflow.graph)
+    let graph = crate::flows::ops::validation::migrate_over_bus(ctx, config, workflow.graph)
+        .await
+        .and_then(|graph| serde_json::from_value(graph).map_err(|error| error.to_string()))
         .map_err(|error| format!("decode workflow graph for resume: {error}"))?;
     Ok(ResumeWorkflow {
         graph,

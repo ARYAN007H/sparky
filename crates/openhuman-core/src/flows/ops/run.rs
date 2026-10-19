@@ -127,7 +127,11 @@ pub(super) async fn prepare_flow_run(
     let flow: Flow =
         store::roundtrip(workflow.ok_or_else(|| format!("flow '{flow_id}' not found"))?)
             .map_err(|error| format!("decode workflow for run: {error}"))?;
-    let no_actionable_nodes = !graph_has_actionable_nodes(&flow.graph);
+    let graph_json = serde_json::to_value(&flow.graph).map_err(|error| error.to_string())?;
+    let analysis = super::validation::validate_over_bus(ctx, config, graph_json).await?;
+    let no_actionable_nodes = !analysis
+        .has_actionable_nodes
+        .ok_or_else(|| "TinyFlows validation returned no actionability result".to_string())?;
     if no_actionable_nodes {
         tracing::warn!(
             target: "flows",

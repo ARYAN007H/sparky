@@ -6,7 +6,7 @@ use tinyflows_bus::{GraphValidation, ImportGraphResult, ValidateGraphRequest};
 #[cfg(test)]
 pub(crate) use tinyflows::compat::UNSUPPORTED_NESTED_CONDITIONAL_FAN_IN;
 
-async fn validate_over_bus(
+pub(super) async fn validate_over_bus(
     ctx: &DispatchCtx,
     config: &Config,
     graph: Value,
