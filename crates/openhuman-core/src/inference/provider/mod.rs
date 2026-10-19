@@ -9,11 +9,12 @@ pub mod error_classify;
 pub mod error_code;
 pub mod factory;
 pub(crate) mod fallback_diagnostics;
+pub mod http_error;
 pub(crate) mod model;
+pub mod models;
 pub(crate) mod openai_codex;
 /// Provider-neutral managed-provider pieces that stay in the core.
 pub mod openhuman_backend_model;
-pub mod ops;
 pub mod types;
 
 #[allow(unused_imports)]
@@ -31,7 +32,9 @@ pub(crate) use factory::is_raw_passthrough_model;
 pub use factory::{
     create_chat_model_from_string, create_chat_model_from_string_with_model_id,
     create_chat_model_in, create_chat_model_with_model_id_in, probe_inference_readiness,
-    provider_for_role, role_for_model_tier, BYOK_INCOMPLETE_SENTINEL,
+    provider_for_role, role_for_model_tier, BYOK_INCOMPLETE_SENTINEL, INFERENCE_BACKEND_ID,
+};
+pub use models::{
+    list_configured_models, list_configured_models_from_config, synthesize_local_runtime_entry,
 };
 pub use openhuman_backend_model::PROVIDER_LABEL;
-pub use ops::*;
