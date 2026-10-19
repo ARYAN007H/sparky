@@ -238,7 +238,7 @@ fn a_patch_over_the_bus_keeps_the_agent_definition_it_does_not_mention() {
     );
 }
 
-fn assert_force_next_run_updates_collection(collection: &str, other_collection: &str) {
+fn assert_force_next_run_updates_collection(collection: 'static str, other_collection: 'static str) {
     use serde_json::json;
     use tinystoragedrivers::{CollectionSpec, Precondition};
 
@@ -246,16 +246,19 @@ fn assert_force_next_run_updates_collection(collection: &str, other_collection: 
     let config = test_config(&tmp);
     let opened = crate::storage::local::open("cron::store-test", &config.workspace_dir).unwrap();
     let docs = std::sync::Arc::clone(opened.scoped().unwrap().documents());
-    crate::storage::block_on_anyhow(async {
-        docs.ensure_collection(&CollectionSpec::new(collection))
+    let seed_docs = std::sync::Arc::clone(&docs);
+    crate::storage::block_on_anyhow(async move {
+        seed_docs
+            .ensure_collection(&CollectionSpec::new(collection))
             .await?;
-        docs.put(
-            collection,
-            "seeded-job",
-            json!({ "next_run_ms": 123, "marker": "keep-me" }),
-            Precondition::Absent,
-        )
-        .await?;
+        seed_docs
+            .put(
+                collection,
+                "seeded-job",
+                json!({ "next_run_ms": 123, "marker": "keep-me" }),
+                Precondition::Absent,
+            )
+            .await?;
         anyhow::Ok(())
     })
     .unwrap();
@@ -263,11 +266,12 @@ fn assert_force_next_run_updates_collection(collection: &str, other_collection: 
     let next = chrono::DateTime::<Utc>::from_timestamp_millis(456).unwrap();
     force_next_run_for_test(&config, "seeded-job", next).unwrap();
 
-    let (updated, other, collections) = crate::storage::block_on_anyhow(async {
+    let read_docs = std::sync::Arc::clone(&docs);
+    let (updated, other, collections) = crate::storage::block_on_anyhow(async move {
         Ok((
-            docs.get(collection, "seeded-job").await?,
-            docs.get(other_collection, "seeded-job").await?,
-            docs.collections("").await?,
+            read_docs.get(collection, "seeded-job").await?,
+            read_docs.get(other_collection, "seeded-job").await?,
+            read_docs.collections("").await?,
         ))
     })
     .unwrap();

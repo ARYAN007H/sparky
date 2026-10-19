@@ -198,10 +198,9 @@ mod attestation_guard {
             assets: &[],
             ..*record()
         };
-        assert!(!digest_is_pinned(
-            &unpinned_record,
-            "5d0a3ae5881f91966249858cd155e5b9c244bd419d06698d808f972a8d23afc9"
-        ));
+        let current_library = "1e38209820ffa41857adfc32c322871bee30eec6bfc02dfae46eb7d9f6013def";
+        assert!(digest_is_pinned(record(), current_library));
+        assert!(!digest_is_pinned(&unpinned_record, current_library));
     }
 
     #[test]
