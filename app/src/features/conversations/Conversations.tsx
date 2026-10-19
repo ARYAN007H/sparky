@@ -1510,6 +1510,7 @@ const Conversations = ({
     const { mime } = await storeVoiceNote(noteId, draft.blob);
     const voicePart = await voiceNoteContentPart(
       noteId,
+      mime,
       draft.blob,
       draft.durationMs,
       draft.waveform

@@ -77,7 +77,12 @@ fn video_and_audio_ride_the_file_marker() {
 fn typed_voice_notes_keep_audio_out_of_model_text() {
     let part = ContentPart::VoiceNote {
         voice_note: tinychannels_bus::VoiceNote {
-            media: media("data:audio/wav;base64,AAA"),
+            media: MediaReference {
+                opaque_id: Some("note-typed".into()),
+                content_type: Some("audio/wav".into()),
+                kind: MediaKind::Audio,
+                ..Default::default()
+            },
             duration_ms: Some(5000),
             ..Default::default()
         },

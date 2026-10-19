@@ -26,6 +26,7 @@ describe('voiceNoteApi', () => {
   it('keeps a recording as a typed voice-note part with its media and duration', async () => {
     const part = await voiceNoteContentPart(
       'note-123',
+      'audio/wav',
       new Blob([new Uint8Array([0, 1, 2])], { type: 'audio/wav' }),
       5000,
       [0.2, 0.8]
@@ -40,7 +41,6 @@ describe('voiceNoteApi', () => {
         pushToTalk: false,
         media: {
           opaqueId: 'note-123',
-          url: 'data:audio/wav;base64,AAEC',
           kind: 'audio',
           contentType: 'audio/wav',
           codec: 'audio/wav',

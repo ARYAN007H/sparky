@@ -132,8 +132,8 @@ pub(crate) fn read_note(
 
 /// Ensure a typed chat attachment names and carries the already stored note.
 /// The RPC upload happens before chat submission; this comparison binds the
-/// following typed part to those durable bytes instead of treating it as a
-/// disposable or model-visible attachment marker.
+/// following typed part to those durable bytes instead of resending audio or
+/// treating the opaque reference as model-visible attachment text.
 pub(crate) fn validate_typed_media(
     workspace: &Path,
     note_id: &str,
@@ -142,31 +142,19 @@ pub(crate) fn validate_typed_media(
     if !is_valid_note_id(note_id) || media.opaque_id.as_deref() != Some(note_id) {
         return Err("voice note media must name its stored note id".into());
     }
-    let url = media
-        .url
-        .as_deref()
-        .ok_or_else(|| "voice note media needs an inline data: URL".to_string())?;
-    let (header, encoded) = url
-        .strip_prefix("data:")
-        .and_then(|data| data.split_once(','))
-        .ok_or_else(|| "voice note media needs an inline data: URL".to_string())?;
-    let mime = header
-        .strip_suffix(";base64")
-        .ok_or_else(|| "voice note media must use base64 encoding".to_string())?;
-    use base64::Engine as _;
-    let bytes = base64::engine::general_purpose::STANDARD
-        .decode(encoded)
-        .map_err(|error| format!("voice note media has invalid base64: {error}"))?;
-    let (stored, stored_mime) = read_note(workspace, note_id)?
+    if media.url.is_some() || media.path.is_some() || media.local_cache_path.is_some() {
+        return Err("typed voice note must use its opaque stored-media reference".into());
+    }
+    if media.kind != tinychannels_bus::MediaKind::Audio {
+        return Err("typed voice note reference must have audio kind".into());
+    }
+    let (_, stored_mime) = read_note(workspace, note_id)?
         .ok_or_else(|| "typed voice note has no stored audio".to_string())?;
-    let normalized_mime = mime.split(';').next().unwrap_or(mime).trim();
-    if normalized_mime != stored_mime
-        || media.content_type.as_deref().is_some_and(|content_type| {
+    if media.content_type.as_deref().is_some_and(|content_type| {
             content_type.split(';').next().unwrap_or(content_type).trim() != stored_mime
         })
-        || bytes != stored
     {
-        return Err("typed voice note does not match the stored audio".into());
+        return Err("typed voice note mime does not match the stored audio".into());
     }
     Ok(())
 }

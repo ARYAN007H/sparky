@@ -51,27 +51,26 @@ export function bytesToBase64(bytes: Uint8Array): string {
 /** Keep the recorded media on the typed web-chat wire beside its transcript. */
 export async function voiceNoteContentPart(
   noteId: string,
+  mime: string,
   blob: Blob,
   durationMs: number,
   waveform: number[]
 ): Promise<ContentPart> {
-  const bytes = new Uint8Array(await blob.arrayBuffer());
-  const mime = blob.type || 'audio/webm';
+  const contentType = mime || blob.type || 'audio/webm';
   return {
     kind: 'voice_note',
     voiceNote: {
-      codec: mime,
+      codec: contentType,
       durationMs,
       waveform,
       pushToTalk: false,
       media: {
         opaqueId: noteId,
-        url: `data:${mime};base64,${bytesToBase64(bytes)}`,
         kind: 'audio',
-        contentType: mime,
-        codec: mime,
+        contentType,
+        codec: contentType,
         durationMs,
-        sizeBytes: bytes.length,
+        sizeBytes: blob.size,
       },
     },
   };

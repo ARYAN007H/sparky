@@ -115,9 +115,9 @@ pub fn fold_into_message(text: &str, parts: &[ContentPart]) -> Result<String, At
                 markers.push(format!("[FILE:{}]", source_of(media, index)?));
             }
             ContentPart::VoiceNote { voice_note } => {
-                // The audio already has a durable voice-note sidecar. Validate
-                // the typed wire reference, but never splice it into model text.
-                source_of(&voice_note.media, index)?;
+                // The handler validates this opaque reference against the
+                // durable note store. Never expose it in model-visible text.
+                let _ = voice_note;
             }
             other => {
                 return Err(AttachmentPartError::UnsupportedKind {
