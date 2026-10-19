@@ -9,7 +9,6 @@ pub mod identity;
 pub mod jwt;
 pub mod openai_oauth;
 pub mod ops;
-pub use ops as rpc;
 pub mod profiles;
 pub mod responses;
 mod schemas;
@@ -23,7 +22,7 @@ pub use http_creds::{
     HttpCredential, HttpCredentialScheme, HttpCredentialSummary, HttpCredentialsStore,
 };
 pub use jwt::user_id_from_profile_payload;
-
+pub use ops as rpc;
 pub use ops::*;
 // Direct-mode (BYO Composio API key) credential helpers.
 pub use ops::{

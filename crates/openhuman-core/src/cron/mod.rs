@@ -23,7 +23,6 @@ pub mod host_delivery;
 pub mod job_builder;
 pub mod limits;
 pub mod ops;
-pub use ops as rpc;
 pub mod origin;
 mod schemas;
 pub mod seed;
@@ -38,6 +37,7 @@ pub mod scheduler;
 #[path = "cutover_tests.rs"]
 mod cutover_tests;
 
+pub use ops as rpc;
 #[cfg(test)]
 pub use ops::update_cron_job;
 pub use ops::{add_once, add_once_at, pause_job, resume_job};

@@ -5,7 +5,6 @@ mod core;
 pub mod daemon;
 pub mod daemon_host;
 pub mod ops;
-pub use ops as rpc;
 mod restart;
 mod schemas;
 mod shutdown;
@@ -21,7 +20,7 @@ pub(crate) mod mock;
 mod windows;
 
 pub use core::*;
-
+pub use ops as rpc;
 pub use ops::*;
 pub use restart::apply_startup_restart_delay_from_env;
 pub use restart::RestartStatus;

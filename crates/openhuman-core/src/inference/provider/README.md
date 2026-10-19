@@ -85,10 +85,10 @@ consumers: the agent harness ([`agent/session_host/builder/factory.rs`](../../ag
 
 ## Sub-modules
 
-- `ops/`: `http_error` (HTTP error
-  classification, Sentry routing, `api_error`), `models`
-  (`list_configured_models`), `tools/delegate.rs` (`ProviderRuntimeOptions`).
-  Preserves the original `pub use ops::*` contract split out of a single `ops.rs`.
+- [`http_error.rs`](./http_error.rs) owns provider HTTP error classification,
+  Sentry routing, and `api_error`; [`models/`](./models/) owns model catalog
+  listing and local-runtime entries. Delegation's `ProviderRuntimeOptions`
+  live with [`tools/delegate.rs`](../tools/delegate.rs).
 - Claude Code CLI provider: `tinyagents_harness::providers::claude_code` in [`vendor/tinyagents`](../../../../../vendor/tinyagents/); see the [Claude Code provider guide](../../../../../docs/gitbooks/en/developing/providers/claude-code.md).
 
 ## Tests
@@ -97,9 +97,8 @@ consumers: the agent harness ([`agent/session_host/builder/factory.rs`](../../ag
   [`factory_egress_fallback_tests.rs`](./factory_egress_fallback_tests.rs), [`factory_route_resolution_tests.rs`](./factory_route_resolution_tests.rs),
   [`factory_test_provider_override_tests.rs`](./factory_test_provider_override_tests.rs): provider-string parsing, access
   gates, and model construction.
-- [`ops_tests.rs`](./ops_tests.rs), [`ops_tests_error_suppression_tests.rs`](./ops_tests_error_suppression_tests.rs),
-  [`ops_tests_models_parsing_tests.rs`](./ops_tests_models_parsing_tests.rs), [`ops/http_error_tests.rs`](./ops/http_error_tests.rs), [`ops/models_tests.rs`](./ops/models_tests.rs): error
-  classification and model listing.
+- [`http_error_tests.rs`](./http_error_tests.rs), [`models/mod_tests.rs`](./models/mod_tests.rs),
+  and provider model-listing tests: error classification and model listing.
 - Claude Code provider tests live with the provider in
   [`vendor/tinyagents/crates/tinyagents-harness/src/providers/claude_code/`](../../../../../vendor/tinyagents/crates/tinyagents-harness/src/providers/claude_code/).
 - [`openhuman_backend_model_tests.rs`](./openhuman_backend_model_tests.rs): managed host transport; reusable provider

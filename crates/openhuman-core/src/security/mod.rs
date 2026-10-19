@@ -1,6 +1,5 @@
 mod core;
 pub mod ops;
-pub use ops as rpc;
 mod schemas;
 pub mod tools;
 
@@ -21,9 +20,9 @@ pub mod pairing;
 pub mod policy;
 pub mod prompt_injection;
 pub mod scrub;
+pub(crate) mod transport;
 pub mod secret_storage;
 pub(crate) mod secure_open;
-pub(crate) mod transport;
 pub mod turn_origin;
 
 #[allow(unused_imports)]
@@ -39,7 +38,7 @@ pub use egress::{
     emit_external_transfer, enforce_egress, local_only_blocks, local_only_tool_block, DataKind,
     EgressDescriptor, EgressReason, IdentificationRisk,
 };
-
+pub use ops as rpc;
 pub use ops::*;
 pub use policy::validate_path_within_root;
 #[allow(unused_imports)]

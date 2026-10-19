@@ -82,7 +82,7 @@ None of its own (no `store.rs`). It only **reads** existing state owned by other
 - `run()` is **strictly blocking** by contract (file system, sqlite, blocking HTTP). `reqwest::blocking::Client` panics inside a tokio runtime, so `ops::doctor_report` runs the whole thing in `tokio::task::spawn_blocking`. Do not add `.await` inside `core::run`.
 - An async probe therefore arrives as an **argument**, resolved in `ops` before the blocking hop: `MemoryEngineCheck` is the first of them. Do not reach for `Handle::block_on` inside [`core`](./core): it panics on a current-thread runtime and deadlocks the multi-thread one whose worker it is already occupying.
 - An engine that is down is reported as an error and memory being off as a warning, so the doctor names what is wrong instead of showing an empty store.
-- `run_models` / `doctor.models` is lists the configured provider slugs from the supplied config and marks each entry `Skipped` because catalog refresh is not part of doctor.
+- `run_models` / `doctor.models` lists configured provider slugs from the supplied config and marks each entry `Skipped` because catalog refresh is not part of doctor.
 - The embedding probe is capped at a 3s timeout to avoid stalling on a slow Ollama daemon; non-ollama providers short-circuit to OK.
 - `model_matches` treats `name` vs `name:tag` as a match only when at most one side is tagged; two differently-tagged names are not considered equal.
 - Severity rollup: `DoctorSummary` counts `Ok`/`Warn`/`Error` items; checks are intentionally lenient (missing optional dirs/tools → `Warn`, not `Error`).

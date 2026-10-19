@@ -1,12 +1,11 @@
 pub mod bus;
 mod core;
 pub mod ops;
-pub use ops as rpc;
 mod schemas;
 pub mod tools;
 
 pub use core::*;
-
+pub use ops as rpc;
 pub use ops::*;
 pub use schemas::{
     all_controller_schemas as all_health_controller_schemas,

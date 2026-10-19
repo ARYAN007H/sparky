@@ -1,5 +1,6 @@
-use super::tests::{runtime_context, RecordingChannel};
 use super::*;
+
+use super::tests::{runtime_context, RecordingChannel};
 use crate::channels::context::conversation_history_key;
 use crate::channels::Channel;
 use std::path::PathBuf;

@@ -12,7 +12,6 @@ pub mod daemon;
 pub mod enrichers;
 pub mod migrations;
 pub mod ops;
-pub use ops as rpc;
 pub mod schema;
 mod schemas;
 pub mod tools;
@@ -26,6 +25,7 @@ pub use enrichers::{
 };
 
 /// RPC operations for configuration.
+pub use ops as rpc;
 pub use ops::*;
 
 pub use schema::{
