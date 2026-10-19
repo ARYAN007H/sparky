@@ -45,8 +45,8 @@ async fn module_inbound_envelope_reaches_host_dispatch_with_identity_intact() {
             ..Default::default()
         },
         text: "native Telegram inbound".into(),
-        access: tinychannels_bus::AccessContext {
-            dm_decision: tinychannels_bus::SenderDmDecision::Allow,
+        access: tinychannels_bus::channel::AccessContext {
+            dm_decision: tinychannels_bus::channel::SenderDmDecision::Allow,
             ..Default::default()
         },
         parts: vec![tinychannels_bus::ContentPart::Text {
