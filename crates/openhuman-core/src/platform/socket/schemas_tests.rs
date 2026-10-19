@@ -1,84 +1,42 @@
 use super::*;
+use crate::core::all::{
+    assert_schema_controller_parity, expect_schema_fields, expect_schema_identity,
+    expect_schema_required_inputs,
+};
 use crate::core::runtime::DispatchCtx;
 
 #[test]
-fn catalog_lists_all_five_controllers() {
-    let schemas = all_controller_schemas();
-    assert_eq!(schemas.len(), 5);
-    let names: Vec<&str> = schemas.iter().map(|s| s.function).collect();
-    assert!(names.contains(&"connect"));
-    assert!(names.contains(&"disconnect"));
-    assert!(names.contains(&"state"));
-    assert!(names.contains(&"emit"));
-    assert!(names.contains(&"connect_with_session"));
-}
-
-#[test]
-fn all_schemas_use_socket_namespace() {
-    for s in all_controller_schemas() {
-        assert_eq!(s.namespace, "socket", "function {}", s.function);
-        assert!(
-            !s.description.is_empty(),
-            "function {} has empty description",
-            s.function
-        );
-    }
-}
-
-#[test]
-fn connect_schema_requires_url_and_token() {
-    let s = schemas("connect");
-    let required: Vec<&str> = s
-        .inputs
+fn socket_schema_contracts_are_preserved() {
+    assert_schema_controller_parity(
+        &all_controller_schemas(),
+        &all_registered_controllers(),
+        "connect",
+    );
+    let functions: Vec<_> = all_controller_schemas()
         .iter()
-        .filter(|f| f.required)
-        .map(|f| f.name)
+        .map(|schema| schema.function)
         .collect();
-    assert!(required.contains(&"url"));
-    assert!(required.contains(&"token"));
-}
-
-#[test]
-fn disconnect_and_state_have_no_inputs() {
-    assert!(schemas("disconnect").inputs.is_empty());
-    assert!(schemas("state").inputs.is_empty());
-    assert!(schemas("connect_with_session").inputs.is_empty());
-}
-
-#[test]
-fn emit_schema_data_is_optional() {
-    let s = schemas("emit");
-    let event = s.inputs.iter().find(|f| f.name == "event").unwrap();
-    let data = s.inputs.iter().find(|f| f.name == "data").unwrap();
-    assert!(event.required);
-    assert!(!data.required);
-}
-
-#[test]
-fn every_schema_has_at_least_one_output_field() {
-    for s in all_controller_schemas() {
-        assert!(
-            !s.outputs.is_empty(),
-            "schema `{}` must expose ≥1 output field for RPC callers",
-            s.function
-        );
+    assert_eq!(functions, ["connect", "disconnect", "state", "emit", "connect_with_session"]);
+    for schema in all_controller_schemas() {
+        assert_eq!(schema.namespace, "socket");
+        assert!(!schema.outputs.is_empty(), "{} output fields", schema.function);
     }
-}
-
-#[test]
-fn all_registered_controllers_have_socket_namespace() {
-    for h in all_registered_controllers() {
-        assert_eq!(h.schema.namespace, "socket");
-        assert!(!h.schema.function.is_empty());
+    for (function, required) in [
+        ("connect", &["url", "token"][..]),
+        ("disconnect", &[][..]),
+        ("state", &[][..]),
+        ("connect_with_session", &[][..]),
+    ] {
+        let schema = schemas(function);
+        expect_schema_identity(&schema, "socket", function);
+        expect_schema_required_inputs(&schema, required);
+        if required.is_empty() {
+            assert!(schema.inputs.is_empty());
+        }
     }
-}
-
-#[test]
-fn connect_schema_inputs_contain_url_and_token() {
-    let s = schemas("connect");
-    let names: Vec<&str> = s.inputs.iter().map(|f| f.name).collect();
-    assert!(names.contains(&"url"));
-    assert!(names.contains(&"token"));
+    let emit = schemas("emit");
+    expect_schema_identity(&emit, "socket", "emit");
+    expect_schema_fields(&emit, &[("event", Some(true)), ("data", Some(false))]);
 }
 
 // ── handlers (without manager): require_manager errors ─────────
