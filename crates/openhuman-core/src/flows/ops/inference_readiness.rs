@@ -141,16 +141,11 @@ pub(super) async fn evaluate_inference_readiness(
     config: &Config,
     graph: &WorkflowGraph,
 ) -> Option<InferenceReadinessEvaluation> {
-    let roles: Vec<_> = graph
-        .nodes
-        .iter()
-        .filter(|node| node.kind == NodeKind::Agent)
-        .map(|node| async move { (node.id.clone(), agent_node_role(config, node).await) });
-    let mut resolved_roles = Vec::with_capacity(roles.len());
-    for role in roles {
-        resolved_roles.push(role.await);
+    let mut roles = Vec::new();
+    for node in graph.nodes.iter().filter(|node| node.kind == NodeKind::Agent) {
+        roles.push((node.id.clone(), agent_node_role(config, node).await));
     }
-    let evaluation = crate::inference::readiness::evaluate(ctx, config, &resolved_roles).await?;
+    let evaluation = crate::inference::readiness::evaluate(ctx, config, &roles).await?;
     let message = format_evaluation(&evaluation);
     let node_id = match evaluation.failures.as_slice() {
         [failure] if failure.node_ids.len() == 1 => Some(failure.node_ids[0].clone()),
