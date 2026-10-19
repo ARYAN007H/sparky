@@ -412,6 +412,87 @@ async fn nested_context_refresh_does_not_pin_a_previous_external_value() {
 }
 
 #[tokio::test]
+async fn profile_context_conflict_refresh_keeps_host_owned_restrictions() {
+    let tmp = tempfile::tempdir().unwrap();
+    let storage = MemoryStorage::new();
+    let _forced = ForcedDocumentSource::new(
+        scoped(&storage, "tenant-profile-refresh"),
+        Scope::new("tenant-profile-refresh").unwrap(),
+        keys(16),
+    );
+    let operator = CoreContext::for_test(DomainSet::full(), None);
+    let mut saas = crate::core::runtime::SaasConfig::new(tmp.path());
+    saas.max_tool_iterations = Some(4);
+    let host = crate::profiles::ProfileHost::new(saas, operator);
+    let id = crate::profiles::ProfileId::for_user(
+        "profile-refresh",
+        crate::profiles::ProfileIdMode::Raw,
+    )
+    .unwrap();
+    host.provision(&id).await.unwrap();
+    let profile = host.open(&id).await.unwrap();
+    let context = Arc::clone(profile.context());
+
+    let mut initial = CoreContext::scope(context.clone(), async {
+        DispatchCtx::new(context.clone())
+            .load_config()
+            .await
+            .unwrap()
+    })
+    .await;
+    assert!(initial.autonomy.enabled);
+    assert!(initial.autonomy.workspace_only);
+    assert_eq!(initial.memory.agent_id.as_deref(), Some(id.as_str()));
+    assert_eq!(initial.agent.max_tool_iterations_override, Some(4));
+    CoreContext::scope(context.clone(), initial.save())
+        .await
+        .unwrap();
+
+    let mut stale = CoreContext::scope(context.clone(), async {
+        DispatchCtx::new(context.clone())
+            .load_config()
+            .await
+            .unwrap()
+    })
+    .await;
+    let mut external = Config::load_from_config_path(&stale.config_path, &stale.workspace_dir)
+        .await
+        .unwrap();
+    external.default_model = Some("external-winner".into());
+    external.autonomy.enabled = false;
+    external.autonomy.workspace_only = false;
+    external.memory.agent_id = Some("external-agent".into());
+    external.memory.root = Some("team:external".into());
+    external.agent.max_tool_iterations_override = Some(99);
+    external.agent.channel_permissions.clear();
+    external.save().await.unwrap();
+
+    stale.default_temperature = 0.8;
+    let error = CoreContext::scope(context.clone(), stale.save())
+        .await
+        .expect_err("the stale profile snapshot must conflict with the external write");
+    assert!(error.chain().any(|cause| {
+        cause
+            .downcast_ref::<tinystoragedrivers::StorageError>()
+            .is_some_and(|error| error.kind() == tinystoragedrivers::ErrorKind::Conflict)
+    }));
+
+    let refreshed = CoreContext::scope(context.clone(), async {
+        DispatchCtx::new(context.clone())
+            .load_config()
+            .await
+            .unwrap()
+    })
+    .await;
+    assert_eq!(refreshed.default_model.as_deref(), Some("external-winner"));
+    assert!(refreshed.autonomy.enabled);
+    assert!(refreshed.autonomy.workspace_only);
+    assert_eq!(refreshed.memory.agent_id.as_deref(), Some(id.as_str()));
+    assert_eq!(refreshed.agent.max_tool_iterations_override, Some(4));
+    assert!(!refreshed.agent.channel_permissions.is_empty());
+}
+
+#[tokio::test]
 async fn config_snapshot_cannot_be_saved_into_a_different_tenant_scope() {
     let tmp = tempfile::tempdir().unwrap();
     let storage = MemoryStorage::new();
