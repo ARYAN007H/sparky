@@ -122,7 +122,7 @@ pub(crate) async fn build_root_parent(
 
 /// Build (or accept) the parent execution context for a **controller-spawned
 /// background orchestration surface** that has no enclosing agent turn (the
-/// workflow-run engine or cron jobs), then run
+/// cron jobs), then run
 /// `run(parent)` with it.
 ///
 /// Folds [`build_root_parent`] and the hand-off into one call so a surface

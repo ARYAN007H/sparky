@@ -1,5 +1,5 @@
 //! JSON-RPC E2E coverage for the agent-orchestration controllers that no e2e
-//! target reached: durable workflow-run `stop` / `resume`, the command
+//! target reached: detached sub-agent control, the command
 //! center's `agent_work_control`, the
 //! detached sub-agent controls (`subagent_cancel` / `subagent_steer`).
 //!
