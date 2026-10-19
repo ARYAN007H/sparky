@@ -244,8 +244,7 @@ impl SpawnSubagentTool {
 
         // Persist this delegation as a reopenable worker sub-thread, seeded
         // with the prompt, so the parent↔subagent conversation survives
-        // navigation and restarts — the same machinery `spawn_worker_thread`
-        // uses. Best-effort: with no parent context or thread store the run
+        // navigation and restarts. Best-effort: with no parent context or thread store the run
         // still proceeds live-only (`worker_thread_id: None`).
         let worker_thread_id = run_context.parent.as_ref().and_then(|p| {
             let parent_thread_id = parent_thread_id.as_ref()?;

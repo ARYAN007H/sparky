@@ -80,10 +80,10 @@ pub(super) fn filter_tool_indices(
     let mut first_specs = std::collections::HashMap::new();
     let mut specs = Vec::new();
     let mut disallowed_recovery = std::collections::HashSet::new();
-    let mut delegation_tools = vec!["spawn_worker_thread".to_string()];
+    let mut delegation_tools = Vec::new();
     for tool in parent_tools {
         let name = tool.name();
-        if is_subagent_spawn_tool(name) || name == "spawn_worker_thread" {
+        if is_subagent_spawn_tool(name) {
             delegation_tools.push(name.to_string());
         }
         if crate::tools::rules::glob_list_matches(disallowed, name) {

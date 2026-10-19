@@ -1,8 +1,7 @@
 //! Shared helper for materialising a sub-agent's work as a persistent
 //! conversation sub-thread.
 //!
-//! Both `spawn_worker_thread` (explicit) and `spawn_subagent` (inline)
-//! back their run with a `worker-<uuid>` thread linked to the parent so the
+//! `spawn_subagent` backs its run with a `worker-<uuid>` thread linked to the parent so the
 //! delegation is reopenable from memory and rendered as a parent↔subagent
 //! chat. The thread is created with `parent_thread_id` set (which hides it
 //! from the main sidebar — it surfaces in the "Workers" tab and the
