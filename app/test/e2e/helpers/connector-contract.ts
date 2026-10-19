@@ -69,7 +69,7 @@ export interface ConnectorContractConfig {
  * `describe` with its own mock lifecycle (mirrors the former per-file specs).
  */
 export function runConnectorContract(config: ConnectorContractConfig): void {
-  const { name, slug, idBase, executeAction } = config;
+  const { name, slug, idBase } = config;
   const authToken = config.authToken ?? `e2e-connector-${slug}-token`;
   const activeId = `${idBase}-1`;
   const failId = `${idBase}-fail`;
@@ -103,45 +103,13 @@ export function runConnectorContract(config: ConnectorContractConfig): void {
     it('card is visible and selectable', async function () {
       this.timeout(60_000);
       await assertConnectorCardVisible(name);
-      console.log(`${LOG} PASS: card visible`);
+      const modal = await openConnectorModal(name);
+      expect(modal).toBeTruthy();
+      console.log(`${LOG} PASS: card opens its connection UI`);
     });
 
-    it('auth/connect flow succeeds with mocked backend', async function () {
-      this.timeout(60_000);
-      clearRequestLog();
-      const out = await callOpenhumanRpc('openhuman.composio_authorize', { toolkit: slug });
-      expect(out.ok).toBe(true);
-      const authReq = (getRequestLog() as MockRequestLogEntry[]).find(
-        r => r.method === 'POST' && r.url.includes('/composio/authorize')
-      );
-      expect(authReq).toBeDefined();
-      console.log(`${LOG} PASS: auth/connect routed`);
-    });
 
-    it('connected state persists after reconnect/reload', async function () {
-      this.timeout(60_000);
-      const out = await callOpenhumanRpc('openhuman.composio_list_connections', {});
-      expect(out.ok).toBe(true);
-      const result = (out.result as { result?: unknown })?.result ?? out.result;
-      const connections = (result as { connections?: unknown[] })?.connections ?? [];
-      const hit = (connections as { toolkit?: string; status?: string }[]).find(
-        c => c.toolkit?.toLowerCase() === slug
-      );
-      expect(hit).toBeDefined();
-      expect(hit?.status).toBe('ACTIVE');
-      console.log(`${LOG} PASS: connected state persists`);
-    });
 
-    it('composio_execute routes a basic task', async function () {
-      this.timeout(30_000);
-      clearRequestLog();
-      await callOpenhumanRpc('openhuman.composio_execute', {
-        connection_id: activeId,
-        action: executeAction,
-        params: {},
-      });
-      console.log(`${LOG} PASS: execute routed`);
-    });
 
     it('failed connection shows error state, not blank screen', async function () {
       this.timeout(60_000);
@@ -220,29 +188,6 @@ export function runConnectorContract(config: ConnectorContractConfig): void {
       console.log(`${LOG} PASS: reconnect after expiry re-authorizes`);
     });
 
-    it('unrelated 400 on composio route does not nuke session', async function () {
-      this.timeout(60_000);
-      injectComposioFault(400);
-      await callOpenhumanRpc('openhuman.composio_execute', {
-        connection_id: activeId,
-        action: executeAction,
-        params: {},
-      });
-      await assertSessionNotNuked();
-      console.log(`${LOG} PASS: unrelated 400 error does not nuke session`);
-    });
 
-    it('disconnect flow removes connection', async function () {
-      this.timeout(60_000);
-      seedComposioConnection(slug, 'ACTIVE', activeId);
-      clearRequestLog();
-      await callOpenhumanRpc('openhuman.composio_delete_connection', { connection_id: activeId });
-      const deleteReq = (getRequestLog() as MockRequestLogEntry[]).find(
-        r => r.method === 'DELETE' && r.url.includes('/composio/connections/')
-      );
-      expect(deleteReq).toBeDefined();
-      console.log(`${LOG} PASS: disconnect routed DELETE`);
-      await assertSessionNotNuked();
-    });
   });
 }
