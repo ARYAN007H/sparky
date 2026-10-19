@@ -56,9 +56,9 @@ pub mod local_speech;
 pub mod postprocess;
 #[cfg(feature = "voice")]
 pub use factory::{
-    create_stt_provider, create_tts_provider, effective_stt_provider, effective_tts_provider,
-    ExternalSttProvider, ExternalTtsProvider, SttProvider, SttResult, TtsProvider,
-    DEFAULT_PIPER_VOICE, DEFAULT_STT_MODEL,
+    DEFAULT_PIPER_VOICE, DEFAULT_STT_MODEL, ExternalSttProvider, ExternalTtsProvider, SttProvider,
+    SttResult, TtsProvider, create_stt_provider, create_tts_provider, effective_stt_provider,
+    effective_tts_provider,
 };
 #[cfg(feature = "voice")]
 pub use ops::*;
