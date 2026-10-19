@@ -390,6 +390,15 @@ export function buildPlan({ profile, areas, env = {}, isPullRequest = true }) {
           },
           run: withModules("bash scripts/ci/rust-coverage.sh"),
         },
+        // ex63: lcov-core.info is written (even after a failed suite), so drop
+        // its ~90 GB of instrumented test executables and profiles before the
+        // next lanes build on the same 160 GB disk. No `needs`: it must run
+        // after a failure too.
+        {
+          name: "prune-coverage-binaries",
+          when: ex63 && (core || areas.storage),
+          run: "bash scripts/ci/self-hosted/prune-coverage-binaries.sh target/ci-private-coverage",
+        },
       ],
     },
     {
