@@ -94,6 +94,62 @@ async function expectBillingMarkers(markers) {
   }
 }
 
+/** Install content-free counters before a native auth expiry can be emitted. */
+async function installAuthExpiryDiagnostics(): Promise<boolean> {
+  return (await browser.execute(async () => {
+    const w = window as typeof window & {
+      __TAURI_INTERNALS__?: {
+        invoke?: (command: string, args?: unknown) => Promise<unknown>;
+        transformCallback?: (callback: () => void) => string | number;
+      };
+      __openhuman235AuthDiagnostics?: {
+        nativeExpiredEvents: number;
+        rendererExpiredEvents: number;
+        nativeListenerId: string | number;
+      };
+    };
+    const internals = w.__TAURI_INTERNALS__;
+    if (!internals?.invoke || !internals.transformCallback) return false;
+
+    const diagnostics = {
+      nativeExpiredEvents: 0,
+      rendererExpiredEvents: 0,
+      nativeListenerId: -1 as string | number,
+    };
+    const handler = internals.transformCallback(() => {
+      diagnostics.nativeExpiredEvents += 1;
+    });
+    diagnostics.nativeListenerId = (await internals.invoke('plugin:event|listen', {
+      event: 'auth://expired',
+      target: { kind: 'Any' },
+      handler,
+    })) as string | number;
+    window.addEventListener('openhuman:session-expired', () => {
+      diagnostics.rendererExpiredEvents += 1;
+    });
+    w.__openhuman235AuthDiagnostics = diagnostics;
+    return true;
+  })) as boolean;
+}
+
+async function readAuthExpiryDiagnostics() {
+  return await browser.execute(() => {
+    const w = window as typeof window & {
+      __openhuman235AuthDiagnostics?: {
+        nativeExpiredEvents: number;
+        rendererExpiredEvents: number;
+      };
+    };
+    return {
+      nativeExpiredEvents: w.__openhuman235AuthDiagnostics?.nativeExpiredEvents ?? 0,
+      rendererExpiredEvents: w.__openhuman235AuthDiagnostics?.rendererExpiredEvents ?? 0,
+      route: window.location.hash,
+      rootShellVisible: document.querySelector('[data-testid="root-shell-sidebar"]') !== null,
+      welcomeVisible: document.querySelector('[data-testid="welcome-card-tinyhumans"]') !== null,
+    };
+  });
+}
+
 // walkOnboarding, waitForHomePage imported from shared-flows
 
 /**
@@ -456,7 +512,23 @@ describe('Auth & Access Control', () => {
     setMockBehavior('session', 'revoked');
 
     // Trigger a re-auth which will fail with 401
+    expect(await installAuthExpiryDiagnostics()).toBe(true);
     await triggerAuthDeepLink('e2e-revoked-check-token');
+
+    // Count a completed response, not merely an attempted request. The mock
+    // records status when the response finishes; this proves the revoked
+    // session branch actually returned 401 before we inspect logout behavior.
+    await browser.waitUntil(
+      async () =>
+        getRequestLog().some(
+          r => r.method === 'GET' && r.url.includes('/auth/me') && r.status === 401
+        ),
+      {
+        timeout: 20_000,
+        interval: 250,
+        timeoutMsg: 'mock did not finish a GET /auth/me response with status 401',
+      }
+    );
 
     // Wait for the app to process the revoked token. The app should either
     // navigate away from Home (auto-logout) or the token consume call should
@@ -499,8 +571,11 @@ describe('Auth & Access Control', () => {
     // 1. The injection landed. A revoked-session test that never provoked a
     //    401 is the "couldn't-run wearing the clothes of proved" failure:
     //    everything downstream would look like a clean auto-logout.
-    const meCalls = getRequestLog().filter(r => r.method === 'GET' && r.url.includes('/auth/me'));
-    expect(meCalls.length).toBeGreaterThan(0);
+    expect(
+      getRequestLog().some(
+        r => r.method === 'GET' && r.url.includes('/auth/me') && r.status === 401
+      )
+    ).toBe(true);
 
     // 2. The core dropped the credential.
     await browser.waitUntil(
@@ -520,6 +595,17 @@ describe('Auth & Access Control', () => {
 
     // 3. The shell left the authenticated surface.
     const stillOnHome = await waitForHomePage(5_000);
+    const eventDiagnostics = await readAuthExpiryDiagnostics();
+    if (stillOnHome !== null) {
+      throw new Error(
+        `expected revoked session to leave the authenticated shell; observed ${JSON.stringify({
+          stillOnHome,
+          coreAuthenticated: authStateValue(revokedState).isAuthenticated,
+          coreCredentialPresent: Boolean(authStateValue(revokedState).credential),
+          ...eventDiagnostics,
+        })}`
+      );
+    }
     expect(stillOnHome).toBeNull();
     console.log('[AuthAccess] Revoked session auto-logout verified');
   });
