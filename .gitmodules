@@ -70,3 +70,4 @@
 [submodule "vendor/tinyeventqueues"]
 	path = vendor/tinyeventqueues
 	url = https://github.com/tinyhumansai/tinyeventqueues
+	branch = main
