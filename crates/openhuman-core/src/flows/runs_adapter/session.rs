@@ -129,7 +129,7 @@ impl RunSession {
             .unwrap_or_else(std::sync::PoisonError::into_inner)
     }
 
-    pub(super) async fn replace_bindings(&self, bindings: Arc<RunBindings>) {
+    pub(super) fn replace_bindings(&self, bindings: Arc<RunBindings>) {
         *self
             .bindings
             .write()
@@ -177,10 +177,6 @@ impl RunSession {
 
     pub(super) fn mark_resumed(&self) {
         self.live_actor.store(true, std::sync::atomic::Ordering::Release);
-    }
-
-    pub(super) fn is_live_actor(&self) -> bool {
-        self.live_actor.load(std::sync::atomic::Ordering::Acquire)
     }
 
     pub(super) fn is_live_actor(&self) -> bool {

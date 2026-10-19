@@ -79,14 +79,7 @@ pub(crate) async fn register_bindings(
     run_id: &str,
 ) -> Result<Arc<RunBindings>, String> {
     let catalog = catalog_storage::register(ctx, config).await?;
-    register_with_catalog(
-        ctx,
-        config,
-        flow,
-        run_id,
-        catalog,
-    )
-    .await
+    register_with_catalog(ctx, config, flow, run_id, catalog).await
 }
 
 async fn register_with_catalog(
@@ -172,6 +165,10 @@ pub(crate) async fn start_run(
             return Err(error.wire_message());
         }
     };
+    if started.run_id != run_id {
+        session::remove(&session);
+        return Err("TinyFlows admitted a different run id".to_string());
+    }
     if started.already_running {
         session::remove(&session);
         return Err(format!("flow run '{run_id}' is already running"));
@@ -290,7 +287,6 @@ pub(crate) async fn resume_and_wait(
     {
         return Err("resume bindings do not match the owner-scoped request".to_string());
     }
-    let key = RunKey::new(&storage, &request.run_id);
     let proxy = module::runs_proxy(config).await?;
     let (session, inserted) = match session::get(&storage, &request.run_id) {
         Some(session) => (session, false),
@@ -337,7 +333,7 @@ pub(crate) async fn resume_and_wait(
     session.replace_flow(candidate.flow.clone()).await;
     session.set_trigger(FlowRunTrigger::Resume);
     session.mark_resumed();
-    session.replace_bindings(candidate).await;
+        session.replace_bindings(candidate);
     session.start_polling(proxy);
     wait_for_outcome(&mut receiver, &request.run_id, baseline).await
 }
@@ -427,7 +423,9 @@ pub(crate) async fn after_recovery(
     let storage = catalog.storage();
     if let Some(session) = session::get(&storage, run_id) {
         let proxy = module::runs_proxy(config).await?;
-        let _ = session.drain(&proxy, true).await?;
+        if session.drain(&proxy, true).await? {
+            session::remove(&session);
+        }
         return Ok(());
     }
 
@@ -464,7 +462,6 @@ pub(crate) async fn after_recovery(
                     .flow_id;
                 projection::project_recovered_finished(&key, &flow_id, run_id, event);
             }
-            cursor = event.seq;
         }
         if page.done || page.events.is_empty() || page.next_cursor <= cursor {
             break;

@@ -267,7 +267,8 @@ mod imp {
         path: String,
         object: impl tinybus::service::Interface + 'static,
     ) -> Result<ServedObjectRegistration, String> {
-        let announces_caps_host = object.name().as_str() == tinyflows_bus::runs::CAPS_INTERFACE;
+        let object_interface = tinybus::service::Interface::name(&object);
+        let announces_caps_host = object_interface.as_str() == tinyflows_bus::runs::CAPS_INTERFACE;
         let runtime = runtime::runtime()
             .await
             .map_err(|error| format!("the module bus is unavailable: {error}"))?;
