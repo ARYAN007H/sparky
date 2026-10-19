@@ -85,6 +85,21 @@ pub async fn flows_draft_promote(
     id: &str,
     require_approval: Option<bool>,
 ) -> Result<Outcome<Flow>, String> {
+    flows_draft_promote_with_context(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        config,
+        id,
+        require_approval,
+    )
+    .await
+}
+
+pub(crate) async fn flows_draft_promote_with_context(
+    ctx: &crate::core::runtime::DispatchCtx,
+    config: &Config,
+    id: &str,
+    require_approval: Option<bool>,
+) -> Result<Outcome<Flow>, String> {
     let draft = draft_store::get_draft(config, id)
         .map_err(|e| e.to_string())?
         .ok_or_else(|| format!("draft '{id}' not found"))?;
@@ -98,7 +113,8 @@ pub async fn flows_draft_promote(
 
     let outcome = match &draft.flow_id {
         Some(flow_id) => {
-            flows_update(
+            flows_update_with_context(
+                ctx,
                 config,
                 flow_id,
                 Some(draft.name.clone()),
@@ -109,7 +125,8 @@ pub async fn flows_draft_promote(
             .await?
         }
         None => {
-            flows_create(
+            flows_create_with_context(
+                ctx,
                 config,
                 draft.name.clone(),
                 draft.graph.clone(),
