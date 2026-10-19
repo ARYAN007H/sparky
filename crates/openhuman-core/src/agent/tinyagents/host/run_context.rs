@@ -130,6 +130,9 @@ pub(crate) struct SessionTurnSidecar {
     /// and the post-commit UI use the same complete ledger.
     pub subagents: Vec<SubagentUsageEntry>,
     pub duration: Option<Duration>,
+    /// Typed host refusal captured before the neutral runtime's string error
+    /// boundary. Read only by the same logical turn that populated it.
+    pub dispatch_refusal: Option<super::budget::DispatchRefusal>,
     pub tool_outcomes: Vec<ToolCallOutcome>,
     pub hit_cap: bool,
     pub wrap_up_injected: bool,
@@ -418,12 +421,12 @@ pub(crate) struct HarnessHostPolicy {
 
 #[cfg(test)]
 pub(crate) use super::operation_context::tool_context_with_approval;
+pub use super::operation_context::{approval_for_tool, OpenHumanRunExt};
 pub(crate) use super::operation_context::{
-    HostOperationContext, command_environment_for_tool, dispatch_ctx_for_tool,
-    memory_identity_for_tool, memory_in_prompt_for_tool, parent_agent_id_for_tool,
-    sandbox_mode_for_tool, task_recency_window_for_tool, turn_origin_for_tool,
+    command_environment_for_tool, dispatch_ctx_for_tool, memory_identity_for_tool,
+    memory_in_prompt_for_tool, parent_agent_id_for_tool, sandbox_mode_for_tool,
+    task_recency_window_for_tool, turn_origin_for_tool, HostOperationContext,
 };
-pub use super::operation_context::{OpenHumanRunExt, approval_for_tool};
 
 impl Default for OpenHumanRunContext {
     fn default() -> Self {
