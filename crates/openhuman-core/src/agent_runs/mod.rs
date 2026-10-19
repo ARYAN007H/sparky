@@ -15,10 +15,13 @@ pub(crate) use agent_chat::all_inference_agent_chat_registered_controllers;
 pub(crate) use agent_teams::{
     all_agent_team_controller_schemas, all_agent_team_registered_controllers,
 };
-/// Canonical RPC method name for the `inference.agent_chat` controller.
+/// The canonical RPC method name for `inference.agent_chat`.
 ///
-/// Hosts reference this value so their dispatch string stays aligned with the
-/// registered controller's namespace and function.
+/// The controller's `namespace` + `function` combine into the wire method
+/// `openhuman.inference_agent_chat` ([`rpc_method_name`](crate::core::ControllerSchema)).
+/// Host facades (the embed library) reference this constant rather than
+/// spelling the string out, so a rename upstream cannot silently drift an
+/// embedder's dispatch string away from the registered controller.
 pub const INFERENCE_AGENT_CHAT: &str = "openhuman.inference_agent_chat";
 pub(crate) use command_center::{
     all_command_center_controller_schemas, all_command_center_registered_controllers,
