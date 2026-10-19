@@ -1,8 +1,8 @@
 use super::*;
 use crate::memory::sources::state;
 use crate::memory::test_fixtures::{bind_reference, config_in, stored};
-use tinymemory_integrations::sources::{SourceState, SourceStatus};
 use tinymemory_api::{ItemKind, MetaFilter};
+use tinymemory_integrations::sources::{SourceState, SourceStatus};
 
 fn folder_source(id: &str, dir: &std::path::Path, mins: Option<u32>) -> MemorySourceConfig {
     MemorySourceConfig {

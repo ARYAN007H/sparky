@@ -10,8 +10,8 @@
 pub mod state;
 mod sync;
 
-use tinymemory_integrations::sources::{Error as SourceError, SourceSpec};
 use tinymemory_integrations::sources::SourceState;
+use tinymemory_integrations::sources::{Error as SourceError, SourceSpec};
 use tinymemory_tools::ops::MemoryOps;
 
 use crate::config::Config;
@@ -22,9 +22,6 @@ use super::types::{SourceView, SourcesAddParams};
 use tinymemory_api::{Error, Result};
 
 pub use sync::{start_sync, sync_due, sync_one};
-
-/// Fewest minutes between scheduled syncs of one source (the module's).
-pub use tinymemory_integrations::sources::sync::MIN_SCHEDULE_MINS;
 
 fn source_spec_error(error: SourceError) -> Error {
     match error {

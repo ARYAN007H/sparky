@@ -1,8 +1,9 @@
 use super::*;
 use crate::memory::test_fixtures::{bind_reference, config_in, stored};
 use chrono::Utc;
-use tinymemory_integrations::sources::{SourceState, SourceStatus};
 use tinymemory_api::{DocumentBody, MemoryMeta, SourceKind, SourceRef, StoreItem};
+use tinymemory_integrations::sources::sync::MIN_SCHEDULE_MINS;
+use tinymemory_integrations::sources::{SourceState, SourceStatus};
 
 fn add_params(kind: &str, target: &str) -> SourcesAddParams {
     SourcesAddParams {
