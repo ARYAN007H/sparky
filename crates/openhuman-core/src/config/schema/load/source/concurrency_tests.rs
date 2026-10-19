@@ -86,6 +86,48 @@ async fn memory_engine_rpc_preserves_document_conflicts() {
 }
 
 #[tokio::test]
+async fn sequential_config_rpcs_use_the_latest_context_snapshot() {
+    let tmp = tempfile::tempdir().unwrap();
+    let storage = MemoryStorage::new();
+    let _forced = ForcedDocumentSource::new(
+        scoped(&storage, "tenant-sequential-config-rpc"),
+        Scope::new("tenant-sequential-config-rpc").unwrap(),
+        keys(11),
+    );
+    let seed = config_at(tmp.path(), "initial");
+    seed.save().await.unwrap();
+    let config = Config::load_from_config_path(&seed.config_path, &seed.workspace_dir)
+        .await
+        .unwrap();
+    let ctx = CoreContext::for_test_with_config(DomainSet::full(), config);
+    let controller = crate::core::all::all_registered_controllers()
+        .into_iter()
+        .find(|controller| controller.rpc_method_name() == "openhuman.config_update_model_settings")
+        .expect("config model settings RPC is registered");
+
+    for patch in [
+        json!({"default_model": "model-a"}),
+        json!({"default_temperature": 0.8}),
+    ] {
+        let dispatch = DispatchCtx::new(ctx.clone());
+        CoreContext::scope(ctx.clone(), async {
+            (controller.handler)(dispatch, patch.as_object().unwrap().clone())
+                .await
+                .expect(
+                    "sequential config settings updates should use the latest context snapshot",
+                );
+        })
+        .await;
+    }
+
+    let saved = Config::load_from_config_path(&seed.config_path, &seed.workspace_dir)
+        .await
+        .unwrap();
+    assert_eq!(saved.default_model.as_deref(), Some("model-a"));
+    assert!((saved.default_temperature - 0.8).abs() < f64::EPSILON);
+}
+
+#[tokio::test]
 async fn document_source_write_uses_its_last_read_revision() {
     let tmp = tempfile::tempdir().unwrap();
     let storage = MemoryStorage::new();
