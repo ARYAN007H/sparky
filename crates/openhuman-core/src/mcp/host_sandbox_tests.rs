@@ -87,3 +87,48 @@ fn built_sandbox_enforcement_follows_the_isolation_requirement() {
         enforcement(sandbox.require_process_isolation)
     );
 }
+
+#[cfg(feature = "modules")]
+#[test]
+fn toolchain_grants_are_keyed_by_what_resolution_reads_not_by_workspace() {
+    let one = tempfile::tempdir().unwrap();
+    let two = tempfile::tempdir().unwrap();
+    let home = tempfile::tempdir().unwrap();
+    // Two agents differ only by workspace: they share one resolution.
+    assert_eq!(
+        grants_key(&config_in(one.path()), Some(home.path())),
+        grants_key(&config_in(two.path()), Some(home.path()))
+    );
+    // A different jail configuration or home must not reuse it.
+    let mut wider = config_in(one.path());
+    wider.runtime.local_jail.extra_read_only = vec!["/opt/tools".into()];
+    assert_ne!(
+        grants_key(&config_in(one.path()), Some(home.path())),
+        grants_key(&wider, Some(home.path()))
+    );
+    assert_ne!(
+        grants_key(&config_in(one.path()), Some(home.path())),
+        grants_key(&config_in(one.path()), None)
+    );
+}
+
+#[cfg(feature = "modules")]
+#[test]
+fn cached_toolchain_grants_are_reused_until_they_expire() {
+    let key = "cached_toolchain_grants_are_reused_until_they_expire".to_string();
+    assert!(cached_grants(&key).is_none());
+    let grants = (
+        vec![PathBuf::from("/opt/node")],
+        vec![PathBuf::from("/opt/cache")],
+    );
+    GRANT_CACHE
+        .lock()
+        .insert(key.clone(), (std::time::Instant::now(), grants.clone()));
+    assert_eq!(cached_grants(&key), Some(grants.clone()));
+    let stale = std::time::Instant::now() - GRANT_CACHE_TTL - std::time::Duration::from_secs(1);
+    GRANT_CACHE.lock().insert(key.clone(), (stale, grants));
+    assert!(
+        cached_grants(&key).is_none(),
+        "an expired entry is resolved again"
+    );
+}
