@@ -104,7 +104,10 @@ fn unrecognized_typed_class_does_not_fall_back_to_english_halt_phrases() {
 fn classified_halt_maps_all_typed_stop_categories_and_aliases() {
     let cases = [
         ("transient", "temporarily unavailable"),
-        ("uncertain_side_effect", "could not confirm whether it went through"),
+        (
+            "uncertain_side_effect",
+            "could not confirm whether it went through",
+        ),
         ("authentication", "rejected my credentials"),
         ("permission", "don't have permission"),
         ("policy", "security settings"),
@@ -119,7 +122,10 @@ fn classified_halt_maps_all_typed_stop_categories_and_aliases() {
         ("out_of_credits", "inference credits"),
         ("provider_config", "configured model or provider rejected"),
         ("missing_connection", "isn't connected"),
-        ("future_failure_class", "my tool calls were not getting anywhere"),
+        (
+            "future_failure_class",
+            "my tool calls were not getting anywhere",
+        ),
         ("blocked_by_policy", "security settings"),
         ("unsupported", "program or feature"),
         ("missing_app", "program or feature"),
