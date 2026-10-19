@@ -279,6 +279,9 @@ impl ChannelHostCallbacks {
         }
     }
 
+}
+
+impl ChannelHostCallbacks {
     async fn dispatch_progressive_transport(
         &self,
         request: ProgressiveTransportRequest,
