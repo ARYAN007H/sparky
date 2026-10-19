@@ -74,8 +74,9 @@ pub(crate) async fn flows_create_with_context(
     graph_json: Value,
     require_approval: bool,
 ) -> Result<Outcome<Flow>, String> {
-    let graph = validate_and_migrate_graph(ctx, config, graph_json).await?;
-    ensure_config_aware_engine_compatible(ctx, config, &graph).await?;
+    ctx.enter(async move {
+        let graph = validate_and_migrate_graph(ctx, config, graph_json).await?;
+        ensure_config_aware_engine_compatible(ctx, config, &graph).await?;
 
     // Rule 1: automatic triggers create DISABLED — the user must arm them
     // explicitly.
@@ -131,8 +132,10 @@ pub(crate) async fn flows_create_with_context(
         );
     }
 
-    publish_flow_changed(&flow.id, "created", "system");
-    Ok(Outcome::new(flow, logs))
+        publish_flow_changed(&flow.id, "created", "system");
+        Ok(Outcome::new(flow, logs))
+    })
+    .await
 }
 
 /// Duplicates a saved flow: creates an independent copy of its graph under a

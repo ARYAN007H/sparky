@@ -94,16 +94,19 @@ pub(crate) async fn flows_update_with_context(
     require_approval: Option<bool>,
     expected_version: Option<String>,
 ) -> Result<Outcome<Flow>, String> {
-    flows_update_inner(
-        ctx,
-        config,
-        id,
-        name,
-        graph_json,
-        require_approval,
-        expected_version,
-        false,
-    )
+    ctx.enter(async move {
+        flows_update_inner(
+            ctx,
+            config,
+            id,
+            name,
+            graph_json,
+            require_approval,
+            expected_version,
+            false,
+        )
+        .await
+    })
     .await
 }
 
@@ -301,19 +304,22 @@ pub(crate) async fn flows_rollback_with_context(
     revision_id: &str,
     expected_version: Option<String>,
 ) -> Result<Outcome<Flow>, String> {
-    let rev = store::revision_by_id(config, id, revision_id)
-        .map_err(|e| e.to_string())?
-        .ok_or_else(|| format!("revision '{revision_id}' not found for flow '{id}'"))?;
+    ctx.enter(async move {
+        let rev = store::revision_by_id(config, id, revision_id)
+            .map_err(|e| e.to_string())?
+            .ok_or_else(|| format!("revision '{revision_id}' not found for flow '{id}'"))?;
 
-    tracing::debug!(target: "flows", flow_id = %id, %revision_id, "[flows] flows_rollback: restoring prior revision");
-    flows_update_with_context(
-        ctx,
-        config,
-        id,
-        Some(rev.name),
-        Some(rev.graph),
-        Some(rev.require_approval),
-        expected_version,
-    )
+        tracing::debug!(target: "flows", flow_id = %id, %revision_id, "[flows] flows_rollback: restoring prior revision");
+        flows_update_with_context(
+            ctx,
+            config,
+            id,
+            Some(rev.name),
+            Some(rev.graph),
+            Some(rev.require_approval),
+            expected_version,
+        )
+        .await
+    })
     .await
 }

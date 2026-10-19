@@ -100,9 +100,10 @@ pub(crate) async fn flows_draft_promote_with_context(
     id: &str,
     require_approval: Option<bool>,
 ) -> Result<Outcome<Flow>, String> {
-    let draft = draft_store::get_draft(config, id)
-        .map_err(|e| e.to_string())?
-        .ok_or_else(|| format!("draft '{id}' not found"))?;
+    ctx.enter(async move {
+        let draft = draft_store::get_draft(config, id)
+            .map_err(|e| e.to_string())?
+            .ok_or_else(|| format!("draft '{id}' not found"))?;
 
     tracing::debug!(
         target: "flows",
@@ -140,5 +141,7 @@ pub(crate) async fn flows_draft_promote_with_context(
     if let Err(e) = draft_store::delete_draft(config, id) {
         tracing::warn!(target: "flows", draft_id = %id, error = %e, "[flows] flows_draft_promote: flow saved but draft file could not be removed");
     }
-    Ok(outcome)
+        Ok(outcome)
+    })
+    .await
 }
