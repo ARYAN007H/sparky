@@ -286,7 +286,7 @@ run_json_rpc_e2e() {
   # The JSON-RPC E2E binary intentionally changes process-global environment
   # and runtime configuration. Run each case in a fresh test process so a
   # provider route persisted by one scenario cannot affect another one.
-  local target listing test_names test_name
+  local target listing test_names test_name matched_count=0
   local -a targets=(json_rpc_threads_e2e json_rpc_wallet_e2e json_rpc_flows_e2e
     json_rpc_mcp_e2e json_rpc_inference_e2e json_rpc_auth_security_e2e
     json_rpc_config_e2e json_rpc_agent_team_e2e json_rpc_web_chat_e2e
@@ -297,17 +297,24 @@ run_json_rpc_e2e() {
       return 1
     fi
     test_names="$(printf '%s\n' "$listing" | sed -n 's/: test$//p')"
-    if [ -n "${JSON_RPC_E2E_FILTER:-}" ]; then test_names="$(printf "%s\n" "$test_names" | grep -- "$JSON_RPC_E2E_FILTER" || true)"; fi
     if [ -z "$test_names" ]; then
-      if [ -n "${JSON_RPC_E2E_FILTER:-}" ]; then continue; fi
       echo "[test-rust-with-mock] ERROR: ${target} enumeration returned no tests." >&2
       return 1
+    fi
+    if [ -n "${JSON_RPC_E2E_FILTER:-}" ]; then test_names="$(printf "%s\n" "$test_names" | grep -- "$JSON_RPC_E2E_FILTER" || true)"; fi
+    if [ -z "$test_names" ]; then
+      continue
     fi
     while IFS= read -r test_name; do
       echo "[test-rust-with-mock] JSON-RPC E2E test: ${test_name} (${target})"
       cargo_test --test "$target" "$test_name" -- --exact --test-threads=1 "$@"
+      matched_count=$((matched_count + 1))
     done <<<"$test_names"
   done
+  if [ -n "${JSON_RPC_E2E_FILTER:-}" ] && [ "$matched_count" -eq 0 ]; then
+    echo "[test-rust-with-mock] ERROR: JSON_RPC_E2E_FILTER matched no tests: ${JSON_RPC_E2E_FILTER}" >&2
+    return 1
+  fi
 }
 
 run_build_only_reaper_test() {
