@@ -130,7 +130,7 @@ pub async fn complete_once_controlled(
 
     let model: std::sync::Arc<dyn ChatModel<()>> = std::sync::Arc::new(model);
     let monetary_budget = budget.map(|budget| tinyagents_harness::cost::ModelBudget::new(
-        budget.ledger.child(crate::agent::tinyagents::budget::SpendLimits::default()),
+        budget.ledger.clone(),
         budget.call,
     ));
     let controlled = tinyagents_harness::cost::ControlledChatModel::new(
