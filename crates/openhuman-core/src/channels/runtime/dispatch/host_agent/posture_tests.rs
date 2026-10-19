@@ -1,8 +1,8 @@
 use super::*;
 use crate::agent::HostTurnTools;
-use serde_json::{Value, json};
-use std::sync::Arc;
+use serde_json::{json, Value};
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
 use tinytools::{ToolCallOptions, ToolResult};
 
 fn external() -> AgentTurnOrigin {

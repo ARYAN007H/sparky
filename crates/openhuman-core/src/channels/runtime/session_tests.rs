@@ -1,7 +1,7 @@
 use super::*;
 use crate::core::runtime::DispatchCtx;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::Arc;
 
 #[tokio::test]
 async fn independent_local_runtime_does_not_need_an_account_session() {

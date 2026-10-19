@@ -6,7 +6,7 @@
 //! about exactly what the channel receives, without needing a real Telegram HTTP server.
 
 use super::super::context::{
-    CHANNEL_MESSAGE_TIMEOUT_SECS, ChannelRuntimeContext, conversation_history_key,
+    conversation_history_key, ChannelRuntimeContext, CHANNEL_MESSAGE_TIMEOUT_SECS,
 };
 use super::super::runtime::process_channel_message;
 use super::super::{Channel, SendMessage};

@@ -2,13 +2,13 @@
 
 pub use super::dispatch::test_support::build_channel_context_block_for_test;
 use super::dispatch::{
-    RuntimeChannelMessage, process_channel_message, process_channel_runtime_message,
+    process_channel_message, process_channel_runtime_message, RuntimeChannelMessage,
 };
 pub use super::startup::test_support::resolve_yuanbao_app_secret_for_test;
-use crate::agent::bus::{AGENT_RUN_TURN_METHOD, AgentTurnRequest, AgentTurnResponse};
+use crate::agent::bus::{AgentTurnRequest, AgentTurnResponse, AGENT_RUN_TURN_METHOD};
+use crate::channels::context::{ChannelRuntimeContext, CHANNEL_MESSAGE_TIMEOUT_SECS};
 use crate::channels::Channel;
 use crate::channels::ChannelSystemPrompt;
-use crate::channels::context::{CHANNEL_MESSAGE_TIMEOUT_SECS, ChannelRuntimeContext};
 use crate::config::{MultimodalConfig, MultimodalFileConfig, ReliabilityConfig};
 use crate::core::bus::BUS;
 use crate::core::events::DomainEvent;

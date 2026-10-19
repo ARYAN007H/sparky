@@ -6,8 +6,8 @@ use async_trait::async_trait;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
-use tinybus::EventHandler;
 use tinybus::module::ModuleClient;
+use tinybus::EventHandler;
 use tinychannels_bus::ChannelMessage;
 
 #[derive(Clone)]
