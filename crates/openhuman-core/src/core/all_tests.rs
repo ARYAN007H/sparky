@@ -69,11 +69,16 @@ fn registered_memory_contract_rejects_missing_or_optional_question() {
         if remove {
             broken.inputs.retain(|input| input.name != "question");
         } else {
-            broken.inputs.iter_mut().find(|input| input.name == "question")
-                .expect("real recall schema declares question").required = false;
+            broken
+                .inputs
+                .iter_mut()
+                .find(|input| input.name == "question")
+                .expect("real recall schema declares question")
+                .required = false;
         }
         assert!(independent_registered_schema_contract(&broken)
-            .unwrap_err().contains("memory.recall required inputs mismatch"));
+            .unwrap_err()
+            .contains("memory.recall required inputs mismatch"));
     }
 }
 

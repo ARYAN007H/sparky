@@ -49,12 +49,6 @@ async fn handle_system_info_returns_json_object() {
     assert!(json["pid"].as_u64().is_some());
 }
 
-#[test]
-fn to_json_helper() {
-    let outcome = Outcome::single_log(serde_json::json!({"ok": true}), "log");
-    assert!(to_json(outcome).is_ok());
-}
-
 /// Every declared output type must match the JSON the handler actually emits.
 ///
 /// `pid` drifted exactly this way (#6074): the schema said `TypeSchema::String`

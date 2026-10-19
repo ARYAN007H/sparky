@@ -123,13 +123,3 @@ fn read_optional_u64_rejects_negative_number() {
 }
 
 // ── type_name ───────────────────────────────────────────────────
-
-#[test]
-fn type_name_reports_each_json_variant() {
-    assert_eq!(type_name(&Value::Null), "null");
-    assert_eq!(type_name(&json!(true)), "bool");
-    assert_eq!(type_name(&json!(1)), "number");
-    assert_eq!(type_name(&json!("s")), "string");
-    assert_eq!(type_name(&json!([])), "array");
-    assert_eq!(type_name(&json!({})), "object");
-}

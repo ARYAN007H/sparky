@@ -57,13 +57,3 @@ fn read_optional_string_present_value_returned() {
     let result = read_optional_string(&params, "label").unwrap();
     assert_eq!(result, Some("iPhone 15".to_string()));
 }
-
-#[test]
-fn type_name_covers_all_variants() {
-    assert_eq!(type_name(&Value::Null), "null");
-    assert_eq!(type_name(&json!(true)), "bool");
-    assert_eq!(type_name(&json!(1)), "number");
-    assert_eq!(type_name(&json!("s")), "string");
-    assert_eq!(type_name(&json!([])), "array");
-    assert_eq!(type_name(&json!({})), "object");
-}

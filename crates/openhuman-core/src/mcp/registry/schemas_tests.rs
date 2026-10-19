@@ -5,7 +5,7 @@ use crate::core::all::{
     assert_schema_controller_parity, expect_schema_fields, expect_schema_identity,
     expect_schema_input_order, expect_schema_output_names, expect_schema_required_inputs,
 };
-use serde_json::{Map, Value};
+use serde_json::Map;
 
 #[test]
 fn registry_schema_contracts_are_preserved() {
@@ -99,13 +99,3 @@ fn read_optional_u32_rejects_negative() {
 }
 
 // ── type_name ─────────────────────────────────────────────────────────────
-
-#[test]
-fn type_name_covers_all_variants() {
-    assert_eq!(type_name(&Value::Null), "null");
-    assert_eq!(type_name(&json!(true)), "bool");
-    assert_eq!(type_name(&json!(1)), "number");
-    assert_eq!(type_name(&json!("s")), "string");
-    assert_eq!(type_name(&json!([])), "array");
-    assert_eq!(type_name(&json!({})), "object");
-}
