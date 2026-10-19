@@ -34,6 +34,30 @@ const REPLY: &str = "harness-embed-ok";
 /// serialization observable.
 const PROVIDER_DELAY: std::time::Duration = std::time::Duration::from_secs(2);
 
+/// Upper bound for any single step that has no clock of its own (building the
+/// harness, one turn, removing the agent).
+///
+/// None of them has a deadline in the library, so a stuck one used to leave
+/// the test parked until the runner's 10-minute kill, with no output at all
+/// (EX63 run 39292268284). Bounding each makes a hang fail in minutes and name
+/// the step.
+const STEP_BUDGET: std::time::Duration = std::time::Duration::from_secs(180);
+
+/// How long dropping the runtime may wait for in-flight blocking work.
+///
+/// `Runtime::drop` joins every `spawn_blocking` task without a limit. After a
+/// failed assertion, 100 agents' unfinished work then holds the panic back for
+/// as long as the slowest of them runs, which is how a missed
+/// `CONCURRENT_BUDGET` turned into a silent timeout.
+const RUNTIME_SHUTDOWN: std::time::Duration = std::time::Duration::from_secs(10);
+
+/// Runs `step` for at most `STEP_BUDGET`, failing with its `name` otherwise.
+async fn bounded<T>(name: &str, step: impl std::future::Future<Output = T>) -> T {
+    tokio::time::timeout(STEP_BUDGET, step)
+        .await
+        .unwrap_or_else(|_| panic!("{name} did not finish within {STEP_BUDGET:?}"))
+}
+
 /// Wall-clock allowance for the 100 overlapping turns below.
 ///
 /// Overlapped, they cost one `PROVIDER_DELAY` plus per-agent construction and
@@ -50,7 +74,14 @@ fn a_harness_runs_a_turn_against_the_provider_it_was_given() {
     let _ = env_logger::builder().is_test(true).try_init();
 
     let runtime = runtime();
-    runtime.block_on(async {
+    // Every turn opens the MCP client, which asks TinyBox for the jail's
+    // toolchain grants. Where the module is not already staged (a local run,
+    // unlike the lanes' `OPENHUMAN_MODULE_PATH`) that downloads it from GitHub
+    // with no timeout, so a test that is meant to be offline waited on the
+    // network (24 s here) and could wait forever behind a firewall.
+    let mut config = offline_config();
+    config.modules.allow_download = false;
+    runtime.block_on(async move {
         // `Runtime::block_on` polls its root future on this test thread, whose
         // default stack is much smaller than the tuned worker stacks. Put the
         // agent host itself on a worker so the documented stack setting
@@ -80,8 +111,8 @@ fn a_harness_runs_a_turn_against_the_provider_it_was_given() {
                 .await;
 
             let harness = std::sync::Arc::new(
-                Harness::builder()
-                    .config(offline_config())
+                bounded("building the harness", Harness::builder()
+                    .config(config)
                     .workspace(Workspace::Ephemeral)
                     .backend_url(backend.uri())
                     .provider(
