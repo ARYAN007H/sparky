@@ -633,9 +633,10 @@ impl OpenHumanRunContext {
     ///
     /// A detached task keeps the authority, thread and workspace descriptor it
     /// needs to execute and deliver its own result, but it is no longer part of
-    /// the originating turn. In particular it cannot consume that turn's
-    /// dispatch budget, append to its usage ledger, or observe a cancellation
-    /// request that only stopped the interactive turn.
+    /// the originating turn's dispatch timer or subagent usage roll-up. It
+    /// still inherits the shared monetary budget and physical-dispatch policy,
+    /// and it does not observe cancellation that only stopped the interactive
+    /// turn.
     pub fn detached_child(&self) -> Self {
         let mut child = self.child();
         // The chat surface belongs to the turn that started it. A detached

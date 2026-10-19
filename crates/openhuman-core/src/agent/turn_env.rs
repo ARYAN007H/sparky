@@ -35,7 +35,8 @@ pub struct HostTurnEnv {
     /// Shared model-spend ledger and per-call bounds every model call of the
     /// turn tree is charged against.
     pub model_budget: Option<ModelBudget>,
-    /// Shared physical-dispatch policy for this turn and its synchronous children.
+    /// Shared physical-dispatch policy for this turn and its synchronous or
+    /// detached children.
     pub dispatch_admission: Option<Arc<dyn super::tinyagents::budget::PhysicalDispatchAdmission>>,
     /// A narrower model-directed delegation depth than the product ceiling.
     pub spawn_depth_limit: Option<usize>,
