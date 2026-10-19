@@ -269,26 +269,31 @@ describe('Harness - Cross-channel bridge flow', () => {
 
   // ── CB1 — Telegram message creates a cron job ─────────────────────────────
 
-  // TODO(#6390): the TinyAgents update no longer exposes the fallback cron approval prompt.
-  it.skip('CB1 — Telegram message "set up a daily standup reminder at 9am" triggers cron_add and bot replies', async function () {
+  it('CB1 — Telegram message "set up a daily standup reminder at 9am" triggers scheduling and bot replies', async function () {
     this.timeout(120_000);
     console.log(`${LOG_PREFIX} CB1: begin`);
 
     const CANARY_CRON = 'canary-cb1-cron-standup';
 
-    // Two-turn forced response: first turn emits cron_add, second turn confirms.
+    // Two-turn forced response: first turn schedules through the supported
+    // scheduling skill, second turn confirms.
     const FORCED = [
       {
         content: '',
         toolCalls: [
           {
-            id: 'call_cron_add_cb1',
-            name: 'cron_add',
+            id: 'call_use_skill_cron_add_cb1',
+            name: 'use_skill',
             arguments: JSON.stringify({
-              name: 'daily_standup_reminder',
-              schedule: { kind: 'cron', expr: '0 9 * * *' },
-              job_type: 'agent',
-              prompt: 'standup reminder',
+              skill: 'scheduling',
+              tool: 'cron',
+              args: {
+                action: 'add',
+                name: 'daily_standup_reminder',
+                schedule: { kind: 'cron', expr: '0 9 * * *' },
+                prompt: 'standup reminder',
+                enabled: true,
+              },
             }),
           },
         ],
