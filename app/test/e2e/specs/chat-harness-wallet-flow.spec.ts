@@ -10,7 +10,6 @@ import { navigateViaHash } from '../helpers/shared-flows';
 import { setMockBehavior, startMockServer, stopMockServer } from '../mock-server';
 
 const USER_ID = 'e2e-chat-harness-wallet-flow';
-const JOHN_ADDRESS = '0x00000000000000000000000000000000000000aa';
 
 async function clickRecoveryConsentCheckbox(): Promise<void> {
   const checkbox = await browser.$('#mnemonic-confirm-checkbox');
