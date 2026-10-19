@@ -43,9 +43,9 @@ fn host_incomplete_status_round_trips_through_neutral_persistence() {
         output: "partial".into(),
         iterations: 2,
         elapsed: std::time::Duration::from_millis(10),
-        mode: SubagentMode::Typed,
+        mode: crate::agent::subagent_host::SubagentMode::Typed,
         status: SubagentRunStatus::Incomplete {
-            reason: cause.summary.clone(),
+            reason: "stopped before finishing; reconcile external state".into(),
             failure_cause: Some(cause),
         },
         final_history: Vec::new(),
@@ -105,7 +105,7 @@ fn host_incomplete_status_round_trips_through_neutral_persistence() {
         panic!("typed stop cause survives neutral persistence");
     };
 
-    assert_eq!(reason, "private URL https://example.com/private?q=secret");
+    assert_eq!(reason, "stopped before finishing; reconcile external state");
     assert_eq!(cause.class, "uncertain_side_effect");
     assert_eq!(cause.operation, "web_answer_tool");
     assert_eq!(cause.summary, reason);

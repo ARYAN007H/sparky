@@ -41,19 +41,6 @@ pub(super) fn incomplete_run_status(
     }
 }
 
-pub(super) fn incomplete_run_status(
-    reason: String,
-    extensions: &std::collections::BTreeMap<String, serde_json::Value>,
-) -> SubagentRunStatus {
-    let failure_cause = extensions
-        .get(CLASSIFIED_STOP_CAUSE_EXTENSION)
-        .and_then(|value| decode_classified_stop_cause(value, &reason));
-    SubagentRunStatus::Incomplete {
-        reason,
-        failure_cause,
-    }
-}
-
 pub(super) fn host_outcome_to_neutral(
     outcome: SubagentRunOutcome,
     definition: &crate::agent::harness::host_definition::AgentDefinition,
