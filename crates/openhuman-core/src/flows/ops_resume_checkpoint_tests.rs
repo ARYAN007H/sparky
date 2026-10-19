@@ -345,9 +345,9 @@ async fn flows_resume_marks_an_incompatible_legacy_checkpoint_failed() {
     let pending: Vec<String> =
         serde_json::from_value(run.value["pending_approvals"].clone()).unwrap();
 
-    // Simulate a graph persisted before the host compatibility gate existed.
-    // The store layer intentionally trusts its typed caller; authoring paths
-    // own validation.
+    // Model a legacy parked checkpoint whose current saved graph is unsafe.
+    // The module owns compatibility refusal and should settle this run as
+    // failed when ResumeRun is attempted.
     let legacy_graph = structurally_valid_graph(nested_conditional_fan_in_graph());
     store::update_flow_graph(
         &config,
@@ -360,6 +360,14 @@ async fn flows_resume_marks_an_incompatible_legacy_checkpoint_failed() {
         None,
     )
     .unwrap();
+    // Keep the compatibility refusal under test distinct from the stale-pin
+    // refusal: a pre-pin parked row has no graph hash to compare.
+    update_parked_run_document_for_test(&config, &thread_id, |document| {
+        document
+            .as_object_mut()
+            .expect("run document is an object")
+            .remove("graph_hash");
+    });
     let error = flows_resume(
         &crate::core::runtime::DispatchCtx::ambient(),
         &config,
@@ -429,6 +437,14 @@ async fn flows_resume_marks_a_checkpoint_with_an_incompatible_saved_child_failed
         None,
     )
     .unwrap();
+    // Keep the compatibility refusal under test distinct from the stale-pin
+    // refusal: a pre-pin parked row has no graph hash to compare.
+    update_parked_run_document_for_test(&config, &thread_id, |document| {
+        document
+            .as_object_mut()
+            .expect("run document is an object")
+            .remove("graph_hash");
+    });
     let error = flows_resume(
         &crate::core::runtime::DispatchCtx::ambient(),
         &config,

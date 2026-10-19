@@ -15,22 +15,6 @@ pub async fn flows_resume(
     rejections: Vec<String>,
 ) -> Result<Outcome<Value>, String> {
     let workflow = current_workflow_for_resume(ctx, config, flow_id).await?;
-
-    // This is an OpenHuman-specific configuration check. The generic saved
-    // snapshot/graph compatibility checks are enforced by ResumeRun itself.
-    // If current host configuration cannot support the run, leave its parked
-    // state intact so it can be retried after configuration is repaired.
-    if let Err(error) = ensure_config_aware_engine_compatible(ctx, config, &workflow.graph).await {
-        tracing::warn!(
-            target: "flows",
-            flow_id,
-            %thread_id,
-            %error,
-            "[flows] flows_resume: rejected by host configuration compatibility"
-        );
-        return Err(error);
-    }
-
     let bindings = crate::flows::runs_adapter::register_resume_bindings(
         ctx,
         config,
@@ -70,13 +54,14 @@ pub async fn flows_resume(
 }
 
 struct ResumeWorkflow {
-    graph: tinyflows::model::WorkflowGraph,
     require_approval: bool,
 }
 
 /// Read the workflow through the same owner-scoped catalog callback that the
 /// run adapter will use. This prevents a caller-supplied run or flow id from
 /// resolving another account's approval policy for the fresh CapsHost.
+/// Compatibility of the saved execution graph and its children is checked by
+/// the owner-scoped Runs.ResumeRun operation.
 async fn current_workflow_for_resume(
     ctx: &crate::core::runtime::DispatchCtx,
     config: &Config,
@@ -93,16 +78,7 @@ async fn current_workflow_for_resume(
         .await
         .map_err(|error| error.wire_message())?;
     let workflow = workflow.ok_or_else(|| format!("flow '{flow_id}' not found"))?;
-    let graph = crate::flows::ops::validation::migrate_over_bus(ctx, config, workflow.graph)
-        .await
-        .and_then(|graph| serde_json::from_value(graph).map_err(|error| error.to_string()))
-        .map_err(|error| format!("decode workflow graph for resume: {error}"))?;
     Ok(ResumeWorkflow {
-        graph,
         require_approval: workflow.require_approval,
     })
 }
-
-// The graph hash is a persisted format owned by tinyflows-catalog. ResumeRun
-// performs the hash comparison against its saved execution snapshot.
-pub(super) use tinyflows_catalog::graph_hash::compute_graph_hash;
