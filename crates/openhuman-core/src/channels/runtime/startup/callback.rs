@@ -3,6 +3,7 @@
 use crate::channels::context::ChannelRuntimeContext;
 use crate::channels::runtime::dispatch::RuntimeChannelMessage;
 use crate::config::Config;
+use std::collections::HashMap;
 use std::sync::{Arc, OnceLock, Weak};
 use tinybus::{Error, Result};
 use tinychannels_bus::{
@@ -17,6 +18,16 @@ const MAX_CALLBACK_BYTES: usize = 128 * 1024;
 const MAX_TRANSCRIPTION_BYTES: usize = 12 * 1024 * 1024;
 const MAX_CONTROLLER_BYTES: usize = 1024 * 1024;
 
+#[async_trait::async_trait]
+pub(super) trait ProgressiveChannelTransport: Send + Sync {
+    fn configured_name(&self) -> &str;
+
+    async fn dispatch_progressive(
+        &self,
+        request: ProgressiveTransportRequest,
+    ) -> Result<ProgressiveTransportResult>;
+}
+
 /// Callbacks capture one immutable host config and a weak runtime context.
 /// The weak reference avoids a cycle from runtime context -> module channel ->
 /// lease -> TinyBus connection -> callback -> runtime context.
@@ -26,6 +37,7 @@ pub(super) struct ChannelHostCallbacks {
     tenant: crate::core::runtime::Tenant,
     cancellation: tokio_util::sync::CancellationToken,
     context: Arc<OnceLock<Weak<ChannelRuntimeContext>>>,
+    progressive_channels: Arc<OnceLock<Arc<HashMap<String, Arc<dyn ProgressiveChannelTransport>>>>>,
     dispatch: mpsc::Sender<RuntimeChannelMessage>,
 }
 
@@ -34,6 +46,7 @@ impl ChannelHostCallbacks {
         ctx: &crate::core::runtime::DispatchCtx,
         config: Arc<Config>,
         context: Arc<OnceLock<Weak<ChannelRuntimeContext>>>,
+        progressive_channels: Arc<OnceLock<Arc<HashMap<String, Arc<dyn ProgressiveChannelTransport>>>>>,
         dispatch: mpsc::Sender<RuntimeChannelMessage>,
     ) -> Self {
         Self {
@@ -45,6 +58,7 @@ impl ChannelHostCallbacks {
             ),
             cancellation: crate::channels::runtime::session::channel_session(),
             context,
+            progressive_channels,
             dispatch,
         }
     }
@@ -252,110 +266,40 @@ impl ChannelHostCallbacks {
         &self,
         request: ProgressiveTransportRequest,
     ) -> Result<ProgressiveTransportResult> {
-        use tinychannels_bus::module_progressive::ProgressiveTransportRequest as Request;
-
-        match request {
-            Request::SendTyped {
-                channel,
-                turn_id,
-                channel_ref,
-                conversation,
-                sequence: _,
-                segment_index: _,
-                idempotency_key,
-                parts,
-                ..
-            } => {
-                let adapter = self.progressive_channel(&channel, channel_ref.as_ref())?;
-                let channel_id = channel_ref
-                    .as_ref()
-                    .map(|reference| reference.id.clone())
-                    .unwrap_or_else(|| channel.clone());
-                let conversation_id = conversation
-                    .as_ref()
-                    .map(|reference| reference.id.clone())
-                    .unwrap_or_default();
-                let outbound = tinychannels_bus::channel::ChannelOutboundMessage {
-                    channel_id,
-                    conversation_id,
-                    channel_ref,
-                    conversation_ref: conversation,
-                    reply_to_id: None,
-                    thread_id: None,
-                    turn_id,
-                    idempotency_key: idempotency_key.unwrap_or_default(),
-                    parts,
-                };
-                let outcome = adapter
-                    .send_typed_with_receipt(&outbound)
-                    .await
-                    .map_err(|_| Error::failed("progressive channel send failed"))?;
-                Ok(ProgressiveTransportResult::Outcome(Box::new(outcome)))
+        let (channel, channel_ref) = match &request {
+            ProgressiveTransportRequest::OutputEvent { channel, channel_ref, .. }
+            | ProgressiveTransportRequest::Send { channel, channel_ref, .. }
+            | ProgressiveTransportRequest::SendTyped { channel, channel_ref, .. }
+            | ProgressiveTransportRequest::Edit { channel, channel_ref, .. }
+            | ProgressiveTransportRequest::Delete { channel, channel_ref, .. }
+            | ProgressiveTransportRequest::Typing { channel, channel_ref, .. } => {
+                (channel.as_str(), channel_ref.as_ref())
             }
-            Request::Send {
-                channel,
-                turn_id,
-                channel_ref,
-                conversation,
-                sequence: _,
-                idempotency_key,
-                message,
-            } => {
-                let adapter = self.progressive_channel(&channel, channel_ref.as_ref())?;
-                let legacy: tinychannels_bus::SendMessage = serde_json::from_value(message)
-                    .map_err(|_| Error::failed("invalid progressive send payload"))?;
-                let mut outbound = tinychannels_bus::channel::ChannelOutboundMessage::from_legacy_message(
-                    channel_ref
-                        .as_ref()
-                        .map(|reference| reference.id.as_str())
-                        .unwrap_or(&channel),
-                    &legacy,
-                );
-                outbound.channel_ref = channel_ref;
-                outbound.conversation_ref = conversation.or(outbound.conversation_ref);
-                outbound.turn_id = turn_id;
-                if let Some(key) = idempotency_key {
-                    outbound.idempotency_key = key;
-                }
-                let outcome = adapter
-                    .send_typed_with_receipt(&outbound)
-                    .await
-                    .map_err(|_| Error::failed("progressive channel send failed"))?;
-                Ok(ProgressiveTransportResult::Outcome(Box::new(outcome)))
-            }
-            Request::Typing { channel, channel_ref, conversation, .. } => {
-                let adapter = self.progressive_channel(&channel, channel_ref.as_ref())?;
-                let recipient = conversation.map(|reference| reference.id).unwrap_or_default();
-                adapter
-                    .start_typing(&recipient)
-                    .await
-                    .map_err(|_| Error::failed("progressive typing callback failed"))?;
-                Ok(ProgressiveTransportResult::Acknowledged)
-            }
-            Request::Edit { .. } | Request::Delete { .. } => {
-                Ok(ProgressiveTransportResult::Unavailable)
-            }
-            Request::OutputEvent { .. } => Ok(ProgressiveTransportResult::Unavailable),
-        }
+        };
+        self.progressive_channel(channel, channel_ref)?
+            .dispatch_progressive(request)
+            .await
     }
 
     fn progressive_channel(
         &self,
         channel: &str,
         channel_ref: Option<&tinychannels_bus::ChannelRef>,
-    ) -> Result<Arc<dyn crate::channels::Channel>> {
+    ) -> Result<Arc<dyn ProgressiveChannelTransport>> {
         let reference = channel_ref.ok_or_else(|| Error::failed("channel account is required"))?;
         let account = reference
             .account_id
             .as_deref()
             .ok_or_else(|| Error::failed("configured channel account is required"))?;
-        let context = self.context()?;
-        let adapter = context
-            .channels_by_name
+        let adapters = self
+            .progressive_channels
+            .get()
+            .ok_or_else(|| Error::failed("progressive channel adapters are unavailable"))?;
+        let adapter = adapters
             .get(account)
             .cloned()
             .ok_or_else(|| Error::failed("configured channel account is unavailable"))?;
-        let configured_provider = tinychannels_bus::capabilities::provider_id(adapter.name());
+        let configured_provider = tinychannels_bus::capabilities::provider_id(adapter.configured_name());
         if configured_provider != reference.id
             || tinychannels_bus::capabilities::provider_id(channel) != reference.id
         {
