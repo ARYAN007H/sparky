@@ -609,7 +609,7 @@ async fn debug_prompt_matches_the_system_prompt_sent_on_a_cold_turn() {
         .tool_dispatcher(Box::new(tinytools_agent::dialect::XmlDialect))
         .build()
         .expect("session build");
-    host.set_thread_id(None);
+    host.set_thread_id(None::<&str>);
     host.ensure_runtime_session().expect("runtime session");
 
     let dumped = host
