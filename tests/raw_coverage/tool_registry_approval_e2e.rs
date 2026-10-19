@@ -225,6 +225,9 @@ async fn install_test_mcp_server(config: &Config, server: &InstalledServer) -> I
                     "command": server.command.clone(),
                     "args": server.args.clone(),
                     "enabled": false,
+                    // This test owns the local stub executable and vouches for
+                    // it explicitly; production-installed servers stay untrusted.
+                    "operator_trusted": true,
                 }
             }
         }),

@@ -1239,19 +1239,19 @@ async fn composio_controller_validation_rejects_malformed_params_over_rpc() {
             70,
             "openhuman.composio_list_github_repos",
             json!({ "connection_id": 42 }),
-            "invalid params",
+            "invalid type for param 'connection_id' in composio.list_github_repos: expected string, got number",
         ),
         (
             71,
             "openhuman.composio_list_trigger_history",
             json!({ "limit": "many" }),
-            "invalid params",
+            "invalid type for param 'limit' in composio.list_trigger_history: expected unsigned integer, got string",
         ),
         (
             72,
             "openhuman.composio_list_triggers",
             json!({ "toolkit": 12 }),
-            "invalid params",
+            "invalid type for param 'toolkit' in composio.list_triggers: expected string, got number",
         ),
         (
             73,
