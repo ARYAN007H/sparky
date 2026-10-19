@@ -898,7 +898,15 @@ async fn run_typed_mode(
         );
     }
 
-    let (output, iterations, agg_usage, early_exit_tool, hit_cap, breaker_halt) =
+    let (
+        output,
+        iterations,
+        agg_usage,
+        early_exit_tool,
+        hit_cap,
+        breaker_halt,
+        failure_cause,
+    ) =
         super::graph::run_subagent_via_graph(
             subagent_source.clone(),
             &model,
@@ -966,7 +974,10 @@ async fn run_typed_mode(
             reason = %reason,
             "[subagent_host] child halted by circuit breaker; reporting Incomplete (#4466)"
         );
-        crate::agent::subagent_host::types::SubagentRunStatus::Incomplete { reason }
+        crate::agent::subagent_host::types::SubagentRunStatus::Incomplete {
+            reason,
+            failure_cause,
+        }
     } else if hit_cap {
         // The tinyagents run stopped at the model-call cap with work still
         // pending (graph summarized a resumable checkpoint into `output`).
@@ -975,6 +986,7 @@ async fn run_typed_mode(
         // or re-spinning the identical delegation (#4096).
         crate::agent::subagent_host::types::SubagentRunStatus::Incomplete {
             reason: tinyagents_harness::turn_stop::SUBAGENT_ITERATION_CAP_REASON.into(),
+            failure_cause: None,
         }
     } else {
         // A clean final response. (An `ask_user_clarification` early-exit is
