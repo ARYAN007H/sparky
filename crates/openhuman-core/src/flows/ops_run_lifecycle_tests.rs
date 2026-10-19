@@ -381,6 +381,11 @@ async fn flows_run_reports_pending_approval_and_blocks_downstream() {
 
     let pending = outcome.value["pending_approvals"].as_array().unwrap();
     assert!(pending.iter().any(|v| v == "gate"));
+    assert_eq!(
+        outcome.value["output"]["run"]["trigger"],
+        json!({ "x": 1 }),
+        "parked runs preserve the engine output already available to the legacy RPC"
+    );
     assert!(outcome.value["output"]["nodes"]["downstream"].is_null());
 
     let reloaded = flows_get(&config, &created.value.id).await.unwrap();
