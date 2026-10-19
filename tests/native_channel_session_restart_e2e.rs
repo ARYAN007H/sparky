@@ -382,13 +382,17 @@ fn model_saw_user_text(request: &Value, text: &str) -> bool {
 fn content_contains_text(content: &Value, expected: &str) -> bool {
     match content {
         Value::String(text) => text.contains(expected),
-        Value::Array(parts) => parts.iter().any(|part| content_contains_text(part, expected)),
-        Value::Object(fields) => fields
-            .get("text")
-            .is_some_and(|text| content_contains_text(text, expected))
-            || fields
-                .get("content")
-                .is_some_and(|nested| content_contains_text(nested, expected)),
+        Value::Array(parts) => parts
+            .iter()
+            .any(|part| content_contains_text(part, expected)),
+        Value::Object(fields) => {
+            fields
+                .get("text")
+                .is_some_and(|text| content_contains_text(text, expected))
+                || fields
+                    .get("content")
+                    .is_some_and(|nested| content_contains_text(nested, expected))
+        }
         _ => false,
     }
 }
@@ -405,14 +409,13 @@ async fn native_telegram_session_resumes_after_the_core_process_restarts() {
     write_config(&home, &workspace, &mocks.inference);
 
     // The first listener instance consumes one real native Telegram update.
-    let (mut first, first_rpc) =
-        start_core(
-            &home,
-            &workspace,
-            &mocks.telegram,
-            &mocks.inference,
-            &logs.join("first.log"),
-        );
+    let (mut first, first_rpc) = start_core(
+        &home,
+        &workspace,
+        &mocks.telegram,
+        &mocks.inference,
+        &logs.join("first.log"),
+    );
     wait_healthy(&first_rpc, &mut first, &logs.join("first.log")).await;
     let first_pid = first.0.id();
     push_update(&mocks.state, 100, 10, FIRST_TEXT);
@@ -431,7 +434,12 @@ async fn native_telegram_session_resumes_after_the_core_process_restarts() {
         serde_json::to_string_pretty(&first_request).unwrap()
     );
     assert_eq!(
-        mocks.state.completions.lock().expect("model requests").len(),
+        mocks
+            .state
+            .completions
+            .lock()
+            .expect("model requests")
+            .len(),
         1,
         "the first process must finish exactly one model turn before restart"
     );
@@ -453,14 +461,13 @@ async fn native_telegram_session_resumes_after_the_core_process_restarts() {
     // The second process starts from the same durable workspace and gets a
     // distinct message in the same Telegram conversation.
     push_update(&mocks.state, 101, 11, SECOND_TEXT);
-    let (mut second, second_rpc) =
-        start_core(
-            &home,
-            &workspace,
-            &mocks.telegram,
-            &mocks.inference,
-            &logs.join("second.log"),
-        );
+    let (mut second, second_rpc) = start_core(
+        &home,
+        &workspace,
+        &mocks.telegram,
+        &mocks.inference,
+        &logs.join("second.log"),
+    );
     assert_ne!(first_pid, second.0.id(), "restart must use a fresh process");
     wait_healthy(&second_rpc, &mut second, &logs.join("second.log")).await;
     wait_until("second model request", || {
@@ -480,7 +487,11 @@ async fn native_telegram_session_resumes_after_the_core_process_restarts() {
         .lock()
         .expect("model requests")
         .clone();
-    assert_eq!(requests.len(), 2, "each Telegram update must reach the model once");
+    assert_eq!(
+        requests.len(),
+        2,
+        "each Telegram update must reach the model once"
+    );
     assert!(
         model_saw_user_text(&requests[1], FIRST_TEXT),
         "the restarted process must resume the first Telegram turn in the exact second model request; got {}",
