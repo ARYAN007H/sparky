@@ -548,7 +548,7 @@ pub(crate) async fn dispatch_subagent_with_live_parent(
                 // finished result or re-run the identical delegation unchanged
                 // (#4096). Still a lifecycle-completed run, so publish
                 // SubagentCompleted like the `Completed` arm.
-                SubagentRunStatus::Incomplete { reason } => {
+                SubagentRunStatus::Incomplete { reason, failure_cause } => {
                     if emit_lifecycle_effects {
                         crate::agent::orchestration::subagent_events::publish_subagent_completed(
                             parent_session,
@@ -577,7 +577,7 @@ pub(crate) async fn dispatch_subagent_with_live_parent(
                                     worktree_path: None,
                                     changed_files: Vec::new(),
                                     dirty_status: None,
-                                    stop: incomplete_stop(reason),
+                                    stop: incomplete_stop(reason, failure_cause.as_ref()),
                                 })
                                 .await;
                         }
@@ -595,6 +595,7 @@ pub(crate) async fn dispatch_subagent_with_live_parent(
                         &outcome.agent_id,
                         &outcome.task_id,
                         reason,
+                        failure_cause.as_ref(),
                         incomplete_envelope(tool_name, reason, &outcome.output, mode),
                     ))
                 }
