@@ -160,6 +160,15 @@ for any commit without posting it.
     - Offline examples run with `--profile dev`, so the release-declared Linux
       fleet measurement shares the dev build instead of a thin-LTO one. Run the
       script without `--profile` to get the declared release measurement.
+  - The 160 GB scratch disk is the scarce resource (EX63 run 39292268284 ran it
+    to 16 MB free in `rust-lint`). Instrumented test binaries dominate it: each
+    one links the whole core, so the nextest coverage suites build `--tests`
+    rather than `--all-targets` (examples run nothing under nextest and each is
+    as large as a test binary). Raw profiles are not the cause: the `%8m` pool
+    above bounds them. Every lane's log ends with `df -h` of the scratch dir and
+    `du -sh` of `target/*` and the top of the scratch dir
+    (`diskUsageReport` in `lanes.mjs`, ex63 only); read those before changing
+    anything else.
   - Cargo registry, pnpm store, and content-based frontend caches remain on the
     slot cache disk. Rust output caching uses Tinymold alone.
   - VM sizing is a supervisor setting; it is not assumed by the lane scheduler.
