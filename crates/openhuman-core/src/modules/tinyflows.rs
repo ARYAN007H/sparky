@@ -150,7 +150,7 @@ mod imp {
             .connection()
             .proxy(
                 tinyflows_bus::BUS_NAME,
-                tinyflows_bus::OBJECT_PATH,
+                tinyflows_bus::catalog::OBJECT_PATH,
                 tinyflows_bus::catalog::INTERFACE,
             )
             .map(|proxy| proxy.with_timeout(CALL_TIMEOUT))
