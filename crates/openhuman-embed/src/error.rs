@@ -235,6 +235,7 @@ impl CoreError {
         matches!(
             self,
             CoreError::BudgetExceeded { .. }
+                | CoreError::DispatchAdmission { .. }
                 | CoreError::Domain {
                     expected_user_state: true,
                     ..
