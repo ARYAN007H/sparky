@@ -490,6 +490,50 @@ async fn profile_context_conflict_refresh_keeps_host_owned_restrictions() {
     assert_eq!(refreshed.memory.agent_id.as_deref(), Some(id.as_str()));
     assert_eq!(refreshed.agent.max_tool_iterations_override, Some(4));
     assert!(!refreshed.agent.channel_permissions.is_empty());
+
+    let nested = context.derive_with(ContextOverlay::new(
+        refreshed,
+        context.domains(),
+        crate::tools::toolpacks::ToolGroups::none(),
+    ));
+    let mut nested_stale = CoreContext::scope(nested.clone(), async {
+        DispatchCtx::new(nested.clone())
+            .load_config()
+            .await
+            .unwrap()
+    })
+    .await;
+    let mut later_external =
+        Config::load_from_config_path(&nested_stale.config_path, &nested_stale.workspace_dir)
+            .await
+            .unwrap();
+    later_external.default_model = Some("external-after-nested".into());
+    later_external.autonomy.enabled = false;
+    later_external.memory.agent_id = Some("later-external-agent".into());
+    later_external.agent.channel_permissions.clear();
+    later_external.save().await.unwrap();
+
+    nested_stale.default_temperature = 0.9;
+    CoreContext::scope(nested.clone(), nested_stale.save())
+        .await
+        .expect_err("a nested profile snapshot must conflict with the later external write");
+    let nested_refreshed = CoreContext::scope(nested.clone(), async {
+        DispatchCtx::new(nested.clone())
+            .load_config()
+            .await
+            .unwrap()
+    })
+    .await;
+    assert_eq!(
+        nested_refreshed.default_model.as_deref(),
+        Some("external-after-nested")
+    );
+    assert!(nested_refreshed.autonomy.enabled);
+    assert_eq!(
+        nested_refreshed.memory.agent_id.as_deref(),
+        Some(id.as_str())
+    );
+    assert!(!nested_refreshed.agent.channel_permissions.is_empty());
 }
 
 #[tokio::test]
