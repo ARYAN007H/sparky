@@ -129,6 +129,7 @@ mod error;
 pub mod fanout;
 mod harness;
 pub mod identity;
+pub mod inbound;
 pub mod memory;
 pub mod modules;
 mod permission;
