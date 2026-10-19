@@ -40,7 +40,7 @@ pub mod turn_models;
 
 pub use schemas::{
     all_controller_schemas as all_inference_controller_schemas,
-    all_registered_controllers as all_inference_registered_controllers, INFERENCE_AGENT_CHAT,
+    all_registered_controllers as all_inference_registered_controllers,
 };
 
 // Re-export the types that external callers (voice, agent, etc.) import from inference
