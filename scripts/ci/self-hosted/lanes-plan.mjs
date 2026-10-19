@@ -341,6 +341,7 @@ export function buildPlan({ profile, areas, env = {}, isPullRequest = true }) {
         {
           name: "browser-test-skip-guard",
           when: areas.frontend,
+          needs: ["pnpm-install"],
           run: "node scripts/ci/check-browser-test-skips.mjs",
         },
         {

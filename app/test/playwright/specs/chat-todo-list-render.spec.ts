@@ -100,7 +100,8 @@ const RULES = [
  * element's own attribute (`todo-list.tsx:46`), so this finds the real
  * component rather than a wrapper that happens to carry a test id.
  */
-const allLists = (page: Page): Locator => page.locator('[data-slot="todo-list"]');
+const allTodoSurfaces = (page: Page): Locator =>
+  page.locator('[data-testid="todo-checklist"], [data-testid="todo-receipt"]');
 
 /** The pinned, always-current list above the composer. */
 const pinnedList = (page: Page): Locator => page.getByTestId('todo-checklist');
@@ -110,8 +111,11 @@ const pinnedList = (page: Page): Locator => page.getByTestId('todo-checklist');
  * one given a test id (`Conversations.tsx:1659`), so excluding it leaves
  * exactly the `TodoListPart` renders.
  */
-const snapshotLists = (page: Page): Locator =>
-  page.locator('[data-testid="todo-receipt"] [data-slot="todo-list"]');
+const snapshotReceipts = (page: Page): Locator => page.getByTestId('todo-receipt');
+
+/** A settled pinned task card maps stored in-progress items to pending. */
+const settledPinnedCard = (page: Page): Locator =>
+  page.locator('[data-testid="todo-checklist"][data-state="waiting"]');
 
 async function expandSnapshotReceipts(page: Page): Promise<void> {
   const receipts = page.getByTestId('todo-receipt');
@@ -174,7 +178,9 @@ test.describe('Todo list render', () => {
 
     // Control: no list of either kind before the agent writes one, so the
     // assertions below are about something that appeared.
-    await expect(allLists(page), 'a todo list was on screen before any write').toHaveCount(0);
+    await expect(allTodoSurfaces(page), 'a todo surface was on screen before any write').toHaveCount(
+      0
+    );
 
     const threadId = await waitForSelectedThreadId(page);
     const before = (await upstreamBodies()).length;
@@ -198,9 +204,9 @@ test.describe('Todo list render', () => {
       'the todo tool round-tripped but rendered nothing in the transcript'
     ).toHaveCount(1, { timeout: 60_000 });
     await expandSnapshotReceipts(page);
-    await expect(snapshotLists(page)).toHaveCount(1);
+    await expect(snapshotReceipts(page)).toHaveCount(1);
 
-    const snapshot = snapshotLists(page).first();
+    const snapshot = snapshotReceipts(page).first();
     await expect
       .poll(async () => itemStates(snapshot), { timeout: 30_000 })
       .toEqual(['active', 'pending', 'pending']);
@@ -214,32 +220,36 @@ test.describe('Todo list render', () => {
     await openChat(page);
     const threadId = await waitForSelectedThreadId(page);
 
+    const firstWriteRequestCount = (await upstreamBodies()).length;
     await sendTurn(page, threadId, 'TODOPLAN write the release plan');
     await expect(page.getByTestId('todo-receipt')).toHaveCount(1, { timeout: 60_000 });
     await expandSnapshotReceipts(page);
-    await expect(snapshotLists(page)).toHaveCount(1);
+    await expect(snapshotReceipts(page)).toHaveCount(1);
     await expect
       .poll(async () => itemStates(snapshotLists(page).first()), { timeout: 30_000 })
       .toEqual(['active', 'pending', 'pending']);
 
+    expect(await upstreamBodies()).toHaveLengthGreaterThan(firstWriteRequestCount + 1);
+
+    const secondWriteRequestCount = (await upstreamBodies()).length;
     await sendTurn(page, threadId, 'TODOADVANCE keep going');
     await expect(
       page.getByTestId('todo-receipt'),
       'the second todo call did not produce its own transcript render'
     ).toHaveCount(2, { timeout: 60_000 });
     await expandSnapshotReceipts(page);
-    await expect(snapshotLists(page)).toHaveCount(2);
+    await expect(snapshotReceipts(page)).toHaveCount(2);
 
     // The new snapshot carries the new write...
     await expect
-      .poll(async () => itemStates(snapshotLists(page).nth(1)), { timeout: 30_000 })
+      .poll(async () => itemStates(snapshotReceipts(page).nth(1)), { timeout: 30_000 })
       .toEqual(['done', 'done', 'active']);
 
     // ...and the first one has NOT moved. A shared store behind both renders
     // would rewrite history: the transcript would show the agent having always
     // known the final state, which is exactly what a transcript must not do.
     expect(
-      await itemStates(snapshotLists(page).first()),
+      await itemStates(snapshotReceipts(page).first()),
       'the earlier transcript snapshot was rewritten by a later write'
     ).toEqual(['active', 'pending', 'pending']);
   });
@@ -248,15 +258,20 @@ test.describe('Todo list render', () => {
     await openChat(page);
     const threadId = await waitForSelectedThreadId(page);
 
-    // A valid write first, so the pinned list exists and the assertion below
-    // is about its contents rather than its absence.
+    // A valid write first, so the pinned task card exists and the assertion
+    // below is about its stored contents rather than its absence.
+    const firstWriteRequestCount = (await upstreamBodies()).length;
     await sendTurn(page, threadId, 'TODOPLAN write the release plan');
-    await expect(pinnedList(page), 'the pinned checklist never appeared').toBeVisible({
-      timeout: 60_000,
+    await expect
+      .poll(async () => (await upstreamBodies()).length, { timeout: 60_000 })
+      .toBeGreaterThan(firstWriteRequestCount + 1);
+    await expect(settledPinnedCard(page), 'the settled task card never appeared').toHaveCount(1, {
+      timeout: 30_000,
     });
     await expect
-      .poll(async () => itemStates(pinnedList(page)), { timeout: 30_000 })
-      .toEqual(['active', 'pending', 'pending']);
+      .poll(async () => itemStates(settledPinnedCard(page).first()), { timeout: 30_000 })
+      .toEqual(['pending', 'pending', 'pending']);
+    expect(await itemTexts(settledPinnedCard(page).first())).toEqual([...STEPS]);
 
     // Now a write the core refuses (`todo_tests.rs:77`).
     //
@@ -275,7 +290,13 @@ test.describe('Todo list render', () => {
       })
       .toBeGreaterThan(before + 1);
 
-    const states = await itemStates(pinnedList(page));
+    await expect(settledPinnedCard(page), 'the rejected write hid the previous task card').toHaveCount(
+      1,
+      { timeout: 30_000 }
+    );
+    const states = await itemStates(settledPinnedCard(page).first());
+    expect(await itemTexts(settledPinnedCard(page).first())).toEqual([...STEPS]);
+    expect(states).toEqual(['pending', 'pending', 'pending']);
     expect(
       states.filter(state => state === 'active').length,
       `the pinned checklist showed a list the core refused to store: ${JSON.stringify(states)}`
