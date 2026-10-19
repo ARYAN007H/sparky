@@ -3,9 +3,7 @@
 //! delivering the draft/final reply.
 
 use crate::agent::bus::AgentTurnResponse;
-use crate::channels::context::{
-    compact_sender_history, is_context_window_overflow_error, ChannelRuntimeContext,
-};
+use crate::channels::context::{is_context_window_overflow_error, ChannelRuntimeContext};
 use crate::channels::routes::{
     get_or_create_turn_model_source, get_route_selection, handle_runtime_command_if_needed,
 };
@@ -16,7 +14,6 @@ use crate::util::truncate_with_ellipsis;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tinyagents_harness::progress::AgentProgress;
-use tinyagents_session::transcript::TranscriptMessage;
 use tinychannels_bus as traits;
 use tinychannels_runtime::context::ChatMessage;
 use tokio_util::sync::CancellationToken;
@@ -86,9 +83,19 @@ pub(crate) async fn process_channel_runtime_message(
     };
     let msg = prepared.message;
     let history_key = prepared.history_key;
+    let canonical_session_key = prepared.session_key.clone();
     let mut envelope = prepared.envelope;
     envelope.access.delivered_via_upstream_relay = authenticated_relay;
     crate::channels::host::voice::record_inbound_envelope(&envelope);
+
+    let tenant = match ctx.dispatch_ctx().tenant() {
+        Ok(tenant) => tenant,
+        Err(error) => {
+            tracing::warn!("[dispatch] channel turn lost its tenant scope: {error}");
+            return;
+        }
+    };
+    let session_key = crate::core::runtime::tenant::tenant_key(&tenant, &canonical_session_key);
 
     println!(
         "  💬 [{}] from {}: {}",
@@ -253,32 +260,10 @@ pub(crate) async fn process_channel_runtime_message(
     println!("  ⏳ Processing message...");
     let started_at = Instant::now();
 
-    // Build history from per-sender conversation cache
-    let mut prior_turns: Vec<TranscriptMessage> = ctx
-        .conversation_histories
-        .lock()
-        .unwrap_or_else(|e| e.into_inner())
-        .get(&history_key)
-        .map(|turns| {
-            // The cache holds the bus's plain `ChatMessage`; convert at the
-            // harness boundary.
-            turns
-                .iter()
-                .map(|turn| match turn.role.as_str() {
-                    "assistant" => TranscriptMessage::assistant(&turn.content),
-                    _ => TranscriptMessage::user(&turn.content),
-                })
-                .collect()
-        })
-        .unwrap_or_default();
-
-    // Re-rendered by `ChannelSystemPrompt` only when the active profile or an
-    // identity file changed since the last message (#6028); otherwise the
-    // same bytes as the previous turn.
-    let system_prompt = ctx.system_prompt.current();
-    let mut history = vec![TranscriptMessage::system(system_prompt.as_str())];
-    history.append(&mut prior_turns);
-    history.push(TranscriptMessage::user(&enriched_message));
+    // The persisted TinyAgents transcript, bound below by `session_key`, is
+    // the sole history source. Only config-less unit fixtures retain the old
+    // graph path; production ingress never reads or mutates an in-memory
+    // per-sender transcript.
 
     // Determine if this channel supports streaming draft updates
     let use_streaming = target_channel
@@ -436,23 +421,55 @@ pub(crate) async fn process_channel_runtime_message(
 
     // A channel bound to a host agent (`agent.channel_agents`) runs as that
     // agent; every other channel goes over the bus to the orchestrator.
+    let mut configured_agent_error = None;
+    let selected_host = match bound_agent {
+        Some(host) => Some(*host),
+        None if ctx.config.is_some() => match host_agent::configured_agent(
+            ctx.as_ref(),
+            &msg.channel,
+            &route,
+        )
+        .await
+        {
+            Ok(host) => Some(host),
+            Err(error) => {
+                tracing::warn!(channel = %msg.channel, %error, "[dispatch] configured channel agent could not be built");
+                configured_agent_error = Some(error);
+                None
+            }
+        },
+        None => None,
+    };
+    let cancellation = CancellationToken::new();
     let agent_call: std::pin::Pin<
         Box<dyn std::future::Future<Output = anyhow::Result<AgentTurnResponse>> + Send + '_>,
-    > = match bound_agent {
+    > = match selected_host {
         Some(host) => Box::pin(run_host_agent_turn(
-            *host,
+            host,
             HostChannelTurn {
                 relay_thread: ctx.relay_thread.clone(),
                 channel: msg.channel.clone(),
-                history_key: history_key.clone(),
-                prior_turns: seed_rows(&history),
+                session_key: session_key.clone(),
+                event_session_id: history_key.clone(),
                 message: enriched_message.clone(),
                 origin: turn_origin,
                 progress: progress_tx,
                 approval,
+                cancellation: cancellation.clone(),
+                turn_deadline: crate::agent::session_host::turn_backstop::configured_backstop(),
             },
         )),
-        None => Box::pin(dispatch_bus_turn(
+        None if configured_agent_error.is_some() => {
+            let error = configured_agent_error.expect("checked configured-agent failure");
+            Box::pin(async move { Err(anyhow::anyhow!(error)) })
+        }
+        None => {
+            let system_prompt = ctx.system_prompt.current();
+            let history = vec![
+                tinyagents_session::transcript::TranscriptMessage::system(system_prompt.as_str()),
+                tinyagents_session::transcript::TranscriptMessage::user(&enriched_message),
+            ];
+            Box::pin(dispatch_bus_turn(
             ctx.as_ref(),
             &msg,
             &route,
@@ -461,10 +478,11 @@ pub(crate) async fn process_channel_runtime_message(
             progress_tx,
             turn_origin,
             approval,
-        )),
+            ))
+        }
     };
-    let llm_result =
-        tokio::time::timeout(Duration::from_secs(ctx.message_timeout_secs), agent_call).await;
+    let llm_result = tokio::time::timeout(Duration::from_secs(ctx.message_timeout_secs), agent_call).await;
+    cancellation.cancel();
 
     // Wait for draft updater to finish
     if let Some(handle) = draft_updater {
@@ -489,20 +507,6 @@ pub(crate) async fn process_channel_runtime_message(
                 .clone()
                 .unwrap_or_else(|| route.model.clone());
             let response_text = response.text;
-            // Save user + assistant turn to per-sender history
-            {
-                let mut histories = ctx
-                    .conversation_histories
-                    .lock()
-                    .unwrap_or_else(|e| e.into_inner());
-                let turns = histories.entry(history_key).or_default();
-                turns.push(ChatMessage::user(&enriched_message));
-                turns.push(ChatMessage::assistant(&response_text));
-                // Trim to MAX_CHANNEL_HISTORY (keep recent turns)
-                while turns.len() > crate::channels::context::MAX_CHANNEL_HISTORY {
-                    turns.remove(0);
-                }
-            }
             println!(
                 "  🤖 Reply ({}ms): {}",
                 started_at.elapsed().as_millis(),
@@ -544,16 +548,10 @@ pub(crate) async fn process_channel_runtime_message(
                 .await
                 .unwrap_or(false)
             {
-                let compacted = compact_sender_history(&ctx.conversation_histories, &history_key);
-                let error_text = if compacted {
-                    "⚠️ Context window exceeded for this conversation. I compacted recent history and kept the latest context. Please resend your last message."
-                } else {
-                    "⚠️ Context window exceeded for this conversation. Please resend your last message."
-                };
+                let error_text = "⚠️ Context window exceeded for this conversation. Please resend your last message.";
                 eprintln!(
-                    "  ⚠️ Context window exceeded after {}ms; sender history compacted={}",
-                    started_at.elapsed().as_millis(),
-                    compacted
+                    "  ⚠️ Context window exceeded after {}ms",
+                    started_at.elapsed().as_millis()
                 );
                 if let Some(channel) = target_channel.as_ref() {
                     if let Some(ref draft_id) = draft_message_id {

@@ -36,7 +36,7 @@ pub(crate) struct HostChannelTurn {
 /// Run `turn` as `host`: its definition and host tools, inside its context,
 /// under `turn.origin` and the posture that origin calls for.
 pub(crate) async fn run_host_agent_turn(
-    mut host: HostAgent,
+    host: HostAgent,
     turn: HostChannelTurn,
 ) -> anyhow::Result<AgentTurnResponse> {
     let HostChannelTurn {
@@ -51,7 +51,6 @@ pub(crate) async fn run_host_agent_turn(
         cancellation,
         turn_deadline,
     } = turn;
-    let mut host = *host;
     let mut config = host.config.clone();
     let profile_ceiling = host
         .context
