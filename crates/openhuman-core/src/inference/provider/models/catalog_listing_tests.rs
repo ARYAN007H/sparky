@@ -1,6 +1,5 @@
 use super::*;
 
-use super::catalog_listing::list_configured_models_from_config;
 use super::local_runtime::synthesize_local_runtime_entry;
 use crate::config::schema::cloud_providers::{AuthStyle, CloudProviderCreds};
 use crate::config::Config;
@@ -16,7 +15,7 @@ async fn list_models_empty_body_returns_diagnostic_error() {
     let endpoint = spawn_static_models_server(StatusCode::OK, "").await;
     let config = configure_generic_workspace(&tmp, endpoint).await;
 
-    let err = list_configured_models_from_config("generic-test", &config)
+    let err = catalog_listing::list_configured_models_from_config("generic-test", &config)
         .await
         .expect_err("empty body must not parse as JSON");
 
@@ -35,7 +34,7 @@ async fn list_models_valid_json_still_succeeds() {
     let endpoint = spawn_static_models_server(StatusCode::OK, body).await;
     let config = configure_generic_workspace(&tmp, endpoint).await;
 
-    let outcome = list_configured_models_from_config("generic-test", &config)
+    let outcome = catalog_listing::list_configured_models_from_config("generic-test", &config)
         .await
         .expect("valid JSON must list models");
     assert_eq!(outcome.value["models"][0]["id"], "some-model");
@@ -55,7 +54,7 @@ async fn list_models_uses_provider_ca_bundle_client() {
         include_str!("../../../util/tls/test-ca.pem").into(),
     );
 
-    let outcome = list_configured_models_from_config("generic-test", &config)
+    let outcome = catalog_listing::list_configured_models_from_config("generic-test", &config)
         .await
         .expect("custom CA client should list models");
     assert_eq!(outcome.value["models"][0]["id"], "private-model");

@@ -1,6 +1,5 @@
 use super::*;
 
-use super::catalog_listing::list_configured_models_from_config;
 use crate::config::schema::cloud_providers::AuthStyle;
 use crate::inference::provider::model_listing_test_support::{
     configure_generic_workspace, configure_openrouter_workspace, spawn_openrouter_probe_server,
@@ -54,7 +53,7 @@ async fn openrouter_invalid_key_fails_before_models_catalog_probe() {
     let (endpoint, state) = spawn_openrouter_probe_server(StatusCode::UNAUTHORIZED).await;
     let config = configure_openrouter_workspace(&tmp, endpoint, "bad-openrouter-key").await;
 
-    let err = list_configured_models_from_config("openrouter", &config)
+    let err = catalog_listing::list_configured_models_from_config("openrouter", &config)
         .await
         .expect_err("invalid OpenRouter key must fail");
 
@@ -76,7 +75,7 @@ async fn openrouter_valid_key_allows_models_catalog_probe() {
     let (endpoint, state) = spawn_openrouter_probe_server(StatusCode::OK).await;
     let config = configure_openrouter_workspace(&tmp, endpoint, "valid-openrouter-key").await;
 
-    let outcome = list_configured_models_from_config("openrouter", &config)
+    let outcome = catalog_listing::list_configured_models_from_config("openrouter", &config)
         .await
         .expect("valid OpenRouter key should list models");
 
@@ -91,7 +90,7 @@ async fn openrouter_key_is_trimmed_for_validation_and_catalog_probe() {
     let (endpoint, state) = spawn_openrouter_probe_server(StatusCode::OK).await;
     let config = configure_openrouter_workspace(&tmp, endpoint, "  valid-openrouter-key\r\n").await;
 
-    list_configured_models_from_config("openrouter", &config)
+    catalog_listing::list_configured_models_from_config("openrouter", &config)
         .await
         .expect("trimmed OpenRouter key should list models");
 
@@ -134,7 +133,7 @@ async fn list_models_html_body_returns_diagnostic_snippet() {
     let endpoint = spawn_static_models_server(StatusCode::OK, html).await;
     let config = configure_generic_workspace(&tmp, endpoint).await;
 
-    let err = list_configured_models_from_config("generic-test", &config)
+    let err = catalog_listing::list_configured_models_from_config("generic-test", &config)
         .await
         .expect_err("HTML body must not parse as JSON");
 
