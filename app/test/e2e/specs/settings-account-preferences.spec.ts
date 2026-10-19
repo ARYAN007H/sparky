@@ -59,7 +59,11 @@ describe('Settings - Account Preferences', function () {
           const checkbox = document.querySelector<HTMLInputElement>('#mnemonic-confirm-checkbox');
           return checkbox !== null && !checkbox.disabled;
         }),
-      { timeout: 5_000, interval: 100, timeoutMsg: 'recovery phrase consent stayed disabled after reveal' }
+      {
+        timeout: 5_000,
+        interval: 100,
+        timeoutMsg: 'recovery phrase consent stayed disabled after reveal',
+      }
     );
     await clickSelector('input[type="checkbox"]');
     expect(

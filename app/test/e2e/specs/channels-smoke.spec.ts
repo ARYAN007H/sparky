@@ -71,7 +71,9 @@ describe('Channels page smoke (Telegram + Discord)', () => {
     await disconnectTelegramBot();
     const baseline = await getTelegramChannelStatus();
     if (!baseline || baseline.connected) {
-      throw new Error(`precondition: Telegram RPC status should be disconnected: ${JSON.stringify(baseline)}`);
+      throw new Error(
+        `precondition: Telegram RPC status should be disconnected: ${JSON.stringify(baseline)}`
+      );
     }
     await navigateViaHash('/channels');
     await waitForText('Telegram', 15_000);
@@ -79,7 +81,7 @@ describe('Channels page smoke (Telegram + Discord)', () => {
       timeout: 15_000,
       timeoutMsg: `Telegram row did not show its disconnected status; saw ${await telegramRowStatus()}`,
     });
-    if (await telegramRowStatus() === 'Connected') {
+    if ((await telegramRowStatus()) === 'Connected') {
       throw new Error('precondition: Telegram row should not already read Connected');
     }
 

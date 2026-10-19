@@ -227,8 +227,12 @@ describe('Voice mode — Human tab capture & error mapping', () => {
     // the controls users can invoke there rather than the removed setup label.
     expect(await textExists('Voice mode')).toBe(true);
     await clickButton('Voice mode');
-    expect(await textExists('Switch to text')).toBe(true);
-    expect(await waitForAnyText(['Tap and speak', 'Waiting for agent'], 10_000)).not.toBeNull();
+    expect(await textExists('Tap and speak')).toBe(true);
+    // The switch is icon-only: "Switch to text" is its accessible name, not
+    // visible text. Exercise it through the accessibility helper and verify
+    // that the text composer returns.
+    await clickButton('Switch to text', 10_000);
+    expect(await waitForAnyText(['How can I help', 'Threads', 'New'], 10_000)).not.toBeNull();
   });
 
   // 6.2 was an RPC-only call with a synthetic payload. The owner-layer JSON-RPC
