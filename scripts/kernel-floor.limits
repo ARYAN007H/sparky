@@ -13,6 +13,18 @@
 # Simulate with: scripts/dep-sim.py --cut <crates>
 #
 # History
+#   334/311/3  2026-10-19  Two first-party crates split out of existing ones
+#                      (EX63 run 39182774906, Linux: 334 packages / 311 names /
+#                      3 native, against 332/309/3). New names: `tinyagents-hooks`
+#                      v2.2.0 (the stop and tool hook traits, extracted from
+#                      tinyagents-harness; openhuman-core and tinyagents-runtime
+#                      depend on it directly) and `tinystoragedrivers-schema`
+#                      v1.0.0 (the schema vocabulary extracted from
+#                      tinystoragedrivers-core). Both are vendored workspace
+#                      crates pulled in by the tinyagents 2.2.0 and
+#                      tinystoragedrivers d45d090 bumps; no third-party crate and
+#                      no native build was added, and neither is a duplicate
+#                      version of an existing crate, so there is nothing to dedupe.
 #   332/309/3  2026-10-18  Configurable storage backend selection (epic #7973)
 #                      makes tinystoragedrivers-core an always-on dependency of
 #                      the tinyagents session stores and the flows graph. Its
@@ -736,4 +748,4 @@
 # 321/301/2 2026-10-16 Re-measure after the upstream/main merge at ba83482245.
 #                      CI (Linux, EX63) reports five fewer packages and two
 #                      fewer unique crate names; native builds remain at two.
-flows:332:309:3
+flows:334:311:3
