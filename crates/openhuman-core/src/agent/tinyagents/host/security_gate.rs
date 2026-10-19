@@ -47,12 +47,8 @@
 //!    this gate must not also compose `ApprovalSecurityMiddleware`'s approval
 //!    step** — the two are alternatives, not layers. The session-allowlist
 //!    shortcut yields no id and needs no terminal row.
-//! 3. **No `Redacted` outcome is ever produced.** OpenHuman can *detect* PII
-//!    ([`tinymemory_api::safety::scan`]) but exposes no verified
-//!    public helper that rewrites free text into a redacted copy — the one that
-//!    exists (`approval::redact::scrub_paths`) is private and shaped for JSON
-//!    argument maps. Screening therefore only ever passes or blocks. See the
-//!    `TODO(phase4)` in [`OpenHumanSecurityGate::screen_input`].
+//! 3. Credential redaction uses TinyInference's shared credential scrubber,
+//!    the same implementation used by the hosted credential middleware.
 //! 4. **An absent approval gate allows, it does not deny.** When
 //!    [`ApprovalGate::try_global`] is `None` (CLI, headless embed, tests) a
 //!    `Prompt` decision cannot be resolved by a human. This adapter warns

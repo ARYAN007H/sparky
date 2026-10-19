@@ -79,6 +79,14 @@ impl SessionDriver<OpenHumanRunContext> for OpenHumanSessionDriver {
         &self,
         mut request: DriverRequest<OpenHumanRunContext>,
     ) -> Result<DriverOutcome, DriverFailure> {
+        // The generic runtime has already admitted the current message by the
+        // time it reaches the driver, but its durable seed is still the raw
+        // request history. Scrub user text before every early snapshot/return
+        // path so cancellation cannot persist a credential the provider gate
+        // has already redacted.
+        if !request.run_context.data.untrusted_input_turn {
+            scrub_user_history(&mut request.history);
+        }
         // Heal a head persisted before #6721 was fixed, before anything reads
         // the history: this turn then commits a clean generation.
         repair_orphaned_tool_head(&mut request.history);
@@ -505,6 +513,18 @@ impl SessionDriver<OpenHumanRunContext> for OpenHumanSessionDriver {
             // `None` lets the runtime derive the outcome from `interrupted`.
             outcome: None,
         })
+    }
+}
+
+fn scrub_user_history(history: &mut [Message]) {
+    for message in history {
+        if let Message::User(user) = message {
+            for block in &mut user.content {
+                if let tinyinference_llm::message::ContentBlock::Text(text) = block {
+                    *text = tinyinference_core::sanitize::scrub_credentials(text);
+                }
+            }
+        }
     }
 }
 
