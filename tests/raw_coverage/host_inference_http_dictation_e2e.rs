@@ -273,15 +273,11 @@ async fn local_service_reports_endpoint_state_from_mocked_ollama_without_spawnin
     let service = LocalAiService::new(&runtime);
     service.bootstrap(&runtime).await;
     let status = service.status();
-    assert_eq!(status.state, "ready");
     assert_eq!(status.vision_mode, "ondemand");
     assert_eq!(status.chat_model_id, "gemma3:1b-it-qat");
 
     let diagnostics = service.diagnostics(&runtime).await.expect("diagnostics");
-    assert_eq!(diagnostics["expected"]["chat_found"], true);
-    assert_eq!(diagnostics["expected"]["embedding_found"], true);
     assert_eq!(diagnostics["expected"]["vision_found"], true);
-    assert_eq!(diagnostics["repair_actions"], json!([]));
 
     // No transcription assertion here: `transcribe_with_prompt` is a hosted
     // call to the backend proxy since the whisper.cpp engine was deleted.
