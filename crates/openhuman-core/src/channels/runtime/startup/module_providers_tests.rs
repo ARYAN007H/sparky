@@ -109,11 +109,17 @@ async fn compiled_module_progressive_send_reenters_typed_callback_without_deadlo
             tinychannels_bus::methods::EXECUTE_PROGRESSIVE,
             (ProgressiveCommand::FeedOutput {
                 handle,
-                events: vec![ChannelOutputEvent::FinalMessage {
-                    text: "nested callback delivery".into(),
-                    parts: Vec::new(),
-                    receipt: None,
-                }],
+                events: vec![
+                    ChannelOutputEvent::TextDelta {
+                        text: "working".into(),
+                        iteration: Some(1),
+                    },
+                    ChannelOutputEvent::FinalMessage {
+                        text: "nested callback delivery".into(),
+                        parts: Vec::new(),
+                        receipt: None,
+                    },
+                ],
             },),
         ),
     )
