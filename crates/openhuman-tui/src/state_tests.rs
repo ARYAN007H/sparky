@@ -286,13 +286,13 @@ fn projected_spoken_replies_show_voice_note_and_known_duration_labels() {
         "result": {"data": {"items": [
             {
                 "kind": "assistantMessage",
-                "content": "I will remind you.",
-                "extraMetadata": {"voiceNote": {"noteId": "reply-1", "mime": "audio/wav", "durationMs": 8600}}
+                "content": "I can say that aloud.",
+                "extraMetadata": {"voiceNote": {"noteId": "reply-2", "mime": "audio/wav", "visemes": [{"viseme": "aa"}]}}
             },
             {
                 "kind": "assistantMessage",
-                "content": "I can say that aloud.",
-                "extraMetadata": {"voiceNote": {"noteId": "reply-2", "mime": "audio/wav", "visemes": [{"viseme": "aa"}]}}
+                "content": "I will remind you.",
+                "extraMetadata": {"voiceNote": {"noteId": "reply-1", "mime": "audio/wav", "durationMs": 8600}}
             }
         ]}}
     }));
