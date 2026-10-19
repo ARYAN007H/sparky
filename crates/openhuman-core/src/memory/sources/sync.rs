@@ -162,12 +162,9 @@ pub(crate) async fn place_and_store(
     layout: &tinymemory_tools::MemoryLayout,
 ) -> std::result::Result<u64, SyncError> {
     let brain_source = crate::memory::brain::brain_source(kind);
-    let placed = module::store_placed(
-        bound.engine.as_ref(),
-        source_id,
-        items,
-        |item| crate::memory::brain::brain_node(config, layout, &brain_source, item),
-    )
+    let placed = module::store_placed(bound.engine.as_ref(), source_id, items, |item| {
+        crate::memory::brain::brain_node(config, layout, &brain_source, item)
+    })
     .await?;
     crate::memory::lifecycle::jobs::enqueue(config, layout.root(), placed.jobs).await;
     Ok(placed.stored.stored)

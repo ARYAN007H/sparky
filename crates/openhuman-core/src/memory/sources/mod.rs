@@ -64,8 +64,7 @@ pub fn list(config: &Config) -> Vec<SourceView> {
 
 /// Normalises a target for `kind` using TinyMemory's source rules.
 pub fn normalize_target(kind: MemorySourceKind, target: &str) -> Result<String> {
-    SourceSpec::normalize_target(kind, target)
-        .map_err(source_spec_error)
+    SourceSpec::normalize_target(kind, target).map_err(source_spec_error)
 }
 
 /// Builds a new source from `memory_sources_add` params and appends it to
