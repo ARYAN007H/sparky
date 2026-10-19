@@ -247,10 +247,6 @@ named = [
     "storage_download_file",
     "storage_list_files",
     "storage_get_link",
-    # NOTE: `spawn_worker_thread` is intentionally absent — the tool is
-    # disabled pending a worker-thread UI (#1624) and is not registered, so
-    # listing it here (and teaching it in prompt.md) only trained the model
-    # to call a tool that does not exist.
     # Sub-agent surface, deliberately three tools (#5701). A sub-agent is
     # always async: `spawn_async_subagent` returns a task id immediately and
     # the runner delivers the result back on an idle system turn via

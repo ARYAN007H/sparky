@@ -16,7 +16,6 @@ Besides doing the work, the agent has tools for organizing it: planning multi-st
 | `spawn_async_subagent`              | A lower-level reusable async delegation tool with the same durable session identity.                                   |
 | `steer_subagent`, `wait_subagent`   | Message or collect a running worker by durable `subagent_session_id` or transient `task_id`.                           |
 | `list_subagents`, `close_subagent`  | Inspect the reusable workers for the parent thread, or retire one.                                                     |
-| `spawn_worker_thread`               | Explicit background work tracked as a separate worker thread.                                                          |
 | `delegate`                          | Hands a task to a specialist, such as an archetype with different prompts, tools or permissions.                       |
 | `spawn_parallel_agents`             | Fans one task out to several specialists at once and merges what they return.                                          |
 | `use_skill`                         | Loads an inline skill's playbook and tools (coding, web3, system, scheduling, docs, mcp) so the agent can call them.   |

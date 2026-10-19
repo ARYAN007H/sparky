@@ -38,8 +38,7 @@ assembled. It is called by the session builder
  feature- and config-gated families appended
    flows, web3, voice, skills, mcp, documents, media, hosting,
    memory (memory::engine::is_on), browser (browser.enabled),
-   gitbooks (gitbooks.enabled), search, integrations, composio,
-   lsp (OPENHUMAN_LSP_ENABLED), delegate
+   gitbooks (gitbooks.enabled), search, integrations, composio, delegate
         |
         v
  post-filter 1: DomainSet      drop tools whose DomainGroup is off

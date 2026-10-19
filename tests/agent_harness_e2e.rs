@@ -2036,7 +2036,7 @@ async fn provider_error_retry_inner() {
 //   spawn tools in their named lists. Verified: vision_agent's agent.toml
 //   (agent_registry/agents/vision_agent/agent.toml) names only `file_read` and
 //   `image_info`. It contains no
-//   spawn_subagent, spawn_worker_thread, or spawn_parallel_agents. The only
+//   spawn_subagent or spawn_parallel_agents. The only
 //   agents with spawn tools are orchestrator and trigger_reactor (loader.rs:383,
 //   527). trigger_reactor is not in the orchestrator's subagents.allowlist.
 //   MAX_SPAWN_DEPTH=3 (spawn_depth_context.rs:16) is structurally unreachable
@@ -2210,7 +2210,7 @@ async fn parallel_subagent_fanout_inner() {
 ///
 /// Depth behavior discovered: vision_agent's agent.toml names only `file_read`
 /// and `image_info` (no spawn_subagent,
-/// spawn_worker_thread, spawn_parallel_agents). MAX_SPAWN_DEPTH=3
+/// spawn_parallel_agents). MAX_SPAWN_DEPTH=3
 /// (spawn_depth_context.rs:16) is unreachable with built-in agents; it guards
 /// runtime/workspace agents. The three-level synthesis (user-turn root →
 /// vision_agent subagent → orchestrator synthesis) is the deepest path
