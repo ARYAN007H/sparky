@@ -84,6 +84,7 @@ pub(in super::super) async fn run_subagent_via_graph(
         // repeat-progress circuit breaker stopped the run; the caller reports
         // `Incomplete` instead of `Completed`.
         Option<String>,
+        Option<tinyagents_harness::no_progress::ClassifiedStopCause>,
     ),
     SubagentRunError,
 > {
