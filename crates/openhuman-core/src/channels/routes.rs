@@ -12,7 +12,6 @@ fn provider_descriptors(config: &crate::config::Config) -> Vec<ProviderDescripto
     config
         .cloud_providers
         .iter()
-        .into_iter()
         .map(|provider| ProviderDescriptor {
             name: provider.slug.clone(),
             aliases: if provider.slug == crate::inference::provider::factory::PROVIDER_OPENHUMAN
