@@ -517,7 +517,7 @@ pub fn expected_error_kind(message: &str) -> Option<ExpectedErrorKind> {
     }
     // TAURI-RUST-8FQ — the OpenAI ChatGPT/Codex OAuth access token expired with
     // no usable refresh token. The provider HTTP layer
-    // (`provider::ops::api_error` / `chat_via_responses`) already demotes its
+    // (`provider::http_error::api_error` / `chat_via_responses`) already demotes its
     // own per-attempt event, but the same `anyhow::bail!` string re-raises here
     // at the RPC boundary (`jsonrpc` → `report_error_or_expected`); route it to
     // the shared `ProviderUserState` bucket so the re-report is demoted too
@@ -1707,7 +1707,7 @@ fn is_provider_user_state_message(lower: &str) -> bool {
         return true;
     }
 
-    // OPENHUMAN-TAURI-YJ: `inference/provider/ops.rs::list_models` probed a
+    // OPENHUMAN-TAURI-YJ: `inference/provider/models/catalog_listing.rs::list_models` probed a
     // user-configured custom-provider's `/models` endpoint and the upstream
     // server returned 404. Wire shape emitted at `ops.rs:118-122`:
     //
@@ -1727,7 +1727,7 @@ fn is_provider_user_state_message(lower: &str) -> bool {
     //   - 400: typically request-shape bugs in OUR client; must escalate.
     //   - 429 / 5xx: transient — handled by other matchers / retry policy.
     //
-    // No `inference/provider/ops.rs::list_models` other than this site emits
+    // No `inference/provider/models/catalog_listing.rs::list_models` other than this site emits
     // the `provider returned NNN` prefix (verified via grep), so the prefix
     // alone is a sufficient anchor.
     //

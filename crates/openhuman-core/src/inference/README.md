@@ -157,7 +157,7 @@ A failed provider call passes through several layers, each with one job:
   HTTP / transport error
      |
      v
-  provider/ops/http_error.rs   api_error(): tinyinference_llm::failure::http
+  provider/http_error.rs   api_error(): tinyinference_llm::failure::http
      |  classifies; HostErrorReporter applies backend guards, demotion, Sentry
      |
      +--> auth_failure.rs: 401 from managed backend -> SessionExpired event
@@ -204,7 +204,7 @@ picks the provider the same way a provider string does.
 | `provider/openai_codex.rs` | Codex routing metadata for the `openai` slug when Codex OAuth is connected. |
 | [`provider/error_code.rs`](./provider/error_code.rs), [`provider/error_classify.rs`](./provider/error_classify.rs) | Managed `errorCode` extraction and Sentry ownership; OpenHuman policy over TinyInference's classifier. |
 | `provider/fallback_diagnostics.rs` | Explains background-role fallback when it hits a provider with no credentials. |
-| [`provider/ops/`](./provider/ops/) | `http_error.rs` (host reporter over `tinyinference_llm::failure::http`, `api_error`), `models/` (model catalog listing, local-runtime and OpenRouter entries), `provider_factory.rs` (`ProviderRuntimeOptions`, `list_providers`). |
+| [`provider/`](./provider/) | `http_error.rs` (host reporter over `tinyinference_llm::failure::http`, `api_error`), `models/` (model catalog listing, local-runtime and OpenRouter entries), `factory/` (chat-model construction and cloud provider resolution). |
 | [`provider/types.rs`](./provider/types.rs) | Host DTOs kept at product and RPC boundaries: `ChatResponse`, `ProviderDelta`, `BilledUsage`, `AGENT_TURN_MAX_OUTPUT_TOKENS`. |
 | `host_runtime/` | Product policy, RPC and speech bindings over `tinyinference_local`. See [`host_runtime/README.md`](host_runtime/README.md). |
 | `embedding_host/` | Embedding provider selection (managed, Voyage, OpenAI, Cohere, Ollama, custom, noop) and the `embeddings.*` RPC. See [`embedding_host/README.md`](embedding_host/README.md). |
@@ -230,7 +230,7 @@ picks the provider the same way a provider string does.
   natively. `INFERENCE_AGENT_CHAT` (`schemas.rs`) is the wire method name hosts reference.
 - `context_window_for_model` (`model_context.rs`) and `resolve_context_window`
   (`context_window.rs`) answer window sizes.
-- `api_error` ([`provider/ops/http_error/dispatch.rs`](./provider/ops/http_error/dispatch.rs)) is the single entry for turning a failed
+- `api_error` ([`provider/http_error/dispatch.rs`](./provider/http_error/dispatch.rs)) is the single entry for turning a failed
   provider response into a classified error.
 - `auth_error_registry::{record, clear, snapshot}` track rejected BYO keys.
 - `test_provider_override` (`provider/factory.rs`) injects a mock `ChatModel` process-wide. It
@@ -270,7 +270,7 @@ Outside JSON-RPC, `http::router()` serves `/v1/chat/completions` and `/v1/models
 ## Events and persistence
 
 This domain publishes but does not subscribe; there is no `bus.rs`. `SessionExpired` comes from
-[`provider/ops/http_error/auth_failure.rs`](./provider/ops/http_error/auth_failure.rs) and `provider/openhuman_backend_model.rs` (the managed model itself is in `openhuman-tinyhumans`).
+[`provider/http_error/auth_failure.rs`](./provider/http_error/auth_failure.rs) and `provider/openhuman_backend_model.rs` (the managed model itself is in `openhuman-tinyhumans`).
 `ProviderApiKeyRejected` comes from `auth_failure.rs`, gated by `auth_error_registry`.
 
 There is no `store.rs`. Routing, provider and local settings persist through `config` (`config/ops/

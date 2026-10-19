@@ -16,7 +16,7 @@ use super::*;
 /// it, because the workspace is already past every gate that would have.
 ///
 /// This is what made `inference_list_models("openhuman")` fail its lookup in
-/// `inference::provider::ops::models` before any HTTP request was made, which
+/// `inference::provider::models::catalog_listing` before any HTTP request was made, which
 /// is what #6201's model picker surfaced as "Could not load models from this
 /// provider."
 #[tokio::test]

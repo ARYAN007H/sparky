@@ -67,7 +67,7 @@ None of its own (no `store.rs`). It only **reads** existing state owned by other
 - `crate::platform::service::daemon`: `state_file_path` for the daemon heartbeat/component snapshot.
 - `crate::memory::status`: the memory engine's status (`ok`/`degraded`/`down`/`off`), taken by `ops` before the blocking hop and passed to `run` as a `MemoryEngineCheck`.
 - `crate::inference::embedding_host::effective_embedding_settings`: resolves the intended embedding provider/model.
-- `crate::inference::{provider, local}`: `provider::list_providers` (model targets) and `local::ollama_base_url` (embedding probe).
+- `crate::inference::{provider, local}`: configured `cloud_providers` slugs (model targets) and `local::ollama_base_url` (embedding probe).
 - `config.resolved_endpoints` (filled by the host's config enricher) for the inference base URL; `crate::security::credentials::jwt::get_session_token` for sign-in state.
 - `crate::core::all::{ControllerFuture, RegisteredController}`, `crate::core::{ControllerSchema, FieldSchema, TypeSchema}`: controller/schema plumbing.
 - `crate::rpc::RpcOutcome`: handler return contract.
@@ -82,7 +82,7 @@ None of its own (no `store.rs`). It only **reads** existing state owned by other
 - `run()` is **strictly blocking** by contract (file system, sqlite, blocking HTTP). `reqwest::blocking::Client` panics inside a tokio runtime, so `ops::doctor_report` runs the whole thing in `tokio::task::spawn_blocking`. Do not add `.await` inside `core::run`.
 - An async probe therefore arrives as an **argument**, resolved in `ops` before the blocking hop: `MemoryEngineCheck` is the first of them. Do not reach for `Handle::block_on` inside [`core`](./core): it panics on a current-thread runtime and deadlocks the multi-thread one whose worker it is already occupying.
 - An engine that is down is reported as an error and memory being off as a warning, so the doctor names what is wrong instead of showing an empty store.
-- `run_models` / `doctor.models` is effectively a **stub**: it enumerates providers from `inference::provider::list_providers` but marks every entry `Skipped` with message "model catalog refresh removed" (catalog refresh was removed). It never actually probes auth/availability despite the schema description.
+- `run_models` / `doctor.models` is lists the configured provider slugs from the supplied config and marks each entry `Skipped` because catalog refresh is not part of doctor.
 - The embedding probe is capped at a 3s timeout to avoid stalling on a slow Ollama daemon; non-ollama providers short-circuit to OK.
 - `model_matches` treats `name` vs `name:tag` as a match only when at most one side is tagged; two differently-tagged names are not considered equal.
 - Severity rollup: `DoctorSummary` counts `Ok`/`Warn`/`Error` items; checks are intentionally lenient (missing optional dirs/tools → `Warn`, not `Error`).

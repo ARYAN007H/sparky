@@ -18,7 +18,7 @@ const LOG_PREFIX: &str = "[inference::ops]";
 /// User picked a provider id (slug) that isn't registered in the cloud
 /// provider list — e.g. selecting `"ollama"` as a cloud provider when it's
 /// actually a local runtime. Matches the literal phrase emitted at
-/// `crates/openhuman-core/src/inference/provider/ops.rs:54`
+/// `crates/openhuman-core/src/inference/provider/models/catalog_listing.rs:54`
 /// (`"no cloud provider with id or slug '{}' found"`).
 ///
 /// Used by [`inference_list_models`] to demote this user-config case to
@@ -305,7 +305,7 @@ pub async fn inference_update_local_settings(
 
 pub async fn inference_list_models(provider_id: &str) -> Result<Outcome<Value>, String> {
     debug!(provider_id, "{LOG_PREFIX} list_models:start");
-    let result = providers::ops::list_configured_models(provider_id).await;
+    let result = providers::models::catalog_listing::list_configured_models(provider_id).await;
     match &result {
         Ok(_) => debug!("{LOG_PREFIX} list_models:ok"),
         Err(err) => {
