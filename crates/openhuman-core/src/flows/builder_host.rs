@@ -190,7 +190,7 @@ impl FlowsHost {
                     wire!(ops::engine_compatibility_errors_json(&context, &config, payload).await?)
                 }
                 PortOperation::GatesWiringWarnings => {
-                    wire!(ops::wiring_warnings_json(&config, payload).await?)
+                    wire!(ops::wiring_warnings_json(&context, &config, payload).await?)
                 }
                 PortOperation::GatesApprovalManifest => {
                     wire!(ops::approval_manifest_json(&context, &config, payload).await?)
