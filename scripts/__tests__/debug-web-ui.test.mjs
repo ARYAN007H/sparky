@@ -89,7 +89,9 @@ test("core RPC client bounds a stalled request and propagates its timeout", asyn
   const hangingFetch = (_url, init) => {
     signal = init.signal;
     return new Promise((_resolve, reject) => {
-      signal.addEventListener("abort", () => reject(signal.reason), { once: true });
+      signal.addEventListener("abort", () => reject(signal.reason), {
+        once: true,
+      });
     });
   };
   const rpc = createCoreRpcClient(
@@ -99,7 +101,9 @@ test("core RPC client bounds a stalled request and propagates its timeout", asyn
     5,
   );
 
-  await assert.rejects(rpc("openhuman.auth_get_state"), { name: "TimeoutError" });
+  await assert.rejects(rpc("openhuman.auth_get_state"), {
+    name: "TimeoutError",
+  });
   assert.equal(signal.aborted, true);
 });
 

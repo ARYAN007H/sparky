@@ -58,7 +58,12 @@ export async function ensureSignedInChat(page, appOrigin) {
 }
 
 /** Create an authenticated core RPC client with a bounded request lifetime. */
-export function createCoreRpcClient(rpcUrl, token, fetchImpl = fetch, timeoutMs = 10_000) {
+export function createCoreRpcClient(
+  rpcUrl,
+  token,
+  fetchImpl = fetch,
+  timeoutMs = 10_000,
+) {
   return async (method, params = {}) => {
     const res = await fetchImpl(rpcUrl, {
       method: "POST",
