@@ -616,6 +616,10 @@ const messages: TranslationMap = {
     'Al momento la memoria non è raggiungibile. Nulla di quanto salvato è andato perso; riprova tra poco.',
   'memory.outOfCredits.title': 'Crediti esauriti',
   'memory.outOfCredits.action': 'Ricarica',
+  'memory.error.planRequired':
+    'La memoria non è inclusa nel tuo piano. Passa a un piano superiore per usarla.',
+  'memory.planRequired.title': 'Non inclusa nel tuo piano',
+  'memory.planRequired.action': 'Aggiorna piano',
   'alerts.title': 'Avvisi',
   'alerts.empty': 'Nessun avviso',
   'alerts.markAllRead': 'Segna tutti come letti',

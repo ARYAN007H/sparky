@@ -602,6 +602,10 @@ const messages: TranslationMap = {
     'अभी मेमोरी तक नहीं पहुँचा जा सकता। संग्रहीत कुछ भी खोया नहीं है; थोड़ी देर में फिर से कोशिश करें।',
   'memory.outOfCredits.title': 'क्रेडिट खत्म हो गए',
   'memory.outOfCredits.action': 'टॉप अप करें',
+  'memory.error.planRequired':
+    'मेमोरी आपके प्लान में शामिल नहीं है। इसका उपयोग करने के लिए अपना प्लान अपग्रेड करें।',
+  'memory.planRequired.title': 'आपके प्लान में नहीं',
+  'memory.planRequired.action': 'अपग्रेड करें',
   'alerts.title': 'अलर्ट',
   'alerts.empty': 'अभी कोई अलर्ट नहीं',
   'alerts.markAllRead': 'सभी पढ़ा हुआ मार्क करें',

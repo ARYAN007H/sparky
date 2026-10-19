@@ -542,7 +542,7 @@ pub fn expected_error_kind(message: &str) -> Option<ExpectedErrorKind> {
     if tinyinference_llm::failure::is_ollama_cloud_internal_500_message(message) {
         return Some(ExpectedErrorKind::TransientUpstreamHttp);
     }
-    if is_backend_user_error_message(&lower) {
+    if is_backend_user_error_message(&lower) || is_plan_required_message(message) {
         return Some(ExpectedErrorKind::BackendUserError);
     }
     // Check `is_session_expired_message` BEFORE `is_embedding_backend_auth_failure`:
@@ -900,6 +900,13 @@ fn is_embedding_model_rejected(lower: &str) -> bool {
     tinyinference_embeddings::probe::is_embedding_model_rejected(lower)
 }
 
+/// Whether `msg` is the hosted backend refusing a feature the account's plan
+/// does not include: a `[…_PLAN_REQUIRED]` code (`MEMORY_PLAN_REQUIRED`) as
+/// tinymemory prefixes it. User state, never an expired session (#8081).
+pub fn is_plan_required_message(msg: &str) -> bool {
+    msg.contains("_PLAN_REQUIRED]")
+}
+
 /// Detect **app-session-expired** boundary errors that bubble up from any
 /// backend-touching call site (agent, web channel, cron, integrations).
 ///
@@ -953,6 +960,14 @@ fn is_embedding_model_rejected(lower: &str) -> bool {
 /// `DomainEvent::SessionExpired` publication, so downstream/provider 401s stay
 /// recoverable and do not clear the stored app session.
 pub fn is_session_expired_message(msg: &str) -> bool {
+    // #8081: tinymemory's hosted mapping words every 403, including
+    // `[MEMORY_PLAN_REQUIRED]` (memory not in the account's plan), as "the
+    // session expired or the API key was rejected (HTTP 403 …)". A 403 or a
+    // plan refusal never means the session expired, and signing out on one
+    // logged a valid user out on opening a Memory tab.
+    if is_plan_required_message(msg) || msg.contains("(HTTP 403") {
+        return false;
+    }
     let lower = msg.to_ascii_lowercase();
     lower.contains("session expired")
         || lower.contains("no backend session token")

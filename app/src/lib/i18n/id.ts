@@ -609,6 +609,10 @@ const messages: TranslationMap = {
     'Memori tidak dapat dijangkau saat ini. Tidak ada data tersimpan yang hilang; coba lagi sebentar lagi.',
   'memory.outOfCredits.title': 'Kredit habis',
   'memory.outOfCredits.action': 'Isi ulang',
+  'memory.error.planRequired':
+    'Memori tidak termasuk dalam paket Anda. Tingkatkan paket Anda untuk menggunakannya.',
+  'memory.planRequired.title': 'Tidak termasuk dalam paket Anda',
+  'memory.planRequired.action': 'Tingkatkan',
   'alerts.title': 'Peringatan',
   'alerts.empty': 'Belum ada peringatan',
   'alerts.markAllRead': 'Tandai semua sudah dibaca',

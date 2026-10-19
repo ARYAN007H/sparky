@@ -620,6 +620,10 @@ const messages: TranslationMap = {
     "La mémoire est injoignable pour le moment. Rien de ce qui est stocké n'a été perdu ; réessayez dans un instant.",
   'memory.outOfCredits.title': 'Crédits épuisés',
   'memory.outOfCredits.action': 'Recharger',
+  'memory.error.planRequired':
+    "La mémoire n'est pas incluse dans votre forfait. Passez à un forfait supérieur pour l'utiliser.",
+  'memory.planRequired.title': 'Non incluse dans votre forfait',
+  'memory.planRequired.action': 'Mettre à niveau',
   'alerts.title': 'Alertes',
   'alerts.empty': "Aucune alerte pour l'instant",
   'alerts.markAllRead': 'Tout marquer comme lu',

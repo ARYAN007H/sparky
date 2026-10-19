@@ -111,6 +111,7 @@ impl TurnPack {
             MemoryError::InsufficientCredits(_) => {
                 "the account is out of credits; topping up restores it"
             }
+            MemoryError::PlanRequired(_) => "memory is not included in the account's plan",
             MemoryError::Unauthorized(_) => "the memory engine rejected the sign-in or API key",
             MemoryError::Unavailable(_) => "the memory engine could not be reached",
             _ => return None,

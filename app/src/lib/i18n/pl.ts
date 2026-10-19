@@ -610,6 +610,10 @@ const messages: TranslationMap = {
     'Nie można teraz połączyć się z pamięcią. Nic z zapisanych danych nie zostało utracone; spróbuj ponownie za chwilę.',
   'memory.outOfCredits.title': 'Brak kredytów',
   'memory.outOfCredits.action': 'Doładuj',
+  'memory.error.planRequired':
+    'Pamięć nie jest uwzględniona w Twoim planie. Ulepsz plan, aby z niej korzystać.',
+  'memory.planRequired.title': 'Poza Twoim planem',
+  'memory.planRequired.action': 'Ulepsz plan',
   'alerts.title': 'Alerty',
   'alerts.empty': 'Brak alertów',
   'alerts.markAllRead': 'Oznacz wszystkie jako przeczytane',

@@ -593,6 +593,10 @@ const messages: TranslationMap = {
     '지금은 메모리에 연결할 수 없습니다. 저장된 내용은 사라지지 않았습니다. 잠시 후 다시 시도하세요.',
   'memory.outOfCredits.title': '크레딧 소진',
   'memory.outOfCredits.action': '충전하기',
+  'memory.error.planRequired':
+    '메모리는 현재 요금제에 포함되어 있지 않습니다. 사용하려면 요금제를 업그레이드하세요.',
+  'memory.planRequired.title': '요금제에 포함되지 않음',
+  'memory.planRequired.action': '업그레이드',
   'alerts.title': '알림',
   'alerts.empty': '아직 알림이 없습니다',
   'alerts.markAllRead': '모두 읽음으로 표시',

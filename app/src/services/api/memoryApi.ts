@@ -554,6 +554,7 @@ export type MemoryErrorCode =
   | 'INVALID_REQUEST'
   | 'UNAUTHORIZED'
   | 'INSUFFICIENT_CREDITS'
+  | 'PLAN_REQUIRED'
   | 'UNAVAILABLE'
   | 'ENGINE';
 
@@ -563,6 +564,7 @@ const MEMORY_ERROR_CODES: readonly MemoryErrorCode[] = [
   'INVALID_REQUEST',
   'UNAUTHORIZED',
   'INSUFFICIENT_CREDITS',
+  'PLAN_REQUIRED',
   'UNAVAILABLE',
   'ENGINE',
 ];
@@ -623,7 +625,7 @@ export function memoryErrorCode(err: unknown): MemoryErrorCode | null {
   const message = (err as { message?: unknown }).message;
   if (typeof message === 'string') {
     const match =
-      /^\s*(MEMORY_OFF|UNSUPPORTED|INVALID_REQUEST|UNAUTHORIZED|INSUFFICIENT_CREDITS|UNAVAILABLE|ENGINE)\b/.exec(
+      /^\s*(MEMORY_OFF|UNSUPPORTED|INVALID_REQUEST|UNAUTHORIZED|INSUFFICIENT_CREDITS|PLAN_REQUIRED|UNAVAILABLE|ENGINE)\b/.exec(
         message
       );
     if (match) return match[1] as MemoryErrorCode;
@@ -634,11 +636,12 @@ export function memoryErrorCode(err: unknown): MemoryErrorCode | null {
 /**
  * The account-wide refusals whose raw message is engine detail, each told
  * apart from an engine fault and from an empty memory: out of credits means
- * "top up", unreachable means "try again". `UNAUTHORIZED` keeps its own
+ * "top up", not in the plan means "upgrade", unreachable means "try again". `UNAUTHORIZED` keeps its own
  * message, which names the rejected key or session.
  */
 const REFUSAL_KEYS: Partial<Record<MemoryErrorCode, string>> = {
   INSUFFICIENT_CREDITS: 'memory.error.insufficientCredits',
+  PLAN_REQUIRED: 'memory.error.planRequired',
   UNAVAILABLE: 'memory.error.unavailable',
 };
 
@@ -673,6 +676,19 @@ export function isOutOfCreditsMessage(
   t: (key: string, fallback?: string) => string
 ): boolean {
   const key = REFUSAL_KEYS.INSUFFICIENT_CREDITS;
+  return message !== null && key !== undefined && message === t(key);
+}
+
+/**
+ * True when `message` is the "memory is not in your plan" explanation
+ * `memoryErrorMessage` produced (with `t`) for `PLAN_REQUIRED` (#8081). Same
+ * contract and language edge as {@link isOutOfCreditsMessage}.
+ */
+export function isPlanRequiredMessage(
+  message: string | null,
+  t: (key: string, fallback?: string) => string
+): boolean {
+  const key = REFUSAL_KEYS.PLAN_REQUIRED;
   return message !== null && key !== undefined && message === t(key);
 }
 

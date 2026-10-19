@@ -620,6 +620,10 @@ const messages: TranslationMap = {
     'Das Gedächtnis ist gerade nicht erreichbar. Nichts Gespeichertes ist verloren; versuche es gleich noch einmal.',
   'memory.outOfCredits.title': 'Kein Guthaben mehr',
   'memory.outOfCredits.action': 'Aufladen',
+  'memory.error.planRequired':
+    'Memory ist in deinem Tarif nicht enthalten. Wechsle zu einem höheren Tarif, um es zu nutzen.',
+  'memory.planRequired.title': 'Nicht in deinem Tarif',
+  'memory.planRequired.action': 'Upgrade',
   'alerts.title': 'Warnungen',
   'alerts.empty': 'Noch keine Benachrichtigungen',
   'alerts.markAllRead': 'Alle als gelesen markieren',

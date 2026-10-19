@@ -192,6 +192,7 @@ describe('memoryErrorCode', () => {
       'INSUFFICIENT_CREDITS'
     );
     expect(memoryErrorCode(new Error('UNAVAILABLE: timed out'))).toBe('UNAVAILABLE');
+    expect(memoryErrorCode(new Error('PLAN_REQUIRED: not in the plan'))).toBe('PLAN_REQUIRED');
   });
 
   it('returns null for an unrelated error', () => {
@@ -217,6 +218,9 @@ describe('helpers', () => {
     expect(memoryErrorMessage(credits, t)).toBe('t:memory.error.insufficientCredits');
     expect(memoryErrorMessage({ message: 'x', data: { code: 'UNAVAILABLE' } }, t)).toBe(
       't:memory.error.unavailable'
+    );
+    expect(memoryErrorMessage({ message: 'x', data: { code: 'PLAN_REQUIRED' } }, t)).toBe(
+      't:memory.error.planRequired'
     );
     // A rejected key and an engine fault keep their own message, and without
     // `t` nothing changes.

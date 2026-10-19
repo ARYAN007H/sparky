@@ -42,7 +42,11 @@ pub(super) fn to_module(error: MemoryError) -> lm::Error {
         MemoryError::Off(message) => lm::Error::Off(message),
         MemoryError::InvalidRequest(message) => lm::Error::InvalidRequest(message),
         MemoryError::Unsupported(message) => EngineError::Unsupported(message).into(),
-        MemoryError::Unauthorized(message) => EngineError::Unauthorized(message).into(),
+        // A plan refusal stops the migration as account-wide, as it did when
+        // it arrived as `Unauthorized`; its `[CODE] ` stays on the message.
+        MemoryError::Unauthorized(message) | MemoryError::PlanRequired(message) => {
+            EngineError::Unauthorized(message).into()
+        }
         MemoryError::Unavailable(message) => EngineError::Unavailable(message).into(),
         // The backend's `[CODE] ` prefix stays on the message, which is how
         // the module tells an exhausted balance.

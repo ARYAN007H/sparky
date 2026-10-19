@@ -4771,6 +4771,10 @@ const messages: TranslationMap = {
     '現在、メモリーに接続できません。保存済みの内容は失われていません。少し待ってから再試行してください。',
   'memory.outOfCredits.title': 'クレジット不足',
   'memory.outOfCredits.action': 'チャージする',
+  'memory.error.planRequired':
+    'メモリーはご利用のプランに含まれていません。利用するにはプランをアップグレードしてください。',
+  'memory.planRequired.title': 'プランに含まれていません',
+  'memory.planRequired.action': 'アップグレード',
   'onboarding.custom.search.skipForNow': '今はスキップ',
   'onboarding.custom.search.ready': 'Web検索の準備ができました。',
   'onboarding.custom.search.notReady':

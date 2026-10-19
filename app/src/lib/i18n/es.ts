@@ -616,6 +616,10 @@ const messages: TranslationMap = {
     'No se puede acceder a la memoria ahora mismo. No se ha perdido nada guardado; inténtalo de nuevo en un momento.',
   'memory.outOfCredits.title': 'Sin créditos',
   'memory.outOfCredits.action': 'Recargar',
+  'memory.error.planRequired':
+    'La memoria no está incluida en tu plan. Mejora tu plan para usarla.',
+  'memory.planRequired.title': 'No incluida en tu plan',
+  'memory.planRequired.action': 'Mejorar plan',
   'alerts.title': 'Alertas',
   'alerts.empty': 'Sin alertas aún',
   'alerts.markAllRead': 'Marcar todo como leído',

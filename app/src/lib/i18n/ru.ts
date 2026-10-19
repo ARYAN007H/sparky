@@ -606,6 +606,10 @@ const messages: TranslationMap = {
     'Сейчас не удаётся связаться с памятью. Ничего из сохранённого не потеряно; повторите попытку чуть позже.',
   'memory.outOfCredits.title': 'Кредиты закончились',
   'memory.outOfCredits.action': 'Пополнить',
+  'memory.error.planRequired':
+    'Память не входит в ваш тариф. Перейдите на более высокий тариф, чтобы пользоваться ею.',
+  'memory.planRequired.title': 'Не входит в ваш тариф',
+  'memory.planRequired.action': 'Улучшить тариф',
   'alerts.title': 'Оповещения',
   'alerts.empty': 'Оповещений пока нет',
   'alerts.markAllRead': 'Отметить всё прочитанным',

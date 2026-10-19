@@ -74,6 +74,49 @@ fn account_wide_refusals_get_their_own_codes() {
     assert!(!MemoryError::invalid("bad").is_account_wide());
 }
 
+/// #8081: memory not in the plan is its own account-wide user state, from
+/// both TinyMemory wordings, and its RPC error never reads as an expired
+/// session (which signs the user out).
+#[test]
+fn a_plan_refusal_is_plan_required_not_unauthorized() {
+    use tinymemory_api::Error as E;
+    for error in [
+        E::Unauthorized(
+            "[MEMORY_PLAN_REQUIRED] memory API memory/scopes on h: the session expired or the \
+             API key was rejected (HTTP 403 Forbidden); re-authenticate — memory is not \
+             included in this account's plan"
+                .into(),
+        ),
+        E::Engine(
+            "[MEMORY_PLAN_REQUIRED] memory API memory/scopes on h: memory is not included in \
+             this account's plan (HTTP 403 Forbidden)"
+                .into(),
+        ),
+    ] {
+        let plan = MemoryError::from(error);
+        assert_eq!(plan.code(), PLAN_REQUIRED);
+        assert!(plan.is_account_wide());
+        let structured = plan.to_structured();
+        assert!(structured.expected_user_state);
+        assert!(
+            !crate::core::session_expiry::is_session_expired_error(&String::from(plan)),
+            "{}",
+            structured.message
+        );
+    }
+    let expired = MemoryError::from(E::Unauthorized(
+        "[UNAUTHORIZED] memory API memory/scopes on h: the session expired (HTTP 401)".into(),
+    ));
+    assert_eq!(expired.code(), UNAUTHORIZED);
+    assert_eq!(
+        MemoryError::refusal_from_skip_reason(
+            "unauthorized: [MEMORY_PLAN_REQUIRED] memory API memory/scopes (HTTP 403 Forbidden)"
+        )
+        .map(|e| e.code()),
+        Some(PLAN_REQUIRED)
+    );
+}
+
 #[test]
 fn a_skip_reason_reads_back_only_account_wide_refusals() {
     let code = |reason: &str| MemoryError::refusal_from_skip_reason(reason).map(|e| e.code());

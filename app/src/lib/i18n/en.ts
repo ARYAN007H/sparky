@@ -595,6 +595,9 @@ const en: TranslationMap = {
     "Memory can't be reached right now. Nothing stored has been lost; try again in a moment.",
   'memory.outOfCredits.title': 'Out of credits',
   'memory.outOfCredits.action': 'Top up',
+  'memory.error.planRequired': "Memory isn't included in your plan. Upgrade your plan to use it.",
+  'memory.planRequired.title': 'Not in your plan',
+  'memory.planRequired.action': 'Upgrade',
 
   // Activity surface: Phase 3 renamed tabs
   'activity.tabs.automations': 'Automations',

@@ -597,6 +597,10 @@ const messages: TranslationMap = {
     'এই মুহূর্তে মেমরিতে পৌঁছানো যাচ্ছে না। সংরক্ষিত কিছুই হারায়নি; একটু পরে আবার চেষ্টা করুন।',
   'memory.outOfCredits.title': 'ক্রেডিট শেষ',
   'memory.outOfCredits.action': 'টপ আপ করুন',
+  'memory.error.planRequired':
+    'আপনার প্ল্যানে মেমোরি অন্তর্ভুক্ত নেই। এটি ব্যবহার করতে আপনার প্ল্যান আপগ্রেড করুন।',
+  'memory.planRequired.title': 'আপনার প্ল্যানে নেই',
+  'memory.planRequired.action': 'আপগ্রেড করুন',
   'alerts.title': 'সতর্কতা',
   'alerts.empty': 'এখনো কোনো সতর্কতা নেই',
   'alerts.markAllRead': 'সব পঠিত চিহ্নিত করুন',
