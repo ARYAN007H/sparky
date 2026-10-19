@@ -257,6 +257,35 @@ async fn config_snapshot_cannot_be_saved_into_a_different_tenant_scope() {
 }
 
 #[tokio::test]
+async fn config_snapshot_is_bound_to_its_backend_instance() {
+    let tmp = tempfile::tempdir().unwrap();
+    let storage = MemoryStorage::new();
+    let seed = config_at(tmp.path(), "same-backend");
+    let stale = {
+        let _source = ForcedDocumentSource::new(
+            scoped(&storage, "tenant-backend-instance"),
+            Scope::new("tenant-backend-instance").unwrap(),
+            keys(14),
+        );
+        seed.save().await.unwrap();
+        Config::load_from_config_path(&seed.config_path, &seed.workspace_dir)
+            .await
+            .unwrap()
+    };
+    let error = {
+        let _source = ForcedDocumentSource::new(
+            scoped(&storage, "tenant-backend-instance"),
+            Scope::new("tenant-backend-instance").unwrap(),
+            keys(14),
+        );
+        let mut stale = stale;
+        stale.default_model = Some("must-not-cross-backend-instance".into());
+        stale.save().await.unwrap_err()
+    };
+    assert_typed_conflict(error);
+}
+
+#[tokio::test]
 async fn document_source_write_uses_its_last_read_revision() {
     let tmp = tempfile::tempdir().unwrap();
     let storage = MemoryStorage::new();
