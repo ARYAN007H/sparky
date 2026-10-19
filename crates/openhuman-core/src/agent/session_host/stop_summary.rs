@@ -207,11 +207,19 @@ impl StopReasonKind {
             // used to fall through to `Generic` ("my tool calls were not
             // getting anywhere").
             "policy" | "blocked_by_policy" => Self::Policy,
+            "missing_program" => Self::MissingProgram,
             "unsupported" | "missing_app" => Self::MissingProgram,
             "not_found" | "missing_window" => Self::NotFound,
+            "invalid_calls" => Self::InvalidCalls,
             "validation" | "invalid_arguments" => Self::InvalidCalls,
             "unavailable" | "service_refused" => Self::Unavailable,
             "site_refused" => Self::SiteRefused,
+            "repeated_failure" => Self::RepeatedFailure,
+            "varied_failures" => Self::VariedFailures,
+            "repeating_step" => Self::RepeatingStep,
+            "out_of_credits" => Self::OutOfCredits,
+            "provider_config" => Self::ProviderConfig,
+            "missing_connection" => Self::MissingConnection,
             _ => Self::Generic,
         }
     }
@@ -262,7 +270,19 @@ fn times(count: usize) -> String {
 
 /// The user-facing reply for a turn the breaker stopped with `stop_note`.
 pub(crate) fn render_stop_summary(results: &[CheckpointToolResult], stop_note: &str) -> String {
-    let kind = StopReasonKind::from_stop_note(stop_note);
+    render_stop_summary_with_cause(results, stop_note, None)
+}
+
+/// Render a stopped-turn summary from its typed cause when the harness has
+/// one. The note is only a compatibility source for old, untyped stops.
+pub(crate) fn render_stop_summary_with_cause(
+    results: &[CheckpointToolResult],
+    stop_note: &str,
+    failure_cause: Option<&tinyagents_harness::no_progress::ClassifiedStopCause>,
+) -> String {
+    let kind = failure_cause
+        .map(|cause| StopReasonKind::from_failure_class(&cause.class))
+        .unwrap_or_else(|| StopReasonKind::from_stop_note(stop_note));
     tracing::debug!(
         reason = kind.key(),
         results = results.len(),
