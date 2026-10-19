@@ -29,6 +29,10 @@ async fn ptt_source_turn_completes_without_publishing_a_voice_event() {
     config.action_dir_override = Some(action_dir.clone());
     config.config_path = config_path;
     config.files_dir_override = Some(files_dir);
+    config.local_ai.runtime_enabled = false;
+    config.memory.conversations.enabled = false;
+    config.agent.session_dual_write = false;
+    config.agent.session_shadow_reads = false;
     let core_context =
         crate::core::runtime::CoreContext::for_test(crate::core::runtime::DomainSet::full(), None)
             .derive_with(
@@ -121,7 +125,12 @@ async fn ptt_source_turn_completes_without_publishing_a_voice_event() {
             }
         })
         .await
-        .expect("PTT turn should finish");
+        .unwrap_or_else(|_| {
+            panic!(
+                "PTT turn should finish; scripted model received {} requests",
+                model.requests().len()
+            )
+        });
         assert_eq!(done.full_response.as_deref(), Some("hello from mock"));
 
         // Subscriber dispatch is a single FIFO loop (`events/subscriber.rs`), so
