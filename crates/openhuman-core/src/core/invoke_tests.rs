@@ -277,6 +277,19 @@ async fn invoke_method_unknown_method_returns_unknown_error() {
 }
 
 #[tokio::test]
+async fn invoke_retired_dictation_settings_method_returns_unknown_error() {
+    let err = invoke_method(
+        DispatchCtx::ambient(),
+        default_state(),
+        "openhuman.config_get_dictation_settings",
+        json!({}),
+    )
+    .await
+    .expect_err("retired dictation settings method must be unknown");
+    assert!(err.contains("unknown method"), "got: {err}");
+}
+
+#[tokio::test]
 async fn invoke_method_core_ping_via_tier1() {
     // core.* methods aren't in the registry; they route through tier 1.
     let result = invoke_method(
