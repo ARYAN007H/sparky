@@ -95,12 +95,14 @@ describe('TodoListPart', () => {
       <TodoListPart
         {...baseProps}
         toolCallId="call-receipt-fallback"
-        args={{
-          todos: [
-            { content: 'Prepare release', status: 'completed' },
-            { content: 'Publish release', status: 'pending' },
-          ],
-        } as never}
+        args={
+          {
+            todos: [
+              { content: 'Prepare release', status: 'completed' },
+              { content: 'Publish release', status: 'pending' },
+            ],
+          } as never
+        }
         result={'Updated 1 of 2 tasks.' as never}
         status={{ type: 'complete' }}
       />

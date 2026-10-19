@@ -166,7 +166,10 @@ test.describe('assistant-ui tool-result elements', () => {
       'composioConnections',
       JSON.stringify([{ id: 'conn-github', toolkit: 'github', status: 'ACTIVE' }])
     );
-    await setMockBehavior('composioTools', JSON.stringify([makeComposioTool(GITHUB_REPOSITORY_ACTION)]));
+    await setMockBehavior(
+      'composioTools',
+      JSON.stringify([makeComposioTool(GITHUB_REPOSITORY_ACTION)])
+    );
   });
 
   // ── elements/code-diff.tsx ────────────────────────────────────────────
@@ -278,7 +281,10 @@ test.describe('assistant-ui tool-result elements', () => {
     ]);
 
     await sendTurn(page, threadId, 'AUI-TABLE-CASE list my repositories');
-    const card = await openToolCall(page, /GITHUB_LIST_REPOSITORIES_FOR_THE_AUTHENTICATED_USER|repositor/i);
+    const card = await openToolCall(
+      page,
+      /GITHUB_LIST_REPOSITORIES_FOR_THE_AUTHENTICATED_USER|repositor/i
+    );
 
     const table = card.locator('[data-slot="data-table"]').first();
     await expect(table).toBeVisible({ timeout: 20_000 });
