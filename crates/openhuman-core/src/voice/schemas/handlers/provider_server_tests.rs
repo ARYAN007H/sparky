@@ -20,19 +20,23 @@ async fn choosing_backend_resets_a_legacy_nondefault_stt_engine() {
     handle_voice_set_providers(ctx.clone(), custom)
         .await
         .expect("setting a custom provider should succeed");
-    let persisted = crate::config::Config::load_from_config_path(
-        &config.config_path,
-        &config.workspace_dir,
-    )
-    .await
-    .unwrap();
-    assert_eq!(persisted.voice_server.stt_engine, crate::config::SttEngine::Elevenlabs);
-    assert_eq!(crate::voice::effective_stt_provider(&persisted), "custom-provider:model-v2");
+    let persisted =
+        crate::config::Config::load_from_config_path(&config.config_path, &config.workspace_dir)
+            .await
+            .unwrap();
+    assert_eq!(
+        persisted.voice_server.stt_engine,
+        crate::config::SttEngine::Elevenlabs
+    );
+    assert_eq!(
+        crate::voice::effective_stt_provider(&persisted),
+        "custom-provider:model-v2"
+    );
 
     for alias in ["cloud", "backend", "openhuman"] {
         let params = Map::from_iter([("stt_provider".to_string(), Value::String(alias.into()))]);
         handle_voice_set_providers(ctx.clone(), params)
-        .await
+            .await
             .expect("setting a backend alias should succeed");
 
         let persisted = crate::config::Config::load_from_config_path(
@@ -41,7 +45,10 @@ async fn choosing_backend_resets_a_legacy_nondefault_stt_engine() {
         )
         .await
         .unwrap();
-        assert_eq!(persisted.voice_server.stt_engine, crate::config::SttEngine::Backend);
+        assert_eq!(
+            persisted.voice_server.stt_engine,
+            crate::config::SttEngine::Backend
+        );
         assert_eq!(crate::voice::effective_stt_provider(&persisted), "cloud");
     }
 }

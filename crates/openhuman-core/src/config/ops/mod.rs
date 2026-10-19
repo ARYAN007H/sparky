@@ -76,9 +76,9 @@ pub use search::{
 };
 pub use ui::{
     apply_analytics_settings, apply_browser_settings, apply_user_timezone,
-    get_onboarding_completed, load_and_apply_analytics_settings,
-    load_and_apply_browser_settings, load_and_apply_user_timezone, set_onboarding_completed,
-    user_timezone_json, workspace_onboarding_flag_exists, workspace_onboarding_flag_resolve,
+    get_onboarding_completed, load_and_apply_analytics_settings, load_and_apply_browser_settings,
+    load_and_apply_user_timezone, set_onboarding_completed, user_timezone_json,
+    workspace_onboarding_flag_exists, workspace_onboarding_flag_resolve,
     workspace_onboarding_flag_set, AnalyticsSettingsPatch, BrowserSettingsPatch,
 };
 

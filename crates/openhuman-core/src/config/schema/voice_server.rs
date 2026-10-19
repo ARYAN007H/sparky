@@ -72,7 +72,6 @@ pub struct VoiceServerConfig {
     /// wins — this field is what the `"cloud"`/unset case resolves to.
     #[serde(default)]
     pub stt_engine: SttEngine,
-
 }
 
 impl Default for VoiceServerConfig {
