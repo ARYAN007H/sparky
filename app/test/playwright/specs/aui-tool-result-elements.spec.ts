@@ -282,7 +282,11 @@ test.describe('assistant-ui tool-result elements', () => {
         toolCalls: [{ name: 'tool_search', arguments: { query: 'list GitHub repositories' } }],
       },
       {
-        keyword: '1 match(es)',
+        // Match the result's stable action identity, not a hit count. The
+        // query can legitimately return multiple nearby GitHub actions, and
+        // the count is a ranking detail rather than the action we intend to
+        // exercise.
+        keyword: GITHUB_REPOSITORY_ACTION,
         toolCalls: [{ name: GITHUB_REPOSITORY_ACTION, arguments: { limit: 2 } }],
       },
     ]);
