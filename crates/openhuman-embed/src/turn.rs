@@ -617,7 +617,7 @@ async fn dispatch(
             let turn: futures_box::BoxFuture<'_, Result<AgentReply, CoreError>> =
                 Box::pin(async move {
                     use openhuman_core::inference::host_runtime::ops::{
-                        agent_chat_reply_for, AgentChatTarget,
+                        agent_chat_reply_for_controlled, AgentChatTarget,
                     };
                     let mut config = dispatch
                         .load_config()
@@ -632,7 +632,7 @@ async fn dispatch(
                         request.api_key.clone(),
                     )
                     .map(|route| route.with_headers(request.inference_headers.clone()));
-                    agent_chat_reply_for(
+                    agent_chat_reply_for_controlled(
                         &mut config,
                         target,
                         &request.message,
@@ -645,7 +645,7 @@ async fn dispatch(
                     )
                     .await
                     .map(|reply| (reply.text, None))
-                    .map_err(|raw| CoreError::from_rpc_string(AGENT_CHAT, raw))
+                    .map_err(|error| map_agent_chat_error(error, None))
                 });
             rt.run_in(ctx, turn).await
         }
@@ -710,6 +710,25 @@ async fn dispatch(
                             spent.reasoning_tokens = report.reasoning_tokens;
                         }
                     }
+                    if let Err(error) = &outcome
+                        && let Some(refusal) = error.downcast_ref::<
+                            crate::budget::DispatchRefusal,
+                        >()
+                    {
+                        return Err(CoreError::DispatchAdmission {
+                            method: AGENT_CHAT,
+                            source: *refusal,
+                            usage: report.usage.map(|spent| {
+                                crate::complete::CompletionUsage {
+                                    input_tokens: spent.input_tokens,
+                                    output_tokens: spent.output_tokens,
+                                    cached_tokens: spent.cached_tokens,
+                                    reasoning_tokens: spent.reasoning_tokens,
+                                    cost_usd: spent.cost_usd,
+                                }
+                            }),
+                        });
+                    }
                     if outcome.is_err() && report.structured_failed {
                         use crate::structured::{
                             StructuredFailureReason as Reason, StructuredOutputFailure,
@@ -739,7 +758,7 @@ async fn dispatch(
                     }
                     outcome
                         .map(|outcome| (outcome.value, Some(report)))
-                        .map_err(|raw| CoreError::from_rpc_string(AGENT_CHAT, raw))
+                        .map_err(|error| map_agent_chat_error(error, report.usage))
                 });
             agent
                 .lifecycle
