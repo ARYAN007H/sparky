@@ -32,31 +32,14 @@ const AUDIO_B64 = silentWavBase64();
 export default async function voiceNoteReplay({ page, mock, log, screenshot }) {
   let typedVoiceNoteSent = false;
   let threadId = null;
-  const projectedVoiceNotes = [];
-  page.on("response", async (response) => {
-    let body;
-    try {
-      body = JSON.parse(response.request().postData() ?? "{}");
-    } catch {
-      return;
-    }
-    if (body.method !== "openhuman.threads_transcript_get") return;
-    if (threadId && body.params?.thread_id !== threadId) return;
-    try {
-      let value = await response.json();
-      for (let depth = 0; depth < 5 && value && !Array.isArray(value.items); depth += 1) {
-        value = value.result ?? value.data ?? value.value;
-      }
-      const items = Array.isArray(value?.items) ? value.items : [];
-      for (const item of items) {
-        const noteId = item.extraMetadata?.voiceNote?.noteId;
-        if (noteId) projectedVoiceNotes.push({ kind: item.kind, noteId });
-      }
-      log(`transcript projection voice rows: ${JSON.stringify(projectedVoiceNotes)}`);
-    } catch {}
-  });
+  let rpcUrl;
+  let rpcAuthorization;
   page.on("request", (request) => {
     if (!request.url().endsWith("/rpc")) return;
+    rpcUrl = request.url();
+    void request
+      .allHeaders()
+      .then((headers) => (rpcAuthorization = headers.authorization));
     try {
       const body = JSON.parse(request.postData() ?? "{}");
       if (body.method !== "openhuman.channel_web_chat") return;
@@ -222,15 +205,31 @@ export default async function voiceNoteReplay({ page, mock, log, screenshot }) {
     .getByTestId("voice-note-player")
     .nth(1)
     .waitFor({ state: "visible", timeout: 30_000 });
-  await page.waitForFunction(
-    () =>
-      window.__OPENHUMAN_STORE__?.getState?.().thread?.messagesByThreadId &&
-      Object.values(window.__OPENHUMAN_STORE__.getState().thread.messagesByThreadId)
-        .flat()
-        .filter((message) => message.extraMetadata?.voiceNote?.noteId).length >= 2,
-    null,
-    { timeout: 30_000 },
-  );
+  if (!rpcUrl || !rpcAuthorization)
+    throw new Error("could not capture the signed local core RPC endpoint");
+  const transcriptResponse = await page.request.post(rpcUrl, {
+    headers: { authorization: rpcAuthorization, "content-type": "application/json" },
+    data: {
+      jsonrpc: "2.0",
+      id: "voice-note-transcript-replay",
+      method: "openhuman.threads_transcript_get",
+      params: { thread_id: threadId, limit: 500 },
+    },
+  });
+  if (!transcriptResponse.ok())
+    throw new Error(`threads_transcript_get returned ${transcriptResponse.status()}`);
+  let transcriptValue = await transcriptResponse.json();
+  for (
+    let depth = 0;
+    depth < 6 && transcriptValue && !Array.isArray(transcriptValue.items);
+    depth += 1
+  ) {
+    transcriptValue = transcriptValue.result ?? transcriptValue.data ?? transcriptValue.value;
+  }
+  const projectedVoiceNotes = (Array.isArray(transcriptValue?.items) ? transcriptValue.items : [])
+    .filter((item) => item.extraMetadata?.voiceNote?.noteId)
+    .map((item) => ({ kind: item.kind, noteId: item.extraMetadata.voiceNote.noteId }));
+  log(`threads_transcript_get voice rows: ${JSON.stringify(projectedVoiceNotes)}`);
   if (
     !projectedVoiceNotes.some((item) => item.kind === "userMessage") ||
     !projectedVoiceNotes.some((item) => item.kind === "assistantMessage")
