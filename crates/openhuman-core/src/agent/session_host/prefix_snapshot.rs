@@ -6,7 +6,9 @@
 //! prefix, so `runtime_session` never has to know how many messages a prefix
 //! is. A resumed thread's prefix is restored by the tinyagents session using
 //! the transcript's recorded frozen-prefix count (or the legacy generation
-//! fallback); nothing here re-derives it.
+//! fallback). Only an agent that sets `refresh_prompt_on_resume` has it
+//! rendered again, through this same helper, and offered as a refresh
+//! (`runtime_session/prompt_refresh.rs`).
 
 use tinyagents_runtime::PrefixSnapshot;
 use tinyinference_llm::message::Message;
