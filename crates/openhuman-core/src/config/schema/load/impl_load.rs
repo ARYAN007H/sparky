@@ -292,8 +292,8 @@ impl Config {
             workspace_dir,
             &ProcessEnvWithoutWorkspace,
         )
-            .await
-            .map(crate::config::enrichers::enriched)
+        .await
+        .map(crate::config::enrichers::enriched)
     }
 
     /// Reloads the resolved config source and its revision without applying

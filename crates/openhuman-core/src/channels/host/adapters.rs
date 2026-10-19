@@ -300,7 +300,12 @@ impl ConfigAllowlistStore {
             &openhuman_dir.join("workspace"),
         )
         .await
-        .with_context(|| format!("failed to load config.toml for allowlist: {}", config_path.display()))?;
+        .with_context(|| {
+            format!(
+                "failed to load config.toml for allowlist: {}",
+                config_path.display()
+            )
+        })?;
 
         match channel {
             "telegram" => {
