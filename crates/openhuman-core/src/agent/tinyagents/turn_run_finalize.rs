@@ -41,6 +41,7 @@ pub(super) async fn finalize_turn_outcome(
     bridge: Option<Arc<OpenhumanEventBridge>>,
     early_exit: Option<tinyagents_harness::tool::EarlyExit>,
     halt_summary: &HaltSummarySlot,
+    classified_cause: Option<tinyagents_harness::no_progress::ClassifiedStopCause>,
     wrap_up_fired: &Option<Arc<tinyagents_harness::middleware::FinalCallWrapUpMiddleware>>,
     run_instance_id: u64,
     tool_outcome_sink: &ToolOutcomeSink,
@@ -163,7 +164,7 @@ pub(super) async fn finalize_turn_outcome(
     // A run the harness stopped (breaker / cap) is traced as stopped, not as a
     // clean completion. No deadline wind-down on this path: only the session
     // turn carries one, and it records the stop through its sidecar.
-    let failure_cause = run.failure_cause.clone();
+    let failure_cause = run.failure_cause.clone().or(classified_cause);
     let stop = crate::agent::turn_projection::classify_stop_with_cause(
         breaker_halt.as_deref(),
         failure_cause.clone(),
