@@ -3567,7 +3567,7 @@ dependencies = [
  "js-sys",
  "log",
  "wasm-bindgen",
- "windows-core 0.62.2",
+ "windows-core 0.58.0",
 ]
 
 [[package]]
@@ -8211,7 +8211,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32497e9a4c7b38532efcdebeef879707aa9f794296a4f0244f6f69e9bc8574bd"
 dependencies = [
  "fastrand",
- "getrandom 0.3.4",
+ "getrandom 0.4.3",
  "once_cell",
  "rustix 1.1.5",
  "windows-sys 0.61.2",
@@ -8414,7 +8414,7 @@ dependencies = [
 
 [[package]]
 name = "tinyagents-definition"
-version = "2.1.4"
+version = "2.2.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -8427,7 +8427,7 @@ dependencies = [
 
 [[package]]
 name = "tinyagents-graph"
-version = "2.1.4"
+version = "2.2.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -8445,18 +8445,21 @@ dependencies = [
 
 [[package]]
 name = "tinyagents-harness"
-version = "2.1.4"
+version = "2.2.0"
 dependencies = [
  "anyhow",
  "async-trait",
  "base64 0.22.1",
+ "cap-std",
  "chrono",
  "chrono-tz",
  "dirs 6.0.0",
  "flate2",
  "futures",
+ "libc",
  "regex",
  "reqwest 0.12.28",
+ "rustix 1.1.5",
  "serde",
  "serde_json",
  "sha2 0.11.0",
@@ -8481,8 +8484,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "tinyagents-hooks"
+version = "2.2.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "regex",
+ "serde",
+ "serde_json",
+ "tinyagents-harness",
+ "tinyinference-llm 0.4.1",
+ "tinytools",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "tinyagents-live"
-version = "2.1.4"
+version = "2.2.0"
 dependencies = [
  "serde_json",
  "tinyagents-harness",
@@ -8493,14 +8512,16 @@ dependencies = [
 
 [[package]]
 name = "tinyagents-orchestration"
-version = "2.1.4"
+version = "2.2.0"
 dependencies = [
  "anyhow",
  "async-trait",
  "chrono",
+ "fs2",
  "parking_lot",
  "serde",
  "serde_json",
+ "sha2 0.11.0",
  "thiserror 2.0.20",
  "tinyagents-definition",
  "tinyagents-graph",
@@ -8518,7 +8539,7 @@ dependencies = [
 
 [[package]]
 name = "tinyagents-registry"
-version = "2.1.4"
+version = "2.2.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -8532,16 +8553,15 @@ dependencies = [
 
 [[package]]
 name = "tinyagents-runtime"
-version = "2.1.4"
+version = "2.2.0"
 dependencies = [
  "anyhow",
  "async-trait",
  "chrono",
- "regex",
- "serde",
  "serde_json",
  "thiserror 2.0.20",
  "tinyagents-harness",
+ "tinyagents-hooks",
  "tinyagents-registry",
  "tinyagents-session",
  "tinyinference-llm 0.4.1",
@@ -8552,7 +8572,7 @@ dependencies = [
 
 [[package]]
 name = "tinyagents-session"
-version = "2.1.4"
+version = "2.2.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -8576,7 +8596,7 @@ dependencies = [
 
 [[package]]
 name = "tinyagents-tasks"
-version = "2.1.4"
+version = "2.2.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -11359,7 +11379,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.48.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
