@@ -499,7 +499,6 @@ async fn start_credential_gated_services_completes_with_all_services_disabled() 
     // exercises the concurrent spawn/await machinery (the changed code) without
     // touching the mic, a model, the screen, or the network.
     config.local_ai.runtime_enabled = false;
-    config.voice_server.auto_start = false;
 
     // Bound the wait so a serial-blocking regression (or a hung join) fails the
     // test instead of hanging CI. Every service no-ops, so this resolves almost
@@ -510,4 +509,18 @@ async fn start_credential_gated_services_completes_with_all_services_disabled() 
     )
     .await
     .expect("start_credential_gated_services must return, not block");
+}
+
+#[tokio::test]
+async fn logout_stops_remaining_services_without_voice_listeners() {
+    let tmp = TempDir::new().expect("private workspace");
+    let config = test_config(&tmp);
+    let ctx = DispatchCtx::default();
+
+    tokio::time::timeout(
+        std::time::Duration::from_secs(5),
+        stop_credential_gated_services(&ctx, &config),
+    )
+    .await
+    .expect("logout cleanup must finish when no voice listener exists");
 }
