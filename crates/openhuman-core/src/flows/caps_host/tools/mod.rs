@@ -25,12 +25,17 @@
 mod composio;
 mod native;
 
+use std::sync::Arc;
+
 use async_trait::async_trait;
 use serde_json::Value;
-use tinyflows::error::{EngineError, Result};
 
 use crate::config::Config;
+use crate::core::runtime::DispatchCtx;
+use crate::security::approval::ApprovalTurnContext;
 use crate::security::SecurityPolicy;
+
+use super::{EngineError, Result};
 
 pub(crate) use composio::ComposioToolBackend;
 pub(crate) use native::NativeToolBackend;
@@ -42,6 +47,47 @@ pub(crate) use native::NativeToolBackend;
 /// search / media generation / file / shell / etc. — the full toolset.
 pub(crate) const NATIVE_TOOL_PREFIX: &str =
     crate::tools::native_ops::flow_backend::NATIVE_TOOL_PREFIX;
+
+pub(crate) async fn classify_composio_action_for_tier(slug: &str) -> tinybox_bus::CommandClass {
+    crate::integrations::composio::flow_gate::classify_composio_action_for_tier(slug)
+}
+
+pub(crate) async fn is_curated_flow_tool(
+    ctx: &DispatchCtx,
+    config: &Config,
+    slug: &str,
+) -> bool {
+    crate::integrations::composio::flow_gate::is_curated_flow_tool(ctx, config, slug).await
+}
+
+/// Per-run tool dispatcher retaining the captured context, live policy and
+/// approval correlation for each module callback.
+pub(crate) struct OpenHumanTools {
+    pub(crate) ctx: DispatchCtx,
+    pub(crate) config: Arc<Config>,
+    pub(crate) security: Arc<SecurityPolicy>,
+    pub(crate) approval: ApprovalTurnContext,
+}
+
+impl OpenHumanTools {
+    pub(crate) async fn invoke(
+        &self,
+        slug: &str,
+        args: Value,
+        conn: Option<&str>,
+    ) -> Result<Value> {
+        let ctx = ToolCallCtx {
+            dispatch: &self.ctx,
+            config: &self.config,
+            security: &self.security,
+            approval: &self.approval,
+        };
+        match backend_for(slug) {
+            Some(backend) => backend.invoke(&ctx, slug, args, conn).await,
+            None => Err(unclaimed_slug_error(slug)),
+        }
+    }
+}
 
 /// What a backend needs to service one call.
 ///
