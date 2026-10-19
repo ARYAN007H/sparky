@@ -198,6 +198,35 @@ impl Docs {
             .collect()
     }
 
+    /// Atomically mutate one session from its current stored value. Live
+    /// lifecycle changes use this path so millisecond timestamp precision
+    /// cannot discard an equal-millisecond state transition. Whole-list saves
+    /// remain guarded by `write_if_newer` for stale snapshot/import protection.
+    pub(super) fn update_session<F>(
+        &self,
+        subagent_session_id: &str,
+        mut update: F,
+    ) -> Result<bool>
+    where
+        F: FnMut(&mut DurableSubagentSession, String) + Send,
+    {
+        let id = key_of(subagent_session_id)?;
+        self.0.run(|docs| async move {
+            let repo = tinystoragedrivers::Repo::<Value>::new(&docs, SESSIONS)?;
+            repo.update(&id, move |current| {
+                let Some(current) = current else {
+                    return Ok(None);
+                };
+                let stored: StoredSession = serde_json::from_value(current)?;
+                let mut session = DurableSubagentSession::from(stored);
+                update(&mut session, chrono::Utc::now().to_rfc3339());
+                Ok(Some(serde_json::to_value(StoredSession::from(&session))?))
+            })
+            .await
+            .map(|updated| updated.is_some())
+        })
+    }
+
     /// Whether the one-time legacy file import finished in this scope.
     pub(super) fn legacy_imported(&self, source: &std::path::Path) -> Result<bool> {
         import_state::is_done(&self.0, OWNER, &import_step(source))

@@ -238,22 +238,12 @@ fn update_session<F>(
     update: F,
 ) -> Result<bool, String>
 where
-    F: FnOnce(&mut DurableSubagentSession, String),
+    F: FnMut(&mut DurableSubagentSession, String) + Send,
 {
     let _guard = store_write_lock()
         .lock()
         .map_err(|_| "subagent session store lock poisoned".to_string())?;
-    let mut sessions = store.load()?;
-    let now = chrono::Utc::now().to_rfc3339();
-    if let Some(session) = sessions
-        .iter_mut()
-        .find(|session| session.subagent_session_id == subagent_session_id)
-    {
-        update(session, now);
-        store.save(&sessions)?;
-        return Ok(true);
-    }
-    Ok(false)
+    store.update_session(subagent_session_id, update)
 }
 
 fn store_write_lock() -> &'static Mutex<()> {
