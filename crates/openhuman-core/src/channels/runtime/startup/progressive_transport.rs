@@ -31,16 +31,21 @@ impl ProgressiveChannelTransport for ModuleChannel {
                 parts,
                 ..
             } => {
+                let channel_id = channel_ref
+                    .as_ref()
+                    .map(|reference| reference.id.clone())
+                    .unwrap_or(channel);
+                let thread_id = conversation
+                    .as_ref()
+                    .and_then(|reference| reference.thread_id.clone());
                 let outbound = tinychannels_bus::channel::ChannelOutboundMessage {
-                    channel_id: channel,
+                    channel_id,
                     conversation_id: conversation
                         .as_ref()
                         .map(|reference| reference.id.clone())
                         .unwrap_or_default(),
                     channel_ref,
-                    thread_id: conversation
-                        .as_ref()
-                        .and_then(|reference| reference.thread_id.clone()),
+                    thread_id,
                     conversation_ref: conversation,
                     reply_to_id: None,
                     turn_id,
@@ -141,7 +146,7 @@ impl ProgressiveChannelTransport for ModuleChannel {
                             Some(tinychannels_bus::channel::SendErrorKind::NotFound) => {
                                 Ok(Result::MessageGone)
                             }
-                            Some(tinychannels_bus::channel::SendErrorKind::Forbidden) => {
+                            Some(error) if error.unsupported => {
                                 Ok(Result::EditUnsupported)
                             }
                             _ => Ok(Result::Outcome(outcome)),

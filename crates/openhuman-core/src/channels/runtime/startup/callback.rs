@@ -284,6 +284,7 @@ impl ChannelHostCallbacks {
         request: ProgressiveTransportRequest,
     ) -> Result<ProgressiveTransportResult> {
         if let ProgressiveTransportRequest::OutputEvent {
+            channel: route,
             channel_ref,
             conversation,
             turn_id,
@@ -292,16 +293,20 @@ impl ChannelHostCallbacks {
             ..
         } = &request
         {
+            let channel = channel_ref
+                .as_ref()
+                .ok_or_else(|| Error::failed("progressive output channel identity is required"))?;
+            let conversation = conversation.as_ref().ok_or_else(|| {
+                Error::failed("progressive output conversation identity is required")
+            })?;
+            let turn_id = turn_id
+                .as_deref()
+                .ok_or_else(|| Error::failed("progressive output turn identity is required"))?;
+            if conversation.id.is_empty() || turn_id.is_empty() {
+                return Err(Error::failed("progressive output scope is invalid"));
+            }
+            self.progressive_channel(route, Some(channel))?;
             if let Some(observer) = &self.output_observer {
-                let channel = channel_ref.as_ref().ok_or_else(|| {
-                    Error::failed("progressive output channel identity is required")
-                })?;
-                let conversation = conversation.as_ref().ok_or_else(|| {
-                    Error::failed("progressive output conversation identity is required")
-                })?;
-                let turn_id = turn_id.as_deref().ok_or_else(|| {
-                    Error::failed("progressive output turn identity is required")
-                })?;
                 observer
                     .observe(channel, conversation, turn_id, *sequence, event)
                     .await?;
