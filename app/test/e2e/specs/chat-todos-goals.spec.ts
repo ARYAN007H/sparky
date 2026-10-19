@@ -258,7 +258,7 @@ describe('Chat todos and goals', () => {
     await browser.waitUntil(
       async () => {
         const current = await readSelectedThreadSnapshot();
-        return Boolean(current.threadId && current.hasUserMessage && current.hasAssistantMessage);
+        return Boolean(current.threadId && current.hasUserMessage && current.hasAgentMessage);
       },
       {
         timeout: 15_000,
@@ -270,7 +270,7 @@ describe('Chat todos and goals', () => {
     const current = await readSelectedThreadSnapshot();
     expect(current.threadId).toBeTruthy();
     expect(current.hasUserMessage).toBe(true);
-    expect(current.hasAssistantMessage).toBe(true);
+    expect(current.hasAgentMessage).toBe(true);
     console.log(
       `${LOG_PREFIX} G1.1 identity: placeholder_changed=${current.threadId !== placeholderThreadId}; selected_message_count=${current.messageCount}`
     );
@@ -331,7 +331,7 @@ describe('Chat todos and goals', () => {
     const current = await readSelectedThreadSnapshot();
     expect(current.threadId).toBe(threadId);
     expect(current.hasUserMessage).toBe(true);
-    expect(current.hasAssistantMessage).toBe(true);
+    expect(current.hasAgentMessage).toBe(true);
     console.log(`${LOG_PREFIX} G1.4: passed — all five done, goal complete`);
   });
 
