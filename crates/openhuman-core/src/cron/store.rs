@@ -322,15 +322,16 @@ pub(crate) fn force_next_run_for_test(
     let docs = std::sync::Arc::clone(opened.scoped()?.documents());
     let job_id = job_id.to_string();
     crate::storage::block_on_anyhow(async move {
-        let stored = docs
-            .get("cron.jobs", &job_id)
-            .await?
-            .ok_or_else(|| anyhow::anyhow!("no job {job_id}"))?;
-        let mut doc = stored.doc;
-        doc["next_run_ms"] = serde_json::json!(at.timestamp_millis());
-        docs.put("cron.jobs", &job_id, doc, Precondition::None)
-            .await?;
-        Ok(())
+        for collection in ["cron.jobs", "cron_jobs"] {
+            if let Some(stored) = docs.get(collection, &job_id).await? {
+                let mut doc = stored.doc;
+                doc["next_run_ms"] = serde_json::json!(at.timestamp_millis());
+                docs.put(collection, &job_id, doc, Precondition::None)
+                    .await?;
+                return Ok(());
+            }
+        }
+        Err(anyhow::anyhow!("no job {job_id}"))
     })
 }
 

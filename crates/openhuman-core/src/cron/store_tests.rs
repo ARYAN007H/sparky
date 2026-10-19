@@ -266,6 +266,11 @@ fn assert_force_next_run_updates_collection(
     })
     .unwrap();
 
+    let before_docs = std::sync::Arc::clone(&docs);
+    let collections_before =
+        crate::storage::block_on_anyhow(async move { before_docs.collections("").await }).unwrap();
+    assert!(collections_before.contains(&collection.to_string()));
+
     let next = chrono::DateTime::<Utc>::from_timestamp_millis(456).unwrap();
     force_next_run_for_test(&config, "seeded-job", next).unwrap();
 
@@ -285,7 +290,7 @@ fn assert_force_next_run_updates_collection(
         other.is_none(),
         "helper must not create or write {other_collection}"
     );
-    assert_eq!(collections, vec![collection.to_string()]);
+    assert_eq!(collections, collections_before);
 }
 
 #[test]
