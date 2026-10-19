@@ -34,6 +34,7 @@ async fn backend_channel_wait_does_not_cut_off_a_live_turn_after_180_seconds() {
         started: Default::default(),
         dropped: Default::default(),
         release: Default::default(),
+        max_park_for: Duration::from_secs(300),
         succeed_in: Some(tempfile::tempdir().expect("temporary workspace").keep()),
     };
     crate::web_chat::set_test_run_chat_task_block(Some(block.clone())).await;
