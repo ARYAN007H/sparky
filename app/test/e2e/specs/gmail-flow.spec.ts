@@ -296,7 +296,7 @@ describe('Gmail Integration Flows', () => {
   // -------------------------------------------------------------------------
 
   describe('9.4 Disconnect & Re-Run Setup', () => {
-    it('9.4.1 — Manual Disconnect: disconnect flow with confirmation', async function () {
+    it('9.4.1 — Manual Disconnect: current Composio flow returns to Connect state', async function () {
       this.timeout(90_000);
       resetMockBehavior();
       seedComposioToolkits(['gmail']);
@@ -307,7 +307,6 @@ describe('Gmail Integration Flows', () => {
           .filter(key => key.includes('composio:connections'))
           .forEach(key => window.localStorage.removeItem(key));
       });
-      await navigateViaHash('/chat');
       await navigateToSkills();
       await assertConnectorCardVisible('Gmail');
 
