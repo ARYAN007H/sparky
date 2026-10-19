@@ -4,6 +4,7 @@ use openhuman_embed::{
     AgentDefinitionSpec, AgentSpec, HostTools, HostTurnTools, Provider, Runtime, Tool,
     ToolScopeSpec, Workspace,
 };
+use tinyagents_session::transcript::{SessionRef, TranscriptLocator};
 use std::sync::Arc;
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, ResponseTemplate};
@@ -30,6 +31,25 @@ impl Tool for Marker {
         Ok(tinytools::ToolResult::success("accepted"))
     }
 }
+
+fn transcript_snapshot(
+    transcripts: &dyn TranscriptLocator,
+    session: &SessionRef,
+) -> serde_json::Value {
+    let handle = transcripts
+        .read_session_transcript(session)
+        .expect("the durable session transcript exists");
+    let transcript = handle
+        .read_session()
+        .expect("the durable session transcript can be read")
+        .expect("the durable session transcript has content");
+    serde_json::json!({
+        "meta": transcript.meta,
+        "messages": transcript.messages,
+        "tools": transcript.tools,
+    })
+}
+
 #[test]
 fn attached_tools_survive_clones_and_session_resume() {
     let _runtime = RUNTIME_LOCK
@@ -124,21 +144,16 @@ fn attached_tools_survive_clones_and_session_resume() {
                 .send()
                 .await
                 .unwrap();
-            let generation_zero = std::fs::read_dir(agent.transcripts_dir())
-                .unwrap()
-                .map(|entry| entry.unwrap().path())
-                .find(|path| {
-                    let has_generation_suffix = path
-                        .file_stem()
-                        .and_then(|stem| stem.to_str())
-                        .and_then(|stem| stem.rsplit_once(".g"))
-                        .is_some_and(|(_, generation)| generation.parse::<u32>().is_ok());
-                    path.extension()
-                        .is_some_and(|extension| extension == "jsonl")
-                        && !has_generation_suffix
-                })
-                .expect("the first committed prefix has generation zero transcript");
-            let frozen_generation_zero = std::fs::read(&generation_zero).unwrap();
+            let transcripts = tinyagents_session::port::WorkspaceStores::open(
+                agent.workspace_dir(),
+                agent.id(),
+            )
+            .expect("the agent's durable workspace store")
+            .transcripts();
+            let continuing_session = SessionRef::scoped("continuing", agent.id());
+            assert_eq!(transcripts.session_chain(&continuing_session).len(), 1);
+            let frozen_generation_zero =
+                transcript_snapshot(transcripts.as_ref(), &continuing_session);
             agent
                 .attach_tools(
                     "second",
@@ -163,26 +178,14 @@ fn attached_tools_survive_clones_and_session_resume() {
                 .await
                 .unwrap();
             assert_eq!(agent.config().action_dir, original_config.action_dir);
-            let paths = std::fs::read_dir(agent.transcripts_dir())
-                .unwrap()
-                .map(|entry| entry.unwrap().path())
-                .collect::<Vec<_>>();
-            assert!(
-                paths.contains(&generation_zero),
-                "the continuing session transcript must remain durable"
-            );
             assert_eq!(
-                std::fs::read(&generation_zero).unwrap(),
+                transcript_snapshot(transcripts.as_ref(), &continuing_session),
                 frozen_generation_zero,
-                "the continuing session must leave its transcript byte-for-byte intact"
+                "the continuing session must leave its durable generation unchanged"
             );
-            let successor = paths
-                .iter()
-                .find(|path| {
-                    std::fs::read_to_string(path).is_ok_and(|text| text.contains("hivemind_list"))
-                })
-                .unwrap();
-            let durable = std::fs::read_to_string(successor).unwrap();
+            let after_attach_session = SessionRef::scoped("after-attach", agent.id());
+            let durable = transcript_snapshot(transcripts.as_ref(), &after_attach_session);
+            let durable = serde_json::to_string(&durable).unwrap();
             assert!(
                 durable
                     .lines()
