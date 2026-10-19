@@ -5,12 +5,9 @@
 //! [`crate::agent::harness`] module remains responsible for prompt
 //! construction, tool filtering, and the actual sub-agent run loop.
 //!
-//! Execution fans out on TinyAgents **graphs**: [`workflow_runs`] schedules
-//! phase DAGs on a graph engine, [`delegation`] wires the durable
-//! plan→execute⇄review→finalize graph, and parallel fanout goes through
-//! `tinyagents_graph::parallel::map_reduce`. What stays here is the product
-//! layer: durable SQL/JSON run ledgers, validation, cancellation semantics,
-//! compatibility events, and JSON-RPC/tool response formatting.
+//! Agent turns can dispatch live detached sub-agents through TinyAgents'
+//! orchestration ports. OpenHuman supplies their definitions, policy,
+//! persistence, steering, progress projection, and host-facing tools.
 //! [`running_subagents`] mirrors detached-sub-agent lifecycle into a
 //! TinyAgents task store.
 
@@ -24,7 +21,6 @@ pub(crate) mod delegation;
 pub(crate) mod delivery_drain;
 pub use delegation::open_delegation_checkpointer;
 pub(crate) mod fleet_tools;
-mod ops;
 #[path = "parent_context/builder.rs"]
 pub(crate) mod parent_context;
 pub(crate) mod running_subagents;
@@ -32,11 +28,7 @@ pub(crate) mod spawn_parallel;
 pub(crate) mod subagent_events;
 pub(crate) mod subagent_sessions;
 pub mod tools;
-pub mod types;
 pub mod worktree;
-
-#[cfg(test)]
-mod ops_tests;
 
 #[cfg(test)]
 #[path = "background_completions_tenant_tests.rs"]
@@ -45,8 +37,6 @@ mod background_completions_tenant_tests;
 #[cfg(test)]
 #[path = "background_delivery_tenant_tests.rs"]
 mod background_delivery_tenant_tests;
-
-pub use ops::{AgentOrchestrationSession, OrchestrationError};
 
 /// Release the background-completion logs this process holds open. The core
 /// calls this on exit so a data reset can delete the workspace directory.

@@ -1,10 +1,9 @@
 //! Shared root [`ParentExecutionContext`] builder for controller-spawned
-//! orchestration tasks (#3374 PR4, extracted from the #3375 workflow engine).
+//! orchestration tasks.
 //!
-//! The workflow-run engine ([`workflow_runs::engine`]) needs to spawn real
-//! sub-agents from a background task that has **no** enclosing agent turn on the
-//! stack, so there is no live parent execution context for the spawn to inherit —
-//! a naive spawn fails with `NoParentContext` (the TAURI-RUST-HMW regression, #4337).
+//! Background host tasks that spawn real sub-agents have **no** enclosing agent
+//! turn on the stack, so there is no live parent execution context for the spawn
+//! to inherit — a naive spawn fails with `NoParentContext`.
 //!
 //! The fix (proven in `triage::escalation::dispatch_target_agent`) is to build a
 //! *root* [`ParentExecutionContext`] from a config-built [`Agent`] and hand it,
