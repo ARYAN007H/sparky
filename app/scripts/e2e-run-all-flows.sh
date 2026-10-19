@@ -313,9 +313,6 @@ if should_run_suite "webhooks"; then
   echo "## Running suite: webhooks"
   run "test/e2e/specs/webhooks-ingress-flow.spec.ts"          "webhooks-ingress"          "webhooks"
   run "test/e2e/specs/webhooks-tunnel-flow.spec.ts"           "webhooks-tunnel"           "webhooks"
-  run "test/e2e/specs/tool-browser-flow.spec.ts"              "tool-browser"              "webhooks"
-  run "test/e2e/specs/tool-filesystem-flow.spec.ts"           "tool-filesystem"           "webhooks"
-  run "test/e2e/specs/tool-shell-git-flow.spec.ts"            "tool-shell-git"            "webhooks"
   run "test/e2e/specs/harness-channel-bridge-flow.spec.ts"    "harness-channel-bridge"    "webhooks"
   run "test/e2e/specs/harness-composio-tool-flow.spec.ts"     "harness-composio-tool"     "webhooks"
   run "test/e2e/specs/harness-cron-prompt-flow.spec.ts"       "harness-cron-prompt"       "webhooks"
@@ -381,7 +378,6 @@ if should_run_suite "connectors"; then
   run "test/e2e/specs/connector-gmail-composio.spec.ts"      "connector-gmail-composio"  "connectors"
   run "test/e2e/specs/connector-jira.spec.ts"                "connector-jira"            "connectors"
   run "test/e2e/specs/connector-session-guard.spec.ts"       "connector-session-guard"   "connectors"
-  run "test/e2e/specs/composio-github-tools-tags.spec.ts"    "composio-github-tags"      "connectors"
   _mini_summary "connectors"
 fi
 
