@@ -17,17 +17,32 @@ export function mergeChildEnv(parent, overrides) {
 /** Isolated environment and working directory for the throwaway core process. */
 export function coreLaunchSpec(parentEnv, { workspace, mockUrl, token, logLevel = "info" }) {
   return {
-    cwd: process.cwd(),
-    env: { ...parentEnv, ...{
+    cwd: workspace,
+    env: mergeChildEnv(parentEnv, {
       OPENHUMAN_WORKSPACE: workspace,
+      OPENHUMAN_DOTENV_PATH: path.join(workspace, "empty.env"),
       OPENHUMAN_CORE_TOKEN: token,
       BACKEND_URL: mockUrl,
       VITE_BACKEND_URL: mockUrl,
       OPENHUMAN_COMPOSIO_MODE: "disabled",
       OPENHUMAN_SANDBOX: "off",
+      OPENHUMAN_BACKEND_API_KEY: null,
+      OPENHUMAN_BACKEND_SESSION_TOKEN: null,
+      OPENHUMAN_STORAGE_URL: null,
       RUST_LOG: logLevel,
-    } },
+    }),
   };
+}
+
+/** Pass the isolated launch specification through to the child process launcher. */
+export function startCoreChild(startChild, core, corePort, launchSpec) {
+  return startChild(
+    "core",
+    core,
+    ["serve", "--port", String(corePort)],
+    launchSpec.env,
+    launchSpec.cwd,
+  );
 }
 
 export const USAGE = `Usage: pnpm debug web [options]
