@@ -141,7 +141,7 @@ Where the built-in tools come from:
 | `detect_tools`, `curl`, `pushover` | `tinytools_std` |
 | `http_request`, `web_fetch` | `tinytools_std::network`, wired with host limits, TinyJuice extraction and the x402 handler in [`impl/network/host.rs`](./impl/network/host.rs) |
 | `current_time`, `resolve_time`, `ask_user_clarification`, `wait`, `wait_loop` | `tinyagents_harness::tools` |
-| `shell`, `install_tool`, `schedule`, `proxy_config`, `lsp`, `update_check`, `update_apply`, `retrieve_tool_output` | [`impl/system/`](./impl/system/) |
+| `shell`, `install_tool`, `schedule`, `proxy_config`, `update_check`, `update_apply`, `retrieve_tool_output` | [`impl/system/`](./impl/system/) |
 | `gitbooks_search`, `gitbooks_get_page`, `gmail_unsubscribe`, `mcp_list_servers`, `mcp_list_tools`, `mcp_call_tool`, `mcp_<server>_<tool>` | [`impl/network/`](./impl/network/) (MCP tools behind `mcp`) |
 | `browser`, `browser_open` | [`impl/browser/`](./impl/browser/) (behind `modules`) |
 | `generate_document`, `generate_presentation` | [`impl/document/`](./impl/document/), [`impl/presentation/`](./impl/presentation/) (behind `documents`) |
