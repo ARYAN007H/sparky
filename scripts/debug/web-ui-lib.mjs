@@ -15,7 +15,10 @@ export function mergeChildEnv(parent, overrides) {
 }
 
 /** Isolated environment and working directory for the throwaway core process. */
-export function coreLaunchSpec({ workspace, mockUrl, token, logLevel = "info" }) {
+export function coreLaunchSpec(
+  parentEnv,
+  { workspace, mockUrl, token, logLevel = parentEnv.RUST_LOG ?? "info" },
+) {
   return {
     cwd: workspace,
     env: {

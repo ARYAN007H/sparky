@@ -28,18 +28,19 @@ test("coreLaunchSpec isolates the core from operator credentials, storage, and d
     mockUrl: "http://127.0.0.1:18500",
     token: "test-core-token",
   });
+  const finalChildEnv = mergeChildEnv(inheritedEnv, spec.env);
   assert.deepEqual(
     {
       cwd: spec.cwd,
-      workspace: spec.env.OPENHUMAN_WORKSPACE,
-      dotenv: spec.env.OPENHUMAN_DOTENV_PATH,
-      backend: spec.env.BACKEND_URL,
-      viteBackend: spec.env.VITE_BACKEND_URL,
-      token: spec.env.OPENHUMAN_CORE_TOKEN,
-      apiKey: spec.env.OPENHUMAN_BACKEND_API_KEY,
-      sessionToken: spec.env.OPENHUMAN_BACKEND_SESSION_TOKEN,
-      storageUrl: spec.env.OPENHUMAN_STORAGE_URL,
-      logLevel: spec.env.RUST_LOG,
+      workspace: finalChildEnv.OPENHUMAN_WORKSPACE,
+      dotenv: finalChildEnv.OPENHUMAN_DOTENV_PATH,
+      backend: finalChildEnv.BACKEND_URL,
+      viteBackend: finalChildEnv.VITE_BACKEND_URL,
+      token: finalChildEnv.OPENHUMAN_CORE_TOKEN,
+      apiKey: finalChildEnv.OPENHUMAN_BACKEND_API_KEY,
+      sessionToken: finalChildEnv.OPENHUMAN_BACKEND_SESSION_TOKEN,
+      storageUrl: finalChildEnv.OPENHUMAN_STORAGE_URL,
+      logLevel: finalChildEnv.RUST_LOG,
     },
     {
       cwd: "/private/run/workspace",
@@ -67,12 +68,18 @@ test("coreLaunchSpec isolates the core from operator credentials, storage, and d
   assert.deepEqual(launch[2], ["serve", "--port", "18473"]);
   assert.equal(launch[3], spec.env);
   assert.equal(launch[4], spec.cwd);
-  const finalChildEnv = mergeChildEnv(inheritedEnv, launch[3]);
-  assert.equal(finalChildEnv.OPENHUMAN_BACKEND_API_KEY, undefined);
-  assert.equal(finalChildEnv.OPENHUMAN_BACKEND_SESSION_TOKEN, undefined);
-  assert.equal(finalChildEnv.OPENHUMAN_STORAGE_URL, undefined);
+  const finalChildEnvFromActualLaunch = mergeChildEnv(inheritedEnv, launch[3]);
   assert.equal(
-    finalChildEnv.OPENHUMAN_DOTENV_PATH,
+    finalChildEnvFromActualLaunch.OPENHUMAN_BACKEND_API_KEY,
+    undefined,
+  );
+  assert.equal(
+    finalChildEnvFromActualLaunch.OPENHUMAN_BACKEND_SESSION_TOKEN,
+    undefined,
+  );
+  assert.equal(finalChildEnvFromActualLaunch.OPENHUMAN_STORAGE_URL, undefined);
+  assert.equal(
+    finalChildEnvFromActualLaunch.OPENHUMAN_DOTENV_PATH,
     "/private/run/workspace/empty.env",
   );
 });
