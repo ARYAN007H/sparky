@@ -503,14 +503,15 @@ impl Config {
         if refreshed.document_snapshot.lock().unwrap().anchor != expected.anchor {
             return;
         }
-        refreshed.profile_providers = runtime.profile_providers.clone();
-        refreshed.workspace_dir = runtime.workspace_dir;
-        refreshed.action_dir = runtime.action_dir;
-        refreshed.config_path = runtime.config_path;
-        refreshed.cli_inference_snapshot = runtime.cli_inference_snapshot;
-        refreshed.recovered_from_corruption = runtime.recovered_from_corruption;
-        refreshed.ephemeral_route = runtime.ephemeral_route;
-        refreshed.resolved_endpoints = runtime.resolved_endpoints;
+        let overlay = runtime.context_overlay.lock().unwrap().clone();
+        if let Some(overlay) = overlay {
+            let Ok(merged) = overlay.reapply(&refreshed) else {
+                return;
+            };
+            refreshed = merged;
+        } else {
+            super::context_overlay::copy_runtime_bindings(&runtime, &mut refreshed);
+        }
         refreshed.context_snapshot = Some(std::sync::Arc::downgrade(&snapshot));
 
         let mut current = snapshot.lock().unwrap();

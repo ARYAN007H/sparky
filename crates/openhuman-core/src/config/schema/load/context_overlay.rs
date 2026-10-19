@@ -119,7 +119,7 @@ fn apply_change(current: &mut Value, path: &[String], value: Option<Value>) {
     apply_change(child, rest, value);
 }
 
-fn copy_runtime_bindings(source: &Config, target: &mut Config) {
+pub(crate) fn copy_runtime_bindings(source: &Config, target: &mut Config) {
     target.profile_providers = source.profile_providers.clone();
     target.workspace_dir = source.workspace_dir.clone();
     target.action_dir = source.action_dir.clone();
