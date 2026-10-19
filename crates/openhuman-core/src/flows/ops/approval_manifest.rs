@@ -9,7 +9,7 @@ use super::*;
 /// ask for all of them in one shot instead of parking the run node-by-node.
 ///
 /// Mirrors — never re-implements — the runtime gating in
-/// `crate::flows::tinyflows::caps` (`OpenHumanTools::invoke` /
+/// `crate::flows::caps_host` (`OpenHumanTools::invoke` /
 /// `OpenHumanHttp` / `OpenHumanCode`) and `approval::gate`'s Workflow-origin
 /// branch. Because Rule 2 (`enforce_side_effect_approval`) forces
 /// `require_approval: true` onto every graph with outbound side-effect nodes,
@@ -60,7 +60,7 @@ async fn compute_approval_manifest_json(
             tinyflows_bus::catalog::members::APPROVAL_MANIFEST,
             &(tinyflows_bus::catalog::ApprovalManifestRequest {
                 graph,
-                native_prefix: crate::flows::tinyflows::caps::NATIVE_TOOL_PREFIX.into(),
+                native_prefix: crate::flows::caps_host::NATIVE_TOOL_PREFIX.into(),
                 host: registration.catalog.clone(),
             },),
         )

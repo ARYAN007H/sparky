@@ -247,7 +247,7 @@ impl FlowsHost {
     async fn preflight_tool(&self, slug: String, args: Value) -> Result<Value, String> {
         let config = Arc::clone(&self.config);
         self.in_context(async move {
-            if let Some(backend) = crate::flows::tinyflows::caps::tools::backend_for(&slug) {
+            if let Some(backend) = crate::flows::caps_host::tools::backend_for(&slug) {
                 backend
                     .preflight(&config, &slug, &args)
                     .await

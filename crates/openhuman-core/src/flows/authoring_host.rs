@@ -122,7 +122,7 @@ impl ApprovalCallbacks {
         let config = Arc::clone(&self.0.config);
         self.0
             .in_context(async move {
-                use crate::flows::tinyflows::caps::classify_composio_action_for_tier;
+                use crate::flows::caps_host::classify_composio_action_for_tier;
                 use crate::security::{GateDecision, SecurityPolicy};
                 use tinybox_bus::CommandClass;
                 use tinyflows_bus::catalog::{ManifestCandidate, ManifestClass};

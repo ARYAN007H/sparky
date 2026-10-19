@@ -49,7 +49,7 @@ pub(crate) async fn run_builder_gates(
                 &(
                     graph,
                     host.authoring.clone(),
-                    vec![crate::flows::tinyflows::caps::NATIVE_TOOL_PREFIX.to_string()],
+                    vec![crate::flows::caps_host::NATIVE_TOOL_PREFIX.to_string()],
                 ),
             )
             .await
