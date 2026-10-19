@@ -19,10 +19,14 @@ mod tinyhumans_boot;
 const TOKEN: &str = "components-e2e-token";
 
 async fn rpc(base: &str, method: &str) -> Value {
+    rpc_with(base, method, json!({})).await
+}
+
+async fn rpc_with(base: &str, method: &str, params: Value) -> Value {
     reqwest::Client::new()
         .post(format!("{base}/rpc"))
         .bearer_auth(TOKEN)
-        .json(&json!({"jsonrpc":"2.0","id":1,"method":method,"params":{}}))
+        .json(&json!({"jsonrpc":"2.0","id":1,"method":method,"params":params}))
         .send()
         .await
         .expect("post")
@@ -150,12 +154,12 @@ fn disabled_component_answers_component_disabled_over_json_rpc() {
                     // error. (The `inbound` family exists with the Cargo
                     // `inbound-queues` gate.)
                     #[cfg(feature = "inbound-queues")]
-                    for method in [
-                        "openhuman.inbound_stats",
-                        "openhuman.inbound_dead",
-                        "openhuman.inbound_redrive",
+                    for (method, params) in [
+                        ("openhuman.inbound_stats", json!({})),
+                        ("openhuman.inbound_dead", json!({ "limit": 5 })),
+                        ("openhuman.inbound_redrive", json!({ "id": "teq.dead/x" })),
                     ] {
-                        let inbound = rpc(&base, method).await;
+                        let inbound = rpc_with(&base, method, params).await;
                         assert_eq!(
                             inbound.pointer("/error/message").and_then(Value::as_str),
                             Some("COMPONENT_DISABLED:eventqueues"),
