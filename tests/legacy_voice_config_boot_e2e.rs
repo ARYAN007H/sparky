@@ -125,6 +125,7 @@ fn legacy_voice_settings_boot_without_starting_retired_listeners() {
         .env("OPENHUMAN_DOTENV_PATH", &dotenv_path)
         .env("OPENHUMAN_CORE_TOKEN", TOKEN)
         .env("OPENHUMAN_KEYRING_BACKEND", "file")
+        .env("RUST_LOG", "info")
         .env("BACKEND_URL", backend_url)
         .env_remove("OPENHUMAN_BACKEND_API_KEY")
         .env_remove("OPENHUMAN_BACKEND_SESSION_TOKEN")
