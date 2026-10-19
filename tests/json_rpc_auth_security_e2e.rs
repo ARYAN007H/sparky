@@ -774,6 +774,54 @@ async fn channels_status_reflects_managed_dm_credential_e2e() {
 ///    upstream STT key) — but it must reach the registered handler,
 ///    which proves the method is wired all the way through.
 
+#[cfg(unix)]
+/// Set on the re-exec below so the child runs the test body instead of
+/// spawning another child.
+#[cfg(unix)]
+const OWNER_ONLY_CHILD_ENV: &str = "OPENHUMAN_E2E_OWNER_ONLY_CHILD";
+#[cfg(unix)]
+const OWNER_ONLY_TEST_NAME: &str =
+    "auth_store_provider_credentials_writes_an_owner_only_store_file";
+
+/// Find `auth-profiles.json` beneath a temp `HOME`.
+///
+/// `cfg(unix)` to match its only caller: the mode assertion below has nothing
+/// to check on a platform without permission bits, and an uncalled helper
+/// would be dead code there.
+///
+/// Searched rather than hard-coded: the state dir is resolved from config and
+/// user scope, and pinning that layout here would make this test fail for a
+/// reason that has nothing to do with file modes.
+#[cfg(unix)]
+fn find_auth_profiles_store(root: &Path) -> Option<PathBuf> {
+    let mut stack = vec![root.to_path_buf()];
+    while let Some(dir) = stack.pop() {
+        let Ok(entries) = std::fs::read_dir(&dir) else {
+            continue;
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                stack.push(path);
+            } else if path.file_name() == Some(std::ffi::OsStr::new("auth-profiles.json")) {
+                return Some(path);
+            }
+        }
+    }
+    None
+}
+
+/// #5795 — the credential store must not be group/world readable.
+///
+/// `fs::write` creates at `0o666 & ~umask` (0644 under the usual 022) and
+/// `fs::rename` carries the source mode onto the destination, so before the fix
+/// every save left OAuth-token ciphertext readable by any UID on the box.
+///
+/// Driven through `auth.store_provider_credentials` — the RPC a user hits when
+/// they paste a provider key — because the existing unit cover calls
+/// `AuthProfilesStore` directly and would not notice the RPC path acquiring a
+/// different writer.
+#[cfg(unix)]
 #[tokio::test]
 async fn auth_store_provider_credentials_writes_an_owner_only_store_file() {
     use std::os::unix::fs::PermissionsExt as _;
