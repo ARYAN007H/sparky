@@ -43,6 +43,9 @@ async fn run_imported_history_prefix_regression() {
         .with_session_history_locator(Arc::clone(&locator))
         .chat_model(first_chat_model)
         .tools(vec![tool()])
+        .prompt_builder(crate::agent::prompts::SystemPromptBuilder::verbatim(
+            "You are the relay assistant. Preserve this exact system prefix.".to_owned(),
+        ))
         .workspace_dir(root.path().join("workspace"))
         .action_dir(root.path().to_path_buf())
         .tool_dispatcher(Box::new(tinytools_agent::dialect::NativeDialect))
@@ -59,6 +62,7 @@ async fn run_imported_history_prefix_regression() {
         first.turn("new relay question").await.unwrap(),
         "first reply"
     );
+    let actual_agent_id = first.agent_definition_id.clone();
 
     let first_request = first_model
         .requests()
@@ -101,7 +105,7 @@ async fn run_imported_history_prefix_regression() {
     let transcript = locator
         .read_session_transcript(&tinyagents_session::transcript::SessionRef::scoped(
             "relay-import-thread",
-            first.agent_definition_name(),
+            &actual_agent_id,
         ))
         .expect("adopted session transcript")
         .read_session()
@@ -127,6 +131,9 @@ async fn run_imported_history_prefix_regression() {
         .with_session_history_locator(locator)
         .chat_model(second_chat_model)
         .tools(vec![tool()])
+        .prompt_builder(crate::agent::prompts::SystemPromptBuilder::verbatim(
+            "This replacement prompt must not change an existing session.".to_owned(),
+        ))
         .workspace_dir(root.path().join("workspace"))
         .action_dir(root.path().to_path_buf())
         .tool_dispatcher(Box::new(tinytools_agent::dialect::NativeDialect))
@@ -146,6 +153,16 @@ async fn run_imported_history_prefix_regression() {
         .map(Message::text)
         .collect();
     assert_eq!(second_prefix, prefix, "resume freezes the committed prompt");
+    assert!(second_prefix
+        .iter()
+        .any(|message| message.contains("Preserve this exact system prefix")));
+    assert!(!second_prefix
+        .iter()
+        .any(|message| message.contains("replacement prompt")));
+    assert_eq!(
+        second_request.tools, first_request.tools,
+        "resume restores the committed tool snapshot"
+    );
     assert!(second_request
         .tools
         .iter()
