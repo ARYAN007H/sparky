@@ -1165,8 +1165,8 @@ fn emit_web_channel_event(io: &SocketIo, event: ScopedWebEvent) {
                 .unwrap_or_default()
         );
         // Primary: the client_id room.
-        let _ = io.to(primary.clone()).emit(&name, &payload);
-        if let Some(alias) = event_alias(&name) {
+        let _ = io.to(primary.clone()).emit(name, &payload);
+        if let Some(alias) = event_alias(name) {
             let _ = io.to(primary.clone()).emit(alias, &payload);
         }
         // Thread room minus the client_id room (dedup — see note above).
@@ -1174,8 +1174,8 @@ fn emit_web_channel_event(io: &SocketIo, event: ScopedWebEvent) {
             let _ = io
                 .to(tr.clone())
                 .except(primary.clone())
-                .emit(&name, &payload);
-            if let Some(alias) = event_alias(&name) {
+                .emit(name, &payload);
+            if let Some(alias) = event_alias(name) {
                 let _ = io
                     .to(tr.clone())
                     .except(primary.clone())
