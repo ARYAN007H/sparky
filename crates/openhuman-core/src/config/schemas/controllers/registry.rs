@@ -172,22 +172,6 @@ pub fn all_registered_controllers() -> Vec<RegisteredController> {
             handler: handle_set_onboarding_completed,
         },
         RegisteredController {
-            schema: schemas("get_dictation_settings"),
-            handler: handle_get_dictation_settings,
-        },
-        RegisteredController {
-            schema: schemas("update_dictation_settings"),
-            handler: handle_update_dictation_settings,
-        },
-        RegisteredController {
-            schema: schemas("get_voice_server_settings"),
-            handler: handle_get_voice_server_settings,
-        },
-        RegisteredController {
-            schema: schemas("update_voice_server_settings"),
-            handler: handle_update_voice_server_settings,
-        },
-        RegisteredController {
             schema: schemas("update_composio_trigger_settings"),
             handler: handle_update_composio_trigger_settings,
         },

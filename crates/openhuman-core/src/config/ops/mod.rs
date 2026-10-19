@@ -80,7 +80,6 @@ pub use ui::{
     load_and_apply_browser_settings, load_and_apply_user_timezone, set_onboarding_completed,
     user_timezone_json, workspace_onboarding_flag_exists, workspace_onboarding_flag_resolve,
     workspace_onboarding_flag_set, AnalyticsSettingsPatch, BrowserSettingsPatch,
-    DictationSettingsPatch, VoiceServerSettingsPatch,
 };
 
 #[cfg(test)]
