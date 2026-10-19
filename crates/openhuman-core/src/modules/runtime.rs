@@ -33,6 +33,7 @@
 //! Everything here is created once and lives for the process. There is no
 //! shutdown path because there is nothing a shutdown could reclaim.
 
+use std::future::Future;
 use std::sync::OnceLock;
 
 use tinybus::module::{ModuleRuntime, RuntimeNames};
@@ -40,8 +41,50 @@ use tinybus::module::{ModuleRuntime, RuntimeNames};
 /// The module bus, built once on first use.
 static RUNTIME: OnceLock<Result<ModuleRuntime, String>> = OnceLock::new();
 
+/// A process-owned callback installation and its shared result.
+#[derive(Default)]
+struct CallbackSetup {
+    result: OnceLock<tokio::sync::watch::Receiver<Option<Result<(), String>>>>,
+}
+
+impl CallbackSetup {
+    fn start<F>(
+        &self,
+        runtime: &ModuleRuntime,
+        setup: F,
+    ) -> tokio::sync::watch::Receiver<Option<Result<(), String>>>
+    where
+        F: Future<Output = tinybus::Result<()>> + Send + 'static,
+    {
+        self.result
+            .get_or_init(|| {
+                let (result_tx, result_rx) = tokio::sync::watch::channel(None);
+                runtime.spawn(async move {
+                    result_tx.send_replace(Some(setup.await.map_err(|error| error.to_string())));
+                });
+                result_rx
+            })
+            .clone()
+    }
+
+    async fn wait(
+        mut result: tokio::sync::watch::Receiver<Option<Result<(), String>>>,
+    ) -> Result<(), String> {
+        loop {
+            if let Some(result) = result.borrow_and_update().clone() {
+                return result;
+            }
+            if result.changed().await.is_err() {
+                return Err("the module callbacks did not finish".to_string());
+            }
+        }
+    }
+}
+
 /// Host callbacks installed on the runtime's bus, once.
-static CALLBACKS: tokio::sync::OnceCell<Result<(), String>> = tokio::sync::OnceCell::const_new();
+static CALLBACKS: CallbackSetup = CallbackSetup {
+    result: OnceLock::new(),
+};
 
 /// The process-wide module runtime, standing it up on first use.
 ///
@@ -61,19 +104,12 @@ pub async fn runtime() -> tinybus::Result<&'static ModuleRuntime> {
     let runtime = started
         .as_ref()
         .map_err(|error| tinybus::Error::Transport(error.clone()))?;
-    CALLBACKS
-        .get_or_init(|| async {
-            // On the module runtime, not the caller's: the callbacks serve
-            // objects that must outlive whichever runtime asked first.
-            match runtime.spawn(install_callbacks(runtime)).await {
-                Ok(Ok(())) => Ok(()),
-                Ok(Err(error)) => Err(error.to_string()),
-                Err(error) => Err(format!("the module callbacks did not finish: {error}")),
-            }
-        })
+    // Start installation once on the process-lifetime module runtime. Callers
+    // only wait on a watch receiver, so cancelling one caller cannot drop the
+    // OnceCell initializer and start a second installation while this task runs.
+    CallbackSetup::wait(CALLBACKS.start(runtime, install_callbacks(runtime)))
         .await
-        .as_ref()
-        .map_err(|error| tinybus::Error::Transport(error.clone()))?;
+        .map_err(tinybus::Error::Transport)?;
     Ok(runtime)
 }
 

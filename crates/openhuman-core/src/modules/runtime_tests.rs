@@ -1,4 +1,42 @@
 use super::{is_started, runtime};
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
+
+/// Cancelling a runtime caller must not restart process-lifetime callback setup.
+#[tokio::test]
+async fn cancelling_a_callback_waiter_does_not_restart_callback_setup() {
+    let names = tinybus::module::RuntimeNames {
+        thread: "openhuman-callback-setup-test".to_string(),
+        worker: "openhuman-callback-worker-test".to_string(),
+    };
+    let module_runtime = tinybus::module::ModuleRuntime::start(&names, None)
+        .expect("test module runtime should start");
+    let setup = super::CallbackSetup::default();
+    let calls = Arc::new(AtomicUsize::new(0));
+    let started = Arc::new(tokio::sync::Notify::new());
+    let release = Arc::new(tokio::sync::Notify::new());
+    let setup_calls = calls.clone();
+    let setup_started = started.clone();
+    let setup_release = release.clone();
+    let result = setup.start(&module_runtime, async move {
+        setup_calls.fetch_add(1, Ordering::SeqCst);
+        setup_started.notify_one();
+        setup_release.notified().await;
+        Ok(())
+    });
+
+    let abandoned_waiter = {
+        let result = result.clone();
+        tokio::spawn(async move { super::CallbackSetup::wait(result).await })
+    };
+    started.notified().await;
+    abandoned_waiter.abort();
+    let _ = abandoned_waiter.await;
+    release.notify_one();
+
+    assert_eq!(super::CallbackSetup::wait(result).await, Ok(()));
+    assert_eq!(calls.load(Ordering::SeqCst), 1);
+}
 
 /// The process-global runtime is stable within one caller runtime.
 #[tokio::test]
