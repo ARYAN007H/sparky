@@ -107,7 +107,15 @@ async function openActivityGroup(page: Page): Promise<Locator> {
     timeout: 30_000,
   });
   const trigger = group.locator('[data-slot="tool-group-trigger"]');
-  if ((await trigger.getAttribute('aria-expanded')) === 'false') await trigger.click();
+  // sendTurn returns when the RPC is accepted, while this group is often still
+  // open because the turn is live. Toggle it closed and open again so the
+  // interaction records an explicit user choice; it then remains open when the
+  // response settles and ActivityGroup's live default changes to closed.
+  if ((await trigger.getAttribute('aria-expanded')) === 'true') {
+    await trigger.click();
+    await expect(trigger).toHaveAttribute('aria-expanded', 'false', { timeout: 10_000 });
+  }
+  await trigger.click();
   await expect(trigger).toHaveAttribute('aria-expanded', 'true', { timeout: 10_000 });
   return group;
 }
