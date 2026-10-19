@@ -248,6 +248,55 @@ async fn external_config_conflict_refresh_keeps_derived_runtime_overrides() {
     assert!(!refreshed.mcp_client.enabled);
     assert!(refreshed.autonomy.enabled);
     assert!(refreshed.composio.host_credential.is_some());
+
+    CoreContext::scope(ctx.clone(), async {
+        (controller.handler)(
+            DispatchCtx::new(ctx.clone()),
+            json!({"default_temperature": 0.6})
+                .as_object()
+                .unwrap()
+                .clone(),
+        )
+        .await
+        .expect("a save after conflict refresh should use the advanced revision");
+    })
+    .await;
+
+    let mut later_external = Config::load_from_config_path(&seed.config_path, &seed.workspace_dir)
+        .await
+        .unwrap();
+    later_external.default_model = Some("external-after-save".into());
+    later_external.save().await.unwrap();
+    let later_conflict = CoreContext::scope(ctx.clone(), async {
+        (controller.handler)(
+            DispatchCtx::new(ctx.clone()),
+            json!({"default_temperature": 0.7})
+                .as_object()
+                .unwrap()
+                .clone(),
+        )
+        .await
+        .unwrap_err()
+    })
+    .await;
+    assert!(crate::core::StructuredRpcError::decode(&later_conflict).is_some());
+
+    let after_later_conflict = CoreContext::scope(ctx.clone(), async {
+        DispatchCtx::new(ctx.clone()).load_config().await.unwrap()
+    })
+    .await;
+    assert_eq!(
+        after_later_conflict.default_model.as_deref(),
+        Some("external-after-save")
+    );
+    assert_eq!(
+        after_later_conflict.memory.agent_id.as_deref(),
+        Some("runtime-memory-agent")
+    );
+    assert_eq!(after_later_conflict.memory.root.as_deref(), Some("team:runtime"));
+    assert!(!after_later_conflict.mcp_client.enabled);
+    assert!(after_later_conflict.autonomy.enabled);
+    assert!(after_later_conflict.composio.host_credential.is_some());
 }
 
 #[tokio::test]
