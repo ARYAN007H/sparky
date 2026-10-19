@@ -76,8 +76,9 @@ impl CatalogStorageRegistration {
     }
 }
 
-static REGISTRATIONS: LazyLock<tokio::sync::Mutex<HashMap<RegistrationKey, Arc<CatalogStorageRegistration>>>> =
-    LazyLock::new(|| tokio::sync::Mutex::new(HashMap::new()));
+static REGISTRATIONS: LazyLock<
+    tokio::sync::Mutex<HashMap<RegistrationKey, Arc<CatalogStorageRegistration>>>,
+> = LazyLock::new(|| tokio::sync::Mutex::new(HashMap::new()));
 
 #[cfg(test)]
 struct RegistrationGate {
@@ -126,11 +127,9 @@ pub(crate) async fn register(
                 return Ok(Arc::clone(registration));
             }
 
-            let served = module::serve_registered(
-                path.clone(),
-                CatalogStoragePort { scope: documents },
-            )
-            .await?;
+            let served =
+                module::serve_registered(path.clone(), CatalogStoragePort { scope: documents })
+                    .await?;
             #[cfg(test)]
             record_served(&path);
             #[cfg(test)]
@@ -220,17 +219,8 @@ const COLLECTIONS: [&str; 16] = [
     "tsd.migrations",
 ];
 
-const SHARED_COLLECTIONS: [&str; 4] = [
-    "tsd.kv",
-    "tsd.leases",
-    "tsd.counters",
-    "tsd.migrations",
-];
-const GRAPH_COLLECTIONS: [&str; 3] = [
-    "graph.checkpoints",
-    "graph.threads",
-    "graph.writes",
-];
+const SHARED_COLLECTIONS: [&str; 4] = ["tsd.kv", "tsd.leases", "tsd.counters", "tsd.migrations"];
+const GRAPH_COLLECTIONS: [&str; 3] = ["graph.checkpoints", "graph.threads", "graph.writes"];
 const FLOW_KEY_PREFIX: &str = "flows/";
 const FLOW_MIGRATION_IDS: [&str; 6] = [
     "flows/flows.definitions/definitions_v2",
@@ -288,13 +278,15 @@ fn flow_namespace_filter(collection: &str, filter: Filter) -> Filter {
 }
 
 fn encoded<T: Serialize>(value: T) -> Result<Value, StorageError> {
-    serde_json::to_value(value)
-        .map_err(|error| StorageError::invalid_input(format!("catalog value encoding failed: {error}")))
+    serde_json::to_value(value).map_err(|error| {
+        StorageError::invalid_input(format!("catalog value encoding failed: {error}"))
+    })
 }
 
 fn decoded<T: serde::de::DeserializeOwned>(value: Value) -> Result<T, StorageError> {
-    serde_json::from_value(value)
-        .map_err(|error| StorageError::invalid_input(format!("catalog value decoding failed: {error}")))
+    serde_json::from_value(value).map_err(|error| {
+        StorageError::invalid_input(format!("catalog value decoding failed: {error}"))
+    })
 }
 
 fn catalog_error(error: StorageError) -> CatalogStorageReply {
@@ -320,13 +312,14 @@ struct CatalogStoragePort {
 #[tinybus::interface(name = "ai.tinyhumans.tinyflows.CatalogStorage")]
 impl CatalogStoragePort {
     async fn doc_capabilities(&self) -> BusResult<CatalogStorageReply> {
-        let result = self.scope.documents().map(|documents| {
-            catalog::CatalogStorageCapabilities {
+        let result = self
+            .scope
+            .documents()
+            .map(|documents| catalog::CatalogStorageCapabilities {
                 record_metadata: documents
                     .capabilities()
                     .contains(Capability::RecordMetadata),
-            }
-        });
+            });
         Ok(catalog_reply(result))
     }
 

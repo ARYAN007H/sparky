@@ -74,7 +74,10 @@ fn catalog_clients_preserve_definition_revisions_and_suggestion_semantics() {
         created_at: flow.created_at,
         source_run_id: None,
     };
-    assert_eq!(upsert_suggestions(&config, &[suggestion.clone()]).unwrap(), 1);
+    assert_eq!(
+        upsert_suggestions(&config, &[suggestion.clone()]).unwrap(),
+        1
+    );
     assert_eq!(
         list_suggestions(&config, Some(SuggestionStatus::New), 10)
             .unwrap()

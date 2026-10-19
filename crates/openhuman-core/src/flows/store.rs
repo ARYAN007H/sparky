@@ -15,8 +15,7 @@ use tinyflows_bus::catalog::{
     SetEnabledRequest, Workflow, WorkflowRevision,
 };
 use tinyflows_catalog::{
-    Flow, FlowRevision, FlowSuggestion, SuggestionStatus,
-    store::FlowUpdateError,
+    Flow, FlowRevision, FlowSuggestion, SuggestionStatus, store::FlowUpdateError,
 };
 
 use crate::config::Config;
@@ -59,7 +58,6 @@ fn flow_from_wire(workflow: Workflow) -> Result<Flow> {
     })
 }
 
-
 pub(crate) fn roundtrip<T, U>(value: T) -> Result<U>
 where
     T: Serialize,
@@ -99,11 +97,8 @@ pub fn upsert_flow(config: &Config, flow: &Flow) -> Result<()> {
 #[cfg(test)]
 fn test_seed_flow(config: &Config, flow: &Flow) -> Result<()> {
     let storage = super::catalog_storage::register_blocking(config)?;
-    let _: ListWorkflowsResult = call_catalog(
-        config,
-        catalog::members::LIST_WORKFLOWS,
-        (storage.clone(),),
-    )?;
+    let _: ListWorkflowsResult =
+        call_catalog(config, catalog::members::LIST_WORKFLOWS, (storage.clone(),))?;
     let created_ms = chrono::DateTime::parse_from_rfc3339(&flow.created_at)
         .map(|date| date.timestamp_millis())
         .unwrap_or(0);
@@ -137,11 +132,7 @@ fn test_seed_flow(config: &Config, flow: &Flow) -> Result<()> {
         expires_ms: None,
         created_ms: Some(created_ms),
     };
-    let _: catalog::CatalogStorageReply = call_catalog(
-        config,
-        catalog::storage::PUT,
-        (request,),
-    )?;
+    let _: catalog::CatalogStorageReply = call_catalog(config, catalog::storage::PUT, (request,))?;
     Ok(())
 }
 
@@ -153,7 +144,8 @@ pub fn insert_duplicate_flow(config: &Config, source: &Flow, new_name: String) -
         id: source.id.clone(),
         name: new_name,
     };
-    let response: PutWorkflowResponse = call_catalog(config, catalog::members::PUT_WORKFLOW, (request,))?;
+    let response: PutWorkflowResponse =
+        call_catalog(config, catalog::members::PUT_WORKFLOW, (request,))?;
     put_result(response)
 }
 
@@ -172,7 +164,8 @@ pub fn create_flow(
         graph: serde_json::to_value(graph)?,
         require_approval,
     };
-    let response: PutWorkflowResponse = call_catalog(config, catalog::members::PUT_WORKFLOW, (request,))?;
+    let response: PutWorkflowResponse =
+        call_catalog(config, catalog::members::PUT_WORKFLOW, (request,))?;
     let flow = put_result(response)?;
     if !enabled && flow.enabled {
         set_enabled(config, &flow.id, false)
@@ -195,11 +188,8 @@ pub fn get_flow(config: &Config, id: &str) -> Result<Option<Flow>> {
 /// List workflows and their full graphs through the module's catalog client.
 pub fn list_flows(config: &Config) -> Result<(Vec<Flow>, usize)> {
     let storage = super::catalog_storage::register_blocking(config)?;
-    let listed: ListWorkflowsResult = call_catalog(
-        config,
-        catalog::members::LIST_WORKFLOWS,
-        (storage.clone(),),
-    )?;
+    let listed: ListWorkflowsResult =
+        call_catalog(config, catalog::members::LIST_WORKFLOWS, (storage.clone(),))?;
     let mut flows = Vec::with_capacity(listed.workflows.len());
     let mut skipped = listed.skipped_rows;
     for summary in listed.workflows {
@@ -223,7 +213,10 @@ pub fn list_flows(config: &Config) -> Result<(Vec<Flow>, usize)> {
 /// List enabled workflows through the same module-owned catalog surface.
 pub fn list_enabled_flows(config: &Config) -> Result<(Vec<Flow>, usize)> {
     let (flows, skipped) = list_flows(config)?;
-    Ok((flows.into_iter().filter(|flow| flow.enabled).collect(), skipped))
+    Ok((
+        flows.into_iter().filter(|flow| flow.enabled).collect(),
+        skipped,
+    ))
 }
 
 /// Remove a workflow through the module's Catalog contract.
@@ -273,8 +266,9 @@ pub fn update_flow_graph(
         expected_version: expected_updated_at.map(str::to_owned),
         force_disarm_automatic: force_disarm_if_automatic,
     };
-    let response: PutWorkflowResponse = call_catalog(config, catalog::members::PUT_WORKFLOW, (request,))
-        .map_err(FlowUpdateError::Store)?;
+    let response: PutWorkflowResponse =
+        call_catalog(config, catalog::members::PUT_WORKFLOW, (request,))
+            .map_err(FlowUpdateError::Store)?;
     match response {
         PutWorkflowResponse::Ok(result) => {
             flow_from_wire(result.workflow).map_err(FlowUpdateError::Store)
@@ -291,15 +285,9 @@ pub fn list_revisions(config: &Config, flow_id: &str, limit: usize) -> Result<Ve
         flow_id: flow_id.to_owned(),
         limit,
     };
-    let revisions: Vec<WorkflowRevision> = call_catalog(
-        config,
-        catalog::members::LIST_REVISIONS,
-        (request,),
-    )?;
-    revisions
-        .into_iter()
-        .map(roundtrip)
-        .collect()
+    let revisions: Vec<WorkflowRevision> =
+        call_catalog(config, catalog::members::LIST_REVISIONS, (request,))?;
+    revisions.into_iter().map(roundtrip).collect()
 }
 
 /// Read one workflow revision by id.
@@ -314,14 +302,9 @@ pub fn revision_by_id(
         flow_id: flow_id.to_owned(),
         revision_id: revision_id.to_owned(),
     };
-    let revision: Option<WorkflowRevision> = call_catalog(
-        config,
-        catalog::members::GET_REVISION,
-        (request,),
-    )?;
-    revision
-        .map(roundtrip)
-        .transpose()
+    let revision: Option<WorkflowRevision> =
+        call_catalog(config, catalog::members::GET_REVISION, (request,))?;
+    revision.map(roundtrip).transpose()
 }
 
 /// Upsert module-owned discovery suggestions.
@@ -346,9 +329,7 @@ pub fn list_suggestions(
     limit: usize,
 ) -> Result<Vec<FlowSuggestion>> {
     let storage = super::catalog_storage::register_blocking(config)?;
-    let status: Option<catalog::SuggestionStatus> = status
-        .map(roundtrip)
-        .transpose()?;
+    let status: Option<catalog::SuggestionStatus> = status.map(roundtrip).transpose()?;
     let request = catalog::ListSuggestionsRequest {
         storage,
         status,
@@ -356,18 +337,11 @@ pub fn list_suggestions(
     };
     let suggestions: Vec<catalog::FlowSuggestion> =
         call_catalog(config, catalog::members::LIST_SUGGESTIONS, (request,))?;
-    suggestions
-        .into_iter()
-        .map(roundtrip)
-        .collect()
+    suggestions.into_iter().map(roundtrip).collect()
 }
 
 /// Set a suggestion's module-owned lifecycle status.
-pub fn set_suggestion_status(
-    config: &Config,
-    id: &str,
-    status: SuggestionStatus,
-) -> Result<bool> {
+pub fn set_suggestion_status(config: &Config, id: &str, status: SuggestionStatus) -> Result<bool> {
     let storage = super::catalog_storage::register_blocking(config)?;
     let status: catalog::SuggestionStatus = roundtrip(status)?;
     let request = catalog::SetSuggestionStatusRequest {

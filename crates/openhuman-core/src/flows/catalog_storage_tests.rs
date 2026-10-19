@@ -6,15 +6,15 @@ fn context(config: &Config, profile: &str) -> DispatchCtx {
     use crate::tools::toolpacks::ToolGroups;
 
     let root = CoreContext::for_test_with_config(DomainSet::full(), config.clone());
-    DispatchCtx::new(root.derive_with(
-        ContextOverlay::new(config.clone(), DomainSet::full(), ToolGroups::default())
-            .profile(profile),
-    ))
+    DispatchCtx::new(
+        root.derive_with(
+            ContextOverlay::new(config.clone(), DomainSet::full(), ToolGroups::default())
+                .profile(profile),
+        ),
+    )
 }
 
-async fn callback_proxy(
-    registration: &CatalogStorageRegistration,
-) -> tinybus::Proxy {
+async fn callback_proxy(registration: &CatalogStorageRegistration) -> tinybus::Proxy {
     let runtime = crate::modules::runtime::runtime()
         .await
         .expect("module runtime is available");
@@ -56,8 +56,14 @@ fn document_records_cannot_address_other_shared_or_graph_keys() {
         "graph.threads",
         "graph.writes",
     ] {
-        assert!(allowed_record(collection, "other-owner/key").is_err(), "{collection}");
-        assert!(allowed_record(collection, "flows/thread/checkpoint").is_ok(), "{collection}");
+        assert!(
+            allowed_record(collection, "other-owner/key").is_err(),
+            "{collection}"
+        );
+        assert!(
+            allowed_record(collection, "flows/thread/checkpoint").is_ok(),
+            "{collection}"
+        );
     }
     for (collection, id) in [
         ("tsd.migrations", "other/definitions_v2"),
@@ -74,17 +80,11 @@ fn graph_query_and_delete_filters_are_confined_to_the_flows_namespace() {
     assert!(all.matches("flows/thread/1", &json!({"ns":"flows"})));
     assert!(!all.matches("other/thread/1", &json!({"ns":"other"})));
 
-    let conflicting = flow_namespace_filter(
-        "graph.writes",
-        Filter::eq("ns", "other"),
-    );
+    let conflicting = flow_namespace_filter("graph.writes", Filter::eq("ns", "other"));
     assert!(!conflicting.matches("flows/thread/1", &json!({"ns":"flows"})));
     assert!(!conflicting.matches("other/thread/1", &json!({"ns":"other"})));
 
-    let widened = flow_namespace_filter(
-        "graph.threads",
-        Filter::one_of("ns", ["flows", "other"]),
-    );
+    let widened = flow_namespace_filter("graph.threads", Filter::one_of("ns", ["flows", "other"]));
     assert!(widened.matches("flows/thread", &json!({"ns":"flows"})));
     assert!(!widened.matches("other/thread", &json!({"ns":"other"})));
 }
@@ -146,11 +146,7 @@ async fn cancelling_the_caller_after_serve_keeps_one_cached_registration() {
         .expect("module runtime remains available");
     let proxy = runtime
         .connection()
-        .proxy(
-            module::HOST_BUS_NAME,
-            &path,
-            catalog::STORAGE_INTERFACE,
-        )
+        .proxy(module::HOST_BUS_NAME, &path, catalog::STORAGE_INTERFACE)
         .expect("storage callback address is valid");
     let reply: CatalogStorageReply = proxy
         .call(catalog::storage::CAPABILITIES, &())
@@ -260,15 +256,11 @@ async fn catalog_module_uses_captured_profile_and_storage_preserves_cas_metadata
         CatalogStorageReply::Error { ref error } if error.kind == "conflict"
     ));
 
-    let foreign: CatalogStorageReply = bob_bus
-        .call(catalog::storage::GET, &(get,))
-        .await
-        .unwrap();
+    let foreign: CatalogStorageReply = bob_bus.call(catalog::storage::GET, &(get,)).await.unwrap();
     assert!(matches!(
         foreign,
         CatalogStorageReply::Value { value } if value.is_null()
     ));
-
 }
 
 #[tokio::test]
@@ -373,7 +365,10 @@ async fn catalog_storage_resolves_the_current_backend_and_confines_graph_namespa
         .get("graph.threads", "other/bob-thread")
         .await
         .unwrap();
-    assert!(foreign.is_some(), "flow deletion leaves the other namespace intact");
+    assert!(
+        foreign.is_some(),
+        "flow deletion leaves the other namespace intact"
+    );
 
     let forbidden_get: CatalogStorageReply = proxy
         .call(
@@ -421,5 +416,8 @@ async fn catalog_storage_resolves_the_current_backend_and_confines_graph_namespa
         rebound,
         CatalogStorageReply::Value { ref value } if value.is_null()
     ));
-    assert_eq!(registration.address.object_path, registration.storage().callback.object_path);
+    assert_eq!(
+        registration.address.object_path,
+        registration.storage().callback.object_path
+    );
 }

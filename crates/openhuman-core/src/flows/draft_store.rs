@@ -40,11 +40,8 @@ pub fn get_draft(config: &Config, id: &str) -> Result<Option<FlowDraft>> {
         storage,
         id: id.to_owned(),
     };
-    let draft: Option<WireDraft> = store::call_catalog(
-        config,
-        catalog::members::GET_DRAFT,
-        (request,),
-    )?;
+    let draft: Option<WireDraft> =
+        store::call_catalog(config, catalog::members::GET_DRAFT, (request,))?;
     draft.map(store::roundtrip).transpose()
 }
 
