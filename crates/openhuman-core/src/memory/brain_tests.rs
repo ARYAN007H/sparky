@@ -220,6 +220,56 @@ async fn ingest_refuses_bad_input() {
 }
 
 #[tokio::test]
+async fn ingest_keeps_the_legacy_blank_source_error() {
+    let tmp = tempfile::tempdir().unwrap();
+    let config = config_in(&tmp);
+    bind_reference(&config);
+    let error = ingest(
+        &config,
+        &tinymemory_tools::layout::identity::Identity::root(),
+        BrainIngestParams {
+            path: None,
+            text: Some("body".into()),
+            source: Some(" ".into()),
+            title: None,
+        },
+    )
+    .await
+    .unwrap_err();
+
+    assert_eq!(
+        error.to_string(),
+        "invalid request: invalid request: a brain source id must not be blank"
+    );
+}
+
+#[tokio::test]
+async fn ingest_keeps_the_legacy_oversized_file_error() {
+    let tmp = tempfile::tempdir().unwrap();
+    let config = config_in(&tmp);
+    bind_reference(&config);
+    let path = config.workspace_dir.join("oversized.bin");
+    let size = MAX_INGEST_BYTES + 1;
+    std::fs::File::create(&path)
+        .unwrap()
+        .set_len(size)
+        .unwrap();
+
+    let error = ingest(
+        &config,
+        &tinymemory_tools::layout::identity::Identity::root(),
+        path_params(path.display().to_string()),
+    )
+    .await
+    .unwrap_err();
+
+    assert_eq!(
+        error.to_string(),
+        format!("invalid request: the file is {size} bytes; the limit is {MAX_INGEST_BYTES}")
+    );
+}
+
+#[tokio::test]
 async fn a_file_is_converted_and_filed_under_files() {
     let tmp = tempfile::tempdir().unwrap();
     let config = config_in(&tmp);
