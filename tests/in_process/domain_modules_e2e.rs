@@ -433,6 +433,55 @@ async fn config_agent_tools_and_threads_mutation_paths_round_trip() {
         data(&update_message, "threads_message_update").pointer("/extraMetadata/phase"),
         Some(&json!("updated"))
     );
+    assert_eq!(
+        data(&update_message, "threads_message_update")
+            .pointer("/extraMetadata/verified"),
+        Some(&json!(true)),
+        "boolean metadata must remain boolean in the projected message"
+    );
+
+    let missing_messages = rpc(
+        &harness.rpc_base,
+        34_005,
+        "openhuman.threads_messages_list",
+        json!({ "thread_id": "missing-domain-e2e-thread" }),
+    )
+    .await;
+    assert_eq!(
+        data(&missing_messages, "threads_messages_list missing thread")
+            .get("count")
+            .and_then(Value::as_u64),
+        Some(0),
+        "listing messages for a missing thread is an empty read"
+    );
+
+    let fresh_turn_state = rpc(
+        &harness.rpc_base,
+        34_006,
+        "openhuman.threads_turn_state_get",
+        json!({ "thread_id": "domain-e2e-thread" }),
+    )
+    .await;
+    let fresh_turn_state = data(&fresh_turn_state, "fresh threads_turn_state_get");
+    assert!(
+        fresh_turn_state.get("turnState").is_none(),
+        "fresh thread must omit turnState rather than serialize null: {fresh_turn_state}"
+    );
+
+    let fresh_clear = rpc(
+        &harness.rpc_base,
+        34_007,
+        "openhuman.threads_turn_state_clear",
+        json!({ "thread_id": "domain-e2e-thread" }),
+    )
+    .await;
+    assert_eq!(
+        data(&fresh_clear, "fresh threads_turn_state_clear")
+            .get("cleared")
+            .and_then(Value::as_bool),
+        Some(false),
+        "clearing absent state reports cleared=false"
+    );
 
     let delete_thread = rpc(
         &harness.rpc_base,
