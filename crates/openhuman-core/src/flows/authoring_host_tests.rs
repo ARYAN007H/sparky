@@ -90,10 +90,10 @@ async fn saved_workflow_callback_uses_its_captured_profile_over_the_bus() {
         .await
         .unwrap();
 
-    // Exercise the released native WiringWarnings operation with two actual
+    // Exercise the released native WiringWarnings operation with the actual
     // OpenHuman LookupToolContract callbacks. Each call runs while the other
-    // profile is ambient; its supplied host address must retain its captured
-    // callback context.
+    // profile is ambient; the ResolveWorkflow assertions below separately
+    // verify that these registered callbacks retain their captured profile.
     for (toolkit, slug, output_field) in [
         ("authoringalice", "AUTHORINGALICE_ACTION", "alice_field"),
         ("authoringbob", "AUTHORINGBOB_ACTION", "bob_field"),
