@@ -379,6 +379,14 @@ pub async fn detect(
     let config = crate::config::Config::load_or_init()
         .await
         .map_err(|error| error.to_string())?;
+    detect_with_config(&config, content, hint).await
+}
+
+async fn detect_with_config(
+    config: &crate::config::Config,
+    content: String,
+    hint: tinyjuice_bus::types::ContentHint,
+) -> Result<String, String> {
     client(&config)
         .call("tinyjuice", methods::DETECT, (content, hint))
         .await
@@ -392,6 +400,14 @@ pub async fn compress(
     let config = crate::config::Config::load_or_init()
         .await
         .map_err(|error| error.to_string())?;
+    compress_with_config(&config, content, hint).await
+}
+
+async fn compress_with_config(
+    config: &crate::config::Config,
+    content: String,
+    hint: tinyjuice_bus::types::ContentHint,
+) -> Result<tinyjuice_bus::types::CompressedOutput, String> {
     install_from_config(&config).await?;
     let response: tinyjuice_bus::types::CompressedOutput = client(&config)
         .call("tinyjuice", methods::COMPRESS, (content, hint))
@@ -414,6 +430,14 @@ pub async fn retrieve(
     let config = crate::config::Config::load_or_init()
         .await
         .map_err(|error| error.to_string())?;
+    retrieve_with_config(&config, token, range).await
+}
+
+async fn retrieve_with_config(
+    config: &crate::config::Config,
+    token: String,
+    range: Option<tinyjuice_bus::wire::RetrieveRange>,
+) -> Result<Option<String>, String> {
     install_from_config(&config).await?;
     client(&config)
         .call("tinyjuice", methods::RETRIEVE, (token, range))
@@ -425,6 +449,12 @@ pub async fn cache_stats() -> Result<tinyjuice_bus::wire::CacheStats, String> {
     let config = crate::config::Config::load_or_init()
         .await
         .map_err(|error| error.to_string())?;
+    cache_stats_with_config(&config).await
+}
+
+async fn cache_stats_with_config(
+    config: &crate::config::Config,
+) -> Result<tinyjuice_bus::wire::CacheStats, String> {
     install_from_config(&config).await?;
     client(&config)
         .call("tinyjuice", methods::CACHE_STATS, ())
