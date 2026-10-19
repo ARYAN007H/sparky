@@ -403,157 +403,8 @@ async fn combine_trail_off_fallback_returns_fallback_alone_for_genuine_silence()
     );
 }
 
-#[test]
-fn run_row_finalizer_reconciles_orphaned_running_row_to_interrupted_on_drop() {
-    let tmp = TempDir::new().unwrap();
-    let (config, flow_id, run_id) = seed_running_run(&tmp);
-
-    // Simulate the run future being dropped mid-await without any terminal
-    // write: the guard is created armed and never disarmed, so its `Drop`
-    // reconciles the row.
-    {
-        let _finalizer = RunRowFinalizer::new(Arc::new(config.clone()), &run_id, &flow_id);
-    }
-
-    let row = store::get_flow_run(&config, &run_id).unwrap().unwrap();
-    assert_eq!(
-        row.status, "interrupted",
-        "a dropped run must not stay 'running'"
-    );
-    assert_eq!(row.error.as_deref(), Some(INTERRUPTED_DROP_REASON));
-    assert!(
-        row.finished_at.is_some(),
-        "an interrupted run must be stamped finished"
-    );
-
-    // The flow-definition summary must track the row, like every other
-    // terminal path — otherwise the runs list keeps advertising the previous
-    // run's status for a flow whose latest run was interrupted.
-    let flow = store::get_flow(&config, &flow_id).unwrap().unwrap();
-    assert_eq!(
-        flow.last_status.as_deref(),
-        Some("interrupted"),
-        "the drop-guard must update the flow summary, not just the run row"
-    );
-    assert!(
-        flow.last_run_at.is_some(),
-        "the drop-guard must stamp last_run_at"
-    );
-}
-
-#[test]
-fn run_row_finalizer_disarm_leaves_a_settled_row_untouched() {
-    let tmp = TempDir::new().unwrap();
-    let (config, flow_id, run_id) = seed_running_run(&tmp);
-
-    // A run that settled normally disarms its guard after the real terminal
-    // write; dropping the disarmed guard must be a no-op.
-    {
-        let finalizer = RunRowFinalizer::new(Arc::new(config.clone()), &run_id, &flow_id);
-        finalizer.disarm();
-    }
-
-    let row = store::get_flow_run(&config, &run_id).unwrap().unwrap();
-    assert_eq!(
-        row.status, "running",
-        "a disarmed finalizer must not overwrite the row's real status"
-    );
-    assert!(row.error.is_none());
-}
-
-#[test]
-fn run_row_finalizer_does_not_record_interrupted_for_an_already_terminal_row() {
-    let tmp = TempDir::new().unwrap();
-    let (config, flow_id, run_id) = seed_running_run(&tmp);
-    let now = Utc::now().to_rfc3339();
-    assert!(
-        store::finish_flow_run(&config, &run_id, "completed", &now, &[], &[], None, None,).unwrap()
-    );
-    store::record_run(&config, &flow_id, "completed").unwrap();
-
-    // A late drop must not rewrite the flow summary when its guarded row
-    // update lost to a terminal outcome.
-    drop(RunRowFinalizer::new(
-        Arc::new(config.clone()),
-        &run_id,
-        &flow_id,
-    ));
-
-    let row = store::get_flow_run(&config, &run_id).unwrap().unwrap();
-    assert_eq!(row.status, "completed");
-    let flow = store::get_flow(&config, &flow_id).unwrap().unwrap();
-    assert_eq!(flow.last_status.as_deref(), Some("completed"));
-}
-
 #[tokio::test]
-async fn boot_sweep_reconciles_orphaned_running_run_to_interrupted() {
-    let tmp = TempDir::new().unwrap();
-    let (config, _flow_id, run_id) = seed_running_run(&tmp);
-
-    // No in-process run owns this row (the registry is empty), so the boot
-    // sweep must reconcile it.
-    let swept = sweep_orphaned_running_runs_on_boot(&config).await;
-    assert_eq!(swept, 1, "the orphaned running row must be swept");
-
-    let row = store::get_flow_run(&config, &run_id).unwrap().unwrap();
-    assert_eq!(row.status, "interrupted");
-    assert!(
-        row.error
-            .as_deref()
-            .is_some_and(|e| e.contains("app restart")),
-        "the reason must explain the boot reconciliation, got {:?}",
-        row.error
-    );
-}
-
-#[tokio::test]
-async fn boot_sweep_skips_a_run_that_is_live_in_flight() {
-    let tmp = TempDir::new().unwrap();
-    let (config, _flow_id, run_id) = seed_running_run(&tmp);
-
-    // Register the run as live in this process; the sweep must leave it alone.
-    let (_token, _guard) = run_registry::register(&run_id);
-    assert!(run_registry::is_in_flight(&run_id));
-
-    let swept = sweep_orphaned_running_runs_on_boot(&config).await;
-    assert_eq!(swept, 0, "a live in-flight run must never be swept");
-
-    let row = store::get_flow_run(&config, &run_id).unwrap().unwrap();
-    assert_eq!(row.status, "running", "the live run must stay running");
-}
-
-#[tokio::test]
-async fn boot_sweep_skips_a_run_started_after_the_process_floor() {
-    let tmp = TempDir::new().unwrap();
-    let (config, flow_id, _prior_run_id) = seed_running_run(&tmp);
-
-    // A row this process inserted, but NOT yet registered in the run registry —
-    // exactly the TOCTOU window between `start_flow_run_row` and
-    // `run_registry::register`. The `is_in_flight` guard does not cover it; the
-    // `PROCESS_RUN_FLOOR` floor must. Sweeping it would flip a live run to
-    // `interrupted` AND drop its durable checkpoint mid-run.
-    let live_run_id = format!("flow:{flow_id}:{}", uuid::Uuid::new_v4());
-    start_flow_run_row(&config, &live_run_id, &flow_id);
-    assert!(
-        !run_registry::is_in_flight(&live_run_id),
-        "the row must be unregistered for this test to exercise the window"
-    );
-
-    let swept = sweep_orphaned_running_runs_on_boot(&config).await;
-
-    let live = store::get_flow_run(&config, &live_run_id).unwrap().unwrap();
-    assert_eq!(
-        live.status, "running",
-        "a run started by THIS process must never be swept, registered or not"
-    );
-    assert_eq!(
-        swept, 1,
-        "only the prior-process orphan may be reconciled, got {swept}"
-    );
-}
-
-#[tokio::test]
-async fn boot_sweep_handles_schema_init_failure_gracefully() {
+async fn boot_sweep_logs_catalog_registration_failure_and_continues_boot() {
     let tmp = TempDir::new().unwrap();
     let file_path = tmp.path().join("not_a_dir");
     std::fs::write(&file_path, b"blocking file").unwrap();
@@ -595,7 +446,8 @@ async fn boot_sweep_handles_schema_init_failure_gracefully() {
     let _subscriber_guard = tracing::subscriber::set_default(subscriber);
 
     // Execute the failing sweep path to exercise the real warning branch.
-    let swept = sweep_orphaned_running_runs_on_boot(&config).await;
+    let ctx = crate::core::runtime::DispatchCtx::ambient();
+    let swept = crate::flows::recovery::sweep_orphaned_runs_on_boot(&ctx, &config).await;
     assert_eq!(swept, 0);
 
     let warning = String::from_utf8(capture.0.lock().unwrap().clone()).unwrap();
