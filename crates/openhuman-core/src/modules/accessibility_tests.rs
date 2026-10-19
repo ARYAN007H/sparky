@@ -58,9 +58,15 @@ async fn fixture() -> (AccessibilityClient, Fixture, tinybus::Connection) {
             ObjectPath::new("/test/Accessibility").unwrap(),
             fixture.clone(),
         )
+        .await
         .unwrap();
+    service.request_name("test.Accessibility").await.unwrap();
     let proxy = caller
-        .proxy::<dyn tinybus::Interface>("test.Accessibility", "/test/Accessibility")
+        .proxy(
+            "test.Accessibility",
+            "/test/Accessibility",
+            "test.Accessibility",
+        )
         .unwrap();
     (AccessibilityClient::fixture(proxy), fixture, service)
 }
@@ -83,5 +89,40 @@ async fn disabled_component_refuses_before_reaching_the_module() {
     assert!(matches!(
         client.permissions().await,
         Err(AccessibilityError::Operation(ref error)) if error.code == crate::core::runtime::components::COMPONENT_DISABLED
+    ));
+}
+
+#[test]
+fn successful_unit_response_preserves_its_explicit_null_data() {
+    let raw = serde_json::to_value(DesktopResponse::ok(
+        "accessibility-permissions",
+        serde_json::Value::Null,
+    ))
+    .unwrap();
+    decode::<()>(raw).unwrap();
+}
+
+#[test]
+fn successful_response_requires_the_data_field_even_for_unit_results() {
+    assert!(matches!(
+        decode::<()>(serde_json::json!({
+            "version": "2.5",
+            "command": "accessibility-permissions",
+            "ok": true
+        })),
+        Err(AccessibilityError::Bus(ModuleCallError::ModuleFault))
+    ));
+}
+
+#[test]
+fn structured_refusal_is_preserved_for_host_presentation() {
+    let raw = serde_json::to_value(DesktopResponse::err(
+        "accessibility-permissions",
+        DesktopError::new("PERMISSION_DENIED", "permission denied"),
+    ))
+    .unwrap();
+    assert!(matches!(
+        decode::<()>(raw),
+        Err(AccessibilityError::Operation(error)) if error.code == "PERMISSION_DENIED"
     ));
 }

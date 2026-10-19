@@ -134,7 +134,7 @@ fn to_json_returns_inner_value() {
 }
 
 #[tokio::test]
-async fn retired_start_method_is_not_registered() {
+async fn voice_server_start_reports_method_not_found() {
     use crate::core::runtime::{CoreContext, DispatchCtx, DomainSet};
     let workspace = tempfile::tempdir().expect("private workspace");
     let mut config = crate::config::Config::default();
@@ -148,7 +148,7 @@ async fn retired_start_method_is_not_registered() {
         crate::core::types::AppState {
             core_version: env!("CARGO_PKG_VERSION").to_string(),
         },
-        concat!("openhuman.voice_server", "_start"),
+        "openhuman.voice_server_start",
         Value::Object(Map::new()),
     )
     .await;
