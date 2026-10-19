@@ -700,6 +700,5 @@ fn loop_guard_halt_summaries_are_byte_identical() {
 
 /// `(case, copy_key, copy_params as literal JSON)` for the same 37 inputs as
 /// [`EXPECTED`], in the same order. One key per table row.
-
 #[path = "web_tests_error_copy_wire_tests.rs"]
 mod wire_tests;

@@ -4,7 +4,7 @@
 use tinychannels_bus::web as bus_web;
 
 use crate::agent::tinyagents::host::LastTurnUsage;
-use crate::web_chat::{SubagentUsagePayload, TurnUsagePayload, WebChannelEvent};
+use crate::web_chat::{SubagentUsagePayload, TurnUsagePayload};
 
 use super::publish_web_channel_event_in;
 
