@@ -67,7 +67,7 @@ async function waitForAnyText(candidates, timeout = 20_000) {
 
 // Browser-media UI behavior now lives in Playwright (`test/playwright/specs/voice-mode.spec.ts`).
 // Keep WDIO/Appium focused on desktop/native-only coverage.
-describe.skip('Voice mode integration', () => {
+describe.skip('Voice mode integration', () => { // https://github.com/senamakel/openhuman/issues/236
   before(async () => {
     await startMockServer();
     await waitForApp();
@@ -206,7 +206,7 @@ describe('Voice mode — hosted STT contract (voice_status RPC)', () => {
  */
 // These Human-tab getUserMedia / MediaRecorder behaviors are browser API paths,
 // not native-shell concerns. They are covered in Playwright now.
-describe.skip('Voice mode — Human tab capture & error mapping (#1610)', () => {
+describe.skip('Voice mode — Human tab capture & error mapping (#1610)', () => { // https://github.com/senamakel/openhuman/issues/236
   before(async () => {
     await startMockServer();
     await waitForApp();
@@ -737,7 +737,7 @@ describe.skip('Voice mode — Human tab capture & error mapping (#1610)', () => 
   // injection (e.g. via a virtual ALSA device + pre-recorded WAV replayer, or
   // a fake getUserMedia implementation that returns a pre-seeded MediaStream).
   // ---------------------------------------------------------------------------
-  it.skip('6.6 — spoken prompt round-trip: mic → STT → user bubble → agent reply (requires real/virtual audio device)', async () => {
+  it.skip('6.6 — spoken prompt round-trip: mic → STT → user bubble → agent reply (requires real/virtual audio device)', async () => { // https://github.com/tinyhumansai/openhuman/issues/1610
     // When unblocked:
     //   1. Navigate to /human.
     //   2. Inject a pre-recorded WAV as a fake MediaStream via getUserMedia mock
