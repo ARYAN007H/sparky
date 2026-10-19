@@ -1,7 +1,10 @@
 //! One trusted `CapsHost` callback object for a single TinyFlows run.
 
 use std::future::Future;
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::{HashMap, HashSet, VecDeque},
+    sync::Arc,
+};
 
 use crate::config::Config;
 use crate::core::runtime::DispatchCtx;
@@ -29,8 +32,112 @@ pub(crate) struct CapsHostBinding {
     pub(crate) security: Arc<crate::security::SecurityPolicy>,
     pub(crate) approval: crate::security::approval::ApprovalTurnContext,
     pub(crate) cancellation: tokio_util::sync::CancellationToken,
-    pub(crate) agent_runs:
-        tokio::sync::Mutex<HashMap<String, Arc<tokio::sync::Mutex<AgentRunState>>>>,
+    pub(crate) agent_runs: tokio::sync::Mutex<AgentRunRegistry>,
+}
+
+/// Bounds invocation records and cancel-before-start tombstones retained by
+/// one run binding. Once either capacity is exhausted, new ids fail closed for
+/// the remaining lifetime of the binding.
+const MAX_AGENT_RUN_RECORDS: usize = 10_000;
+const MAX_AGENT_CANCEL_TOMBSTONES: usize = 4_096;
+
+pub(crate) struct AgentRunEntry {
+    pub(crate) handle: String,
+    pub(crate) state: Arc<tokio::sync::Mutex<AgentRunState>>,
+    pub(crate) cancellation: tokio_util::sync::CancellationToken,
+}
+
+pub(crate) struct AgentRunAdmission {
+    pub(crate) entry: AgentRunEntry,
+    pub(crate) start_task: bool,
+    pub(crate) cancelled_before_admission: bool,
+}
+
+#[derive(Default)]
+pub(crate) struct AgentRunRegistry {
+    by_request_id: HashMap<String, AgentRunEntry>,
+    by_handle: HashMap<String, Arc<tokio::sync::Mutex<AgentRunState>>>,
+    cancelled_before_start: HashSet<String>,
+    cancellation_order: VecDeque<String>,
+    reject_new_ids: bool,
+}
+
+impl AgentRunRegistry {
+    pub(crate) fn admit(
+        &mut self,
+        client_request_id: String,
+        state: Arc<tokio::sync::Mutex<AgentRunState>>,
+        cancellation: tokio_util::sync::CancellationToken,
+    ) -> Result<AgentRunAdmission, String> {
+        if let Some(entry) = self.by_request_id.get(&client_request_id) {
+            return Ok(AgentRunAdmission {
+                entry: entry.clone(),
+                start_task: false,
+                cancelled_before_admission: false,
+            });
+        }
+        if self.reject_new_ids {
+            return Err("CapsHost agent invocation capacity is exhausted".to_owned());
+        }
+        if self.by_request_id.len() >= MAX_AGENT_RUN_RECORDS {
+            self.reject_new_ids = true;
+            return Err("CapsHost agent invocation capacity is exhausted".to_owned());
+        }
+
+        let cancelled_before_admission = self.cancelled_before_start.remove(&client_request_id);
+        if cancelled_before_admission {
+            self.cancellation_order
+                .retain(|request_id| request_id != &client_request_id);
+            cancellation.cancel();
+        }
+        let entry = AgentRunEntry {
+            handle: uuid::Uuid::new_v4().simple().to_string(),
+            state: Arc::clone(&state),
+            cancellation,
+        };
+        self.by_handle.insert(entry.handle.clone(), state);
+        self.by_request_id
+            .insert(client_request_id, entry.clone());
+        Ok(AgentRunAdmission {
+            entry,
+            start_task: !cancelled_before_admission,
+            cancelled_before_admission,
+        })
+    }
+
+    pub(crate) fn cancel(&mut self, client_request_id: String) {
+        if let Some(entry) = self.by_request_id.get(&client_request_id) {
+            entry.cancellation.cancel();
+            return;
+        }
+        if self.cancelled_before_start.contains(&client_request_id) {
+            return;
+        }
+        if self.cancelled_before_start.len() >= MAX_AGENT_CANCEL_TOMBSTONES {
+            self.reject_new_ids = true;
+            return;
+        }
+        self.cancelled_before_start
+            .insert(client_request_id.clone());
+        self.cancellation_order.push_back(client_request_id);
+    }
+
+    pub(crate) fn state_for_handle(
+        &self,
+        handle: &str,
+    ) -> Option<Arc<tokio::sync::Mutex<AgentRunState>>> {
+        self.by_handle.get(handle).cloned()
+    }
+}
+
+impl Clone for AgentRunEntry {
+    fn clone(&self) -> Self {
+        Self {
+            handle: self.handle.clone(),
+            state: Arc::clone(&self.state),
+            cancellation: self.cancellation.clone(),
+        }
+    }
 }
 
 impl Drop for CapsHostRegistration {
@@ -93,7 +200,7 @@ pub(crate) async fn serve(
         security,
         approval,
         cancellation: tokio_util::sync::CancellationToken::new(),
-        agent_runs: tokio::sync::Mutex::new(HashMap::new()),
+        agent_runs: tokio::sync::Mutex::new(AgentRunRegistry::default()),
     });
     let path = format!(
         "/ai/tinyhumans/openhuman/CapsHost/{}",

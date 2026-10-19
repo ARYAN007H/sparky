@@ -19,9 +19,8 @@
 //! | `triggers` | enable/disable, trigger binding, boot reconciliation, trigger warnings |
 //! | `connections` | the `connection_ref` picker list and required-connection CTAs |
 //! | `run` | `flows_run` / `flows_run_detached` entry points and run prep |
-//! | `execution` | the shared run body, origin, Langfuse export, approval notification |
+//! | `execution` | Langfuse export and approval notification |
 //! | `resume` | `flows_resume` and the T-M1 graph pin |
-//! | `run_rows` | `flow_runs` row persistence, drop-guard finalizer, step settlement |
 //! | `run_management` | cancel, run listing/pruning, TTL and boot sweeps |
 //! | `discovery` | Flow Scout discovery and suggestion lifecycle |
 //! | `streaming` | copilot/scout progress bridge onto the web-channel socket |
@@ -46,15 +45,11 @@ use tinyflows::triggers::graph_trigger_warnings;
 pub(crate) use tinyflows_catalog::graph_policy::{
     enforce_side_effect_approval, graph_has_actionable_nodes, trigger_is_automatic,
 };
-use tokio_util::sync::CancellationToken;
-
-use crate::agent::turn_origin::{with_origin, AgentTurnOrigin};
 use crate::config::Config;
 use crate::core::Outcome;
 use crate::flows::bus;
 use crate::flows::draft_store;
 use crate::flows::store;
-use crate::security::approval::{ApprovalChatContext, ApprovalTurnContext};
 use tinyflows_catalog::build_registry;
 use tinyflows_catalog::types::{
     FlowConnection, FlowRunTrigger, FlowSuggestion, SuggestionStatus,
@@ -91,15 +86,13 @@ const GRAPH_CHANGED_SINCE_PARK_ERROR: &str = "the workflow changed after this ru
 // Phase 2 — autonomy-tier gating of acting flow nodes
 // ─────────────────────────────────────────────────────────────────────────────
 //
-// A `flows_run` / `flows_resume` executes under a `TrustedAutomation { Workflow }`
-// origin (see `workflow_origin` below), but the *acting power* of a run is still
-// bounded by the user's `[autonomy]` tier — the same `SecurityPolicy`
-// (`crates/openhuman-core/src/security/`) the agent tool-loop honors, built via
-// `SecurityPolicy::from_config(&config.autonomy, …)` inside
-// `tinyflows::caps::build_capabilities`.
+// A `flows_run` / `flows_resume` executes under a trusted workflow origin, but
+// its acting power is still bounded by the user's `[autonomy]` tier. The
+// `CapsHost` adapter applies OpenHuman policy and approvals at the host
+// callback; TinyFlows owns graph execution and lifecycle settlement.
 //
 // Before an acting node dispatches, its capability adapter
-// (`crates/openhuman-core/src/flows/tinyflows/caps.rs::enforce_node_tier_gate`) maps the node to a
+// (`crates/openhuman-core/src/flows/caps_host/`) maps the node to a
 // `CommandClass` and consults `SecurityPolicy::gate_decision`. `Block` refuses
 // outright (`[policy-blocked]` error, no dispatch); `Prompt`/`Allow` fall through
 // to the process-global `ApprovalGate`, which performs the human round-trip for
@@ -118,7 +111,7 @@ const GRAPH_CHANGED_SINCE_PARK_ERROR: &str = "the workflow changed after this ru
 //   ¹ tool_call routes through the deny-by-default curation/scope gate plus the
 //     ApprovalGate rather than `gate_decision`; a Network-class Composio action
 //     still prompts under supervised/full and the curation gate is the hard
-//     allowlist. See `caps.rs::OpenHumanTools`.
+//     allowlist. See `caps_host::service_tools`.
 //
 // `Network` is never `Allow` in any tier (always `Prompt` when not blocked), so
 // even a full-tier http_request node prompts unless a pre-declared trust root /

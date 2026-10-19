@@ -2,9 +2,7 @@
 //! create/get/list/update/delete/enable/run, backed by SQLite. Mirrors
 //! `crates/openhuman-core/src/cron/`'s module shape.
 //!
-//! Business logic lives in [`ops`]; persistence in `store` (private, with a
-//! handful of functions re-exported below for the capability seam's
-//! `tinyflows_sqlite::flows::SqliteStateStore`); the RPC/CLI
+//! Business logic lives in [`ops`]; workflow definitions in `store`; the RPC/CLI
 //! controller surface in `schemas` (private, re-exported below).
 //!
 //! # Gate shape — leaf, not facade
@@ -52,16 +50,6 @@ pub use schemas::{
     all_controller_schemas as all_flows_controller_schemas,
     all_registered_controllers as all_flows_registered_controllers,
 };
-// `kv_get`/`kv_set` are re-exported (not just `pub(crate)`-visible within this
-// domain's own module tree) because `tinyflows_sqlite::flows::SqliteStateStore`
-// (built in `crates/openhuman-core/src/flows/tinyflows/caps/ops.rs`) lives in a sibling module and needs
-// them to implement `tinyflows::caps::StateStore` without duplicating the
-// `flow_state` table's persistence logic.
-// `upsert_flow_run_step` is likewise re-exported for the tinyflows seam: the
-// live run observer (`tinyflows::observability::FlowRunObserver`, issue G2)
-// lives in the sibling `tinyflows` domain and persists each finished step onto
-// the `flow_runs` row through this function as the run executes.
-pub use store::{kv_get, kv_set, upsert_flow_run_step};
 pub use {node_contracts::all_node_kind_contracts, node_contracts::node_kind_contract};
 // Flow memory scoping (`flow:<id>` tags over memory v2) lives in
 // `memory_tools`, the sibling that owns the agent tools; the digest

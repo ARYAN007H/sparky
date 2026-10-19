@@ -58,7 +58,7 @@ mod imp {
     #[cfg(not(test))]
     use crate::modules::ops;
     use crate::modules::runtime;
-    use tinybus::{ObjectPath, Proxy};
+    use tinybus::{InterfaceName, InterfaceVersion, ObjectPath, PeerManifest, Proxy, Version};
     use tinyflows_bus::schedule;
 
     /// Longest a store or maths call waits. Job execution is not a call to the
@@ -69,6 +69,10 @@ mod imp {
     /// Longest `ExecuteJob` (Run Now) waits: the host runs the job's real work
     /// (an agent turn, a shell command) inside the call.
     const RUN_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(2 * 60 * 60);
+
+    /// Serialize CapsHost manifest read-modify-announce operations on the
+    /// process-wide module-runtime peer.
+    static CAPS_HOST_MANIFEST_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
     /// Make sure the module serves. In unit tests this attaches the linked
     /// module built into the test binary; everywhere else it goes through the
@@ -263,6 +267,7 @@ mod imp {
         path: String,
         object: impl tinybus::service::Interface + 'static,
     ) -> Result<ServedObjectRegistration, String> {
+        let announces_caps_host = object.name().as_str() == tinyflows_bus::runs::CAPS_INTERFACE;
         let runtime = runtime::runtime()
             .await
             .map_err(|error| format!("the module bus is unavailable: {error}"))?;
@@ -275,13 +280,44 @@ mod imp {
                     .await
                     .map_err(|error| error.to_string())?;
                 connection
-                    .serve_at(object_path, object)
+                    .serve_at(object_path.clone(), object)
                     .await
                     .map_err(|error| error.to_string())?;
+                if announces_caps_host
+                    && let Err(error) = announce_caps_host_v2(&connection).await
+                {
+                    let _ = connection.unserve(&object_path).await;
+                    return Err(error);
+                }
                 Ok(ServedObjectRegistration(path))
             })
             .await
             .map_err(|error| format!("serving the host object did not finish: {error}"))?
+    }
+
+    async fn announce_caps_host_v2(connection: &tinybus::Connection) -> Result<(), String> {
+        let _lock = CAPS_HOST_MANIFEST_LOCK.lock().await;
+        let interface = InterfaceName::new(tinyflows_bus::runs::CAPS_INTERFACE)
+            .map_err(|error| error.to_string())?;
+        let mut manifest = connection
+            .manifest_of(HOST_BUS_NAME)
+            .await
+            .map_err(|error| error.to_string())?
+            .unwrap_or_else(|| PeerManifest::new("openhuman-module-host"));
+        let caps_host = InterfaceVersion::provided(interface.clone(), Version::new(2, 0, 0));
+        if let Some(provided) = manifest
+            .provides
+            .iter_mut()
+            .find(|provided| provided.interface == interface)
+        {
+            *provided = caps_host;
+        } else {
+            manifest.provides.push(caps_host);
+        }
+        connection
+            .announce(&manifest)
+            .await
+            .map_err(|error| format!("announcing the CapsHost v2 contract failed: {error}"))
     }
 
     /// Serve two interfaces at one object path and return an RAII token for
