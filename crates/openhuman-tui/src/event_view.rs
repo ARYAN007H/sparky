@@ -133,7 +133,7 @@ impl WebEventView {
                 view.args.clone_from(args);
                 view.tool_call_id.clone_from(tool_call_id);
                 view.tool_display_label.clone_from(tool_display_label);
-                view.subagent = subagent.as_ref().map(|detail| subagent_view(detail));
+                view.subagent = subagent.as_ref().map(&subagent_view);
             }
             E::ApprovalRequest {
                 tool_name,
@@ -214,7 +214,7 @@ impl WebEventView {
                 view.failure.clone_from(failure);
                 view.elapsed_ms.clone_from(elapsed_ms);
                 view.tool_display_label.clone_from(tool_display_label);
-                view.subagent = subagent.as_ref().map(|detail| subagent_view(detail));
+                view.subagent = subagent.as_ref().map(&subagent_view);
             }
             E::ToolArgsDelta {
                 delta,
