@@ -33,7 +33,12 @@ fn composio_schema_contracts_and_registration_are_preserved() {
         expect_schema_identity(&schemas(function), "composio", function);
     }
     let registered = all_registered_controllers();
-    for function in ["list_triggers", "enable_trigger", "disable_trigger", "list_trigger_history"] {
+    for function in [
+        "list_triggers",
+        "enable_trigger",
+        "disable_trigger",
+        "list_trigger_history",
+    ] {
         assert!(
             registered.iter().any(|controller| {
                 controller.schema.namespace == "composio" && controller.schema.function == function

@@ -17,7 +17,13 @@ fn socket_schema_contracts_are_preserved() {
         .map(|schema| schema.function)
         .collect();
     assert_eq!(functions.len(), 5);
-    for expected in ["connect", "disconnect", "state", "emit", "connect_with_session"] {
+    for expected in [
+        "connect",
+        "disconnect",
+        "state",
+        "emit",
+        "connect_with_session",
+    ] {
         assert!(functions.contains(&expected), "missing socket.{expected}");
     }
     for schema in all_controller_schemas() {
