@@ -500,7 +500,6 @@ async fn drive_turn(
     let candidate_names = prepared.tools().plan.candidates.clone();
     let TurnWiring {
         halt_summary,
-        classified_cause,
         wrap_up_fired,
         compression_mw,
         prompt_cache_guard,
@@ -686,7 +685,6 @@ async fn drive_turn(
         Some(bridge),
         early_exit,
         &halt_summary,
-        classified_cause(),
         &wrap_up_fired,
         run_instance_id,
         &tool_outcome_sink,

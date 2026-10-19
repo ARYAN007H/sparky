@@ -101,11 +101,6 @@ pub(super) struct TurnMiddlewareInputs {
 pub(super) struct TurnWiring {
     /// Root-cause summary recorded by the repeated-tool-failure breaker.
     pub(super) halt_summary: HaltSummarySlot,
-    /// Reads the repeated-failure latch's typed cause while it still owns the
-    /// halt summary. `AgentRun.failure_cause` covers the harness guard path.
-    pub(super) classified_cause: Arc<
-        dyn Fn() -> Option<tinyagents_harness::no_progress::ClassifiedStopCause> + Send + Sync,
-    >,
     /// Set by `FinalCallWrapUpMiddleware` when it turned the last permitted
     /// model call into the turn's conclusion (issue #6014). `None` when the
     /// middleware is not installed (a run that does not pause at its cap).
@@ -596,12 +591,8 @@ pub(super) fn install_turn_middleware(
     // compacted, trimmed or persisted (`memory::lifecycle::prefetch::pre_turn`).
     harness.push_middleware(Arc::new(middleware::memory_pack::memory_pack_middleware()));
 
-    let classified_cause = repeated_failure
-        .map(|mw| Arc::new(move || mw.current_classified_cause()) as _)
-        .unwrap_or_else(|| Arc::new(|| None));
     TurnWiring {
         halt_summary,
-        classified_cause,
         wrap_up_fired,
         compression_mw,
         prompt_cache_guard,
