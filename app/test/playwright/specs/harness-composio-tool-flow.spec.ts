@@ -10,12 +10,6 @@ import {
 const MOCK_ADMIN_BASE = `http://127.0.0.1:${process.env.E2E_MOCK_PORT || '18473'}`;
 const USER_ID = 'pw-harness-composio-tool-flow';
 
-interface MockRequest {
-  method: string;
-  url: string;
-  body?: string;
-}
-
 async function resetMock(): Promise<void> {
   await fetch(`${MOCK_ADMIN_BASE}/__admin/reset`, {
     method: 'POST',
@@ -30,12 +24,6 @@ async function setMockBehavior(key: string, value: string): Promise<void> {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ key, value }),
   });
-}
-
-async function requests(): Promise<MockRequest[]> {
-  const response = await fetch(`${MOCK_ADMIN_BASE}/__admin/requests`);
-  const payload = (await response.json()) as { data?: MockRequest[] };
-  return Array.isArray(payload.data) ? payload.data : [];
 }
 
 function seedHarnessComposioState(): Promise<void[]> {
