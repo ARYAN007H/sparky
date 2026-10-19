@@ -45,10 +45,16 @@ async fn config_context(provider: String) -> (tempfile::TempDir, DispatchCtx) {
     (tmp, DispatchCtx::new(core))
 }
 
+async fn reloaded_config(tmp: &tempfile::TempDir) -> Config {
+    Config::load_from_config_path(&tmp.path().join("config.toml"), tmp.path())
+        .await
+        .unwrap()
+}
+
 #[tokio::test]
 async fn endpoint_only_custom_change_reports_persisted_provider_signature() {
     let (endpoint, server) = endpoint().await;
-    let (_tmp, ctx) = config_context("custom:http://127.0.0.1:1/v1".to_string()).await;
+    let (tmp, ctx) = config_context("custom:http://127.0.0.1:1/v1".to_string()).await;
 
     let outcome = update_settings(
         &ctx,
@@ -60,7 +66,7 @@ async fn endpoint_only_custom_change_reports_persisted_provider_signature() {
     )
     .await
     .unwrap();
-    let persisted = ctx.load_config().await.unwrap();
+    let persisted = reloaded_config(&tmp).await;
     let expected = format_embedding_signature(
         &persisted.memory.embedding_provider,
         &persisted.memory.embedding_model,
@@ -90,5 +96,34 @@ async fn explicit_custom_provider_with_same_endpoint_keeps_signature_unchanged()
     .unwrap();
 
     assert_eq!(outcome.value["signature_changed"], false);
+    server.abort();
+}
+
+#[tokio::test]
+async fn auto_detected_dimensions_are_used_in_persisted_provider_signature() {
+    let (endpoint, server) = endpoint().await;
+    let (tmp, ctx) = config_context("custom:http://127.0.0.1:1/v1".to_string()).await;
+
+    let outcome = update_settings(
+        &ctx,
+        None,
+        None,
+        Some(8),
+        Some(endpoint.clone()),
+        None,
+    )
+    .await
+    .unwrap();
+    let persisted = reloaded_config(&tmp).await;
+    let expected = format_embedding_signature(
+        &persisted.memory.embedding_provider,
+        &persisted.memory.embedding_model,
+        persisted.memory.embedding_dimensions,
+    );
+
+    assert_eq!(persisted.memory.embedding_provider, format!("custom:{endpoint}"));
+    assert_eq!(persisted.memory.embedding_dimensions, 4);
+    assert_eq!(outcome.value["signature_changed"], true);
+    assert_eq!(outcome.value["new_signature"], expected);
     server.abort();
 }
