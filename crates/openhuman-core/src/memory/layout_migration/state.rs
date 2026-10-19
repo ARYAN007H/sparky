@@ -7,10 +7,10 @@
 
 use std::path::{Path, PathBuf};
 
-use tinymemory_tools::layout_migration::{Error, Result};
+use tinymemory_tools::layout_migration::{Error as MigrationError, Result as MigrationResult};
 
 use super::{MigrationState, MigrationStateStore};
-use crate::memory::error::{MemoryError, MemoryResult};
+use tinymemory_api::{Error, Result};
 
 const STATE: &str = "layout_migration";
 
@@ -40,18 +40,18 @@ impl FileStateStore {
 }
 
 impl MigrationStateStore for FileStateStore {
-    fn load(&self) -> Result<MigrationState> {
-        load(&self.workspace_dir).map_err(|error| Error::State(detail(error)))
+    fn load(&self) -> MigrationResult<MigrationState> {
+        load(&self.workspace_dir).map_err(|error| MigrationError::State(detail(error)))
     }
 
-    fn save(&self, state: &MigrationState) -> Result<()> {
-        save(&self.workspace_dir, state).map_err(|error| Error::State(detail(error)))
+    fn save(&self, state: &MigrationState) -> MigrationResult<()> {
+        save(&self.workspace_dir, state).map_err(|error| MigrationError::State(detail(error)))
     }
 }
 
-fn detail(error: MemoryError) -> String {
+fn detail(error: Error) -> String {
     match error {
-        MemoryError::Engine(message) => message,
+        Error::Engine(message) => message,
         other => other.to_string(),
     }
 }
@@ -62,12 +62,10 @@ fn detail(error: MemoryError) -> String {
 ///
 /// A state that cannot be read or parsed: the migration must not start
 /// over and copy everything again on a damaged value.
-pub fn load(workspace_dir: &Path) -> MemoryResult<MigrationState> {
+pub fn load(workspace_dir: &Path) -> Result<MigrationState> {
     crate::memory::state_store::load_strict(workspace_dir, STATE)
         .map(Option::unwrap_or_default)
-        .map_err(|error| {
-            MemoryError::Engine(format!("layout migration state unreadable: {error:#}"))
-        })
+        .map_err(|error| Error::Engine(format!("layout migration state unreadable: {error:#}")))
 }
 
 /// Saves `state` whole (one storage write, so a crash leaves the previous
@@ -76,10 +74,9 @@ pub fn load(workspace_dir: &Path) -> MemoryResult<MigrationState> {
 /// # Errors
 ///
 /// When the state cannot be written.
-pub fn save(workspace_dir: &Path, state: &MigrationState) -> MemoryResult<()> {
-    crate::memory::state_store::save(workspace_dir, STATE, state).map_err(|error| {
-        MemoryError::Engine(format!("layout migration state not saved: {error:#}"))
-    })
+pub fn save(workspace_dir: &Path, state: &MigrationState) -> Result<()> {
+    crate::memory::state_store::save(workspace_dir, STATE, state)
+        .map_err(|error| Error::Engine(format!("layout migration state not saved: {error:#}")))
 }
 
 #[cfg(test)]

@@ -5559,6 +5559,7 @@ dependencies = [
  "tinyinference-local",
  "tinyinference-voice",
  "tinymcp-bus",
+ "tinymemory-tools",
  "tinysearch-bus",
  "tinystoragedrivers",
  "tinystoragedrivers-core",
@@ -5663,6 +5664,7 @@ dependencies = [
  "sentry",
  "serde",
  "serde_json",
+ "sha2 0.10.9",
  "socketioxide",
  "tempfile",
  "tinyagents-harness",
@@ -9606,6 +9608,7 @@ dependencies = [
  "tinyredact",
  "tokio",
  "tracing",
+ "url",
  "walkdir",
 ]
 
@@ -9613,6 +9616,7 @@ dependencies = [
 name = "tinymemory-tools"
 version = "1.28.0"
 dependencies = [
+ "async-lock",
  "async-trait",
  "chrono",
  "futures",
@@ -9622,6 +9626,7 @@ dependencies = [
  "sha2 0.11.0",
  "thiserror 2.0.20",
  "tinymemory-api",
+ "uuid",
 ]
 
 [[package]]

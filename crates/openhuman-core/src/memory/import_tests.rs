@@ -129,5 +129,5 @@ async fn a_paused_scheduler_leaves_an_interrupted_import_for_later() {
 #[test]
 fn a_store_with_no_legacy_files_counts_nothing() {
     let tmp = tempfile::tempdir().unwrap();
-    assert!(count_legacy(tmp.path()).is_none());
+    assert!(tinymemory_integrations::import::count_legacy(tmp.path()).is_none());
 }

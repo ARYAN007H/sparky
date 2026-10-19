@@ -4,7 +4,6 @@ use std::time::Duration;
 
 use tinymemory_api::{ItemKind, MetaFilter};
 
-use crate::memory::error::{INVALID_REQUEST, MEMORY_OFF};
 use crate::memory::test_fixtures::{bind_reference, config_in, stored};
 use crate::threads::store::{ConversationMessage, CreateConversationThread};
 
@@ -74,7 +73,7 @@ async fn refuses_without_consent_and_with_memory_off() {
     )
     .await
     .unwrap_err();
-    assert_eq!(error.code(), INVALID_REQUEST);
+    assert_eq!(error.code(), "INVALID_REQUEST");
     let error = start(
         &DispatchCtx::ambient(),
         &config,
@@ -82,7 +81,7 @@ async fn refuses_without_consent_and_with_memory_off() {
     )
     .await
     .unwrap_err();
-    assert_eq!(error.code(), MEMORY_OFF);
+    assert_eq!(error.code(), "MEMORY_OFF");
 }
 
 #[tokio::test]
@@ -115,20 +114,20 @@ async fn stores_past_chats_once_and_skips_what_live_logging_took() {
     )
     .await;
     // The lifecycle logged live-thread's second turn (user index 2).
-    let identity = MemoryIdentity::agent(MAIN_AGENT).resolve(&config);
-    crate::memory::lifecycle::hooks::pre_turn(
+    let identity = tinymemory_tools::layout::identity::Identity::agent(MAIN_AGENT)
+        .resolve(&crate::memory::scope::identity_pins(&config));
+    crate::memory::lifecycle::hooks::pre_turn_work(
         &crate::core::runtime::DispatchCtx::ambient(),
         &config,
         &identity,
-        crate::memory::lifecycle::hooks::PreTurnInput {
-            thread_id: "live-thread".into(),
-            turn_index: 2,
-            user_text: "After logging".into(),
-            in_prompt_from: 0,
-            at: Utc::now(),
-            resumed_after_compaction: false,
-            observed_actor: None,
-        },
+        "live-thread".into(),
+        2,
+        "After logging".into(),
+        0,
+        Utc::now(),
+        false,
+        None,
+        None,
     )
     .await;
 

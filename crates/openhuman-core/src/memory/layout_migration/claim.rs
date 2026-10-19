@@ -16,7 +16,7 @@ use sha2::Digest;
 use tinymemory_tools::layout_migration::{LegacyClaim, Result as ModuleResult};
 
 use super::app_host::to_module;
-use crate::memory::error::{MemoryError, MemoryResult};
+use tinymemory_api::{Error, Result};
 
 /// Where a legacy tree's marker lives and who would own it.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -70,7 +70,7 @@ fn normalize(endpoint: &str) -> String {
 /// # Errors
 ///
 /// When the marker exists but cannot be read.
-fn owner(key: &ClaimKey) -> MemoryResult<Option<String>> {
+fn owner(key: &ClaimKey) -> Result<Option<String>> {
     match std::fs::read(&key.marker) {
         Ok(bytes) => serde_json::from_slice::<Marker>(&bytes)
             .map(|marker| Some(marker.owner))
@@ -85,7 +85,7 @@ fn owner(key: &ClaimKey) -> MemoryResult<Option<String>> {
 /// # Errors
 ///
 /// When the marker exists but cannot be read.
-pub fn held_by_other(key: &ClaimKey) -> MemoryResult<bool> {
+pub fn held_by_other(key: &ClaimKey) -> Result<bool> {
     Ok(owner(key)?.is_some_and(|owner| owner != key.owner))
 }
 
@@ -95,7 +95,7 @@ pub fn held_by_other(key: &ClaimKey) -> MemoryResult<bool> {
 /// # Errors
 ///
 /// When the marker cannot be read or written.
-pub fn take(key: &ClaimKey) -> MemoryResult<bool> {
+pub fn take(key: &ClaimKey) -> Result<bool> {
     if let Some(owner) = owner(key)? {
         return Ok(owner == key.owner);
     }
@@ -121,7 +121,7 @@ pub fn take(key: &ClaimKey) -> MemoryResult<bool> {
         Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
             Ok(owner(key)?.is_some_and(|owner| owner == key.owner))
         }
-        Err(error) => Err(MemoryError::Engine(format!(
+        Err(error) => Err(Error::Engine(format!(
             "legacy tree claim not saved: {error}"
         ))),
     }
@@ -137,8 +137,8 @@ impl LegacyClaim for ClaimKey {
     }
 }
 
-fn unreadable(error: &dyn std::fmt::Display) -> MemoryError {
-    MemoryError::Engine(format!("legacy tree claim unreadable: {error}"))
+fn unreadable(error: &dyn std::fmt::Display) -> Error {
+    Error::Engine(format!("legacy tree claim unreadable: {error}"))
 }
 
 #[cfg(test)]

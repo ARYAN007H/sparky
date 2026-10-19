@@ -1,14 +1,15 @@
 //! The background job queue: the slow memory work TinyMemory hands back.
 //!
 //! The queue itself (dedupe, retry, history) is `tinymemory_tools::queue`;
-//! this module is the host adapter: one queue per workspace over a file
-//! store (the `memory`/`state`/`jobs` storage value), the engine and `[memory.recall]
-//! build_delay_secs` it runs against, and the `memory_background` cron hook.
+//! this module is the host adapter: one queue per workspace over the
+//! `memory`/`state`/`jobs` storage value, the engine and
+//! `[memory.recall] build_delay_secs` it runs against, and the
+//! `memory_background` cron hook.
 //!
 //! `post_turn` and brain ingests return `BackgroundJob` values (belief builds,
 //! deferred ingests) instead of running them. They are queued here, persisted
-//! in the `memory`/`state`/`jobs` storage value so a restart loses none, de-duplicated
-//! (two builds of one scope are one build), and run by the
+//! in the `memory`/`state`/`jobs` storage value so a restart loses none,
+//! de-duplicated (two builds of one scope are one build), and run by the
 //! `memory_background` cron job ([`run_due`]) once they are at least
 //! `[memory.recall] build_delay_secs` old — a belief build reads the facts the
 //! engine extracts from the writes, and that extraction lags behind them.
@@ -19,17 +20,17 @@
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, LazyLock, Mutex};
+use std::sync::{Arc, LazyLock, Mutex, Weak};
 
 use tinymemory_api::Namespace;
 use tinymemory_tools::queue::{JobQueue as Queue, QueueError, QueueState, QueueStore};
 use tinymemory_tools::BackgroundJob;
 
-pub use tinymemory_tools::queue::{JobRun, QueuedJob, Selection, MAX_ATTEMPTS, MAX_HISTORY};
+use tinymemory_tools::queue::{JobRun, Selection};
 
 use crate::config::Config;
 use crate::memory::engine;
-use crate::memory::error::{MemoryError, MemoryResult};
+use tinymemory_api::{Error, Result};
 
 /// The cron job that runs the queue.
 pub const BACKGROUND_JOB: &str = "memory_background";
@@ -57,7 +58,7 @@ impl QueueStore for FileQueueStore {
             .unwrap_or_default()
     }
 
-    fn save(&self, state: &QueueState) -> Result<(), String> {
+    fn save(&self, state: &QueueState) -> std::result::Result<(), String> {
         crate::memory::state_store::save(&self.workspace_dir, STATE, state)
             .map_err(|error| error.to_string())
     }
@@ -66,19 +67,20 @@ impl QueueStore for FileQueueStore {
 type WorkspaceQueue = Queue<FileQueueStore>;
 
 /// One queue per workspace, so its lock serialises every run in the process.
-static QUEUES: LazyLock<Mutex<HashMap<PathBuf, Arc<WorkspaceQueue>>>> =
+static QUEUES: LazyLock<Mutex<HashMap<PathBuf, Weak<WorkspaceQueue>>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
 
 fn queue_of(workspace_dir: &Path) -> Arc<WorkspaceQueue> {
     let mut queues = QUEUES.lock().unwrap_or_else(|e| e.into_inner());
-    queues
-        .entry(workspace_dir.to_path_buf())
-        .or_insert_with(|| {
-            Arc::new(Queue::new(FileQueueStore {
-                workspace_dir: workspace_dir.to_path_buf(),
-            }))
-        })
-        .clone()
+    queues.retain(|_, queue| queue.strong_count() > 0);
+    if let Some(queue) = queues.get(workspace_dir).and_then(Weak::upgrade) {
+        return queue;
+    }
+    let queue = Arc::new(Queue::new(FileQueueStore {
+        workspace_dir: workspace_dir.to_path_buf(),
+    }));
+    queues.insert(workspace_dir.to_path_buf(), Arc::downgrade(&queue));
+    queue
 }
 
 /// Queues `jobs` under `root`; a job already queued is kept once, at its
@@ -94,13 +96,13 @@ pub fn has_pending(workspace_dir: &Path) -> bool {
 }
 
 /// The queue as it stands.
-pub async fn snapshot(config: &Config) -> JobQueue {
+pub async fn snapshot(config: &Config) -> QueueState {
     queue_of(&config.workspace_dir).snapshot().await
 }
 
 /// Runs the selected jobs on the configured engine. Returns the runs it
 /// recorded; see `tinymemory_tools::queue::JobQueue::run` for the retry rules.
-pub async fn run(config: &Config, selection: Selection) -> MemoryResult<Vec<JobRun>> {
+pub async fn run(config: &Config, selection: Selection) -> Result<Vec<JobRun>> {
     let bound = engine::resolve(config).engine()?;
     queue_of(&config.workspace_dir)
         .run(
@@ -110,7 +112,7 @@ pub async fn run(config: &Config, selection: Selection) -> MemoryResult<Vec<JobR
         )
         .await
         .map_err(|error| match error {
-            QueueError::NoSuchJob(_) => MemoryError::invalid(error.to_string()),
+            QueueError::NoSuchJob(_) => Error::InvalidRequest(error.to_string()),
         })
 }
 
@@ -130,7 +132,7 @@ pub async fn run_due(config: &Config) {
             tracing::debug!(ran = runs.len(), "[memory:jobs] background run finished");
         }
         Ok(_) => {}
-        Err(MemoryError::Off(_)) => {}
+        Err(Error::Off(_)) => {}
         Err(error) => tracing::warn!(%error, "[memory:jobs] background run failed"),
     }
 }

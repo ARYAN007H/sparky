@@ -9,9 +9,9 @@
 //!   placement, the layout switch, the free period), with [`claim`] naming the
 //!   account that takes a legacy tree several accounts share.
 //! - [`service`]: running in the background (one run per workspace, gated on
-//!   the import) and mapping the module's errors to [`MemoryError`].
+//!   the import) and mapping the module's errors to [`Error`].
 //!
-//! [`MemoryError`]: crate::memory::error::MemoryError
+//! [`Error`]: tinymemory_api::Error
 
 pub mod app_host;
 pub mod claim;

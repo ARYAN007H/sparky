@@ -1,21 +1,21 @@
 use super::*;
 
-use crate::memory::scope::MemoryIdentity;
-use crate::memory::test_fixtures::config_in;
+use crate::memory::test_fixtures::{bind_reference, config_in, stored};
+use tinymemory_tools::lifecycle::turn::TurnPack as NativeTurnPack;
 
 const MAX_PENDING: usize = 16;
 
 static TEST_LOCK: LazyLock<tokio::sync::Mutex<()>> = LazyLock::new(|| tokio::sync::Mutex::new(()));
 
 fn pack(text: &str) -> TurnPack {
-    TurnPack {
+    TurnPack::from_native(NativeTurnPack {
         markdown: text.into(),
         tokens: 1,
         refs: vec![],
         engine: "test".into(),
         citations: vec![],
         refusal: None,
-    }
+    })
 }
 
 async fn drain(cache: &Cache, key: &Key) {
@@ -33,7 +33,8 @@ async fn held_refresh_returns_immediately_and_later_turn_reads_completed_context
     let _guard = TEST_LOCK.lock().await;
     let tmp = tempfile::tempdir().unwrap();
     let config = config_in(&tmp);
-    let identity = MemoryIdentity::agent("a").resolve(&config);
+    let identity = tinymemory_tools::layout::identity::Identity::agent("a")
+        .resolve(&crate::memory::scope::identity_pins(&config));
     let key = Key::new(&config, &identity, "t", false);
     let cache = Arc::new(Cache::default());
     let release = Arc::new(tokio::sync::Notify::new());
@@ -60,7 +61,8 @@ async fn identity_config_thread_workspace_and_context_are_isolated() {
     let _guard = TEST_LOCK.lock().await;
     let tmp = tempfile::tempdir().unwrap();
     let config = config_in(&tmp);
-    let identity = MemoryIdentity::agent("a").resolve(&config);
+    let identity = tinymemory_tools::layout::identity::Identity::agent("a")
+        .resolve(&crate::memory::scope::identity_pins(&config));
     let key = Key::new(&config, &identity, "t", false);
     let cache = Arc::new(Cache::default());
     enqueue(
@@ -90,11 +92,82 @@ async fn identity_config_thread_workspace_and_context_are_isolated() {
 }
 
 #[tokio::test]
+async fn pre_turn_logs_channel_metadata_without_writing_legacy_thread_map() {
+    let _guard = TEST_LOCK.lock().await;
+    let tmp = tempfile::tempdir().unwrap();
+    let config = Arc::new(config_in(&tmp));
+    let engine = bind_reference(&config);
+    let identity = tinymemory_tools::layout::identity::Identity::agent("channel-agent")
+        .resolve(&crate::memory::scope::identity_pins(&config));
+    let thread_id = "telegram-thread";
+    let key = Key::new(&config, &identity, thread_id, false);
+    let cache = cache(&crate::core::runtime::DispatchCtx::ambient());
+
+    assert!(pre_turn(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        config.clone(),
+        identity,
+        thread_id.into(),
+        0,
+        "hello from telegram".into(),
+        0,
+        chrono::Utc::now(),
+        false,
+        None,
+        Some("telegram".into()),
+    )
+    .is_none());
+    drain(&cache, &key).await;
+
+    let turns = stored(
+        &engine,
+        tinymemory_api::MetaFilter::kinds([tinymemory_api::ItemKind::Conversation]),
+    )
+    .await;
+    assert_eq!(turns.len(), 1);
+    assert_eq!(turns[0].meta.channel.as_deref(), Some("telegram"));
+    assert!(
+        !config
+            .workspace_dir
+            .join("memory")
+            .join("channel_threads.json")
+            .exists(),
+        "new turns must not write the legacy channel/thread map"
+    );
+}
+
+#[test]
+fn prefetch_key_tracks_memory_config_without_hashing_unrelated_config() {
+    let tmp = tempfile::tempdir().unwrap();
+    let config = config_in(&tmp);
+    let identity = tinymemory_tools::layout::identity::Identity::agent("a")
+        .resolve(&crate::memory::scope::identity_pins(&config));
+    let key = Key::new(&config, &identity, "t", false);
+
+    let mut memory_changed = config.clone();
+    memory_changed.memory.recall.brain_limit += 1;
+    assert!(key != Key::new(&memory_changed, &identity, "t", false));
+
+    let mut engine_changed = config.clone();
+    engine_changed.api_url = Some("https://memory.example.test".into());
+    assert!(key != Key::new(&engine_changed, &identity, "t", false));
+
+    let mut inference_changed = config.clone();
+    inference_changed.inference_url = Some("https://inference.example.test".into());
+    assert!(key != Key::new(&inference_changed, &identity, "t", false));
+
+    let mut unrelated_changed = config;
+    unrelated_changed.context.enabled = false;
+    assert!(key == Key::new(&unrelated_changed, &identity, "t", false));
+}
+
+#[tokio::test]
 async fn invalidation_rejects_late_results_and_preserves_bounded_pending_logs() {
     let _guard = TEST_LOCK.lock().await;
     let tmp = tempfile::tempdir().unwrap();
     let config = config_in(&tmp);
-    let identity = MemoryIdentity::agent("a").resolve(&config);
+    let identity = tinymemory_tools::layout::identity::Identity::agent("a")
+        .resolve(&crate::memory::scope::identity_pins(&config));
     let key = Key::new(&config, &identity, "t", false);
     let cache = Arc::new(Cache::default());
     CACHES.lock().unwrap().push(Arc::downgrade(&cache));
@@ -143,7 +216,8 @@ async fn expiration_failure_and_oversized_packs_are_not_reused() {
     let _guard = TEST_LOCK.lock().await;
     let tmp = tempfile::tempdir().unwrap();
     let config = config_in(&tmp);
-    let identity = MemoryIdentity::agent("a").resolve(&config);
+    let identity = tinymemory_tools::layout::identity::Identity::agent("a")
+        .resolve(&crate::memory::scope::identity_pins(&config));
     let key = Key::new(&config, &identity, "t", false);
     let cache = Arc::new(Cache::default());
     enqueue(
@@ -170,7 +244,8 @@ async fn credential_invalidation_removes_ready_and_rejects_late_inflight_results
     let _guard = TEST_LOCK.lock().await;
     let tmp = tempfile::tempdir().unwrap();
     let config = config_in(&tmp);
-    let identity = MemoryIdentity::agent("a").resolve(&config);
+    let identity = tinymemory_tools::layout::identity::Identity::agent("a")
+        .resolve(&crate::memory::scope::identity_pins(&config));
     let key = Key::new(&config, &identity, "t", false);
     let cache = Arc::new(Cache::default());
     CACHES.lock().unwrap().push(Arc::downgrade(&cache));
@@ -302,25 +377,47 @@ async fn slow_engine_results_survive_the_manual_pre_turn_cutoff() {
         .await
         .unwrap();
     crate::memory::engine::install_test_engine(&config.workspace_dir, engine.clone());
-    let identity = MemoryIdentity::agent("a").resolve(&config);
-    let input = |index| PreTurnInput {
-        thread_id: "slow".into(),
-        turn_index: index,
-        user_text: "what is my favourite colour?".into(),
-        in_prompt_from: 0,
-        at: chrono::Utc::now(),
-        resumed_after_compaction: false,
-        observed_actor: None,
+    let identity = tinymemory_tools::layout::identity::Identity::agent("a")
+        .resolve(&crate::memory::scope::identity_pins(&config));
+    let input = |index| {
+        (
+            "slow".to_string(),
+            index,
+            "what is my favourite colour?".to_string(),
+            0,
+            chrono::Utc::now(),
+            false,
+            None,
+        )
+    };
+    let pre_turn = |config,
+                    identity,
+                    input: (
+        String,
+        u32,
+        String,
+        u32,
+        chrono::DateTime<chrono::Utc>,
+        bool,
+        Option<tinymemory_api::ObservedActor>,
+    )| {
+        let (thread, index, text, in_prompt_from, at, resumed, observed_actor) = input;
+        super::pre_turn(
+            &crate::core::runtime::DispatchCtx::ambient(),
+            config,
+            identity,
+            thread,
+            index,
+            text,
+            in_prompt_from,
+            at,
+            resumed,
+            observed_actor,
+            None,
+        )
     };
     let config = Arc::new(config);
-    assert!(pre_turn(
-        &crate::core::runtime::DispatchCtx::ambient(),
-        config.clone(),
-        identity.clone(),
-        input(0),
-        None
-    )
-    .is_none());
+    assert!(pre_turn(config.clone(), identity.clone(), input(0)).is_none());
     // Even after the old one-millisecond cutoff, the pack remains owned by
     // the background worker instead of being discarded by the live turn.
     tokio::time::sleep(Duration::from_millis(5)).await;
@@ -329,27 +426,14 @@ async fn slow_engine_results_survive_the_manual_pre_turn_cutoff() {
     assert!(completed(&cache, &key).is_none());
     release.add_permits(100);
     drain(&cache, &key).await;
-    let pack = pre_turn(
-        &crate::core::runtime::DispatchCtx::ambient(),
-        config.clone(),
-        identity.clone(),
-        input(2),
-        None,
-    )
-    .expect("next turn uses completed slow lookup");
+    let pack = pre_turn(config.clone(), identity.clone(), input(2))
+        .expect("next turn uses completed slow lookup");
     assert!(pack.markdown.contains("teal"));
     assert!(pack.markdown.contains("earlier turn"));
     drain(&cache, &key).await;
     let mut omitted = identity;
     omitted.recall = false;
-    assert!(pre_turn(
-        &crate::core::runtime::DispatchCtx::ambient(),
-        config.clone(),
-        omitted.clone(),
-        input(4),
-        None
-    )
-    .is_none());
+    assert!(pre_turn(config.clone(), omitted.clone(), input(4)).is_none());
     drain(&cache, &Key::new(&config, &omitted, "slow", false)).await;
     let turns = crate::memory::test_fixtures::stored(
         &engine.inner,
@@ -369,7 +453,8 @@ async fn queued_work_keeps_the_callers_core_context() {
         Some(config.workspace_dir.clone()),
     );
     crate::core::runtime::CoreContext::scope(ctx.clone(), async {
-        let identity = MemoryIdentity::agent("scoped-agent").resolve(&config);
+        let identity = tinymemory_tools::layout::identity::Identity::agent("scoped-agent")
+            .resolve(&crate::memory::scope::identity_pins(&config));
         let key = Key::new(&config, &identity, "t", false);
         let cache = cache(&crate::core::runtime::DispatchCtx::ambient());
         let expected = ctx.clone();
@@ -397,7 +482,8 @@ fn runtime_shutdown_releases_worker_and_pending_work() {
     let _guard = TEST_LOCK.blocking_lock();
     let tmp = tempfile::tempdir().unwrap();
     let config = config_in(&tmp);
-    let identity = MemoryIdentity::agent("a").resolve(&config);
+    let identity = tinymemory_tools::layout::identity::Identity::agent("a")
+        .resolve(&crate::memory::scope::identity_pins(&config));
     let key = Key::new(&config, &identity, "t", false);
     let cache = Arc::new(Cache::default());
     let runtime = tokio::runtime::Builder::new_current_thread()
@@ -436,7 +522,8 @@ async fn an_erase_retires_queued_automatic_work_and_allows_later_work() {
     use std::sync::atomic::{AtomicUsize, Ordering};
     let tmp = tempfile::tempdir().unwrap();
     let config = crate::memory::test_fixtures::config_in(&tmp);
-    let identity = crate::memory::scope::MemoryIdentity::agent("erase-prefetch").resolve(&config);
+    let identity = tinymemory_tools::layout::identity::Identity::agent("erase-prefetch")
+        .resolve(&crate::memory::scope::identity_pins(&config));
     let key = Key::new(&config, &identity, "erase-prefetch", false);
     let cache = Arc::new(Cache::default());
     let earlier = Arc::new(AtomicUsize::new(0));
@@ -487,7 +574,8 @@ async fn an_erase_retires_queued_automatic_work_and_allows_later_work() {
 async fn erase_waits_for_current_automatic_work_before_returning_its_barrier() {
     let tmp = tempfile::tempdir().unwrap();
     let config = crate::memory::test_fixtures::config_in(&tmp);
-    let identity = crate::memory::scope::MemoryIdentity::agent("erase-active").resolve(&config);
+    let identity = tinymemory_tools::layout::identity::Identity::agent("erase-active")
+        .resolve(&crate::memory::scope::identity_pins(&config));
     let key = Key::new(&config, &identity, "erase-active", false);
     let cache = Arc::new(Cache::default());
     let started = Arc::new(tokio::sync::Notify::new());

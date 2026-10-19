@@ -257,7 +257,7 @@ async fn forget_matching_refuses_an_empty_filter() {
     let err = forget_matching(&config, MetaFilter::default())
         .await
         .unwrap_err();
-    assert_eq!(err.code(), crate::memory::error::INVALID_REQUEST);
+    assert_eq!(err.code(), "INVALID_REQUEST");
 }
 
 #[tokio::test]
@@ -270,7 +270,7 @@ async fn memory_off_forgets_nothing_and_refuses_writes() {
     let err = remember_keyed(&config, "f1", "k", "v", LearningKind::Fact)
         .await
         .unwrap_err();
-    assert_eq!(err.code(), crate::memory::error::MEMORY_OFF);
+    assert_eq!(err.code(), "MEMORY_OFF");
 }
 
 // ── FlowMemoryRecallTool ────────────────────────────────────────

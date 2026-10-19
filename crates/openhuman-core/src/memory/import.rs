@@ -3,7 +3,7 @@
 //! The driver (batching, checkpoints, backoff, failed-item list, retry) is
 //! `tinymemory_integrations::import::Importer`. This file is the host
 //! adapter around it: the consent gate, the one-run-per-workspace registry,
-//! the atomic state file `<workspace>/memory/import_state.json`, the tokio
+//! the `memory`/`state`/`import_state` storage value, the tokio
 //! clock, the scheduler pause, the credits resume policy, and what follows a
 //! finished import (organizing the tree).
 
@@ -13,14 +13,15 @@ use std::sync::{Arc, LazyLock, Mutex};
 use std::time::Duration;
 
 use tinymemory_integrations::import::{
-    Begun, CheckpointStore, ImportError, ImportFile, Importer, Pacer,
+    Begun, CheckpointStore, ImportCounts as LegacyImportCounts, ImportError, ImportFile,
+    ImportPhase, ImportState, Importer, Pacer,
 };
 
 use crate::config::Config;
 
 use super::engine;
-use super::error::{MemoryError, MemoryResult};
-use super::types::{ImportCounts, ImportPhase, ImportScanView, ImportState};
+use super::types::{ImportCounts, ImportScanView};
+use tinymemory_api::{Error, Result};
 
 /// Whether background work is paused right now. An automatic resume asks
 /// before it starts and again before every batch it stores.
@@ -52,9 +53,8 @@ fn release(workspace_dir: &Path) {
         .remove(workspace_dir);
 }
 
-/// The state file, written atomically (staged, synced, renamed): a crash
-/// mid-write leaves the previous state, never a torn file that reads back as
-/// a fresh start and re-sends everything.
+/// The state value: storage writes are atomic, so a crash mid-write leaves
+/// the previous state or the new state rather than a fresh start.
 pub(crate) struct FileCheckpointStore {
     workspace_dir: PathBuf,
 }
@@ -106,8 +106,8 @@ pub(crate) fn listed_unconfirmed(workspace_dir: &Path) -> bool {
     read_file(workspace_dir).listed_unconfirmed
 }
 
-fn import_error(error: &ImportError) -> MemoryError {
-    MemoryError::invalid(error.to_string())
+fn import_error(error: &ImportError) -> Error {
+    Error::InvalidRequest(error.to_string())
 }
 
 fn importer(
@@ -123,32 +123,26 @@ fn importer(
         Arc::new(TokioPacer),
         Arc::new(move || consent),
     )
-    .with_describe(Arc::new(|error| {
-        MemoryError::from(error.clone()).to_string()
-    }));
+    .with_describe(Arc::new(|error| error.to_string()));
     if let Some(paused) = paused {
         importer = importer.with_pause(paused);
     }
     Arc::new(importer)
 }
 
-/// Counts what a legacy store at `workspace_dir` holds, or `None` when there
-/// is no v1 store there. Blocking (SQLite, and memory-tree chunk files).
-pub fn count_legacy(workspace_dir: &Path) -> Option<ImportCounts> {
-    let counts = tinymemory_integrations::import::count_legacy(workspace_dir)?;
-    Some(ImportCounts {
+/// `memory_import_scan`.
+pub async fn scan(config: &Config) -> Result<ImportScanView> {
+    let workspace_dir = config.workspace_dir.clone();
+    let counts = tokio::task::spawn_blocking(move || {
+        tinymemory_integrations::import::count_legacy(&workspace_dir)
+    })
+    .await
+    .map_err(|error| Error::Engine(format!("import scan failed: {error}")))?;
+    let counts = counts.map(|counts: LegacyImportCounts| ImportCounts {
         documents: counts.documents,
         conversations: counts.conversations,
         learnings: counts.learnings,
-    })
-}
-
-/// `memory_import_scan`.
-pub async fn scan(config: &Config) -> MemoryResult<ImportScanView> {
-    let workspace_dir = config.workspace_dir.clone();
-    let counts = tokio::task::spawn_blocking(move || count_legacy(&workspace_dir))
-        .await
-        .map_err(|error| MemoryError::Engine(format!("import scan failed: {error}")))?;
+    });
     Ok(ImportScanView {
         found: counts.is_some(),
         counts,
@@ -281,7 +275,7 @@ pub async fn start(
     ctx: &crate::core::runtime::DispatchCtx,
     config: &Config,
     consent: bool,
-) -> MemoryResult<ImportState> {
+) -> Result<ImportState> {
     launch(ctx, config, Mode::Import, consent, None).await
 }
 
@@ -290,7 +284,7 @@ pub async fn start(
 pub async fn retry_failed(
     ctx: &crate::core::runtime::DispatchCtx,
     config: &Config,
-) -> MemoryResult<ImportState> {
+) -> Result<ImportState> {
     launch(ctx, config, Mode::Retry, true, None).await
 }
 
@@ -308,7 +302,7 @@ async fn launch(
     mode: Mode,
     consent: bool,
     paused: Option<PauseCheck>,
-) -> MemoryResult<ImportState> {
+) -> Result<ImportState> {
     if mode == Mode::Import && !consent {
         return Err(import_error(&ImportError::ConsentRequired));
     }
@@ -321,11 +315,14 @@ async fn launch(
         // Items written to the legacy tree while it is being moved would be
         // left behind there.
         if super::layout_migration::service::is_running(config) {
-            return Err(MemoryError::invalid(if mode == Mode::Import {
-                "memory is being organized; import once that finishes"
-            } else {
-                "memory is being organized; retry once that finishes"
-            }));
+            return Err(Error::InvalidRequest(
+                (if mode == Mode::Import {
+                    "memory is being organized; import once that finishes"
+                } else {
+                    "memory is being organized; retry once that finishes"
+                })
+                .into(),
+            ));
         }
         RUNNING
             .lock()
@@ -353,7 +350,7 @@ async fn launch(
         }
         Err(error) => {
             release(&workspace_dir);
-            return Err(MemoryError::Engine(format!("import start failed: {error}")));
+            return Err(Error::Engine(format!("import start failed: {error}")));
         }
     };
     let state = begun.state.clone();

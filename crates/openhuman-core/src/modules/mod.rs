@@ -72,6 +72,8 @@ pub mod desktop;
 pub mod documents;
 #[cfg(feature = "modules")]
 pub mod linked;
+#[path = "documents/memory_converter.rs"]
+pub(crate) mod memory_converter;
 #[cfg(feature = "modules")]
 pub mod ops;
 #[cfg(feature = "modules")]

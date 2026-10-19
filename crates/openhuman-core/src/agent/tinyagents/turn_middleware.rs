@@ -588,7 +588,7 @@ pub(super) fn install_turn_middleware(
     }
     // The turn's memory pack rides every request of the turn, after every
     // reduction step and after the transcript snapshot, so it is never
-    // compacted, trimmed or persisted (`memory::lifecycle::hooks::pre_turn`).
+    // compacted, trimmed or persisted (`memory::lifecycle::prefetch::pre_turn`).
     harness.push_middleware(Arc::new(middleware::memory_pack::memory_pack_middleware()));
 
     TurnWiring {

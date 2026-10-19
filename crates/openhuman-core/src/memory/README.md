@@ -65,15 +65,15 @@ Memory follows TinyMemory's standard layout (`tinymemory_tools::MemoryLayout`):
  +-- agent:<memory agent>   one agent's conversations, one turn per item
 ```
 
-A `MemoryIdentity` (in [`scope.rs`](./scope.rs)) is the acting agent definition and, for a
-team member, its team. It is explicit, never ambient: a turn's
-`OpenHumanRunContext::memory_identity` carries it (`MemoryIdentity::child` for
-each sub-agent, `team_member` from the team runtime through
-`HostTurnEnv::memory_identity`), the RPC handlers and the embed facade pass
-`MemoryIdentity::root()`, and the `confine`, `brain`, `lifecycle` and `ops`
-entry points take a `&MemoryIdentity`.
-`MemoryIdentity::resolve` turns it into a `ResolvedIdentity` (layout root plus
-memory agent id), first match wins:
+TinyMemory's `Identity` is the acting agent definition and, for a team member,
+its team. It is explicit, never ambient: a turn's
+`OpenHumanRunContext::memory_identity` carries it (`Identity::child` for each
+sub-agent, `team_member` from the team runtime through
+`HostTurnEnv::memory_identity`), and RPC/embed entry points construct
+`Identity::root()`. OpenHuman projects its config into upstream
+`IdentityPins` in [`scope.rs`](./scope.rs); `Identity::resolve(&pins)` returns
+the upstream `ResolvedIdentity` (layout root plus memory agent id), with this
+first-match precedence:
 
 | Rule | Memory agent id | Layout root |
 | --- | --- | --- |
@@ -87,10 +87,12 @@ The host binding is how a coordinating host (an embedder through
 its own: it derives a per-agent config with those two keys set. The
 identity is never taken from model arguments.
 
-Under `[memory] layout = "v3"` everything sits below the signed-in person's
-own scope root (`org:<id>`, `scope::user_root`), and every agent's chats
-share one chat node (`ws:main`, `scope::chat_node`), with the agent id kept
-on each turn. The person's actor is `user:<id>` (`scope::actor_of_root`),
+Under `[memory] layout = "v3"` the engine binds below the signed-in person's
+tenant root (`org:<id>`, `scope::user_root`), while namespace placement stays
+within the configured TinyMemory layout. Every agent's chats share the
+absolute `ws:main` child of that layout root (`tinymemory_tools::layout::identity::chat_node`),
+with the agent id kept on each turn. The person's actor is `user:<id>`
+(`tinymemory_tools::layout::identity::actor_of_root`),
 which is also the retired root still read during the move while
 `[memory] legacy_user_segment_read` is on. A signed-out session gets its
 root from a random install id minted once and recorded in
@@ -155,20 +157,22 @@ preserving queued logs; engine/credential invalidation also clears pending
 refreshes. Scoped spawns retain the caller's core context; the key carries the
 resolved identity, so queued work needs nothing ambient.
 
-The explicit/manual `hooks::pre_turn` and `hooks::compaction` retain their
-configured `pre_turn_timeout_ms` and `compaction_timeout_ms` deadlines; they
-are not what the live prelude and compaction wrapper await.
+The live prelude and compaction summarizer call the underlying work directly
+from the scoped prefetch workers. Their background deadlines bound engine I/O
+without a second manual timeout wrapper.
 
 A few details hang off the turn. For a message that arrived on a channel,
 `lifecycle::sender::channel_actor` records the sender as the observed actor
 (`user:+1555...` for phone-addressed channels, `user:<email>`, otherwise
-`<channel>:<sender>`). The session host records the channel/thread pairing
-in [`channels.rs`](./channels.rs) so a channel's memory can be forgotten later. With
-`[memory.recall] date_hint` on, `lifecycle::date_hint::extract` makes one
-small model call to work out which days the user means; a late or bad
-answer just leaves the pack in its normal order. The pack's citations are
-parked per thread (`tools::record_pack_citations`) and `web_chat` takes them
-for the chat's memory chips (`tools::take_turn_citations`).
+`<channel>:<sender>`). The session host stamps both logged turns with the
+normalized provider channel from the turn origin. Disconnect uses that
+metadata and the canonical channel thread IDs prepared by the TinyChannels
+module to forget only that channel's conversations. With
+`[memory.recall] date_hint` on, TinyMemory's turn hook asks the host callback
+in `lifecycle::date_hint` for one small model call to work out which days the
+user means; a late or bad answer just leaves the pack in its normal order.
+The web chat citation sink records citations only when a cached pack is
+returned to the turn and drained for the chat's memory chips.
 
 ### Background work
 
@@ -200,12 +204,16 @@ CronSystemJobDue
 The brain is the set of documents every agent under a root shares, filed at
 `source:<connector>` nodes with no agent id ([`brain.rs`](./brain.rs)). A file ingested
 from the UI (`memory_brain_ingest`) goes under `files`; synced sources are
-filed by what they read. Files are converted through [`convert.rs`](./convert.rs): PDF,
-DOCX, PPTX and XLSX are streamed to the configured TinyDocs module when the
-`documents` feature is on, then `NativeConverter` handles text, markdown, HTML
-and code. The host carries only the bus contract and current config; it has no
-local office parser fallback. Every ingest queues a belief build of the
-source's scope.
+filed by what they read. The [TinyDocs memory converter](../modules/documents/memory_converter.rs)
+streams PDF, DOCX and PPTX to the configured module when the `documents`
+feature is on, then `NativeConverter` handles text, markdown, HTML and code.
+XLSX remains recognized by the import route but is temporarily refused before
+module loading until fixed Calamine dependencies are verified in both the
+published TinyMemory and TinyDocs artifacts (tracked by
+[`tinyhumansai/tinymemory#293`](https://github.com/tinyhumansai/tinymemory/issues/293));
+it cannot fall through to a native parser. The host carries only the bus
+contract and current config; it has no local office parser fallback. Every
+successful ingest queues a belief build of the source's scope.
 
 Sources ([`sources/`](./sources/)) are the `[[memory.sources]]` registry in `config.toml`:
 a folder, a file, a web page, a GitHub repository or an RSS feed, plus how
@@ -265,13 +273,12 @@ Anything unknown counts as not free.
 
 ### The RPC surface is confined
 
-The `memory_*` RPCs (and the MCP memory tools that dispatch through them)
-go through [`confine.rs`](./confine.rs). It resolves the identity in scope (the agent of a
-running turn, else the config's own root identity), fills an unset `reach`
-with that identity's subtree, refuses a wider reach with `INVALID_REQUEST`,
-and places a `learn` with no namespace at the identity's learnings node.
-The agent `memory` tool applies the same confinement and overwrites any
-`reach` in the model's filter.
+The `memory_*` RPC handlers apply TinyMemory `Confinement` with
+`Policy::Refuse`: an unset `reach` becomes the root identity's subtree, wider
+reaches return `INVALID_REQUEST`, and a `learn` with no namespace uses the
+identity's learnings node. SaaS operations use `Policy::Clamp` selected from
+the configured profile root in `ops.rs`. The agent `memory` tool stamps its
+trusted call facts; queued writes retain that call's narrower reach.
 
 ## Layout
 
@@ -280,7 +287,7 @@ The agent `memory` tool applies the same confinement and overwrites any
 | [`mod.rs`](./mod.rs) | Module declarations and re-exports (`memory_is_on`, `MemoryTool`, the controller aggregators, `register_memory_subscribers`). |
 | [`engine.rs`](./engine.rs) | `resolve` binds the configured engine or says why memory is off; per-fingerprint cache; host engine install; CortexDB key storage. |
 | [`guard.rs`](./guard.rs) | `ScrubbingEngine`: scrubs every write and times every engine call. |
-| [`scope.rs`](./scope.rs) | `MemoryIdentity`, `ResolvedIdentity`, resolution order, layout v3 roots. |
+| [`scope.rs`](./scope.rs) | Config-to-`IdentityPins` adapter, account root and layout migration switch. |
 | [`local_root.rs`](./local_root.rs) | The persistent install-id root of a signed-out session. |
 | [`lifecycle/mod.rs`](./lifecycle/mod.rs) | Builds `AgentMemory` for an identity under the `[memory.recall]` policy. |
 | [`lifecycle/hooks.rs`](./lifecycle/hooks.rs) | Lifecycle operations and bounded manual wrappers; `TurnPack`, `MemoryTurn`. |
@@ -289,25 +296,23 @@ The agent `memory` tool applies the same confinement and overwrites any
 | [`lifecycle/views.rs`](./lifecycle/views.rs) | Policy get/set, pack preview, agents list, jobs list/run for the UI. |
 | [`lifecycle/sender.rs`](./lifecycle/sender.rs) | Maps a channel message's sender to an observed actor. |
 | [`lifecycle/date_hint.rs`](./lifecycle/date_hint.rs) | Optional model call that works out which days a turn refers to. |
-| [`ops.rs`](./ops.rs) | Engine list/get/set, recall, fetch, learn, forget, erase all, items list. |
+| [`ops.rs`](./ops.rs) | Engine list/get/set, recall, fetch, learn, forget, channel conversation cleanup, erase all, items list. |
 | [`tool_budget.rs`](./tool_budget.rs), [`tool_writes.rs`](./tool_writes.rs) | Agent call deadlines; owner-scoped admission and file store for optional writes. The FIFO, coalescing and fencing are `tinymemory_tools::pending`. |
-| [`confine.rs`](./confine.rs) | Confines the RPC surface to the acting identity's subtree. |
 | [`explore.rs`](./explore.rs) | The facet explorer behind `memory_explore` and `memory_items_get`. |
 | [`brain.rs`](./brain.rs) | Brain source mapping and the `memory_brain_*` ops. |
-| [`convert.rs`](./convert.rs) | The document converter chain used by brain ingest and file sources. |
 | [`sources/`](./sources/) | The `[[memory.sources]]` registry (`mod.rs`), sync state (`state.rs`) and the `SourceRegistry` adapter over `tinymemory_integrations::sources::sync` (`sync.rs`). |
-| [`channels.rs`](./channels.rs) | Channel to thread records, for forgetting a channel. |
 | [`deletion.rs`](./deletion.rs) | Hard deletes; the file store and executor for the pending-deletion queue (`tinymemory_tools::deletion`, with retry backoff on background ticks). |
 | [`backfill.rs`](./backfill.rs) | Consent-gated, resumable storing of past chats; turns are built by `tinymemory_tools::backfill`. |
 | [`import.rs`](./import.rs) | Host adapter for the consent-gated, resumable v1 import and the retry of refused items; the driver is the module's `Importer`, which skips what v1 synced from Composio connectors. |
 | [`layout_migration/`](./layout_migration/) | Host adapter over `tinymemory_tools::layout_migration` (copy, placement, cleanup and the job live in tinymemory): `app_host.rs` (the real `LayoutHost`), `claim.rs`, `state.rs` (file-backed `MigrationStateStore`), `service.rs` (RPC/tick entry points). |
 | [`billing.rs`](./billing.rs) | Whether background rewrites are free for the user right now. |
 | [`files.rs`](./files.rs) | Owner-only (0600 / 0700 on unix) writes of the local state files. |
-| [`tools.rs`](./tools.rs) | The single `memory` agent tool and per-turn citations. |
+| [`tools.rs`](./tools.rs) | The single `memory` agent tool; citations are collected by `web_chat`. |
 | [`bus.rs`](./bus.rs) | The cron subscriber and the pending-deletions subscriber. |
-| [`schemas.rs`](./schemas.rs), [`schemas/defs.rs`](./schemas/defs.rs), [`schemas/handlers.rs`](./schemas/handlers.rs) | The `openhuman.memory_*` controller schemas and thin handlers. |
+| [`schemas.rs`](./schemas.rs), [`schemas/defs.rs`](./schemas/defs.rs), [`schemas/defs/`](./schemas/defs/) | The `openhuman.memory_*` controller schemas, split by controller group with shared field helpers. |
+| [`schemas/handlers.rs`](./schemas/handlers.rs) | Thin handlers using the shared parse, config-load, operation and result-serialization path. |
 | [`types.rs`](./types.rs) | RPC request and view shapes; contract types are re-exported from `tinymemory_api`. |
-| [`error.rs`](./error.rs) | `MemoryError` and the seven stable error codes. |
+| [`error.rs`](./error.rs) | Maps upstream `tinymemory_api::Error` values to the existing structured RPC envelope. |
 | [`status.rs`](./status.rs) | The memory row of `subsystems.status`. |
 | [`test_fixtures.rs`](./test_fixtures.rs) | Shared in-memory engines for the unit tests. |
 
@@ -317,8 +322,9 @@ The agent `memory` tool applies the same confinement and overwrites any
   `BoundEngine`, or learn that memory is off.
 - `engine::install_host_engine` (`engine.rs`): lets an embedder or test
   supply its own `MemoryEngine`.
-- `MemoryIdentity::child` and `MemoryIdentity::resolve` (`scope.rs`): derive
-  and resolve the acting identity a turn's run context carries.
+- TinyMemory `Identity::child` / `Identity::resolve` with
+  `scope::identity_pins` (`scope.rs`): derive and resolve the acting identity
+  a turn's run context carries.
 - `lifecycle::prefetch::pre_turn` and `compaction`
   (`lifecycle/prefetch.rs`): synchronous reads of completed packs plus scoped
   background refresh. `lifecycle::hooks` contains the underlying operations;
@@ -351,9 +357,11 @@ The agent `memory` tool applies the same confinement and overwrites any
   deletion workflows retain their own behavior.
 
 - `deletion::forget_thread` (`deletion.rs`): called by `threads` when a
-  thread is deleted. `channels::forget_channel` is called by `channels` on
-  disconnect.
-- `MemoryError` ([`error.rs`](./error.rs)): every RPC failure carries one of `MEMORY_OFF`,
+  thread is deleted. `ops::forget_channel` is called on channel disconnect; it
+  forgets channel-stamped turns and falls back to the previous release's
+  thread ownership data for older unstamped conversations.
+- Upstream `tinymemory_api::Error` values map at the RPC boundary ([`error.rs`](./error.rs)):
+  every RPC failure carries one of `MEMORY_OFF`,
   `UNSUPPORTED`, `INVALID_REQUEST`, `UNAUTHORIZED`, `INSUFFICIENT_CREDITS`,
   `UNAVAILABLE` or `ENGINE` in `data.code`. The two account-wide refusals are
   split out so a caller can tell "top up" and "try later" apart from an
@@ -384,13 +392,22 @@ files under `<workspace>/memory/`, written owner-only through [`files.rs`](./fil
 | File | Owner |
 | --- | --- |
 | `jobs.json` | `lifecycle/jobs.rs` |
-| `channel_threads.json` | `channels.rs` |
 | `pending_deletions.json` | `deletion.rs` |
 | `sources_state.json` | [`sources/state.rs`](./sources/state.rs) |
 | `conversations_backfill.json` | `backfill.rs` |
 | `import_state.json` | `import.rs` |
 | `layout_migration.json` | [`layout_migration/state.rs`](./layout_migration/state.rs) |
 | `local_root.json` | `local_root.rs` |
+
+For one release, disconnect reads a valid `channel_threads.json` written by
+older versions as a read-only fallback for legacy conversations. Current code
+does not write this file. Malformed JSON keeps the existing quarantine behavior;
+remove the compatibility reader in the next release.
+
+Before enumerating canonical channel threads, disconnect asks the TinyChannels
+module to prepare the channel's base thread ID. If identity preparation fails,
+known legacy thread IDs are queued and the failure is returned to the caller;
+the host does not recreate the module's ID algorithm.
 
 The sources registry is `[[memory.sources]]` in `config.toml`. The CortexDB
 key is in the OS keyring. The layout migration's shared-tree claim marker
@@ -415,15 +432,16 @@ sits in the app directory shared by all accounts
 
 ## Gotchas
 
-- The acting identity is a task-local. Work spawned off a turn without
-  `scope::within` runs as the config's root identity, not the agent.
+- The acting identity is passed explicitly. Work spawned without an identity
+  runs as the config's root identity, not the agent.
 - Turn hooks run under the session's own config, which may be a derived
   context carrying a host binding (`[memory] agent_id` / `root`). Loading the
   global config instead would write to the wrong memory.
 - Every write must go through a bound engine so the scrubber sees it. Do not
   hold a raw `MemoryEngine` outside `engine.rs`.
-- RPC handlers must call through `confine.rs`, not [`ops.rs`](./ops.rs) directly, or a
-  caller can read another root's memory.
+- RPC handlers must apply upstream `Confinement` with `Policy::Refuse` in
+  [`schemas/handlers.rs`](./schemas/handlers.rs) before calling [`ops.rs`](./ops.rs),
+  or a caller can read another root's memory.
 - A new local state file should be written with `files::write_private`.
 - `engine::invalidate` clears the engine cache; tests that swap engines rely
   on the `CACHE_STABLE` lock and `install_test_engine`.
