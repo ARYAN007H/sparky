@@ -39,6 +39,8 @@ pub mod memory_tools;
 pub mod node_contracts;
 pub mod ops;
 pub(crate) mod registration;
+pub(crate) mod recovery;
+pub(crate) mod runs_adapter;
 mod schemas;
 mod store;
 /// The tinyflows engine seam (formerly `crate::tinyflows`).
