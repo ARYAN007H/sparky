@@ -11,22 +11,22 @@ alone can supply:
 
 | Engine | Owns | Where |
 | --- | --- | --- |
-| TinyAgents' turn runner | The lifecycle of a turn: ingress order, per-thread serialization, the five queue modes, cancellation generations, the idle and wall-clock guards, reply persistence, exactly one terminal event | `vendor/tinyagents/crates/tinyagents-harness/src/turn_runner/` |
+| TinyAgents' turn runner | The lifecycle of a turn: ingress order, per-thread serialization, the five queue modes, cancellation generations, idle and wall-clock guards, reply-store ordering through a host port, exactly one terminal event | `vendor/tinyagents/crates/tinyagents-harness/src/turn_runner/` |
 | TinyChannels' compiled web projection module | The projection of canonical output events onto typed web events, with per-turn `seq` | `vendor/tinychannels/crates/tinychannels-module/`, called through `tinychannels-bus` |
 
-External messaging providers (Telegram, Discord and so on) live in
-`channels/`, but their inbound messages are dispatched through this module's
-`start_chat` as well (`channels/bus/subscriber.rs`). So this is the single
-turn runner behind both surfaces, and its `WebChannelEvent` broadcast bus is
-what Socket.IO, the JSON-RPC `/events` SSE stream, the TUI and the channel
-subscriber all listen to.
+Hosted channel domain events are dispatched through this module's `start_chat`
+via `channels/bus/subscriber.rs`; those hosted turns share the web-chat runner
+and `WebChannelEvent` broadcast bus. Native channel listener paths still use
+their channel-specific dispatch and are a separate migration tracked by #136.
+The web event bus is consumed by Socket.IO, the JSON-RPC `/events` SSE stream,
+the TUI and the hosted channel subscriber.
 
 ## How it works
 
 ### The request path
 
 ```text
- Socket.IO chat:start         channel.web_chat RPC      channels/ subscriber
+ Socket.IO chat:start         channel.web_chat RPC      hosted channels subscriber
  (openhuman-rpc socketio.rs)  (schemas.rs)              threads edit/regenerate
             \                      |                        /
              v                     v                       v
@@ -53,7 +53,7 @@ subscriber all listen to.
 ```
 
 1. A `chat:start` socket event arrives in `openhuman-rpc/src/server/socketio.rs`
-   (or a `channel.web_chat` RPC call, or an inbound provider message) and
+   (or a `channel.web_chat` RPC call, or a hosted channel domain event) and
    calls `start_chat` with the raw message, the thread and client ids, and any
    model, temperature, locale or queue-mode overrides.
 
