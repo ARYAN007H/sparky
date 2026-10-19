@@ -65,7 +65,8 @@ fn indexed_rows_equal_full_wrapping_after_updates_resizes_and_expired_journal() 
     let mut state = TranscriptState::new("test");
     state.apply_event(
         &serde_json::from_value(serde_json::json!({
-            "event":"tool_call","client_id":"test","tool_call_id":"first","tool_name":"tool"
+            "event":"tool_call","client_id":"test","thread_id":"thread-1",
+            "request_id":"turn","tool_call_id":"first","tool_name":"tool"
         }))
         .unwrap(),
     );
@@ -80,7 +81,8 @@ fn indexed_rows_equal_full_wrapping_after_updates_resizes_and_expired_journal() 
         if step == 4 {
             state.apply_event(
                 &serde_json::from_value(serde_json::json!({
-                    "event":"tool_result","client_id":"test","tool_call_id":"first",
+                    "event":"tool_result","client_id":"test","thread_id":"thread-1",
+                    "request_id":"turn","tool_call_id":"first",
                     "output":"a\nb\nc","success":true
                 }))
                 .unwrap(),
