@@ -444,6 +444,10 @@ pub(crate) mod module_stub;
 #[path = "mod_repl_module_tests.rs"]
 mod repl_module_tests;
 
+#[cfg(test)]
+#[path = "rpc_scope_tests.rs"]
+mod rpc_scope_tests;
+
 /// Run a typed query inside TinyJuice; cached originals stay inside the module.
 pub async fn query(
     ctx: &DispatchCtx,
