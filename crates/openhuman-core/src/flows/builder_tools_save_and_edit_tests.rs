@@ -153,13 +153,9 @@ async fn dry_run_no_routing_divergence_warning_when_every_node_executes() {
     );
 }
 
-/// (systemic tool-contract fix, Part 2b) A missing required Composio arg is
-/// now a HARD REJECT at `revise_workflow` — `validate_tool_contracts` runs
-/// ahead of the older advisory `graph_wiring_warnings` check and catches the
-/// exact same condition first, so the graph never gets far enough to merely
-/// warn about it. `graph_wiring_warnings`'s own required-arg warning (still
-/// exercised directly in `ops_tests.rs`) stays as a defense-in-depth
-/// fallback for any caller that doesn't also run `validate_tool_contracts`.
+/// A missing required Composio arg is a HARD REJECT at `revise_workflow` via
+/// `validate_tool_contracts`; TinyFlows wiring warnings cover output bindings
+/// and split paths, not required input arguments.
 #[tokio::test]
 async fn revise_workflow_rejects_a_missing_required_composio_arg() {
     seed_live_catalog_cache("gmail", vec![seeded_gmail_send_contract()]);

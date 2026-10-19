@@ -32,10 +32,9 @@ use tinyflows::model::{NodeKind, WorkflowGraph};
 /// live-catalog fetch itself fails (no backend session, network error) the
 /// node is SKIPPED with a debug log — never rejected — because a
 /// hallucinated slug can only be confirmed hallucinated once the real
-/// catalog was actually reachable; `graph_wiring_warnings`'s
-/// `composio_required_args` checks share this exact contract. Once the
-/// catalog IS reachable, though, both checks below are HARD: an unreal slug
-/// or a missing required arg rejects the graph outright, unlike the
+/// catalog was actually reachable. Once the catalog IS reachable, both
+/// checks below are HARD: an unreal slug or a missing required arg rejects
+/// the graph outright, unlike the
 /// advisory output-field/`split_out.path` WARNs in `graph_wiring_warnings`
 /// (Part 2c/2d) — those degrade gracefully because a binding to an unknown
 /// field can't be proven wrong, whereas a nonexistent slug or a missing

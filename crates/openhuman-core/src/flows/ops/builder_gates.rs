@@ -148,7 +148,9 @@ pub(crate) async fn build_builder_proposal(
     let mut warnings = graph_trigger_warnings(graph);
     match graph_wiring_warnings(ctx, config, graph).await {
         Ok(wiring_warnings) => warnings.extend(wiring_warnings),
-        Err(error) => tracing::warn!(target: "flows", %error, "[flows] TinyFlows wiring warnings failed"),
+        Err(error) => {
+            tracing::warn!(target: "flows", %error, "[flows] TinyFlows wiring warnings failed")
+        }
     }
     // Connector onboarding (Phase 5, item 18): tell the proposal card which
     // toolkits this graph needs and whether they're connected, so it can render

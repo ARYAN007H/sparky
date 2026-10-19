@@ -10,7 +10,11 @@ pub(crate) async fn graph_wiring_warnings(
 ) -> Result<Vec<String>, String> {
     let graph = match serde_json::to_value(graph) {
         Ok(graph) => graph,
-        Err(error) => return Err(format!("wiring warnings could not serialize graph: {error}")),
+        Err(error) => {
+            return Err(format!(
+                "wiring warnings could not serialize graph: {error}"
+            ))
+        }
     };
     wiring_warnings(context, config, graph).await
 }
