@@ -519,11 +519,15 @@ pub(crate) fn build_deterministic_final_summary_with_cause(
     stop_reason: Option<&str>,
     failure_cause: Option<&tinyagents_harness::no_progress::ClassifiedStopCause>,
 ) -> String {
-    if results.is_empty() && stop_reason.is_none() {
+    if results.is_empty() && stop_reason.is_none() && failure_cause.is_none() {
         return "I finished this turn but produced no result to report.".to_string();
     }
-    if let Some(reason) = stop_reason {
-        return super::stop_summary::render_stop_summary_with_cause(results, reason, failure_cause);
+    if stop_reason.is_some() || failure_cause.is_some() {
+        return super::stop_summary::render_stop_summary_with_cause(
+            results,
+            stop_reason.unwrap_or_default(),
+            failure_cause,
+        );
     }
     let mut out = String::from(
         "I finished this turn without writing up a result. Here is what each tool call returned:\n",

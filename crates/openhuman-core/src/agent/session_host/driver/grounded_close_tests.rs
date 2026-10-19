@@ -187,7 +187,9 @@ fn typed_cause_without_halt_note_still_closes_and_keeps_operation() {
 
     let close = classified_halt_close(&outcome).expect("typed cause closes without a note");
     assert!(
-        close.output.contains("configured model or provider rejected"),
+        close
+            .output
+            .contains("configured model or provider rejected"),
         "summary uses typed provider_config cause even without a note: {}",
         close.output
     );
