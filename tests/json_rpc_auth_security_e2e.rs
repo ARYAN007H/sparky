@@ -755,27 +755,8 @@ async fn channels_status_reflects_managed_dm_credential_e2e() {
     rpc_join.abort();
 }
 
-/// Regression guard for issue #1289: `openhuman.voice_cloud_transcribe`
-/// must stay registered in the controller registry and reachable via
-/// JSON-RPC dispatch.
-///
-/// The user-visible symptom was "Voice transcription failed: unknown
-/// method: openhuman.voice_cloud_transcribe" — the frontend (mascot
-/// mic-only composer) was calling a method that wasn't reachable.
-/// This test pins both ends:
-///
-/// 1. `/schema` exposes `openhuman.voice_cloud_transcribe` so the
-///    discovery surface stays in sync with the live registry.
-/// 2. Calling the method over RPC does NOT hit the dispatcher's
-///    unknown-method branch (`Err("unknown method: …")`). The call may
-///    still fail downstream (missing audio, unauthenticated, missing
-///    upstream STT key) — but it must reach the registered handler,
-///    which proves the method is wired all the way through.
-
-#[cfg(unix)]
 /// Set on the re-exec below so the child runs the test body instead of
 /// spawning another child.
-#[cfg(unix)]
 const OWNER_ONLY_CHILD_ENV: &str = "OPENHUMAN_E2E_OWNER_ONLY_CHILD";
 #[cfg(unix)]
 const OWNER_ONLY_TEST_NAME: &str =
