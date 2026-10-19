@@ -456,7 +456,7 @@ fn output_event_request(
 #[tokio::test]
 async fn native_progressive_output_event_validates_scope_without_observer() {
     let adapter = Arc::new(RecordingChannel::new("telegram:bot-b"));
-    let (callback, _) = callback_for_channels(
+    let (callback, _context) = callback_for_channels(
         HashMap::from([("telegram:bot-b".into(), adapter.clone() as Arc<dyn Channel>)]),
         HashMap::from([(
             "telegram:bot-b".into(),
