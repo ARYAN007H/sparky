@@ -342,9 +342,11 @@ fn remember(state: &MockState, path: &str, body: Value) {
 fn temp_config(tmp: &TempDir) -> Config {
     let root = tmp.path().join(".openhuman");
     std::fs::create_dir_all(root.join("workspace")).expect("workspace dir");
-    let mut config = Config::default();
-    config.config_path = root.join("config.toml");
-    config.workspace_dir = root.join("workspace");
+    let mut config = Config {
+        config_path: root.join("config.toml"),
+        workspace_dir: root.join("workspace"),
+        ..Config::default()
+    };
     config.secrets.encrypt = false;
     config.api_url = Some("http://127.0.0.1:9".to_string());
     config

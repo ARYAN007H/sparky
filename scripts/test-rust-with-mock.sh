@@ -241,7 +241,8 @@ run_raw_coverage_modules() {
     # path. These groups verify the host-to-module round trip, so inject the
     # pinned connector only for their processes.
     if [ "$module" = "composio_direct_client_e2e" ] ||
-       [ "$module" = "composio_direct_tools_e2e" ]; then
+       [ "$module" = "composio_direct_tools_e2e" ] ||
+       [ "$module" = "composio_host_helpers_e2e" ]; then
       OPENHUMAN_MODULE_PATH="$connectors_module_path" \
         cargo_test --test raw_coverage_all -- "${module}::" --test-threads=1 "$@"
     elif [ "$module" = "automation_scheduling_e2e" ]; then

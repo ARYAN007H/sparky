@@ -90,5 +90,9 @@ pub mod env_guard;
 pub mod rpc_auth;
 #[path = "support/rpc_harness.rs"]
 pub mod rpc_harness;
+/// A loopback Streamable HTTP MCP server for tests that exercise the real
+/// TinyMCP client without involving stdio trust or sandbox policy.
+#[path = "support/local_mcp_http.rs"]
+pub mod local_mcp_http;
 
 include!(concat!(env!("OUT_DIR"), "/raw_coverage_mods.rs"));
