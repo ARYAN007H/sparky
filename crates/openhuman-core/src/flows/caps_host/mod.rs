@@ -12,6 +12,10 @@ mod service;
 mod tier;
 pub(crate) mod tools;
 
+#[cfg(test)]
+#[path = "binding_tests.rs"]
+mod binding_tests;
+
 pub(crate) use binding::{CapsHostRegistration, serve};
 pub(crate) use agent::OpenHumanAgentRunner;
 pub(crate) use code::OpenHumanCode;
