@@ -15,10 +15,9 @@
 //! is gated behind the default-ON `voice` Cargo feature. When the feature is
 //! off, [`stub`] takes its place and exposes the same public surface that
 //! other-gated callers depend on (`server`, `dictation_listener`,
-//! `create_stt_provider`,
-//! `effective_stt_provider`) with no-op / disabled-error bodies. Keeping the
-//! two surfaces in lockstep is
-//! enforced by the disabled-build check
+//! `create_stt_provider`, `effective_stt_provider`) with no-op / disabled-error
+//! bodies. Keeping the two surfaces in lockstep is enforced by the
+//! disabled-build check
 //! (`cargo check --no-default-features --features "<all-but-voice>"`): any
 //! signature drift fails that build.
 
@@ -57,9 +56,9 @@ pub mod local_speech;
 pub mod postprocess;
 #[cfg(feature = "voice")]
 pub use factory::{
-    DEFAULT_PIPER_VOICE, DEFAULT_STT_MODEL, ExternalSttProvider, ExternalTtsProvider, SttProvider,
-    SttResult, TtsProvider, create_stt_provider, create_tts_provider, effective_stt_provider,
-    effective_tts_provider,
+    create_stt_provider, create_tts_provider, effective_stt_provider, effective_tts_provider,
+    ExternalSttProvider, ExternalTtsProvider, SttProvider, SttResult, TtsProvider,
+    DEFAULT_PIPER_VOICE, DEFAULT_STT_MODEL,
 };
 #[cfg(feature = "voice")]
 pub use ops::*;
