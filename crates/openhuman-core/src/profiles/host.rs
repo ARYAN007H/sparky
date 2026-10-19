@@ -538,6 +538,11 @@ impl ProfileHost {
             .collect()
     }
 
+    /// The current grant of `id`, when it is open here.
+    pub(crate) fn grant_of(&self, id: &ProfileId) -> Option<LeaseGrant> {
+        self.lock().get(id).map(|slot| slot.grant.clone())
+    }
+
     /// Replace `id`'s grant `old` with `renewed`, unless the slot moved on
     /// (closed, or re-opened under a newer grant) meanwhile.
     pub(crate) fn store_grant(&self, id: &ProfileId, old: &LeaseGrant, renewed: LeaseGrant) {
