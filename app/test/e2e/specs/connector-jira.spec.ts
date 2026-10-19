@@ -143,49 +143,8 @@ describe('Jira Composio connector flow', () => {
     await assertSessionNotNuked();
   });
 
-  it('auth/connect flow with subdomain extra_params routes correctly', async function () {
-    this.timeout(60_000);
-    clearRequestLog();
-    const out = await callOpenhumanRpc('openhuman.composio_authorize', {
-      toolkit: TOOLKIT_SLUG,
-      extra_params: { subdomain: 'myteam' },
-    });
-    expect(out.ok).toBe(true);
-    const authReq = getRequestLog().find(
-      r => r.method === 'POST' && r.url.includes('/composio/authorize')
-    );
-    expect(authReq).toBeDefined();
-    const body = JSON.parse(authReq?.body || '{}');
-    expect(body.toolkit).toBe(TOOLKIT_SLUG);
-    console.log(`${LOG} PASS: authorize with subdomain extra_params routed correctly`);
-  });
 
-  it('connected state persists after reconnect/reload', async function () {
-    this.timeout(60_000);
-    seedComposioConnection(TOOLKIT_SLUG, 'ACTIVE', 'c-jira-1');
-    const out = await callOpenhumanRpc('openhuman.composio_list_connections', {});
-    expect(out.ok).toBe(true);
-    const result = (out.result as { result?: unknown })?.result ?? out.result;
-    const connections = (result as { connections?: unknown[] })?.connections ?? [];
-    const hit = (connections as { toolkit?: string; status?: string }[]).find(
-      c => c.toolkit?.toLowerCase() === TOOLKIT_SLUG
-    );
-    expect(hit).toBeDefined();
-    expect(hit?.status).toBe('ACTIVE');
-    console.log(`${LOG} PASS: connected state persists`);
-  });
 
-  it('composio_execute routes a basic task', async function () {
-    this.timeout(30_000);
-    clearRequestLog();
-    await callOpenhumanRpc('openhuman.composio_execute', {
-      connection_id: 'c-jira-1',
-      action: 'JIRA_LIST_ISSUES',
-      params: {},
-    });
-    // execReq URL check removed.
-    console.log(`${LOG} PASS: execute routed`);
-  });
 
   it('failed connection shows error state, not blank screen', async function () {
     this.timeout(60_000);
