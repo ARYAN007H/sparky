@@ -1,9 +1,8 @@
 //! Socket.IO live-event bridge to the desktop shell.
 //!
 //! `spawn_web_channel_bridge` spawns one forwarding task per source. Domain
-//! broadcast channels: web-chat events (`openhuman::web_chat`), dictation hotkeys
-//! and transcription results (the live-voice transport), core notifications
-//! (`openhuman::desktop::notifications`), and shell companion state
+//! broadcast channels: web-chat events (`openhuman::web_chat`), core
+//! notifications (`openhuman::desktop::notifications`), and shell companion state
 //! (`COMPANION_STATE_BUS`). `DomainEvent`s read off `openhuman::core::bus::BUS`:
 //! session expiry, MCP setup secret requests, memory sync and tree-build
 //! progress, channel listener health, and active-workspace changes. Web-chat

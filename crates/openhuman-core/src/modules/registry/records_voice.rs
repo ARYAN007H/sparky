@@ -8,11 +8,8 @@ use crate::modules::types::{LoadPolicy, ModuleRecord, PlatformAsset, SourceSpec}
 ///
 /// STT hallucination detection used by the voice transcription pipeline.
 ///
-/// Lazy: voice dictation is opt-in, so a session that never records should not
-/// pay a download or a `dlopen`.
-///
-/// Devices and audio processing live in the compiled module. Hosts poll bounded
-/// capture batches and apply product permission, privacy and transcription policy.
+/// Lazy: transcript screening loads the module only when voice transcription
+/// needs it.
 pub(crate) const TINYVOICE: ModuleRecord = ModuleRecord {
     id: "tinyvoice",
     description: "Voice transcript hallucination detection",

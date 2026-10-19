@@ -44,7 +44,7 @@ pub(super) fn spawn_integrations_cache_warm(config: &Config) {
 /// from the initial boot path (when an existing
 /// session is detected) and from `set_credential()` when a credential is installed.
 pub async fn start_credential_gated_services(
-    ctx: &crate::core::runtime::DispatchCtx,
+    _ctx: &crate::core::runtime::DispatchCtx,
     config: &Config,
 ) {
     // Unit tests must not launch the real login-gated background services: they

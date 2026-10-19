@@ -513,9 +513,17 @@ async fn start_credential_gated_services_completes_with_all_services_disabled() 
 
 #[tokio::test]
 async fn logout_stops_remaining_services_without_voice_listeners() {
+    let _inference = crate::inference::host_runtime::inference_test_guard_async().await;
     let tmp = TempDir::new().expect("private workspace");
-    let config = test_config(&tmp);
-    let ctx = DispatchCtx::default();
+    let mut config = test_config(&tmp);
+    config.local_ai.runtime_enabled = true;
+    let core = crate::core::runtime::CoreContext::for_test_with_config(
+        crate::core::runtime::DomainSet::full(),
+        config.clone(),
+    );
+    let service = crate::inference::host_runtime::global(&config);
+    service.replace_status_state("ready");
+    let ctx = DispatchCtx::new(core);
 
     tokio::time::timeout(
         std::time::Duration::from_secs(5),
@@ -523,4 +531,5 @@ async fn logout_stops_remaining_services_without_voice_listeners() {
     )
     .await
     .expect("logout cleanup must finish when no voice listener exists");
+    assert_eq!(service.status().state, "idle");
 }
