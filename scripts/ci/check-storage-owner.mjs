@@ -53,9 +53,7 @@ export const FORBIDDEN_DEPS = [
 ];
 
 /** Patterns matched as a prefix against the normalised crate name. */
-export const FORBIDDEN_PREFIXES = [
-  'aws-smithy-',     // all AWS Smithy crates (smithy-http, smithy-types, …)
-];
+export const FORBIDDEN_PREFIXES = ['aws-smithy-'];
 
 /** Engine crates in the tinystoragedrivers family. */
 export const FORBIDDEN_TSD_ENGINES = [
@@ -75,27 +73,17 @@ export const FORBIDDEN_TSD_ENGINES = [
 /** Packages allowed to transitively reach a forbidden engine, with a reason. */
 export const ALLOWLIST = {
   // Core storage domain — owns all engine initialisation.
-  openhuman:         'core storage domain',
+  openhuman:          'core storage domain',
   // Hosts — own keyring access through rusqlite (keyring backend).
-  'openhuman-app':   'keyring secrets via rusqlite',
-  'openhuman-cli':   'keyring secrets via rusqlite',
-  'openhuman-tui':   'keyring secrets via rusqlite',
-  'openhuman-rpc':   'keyring secrets via rusqlite',
+  'openhuman-app':    'keyring secrets via rusqlite',
+  'openhuman-cli':    'keyring secrets via rusqlite',
+  'openhuman-tui':    'keyring secrets via rusqlite',
+  'openhuman-rpc':    'keyring secrets via rusqlite',
   // iMessage scanner — reads chat.db directly, read-only.
-  tinychannels:      'iMessage chat.db reader: read-only SQLite access',
-  // CLI tool that bundles its own engine.
-  'tinybox-cli':     'bin target, bundles engine',
-  // CLI tool that bundles its own engine.
-  tinyjuice:         'bin target, bundles engine',
-};
-
-/** Packages allowed to reach tinychannels transitively with the imessage feature. */
-const TINYCHANNELS_IMESSAGE_ONLY = new Set(['tinychannels']);
-
-/** Packages whose engine reach is allowed only under a specific feature. */
-export const FEATURE_EXEMPTIONS = {
-  'tinychannels':    ['imessage'],   // only with the imessage feature
-  'tinymemory-integrations': ['legacy-import'], // legacy import reads SQLite read-only
+  tinychannels:       'iMessage chat.db reader: read-only SQLite access',
+  // CLI tools that bundle their own engine.
+  'tinybox-cli':      'bin target, bundles engine',
+  tinyjuice:          'bin target, bundles engine',
 };
 
 export const FORBIDDEN_CRATE_NAME = /-(sqlite|mongodb|file)$/;
@@ -127,8 +115,15 @@ const isForbiddenTsdEngine = name => {
   return FORBIDDEN_TSD_ENGINES.includes(n) || n === 'tinystoragedrivers';
 };
 
-/** First-party = built from a path or a git source, not from a registry. */
-const isFirstParty = pkg => !pkg.source || pkg.source.startsWith('git+');
+/**
+ * First-party = built from a path or a git source, not from a registry.
+ * `null` source means path-based (same repo); a git source means git-based.
+ * A registry source (starts with "registry+") is third-party.
+ */
+const isFirstParty = pkg => {
+  if (pkg.source === null || pkg.source === undefined) return true;
+  return pkg.source.startsWith('git+');
+};
 
 export function isUnderVendoredTsd(manifest, root) {
   const prefix = `${norm(root)}/${VENDORED_TSD_DIR}`;
@@ -142,14 +137,13 @@ const TSD_GIT = /^git\+https?:\/\/[^?#]*\/tinystoragedrivers(?:\.git)?\?tag=([^#
 // ---------------------------------------------------------------------------
 
 /**
- * Walk the resolved normal+build dependency graph from `roots` and return
- * every path that reaches a forbidden crate.
+ * Walk the resolved normal+build dependency graph starting from `roots`
+ * (composition roots — always allowed) and report every first-party non-root
+ * package that reaches a forbidden engine.
  *
  * @param {object} metadata  - cargo metadata document
- * @param {string[]} roots   - package names that are composition roots (skip
- *                             them in the walk and do not report violations
- *                             from them)
- * @returns {{ package: string, kind: string, detail: string, path: string[] }[]}
+ * @param {string[]} roots   - package names that are composition roots
+ * @returns {{ package: string, kind: string, engine: string, path: string[], detail: string }[]}
  */
 export function checkEngineClosure(metadata, roots) {
   const packages = Object.fromEntries(
@@ -159,6 +153,7 @@ export function checkEngineClosure(metadata, roots) {
     (metadata.resolve?.nodes ?? []).map(n => [n.id, n])
   );
 
+  // Set of package IDs that are composition roots (always allowed to reach engines)
   const rootIds = new Set(
     (metadata.packages ?? [])
       .filter(p => roots.includes(p.name))
@@ -174,20 +169,22 @@ export function checkEngineClosure(metadata, roots) {
     const pkg_id = pkg.id;
     if (!nodes[pkg_id]) continue;
 
-    // BFS from this package, skipping root packages
+    // BFS from this package
+    // Each entry: [current_id, current_name, path_names]
     const queue = [[pkg_id, pkg.name, [pkg.name]]];
     const seen = new Set([pkg_id]);
 
     while (queue.length) {
       const [current_id, current_name, path] = queue.shift();
-
       const node = nodes[current_id];
       if (!node) continue;
 
       for (const dep of node.deps ?? []) {
-        // Only normal and build edges count
-        const has_normal_or_build = dep.dep_kinds?.some(
-          dk => dk.kind === undefined || dk.kind === 'build'
+        // Only normal and build edges count.
+        // dep_kinds may be absent (defaults to normal per cargo convention).
+        const dep_kinds = dep.dep_kinds ?? [{ kind: null }];
+        const has_normal_or_build = dep_kinds.some(
+          dk => dk.kind === undefined || dk.kind === null || dk.kind === 'build'
         );
         if (!has_normal_or_build) continue;
 
@@ -199,12 +196,9 @@ export function checkEngineClosure(metadata, roots) {
         if (!dep_pkg) continue;
 
         const dep_name = dep_pkg.name;
-
-        // Skip root packages — they are allowed
-        if (rootIds.has(dep_id)) continue;
-
         const new_path = [...path, dep_name];
 
+        // Forbidden engine found — report it.
         if (isForbiddenDep(dep_name) || isForbiddenTsdEngine(dep_name)) {
           violations.push({
             package: pkg.name,
@@ -213,12 +207,14 @@ export function checkEngineClosure(metadata, roots) {
             path: new_path,
             detail: `reaches ${dep_name} via ${path.slice(1).join(' -> ')}`,
           });
-          // Don't continue through forbidden crates — the path to the engine
-          // is already captured; don't flood with deeper paths.
+          // Don't continue through forbidden crates — path to engine is captured.
           continue;
         }
 
-        // Continue the walk
+        // Continue the walk through this dep, regardless of whether it's
+        // first-party, owner-owned, or a registry crate.  The BFS always
+        // continues so that we can trace a path all the way to a forbidden
+        // crate even when it passes through tsd engine crates.
         queue.push([dep_id, dep_name, new_path]);
       }
     }
@@ -255,6 +251,7 @@ export function checkVendoredOwner(metadata, root = REPO_ROOT) {
   const packages = metadata.packages ?? [];
   let vendoredVersion = null;
 
+  // Rule 3: every tsd* package must be a vendored path
   for (const pkg of packages) {
     if (!isOwner(pkg.name)) continue;
     const manifest = norm(pkg.manifest_path);
@@ -280,13 +277,18 @@ export function checkVendoredOwner(metadata, root = REPO_ROOT) {
     });
   }
 
+  // Rule 4: git-tag mismatch
   if (vendoredVersion) {
     const seen = new Set();
     for (const p of packages) {
       if (isOwner(p.name)) continue;
       for (const d of p.dependencies ?? []) {
-        const tag = isOwner(d.name) ? TSD_GIT.exec(d.source ?? '')?.[1] : null;
-        if (!tag || tag.replace(/^v/, '') === vendoredVersion) continue;
+        if (!isOwner(d.name)) continue;
+        // Check the dependency's declared source (what the consumer wrote in Cargo.toml)
+        const tag = d.source ? TSD_GIT.exec(d.source)?.[1] : null;
+        if (!tag) continue;
+        const normalisedTag = tag.replace(/^v/, '');
+        if (normalisedTag === vendoredVersion) continue;
         const key = `${p.name}|${tag}`;
         if (seen.has(key)) continue;
         seen.add(key);
