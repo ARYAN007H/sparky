@@ -69,64 +69,12 @@ pub(super) fn stdio_sandbox(_config: &Config) -> Option<StdioSandboxConfig> {
     None
 }
 
-/// How long a resolved set of toolchain grants is reused. The toolchains an
-/// MCP server needs (`npx`, `uvx`, ...) do not move between workspace opens, but
-/// a runtime installed while the core runs should still be picked up soon.
-#[cfg(feature = "modules")]
-const GRANT_CACHE_TTL: std::time::Duration = std::time::Duration::from_secs(60);
-
-/// Toolchain grants by [`grants_key`], each with the instant it was resolved.
-#[cfg(feature = "modules")]
-static GRANT_CACHE: std::sync::LazyLock<
-    parking_lot::Mutex<std::collections::HashMap<String, (std::time::Instant, Grants)>>,
-> = std::sync::LazyLock::new(Default::default);
-
-/// The read-only and read-write mounts TinyBox resolved.
-#[cfg(feature = "modules")]
-type Grants = (Vec<PathBuf>, Vec<PathBuf>);
-
-/// What the resolved grants depend on: the operator's jail configuration, the
-/// home directory and the `PATH` the toolchains are found on. The workspace is
-/// deliberately absent: it is not an input to the resolution.
-#[cfg(feature = "modules")]
-fn grants_key(config: &Config, home: Option<&Path>) -> String {
-    format!(
-        "{}|{}|{}",
-        serde_json::to_string(&config.runtime.local_jail).unwrap_or_default(),
-        home.map(path_string).unwrap_or_default(),
-        std::env::var("PATH").unwrap_or_default()
-    )
-}
-
-#[cfg(feature = "modules")]
-fn cached_grants(key: &str) -> Option<Grants> {
-    let cache = GRANT_CACHE.lock();
-    let (resolved_at, grants) = cache.get(key)?;
-    (resolved_at.elapsed() < GRANT_CACHE_TTL).then(|| grants.clone())
-}
-
 /// Adds the TinyBox-resolved toolchain grants (the runtimes `npx`, `uvx` and
 /// friends live in) to `sandbox`. A resolution failure keeps the config
 /// grants only: the jail never widens on error.
-///
-/// TinyMCP admits one lifecycle transition at a time and the host serializes
-/// every workspace's open behind one gate (`module_client::LIFECYCLE_GATE`), so
-/// whatever runs here is paid once per agent, in turn, while all the others
-/// wait. Resolving through the TinyBox module on each open made N agents cost N
-/// module calls inside that gate; the result is the same for all of them, so it
-/// is resolved once per minute.
 #[cfg(feature = "modules")]
 pub(super) async fn with_toolchain_grants(config: &Config, sandbox: &mut StdioSandboxConfig) {
     use crate::sandbox::types::SandboxPolicy;
-    let home =
-        crate::sandbox::local_grants::grant_home(crate::core::runtime::is_saas(), dirs::home_dir);
-    let key = grants_key(config, home.as_deref());
-    if let Some((read_only, read_write)) = cached_grants(&key) {
-        merge(&mut sandbox.read_only, &read_only);
-        merge(&mut sandbox.read_write, &read_write);
-        tracing::debug!("[mcp] stdio sandbox grants reused from the cache");
-        return;
-    }
     let seed = SandboxPolicy {
         backend: crate::sandbox::types::SandboxBackendKind::Local,
         workspace_root: PathBuf::from(&sandbox.workspace),
@@ -141,13 +89,6 @@ pub(super) async fn with_toolchain_grants(config: &Config, sandbox: &mut StdioSa
         Ok(resolved) => {
             merge(&mut sandbox.read_only, &resolved.read_only_mounts);
             merge(&mut sandbox.read_write, &resolved.read_write_mounts);
-            GRANT_CACHE.lock().insert(
-                key,
-                (
-                    std::time::Instant::now(),
-                    (resolved.read_only_mounts, resolved.read_write_mounts),
-                ),
-            );
             tracing::debug!(
                 read_only = sandbox.read_only.len(),
                 read_write = sandbox.read_write.len(),
