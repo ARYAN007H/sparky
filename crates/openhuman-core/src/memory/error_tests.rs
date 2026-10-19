@@ -104,6 +104,12 @@ fn a_plan_refusal_is_plan_required_not_unauthorized() {
             structured.message
         );
     }
+    // A mention of the code that is not the leading code stays an engine failure.
+    let mention = MemoryError::from(E::Engine(
+        "[HTTP_500] memory API recall on h — unexpected [MEMORY_PLAN_REQUIRED] token".into(),
+    ));
+    assert_eq!(mention.code(), ENGINE);
+    assert!(!mention.is_account_wide());
     let expired = MemoryError::from(E::Unauthorized(
         "[UNAUTHORIZED] memory API memory/scopes on h: the session expired (HTTP 401)".into(),
     ));

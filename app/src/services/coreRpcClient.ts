@@ -180,7 +180,7 @@ export function classifyRpcError(
   // key was rejected (HTTP 403 …)". A refusal is never an expired session;
   // matching it below signed a valid user out on opening a Memory tab.
   // Mirrors Rust `is_session_expired_message`.
-  if (/_PLAN_REQUIRED\]|\(HTTP 403/.test(message)) return 'unknown';
+  if (/\[[A-Z0-9_]*_PLAN_REQUIRED\] memory API |\(HTTP 403/.test(message)) return 'unknown';
   // Confirmed OpenHuman session expiry — explicit markers from the backend/core.
   if (/Session expired|SESSION_EXPIRED/i.test(message)) return 'auth_expired';
   // Core-side "no backend session token" → the auth profile is gone but the

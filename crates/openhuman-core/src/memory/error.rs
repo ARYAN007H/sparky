@@ -127,8 +127,9 @@ impl From<tinymemory_api::Error> for MemoryError {
         let credits = tinymemory_integrations::cortex::is_insufficient_credits(&error);
         // A plan refusal (403 `[MEMORY_PLAN_REQUIRED]`) arrives as
         // `Unauthorized` from older TinyMemory and as `Engine` from newer, with
-        // the code on its message either way (#8081).
-        let plan = crate::core::observability::is_plan_required_message(&error.to_string());
+        // the backend's code leading its message either way (#8081).
+        let plan = tinymemory_integrations::cortex::error_code(&error)
+            .is_some_and(|code| code.ends_with("_PLAN_REQUIRED"));
         match error {
             E::Unauthorized(message) | E::Engine(message) if plan => Self::PlanRequired(message),
             E::Unsupported(message) => Self::Unsupported(message),

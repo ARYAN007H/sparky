@@ -194,12 +194,23 @@ describe('memoryErrorCode', () => {
     );
     expect(memoryErrorCode(new Error('UNAVAILABLE: timed out'))).toBe('UNAVAILABLE');
     expect(memoryErrorCode(new Error('PLAN_REQUIRED: not in the plan'))).toBe('PLAN_REQUIRED');
-    // A plan refusal that lost its structured code still names the backend's.
+    // A plan refusal that lost its structured code still names the backend's,
+    // and an older core's UNAUTHORIZED does not shadow it.
     expect(
       memoryErrorCode(
         new Error('unauthorized: [MEMORY_PLAN_REQUIRED] memory API memory/scopes (HTTP 403)')
       )
     ).toBe('PLAN_REQUIRED');
+    expect(
+      memoryErrorCode({
+        message: 'unauthorized: [MEMORY_PLAN_REQUIRED] memory API memory/scopes (HTTP 403)',
+        data: { code: 'UNAUTHORIZED' },
+      })
+    ).toBe('PLAN_REQUIRED');
+    // A mention of the code is not a plan refusal.
+    expect(memoryErrorCode(new Error('ENGINE: unexpected [MEMORY_PLAN_REQUIRED] token'))).toBe(
+      'ENGINE'
+    );
   });
 
   it('returns null for an unrelated error', () => {

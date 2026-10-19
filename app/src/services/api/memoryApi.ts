@@ -547,6 +547,13 @@ export interface JobsList {
   history: JobRun[];
 }
 
+/**
+ * A plan refusal's code in the head TinyMemory gives a hosted failure,
+ * `[MEMORY_PLAN_REQUIRED] memory API …` (#8081). Delimited, so a message that
+ * merely mentions the code does not match.
+ */
+const PLAN_REFUSAL = /\[[A-Z0-9_]*_PLAN_REQUIRED\] memory API /;
+
 /** The structured error codes a memory RPC can fail with. */
 export type MemoryErrorCode =
   | 'MEMORY_OFF'
@@ -612,6 +619,10 @@ async function call<T>(method: string, params: object = {}): Promise<T> {
  */
 export function memoryErrorCode(err: unknown): MemoryErrorCode | null {
   if (!err || typeof err !== 'object') return null;
+  const message = (err as { message?: unknown }).message;
+  // Before the structured code: an older core files a plan refusal under
+  // `UNAUTHORIZED`, with the backend's code still on the message.
+  if (typeof message === 'string' && PLAN_REFUSAL.test(message)) return 'PLAN_REQUIRED';
   const data = (err as { data?: unknown }).data;
   if (data && typeof data === 'object') {
     const d = data as Record<string, unknown>;
@@ -622,10 +633,7 @@ export function memoryErrorCode(err: unknown): MemoryErrorCode | null {
       }
     }
   }
-  const message = (err as { message?: unknown }).message;
   if (typeof message === 'string') {
-    // A plan refusal that lost its structured code still names the backend's.
-    if (message.includes('_PLAN_REQUIRED]')) return 'PLAN_REQUIRED';
     const match =
       /^\s*(MEMORY_OFF|UNSUPPORTED|INVALID_REQUEST|UNAUTHORIZED|INSUFFICIENT_CREDITS|PLAN_REQUIRED|UNAVAILABLE|ENGINE)\b/.exec(
         message
@@ -692,7 +700,7 @@ export function memoryStatusError(
   t: (key: string, fallback?: string) => string
 ): string {
   const key = REFUSAL_KEYS.PLAN_REQUIRED;
-  return key && raw.includes('_PLAN_REQUIRED]') ? t(key) : raw;
+  return key && PLAN_REFUSAL.test(raw) ? t(key) : raw;
 }
 
 /**

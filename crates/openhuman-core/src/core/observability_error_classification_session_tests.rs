@@ -760,4 +760,11 @@ fn memory_plan_refusal_is_backend_user_state_not_session_expiry() {
     assert!(!is_plan_required_message(
         "[USER_INSUFFICIENT_CREDITS] top up"
     ));
+    // Only the delimited code in a hosted failure head counts, not a mention.
+    assert!(!is_plan_required_message(
+        "backend returned 500: unexpected [MEMORY_PLAN_REQUIRED] token"
+    ));
+    assert!(!is_plan_required_message(
+        "engine error: saw [not a code_PLAN_REQUIRED] memory API x"
+    ));
 }
