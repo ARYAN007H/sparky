@@ -15,8 +15,8 @@ mod shell_support;
 mod update_apply;
 mod update_check;
 
-use crate::tools::implementations::filesystem::gate::security_scoped_to_root;
 use crate::security::SecurityPolicy;
+use crate::tools::implementations::filesystem::gate::security_scoped_to_root;
 use tinytools::ToolRunContext;
 
 pub use install_tool::InstallToolTool;
