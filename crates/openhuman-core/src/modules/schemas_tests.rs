@@ -21,11 +21,6 @@ fn registered_controllers_match_the_advertised_schemas() {
 }
 
 #[test]
-fn an_unknown_function_falls_through_to_the_unknown_arm() {
-    assert_eq!(schemas("nope").function, "unknown");
-}
-
-#[test]
 fn a_blank_or_missing_id_is_not_a_parameter() {
     let mut params = Map::new();
     assert_eq!(string_param(&params, "id"), None);

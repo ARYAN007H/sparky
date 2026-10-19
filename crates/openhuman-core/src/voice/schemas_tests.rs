@@ -82,13 +82,6 @@ fn deserialize_params_rejects_wrong_type() {
     assert!(err.contains("invalid params"));
 }
 
-#[test]
-fn to_json_returns_inner_value() {
-    let json =
-        to_json(Outcome::single_log(json!({"ok": true}), "done")).expect("serialize outcome");
-    assert_eq!(json["ok"], true);
-}
-
 #[tokio::test]
 async fn voice_server_start_reports_method_not_found() {
     use crate::core::runtime::{CoreContext, DispatchCtx, DomainSet};

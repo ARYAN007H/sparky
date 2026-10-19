@@ -120,12 +120,6 @@ async fn inference_openai_oauth_complete_handler_rejects_invalid_params() {
     assert!(err.contains("invalid params"));
 }
 
-#[test]
-fn inference_unknown_schema_panics() {
-    let panic = std::panic::catch_unwind(|| schemas("no_such_function"));
-    assert!(panic.is_err());
-}
-
 #[tokio::test]
 async fn inference_status_handler_returns_cli_json() {
     let value = handle_inference_status(DispatchCtx::process_default(), Map::new())

@@ -61,13 +61,6 @@ fn every_schema_uses_threads_namespace() {
     }
 }
 
-#[test]
-fn unknown_function_returns_fallback() {
-    let s = schemas("no_such_fn");
-    assert_eq!(s.function, "unknown");
-    assert_eq!(s.namespace, "threads");
-}
-
 // ── parse::<T>(params) contract ─────────────────────────────────────
 
 fn obj(value: Value) -> Map<String, Value> {

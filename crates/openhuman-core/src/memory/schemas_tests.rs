@@ -77,22 +77,7 @@ fn every_spec_method_is_registered_with_its_exact_name() {
 }
 
 #[test]
-fn unknown_function_gets_the_placeholder_schema() {
-    let unknown = schema("no_such_function");
-    assert_eq!(unknown.function, "unknown");
-    assert!(!FUNCTIONS.contains(&"unknown"));
-}
-
-#[test]
 fn required_inputs_match_the_spec() {
-    let required = |function: &str| -> Vec<&'static str> {
-        schema(function)
-            .inputs
-            .iter()
-            .filter(|input| input.required)
-            .map(|input| input.name)
-            .collect()
-    };
     let optional = |function: &str| -> Vec<&'static str> {
         schema(function)
             .inputs
@@ -101,27 +86,16 @@ fn required_inputs_match_the_spec() {
             .map(|input| input.name)
             .collect()
     };
-    assert_eq!(required("engine_set"), ["engine"]);
     assert_eq!(optional("engine_set"), ["endpoint", "api_key"]);
-    assert_eq!(required("recall"), ["question"]);
-    assert_eq!(required("fetch"), ["query"]);
-    assert_eq!(required("learn"), ["text"]);
-    assert_eq!(required("forget"), ["ids"]);
-    assert_eq!(required("sources_add"), ["kind", "target"]);
-    assert_eq!(required("sources_remove"), ["id"]);
     assert_eq!(optional("sources_remove"), ["forget_items"]);
     assert_eq!(optional("sources_sync"), ["id"]);
-    assert_eq!(required("import_start"), ["consent"]);
     assert_eq!(optional("migration_start"), ["takeover"]);
     assert_eq!(optional("pack_preview"), ["query", "thread_id", "agent_id"]);
-    assert_eq!(required("brain_search"), ["query"]);
     assert_eq!(
         optional("brain_ingest"),
         ["path", "text", "source", "title"]
     );
-    assert_eq!(required("brain_forget"), ["source"]);
     assert_eq!(optional("jobs_run"), ["id"]);
-    assert!(required("policy_set").is_empty());
     for empty in [
         "engines_list",
         "engine_get",

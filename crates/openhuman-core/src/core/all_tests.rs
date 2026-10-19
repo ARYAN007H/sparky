@@ -36,11 +36,44 @@ fn grouped(controllers: Vec<RegisteredController>) -> Vec<GroupedController> {
         .collect()
 }
 
+// Fixed expectations carried over from the pre-existing memory specification
+// tests and wallet setup regression. Never derive this oracle from live schemas.
 fn independent_registered_schema_contract(schema: &ControllerSchema) -> Result<(), String> {
-    if schema.method_name() == "wallet.setup" {
-        required_fields_contract(schema, &["encryptedMnemonic"])
-    } else {
-        Ok(())
+    let required: &[&str] = match (schema.namespace, schema.function) {
+        ("memory", "engine_set") => &["engine"],
+        ("memory", "recall") => &["question"],
+        ("memory", "fetch" | "brain_search") => &["query"],
+        ("memory", "learn") => &["text"],
+        ("memory", "forget") => &["ids"],
+        ("memory", "sources_add") => &["kind", "target"],
+        ("memory", "sources_remove") => &["id"],
+        ("memory", "import_start") => &["consent"],
+        ("memory", "brain_forget") => &["source"],
+        ("memory", "policy_set") => &[],
+        ("wallet", "setup") => return required_fields_contract(schema, &["encryptedMnemonic"]),
+        _ => return Ok(()),
+    };
+    required_input_contract(schema, required)
+}
+
+#[test]
+fn registered_memory_contract_rejects_missing_or_optional_question() {
+    let actual = all_registered_controllers()
+        .into_iter()
+        .map(|controller| controller.schema)
+        .find(|schema| schema.method_name() == "memory.recall")
+        .expect("memory.recall is registered");
+    assert_eq!(independent_registered_schema_contract(&actual), Ok(()));
+    for remove in [true, false] {
+        let mut broken = actual.clone();
+        if remove {
+            broken.inputs.retain(|input| input.name != "question");
+        } else {
+            broken.inputs.iter_mut().find(|input| input.name == "question")
+                .expect("real recall schema declares question").required = false;
+        }
+        assert!(independent_registered_schema_contract(&broken)
+            .unwrap_err().contains("memory.recall required inputs mismatch"));
     }
 }
 

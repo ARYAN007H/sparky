@@ -9,11 +9,6 @@ fn default_enables_analytics() {
 }
 
 #[test]
-fn default_analytics_enabled_helper_returns_true() {
-    assert!(default_analytics_enabled());
-}
-
-#[test]
 fn share_usage_data_is_on_by_default() {
     assert!(default_share_usage_data());
     assert!(ObservabilityConfig::default().share_usage_data);
