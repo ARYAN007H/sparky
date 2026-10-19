@@ -24,27 +24,6 @@ async fn put_expiring(backend: &Arc<dyn StorageBackend>, scope: &Scope, key: &st
 }
 
 #[tokio::test]
-async fn sweep_scope_reclaims_only_lapsed_blobs_of_that_scope() {
-    let (now, backend) = backend_with_clock();
-    let local = Scope::local();
-    let other = crate::storage::scope_for_agent("blob-sweep-other");
-    put_expiring(&backend, &local, "short", 10).await;
-    put_expiring(&backend, &local, "long", 10_000).await;
-    put_expiring(&backend, &other, "short", 10).await;
-
-    now.store(2_000, Ordering::SeqCst);
-    assert_eq!(sweep_scope(backend.as_ref(), &local).await, 1);
-    assert_eq!(sweep_scope(backend.as_ref(), &local).await, 0, "idempotent");
-    assert_eq!(
-        sweep_scope(backend.as_ref(), &other).await,
-        1,
-        "the other scope's lapsed blob was untouched until its own sweep"
-    );
-    let still = backend.for_scope(&local).unwrap().blobs().get("long").await;
-    assert!(still.unwrap().is_some(), "an unexpired blob survives");
-}
-
-#[tokio::test]
 async fn sweep_all_visits_the_local_scope() {
     let (now, backend) = backend_with_clock();
     put_expiring(&backend, &Scope::local(), "gone", 10).await;

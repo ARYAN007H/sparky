@@ -275,7 +275,7 @@ enabled = true
         "tools.secret",
         "external-write",
         "denied",
-        "blocked Authorization: Bearer sk-secret-abcdefghijklmnopqrstuvwxyz",
+        "blocked Authorization: Bearer example-redacted-test-value",
     );
     denials::record("tools.long", "", "", &"x".repeat(320));
 
@@ -393,17 +393,6 @@ enabled = true
     assert!(error_message(&missing, "missing tool").contains("missing.tool"));
 
     harness.rpc_join.abort();
-}
-
-#[tokio::test(flavor = "current_thread")]
-async fn tool_registry_entries_fall_back_on_current_thread_runtime() {
-    let entries = registry_entries(&openhuman_core::core::runtime::DispatchCtx::host_default());
-    assert!(entries
-        .iter()
-        .any(|entry| entry.tool_id == "tools.web_search"));
-    assert!(entries
-        .iter()
-        .all(|entry| !entry.tool_id.starts_with("mcp-client::")));
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]

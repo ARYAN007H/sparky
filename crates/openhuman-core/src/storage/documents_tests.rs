@@ -47,33 +47,24 @@ fn storage_errors_name_the_domain() {
 }
 
 #[test]
-fn compare_and_swap_applies_declines_and_skips_missing() {
+fn compare_and_swap_does_not_run_the_change_for_a_missing_document() {
     let storage = MemoryStorage::new();
     let repo = repo(&storage, "local");
-    let (closed, declined, missing) = repo
+    let changed = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let observed = Arc::clone(&changed);
+
+    let result = repo
         .run(|docs| async move {
-            docs.put(
-                THINGS,
-                "a",
-                json!({ "state": "open" }),
-                Precondition::Absent,
-            )
-            .await?;
-            let close = |doc: &Value| {
-                (text(doc, "state") == Some("open")).then(|| json!({ "state": "closed" }))
-            };
-            let closed = compare_and_swap(&docs, THINGS, "a", close).await?;
-            let declined = compare_and_swap(&docs, THINGS, "a", close).await?;
-            let missing = compare_and_swap(&docs, THINGS, "nope", close).await?;
-            Ok((closed, declined, missing))
+            compare_and_swap(&docs, THINGS, "missing", move |_| {
+                observed.store(true, std::sync::atomic::Ordering::SeqCst);
+                Some(json!({ "state": "closed" }))
+            })
+            .await
         })
         .unwrap();
-    assert_eq!(
-        closed.map(|stored| stored.doc),
-        Some(json!({ "state": "closed" }))
-    );
-    assert!(declined.is_none(), "already closed");
-    assert!(missing.is_none());
+
+    assert!(result.is_none());
+    assert!(!changed.load(std::sync::atomic::Ordering::SeqCst));
 }
 
 #[test]

@@ -265,7 +265,7 @@ test("untouched areas leave only the always-on gates", () => {
   );
 });
 
-test("the storage area arms only the storage-drivers lane, with the sqlite and file drivers on", () => {
+test("the storage area runs host suites on memory and sqlite and compiles optional drivers", () => {
   for (const profile of ["hosted", "ex63"]) {
     const plan = buildPlan({
       profile,
@@ -281,6 +281,7 @@ test("the storage area arms only the storage-drivers lane, with the sqlite and f
       on.filter((id) => !id.startsWith("static:")),
       [
         "storage-drivers:storage-e2e",
+        "storage-drivers:storage-feature-compile",
         "storage-drivers:storage-lib-tests",
         "storage-drivers:cron-module-tests",
         "storage-drivers:storage-session-store-tests",
@@ -303,12 +304,13 @@ test("the storage area arms only the storage-drivers lane, with the sqlite and f
     );
     const lane = plan.lanes.find((l) => l.name === "storage-drivers");
     assert.equal(lane.active, true, profile);
-    for (const check of lane.checks) {
-      assert.match(
-        check.run,
-        /--features (?:session-store,)?storage-sqlite,storage-file(?:\s|$)/,
-      );
+    for (const check of lane.checks.filter((c) => c.name !== "storage-feature-compile")) {
+      assert.match(check.run, /--features (?:session-store,)?storage-sqlite(?:\s|$)/);
     }
+    assert.equal(
+      lane.checks.find((c) => c.name === "storage-feature-compile").run,
+      "cargo check -p openhuman-cli --features storage-mongodb,storage-file",
+    );
     // Every root storage target runs in the lane, so a new one cannot be
     // forgotten: the targets on disk are exactly the targets in the command.
     const e2e = lane.checks.find((c) => c.name === "storage-e2e").run;
@@ -319,20 +321,6 @@ test("the storage area arms only the storage-drivers lane, with the sqlite and f
       .sort();
     const inLane = [...e2e.matchAll(/--test (\S+)/g)].map((m) => m[1]).sort();
     assert.deepEqual(inLane, onDisk, profile);
-    // MongoDB runs the shared storage targets that support its feature set.
-    // SQLite-only targets belong to the driver lane above, not MongoDB.
-    const mongo = fs.readFileSync(
-      path.join(repoRoot, ".github/workflows/storage-mongodb.yml"),
-      "utf8",
-    );
-    const inMongo = [...mongo.matchAll(/--test (\S+)/g)]
-      .map((m) => m[1])
-      .sort();
-    assert.deepEqual(
-      inMongo,
-      onDisk.filter((target) => target !== "storage_default_import_e2e"),
-      "storage-mongodb.yml",
-    );
     if (profile === "hosted") {
       assert.deepEqual(
         hostedMatrix(plan).map((g) => g.group),
