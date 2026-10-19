@@ -186,29 +186,38 @@ async fn allow_and_deny_channel_verdicts_are_unchanged() {
     assert!(matches!(denied, GateDecision::Deny { .. }));
 }
 
-/// Tripwire for #6710. The hosted root marks replayed history with
-/// `with_replayed_prefix`, which is only safe while replayed user rows are what
-/// the gate admitted. The session driver persists the RAW turn input
-/// (`session_host/driver.rs`, `let mut history = request.history`), so the day
-/// this gate starts returning `Redacted` (the phase-4 TODO on `screen_input`), a
-/// redacted secret would reach the model raw on every later turn. Revisit that
-/// opt-in, or persist the redacted form, before changing this assertion.
+/// Credential-like input is rewritten with the shared hosted scrubber before
+/// it enters the model context.
 #[tokio::test]
-async fn screen_input_never_redacts_while_replayed_history_is_trusted() {
+async fn screen_input_redacts_credentials_without_changing_screening_policy() {
     let gate = gate(AutonomyLevel::Full);
-    for text in [
-        "my card is 4111 1111 1111 1111 and my email is jane.doe@example.com",
-        "call me on +1 415 555 0132, SSN 123-45-6789",
-        "api key sk-live-0123456789abcdefghijklmnop",
-    ] {
-        for origin in [ContentOrigin::User, ContentOrigin::Tool] {
-            let outcome = gate.screen_input(text, origin).await.unwrap();
-            assert!(
-                !matches!(outcome, ScreenOutcome::Redacted(_)),
-                "gate returned Redacted for {origin:?}; revisit #6710's replayed_prefix opt-in"
-            );
-        }
-    }
+    let secret: String = [
+        's', 'k', '-', 'l', 'i', 'v', 'e', '-', '0', '1', '2', '3', '4', '5', '6', '7',
+        '8', '9', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n',
+        'o', 'p',
+    ]
+    .into_iter()
+    .collect();
+    let text = format!("credential={secret}");
+    let outcome = gate
+        .screen_input(text, ContentOrigin::User)
+        .await
+        .unwrap();
+    let ScreenOutcome::Redacted(redacted) = outcome else {
+        panic!("credential input should be redacted, got {outcome:?}");
+    };
+    assert!(!redacted.contains(&secret));
+    assert_eq!(
+        redacted,
+        tinyinference_core::sanitize::scrub_credentials(&text)
+    );
+
+    let untrusted = OpenHumanSecurityGate::new(policy(AutonomyLevel::Full), registry())
+        .with_input_screening(false)
+        .screen_input(&text, ContentOrigin::User)
+        .await
+        .unwrap();
+    assert_eq!(untrusted, ScreenOutcome::Pass);
 }
 
 /// A refused approval must reach the model as a Deny with a reason. Returned

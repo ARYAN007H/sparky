@@ -1,5 +1,52 @@
 use super::*;
 
+#[test]
+fn cancelled_seed_history_is_scrubbed_before_snapshot_fallback() {
+    let secret: String = [
+        's', 'k', '-', 'l', 'i', 'v', 'e', '-', '0', '1', '2', '3', '4', '5', '6', '7',
+        '8', '9', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n',
+        'o', 'p',
+    ]
+    .into_iter()
+    .collect();
+    let mut history = vec![
+        Message::system("stable prefix"),
+        Message::user(format!("please use {secret}")),
+        Message::assistant("earlier answer"),
+    ];
+
+    scrub_user_history(&mut history, true);
+    let snapshot = Arc::new(std::sync::Mutex::new(
+        crate::agent::tinyagents::middleware::turn_context::TranscriptSnapshot::default(),
+    ));
+    let failure = driver_cancelled_with_snapshot(
+        &snapshot,
+        &sidecar(),
+        std::time::Duration::from_millis(1),
+        history,
+    );
+    let partial = failure.partial.expect("cancel returns resumable history");
+    let joined = partial.history.iter().map(Message::text).collect::<Vec<_>>().join("\n");
+    assert!(!joined.contains(&secret));
+    assert!(joined.contains("stable prefix"));
+    assert!(joined.contains("earlier answer"));
+}
+
+#[test]
+fn untrusted_turn_history_is_not_scrubbed() {
+    let secret: String = [
+        's', 'k', '-', 'l', 'i', 'v', 'e', '-', '0', '1', '2', '3', '4', '5', '6', '7',
+        '8', '9', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n',
+        'o', 'p',
+    ]
+    .into_iter()
+    .collect();
+    let original = Message::user(format!("please use {secret}"));
+    let mut history = vec![original.clone()];
+    scrub_user_history(&mut history, false);
+    assert_eq!(history, vec![original]);
+}
+
 fn sidecar(
 ) -> std::sync::Arc<std::sync::Mutex<crate::agent::tinyagents::host::run_context::SessionTurnSidecar>>
 {
