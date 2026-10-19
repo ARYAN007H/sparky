@@ -31,6 +31,7 @@ const AUDIO_B64 = silentWavBase64();
 
 export default async function voiceNoteReplay({ page, mock, log, screenshot }) {
   let typedVoiceNoteSent = false;
+  let typedVoiceNoteId;
   let threadId = null;
   let rpcUrl;
   let rpcAuthorizationPromise;
@@ -44,15 +45,15 @@ export default async function voiceNoteReplay({ page, mock, log, screenshot }) {
       const body = JSON.parse(request.postData() ?? "{}");
       if (body.method !== "openhuman.channel_web_chat") return;
       const params = body.params ?? {};
+      const typedVoicePart = params.attachments?.find(
+        (part) => part.kind === "voice_note",
+      );
+      typedVoiceNoteId = typedVoicePart?.voiceNote?.media?.opaqueId;
       typedVoiceNoteSent =
         params.source === "voice_note" &&
-        params.attachments?.some(
-          (part) =>
-            part.kind === "voice_note" &&
-            part.voiceNote?.media?.opaqueId &&
-            !part.voiceNote?.media?.url &&
-            part.voiceNote?.durationMs > 0,
-        );
+        !!typedVoiceNoteId &&
+        !typedVoicePart.voiceNote?.media?.url &&
+        typedVoicePart.voiceNote?.durationMs > 0;
       log(`voice-note chat RPC carried typed media: ${typedVoiceNoteSent}`);
     } catch {}
   });
@@ -246,7 +247,10 @@ export default async function voiceNoteReplay({ page, mock, log, screenshot }) {
     `threads_transcript_get voice rows: ${JSON.stringify(projectedVoiceNotes)}`,
   );
   if (
-    !projectedVoiceNotes.some((item) => item.kind === "userMessage") ||
+    !projectedVoiceNotes.some(
+      (item) =>
+        item.kind === "userMessage" && item.noteId === typedVoiceNoteId,
+    ) ||
     !projectedVoiceNotes.some((item) => item.kind === "assistantMessage")
   )
     throw new Error(
