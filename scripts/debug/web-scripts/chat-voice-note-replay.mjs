@@ -30,6 +30,48 @@ function silentWavBase64() {
 const AUDIO_B64 = silentWavBase64();
 
 export default async function voiceNoteReplay({ page, mock, log, screenshot }) {
+  let typedVoiceNoteSent = false;
+  let threadId = null;
+  const projectedVoiceNotes = [];
+  page.on("response", async (response) => {
+    let body;
+    try {
+      body = JSON.parse(response.request().postData() ?? "{}");
+    } catch {
+      return;
+    }
+    if (body.method !== "openhuman.threads_transcript_get") return;
+    if (threadId && body.params?.thread_id !== threadId) return;
+    try {
+      let value = await response.json();
+      for (let depth = 0; depth < 5 && value && !Array.isArray(value.items); depth += 1) {
+        value = value.result ?? value.data ?? value.value;
+      }
+      const items = Array.isArray(value?.items) ? value.items : [];
+      for (const item of items) {
+        const noteId = item.extraMetadata?.voiceNote?.noteId;
+        if (noteId) projectedVoiceNotes.push({ kind: item.kind, noteId });
+      }
+      log(`transcript projection voice rows: ${JSON.stringify(projectedVoiceNotes)}`);
+    } catch {}
+  });
+  page.on("request", (request) => {
+    if (!request.url().endsWith("/rpc")) return;
+    try {
+      const body = JSON.parse(request.postData() ?? "{}");
+      if (body.method !== "openhuman.channel_web_chat") return;
+      const params = body.params ?? {};
+      typedVoiceNoteSent =
+        params.source === "voice_note" &&
+        params.attachments?.some(
+          (part) =>
+            part.kind === "voice_note" &&
+            part.voiceNote?.media?.url?.startsWith("data:audio/wav;base64,") &&
+            part.voiceNote?.durationMs > 0,
+        );
+      log(`voice-note chat RPC carried typed media: ${typedVoiceNoteSent}`);
+    } catch {}
+  });
   page.on("response", async (response) => {
     const body = response.request().postData() ?? "";
     if (body.includes("channel_web_voice_note_read")) {
@@ -56,7 +98,7 @@ export default async function voiceNoteReplay({ page, mock, log, screenshot }) {
   await page.goto(new URL("/#/chat", page.url()).toString());
   const composer = page.getByRole("textbox", { name: "Message input" });
   await composer.waitFor({ state: "visible", timeout: 30_000 });
-  let threadId = await page.evaluate(
+  threadId = await page.evaluate(
     () =>
       window.__OPENHUMAN_STORE__?.getState?.().thread?.selectedThreadId ?? null,
   );
@@ -162,6 +204,8 @@ export default async function voiceNoteReplay({ page, mock, log, screenshot }) {
         `mock request missing ${expected}: ${requests.join(", ")}`,
       );
   }
+  if (!typedVoiceNoteSent)
+    throw new Error("voice-note turn did not send typed voice_note media");
   await page.reload();
   await page
     .getByRole("textbox", { name: "Message input" })
@@ -178,6 +222,22 @@ export default async function voiceNoteReplay({ page, mock, log, screenshot }) {
     .getByTestId("voice-note-player")
     .nth(1)
     .waitFor({ state: "visible", timeout: 30_000 });
+  await page.waitForFunction(
+    () =>
+      window.__OPENHUMAN_STORE__?.getState?.().thread?.messagesByThreadId &&
+      Object.values(window.__OPENHUMAN_STORE__.getState().thread.messagesByThreadId)
+        .flat()
+        .filter((message) => message.extraMetadata?.voiceNote?.noteId).length >= 2,
+    null,
+    { timeout: 30_000 },
+  );
+  if (
+    !projectedVoiceNotes.some((item) => item.kind === "userMessage") ||
+    !projectedVoiceNotes.some((item) => item.kind === "assistantMessage")
+  )
+    throw new Error(
+      `threads_transcript_get did not project both voice-note rows: ${JSON.stringify(projectedVoiceNotes)}`,
+    );
   await page.getByText(REPLY, { exact: false }).waitFor({ timeout: 10_000 });
   await screenshot("voice-note-reloaded");
 
