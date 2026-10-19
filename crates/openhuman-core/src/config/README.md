@@ -187,7 +187,7 @@ config.update_model_settings (JSON-RPC / CLI)
 ## RPC surface
 
 All methods are in the `config` namespace and are registered by [`core/all.rs`](../core/all.rs) through
-`all_config_registered_controllers()` under `DomainGroup::Config`. There are 41.
+`all_config_registered_controllers()` under `DomainGroup::Config`. There are 37.
 
 | Group | Methods |
 | --- | --- |
