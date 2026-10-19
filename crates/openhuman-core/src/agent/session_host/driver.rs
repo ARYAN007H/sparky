@@ -79,8 +79,7 @@ impl SessionDriver<OpenHumanRunContext> for OpenHumanSessionDriver {
         &self,
         mut request: DriverRequest<OpenHumanRunContext>,
     ) -> Result<DriverOutcome, DriverFailure> {
-        // Heal a head persisted before #6721 was fixed, before anything reads
-        // the history: this turn then commits a clean generation.
+        // Heal an orphaned tool head before reading history.
         repair_orphaned_tool_head(&mut request.history);
         // These two inputs are prepared by the OpenHuman lifecycle hook for
         // this exact request.  Falling back to the snapshots captured when the
@@ -123,10 +122,8 @@ impl SessionDriver<OpenHumanRunContext> for OpenHumanSessionDriver {
                 outcome: None,
             });
         }
-        // The harness drops its `AgentRun` on an error.  Snapshot the exact
-        // request boundary before assembling the graph so the error path can
-        // persist only provider-accepted rounds, plus a display-only failure
-        // record, without manufacturing a second host history.
+        // Snapshot the request boundary before assembling the graph so errors
+        // persist only provider-accepted rounds.
         let snapshot = context_mw
             .transcript_snapshot
             .get_or_insert_with(|| {
