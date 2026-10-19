@@ -1,4 +1,66 @@
 use super::*;
+use crate::config::Config;
+use crate::integrations::composio::catalog::{seed_live_catalog_cache, ToolContract};
+use serde_json::{json, Value};
+use tinyflows_catalog::FlowConnection;
+use tinyflows::model::WorkflowGraph;
+
+fn graph(value: Value) -> WorkflowGraph {
+    let graph = tinyflows::migrate::deserialize_graph(value).expect("test graph deserializes");
+    tinyflows::validate::validate(&graph).expect("test graph is structurally valid");
+    tinyflows::compat::ensure_compatible(&graph).expect("test graph is compatible");
+    graph
+}
+
+fn seeded_slack_send_contract() -> ToolContract {
+    ToolContract {
+        slug: "SLACK_SEND_MESSAGE".to_string(),
+        toolkit: "slack".to_string(),
+        description: None,
+        required_args: vec!["channel".to_string(), "text".to_string()],
+        input_schema: None,
+        output_fields: vec!["ts".to_string(), "channel".to_string()],
+        output_schema: Some(json!({
+            "type": "object",
+            "properties": { "ts": {"type": "string"}, "channel": {"type": "string"} }
+        })),
+        primary_array_path: None,
+        is_curated: true,
+    }
+}
+
+fn ws3_flow_conn(toolkit: &str, id: &str) -> FlowConnection {
+    FlowConnection {
+        connection_ref: format!("composio:{toolkit}:{id}"),
+        kind: "composio".to_string(),
+        display: toolkit.to_string(),
+        toolkit: Some(toolkit.to_string()),
+        scheme: None,
+        platform_user_id: None,
+    }
+}
+
+fn ws3_transcript_connections() -> Vec<FlowConnection> {
+    vec![
+        ws3_flow_conn("twitter", "ca_JX6QU88UfSk4"),
+        ws3_flow_conn("gmail", "ca_vX_WA8FsqNmE"),
+        ws3_flow_conn("tiktok", "ca_LPCp3WQpaDma"),
+    ]
+}
+
+fn ws3_tool_call_graph(slug: &str, connection_ref: Option<&str>) -> WorkflowGraph {
+    let mut config = json!({ "slug": slug, "args": {} });
+    if let Some(connection_ref) = connection_ref {
+        config["connection_ref"] = json!(connection_ref);
+    }
+    graph(json!({
+        "nodes": [
+            {"id":"t","kind":"trigger","name":"Manual"},
+            {"id":"act","kind":"tool_call","name":"Act","config":config}
+        ],
+        "edges": [{"from_node":"t","to_node":"act"}]
+    }))
+}
 
 #[tokio::test]
 async fn validate_tool_contracts_rejects_a_hallucinated_slug() {
