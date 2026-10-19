@@ -996,13 +996,9 @@ fn outcome_to_host(
             options: None,
             checkpoint: None,
         },
-        SubagentOutcomeKind::Incomplete(incomplete) => SubagentRunStatus::Incomplete {
-            failure_cause: outcome
-                .extensions
-                .get(outcome::CLASSIFIED_STOP_CAUSE_EXTENSION)
-                .and_then(|value| outcome::decode_classified_stop_cause(value, &incomplete.reason)),
-            reason: incomplete.reason,
-        },
+        SubagentOutcomeKind::Incomplete(incomplete) => {
+            outcome::incomplete_run_status(incomplete.reason, &outcome.extensions)
+        }
         SubagentOutcomeKind::Cancelled => SubagentRunStatus::Cancelled,
     };
     host.status = status;
