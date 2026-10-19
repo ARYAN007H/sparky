@@ -232,23 +232,6 @@ impl WebHost {
         let _tap = AbortOnDrop(tap);
         let _beat = AbortOnDrop(spawn_heartbeat(&ctx, projection.clone()));
 
-        agent.set_on_progress(Some(progress_tx));
-        agent.set_run_queue(Some(queue));
-        agent.set_thread_id(Some(thread_id));
-        agent.set_host_env(crate::agent::turn_env::HostTurnEnv {
-            cancellation: Some(cancellation),
-            turn_deadline: request
-                .deadline
-                .map(tinyagents_harness::turn_deadline::TurnDeadline::starting_now),
-            ..Default::default()
-        });
-        // Also the turn's workspace, so attachment reads and delegated
-        // sub-agents (which load a fresh config) use the folder its uploads
-        // were staged in (#7714).
-        if let Some(dir) = thread_dir {
-            agent.set_workspace_descriptor(Some(tinytools::WorkspaceDescriptor::new(dir)));
-        }
-
         let origin = AgentTurnOrigin::WebChat {
             thread_id: thread_id.to_owned(),
             client_id: payload.client_id.clone(),
@@ -268,7 +251,24 @@ impl WebHost {
         let turn_started = std::time::Instant::now();
         let turn = Box::pin(with_origin(
             origin.clone(),
-            agent.run_single_with_approval(&request.text, Some(origin), approval),
+            crate::agent::turn_host::run_session_turn(
+                agent,
+                crate::agent::turn_host::AgentTurnRequest {
+                    message: request.text.clone(),
+                    thread_id: Some(thread_id.to_owned()),
+                    origin,
+                    approval,
+                    progress: Some(progress_tx),
+                    run_queue: Some(queue),
+                    cancellation,
+                    turn_deadline: request.deadline,
+                    // Also the turn's workspace, so attachment reads and
+                    // delegated sub-agents use the upload folder (#7714).
+                    workspace: thread_dir
+                        .map(tinytools::WorkspaceDescriptor::new),
+                    host_env: Default::default(),
+                },
+            ),
         ));
         let outcome = turn.await;
         let result = match outcome {
