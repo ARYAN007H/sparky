@@ -227,9 +227,9 @@ pub fn spawn_update_scheduler() -> tokio::task::JoinHandle<()> {
 /// [`ServiceSet`]. Gating this on cron would silently skip reconciliation on any
 /// cron-less selection (`headless_api()`, embedders), leaving prior-process
 /// orphans wedged forever. Selected by the `flows` **domain** flag instead, and
-/// safe at any point in boot — the sweep's own `PROCESS_RUN_FLOOR` guard means
-/// it can never touch a run this process started, so it carries no ordering
-/// requirement against the cron scheduler or any agent turn.
+/// safe at any point in boot — the module's boot-floor and live-actor guards
+/// keep it off runs this process owns, so it carries no ordering requirement
+/// against the cron scheduler or any agent turn.
 pub fn spawn_flows_boot_reconcile(
     ctx: std::sync::Arc<crate::core::runtime::CoreContext>,
 ) {
@@ -395,6 +395,8 @@ pub(crate) fn bootstrap_job_plan(services: &ServiceSet) -> BootstrapJobPlan {
         // flag.
         module_preload: services.integrations,
     }
+    #[cfg(not(feature = "flows"))]
+    let _ = ctx;
 }
 
 /// Starts legacy bootstrap loops that predate [`ServiceSet`].
