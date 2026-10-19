@@ -994,20 +994,6 @@
     "occurrence": 1
   },
   {
-    "rule": "ambient-config",
-    "path": "crates/openhuman-core/src/voice/cli.rs",
-    "line": 79,
-    "text": "let mut config = match crate::config::Config::load_or_init().await {",
-    "occurrence": 1
-  },
-  {
-    "rule": "bare-spawn",
-    "path": "crates/openhuman-core/src/voice/dictation_listener.rs",
-    "line": 188,
-    "text": "let task = tokio::spawn(async move {",
-    "occurrence": 1
-  },
-  {
     "rule": "bare-spawn",
     "path": "crates/openhuman-core/src/voice/realtime_harness/turn_handler.rs",
     "line": 204,
@@ -1020,27 +1006,6 @@
     "line": 221,
     "text": "tokio::spawn(async move {",
     "occurrence": 1
-  },
-  {
-    "rule": "bare-spawn",
-    "path": "crates/openhuman-core/src/voice/schemas/handlers/provider_server.rs",
-    "line": 497,
-    "text": "tokio::spawn(async move {",
-    "occurrence": 1
-  },
-  {
-    "rule": "bare-spawn",
-    "path": "crates/openhuman-core/src/voice/server/singleton.rs",
-    "line": 78,
-    "text": "tokio::spawn(async move {",
-    "occurrence": 1
-  },
-  {
-    "rule": "bare-spawn",
-    "path": "crates/openhuman-core/src/voice/server/singleton.rs",
-    "line": 107,
-    "text": "tokio::spawn(async move {",
-    "occurrence": 2
   },
   {
     "rule": "env-mutation",
