@@ -62,16 +62,8 @@ fn synthesized_reply_metadata_preserves_its_viseme_timeline() {
         "YWJj",
         "audio/mpeg",
         &[
-            tinyinference_voice::VisemeFrame {
-                viseme: "aa".into(),
-                start_ms: 0,
-                end_ms: 120
-            },
-            tinyinference_voice::VisemeFrame {
-                viseme: "PP".into(),
-                start_ms: 120,
-                end_ms: 220
-            },
+            tinyinference_voice::VisemeFrame { viseme: "aa".into(), start_ms: 0, end_ms: 120 },
+            tinyinference_voice::VisemeFrame { viseme: "PP".into(), start_ms: 120, end_ms: 220 },
         ]
     ));
 
@@ -100,13 +92,7 @@ fn rpc_round_trip_and_bad_base64() {
 #[test]
 fn synthesized_reply_is_stored_only_with_decodable_audio() {
     let tmp = tempfile::tempdir().unwrap();
-    assert!(!store_synthesized_reply(
-        tmp.path(),
-        "r1",
-        "",
-        "audio/mpeg",
-        &[]
-    ));
+    assert!(!store_synthesized_reply(tmp.path(), "r1", "", "audio/mpeg", &[]));
     assert!(!store_synthesized_reply(
         tmp.path(),
         "r1",

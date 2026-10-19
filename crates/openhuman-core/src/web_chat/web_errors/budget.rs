@@ -3,8 +3,8 @@
 //! copy lives in the host copy table; the phrase matching in
 //! `tinyinference_providers::billing`.
 
-use crate::inference::failure_copy::{failure_copy, FailureClass};
-use tinyinference_providers::{is_budget_message, BudgetMatch};
+use crate::inference::failure_copy::{FailureClass, failure_copy};
+use tinyinference_providers::{BudgetMatch, is_budget_message};
 
 /// Whether an error string signals an exhausted inference budget, read with the
 /// chat surface's [`BudgetMatch::Managed`] strictness: the managed no-credits
