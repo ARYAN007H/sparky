@@ -10,8 +10,7 @@ use crate::modules::documents::DocumentCallError;
 // The size limits are the wire contract's: the tool validates against the same
 // numbers the `tinydocs` module enforces, so they are defined once, there.
 pub(super) use tinydocs_bus::spec::presentation::{
-    MAX_BULLETS_PER_SLIDE, MAX_IMAGES_PER_DECK, MAX_IMAGES_PER_SLIDE, MAX_IMAGE_BYTES, MAX_SLIDES,
-    MAX_TEXT_CHARS,
+    MAX_BULLETS_PER_SLIDE, MAX_IMAGES_PER_SLIDE, MAX_IMAGE_BYTES, MAX_SLIDES, MAX_TEXT_CHARS,
 };
 
 /// Where a slide image's bytes come from. `Url` is intentionally
