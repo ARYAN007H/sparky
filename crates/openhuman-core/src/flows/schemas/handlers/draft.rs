@@ -92,7 +92,10 @@ pub(in crate::flows::schemas) fn handle_draft_promote(
         let config = ctx.load_config().await?;
         let id = read_required::<String>(&params, "id")?;
         let require_approval = params.get("require_approval").and_then(Value::as_bool);
-        to_json(ops::flows_draft_promote(&config, id.trim(), require_approval).await?)
+        to_json(
+            ops::flows_draft_promote_with_context(&ctx, &config, id.trim(), require_approval)
+                .await?,
+        )
     })
 }
 

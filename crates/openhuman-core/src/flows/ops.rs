@@ -13,8 +13,7 @@
 //! | `builder_gates` | the author-time hard-gate stack, `strict_gate`, `build_builder_proposal` |
 //! | `wiring_warnings` | advisory Composio wiring / output-field / `split_out.path` warnings |
 //! | `inference_readiness` | B45 provider-connectivity evaluation + probe cache |
-//! | `tool_contract_gate` | live-catalog slug / required-arg / arg-name gate |
-//! | `connection_ref_gate` | WS3 `connection_ref` toolkit + existence gate |
+//! | `host_gates` | OpenHuman checks served to TinyFlows for one authoring call |
 //! | `definitions` | create / duplicate / get / list / delete + saved-graph lookups |
 //! | `updates` | update / history / rollback with optimistic concurrency |
 //! | `triggers` | enable/disable, trigger binding, boot reconciliation, trigger warnings |
@@ -38,7 +37,6 @@ use std::sync::{Arc, LazyLock};
 
 use chrono::Utc;
 use serde_json::{json, Value};
-use tinyflows::authoring::validate_and_migrate_graph;
 use tinyflows::model::{NodeKind, TriggerKind, WorkflowGraph};
 use tinyflows::triggers::graph_trigger_warnings;
 // The save/run safety predicates are `tinyflows-catalog`'s: whether a graph
@@ -133,7 +131,6 @@ mod builder;
 mod builder_gates;
 mod builder_toolset;
 mod catalog;
-mod connection_ref_gate;
 mod connections;
 mod definitions;
 mod discovery;
@@ -145,7 +142,6 @@ mod run;
 mod run_management;
 mod run_rows;
 mod streaming;
-mod tool_contract_gate;
 mod trail_off;
 mod triggers;
 mod updates;
@@ -157,7 +153,6 @@ pub use builder::*;
 pub(crate) use builder_gates::*;
 use builder_toolset::*;
 pub use catalog::*;
-pub(crate) use connection_ref_gate::*;
 pub use connections::*;
 pub use definitions::*;
 pub use discovery::*;
@@ -169,7 +164,6 @@ pub use run::*;
 pub use run_management::*;
 use run_rows::*;
 pub use streaming::*;
-pub(crate) use tool_contract_gate::*;
 use trail_off::*;
 pub use triggers::*;
 pub use updates::*;

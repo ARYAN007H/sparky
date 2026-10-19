@@ -24,27 +24,27 @@ pub(in crate::flows::schemas) fn handle_create(
         {
             ops::strict_gate(&ctx, &config, &graph).await?;
         }
-        to_json(ops::flows_create(&config, name, graph, require_approval).await?)
+        to_json(ops::flows_create_with_context(&ctx, &config, name, graph, require_approval).await?)
     })
 }
 
 pub(in crate::flows::schemas) fn handle_validate(
-    _ctx: DispatchCtx,
+    ctx: DispatchCtx,
     params: Map<String, Value>,
 ) -> ControllerFuture {
     Box::pin(async move {
-        // No config load: validation is pure (no persistence, no workspace).
+        let config = ctx.load_config().await?;
         let graph = read_required::<Value>(&params, "graph")?;
-        to_json(ops::flows_validate(graph))
+        to_json(ops::flows_validate(&ctx, &config, graph).await)
     })
 }
 
 pub(in crate::flows::schemas) fn handle_import(
-    _ctx: DispatchCtx,
+    ctx: DispatchCtx,
     params: Map<String, Value>,
 ) -> ControllerFuture {
     Box::pin(async move {
-        // No config load: import is pure (no persistence, no workspace).
+        let config = ctx.load_config().await?;
         let graph = read_required::<Value>(&params, "graph")?;
         let format = params
             .get("format")
@@ -52,7 +52,7 @@ pub(in crate::flows::schemas) fn handle_import(
             .map(|v| serde_json::from_value::<String>(v.clone()))
             .transpose()
             .map_err(|e| format!("invalid 'format': {e}"))?;
-        to_json(ops::flows_import(graph, format)?)
+        to_json(ops::flows_import(&ctx, &config, graph, format).await?)
     })
 }
 
@@ -130,7 +130,8 @@ pub(in crate::flows::schemas) fn handle_update(
             }
         }
         to_json(
-            ops::flows_update(
+            ops::flows_update_with_context(
+                &ctx,
                 &config,
                 id.trim(),
                 name,

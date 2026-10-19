@@ -57,8 +57,26 @@ pub async fn flows_create(
     graph_json: Value,
     require_approval: bool,
 ) -> Result<Outcome<Flow>, String> {
-    let graph = validate_and_migrate_graph(graph_json)?;
-    ensure_config_aware_engine_compatible(config, &graph)?;
+    flows_create_with_context(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        config,
+        name,
+        graph_json,
+        require_approval,
+    )
+    .await
+}
+
+pub(crate) async fn flows_create_with_context(
+    ctx: &crate::core::runtime::DispatchCtx,
+    config: &Config,
+    name: String,
+    graph_json: Value,
+    require_approval: bool,
+) -> Result<Outcome<Flow>, String> {
+    ctx.enter(async move {
+        let graph = validate_and_migrate_graph(ctx, config, graph_json).await?;
+        ensure_config_aware_engine_compatible(ctx, config, &graph).await?;
 
     // Rule 1: automatic triggers create DISABLED — the user must arm them
     // explicitly.
@@ -114,8 +132,10 @@ pub async fn flows_create(
         );
     }
 
-    publish_flow_changed(&flow.id, "created", "system");
-    Ok(Outcome::new(flow, logs))
+        publish_flow_changed(&flow.id, "created", "system");
+        Ok(Outcome::new(flow, logs))
+    })
+    .await
 }
 
 /// Duplicates a saved flow: creates an independent copy of its graph under a
@@ -177,13 +197,15 @@ pub fn load_flow_graph(config: &Config, id: &str) -> Result<Option<WorkflowGraph
 /// Resolver-only saved-graph lookup. Authoring tools use [`load_flow_graph`]
 /// so a legacy draft can still be opened and repaired; execution resolves only
 /// graphs the current engine can run safely.
-pub(crate) fn load_engine_compatible_flow_graph(
+pub(crate) async fn load_engine_compatible_flow_graph(
+    ctx: &crate::core::runtime::DispatchCtx,
     config: &Config,
     id: &str,
 ) -> Result<Option<WorkflowGraph>, String> {
     let graph = load_flow_graph(config, id)?;
     if let Some(graph) = graph.as_ref() {
-        ensure_config_aware_engine_compatible(config, graph)
+        ensure_config_aware_engine_compatible(ctx, config, graph)
+            .await
             .map_err(|error| format!("workflow_id '{id}' is engine-incompatible: {error}"))?;
     }
     Ok(graph)

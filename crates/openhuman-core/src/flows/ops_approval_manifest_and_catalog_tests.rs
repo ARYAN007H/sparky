@@ -84,7 +84,13 @@ async fn flows_run_detached_registers_the_run_before_returning_its_id() {
 async fn approval_manifest_lists_gated_nodes_and_skips_curated_reads() {
     let tmp = TempDir::new().unwrap();
     let config = test_config(&tmp); // default tier: Supervised
-    let entries = compute_approval_manifest(&config, &manifest_graph()).await;
+    let entries = compute_approval_manifest(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        &manifest_graph(),
+    )
+    .await
+    .unwrap();
 
     let kinds = entry_kinds_by_tool(&entries);
     // Supervised prompts on every acting class → all three are approvable.
@@ -104,7 +110,13 @@ async fn approval_manifest_marks_blocked_classes_under_readonly_tier() {
     let tmp = TempDir::new().unwrap();
     let mut config = test_config(&tmp);
     config.autonomy.level = crate::security::AutonomyLevel::ReadOnly;
-    let entries = compute_approval_manifest(&config, &manifest_graph()).await;
+    let entries = compute_approval_manifest(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        &manifest_graph(),
+    )
+    .await
+    .unwrap();
 
     let kinds = entry_kinds_by_tool(&entries);
     // Read-only blocks every non-Read class: informational, never approvable.
@@ -135,7 +147,13 @@ async fn approval_manifest_dedupes_repeated_tools_and_flags_dynamic_slugs() {
             { "from_node": "h2", "from_port": "main", "to_node": "d" }
         ]
     }));
-    let entries = compute_approval_manifest(&config, &graph).await;
+    let entries = compute_approval_manifest(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        &graph,
+    )
+    .await
+    .unwrap();
 
     // Two http nodes share one trust key → exactly one row.
     let http_rows = entries
@@ -170,7 +188,13 @@ async fn approval_manifest_discloses_agent_ref_nodes_only() {
             { "from_node": "plain", "from_port": "main", "to_node": "harness" }
         ]
     }));
-    let entries = compute_approval_manifest(&config, &graph).await;
+    let entries = compute_approval_manifest(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        &graph,
+    )
+    .await
+    .unwrap();
 
     let agent_rows: Vec<_> = entries
         .iter()
@@ -489,9 +513,14 @@ async fn approval_manifest_never_claims_trust_that_was_never_granted() {
     // A candidate graph carries no flow id, so there is no `flow_tool_trust`
     // row to join against and nothing can legitimately be "already trusted" —
     // whether or not this process happens to have an `ApprovalGate` installed.
-    let outcome = flows_approval_manifest(&config, None, Some(manifest_graph_json()))
-        .await
-        .expect("manifest must compute for a candidate graph");
+    let outcome = flows_approval_manifest(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &config,
+        None,
+        Some(manifest_graph_json()),
+    )
+    .await
+    .expect("manifest must compute for a candidate graph");
 
     let already_trusted = outcome.value["already_trusted"]
         .as_array()

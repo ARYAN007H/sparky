@@ -73,19 +73,45 @@ pub async fn flows_update(
     require_approval: Option<bool>,
     expected_version: Option<String>,
 ) -> Result<Outcome<Flow>, String> {
-    flows_update_inner(
+    flows_update_with_context(
+        &crate::core::runtime::DispatchCtx::ambient(),
         config,
         id,
         name,
         graph_json,
         require_approval,
         expected_version,
-        false,
     )
     .await
 }
 
+pub(crate) async fn flows_update_with_context(
+    ctx: &crate::core::runtime::DispatchCtx,
+    config: &Config,
+    id: &str,
+    name: Option<String>,
+    graph_json: Option<Value>,
+    require_approval: Option<bool>,
+    expected_version: Option<String>,
+) -> Result<Outcome<Flow>, String> {
+    ctx.enter(async move {
+        flows_update_inner(
+            ctx,
+            config,
+            id,
+            name,
+            graph_json,
+            require_approval,
+            expected_version,
+            false,
+        )
+        .await
+    })
+    .await
+}
+
 async fn flows_update_inner(
+    ctx: &crate::core::runtime::DispatchCtx,
     config: &Config,
     id: &str,
     name: Option<String>,
@@ -103,12 +129,19 @@ async fn flows_update_inner(
     let graph_changed = graph_json.is_some();
     let graph = match graph_json {
         Some(raw) => {
-            let graph = validate_and_migrate_graph(raw)?;
-            ensure_config_aware_engine_compatible(config, &graph)?;
+            let graph = validate_and_migrate_graph(ctx, config, raw).await?;
+            ensure_config_aware_engine_compatible(ctx, config, &graph).await?;
             graph
         }
+        // Metadata-only updates preserve access to legacy graphs written by
+        // older versions, even when the current engine no longer accepts them.
         None => {
-            tinyflows::validate::validate(&existing.graph).map_err(|e| e.to_string())?;
+            validate_and_migrate_graph(
+                ctx,
+                config,
+                serde_json::to_value(&existing.graph).map_err(|error| error.to_string())?,
+            )
+            .await?;
             existing.graph.clone()
         }
     };
@@ -254,18 +287,39 @@ pub async fn flows_rollback(
     revision_id: &str,
     expected_version: Option<String>,
 ) -> Result<Outcome<Flow>, String> {
-    let rev = store::revision_by_id(config, id, revision_id)
-        .map_err(|e| e.to_string())?
-        .ok_or_else(|| format!("revision '{revision_id}' not found for flow '{id}'"))?;
-
-    tracing::debug!(target: "flows", flow_id = %id, %revision_id, "[flows] flows_rollback: restoring prior revision");
-    flows_update(
+    flows_rollback_with_context(
+        &crate::core::runtime::DispatchCtx::ambient(),
         config,
         id,
-        Some(rev.name),
-        Some(rev.graph),
-        Some(rev.require_approval),
+        revision_id,
         expected_version,
     )
+    .await
+}
+
+pub(crate) async fn flows_rollback_with_context(
+    ctx: &crate::core::runtime::DispatchCtx,
+    config: &Config,
+    id: &str,
+    revision_id: &str,
+    expected_version: Option<String>,
+) -> Result<Outcome<Flow>, String> {
+    ctx.enter(async move {
+        let rev = store::revision_by_id(config, id, revision_id)
+            .map_err(|e| e.to_string())?
+            .ok_or_else(|| format!("revision '{revision_id}' not found for flow '{id}'"))?;
+
+        tracing::debug!(target: "flows", flow_id = %id, %revision_id, "[flows] flows_rollback: restoring prior revision");
+        flows_update_with_context(
+            ctx,
+            config,
+            id,
+            Some(rev.name),
+            Some(rev.graph),
+            Some(rev.require_approval),
+            expected_version,
+        )
+        .await
+    })
     .await
 }

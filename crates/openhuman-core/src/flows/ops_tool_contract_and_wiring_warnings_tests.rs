@@ -53,272 +53,6 @@ async fn flows_get_tool_contract_rpc_warns_for_runtime_gated_uncurated_action() 
     );
 }
 
-#[tokio::test]
-async fn validate_tool_contracts_accepts_a_separated_action_slug_alias() {
-    seed_live_catalog_cache("googledrive", vec![seeded_alias_contract()]);
-    let g = graph(json!({
-        "nodes": [
-            { "id": "t", "kind": "trigger", "name": "Manual" },
-            { "id": "find", "kind": "tool_call", "name": "Find",
-              "config": { "slug": "GOOGLE_DRIVE_FIND_FILE", "args": {} } }
-        ],
-        "edges": [ { "from_node": "t", "to_node": "find" } ]
-    }));
-
-    let errors = validate_tool_contracts(&Config::default(), &g).await;
-
-    assert!(
-        errors.is_empty(),
-        "valid action alias was rejected: {errors:?}"
-    );
-}
-
-#[tokio::test]
-async fn graph_wiring_warnings_resolves_a_separated_action_slug_alias() {
-    seed_live_catalog_cache("googledrive", vec![seeded_alias_contract()]);
-    let g = graph(json!({
-        "nodes": [
-            { "id": "t", "kind": "trigger", "name": "Manual" },
-            { "id": "find", "kind": "tool_call", "name": "Find",
-              "config": { "slug": "GOOGLE_DRIVE_FIND_FILE", "args": {} } },
-            { "id": "split", "kind": "split_out", "name": "Split",
-              "config": { "path": "json.data.wrong" } },
-            { "id": "shape", "kind": "transform", "name": "Shape",
-              "config": { "set": { "file": "=nodes.find.item.json.data.wrong" } } }
-        ],
-        "edges": [
-            { "from_node": "t", "to_node": "find" },
-            { "from_node": "find", "to_node": "split" },
-            { "from_node": "find", "to_node": "shape" }
-        ]
-    }));
-
-    let warnings = graph_wiring_warnings(&Config::default(), &g).await;
-
-    assert_eq!(
-        warnings.len(),
-        2,
-        "alias should reach both wiring checks: {warnings:?}"
-    );
-    assert!(
-        warnings
-            .iter()
-            .any(|warning| warning.contains("json.data.files")),
-        "{warnings:?}"
-    );
-    assert!(
-        warnings.iter().any(|warning| warning.contains("wrong")),
-        "{warnings:?}"
-    );
-}
-
-/// (Codex feedback on this PR) `notion` ships a static curated catalog
-/// (`catalog_for_toolkit`), so at RUNTIME `flow_tool_allowed`'s Path A
-/// hard-rejects any slug `find_curated` doesn't recognize — even a real,
-/// live action. Without this check, a real-but-uncurated action for a
-/// statically-catalogued toolkit would pass authoring/save here and then
-/// fail every single run as "tool not permitted". Uses its own toolkit key
-/// (`notion`, not `slack`/`gmail`) since it seeds different `is_curated`
-/// content than every other test sharing those keys.
-#[tokio::test]
-async fn validate_tool_contracts_rejects_a_real_but_uncurated_action_on_a_statically_catalogued_toolkit(
-) {
-    seed_live_catalog_cache(
-        "notion",
-        vec![ToolContract {
-            slug: "NOTION_UNCURATED_ACTION".to_string(),
-            toolkit: "notion".to_string(),
-            description: None,
-            required_args: vec![],
-            input_schema: None,
-            output_fields: vec![],
-            output_schema: None,
-            primary_array_path: None,
-            // Real (a live catalog fetch found it), but NOT one of
-            // OpenHuman's curated Notion actions.
-            is_curated: false,
-        }],
-    );
-    let config = Config::default();
-    let g = graph(json!({
-        "nodes": [
-            { "id": "t", "kind": "trigger", "name": "Manual" },
-            { "id": "post", "kind": "tool_call", "name": "Post",
-              "config": { "slug": "NOTION_UNCURATED_ACTION", "args": {} } }
-        ],
-        "edges": [ { "from_node": "t", "to_node": "post" } ]
-    }));
-    let errors = validate_tool_contracts(&config, &g).await;
-    assert_eq!(errors.len(), 1, "{errors:?}");
-    assert!(
-        errors[0].contains("NOTION_UNCURATED_ACTION"),
-        "{}",
-        errors[0]
-    );
-    assert!(errors[0].contains("curated"), "{}", errors[0]);
-}
-
-#[tokio::test]
-async fn validate_tool_contracts_skips_expression_derived_and_native_slugs() {
-    let config = Config::default();
-    let g = graph(json!({
-        "nodes": [
-            { "id": "t", "kind": "trigger", "name": "Manual" },
-            { "id": "dynamic", "kind": "tool_call", "name": "Dynamic",
-              "config": { "slug": "=item.tool", "args": {} } },
-            { "id": "native", "kind": "tool_call", "name": "Native",
-              "config": { "slug": "oh:web_search", "args": {} } }
-        ],
-        "edges": [
-            { "from_node": "t", "to_node": "dynamic" },
-            { "from_node": "t", "to_node": "native" }
-        ]
-    }));
-    let errors = validate_tool_contracts(&config, &g).await;
-    assert!(errors.is_empty(), "{errors:?}");
-}
-
-#[tokio::test]
-async fn validate_tool_contracts_skips_rather_than_rejects_when_the_catalog_is_unreachable() {
-    // No seed for this toolkit and no live backend configured — the fetch
-    // fails, and the node must be SKIPPED (never false-rejected).
-    let config = Config::default();
-    let g = graph(json!({
-        "nodes": [
-            { "id": "t", "kind": "trigger", "name": "Manual" },
-            { "id": "post", "kind": "tool_call", "name": "Post",
-              "config": { "slug": "SOMEUNSEEDEDTOOLKIT_DO_THING", "args": {} } }
-        ],
-        "edges": [ { "from_node": "t", "to_node": "post" } ]
-    }));
-    let errors = validate_tool_contracts(&config, &g).await;
-    assert!(
-        errors.is_empty(),
-        "a live-catalog fetch failure must skip, not reject: {errors:?}"
-    );
-}
-
-#[tokio::test]
-async fn validate_tool_contracts_rejects_an_arg_name_not_in_the_input_schema() {
-    seed_live_catalog_cache(
-        "slackargnametest",
-        vec![seeded_slack_send_message_contract_with_schema()],
-    );
-    let config = Config::default();
-    let g = graph(json!({
-        "nodes": [
-            { "id": "t", "kind": "trigger", "name": "Manual" },
-            { "id": "post", "kind": "tool_call", "name": "Post",
-              "config": { "slug": "SLACKARGNAMETEST_SEND_MESSAGE",
-                "args": { "channel": "#general", "text": "hi" } } }
-        ],
-        "edges": [ { "from_node": "t", "to_node": "post" } ]
-    }));
-    let errors = validate_tool_contracts(&config, &g).await;
-    assert_eq!(errors.len(), 1, "{errors:?}");
-    assert!(errors[0].contains("post"), "{}", errors[0]);
-    assert!(errors[0].contains("`text`"), "{}", errors[0]);
-    assert!(errors[0].contains("markdown_text"), "{}", errors[0]);
-    assert!(errors[0].contains("get_tool_contract"), "{}", errors[0]);
-}
-
-#[tokio::test]
-async fn validate_tool_contracts_passes_the_real_arg_name_from_the_input_schema() {
-    seed_live_catalog_cache(
-        "slackargnametest",
-        vec![seeded_slack_send_message_contract_with_schema()],
-    );
-    let config = Config::default();
-    let g = graph(json!({
-        "nodes": [
-            { "id": "t", "kind": "trigger", "name": "Manual" },
-            { "id": "post", "kind": "tool_call", "name": "Post",
-              "config": { "slug": "SLACKARGNAMETEST_SEND_MESSAGE",
-                "args": { "channel": "#general", "markdown_text": "hi" } } }
-        ],
-        "edges": [ { "from_node": "t", "to_node": "post" } ]
-    }));
-    let errors = validate_tool_contracts(&config, &g).await;
-    assert!(errors.is_empty(), "{errors:?}");
-}
-
-/// Uses its own cache key/toolkit (never `"slack"`/`"gmail"`) since the
-/// arg-name check must behave identically no matter which slug it's
-/// exercised against, and a dedicated, unregistered toolkit sidesteps both
-/// the process-global `LIVE_CATALOG_CACHE` sharing risk the other
-/// `validate_tool_contracts` tests accept AND the static curated-catalog
-/// gate (this toolkit has none, so `is_curated` is irrelevant here).
-#[tokio::test]
-async fn validate_tool_contracts_skips_arg_name_check_when_input_schema_is_unknown() {
-    seed_live_catalog_cache(
-        "argschemaunknown",
-        vec![ToolContract {
-            slug: "ARGSCHEMAUNKNOWN_DO_THING".to_string(),
-            toolkit: "argschemaunknown".to_string(),
-            description: None,
-            required_args: vec![],
-            input_schema: None,
-            output_fields: vec![],
-            output_schema: None,
-            primary_array_path: None,
-            is_curated: false,
-        }],
-    );
-    let config = Config::default();
-    let g = graph(json!({
-        "nodes": [
-            { "id": "t", "kind": "trigger", "name": "Manual" },
-            { "id": "post", "kind": "tool_call", "name": "Post",
-              "config": { "slug": "ARGSCHEMAUNKNOWN_DO_THING",
-                "args": { "totally_made_up_field": "hi" } } }
-        ],
-        "edges": [ { "from_node": "t", "to_node": "post" } ]
-    }));
-    let errors = validate_tool_contracts(&config, &g).await;
-    assert!(
-        errors.is_empty(),
-        "an unknown input_schema must skip the arg-name check, never reject: {errors:?}"
-    );
-}
-
-#[tokio::test]
-async fn validate_tool_contracts_allows_arbitrary_arg_names_when_schema_permits_additional_properties(
-) {
-    seed_live_catalog_cache(
-        "argschemaadditional",
-        vec![ToolContract {
-            slug: "ARGSCHEMAADDITIONAL_DO_THING".to_string(),
-            toolkit: "argschemaadditional".to_string(),
-            description: None,
-            required_args: vec![],
-            input_schema: Some(json!({
-                "type": "object",
-                "properties": { "channel": { "type": "string" } },
-                "additionalProperties": true
-            })),
-            output_fields: vec![],
-            output_schema: None,
-            primary_array_path: None,
-            is_curated: false,
-        }],
-    );
-    let config = Config::default();
-    let g = graph(json!({
-        "nodes": [
-            { "id": "t", "kind": "trigger", "name": "Manual" },
-            { "id": "post", "kind": "tool_call", "name": "Post",
-              "config": { "slug": "ARGSCHEMAADDITIONAL_DO_THING",
-                "args": { "channel": "#general", "any_extra_field": "hi" } } }
-        ],
-        "edges": [ { "from_node": "t", "to_node": "post" } ]
-    }));
-    let errors = validate_tool_contracts(&config, &g).await;
-    assert!(
-        errors.is_empty(),
-        "additionalProperties: true must allow arbitrary arg names: {errors:?}"
-    );
-}
-
 // ── graph_wiring_warnings: required-arg advisory + output-field/split_out.path
 //    advisories (Part 2c/2d) ────────────────────────────────────────────────
 
@@ -687,5 +421,44 @@ async fn graph_wiring_warnings_suggests_the_probed_split_out_path_when_schema_is
         graph_wiring_warnings(&config, &fixed).await.is_empty(),
         "{:?}",
         graph_wiring_warnings(&config, &fixed).await
+    );
+}
+
+#[tokio::test]
+async fn graph_wiring_warnings_resolves_a_separated_action_slug_alias() {
+    seed_live_catalog_cache("googledrive", vec![seeded_alias_contract()]);
+    let g = graph(json!({
+        "nodes": [
+            { "id": "t", "kind": "trigger", "name": "Manual" },
+            { "id": "find", "kind": "tool_call", "name": "Find",
+              "config": { "slug": "GOOGLE_DRIVE_FIND_FILE", "args": {} } },
+            { "id": "split", "kind": "split_out", "name": "Split",
+              "config": { "path": "json.data.wrong" } },
+            { "id": "shape", "kind": "transform", "name": "Shape",
+              "config": { "set": { "file": "=nodes.find.item.json.data.wrong" } } }
+        ],
+        "edges": [
+            { "from_node": "t", "to_node": "find" },
+            { "from_node": "find", "to_node": "split" },
+            { "from_node": "find", "to_node": "shape" }
+        ]
+    }));
+
+    let warnings = graph_wiring_warnings(&Config::default(), &g).await;
+
+    assert_eq!(
+        warnings.len(),
+        2,
+        "alias should reach both wiring checks: {warnings:?}"
+    );
+    assert!(
+        warnings
+            .iter()
+            .any(|warning| warning.contains("json.data.files")),
+        "{warnings:?}"
+    );
+    assert!(
+        warnings.iter().any(|warning| warning.contains("wrong")),
+        "{warnings:?}"
     );
 }

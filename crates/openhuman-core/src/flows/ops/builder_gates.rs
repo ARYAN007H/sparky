@@ -19,56 +19,6 @@ use crate::core::runtime::DispatchCtx;
 /// `validate_and_migrate_graph` / `validate_all` first) — these gates check
 /// resolvability/contracts on a compilable graph.
 ///
-/// Author-gate for `oh:storage_upload_file`: its literal `path` arg must be
-/// workspace-relative. Uploads are confined to the agent workspace by the
-/// runtime `resolve_upload_path` (a canonicalized path that escapes `action_dir`
-/// is rejected), so an absolute path like `/tmp/report.html` or one climbing out
-/// with `..` cannot work — it fails mid-run at the upload step. The prompt tells
-/// the builder to use a relative path, but the model reliably ignores that and
-/// copies an absolute path from a prior flow's example, so this enforces it in
-/// code (a hard, actionable author-gate) rather than trusting the prose.
-///
-/// Only LITERAL paths are checked: a `=`-expression resolves from upstream data
-/// at runtime and is out of scope here (the runtime check still applies). An
-/// absent `path` is left to the required-arg gate.
-pub(crate) fn validate_upload_paths(graph: &WorkflowGraph) -> Vec<String> {
-    const UPLOAD_SLUG: &str = "oh:storage_upload_file";
-    let mut errors = Vec::new();
-    for node in &graph.nodes {
-        if node.kind != NodeKind::ToolCall {
-            continue;
-        }
-        if node.config.get("slug").and_then(Value::as_str) != Some(UPLOAD_SLUG) {
-            continue;
-        }
-        let Some(raw) = node
-            .config
-            .get("args")
-            .and_then(|a| a.get("path"))
-            .and_then(Value::as_str)
-        else {
-            continue;
-        };
-        let path = raw.trim();
-        // Dynamic (resolved at runtime) or absent — not a literal we can check here.
-        if path.is_empty() || path.starts_with('=') {
-            continue;
-        }
-        let escapes_via_parent = path.split(['/', '\\']).any(|seg| seg == "..");
-        if std::path::Path::new(path).is_absolute() || escapes_via_parent {
-            errors.push(format!(
-                "Node '{}': `oh:storage_upload_file` path `{path}` must be workspace-relative \
-                 (e.g. `report.html`). Uploads are confined to the agent workspace, so an \
-                 absolute path (`/tmp/...`, `/Users/...`) or one escaping with `..` is rejected \
-                 at run time. Use a relative path, and have the producing node write the file to \
-                 that same relative path.",
-                node.id
-            ));
-        }
-    }
-    errors
-}
-
 pub(crate) async fn run_builder_gates(
     ctx: &DispatchCtx,
     config: &Config,
@@ -81,14 +31,32 @@ pub(crate) async fn run_builder_gates(
     // Provider connectivity (B45) is deliberately NOT a stage: it is an advisory
     // `inference_status` on the proposal payload and a run-time rejection, so a
     // graph that is only "not runnable yet" can still be shown to the user.
-    let host = OpenHumanBuilderGateHost { ctx, config };
-    match tinyflows::gates::builder_failures(
-        graph,
-        &host,
-        &[crate::flows::tinyflows::caps::NATIVE_TOOL_PREFIX],
+    let host = match crate::flows::authoring_host::register(
+        std::sync::Arc::new(config.clone()),
+        ctx.clone(),
     )
     .await
     {
+        Ok(host) => host,
+        Err(error) => return vec![format!("builder gate could not complete: {error}")],
+    };
+    let result = async {
+        let proxy = crate::modules::tinyflows::authoring_proxy(config).await?;
+        let graph = serde_json::to_value(graph).map_err(|error| error.to_string())?;
+        proxy
+            .call::<Vec<String>>(
+                tinyflows_bus::methods::BUILDER_FAILURES,
+                &(
+                    graph,
+                    host.authoring.clone(),
+                    vec![crate::flows::tinyflows::caps::NATIVE_TOOL_PREFIX.to_string()],
+                ),
+            )
+            .await
+            .map_err(|error| error.wire_message())
+    }
+    .await;
+    match result {
         Ok(failures) => failures,
         Err(error) => {
             tracing::warn!(
@@ -98,52 +66,6 @@ pub(crate) async fn run_builder_gates(
             );
             vec![format!("builder gate could not complete: {error}")]
         }
-    }
-}
-
-/// Host side of the builder gate stack: the four `HostGateStage`s and the
-/// saved-workflow lookup the compatibility walk needs.
-struct OpenHumanBuilderGateHost<'a> {
-    ctx: &'a DispatchCtx,
-    config: &'a Config,
-}
-
-#[async_trait::async_trait]
-impl tinyflows::caps::WorkflowResolver for OpenHumanBuilderGateHost<'_> {
-    async fn resolve(&self, workflow_id: &str) -> tinyflows::error::Result<WorkflowGraph> {
-        let config = self.config.clone();
-        let id = workflow_id.to_string();
-        let loaded = tokio::task::spawn_blocking(move || load_flow_graph(&config, &id))
-            .await
-            .map_err(|e| tinyflows::error::EngineError::Capability(e.to_string()))?;
-        match loaded {
-            Ok(Some(graph)) => Ok(graph),
-            Ok(None) => Err(tinyflows::error::EngineError::Capability(format!(
-                "no saved workflow '{workflow_id}'"
-            ))),
-            Err(e) => Err(tinyflows::error::EngineError::Capability(e.to_string())),
-        }
-    }
-}
-
-#[async_trait::async_trait]
-impl tinyflows::gates::BuilderGateHost for OpenHumanBuilderGateHost<'_> {
-    async fn check(
-        &self,
-        stage: tinyflows::gates::HostGateStage,
-        graph: &WorkflowGraph,
-    ) -> tinyflows::error::Result<Vec<String>> {
-        use tinyflows::gates::HostGateStage;
-        Ok(match stage {
-            HostGateStage::ToolPolicy => validate_upload_paths(graph),
-            HostGateStage::AgentReferences => {
-                validate_agent_refs(self.ctx, self.config, graph).await
-            }
-            HostGateStage::Connections => {
-                validate_connection_refs(self.ctx, self.config, graph).await
-            }
-            HostGateStage::ToolContracts => validate_tool_contracts(self.config, graph).await,
-        })
     }
 }
 
@@ -161,15 +83,11 @@ pub(crate) async fn strict_gate(
     config: &Config,
     graph_json: &Value,
 ) -> Result<(), String> {
-    let graph = tinyflows::migrate::deserialize_graph(graph_json.clone())?;
-    let structural = tinyflows::validate::validate_all(&graph);
-    if !structural.is_empty() {
-        let messages: Vec<String> = structural.iter().map(ToString::to_string).collect();
-        return Err(format!(
-            "strict validation failed — the graph is structurally invalid:\n{}",
-            messages.join("\n")
-        ));
-    }
+    let graph = validate_and_migrate_graph(ctx, config, graph_json.clone())
+        .await
+        .map_err(|error| {
+            format!("strict validation failed — the graph is structurally invalid:\n{error}")
+        })?;
     let gate_errors = run_builder_gates(ctx, config, &graph).await;
     if !gate_errors.is_empty() {
         return Err(format!(
@@ -310,7 +228,7 @@ pub(crate) async fn build_builder_proposal_json(
     draft_id: Option<String>,
     flow_id: Option<String>,
 ) -> Result<Value, String> {
-    let graph = tinyflows::migrate::deserialize_graph(graph)?;
+    let graph = validate_and_migrate_graph(ctx, config, graph).await?;
     build_builder_proposal(
         ctx,
         config,
@@ -332,177 +250,8 @@ pub(crate) async fn run_builder_gates_json(
     config: &Config,
     graph: Value,
 ) -> Result<Vec<String>, String> {
-    let graph = tinyflows::migrate::deserialize_graph(graph)?;
+    let graph = validate_and_migrate_graph(ctx, config, graph).await?;
     Ok(run_builder_gates(ctx, config, &graph).await)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Agent-ref resolvability gate: an `agent` node's `agent_ref` must name a
-// real agent, not the runtime's `RegistryFallback` "unknown agent_ref" case
-// ─────────────────────────────────────────────────────────────────────────────
-//
-// `run_via_registry_fallback` (`tinyflows/caps.rs`) hard-errors mid-run with
-// "unknown agent_ref '…'" the moment an `agent` node's `config.agent_ref`
-// doesn't resolve to either a harness `AgentDefinition` or a custom agent
-// registry entry. Today that is the FIRST time an author finds out — the
-// graph proposes, saves, and even passes every other builder gate, then
-// fails on the very node whose whole job was to run. This gate moves that
-// same check to propose/edit/save time so a broken `agent_ref` is rejected
-// before it's ever persisted, using the exact resolution the runtime uses
-// (`route_for_agent_ref` + `agent_registry::get_agent`) rather than
-// re-implementing it.
-//
-// A plain `agent` node with NO `agent_ref` is unaffected (and must stay
-// that way) — it runs on the default LLM completion (`caps.llm`), never
-// touches `OpenHumanAgentRunner`'s routing at all, so there is nothing to
-// resolve.
-
-/// Rejects an `agent` node whose `config.agent_ref` would hit the runtime's
-/// `RegistryFallback` "unknown agent_ref" hard error mid-run
-/// (`run_via_registry_fallback` in `tinyflows/caps.rs`) — a real ref is one
-/// that resolves via [`crate::flows::agent_route::route_for_agent_ref`]
-/// to a harness [`AgentDefinition`](crate::agent::harness::host_definition::AgentDefinition)
-/// (`AgentRoute::Harness`), OR — when it routes to `AgentRoute::RegistryFallback`
-/// — resolves to an *enabled*
-/// [`AgentRegistryEntry`](crate::agent::registry::AgentRegistryEntry)
-/// via [`crate::agent::registry::get_agent`]. Both are exactly the
-/// checks `OpenHumanAgentRunner::run_agent` performs at run time, reused here
-/// rather than duplicated so the two planes cannot drift.
-///
-/// A node with no `agent_ref` (or a blank one) is a plain agent node — it
-/// runs on the default LLM completion, never reaches this routing at all —
-/// and is skipped, not rejected. A registry lookup failure (e.g. config
-/// unavailable) fails OPEN (skipped, logged) like the sibling
-/// `validate_connection_refs` gate: this gate must never false-reject a
-/// graph because of a transient local read.
-///
-/// Takes `config` for two reasons. First (CodeRabbit/Codex review on #5114):
-/// one-shot contexts — the generic `openhuman <namespace> <function>` CLI
-/// dispatcher (`default_state()`, no bootstrap), cron, tests — may reach this
-/// gate before the full server bootstrap has called
-/// [`AgentDefinitionRegistry::init_global`]. Without it, `route_for_agent_ref`
-/// sees an empty global registry and routes EVERY ref — including a real
-/// workspace-TOML harness definition — to `RegistryFallback`, which then only
-/// checks the custom agent registry and would reject a valid harness agent
-/// as unknown. So this gate defensively (re-)initialises the harness registry
-/// itself, same idempotent (`OnceLock`) idiom as
-/// other lazy registry users, before resolving any ref — the two planes
-/// (author-time gate and `OpenHumanAgentRunner::run_agent` at actual run
-/// time) then always see the same registry state. Second, it threads through
-/// to `agent_registry::get_agent`'s underlying config load.
-///
-/// Also lazily caches the custom agent registry snapshot on the first
-/// `RegistryFallback` node (CodeRabbit nitpick): a graph with several
-/// non-harness `agent_ref`s previously triggered one `config_rpc::
-/// load_config_with_timeout` per node; an all-`Harness`/no-custom-ref graph
-/// still never reads it at all.
-pub(crate) async fn validate_agent_refs(
-    ctx: &DispatchCtx,
-    config: &Config,
-    graph: &WorkflowGraph,
-) -> Vec<String> {
-    use crate::agent::harness::host_definition::AgentDefinitionRegistry;
-    use crate::agent::registry::AgentRegistryEntry;
-    use crate::flows::agent_route::{route_for_agent_ref, AgentRoute};
-
-    let mut errors = Vec::new();
-    let mut harness_registry_init_attempted = false;
-    let mut custom_registry: Option<Result<Vec<AgentRegistryEntry>, String>> = None;
-
-    for node in &graph.nodes {
-        if node.kind != NodeKind::Agent {
-            continue;
-        }
-        let Some(agent_ref) = node.config.get("agent_ref").and_then(Value::as_str) else {
-            continue;
-        };
-        let agent_ref = agent_ref.trim();
-        if agent_ref.is_empty() {
-            continue;
-        }
-
-        if !harness_registry_init_attempted && AgentDefinitionRegistry::global().is_none() {
-            harness_registry_init_attempted = true;
-            if let Err(e) = AgentDefinitionRegistry::init_global(&config.workspace_dir) {
-                tracing::debug!(
-                    target: "flows",
-                    error = %e,
-                    "[flows] agent-ref check: harness registry init failed — falling through \
-                     to route resolution with whatever state is available"
-                );
-            }
-        }
-
-        match route_for_agent_ref(agent_ref) {
-            AgentRoute::Harness | AgentRoute::HostAgent => {
-                tracing::debug!(
-                    target: "flows",
-                    node = %node.id,
-                    %agent_ref,
-                    "[flows] agent-ref check: resolves to a harness or host agent definition"
-                );
-            }
-            AgentRoute::RegistryFallback => {
-                if custom_registry.is_none() {
-                    custom_registry = Some(crate::agent::registry::list_agents(ctx, true).await);
-                }
-                match custom_registry.as_ref().expect("just populated") {
-                    Ok(entries) => match entries.iter().find(|entry| entry.id == agent_ref) {
-                        Some(entry) if entry.enabled => {
-                            tracing::debug!(
-                                target: "flows",
-                                node = %node.id,
-                                %agent_ref,
-                                "[flows] agent-ref check: resolves to an enabled custom agent \
-                                 registry entry"
-                            );
-                        }
-                        Some(_disabled) => {
-                            tracing::warn!(
-                                target: "flows",
-                                node = %node.id,
-                                %agent_ref,
-                                "[flows] agent-ref check: agent_ref is registered but disabled — \
-                                 rejecting"
-                            );
-                            errors.push(format!(
-                                "Node '{}': `agent_ref` `{agent_ref}` is registered but currently \
-                                 disabled — enable it (or pick another agent_ref via \
-                                 list_agent_definitions) before this node can run.",
-                                node.id
-                            ));
-                        }
-                        None => {
-                            tracing::warn!(
-                                target: "flows",
-                                node = %node.id,
-                                %agent_ref,
-                                "[flows] agent-ref check: unknown agent_ref — neither a harness \
-                                 definition nor a custom agent registry entry — rejecting"
-                            );
-                            errors.push(format!(
-                                "Node '{}': `agent_ref` `{agent_ref}` is not a real agent — it \
-                                 names neither a built-in agent definition nor a custom agent \
-                                 registry entry, and would fail at run time with an \"unknown \
-                                 agent_ref\" error. Call list_agent_definitions to see the real, \
-                                 selectable agent_ref values.",
-                                node.id
-                            ));
-                        }
-                    },
-                    Err(e) => {
-                        tracing::debug!(
-                            target: "flows",
-                            node = %node.id,
-                            %agent_ref,
-                            error = %e,
-                            "[flows] agent-ref check: custom agent registry lookup unavailable — \
-                             skipping (fail-open)"
-                        );
-                    }
-                }
-            }
-        }
-    }
-    errors
-}

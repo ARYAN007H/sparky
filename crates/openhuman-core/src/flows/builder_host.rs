@@ -85,7 +85,8 @@ impl FlowsHost {
                     wire!(ops::load_flow_graph(&config, &required::<String>(&payload, "id")?)?)
                 }
                 PortOperation::FlowsCreate => {
-                    wire!(ops::flows_create(
+                    wire!(ops::flows_create_with_context(
+                        &context,
                         &config,
                         required(&payload, "name")?,
                         required(&payload, "graph")?,
@@ -95,7 +96,8 @@ impl FlowsHost {
                     .value)
                 }
                 PortOperation::FlowsUpdate => {
-                    let outcome = ops::flows_update(
+                    let outcome = ops::flows_update_with_context(
+                        &context,
                         &config,
                         &required::<String>(&payload, "id")?,
                         optional_field(&payload, "name")?,
@@ -178,7 +180,7 @@ impl FlowsHost {
                         &config, payload
                     )?)
                 }
-                PortOperation::GatesValidate => wire!(ops::flows_validate(payload).value),
+                PortOperation::GatesValidate => wire!(ops::flows_validate(&context, &config, payload).await.value),
                 PortOperation::GatesRun => {
                     wire!(ops::run_builder_gates_json(&context, &config, payload).await?)
                 }
@@ -187,13 +189,13 @@ impl FlowsHost {
                     json!(true)
                 }
                 PortOperation::GatesEngineCompatibility => {
-                    wire!(ops::engine_compatibility_errors_json(&config, payload)?)
+                    wire!(ops::engine_compatibility_errors_json(&context, &config, payload).await?)
                 }
                 PortOperation::GatesWiringWarnings => {
                     wire!(ops::wiring_warnings_json(&config, payload).await?)
                 }
                 PortOperation::GatesApprovalManifest => {
-                    wire!(ops::approval_manifest_json(&config, payload).await?)
+                    wire!(ops::approval_manifest_json(&context, &config, payload).await?)
                 }
             };
             Ok(value)

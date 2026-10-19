@@ -123,6 +123,40 @@ mod imp {
             .map_err(|error| format!("the tinyflows copilot object is unreachable: {error}"))
     }
 
+    /// Proxy to the module-owned Authoring contract.
+    pub(crate) async fn authoring_proxy(config: &Config) -> Result<Proxy, String> {
+        ensure(config).await?;
+        let runtime = runtime::runtime()
+            .await
+            .map_err(|error| format!("the module bus is unavailable: {error}"))?;
+        runtime
+            .connection()
+            .proxy(
+                tinyflows_bus::BUS_NAME,
+                tinyflows_bus::OBJECT_PATH,
+                tinyflows_bus::INTERFACE,
+            )
+            .map(|proxy| proxy.with_timeout(CALL_TIMEOUT))
+            .map_err(|error| format!("the tinyflows authoring object is unreachable: {error}"))
+    }
+
+    /// Proxy to the module-owned Catalog contract.
+    pub(crate) async fn catalog_proxy(config: &Config) -> Result<Proxy, String> {
+        ensure(config).await?;
+        let runtime = runtime::runtime()
+            .await
+            .map_err(|error| format!("the module bus is unavailable: {error}"))?;
+        runtime
+            .connection()
+            .proxy(
+                tinyflows_bus::BUS_NAME,
+                tinyflows_bus::catalog::OBJECT_PATH,
+                tinyflows_bus::catalog::INTERFACE,
+            )
+            .map(|proxy| proxy.with_timeout(CALL_TIMEOUT))
+            .map_err(|error| format!("the tinyflows catalog object is unreachable: {error}"))
+    }
+
     async fn copilot_invoke_interface_proxy(config: &Config) -> Result<Proxy, String> {
         ensure(config).await?;
         let runtime = runtime::runtime()
@@ -270,7 +304,8 @@ mod fixture;
 pub(crate) use imp::serve_pair_after_first;
 #[cfg(feature = "modules")]
 pub(crate) use imp::{
-    copilot_invoke_proxy, copilot_proxy, proxy, run_proxy, serve, serve_pair, unserve,
+    authoring_proxy, catalog_proxy, copilot_invoke_proxy, copilot_proxy, proxy, run_proxy, serve,
+    serve_pair, unserve,
 };
 
 #[cfg(not(feature = "modules"))]
@@ -299,6 +334,14 @@ mod imp {
         Err(unavailable(config))
     }
 
+    pub(crate) async fn authoring_proxy(config: &Config) -> Result<tinybus::Proxy, String> {
+        Err(unavailable(config))
+    }
+
+    pub(crate) async fn catalog_proxy(config: &Config) -> Result<tinybus::Proxy, String> {
+        Err(unavailable(config))
+    }
+
     pub(crate) async fn copilot_invoke_proxy(config: &Config) -> Result<tinybus::Proxy, String> {
         Err(unavailable(config))
     }
@@ -323,7 +366,8 @@ mod imp {
 
 #[cfg(not(feature = "modules"))]
 pub(crate) use imp::{
-    copilot_invoke_proxy, copilot_proxy, proxy, run_proxy, serve, serve_pair, unserve,
+    authoring_proxy, catalog_proxy, copilot_invoke_proxy, copilot_proxy, proxy, run_proxy, serve,
+    serve_pair, unserve,
 };
 
 /// Whether the module can serve in this build and configuration (the switch

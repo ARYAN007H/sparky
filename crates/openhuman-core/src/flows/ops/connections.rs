@@ -153,7 +153,7 @@ async fn normalize_keys(
 /// (e.g. Slack `U123ABC`). This is what lets the workflow builder wire a
 /// self-targeted action ("DM me") to the user's own account instead of
 /// guessing a public channel.
-pub(super) fn build_flow_connections(
+pub(crate) fn build_flow_connections(
     composio: Vec<crate::integrations::composio::ComposioConnection>,
     http: Vec<crate::security::credentials::HttpCredentialSummary>,
     identities: &[crate::integrations::composio::contract::ConnectedIdentity],

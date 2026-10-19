@@ -79,6 +79,66 @@ fn structurally_valid_graph(value: Value) -> WorkflowGraph {
     graph
 }
 
+#[tokio::test]
+async fn flows_import_uses_the_tinyflows_authoring_module_in_a_cold_process() {
+    const CHILD_ENV: &str = "OPENHUMAN_FLOWS_IMPORT_AUTHORING_CHILD";
+    if std::env::var_os(CHILD_ENV).is_none() {
+        let output = std::process::Command::new(std::env::current_exe().expect("test executable"))
+            .args([
+                "--exact",
+                "flows::ops::tests::flows_import_uses_the_tinyflows_authoring_module_in_a_cold_process",
+                "--nocapture",
+                "--test-threads=1",
+            ])
+            .env(CHILD_ENV, "1")
+            .output()
+            .expect("run cold-process import test");
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        print!("{stdout}");
+        eprint!("{stderr}");
+        let child_output = format!("{stdout}{stderr}");
+        assert!(
+            output.status.success(),
+            "cold-process import test failed:\n{child_output}"
+        );
+        assert!(
+            child_output.contains("running 1 test")
+                && child_output.contains(
+                    "flows_import_uses_the_tinyflows_authoring_module_in_a_cold_process ... ok"
+                )
+                && child_output.contains("1 passed; 0 failed"),
+            "child must prove exactly one test ran:\n{child_output}"
+        );
+        return;
+    }
+
+    assert_eq!(
+        crate::modules::state_of("tinyflows"),
+        crate::modules::ModuleState::Available,
+        "the isolated process must start with TinyFlows unloaded"
+    );
+    let result = flows_import(
+        &crate::core::runtime::DispatchCtx::ambient(),
+        &Config::default(),
+        json!({
+            "name": "constant import",
+            "nodes": [{"id":"trigger","kind":"trigger","name":"Trigger"}],
+            "edges": []
+        }),
+        Some("native".to_string()),
+    )
+    .await
+    .expect("valid native graph imports")
+    .value;
+    assert_eq!(result.graph.name, "constant import");
+    assert_eq!(
+        crate::modules::state_of("tinyflows"),
+        crate::modules::ModuleState::Ready,
+        "public import must dispatch through the Authoring module"
+    );
+}
+
 /// A graph declaring `repo` (required) and `depth` (defaulted), whose single
 /// `transform` node copies both out via `=inputs.<name>`.
 fn parameterized_graph() -> Value {
@@ -266,7 +326,10 @@ fn seed_suggestion(config: &Config, id: &str) {
 /// Runs a candidate graph `Value` through the exact same migrate/validate
 /// path the builder tools use, for a [`WorkflowGraph`] test fixture.
 fn graph(value: Value) -> WorkflowGraph {
-    validate_and_migrate_graph(value).expect("structurally valid test graph")
+    let graph = tinyflows::migrate::deserialize_graph(value).expect("test graph deserializes");
+    tinyflows::validate::validate(&graph).expect("structurally valid test graph");
+    tinyflows::compat::ensure_compatible(&graph).expect("engine-compatible test graph");
+    graph
 }
 
 // ── validate_inference_readiness (provider-connectivity author gate, B45) ──
@@ -333,63 +396,6 @@ fn seeded_slack_send_contract() -> ToolContract {
         // hallucinated-slug checks rather than the curation gate itself.
         is_curated: true,
     }
-}
-
-// ── validate_connection_refs (WS3) ──────────────────────────────────────────
-//
-// The transcript bug: the user's connections were twitter →
-// `composio:twitter:ca_JX6QU88UfSk4`, gmail → `composio:gmail:ca_vX_WA8FsqNmE`,
-// tiktok → `composio:tiktok:ca_LPCp3WQpaDma`. The agent wired
-// `composio:twitter:ca_LPCp3WQpaDma` (the TIKTOK id) onto a Twitter node and
-// every author-time gate returned ok. These tests exercise the pure matcher so
-// no live Composio backend is touched.
-
-/// Build a composio `FlowConnection` fixture (the exact shape
-/// `build_flow_connections` produces).
-fn ws3_flow_conn(toolkit: &str, id: &str) -> FlowConnection {
-    FlowConnection {
-        connection_ref: format!("composio:{toolkit}:{id}"),
-        kind: "composio".to_string(),
-        display: toolkit.to_string(),
-        toolkit: Some(toolkit.to_string()),
-        scheme: None,
-        platform_user_id: None,
-    }
-}
-
-/// The user's real connected set from the transcript.
-fn ws3_transcript_connections() -> Vec<FlowConnection> {
-    vec![
-        ws3_flow_conn("twitter", "ca_JX6QU88UfSk4"),
-        ws3_flow_conn("gmail", "ca_vX_WA8FsqNmE"),
-        ws3_flow_conn("tiktok", "ca_LPCp3WQpaDma"),
-    ]
-}
-
-/// A single tool_call node graph with `slug` + optional `connection_ref`.
-fn ws3_tool_call_graph(slug: &str, connection_ref: Option<&str>) -> WorkflowGraph {
-    let mut config = json!({ "slug": slug, "args": {} });
-    if let Some(cr) = connection_ref {
-        config["connection_ref"] = json!(cr);
-    }
-    graph(json!({
-        "nodes": [
-            { "id": "t", "kind": "trigger", "name": "Manual" },
-            { "id": "act", "kind": "tool_call", "name": "Act", "config": config }
-        ],
-        "edges": [ { "from_node": "t", "to_node": "act" } ]
-    }))
-}
-
-fn upload_graph(path: Value) -> WorkflowGraph {
-    graph(json!({
-        "nodes": [
-            { "id": "t", "kind": "trigger", "name": "Manual" },
-            { "id": "up", "kind": "tool_call", "name": "Upload",
-              "config": { "slug": "oh:storage_upload_file", "args": { "path": path } } }
-        ],
-        "edges": [ { "from_node": "t", "to_node": "up" } ]
-    }))
 }
 
 // ── validate_tool_contracts: arg-NAME validation against the input schema
@@ -650,8 +656,6 @@ mod approval_manifest_and_catalog_tests;
 mod builder_repair_tests;
 #[path = "ops_builder_trail_off_tests.rs"]
 mod builder_trail_off_tests;
-#[path = "ops_connection_ref_gate_tests.rs"]
-mod connection_ref_gate_tests;
 #[path = "ops_engine_compatibility_tests.rs"]
 mod engine_compatibility_tests;
 #[path = "ops_inference_gate_tests.rs"]
