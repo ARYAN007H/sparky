@@ -365,6 +365,7 @@ test("CLI inventory sends product features only to nextest, preserving instrumen
   const script = [
     "set -euo pipefail",
     'CORE_PRODUCT_FEATURES="channels,modules"',
+    "SUITE_TARGETS=(--tests)",
     ...source
       .split("\n")
       .filter((line) => /^(UNIFIED_PRODUCT_ARGS|FILTER_CLI_TESTS)=/.test(line)),
