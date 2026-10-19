@@ -190,27 +190,23 @@ re-exports them through `crate::tools` ([`tools/mod.rs`](../../tools/mod.rs):
 `pub use crate::agent::orchestration::tools::*`). LLM-callable tools, by wire
 name:
 
-- Spawn: `spawn_subagent`, `spawn_async_subagent`, `spawn_parallel_agents`,
-  `spawn_worker_thread`.
+- Spawn: `spawn_subagent`, `spawn_async_subagent`, `spawn_parallel_agents`.
 - Control: `steer_subagent`, `continue_subagent`, `close_subagent`,
   `wait_subagent`, `wait`, `wait_loop`, `list_subagents`.
-- Delegation: `DelegateGraphTool` (`delegate_graph.rs`),
-  `ArchetypeDelegationTool` (name set per instance, e.g. `research`),
-  and `CollapsedDelegationTool` (`delegate_to`).
+- Delegation: `DelegateGraphTool` (`delegate_graph.rs`) and
+  `ArchetypeDelegationTool` (name set per instance, e.g. `research`).
   There is no integrations delegate: connected Composio actions are
   `Deferred` tools on the orchestrator's own belt, found through
   `tool_search` and called directly ([`tools/orchestrator_tools.rs`](../../tools/orchestrator_tools.rs)).
 
-`dispatch.rs` (the shared spawn path every tool above
-calls), `awaiting_user.rs` (the awaiting-user envelope), and
+`dispatch.rs` (the shared archetype spawn path), `awaiting_user.rs` (the awaiting-user envelope), and
 `threads/worker_thread.rs` (worker thread creation) are `pub(crate)` helpers, not
 tools. Live harness registrations use typed `ToolDispatch<(),
 OpenHumanRunContext>` wrappers and fork the parent carrier for every child,
 so cancellation, origin, progress, dispatch state, thread, and workspace stay
-attached. `delegate_to` retains its concrete enum-to-agent routing table in
-its schema metadata at registration; it never broadens a call by rebuilding
-targets from the global agent registry. `delegate_graph` has a dedicated typed
-registration for its durable plan→execute→review loop, while the optional
+attached. Synthesized archetype routes carry their target marker in the
+registration, so dispatch never rebuilds targets from the global agent
+registry. `delegate_graph` has a dedicated typed registration for its durable plan→execute→review loop, while the optional
 config-driven `delegate` registration preserves the configured executor and
 races it against the inherited cancellation token. Execution itself routes through
 `agent::subagent_host::run_subagent`.

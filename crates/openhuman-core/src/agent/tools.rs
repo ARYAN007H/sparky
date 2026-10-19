@@ -10,8 +10,7 @@
 //! - [`DelegateTool`] — hands a subtask to a named agent with its own
 //!   provider/model configuration.
 //! - [`PlanExitTool`] — ends a plan-mode pass by returning the plan plus
-//!   [`PLAN_EXIT_MARKER`]. The mode switch itself lives outside the tool;
-//!   nothing in this crate consumes the marker yet.
+//!   [`PLAN_EXIT_MARKER`], which TinyAgents consumes to switch to build mode.
 //! - `RunWorkflowTool` / `AwaitWorkflowTool` — spawn a
 //!   `crate::skills::runtime` workflow run and wait on its outcome. Compiled
 //!   in only with the `skills` feature, so builds without it omit both tools
@@ -21,9 +20,6 @@
 //! `agent::registration` assembles the dialogue tools; `tools::ops` composes
 //! domain registrations and applies the runtime capability filters.
 pub(crate) mod plan_exit;
-// Pure `skill_runtime` client (spawn + await a workflow run) — compiled out
-// with the `skills` gate so the tool list OMITS these rather than degrading
-// them to a disabled-error.
 mod todo;
 
 pub use plan_exit::PlanExitTool;

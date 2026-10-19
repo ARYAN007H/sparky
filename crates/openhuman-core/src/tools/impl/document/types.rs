@@ -1,7 +1,7 @@
 //! Typed input / output / error contracts for the `generate_document` tool.
 //!
 //! The *document* half of these contracts — the section spec, its size
-//! limits, and the validation rules — lives in the host-local
+//! limits, and the validation rules — is shared through the
 //! [`format`](super::format)
 //! module and is re-exported here. Nothing about "a title, some sections, and a bullet
 //! list" is OpenHuman-specific, so the definitions live where any host can

@@ -4,8 +4,8 @@ TinyAgents owns goal types, lifecycle, persistence, budgets, and prompt
 rendering. This directory contains OpenHuman runtime adapters for explicit
 thread selection, tool registration, and turn accounting.
 
-Goals are controlled by the agent tools and runtime. There is no thread-goal
-frontend or `openhuman.thread_goals_*` JSON-RPC API.
+Goals are controlled by the agent tools and runtime. The conversation UI reads
+them through the `threads.goal_get` RPC and renders the thread goal panel.
 
 ## Further reading
 
