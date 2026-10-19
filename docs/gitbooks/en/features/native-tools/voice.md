@@ -11,12 +11,11 @@ Voice is an optional core capability. The Cargo `voice` feature is off in contri
 
 ## Speech-to-text
 
-- **Audio capture.** Microphone capture with voice-activity detection when you start dictation.
-- **Streaming transcription.** Words appear as you speak.
+- **Recording.** Start a microphone recording from the composer and stop it to transcribe.
 - **Hallucination filter.** Strips known artifacts such as "Thanks for watching" and phrases invented from silence.
 - **Postprocessing.** Punctuation, capitalization and dictation cleanup.
 
-Dictation can replace the active text input or go straight into a chat with the agent. Desktop global voice shortcuts are no longer part of the product.
+The resulting text goes into the active chat composer, where you can edit or send it. Desktop global voice shortcuts are no longer part of the product.
 
 ## Text-to-speech
 

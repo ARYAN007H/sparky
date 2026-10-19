@@ -109,12 +109,13 @@ test('release highlights do not classify removed desktop voice controls as curre
     { number: 1, title: 'Remove the push-to-talk hotkey', labels: [] },
     { number: 2, title: 'Retire the notch window', labels: [] },
     { number: 3, title: 'Remove wake word support', labels: [] },
-    { number: 4, title: 'Improve voice transcription', labels: [] },
+    { number: 4, title: 'Remove PTT overlay', labels: [] },
+    { number: 5, title: 'Improve voice transcription', labels: [] },
   ]);
 
   assert.deepEqual(groups.map(({ title, pullRequests }) => [title, pullRequests.map(({ number }) => number)]), [
-    ['🎙️ Voice & hands-free control', [4]],
-    ['🧩 Integrations, UI & developer foundations', [1, 2, 3]],
+    ['🎙️ Voice & hands-free control', [5]],
+    ['🧩 Integrations, UI & developer foundations', [1, 2, 3, 4]],
   ]);
 });
 

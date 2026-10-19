@@ -435,7 +435,6 @@ loadable:
   compiles without the gate; wallet, Web3, and x402 adapters use `wallet.rs`;
   `tools/impl/document`, `tools/impl/presentation`,
   `agent/multimodal.rs` and `attachments/` use `documents.rs`;
-  `voice/server` and `voice/streaming.rs` use `voice.rs`;
   `tools/impl/browser/` and `desktop/control/` use the TinyComputer files;
   `integrations/composio/module_client.rs` uses [`connectors.rs`](./connectors.rs);
   `search/tools.rs` and `search/bus.rs` use [`search/`](./search/); and
@@ -497,4 +496,4 @@ configuration and direct reads use attested confidential calls.
 
 ## `[components] computer`
 
-`computer = false` is a ceiling over TinyComputer: desktop and browser tools are not registered, `ensure_loaded("tinycomputer")` refuses, `AccessibilityClient` (Globe hotkey, permissions, paste) answers `COMPONENT_DISABLED:computer`, and the `desktop.*` and `modules.browser_*` / `modules.computer_status` RPC methods answer `COMPONENT_DISABLED`. Effective desktop control is the flag AND the local consent file (`desktop::control::ops::enabled`); the flag never grants consent.
+`computer = false` is a ceiling over TinyComputer: desktop and browser tools are not registered, `ensure_loaded("tinycomputer")` refuses, and `AccessibilityClient` permission reads and requests answer `COMPONENT_DISABLED:computer`. The `desktop.*` and `modules.browser_*` / `modules.computer_status` RPC methods answer `COMPONENT_DISABLED`. Effective desktop control is the flag AND the local consent file (`desktop::control::ops::enabled`); the flag never grants consent.
