@@ -14,7 +14,7 @@
  * "not_connected" state we assert here.
  */
 import { waitForApp } from '../helpers/app-helpers';
-import { textExists, waitForText } from '../helpers/element-helpers';
+import { waitForText } from '../helpers/element-helpers';
 import { resetApp } from '../helpers/reset-app';
 import { navigateViaHash } from '../helpers/shared-flows';
 import {
