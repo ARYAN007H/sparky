@@ -339,6 +339,12 @@ export function buildPlan({ profile, areas, env = {}, isPullRequest = true }) {
             : "pnpm --filter openhuman-app lint",
         },
         {
+          name: "browser-test-skip-guard",
+          when: areas.frontend,
+          needs: ["pnpm-install"],
+          run: "node scripts/ci/check-browser-test-skips.mjs",
+        },
+        {
           name: "i18n",
           when: areas.i18n,
           needs: ["pnpm-install"],
@@ -354,7 +360,7 @@ export function buildPlan({ profile, areas, env = {}, isPullRequest = true }) {
           name: "scripts-self-tests",
           when: areas.scripts,
           needs: ["pnpm-install"],
-          run: "pnpm test:scripts",
+          run: "pnpm test:scripts && node scripts/ci/check-browser-test-skips.mjs",
         },
       ],
     },

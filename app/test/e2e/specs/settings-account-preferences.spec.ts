@@ -40,7 +40,7 @@ describe('Settings - Account Preferences', function () {
     await waitForText('Language', 15_000);
   });
 
-  it.skip('saves a generated recovery phrase and exposes configured wallet state', async function () {
+  it('saves a generated recovery phrase and exposes configured wallet state', async function () {
     this.timeout(90_000);
     await navigateViaHash('/settings/recovery-phrase');
 
@@ -51,8 +51,26 @@ describe('Settings - Account Preferences', function () {
       await clickText('Replace wallet', 10_000);
       await clickText('I understand, replace my wallet', 10_000);
     }
+    await clickText('Reveal recovery phrase', 10_000);
     await waitForText('Copy to Clipboard', 15_000);
+    await browser.waitUntil(
+      async () =>
+        await browser.execute(() => {
+          const checkbox = document.querySelector<HTMLInputElement>('#mnemonic-confirm-checkbox');
+          return checkbox !== null && !checkbox.disabled;
+        }),
+      {
+        timeout: 5_000,
+        interval: 100,
+        timeoutMsg: 'recovery phrase consent stayed disabled after reveal',
+      }
+    );
     await clickSelector('input[type="checkbox"]');
+    expect(
+      await browser.execute(
+        () => document.querySelector<HTMLInputElement>('#mnemonic-confirm-checkbox')?.checked
+      )
+    ).toBe(true);
     await clickText('Save Recovery Phrase', 10_000);
 
     await waitForText('Recovery phrase saved', 20_000);
@@ -102,20 +120,12 @@ describe('Settings - Account Preferences', function () {
     expect(Boolean(snapshot.result?.result?.analyticsEnabled)).toBe(!initialAnalytics);
   });
 
-  it.skip('opens the billing route and shows the moved-to-web redirect panel', async function () {
+  it('opens the billing route and shows the account billing handoff', async function () {
     this.timeout(60_000);
-    await navigateViaHash('/settings/billing');
+    await navigateViaHash('/settings/account');
 
-    await waitForHashContains('/settings/billing');
-    // BillingPanel is now a static "moved to the web" redirect page: heading
-    // t('settings.billing.movedToWeb'), an "Open billing dashboard" button, and
-    // a "Back to settings" link. The previous auto-open status copy
-    // ("Opening your browser…" / "If your browser did not open…") was removed,
-    // so we assert the panel content instead of the transient open state.
-    await waitForText('Billing moved to the web', 15_000);
-    expect(await textExists('Open billing dashboard')).toBe(true);
-
-    await clickText('Back to settings', 10_000);
-    await waitForHashContains('/settings');
+    await waitForHashContains('/settings/account');
+    await waitForText('Plan & billing', 15_000);
+    expect(await textExists('Open dashboard')).toBe(true);
   });
 });

@@ -90,7 +90,7 @@ async function getToolTimeline(threadId: string): Promise<ToolTimelineSnapshot> 
 
 describe('Chat multi-tool round', () => {
   before(function () {
-    this.skip();
+    this.skip(); // https://github.com/senamakel/openhuman/issues/236 — the Playwright twin owns the current web_fetch/web_search UI flow pending runner assignment.
   });
   let threadId: string;
 

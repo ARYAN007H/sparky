@@ -36,7 +36,6 @@
  */
 import { waitForApp } from '../helpers/app-helpers';
 import {
-  approvePendingToolCall,
   chatMounted,
   clickByTitle,
   clickSend,
@@ -51,7 +50,6 @@ import { resetApp } from '../helpers/reset-app';
 import { navigateViaHash } from '../helpers/shared-flows';
 import {
   clearRequestLog,
-  getRequestLog,
   resetMockBehavior,
   setMockBehavior,
   startMockServer,
@@ -159,9 +157,6 @@ async function navigateChatAndSend(prompt: string): Promise<string | null> {
 // ---------------------------------------------------------------------------
 
 describe('Harness - Cron prompt-flow', () => {
-  before(function () {
-    this.skip();
-  });
   before(async function beforeSuite() {
     this.timeout(90_000);
     console.log(`${LOG_PREFIX} Starting mock server and resetting app`);
@@ -180,98 +175,7 @@ describe('Harness - Cron prompt-flow', () => {
   // ── CR2.1 — Create cron via natural language ──────────────────────────────
 
   // TODO(#6391): the TinyAgents update no longer exposes write-tool approval prompts.
-  it.skip('CR2.1 — "remind me every morning at 9am" triggers cron_add and oracle confirms creation', async function () {
-    this.timeout(120_000);
-    console.log(`${LOG_PREFIX} CR2.1: begin`);
-
-    clearRequestLog();
-    resetMockBehavior();
-
-    const CANARY = 'canary-cron-create-a1b2';
-    const FORCED = [
-      {
-        content: '',
-        toolCalls: [
-          {
-            id: 'call_cron_add_1',
-            name: 'cron_add',
-            // `schedule` must be the tagged-union shape { kind, expr } that
-            // `Schedule` deserializes from; a bare cron string fails at
-            // `serde_json::from_value::<Schedule>` inside CronAddTool.
-            arguments: JSON.stringify({
-              name: 'morning_reminder',
-              schedule: { kind: 'cron', expr: '0 9 * * *' },
-              job_type: 'agent',
-              prompt: 'morning reminder',
-            }),
-          },
-        ],
-      },
-      { content: `Done! I have set up a daily 9am morning reminder for you. ${CANARY}` },
-    ];
-    setMockBehavior('llmForcedResponses', JSON.stringify(FORCED));
-    setMockBehavior('llmStreamChunkDelayMs', '10');
-
-    // Snapshot cron state before.
-    const before = await listCronJobs();
-    console.log(
-      `${LOG_PREFIX} CR2.1: pre-send cron jobs: ${before.map(j => j.name).join(', ') || '(none)'}`
-    );
-
-    await navigateChatAndSend('remind me every morning at 9am');
-    expect(await approvePendingToolCall()).toBe(true);
-
-    // Wait for final reply.
-    await browser.waitUntil(async () => await textExists(CANARY), {
-      timeout: 60_000,
-      timeoutMsg: `CR2.1: creation-confirmation canary "${CANARY}" never appeared`,
-    });
-    console.log(`${LOG_PREFIX} CR2.1: canary visible`);
-
-    // Oracle: did the tool actually create the job in the in-process core?
-    // Poll briefly to allow the cron domain to persist.
-    let afterJobs: Array<{ name: string }> = [];
-    const oracleDeadline = Date.now() + 10_000;
-    while (Date.now() < oracleDeadline) {
-      afterJobs = await listCronJobs();
-      if (afterJobs.length > before.length) break;
-      await browser.pause(500);
-    }
-    console.log(
-      `${LOG_PREFIX} CR2.1: post-send cron jobs: ${afterJobs.map(j => j.name).join(', ') || '(none)'}`
-    );
-
-    if (afterJobs.length > before.length) {
-      // Tool was executed and persisted — strongest assertion.
-      console.log(
-        `${LOG_PREFIX} CR2.1: cron_add tool executed and persisted — full round-trip confirmed`
-      );
-      const created = afterJobs.find(
-        j => j.name === 'morning_reminder' || j.name.includes('morning')
-      );
-      if (created) {
-        console.log(`${LOG_PREFIX} CR2.1: created job: ${JSON.stringify(created)}`);
-      }
-    } else {
-      // Tool call reached the LLM (mock log must show 2 turns) but may not have
-      // persisted (e.g. security policy blocks tool execution in E2E build).
-      console.warn(
-        `${LOG_PREFIX} CR2.1: cron_add tool call was issued but oracle did not see a new job. ` +
-          `TODO(ws-a-followup): verify tool execution routing in E2E build.`
-      );
-    }
-
-    // LLM mock log: verify 2 turns (tool call turn + final answer turn).
-    const log = getRequestLog() as Array<{ method: string; url: string }>;
-    const llmHits = log.filter(r => r.method === 'POST' && r.url.includes('/chat/completions'));
-    console.log(`${LOG_PREFIX} CR2.1: ${llmHits.length} LLM completion request(s)`);
-    expect(llmHits.length).toBeGreaterThanOrEqual(2);
-
-    // UI assertion: the assistant reply must mention creation.
-    expect(await waitForAssistantReplyContaining('9am', { logPrefix: LOG_PREFIX })).toBe(true);
-
-    console.log(`${LOG_PREFIX} CR2.1: PASSED`);
-  });
+  // Retired legacy direct cron_* call; the supported use_skill path is covered in Playwright.
 
   // ── CR2.2 — List jobs ─────────────────────────────────────────────────────
 
@@ -331,175 +235,10 @@ describe('Harness - Cron prompt-flow', () => {
   // ── CR2.3 — Update schedule ───────────────────────────────────────────────
 
   // TODO(#6391): the TinyAgents update no longer exposes write-tool approval prompts.
-  it.skip('CR2.3 — "change my morning reminder to 8am" triggers cron_update and oracle confirms', async function () {
-    this.timeout(120_000);
-    console.log(`${LOG_PREFIX} CR2.3: begin`);
-
-    clearRequestLog();
-    resetMockBehavior();
-
-    // Pre-create the job to update.
-    const jobId = await createCronJobOracle({
-      name: 'morning_reminder_update_test',
-      schedule: '0 9 * * *',
-    });
-    console.log(`${LOG_PREFIX} CR2.3: pre-created job id: ${jobId}`);
-
-    const CANARY = 'canary-cron-update-e5f6';
-    const FORCED = [
-      {
-        content: '',
-        toolCalls: [
-          {
-            id: 'call_cron_update_1',
-            name: 'cron_update',
-            // CronUpdateTool takes `{ job_id, patch }` where `patch` is a
-            // CronJobPatch (schedule/command/prompt/enabled/...). The LLM
-            // would look up the job id from context; the mock embeds it
-            // directly when available, otherwise a placeholder.
-            arguments: JSON.stringify({
-              job_id: jobId ?? 'morning_reminder_update_test',
-              patch: { schedule: { kind: 'cron', expr: '0 8 * * *' } },
-            }),
-          },
-        ],
-      },
-      { content: `Done! I have changed your morning reminder to 8am. ${CANARY}` },
-    ];
-    setMockBehavior('llmForcedResponses', JSON.stringify(FORCED));
-    setMockBehavior('llmStreamChunkDelayMs', '10');
-
-    await navigateChatAndSend('change my morning reminder to 8am');
-    expect(await approvePendingToolCall()).toBe(true);
-
-    await browser.waitUntil(async () => await textExists(CANARY), {
-      timeout: 60_000,
-      timeoutMsg: `CR2.3: update-confirmation canary "${CANARY}" never appeared`,
-    });
-    console.log(`${LOG_PREFIX} CR2.3: canary visible`);
-
-    // Oracle: check if the schedule changed.
-    const afterJobs = await listCronJobs();
-    const updatedJob = afterJobs.find(
-      j => j.name === 'morning_reminder_update_test' || j.id === jobId
-    );
-    if (updatedJob) {
-      console.log(`${LOG_PREFIX} CR2.3: oracle job after update: ${JSON.stringify(updatedJob)}`);
-      // The schedule may be in a normalised form — '0 8 * * *' is the target.
-      if (String(updatedJob.schedule ?? '').includes('8')) {
-        console.log(`${LOG_PREFIX} CR2.3: schedule updated to 8am — confirmed via oracle`);
-      } else {
-        console.warn(
-          `${LOG_PREFIX} CR2.3: schedule not updated in oracle (may need tool-execution routing). ` +
-            `TODO(ws-a-followup): verify cron_update tool dispatch.`
-        );
-      }
-    } else {
-      console.warn(
-        `${LOG_PREFIX} CR2.3: updated job not found in oracle list. ` +
-          `TODO(ws-a-followup): verify cron tool execution in E2E build.`
-      );
-    }
-
-    // LLM turn count.
-    const log = getRequestLog() as Array<{ method: string; url: string }>;
-    const llmHits = log.filter(r => r.method === 'POST' && r.url.includes('/chat/completions'));
-    expect(llmHits.length).toBeGreaterThanOrEqual(2);
-
-    // UI assertion.
-    expect(await waitForAssistantReplyContaining('8am', { logPrefix: LOG_PREFIX })).toBe(true);
-
-    console.log(`${LOG_PREFIX} CR2.3: PASSED`);
-  });
+  // Retired legacy direct cron_* call; the supported use_skill path is covered in Playwright.
 
   // ── CR2.4 — Delete via prompt ─────────────────────────────────────────────
 
   // TODO(#6391): the TinyAgents update no longer exposes write-tool approval prompts.
-  it.skip('CR2.4 — "delete the morning reminder" triggers cron_remove and oracle confirms removal', async function () {
-    this.timeout(120_000);
-    console.log(`${LOG_PREFIX} CR2.4: begin`);
-
-    clearRequestLog();
-    resetMockBehavior();
-
-    // Pre-create the job to delete.
-    const jobId = await createCronJobOracle({
-      name: 'morning_reminder_delete_test',
-      schedule: '0 9 * * *',
-    });
-    console.log(`${LOG_PREFIX} CR2.4: pre-created job id: ${jobId}`);
-
-    const CANARY = 'canary-cron-delete-g7h8';
-    const FORCED = [
-      {
-        content: '',
-        toolCalls: [
-          {
-            id: 'call_cron_remove_1',
-            name: 'cron_remove',
-            // CronRemoveTool takes `{ job_id }`, not `{ id }`.
-            arguments: JSON.stringify({ job_id: jobId ?? 'morning_reminder_delete_test' }),
-          },
-        ],
-      },
-      { content: `Done! I have deleted the morning reminder. ${CANARY}` },
-    ];
-    setMockBehavior('llmForcedResponses', JSON.stringify(FORCED));
-    setMockBehavior('llmStreamChunkDelayMs', '10');
-
-    // Verify job exists before deletion.
-    const before = await listCronJobs();
-    const existsBefore = before.some(
-      j => j.name === 'morning_reminder_delete_test' || j.id === jobId
-    );
-    console.log(
-      `${LOG_PREFIX} CR2.4: job exists before delete: ${existsBefore} (${before.length} total jobs)`
-    );
-
-    await navigateChatAndSend('delete the morning reminder');
-    expect(await approvePendingToolCall()).toBe(true);
-
-    await browser.waitUntil(async () => await textExists(CANARY), {
-      timeout: 60_000,
-      timeoutMsg: `CR2.4: deletion-confirmation canary "${CANARY}" never appeared`,
-    });
-    console.log(`${LOG_PREFIX} CR2.4: canary visible`);
-
-    // Oracle: verify job is gone.
-    let isGone = false;
-    const oracleDeadline = Date.now() + 8_000;
-    while (Date.now() < oracleDeadline) {
-      const after = await listCronJobs();
-      const stillExists = after.some(
-        j => j.name === 'morning_reminder_delete_test' || j.id === jobId
-      );
-      if (!stillExists) {
-        isGone = true;
-        console.log(`${LOG_PREFIX} CR2.4: oracle confirmed job is gone`);
-        break;
-      }
-      await browser.pause(500);
-    }
-
-    if (!isGone && existsBefore) {
-      console.warn(
-        `${LOG_PREFIX} CR2.4: job still present in oracle after cron_remove tool call. ` +
-          `TODO(ws-a-followup): verify cron_remove tool dispatch in E2E build.`
-      );
-    } else if (!existsBefore) {
-      console.log(
-        `${LOG_PREFIX} CR2.4: job was not present in oracle before delete either — tool execution not confirmed via oracle.`
-      );
-    }
-
-    // LLM turn count.
-    const log = getRequestLog() as Array<{ method: string; url: string }>;
-    const llmHits = log.filter(r => r.method === 'POST' && r.url.includes('/chat/completions'));
-    expect(llmHits.length).toBeGreaterThanOrEqual(2);
-
-    // UI assertion: the assistant acknowledged the deletion.
-    expect(await waitForAssistantReplyContaining('deleted', { logPrefix: LOG_PREFIX })).toBe(true);
-
-    console.log(`${LOG_PREFIX} CR2.4: PASSED`);
-  });
+  // Retired legacy direct cron_* call; the supported use_skill path is covered in Playwright.
 });

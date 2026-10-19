@@ -22,11 +22,11 @@
  * have been built with VITE_BACKEND_URL pointing there.
  */
 import { waitForApp, waitForAppReady, waitForAuthBootstrap } from '../helpers/app-helpers';
+import { type AuthStateResponse, authStateValue } from '../helpers/auth-state';
 import { callOpenhumanRpc, expectRpcOk } from '../helpers/core-rpc';
 import { triggerAuthDeepLink } from '../helpers/deep-link-helpers';
 import {
-  clickButton,
-  clickText,
+  clickTestId,
   dumpAccessibilityTree,
   hasAppChrome,
   textExists,
@@ -36,7 +36,6 @@ import {
 } from '../helpers/element-helpers';
 import { resetApp } from '../helpers/reset-app';
 import {
-  navigateToBilling,
   navigateToHome,
   navigateToSettings,
   navigateViaHash,
@@ -95,6 +94,62 @@ async function expectBillingMarkers(markers) {
   }
 }
 
+/** Install content-free counters before a native auth expiry can be emitted. */
+async function installAuthExpiryDiagnostics(): Promise<boolean> {
+  return (await browser.execute(async () => {
+    const w = window as typeof window & {
+      __TAURI_INTERNALS__?: {
+        invoke?: (command: string, args?: unknown) => Promise<unknown>;
+        transformCallback?: (callback: () => void) => string | number;
+      };
+      __openhuman235AuthDiagnostics?: {
+        nativeExpiredEvents: number;
+        rendererExpiredEvents: number;
+        nativeListenerId: string | number;
+      };
+    };
+    const internals = w.__TAURI_INTERNALS__;
+    if (!internals?.invoke || !internals.transformCallback) return false;
+
+    const diagnostics = {
+      nativeExpiredEvents: 0,
+      rendererExpiredEvents: 0,
+      nativeListenerId: -1 as string | number,
+    };
+    const handler = internals.transformCallback(() => {
+      diagnostics.nativeExpiredEvents += 1;
+    });
+    diagnostics.nativeListenerId = (await internals.invoke('plugin:event|listen', {
+      event: 'auth://expired',
+      target: { kind: 'Any' },
+      handler,
+    })) as string | number;
+    window.addEventListener('openhuman:session-expired', () => {
+      diagnostics.rendererExpiredEvents += 1;
+    });
+    w.__openhuman235AuthDiagnostics = diagnostics;
+    return true;
+  })) as boolean;
+}
+
+async function readAuthExpiryDiagnostics() {
+  return await browser.execute(() => {
+    const w = window as typeof window & {
+      __openhuman235AuthDiagnostics?: {
+        nativeExpiredEvents: number;
+        rendererExpiredEvents: number;
+      };
+    };
+    return {
+      nativeExpiredEvents: w.__openhuman235AuthDiagnostics?.nativeExpiredEvents ?? 0,
+      rendererExpiredEvents: w.__openhuman235AuthDiagnostics?.rendererExpiredEvents ?? 0,
+      route: window.location.hash,
+      rootShellVisible: document.querySelector('[data-testid="root-shell-sidebar"]') !== null,
+      welcomeVisible: document.querySelector('[data-testid="welcome-card-tinyhumans"]') !== null,
+    };
+  });
+}
+
 // walkOnboarding, waitForHomePage imported from shared-flows
 
 /**
@@ -138,23 +193,6 @@ async function performFullLogin(token = 'e2e-test-token') {
     throw new Error('Full login did not reach Home page');
   }
   console.log(`[AuthAccess] Home page confirmed: found "${homeText}"`);
-}
-
-/**
- * `AuthStateResponse` — `crates/openhuman-core/src/security/credentials/responses.rs`.
- *
- * `credential` is `skip_serializing_if = "Option::is_none"` on the Rust side,
- * so it is absent (not null) when signed out.
- */
-interface AuthStateResponse {
-  isAuthenticated: boolean;
-  userId?: string | null;
-  credential?: 'session' | 'api-key' | 'local';
-}
-
-function authStateValue(state: { result?: unknown }): AuthStateResponse {
-  const raw = (state.result ?? {}) as { value?: AuthStateResponse } & AuthStateResponse;
-  return raw.value ?? raw;
 }
 
 // ===========================================================================
@@ -222,6 +260,11 @@ describe('Auth & Access Control', () => {
   });
 
   it('second device token is accepted and processed', async () => {
+    // The WebView simulation dispatches auth deep links asynchronously. Move
+    // off Chat first so a subsequent redirect back to the authenticated chat
+    // route proves the handler finished; the persistent app shell alone is
+    // already visible before that work completes.
+    await navigateViaHash('/settings/account');
     clearRequestLog();
     await triggerAuthDeepLink('e2e-auth-device2-token');
 
@@ -240,12 +283,17 @@ describe('Auth & Access Control', () => {
       }
     );
 
+    await browser.waitUntil(
+      async () => (await browser.execute(() => window.location.hash)) === '#/chat',
+      {
+        timeout: 20_000,
+        interval: 250,
+        timeoutMsg: 'Timed out waiting for the completed auth handoff to return to Chat',
+      }
+    );
+
     const homeText = await waitForHomePage(15_000);
-    if (!homeText) {
-      await navigateToHome();
-    }
-    const finalHome = homeText || (await waitForHomePage(10_000));
-    expect(finalHome).not.toBeNull();
+    expect(homeText).not.toBeNull();
 
     const consumeCall = getRequestLog().find(
       r => r.method === 'POST' && r.url.includes('/auth/login-token/consume')
@@ -258,12 +306,12 @@ describe('Auth & Access Control', () => {
   // 2. Default Plan
   // -------------------------------------------------------------------------
 
-  it.skip('3.1.1 — billing dashboard handoff is available', async () => {
-    await navigateToBilling();
+  it('3.1.1 — billing dashboard handoff is available', async () => {
+    await navigateViaHash('/settings/account');
     // The upstream billing summary now arrives asynchronously. Reuse the
     // polling marker assertion so this first navigation has the same contract
     // as the later billing checks in this spec.
-    await expectBillingMarkers(['Open billing dashboard']);
+    await expectBillingMarkers(['Open dashboard']);
 
     console.log('[AuthAccess] 3.1.1 — Billing web handoff verified');
     await navigateToHome();
@@ -273,11 +321,11 @@ describe('Auth & Access Control', () => {
   // 3. Upgrade Flow
   // -------------------------------------------------------------------------
 
-  it.skip('3.2.1 — billing dashboard entry point is stable', async () => {
-    await navigateToBilling();
+  it('3.2.1 — billing dashboard entry point is stable', async () => {
+    await navigateViaHash('/settings/account');
     clearRequestLog();
 
-    await expectBillingMarkers(['Open billing dashboard', 'TinyHumans on the web']);
+    await expectBillingMarkers(['Open dashboard', 'Plan & billing']);
 
     console.log('[AuthAccess] 3.2.1 — Billing dashboard entry point verified');
     await navigateToHome();
@@ -287,35 +335,35 @@ describe('Auth & Access Control', () => {
   // 4. Active Subscription Display
   // -------------------------------------------------------------------------
 
-  it.skip('3.3.1 — subscription management handoff is displayed correctly', async () => {
+  it('3.3.1 — subscription management handoff is displayed correctly', async () => {
     // Seed mock state explicitly so this test is self-contained
     setMockBehavior('plan', 'BASIC');
     setMockBehavior('planActive', 'true');
     setMockBehavior('planExpiry', new Date(Date.now() + 30 * 86400000).toISOString());
     clearRequestLog();
 
-    await navigateToBilling();
+    await navigateViaHash('/settings/account');
 
     await expectBillingMarkers([
-      'Billing moved to the web',
-      'Subscription changes',
-      'Open billing dashboard',
+      'Plan & billing',
+      'Manage your subscription, credits, and invoices',
+      'Open dashboard',
     ]);
 
     console.log('[AuthAccess] 3.3.1 — Subscription management handoff verified');
   });
 
-  it.skip('3.3.3 — manage subscription uses the web dashboard handoff', async () => {
+  it('3.3.3 — manage subscription uses the web dashboard handoff', async () => {
     // Seed mock state explicitly so this test is self-contained
     setMockBehavior('plan', 'BASIC');
     setMockBehavior('planActive', 'true');
     setMockBehavior('planExpiry', new Date(Date.now() + 30 * 86400000).toISOString());
     clearRequestLog();
 
-    await navigateToBilling();
+    await navigateViaHash('/settings/account');
     await browser.pause(3_000);
 
-    await expectBillingMarkers(['Open billing dashboard']);
+    await expectBillingMarkers(['Open dashboard']);
 
     console.log('[AuthAccess] 3.3.3 — Dashboard handoff verified');
     resetMockBehavior();
@@ -326,7 +374,7 @@ describe('Auth & Access Control', () => {
   // 5. Logout
   // -------------------------------------------------------------------------
 
-  it.skip('user can log out via Settings and returns to Welcome', async () => {
+  it('user can log out via Settings and returns to Welcome', async () => {
     // resetApp established a clean authenticated session for this suite.
     // A second asynchronous deep-link login here races its post-login redirect
     // against the Settings navigation, while adding no logout coverage.
@@ -337,53 +385,32 @@ describe('Auth & Access Control', () => {
     // on /settings/account).
     await navigateViaHash('/settings/account');
 
-    // Click "Log out" via JS — the settings menu item text is "Log out"
-    // with description "Sign out of your account"
-    const loggedOut = await browser.execute(() => {
-      const allElements = document.querySelectorAll('*');
-      for (const el of allElements) {
-        const text = el.textContent?.trim() || '';
-        if (text === 'Log out') {
-          const clickable = el.closest(
-            'button, [role="button"], a, [class*="MenuItem"]'
-          ) as HTMLElement;
-          if (clickable) {
-            clickable.click();
-            return 'clicked-parent';
-          }
-          (el as HTMLElement).click();
-          return 'clicked-self';
-        }
-      }
-      return null;
-    });
+    // The card also has a noninteractive "Log out" label, so target the
+    // actual action button by its stable test id rather than matching text.
+    await clickTestId('settings-nav-logout', 10_000);
+    console.log('[AuthAccess] Logout action button clicked');
 
-    if (!loggedOut) {
-      // Fallback: try XPath text search
-      const logoutCandidates = ['Log out', 'Logout', 'Sign out'];
-      let found = false;
-      for (const text of logoutCandidates) {
-        if (await textExists(text)) {
-          await clickText(text, 10_000);
-          console.log(`[AuthAccess] Clicked "${text}" via XPath`);
-          found = true;
-          break;
-        }
+    // Wait for either the optional confirmation dialog or the authoritative
+    // core logout state. A fixed delay could inspect the core before the
+    // renderer's async clearSession() has reached auth_logout.
+    const logoutProgress = await browser.waitUntil(
+      async () => {
+        const hasConfirm =
+          (await textExists('Confirm')) ||
+          (await textExists('Yes')) ||
+          (await textExists('Log Out'));
+        if (hasConfirm) return 'confirmation';
+        const state = await callOpenhumanRpc<AuthStateResponse>('openhuman.auth_get_state', {});
+        expectRpcOk('auth_get_state', state);
+        return authStateValue(state).isAuthenticated === false ? 'signed-out' : false;
+      },
+      {
+        timeout: 15_000,
+        interval: 250,
+        timeoutMsg: 'logout neither opened confirmation nor cleared core authentication',
       }
-      if (!found) {
-        const tree = await dumpAccessibilityTree();
-        console.log('[AuthAccess] Logout button not found. Tree:\n', tree.slice(0, 4000));
-        throw new Error('Could not find logout button in Settings');
-      }
-    } else {
-      console.log(`[AuthAccess] Logout: ${loggedOut}`);
-    }
-
-    // If a confirmation dialog appears, confirm it
-    await browser.pause(2_000);
-    const hasConfirm =
-      (await textExists('Confirm')) || (await textExists('Yes')) || (await textExists('Log Out'));
-    if (hasConfirm) {
+    );
+    if (logoutProgress === 'confirmation') {
       const confirmed = await browser.execute(() => {
         const candidates = document.querySelectorAll('button, [role="button"], a');
         for (const el of candidates) {
@@ -398,7 +425,6 @@ describe('Auth & Access Control', () => {
       });
       expect(confirmed).toBe(true);
       console.log('[AuthAccess] Confirmation dialog: clicked');
-      await browser.pause(2_000);
     }
 
     // ── Assertion, rewritten ────────────────────────────────────────────
@@ -417,8 +443,18 @@ describe('Auth & Access Control', () => {
     //      security: a UI that routes to Welcome while the core keeps
     //      authenticating is exactly the regression worth catching), and
     //   2. the shell actually renders the logged-out surface.
-    await browser.pause(3_000);
-
+    await browser.waitUntil(
+      async () => {
+        const state = await callOpenhumanRpc<AuthStateResponse>('openhuman.auth_get_state', {});
+        expectRpcOk('auth_get_state', state);
+        return authStateValue(state).isAuthenticated === false;
+      },
+      {
+        timeout: 15_000,
+        interval: 250,
+        timeoutMsg: 'core still reports authenticated after Settings logout completed',
+      }
+    );
     const state = await callOpenhumanRpc<AuthStateResponse>('openhuman.auth_get_state', {});
     expectRpcOk('auth_get_state', state);
     const authState = authStateValue(state);
@@ -445,7 +481,7 @@ describe('Auth & Access Control', () => {
     expect(onWelcome).toBe(true);
   });
 
-  it.skip('revoked session auto-logs out the user', async function () {
+  it('revoked session auto-logs out the user', async function () {
     this.timeout(120_000);
     // Login fresh
     clearRequestLog();
@@ -457,7 +493,23 @@ describe('Auth & Access Control', () => {
     setMockBehavior('session', 'revoked');
 
     // Trigger a re-auth which will fail with 401
+    expect(await installAuthExpiryDiagnostics()).toBe(true);
     await triggerAuthDeepLink('e2e-revoked-check-token');
+
+    // Count a completed response, not merely an attempted request. The mock
+    // records status when the response finishes; this proves the revoked
+    // session branch actually returned 401 before we inspect logout behavior.
+    await browser.waitUntil(
+      async () =>
+        getRequestLog().some(
+          r => r.method === 'GET' && r.url.includes('/auth/me') && r.status === 401
+        ),
+      {
+        timeout: 20_000,
+        interval: 250,
+        timeoutMsg: 'mock did not finish a GET /auth/me response with status 401',
+      }
+    );
 
     // Wait for the app to process the revoked token. The app should either
     // navigate away from Home (auto-logout) or the token consume call should
@@ -500,8 +552,11 @@ describe('Auth & Access Control', () => {
     // 1. The injection landed. A revoked-session test that never provoked a
     //    401 is the "couldn't-run wearing the clothes of proved" failure:
     //    everything downstream would look like a clean auto-logout.
-    const meCalls = getRequestLog().filter(r => r.method === 'GET' && r.url.includes('/auth/me'));
-    expect(meCalls.length).toBeGreaterThan(0);
+    expect(
+      getRequestLog().some(
+        r => r.method === 'GET' && r.url.includes('/auth/me') && r.status === 401
+      )
+    ).toBe(true);
 
     // 2. The core dropped the credential.
     await browser.waitUntil(
@@ -521,6 +576,17 @@ describe('Auth & Access Control', () => {
 
     // 3. The shell left the authenticated surface.
     const stillOnHome = await waitForHomePage(5_000);
+    const eventDiagnostics = await readAuthExpiryDiagnostics();
+    if (stillOnHome !== null) {
+      throw new Error(
+        `expected revoked session to leave the authenticated shell; observed ${JSON.stringify({
+          stillOnHome,
+          coreAuthenticated: authStateValue(revokedState).isAuthenticated,
+          coreCredentialPresent: Boolean(authStateValue(revokedState).credential),
+          ...eventDiagnostics,
+        })}`
+      );
+    }
     expect(stillOnHome).toBeNull();
     console.log('[AuthAccess] Revoked session auto-logout verified');
   });

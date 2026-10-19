@@ -49,10 +49,8 @@ const USER_ID = 'e2e-tool-shell-git';
  *    sidecar-driven write path is exercised by
  *    tinytools-std `filesystem/git_operations/test.rs`.
  *
- * Future: when the harness gains a deterministic mock-LLM that emits
- * structured tool_calls (tracked alongside #68 in skill-execution-flow), the
- * `it.skip` blocks below can flip into full chat-driven assertions without
- * changing the rest of this file.
+ * The agent-side execution path belongs to the tool owner tests; this spec
+ * focuses on the host registry and workspace envelope only.
  */
 function stepLog(message: string, context?: unknown): void {
   const stamp = new Date().toISOString();
@@ -290,13 +288,5 @@ describe('System tools — Shell + Git (registry, denial envelope, fixture repo)
       .filter(l => l.length > 0);
     expect(lines.length).toBe(2);
     expect(lines.some(l => l.includes('follow-up commit asserted'))).toBe(true);
-  });
-
-  it.skip('(future #68) chat tool_calls drive `shell echo hello` end-to-end via mock LLM', () => {
-    // Tracked alongside skill-execution-flow's `it.skip` for the same reason:
-    // requires a deterministic mock-LLM that emits structured tool_calls.
-    // The execution path itself is covered by Rust unit tests under
-    // `crates/openhuman-core/src/tools/impl/system/shell.rs::tests::shell_executes_allowed_command`
-    // and `shell_blocks_disallowed_command`.
   });
 });
