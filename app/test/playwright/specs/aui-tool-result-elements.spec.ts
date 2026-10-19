@@ -143,7 +143,6 @@ async function captureToolTimeline(page: Page, threadId: string): Promise<unknow
                   name: string;
                   status: string;
                   round: number;
-                  requestId?: string;
                   argsBuffer?: string;
                   result?: string;
                 }>
@@ -158,7 +157,6 @@ async function captureToolTimeline(page: Page, threadId: string): Promise<unknow
       name: row.name,
       status: row.status,
       round: row.round,
-      requestId: row.requestId,
       argsLength: row.argsBuffer?.length ?? 0,
       resultLength: row.result?.length ?? 0,
     }));
@@ -328,8 +326,8 @@ test.describe('assistant-ui tool-result elements', () => {
   test('a tabular tool result renders its rows and columns through the data-table element', async ({
     page,
   }) => {
-    const threadId = await openChat(page);
     const progress = process.env.EPIC235_CAPTURE_TOOL_PROGRESS ? captureToolProgress(page) : null;
+    const threadId = await openChat(page);
     // `ToolDataView` renders `DataTable` only for a non-empty array of plain
     // objects that share one key set and hold only primitives
     // (`ToolDataView.tsx:isFlatObjectArray`). `result` is one of the semantic
