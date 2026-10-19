@@ -152,7 +152,6 @@ async fn json_rpc_config_update_browser_settings_persists_backend() {
     rpc_join.abort();
 }
 
-#[cfg(feature = "modules")]
 #[tokio::test]
 async fn json_rpc_reasoning_effort_persists_and_rejects_unknown_levels() {
     let _env_lock = json_rpc_e2e_env_lock_async().await;

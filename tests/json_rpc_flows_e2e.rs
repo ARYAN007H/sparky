@@ -1810,6 +1810,7 @@ async fn json_rpc_workflow_run_engine_executes_builtin_to_completion_inner() {
     mock_join.abort();
 }
 
+#[cfg(feature = "flows")]
 #[tokio::test]
 async fn json_rpc_flows_strict_create_refuses_binding_to_undeclared_agent_field() {
     let _env_lock = json_rpc_e2e_env_lock_async().await;

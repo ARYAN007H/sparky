@@ -4,6 +4,7 @@
 mod harness;
 use harness::*;
 
+#[cfg(feature = "modules")]
 #[tokio::test]
 async fn json_rpc_modules_list_reports_the_serving_source() {
     let _env_lock = json_rpc_e2e_env_lock_async().await;
