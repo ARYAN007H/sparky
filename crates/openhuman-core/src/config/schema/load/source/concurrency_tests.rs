@@ -1,5 +1,5 @@
 use super::*;
-use crate::core::runtime::{DispatchCtx, DomainSet, context::CoreContext};
+use crate::core::runtime::{context::CoreContext, ContextOverlay, DispatchCtx, DomainSet};
 use serde_json::json;
 
 #[tokio::test]
@@ -175,6 +175,67 @@ async fn external_config_conflict_refreshes_the_context_before_the_next_read() {
 }
 
 #[tokio::test]
+async fn external_config_conflict_refresh_keeps_derived_runtime_overrides() {
+    let tmp = tempfile::tempdir().unwrap();
+    let storage = MemoryStorage::new();
+    let _forced = ForcedDocumentSource::new(
+        scoped(&storage, "tenant-refresh-overlay"),
+        Scope::new("tenant-refresh-overlay").unwrap(),
+        keys(14),
+    );
+    let seed = config_at(tmp.path(), "initial");
+    seed.save().await.unwrap();
+    let mut runtime_config = Config::load_from_config_path(&seed.config_path, &seed.workspace_dir)
+        .await
+        .unwrap();
+    runtime_config.memory.agent_id = Some("runtime-memory-agent".into());
+    runtime_config.memory.root = Some("team:runtime".into());
+    runtime_config.mcp_client.enabled = false;
+    let parent = CoreContext::for_test_with_config(DomainSet::full(), runtime_config.clone());
+    let ctx = parent.derive_with(ContextOverlay::new(
+        runtime_config,
+        DomainSet::full(),
+        crate::tools::toolpacks::ToolGroups::none(),
+    ));
+
+    let mut external = Config::load_from_config_path(&seed.config_path, &seed.workspace_dir)
+        .await
+        .unwrap();
+    external.default_model = Some("external-winner".into());
+    external.save().await.unwrap();
+
+    let controller = crate::core::all::all_registered_controllers()
+        .into_iter()
+        .find(|controller| controller.rpc_method_name() == "openhuman.config_update_model_settings")
+        .expect("config model settings RPC is registered");
+    let conflict = CoreContext::scope(ctx.clone(), async {
+        (controller.handler)(
+            DispatchCtx::new(ctx.clone()),
+            json!({"default_temperature": 0.8})
+                .as_object()
+                .unwrap()
+                .clone(),
+        )
+        .await
+        .unwrap_err()
+    })
+    .await;
+    assert!(crate::core::StructuredRpcError::decode(&conflict).is_some());
+
+    let refreshed = CoreContext::scope(ctx.clone(), async {
+        DispatchCtx::new(ctx.clone()).load_config().await.unwrap()
+    })
+    .await;
+    assert_eq!(refreshed.default_model.as_deref(), Some("external-winner"));
+    assert_eq!(
+        refreshed.memory.agent_id.as_deref(),
+        Some("runtime-memory-agent")
+    );
+    assert_eq!(refreshed.memory.root.as_deref(), Some("team:runtime"));
+    assert!(!refreshed.mcp_client.enabled);
+}
+
+#[tokio::test]
 async fn config_snapshot_cannot_be_saved_into_a_different_tenant_scope() {
     let tmp = tempfile::tempdir().unwrap();
     let storage = MemoryStorage::new();
@@ -270,7 +331,9 @@ async fn config_snapshot_is_bound_to_its_backend_instance() {
             keys(14),
         );
         config_at(tmp.path(), "backend-a").save().await.unwrap();
-        Config::load_from_config_path(&path, &workspace).await.unwrap()
+        Config::load_from_config_path(&path, &workspace)
+            .await
+            .unwrap()
     };
     let (config_b, version_b) = {
         let _source = ForcedDocumentSource::new(
@@ -279,12 +342,17 @@ async fn config_snapshot_is_bound_to_its_backend_instance() {
             keys(14),
         );
         config_at(tmp.path(), "backend-b").save().await.unwrap();
-        let config = Config::load_from_config_path(&path, &workspace).await.unwrap();
+        let config = Config::load_from_config_path(&path, &workspace)
+            .await
+            .unwrap();
         let version = config.document_snapshot.lock().unwrap().version;
         (config, version)
     };
     let version_a = config_a.document_snapshot.lock().unwrap().version;
-    assert_eq!(version_a, version_b, "fixture uses colliding document versions");
+    assert_eq!(
+        version_a, version_b,
+        "fixture uses colliding document versions"
+    );
     let anchor_a = config_a.document_snapshot.lock().unwrap().anchor.clone();
     let anchor_b = config_b.document_snapshot.lock().unwrap().anchor.clone();
     assert_ne!(anchor_a, anchor_b, "source anchors retain backend identity");
@@ -325,8 +393,13 @@ async fn a_file_snapshot_can_seed_an_absent_document_after_storage_bootstrap() {
     );
     snapshot.default_model = Some("imported-to-document".into());
     snapshot.save().await.unwrap();
-    let loaded = Config::load_from_config_path(&path, &workspace).await.unwrap();
-    assert_eq!(loaded.default_model.as_deref(), Some("imported-to-document"));
+    let loaded = Config::load_from_config_path(&path, &workspace)
+        .await
+        .unwrap();
+    assert_eq!(
+        loaded.default_model.as_deref(),
+        Some("imported-to-document")
+    );
 }
 
 #[tokio::test]
