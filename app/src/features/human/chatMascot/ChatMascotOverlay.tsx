@@ -113,9 +113,7 @@ const ChatMascotOverlay = () => {
   // lip-sync); the rAF loop only exists while it speaks.
   const liveLipsync = useAmplitudeLipsync(liveAudioRef, livePhase === 'speaking');
   const face = liveLipsync.active || replayViseme !== null ? 'speaking' : classicFace;
-  const visemeCode = liveLipsync.active
-    ? liveLipsync.visemeCode
-    : replayViseme ?? classicViseme;
+  const visemeCode = liveLipsync.active ? liveLipsync.visemeCode : (replayViseme ?? classicViseme);
 
   const mascotColor = useAppSelector(selectMascotColor);
   const customPrimary = useAppSelector(selectCustomPrimaryColor);

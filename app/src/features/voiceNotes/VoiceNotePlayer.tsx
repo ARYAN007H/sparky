@@ -19,8 +19,8 @@ import {
 import Slider from '../../components/ui/Slider';
 import { cn } from '../../lib/cn';
 import { useT } from '../../lib/i18n/I18nContext';
-import { formatDuration, readVoiceNote } from './voiceNoteApi';
 import { proceduralVisemes } from '../human/voice/ttsClient';
+import { formatDuration, readVoiceNote } from './voiceNoteApi';
 
 export interface VoiceNotePlayerProps {
   noteId?: string;
@@ -62,15 +62,18 @@ function VoiceNotePlayerBody({
   const totalMs = loadedMs ?? durationMs ?? 0;
   const frames = visemes?.length ? visemes : proceduralVisemes(speechText, totalMs);
 
-  const publishMascot = useCallback((active: boolean, atMs = 0) => {
-    if (!mascotPlayback) return;
-    let viseme = 'sil';
-    if (active) {
-      const frame = frames.find(item => atMs >= item.start_ms && atMs < item.end_ms);
-      viseme = frame?.viseme ?? 'sil';
-    }
-    window.dispatchEvent(new CustomEvent('voice-note-mascot', { detail: { active, viseme } }));
-  }, [frames, mascotPlayback]);
+  const publishMascot = useCallback(
+    (active: boolean, atMs = 0) => {
+      if (!mascotPlayback) return;
+      let viseme = 'sil';
+      if (active) {
+        const frame = frames.find(item => atMs >= item.start_ms && atMs < item.end_ms);
+        viseme = frame?.viseme ?? 'sil';
+      }
+      window.dispatchEvent(new CustomEvent('voice-note-mascot', { detail: { active, viseme } }));
+    },
+    [frames, mascotPlayback]
+  );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
 
@@ -122,8 +125,14 @@ function VoiceNotePlayerBody({
       setPositionMs(0);
       publishMascot(false);
     });
-    audio.addEventListener('pause', () => { setPlaying(false); publishMascot(false); });
-    audio.addEventListener('play', () => { setPlaying(true); publishMascot(true, audio.currentTime * 1000); });
+    audio.addEventListener('pause', () => {
+      setPlaying(false);
+      publishMascot(false);
+    });
+    audio.addEventListener('play', () => {
+      setPlaying(true);
+      publishMascot(true, audio.currentTime * 1000);
+    });
     audioRef.current = audio;
     return audio;
   }, [noteId, src, publishMascot]);

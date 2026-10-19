@@ -1,7 +1,12 @@
 // @ts-nocheck
 /** Full mocked recording -> transcription -> assistant speech -> reload flow. */
 import { waitForApp } from '../helpers/app-helpers';
-import { chatMounted, clickByTitle, getSelectedThreadId, waitForAssistantReplyContaining } from '../helpers/chat-harness';
+import {
+  chatMounted,
+  clickByTitle,
+  getSelectedThreadId,
+  waitForAssistantReplyContaining,
+} from '../helpers/chat-harness';
 import { clickElement, clickTestId, textExists, waitForTestId } from '../helpers/element-helpers';
 import { resetApp } from '../helpers/reset-app';
 import { navigateViaHash } from '../helpers/shared-flows';
@@ -16,12 +21,21 @@ function silentWavBase64() {
   const samples = new Uint8Array(sampleRate / 2);
   const bytes = new Uint8Array(44 + samples.length);
   const view = new DataView(bytes.buffer);
-  const tag = (offset, value) => [...value].forEach((char, index) => (bytes[offset + index] = char.charCodeAt(0)));
-  tag(0, 'RIFF'); view.setUint32(4, 36 + samples.length, true); tag(8, 'WAVE');
-  tag(12, 'fmt '); view.setUint32(16, 16, true); view.setUint16(20, 1, true);
-  view.setUint16(22, 1, true); view.setUint32(24, sampleRate, true);
-  view.setUint32(28, sampleRate, true); view.setUint16(32, 1, true);
-  view.setUint16(34, 8, true); tag(36, 'data'); view.setUint32(40, samples.length, true);
+  const tag = (offset, value) =>
+    [...value].forEach((char, index) => (bytes[offset + index] = char.charCodeAt(0)));
+  tag(0, 'RIFF');
+  view.setUint32(4, 36 + samples.length, true);
+  tag(8, 'WAVE');
+  tag(12, 'fmt ');
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, 1, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate, true);
+  view.setUint16(32, 1, true);
+  view.setUint16(34, 8, true);
+  tag(36, 'data');
+  view.setUint32(40, samples.length, true);
   bytes.set(samples, 44);
   return Buffer.from(bytes).toString('base64');
 }
@@ -37,10 +51,13 @@ describe('Chat voice notes', () => {
     setMockBehavior('audioTranscriptionText', TRANSCRIPT);
     setMockBehavior('audioSpeechBase64', AUDIO_B64);
     setMockBehavior('audioSpeechMime', 'audio/wav');
-    setMockBehavior('audioSpeechVisemes', JSON.stringify([
-      { viseme: 'aa', start_ms: 0, end_ms: 180 },
-      { viseme: 'PP', start_ms: 180, end_ms: 420 },
-    ]));
+    setMockBehavior(
+      'audioSpeechVisemes',
+      JSON.stringify([
+        { viseme: 'aa', start_ms: 0, end_ms: 180 },
+        { viseme: 'PP', start_ms: 180, end_ms: 420 },
+      ])
+    );
     setMockBehavior('llmStreamScript', JSON.stringify([{ text: REPLY }, { finish: 'stop' }]));
   });
 
@@ -58,20 +75,33 @@ describe('Chat voice notes', () => {
     await navigateViaHash('/chat');
     await browser.waitUntil(async () => await chatMounted(), { timeout: 15_000 });
     expect(await clickByTitle('New thread', 8_000)).toBe(true);
-    const threadId = await browser.waitUntil(async () => await getSelectedThreadId(), { timeout: 8_000 });
+    const threadId = await browser.waitUntil(async () => await getSelectedThreadId(), {
+      timeout: 8_000,
+    });
 
     // The browser recorder emits a valid short WAV so both stored user and synthesized
     // assistant audio can be decoded by the real player without a microphone/device.
     await browser.execute(wav => {
       const raw = Uint8Array.from(atob(wav), char => char.charCodeAt(0));
-      Object.defineProperty(navigator, 'mediaDevices', { configurable: true, value: {
-        getUserMedia: async () => ({ getTracks: () => [{ stop() {} }] }),
-      } });
+      Object.defineProperty(navigator, 'mediaDevices', {
+        configurable: true,
+        value: { getUserMedia: async () => ({ getTracks: () => [{ stop() {} }] }) },
+      });
       window.MediaRecorder = class {
-        static isTypeSupported() { return true; }
-        constructor() { this.state = 'inactive'; this.mimeType = 'audio/wav'; this.listeners = {}; }
-        addEventListener(type, fn) { this.listeners[type] = fn; }
-        start() { this.state = 'recording'; }
+        static isTypeSupported() {
+          return true;
+        }
+        constructor() {
+          this.state = 'inactive';
+          this.mimeType = 'audio/wav';
+          this.listeners = {};
+        }
+        addEventListener(type, fn) {
+          this.listeners[type] = fn;
+        }
+        start() {
+          this.state = 'recording';
+        }
         stop() {
           this.state = 'inactive';
           this.listeners.dataavailable?.({ data: new Blob([raw], { type: 'audio/wav' }) });
@@ -87,14 +117,24 @@ describe('Chat voice notes', () => {
     await clickTestId('voice-note-send');
     await browser.waitUntil(async () => await textExists(TRANSCRIPT), { timeout: 20_000 });
     await waitForAssistantReplyContaining(REPLY, 60_000);
-    await browser.waitUntil(async () => (await browser.$$('[data-testid="voice-note-player"]')).length === 2, { timeout: 30_000 });
+    await browser.waitUntil(
+      async () => (await browser.$$('[data-testid="voice-note-player"]')).length === 2,
+      { timeout: 30_000 }
+    );
 
     await browser.refresh();
     await waitForApp();
     await navigateViaHash('/chat');
     await browser.waitUntil(async () => await chatMounted(), { timeout: 20_000 });
-    await browser.execute(tid => window.__OPENHUMAN_STORE__?.dispatch({ type: 'thread/setSelectedThread', payload: tid }), threadId);
-    await browser.waitUntil(async () => (await browser.$$('[data-testid="voice-note-player"]')).length === 2, { timeout: 30_000 });
+    await browser.execute(
+      tid =>
+        window.__OPENHUMAN_STORE__?.dispatch({ type: 'thread/setSelectedThread', payload: tid }),
+      threadId
+    );
+    await browser.waitUntil(
+      async () => (await browser.$$('[data-testid="voice-note-player"]')).length === 2,
+      { timeout: 30_000 }
+    );
     expect(await textExists(REPLY)).toBe(true);
     await clickTestId('voice-note-transcript-toggle');
     await browser.waitUntil(async () => await textExists(TRANSCRIPT), { timeout: 5_000 });
@@ -102,7 +142,13 @@ describe('Chat voice notes', () => {
     const playButtons = await browser.$$('[data-testid="voice-note-toggle"]');
     expect(playButtons.length).toBe(2);
     await clickElement(playButtons[1]);
-    await browser.waitUntil(async () => (await browser.$$('[data-testid="voice-note-toggle"]'))[1]?.getAttribute('aria-label').then(label => label?.toLowerCase().includes('pause')), { timeout: 5_000 });
+    await browser.waitUntil(
+      async () =>
+        (await browser.$$('[data-testid="voice-note-toggle"]'))[1]
+          ?.getAttribute('aria-label')
+          .then(label => label?.toLowerCase().includes('pause')),
+      { timeout: 5_000 }
+    );
     await clickElement((await browser.$$('[data-testid="voice-note-toggle"]'))[1]);
   });
 });
