@@ -106,15 +106,15 @@ async function disarmWalkthrough(): Promise<void> {
 }
 
 /**
- * Wait up to `timeout` ms for the Joyride tooltip overlay to be visible.
- * Detection: the WalkthroughTooltip renders a `[role="tooltip"]` div.
+ * Wait up to `timeout` ms for the Joyride dialog overlay to be visible.
+ * WalkthroughTooltip is an accessible dialog, rendered with `role="alertdialog"`.
  */
 async function waitForTourTooltip(timeout = 15_000): Promise<boolean> {
   if (!supportsExecuteScript()) return false;
   const deadline = Date.now() + timeout;
   while (Date.now() < deadline) {
     const visible = await browser.execute(() => {
-      return document.querySelector('[role="tooltip"]') !== null;
+      return document.querySelector('[role="alertdialog"]') !== null;
     });
     if (visible) return true;
     await browser.pause(400);
@@ -132,7 +132,7 @@ async function clickTourNext(timeout = 8_000): Promise<boolean> {
   const deadline = Date.now() + timeout;
   while (Date.now() < deadline) {
     const clicked = await browser.execute(() => {
-      const tooltip = document.querySelector('[role="tooltip"]');
+      const tooltip = document.querySelector('[role="alertdialog"]');
       if (!tooltip) return false;
       // Primary button carries data-action="primary" (set by Joyride on primaryProps)
       const primary = tooltip.querySelector<HTMLButtonElement>('[data-action="primary"]');
@@ -193,7 +193,7 @@ describe('Guided tour — gates and resume behaviour (#1215)', function () {
       expect(await armWalkthrough()).toBe(true);
       await browser.refresh();
       expect(await waitForTourTooltip()).toBe(true);
-      expect(await textExists('1 of 10')).toBe(true);
+      expect(await textExists('1 of 9')).toBe(true);
       expect(
         await browser.execute(
           () => document.querySelector('[data-walkthrough="home-card"]') !== null
@@ -241,7 +241,7 @@ describe('Guided tour — gates and resume behaviour (#1215)', function () {
       expect(hasLastStepTitle).toBe(true);
 
       const skipVisible = await browser.execute(() => {
-        const tooltip = document.querySelector('[role="tooltip"]');
+        const tooltip = document.querySelector('[role="alertdialog"]');
         if (!tooltip) return false;
         const skip = tooltip.querySelector<HTMLButtonElement>('[data-action="skip"]');
         return skip !== null && !skip.hidden;
