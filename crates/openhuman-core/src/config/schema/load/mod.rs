@@ -4,6 +4,7 @@ mod active_workspace;
 mod branches;
 mod config_file_read;
 pub(crate) mod context_overlay;
+mod context_refresh;
 mod dirs;
 pub(in crate::config::schema) mod env;
 mod env_overlay;

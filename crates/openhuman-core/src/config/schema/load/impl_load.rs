@@ -493,11 +493,4 @@ impl Config {
 
         Ok(())
     }
-
-}
-
-impl Config {
-    pub(crate) fn bind_context_snapshot(snapshot: &std::sync::Arc<std::sync::Mutex<Config>>) {
-        snapshot.lock().unwrap().context_snapshot = Some(std::sync::Arc::downgrade(snapshot));
-    }
 }
