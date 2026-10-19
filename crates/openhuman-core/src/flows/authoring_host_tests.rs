@@ -100,7 +100,7 @@ async fn saved_workflow_callback_uses_its_captured_profile_over_the_bus() {
         host: Some(alice_registration.authoring.clone()),
     };
     let bob_request = tinyflows_bus::ValidateGraphRequest {
-        graph: candidate,
+        graph: candidate.clone(),
         host: Some(bob_registration.authoring.clone()),
     };
 
@@ -140,5 +140,37 @@ async fn saved_workflow_callback_uses_its_captured_profile_over_the_bus() {
         bob_report.errors.is_empty(),
         "Bob's safe child: {:?}",
         bob_report.errors
+    );
+
+    // The public draft-promote path must carry the same explicit caller
+    // context into validation when its handler runs under another ambient
+    // profile; otherwise it sees Bob's safe child and promotes Alice's draft.
+    let draft = CoreContext::scope(Arc::clone(&alice), async {
+        crate::flows::ops::flows_draft_create(
+            &config,
+            None,
+            "Scoped parent".into(),
+            candidate,
+            tinyflows_catalog::DraftOrigin::Chat,
+        )
+        .unwrap()
+        .value
+    })
+    .await;
+    let alice_context = DispatchCtx::new(Arc::clone(&alice));
+    let promotion = CoreContext::scope(Arc::clone(&bob), async {
+        crate::flows::ops::flows_draft_promote_with_context(
+            &alice_context,
+            &config,
+            &draft.id,
+            None,
+        )
+        .await
+    })
+    .await;
+    let error = promotion.expect_err("Alice's incompatible saved child must block promotion");
+    assert!(
+        error.contains("unsupported_nested_conditional_fan_in"),
+        "the promotion must validate in Alice's profile: {error}"
     );
 }
