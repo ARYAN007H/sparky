@@ -10,8 +10,9 @@ use tinyagents_harness::context::RunContext;
 use tinyagents_harness::error::Result as TaResult;
 use tinyagents_harness::middleware::{
     call_effect, dispatch_target, is_repeat_call_exempt, repeat_guard_marker, CallEffect,
-    Middleware, StopLatch, ToolFactsLookup, ToolInvocationIdentity,
+    Middleware, ToolFactsLookup, ToolInvocationIdentity,
 };
+use tinyagents_hooks::stop::StopLatch;
 use tinyagents_harness::no_progress::{
     classified_step, clear_recovered, ClassifiedFailureTracker, ClassifiedStep, FailurePolicy,
     NoProgress, NoProgressTracker, RecoverableFailureLadder, ToolAttempt,
