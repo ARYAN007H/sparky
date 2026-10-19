@@ -12,12 +12,12 @@ use tinyagents_harness::middleware::{
     call_effect, dispatch_target, is_repeat_call_exempt, repeat_guard_marker, CallEffect,
     Middleware, ToolFactsLookup, ToolInvocationIdentity,
 };
-use tinyagents_hooks::stop::StopLatch;
 use tinyagents_harness::no_progress::{
     classified_step, clear_recovered, ClassifiedFailureTracker, ClassifiedStep, FailurePolicy,
     NoProgress, NoProgressTracker, RecoverableFailureLadder, ToolAttempt,
 };
 use tinyagents_harness::steering::SteeringHandle;
+use tinyagents_hooks::stop::StopLatch;
 use tinyinference_llm::tool::ToolCall as TaToolCall;
 use tinytools::ToolResult as TaToolResult;
 

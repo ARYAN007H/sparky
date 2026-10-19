@@ -19,8 +19,7 @@ use super::{PostTurnHook, ToolHook};
 pub struct HookScope {
     tools: Vec<Arc<dyn ToolHook>>,
     post_turn: Vec<Arc<dyn PostTurnHook>>,
-    stop:
-        Vec<Arc<dyn tinyagents_hooks::stop::StopHook<tinyagents_harness::cost::TurnCost>>>,
+    stop: Vec<Arc<dyn tinyagents_hooks::stop::StopHook<tinyagents_harness::cost::TurnCost>>>,
 }
 
 impl HookScope {
@@ -55,8 +54,7 @@ impl HookScope {
     /// The scope's own stop policies, in registration order.
     pub fn stop_hooks(
         &self,
-    ) -> &[Arc<dyn tinyagents_hooks::stop::StopHook<tinyagents_harness::cost::TurnCost>>]
-    {
+    ) -> &[Arc<dyn tinyagents_hooks::stop::StopHook<tinyagents_harness::cost::TurnCost>>] {
         &self.stop
     }
 
