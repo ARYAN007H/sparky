@@ -79,13 +79,9 @@ impl SessionDriver<OpenHumanRunContext> for OpenHumanSessionDriver {
         &self,
         mut request: DriverRequest<OpenHumanRunContext>,
     ) -> Result<DriverOutcome, DriverFailure> {
-        // Heal a head persisted before #6721 was fixed, before anything reads
-        // the history: this turn then commits a clean generation.
+        // Heal an orphaned tool head before reading history.
         repair_orphaned_tool_head(&mut request.history);
-        // These two inputs are prepared by the OpenHuman lifecycle hook for
-        // this exact request.  Falling back to the snapshots captured when the
-        // long-lived driver was constructed would let a later channel/tool
-        // policy or context change execute under stale authority.
+        // Use the policy and context prepared for this exact request.
         let tool_policy = request
             .run_context
             .data
@@ -100,10 +96,31 @@ impl SessionDriver<OpenHumanRunContext> for OpenHumanSessionDriver {
             .context_middleware
             .clone()
             .ok_or_else(|| driver_failure("session turn is missing its request-scoped context"))?;
-        // The harness drops its `AgentRun` on an error.  Snapshot the exact
-        // request boundary before assembling the graph so the error path can
-        // persist only provider-accepted rounds, plus a display-only failure
-        // record, without manufacturing a second host history.
+        let hosted_base = self.hosted_base.clone().ok_or_else(|| {
+            driver_failure(
+                "hosted root invocation is unavailable because the session has no hosted authority",
+            )
+        })?;
+        let security = crate::agent::tinyagents::host::OpenHumanSecurityGate::new(
+            hosted_base.security_policy.clone(),
+            Vec::new(),
+        )
+        .with_input_screening(!request.run_context.data.untrusted_input_turn)
+        .with_approval(request.run_context.data.approval.clone())
+        .with_dispatch(request.run_context.data.dispatch_ctx());
+        let (_, block_reason) = security
+            .screen_new_user_row(&mut request.history)
+            .await
+            .map_err(|error| driver_failure(error.to_string()))?;
+        if let Some(reason) = block_reason {
+            return Err(DriverFailure {
+                error: RuntimeError::Driver(reason),
+                partial: None,
+                outcome: None,
+            });
+        }
+        // Snapshot the request boundary before assembling the graph so errors
+        // persist only provider-accepted rounds.
         let snapshot = context_mw
             .transcript_snapshot
             .get_or_insert_with(|| {
@@ -186,11 +203,7 @@ impl SessionDriver<OpenHumanRunContext> for OpenHumanSessionDriver {
         let cancellation = request.run_context.cancellation.clone();
         // Boxing avoids worker-stack overflow in debug builds.
         let turn = Box::pin(async move {
-            let hosted_base = self.hosted_base.clone().ok_or_else(|| {
-                anyhow::anyhow!(
-                    "hosted root invocation is unavailable because the session has no hosted authority"
-                )
-            })?;
+            let hosted_base = hosted_base.clone();
             let mut run_context = run_context;
             run_context.workspace = self.workspace.clone().or(run_context.workspace);
             run_context.sandbox_mode = Some(self.sandbox_mode);

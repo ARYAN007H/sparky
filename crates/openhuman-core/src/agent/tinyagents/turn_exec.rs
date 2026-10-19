@@ -645,7 +645,7 @@ async fn drive_turn(
             AgentTurnRequest::new(agent_id, parts.history),
             parts.run_context,
         )
-        .with_replayed_prefix(request_base_len.saturating_sub(1)) // #6710: only the new input is screened
+        .with_replayed_prefix(request_base_len.saturating_sub(1))
         .with_runtime(InvocationRuntime::new(parts.harness));
         let state = ();
         // Both surfaces return the harness's typed `HostedError`, so a timeout,
