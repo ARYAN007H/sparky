@@ -269,6 +269,13 @@ mod imp {
     ) -> Result<ServedObjectRegistration, String> {
         let object_interface = tinybus::service::Interface::name(&object);
         let announces_caps_host = object_interface.as_str() == tinyflows_bus::runs::CAPS_INTERFACE;
+        if announces_caps_host {
+            let cancel_member = tinybus::MemberName::new(tinyflows_bus::runs::caps::AGENT_CANCEL)
+                .map_err(|error| error.to_string())?;
+            if !tinybus::service::Interface::members(&object).contains(&cancel_member) {
+                return Err("CapsHost v2 object does not expose AgentCancel".to_owned());
+            }
+        }
         let runtime = runtime::runtime()
             .await
             .map_err(|error| format!("the module bus is unavailable: {error}"))?;
