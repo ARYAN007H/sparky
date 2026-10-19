@@ -174,6 +174,23 @@ mod imp {
             .map_err(|error| format!("the tinyflows portability object is unreachable: {error}"))
     }
 
+    /// Proxy to the module-owned run admission and control surface.
+    pub(crate) async fn runs_proxy(config: &Config) -> Result<Proxy, String> {
+        ensure(config).await?;
+        let runtime = runtime::runtime()
+            .await
+            .map_err(|error| format!("the module bus is unavailable: {error}"))?;
+        runtime
+            .connection()
+            .proxy(
+                tinyflows_bus::BUS_NAME,
+                tinyflows_bus::runs::OBJECT_PATH,
+                tinyflows_bus::runs::INTERFACE,
+            )
+            .map(|proxy| proxy.with_timeout(CALL_TIMEOUT))
+            .map_err(|error| format!("the tinyflows runs object is unreachable: {error}"))
+    }
+
     async fn copilot_invoke_interface_proxy(config: &Config) -> Result<Proxy, String> {
         ensure(config).await?;
         let runtime = runtime::runtime()
@@ -391,6 +408,10 @@ mod imp {
         Err(unavailable(config))
     }
 
+    pub(crate) async fn runs_proxy(config: &Config) -> Result<tinybus::Proxy, String> {
+        Err(unavailable(config))
+    }
+
     pub(crate) async fn copilot_invoke_proxy(config: &Config) -> Result<tinybus::Proxy, String> {
         Err(unavailable(config))
     }
@@ -423,7 +444,7 @@ mod imp {
 #[cfg(not(feature = "modules"))]
 pub(crate) use imp::{
     authoring_proxy, catalog_proxy, copilot_invoke_proxy, copilot_proxy, portability_proxy, proxy,
-    run_proxy, serve, serve_pair, serve_registered, unserve,
+    run_proxy, runs_proxy, serve, serve_pair, serve_registered, unserve,
 };
 
 /// Whether the module can serve in this build and configuration (the switch

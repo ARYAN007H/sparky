@@ -7,17 +7,14 @@
 
 use std::sync::Arc;
 
-use async_trait::async_trait;
 use serde_json::{json, Value};
-use tinyflows::caps::*;
-use tinyflows::error::{EngineError, Result};
 
 use super::*;
 use crate::config::Config;
 use crate::inference::provider::{
     create_chat_model_with_model_id_in, is_raw_passthrough_model, role_for_model_tier,
 };
-use tinyflows::nodes::integration::agent_prompt;
+use crate::modules::tinyflows as module;
 use tinyinference_llm::model::ModelRequest;
 
 /// [`LlmProvider`] adapter over OpenHuman's inference stack
@@ -43,9 +40,8 @@ pub struct OpenHumanLlm {
     pub config: Arc<Config>,
 }
 
-#[async_trait]
-impl LlmProvider for OpenHumanLlm {
-    async fn complete(&self, request: Value, conn: Option<&str>) -> Result<Value> {
+impl OpenHumanLlm {
+    pub(crate) async fn complete(&self, request: Value, conn: Option<&str>) -> Result<Value> {
         if let Some(c) = conn {
             // B1 does not resolve `connection_ref` to a specific BYOK account —
             // `create_chat_provider` picks the configured provider for `role`.
@@ -91,8 +87,21 @@ impl LlmProvider for OpenHumanLlm {
             .and_then(Value::as_u64)
             .and_then(|n| u32::try_from(n).ok());
 
-        let structured = structured_output_requested(&request);
-        let messages = build_completion_messages(&request);
+        let portability = module::portability_proxy(&self.config)
+            .await
+            .map_err(EngineError::Capability)?;
+        let prepared: tinyflows_bus::portability::PreparedLlmComplete = portability
+            .call(
+                tinyflows_bus::portability::methods::PREPARE_LLM_COMPLETE,
+                &(tinyflows_bus::portability::PrepareLlmComplete {
+                    request: request.clone(),
+                },),
+            )
+            .await
+            .map_err(|error| EngineError::Capability(error.to_string()))?;
+        let node_model = prepared.node_model.as_deref();
+        let structured = prepared.structured_output;
+        let messages = build_completion_messages(&prepared.messages);
 
         tracing::debug!(
             target: "flows",
@@ -107,8 +116,10 @@ impl LlmProvider for OpenHumanLlm {
                 .map_err(|e| EngineError::Capability(e.to_string()))?;
         // `create_chat_provider` handed back the role's default model. If the node
         // pinned a raw/BYOK id, forward it verbatim instead (issue #4598).
-        let model =
-            agent_prompt::resolve_completion_model(node_model, model, is_raw_passthrough_model);
+        let model = match node_model.filter(|model| is_raw_passthrough_model(model)) {
+            Some(model) => model.to_owned(),
+            None => model,
+        };
 
         let mut model_request = ModelRequest::new(
             messages
@@ -130,23 +141,23 @@ impl LlmProvider for OpenHumanLlm {
         // `=item.<field>` / `=nodes.<id>.item.<field>` bindings work. The
         // agent node's output_parser sub-port then validates it against the
         // configured schema (and auto-fixes when it doesn't parse here).
-        if structured {
-            let text = response.text();
-            if let Some(parsed) = extract_structured_json(&text) {
-                tracing::debug!(
-                    target: "flows",
-                    "[flows] llm.complete: structured output extracted from completion text"
-                );
-                return Ok(parsed);
-            }
+        let host_response = model_response_to_completion_value(&response);
+        let formatted: Value = portability
+            .call(
+                tinyflows_bus::portability::methods::FORMAT_LLM_COMPLETE,
+                &(tinyflows_bus::portability::FormatLlmComplete {
+                    request,
+                    response: host_response,
+                },),
+            )
+            .await
+            .map_err(|error| EngineError::Capability(error.to_string()))?;
+        if structured && !formatted.is_object() && !formatted.is_array() {
             tracing::warn!(
                 target: "flows",
-                "[flows] llm.complete: structured output requested but no JSON extraction \
-                 strategy succeeded — falling back to the {{text}} shape (the output_parser \
-                 sub-port may still coerce it)"
+                "[flows] llm.complete: structured output requested but module did not extract JSON"
             );
         }
-
-        Ok(model_response_to_completion_value(&response))
+        Ok(formatted)
     }
 }
