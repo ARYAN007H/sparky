@@ -139,5 +139,6 @@ mod session_and_concurrency_tests;
 #[path = "web_tests_start_chat_ingress_tests.rs"]
 mod start_chat_ingress_tests;
 
+#[cfg(feature = "voice")]
 #[path = "web_tests_ptt_source_tests.rs"]
 mod ptt_source_tests;
