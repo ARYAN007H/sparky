@@ -247,7 +247,8 @@ fn assert_force_next_run_updates_collection(collection: &str, other_collection: 
     let opened = crate::storage::local::open("cron::store-test", &config.workspace_dir).unwrap();
     let docs = std::sync::Arc::clone(opened.scoped().unwrap().documents());
     crate::storage::block_on_anyhow(async {
-        docs.ensure_collection(&CollectionSpec::new(collection)).await?;
+        docs.ensure_collection(&CollectionSpec::new(collection))
+            .await?;
         docs.put(
             collection,
             "seeded-job",
@@ -273,7 +274,10 @@ fn assert_force_next_run_updates_collection(collection: &str, other_collection: 
     let updated = updated.expect("seeded document remains present").doc;
     assert_eq!(updated["next_run_ms"], json!(456));
     assert_eq!(updated["marker"], json!("keep-me"));
-    assert!(other.is_none(), "helper must not create or write {other_collection}");
+    assert!(
+        other.is_none(),
+        "helper must not create or write {other_collection}"
+    );
     assert_eq!(collections, vec![collection.to_string()]);
 }
 
