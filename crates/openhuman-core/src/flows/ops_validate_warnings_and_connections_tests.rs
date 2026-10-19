@@ -389,7 +389,7 @@ fn build_flow_connections_emits_parseable_refs_for_both_kinds() {
     // exact parser the caps seam uses on execution.
     assert_eq!(gmail.connection_ref, "composio:gmail:ca_abc");
     assert_eq!(
-        crate::flows::tinyflows::caps::composio_connection_id(&gmail.connection_ref),
+        crate::integrations::composio::flow_gate::composio_connection_id(&gmail.connection_ref),
         Some("ca_abc")
     );
     assert_eq!(gmail.toolkit.as_deref(), Some("gmail"));
@@ -401,7 +401,7 @@ fn build_flow_connections_emits_parseable_refs_for_both_kinds() {
     assert_eq!(stripe.kind, "http");
     assert_eq!(stripe.connection_ref, "http_cred:stripe");
     assert_eq!(
-        crate::flows::tinyflows::caps::http_cred_name(&stripe.connection_ref),
+        crate::flows::ops::connections::http_credential_name(&stripe.connection_ref),
         Some("stripe")
     );
     assert_eq!(stripe.scheme.as_deref(), Some("bearer"));

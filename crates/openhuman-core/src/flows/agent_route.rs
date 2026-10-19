@@ -60,7 +60,7 @@ pub(crate) fn harness_model_default_override(node_model: &str) -> String {
 /// synthesizes a real `AgentDefinition` for it (issue B38/Gap 2), so it can
 /// run the full tool loop — and [`AgentRoute::RegistryFallback`] for
 /// anything else (no entry at all, or a disabled one, which
-/// [`crate::flows::tinyflows::caps::OpenHumanAgentRunner::run_via_registry_fallback`] itself rejects with a
+/// [`crate::flows::caps_host::OpenHumanAgentRunner::run_via_registry_fallback`] itself rejects with a
 /// clear "is disabled" error rather than silently skipping it here). Pure
 /// over the lookup result so the decision is unit-testable without a live
 /// `Config`/registry.
