@@ -614,8 +614,6 @@ const messages: TranslationMap = {
     'Twój obecny plan nie obejmuje pamięci, więc OpenHuman nie może zapisywać ani wyszukiwać tego, czego się uczy. Ulepsz plan, aby włączyć pamięć, lub przełącz się na inną opcję pamięci w Ustawieniach.',
   'memory.planRequired.title': 'Pamięć nie wchodzi w skład Twojego planu',
   'memory.planRequired.action': 'Zobacz plany',
-  'memoryPage.engine.builtin.planRequired':
-    'Wbudowana pamięć wymaga planu Basic lub Pro. Ulepsz plan, aby z niej korzystać, lub wybierz jedną z pozostałych opcji pamięci.',
   'alerts.title': 'Alerty',
   'alerts.empty': 'Brak alertów',
   'alerts.markAllRead': 'Oznacz wszystkie jako przeczytane',

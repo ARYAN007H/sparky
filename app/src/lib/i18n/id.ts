@@ -613,8 +613,6 @@ const messages: TranslationMap = {
     'Paket Anda saat ini tidak mencakup memori, sehingga OpenHuman tidak dapat menyimpan atau mencari apa yang dipelajarinya. Tingkatkan paket untuk mengaktifkan memori, atau beralih ke opsi memori lain di Pengaturan.',
   'memory.planRequired.title': 'Memori tidak termasuk dalam paket Anda',
   'memory.planRequired.action': 'Lihat paket',
-  'memoryPage.engine.builtin.planRequired':
-    'Memori bawaan memerlukan paket Basic atau Pro. Tingkatkan paket untuk menggunakannya, atau pilih salah satu opsi memori lainnya.',
   'alerts.title': 'Peringatan',
   'alerts.empty': 'Belum ada peringatan',
   'alerts.markAllRead': 'Tandai semua sudah dibaca',

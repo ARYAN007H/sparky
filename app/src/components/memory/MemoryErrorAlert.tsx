@@ -10,7 +10,9 @@ import { useNavigate } from 'react-router-dom';
 import { useT } from '../../lib/i18n/I18nContext';
 import { isOutOfCreditsMessage, isPlanRequiredMessage } from '../../services/api/memoryApi';
 import { Alert, AlertDescription, AlertTitle, Button } from '../ui';
-import { BILLING_ROUTE } from './memoryPlan';
+
+/** Where the app sends every "top up" action (`open_billing` in useAppNotices). */
+const BILLING_ROUTE = '/settings/account';
 
 interface MemoryCreditsPromptProps {
   /** The out-of-credits explanation. */

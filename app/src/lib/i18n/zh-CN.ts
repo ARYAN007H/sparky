@@ -567,8 +567,6 @@ const messages: TranslationMap = {
     '你当前的套餐不包含记忆功能，因此 OpenHuman 无法保存或查找它学到的内容。升级套餐即可开启记忆功能，也可以在设置中改用其他记忆选项。',
   'memory.planRequired.title': '记忆功能不在你的套餐中',
   'memory.planRequired.action': '查看套餐',
-  'memoryPage.engine.builtin.planRequired':
-    '内置记忆需要 Basic 或 Pro 套餐。升级即可使用，也可以选择其他记忆选项。',
   'alerts.title': '通知',
   'alerts.empty': '暂无通知',
   'alerts.markAllRead': '全部标记为已读',

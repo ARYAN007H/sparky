@@ -1,6 +1,5 @@
 import { ExternalLink, Info } from 'lucide-react';
 import { type ReactNode, useId } from 'react';
-import { useNavigate } from 'react-router-dom';
 
 import { useT } from '../../lib/i18n/I18nContext';
 import { type EngineState, isMemoryOn } from '../../services/api/memoryApi';
@@ -8,7 +7,6 @@ import { TINYHUMANS_TERMS_URL } from '../../utils/links';
 import { openUrl } from '../../utils/openUrl';
 import { Alert, AlertDescription, Button, Label, TextField } from '../ui';
 import { PopoverContent, PopoverRoot, PopoverTrigger } from '../ui/Popover';
-import { BILLING_ROUTE, MEMORY_QUOTA, planIncludesMemory } from './memoryPlan';
 import type { MemoryProviderOption } from './MemoryProviderLogo';
 
 /** CortexDB's self-hosting guide, linked from the Local provider. */
@@ -64,6 +62,9 @@ export interface MemoryConnectionPanelProps {
   onSubmit: () => void;
 }
 
+/** Free hosted memory per plan; memory inference itself is never charged. */
+const MEMORY_QUOTA = { BASIC: '1 GB', PRO: '20 GB' } as const;
+
 /**
  * One way to connect CortexDB, shown under its chip on Memory → Provider: what
  * it is, what it needs (nothing via TinyHumans, a key for your own account, an
@@ -94,11 +95,7 @@ export default function MemoryConnectionPanel({
   const baseId = useId();
   const formId = `${baseId}-form`;
   const busy = saving !== null;
-  const navigate = useNavigate();
   const planName = plan === 'PRO' ? 'Pro' : plan === 'BASIC' ? 'Basic' : null;
-  // A known plan without memory (FREE): "Use" is disabled by the caller and
-  // this says why. An unknown plan is left to the core's PLAN_REQUIRED.
-  const planWithoutMemory = plan !== null && !planIncludesMemory(plan);
 
   const keyField = (value: string, onChange: (value: string) => void) => {
     const saved = active && state.has_key;
@@ -189,21 +186,6 @@ export default function MemoryConnectionPanel({
         <p className="text-xs text-content-muted" data-testid="memory-engine-builtin-sign-in">
           {t('memoryPage.engine.builtin.signInHint')}
         </p>
-      )}
-      {signedIn && planWithoutMemory && (
-        <Alert variant="warning" data-testid="memory-engine-builtin-plan-required">
-          <AlertDescription className="flex flex-wrap items-center gap-2">
-            <span>{t('memoryPage.engine.builtin.planRequired')}</span>
-            <Button
-              type="button"
-              size="xs"
-              variant="primary"
-              data-testid="memory-engine-builtin-upgrade"
-              onClick={() => navigate(BILLING_ROUTE)}>
-              {t('memory.planRequired.action')}
-            </Button>
-          </AlertDescription>
-        </Alert>
       )}
     </>
   );

@@ -4429,8 +4429,6 @@ const messages: TranslationMap = {
     "Mevcut planınız bellek içermediği için OpenHuman öğrendiklerini kaydedemez veya bunlara bakamaz. Belleği açmak için planınızı yükseltin ya da Ayarlar'dan başka bir bellek seçeneğine geçin.",
   'memory.planRequired.title': 'Bellek planınıza dahil değil',
   'memory.planRequired.action': 'Planları gör',
-  'memoryPage.engine.builtin.planRequired':
-    'Yerleşik bellek için Basic veya Pro planı gerekir. Kullanmak için planınızı yükseltin ya da diğer bellek seçeneklerinden birini seçin.',
   'memoryPage.engine.badgeDegraded': 'Kısıtlı çalışıyor',
   'memoryPage.engine.badgeDown': 'Ulaşılamıyor',
   'memoryPage.engine.connecting': 'Bağlanıyor…',

@@ -624,8 +624,6 @@ const messages: TranslationMap = {
     'Dein aktueller Tarif enthält kein Gedächtnis, daher kann OpenHuman nicht speichern oder nachschlagen, was es lernt. Wechsle zu einem höheren Tarif, um das Gedächtnis einzuschalten, oder wähle in den Einstellungen eine andere Gedächtnis-Option.',
   'memory.planRequired.title': 'Gedächtnis ist nicht Teil deines Tarifs',
   'memory.planRequired.action': 'Tarife ansehen',
-  'memoryPage.engine.builtin.planRequired':
-    'Das integrierte Gedächtnis erfordert einen Basic- oder Pro-Tarif. Wechsle den Tarif, um es zu nutzen, oder wähle eine der anderen Gedächtnis-Optionen.',
   'alerts.title': 'Warnungen',
   'alerts.empty': 'Noch keine Benachrichtigungen',
   'alerts.markAllRead': 'Alle als gelesen markieren',

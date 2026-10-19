@@ -624,8 +624,6 @@ const messages: TranslationMap = {
     "Votre forfait actuel n'inclut pas la mémoire : OpenHuman ne peut donc ni enregistrer ni retrouver ce qu'il apprend. Passez à un forfait supérieur pour activer la mémoire, ou choisissez une autre option de mémoire dans les Paramètres.",
   'memory.planRequired.title': 'La mémoire ne fait pas partie de votre forfait',
   'memory.planRequired.action': 'Voir les forfaits',
-  'memoryPage.engine.builtin.planRequired':
-    "La mémoire intégrée nécessite un forfait Basic ou Pro. Passez à un forfait supérieur pour l'utiliser, ou choisissez l'une des autres options de mémoire.",
   'alerts.title': 'Alertes',
   'alerts.empty': "Aucune alerte pour l'instant",
   'alerts.markAllRead': 'Tout marquer comme lu',

@@ -593,8 +593,6 @@ const messages: TranslationMap = {
     'خطتك الحالية لا تتضمن الذاكرة، لذا لا يستطيع OpenHuman حفظ ما يتعلّمه أو البحث فيه. قم بالترقية لتفعيل الذاكرة، أو انتقل إلى خيار ذاكرة آخر من الإعدادات.',
   'memory.planRequired.title': 'الذاكرة ليست جزءًا من خطتك',
   'memory.planRequired.action': 'عرض الخطط',
-  'memoryPage.engine.builtin.planRequired':
-    'تتطلب الذاكرة المدمجة خطة Basic أو Pro. قم بالترقية لاستخدامها، أو اختر أحد خيارات الذاكرة الأخرى.',
   'alerts.title': 'التنبيهات',
   'alerts.empty': 'لا توجد تنبيهات بعد',
   'alerts.markAllRead': 'تحديد الكل كمقروء',

@@ -4775,8 +4775,6 @@ const messages: TranslationMap = {
     '現在のプランにはメモリが含まれていないため、OpenHuman は学んだことを保存したり参照したりできません。メモリを有効にするにはプランをアップグレードするか、設定で別のメモリオプションに切り替えてください。',
   'memory.planRequired.title': 'メモリはご利用のプランに含まれていません',
   'memory.planRequired.action': 'プランを見る',
-  'memoryPage.engine.builtin.planRequired':
-    '内蔵メモリには Basic または Pro プランが必要です。利用するにはアップグレードするか、ほかのメモリオプションを選んでください。',
   'onboarding.custom.search.skipForNow': '今はスキップ',
   'onboarding.custom.search.ready': 'Web検索の準備ができました。',
   'onboarding.custom.search.notReady':

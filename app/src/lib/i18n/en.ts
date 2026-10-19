@@ -599,8 +599,6 @@ const en: TranslationMap = {
     "Your current plan doesn't include memory, so OpenHuman can't save or look up what it learns. Upgrade to turn memory on, or switch to a different memory option in Settings.",
   'memory.planRequired.title': "Memory isn't part of your plan",
   'memory.planRequired.action': 'See plans',
-  'memoryPage.engine.builtin.planRequired':
-    'Built-in memory needs a Basic or Pro plan. Upgrade to use it, or pick one of the other memory options.',
 
   // Activity surface: Phase 3 renamed tabs
   'activity.tabs.automations': 'Automations',
