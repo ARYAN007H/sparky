@@ -1,87 +1,45 @@
 use super::*;
-use crate::core::all::{assert_schema_controller_parity, expect_schema_required_inputs};
+use crate::core::all::{
+    assert_schema_controller_parity, expect_schema_fields, expect_schema_identity,
+    expect_schema_required_inputs,
+};
 use crate::core::runtime::DispatchCtx;
 use serde_json::json;
 
 #[test]
 fn voice_schema_wire_contracts_are_preserved() {
-    let contracts = [
-        ("voice_status", "status", &[][..], &[][..]),
-        (
-            "voice_transcribe",
-            "transcribe",
-            &["audio_path"][..],
-            &[][..],
-        ),
-        (
-            "voice_transcribe_bytes",
-            "transcribe_bytes",
-            &["audio_bytes"][..],
-            &["extension"][..],
-        ),
-        ("voice_tts", "tts", &["text"][..], &["output_path"][..]),
-        ("overlay_stt_notify", "overlay_stt_notify", &[][..], &[][..]),
-        ("voice_stt_dispatch", "stt_dispatch", &[][..], &[][..]),
-        ("voice_tts_dispatch", "tts_dispatch", &[][..], &[][..]),
-        ("voice_set_providers", "set_providers", &[][..], &[][..]),
-        ("voice_server_start", "server_start", &[][..], &[][..]),
-        (
-            "voice_update_provider_settings",
-            "update_provider_settings",
-            &[][..],
-            &["voice_providers", "stt_provider", "tts_provider"][..],
-        ),
-        (
-            "voice_list_models",
-            "list_models",
-            &["provider_id"][..],
-            &[][..],
-        ),
-        (
-            "voice_test_provider",
-            "test_provider",
-            &["workload", "provider"][..],
-            &[][..],
-        ),
+    let identities = [
+        ("voice_status", "status"),
+        ("voice_transcribe", "transcribe"),
+        ("voice_transcribe_bytes", "transcribe_bytes"),
+        ("voice_tts", "tts"),
+        ("overlay_stt_notify", "overlay_stt_notify"),
+        ("voice_stt_dispatch", "stt_dispatch"),
+        ("voice_tts_dispatch", "tts_dispatch"),
+        ("voice_set_providers", "set_providers"),
+        ("voice_server_start", "server_start"),
+        ("voice_update_provider_settings", "update_provider_settings"),
+        ("voice_list_models", "list_models"),
+        ("voice_test_provider", "test_provider"),
     ];
-    for (key, function, required, optional) in contracts {
-        let schema = voice_schemas(key);
-        assert_eq!(schema.namespace, "voice");
-        assert_eq!(schema.function, function);
-        if key == "voice_status" {
-            assert!(schema.inputs.is_empty());
-        }
-        for name in required {
-            assert!(
-                schema
-                    .inputs
-                    .iter()
-                    .any(|field| field.name == *name && field.required),
-                "voice.{function} must require {name}"
-            );
-        }
-        for name in optional {
-            assert!(
-                schema
-                    .inputs
-                    .iter()
-                    .any(|field| field.name == *name && !field.required),
-                "voice.{function} must expose optional {name}"
-            );
-        }
+    for (key, function) in identities {
+        expect_schema_identity(&voice_schemas(key), "voice", function);
     }
+    let fields: &[(&str, &[(&str, bool)])] = &[
+        ("voice_transcribe", &[("audio_path", true)]),
+        ("voice_transcribe_bytes", &[("audio_bytes", true), ("extension", false)]),
+        ("voice_tts", &[("text", true), ("output_path", false)]),
+        ("voice_update_provider_settings", &[("voice_providers", false), ("stt_provider", false), ("tts_provider", false)]),
+        ("voice_list_models", &[("provider_id", true)]),
+        ("voice_test_provider", &[("workload", true), ("provider", true)]),
+    ];
+    for (key, expected) in fields {
+        let expected: Vec<_> = expected.iter().map(|(name, required)| (*name, Some(*required))).collect();
+        expect_schema_fields(&voice_schemas(key), &expected);
+    }
+    assert!(voice_schemas("voice_status").inputs.is_empty());
     expect_schema_required_inputs(&voice_schemas("voice_server_start"), &[]);
     expect_schema_required_inputs(&voice_schemas("voice_update_provider_settings"), &[]);
-    let registered: Vec<_> = all_voice_registered_controllers()
-        .into_iter()
-        .map(|controller| controller.schema.function)
-        .collect();
-    for expected in ["stt_dispatch", "tts_dispatch", "set_providers"] {
-        assert!(
-            registered.contains(&expected),
-            "voice.{expected} not registered"
-        );
-    }
     assert_schema_controller_parity(
         &all_voice_controller_schemas(),
         &all_voice_registered_controllers(),
