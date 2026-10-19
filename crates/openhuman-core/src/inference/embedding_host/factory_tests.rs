@@ -1,5 +1,5 @@
 use super::*;
-use crate::inference::embedding_host::{
+use crate::inference::embedding_host::cloud::{
     DEFAULT_CLOUD_EMBEDDING_DIMENSIONS, DEFAULT_CLOUD_EMBEDDING_MODEL,
 };
 use crate::security::credentials::{AuthService, APP_SESSION_PROVIDER};
