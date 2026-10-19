@@ -32,6 +32,15 @@ fn composio_schema_contracts_and_registration_are_preserved() {
     for function in keys {
         expect_schema_identity(&schemas(function), "composio", function);
     }
+    let registered = all_registered_controllers();
+    for function in ["list_triggers", "enable_trigger", "disable_trigger", "list_trigger_history"] {
+        assert!(
+            registered.iter().any(|controller| {
+                controller.schema.namespace == "composio" && controller.schema.function == function
+            }),
+            "composio.{function} is not registered"
+        );
+    }
     let capabilities = schemas("list_capabilities");
     assert!(capabilities.inputs.is_empty());
     expect_schema_fields(&capabilities, &[("capabilities", Some(true))]);
