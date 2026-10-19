@@ -145,6 +145,11 @@ impl Running {
     }
 
     async fn send(&mut self, sender: &str, content: &str) {
+        let message = self.prepared(sender, content);
+        self.tx.send(message).await.unwrap();
+    }
+
+    fn prepared(&mut self, sender: &str, content: &str) -> RuntimeChannelMessage {
         let message = self.message(sender, content);
         let history_key = format!("{}_{sender}_{sender}", self.channel);
         let prepared = PreparedChannelInbound {
@@ -155,15 +160,12 @@ impl Running {
             client_id: self.channel.to_string(),
             session_key: history_key,
         };
-        self.tx
-            .send(RuntimeChannelMessage {
-                message,
-                inbound_envelope: None,
-                authenticated_relay: false,
-                prepared_inbound: Some(prepared),
-            })
-            .await
-            .unwrap();
+        RuntimeChannelMessage {
+            message,
+            inbound_envelope: None,
+            authenticated_relay: false,
+            prepared_inbound: Some(prepared),
+        }
     }
 
     async fn send_unprepared(&mut self, sender: &str, content: &str) {
@@ -391,4 +393,39 @@ async fn closing_the_queue_flushes_buffered_messages() {
 
     assert_eq!(turns.count(), 1);
     assert!(turns.last_user(0).ends_with("a\nb"));
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_full_intake_budget_stops_receiving_until_turns_drain() {
+    let turns = Arc::new(Turns::default());
+    let gate = Arc::new(Notify::new());
+    let _guard = install_handler(Arc::clone(&turns), Some(Arc::clone(&gate))).await;
+    let (_channel, ctx) = runtime();
+    let config = InboundDebounceConfig {
+        max_batch_messages: 1,
+        ..InboundDebounceConfig::default()
+    };
+    let mut run = Running::start(ctx, config);
+
+    run.send("alice", "first").await;
+    sleep_ms(2000).await;
+    assert_eq!(turns.count(), 1);
+
+    let mut accepted = 0;
+    for i in 0..200 {
+        let message = run.prepared("alice", &format!("queued {i}"));
+        if run.tx.try_send(message).is_err() {
+            break;
+        }
+        accepted += 1;
+        sleep_ms(1).await;
+    }
+    assert_eq!(accepted, 4 + 32, "4 held by the loop plus a full queue");
+
+    gate.notify_one();
+    run.finish().await;
+    assert_eq!(turns.count(), 1 + accepted);
+    for i in 0..accepted {
+        assert!(turns.last_user(i + 1).ends_with(&format!("queued {i}")));
+    }
 }
