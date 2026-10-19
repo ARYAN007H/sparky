@@ -175,7 +175,7 @@ async fn recv_for_thread(
     loop {
         match rx.recv().await {
             Ok(ev) if ev.context().thread_id == thread_id => return ev,
-            Ok(ev) => eprintln!("receiver skipped {} thread={}", ev.event_name(), ev.context().thread_id),
+            Ok(_) => continue,
             Err(err) => panic!("web-channel bus closed before event: {err}"),
         }
     }

@@ -180,7 +180,6 @@ impl Surface {
                 *round = interim_round.filter(|round| *round > 0);
             }
         }
-        eprintln!("surface publish: {} thread={} projected={projected}", event.event_name(), event.context().thread_id);
         publish_web_channel_event_in(&self.ctx, event);
     }
 
@@ -188,15 +187,13 @@ impl Surface {
     /// sequence order. Module errors fail closed; the host never reimplements
     /// the projection locally.
     pub(crate) async fn output(&self, event: ChannelOutputEvent) {
-        eprintln!("surface output invoked");
         self.project(event, None).await;
     }
 
     async fn project(&self, event: ChannelOutputEvent, interim_round: Option<u32>) {
-        eprintln!("surface project waiting for state");
         let mut state = self.state.lock().await;
-        eprintln!("surface project acquired state");
         if state.closed {
+            eprintln!("surface projection already closed");
             log::debug!(
                 "[web-channel] dropping output after terminal request_id={}",
                 self.ids.request_id
@@ -206,6 +203,7 @@ impl Surface {
         let handle = match self.begin_if_needed(&mut state).await {
             Ok(handle) => handle,
             Err(error) => {
+                eprintln!("surface projection begin error: {error}");
                 log::warn!(
                     "[web-channel] projection turn could not begin request_id={}: {error}",
                     self.ids.request_id
@@ -230,6 +228,7 @@ impl Surface {
         {
             Ok(projected) => projected,
             Err(error) => {
+                eprintln!("surface projection call error: {error}");
                 log::warn!(
                     "[web-channel] output event not projected request_id={}: {error}",
                     self.ids.request_id
