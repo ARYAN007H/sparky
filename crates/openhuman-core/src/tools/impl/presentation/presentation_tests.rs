@@ -146,12 +146,13 @@ async fn assert_rejected_before_image_resolution(args: serde_json::Value, expect
         "invalid request should fail: {}",
         result.text()
     );
-    assert!(result.text().contains(expected), "{}", result.text());
-    assert_eq!(resolver.0.load(Ordering::SeqCst), 0, "image resolution ran");
+    let resolution_calls = resolver.0.load(Ordering::SeqCst);
+    let files_created = ws.path().join("Files").exists();
     assert!(
-        !ws.path().join("Files").exists(),
-        "invalid request created the artifact output directory"
+        resolution_calls == 0 && !files_created,
+        "expected zero image resolution calls and no artifact output; got {resolution_calls} calls, Files created={files_created}"
     );
+    assert!(result.text().contains(expected), "{}", result.text());
 }
 
 #[tokio::test]
