@@ -13,7 +13,7 @@
  * The scripted turn:
  *   Turn 1: goal_set → todo (five items, first in progress) → text
  *   Turn 2: todo (three completed, fourth in progress) → text
- *   Turn 3: todo (all five completed) → goal_complete → text
+ *   Turn 3: todo (all five completed) → goal_complete
  *
  * Verifies:
  *   G1.1 — after the scripted turn settles, the task card shows the objective
@@ -41,7 +41,6 @@ import { setMockBehavior, startMockServer, stopMockServer } from '../mock-server
 const LOG_PREFIX = '[chat-todos-goals]';
 const USER_ID = 'e2e-chat-todos-goals';
 const OBJECTIVE = 'Ship the v2 release notes';
-const CANARY_FINAL = 'canary-todos-goals-9a8b7c';
 
 const STEPS = [
   'Read the changelog',
@@ -87,8 +86,9 @@ const TURN_2_RESPONSES = [
 const TURN_3_RESPONSES = [
   // Turn 3: everything done, goal closed.
   toolCall('call_todo_3', 'todo', todoArgs(5)),
+  // goal_complete is terminal by the TinyAgents contract; it suppresses
+  // autonomous continuation, so there is no subsequent model text response.
   toolCall('call_goal_complete_1', 'goal_complete', JSON.stringify({})),
-  { content: `All five steps are done: ${CANARY_FINAL}` },
 ];
 
 /** The checklist's rendered items: `[content, status]` pairs, in list order. */
@@ -269,7 +269,7 @@ describe('Chat todos and goals', () => {
 
     const items = await readChecklist();
     expect(items.map(([, status]) => status)).toEqual(['done', 'done', 'done', 'done', 'done']);
-    expect(await textExists(CANARY_FINAL)).toBe(true);
+    expect(await readGoal()).toMatchObject({ status: 'done', objective: OBJECTIVE });
     console.log(`${LOG_PREFIX} G1.4: passed — all five done, goal complete`);
   });
 
@@ -298,7 +298,7 @@ describe('Chat todos and goals', () => {
       timeoutMsg: 'never switched back to the first thread',
     });
 
-    await browser.waitUntil(async () => (await readGoal())?.status === 'complete', {
+    await browser.waitUntil(async () => (await readGoal())?.status === 'done', {
       timeout: 30_000,
       timeoutMsg: `goal did not rehydrate; last: ${JSON.stringify(await readGoal())}`,
     });
