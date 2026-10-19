@@ -280,7 +280,12 @@ test("the storage area arms the core coverage lane, which covers every storage d
     // the always-on gates: there is no separate driver build of the core.
     assert.deepEqual(
       on.filter((id) => !id.startsWith("static:") && !id.endsWith("pnpm-install")),
-      ["rust-cov:test-modules", "rust-cov:rust-core-coverage"],
+      [
+        "rust-cov:test-modules",
+        "rust-cov:rust-core-coverage",
+        // ex63 frees the shared scratch disk once the core lcov is written.
+        ...(profile === "ex63" ? ["rust-cov:prune-coverage-binaries"] : []),
+      ],
       profile,
     );
     assert.equal(
@@ -298,6 +303,22 @@ test("the storage area arms the core coverage lane, which covers every storage d
   // Without the area (or a core change) the coverage lane stays off.
   const off = buildPlan({ profile: "hosted", areas: NONE });
   assert.equal(off.lanes.find((l) => l.name === "rust-cov").active, false);
+});
+
+test("ex63 prunes core coverage executables with no needs, after the core suite", () => {
+  const plan = buildPlan({ profile: "ex63", areas: { ...NONE, rustCore: true }, env: EX63_ENV });
+  const checks = plan.lanes.find((l) => l.name === "rust-cov").checks;
+  const names = checks.map((c) => c.name);
+  const prune = checks.find((c) => c.name === "prune-coverage-binaries");
+  assert.ok(names.indexOf("prune-coverage-binaries") > names.indexOf("rust-core-coverage"));
+  assert.deepEqual(prune.needs, []);
+  assert.equal(prune.when, true);
+  assert.match(prune.run, /prune-coverage-binaries\.sh target\/ci-private-coverage$/);
+  const hosted = buildPlan({ profile: "hosted", areas: { ...NONE, rustCore: true }, env: {} });
+  assert.equal(
+    hosted.lanes.flatMap((l) => l.checks).some((c) => c.name === "prune-coverage-binaries" && c.when),
+    false,
+  );
 });
 
 test("hosted matrix only spins up groups with active lanes", () => {
