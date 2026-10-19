@@ -73,21 +73,6 @@ pub fn create_stt_provider(
     Err(anyhow::anyhow!(DISABLED_MSG))
 }
 
-// ---------------------------------------------------------------------------
-// Event bus surface (mirrors `bus::publish_ptt_transcript_committed`)
-// ---------------------------------------------------------------------------
-
-/// No-op: with voice disabled there is no PTT dictation path to announce.
-pub fn publish_ptt_transcript_committed(
-    _thread_id: String,
-    _session_id: u64,
-    _text_len: usize,
-    _held_ms: u64,
-    _finalized_by_watchdog: bool,
-) {
-    log::debug!("[voice-stub] publish_ptt_transcript_committed ignored (voice disabled)");
-}
-
 // `live::ws::handle_live_voice_ws`: with voice off there are no live
 // providers, so the upgraded socket is dropped immediately.
 #[cfg(feature = "http-server")]

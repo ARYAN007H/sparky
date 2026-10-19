@@ -10,13 +10,11 @@
 //! ## Compile-time gate (`voice` feature)
 //!
 //! `pub mod voice;` is ALWAYS compiled — it is a facade. The real
-//! implementation (the submodules below)
-//! is gated behind the default-ON `voice` Cargo feature. When the feature is
-//! off, [`stub`] takes its place and exposes the same public surface that
-//! other-gated callers depend on (`create_stt_provider`,
-//! `effective_stt_provider`, `publish_ptt_transcript_committed`) with
-//! no-op / disabled-error bodies. Keeping the two surfaces in lockstep is
-//! enforced by the disabled-build check
+//! implementation (the submodules below) is gated behind the `voice` Cargo
+//! feature. When the feature is off, [`stub`] takes its place and exposes the
+//! same public surface that other-gated callers depend on (`create_stt_provider`
+//! and `effective_stt_provider`) with no-op / disabled-error bodies. Keeping
+//! the two surfaces in lockstep is enforced by the disabled-build check
 //! (`cargo check --no-default-features --features "<all-but-voice>"`): any
 //! signature drift fails that build.
 
@@ -26,10 +24,6 @@
 pub mod compile_status;
 pub use compile_status::VOICE_COMPILED_IN;
 
-#[cfg(feature = "voice")]
-pub mod bus;
-#[cfg(feature = "voice")]
-pub use bus::publish_ptt_transcript_committed;
 #[cfg(feature = "voice")]
 pub mod factory;
 #[cfg(feature = "voice")]
@@ -49,9 +43,9 @@ pub mod local_speech;
 pub mod postprocess;
 #[cfg(feature = "voice")]
 pub use factory::{
-    create_stt_provider, create_tts_provider, effective_stt_provider, effective_tts_provider,
-    ExternalSttProvider, ExternalTtsProvider, SttProvider, SttResult, TtsProvider,
-    DEFAULT_PIPER_VOICE, DEFAULT_STT_MODEL,
+    DEFAULT_PIPER_VOICE, DEFAULT_STT_MODEL, ExternalSttProvider, ExternalTtsProvider, SttProvider,
+    SttResult, TtsProvider, create_stt_provider, create_tts_provider, effective_stt_provider,
+    effective_tts_provider,
 };
 #[cfg(feature = "voice")]
 pub use ops::*;
