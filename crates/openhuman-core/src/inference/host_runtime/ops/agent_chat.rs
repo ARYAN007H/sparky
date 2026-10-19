@@ -548,9 +548,7 @@ pub async fn agent_chat_reply_for_controlled(
         ..
     } = target
     {
-        agent
-            .set_untrusted_input(true)
-            .map_err(anyhow::Error::msg)?;
+        agent.set_untrusted_input(true)?;
     }
     // A seeded turn replaces resume rather than adding to it.
     //

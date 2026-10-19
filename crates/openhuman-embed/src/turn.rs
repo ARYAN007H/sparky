@@ -49,8 +49,8 @@ use openhuman_core::security::turn_origin::AgentTurnOrigin;
 
 #[path = "turn_types.rs"]
 mod types;
-pub use types::{Route, TurnOutcome, TurnRequest};
 pub(crate) use types::{is_safe_endpoint_for_bearer, sanitize_url_for_display};
+pub use types::{Route, TurnOutcome, TurnRequest};
 #[path = "turn_control.rs"]
 mod control;
 
@@ -175,11 +175,11 @@ impl Turn {
     pub fn tools(
         mut self,
         factory: impl for<'a> Fn(
-            openhuman_core::agent::TurnContext<'a>,
-        ) -> openhuman_core::agent::HostTurnTools
-        + Send
-        + Sync
-        + 'static,
+                openhuman_core::agent::TurnContext<'a>,
+            ) -> openhuman_core::agent::HostTurnTools
+            + Send
+            + Sync
+            + 'static,
     ) -> Self {
         self.tools = Some(Arc::new(factory));
         self
@@ -617,7 +617,7 @@ async fn dispatch(
             let turn: futures_box::BoxFuture<'_, Result<AgentReply, CoreError>> =
                 Box::pin(async move {
                     use openhuman_core::inference::host_runtime::ops::{
-                        AgentChatTarget, agent_chat_reply_for_controlled,
+                        agent_chat_reply_for_controlled, AgentChatTarget,
                     };
                     let mut config = dispatch
                         .load_config()
@@ -663,7 +663,7 @@ async fn dispatch(
             let turn: futures_box::BoxFuture<'_, Result<AgentReply, CoreError>> =
                 Box::pin(async move {
                     use openhuman_core::inference::host_runtime::ops::{
-                        AgentChatTarget, agent_chat_reply_for_controlled,
+                        agent_chat_reply_for_controlled, AgentChatTarget,
                     };
                     let mut config = inner.config.clone();
                     let route = openhuman_core::config::schema::EphemeralRoute::from_params(
@@ -711,21 +711,22 @@ async fn dispatch(
                             spent.reasoning_tokens = report.reasoning_tokens;
                         }
                     }
-                    if let Err(error) = &outcome
-                        && let Some(refusal) =
+                    if let Err(error) = &outcome {
+                        if let Some(refusal) =
                             error.downcast_ref::<crate::budget::DispatchRefusal>()
-                    {
-                        return Err(CoreError::DispatchAdmission {
-                            method: AGENT_CHAT,
-                            source: *refusal,
-                            usage: report.usage.map(|spent| crate::complete::CompletionUsage {
-                                input_tokens: spent.input_tokens,
-                                output_tokens: spent.output_tokens,
-                                cached_tokens: spent.cached_tokens,
-                                reasoning_tokens: spent.reasoning_tokens,
-                                cost_usd: spent.cost_usd,
-                            }),
-                        });
+                        {
+                            return Err(CoreError::DispatchAdmission {
+                                method: AGENT_CHAT,
+                                source: *refusal,
+                                usage: report.usage.map(|spent| crate::complete::CompletionUsage {
+                                    input_tokens: spent.input_tokens,
+                                    output_tokens: spent.output_tokens,
+                                    cached_tokens: spent.cached_tokens,
+                                    reasoning_tokens: spent.reasoning_tokens,
+                                    cost_usd: spent.cost_usd,
+                                }),
+                            });
+                        }
                     }
                     if outcome.is_err() && report.structured_failed {
                         use crate::structured::{
