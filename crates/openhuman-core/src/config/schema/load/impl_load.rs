@@ -1,8 +1,8 @@
 use super::super::Config;
 use super::branches::pre_login_config_boxed;
 use super::dirs::{
-    default_action_dir, default_config_and_workspace_dirs, resolve_action_dir,
-    resolve_config_dirs_ignoring_env, resolve_runtime_config_dirs_with, ConfigResolutionSource,
+    ConfigResolutionSource, default_action_dir, default_config_and_workspace_dirs,
+    resolve_action_dir, resolve_config_dirs_ignoring_env, resolve_runtime_config_dirs_with,
 };
 use super::env::{EnvLookup, ProcessEnv, ProcessEnvWithoutWorkspace};
 use super::migrate::{
@@ -17,8 +17,8 @@ use std::path::Path;
 use std::sync::{Mutex, OnceLock};
 use tokio::fs;
 
-pub(crate) use super::config_file_read::parse_config_with_recovery;
 pub(crate) use super::config_file_read::CONFIG_OWNER_MISMATCH_MARKER;
+pub(crate) use super::config_file_read::parse_config_with_recovery;
 pub(super) use super::config_file_read::{
     describe_config_ownership, migration_source, parse_config_boxed, parse_toml_off_worker,
 };

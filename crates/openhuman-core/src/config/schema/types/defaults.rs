@@ -4,8 +4,8 @@ use directories::UserDirs;
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-use super::config::default_temperature_unsupported_models;
 use super::config::DEFAULT_TEMPERATURE;
+use super::config::default_temperature_unsupported_models;
 use super::model_ids::DEFAULT_MODEL;
 use crate::config::schema::*;
 

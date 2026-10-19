@@ -2,17 +2,20 @@
 
 use std::sync::{Arc, Mutex};
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 use async_trait::async_trait;
 use serde_json::json;
-use tinystoragedrivers::secrets::{crypto, KeyProvider};
+use tinystoragedrivers::secrets::{KeyProvider, crypto};
 use tinystoragedrivers::{CollectionSpec, DocumentStore, Precondition};
 
-use super::{apply_bootstrap, strip_bootstrap, ConfigRead, ConfigSource, ConfigSourceAnchor, FileConfigSource};
+use super::{
+    ConfigRead, ConfigSource, ConfigSourceAnchor, FileConfigSource, apply_bootstrap,
+    strip_bootstrap,
+};
 use crate::storage::Scope;
 
-use super::storage_schema::document_id;
 pub(crate) use super::storage_schema::CONFIG_COLLECTION;
+use super::storage_schema::document_id;
 
 /// The document field holding the encrypted TOML body (`enc2:` hex).
 const BODY_FIELD: &str = "toml_enc";
@@ -173,7 +176,10 @@ impl ConfigSource for DocumentConfigSource {
             tracing::debug!(scope = %self.scope.as_str(), "[config] no config document; reading the file");
             let read = self.file.read().await?;
             *self.observed_version.lock().unwrap() = None;
-            return Ok(ConfigRead { source_anchor: self.anchor(), ..read });
+            return Ok(ConfigRead {
+                source_anchor: self.anchor(),
+                ..read
+            });
         };
         // Bootstrap tables come from the file, whatever the document says.
         // Through the file source, so its corruption recovery (a `.bak`, a

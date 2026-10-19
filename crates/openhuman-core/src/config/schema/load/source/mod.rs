@@ -62,7 +62,11 @@ pub(crate) struct ConfigRead {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum ConfigSourceAnchor {
     File(std::path::PathBuf),
-    Document { backend: usize, scope: String, id: String },
+    Document {
+        backend: usize,
+        scope: String,
+        id: String,
+    },
 }
 
 /// A place a config's TOML text is read from and written to.

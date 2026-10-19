@@ -1,5 +1,5 @@
 use super::*;
-use crate::core::runtime::{context::CoreContext, DispatchCtx, DomainSet};
+use crate::core::runtime::{DispatchCtx, DomainSet, context::CoreContext};
 use serde_json::json;
 
 #[tokio::test]
@@ -191,7 +191,10 @@ async fn config_snapshot_cannot_be_saved_into_a_different_tenant_scope() {
         .chain()
         .find_map(|cause| cause.downcast_ref::<tinystoragedrivers::StorageError>())
         .expect("a save into a different source returns a typed conflict");
-    assert_eq!(storage_error.kind(), tinystoragedrivers::ErrorKind::Conflict);
+    assert_eq!(
+        storage_error.kind(),
+        tinystoragedrivers::ErrorKind::Conflict
+    );
 
     let tenant_b = {
         let _source = ForcedDocumentSource::new(
