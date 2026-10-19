@@ -169,7 +169,7 @@ fn legacy_voice_settings_boot_without_starting_retired_listeners() {
             let line = line.to_ascii_lowercase();
             (line.contains("[voice::") && line.contains("start"))
                 || ((line.contains("dictation listener") || line.contains("hotkey listener"))
-                && line.contains("start"))
+                    && line.contains("start"))
                 || (line.contains("always-on") && line.contains("voice") && line.contains("start"))
                 || (line.contains("capture listener") && line.contains("start"))
         })
