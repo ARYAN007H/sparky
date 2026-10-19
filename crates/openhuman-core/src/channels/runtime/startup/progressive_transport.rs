@@ -141,7 +141,7 @@ impl ProgressiveChannelTransport for ModuleChannel {
                     )
                     .await
                 {
-                    Ok(ChannelInteractionResult::Sent(outcome)) => Ok(map_edit_outcome(outcome)),
+                    Ok(ChannelInteractionResult::Sent(outcome)) => Ok(map_edit_outcome(*outcome)),
                     Ok(_) => Err(tinybus::Error::failed(
                         "channel returned an invalid edit result",
                     )),
@@ -214,13 +214,9 @@ fn map_edit_outcome(
         {
             Result::EditUnsupported
         }
-        _ => Result::Outcome(outcome),
+        _ => Result::Outcome(Box::new(outcome)),
     }
 }
-
-#[cfg(test)]
-#[path = "progressive_transport_tests.rs"]
-mod tests;
 
 fn receipt_matches_scope(
     receipt: &tinychannels_bus::channel::MessageReceipt,
@@ -250,3 +246,7 @@ fn receipt_contains_message(receipt: &tinychannels_bus::channel::MessageReceipt,
             .iter()
             .any(|part| part.platform_message_id == id)
 }
+
+#[cfg(test)]
+#[path = "progressive_transport_tests.rs"]
+mod tests;
