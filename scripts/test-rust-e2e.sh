@@ -208,7 +208,7 @@ fi
 # them with Cargo's default feature set makes the runner fail before a test can
 # execute. Keep this list in the same canonical source as `pnpm test:rust`.
 PRODUCT_FEATURES="$(bash "$REPO_ROOT/scripts/ci/product-features.sh")"
-# scripts/e2e-core.sh adds a storage driver (storage-mongodb) the product set lacks.
+# scripts/e2e-core.sh uses the product storage driver set.
 if [ -n "${OPENHUMAN_E2E_EXTRA_FEATURES:-}" ]; then
   PRODUCT_FEATURES="$PRODUCT_FEATURES,$OPENHUMAN_E2E_EXTRA_FEATURES"
 fi
