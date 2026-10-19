@@ -812,6 +812,14 @@ async fn voice_cloud_transcribe_registered_e2e() {
 // inject fakes without touching the filesystem.
 
 
+/// #5947 — `validate_only` is a dry run for **stt**, not only for tts.
+///
+/// It used to be checked inside the `"tts"` arm alone. Every provider the
+/// settings modal can reach maps to `"stt"`, so the modal's dry-run request
+/// fell through to a live transcription — the opposite of what "Test Key"
+/// promises. A reserved slug is used because it is the one dry-run answer that
+/// is fully determined with no network: there is no user-held key to check, so
+/// the handler reports success without calling a provider.
 #[tokio::test]
 async fn voice_test_provider_honours_validate_only_for_the_stt_workload() {
     let _env_lock = json_rpc_e2e_env_lock_async().await;

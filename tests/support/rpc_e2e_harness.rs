@@ -117,7 +117,8 @@ pub(crate) fn with_chat_completion_requests<T>(f: impl FnOnce(&mut Vec<Value>) -
 // different node. Matching entries are still served in strict FIFO order among
 // themselves, so a two-turn tool loop (tool_call turn, then terminal-text turn)
 // stays ordered.
-pub(crate) static FORCED_CHAT_COMPLETIONS: OnceLock<Mutex<VecDeque<ForcedChatCompletion>>> = OnceLock::new();
+pub(crate) static FORCED_CHAT_COMPLETIONS: OnceLock<Mutex<VecDeque<ForcedChatCompletion>>> =
+    OnceLock::new();
 
 #[derive(Clone)]
 pub(crate) struct ForcedChatCompletion {
@@ -128,7 +129,9 @@ pub(crate) struct ForcedChatCompletion {
     body: Value,
 }
 
-pub(crate) fn with_forced_chat_completions<T>(f: impl FnOnce(&mut VecDeque<ForcedChatCompletion>) -> T) -> T {
+pub(crate) fn with_forced_chat_completions<T>(
+    f: impl FnOnce(&mut VecDeque<ForcedChatCompletion>) -> T,
+) -> T {
     let mutex = FORCED_CHAT_COMPLETIONS.get_or_init(|| Mutex::new(VecDeque::new()));
     match mutex.lock() {
         Ok(mut guard) => f(&mut guard),
@@ -1165,4 +1168,3 @@ pub(crate) fn ensure_test_rpc_auth() {
         init_rpc_token(&token_dir).expect("init rpc auth token for json_rpc_e2e");
     });
 }
-

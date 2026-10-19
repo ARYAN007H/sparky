@@ -190,7 +190,6 @@ async fn json_rpc_cron_origin_delivery_lands_in_the_asking_thread_inner() {
     rpc_join.abort();
 }
 
-
 #[test]
 fn json_rpc_cron_add_run_list_round_trip_over_the_tinyflows_module() {
     run_json_rpc_e2e_on_agent_stack(
@@ -322,7 +321,6 @@ async fn json_rpc_cron_add_run_list_round_trip_over_the_tinyflows_module_inner()
     rpc_join.abort();
 }
 
-
 #[tokio::test]
 async fn json_rpc_workflow_run_definitions_and_runs_roundtrip() {
     let _env_lock = json_rpc_e2e_env_lock_async().await;
@@ -427,7 +425,6 @@ async fn json_rpc_workflow_run_definitions_and_runs_roundtrip() {
     api_join.abort();
     rpc_join.abort();
 }
-
 
 #[tokio::test]
 async fn json_rpc_workflows_lifecycle_round_trip() {
@@ -613,7 +610,6 @@ fn approval_gated_graph_json() -> Value {
 /// parked run rather than the already-completed one (cancelling a terminal run
 /// is an error).
 #[cfg(feature = "flows")]
-
 #[tokio::test]
 async fn json_rpc_flows_lifecycle_round_trip() {
     let _env_lock = json_rpc_e2e_env_lock_async().await;
@@ -838,7 +834,6 @@ async fn json_rpc_flows_lifecycle_round_trip() {
 /// `openhuman.flows_run_detached` controller (schema + handler wiring), not
 /// just the `ops::flows_run_detached` fn directly.
 #[cfg(feature = "flows")]
-
 #[tokio::test]
 async fn json_rpc_flows_run_detached_returns_before_run_completes() {
     let _env_lock = json_rpc_e2e_env_lock_async().await;
@@ -953,7 +948,6 @@ async fn json_rpc_flows_run_detached_returns_before_run_completes() {
 /// `openhuman.flows_update` controller (schema + handler wiring), not just
 /// the `ops::flows_update` fn directly.
 #[cfg(feature = "flows")]
-
 #[tokio::test]
 async fn json_rpc_flows_update_forces_require_approval_on_side_effect_graph() {
     let _env_lock = json_rpc_e2e_env_lock_async().await;
@@ -1049,7 +1043,6 @@ async fn json_rpc_flows_update_forces_require_approval_on_side_effect_graph() {
 /// end-to-end (schema + handler wiring), independent of the agent-backed
 /// `flows_discover`, which needs a provider.
 #[cfg(feature = "flows")]
-
 #[tokio::test]
 async fn json_rpc_flows_suggestion_lifecycle_methods_are_wired() {
     let _env_lock = json_rpc_e2e_env_lock_async().await;
@@ -1236,7 +1229,6 @@ fn opus_sonnet_demo_graph() -> Value {
 /// Runs on the agent-sized worker stack because the builder/scout turns and the
 /// agent-node run drive the full harness (deep async stacks).
 #[cfg(feature = "flows")]
-
 #[test]
 fn json_rpc_flows_full_arc_discover_build_create_run() {
     run_json_rpc_e2e_on_agent_stack(
@@ -1488,7 +1480,6 @@ async fn json_rpc_flows_full_arc_discover_build_create_run_inner() {
 /// Keep one valid and one invalid `flows_validate` wire call at the host
 /// boundary; the engine validation details are covered by TinyFlows.
 #[cfg(feature = "flows")]
-
 #[tokio::test]
 async fn json_rpc_flows_validate_wire_shape() {
     let _env_lock = json_rpc_e2e_env_lock_async().await;
@@ -1562,7 +1553,6 @@ async fn json_rpc_flows_validate_wire_shape() {
 
 /// `openhuman.flows_import` returns a native graph without persisting a flow row.
 #[cfg(feature = "flows")]
-
 #[tokio::test]
 async fn json_rpc_flows_import_does_not_persist() {
     let _env_lock = json_rpc_e2e_env_lock_async().await;
@@ -1622,7 +1612,6 @@ async fn json_rpc_flows_import_does_not_persist() {
 /// Composio source fails and is tolerated (the RPC still returns the HTTP half
 /// rather than erroring).
 #[cfg(feature = "flows")]
-
 #[tokio::test]
 async fn json_rpc_flows_list_connections_aggregates_secret_free() {
     let _env_lock = json_rpc_e2e_env_lock_async().await;
@@ -1821,7 +1810,6 @@ async fn json_rpc_workflow_run_engine_executes_builtin_to_completion_inner() {
     mock_join.abort();
 }
 
-
 #[tokio::test]
 async fn json_rpc_flows_strict_create_refuses_binding_to_undeclared_agent_field() {
     let _env_lock = json_rpc_e2e_env_lock_async().await;
@@ -1860,4 +1848,3 @@ async fn json_rpc_flows_strict_create_refuses_binding_to_undeclared_agent_field(
 // ---------------------------------------------------------------------------
 // Migration import guard: refusing the null memory driver (#5799)
 // ---------------------------------------------------------------------------
-

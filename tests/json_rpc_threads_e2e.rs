@@ -204,7 +204,6 @@ async fn json_rpc_thread_goal_and_todos_get_and_queue_remove_are_wired() {
     rpc_join.abort();
 }
 
-
 #[tokio::test]
 async fn json_rpc_thread_title_create_and_update() {
     let _env_lock = json_rpc_e2e_env_lock_async().await;
@@ -298,7 +297,6 @@ async fn json_rpc_thread_title_create_and_update() {
     api_join.abort();
     rpc_join.abort();
 }
-
 
 #[tokio::test]
 async fn json_rpc_thread_working_dir_binds_before_the_first_message() {
@@ -412,7 +410,6 @@ async fn json_rpc_thread_working_dir_binds_before_the_first_message() {
     rpc_join.abort();
 }
 
-
 #[tokio::test]
 async fn json_rpc_thread_not_found_errors_are_structured() {
     let _env_lock = json_rpc_e2e_env_lock_async().await;
@@ -479,7 +476,6 @@ async fn json_rpc_thread_not_found_errors_are_structured() {
     api_join.abort();
     rpc_join.abort();
 }
-
 
 #[tokio::test]
 async fn json_rpc_thread_generate_title_falls_back_when_provider_path_is_unavailable() {
@@ -589,7 +585,6 @@ async fn json_rpc_thread_generate_title_falls_back_when_provider_path_is_unavail
     api_join.abort();
     rpc_join.abort();
 }
-
 
 #[tokio::test]
 async fn json_rpc_thread_turn_state_lifecycle() {
@@ -800,7 +795,6 @@ async fn json_rpc_thread_turn_state_lifecycle() {
     rpc_join.abort();
 }
 
-
 #[tokio::test]
 async fn json_rpc_threads_token_usage_reads_persisted_thread_totals() {
     let _env_lock = json_rpc_e2e_env_lock_async().await;
@@ -989,7 +983,6 @@ fn seed_raw_transcript(workspace: &Path, stem: &str, thread_id: &str, body: &[&s
     }
     std::fs::write(raw_dir.join(format!("{stem}.jsonl")), buf).expect("write transcript");
 }
-
 
 #[tokio::test]
 async fn json_rpc_threads_transcript_get_projects_and_paginates() {
@@ -1417,7 +1410,6 @@ async fn json_rpc_threads_edit_message_truncates_and_restarts_turn_inner() {
     api_join.abort();
     rpc_join.abort();
 }
-
 
 #[test]
 fn json_rpc_threads_regenerate_truncates_and_restarts_turn() {

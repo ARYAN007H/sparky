@@ -46,7 +46,6 @@ async fn json_rpc_modules_list_reports_the_serving_source() {
 }
 
 #[cfg(feature = "modules")]
-
 #[tokio::test]
 async fn json_rpc_modules_browser_forget_sites_removes_learned_sites() {
     let _env_lock = json_rpc_e2e_env_lock_async().await;
@@ -122,7 +121,6 @@ async fn json_rpc_modules_browser_forget_sites_removes_learned_sites() {
     rpc_join.abort();
 }
 
-
 #[tokio::test]
 async fn json_rpc_tokenjuice_detect_and_cache_stats() {
     let _env_lock = json_rpc_e2e_env_lock_async().await;
@@ -157,7 +155,6 @@ async fn json_rpc_tokenjuice_detect_and_cache_stats() {
 
     rpc_join.abort();
 }
-
 
 #[tokio::test]
 async fn json_rpc_tokenjuice_settings_and_savings() {
@@ -234,7 +231,6 @@ async fn json_rpc_tokenjuice_settings_and_savings() {
 
     rpc_join.abort();
 }
-
 
 #[tokio::test]
 async fn json_rpc_tool_registry_lists_and_gets_entries() {
@@ -329,7 +325,6 @@ async fn json_rpc_tool_registry_lists_and_gets_entries() {
     rpc_join.abort();
 }
 
-
 #[tokio::test]
 async fn json_rpc_removed_harness_provisioning_is_unavailable() {
     let _env_lock = json_rpc_e2e_env_lock_async().await;
@@ -362,7 +357,6 @@ async fn json_rpc_removed_harness_provisioning_is_unavailable() {
     }
     rpc_join.abort();
 }
-
 
 #[test]
 fn json_rpc_prompt_injection_is_rejected_before_model_call() {
@@ -471,7 +465,6 @@ async fn json_rpc_prompt_injection_is_rejected_before_model_call_inner() {
     rpc_join.abort();
 }
 
-
 #[tokio::test]
 async fn json_rpc_plan_review_decide_unknown_and_invalid() {
     // The plan-review gate is in-memory and parks a live turn; over RPC we can
@@ -533,7 +526,6 @@ async fn json_rpc_plan_review_decide_unknown_and_invalid() {
     api_join.abort();
     rpc_join.abort();
 }
-
 
 #[tokio::test]
 async fn json_rpc_run_ledger_lifecycle() {
@@ -652,7 +644,6 @@ async fn json_rpc_run_ledger_lifecycle() {
     rpc_join.abort();
 }
 
-
 #[tokio::test]
 async fn json_rpc_rejects_non_object_params_with_clear_error() {
     let _env_lock = json_rpc_e2e_env_lock_async().await;
@@ -694,7 +685,6 @@ async fn json_rpc_rejects_non_object_params_with_clear_error() {
     rpc_join.abort();
 }
 
-
 #[tokio::test]
 async fn json_rpc_removed_screen_intelligence_methods_are_not_found() {
     let _env_lock = json_rpc_e2e_env_lock_async().await;
@@ -727,7 +717,6 @@ async fn json_rpc_removed_screen_intelligence_methods_are_not_found() {
     mock_join.abort();
     rpc_join.abort();
 }
-
 
 #[tokio::test]
 async fn json_rpc_app_state_snapshot_returns_runtime_shape() {
@@ -816,7 +805,9 @@ async fn json_rpc_app_state_snapshot_returns_runtime_shape() {
     rpc_join.abort();
 }
 
-
+/// Verify that when `chat_onboarding_completed` is unset in config.toml (fresh
+/// user), the `openhuman.app_state_snapshot` RPC surfaces the flag as `false`
+/// (its serde default). The field is deprecated but still surfaced for backward compat.
 #[tokio::test]
 async fn json_rpc_app_state_snapshot_chat_onboarding_defaults_false() {
     let _env_lock = json_rpc_e2e_env_lock_async().await;
@@ -994,7 +985,6 @@ async fn about_app_rpc_list_lookup_and_search() {
     rpc_join.abort();
 }
 
-
 #[tokio::test]
 async fn skills_uninstall_rpc_e2e() {
     let _env_lock = json_rpc_e2e_env_lock_async().await;
@@ -1104,6 +1094,13 @@ async fn skills_uninstall_rpc_e2e() {
 
 /// POST /rpc without any Authorization header → 401 with error=unauthorized.
 
+/// Task-sources CRUD + status + dry-run over JSON-RPC.
+///
+/// Exercises `openhuman.task_sources_{add,list,get,update,remove,status,
+/// list_tasks,preview_filter}` against an isolated HOME workspace. The
+/// fetch/preview paths require no network here: with no signed-in
+/// Composio session, `preview_filter` returns a clean JSON-RPC error
+/// rather than hanging.
 #[tokio::test]
 async fn json_rpc_task_sources_crud_and_status() {
     let _env_lock = json_rpc_e2e_env_lock_async().await;
@@ -1407,6 +1404,8 @@ async fn json_rpc_task_sources_fetch_pipeline_e2e() {
 /// the user-scope root (`$HOME/.openhuman/workflows/<slug>/`), which the temp
 /// `HOME` isolates per-test.
 
+/// E2E: the retired dictation and voice-server config methods are absent from
+/// the JSON-RPC surface.
 #[tokio::test]
 async fn json_rpc_retired_dictation_and_voice_server_methods_are_unknown() {
     let _env_lock = json_rpc_e2e_env_lock_async().await;
@@ -1450,7 +1449,6 @@ async fn json_rpc_retired_dictation_and_voice_server_methods_are_unknown() {
 // Self-contained: boots its own mock + core stack and tears them down. Appended
 // at the END of the file per the multi-agent coordination protocol (#3370 epic).
 // ─────────────────────────────────────────────────────────────────────────────
-
 
 #[tokio::test]
 async fn json_rpc_memory_diff_surface_is_gone_and_memory_still_answers() {

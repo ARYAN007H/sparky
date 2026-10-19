@@ -749,7 +749,3 @@ async fn json_rpc_wallet_network_defaults_returns_network_rows() {
     mock_join.abort();
     rpc_join.abort();
 }
-
-/// Verify that when `chat_onboarding_completed` is unset in config.toml (fresh
-/// user), the `openhuman.app_state_snapshot` RPC surfaces the flag as `false`
-/// (its serde default). The field is deprecated but still surfaced for backward compat.

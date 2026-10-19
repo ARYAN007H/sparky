@@ -25,6 +25,8 @@
 
 #![allow(dead_code)]
 
+#[path = "support/config_auth_harness.rs"]
+pub mod config_auth_harness;
 #[path = "support/env_guard.rs"]
 pub mod env_guard;
 #[path = "support/rpc_auth.rs"]
@@ -35,7 +37,5 @@ pub mod rpc_harness;
 pub mod scripted_stack;
 #[path = "support/tinyhumans_boot.rs"]
 pub mod tinyhumans_boot;
-#[path = "support/config_auth_harness.rs"]
-pub mod config_auth_harness;
 
 include!(concat!(env!("OUT_DIR"), "/in_process_mods.rs"));

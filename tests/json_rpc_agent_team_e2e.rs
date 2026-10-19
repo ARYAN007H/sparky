@@ -606,7 +606,6 @@ async fn json_rpc_agent_registry_manages_defaults_and_custom_agents() {
     rpc_join.abort();
 }
 
-
 #[test]
 fn json_rpc_protocol_auth_and_agent_hello() {
     run_json_rpc_e2e_on_agent_stack(
@@ -756,7 +755,6 @@ async fn json_rpc_protocol_auth_and_agent_hello_inner() {
     rpc_join.abort();
 }
 
-
 #[tokio::test]
 async fn json_rpc_agent_work_list_groups_runs_by_bucket() {
     let _env_lock = json_rpc_e2e_env_lock_async().await;
@@ -860,7 +858,6 @@ async fn json_rpc_agent_work_list_groups_runs_by_bucket() {
     api_join.abort();
     rpc_join.abort();
 }
-
 
 #[tokio::test]
 async fn json_rpc_agent_team_coordination_roundtrip() {
@@ -1210,7 +1207,6 @@ async fn json_rpc_agent_team_coordination_roundtrip() {
     rpc_join.abort();
 }
 
-
 #[tokio::test]
 async fn billing_rpc_e2e() {
     let _env_lock = json_rpc_e2e_env_lock_async().await;
@@ -1492,7 +1488,6 @@ async fn team_rpc_e2e() {
     mock_join.abort();
     rpc_join.abort();
 }
-
 
 #[test]
 fn json_rpc_agent_team_live_member_run_roundtrip() {
@@ -1895,7 +1890,6 @@ async fn json_rpc_agent_run_mode_set_and_get_round_trip() {
     rpc_join.abort();
 }
 
-
 #[tokio::test]
 async fn json_rpc_agent_context_breakdown_default_agent_returns_sections() {
     // `agent.context_breakdown` (wire method `openhuman.agent_context_breakdown`,
@@ -1963,7 +1957,6 @@ async fn json_rpc_agent_context_breakdown_default_agent_returns_sections() {
     api_join.abort();
     rpc_join.abort();
 }
-
 
 #[tokio::test]
 async fn json_rpc_commands_list_merges_builtins() {
@@ -2039,4 +2032,3 @@ async fn json_rpc_commands_list_merges_builtins() {
     api_join.abort();
     rpc_join.abort();
 }
-

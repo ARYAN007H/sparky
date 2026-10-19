@@ -90,7 +90,6 @@ async fn notification_settings_roundtrip_and_disabled_ingest_skip() {
     rpc_join.abort();
 }
 
-
 #[tokio::test]
 async fn credentials_crud_roundtrip() {
     // Tests the provider-credential lifecycle over the JSON-RPC transport:
@@ -591,7 +590,6 @@ async fn external_process_with_guessed_token_is_rejected() {
     rpc_join.abort();
 }
 
-
 #[tokio::test]
 async fn rpc_update_apply_can_be_disabled_by_config_policy() {
     let _env_lock = json_rpc_e2e_env_lock_async().await;
@@ -932,12 +930,3 @@ async fn auth_store_provider_credentials_writes_an_owner_only_store_file() {
     mock_join.abort();
     rpc_join.abort();
 }
-
-/// #5947 — `validate_only` is a dry run for **stt**, not only for tts.
-///
-/// It used to be checked inside the `"tts"` arm alone. Every provider the
-/// settings modal can reach maps to `"stt"`, so the modal's dry-run request
-/// fell through to a live transcription — the opposite of what "Test Key"
-/// promises. A reserved slug is used because it is the one dry-run answer that
-/// is fully determined with no network: there is no user-held key to check, so
-/// the handler reports success without calling a provider.

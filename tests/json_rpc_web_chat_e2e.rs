@@ -187,7 +187,6 @@ async fn json_rpc_web_chat_routing_cases_use_expected_backend_models_inner() {
     rpc_join.abort();
 }
 
-
 #[test]
 fn json_rpc_web_chat_custom_chat_provider_uses_stored_key_and_rebuilds_on_route_change() {
     run_json_rpc_e2e_on_agent_stack(
@@ -582,7 +581,6 @@ async fn json_rpc_web_chat_custom_chat_provider_uses_stored_key_and_rebuilds_on_
     rpc_join.abort();
 }
 
-
 #[test]
 fn json_rpc_web_chat_custom_chat_provider_with_auth_none_omits_auth_header() {
     run_json_rpc_e2e_on_agent_stack(
@@ -806,7 +804,6 @@ async fn json_rpc_web_chat_custom_chat_provider_with_auth_none_omits_auth_header
     rpc_join.abort();
 }
 
-
 #[test]
 fn json_rpc_channel_web_chat_with_speak_reply_invokes_reply_speech() {
     run_json_rpc_e2e_on_agent_stack(
@@ -931,6 +928,3 @@ async fn json_rpc_channel_web_chat_with_speak_reply_invokes_reply_speech_inner()
 }
 
 // ── Model resolution and voice settings ─────────────────────────────────
-
-/// E2E: the retired dictation and voice-server config methods are absent from
-/// the JSON-RPC surface.

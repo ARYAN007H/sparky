@@ -28,13 +28,14 @@ pub use openhuman_core::config::schema::{
 };
 pub use openhuman_core::config::{
     clear_active_user, default_projects_dir, pre_login_user_dir, read_active_user_id,
-    user_openhuman_dir, write_active_user_id, Config, DaemonConfig,
-    UpdateRestartStrategy,
+    user_openhuman_dir, write_active_user_id, Config, DaemonConfig, UpdateRestartStrategy,
 };
 pub use openhuman_core::core::events::DomainEvent;
 pub use openhuman_core::desktop::app_state::app_state_schemas;
 pub use openhuman_core::security::credentials::bus::SessionExpiredSubscriber;
-pub use openhuman_core::security::credentials::profiles::{AuthProfile, AuthProfilesStore, TokenSet};
+pub use openhuman_core::security::credentials::profiles::{
+    AuthProfile, AuthProfilesStore, TokenSet,
+};
 pub use openhuman_core::security::credentials::{
     clear_composio_api_key, decrypt_secret, encrypt_secret, get_composio_api_key,
     list_provider_credentials_by_prefix, normalize_provider, rpc_store_composio_api_key,
@@ -131,7 +132,10 @@ pub(crate) fn bearer(headers: &HeaderMap) -> Option<&str> {
         .and_then(|value| value.to_str().ok())
 }
 
-pub(crate) async fn mock_auth_me(State(state): State<MockBackendState>, headers: HeaderMap) -> Json<Value> {
+pub(crate) async fn mock_auth_me(
+    State(state): State<MockBackendState>,
+    headers: HeaderMap,
+) -> Json<Value> {
     state.auth_me_hits.fetch_add(1, Ordering::SeqCst);
     let auth = bearer(&headers).unwrap_or_default();
     Json(json!({
@@ -227,7 +231,9 @@ pub(crate) fn encrypt_handoff_blob(key: &str, plaintext: &str) -> String {
     base64::engine::general_purpose::STANDARD.encode(combined)
 }
 
-pub(crate) async fn mock_revoke_integration(AxumPath(_integration_id): AxumPath<String>) -> Json<Value> {
+pub(crate) async fn mock_revoke_integration(
+    AxumPath(_integration_id): AxumPath<String>,
+) -> Json<Value> {
     Json(json!({ "success": true, "data": { "revoked": true } }))
 }
 
@@ -329,4 +335,3 @@ pub(crate) fn schema_method_names(value: &Value, namespace: &str) -> Vec<String>
     methods.sort();
     methods
 }
-

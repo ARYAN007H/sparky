@@ -863,4 +863,3 @@ async fn mcp_clients_registry_settings_roundtrip() {
     mock_join.abort();
     rpc_join.abort();
 }
-
