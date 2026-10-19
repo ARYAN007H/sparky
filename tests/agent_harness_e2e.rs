@@ -15,6 +15,9 @@
 mod env_guard;
 #[path = "support/linked_modules.rs"]
 mod linked_modules;
+#[cfg(feature = "mcp")]
+#[path = "support/local_mcp_http.rs"]
+mod local_mcp_http;
 #[path = "support/scripted_stack.rs"]
 mod scripted_stack;
 #[path = "support/tinyhumans_boot.rs"]
@@ -3394,44 +3397,49 @@ const REGISTRY_MCP_SERVER: &str = "io.github.harness/echo";
 #[cfg(feature = "mcp")]
 const MCP_ECHO_CANARY: &str = "MCP_ECHO_CANARY_91c2";
 
-/// An official-registry record whose npm package launches the hermetic stub.
-///
-/// `runtimeHint` replaces the `npx` launcher (`official/types.rs`
-/// `to_example_config`), and the stub ignores the `-y <identifier>` it is given.
+/// An official-registry record pointing to the local, protocol-speaking fixture.
 #[cfg(feature = "mcp")]
-fn registry_mcp_record() -> Value {
+fn registry_mcp_record(endpoint: &str) -> Value {
     json!({
         "name": REGISTRY_MCP_SERVER,
         "title": "Harness Echo",
         "description": "Echoes a message back.",
-        "remotes": [],
-        "packages": [{
-            "registryType": "npm",
-            "identifier": "@harness/echo",
-            "runtimeHint": env!("CARGO_BIN_EXE_test-mcp-stub"),
-            "environmentVariables": []
-        }]
+        "remotes": [{ "type": "streamable-http", "url": endpoint }]
     })
 }
 
 /// The official registry's list and versions endpoints, serving one server.
 #[cfg(feature = "mcp")]
-async fn serve_mcp_registry_fixture() -> (
+async fn serve_mcp_registry_fixture(
+    endpoint: &str,
+) -> (
     SocketAddr,
     tokio::task::JoinHandle<Result<(), std::io::Error>>,
 ) {
-    async fn list() -> Json<Value> {
+    async fn list(endpoint: String) -> Json<Value> {
         Json(json!({
-            "servers": [{ "server": registry_mcp_record() }],
+            "servers": [{ "server": registry_mcp_record(&endpoint) }],
             "metadata": { "nextCursor": "" }
         }))
     }
-    async fn versions() -> Json<Value> {
-        Json(json!({ "servers": [{ "server": registry_mcp_record() }] }))
+    async fn versions(endpoint: String) -> Json<Value> {
+        Json(json!({ "servers": [{ "server": registry_mcp_record(&endpoint) }] }))
     }
     let app = Router::new()
-        .route("/v0/servers", get(list))
-        .route("/v0/servers/{name}/versions", get(versions));
+        .route(
+            "/v0/servers",
+            get({
+                let endpoint = endpoint.to_owned();
+                move || list(endpoint.clone())
+            }),
+        )
+        .route(
+            "/v0/servers/{name}/versions",
+            get({
+                let endpoint = endpoint.to_owned();
+                move || versions(endpoint.clone())
+            }),
+        );
     serve_on_ephemeral(app).await
 }
 
@@ -3459,7 +3467,8 @@ fn agent_calls_a_tool_on_an_mcp_server_installed_from_the_registry() {
 #[cfg(feature = "mcp")]
 async fn agent_calls_a_tool_on_an_mcp_server_installed_from_the_registry_inner() {
     let _lock = env_lock();
-    let (registry_addr, registry_join) = serve_mcp_registry_fixture().await;
+    let mcp_server = local_mcp_http::LocalMcpHttpServer::start_echo().await;
+    let (registry_addr, registry_join) = serve_mcp_registry_fixture(mcp_server.endpoint()).await;
     let _registry = EnvVarGuard::set(
         "MCP_OFFICIAL_REGISTRY_BASE",
         format!("http://{registry_addr}"),
@@ -3485,7 +3494,8 @@ async fn agent_calls_a_tool_on_an_mcp_server_installed_from_the_registry_inner()
     );
 
     // Declared in mcp.json (the registry is browse-only) and connected.
-    let server_id = declare_and_connect_registry_echo_server(&stack.rpc_base, 801).await;
+    let server_id =
+        declare_and_connect_registry_echo_server(&stack.rpc_base, 801, mcp_server.endpoint()).await;
 
     // Used: the orchestrator discovers the schema, then calls the tool itself.
     reset_script(vec![
@@ -3538,22 +3548,27 @@ async fn agent_calls_a_tool_on_an_mcp_server_installed_from_the_registry_inner()
         result.contains(MCP_ECHO_CANARY),
         "the MCP server's answer did not reach the model: {result}"
     );
+    assert_echo_call(&mcp_server, MCP_ECHO_CANARY);
 
     registry_join.abort();
     stack.shutdown();
 }
 
-/// Declare the registry's echo server in `mcp.json` the way a user who found
-/// it in the registry tab would — by its command, pointed at the stub — through
-/// the settings RPCs, connect it, and return its server id.
+/// Declare the registry's echo server in `mcp.json` by its discovered endpoint,
+/// connect it through settings RPCs, and return its server id. Registry data
+/// remains browse-only and never grants operator trust.
 #[cfg(feature = "mcp")]
-async fn declare_and_connect_registry_echo_server(rpc_base: &str, first_rpc_id: i64) -> String {
+async fn declare_and_connect_registry_echo_server(
+    rpc_base: &str,
+    first_rpc_id: i64,
+    endpoint: &str,
+) -> String {
     let declared = post_json_rpc(
         rpc_base,
         first_rpc_id,
         "openhuman.mcp_clients_config_set",
         json!({ "mcpServers": { REGISTRY_MCP_SERVER: {
-            "command": env!("CARGO_BIN_EXE_test-mcp-stub"),
+            "url": endpoint,
             // Off until the explicit connect below, so the background connect
             // config_set would otherwise start cannot race it.
             "enabled": false
@@ -3695,7 +3710,8 @@ async fn orchestrator_calls_a_connected_mcp_tool_directly_inner() {
     let _ttl = EnvVarGuard::set("OPENHUMAN_APPROVAL_TTL_SECS", "120");
     ensure_approval_gate().await;
     let _approval_bridge = register_approval_bridge();
-    let (registry_addr, registry_join) = serve_mcp_registry_fixture().await;
+    let mcp_server = local_mcp_http::LocalMcpHttpServer::start_echo().await;
+    let (registry_addr, registry_join) = serve_mcp_registry_fixture(mcp_server.endpoint()).await;
     let _registry = EnvVarGuard::set(
         "MCP_OFFICIAL_REGISTRY_BASE",
         format!("http://{registry_addr}"),
@@ -3703,7 +3719,7 @@ async fn orchestrator_calls_a_connected_mcp_tool_directly_inner() {
     reset_script(Vec::new());
     let stack = boot_stack().await;
     // Connecting also writes the tool cache the orchestrator's surface reads.
-    declare_and_connect_registry_echo_server(&stack.rpc_base, 940).await;
+    declare_and_connect_registry_echo_server(&stack.rpc_base, 940, mcp_server.endpoint()).await;
 
     reset_script(vec![
         tool_call_completion(
@@ -3791,9 +3807,28 @@ async fn orchestrator_calls_a_connected_mcp_tool_directly_inner() {
         !result.contains("\"is_error\":true"),
         "the direct MCP call failed: {result}"
     );
+    assert_echo_call(&mcp_server, MCP_ECHO_CANARY);
 
     registry_join.abort();
     stack.shutdown();
+}
+
+#[cfg(feature = "mcp")]
+fn assert_echo_call(server: &local_mcp_http::LocalMcpHttpServer, expected: &str) {
+    let calls = server.tool_calls();
+    assert_eq!(
+        calls.len(),
+        1,
+        "expected one actual MCP tools/call: {calls:?}"
+    );
+    assert_eq!(calls[0].get("name").and_then(Value::as_str), Some("echo"));
+    assert_eq!(
+        calls[0]
+            .pointer("/arguments/message")
+            .and_then(Value::as_str),
+        Some(expected),
+        "the actual MCP server must receive the model's argument"
+    );
 }
 
 #[cfg(feature = "mcp")]
