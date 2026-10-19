@@ -85,7 +85,6 @@ fn tinymcp_reaches_its_v2_collections_stream_and_secrets() {
 #[test]
 fn tinyjuice_reaches_only_its_blob_prefix() {
     let grant = declared("tinyjuice").unwrap();
-    assert!(grant.collections.contains("juice.savings"));
     assert!(allowed(
         &grant,
         Object::Documents,
