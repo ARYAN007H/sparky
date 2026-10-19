@@ -299,12 +299,27 @@ async fn digest_treats_completed_with_warnings_as_success() {
     .unwrap();
     let run_id = run.value["thread_id"].as_str().unwrap().to_owned();
 
+    // The real run has already exercised the module-owned storage/projection
+    // path. Call the digest policy directly with the warning-success status so
+    // this test does not depend on a process-global subscriber registration.
+    for digest in stored_digests(&config, "f-warn").await {
+        crate::memory::ops::forget(
+            &config,
+            crate::memory::types::ForgetParams {
+                ids: vec![digest.id.0],
+                reach: None,
+            },
+        )
+        .await
+        .unwrap();
+    }
     let sub = FlowRunDigestSubscriber::new(config.clone());
-    sub.handle(&DomainEvent::FlowRunFinished {
-        flow_id: "f-warn".into(),
-        run_id,
-        status: "completed_with_warnings".into(),
-    })
+    sub.handle_finished(
+        crate::core::runtime::DispatchCtx::ambient(),
+        "f-warn",
+        &run_id,
+        "completed_with_warnings",
+    )
     .await;
 
     assert_eq!(stored_digests(&config, "f-warn").await.len(), 1);
