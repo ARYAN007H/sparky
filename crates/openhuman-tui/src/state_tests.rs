@@ -269,7 +269,7 @@ fn projected_voice_note_keeps_its_transcript_and_duration_label() {
             {
                 "kind": "userMessage",
                 "content": "Remind me about the dentist",
-                "extraMetadata": {"voiceNote": {"durationMs": 12000}}
+                "extraMetadata": {"voiceNote": {"noteId": "recording-1", "durationMs": 12000}}
             }
         ]}}
     }));
@@ -277,6 +277,27 @@ fn projected_voice_note_keeps_its_transcript_and_duration_label() {
         state.entries()[0].text,
         "[voice note 0:12] Remind me about the dentist"
     );
+}
+
+#[test]
+fn projected_spoken_replies_show_voice_note_and_known_duration_labels() {
+    let mut state = TranscriptState::new(CLIENT);
+    state.load_transcript(&serde_json::json!({
+        "result": {"data": {"items": [
+            {
+                "kind": "assistantMessage",
+                "content": "I will remind you.",
+                "extraMetadata": {"voiceNote": {"noteId": "reply-1", "mime": "audio/wav", "durationMs": 8600}}
+            },
+            {
+                "kind": "assistantMessage",
+                "content": "I can say that aloud.",
+                "extraMetadata": {"voiceNote": {"noteId": "reply-2", "mime": "audio/wav", "visemes": [{"viseme": "aa"}]}}
+            }
+        ]}}
+    }));
+    assert_eq!(state.entries()[0].text, "[voice note 0:09] I will remind you.");
+    assert_eq!(state.entries()[1].text, "[voice note] I can say that aloud.");
 }
 
 #[test]
