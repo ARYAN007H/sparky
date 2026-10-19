@@ -25,8 +25,8 @@ pub(super) fn update_parked_run_document_for_test(
         CatalogStorageReply::Value { value } => value,
         CatalogStorageReply::Error { error } => panic!("run fixture read failed: {error:?}"),
     };
-    let stored: Option<CatalogVersionedDocument> = serde_json::from_value(value)
-        .expect("decode the module-created parked run document");
+    let stored: Option<CatalogVersionedDocument> =
+        serde_json::from_value(value).expect("decode the module-created parked run document");
     let mut stored = stored.expect("the parked run document must exist");
     update(&mut stored.doc);
 
@@ -315,10 +315,12 @@ async fn flows_resume_marks_a_checkpoint_with_an_incompatible_saved_child_failed
     let run_row = flows_get_run(&config, &thread_id).await.unwrap().value;
     assert_eq!(run_row.status, "failed");
     assert!(run_row.pending_approvals.is_empty());
-    assert!(run_row
-        .error
-        .as_deref()
-        .is_some_and(|value| value.contains(UNSUPPORTED_NESTED_CONDITIONAL_FAN_IN)));
+    assert!(
+        run_row
+            .error
+            .as_deref()
+            .is_some_and(|value| value.contains(UNSUPPORTED_NESTED_CONDITIONAL_FAN_IN))
+    );
     let flow = flows_get(&config, &created.value.id).await.unwrap().value;
     assert_eq!(flow.last_status.as_deref(), Some("failed"));
 }

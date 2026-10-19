@@ -259,7 +259,7 @@ pub fn spawn_flows_boot_reconcile(
                 }
             }
         });
-    }
+    };
     #[cfg(not(feature = "flows"))]
     log::debug!("[flows] flows feature disabled at compile time — no boot run reconciliation");
 }
