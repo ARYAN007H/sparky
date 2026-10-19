@@ -9,7 +9,6 @@ use crate::tools::implementations::system::security_for_tool_context;
 use std::path::Path;
 use tinyagents_harness::context::{RunConfig, RunContext};
 use tinyagents_harness::tool::ToolExecutionContext;
-use tinytools::ToolRunContext;
 use tinytools::WorkspaceDescriptor;
 
 /// A run context carrying a workspace descriptor rooted at `root`, exactly as
