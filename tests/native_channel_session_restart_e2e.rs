@@ -373,10 +373,24 @@ async fn wait_for_completion(state: &MockState, count: usize) {
 
 fn model_saw_user_text(request: &Value, text: &str) -> bool {
     request["messages"].as_array().is_some_and(|messages| {
-        messages
-            .iter()
-            .any(|message| message["role"] == "user" && message["content"].as_str() == Some(text))
+        messages.iter().any(|message| {
+            message["role"] == "user" && content_contains_text(&message["content"], text)
+        })
     })
+}
+
+fn content_contains_text(content: &Value, expected: &str) -> bool {
+    match content {
+        Value::String(text) => text.contains(expected),
+        Value::Array(parts) => parts.iter().any(|part| content_contains_text(part, expected)),
+        Value::Object(fields) => fields
+            .get("text")
+            .is_some_and(|text| content_contains_text(text, expected))
+            || fields
+                .get("content")
+                .is_some_and(|nested| content_contains_text(nested, expected)),
+        _ => false,
+    }
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
