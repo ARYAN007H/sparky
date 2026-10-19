@@ -21,6 +21,7 @@ pub mod policy;
 pub mod prompt_injection;
 pub mod scrub;
 pub mod secret_storage;
+pub(crate) mod transport;
 pub(crate) mod secure_open;
 pub mod turn_origin;
 
