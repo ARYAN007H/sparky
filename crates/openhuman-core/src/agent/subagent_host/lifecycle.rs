@@ -998,6 +998,7 @@ fn outcome_to_host(
         },
         SubagentOutcomeKind::Incomplete(incomplete) => SubagentRunStatus::Incomplete {
             reason: incomplete.reason,
+            failure_cause: None,
         },
         SubagentOutcomeKind::Cancelled => SubagentRunStatus::Cancelled,
     };
