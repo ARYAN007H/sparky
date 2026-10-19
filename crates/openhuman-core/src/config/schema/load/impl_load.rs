@@ -458,6 +458,7 @@ impl Config {
             version,
             anchor: Some(source_anchor.clone()),
         };
+        *self.context_overlay.lock().unwrap() = None;
 
         if let Some(snapshot) = self
             .context_snapshot

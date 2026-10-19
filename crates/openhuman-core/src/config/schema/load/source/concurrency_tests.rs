@@ -11,8 +11,7 @@ async fn agent_registry_rpc_preserves_document_conflicts() {
         Scope::new("tenant-rpc").unwrap(),
         keys(9),
     );
-    let mut seed = config_at(tmp.path(), "initial");
-    seed.output_language = Some("seed-language".into());
+    let seed = config_at(tmp.path(), "initial");
     seed.save().await.unwrap();
     let stale = Config::load_from_config_path(&seed.config_path, &seed.workspace_dir)
         .await
@@ -184,11 +183,13 @@ async fn external_config_conflict_refresh_keeps_derived_runtime_overrides() {
         Scope::new("tenant-refresh-overlay").unwrap(),
         keys(14),
     );
-    let seed = config_at(tmp.path(), "initial");
+    let mut seed = config_at(tmp.path(), "initial");
+    seed.output_language = Some("seed-language".into());
     seed.save().await.unwrap();
     let mut runtime_config = Config::load_from_config_path(&seed.config_path, &seed.workspace_dir)
         .await
         .unwrap();
+    let parent = CoreContext::for_test_with_config(DomainSet::full(), runtime_config.clone());
     assert!(runtime_config.mcp_client.enabled);
     assert!(!runtime_config.autonomy.enabled);
     assert!(runtime_config.memory.agent_id.is_none());
@@ -201,7 +202,6 @@ async fn external_config_conflict_refresh_keeps_derived_runtime_overrides() {
     runtime_config.composio.pin_host_credential(
         crate::config::schema::ComposioHostCredential::direct("overlay-only-test-secret"),
     );
-    let parent = CoreContext::for_test_with_config(DomainSet::full(), runtime_config.clone());
     let ctx = parent.derive_with(ContextOverlay::new(
         runtime_config,
         DomainSet::full(),
