@@ -8,7 +8,7 @@
 //! (web_chat regex list, triage whole-word list, loop-guard billing list).
 
 use super::*;
-use crate::agent::triage::evaluator::{classify_error, ArmError};
+use crate::agent::triage::evaluator::{ArmError, classify_error};
 use regex::Regex;
 
 /// `(case, input, error_type, source, retryable, retry_after_ms, provider,
@@ -652,8 +652,9 @@ fn shared_budget_matcher_reproduces_each_legacy_matcher_on_the_corpus() {
 #[test]
 fn loop_guard_halt_summaries_are_byte_identical() {
     use crate::inference::failure_copy::{
-        recoverable_identical_halt_summary, recoverable_no_progress_halt_summary,
-        terminal_inference_halt_summary, user_actionable_escalation, TerminalInferenceFailure,
+        TerminalInferenceFailure, recoverable_identical_halt_summary,
+        recoverable_no_progress_halt_summary, terminal_inference_halt_summary,
+        user_actionable_escalation,
     };
     assert_eq!(
         terminal_inference_halt_summary(

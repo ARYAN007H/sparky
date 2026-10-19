@@ -166,9 +166,10 @@ async fn a_stopped_turn_announces_cancelled_to_the_client_that_stopped_it() {
         cancel_reason: Some(reason), ..
     } if reason == "user_stop")
     );
-    assert!(seen
-        .iter()
-        .all(|event| event.context().client_id == "stopper"));
+    assert!(
+        seen.iter()
+            .all(|event| event.context().client_id == "stopper")
+    );
 }
 
 #[tokio::test]
@@ -263,10 +264,12 @@ async fn a_turn_stopped_before_its_config_resolved_cannot_be_closed() {
     let shared = Arc::new(Shared::default());
     let summarizer = WebSummarizer::new(shared.clone());
     let req = request("close-none", QueueDisposition::Interrupt);
-    assert!(summarizer
-        .grounded_close(&req, RUNNER_DEADLINE)
-        .await
-        .is_none());
+    assert!(
+        summarizer
+            .grounded_close(&req, RUNNER_DEADLINE)
+            .await
+            .is_none()
+    );
     assert!(summarizer.grounded_close(&req, RUNNER_IDLE).await.is_none());
 }
 

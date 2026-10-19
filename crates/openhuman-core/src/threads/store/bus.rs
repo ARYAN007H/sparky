@@ -36,7 +36,7 @@ use tinychannels_bus::ChannelMessage;
 use tinychannels_runtime::context::conversation_history_key;
 
 use super::{
-    append_message, ensure_thread, get_messages, ConversationMessage, CreateConversationThread,
+    ConversationMessage, CreateConversationThread, append_message, ensure_thread, get_messages,
 };
 
 static CONVERSATION_PERSISTENCE_HANDLE: OnceLock<SubscriptionHandle> = OnceLock::new();
