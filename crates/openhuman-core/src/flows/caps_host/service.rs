@@ -119,8 +119,8 @@ impl CapsHostService {
         opts: Value,
     ) -> tinybus::Result<Value> {
         let binding = Arc::clone(&self.0);
-        let scope = Arc::clone(&binding);
-        scope
+        let context = Arc::clone(&binding);
+        context
             .within(async move { memory(&binding).recall(&scope, &query, opts).await })
             .await
             .map_err(bus_error)
@@ -151,8 +151,8 @@ impl CapsHostService {
         value: Value,
     ) -> tinybus::Result<()> {
         let binding = Arc::clone(&self.0);
-        let scope = Arc::clone(&binding);
-        scope
+        let context = Arc::clone(&binding);
+        context
             .within(async move { memory(&binding).remember(&scope, &key, value).await })
             .await
             .map_err(bus_error)
@@ -160,8 +160,8 @@ impl CapsHostService {
 
     async fn memory_forget(&self, scope: String, key: String) -> tinybus::Result<()> {
         let binding = Arc::clone(&self.0);
-        let scope = Arc::clone(&binding);
-        scope
+        let context = Arc::clone(&binding);
+        context
             .within(async move { memory(&binding).forget(&scope, &key).await })
             .await
             .map_err(bus_error)
@@ -177,8 +177,15 @@ impl CapsHostService {
         ));
         self.0.agent_runs.lock().await.insert(handle.clone(), state);
         let binding = Arc::clone(&self.0);
+        let state = binding
+            .agent_runs
+            .lock()
+            .await
+            .get(&handle)
+            .cloned()
+            .expect("run state was inserted");
         tokio::spawn(async move {
-            if let Err(error) = service_agent::run_agent(binding.clone(), request).await {
+            if let Err(error) = service_agent::run_agent(binding.clone(), request, state).await {
                 if let Some(state) = binding.agent_runs.lock().await.get(&handle).cloned() {
                     let mut state = state.lock().await;
                     state.error = Some(error);
