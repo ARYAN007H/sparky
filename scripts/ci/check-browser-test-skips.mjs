@@ -11,7 +11,7 @@ export function untrackedSkipLines(patch) {
     if (!line.startsWith("+") || line.startsWith("+++")) continue;
     const source = line.slice(1);
     if (/^\s*\/\//.test(source)) continue;
-    if (!/\b(?:it|test|describe)\.skip\s*\(/.test(source)) continue;
+    if (!/\b(?:it|test|describe)\.skip\s*\(|\bthis\.skip\s*\(/.test(source)) continue;
     if (!/https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/issues\/\d+/.test(source)) {
       failures.push(source.trim());
     }

@@ -225,7 +225,7 @@ test.describe('Chat transcript stick-to-bottom', () => {
     await completeTurn(page, FIRST_PROMPT, 'FIRST-REPLY-END');
 
     const overflowing = await scrollState(page);
-    test.skip(
+    test.skip( // https://github.com/tinyhumansai/openhuman/issues/6563
       overflowing.scrollHeight <= overflowing.clientHeight + 200,
       'transcript did not overflow enough to scroll — viewport too tall for this fixture'
     );
@@ -291,7 +291,7 @@ test.describe('Chat transcript stick-to-bottom', () => {
     await completeTurn(page, FIRST_PROMPT, 'FIRST-REPLY-END');
 
     const first = await scrollState(page);
-    test.skip(
+    test.skip( // https://github.com/tinyhumansai/openhuman/issues/6563
       first.scrollHeight <= first.clientHeight + 200,
       'transcript did not overflow enough to scroll — viewport too tall for this fixture'
     );
@@ -384,7 +384,7 @@ test.describe('Chat transcript stick-to-bottom', () => {
     expect(threadA, 'thread A must have an id').not.toBeNull();
 
     const overflowing = await scrollState(page);
-    test.skip(
+    test.skip( // https://github.com/tinyhumansai/openhuman/issues/6563
       overflowing.scrollHeight <= overflowing.clientHeight + 200,
       'transcript did not overflow enough to scroll — viewport too tall for this fixture'
     );
