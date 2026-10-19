@@ -91,3 +91,21 @@ fn inbound_events_belong_to_the_inbound_domain_and_name_themselves() {
         assert_eq!(event.variant_name(), name);
     }
 }
+
+#[tokio::test]
+async fn a_module_that_never_saw_the_event_is_not_sent_it_again() {
+    // Modules off for the client: every call is refused as unavailable, which
+    // proves the event never reached the queues, so there is nothing to
+    // re-send and the direct path runs at once.
+    let mut off = active_config();
+    off.modules.enabled = false;
+    let client = crate::modules::ops::client(off);
+    let started = std::time::Instant::now();
+    let offered = offer(&active_config(), &client, event("u4")).await;
+    assert!(matches!(offered, Offered::Direct(ref why) if why.contains("ingest failed")));
+    assert!(
+        started.elapsed() < RESEND_PAUSE,
+        "re-sent an event the module never saw: {:?}",
+        started.elapsed()
+    );
+}
