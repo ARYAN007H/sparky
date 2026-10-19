@@ -51,6 +51,56 @@ fn classified_halt_returns_partial_work_without_provider_usage() {
     assert!(close.output.contains("403 Forbidden"), "{}", close.output);
 }
 
+#[test]
+fn classified_halt_summary_uses_typed_cause_when_halt_copy_conflicts() {
+    use tinyagents_harness::turn_outcome::ToolCallOutcome;
+
+    let outcome = TinyagentsTurnOutcome {
+        deferred_terminal: None,
+        text: String::new(),
+        resolved_route: None,
+        history: Vec::new(),
+        conversation: Vec::new(),
+        model_calls: 1,
+        tool_calls: 1,
+        input_tokens: 0,
+        output_tokens: 0,
+        cached_input_tokens: 0,
+        cost: tinyagents_harness::cost::CostTally::default(),
+        early_exit_tool: None,
+        hit_cap: false,
+        wrap_up_injected: false,
+        truncated: false,
+        breaker_halt: Some("Stopping after 1 attempt(s): blocked by the security policy".into()),
+        failure_cause: Some(tinyagents_harness::no_progress::ClassifiedStopCause {
+            class: "out_of_credits".into(),
+            operation: "search".into(),
+            summary: "Stopping after 1 attempt(s): budget exhausted".into(),
+        }),
+        tool_outcomes: vec![ToolCallOutcome {
+            call_id: "call".into(),
+            name: "search".into(),
+            arguments: serde_json::Value::Null,
+            success: false,
+            content: "credit limit reached".into(),
+            duration_ms: 0,
+        }],
+        compaction: None,
+    };
+
+    let close = classified_halt_close(&outcome).expect("classified halt");
+    assert!(
+        close.output.contains("inference budget"),
+        "typed out_of_credits cause must win over contradictory prose: {}",
+        close.output
+    );
+    assert!(
+        !close.output.contains("security settings"),
+        "the note's policy wording must not override the typed cause: {}",
+        close.output
+    );
+}
+
 /// The host adapter delegates generation and verification to TinyAgents while
 /// retaining its selected model, temperature, output cap and billing gauge.
 #[tokio::test]
