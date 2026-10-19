@@ -10,6 +10,9 @@ pub(crate) const MAX_SPAWN_DEPTH: usize = 3;
 pub use tinyinference_llm::model::budget::{
     Budget, BudgetExceeded, BudgetSnapshot, CallBudget, Spend, SpendLimits,
 };
+pub use tinyagents_harness::cost::{
+    DispatchRefusal, DispatchRefusalReason, PhysicalDispatchAdmission, PhysicalDispatchPermit,
+};
 
 /// OpenHuman's source-compatible carrier for the shared ledger and physical
 /// call reservation bounds. The owner harness performs the wrapping engine.

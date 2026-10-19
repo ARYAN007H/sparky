@@ -448,6 +448,7 @@ pub struct Completer {
     observers: Arc<CompleterObservers>,
     cancellation: crate::cancellation::Cancellation,
     budget: Option<crate::budget::ModelBudget>,
+    dispatch_admission: Option<Arc<dyn crate::budget::PhysicalDispatchAdmission>>,
 }
 
 impl std::fmt::Debug for Completer {
@@ -471,6 +472,7 @@ impl Completer {
             observers: Arc::new(CompleterObservers::default()),
             cancellation: Default::default(),
             budget: None,
+            dispatch_admission: None,
         }
     }
 
@@ -499,6 +501,15 @@ impl Completer {
     /// Enforce a shared run or per-turn budget before every provider call.
     pub fn budget(mut self, budget: crate::budget::ModelBudget) -> Self {
         self.budget = Some(budget);
+        self
+    }
+
+    /// Attach a host-owned physical-dispatch policy shared with other calls.
+    pub fn dispatch_admission(
+        mut self,
+        admission: Arc<dyn crate::budget::PhysicalDispatchAdmission>,
+    ) -> Self {
+        self.dispatch_admission = Some(admission);
         self
     }
 

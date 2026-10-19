@@ -70,6 +70,7 @@ pub(crate) enum TurnTarget {
 /// on, so a host can build it in one place and send it from another.
 pub struct Turn {
     budget: Option<crate::budget::ModelBudget>,
+    dispatch_admission: Option<Arc<dyn crate::budget::PhysicalDispatchAdmission>>,
     /// A narrower model-directed delegation depth for this turn (fanout leaves).
     spawn_depth_limit: Option<usize>,
     /// The native token this turn's run tree observes, minted by `send` and
@@ -111,6 +112,7 @@ impl Turn {
         Self {
             target,
             budget: None,
+            dispatch_admission: None,
             spawn_depth_limit: None,
             native_cancellation: None,
             request: TurnRequest::new(message),

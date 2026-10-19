@@ -476,6 +476,63 @@ async fn physical_observer_reports_each_structured_repair_dispatch() {
     }));
 }
 
+struct OneCallAdmission(std::sync::atomic::AtomicUsize);
+
+struct TestDispatchPermit;
+
+#[async_trait::async_trait]
+impl crate::budget::PhysicalDispatchAdmission for OneCallAdmission {
+    async fn acquire(
+        &self,
+    ) -> Result<Arc<dyn crate::budget::PhysicalDispatchPermit>, crate::budget::DispatchRefusal>
+    {
+        use std::sync::atomic::Ordering;
+
+        if self.0.fetch_add(1, Ordering::SeqCst) != 0 {
+            return Err(crate::budget::DispatchRefusal::new(
+                crate::budget::DispatchRefusalReason::CallLimit,
+            ));
+        }
+        Ok(Arc::new(TestDispatchPermit))
+    }
+}
+
+impl crate::budget::PhysicalDispatchPermit for TestDispatchPermit {
+    fn mark_dispatched(&self) -> Result<(), crate::budget::DispatchRefusal> {
+        Ok(())
+    }
+}
+
+#[tokio::test]
+async fn repair_cannot_exceed_dispatch_limit() {
+    let server = MockServer::start().await;
+    let replies = Arc::new(Mutex::new(0));
+    let replies_for_handler = Arc::clone(&replies);
+    Mock::given(method("POST"))
+        .and(path("/v1/chat/completions"))
+        .respond_with(move |_request: &wiremock::Request| {
+            let mut replies = replies_for_handler.lock().unwrap();
+            let text = if *replies == 0 { "invalid" } else { "{\"ok\":true}" };
+            *replies += 1;
+            ResponseTemplate::new(200).set_body_json(body(text, "stop"))
+        })
+        .mount(&server)
+        .await;
+    let admission = Arc::new(OneCallAdmission(std::sync::atomic::AtomicUsize::new(0)));
+    let request = CompletionRequest::new("repair-model", vec![ChatMessage::user("private")])
+        .response_format(ResponseFormat::JsonObject)
+        .structured_retries(1);
+
+    let result = completer(&server)
+        .dispatch_admission(admission)
+        .complete(request)
+        .await;
+
+    assert!(result.is_err(), "the refused repair must be terminal");
+    let requests = server.received_requests().await.expect("recording on");
+    assert_eq!(requests.len(), 1, "a refused repair must not reach the server");
+}
+
 #[test]
 fn json_reply_tolerates_one_code_fence() {
     assert_eq!(
