@@ -6,12 +6,12 @@
 //! ([`register`]). With this crate absent the mode answers
 //! `BACKEND_UNAVAILABLE:`.
 
-use openhuman_embed::__host::composio::{ComposioRoute, register_composio_route_builder};
+use openhuman_embed::__host::composio::{register_composio_route_builder, ComposioRoute};
 #[cfg(feature = "modules")]
-use openhuman_embed::__host::composio::{ProxyTarget, register_proxy_target};
+use openhuman_embed::__host::composio::{register_proxy_target, ProxyTarget};
+use openhuman_embed::__host::config::schema::COMPOSIO_MODE_BACKEND;
 #[cfg(feature = "modules")]
 use openhuman_embed::__host::config::Config;
-use openhuman_embed::__host::config::schema::COMPOSIO_MODE_BACKEND;
 
 use super::build_client;
 

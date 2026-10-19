@@ -1,7 +1,7 @@
 //! A real CLI host boot must tolerate pre-removal voice settings without
 //! starting the retired always-on listeners.
 
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::path::Path;

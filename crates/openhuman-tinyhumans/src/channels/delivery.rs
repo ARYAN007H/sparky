@@ -6,7 +6,7 @@
 
 use openhuman_embed::__host::channel_callback::ChannelCallbackCtx;
 use openhuman_embed::__host::security::credentials::session_support::{
-    BackendCredential, get_session_token, is_local_session_token,
+    get_session_token, is_local_session_token, BackendCredential,
 };
 use serde_json::json;
 use tinychannels_bus::module_progressive::{
