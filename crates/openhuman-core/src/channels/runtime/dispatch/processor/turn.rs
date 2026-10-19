@@ -438,6 +438,33 @@ pub(crate) async fn process_channel_runtime_message(
         }
         None => None,
     };
+    // Each surface has its own TinyAgents runner. Serialize the canonical
+    // durable transcript across those runners before entering shared agent
+    // execution, and retain the lease through provider delivery below. The
+    // runner's own lock is local to that runner and checks sessions in before
+    // egress, so it cannot cover this cross-surface boundary.
+    let lease_agent_id = selected_host
+        .as_ref()
+        .map(|host| host.definition.id.clone())
+        .or_else(|| tenant.agent.clone())
+        .unwrap_or_else(|| "orchestrator".to_owned());
+    let tenant_scope = crate::core::runtime::tenant::tenant_key(&tenant, "");
+    let _session_lease = match crate::agent::session_lease::SessionLease::acquire(
+        crate::agent::session_lease::SessionLeaseKey::new(
+            tenant_scope,
+            lease_agent_id,
+            session_key.clone(),
+        ),
+        None,
+    )
+    .await
+    {
+        Ok(lease) => lease,
+        Err(()) => {
+            tracing::warn!("[dispatch] channel session lease was cancelled");
+            return;
+        }
+    };
     let cancellation = tinyagents_harness::CancellationToken::new();
     let agent_call: std::pin::Pin<
         Box<dyn std::future::Future<Output = anyhow::Result<AgentTurnResponse>> + Send + '_>,
