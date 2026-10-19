@@ -135,23 +135,39 @@ fn legacy_voice_settings_boot_without_starting_retired_listeners() {
         "installing the local test credential failed"
     );
     let status = rpc(&base, "openhuman.voice_status", json!({}));
-    assert!(status.get("error").is_none(), "{status}");
+    let voice_enabled = status.get("error").is_none();
+    assert!(voice_enabled, "the voice RPC component must remain enabled");
+    let observed_engine = status
+        .pointer("/result/stt_engine")
+        .and_then(Value::as_str)
+        .unwrap_or_default();
     assert_eq!(
-        status.pointer("/result/stt_engine").and_then(Value::as_str),
-        Some("elevenlabs"),
-        "legacy non-default engine must survive host configuration load: {status}"
+        observed_engine, "elevenlabs",
+        "legacy non-default engine must survive host configuration load"
     );
 
     std::thread::sleep(Duration::from_millis(500));
     let logs = std::fs::read_to_string(log_path).unwrap();
+    let gated_startup_completed = logs.contains("login-gated services started concurrently");
     assert!(
-        logs.contains("login-gated services started concurrently"),
+        gated_startup_completed,
         "the credential-gated startup completion record is missing"
     );
+    let retired_listener_starts = logs
+        .lines()
+        .filter(|line| {
+            let line = line.to_ascii_lowercase();
+            ((line.contains("dictation listener") || line.contains("hotkey listener"))
+                && line.contains("start"))
+                || (line.contains("always-on") && line.contains("voice") && line.contains("start"))
+                || (line.contains("capture listener") && line.contains("start"))
+        })
+        .count();
     assert!(
-        !logs.contains("[voice::")
-            && !logs.contains("dictation listener")
-            && !logs.contains("hotkey listener"),
+        retired_listener_starts == 0,
         "retired voice listener startup record appeared during boot"
+    );
+    println!(
+        "[legacy-voice-boot] engine={observed_engine} voice_enabled={voice_enabled} gated_startup_completed={gated_startup_completed} retired_listener_starts={retired_listener_starts}"
     );
 }
