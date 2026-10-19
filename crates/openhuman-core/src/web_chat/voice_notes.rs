@@ -97,6 +97,7 @@ pub(crate) fn store_note(
     for (other, _) in KNOWN.iter().filter(|(e, _)| *e != ext) {
         let _ = std::fs::remove_file(root.join(format!("{id}.{other}")));
     }
+    let _ = std::fs::remove_file(root.join(format!("{id}.visemes.json")));
     std::fs::write(root.join(format!("{id}.{ext}")), bytes)
         .map_err(|e| format!("write voice note: {e}"))?;
     log::debug!(
@@ -134,9 +135,19 @@ pub(crate) fn reply_note_metadata(workspace: &Path, request_id: &str) -> Option<
     let id = reply_note_id(request_id);
     let root = dir(workspace);
     KNOWN.iter().find_map(|(ext, mime)| {
-        root.join(format!("{id}.{ext}"))
-            .is_file()
-            .then(|| json!({ "noteId": id, "mime": mime }))
+        if !root.join(format!("{id}.{ext}")).is_file() {
+            return None;
+        }
+        let mut metadata = json!({ "noteId": id, "mime": mime });
+        let viseme_path = root.join(format!("{id}.visemes.json"));
+        if let Ok(bytes) = std::fs::read(viseme_path) {
+            if let Ok(frames) = serde_json::from_slice::<Vec<tinyinference_voice::VisemeFrame>>(&bytes)
+                && !frames.is_empty()
+            {
+                metadata["visemes"] = json!(frames);
+            }
+        }
+        Some(metadata)
     })
 }
 
@@ -202,6 +213,7 @@ pub(crate) fn store_synthesized_reply(
     request_id: &str,
     audio_base64: &str,
     audio_mime: &str,
+    visemes: &[tinyinference_voice::VisemeFrame],
 ) -> bool {
     use base64::Engine as _;
     if audio_base64.is_empty() {
@@ -214,8 +226,20 @@ pub(crate) fn store_synthesized_reply(
             return false;
         }
     };
-    match store_note(workspace, &reply_note_id(request_id), audio_mime, &bytes) {
-        Ok(_) => true,
+    let id = reply_note_id(request_id);
+    match store_note(workspace, &id, audio_mime, &bytes) {
+        Ok(_) => {
+            if !visemes.is_empty() {
+                let path = dir(workspace).join(format!("{id}.visemes.json"));
+                if let Err(err) = serde_json::to_vec(visemes)
+                    .map_err(|err| err.to_string())
+                    .and_then(|encoded| std::fs::write(path, encoded).map_err(|err| err.to_string()))
+                {
+                    log::warn!("{LOG_PREFIX} could not store reply visemes request_id={request_id}: {err}");
+                }
+            }
+            true
+        }
         Err(err) => {
             log::warn!("{LOG_PREFIX} could not store reply audio request_id={request_id}: {err}");
             false

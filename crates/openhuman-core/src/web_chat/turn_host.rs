@@ -468,6 +468,7 @@ async fn speak_and_publish(
                     &request.request_id,
                     &outcome.value.audio_base64,
                     &outcome.value.audio_mime,
+                    &outcome.value.visemes,
                 );
                 log::debug!(
                     "[web_channel] reply_speech dispatched chars={} stored={stored} client_id={} thread_id={thread_id} request_id={}",
