@@ -10,7 +10,7 @@ pub struct AgentChatReply {
     /// The reply text. When `hit_cap` is set this is the turn's checkpoint.
     pub text: String,
     /// The turn paused at its iteration cap (see
-    /// [`OpenHumanSessionHost::last_turn_hit_cap`]).
+    /// [`OpenHumanSessionHost::last_turn_hit_cap`](crate::agent::OpenHumanSessionHost::last_turn_hit_cap).
     pub hit_cap: bool,
 }
 

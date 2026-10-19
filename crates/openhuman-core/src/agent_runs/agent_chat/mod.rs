@@ -13,6 +13,5 @@ pub use session_turn::{
 };
 
 pub(crate) use controllers::{
-    all_controller_schemas as all_inference_agent_chat_controller_schemas,
     all_registered_controllers as all_inference_agent_chat_registered_controllers,
 };

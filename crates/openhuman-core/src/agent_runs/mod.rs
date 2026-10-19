@@ -11,9 +11,7 @@ mod subagent_finalize;
 pub(crate) mod workflow_runs;
 pub(crate) mod worktree_schemas;
 
-pub(crate) use agent_chat::{
-    all_inference_agent_chat_controller_schemas, all_inference_agent_chat_registered_controllers,
-};
+pub(crate) use agent_chat::all_inference_agent_chat_registered_controllers;
 pub(crate) use agent_teams::{
     all_agent_team_controller_schemas, all_agent_team_registered_controllers,
 };

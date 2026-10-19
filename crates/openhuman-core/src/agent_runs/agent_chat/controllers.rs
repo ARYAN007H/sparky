@@ -99,10 +99,6 @@ pub(crate) fn schemas(function: &str) -> ControllerSchema {
     }
 }
 
-pub(crate) fn all_controller_schemas() -> Vec<ControllerSchema> {
-    vec![schemas("agent_chat"), schemas("agent_chat_simple")]
-}
-
 pub(crate) fn all_registered_controllers() -> Vec<RegisteredController> {
     vec![
         RegisteredController {
