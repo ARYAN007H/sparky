@@ -11,7 +11,8 @@ async fn agent_registry_rpc_preserves_document_conflicts() {
         Scope::new("tenant-rpc").unwrap(),
         keys(9),
     );
-    let seed = config_at(tmp.path(), "initial");
+    let mut seed = config_at(tmp.path(), "initial");
+    seed.output_language = Some("seed-language".into());
     seed.save().await.unwrap();
     let stale = Config::load_from_config_path(&seed.config_path, &seed.workspace_dir)
         .await
@@ -196,6 +197,7 @@ async fn external_config_conflict_refresh_keeps_derived_runtime_overrides() {
     runtime_config.memory.root = Some("team:runtime".into());
     runtime_config.mcp_client.enabled = false;
     runtime_config.autonomy.enabled = true;
+    runtime_config.output_language = None;
     runtime_config.composio.pin_host_credential(
         crate::config::schema::ComposioHostCredential::direct("overlay-only-test-secret"),
     );
@@ -210,6 +212,7 @@ async fn external_config_conflict_refresh_keeps_derived_runtime_overrides() {
         .await
         .unwrap();
     external.default_model = Some("external-winner".into());
+    external.default_temperature = 0.4;
     external.save().await.unwrap();
 
     let controller = crate::core::all::all_registered_controllers()
@@ -235,6 +238,8 @@ async fn external_config_conflict_refresh_keeps_derived_runtime_overrides() {
     })
     .await;
     assert_eq!(refreshed.default_model.as_deref(), Some("external-winner"));
+    assert!((refreshed.default_temperature - 0.4).abs() < f64::EPSILON);
+    assert!(refreshed.output_language.is_none());
     assert_eq!(
         refreshed.memory.agent_id.as_deref(),
         Some("runtime-memory-agent")

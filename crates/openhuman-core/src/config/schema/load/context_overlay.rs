@@ -47,7 +47,8 @@ impl ConfigContextOverlay {
     }
 
     pub(crate) fn reapply(&self, fresh: &Config) -> anyhow::Result<Config> {
-        let mut value = serde_json::to_value(fresh)?;
+        let fresh_persisted = serde_json::to_value(fresh)?;
+        let mut value = fresh_persisted.clone();
         for change in &self.changes {
             apply_change(&mut value, &change.path, change.value.clone());
         }
@@ -57,7 +58,11 @@ impl ConfigContextOverlay {
         result.document_snapshot =
             std::sync::Mutex::new(fresh.document_snapshot.lock().unwrap().clone());
         result.context_snapshot = fresh.context_snapshot.clone();
-        result.context_overlay = std::sync::Mutex::new(Some(Arc::new(self.clone())));
+        result.context_overlay = std::sync::Mutex::new(Some(Arc::new(Self {
+            base: fresh_persisted,
+            changes: self.changes.clone(),
+            runtime: self.runtime.clone(),
+        })));
         Ok(result)
     }
 }
@@ -101,9 +106,15 @@ fn apply_change(current: &mut Value, path: &[String], value: Option<Value>) {
         }
         return;
     };
-    let Some(object) = current.as_object_mut() else {
-        return;
-    };
+    if !current.is_object() {
+        if value.is_none() {
+            return;
+        }
+        *current = Value::Object(Default::default());
+    }
+    let object = current
+        .as_object_mut()
+        .expect("object created for nested config override");
     if rest.is_empty() {
         if let Some(value) = value {
             object.insert(key.clone(), value);
