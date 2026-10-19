@@ -1,6 +1,9 @@
 //! Channel startup wiring.
 
 mod callback;
+#[cfg(test)]
+#[path = "startup/callback_tests.rs"]
+mod callback_tests;
 mod chat_workload;
 mod credentials;
 mod delivery_import;

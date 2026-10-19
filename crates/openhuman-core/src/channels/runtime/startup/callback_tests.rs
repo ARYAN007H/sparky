@@ -1,0 +1,156 @@
+use super::*;
+
+use crate::channels::context::ChannelRuntimeContext;
+use crate::channels::runtime::dispatch::RuntimeChannelMessage;
+use crate::channels::Channel;
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex, OnceLock, Weak};
+use tinychannels_bus::channel::{
+    ChannelOutboundMessage, ChannelSendOutcome, MessageReceipt, OutboundContentPart,
+};
+use tinychannels_bus::module_progressive::{
+    ProgressiveTransportRequest, ProgressiveTransportResult,
+};
+use tinychannels_bus::{ChannelBackendRequest, ChannelBackendResult};
+use tinychannels_runtime::SendMessage;
+
+#[derive(Default)]
+struct RecordingChannel {
+    sent: tokio::sync::Mutex<Vec<ChannelOutboundMessage>>,
+}
+
+#[async_trait::async_trait]
+#[allow(deprecated)]
+impl Channel for RecordingChannel {
+    fn name(&self) -> &str {
+        "telegram"
+    }
+
+    async fn send(&self, _message: &SendMessage) -> anyhow::Result<()> {
+        anyhow::bail!("progressive native send must use the typed adapter")
+    }
+
+    async fn send_typed_with_receipt(
+        &self,
+        message: &ChannelOutboundMessage,
+    ) -> anyhow::Result<ChannelSendOutcome> {
+        self.sent.lock().await.push(message.clone());
+        Ok(ChannelSendOutcome {
+            receipt: MessageReceipt {
+                primary_platform_message_id: Some("telegram-message-7".into()),
+                platform_message_ids: vec!["telegram-message-7".into()],
+                ..Default::default()
+            },
+            ..Default::default()
+        })
+    }
+
+    async fn listen(
+        &self,
+        _tx: tokio::sync::mpsc::Sender<tinychannels_bus::ChannelMessage>,
+    ) -> anyhow::Result<()> {
+        Ok(())
+    }
+}
+
+fn callback_for(
+    channel: Arc<RecordingChannel>,
+) -> (ChannelHostCallbacks, Arc<ChannelRuntimeContext>) {
+    let mut channels = HashMap::new();
+    channels.insert(channel.name().to_owned(), channel as Arc<dyn Channel>);
+    let context = Arc::new(ChannelRuntimeContext {
+        relay_thread: None,
+        channels_by_name: Arc::new(channels),
+        turn_model_source: None,
+        default_provider: Arc::new("test-provider".into()),
+        tools_registry: Arc::new(Vec::new()),
+        system_prompt: crate::channels::ChannelSystemPrompt::fixed("test system"),
+        model: Arc::new("test-model".into()),
+        temperature: 0.0,
+        max_tool_iterations: 1,
+        conversation_histories: Arc::new(Mutex::new(HashMap::new())),
+        turn_model_source_cache: Arc::new(Mutex::new(HashMap::new())),
+        route_overrides: Arc::new(Mutex::new(HashMap::new())),
+        api_url: None,
+        inference_url: None,
+        reliability: Arc::new(crate::config::ReliabilityConfig::default()),
+        provider_runtime_options: crate::inference::provider::ProviderRuntimeOptions::default(),
+        workspace_dir: Arc::new(std::env::temp_dir()),
+        message_timeout_secs: 300,
+        multimodal: crate::config::MultimodalConfig::default(),
+        multimodal_files: crate::config::MultimodalFileConfig::default(),
+        config: None,
+        core: None,
+    });
+    let context_slot: Arc<OnceLock<Weak<ChannelRuntimeContext>>> = Arc::new(OnceLock::new());
+    assert!(context_slot.set(Arc::downgrade(&context)).is_ok());
+    let (dispatch, _receiver) = tokio::sync::mpsc::channel::<RuntimeChannelMessage>(1);
+    (
+        ChannelHostCallbacks::new(
+            &crate::core::runtime::DispatchCtx::host_default(),
+            Arc::new(crate::config::Config::default()),
+            context_slot,
+            dispatch,
+        ),
+        context,
+    )
+}
+
+#[tokio::test]
+async fn native_progressive_transport_dispatches_typed_content_through_configured_channel() {
+    let channel = Arc::new(RecordingChannel::default());
+    let (callback, _context) = callback_for(Arc::clone(&channel));
+    let parts = vec![OutboundContentPart::Content {
+        part: tinychannels_bus::ContentPart::Image {
+            media: tinychannels_bus::MediaReference {
+                url: Some("https://media.invalid/receipt.png".into()),
+                kind: tinychannels_bus::MediaKind::Image,
+                ..Default::default()
+            },
+            caption: Some("diagram".into()),
+            alt_text: None,
+        },
+    }];
+
+    let result = callback
+        .dispatch_controller_backend(ChannelBackendRequest::ProgressiveTransport(Box::new(
+            ProgressiveTransportRequest::SendTyped {
+                channel: "telegram".into(),
+                turn_id: Some("turn-11".into()),
+                channel_ref: Some(tinychannels_bus::ChannelRef {
+                    id: "telegram".into(),
+                    account_id: Some("bot-account-a".into()),
+                }),
+                conversation: Some(tinychannels_bus::ConversationRef {
+                    id: "chat-42".into(),
+                    thread_id: Some("topic-9".into()),
+                    ..Default::default()
+                }),
+                sequence: Some(3),
+                segment_index: Some(1),
+                idempotency_key: Some("turn-11:3:1".into()),
+                parts: parts.clone(),
+                text: "diagram attached".into(),
+            },
+        )))
+        .await
+        .expect("native progressive callback should dispatch through the channel adapter");
+
+    let ChannelBackendResult::ProgressiveTransport(result) = result else {
+        panic!("expected progressive transport result");
+    };
+    let ProgressiveTransportResult::Outcome(outcome) = *result else {
+        panic!("typed native send must return the complete provider outcome");
+    };
+    assert_eq!(
+        outcome.receipt.primary_platform_message_id.as_deref(),
+        Some("telegram-message-7")
+    );
+    let sent = channel.sent.lock().await;
+    assert_eq!(sent.len(), 1);
+    assert_eq!(sent[0].channel_ref.as_ref().unwrap().account_id.as_deref(), Some("bot-account-a"));
+    assert_eq!(sent[0].conversation_ref.as_ref().unwrap().thread_id.as_deref(), Some("topic-9"));
+    assert_eq!(sent[0].turn_id.as_deref(), Some("turn-11"));
+    assert_eq!(sent[0].idempotency_key, "turn-11:3:1");
+    assert_eq!(sent[0].parts, parts);
+}
