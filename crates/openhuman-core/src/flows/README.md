@@ -45,19 +45,19 @@ the engine, the capability seam).
 ### Saving a flow
 
 A graph arrives as raw JSON, from the canvas, an import, a draft promotion or
-an agent tool. `tinyflows::authoring::validate_and_migrate_graph` runs
-it through `tinyflows::migrate::migrate` to upgrade older schemas, deserializes
-it into a `WorkflowGraph`, and rejects anything `tinyflows::validate::validate`
-refuses. Engine-compatibility checks map topology problems onto
-`FlowValidationError`.
+an agent tool. OpenHuman calls TinyFlows' `Authoring.ValidateGraph` and
+`Authoring.ImportGraph` bus members for migration, validation and import
+normalization. Validation passes a per-call `ResolveWorkflow` callback so
+compatibility checks can inspect saved children in the caller's profile.
 
-Agent-authored graphs pass one more stack, `run_builder_gates` (a `tinyflows::gates::BuilderGateHost` over `builder_failures`) in
-[`ops/builder_gates.rs`](./ops/builder_gates.rs). It is the single definition of the author-time hard
+Agent-authored graphs pass one more stack, `run_builder_gates` in
+[`ops/builder_gates.rs`](./ops/builder_gates.rs), which calls TinyFlows'
+`Authoring.BuilderFailures` with a scoped `AuthoringHost`. It is the single definition of the author-time hard
 gates, run in increasing cost order and short-circuiting on the first failure:
 engine compatibility, binding resolvability, agent-ref resolvability,
-connection refs ([`ops/connection_ref_gate.rs`](./ops/connection_ref_gate.rs): a `composio:<toolkit>:<id>` ref
+connection refs ([`host_gates/connections.rs`](./host_gates/connections.rs): a `composio:<toolkit>:<id>` ref
 must name a connected account of the same toolkit as the slug), tool contracts
-([`ops/tool_contract_gate.rs`](./ops/tool_contract_gate.rs): the slug must exist in the live Composio catalog
+([`host_gates/tool_contracts.rs`](./host_gates/tool_contracts.rs): the slug must exist in the live Composio catalog
 and every required arg must be present), and required-arg resolvability.
 `propose_workflow`, `revise_workflow`, `edit_workflow`, `save_workflow`, and the
 `strict` create/update RPC path all route through it, so agent saves and UI
@@ -270,7 +270,8 @@ Top level:
 | `memory_tools.rs` | `FlowMemoryRecallTool`, `FlowMemoryRememberTool`, and the flow-memory tag helpers. |
 | `../agent/registry/agents/` | `workflow_builder/` and `flow_discovery/` built-in definitions and prompt builders. |
 | [`catalogue.rs`](./catalogue.rs) | `flow_entries` lists saved flows as `Workflow` entries with `WorkflowScope::Flow`, so the skill catalogue and `skill_search` show one list. |
-| [`node_contracts.rs`](./node_contracts.rs) | Host overlay on `tinyflows::catalog`'s node-kind contracts (which `tool_call` slugs resolve to Composio or native `oh:` tools, which trigger kinds dispatch here). |
+| [`node_contracts.rs`](./node_contracts.rs) | Host overlay on `Catalog.NodeKinds` returned over TinyBus (which `tool_call` slugs resolve to Composio or native `oh:` tools, which trigger kinds dispatch here). |
+| [`host_gates/`](./host_gates/) | OpenHuman stages served through the scoped TinyFlows `AuthoringHost` callback. |
 | `../skills/bundled/flow_authoring.rs` | Adapts Copilot `ListResources` to TinySkills materialization and scoped skill discovery. |
 | `tinyflows/` | The capability seam. See [tinyflows/README.md](tinyflows/README.md). |
 
@@ -281,7 +282,7 @@ Top level:
 | Definitions | `definitions.rs` (create, get, list, delete, duplicate), `updates.rs` (update, history, rollback), `validation.rs` (validate, import, migrate), `drafts.rs` |
 | Triggers | `triggers.rs` (set_enabled, bind/unbind, boot reconcile) |
 | Runs | `run.rs` (entry points), `execution.rs` (shared body, origin, notifications, Langfuse export), `run_rows.rs` (row writes, `RunRowFinalizer`), `resume.rs`, `run_management.rs` (cancel, list, prune, sweeps), `inference_readiness.rs` |
-| Gates and warnings | `builder_gates.rs`, `connection_ref_gate.rs`, `tool_contract_gate.rs`, `wiring_warnings.rs`, `approval_manifest.rs` |
+| Gates and manifests | `builder_gates.rs`, `approval_manifest.rs` |
 | Copilot and scout | `builder.rs`, `builder_toolset.rs`, `streaming.rs`, `trail_off.rs`, `discovery.rs` |
 | Catalog reads | `catalog.rs` (tool catalog search, tool contract), `connections.rs` (connection picker, required connections) |
 
@@ -292,8 +293,8 @@ Top level:
 - `ops::flows_create` / `ops::flows_update` (`ops/definitions.rs`,
   [`ops/updates.rs`](./ops/updates.rs)): the save paths that enforce born-disabled and forced
   approval.
-- `tinyflows::authoring::validate_and_migrate_graph`: the one
-  structural-validation door.
+- `Authoring.ValidateGraph` / `Authoring.ImportGraph`: module-owned graph
+  migration, validation and import over TinyBus.
 - `run_builder_gates` (`ops/builder_gates.rs`): the agent-authored hard-gate
   stack.
 - `RunRowFinalizer` ([`ops/run_rows.rs`](./ops/run_rows.rs)): drop guard that keeps a run row from
