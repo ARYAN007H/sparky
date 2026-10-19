@@ -2,9 +2,9 @@ use super::*;
 use crate::config::Config;
 use crate::integrations::composio::catalog::{seed_live_catalog_cache, ToolContract};
 use serde_json::{json, Value};
-use tinyflows_catalog::FlowConnection;
-use tinyflows::model::WorkflowGraph;
 use tempfile::TempDir;
+use tinyflows::model::WorkflowGraph;
+use tinyflows_catalog::FlowConnection;
 
 fn test_config(tmp: &TempDir) -> Config {
     let mut config = Config {
@@ -16,7 +16,6 @@ fn test_config(tmp: &TempDir) -> Config {
     std::fs::create_dir_all(&config.workspace_dir).unwrap();
     config
 }
-
 
 fn graph(value: Value) -> WorkflowGraph {
     let graph = tinyflows::migrate::deserialize_graph(value).expect("test graph deserializes");
@@ -583,7 +582,6 @@ async fn validate_tool_contracts_rejects_a_real_but_uncurated_action_on_a_static
     assert!(errors[0].contains("curated"), "{}", errors[0]);
 }
 
-
 #[tokio::test]
 async fn validate_tool_contracts_skips_expression_derived_and_native_slugs() {
     let config = Config::default();
@@ -604,7 +602,6 @@ async fn validate_tool_contracts_skips_expression_derived_and_native_slugs() {
     assert!(errors.is_empty(), "{errors:?}");
 }
 
-
 #[tokio::test]
 async fn validate_tool_contracts_skips_rather_than_rejects_when_the_catalog_is_unreachable() {
     // No seed for this toolkit and no live backend configured — the fetch
@@ -624,7 +621,6 @@ async fn validate_tool_contracts_skips_rather_than_rejects_when_the_catalog_is_u
         "a live-catalog fetch failure must skip, not reject: {errors:?}"
     );
 }
-
 
 #[tokio::test]
 async fn validate_tool_contracts_rejects_an_arg_name_not_in_the_input_schema() {
@@ -649,7 +645,6 @@ async fn validate_tool_contracts_rejects_an_arg_name_not_in_the_input_schema() {
     assert!(errors[0].contains("markdown_text"), "{}", errors[0]);
     assert!(errors[0].contains("get_tool_contract"), "{}", errors[0]);
 }
-
 
 #[tokio::test]
 async fn validate_tool_contracts_passes_the_real_arg_name_from_the_input_schema() {
@@ -711,7 +706,6 @@ async fn validate_tool_contracts_skips_arg_name_check_when_input_schema_is_unkno
     );
 }
 
-
 #[tokio::test]
 async fn validate_tool_contracts_allows_arbitrary_arg_names_when_schema_permits_additional_properties(
 ) {
@@ -749,4 +743,3 @@ async fn validate_tool_contracts_allows_arbitrary_arg_names_when_schema_permits_
         "additionalProperties: true must allow arbitrary arg names: {errors:?}"
     );
 }
-

@@ -48,10 +48,16 @@ async fn saved_workflow_callback_uses_its_captured_profile_over_the_bus() {
             .profile("authoring-bob"),
     );
     let shared_id = "same-child-id";
-    for (core, graph) in [(&alice, nested_conditional_fan_in()), (&bob, json!({
-        "nodes": [{"id":"start","kind":"trigger","name":"Start"}],
-        "edges": []
-    }))] {
+    for (core, graph) in [
+        (&alice, nested_conditional_fan_in()),
+        (
+            &bob,
+            json!({
+                "nodes": [{"id":"start","kind":"trigger","name":"Start"}],
+                "edges": []
+            }),
+        ),
+    ] {
         let core = Arc::clone(core);
         let config = config.clone();
         CoreContext::scope(core, async move {
@@ -70,10 +76,12 @@ async fn saved_workflow_callback_uses_its_captured_profile_over_the_bus() {
         .await;
     }
 
-    let alice_registration =
-        register(Arc::new(config.clone()), DispatchCtx::new(Arc::clone(&alice)))
-            .await
-            .unwrap();
+    let alice_registration = register(
+        Arc::new(config.clone()),
+        DispatchCtx::new(Arc::clone(&alice)),
+    )
+    .await
+    .unwrap();
     let bob_registration = register(Arc::new(config.clone()), DispatchCtx::new(Arc::clone(&bob)))
         .await
         .unwrap();
@@ -119,15 +127,18 @@ async fn saved_workflow_callback_uses_its_captured_profile_over_the_bus() {
         })
     );
     assert!(
-        alice_report
-            .errors
-            .iter()
-            .any(|error| {
-                error.code == "incompatible_referenced_workflow"
-                    && error.message.contains("unsupported_nested_conditional_fan_in")
-            }),
+        alice_report.errors.iter().any(|error| {
+            error.code == "incompatible_referenced_workflow"
+                && error
+                    .message
+                    .contains("unsupported_nested_conditional_fan_in")
+        }),
         "Alice must resolve her incompatible child: {:?}",
         alice_report.errors
     );
-    assert!(bob_report.errors.is_empty(), "Bob's safe child: {:?}", bob_report.errors);
+    assert!(
+        bob_report.errors.is_empty(),
+        "Bob's safe child: {:?}",
+        bob_report.errors
+    );
 }

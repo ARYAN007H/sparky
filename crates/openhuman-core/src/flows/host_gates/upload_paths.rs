@@ -50,4 +50,3 @@ pub(crate) fn validate_upload_paths(graph: &WorkflowGraph) -> Vec<String> {
     }
     errors
 }
-

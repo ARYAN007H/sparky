@@ -44,9 +44,9 @@ impl CopilotToolCatalog {
         })
         .map_err(|error| format!("could not load workflow node contracts: {error}"))
         .and_then(|contracts| serde_json::to_value(contracts).map_err(|error| error.to_string()))?
-            .as_array()
-            .cloned()
-            .ok_or_else(|| "workflow node contracts were not an array".to_string())?;
+        .as_array()
+        .cloned()
+        .ok_or_else(|| "workflow node contracts were not an array".to_string())?;
         let request = ToolCatalogRequest {
             node_kinds: node_kinds.clone(),
         };

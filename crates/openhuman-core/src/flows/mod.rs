@@ -24,15 +24,15 @@
 //! family must convert to the facade+stub shape (see `voice/`).
 
 mod agent_route;
+pub(crate) mod authoring_host;
 pub mod builder_host;
 pub(crate) mod builder_tools;
 mod builder_tools_connection_reads;
 pub mod bus;
-pub(crate) mod authoring_host;
-pub(crate) mod host_gates;
 pub mod catalogue;
 mod copilot_bus;
 mod draft_store;
+pub(crate) mod host_gates;
 pub mod memory_tools;
 pub mod node_contracts;
 pub mod ops;

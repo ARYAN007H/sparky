@@ -104,7 +104,9 @@ async fn flows_import_uses_the_tinyflows_authoring_module_in_a_cold_process() {
         );
         assert!(
             child_output.contains("running 1 test")
-                && child_output.contains("flows_import_uses_the_tinyflows_authoring_module_in_a_cold_process ... ok")
+                && child_output.contains(
+                    "flows_import_uses_the_tinyflows_authoring_module_in_a_cold_process ... ok"
+                )
                 && child_output.contains("1 passed; 0 failed"),
             "child must prove exactly one test ran:\n{child_output}"
         );

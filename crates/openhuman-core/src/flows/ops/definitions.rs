@@ -200,7 +200,8 @@ pub(crate) async fn load_engine_compatible_flow_graph(
 ) -> Result<Option<WorkflowGraph>, String> {
     let graph = load_flow_graph(config, id)?;
     if let Some(graph) = graph.as_ref() {
-        ensure_config_aware_engine_compatible(ctx, config, graph).await
+        ensure_config_aware_engine_compatible(ctx, config, graph)
+            .await
             .map_err(|error| format!("workflow_id '{id}' is engine-incompatible: {error}"))?;
     }
     Ok(graph)

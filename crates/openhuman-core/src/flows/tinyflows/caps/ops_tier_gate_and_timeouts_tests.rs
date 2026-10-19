@@ -506,9 +506,9 @@ async fn resolver_rejects_an_engine_incompatible_saved_graph() {
         ctx: crate::core::runtime::DispatchCtx::ambient(),
         config,
     }
-        .resolve(&flow.id)
-        .await
-        .expect_err("resolver must reject an incompatible legacy child");
+    .resolve(&flow.id)
+    .await
+    .expect_err("resolver must reject an incompatible legacy child");
     match error {
         EngineError::Capability(message) => assert!(
             message.contains("unsupported_nested_conditional_fan_in"),

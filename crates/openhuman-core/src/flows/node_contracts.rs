@@ -155,7 +155,9 @@ fn apply_host_overlay(contract: NodeKindContract) -> NodeKindContract {
 
 /// Every node-kind contract returned by Catalog.NodeKinds with this host's
 /// overlay applied, in the module's catalog order.
-pub async fn all_node_kind_contracts(config: &crate::config::Config) -> Result<Vec<NodeKindContract>, String> {
+pub async fn all_node_kind_contracts(
+    config: &crate::config::Config,
+) -> Result<Vec<NodeKindContract>, String> {
     let proxy = crate::modules::tinyflows::catalog_proxy(config).await?;
     let contracts: Vec<NodeKindContract> = proxy
         .call(tinyflows_bus::catalog::members::NODE_KINDS, ())
@@ -166,7 +168,10 @@ pub async fn all_node_kind_contracts(config: &crate::config::Config) -> Result<V
 
 /// The overlaid contract for one node kind, or `None` when the module catalog
 /// does not contain `kind`.
-pub async fn node_kind_contract(config: &crate::config::Config, kind: &str) -> Result<Option<NodeKindContract>, String> {
+pub async fn node_kind_contract(
+    config: &crate::config::Config,
+    kind: &str,
+) -> Result<Option<NodeKindContract>, String> {
     Ok(all_node_kind_contracts(config)
         .await?
         .into_iter()

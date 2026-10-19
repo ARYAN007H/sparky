@@ -67,13 +67,16 @@ impl Callbacks {
             let graph: tinyflows::model::WorkflowGraph =
                 serde_json::from_value(graph).map_err(|error| error.to_string())?;
             match stage.as_str() {
-                tinyflows_bus::host::TOOL_POLICY => Ok(crate::flows::host_gates::validate_upload_paths(&graph)),
-                tinyflows_bus::host::AGENT_REFERENCES => {
-                    Ok(crate::flows::host_gates::validate_agent_refs(&context, &config, &graph).await)
+                tinyflows_bus::host::TOOL_POLICY => {
+                    Ok(crate::flows::host_gates::validate_upload_paths(&graph))
                 }
-                tinyflows_bus::host::CONNECTIONS => {
-                    Ok(crate::flows::host_gates::validate_connection_refs(&context, &config, &graph).await)
-                }
+                tinyflows_bus::host::AGENT_REFERENCES => Ok(
+                    crate::flows::host_gates::validate_agent_refs(&context, &config, &graph).await,
+                ),
+                tinyflows_bus::host::CONNECTIONS => Ok(
+                    crate::flows::host_gates::validate_connection_refs(&context, &config, &graph)
+                        .await,
+                ),
                 tinyflows_bus::host::TOOL_CONTRACTS => {
                     Ok(crate::flows::host_gates::validate_tool_contracts(&config, &graph).await)
                 }
@@ -87,10 +90,8 @@ impl Callbacks {
     async fn lookup_tool_contract(&self, slug: String) -> BusResult<Option<ToolContract>> {
         let config = Arc::clone(&self.config);
         self.in_context(async move {
-            let Ok((contract, _)) = crate::integrations::composio::catalog::lookup_contract(
-                &config, &slug,
-            )
-            .await
+            let Ok((contract, _)) =
+                crate::integrations::composio::catalog::lookup_contract(&config, &slug).await
             else {
                 return Ok(None);
             };
@@ -119,54 +120,57 @@ impl ApprovalCallbacks {
         request: ClassifyManifestCandidatesRequest,
     ) -> BusResult<catalog::ClassifyManifestCandidatesResponse> {
         let config = Arc::clone(&self.0.config);
-        self.0.in_context(async move {
-            use crate::flows::tinyflows::caps::classify_composio_action_for_tier;
-            use crate::security::{GateDecision, SecurityPolicy};
-            use tinybox_bus::CommandClass;
-            use tinyflows_bus::catalog::{ManifestCandidate, ManifestClass};
+        self.0
+            .in_context(async move {
+                use crate::flows::tinyflows::caps::classify_composio_action_for_tier;
+                use crate::security::{GateDecision, SecurityPolicy};
+                use tinybox_bus::CommandClass;
+                use tinyflows_bus::catalog::{ManifestCandidate, ManifestClass};
 
-            let security = SecurityPolicy::from_config(
-                &config.autonomy,
-                &config.workspace_dir,
-                &config.action_dir,
-            );
-            let gated = |class: CommandClass| {
-                Some(ManifestClass {
-                    name: format!("{class:?}"),
-                    blocked: security.gate_decision(class) == GateDecision::Block,
-                    skip: false,
-                })
-            };
-            let mut classes = Vec::with_capacity(request.candidates.len());
-            for candidate in request.candidates {
-                let class = match candidate {
-                    ManifestCandidate::Http { .. } => gated(CommandClass::Network),
-                    ManifestCandidate::Code { .. } => gated(CommandClass::Write),
-                    ManifestCandidate::NativeTool { tool_name, args, .. } => {
-                        let class = crate::tools::native_ops::classify_tool_call(
-                            &config,
-                            &tool_name,
-                            &args,
-                        )
-                        .unwrap_or(CommandClass::Network);
-                        gated(class)
-                    }
-                    ManifestCandidate::ConnectorTool { slug, .. } => {
-                        let class = classify_composio_action_for_tier(&slug).await;
-                        Some(ManifestClass {
-                            name: format!("{class:?}"),
-                            blocked: security.gate_decision(class) == GateDecision::Block,
-                            skip: class == CommandClass::Read,
-                        })
-                    }
-                    ManifestCandidate::DynamicTool { .. } | ManifestCandidate::Agent { .. } => None,
+                let security = SecurityPolicy::from_config(
+                    &config.autonomy,
+                    &config.workspace_dir,
+                    &config.action_dir,
+                );
+                let gated = |class: CommandClass| {
+                    Some(ManifestClass {
+                        name: format!("{class:?}"),
+                        blocked: security.gate_decision(class) == GateDecision::Block,
+                        skip: false,
+                    })
                 };
-                classes.push(class);
-            }
-            Ok(classes)
-        })
-        .await
-        .map_err(|error| tinybus::Error::failed(error))
+                let mut classes = Vec::with_capacity(request.candidates.len());
+                for candidate in request.candidates {
+                    let class = match candidate {
+                        ManifestCandidate::Http { .. } => gated(CommandClass::Network),
+                        ManifestCandidate::Code { .. } => gated(CommandClass::Write),
+                        ManifestCandidate::NativeTool {
+                            tool_name, args, ..
+                        } => {
+                            let class = crate::tools::native_ops::classify_tool_call(
+                                &config, &tool_name, &args,
+                            )
+                            .unwrap_or(CommandClass::Network);
+                            gated(class)
+                        }
+                        ManifestCandidate::ConnectorTool { slug, .. } => {
+                            let class = classify_composio_action_for_tier(&slug).await;
+                            Some(ManifestClass {
+                                name: format!("{class:?}"),
+                                blocked: security.gate_decision(class) == GateDecision::Block,
+                                skip: class == CommandClass::Read,
+                            })
+                        }
+                        ManifestCandidate::DynamicTool { .. } | ManifestCandidate::Agent { .. } => {
+                            None
+                        }
+                    };
+                    classes.push(class);
+                }
+                Ok(classes)
+            })
+            .await
+            .map_err(|error| tinybus::Error::failed(error))
     }
 }
 
@@ -184,7 +188,10 @@ pub(crate) async fn register(
     config: Arc<Config>,
     context: DispatchCtx,
 ) -> Result<Registration, String> {
-    let path = format!("/ai/tinyhumans/openhuman/AuthoringHost/h{}", uuid::Uuid::new_v4().simple());
+    let path = format!(
+        "/ai/tinyhumans/openhuman/AuthoringHost/h{}",
+        uuid::Uuid::new_v4().simple()
+    );
     let callbacks = Callbacks {
         config,
         context,

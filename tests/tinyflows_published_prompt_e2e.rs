@@ -191,10 +191,15 @@ async fn published_module_public_import_uses_authoring_bus_in_a_cold_process() {
         print!("{stdout}");
         eprint!("{stderr}");
         let child_output = format!("{stdout}{stderr}");
-        assert!(output.status.success(), "published authoring child failed:\n{child_output}");
+        assert!(
+            output.status.success(),
+            "published authoring child failed:\n{child_output}"
+        );
         assert!(
             child_output.contains("running 1 test")
-                && child_output.contains("published_module_public_import_uses_authoring_bus_in_a_cold_process ... ok")
+                && child_output.contains(
+                    "published_module_public_import_uses_authoring_bus_in_a_cold_process ... ok"
+                )
                 && child_output.contains("1 passed; 0 failed"),
             "child must prove exactly one public-import test ran:\n{child_output}"
         );
@@ -290,6 +295,8 @@ async fn published_module_public_import_uses_authoring_bus_in_a_cold_process() {
         Some(legacy_graph),
     )
     .await
-    .expect_err("a failed Catalog operation must propagate instead of yielding an empty grant list");
+    .expect_err(
+        "a failed Catalog operation must propagate instead of yielding an empty grant list",
+    );
     assert!(error.contains("COMPONENT_DISABLED"), "{error}");
 }

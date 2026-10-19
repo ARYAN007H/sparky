@@ -85,7 +85,9 @@ pub(crate) async fn strict_gate(
 ) -> Result<(), String> {
     let graph = validate_and_migrate_graph(ctx, config, graph_json.clone())
         .await
-        .map_err(|error| format!("strict validation failed — the graph is structurally invalid:\n{error}"))?;
+        .map_err(|error| {
+            format!("strict validation failed — the graph is structurally invalid:\n{error}")
+        })?;
     let gate_errors = run_builder_gates(ctx, config, &graph).await;
     if !gate_errors.is_empty() {
         return Err(format!(

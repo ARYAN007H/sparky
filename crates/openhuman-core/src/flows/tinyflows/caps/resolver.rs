@@ -41,7 +41,9 @@ impl WorkflowResolver for OpenHumanWorkflowResolver {
             %workflow_id,
             "[flows] sub_workflow resolver: resolving workflow_id to a saved flow graph"
         );
-        let loaded = flows::ops::load_engine_compatible_flow_graph(&self.ctx, &self.config, workflow_id).await;
+        let loaded =
+            flows::ops::load_engine_compatible_flow_graph(&self.ctx, &self.config, workflow_id)
+                .await;
         match loaded {
             Ok(Some(graph)) => {
                 tracing::debug!(
