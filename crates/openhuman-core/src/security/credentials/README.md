@@ -109,7 +109,7 @@ across processes; the local file lock still serializes one host.
 - `crate::platform::llm_gate`: signed-out override flipped on install/removal/expiry.
 - `crate::memory::conversations`: purge pre-login threads, bind conversation persistence after activation.
 - `crate::memory`: bind memory client to the active workspace after activation.
-- `crate::inference::host_runtime`, `crate::voice::{server,dictation_listener}`: credential-gated services started/stopped.
+- `crate::inference::host_runtime`: the local runtime probe is reset on logout.
 - [`jwt.rs`](./jwt.rs): JWT `exp` decode and `user_id_from_profile_payload`.
 - `crate::core::all` (`ControllerFuture`, `RegisteredController`), `crate::core` (`ControllerSchema`/`FieldSchema`/`TypeSchema`), `crate::core::events::DomainEvent` + `tinybus::EventHandler`, `crate::rpc::RpcOutcome`: controller registry + RPC envelope + event bus.
 

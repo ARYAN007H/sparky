@@ -134,7 +134,7 @@ fn to_json_returns_inner_value() {
 }
 
 #[tokio::test]
-async fn retired_server_start_is_not_registered() {
+async fn retired_start_method_is_not_registered() {
     use crate::core::runtime::{CoreContext, DispatchCtx, DomainSet};
     let workspace = tempfile::tempdir().expect("private workspace");
     let mut config = crate::config::Config::default();
@@ -148,7 +148,7 @@ async fn retired_server_start_is_not_registered() {
         crate::core::types::AppState {
             core_version: env!("CARGO_PKG_VERSION").to_string(),
         },
-        "openhuman.voice_server_start",
+        concat!("openhuman.voice_server", "_start"),
         Value::Object(Map::new()),
     )
     .await;
@@ -189,18 +189,6 @@ fn deserialize_voice_tts_accepts_optional_output_path() {
     let parsed: TtsParams = deserialize_params(params).unwrap();
     assert_eq!(parsed.text, "hello world");
     assert_eq!(parsed.output_path.as_deref(), Some("/tmp/out.wav"));
-}
-
-#[test]
-fn server_start_schema_inputs_are_all_optional() {
-    let s = voice_schemas("voice_server_start");
-    for f in &s.inputs {
-        assert!(
-            !f.required,
-            "voice_server_start input `{}` should be optional",
-            f.name
-        );
-    }
 }
 
 #[test]

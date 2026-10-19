@@ -181,7 +181,7 @@ event.
 Server to client, `spawn_web_channel_bridge` spawns one forwarding task per
 source: web-chat events (`web_chat::subscribe_web_channel_events`, sent to
 the initiating client's room and the `thread:<id>` room, not broadcast),
-dictation hotkeys and transcription results (`voice::dictation_listener`),
+live voice session events,
 core notifications (`desktop::notifications`), and companion state. It also
 forwards a set of `DomainEvent`s read off `BUS`: session expiry, MCP setup
 secret requests, memory sync and tree-build progress, channel listener
