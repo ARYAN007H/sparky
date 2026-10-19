@@ -125,7 +125,7 @@ pub(crate) struct ForcedChatCompletion {
     /// this marker. `None` matches any request (strict FIFO).
     when_contains: Option<String>,
     /// The OpenAI-shape chat-completion body to return verbatim.
-    pub(crate) body: Value,
+    body: Value,
 }
 
 pub(crate) fn with_forced_chat_completions<T>(f: impl FnOnce(&mut VecDeque<ForcedChatCompletion>) -> T) -> T {
@@ -285,7 +285,7 @@ pub(crate) fn mock_upstream_router() -> Router {
     }
 
     fn require_string_field<'a>(
-        pub(crate) body: &'a Value,
+        body: &'a Value,
         field: &str,
     ) -> Result<&'a str, (StatusCode, Json<Value>)> {
         body.get(field)
@@ -301,7 +301,7 @@ pub(crate) fn mock_upstream_router() -> Router {
     }
 
     fn require_positive_f64_field(
-        pub(crate) body: &Value,
+        body: &Value,
         field: &str,
     ) -> Result<f64, (StatusCode, Json<Value>)> {
         body.get(field)
