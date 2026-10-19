@@ -349,6 +349,43 @@ fn composio_connect_is_not_advertised_when_the_tool_is_not_visible() {
     assert!(build(&ctx).unwrap().contains("`composio_connect`"));
 }
 
+#[test]
+fn withheld_specialist_roster_keeps_live_when_to_use_descriptions() {
+    use crate::agent_registry::host_definition::AgentDefinitionRegistry;
+
+    let registry = AgentDefinitionRegistry::init_global_builtins()
+        .expect("built-in agent definitions");
+    let orchestrator = registry.get("orchestrator").expect("orchestrator");
+    let (tool_name, description) = orchestrator
+        .subagents
+        .iter()
+        .filter_map(|entry| match entry {
+            SubagentEntry::AgentId(agent_id) if agent_id != "summarizer" => {
+                let target = registry.get(agent_id)?;
+                let tool_name = target
+                    .delegate_name
+                    .clone()
+                    .unwrap_or_else(|| format!("delegate_{}", target.id));
+                crate::tools::toolpacks::pack_for_tool(&tool_name)?;
+                Some((tool_name, target.when_to_use.clone()))
+            }
+            _ => None,
+        })
+        .next()
+        .expect("a built-in specialist is withheld by a tool pack");
+    let visible = ["unrelated_tool".to_string()].into_iter().collect();
+    let mut ctx = ctx_with(&[]);
+    ctx.visible_tool_names = &visible;
+
+    let body = build(&ctx).expect("orchestrator prompt");
+    assert!(body.contains(&format!("`{tool_name}`: {}", prompt_safe(&description))));
+}
+
+#[test]
+fn specialist_description_escaping_prevents_prompt_markup_injection() {
+    assert_eq!(prompt_safe("use `tool`\nnext"), "use 'tool'\\u{a}next");
+}
+
 fn gmail_only() -> Vec<ConnectedIntegration> {
     vec![ConnectedIntegration {
         toolkit: "gmail".into(),
