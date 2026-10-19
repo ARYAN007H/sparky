@@ -33,10 +33,14 @@ pub(super) async fn migrate_over_bus(
     config: &Config,
     graph: Value,
 ) -> Result<Value, String> {
-    validate_over_bus(ctx, config, graph)
-        .await?
-        .graph
-        .ok_or_else(|| "TinyFlows validation returned no graph".to_string())
+    let report = validate_over_bus(ctx, config, graph).await?;
+    report.graph.ok_or_else(|| {
+        report
+            .errors
+            .first()
+            .map(|error| error.message.clone())
+            .unwrap_or_else(|| "TinyFlows validation returned no graph".to_string())
+    })
 }
 
 fn is_engine_compatibility_error(code: &str) -> bool {
