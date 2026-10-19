@@ -9,8 +9,8 @@ use serde_json::json;
 use serde_json::Value;
 use tinybus::module::ModuleCallError;
 use tinychannels_bus::module_progressive::{
-    ProgressiveCommand, ProgressiveEvent, ProgressiveResult, ProgressiveTransportRequest,
-    ProgressiveTransportResult,
+    ChannelOutputEvent, ProgressiveCommand, ProgressiveEvent, ProgressiveResult,
+    ProgressiveTransportRequest, ProgressiveTransportResult,
 };
 use tinychannels_bus::{methods, ChannelBackendRequest, ChannelBackendResult};
 
@@ -151,6 +151,81 @@ impl ManagedTransport {
 pub(super) struct ModuleProgressiveReply {
     runtime: ChannelRuntimeLease,
     handle: String,
+}
+
+/// Native listener output handle on the already-running compiled module
+/// object. Its callback is the captured configured provider adapter, so native
+/// output never falls back to the hosted REST transport.
+pub(crate) struct NativeProgressiveReply {
+    object: tinybus::module::ModuleObjectClient,
+    handle: String,
+}
+
+impl NativeProgressiveReply {
+    pub(crate) async fn open(
+        object: tinybus::module::ModuleObjectClient,
+        channel: tinychannels_bus::channel::ChannelRef,
+        conversation: tinychannels_bus::channel::ConversationRef,
+        turn_id: String,
+        lifetime: std::time::Duration,
+    ) -> anyhow::Result<Self> {
+        let result: ProgressiveResult = object
+            .call_confidential(
+                methods::EXECUTE_PROGRESSIVE,
+                (ProgressiveCommand::OpenOutput {
+                    channel,
+                    conversation,
+                    turn_id,
+                    lifetime_ms: lifetime.as_millis().min(u64::MAX as u128) as u64,
+                },),
+            )
+            .await?;
+        match result {
+            ProgressiveResult::Opened { handle } if !handle.is_empty() && handle.len() <= 128 => {
+                Ok(Self { object, handle })
+            }
+            _ => {
+                crate::modules::report::malformed_reply("tinychannels");
+                Err(ModuleCallError::ModuleFault.into())
+            }
+        }
+    }
+
+    pub(crate) async fn feed(&self, events: Vec<ChannelOutputEvent>) -> Result<(), ModuleCallError> {
+        let result: ProgressiveResult = self
+            .object
+            .call_confidential(
+                methods::EXECUTE_PROGRESSIVE,
+                (ProgressiveCommand::FeedOutput {
+                    handle: self.handle.clone(),
+                    events,
+                },),
+            )
+            .await?;
+        if !matches!(result, ProgressiveResult::Updated | ProgressiveResult::DeliveryBatch { .. }) {
+            crate::modules::report::malformed_reply("tinychannels");
+            return Err(ModuleCallError::ModuleFault);
+        }
+        Ok(())
+    }
+
+    pub(crate) async fn finish(&self, text: &str) -> Result<(), ModuleCallError> {
+        let result: ProgressiveResult = self
+            .object
+            .call_confidential(
+                methods::EXECUTE_PROGRESSIVE,
+                (ProgressiveCommand::Finish {
+                    handle: self.handle.clone(),
+                    text: text.to_owned(),
+                },),
+            )
+            .await?;
+        if result != ProgressiveResult::Closed {
+            crate::modules::report::malformed_reply("tinychannels");
+            return Err(ModuleCallError::ModuleFault);
+        }
+        Ok(())
+    }
 }
 
 impl ModuleProgressiveReply {
