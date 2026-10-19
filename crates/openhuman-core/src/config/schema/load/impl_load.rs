@@ -5,7 +5,7 @@ use super::dirs::{
     default_action_dir, default_config_and_workspace_dirs, resolve_action_dir,
     resolve_config_dirs_ignoring_env, resolve_runtime_config_dirs_with, ConfigResolutionSource,
 };
-use super::env::{EnvLookup, ProcessEnv, ProcessEnvWithoutWorkspace};
+use super::env::{EnvLookup, NoEnv, ProcessEnv, ProcessEnvWithoutWorkspace};
 use super::migrate::{
     migrate_cloud_provider_slugs, migrate_components, migrate_legacy_inference_url,
     migrate_legacy_memory_backend, migrate_search_settings,
@@ -287,14 +287,30 @@ impl Config {
     /// streams with unrelated tests or runtime tasks that temporarily
     /// repoint it. Other process env overrides still apply.
     pub async fn load_from_config_path(config_path: &Path, workspace_dir: &Path) -> Result<Self> {
-        Self::load_from_config_path_unenriched(config_path, workspace_dir)
+        Self::load_from_config_path_with_env(
+            config_path,
+            workspace_dir,
+            &ProcessEnvWithoutWorkspace,
+        )
             .await
             .map(crate::config::enrichers::enriched)
     }
 
-    async fn load_from_config_path_unenriched(
+    /// Reloads the resolved config source and its revision without applying
+    /// process environment overrides.
+    pub(crate) async fn load_from_config_path_without_env(
         config_path: &Path,
         workspace_dir: &Path,
+    ) -> Result<Self> {
+        Self::load_from_config_path_with_env(config_path, workspace_dir, &NoEnv)
+            .await
+            .map(crate::config::enrichers::enriched)
+    }
+
+    async fn load_from_config_path_with_env(
+        config_path: &Path,
+        workspace_dir: &Path,
+        env: &(dyn EnvLookup + Send + Sync),
     ) -> Result<Self> {
         let config_path = config_path.to_path_buf();
         let workspace_dir = workspace_dir.to_path_buf();
@@ -311,7 +327,7 @@ impl Config {
                 action_dir: default_action_dir(),
                 ..Default::default()
             };
-            config.apply_env_overrides_from(&ProcessEnvWithoutWorkspace);
+            config.apply_env_overrides_from(env);
             return Ok(config);
         }
 
@@ -344,7 +360,7 @@ impl Config {
         migrate_components(&mut config, &migration_raw);
         migrate_cloud_provider_slugs(&mut config);
         migrate_search_settings(&mut config);
-        config.apply_env_overrides_from(&ProcessEnvWithoutWorkspace);
+        config.apply_env_overrides_from(env);
 
         if config_was_corrupted {
             tracing::warn!(
