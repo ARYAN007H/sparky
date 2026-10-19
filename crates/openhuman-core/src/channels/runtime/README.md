@@ -34,7 +34,9 @@ the host does not reconstruct provider-specific outbound behavior.
 
 The dispatch loop admits each message first: preparation, the
 `ChannelMessageReceived` event, runtime commands and approval replies run
-immediately. What remains goes through the per-conversation debouncer
+immediately. Admissions run concurrently, but their results enter the
+debouncer in receive order, so a slow admission never lets a later message
+overtake it. What remains goes through the per-conversation debouncer
 ([`inbound_debounce`](../../inbound_debounce/README.md)) keyed by
 `history_key`. Messages from one sender within the quiet window
 (`[inbound_debounce]`, 1.5 s by default, 4 s once the batch holds media,

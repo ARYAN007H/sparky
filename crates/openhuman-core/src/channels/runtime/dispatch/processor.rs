@@ -20,12 +20,14 @@
 mod admit;
 mod approval;
 mod bus_turn;
+mod in_order;
 mod turn;
 
 use super::inbound_batch::{merge_channel_batch, QueuedInbound};
 use crate::channels::context::ChannelRuntimeContext;
 use crate::config::InboundDebounceConfig;
 use crate::inbound_debounce::{KeyedDebouncer, Push};
+use in_order::InOrder;
 use std::collections::{HashMap, VecDeque};
 use std::sync::Arc;
 use tinychannels_bus::{ChannelInboundEnvelope, ChannelMessage};
@@ -105,6 +107,8 @@ pub(crate) async fn run_message_dispatch_loop(
     let mut inbound_open = true;
     let mut next_seq: u64 = 0;
     let mut admitting = JoinSet::new();
+    let mut admit_seqs: HashMap<tokio::task::Id, u64> = HashMap::new();
+    let mut admitted = InOrder::new();
     let mut turns = JoinSet::new();
     let mut turn_keys: HashMap<tokio::task::Id, String> = HashMap::new();
     let mut typing = JoinSet::new();
@@ -151,8 +155,8 @@ pub(crate) async fn run_message_dispatch_loop(
                     Some(message) => {
                         let seq = next_seq;
                         next_seq += 1;
-                        let ctx = Arc::clone(&ctx);
-                        admitting.spawn(async move { (seq, admit_runtime_message(ctx, message).await) });
+                        let handle = admitting.spawn(admit_runtime_message(Arc::clone(&ctx), message));
+                        admit_seqs.insert(handle.id(), seq);
                     }
                     None => {
                         tracing::debug!(
@@ -163,41 +167,19 @@ pub(crate) async fn run_message_dispatch_loop(
                     }
                 }
             }
-            Some(joined) = admitting.join_next(), if !admitting.is_empty() => {
-                match joined {
-                    Ok((seq, Some(inbound))) => {
-                        let settings = debounce.settings_for(&inbound.msg.channel);
-                        let channel = inbound.msg.channel.clone();
-                        let reply_target = inbound.msg.reply_target.clone();
-                        let key = inbound.history_key.clone();
-                        let push = debouncer.push(
-                            key,
-                            QueuedInbound { seq, inbound },
-                            &settings,
-                            Instant::now(),
-                        );
-                        tracing::debug!(
-                            channel = %channel,
-                            seq,
-                            outcome = ?push,
-                            tracked = debouncer.tracked(),
-                            "[dispatch][debounce] buffered inbound message"
-                        );
-                        if push == Push::Opened {
-                            if let Some(target) = ctx.channels_by_name.get(&channel).cloned() {
-                                typing.spawn(async move {
-                                    if let Err(error) = target.start_typing(&reply_target).await {
-                                        tracing::debug!(
-                                            "[dispatch][debounce] typing start failed on {}: {error}",
-                                            target.name()
-                                        );
-                                    }
-                                });
-                            }
-                        }
+            Some(joined) = admitting.join_next_with_id(), if !admitting.is_empty() => {
+                let (id, result) = match joined {
+                    Ok((id, result)) => (id, result),
+                    Err(error) => {
+                        let id = error.id();
+                        log_join_error("admission", Some(error));
+                        (id, None)
                     }
-                    Ok((_, None)) => {}
-                    Err(error) => log_join_error("admission", Some(error)),
+                };
+                if let Some(seq) = admit_seqs.remove(&id) {
+                    for (seq, inbound) in admitted.finish(seq, result) {
+                        buffer_admitted(&ctx, &debounce, &mut debouncer, &mut typing, seq, inbound);
+                    }
                 }
             }
             Some(joined) = turns.join_next_with_id(), if !turns.is_empty() => {
@@ -221,6 +203,46 @@ pub(crate) async fn run_message_dispatch_loop(
             debouncer.flush_all(now);
         }
         ready.extend(debouncer.poll_ready(now));
+    }
+}
+
+fn buffer_admitted(
+    ctx: &Arc<ChannelRuntimeContext>,
+    debounce: &InboundDebounceConfig,
+    debouncer: &mut KeyedDebouncer<String, QueuedInbound>,
+    typing: &mut JoinSet<()>,
+    seq: u64,
+    inbound: AdmittedInbound,
+) {
+    let settings = debounce.settings_for(&inbound.msg.channel);
+    let channel = inbound.msg.channel.clone();
+    let reply_target = inbound.msg.reply_target.clone();
+    let key = inbound.history_key.clone();
+    let push = debouncer.push(
+        key,
+        QueuedInbound { seq, inbound },
+        &settings,
+        Instant::now(),
+    );
+    tracing::debug!(
+        channel = %channel,
+        seq,
+        outcome = ?push,
+        tracked = debouncer.tracked(),
+        "[dispatch][debounce] buffered inbound message"
+    );
+    if push != Push::Opened {
+        return;
+    }
+    if let Some(target) = ctx.channels_by_name.get(&channel).cloned() {
+        typing.spawn(async move {
+            if let Err(error) = target.start_typing(&reply_target).await {
+                tracing::debug!(
+                    "[dispatch][debounce] typing start failed on {}: {error}",
+                    target.name()
+                );
+            }
+        });
     }
 }
 
