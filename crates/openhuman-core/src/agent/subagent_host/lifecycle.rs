@@ -369,8 +369,7 @@ impl OpenHumanSubagentHost {
         })
         .map_err(map_lifecycle_error)?;
         let request = if continuation {
-            SubagentRequest::continue_with_key(task_key.clone(), child, request, input, None, None)
-                .await
+            SubagentRequest::continue_with_task_key(task_key.clone(), child, request, input, None)
         } else {
             // `direct_subagent_child` derives the same key for the host's
             // durable lookup; this constructor independently proves that the
