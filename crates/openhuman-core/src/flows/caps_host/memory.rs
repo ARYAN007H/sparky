@@ -211,7 +211,7 @@ impl OpenHumanMemory {
     /// synthesised `answer` plus its citations as `results`; `search` returns
     /// raw ranked hits as `results`. Each row is `{ id, key, text, score,
     /// source }`; rows under the node's `min_score` are dropped.
-    async fn recall(&self, scope: &str, query: &str, opts: Value) -> Result<Value> {
+    pub(crate) async fn recall(&self, scope: &str, query: &str, opts: Value) -> Result<Value> {
         let operation: &str = opts
             .get("operation")
             .and_then(Value::as_str)
@@ -294,7 +294,7 @@ impl OpenHumanMemory {
     }
 
     /// Memory v2 keeps no flavoured profiles, so every slug is unknown.
-    async fn flavour(&self, slug: &str) -> Result<Value> {
+    pub(crate) async fn flavour(&self, slug: &str) -> Result<Value> {
         tracing::debug!(target: "flows", flavour = slug, "{LOG_PREFIX} flavour: unsupported");
         self.tier_gate_read("flavour").await?;
         Err(EngineError::Capability(format!(
@@ -303,7 +303,7 @@ impl OpenHumanMemory {
     }
 
     /// Memory v2 keeps no people store: an empty listing marked unsupported.
-    async fn people(&self, query: Option<&str>) -> Result<Value> {
+    pub(crate) async fn people(&self, query: Option<&str>) -> Result<Value> {
         tracing::debug!(
             target: "flows",
             has_query = query.is_some_and(|q| !q.trim().is_empty()),
@@ -317,7 +317,7 @@ impl OpenHumanMemory {
     /// reachable for `scope != "flow"`, regardless of what the caller
     /// passes: this is checked here independently of the engine's own
     /// `validate_all` rejection of `scope: "user"` writes.
-    async fn remember(&self, scope: &str, key: &str, value: Value) -> Result<()> {
+    pub(crate) async fn remember(&self, scope: &str, key: &str, value: Value) -> Result<()> {
         if scope != "flow" {
             tracing::warn!(
                 target: "flows",
@@ -380,7 +380,7 @@ impl OpenHumanMemory {
 
     /// Forgets this flow's value for `key` (by its per-key tag) — same
     /// `scope`-lockdown as [`Self::remember`].
-    async fn forget(&self, scope: &str, key: &str) -> Result<()> {
+    pub(crate) async fn forget(&self, scope: &str, key: &str) -> Result<()> {
         if scope != "flow" {
             tracing::warn!(
                 target: "flows",
