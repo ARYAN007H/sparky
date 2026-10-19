@@ -107,8 +107,12 @@ async fn flows_update_inner(
             graph
         }
         None => {
-            tinyflows::validate::validate(&existing.graph).map_err(|e| e.to_string())?;
-            existing.graph.clone()
+            validate_and_migrate_graph(
+                &crate::core::runtime::DispatchCtx::ambient(),
+                config,
+                serde_json::to_value(&existing.graph).map_err(|error| error.to_string())?,
+            )
+            .await?
         }
     };
     // B29 Rule 1 analogue: disarm every manual/none → automatic trigger
