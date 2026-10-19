@@ -99,25 +99,19 @@ fn rpc_round_trip_and_bad_base64() {
 
 #[test]
 fn typed_voice_media_must_match_its_durable_note_reference() {
-    use base64::Engine as _;
-
     let tmp = tempfile::tempdir().unwrap();
     store_note(tmp.path(), "note-typed", "audio/wav", &[0, 1, 2]).unwrap();
-    let media = |note_id: &str, bytes: &[u8]| tinychannels_bus::MediaReference {
+    let media = |note_id: &str, content_type: &str| tinychannels_bus::MediaReference {
         opaque_id: Some(note_id.into()),
-        url: Some(format!(
-            "data:audio/wav;base64,{}",
-            base64::engine::general_purpose::STANDARD.encode(bytes)
-        )),
-        content_type: Some("audio/wav".into()),
+        content_type: Some(content_type.into()),
         kind: tinychannels_bus::MediaKind::Audio,
         ..Default::default()
     };
 
-    assert!(validate_typed_media(tmp.path(), "note-typed", &media("note-typed", &[0, 1, 2])).is_ok());
-    assert!(validate_typed_media(tmp.path(), "note-typed", &media("other-note", &[0, 1, 2])).is_err());
-    assert!(validate_typed_media(tmp.path(), "note-typed", &media("note-typed", &[9])).is_err());
-    assert!(validate_typed_media(tmp.path(), "missing", &media("missing", &[0])).is_err());
+    assert!(validate_typed_media(tmp.path(), "note-typed", &media("note-typed", "audio/wav")).is_ok());
+    assert!(validate_typed_media(tmp.path(), "note-typed", &media("other-note", "audio/wav")).is_err());
+    assert!(validate_typed_media(tmp.path(), "note-typed", &media("note-typed", "audio/mpeg")).is_err());
+    assert!(validate_typed_media(tmp.path(), "missing", &media("missing", "audio/wav")).is_err());
 }
 
 #[test]

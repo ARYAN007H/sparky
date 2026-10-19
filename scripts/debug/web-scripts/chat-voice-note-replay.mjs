@@ -50,7 +50,7 @@ export default async function voiceNoteReplay({ page, mock, log, screenshot }) {
           (part) =>
             part.kind === "voice_note" &&
             part.voiceNote?.media?.opaqueId &&
-            part.voiceNote?.media?.url?.startsWith("data:audio/wav;base64,") &&
+            !part.voiceNote?.media?.url &&
             part.voiceNote?.durationMs > 0,
         );
       log(`voice-note chat RPC carried typed media: ${typedVoiceNoteSent}`);

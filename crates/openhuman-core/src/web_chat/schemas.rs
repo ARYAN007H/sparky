@@ -76,7 +76,7 @@ pub fn schemas(function: &str) -> ControllerSchema {
                 FieldSchema {
                     name: "attachments",
                     ty: TypeSchema::Option(Box::new(TypeSchema::Json)),
-                    comment: "Typed attachments (tinychannels ContentPart[]: image/video/audio/file parts whose media carries an inline data: or http(s) url). Replaces splicing [IMAGE:]/[FILE:] markers into `message`.",
+                    comment: "Typed attachments (tinychannels ContentPart[]). VoiceNote parts carry an opaque id for audio already stored by channel.web_voice_note_store; the core validates and binds it to the user row without adding audio markers to model text.",
                     required: false,
                 },
                 optional_string("model_override", "Optional model override."),
