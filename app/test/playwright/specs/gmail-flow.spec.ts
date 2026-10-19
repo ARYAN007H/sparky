@@ -130,6 +130,4 @@ test.describe('Gmail Integration Flows', () => {
       /Auth expired|Reconnect/i
     );
   });
-
-
 });

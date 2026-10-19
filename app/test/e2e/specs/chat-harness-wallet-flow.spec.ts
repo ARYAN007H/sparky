@@ -166,5 +166,4 @@ describe('Chat harness — wallet flow', () => {
     expect(content).toContain('"chain": "solana"');
     expect(content).toContain('"chain": "tron"');
   });
-
 });

@@ -269,7 +269,6 @@ describe('Chat harness — orchestrator → subagent continuation flow', () => {
     );
   });
 
-
   it('persisted thread file records the final orchestrator text', async () => {
     const threadId = await getSelectedThreadId();
     expect(typeof threadId).toBe('string');

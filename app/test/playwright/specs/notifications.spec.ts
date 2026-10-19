@@ -21,7 +21,6 @@ async function waitForNotificationsSections(page: Page): Promise<void> {
 }
 
 test.describe('Notifications', () => {
-
   test('Notifications page renders integration notifications', async ({ page }) => {
     const title = `PW Notification UI ${Date.now()}`;
     const body = `Created by the notifications Playwright spec ${Date.now()}`;

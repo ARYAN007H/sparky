@@ -26,12 +26,7 @@ import {
 import { textExists } from '../helpers/element-helpers';
 import { resetApp } from '../helpers/reset-app';
 import { navigateViaHash } from '../helpers/shared-flows';
-import {
-  clearRequestLog,
-  setMockBehavior,
-  startMockServer,
-  stopMockServer,
-} from '../mock-server';
+import { clearRequestLog, setMockBehavior, startMockServer, stopMockServer } from '../mock-server';
 
 const LOG_PREFIX = '[chat-multi-tool-round]';
 const USER_ID = 'e2e-chat-multi-tool-round';
@@ -200,7 +195,6 @@ describe('Chat multi-tool round', () => {
     });
     console.log(`${LOG_PREFIX} T2.3: passed — canary visible`);
   });
-
 
   it('T2.5 — tool timeline has 2 entries (file_read before grep)', async () => {
     console.log(`${LOG_PREFIX} T2.5: verifying timeline order`);

@@ -62,7 +62,6 @@ describe('Gmail (Composio) connector flow', () => {
     console.log(`${LOG} PASS: card visible`);
   });
 
-
   it('failed connection shows error state, not blank screen', async function () {
     this.timeout(60_000);
     seedComposioConnection(TOOLKIT_SLUG, 'FAILED', 'c-gmail-fail');

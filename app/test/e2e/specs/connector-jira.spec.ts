@@ -139,7 +139,6 @@ describe('Jira Composio connector flow', () => {
     await assertSessionNotNuked();
   });
 
-
   it('failed connection shows error state, not blank screen', async function () {
     this.timeout(60_000);
     seedComposioConnection(TOOLKIT_SLUG, 'FAILED', 'c-jira-fail');
@@ -161,5 +160,4 @@ describe('Jira Composio connector flow', () => {
     await assertSessionNotNuked();
     console.log(`${LOG} PASS: expired auth does not log user out`);
   });
-
 });

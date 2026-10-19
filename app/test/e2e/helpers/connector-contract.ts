@@ -108,9 +108,6 @@ export function runConnectorContract(config: ConnectorContractConfig): void {
       console.log(`${LOG} PASS: card opens its connection UI`);
     });
 
-
-
-
     it('failed connection shows error state, not blank screen', async function () {
       this.timeout(60_000);
       seedComposioConnection(slug, 'FAILED', failId);
@@ -187,7 +184,5 @@ export function runConnectorContract(config: ConnectorContractConfig): void {
       await assertSessionNotNuked();
       console.log(`${LOG} PASS: reconnect after expiry re-authorizes`);
     });
-
-
   });
 }

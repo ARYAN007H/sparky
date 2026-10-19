@@ -286,33 +286,19 @@ describe('Gmail Integration Flows', () => {
       await navigateToHome();
       console.log(`${LOG_PREFIX} 9.1.1 PASSED`);
     });
-
-
   });
 
   // -------------------------------------------------------------------------
   // 9.2 Permission Enforcement
   // -------------------------------------------------------------------------
 
-  describe('9.2 Permission Enforcement', () => {
-
-
-
-
-
-  });
+  describe('9.2 Permission Enforcement', () => {});
 
   // -------------------------------------------------------------------------
   // 9.3 Email Processing
   // -------------------------------------------------------------------------
 
-  describe('9.3 Email Processing', () => {
-
-
-
-
-
-  });
+  describe('9.3 Email Processing', () => {});
 
   // -------------------------------------------------------------------------
   // 9.4 Disconnect & Re-Run Setup

@@ -76,7 +76,6 @@ test.describe('Composio trigger section UI', () => {
     await bootSkillsPage(page, 'pw-composio-triggers-' + testSlug);
   });
 
-
   test('renders the Triggers section in the Gmail modal', async ({ page }) => {
     await setMockBehavior({
       composioActiveTriggers: JSON.stringify([

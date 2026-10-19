@@ -33,7 +33,6 @@ async function setMockBehavior(behavior: Record<string, unknown>) {
   });
 }
 
-
 async function seedConnector(status: 'ACTIVE' | 'FAILED' | 'EXPIRED' = 'ACTIVE') {
   await setMockBehavior({
     composioToolkits: JSON.stringify([TOOLKIT_SLUG]),
@@ -144,7 +143,6 @@ async function openModal(page: Page) {
   return dialog;
 }
 
-
 test.describe('Gmail connector', () => {
   test.beforeEach(async ({ page }, testInfo) => {
     const testSlug = testInfo.title.toLowerCase().replace(/[^a-z0-9]+/g, '-');
@@ -170,17 +168,6 @@ test.describe('Gmail connector', () => {
     );
     const dialog = await openModal(page);
     await expect(dialog).toContainText(CONNECTOR_NAME);
-    await assertSessionNotNuked(page);
-  });
-
-});
-    const requests = await getRequestLog();
-    const deleteReq = requests.find(
-      request =>
-        request.method === 'DELETE' &&
-        request.url?.includes('/agent-integrations/composio/connections/')
-    );
-    expect(deleteReq).toBeDefined();
     await assertSessionNotNuked(page);
   });
 });

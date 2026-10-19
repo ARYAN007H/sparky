@@ -189,6 +189,4 @@ describe('Chat tool-call lifecycle', () => {
     });
     console.log(`${LOG_PREFIX} T1.3: passed — canary visible`);
   });
-
-
 });

@@ -220,10 +220,7 @@ describe('Harness — Composio tool-call prompt flow', () => {
 
   // ── C1.2 — GitHub GITHUB_LIST_REPOS ──────────────────────────────────────
 
-
   // ── C1.3 — Composio execute failure ──────────────────────────────────────
 
-
   // ── C1.4 — Linear LINEAR_CREATE_ISSUE ────────────────────────────────────
-
 });

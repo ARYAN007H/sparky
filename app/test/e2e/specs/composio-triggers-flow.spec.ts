@@ -46,7 +46,6 @@ describe('Composio trigger section UI', () => {
     await stopMockServer();
   });
 
-
   it('Triggers section renders in the Composio modal for an ACTIVE connection', async () => {
     // Seed one active trigger so the modal shows both the enabled and
     // available rows when it loads.
