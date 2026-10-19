@@ -1687,6 +1687,8 @@ impl DomainEvent {
     }
 }
 
+mod variant_names;
+
 #[cfg(test)]
 #[path = "events_tests.rs"]
 mod tests;

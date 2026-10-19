@@ -55,3 +55,39 @@ async fn an_unreachable_module_sends_the_event_down_the_direct_path() {
     let offered = offer(&active_config(), &client, event("u3")).await;
     assert!(matches!(offered, Offered::Direct(ref why) if why.contains("ingest failed")));
 }
+
+#[test]
+fn inbound_events_belong_to_the_inbound_domain_and_name_themselves() {
+    use crate::core::events::DomainEvent;
+    for (event, name) in [
+        (
+            DomainEvent::InboundEventDropped {
+                source: "composio:gmail".into(),
+                event_id: "e1".into(),
+                reason: "duplicate".into(),
+            },
+            "InboundEventDropped",
+        ),
+        (
+            DomainEvent::InboundDeferred {
+                source: "composio:gmail".into(),
+                event_id: "e1".into(),
+                defer_until_ms: 1_000,
+                reason: "busy".into(),
+            },
+            "InboundDeferred",
+        ),
+        (
+            DomainEvent::InboundDeadLettered {
+                source: "webhook:t1".into(),
+                event_id: "c1".into(),
+                attempt: 5,
+                detail: "terminal".into(),
+            },
+            "InboundDeadLettered",
+        ),
+    ] {
+        assert_eq!(event.domain(), "inbound");
+        assert_eq!(event.variant_name(), name);
+    }
+}
