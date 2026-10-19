@@ -328,6 +328,68 @@ impl Channel for ModuleChannel {
         self.send_prepared(message).await
     }
 
+    async fn send_typed_with_receipt(
+        &self,
+        message: &tinychannels_bus::channel::ChannelOutboundMessage,
+    ) -> anyhow::Result<tinychannels_bus::channel::ChannelSendOutcome> {
+        let intent = tinychannels_bus::channel::ChannelOutboundIntent {
+            idempotency_key: message.idempotency_key.clone(),
+            channel_id: message.channel_id.clone(),
+            conversation_id: message.conversation_id.clone(),
+            channel_ref: message.channel_ref.clone(),
+            conversation_ref: message.conversation_ref.clone(),
+            reply_to_id: message.reply_to_id.clone(),
+            thread_id: message.thread_id.clone(),
+            turn_id: message.turn_id.clone(),
+            durability: tinychannels_bus::channel::DeliveryDurability::Required,
+            payload: tinychannels_bus::channel::OutboundPayload::Parts {
+                parts: message.parts.clone(),
+            },
+        };
+        let prepared: tinychannels_bus::module_runtime::PreparedChannelIntent = self
+            .object
+            .call_confidential(
+                tinychannels_bus::methods::PREPARE_OUTBOUND_INTENT,
+                (
+                    self.name.clone(),
+                    ChannelMessagePreparation::Intent(intent),
+                ),
+            )
+            .await
+            .map_err(anyhow::Error::new)?;
+        let result: tinychannels_bus::controllers::ChannelSendMessageResult =
+            if let Some(relay) = self.relay.as_ref().filter(|_| self.relay_fronted) {
+                self.object
+                    .call_confidential(
+                        tinychannels_bus::methods::SEND_RELAY_INTENT,
+                        (relay.clone(), prepared.intent),
+                    )
+                    .await
+                    .map_err(anyhow::Error::new)?
+            } else {
+                self.object
+                    .call_confidential(
+                        tinychannels_bus::methods::SEND_CHANNEL_INTENT,
+                        (self.name.clone(), prepared.intent),
+                    )
+                    .await
+                    .map_err(anyhow::Error::new)?
+            };
+        let mut receipt = result.receipt.unwrap_or_default();
+        if receipt.primary_platform_message_id.is_none() {
+            receipt.primary_platform_message_id = result.message_id.clone();
+        }
+        if receipt.platform_message_ids.is_empty()
+            && let Some(message_id) = result.message_id
+        {
+            receipt.platform_message_ids.push(message_id);
+        }
+        Ok(tinychannels_bus::channel::ChannelSendOutcome {
+            receipt,
+            error: result.error,
+        })
+    }
+
     async fn listen(&self, _tx: mpsc::Sender<ChannelMessage>) -> anyhow::Result<()> {
         anyhow::bail!("TinyChannels module owns provider listeners")
     }

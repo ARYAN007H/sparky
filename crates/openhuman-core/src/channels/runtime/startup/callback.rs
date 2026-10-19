@@ -10,6 +10,7 @@ use tinychannels_bus::{
     HostSpeechSynthesisResult, HostTranscriptionRequest, HostTranscriptionResult,
     HostVoiceReplyPolicy, HostVoiceReplyPolicyRequest, HostVoiceTranscriptionRequest,
 };
+use tinychannels_bus::module_progressive::{ProgressiveTransportRequest, ProgressiveTransportResult};
 use tokio::sync::mpsc;
 
 const MAX_CALLBACK_BYTES: usize = 128 * 1024;
@@ -232,9 +233,12 @@ impl ChannelHostCallbacks {
                     None => dispatch.await,
                 }
             }
-            ChannelBackendRequest::ProgressiveTransport(_) => Err(Error::failed(
-                "progressive transport callback is unavailable",
-            )),
+            ChannelBackendRequest::ProgressiveTransport(request) => self
+                .dispatch_progressive_transport(*request)
+                .await
+                .map(|result| {
+                    ChannelBackendResult::ProgressiveTransport(Box::new(result))
+                }),
             request => {
                 crate::channels::controllers::OpenHumanChannelBackend::new((*self.config).clone())
                     .dispatch_callback(request)
@@ -242,5 +246,121 @@ impl ChannelHostCallbacks {
                     .map_err(|_| Error::failed("channel controller callback failed"))
             }
         }
+    }
+
+    async fn dispatch_progressive_transport(
+        &self,
+        request: ProgressiveTransportRequest,
+    ) -> Result<ProgressiveTransportResult> {
+        use tinychannels_bus::module_progressive::ProgressiveTransportRequest as Request;
+
+        match request {
+            Request::SendTyped {
+                channel,
+                turn_id,
+                channel_ref,
+                conversation,
+                sequence: _,
+                segment_index: _,
+                idempotency_key,
+                parts,
+                ..
+            } => {
+                let adapter = self.progressive_channel(&channel, channel_ref.as_ref())?;
+                let channel_id = channel_ref
+                    .as_ref()
+                    .map(|reference| reference.id.clone())
+                    .unwrap_or_else(|| channel.clone());
+                let conversation_id = conversation
+                    .as_ref()
+                    .map(|reference| reference.id.clone())
+                    .unwrap_or_default();
+                let outbound = tinychannels_bus::channel::ChannelOutboundMessage {
+                    channel_id,
+                    conversation_id,
+                    channel_ref,
+                    conversation_ref: conversation,
+                    reply_to_id: None,
+                    thread_id: None,
+                    turn_id,
+                    idempotency_key: idempotency_key.unwrap_or_default(),
+                    parts,
+                };
+                let outcome = adapter
+                    .send_typed_with_receipt(&outbound)
+                    .await
+                    .map_err(|_| Error::failed("progressive channel send failed"))?;
+                Ok(ProgressiveTransportResult::Outcome(Box::new(outcome)))
+            }
+            Request::Send {
+                channel,
+                turn_id,
+                channel_ref,
+                conversation,
+                sequence: _,
+                idempotency_key,
+                message,
+            } => {
+                let adapter = self.progressive_channel(&channel, channel_ref.as_ref())?;
+                let legacy: tinychannels_bus::SendMessage = serde_json::from_value(message)
+                    .map_err(|_| Error::failed("invalid progressive send payload"))?;
+                let mut outbound = tinychannels_bus::channel::ChannelOutboundMessage::from_legacy_message(
+                    channel_ref
+                        .as_ref()
+                        .map(|reference| reference.id.as_str())
+                        .unwrap_or(&channel),
+                    &legacy,
+                );
+                outbound.channel_ref = channel_ref;
+                outbound.conversation_ref = conversation.or(outbound.conversation_ref);
+                outbound.turn_id = turn_id;
+                if let Some(key) = idempotency_key {
+                    outbound.idempotency_key = key;
+                }
+                let outcome = adapter
+                    .send_typed_with_receipt(&outbound)
+                    .await
+                    .map_err(|_| Error::failed("progressive channel send failed"))?;
+                Ok(ProgressiveTransportResult::Outcome(Box::new(outcome)))
+            }
+            Request::Typing { channel, channel_ref, conversation, .. } => {
+                let adapter = self.progressive_channel(&channel, channel_ref.as_ref())?;
+                let recipient = conversation.map(|reference| reference.id).unwrap_or_default();
+                adapter
+                    .start_typing(&recipient)
+                    .await
+                    .map_err(|_| Error::failed("progressive typing callback failed"))?;
+                Ok(ProgressiveTransportResult::Acknowledged)
+            }
+            Request::Edit { .. } | Request::Delete { .. } => {
+                Ok(ProgressiveTransportResult::Unavailable)
+            }
+            Request::OutputEvent { .. } => Ok(ProgressiveTransportResult::Unavailable),
+        }
+    }
+
+    fn progressive_channel(
+        &self,
+        channel: &str,
+        channel_ref: Option<&tinychannels_bus::ChannelRef>,
+    ) -> Result<Arc<dyn crate::channels::Channel>> {
+        let reference = channel_ref.ok_or_else(|| Error::failed("channel account is required"))?;
+        let account = reference
+            .account_id
+            .as_deref()
+            .ok_or_else(|| Error::failed("configured channel account is required"))?;
+        let context = self.context()?;
+        let adapter = context
+            .channels_by_name
+            .get(account)
+            .cloned()
+            .ok_or_else(|| Error::failed("configured channel account is unavailable"))?;
+        let configured_provider = tinychannels_bus::capabilities::provider_id(adapter.name());
+        if configured_provider != reference.id
+            || tinychannels_bus::capabilities::provider_id(channel) != reference.id
+        {
+            return Err(Error::failed("configured channel account does not match request"));
+        }
+        Ok(adapter)
     }
 }
