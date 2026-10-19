@@ -18,8 +18,9 @@ use tinyagents_harness::middleware::wrap_harness_instruction;
 use crate::agent::{
     session_host::turn_checkpoint::{
         self, build_deterministic_checkpoint, build_deterministic_final_summary,
-        close_verification_prompt, final_answer_instruction, harness_instruction_needles,
-        render_tool_results, results_from_tool_outcomes,
+        build_deterministic_final_summary_with_cause, close_verification_prompt,
+        final_answer_instruction, harness_instruction_needles, render_tool_results,
+        results_from_tool_outcomes,
     },
     tinyagents::{SupplementalTrace, TinyagentsTurnOutcome, TurnModelSource},
 };
@@ -234,12 +235,16 @@ pub(super) struct GroundedClose {
 /// additional provider calls once its recovery budget is exhausted.
 fn classified_halt_close(outcome: &TinyagentsTurnOutcome) -> Option<GroundedClose> {
     let reason = outcome.breaker_halt.as_deref()?;
-    if !reason.starts_with("Stopping after ") {
+    if outcome.failure_cause.is_none() && !reason.starts_with("Stopping after ") {
         return None;
     }
     let records = results_from_tool_outcomes(&outcome.tool_outcomes);
     Some(GroundedClose {
-        output: build_deterministic_final_summary(&records, Some(reason)),
+        output: build_deterministic_final_summary_with_cause(
+            &records,
+            Some(reason),
+            outcome.failure_cause.as_ref(),
+        ),
         usage: RepairUsage::default(),
     })
 }
@@ -398,7 +403,11 @@ pub(super) async fn close_if_needed(
         if needs_cap_close {
             build_deterministic_checkpoint(&records, outcome.model_calls)
         } else {
-            build_deterministic_final_summary(&records, stop_reason)
+            build_deterministic_final_summary_with_cause(
+                &records,
+                stop_reason,
+                outcome.failure_cause.as_ref(),
+            )
         }
     };
 

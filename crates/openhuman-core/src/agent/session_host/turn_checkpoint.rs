@@ -523,11 +523,7 @@ pub(crate) fn build_deterministic_final_summary_with_cause(
         return "I finished this turn but produced no result to report.".to_string();
     }
     if let Some(reason) = stop_reason {
-        return super::stop_summary::render_stop_summary_with_cause(
-            results,
-            reason,
-            failure_cause,
-        );
+        return super::stop_summary::render_stop_summary_with_cause(results, reason, failure_cause);
     }
     let mut out = String::from(
         "I finished this turn without writing up a result. Here is what each tool call returned:\n",
