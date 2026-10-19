@@ -14,7 +14,7 @@
 //! `propose_workflow` description all read the *overlaid* view via
 //! [`all_node_kind_contracts`] / [`node_kind_contract`].
 
-use tinyflows::catalog::NodeKindContract;
+use tinyflows_bus::node_kinds::NodeKindContract;
 
 /// Appends this host's vendor-specific caveats to a portable tinyflows
 /// contract. One arm per kind that has host-owned facts; the rest pass through
@@ -155,17 +155,22 @@ fn apply_host_overlay(contract: NodeKindContract) -> NodeKindContract {
 
 /// Every node-kind contract with this host's overlay applied, in
 /// [`tinyflows::catalog::NODE_KINDS`] order.
-pub fn all_node_kind_contracts() -> Vec<NodeKindContract> {
-    tinyflows::catalog::all_contracts()
-        .into_iter()
-        .map(apply_host_overlay)
-        .collect()
+pub async fn all_node_kind_contracts(config: &crate::config::Config) -> Result<Vec<NodeKindContract>, String> {
+    let proxy = crate::modules::tinyflows::catalog_proxy(config).await?;
+    let contracts: Vec<NodeKindContract> = proxy
+        .call(tinyflows_bus::catalog::members::NODE_KINDS, ())
+        .await
+        .map_err(|error| error.wire_message())?;
+    Ok(contracts.into_iter().map(apply_host_overlay).collect())
 }
 
 /// The overlaid contract for one node kind, or `None` when `kind` is not one
 /// of [`tinyflows::catalog::NODE_KINDS`].
-pub fn node_kind_contract(kind: &str) -> Option<NodeKindContract> {
-    tinyflows::catalog::contract_for(kind).map(apply_host_overlay)
+pub async fn node_kind_contract(config: &crate::config::Config, kind: &str) -> Result<Option<NodeKindContract>, String> {
+    Ok(all_node_kind_contracts(config)
+        .await?
+        .into_iter()
+        .find(|contract| contract.kind == kind))
 }
 
 #[cfg(test)]

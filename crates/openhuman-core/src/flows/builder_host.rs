@@ -178,7 +178,7 @@ impl FlowsHost {
                         &config, payload
                     )?)
                 }
-                PortOperation::GatesValidate => wire!(ops::flows_validate(payload).value),
+                PortOperation::GatesValidate => wire!(ops::flows_validate(&context, &config, payload).await.value),
                 PortOperation::GatesRun => {
                     wire!(ops::run_builder_gates_json(&context, &config, payload).await?)
                 }
@@ -187,7 +187,7 @@ impl FlowsHost {
                     json!(true)
                 }
                 PortOperation::GatesEngineCompatibility => {
-                    wire!(ops::engine_compatibility_errors_json(&config, payload)?)
+                    wire!(ops::engine_compatibility_errors_json(&context, &config, payload).await?)
                 }
                 PortOperation::GatesWiringWarnings => {
                     wire!(ops::wiring_warnings_json(&config, payload).await?)
