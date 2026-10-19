@@ -291,7 +291,7 @@ async fn physical_observer_reports_content_free_provider_outcome() {
 #[tokio::test]
 async fn physical_observer_sees_the_buyer_charge_settled_by_the_budget() {
     use tinyagents_harness::observability::turn_observer::{
-        with_observer, ObserverScope, TraceContent, TurnObservation,
+        ObserverScope, TraceContent, TurnObservation, with_observer,
     };
 
     let mut reply = body("hi", "stop");
@@ -512,7 +512,11 @@ async fn repair_cannot_exceed_dispatch_limit() {
         .and(path("/v1/chat/completions"))
         .respond_with(move |_request: &wiremock::Request| {
             let mut replies = replies_for_handler.lock().unwrap();
-            let text = if *replies == 0 { "invalid" } else { "{\"ok\":true}" };
+            let text = if *replies == 0 {
+                "invalid"
+            } else {
+                "{\"ok\":true}"
+            };
             *replies += 1;
             ResponseTemplate::new(200).set_body_json(body(text, "stop"))
         })
@@ -529,7 +533,11 @@ async fn repair_cannot_exceed_dispatch_limit() {
         .await;
 
     let requests = server.received_requests().await.expect("recording on");
-    assert_eq!(requests.len(), 1, "a refused repair must not reach the server");
+    assert_eq!(
+        requests.len(),
+        1,
+        "a refused repair must not reach the server"
+    );
     assert!(result.is_err(), "the refused repair must be terminal");
 }
 
@@ -563,7 +571,11 @@ async fn scoped_monetary_budget_keeps_the_shared_dispatch_admission() {
         .and(path("/v1/chat/completions"))
         .respond_with(move |_request: &wiremock::Request| {
             let mut replies = replies_for_handler.lock().unwrap();
-            let text = if *replies == 0 { "invalid" } else { "{\"ok\":true}" };
+            let text = if *replies == 0 {
+                "invalid"
+            } else {
+                "{\"ok\":true}"
+            };
             *replies += 1;
             ResponseTemplate::new(200).set_body_json(body(text, "stop"))
         })
@@ -640,7 +652,11 @@ async fn refusal_preserves_paid_usage_without_a_phantom_observer_event() {
         .and(path("/v1/chat/completions"))
         .respond_with(move |_request: &wiremock::Request| {
             let mut replies = replies_for_handler.lock().unwrap();
-            let text = if *replies == 0 { "invalid" } else { "{\"ok\":true}" };
+            let text = if *replies == 0 {
+                "invalid"
+            } else {
+                "{\"ok\":true}"
+            };
             *replies += 1;
             ResponseTemplate::new(200).set_body_json(body(text, "stop"))
         })
@@ -661,7 +677,10 @@ async fn refusal_preserves_paid_usage_without_a_phantom_observer_event() {
 
     match error {
         CoreError::DispatchAdmission { usage, .. } => {
-            assert_eq!(usage.expect("first call usage is retained").cost_usd, Some(0.0125));
+            assert_eq!(
+                usage.expect("first call usage is retained").cost_usd,
+                Some(0.0125)
+            );
         }
         other => panic!("expected typed admission refusal, got {other:?}"),
     }

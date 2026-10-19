@@ -270,8 +270,7 @@ pub struct OpenHumanRunContext {
     /// Explicit shared model-call budget inherited by synchronous children.
     pub model_budget: Option<super::super::budget::ModelBudget>,
     /// Host admission policy shared by this run and its synchronous descendants.
-    pub dispatch_admission:
-        Option<Arc<dyn super::super::budget::PhysicalDispatchAdmission>>,
+    pub dispatch_admission: Option<Arc<dyn super::super::budget::PhysicalDispatchAdmission>>,
     /// The response format and output cap this root turn asks of every model
     /// call, and the slot its final call is reported into. Carried explicitly
     /// from the caller (`agent_chat`) through the session; children never
@@ -419,12 +418,12 @@ pub(crate) struct HarnessHostPolicy {
 
 #[cfg(test)]
 pub(crate) use super::operation_context::tool_context_with_approval;
-pub use super::operation_context::{approval_for_tool, OpenHumanRunExt};
 pub(crate) use super::operation_context::{
-    command_environment_for_tool, dispatch_ctx_for_tool, memory_identity_for_tool,
-    memory_in_prompt_for_tool, parent_agent_id_for_tool, sandbox_mode_for_tool,
-    task_recency_window_for_tool, turn_origin_for_tool, HostOperationContext,
+    HostOperationContext, command_environment_for_tool, dispatch_ctx_for_tool,
+    memory_identity_for_tool, memory_in_prompt_for_tool, parent_agent_id_for_tool,
+    sandbox_mode_for_tool, task_recency_window_for_tool, turn_origin_for_tool,
 };
+pub use super::operation_context::{OpenHumanRunExt, approval_for_tool};
 
 impl Default for OpenHumanRunContext {
     fn default() -> Self {

@@ -53,7 +53,7 @@ use tinyinference_llm::message::{ContentBlock, ImageRef, Message, UserMessage};
 use tinyinference_llm::model::{ModelRequest, ModelResponse};
 
 use crate::error::CoreError;
-use crate::turn::{is_safe_endpoint_for_bearer, sanitize_url_for_display, Route};
+use crate::turn::{Route, is_safe_endpoint_for_bearer, sanitize_url_for_display};
 
 pub use tinyagents_harness::observability::{
     PhysicalDispatchMetadata, PhysicalDispatchObserver, PhysicalDispatchOutcome,
@@ -576,7 +576,7 @@ impl Completer {
         mut request: CompletionRequest,
     ) -> Result<CompletionResponse, CoreError> {
         use crate::structured::{
-            accumulate, StructuredFailureReason, StructuredOutputFailure, Validator,
+            StructuredFailureReason, StructuredOutputFailure, Validator, accumulate,
         };
         let initial_failure = |reason| CoreError::StructuredOutput {
             method: COMPLETE,

@@ -14,11 +14,11 @@ mod runtime_ops;
 mod turn_guards;
 
 pub use agent_chat::{
-    agent_chat, agent_chat_for, agent_chat_reply_for, agent_chat_simple, AgentChatEnv,
-    AgentChatReply, AgentChatTarget,
+    AgentChatEnv, AgentChatReply, AgentChatTarget, agent_chat, agent_chat_for,
+    agent_chat_reply_for, agent_chat_simple,
 };
 pub use complete_once::{
-    complete_once, complete_once_controlled, complete_once_observed, CompletionEndpoint,
+    CompletionEndpoint, complete_once, complete_once_controlled, complete_once_observed,
 };
 pub use runtime_ops::{
     local_ai_prompt, local_ai_status, local_ai_summarize, local_ai_transcribe,

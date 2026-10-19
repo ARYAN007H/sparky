@@ -7,12 +7,12 @@ use tinyinference_llm::model::ChatModel;
 
 /// Product recursion ceiling shared by native and MCP delegation.
 pub(crate) const MAX_SPAWN_DEPTH: usize = 3;
-pub use tinyinference_llm::model::budget::{
-    Budget, BudgetExceeded, BudgetSnapshot, CallBudget, Spend, SpendLimits,
-};
 pub use tinyagents_harness::cost::{
     ControlledDispatchError, DispatchModelOptions, DispatchRefusal, DispatchRefusalReason,
     PhysicalDispatchAdmission, PhysicalDispatchPermit,
+};
+pub use tinyinference_llm::model::budget::{
+    Budget, BudgetExceeded, BudgetSnapshot, CallBudget, Spend, SpendLimits,
 };
 
 /// OpenHuman's source-compatible carrier for the shared ledger and physical

@@ -89,7 +89,9 @@ pub async fn complete_once_controlled(
     endpoint: &CompletionEndpoint,
     request: ModelRequest,
     budget: Option<&crate::agent::tinyagents::budget::ModelBudget>,
-    observer: Option<std::sync::Arc<dyn tinyagents_harness::observability::PhysicalDispatchObserver>>,
+    observer: Option<
+        std::sync::Arc<dyn tinyagents_harness::observability::PhysicalDispatchObserver>,
+    >,
     admission: Option<std::sync::Arc<dyn tinyagents_harness::cost::PhysicalDispatchAdmission>>,
 ) -> Result<ModelResponse, tinyagents_harness::cost::ControlledDispatchError> {
     if !request.tools.is_empty() {
@@ -101,16 +103,24 @@ pub async fn complete_once_controlled(
     // reach the provider even though `request.tools` is empty above. The typed
     // request fields own these keys.
     if let Some(key) = reserved_provider_option(&request.provider_options) {
-        return Err(tinyagents_harness::cost::ControlledDispatchError::Model(tinyinference_llm::Error::Validation(format!(
-            "complete_once: provider_options may not set `{key}`; use the typed request fields"
-        ))));
+        return Err(tinyagents_harness::cost::ControlledDispatchError::Model(
+            tinyinference_llm::Error::Validation(format!(
+                "complete_once: provider_options may not set `{key}`; use the typed request fields"
+            )),
+        ));
     }
     // Blank is refused, but the id itself goes out exactly as the caller named it.
     let model_id = request
         .model
         .as_deref()
         .filter(|model| !model.trim().is_empty())
-        .ok_or_else(|| tinyagents_harness::cost::ControlledDispatchError::Model(tinyinference_llm::Error::Validation("complete_once: request.model is required".to_string())))?
+        .ok_or_else(|| {
+            tinyagents_harness::cost::ControlledDispatchError::Model(
+                tinyinference_llm::Error::Validation(
+                    "complete_once: request.model is required".to_string(),
+                ),
+            )
+        })?
         .to_string();
 
     let mut model = OpenAiModel::new(endpoint.api_key.clone())
@@ -129,17 +139,15 @@ pub async fn complete_once_controlled(
     );
 
     let model: std::sync::Arc<dyn ChatModel<()>> = std::sync::Arc::new(model);
-    let monetary_budget = budget.map(|budget| tinyagents_harness::cost::ModelBudget::new(
-        budget.ledger.clone(),
-        budget.call,
-    ));
+    let monetary_budget = budget.map(|budget| {
+        tinyagents_harness::cost::ModelBudget::new(budget.ledger.clone(), budget.call)
+    });
     if admission.is_none() {
         let model: std::sync::Arc<dyn ChatModel<()>> = match (budget, observer) {
             (Some(budget), observer) => budget.wrap_with_observer(model, observer),
             (None, Some(observer)) => {
-                let normalized = std::sync::Arc::new(
-                    tinyagents_harness::cost::GatewayChargeModel::new(model),
-                );
+                let normalized =
+                    std::sync::Arc::new(tinyagents_harness::cost::GatewayChargeModel::new(model));
                 std::sync::Arc::new(
                     tinyagents_harness::observability::physical_dispatch::ObservedChatModel::new(
                         normalized, observer,
