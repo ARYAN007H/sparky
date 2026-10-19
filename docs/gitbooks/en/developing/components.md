@@ -27,6 +27,7 @@ sandbox = true     # tinybox
 channels = true    # tinychannels
 skills = true      # tinyskills
 voice = true       # tinyvoice
+eventqueues = true # tinyeventqueues: inbound event queues
 ```
 
 Each switch also reads `OPENHUMAN_COMPONENT_<NAME>=0|1` (for example `OPENHUMAN_COMPONENT_VOICE=0`); the environment wins over the file.
@@ -74,6 +75,20 @@ A `components.*` key already present in the file always wins over its legacy fla
 `components.memes` is the master switch: off means no remix and no module load, and the A/B arm is ignored. When on, `OPENHUMAN_TINYMEMES` (`off`, `on`, `ab`, `ab:NN`; build-time default `OPENHUMAN_TINYMEMES_DEFAULT`) picks the threads that are remixed. The `[memes]` section tunes it: `timeout_ms` (default 20000) and `meme_cooldown` (default 3). `OPENHUMAN_TINYMEMES_TIMEOUT_MS` and `OPENHUMAN_TINYMEMES_MEME_COOLDOWN` override them when set.
 
 The module reads its own `TINYMEMES_*` overrides from the process environment, so credentials never cross the bus: `TINYMEMES_OPENROUTER_KEY` (and `TINYMEMES_MODEL`) route the rewrite model and slang research through OpenRouter, `TINYMEMES_JEV` (`auto`, `typesafe`, `openrouter`, `openjev`, `llm`) with `TINYMEMES_TYPESAFE_KEY` / `TINYMEMES_OPENJEV_KEY` picks the Jev route. Without any override the module asks OpenHuman for Jev; when OpenHuman has none (signed out, offline session) the chat model answers Jev's questions instead. After the reply is delivered the module may run slang and meme research in the background through OpenHuman web search. Learned slang, memes and the remixed-message ring are documents on the storage port (older `<workspace>/tinymemes/*.json` files are adopted once and renamed `*.migrated`).
+
+## Event queues
+
+`eventqueues` is the inbound event queues (the `tinyeventqueues` module), tuned by the `[inbound]` section. When it is on and `[inbound] enabled` is `true` (the default), Composio triggers and agent webhooks are no longer triaged where they arrive. They are ingested into the module, which writes them to the host's storage before answering. The module rejects a redelivery of the same trigger (the Composio trigger uuid, or the webhook's correlation id), filters and paces a flood (rate limits fold the overflow into one digest), and calls the host back with `Deliver` when each event is due. Triage runs then. A triage that comes back `Deferred` is retried at its `defer_until_ms` instead of being dropped. A failed or slow triage backs off, and an event that runs out of attempts, or that triage marks terminal, is parked in the dead-letter queue. `inbound.stats`, `inbound.dead` and `inbound.redrive` inspect and replay the queues. They answer `COMPONENT_DISABLED:eventqueues` when the switch is off.
+
+With the switch off, `[inbound] enabled = false`, or the module unavailable on this host, events take the direct triage path as before. An event too large to queue (over 192 KiB encoded) also takes the direct path.
+
+| `[inbound]` key | Default | Meaning |
+| --- | --- | --- |
+| `enabled` | `true` | route inbound events through the queues |
+| `queues_path` | unset | a `queues.json` replacing the module's shipped one; the host declares exactly these queues on the module's storage scope |
+| `pipeline_path` | unset | a `pipeline.json` replacing the shipped one (gate, coalescing, salience, lanes, cadences, retry back-off) |
+| `queue_url` | `storage` | where the queues live: the module's storage scope, or `amqp://` / `amqps://` for a RabbitMQ broker in builds with the storage `rabbitmq` driver |
+| `triage_timeout_ms` | `90000` | how long one delivered event's triage may take before the delivery is retried |
 
 ## Wallet
 
