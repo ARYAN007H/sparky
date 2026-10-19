@@ -1,6 +1,6 @@
 //! OpenRouter detection and API-key validation.
 
-use super::*;
+use tinyinference_core::sanitize::sanitize_api_error;
 
 pub(super) async fn validate_openrouter_api_key(
     client: &reqwest::Client,
