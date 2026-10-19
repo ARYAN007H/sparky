@@ -57,7 +57,11 @@ pub(crate) fn notify_pending_approval(flow: &Flow, run_id: &str, pending_approva
             "\"{}\" is waiting on {} approval{} before it can continue.",
             flow.name,
             pending_approvals.len(),
-            if pending_approvals.len() == 1 { "" } else { "s" }
+            if pending_approvals.len() == 1 {
+                ""
+            } else {
+                "s"
+            }
         ),
         deep_link: None,
         timestamp_ms: now_ms(),

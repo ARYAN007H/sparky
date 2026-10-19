@@ -20,7 +20,10 @@ fn failed_graph_with_engine_output_keeps_the_legacy_success_payload() {
     .expect("an engine RunOutcome remains the legacy RPC payload, even for failed status");
 
     assert_eq!(outcome.run_id, "flow:example:run");
-    assert_eq!(outcome.output, json!({"partial": [1, 2], "nodes": {"node": "result"}}));
+    assert_eq!(
+        outcome.output,
+        json!({"partial": [1, 2], "nodes": {"node": "result"}})
+    );
     assert!(outcome.pending_approvals.is_empty());
     assert_eq!(outcome.status, "failed");
 }

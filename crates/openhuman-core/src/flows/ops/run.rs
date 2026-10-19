@@ -23,12 +23,8 @@ pub async fn flows_run(
         trigger,
     )
     .await?;
-    let result = crate::flows::runs_adapter::wait_for_outcome(
-        &mut events,
-        &prepared.run_id,
-        0,
-    )
-    .await?;
+    let result =
+        crate::flows::runs_adapter::wait_for_outcome(&mut events, &prepared.run_id, 0).await?;
     drop(session);
     Ok(run_outcome(result, prepared.no_actionable_nodes))
 }
@@ -128,10 +124,9 @@ pub(super) async fn prepare_flow_run(
         )
         .await
         .map_err(|error| error.wire_message())?;
-    let flow: Flow = store::roundtrip(
-        workflow.ok_or_else(|| format!("flow '{flow_id}' not found"))?,
-    )
-    .map_err(|error| format!("decode workflow for run: {error}"))?;
+    let flow: Flow =
+        store::roundtrip(workflow.ok_or_else(|| format!("flow '{flow_id}' not found"))?)
+            .map_err(|error| format!("decode workflow for run: {error}"))?;
     let no_actionable_nodes = !graph_has_actionable_nodes(&flow.graph);
     if no_actionable_nodes {
         tracing::warn!(

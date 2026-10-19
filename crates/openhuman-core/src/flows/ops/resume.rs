@@ -48,13 +48,8 @@ pub async fn flows_resume(
         rejections,
         timeout_ms: FLOW_RUN_TIMEOUT_SECS.saturating_mul(1_000),
     };
-    let resumed = crate::flows::runs_adapter::resume_and_wait(
-        ctx,
-        config,
-        request,
-        bindings,
-    )
-    .await?;
+    let resumed =
+        crate::flows::runs_adapter::resume_and_wait(ctx, config, request, bindings).await?;
 
     tracing::info!(
         target: "flows",

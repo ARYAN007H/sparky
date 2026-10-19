@@ -1,7 +1,7 @@
 use super::*;
 
-use tinyflows_catalog::run_management as rm;
 use tinyflows_bus::catalog::{self as wire, FlowRun as WireFlowRun};
+use tinyflows_catalog::run_management as rm;
 
 /// Cancel a workflow run through its owner-scoped Runs.CancelRun operation.
 pub async fn flows_cancel_run(config: &Config, run_id: &str) -> Result<Outcome<Value>, String> {
@@ -153,11 +153,7 @@ async fn get_run_with_storage(
         .map_err(|error| error.to_string())
 }
 
-async fn catalog_call<T, A>(
-    config: &Config,
-    member: &'static str,
-    args: A,
-) -> Result<T, String>
+async fn catalog_call<T, A>(config: &Config, member: &'static str, args: A) -> Result<T, String>
 where
     T: serde::de::DeserializeOwned + Send + 'static,
     A: serde::Serialize + Send + 'static,

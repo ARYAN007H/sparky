@@ -10,14 +10,14 @@ mod session;
 
 use std::sync::Arc;
 
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use tinyflows_bus::runs::{self, ResumeRun, StartRun};
-use tinyflows_catalog::{Flow, types::FlowRunTrigger};
+use tinyflows_catalog::{types::FlowRunTrigger, Flow};
 
 use crate::config::Config;
 use crate::core::runtime::DispatchCtx;
-use crate::flows::catalog_storage::{self, CatalogStorageRegistration};
 use crate::flows::caps_host::{self, CapsHostRegistration};
+use crate::flows::catalog_storage::{self, CatalogStorageRegistration};
 use crate::modules::tinyflows as module;
 
 const RUN_TIMEOUT_MS: u64 = 600_000;
@@ -117,7 +117,13 @@ pub(crate) async fn start_run(
     input: Value,
     inputs: serde_json::Map<String, Value>,
     trigger: FlowRunTrigger,
-) -> Result<(Arc<RunSession>, tokio::sync::mpsc::UnboundedReceiver<runs::RunEvent>), String> {
+) -> Result<
+    (
+        Arc<RunSession>,
+        tokio::sync::mpsc::UnboundedReceiver<runs::RunEvent>,
+    ),
+    String,
+> {
     let bindings = register_bindings(ctx, config, flow, run_id).await?;
     let session = RunSession::new(
         Arc::clone(&bindings),
@@ -152,19 +158,17 @@ pub(crate) async fn start_run(
         inputs,
         timeout_ms: RUN_TIMEOUT_MS,
     };
-    let started: runs::StartRunResponse = match proxy
-        .call(runs::methods::START_RUN, (request,))
-        .await
-    {
-        Ok(started) => started,
-        Err(error) => {
-            match run_exists(config, bindings.storage(), run_id).await {
-                Ok(true) | Err(_) => session.start_polling(proxy),
-                Ok(false) => session::remove(&session),
+    let started: runs::StartRunResponse =
+        match proxy.call(runs::methods::START_RUN, (request,)).await {
+            Ok(started) => started,
+            Err(error) => {
+                match run_exists(config, bindings.storage(), run_id).await {
+                    Ok(true) | Err(_) => session.start_polling(proxy),
+                    Ok(false) => session::remove(&session),
+                }
+                return Err(error.wire_message());
             }
-            return Err(error.wire_message());
-        }
-    };
+        };
     if started.run_id != run_id {
         session::remove(&session);
         return Err("TinyFlows admitted a different run id".to_string());
@@ -197,9 +201,9 @@ pub(crate) async fn wait_for_outcome(
                     .map_err(|error| format!("decode parked run outcome: {error}"))?;
                 return Ok(RunOutcome {
                     run_id: run_id.to_owned(),
-                    output: parked.output.ok_or_else(|| {
-                        "TinyFlows omitted the parked engine outcome".to_string()
-                    })?,
+                    output: parked
+                        .output
+                        .ok_or_else(|| "TinyFlows omitted the parked engine outcome".to_string())?,
                     pending_approvals: parked.pending_approvals,
                     status: "pending_approval".into(),
                 });
@@ -240,7 +244,9 @@ pub(crate) async fn register_resume_bindings(
         .map_err(|error| error.wire_message())?;
     let run = run.ok_or_else(|| format!("flow run '{run_id}' not found"))?;
     if run.flow_id != flow_id {
-        return Err(format!("flow run '{run_id}' does not belong to flow '{flow_id}'"));
+        return Err(format!(
+            "flow run '{run_id}' does not belong to flow '{flow_id}'"
+        ));
     }
     if run.status != "pending_approval" {
         return Err(format!("flow run '{run_id}' is not waiting for approval"));
@@ -263,7 +269,9 @@ pub(crate) async fn register_resume_bindings(
 
     if let Some(session) = session::get(&catalog.storage(), run_id) {
         if session.flow_id() != flow_id {
-            return Err(format!("flow run '{run_id}' is bound to a different workflow"));
+            return Err(format!(
+                "flow run '{run_id}' is bound to a different workflow"
+            ));
         }
     }
     register_with_catalog(ctx, config, &flow, run_id, catalog).await
@@ -333,7 +341,7 @@ pub(crate) async fn resume_and_wait(
     session.replace_flow(candidate.flow.clone()).await;
     session.set_trigger(FlowRunTrigger::Resume);
     session.mark_resumed();
-        session.replace_bindings(candidate);
+    session.replace_bindings(candidate);
     session.start_polling(proxy);
     wait_for_outcome(&mut receiver, &request.run_id, baseline).await
 }
@@ -471,10 +479,7 @@ pub(crate) async fn after_recovery(
     Ok(())
 }
 
-fn finished_outcome(
-    finished: runs::RunFinished,
-    run_id: &str,
-) -> Result<RunOutcome, String> {
+fn finished_outcome(finished: runs::RunFinished, run_id: &str) -> Result<RunOutcome, String> {
     if finished.timed_out {
         return Err(finished
             .error
@@ -489,10 +494,12 @@ fn finished_outcome(
         });
     }
     let output = finished.output.ok_or_else(|| {
-        finished
-            .error
-            .clone()
-            .unwrap_or_else(|| format!("flow run ended as {} without an engine outcome", finished.status))
+        finished.error.clone().unwrap_or_else(|| {
+            format!(
+                "flow run ended as {} without an engine outcome",
+                finished.status
+            )
+        })
     })?;
     Ok(RunOutcome {
         run_id: run_id.to_owned(),

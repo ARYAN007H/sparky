@@ -406,4 +406,3 @@ fn render_run_digest_is_bounded_and_includes_key_fields() {
     assert!(digest.contains("n1"));
     assert!(digest.chars().count() <= DIGEST_MAX_CHARS);
 }
-

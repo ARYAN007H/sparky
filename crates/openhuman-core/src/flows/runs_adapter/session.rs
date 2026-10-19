@@ -5,12 +5,12 @@ use std::sync::{Arc, LazyLock, Mutex};
 use std::time::Duration;
 
 use tinyflows_bus::runs::{self, RunEvent};
-use tinyflows_catalog::{Flow, types::FlowRunTrigger};
+use tinyflows_catalog::{types::FlowRunTrigger, Flow};
 
 use crate::config::Config;
 use crate::modules::tinyflows as module;
 
-use super::{RunBindings, projection};
+use super::{projection, RunBindings};
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub(crate) struct RunKey {
@@ -158,25 +158,29 @@ impl RunSession {
     }
 
     pub(super) fn mark_started(&self) -> bool {
-        self.live_actor.store(true, std::sync::atomic::Ordering::Release);
+        self.live_actor
+            .store(true, std::sync::atomic::Ordering::Release);
         !self
             .started_event
             .swap(true, std::sync::atomic::Ordering::AcqRel)
     }
 
     pub(super) fn mark_finished(&self) -> bool {
-        self.live_actor.store(false, std::sync::atomic::Ordering::Release);
+        self.live_actor
+            .store(false, std::sync::atomic::Ordering::Release);
         !self
             .finished_event
             .swap(true, std::sync::atomic::Ordering::AcqRel)
     }
 
     pub(super) fn mark_parked(&self) {
-        self.live_actor.store(false, std::sync::atomic::Ordering::Release);
+        self.live_actor
+            .store(false, std::sync::atomic::Ordering::Release);
     }
 
     pub(super) fn mark_resumed(&self) {
-        self.live_actor.store(true, std::sync::atomic::Ordering::Release);
+        self.live_actor
+            .store(true, std::sync::atomic::Ordering::Release);
     }
 
     pub(super) fn is_live_actor(&self) -> bool {
@@ -226,7 +230,11 @@ impl RunSession {
     /// and the background projector from reading and publishing one sequence
     /// twice. `project=false` is used only to prime a process-restarted parked
     /// run before admitting its resume.
-    pub(super) async fn drain(&self, proxy: &tinybus::Proxy, project: bool) -> Result<bool, String> {
+    pub(super) async fn drain(
+        &self,
+        proxy: &tinybus::Proxy,
+        project: bool,
+    ) -> Result<bool, String> {
         let _poll = self.poll_lock.lock().await;
         loop {
             let cursor = self.cursor();
@@ -278,13 +286,19 @@ pub(crate) fn insert(session: Arc<RunSession>) -> Result<(), String> {
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner);
     if sessions.contains_key(&key) {
-        return Err(format!("flow run '{}' already has a host session", session.run_id));
+        return Err(format!(
+            "flow run '{}' already has a host session",
+            session.run_id
+        ));
     }
     sessions.insert(key, session);
     Ok(())
 }
 
-pub(crate) fn get(storage: &tinyflows_bus::catalog::CatalogStorage, run_id: &str) -> Option<Arc<RunSession>> {
+pub(crate) fn get(
+    storage: &tinyflows_bus::catalog::CatalogStorage,
+    run_id: &str,
+) -> Option<Arc<RunSession>> {
     SESSIONS
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner)
@@ -308,4 +322,3 @@ pub(crate) fn remove(session: &Arc<RunSession>) {
         sessions.remove(&key);
     }
 }
-

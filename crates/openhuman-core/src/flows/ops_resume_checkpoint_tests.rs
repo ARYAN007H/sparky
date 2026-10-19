@@ -52,7 +52,9 @@ async fn flows_resume_succeeds_when_the_graph_is_unchanged() {
         .collect();
     assert_eq!(
         response_keys,
-        ["output", "pending_approvals", "thread_id"].into_iter().collect(),
+        ["output", "pending_approvals", "thread_id"]
+            .into_iter()
+            .collect(),
         "ResumeRun's internal admission acknowledgement must not change the public RPC shape"
     );
     assert_eq!(resumed.value["pending_approvals"], json!([]));

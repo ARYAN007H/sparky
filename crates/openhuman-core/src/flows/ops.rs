@@ -42,18 +42,16 @@ use tinyflows::triggers::graph_trigger_warnings;
 // do at all are properties of the graph, not of this host. Re-exported at
 // `ops::` scope because the agent tools and this module's tests already name
 // them there.
-pub(crate) use tinyflows_catalog::graph_policy::{
-    enforce_side_effect_approval, graph_has_actionable_nodes, trigger_is_automatic,
-};
 use crate::config::Config;
 use crate::core::Outcome;
 use crate::flows::bus;
 use crate::flows::draft_store;
 use crate::flows::store;
 use tinyflows_catalog::build_registry;
-use tinyflows_catalog::types::{
-    FlowConnection, FlowRunTrigger, FlowSuggestion, SuggestionStatus,
+pub(crate) use tinyflows_catalog::graph_policy::{
+    enforce_side_effect_approval, graph_has_actionable_nodes, trigger_is_automatic,
 };
+use tinyflows_catalog::types::{FlowConnection, FlowRunTrigger, FlowSuggestion, SuggestionStatus};
 use {tinyflows_catalog::Flow, tinyflows_catalog::FlowRun};
 
 /// Overall safety bound on a single `flows_run` / `flows_resume`. Individual
@@ -149,11 +147,11 @@ pub use connections::*;
 pub use definitions::*;
 pub use discovery::*;
 pub use drafts::*;
+pub(crate) use execution::{export_run_to_langfuse, notify_pending_approval};
 pub(crate) use inference_readiness::*;
 pub use resume::*;
 pub use run::*;
 pub use run_management::*;
-pub(crate) use execution::{export_run_to_langfuse, notify_pending_approval};
 pub use streaming::*;
 use trail_off::*;
 pub use triggers::*;

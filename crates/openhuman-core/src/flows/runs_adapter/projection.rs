@@ -43,16 +43,16 @@ pub(super) async fn project(session: &RunSession, event: &RunEvent) {
                 publish_step(session, node_id, status);
             }
         }
-        "graph_observation" => match serde_json::from_value::<tinyagents_graph::GraphObservation>(
-            event.data.clone(),
-        ) {
-            Ok(observation) => session.add_observation(observation),
-            Err(_) => tracing::warn!(
-                target: "flows",
-                run_id = %session.run_id,
-                "[flows] PollRun graph observation could not be decoded for Langfuse"
-            ),
-        },
+        "graph_observation" => {
+            match serde_json::from_value::<tinyagents_graph::GraphObservation>(event.data.clone()) {
+                Ok(observation) => session.add_observation(observation),
+                Err(_) => tracing::warn!(
+                    target: "flows",
+                    run_id = %session.run_id,
+                    "[flows] PollRun graph observation could not be decoded for Langfuse"
+                ),
+            }
+        }
         "agent_progress" => {
             // Detailed agent events remain on the module stream. The OpenHuman
             // workflow overlay consumes the node-level progress events above.
