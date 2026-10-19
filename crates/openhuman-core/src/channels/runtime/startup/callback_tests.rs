@@ -45,6 +45,8 @@ async fn module_inbound_envelope_reaches_host_dispatch_with_identity_intact() {
             ..Default::default()
         },
         text: "native Telegram inbound".into(),
+        reply_to_id: Some("parent-message-9".into()),
+        timestamp_unix_ms: Some(1_700_000_000_123),
         access: tinychannels_bus::channel::AccessContext {
             dm_decision: tinychannels_bus::channel::SenderDmDecision::Allow,
             ..Default::default()
@@ -69,6 +71,7 @@ async fn module_inbound_envelope_reaches_host_dispatch_with_identity_intact() {
         .try_recv()
         .expect("native envelope should enter the channel dispatch queue");
     assert!(runtime_message.message.channel.is_empty());
+    assert!(!runtime_message.authenticated_relay);
     let received_envelope = runtime_message
         .inbound_envelope
         .expect("typed source envelope must reach module preparation");
@@ -85,6 +88,117 @@ async fn module_inbound_envelope_reaches_host_dispatch_with_identity_intact() {
     assert_eq!(received_envelope.parts, envelope.parts);
     assert_eq!(received_envelope.access, envelope.access);
     assert_eq!(received_envelope.raw, envelope.raw);
+}
+
+#[tokio::test]
+async fn typed_inbound_rejects_malformed_or_cross_account_envelopes_without_queueing() {
+    let (dispatch, mut received) = tokio::sync::mpsc::channel(4);
+    let callback = ChannelHostCallbacks::new(
+        &crate::core::runtime::DispatchCtx::host_default(),
+        Arc::new(crate::config::Config::default()),
+        Arc::new(OnceLock::new()),
+        Arc::new(OnceLock::from(Arc::new(HashMap::new()))),
+        None,
+        dispatch,
+    );
+    let valid_envelope = || tinychannels_bus::ChannelInboundEnvelope {
+        channel: tinychannels_bus::ChannelRef {
+            id: "telegram".into(),
+            account_id: Some("telegram:bot-a".into()),
+        },
+        message_id: "message-1".into(),
+        conversation: tinychannels_bus::ConversationRef {
+            kind: tinychannels_bus::ConversationKind::Dm,
+            id: "42".into(),
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    let mut wrong_account = valid_envelope();
+    wrong_account.channel.account_id = Some("telegram:bot-b".into());
+    let mut wrong_provider = valid_envelope();
+    wrong_provider.channel.id = "slack".into();
+    let invalid_payloads = [
+        serde_json::to_value(wrong_account).expect("encode wrong-account envelope"),
+        serde_json::to_value(wrong_provider).expect("encode wrong-provider envelope"),
+        serde_json::json!({
+            "channel": { "id": "telegram", "account_id": "telegram:bot-a" },
+            "conversation": "not-a-conversation",
+            "parts": []
+        }),
+        serde_json::json!({
+            "envelope": "malformed",
+            "delivered_via_authenticated_relay": true
+        }),
+    ];
+
+    for payload in invalid_payloads {
+        assert!(
+            callback
+                .deliver_inbound("telegram:bot-a".into(), payload)
+                .await
+                .is_err(),
+            "invalid typed or relay input must fail closed"
+        );
+    }
+    assert!(
+        received.try_recv().is_err(),
+        "rejected input must not reach channel dispatch"
+    );
+}
+
+#[tokio::test]
+async fn trusted_relay_provenance_and_legacy_inbound_remain_supported() {
+    let (dispatch, mut received) = tokio::sync::mpsc::channel(2);
+    let callback = ChannelHostCallbacks::new(
+        &crate::core::runtime::DispatchCtx::host_default(),
+        Arc::new(crate::config::Config::default()),
+        Arc::new(OnceLock::new()),
+        Arc::new(OnceLock::from(Arc::new(HashMap::new()))),
+        None,
+        dispatch,
+    );
+    let envelope = tinychannels_bus::ChannelInboundEnvelope {
+        channel: tinychannels_bus::ChannelRef {
+            id: "telegram".into(),
+            account_id: Some("telegram:bot-a".into()),
+        },
+        message_id: "message-2".into(),
+        conversation: tinychannels_bus::ConversationRef {
+            id: "42".into(),
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    let relay = tinychannels_bus::module_relay::RelayInboundDelivery {
+        envelope,
+        delivered_via_authenticated_relay: true,
+    };
+    callback
+        .deliver_inbound(
+            "telegram".into(),
+            serde_json::to_value(relay).expect("encode relay delivery"),
+        )
+        .await
+        .expect("trusted relay delivery remains accepted");
+    assert!(received.try_recv().unwrap().authenticated_relay);
+
+    let legacy = tinychannels_bus::ChannelMessage {
+        channel: "telegram".into(),
+        text: "legacy message".into(),
+        ..Default::default()
+    };
+    callback
+        .deliver_inbound(
+            "telegram".into(),
+            serde_json::to_value(legacy).expect("encode legacy message"),
+        )
+        .await
+        .expect("legacy callback remains supported");
+    let legacy_runtime_message = received.try_recv().unwrap();
+    assert!(!legacy_runtime_message.authenticated_relay);
+    assert!(legacy_runtime_message.inbound_envelope.is_none());
+    assert_eq!(legacy_runtime_message.message.text, "legacy message");
 }
 
 #[derive(Default)]
