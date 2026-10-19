@@ -13,7 +13,7 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-use std::cell::RefCell;
+use std::sync::Mutex;
 
 use tinyagents_graph::parallel::{parse_relative_claim_paths, ClaimConflict, ClaimPathError};
 use tinyagents_orchestration::parallel::WorkerDispatchMode;
@@ -234,7 +234,7 @@ struct AdmitPayload {
 struct SpawnParallelPolicy<'a> {
     parent: &'a ParentExecutionContext,
     /// Rejection kind per input index (the module carries only the sentence).
-    kinds: RefCell<HashMap<usize, ParallelTaskRejectionKind>>,
+    kinds: Mutex<HashMap<usize, ParallelTaskRejectionKind>>,
 }
 
 impl SpawnParallelPolicy<'_> {
@@ -244,7 +244,10 @@ impl SpawnParallelPolicy<'_> {
         kind: ParallelTaskRejectionKind,
         message: String,
     ) -> AdmissionVerdict {
-        self.kinds.borrow_mut().insert(index, kind);
+        self.kinds
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .insert(index, kind);
         AdmissionVerdict::Reject(message)
     }
 }
@@ -319,10 +322,13 @@ pub(crate) fn prepare_spawn_parallel_tasks_from_defs(
     );
     let policy = SpawnParallelPolicy {
         parent,
-        kinds: RefCell::new(HashMap::new()),
+        kinds: Mutex::new(HashMap::new()),
     };
     let staged = plan.stage(&policy);
-    let kinds = policy.kinds.into_inner();
+    let kinds = policy
+        .kinds
+        .into_inner()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
     staged
         .into_iter()
         .enumerate()

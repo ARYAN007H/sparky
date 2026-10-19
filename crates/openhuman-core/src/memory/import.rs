@@ -79,7 +79,7 @@ impl CheckpointStore for FileCheckpointStore {
             .unwrap_or_default()
     }
 
-    fn save(&self, file: &ImportFile) -> Result<(), String> {
+    fn save(&self, file: &ImportFile) -> std::result::Result<(), String> {
         super::state_store::save(&self.workspace_dir, STATE, file)
             .map_err(|error| error.to_string())
     }
