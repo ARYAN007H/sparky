@@ -438,11 +438,8 @@ pub(crate) async fn process_channel_runtime_message(
         }
         None => None,
     };
-    // Each surface has its own TinyAgents runner. Serialize the canonical
-    // durable transcript across those runners before entering shared agent
-    // execution, and retain the lease through provider delivery below. The
-    // runner's own lock is local to that runner and checks sessions in before
-    // egress, so it cannot cover this cross-surface boundary.
+    // Serialize this durable identity across surface runners through delivery;
+    // TinyAgents' own lock is local to one runner and checks in before egress.
     let lease_agent_id = selected_host
         .as_ref()
         .map(|host| host.definition.id.clone())
