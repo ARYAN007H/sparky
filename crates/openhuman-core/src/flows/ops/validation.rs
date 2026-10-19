@@ -104,8 +104,8 @@ pub(super) async fn ensure_config_aware_engine_compatible(
     }
 }
 
-/// Validates a candidate graph without persisting it and reports all errors
-/// with host trigger warnings added after successful engine validation.
+/// Validates a candidate graph without persisting it and returns the owner
+/// module's trigger warnings after successful graph validation.
 pub async fn flows_validate(
     ctx: &DispatchCtx,
     config: &Config,
