@@ -236,11 +236,8 @@ pub fn spawn_flows_boot_reconcile(ctx: std::sync::Arc<crate::core::runtime::Core
         tokio::spawn(async move {
             log::debug!("[flows] boot reconcile: loading config");
             let dispatch = crate::core::runtime::DispatchCtx::new(ctx);
-            match dispatch.load_config().await {
-                Ok(config) => {
-                    let swept =
-                        crate::flows::recovery::sweep_orphaned_runs_on_boot(&dispatch, &config)
-                            .await;
+            match reconcile_flows_on_boot(&dispatch).await {
+                Ok(swept) => {
                     // Logged unconditionally: a silent success and a task that
                     // never ran are otherwise indistinguishable in a boot log.
                     log::debug!("[flows] boot reconcile: completed; reconciled_runs={swept}");
@@ -250,14 +247,21 @@ pub fn spawn_flows_boot_reconcile(ctx: std::sync::Arc<crate::core::runtime::Core
                         );
                     }
                 }
-                Err(err) => {
-                    log::warn!("[core] config load failed, skipping flows boot reconcile: {err}");
+                Err(error) => {
+                    log::warn!("[core] config load failed, skipping flows boot reconcile: {error}");
                 }
             }
         });
     };
     #[cfg(not(feature = "flows"))]
     log::debug!("[flows] flows feature disabled at compile time — no boot run reconciliation");
+}
+
+async fn reconcile_flows_on_boot(
+    dispatch: &crate::core::runtime::DispatchCtx,
+) -> Result<usize, String> {
+    let config = dispatch.load_config().await.map_err(|error| error.to_string())?;
+    Ok(crate::flows::recovery::sweep_orphaned_runs_on_boot(dispatch, &config).await)
 }
 
 /// Cron scheduler — ticks the schedule module every ~5s and executes due jobs
