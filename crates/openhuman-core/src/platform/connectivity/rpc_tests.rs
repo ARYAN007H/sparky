@@ -472,5 +472,7 @@ async fn pick_listen_port_identifies_ipv6_openhuman_listener_when_supported() {
     let _ = shutdown_tx.send(());
     task.abort();
     let error = result.expect_err("an OpenHuman IPv6 listener should request takeover");
-    assert!(matches!(error, PickListenPortError::WouldTakeOver { preferred, fingerprint } if preferred == port && fingerprint == "openhuman-core"));
+    assert!(
+        matches!(error, PickListenPortError::WouldTakeOver { preferred, fingerprint } if preferred == port && fingerprint == "openhuman-core")
+    );
 }
