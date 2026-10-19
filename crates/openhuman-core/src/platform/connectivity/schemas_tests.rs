@@ -1,4 +1,14 @@
 use super::*;
+use crate::core::all::assert_schema_controller_parity;
+
+#[test]
+fn connectivity_schema_catalog_matches_registered_controllers() {
+    assert_schema_controller_parity(
+        &all_controller_schemas(),
+        &all_registered_controllers(),
+        "diag",
+    );
+}
 use crate::core::runtime::DispatchCtx;
 
 #[test]

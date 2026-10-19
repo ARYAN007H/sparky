@@ -7,7 +7,7 @@ fn config_schema_catalog_matches_registered_controllers() {
     assert_schema_controller_parity(
         &all_controller_schemas(),
         &all_registered_controllers(),
-        "get_settings",
+        "get",
     );
 }
 use crate::core::runtime::DispatchCtx;
