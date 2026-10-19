@@ -91,7 +91,7 @@ const HOLD_DURATION_MS = 800;
 
 describe('PTT — global push-to-talk flow', function () {
   before(function () {
-    this.skip();
+    this.skip(); // https://github.com/tinyhumansai/openhuman/issues/8096 — this global-hotkey PTT surface is being removed.
   });
   this.timeout(180_000);
 
