@@ -1,7 +1,7 @@
 use super::*;
 
 use std::sync::Arc;
-use tinyagents_session::transcript::{TranscriptLocator, TranscriptMessage};
+use tinyagents_session::transcript::TranscriptMessage;
 use tinyinference_llm::message::Message;
 use tinyinference_llm::model::ChatModel;
 
@@ -14,14 +14,14 @@ fn imported_history_gets_the_real_prefix_and_freezes_it_after_first_turn() {
                 .enable_all()
                 .build()
                 .expect("test runtime")
-                .block_on(imported_history_gets_the_real_prefix_and_freezes_it_after_first_turn());
+                .block_on(run_imported_history_prefix_regression());
         })
         .expect("test thread")
         .join()
         .expect("test thread panicked");
 }
 
-async fn imported_history_gets_the_real_prefix_and_freezes_it_after_first_turn() {
+async fn run_imported_history_prefix_regression() {
     let root = tempfile::tempdir().expect("workspace");
     let locator = crate::agent::session_store::splice_fixture::memory_locator();
     let tool = || {
