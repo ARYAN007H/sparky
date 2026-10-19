@@ -15,21 +15,19 @@ import {
 } from "../debug/web-ui-lib.mjs";
 
 test("coreLaunchSpec isolates the core from operator credentials, storage, and dotenv", () => {
-  const spec = coreLaunchSpec(
-    {
-      OPENHUMAN_BACKEND_API_KEY: "inherited",
-      OPENHUMAN_BACKEND_SESSION_TOKEN: "inherited",
-      OPENHUMAN_STORAGE_URL: "inherited",
-      OPENHUMAN_DOTENV_PATH: "/operator/.env",
-      RUST_LOG: "trace",
-    },
-    {
-      repo: "/checkout/openhuman",
-      workspace: "/private/run/workspace",
-      mockUrl: "http://127.0.0.1:18500",
-      token: "test-core-token",
-    },
-  );
+  const inheritedEnv = {
+    OPENHUMAN_BACKEND_API_KEY: "inherited",
+    OPENHUMAN_BACKEND_SESSION_TOKEN: "inherited",
+    OPENHUMAN_STORAGE_URL: "inherited",
+    OPENHUMAN_DOTENV_PATH: "/operator/.env",
+    RUST_LOG: "trace",
+  };
+  const spec = coreLaunchSpec(inheritedEnv, {
+    repo: "/checkout/openhuman",
+    workspace: "/private/run/workspace",
+    mockUrl: "http://127.0.0.1:18500",
+    token: "test-core-token",
+  });
   assert.deepEqual(
     {
       cwd: spec.cwd,
@@ -69,6 +67,14 @@ test("coreLaunchSpec isolates the core from operator credentials, storage, and d
   assert.deepEqual(launch[2], ["serve", "--port", "18473"]);
   assert.equal(launch[3], spec.env);
   assert.equal(launch[4], spec.cwd);
+  const finalChildEnv = mergeChildEnv(inheritedEnv, launch[3]);
+  assert.equal(finalChildEnv.OPENHUMAN_BACKEND_API_KEY, undefined);
+  assert.equal(finalChildEnv.OPENHUMAN_BACKEND_SESSION_TOKEN, undefined);
+  assert.equal(finalChildEnv.OPENHUMAN_STORAGE_URL, undefined);
+  assert.equal(
+    finalChildEnv.OPENHUMAN_DOTENV_PATH,
+    "/private/run/workspace/empty.env",
+  );
 });
 
 test("mergeChildEnv overrides and removes inherited variables", () => {
