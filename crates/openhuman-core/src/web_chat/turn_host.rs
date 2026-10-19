@@ -95,11 +95,18 @@ impl WebHost {
         // and commit the same transcript concurrently.
         let tenant = ctx.tenant().map_err(|error| error.to_string())?;
         let tenant_scope = crate::core::runtime::tenant::tenant_key(&tenant, "");
+        // A parallel fork has its own transcript identity, while the other
+        // queue modes resume the canonical thread session.
+        let session_identity = if policy == CheckoutPolicy::Fork {
+            format!("fork:{}", request.request_id)
+        } else {
+            request.thread_id.clone()
+        };
         let lease = crate::agent::session_lease::SessionLease::acquire(
             crate::agent::session_lease::SessionLeaseKey::new(
                 tenant_scope,
                 request.scope.agent_id.clone(),
-                request.thread_id.clone(),
+                session_identity,
             ),
             None,
         )
