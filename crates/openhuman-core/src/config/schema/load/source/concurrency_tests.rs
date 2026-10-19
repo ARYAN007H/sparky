@@ -433,7 +433,7 @@ async fn profile_context_conflict_refresh_keeps_host_owned_restrictions() {
     let profile = host.open(&id).await.unwrap();
     let context = Arc::clone(profile.context());
 
-    let mut initial = CoreContext::scope(context.clone(), async {
+    let initial = CoreContext::scope(context.clone(), async {
         DispatchCtx::new(context.clone())
             .load_config()
             .await
