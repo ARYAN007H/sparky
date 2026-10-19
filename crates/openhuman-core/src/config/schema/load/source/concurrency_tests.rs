@@ -307,7 +307,7 @@ async fn a_file_snapshot_can_seed_an_absent_document_after_storage_bootstrap() {
     let tmp = tempfile::tempdir().unwrap();
     let path = tmp.path().join("config.toml");
     let workspace = tmp.path().join("workspace");
-    let mut file_config = config_at(tmp.path(), "file-seed");
+    let file_config = config_at(tmp.path(), "file-seed");
     file_config.save().await.unwrap();
     let mut snapshot = Config::load_from_config_path(&path, &workspace)
         .await

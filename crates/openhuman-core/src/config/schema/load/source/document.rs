@@ -143,7 +143,7 @@ impl ConfigSource for DocumentConfigSource {
 
     fn anchor(&self) -> ConfigSourceAnchor {
         ConfigSourceAnchor::Document {
-            backend: self.backend_identity,
+            backend: self.backend_identity.clone(),
             scope: self.scope.as_str().to_owned(),
             id: document_id(self.scope.as_str()).expect("validated scope has a document id"),
         }
