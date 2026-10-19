@@ -85,7 +85,9 @@ fn tinymcp_reaches_its_v2_collections_stream_and_secrets() {
 #[test]
 fn tinyjuice_reaches_only_its_blob_prefix() {
     let grant = declared("tinyjuice").unwrap();
-    assert!(grant.collections.is_empty());
+    // Its only document collection is the savings ledger; it declares no other.
+    let names: Vec<&str> = grant.collections.iter().map(|c| c.name.as_str()).collect();
+    assert_eq!(names, [tinyjuice_bus::storage::SAVINGS_COLLECTION]);
     assert!(allowed(
         &grant,
         Object::Blobs,
