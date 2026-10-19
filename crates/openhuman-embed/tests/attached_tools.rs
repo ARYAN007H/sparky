@@ -197,16 +197,21 @@ fn attached_tools_survive_clones_and_session_resume() {
                 .filter(|message| message["role"] == "system")
                 .filter_map(|message| message["content"].as_str())
                 .collect::<Vec<_>>();
+            let has_frozen_prompt = durable_system
+                .iter()
+                .any(|content| content.contains("FROZEN_HOST_PROMPT"));
+            let has_permanent_tools_message = durable_system
+                .iter()
+                .any(|content| content.contains("openhuman-permanent-tools"));
+            if !has_frozen_prompt || !has_permanent_tools_message {
+                eprintln!("durable system messages: {durable_system:#?}");
+            }
             assert!(
-                durable_system
-                    .iter()
-                    .any(|content| content.contains("FROZEN_HOST_PROMPT")),
+                has_frozen_prompt,
                 "the new session must persist its frozen prompt"
             );
             assert!(
-                durable_system
-                    .iter()
-                    .any(|content| content.contains("openhuman-permanent-tools")),
+                has_permanent_tools_message,
                 "the new session must persist its permanent-tools system message"
             );
             let declared_tools = durable["tools"]
