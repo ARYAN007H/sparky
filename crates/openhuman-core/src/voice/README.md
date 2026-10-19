@@ -334,7 +334,6 @@ server and listener when gating credentials change),
   it off. `pub mod voice` always compiles as a facade. With the feature off, [`stub.rs`](./stub.rs) replaces the real modules and mirrors
   the surface other code depends on (`server`, `dictation_listener`,
   `streaming`, `live::ws`, `reply_speech`, `cloud_transcribe`,
-  `cli`, `create_stt_provider`, `effective_stt_provider`, `SttProvider`,
   `cli`, `create_stt_provider`, `effective_stt_provider`, `SttProvider`) with
   no-op or disabled-error bodies.
   Signature drift is caught by the disabled build
