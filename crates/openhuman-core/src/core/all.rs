@@ -513,6 +513,8 @@ fn build_registered_controllers() -> Vec<GroupedController> {
         crate::platform::service::all_service_registered_controllers(),
     );
     let mut inference_controllers = crate::inference::all_inference_registered_controllers();
+    // Agent-owned chat keeps inference's capability group and contract order.
+    // Append it before the local runtime's speech controllers.
     inference_controllers
         .extend(crate::agent_runs::all_inference_agent_chat_registered_controllers());
     inference_controllers.extend(crate::inference::all_local_inference_registered_controllers());
