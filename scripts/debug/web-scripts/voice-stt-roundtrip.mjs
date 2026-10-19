@@ -31,19 +31,27 @@ export default async function voiceSttRoundtrip({ mock, rpc, log }) {
     provider: "cloud",
   });
   if (result.text !== TRANSCRIPT) {
-    throw new Error(`STT returned an unexpected transcript: ${JSON.stringify(result)}`);
+    throw new Error(
+      `STT returned an unexpected transcript: ${JSON.stringify(result)}`,
+    );
   }
   const requests = mock.requests();
   const request = requests.find(
-    entry =>
+    (entry) =>
       entry.method === "POST" &&
       /^\/openai\/v1\/audio\/transcriptions\/?$/.test(entry.url),
   );
   if (!request) {
-    throw new Error("STT returned text without sending a transcription request to the mock");
+    throw new Error(
+      "STT returned text without sending a transcription request to the mock",
+    );
   }
   if (!request.body.includes("retained-stt.wav")) {
-    throw new Error("the mock transcription request did not contain the submitted audio file");
+    throw new Error(
+      "the mock transcription request did not contain the submitted audio file",
+    );
   }
-  log("canonical STT RPC returned the mock transcript after posting valid PCM WAV to local mock");
+  log(
+    "canonical STT RPC returned the mock transcript after posting valid PCM WAV to local mock",
+  );
 }
