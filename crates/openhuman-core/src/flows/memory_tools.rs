@@ -27,9 +27,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use serde_json::json;
-use tinymemory_api::{
-    Citation, LearningKind, MemoryMeta, MetaFilter, SourceKind, SourceRef,
-};
+use tinymemory_api::{Citation, LearningKind, MemoryMeta, MetaFilter, SourceKind, SourceRef};
 use tinytools::{PermissionLevel, Tool, ToolResult};
 
 use crate::agent::turn_origin::{AgentTurnOrigin, TrustedAutomationSource};
