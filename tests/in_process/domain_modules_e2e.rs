@@ -1212,3 +1212,56 @@ fn assert_registered_dispatch(value: &Value, method: &str) {
         "{method} was not registered: {message}"
     );
 }
+
+#[tokio::test]
+async fn tools_return_provider_unavailable_errors_without_attempting_network_access() {
+    let _lock = env_lock_async().await;
+    let harness = setup().await;
+
+    for (id, method, params) in [
+        (80, "openhuman.tools_web_search", json!({ "query": "worker b", "max_results": 1 })),
+        (81, "openhuman.tools_web_answer", json!({ "query": "worker b" })),
+        (82, "openhuman.tools_searxng_search", json!({ "query": "worker b", "max_results": 1 })),
+    ] {
+        let response = rpc(&harness.rpc_base, id, method, params).await;
+        let message = err(&response, method)
+            .get("message")
+            .and_then(Value::as_str)
+            .unwrap_or_else(|| panic!("{method}: expected provider-unavailable error, got {response}"));
+        assert!(
+            message.contains("No web search provider is available"),
+            "{method} should report the configured missing provider without dialing a service: {message}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn approval_rpc_validates_decisions_when_no_gate_is_installed() {
+    let _lock = env_lock_async().await;
+    let harness = setup().await;
+
+    let pending = rpc(&harness.rpc_base, 90, "openhuman.approval_list_pending", json!({})).await;
+    assert!(ok(&pending, "approval_list_pending").is_array());
+    let recent = rpc(
+        &harness.rpc_base,
+        91,
+        "openhuman.approval_list_recent_decisions",
+        json!({ "limit": 3 }),
+    )
+    .await;
+    assert!(ok(&recent, "approval_list_recent_decisions").is_array());
+
+    for (id, method, params, expected) in [
+        (92, "openhuman.approval_list_recent_decisions", json!({ "limit": "3" }), "expected unsigned integer"),
+        (93, "openhuman.approval_decide", json!({ "request_id": "test-request", "decision": "maybe" }), "invalid 'decision'"),
+        (94, "openhuman.approval_decide", json!({ "decision": "deny" }), "missing required param 'request_id'"),
+        (95, "openhuman.approval_decide", json!({ "request_id": "test-request", "decision": "deny" }), "approval gate is not installed"),
+    ] {
+        let response = rpc(&harness.rpc_base, id, method, params).await;
+        let message = err(&response, method)
+            .get("message")
+            .and_then(Value::as_str)
+            .unwrap_or_else(|| panic!("{method}: expected structured validation error, got {response}"));
+        assert!(message.contains(expected), "{method}: expected `{expected}`, got `{message}`");
+    }
+}
