@@ -151,15 +151,21 @@ function loadChromium() {
   return chromium;
 }
 
-async function signIn(page) {
+async function signIn(page, rpc, appOrigin) {
   await page.getByText("Welcome to OpenHuman").waitFor({ timeout: 120_000 });
   log("signing in through the GitHub provider button (mock backend)…");
   await page.getByRole("button", { name: "GitHub" }).click();
-  // The app bounces through `#/auth`, `#/chat` and `#/home` while boot
-  // settles; ready means the signed-in chat composer is actually on screen.
-  await page
-    .getByRole("textbox", { name: "Message input" })
-    .waitFor({ state: "visible", timeout: 120_000 });
+  await waitFor(async () => (await rpc("openhuman.auth_get_state")).isAuthenticated, {
+    timeoutMs: 120_000,
+    what: "the core's authenticated state after mock sign-in",
+  });
+  const composer = page.getByRole("textbox", { name: "Message input" });
+  if (!(await composer.isVisible().catch(() => false))) {
+    // Authenticated users now land on Home by default; scripted browser flows
+    // need the chat route to exercise the same signed-in shell consistently.
+    await page.goto(`${appOrigin}/#/chat`);
+  }
+  await composer.waitFor({ state: "visible", timeout: 120_000 });
 }
 
 async function main() {
@@ -269,7 +275,7 @@ async function main() {
   page.setDefaultNavigationTimeout(120_000);
   await page.goto(devConnectUrl(appOrigin, rpcUrl, token));
   if (opts.signIn) {
-    await signIn(page);
+    await signIn(page, rpc, appOrigin);
     log(`signed in      ${page.url()}`);
   }
   await screenshot("ready");
