@@ -4,8 +4,8 @@ use openhuman_embed::{
     AgentDefinitionSpec, AgentSpec, HostTools, HostTurnTools, Provider, Runtime, Tool,
     ToolScopeSpec, Workspace,
 };
-use tinyagents_session::transcript::{SessionRef, TranscriptLocator};
 use std::sync::Arc;
+use tinyagents_session::transcript::{SessionRef, TranscriptLocator};
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, ResponseTemplate};
 // Runtime is process-wide. Keep the guard on the synchronous test caller;
@@ -144,12 +144,10 @@ fn attached_tools_survive_clones_and_session_resume() {
                 .send()
                 .await
                 .unwrap();
-            let transcripts = tinyagents_session::port::WorkspaceStores::open(
-                agent.workspace_dir(),
-                agent.id(),
-            )
-            .expect("the agent's durable workspace store")
-            .transcripts();
+            let transcripts =
+                tinyagents_session::port::WorkspaceStores::open(agent.workspace_dir(), agent.id())
+                    .expect("the agent's durable workspace store")
+                    .transcripts();
             let continuing_session = SessionRef::scoped("continuing", agent.id());
             assert_eq!(transcripts.session_chain(&continuing_session).len(), 1);
             let frozen_generation_zero =
@@ -194,7 +192,7 @@ fn attached_tools_survive_clones_and_session_resume() {
                         && line.contains("hivemind_list")),
                 "successor generation must persist the updated permanent-tool catalogue"
             );
-            let sealed = String::from_utf8(frozen_generation_zero).unwrap();
+            let sealed = frozen_generation_zero.to_string();
             assert!(
                 sealed.contains("FROZEN_HOST_PROMPT"),
                 "sealed prefix: {sealed}"
