@@ -10,6 +10,7 @@ import {
   isLoopback,
   parseArgs,
   runStamp,
+  startCoreChild,
   waitFor,
 } from "../debug/web-ui-lib.mjs";
 
@@ -38,6 +39,14 @@ test("coreLaunchSpec isolates the core from operator credentials, storage, and d
   assert.equal(spec.env.OPENHUMAN_BACKEND_SESSION_TOKEN, undefined);
   assert.equal(spec.env.OPENHUMAN_STORAGE_URL, undefined);
   assert.equal(spec.env.RUST_LOG, "info");
+
+  let launch;
+  startCoreChild((...args) => (launch = args), "/private/openhuman-core", 18473, spec);
+  assert.equal(launch[0], "core");
+  assert.equal(launch[1], "/private/openhuman-core");
+  assert.deepEqual(launch[2], ["serve", "--port", "18473"]);
+  assert.equal(launch[3], spec.env);
+  assert.equal(launch[4], spec.cwd);
 });
 
 test("mergeChildEnv overrides and removes inherited variables", () => {

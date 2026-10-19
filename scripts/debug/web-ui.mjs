@@ -28,6 +28,7 @@ import {
   mergeChildEnv,
   parseArgs,
   runStamp,
+  startCoreChild,
   USAGE,
   waitFor,
 } from "./web-ui-lib.mjs";
@@ -169,7 +170,7 @@ async function main() {
     token,
     logLevel: process.env.RUST_LOG ?? "info",
   });
-  startChild("core", core, ["serve", "--port", String(corePort)], coreLaunch.env, coreLaunch.cwd);
+  startCoreChild(startChild, core, corePort, coreLaunch);
   await waitFor(async () => (await fetch(`http://127.0.0.1:${corePort}/health`)).ok, {
     timeoutMs: 120_000,
     what: "the core's /health",
