@@ -53,6 +53,7 @@ fn disabled_component_answers_component_disabled_over_json_rpc() {
                     config.components.channels = false;
                     config.components.sandbox = false;
                     config.components.computer = false;
+                    config.components.eventqueues = false;
                     tinyhumans_boot::boot();
                     let _runtime = CoreBuilder::new(HostKind::Library)
                         .config(config)
@@ -145,6 +146,23 @@ fn disabled_component_answers_component_disabled_over_json_rpc() {
                         );
                     }
 
+                    // The inbound event queue operations answer the same typed
+                    // error. (The `inbound` family exists with the Cargo
+                    // `inbound-queues` gate.)
+                    #[cfg(feature = "inbound-queues")]
+                    for method in [
+                        "openhuman.inbound_stats",
+                        "openhuman.inbound_dead",
+                        "openhuman.inbound_redrive",
+                    ] {
+                        let inbound = rpc(&base, method).await;
+                        assert_eq!(
+                            inbound.pointer("/error/message").and_then(Value::as_str),
+                            Some("COMPONENT_DISABLED:eventqueues"),
+                            "{method}: {inbound}"
+                        );
+                    }
+
                     // `modules.list` reports the same modules as Disabled, and only them.
                     let listed = rpc(&base, "openhuman.modules_list").await;
                     let modules = listed
@@ -166,6 +184,12 @@ fn disabled_component_answers_component_disabled_over_json_rpc() {
                         "{listed}"
                     );
                     assert_eq!(state_of("tinybox").as_deref(), Some("disabled"), "{listed}");
+                    #[cfg(feature = "inbound-queues")]
+                    assert_eq!(
+                        state_of("tinyeventqueues").as_deref(),
+                        Some("disabled"),
+                        "{listed}"
+                    );
                     assert_ne!(
                         state_of("tinydocs").as_deref(),
                         Some("disabled"),
