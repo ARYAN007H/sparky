@@ -149,10 +149,8 @@ impl ModuleChannelRuntime {
             };
             let channel = Arc::new(channel);
             channels.insert(info.name.clone(), channel.clone() as Arc<dyn Channel>);
-            progressive.insert(
-                info.name.clone(),
-                channel as Arc<dyn ProgressiveChannelTransport>,
-            );
+            let progressive_channel: Arc<dyn ProgressiveChannelTransport> = channel.clone();
+            progressive.insert(info.name.clone(), Arc::downgrade(&progressive_channel));
         }
         progressive_channels
             .set(Arc::new(progressive))
@@ -533,10 +531,10 @@ impl ModuleChannel {
         if receipt.primary_platform_message_id.is_none() {
             receipt.primary_platform_message_id = result.message_id.clone();
         }
-        if receipt.platform_message_ids.is_empty()
-            && let Some(message_id) = result.message_id
-        {
-            receipt.platform_message_ids.push(message_id);
+        if receipt.platform_message_ids.is_empty() {
+            if let Some(message_id) = result.message_id {
+                receipt.platform_message_ids.push(message_id);
+            }
         }
         Ok(tinychannels_bus::channel::ChannelSendOutcome {
             receipt,

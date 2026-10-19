@@ -141,19 +141,13 @@ impl ProgressiveChannelTransport for ModuleChannel {
                     )
                     .await
                 {
-                    Ok(ChannelInteractionResult::Sent(outcome)) => {
-                        match outcome.error.as_ref().map(|error| error.kind) {
-                            Some(tinychannels_bus::channel::SendErrorKind::NotFound) => {
-                                Ok(Result::MessageGone)
-                            }
-                            Some(error) if error.unsupported => Ok(Result::EditUnsupported),
-                            _ => Ok(Result::Outcome(outcome)),
-                        }
-                    }
+                    Ok(ChannelInteractionResult::Sent(outcome)) => Ok(map_edit_outcome(outcome)),
                     Ok(_) => Err(tinybus::Error::failed(
                         "channel returned an invalid edit result",
                     )),
-                    Err(error) => Err(error),
+                    Err(error) => Err(tinybus::Error::failed(format!(
+                        "channel edit callback failed: {error}"
+                    ))),
                 }
             }
             Request::Delete {
@@ -186,7 +180,9 @@ impl ProgressiveChannelTransport for ModuleChannel {
                     Ok(_) => Err(tinybus::Error::failed(
                         "channel returned an invalid delete result",
                     )),
-                    Err(error) => Err(error),
+                    Err(error) => Err(tinybus::Error::failed(format!(
+                        "channel delete callback failed: {error}"
+                    ))),
                 }
             }
             Request::Typing { conversation, .. } => {
@@ -202,6 +198,29 @@ impl ProgressiveChannelTransport for ModuleChannel {
         }
     }
 }
+
+fn map_edit_outcome(
+    outcome: tinychannels_bus::channel::ChannelSendOutcome,
+) -> tinychannels_bus::module_progressive::ProgressiveTransportResult {
+    use tinychannels_bus::channel::SendErrorKind;
+    use tinychannels_bus::module_progressive::ProgressiveTransportResult as Result;
+
+    match outcome.error.as_ref().map(|error| error.kind) {
+        Some(SendErrorKind::NotFound) => Result::MessageGone,
+        _ if outcome
+            .error
+            .as_ref()
+            .is_some_and(|error| error.unsupported) =>
+        {
+            Result::EditUnsupported
+        }
+        _ => Result::Outcome(outcome),
+    }
+}
+
+#[cfg(test)]
+#[path = "progressive_transport_tests.rs"]
+mod tests;
 
 fn receipt_matches_scope(
     receipt: &tinychannels_bus::channel::MessageReceipt,

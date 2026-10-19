@@ -51,7 +51,8 @@ pub(super) struct ChannelHostCallbacks {
     tenant: crate::core::runtime::Tenant,
     cancellation: tokio_util::sync::CancellationToken,
     context: Arc<OnceLock<Weak<ChannelRuntimeContext>>>,
-    progressive_channels: Arc<OnceLock<Arc<HashMap<String, Arc<dyn ProgressiveChannelTransport>>>>>,
+    progressive_channels:
+        Arc<OnceLock<Arc<HashMap<String, Weak<dyn ProgressiveChannelTransport>>>>>,
     output_observer: Option<Arc<dyn ProgressiveOutputObserver>>,
     dispatch: mpsc::Sender<RuntimeChannelMessage>,
 }
@@ -62,7 +63,7 @@ impl ChannelHostCallbacks {
         config: Arc<Config>,
         context: Arc<OnceLock<Weak<ChannelRuntimeContext>>>,
         progressive_channels: Arc<
-            OnceLock<Arc<HashMap<String, Arc<dyn ProgressiveChannelTransport>>>>,
+            OnceLock<Arc<HashMap<String, Weak<dyn ProgressiveChannelTransport>>>>,
         >,
         output_observer: Option<Arc<dyn ProgressiveOutputObserver>>,
         dispatch: mpsc::Sender<RuntimeChannelMessage>,
@@ -285,6 +286,9 @@ impl ChannelHostCallbacks {
         &self,
         request: ProgressiveTransportRequest,
     ) -> Result<ProgressiveTransportResult> {
+        if self.cancellation.is_cancelled() {
+            return Err(Error::failed("channel session ended"));
+        }
         if let ProgressiveTransportRequest::OutputEvent {
             channel: route,
             channel_ref,
@@ -295,6 +299,9 @@ impl ChannelHostCallbacks {
             ..
         } = &request
         {
+            if self.cancellation.is_cancelled() {
+                return Err(Error::failed("channel session ended"));
+            }
             let channel = channel_ref
                 .as_ref()
                 .ok_or_else(|| Error::failed("progressive output channel identity is required"))?;
@@ -368,7 +375,7 @@ impl ChannelHostCallbacks {
             .ok_or_else(|| Error::failed("progressive channel adapters are unavailable"))?;
         let adapter = adapters
             .get(account)
-            .cloned()
+            .and_then(Weak::upgrade)
             .ok_or_else(|| Error::failed("configured channel account is unavailable"))?;
         let configured_provider =
             tinychannels_bus::capabilities::provider_id(adapter.configured_name());
