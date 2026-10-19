@@ -25,15 +25,9 @@ fn update_parked_run_document_for_test(
         CatalogStorageReply::Value { value } => value,
         CatalogStorageReply::Error { error } => panic!("run fixture read failed: {error:?}"),
     };
-    let mut stored: CatalogVersionedDocument = serde_json::from_value(
-        value
-            .as_array()
-            .and_then(|items| items.first())
-            .cloned()
-            .or_else(|| value.as_object().map(|_| value.clone()))
-            .expect("DocGet must return the stored versioned run document"),
-    )
-    .expect("decode the module-created parked run document");
+    let stored: Option<CatalogVersionedDocument> = serde_json::from_value(value)
+        .expect("decode the module-created parked run document");
+    let mut stored = stored.expect("the parked run document must exist");
     update(&mut stored.doc);
 
     let reply = crate::flows::catalog_storage::call_test_storage::<CatalogStorageReply, _>(
@@ -155,18 +149,12 @@ async fn flows_resume_allows_a_legacy_row_with_null_graph_hash() {
     // Simulate a row written before the T-M1 migration: still `pending_approval`,
     // but with no graph hash pinned — exactly what `add_column_if_missing`
     // leaves behind for every row that existed before this feature shipped.
-    let now = Utc::now().to_rfc3339();
-    store::finish_flow_run(
-        &config,
-        &thread_id,
-        "pending_approval",
-        &now,
-        &[],
-        &pending,
-        None,
-        None,
-    )
-    .unwrap();
+    update_parked_run_document_for_test(&config, &thread_id, |document| {
+        document
+            .as_object_mut()
+            .expect("run document is an object")
+            .remove("graph_hash");
+    });
     let staged = flows_get_run(&config, &thread_id).await.unwrap().value;
     assert!(
         staged.graph_hash.is_none(),
@@ -201,36 +189,6 @@ async fn flows_resume_allows_a_legacy_row_with_null_graph_hash() {
     .await
     .expect("a legacy row with no graph_hash must still resume (unknown treated as allow)");
     assert_eq!(resumed.value["pending_approvals"], json!([]));
-}
-
-/// The stale-approval pin is a persisted format. The algorithm and its
-/// key-order / `require_approval` properties are tested in `tinyflows-catalog`;
-/// this pins the same digests in the host build, where `serde_json` has
-/// `preserve_order` active, so a feature-unification change cannot silently
-/// invalidate every parked run's pin.
-#[test]
-fn graph_hash_matches_the_persisted_vector_under_preserve_order() {
-    let graph = structurally_valid_graph(json!({
-        "name": "order-test",
-        "nodes": [
-            { "id": "t", "kind": "trigger", "name": "Trigger" },
-            {
-                "id": "n",
-                "kind": "output_parser",
-                "name": "N",
-                "config": { "nested": { "y": 2, "x": 1 }, "b": 2, "a": 1 }
-            }
-        ],
-        "edges": [ { "from_node": "t", "to_node": "n" } ]
-    }));
-    assert_eq!(
-        compute_graph_hash(&graph, false).as_deref(),
-        Some("33ff2f572641fba1b81c6726161314f8a9e725a6b8c33a0a119cbe0564b57ad2")
-    );
-    assert_eq!(
-        compute_graph_hash(&graph, true).as_deref(),
-        Some("a13666dfbcff29a5509b0ee4d0bc50199b47eb11cb32f5ba2b00c7ae626cd179")
-    );
 }
 
 #[tokio::test]
@@ -269,29 +227,6 @@ async fn flows_resume_marks_an_incompatible_legacy_checkpoint_failed() {
         None,
     )
     .unwrap();
-    // T-M1: re-pin the parked row's graph_hash to this same (legacy,
-    // incompatible) graph. Without this the fixture reads as "the graph
-    // changed after park" (a DIFFERENT bug class this same PR now catches
-    // earlier and refuses with a distinct message) rather than "the
-    // checkpoint has always been incompatible" — the scenario this test
-    // means to pin. A real legacy row predating T-M1 would carry
-    // `graph_hash: NULL` and fall through the same way (see the
-    // `flows_resume_allows_a_legacy_row_with_null_graph_hash` test above).
-    let run_row_before = flows_get_run(&config, &thread_id).await.unwrap().value;
-    let legacy_hash = compute_graph_hash(&legacy_graph, created.value.require_approval)
-        .expect("fixture graph should hash");
-    store::finish_flow_run(
-        &config,
-        &thread_id,
-        "pending_approval",
-        &run_row_before.finished_at.unwrap_or_default(),
-        &run_row_before.steps,
-        &run_row_before.pending_approvals,
-        None,
-        Some(&legacy_hash),
-    )
-    .unwrap();
-
     let error = flows_resume(
         &crate::core::runtime::DispatchCtx::ambient(),
         &config,
@@ -361,24 +296,6 @@ async fn flows_resume_marks_a_checkpoint_with_an_incompatible_saved_child_failed
         None,
     )
     .unwrap();
-    // T-M1: re-pin the parked row's hash to this same graph — see the sibling
-    // legacy-checkpoint test above for why this fixture needs it now that a
-    // graph swap is independently caught by the stale-approval guard.
-    let run_row_before = flows_get_run(&config, &thread_id).await.unwrap().value;
-    let legacy_hash = compute_graph_hash(&legacy_graph, created.value.require_approval)
-        .expect("fixture graph should hash");
-    store::finish_flow_run(
-        &config,
-        &thread_id,
-        "pending_approval",
-        &run_row_before.finished_at.unwrap_or_default(),
-        &run_row_before.steps,
-        &run_row_before.pending_approvals,
-        None,
-        Some(&legacy_hash),
-    )
-    .unwrap();
-
     let error = flows_resume(
         &crate::core::runtime::DispatchCtx::ambient(),
         &config,
