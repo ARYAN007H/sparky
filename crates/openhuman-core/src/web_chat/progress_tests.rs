@@ -274,12 +274,9 @@ async fn emits_inference_heartbeat_while_turn_in_flight() {
 async fn stops_heartbeat_after_turn_completed() {
     let mut events = crate::web_chat::subscribe_web_channel_events();
     let thread_id = "thread-hb-stop-4270";
-    let (tx, task) = spawn_test_bridge_with_interval(
-        thread_id,
-        "req-hb-stop-4270",
-        Duration::from_millis(50),
-    )
-    .await;
+    let (tx, task) =
+        spawn_test_bridge_with_interval(thread_id, "req-hb-stop-4270", Duration::from_millis(50))
+            .await;
 
     tx.send(AgentProgress::TurnStarted).await.unwrap();
     // Drain through the first heartbeat to prove the turn was beating.
@@ -319,7 +316,8 @@ async fn no_heartbeat_before_turn_started() {
     let mut events = crate::web_chat::subscribe_web_channel_events();
     let thread_id = "thread-hb-gate-4270";
     let (tx, task) =
-        spawn_test_bridge_with_interval(thread_id, "req-hb-gate-4270", Duration::from_millis(25)).await;
+        spawn_test_bridge_with_interval(thread_id, "req-hb-gate-4270", Duration::from_millis(25))
+            .await;
 
     // Real time avoids expiring TinyBus' RPC deadline under Tokio's paused
     // clock while still crossing several short heartbeat intervals.
