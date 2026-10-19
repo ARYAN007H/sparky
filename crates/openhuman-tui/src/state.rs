@@ -469,13 +469,20 @@ impl TranscriptState {
 
     fn push_projected_item(&mut self, item: &serde_json::Value) {
         match item.get("kind").and_then(serde_json::Value::as_str) {
-            Some("userMessage") => self.entries.push(Entry::new(
-                EntryKind::User,
-                item.get("displayContent")
+            Some("userMessage") => {
+                let content = item
+                    .get("displayContent")
                     .or_else(|| item.get("content"))
                     .and_then(serde_json::Value::as_str)
-                    .unwrap_or_default(),
-            )),
+                    .unwrap_or_default();
+                let duration_ms = item
+                    .pointer("/extraMetadata/voiceNote/durationMs")
+                    .and_then(serde_json::Value::as_u64);
+                let text = duration_ms
+                    .map(|ms| format!("[voice note {}] {content}", format_short_duration(ms)))
+                    .unwrap_or_else(|| content.to_string());
+                self.entries.push(Entry::new(EntryKind::User, text));
+            }
             Some("assistantMessage") => self.entries.push(Entry::new(
                 EntryKind::Assistant,
                 item.get("content")
@@ -595,6 +602,11 @@ impl TranscriptState {
             _ => {}
         }
     }
+}
+
+fn format_short_duration(ms: u64) -> String {
+    let seconds = ms.saturating_add(500) / 1000;
+    format!("{}:{:02}", seconds / 60, seconds % 60)
 }
 
 /// Collapse to a single line and cap length so a rogue tool output can't blow
