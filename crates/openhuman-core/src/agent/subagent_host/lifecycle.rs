@@ -583,12 +583,8 @@ pub(super) fn shared_subagent_flight(
         .unwrap_or_else(|poisoned| poisoned.into_inner());
     // Key by the normalized root so every caller of one task, whether or not the
     // directory exists yet, reaches the same reservation.
-    flights
-        .entry(checkpoint::absolute_checkpoint_dir(
-            checkpoint_dir.to_path_buf(),
-        ))
-        .or_default()
-        .clone()
+    let root = checkpoint::absolute_checkpoint_dir(checkpoint_dir.to_path_buf());
+    flights.entry(root).or_default().clone()
 }
 
 impl OpenHumanSubagentHost {
