@@ -394,6 +394,43 @@ export async function waitForTestId(
   return el;
 }
 
+/** Wait for an indexed match when a conversation contains repeated controls. */
+export async function waitForTestIdAtIndex(
+  testId: string,
+  index: number,
+  timeout: number = 15_000
+): Promise<ChainablePromiseElement> {
+  if (!isTauriDriver()) {
+    throw new Error(`waitForTestIdAtIndex is only supported on tauri-driver: ${testId}`);
+  }
+
+  const selector = testIdSelector(testId);
+  await browser.waitUntil(async () => (await browser.$$(selector)).length > index, {
+    timeout,
+    timeoutMsg: `data-testid="${testId}" index ${index} not found within ${timeout}ms`,
+  });
+  return (await browser.$$(selector))[index];
+}
+
+/** Count matching test-id elements through the DOM-backed driver. */
+export async function countTestId(testId: string): Promise<number> {
+  if (!isTauriDriver()) {
+    throw new Error(`countTestId is only supported on tauri-driver: ${testId}`);
+  }
+  return (await browser.$$(testIdSelector(testId))).length;
+}
+
+/** Click an indexed repeated test-id control through the shared click path. */
+export async function clickTestIdAtIndex(
+  testId: string,
+  index: number,
+  timeout: number = 15_000
+): Promise<ChainablePromiseElement> {
+  const el = await waitForTestIdAtIndex(testId, index, timeout);
+  await clickAtElement(el);
+  return el;
+}
+
 /** Wait until a selector is absent from the DOM. */
 export async function waitForElementAbsence(
   selector: string,
