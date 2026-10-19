@@ -107,18 +107,33 @@ fn an_equal_millisecond_live_close_persists_and_a_stale_snapshot_cannot_reopen_i
 
     let storage = MemoryStorage::new();
     let docs = Docs::over(&storage.for_scope(&Scope::new("local").unwrap()).unwrap());
-    let original = session("equal-ms-close");
-    docs.save(std::slice::from_ref(&original)).unwrap();
-    let stale_snapshot = docs.load().unwrap();
     let store = SubagentSessionStore::new(std::env::temp_dir());
+    let original = with_override(docs.clone(), || {
+        upsert_running(
+            &store,
+            SubagentSessionUpsert {
+                selector: selector("equal-ms-close"),
+                display_name: None,
+                task_title: "Task".into(),
+                worker_thread_id: None,
+                task_id: "task-id".into(),
+            },
+            None,
+        )
+        .unwrap()
+    });
+    let stale_snapshot = docs.load().unwrap();
 
     with_override(docs.clone(), || {
-        let mut equal_ms_closed = original.clone();
-        equal_ms_closed.status = DurableSubagentStatus::Closed;
-        equal_ms_closed.reusable = false;
-        // Deliberately preserve the same `_ms` value. A close can occur
-        // inside the same millisecond as the last update.
-        store.save(&[equal_ms_closed]).unwrap();
+        store
+            .update_session(&original.subagent_session_id, |current, _now| {
+                current.status = DurableSubagentStatus::Closed;
+                current.reusable = false;
+                // Deliberately leave updated_at unchanged to force an equal
+                // `_ms` live transition without a clock shim or sleep.
+            })
+            .unwrap()
+            .expect("the session is updated");
 
         // A whole-list snapshot at the same timestamp must not reopen it.
         store.save(&stale_snapshot).unwrap();

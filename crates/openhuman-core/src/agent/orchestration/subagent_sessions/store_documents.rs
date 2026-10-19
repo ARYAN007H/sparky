@@ -211,26 +211,28 @@ impl Docs {
         F: FnMut(&mut DurableSubagentSession, String) + Send,
     {
         let id = key_of(subagent_session_id)?;
-        self.0.run(|docs| async move {
+        let updated = self.0.run(|docs| async move {
             let repo = tinystoragedrivers::Repo::<Value>::new(&docs, SESSIONS)?;
-            let updated = repo
-                .update(&id, move |current| {
-                    let Some(current) = current else {
-                        return Ok(None);
-                    };
-                    let stored: StoredSession = serde_json::from_value(current)?;
-                    let mut session = DurableSubagentSession::from(stored);
-                    update(&mut session, chrono::Utc::now().to_rfc3339());
-                    Ok(Some(serde_json::to_value(StoredSession::from(&session))?))
-                })
-                .await?;
-            updated
-                .map(|(stored, _)| {
-                    serde_json::from_value::<StoredSession>(stored)
-                        .map(DurableSubagentSession::from)
-                })
-                .transpose()
-        })
+            repo.update(&id, move |current| {
+                let Some(current) = current else {
+                    return Ok(None);
+                };
+                let stored: StoredSession = serde_json::from_value(current)
+                    .map_err(|error| crate::storage::StorageError::backend(error.to_string()))?;
+                let mut session = DurableSubagentSession::from(stored);
+                update(&mut session, chrono::Utc::now().to_rfc3339());
+                let next = serde_json::to_value(StoredSession::from(&session))
+                    .map_err(|error| crate::storage::StorageError::backend(error.to_string()))?;
+                Ok(Some(next))
+            })
+            .await
+            .map(|updated| updated.map(|(value, _)| value))
+        })?;
+        updated
+            .map(|value| {
+                serde_json::from_value::<StoredSession>(value).map(DurableSubagentSession::from)
+            })
+            .transpose()
     }
 
     /// Whether the one-time legacy file import finished in this scope.
