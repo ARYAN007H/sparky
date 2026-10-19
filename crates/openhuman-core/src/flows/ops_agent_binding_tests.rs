@@ -108,9 +108,9 @@ async fn agent_ref_unknown_is_rejected() {
 /// Pinned here rather than left to the vendor's own suite because the
 /// `workflow_builder` agent can propose this shape, and the message a builder
 /// sees on rejection is this host's contract with it.
-#[test]
-fn dynamic_agent_ref_is_rejected_during_structural_validation() {
-    let err = validate_and_migrate_graph(json!({
+#[tokio::test]
+async fn dynamic_agent_ref_is_rejected_during_structural_validation() {
+    let err = validate_and_migrate_graph(&crate::core::runtime::DispatchCtx::ambient(), &Config::default(), json!({
         "nodes": [
             { "id": "t", "kind": "trigger", "name": "Manual" },
             { "id": "a", "kind": "agent", "name": "Dynamic",
@@ -118,6 +118,7 @@ fn dynamic_agent_ref_is_rejected_during_structural_validation() {
         ],
         "edges": [ { "from_node": "t", "to_node": "a" } ]
     }))
+    .await
     .expect_err("dynamic agent_ref must fail structural validation");
     assert!(
         err.contains("agent_ref") && err.contains("must be a literal"),

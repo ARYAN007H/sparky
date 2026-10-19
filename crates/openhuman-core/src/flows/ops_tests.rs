@@ -79,8 +79,8 @@ fn structurally_valid_graph(value: Value) -> WorkflowGraph {
     graph
 }
 
-#[test]
-fn flows_import_uses_the_tinyflows_authoring_module_in_a_cold_process() {
+#[tokio::test]
+async fn flows_import_uses_the_tinyflows_authoring_module_in_a_cold_process() {
     const CHILD_ENV: &str = "OPENHUMAN_FLOWS_IMPORT_AUTHORING_CHILD";
     if std::env::var_os(CHILD_ENV).is_none() {
         let output = std::process::Command::new(std::env::current_exe().expect("test executable"))
@@ -126,6 +126,7 @@ fn flows_import_uses_the_tinyflows_authoring_module_in_a_cold_process() {
         }),
         Some("native".to_string()),
     )
+    .await
     .expect("valid native graph imports")
     .value;
     assert_eq!(result.graph.name, "constant import");
