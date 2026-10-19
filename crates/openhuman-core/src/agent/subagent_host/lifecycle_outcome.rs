@@ -7,6 +7,27 @@ pub(super) type HostInFlightMap = AsyncMutex<HashMap<HostLifecycleKey, Arc<HostI
 
 pub(super) const CLASSIFIED_STOP_CAUSE_EXTENSION: &str = "openhuman.classified_stop_cause";
 
+pub(super) fn encode_classified_stop_cause(
+    cause: &tinyagents_harness::no_progress::ClassifiedStopCause,
+) -> serde_json::Value {
+    let stop = crate::agent::turn_projection::breaker_stop_with_cause(cause.clone());
+    serde_json::json!({
+        "class": stop.failure_class.as_ref().map(|class| class.as_str()),
+        "operation": stop.operation,
+    })
+}
+
+pub(super) fn decode_classified_stop_cause(
+    value: &serde_json::Value,
+    summary: &str,
+) -> Option<tinyagents_harness::no_progress::ClassifiedStopCause> {
+    Some(tinyagents_harness::no_progress::ClassifiedStopCause {
+        class: value.get("class")?.as_str()?.to_string(),
+        operation: value.get("operation")?.as_str()?.to_string(),
+        summary: summary.to_string(),
+    })
+}
+
 pub(super) fn host_outcome_to_neutral(
     outcome: SubagentRunOutcome,
     definition: &crate::agent::harness::host_definition::AgentDefinition,
@@ -90,11 +111,11 @@ pub(super) fn host_outcome_to_neutral(
         ..SubagentOutcome::cancelled(String::new())
     };
     if let Some(cause) = failure_cause {
-        // Keep only bounded machine identifiers in neutral durable metadata;
-        // the human-readable summary may contain private tool or URL details.
+        // Keep only the SDK-normalized class and operation; the human-readable
+        // summary may contain private tool or URL details.
         neutral.extensions.insert(
             CLASSIFIED_STOP_CAUSE_EXTENSION.into(),
-            serde_json::json!({"class": cause.class, "operation": cause.operation}),
+            encode_classified_stop_cause(&cause),
         );
     }
     neutral

@@ -1000,13 +1000,7 @@ fn outcome_to_host(
             failure_cause: outcome
                 .extensions
                 .get(outcome::CLASSIFIED_STOP_CAUSE_EXTENSION)
-                .and_then(|value| {
-                    Some(tinyagents_harness::no_progress::ClassifiedStopCause {
-                        class: value.get("class")?.as_str()?.to_string(),
-                        operation: value.get("operation")?.as_str()?.to_string(),
-                        summary: incomplete.reason.clone(),
-                    })
-                }),
+                .and_then(|value| outcome::decode_classified_stop_cause(value, &incomplete.reason)),
             reason: incomplete.reason,
         },
         SubagentOutcomeKind::Cancelled => SubagentRunStatus::Cancelled,
