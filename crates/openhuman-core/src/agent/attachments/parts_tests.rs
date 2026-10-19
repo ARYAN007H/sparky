@@ -74,7 +74,7 @@ fn video_and_audio_ride_the_file_marker() {
 }
 
 #[test]
-fn typed_voice_notes_are_staged_as_their_audio_media() {
+fn typed_voice_notes_keep_audio_out_of_model_text() {
     let part = ContentPart::VoiceNote {
         voice_note: tinychannels_bus::VoiceNote {
             media: media("data:audio/wav;base64,AAA"),
@@ -84,7 +84,7 @@ fn typed_voice_notes_are_staged_as_their_audio_media() {
     };
     assert_eq!(
         fold_into_message("heard words", &[part]).unwrap(),
-        "heard words [FILE:data:audio/wav;base64,AAA]"
+        "heard words"
     );
 }
 
