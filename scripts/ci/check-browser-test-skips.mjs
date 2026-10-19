@@ -13,9 +13,18 @@ function tokenize(source) {
   const advance = (end) => {
     while (index < end) if (source[index++] === "\n") line++;
   };
-
-  while (index < source.length) {
+  const scan = (templateExpression = false) => {
+    let braces = 0;
+    while (index < source.length) {
     const char = source[index];
+    if (templateExpression && char === "}") {
+      if (braces === 0) {
+        index++;
+        return;
+      }
+      braces--;
+    }
+    if (templateExpression && char === "{") braces++;
     if (/\s/.test(char)) {
       advance(index + 1);
       continue;
@@ -30,7 +39,7 @@ function tokenize(source) {
       advance(close < 0 ? source.length : close + 2);
       continue;
     }
-    if (char === "'" || char === '"' || char === "`") {
+    if (char === "'") {
       const quote = char;
       const start = index;
       const tokenLine = line;
@@ -49,6 +58,44 @@ function tokenize(source) {
       tokens.push({ value: "<string>", start, end: index, line: tokenLine });
       continue;
     }
+    if (char === '"') {
+      const start = index;
+      const tokenLine = line;
+      index++;
+      while (index < source.length) {
+        if (source[index] === "\\") {
+          advance(Math.min(index + 2, source.length));
+          continue;
+        }
+        if (source[index++] === '"') break;
+        if (source[index - 1] === "\n") line++;
+      }
+      tokens.push({ value: "<string>", start, end: index, line: tokenLine });
+      continue;
+    }
+    if (char === "`") {
+      const start = index;
+      const tokenLine = line;
+      index++;
+      while (index < source.length) {
+        if (source[index] === "\\") {
+          advance(Math.min(index + 2, source.length));
+          continue;
+        }
+        if (source[index] === "`") {
+          index++;
+          break;
+        }
+        if (source[index] === "$" && source[index + 1] === "{") {
+          advance(index + 2);
+          scan(true);
+          continue;
+        }
+        advance(index + 1);
+      }
+      tokens.push({ value: "<template>", start, end: index, line: tokenLine });
+      continue;
+    }
     const start = index;
     const tokenLine = line;
     if (/[A-Za-z_$]/.test(char)) {
@@ -63,7 +110,9 @@ function tokenize(source) {
       end: index,
       line: tokenLine,
     });
-  }
+    }
+  };
+  scan();
   return tokens;
 }
 

@@ -23,15 +23,21 @@ test("requires a same-line URL for direct, qualified, and runtime skip calls", (
   ]);
 });
 
-test("ignores comments, strings, templates, and removed examples containing skip syntax", () => {
+test("ignores inert text but scans executable template interpolations", () => {
   const source = [
     "// test.skip('comment')",
     "/* test.skip('block comment') */",
     "const example = \"it.skip('string')\";",
     "const template = `describe.skip('template')`;",
+    "const interpolated = `raw test.skip('ignored') ${test.skip('missing')}`;",
+    `const linked = \`raw describe.skip('ignored') \${test.skip('tracked')}\`; // ${url}`,
+    "const nested = `outer ${({ value: `inner ${this.skip()}` })}`;",
     "const removed = '- test.skip(\\\"old\\\")';",
     `test.skip('real'); // ${url}`,
   ].join("\n");
 
-  assert.deepEqual(untrackedSkipLines(source), []);
+  assert.deepEqual(untrackedSkipLines(source), [
+    "5: const interpolated = `raw test.skip('ignored') ${test.skip('missing')}`;",
+    "7: const nested = `outer ${({ value: `inner ${this.skip()}` })}`;",
+  ]);
 });
