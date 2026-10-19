@@ -97,6 +97,7 @@ async fn a_new_artifact_shares_one_id_and_one_file_between_card_and_record() {
         crate::artifacts::tiny_store::stored_file_path(&workspace, &file),
         kept
     );
+    assert_eq!(std::fs::read(&kept).unwrap(), b"deck-v1");
     assert_eq!(
         files_in(&files),
         vec!["quarterly-deck.pptx"],
