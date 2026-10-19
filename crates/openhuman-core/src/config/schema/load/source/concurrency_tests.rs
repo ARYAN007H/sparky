@@ -191,6 +191,10 @@ async fn external_config_conflict_refresh_keeps_derived_runtime_overrides() {
     runtime_config.memory.agent_id = Some("runtime-memory-agent".into());
     runtime_config.memory.root = Some("team:runtime".into());
     runtime_config.mcp_client.enabled = false;
+    runtime_config.autonomy.enabled = true;
+    runtime_config.composio.pin_host_credential(
+        crate::config::schema::ComposioHostCredential::direct("overlay-only-test-secret"),
+    );
     let parent = CoreContext::for_test_with_config(DomainSet::full(), runtime_config.clone());
     let ctx = parent.derive_with(ContextOverlay::new(
         runtime_config,
@@ -233,6 +237,8 @@ async fn external_config_conflict_refresh_keeps_derived_runtime_overrides() {
     );
     assert_eq!(refreshed.memory.root.as_deref(), Some("team:runtime"));
     assert!(!refreshed.mcp_client.enabled);
+    assert!(refreshed.autonomy.enabled);
+    assert!(refreshed.composio.host_credential.is_some());
 }
 
 #[tokio::test]
