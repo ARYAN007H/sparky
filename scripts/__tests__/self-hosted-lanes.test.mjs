@@ -304,8 +304,13 @@ test("the storage area runs host suites on memory and sqlite and compiles option
     );
     const lane = plan.lanes.find((l) => l.name === "storage-drivers");
     assert.equal(lane.active, true, profile);
-    for (const check of lane.checks.filter((c) => c.name !== "storage-feature-compile")) {
-      assert.match(check.run, /--features (?:session-store,)?storage-sqlite(?:\s|$)/);
+    for (const check of lane.checks.filter(
+      (c) => c.name !== "storage-feature-compile",
+    )) {
+      assert.match(
+        check.run,
+        /--features (?:session-store,)?storage-sqlite(?:\s|$)/,
+      );
     }
     assert.equal(
       lane.checks.find((c) => c.name === "storage-feature-compile").run,
