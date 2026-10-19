@@ -179,13 +179,29 @@ fn unrecognized_typed_class_does_not_fall_back_to_english_halt_phrases() {
     );
 }
 
-#[test]
-fn typed_cause_without_halt_note_still_closes_and_keeps_operation() {
+#[tokio::test]
+async fn typed_cause_without_halt_note_still_closes_and_keeps_operation() {
     let mut outcome = classified_halt("", "provider_config");
     outcome.breaker_halt = None;
+    outcome.text = "A partial reply that should be replaced by the classified halt summary.".into();
     outcome.tool_outcomes.clear();
 
-    let close = classified_halt_close(&outcome).expect("typed cause closes without a note");
+    let scripted = Arc::new(tinyagents_harness::testkit::ScriptedModel::new(vec![]));
+    let source = TurnModelSource::from_model(scripted.clone());
+    let close = close_if_needed(
+        &source,
+        "host-selected-model",
+        0.0,
+        None,
+        &tinytools_agent::dialect::NativeDialect,
+        &[],
+        "search",
+        &outcome,
+        None,
+        None,
+    )
+    .await
+    .expect("typed cause closes without a note");
     assert!(
         close
             .output
@@ -194,6 +210,11 @@ fn typed_cause_without_halt_note_still_closes_and_keeps_operation() {
         close.output
     );
     assert_eq!(close.usage.model_calls, 0);
+    assert_eq!(
+        scripted.call_count(),
+        0,
+        "typed cause closes deterministically"
+    );
 
     let stop = crate::agent::session_host::stop_summary::classify_stop_with_cause(
         None,
