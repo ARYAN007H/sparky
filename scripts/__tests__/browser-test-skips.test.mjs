@@ -13,7 +13,7 @@ test("browser skip guard requires an issue URL on the added skip line", () => {
   ].join("\n");
 
   assert.deepEqual(untrackedSkipLines(patch), [
-    "  it.skip('missing link', () => {}); // see issue #456",
-    "  describe.skip('also missing', () => {});",
+    "it.skip('missing link', () => {}); // see issue #456",
+    "describe.skip('also missing', () => {});",
   ]);
 });
