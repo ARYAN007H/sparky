@@ -652,7 +652,7 @@ async fn run_case_inner(case: Case) {
                 None,
                 None,
                 None,
-                openhuman_core::inference::host_runtime::ops::AgentChatEnv::default(),
+                openhuman_core::agent_runs::agent_chat::AgentChatEnv::default(),
             )
             .await
             .expect("summarizer turn must finish");

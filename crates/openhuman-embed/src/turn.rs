@@ -43,7 +43,7 @@ use std::sync::Arc;
 
 use super::error::CoreError;
 use openhuman_core::core::runtime::CoreRuntime;
-use openhuman_core::inference::INFERENCE_AGENT_CHAT as AGENT_CHAT;
+use openhuman_core::agent_runs::INFERENCE_AGENT_CHAT as AGENT_CHAT;
 use openhuman_core::progress::AgentProgress;
 use openhuman_core::security::turn_origin::AgentTurnOrigin;
 
@@ -545,7 +545,7 @@ struct AgentTurnOptions {
     attachments: Vec<openhuman_core::agent::HostAttachment>,
     /// The explicit per-turn values the core honours: live progress and the
     /// host environment (budget, depth, cancellation, hooks, tool-belt authority).
-    chat_env: openhuman_core::inference::host_runtime::ops::AgentChatEnv,
+    chat_env: openhuman_core::agent_runs::agent_chat::AgentChatEnv,
 }
 
 async fn dispatch(

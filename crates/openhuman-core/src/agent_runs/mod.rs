@@ -1,7 +1,7 @@
 //! Product-facing RPC surfaces for agent runs, teams, workflows, replay, and tools.
 
 pub(crate) mod agent_teams;
-pub(crate) mod agent_chat;
+pub mod agent_chat;
 pub(crate) mod command_center;
 pub(crate) mod context_breakdown;
 pub(crate) mod replay;
