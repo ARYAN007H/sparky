@@ -255,3 +255,90 @@ async fn single_callback_registration_unserves_when_its_guard_drops() {
     );
     assert!(proxy.call::<serde_json::Value>("Ping", ()).await.is_err());
 }
+
+#[cfg(feature = "modules")]
+struct CapsHostManifestProbe;
+
+#[cfg(feature = "modules")]
+#[async_trait::async_trait]
+impl tinybus::service::Interface for CapsHostManifestProbe {
+    fn name(&self) -> tinybus::InterfaceName {
+        tinybus::InterfaceName::new(tinyflows_bus::runs::CAPS_INTERFACE)
+            .expect("CapsHost interface name")
+    }
+
+    fn members(&self) -> Vec<tinybus::MemberName> {
+        vec![tinybus::MemberName::new("AgentCancel").expect("member name")]
+    }
+
+    async fn call(
+        &self,
+        _member: &tinybus::MemberName,
+        _args: serde_json::Value,
+    ) -> tinybus::Result<serde_json::Value> {
+        Ok(serde_json::Value::Null)
+    }
+}
+
+#[cfg(feature = "modules")]
+#[tokio::test]
+async fn serving_caps_host_advertises_v2_without_replacing_other_peer_manifest_entries() {
+    let runtime = super::super::runtime::runtime()
+        .await
+        .expect("module runtime exists");
+    let connection = runtime.connection();
+    let other_interface = tinybus::InterfaceName::new("ai.tinyhumans.openhuman.TestPreserved")
+        .expect("interface name");
+    let caps_interface = tinybus::InterfaceName::new(tinyflows_bus::runs::CAPS_INTERFACE)
+        .expect("CapsHost interface name");
+    let mut original = connection
+        .manifest_of(HOST_BUS_NAME)
+        .await
+        .expect("manifest lookup succeeds")
+        .unwrap_or_else(|| tinybus::PeerManifest::new("openhuman-module-host"));
+    original.provides.retain(|item| item.interface != caps_interface);
+    original.provides.push(tinybus::InterfaceVersion::provided(
+        caps_interface.clone(),
+        tinybus::Version::new(1, 0, 0),
+    ));
+    original.provides.push(tinybus::InterfaceVersion::provided(
+        other_interface,
+        tinybus::Version::new(4, 2, 0),
+    ));
+    let prior_consumes = original.consumes.clone();
+    connection
+        .announce(&original)
+        .await
+        .expect("prior manifest can be announced");
+
+    let path = format!(
+        "/ai/tinyhumans/openhuman/CapsHost/{}",
+        uuid::Uuid::new_v4().simple()
+    );
+    let registration = serve_registered(path, CapsHostManifestProbe)
+        .await
+        .expect("CapsHost registration succeeds");
+    let announced = connection
+        .manifest_of(HOST_BUS_NAME)
+        .await
+        .expect("manifest lookup succeeds")
+        .expect("the module runtime peer is announced");
+
+    let caps_host = announced
+        .provided(&caps_interface)
+        .expect("CapsHost is advertised");
+    assert_eq!(caps_host.speaks, tinybus::Version::new(2, 0, 0));
+    assert!(announced
+        .provides
+        .iter()
+        .any(|item| item.interface.as_str() == "ai.tinyhumans.openhuman.TestPreserved"));
+    assert_eq!(announced.consumes, prior_consumes);
+
+    let proxy = connection
+        .proxy(HOST_BUS_NAME, &registration.0, tinyflows_bus::runs::CAPS_INTERFACE)
+        .expect("CapsHost proxy resolves");
+    proxy
+        .call::<serde_json::Value>("AgentCancel", (serde_json::json!({"client_request_id":"probe"}),))
+        .await
+        .expect("the advertised member is actually served");
+}

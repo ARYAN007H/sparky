@@ -5,7 +5,7 @@
 
 use crate::config::Config;
 use crate::core::events::DomainEvent;
-use crate::flows::store;
+use crate::flows::{catalog_storage, store};
 use crate::memory::types::{ForgetParams, ItemsListParams, MAX_LIMIT};
 use async_trait::async_trait;
 use std::sync::Arc;
@@ -77,26 +77,66 @@ impl FlowRunDigestSubscriber {
             return;
         }
 
-        let flow_name = match store::get_flow(&config, flow_id) {
-            Ok(Some(flow)) => flow.name,
-            Ok(None) => {
-                tracing::debug!(target: "flows", %flow_id, %run_id, "[flows] digest: flow no longer exists — skipping");
+        let storage = match catalog_storage::register(&ctx, &config).await {
+            Ok(registration) => registration.storage(),
+            Err(error) => {
+                tracing::warn!(target: "flows", %flow_id, %run_id, %error, "[flows] digest: failed to register scoped CatalogStorage");
                 return;
             }
-            Err(e) => {
-                tracing::warn!(target: "flows", %flow_id, %run_id, error = %e, "[flows] digest: failed to load flow — skipping");
+        };
+        let proxy = match crate::modules::tinyflows::catalog_proxy(&config).await {
+            Ok(proxy) => proxy,
+            Err(error) => {
+                tracing::warn!(target: "flows", %flow_id, %run_id, %error, "[flows] digest: Catalog module unavailable");
                 return;
             }
         };
 
-        let run = match store::get_flow_run(&config, run_id) {
-            Ok(Some(run)) => run,
-            Ok(None) => {
-                tracing::warn!(target: "flows", %flow_id, %run_id, "[flows] digest: run row not found — skipping");
+        let workflow: Option<tinyflows_bus::catalog::Workflow> = match proxy
+            .call(
+                tinyflows_bus::catalog::members::GET_WORKFLOW,
+                (storage.clone(), flow_id.to_owned()),
+            )
+            .await
+        {
+            Ok(workflow) => workflow,
+            Err(error) => {
+                tracing::warn!(target: "flows", %flow_id, %run_id, error = %error, "[flows] digest: failed to load workflow");
                 return;
             }
-            Err(e) => {
-                tracing::warn!(target: "flows", %flow_id, %run_id, error = %e, "[flows] digest: failed to load run — skipping");
+        };
+        let flow_name = match workflow {
+            Some(flow) => flow.name,
+            None => {
+                tracing::debug!(target: "flows", %flow_id, %run_id, "[flows] digest: flow no longer exists — skipping");
+                return;
+            }
+        };
+
+        let wire_run: Option<tinyflows_bus::catalog::FlowRun> = match proxy
+            .call(
+                tinyflows_bus::catalog::members::GET_RUN,
+                (tinyflows_bus::catalog::RunIdRequest {
+                    storage,
+                    id: run_id.to_owned(),
+                },),
+            )
+            .await
+        {
+            Ok(run) => run,
+            Err(error) => {
+                tracing::warn!(target: "flows", %flow_id, %run_id, error = %error, "[flows] digest: failed to load run — skipping");
+                return;
+            }
+        };
+        let Some(wire_run) = wire_run else {
+            tracing::warn!(target: "flows", %flow_id, %run_id, "[flows] digest: run row not found — skipping");
+            return;
+        };
+        let run: FlowRun = match store::roundtrip(wire_run) {
+            Ok(run) => run,
+            Err(error) => {
+                tracing::warn!(target: "flows", %flow_id, %run_id, %error, "[flows] digest: failed to decode run — skipping");
                 return;
             }
         };
