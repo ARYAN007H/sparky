@@ -6,6 +6,6 @@
 # backported `cfg_select!` to `#[cfg]`. The former "pin below 1.94" existed only
 # for matrix-sdk's async recursion overflow (matrix-rust-sdk#6254); the
 # `channel-matrix` feature and its matrix-sdk dependency have since been removed.
-channel = "1.96.1"
+channel = "1.99.1"
 components = ["rustfmt", "clippy"]
 profile = "minimal"
