@@ -40,8 +40,8 @@ import {
 import {
   navigateToHome,
   navigateToIntelligence,
-  navigateToSkills,
   navigateToSettings,
+  navigateToSkills,
   performFullLogin,
   waitForHomePage,
 } from '../helpers/shared-flows';
