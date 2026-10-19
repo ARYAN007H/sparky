@@ -177,11 +177,86 @@ impl ApprovalCallbacks {
 #[derive(Clone)]
 struct ApprovalCallbacks(Callbacks);
 
+#[derive(Clone)]
+struct DraftPromotionCallbacks(Callbacks);
+
+#[tinybus::interface(name = "ai.tinyhumans.tinyflows.DraftPromotionHost")]
+impl DraftPromotionCallbacks {
+    async fn save_promoted_draft(
+        &self,
+        request: catalog::SavePromotedDraftRequest,
+    ) -> BusResult<catalog::SavePromotedDraftResponse> {
+        let config = Arc::clone(&self.0.config);
+        let context = self.0.context.clone();
+        let response = self
+            .0
+            .in_context(async move {
+                use catalog::{DraftPromotionOperation, SavePromotedDraftResponse};
+
+                let outcome = match request.operation {
+                    DraftPromotionOperation::Create {
+                        name,
+                        graph,
+                        require_approval,
+                    } => {
+                        ops::flows_create_with_context(
+                            &context,
+                            &config,
+                            name,
+                            graph,
+                            require_approval,
+                        )
+                        .await?
+                    }
+                    DraftPromotionOperation::Update {
+                        id,
+                        name,
+                        graph,
+                        require_approval,
+                        expected_version,
+                    } => {
+                        ops::flows_update_with_context(
+                            &context,
+                            &config,
+                            &id,
+                            Some(name),
+                            Some(graph),
+                            require_approval,
+                            expected_version,
+                        )
+                        .await?
+                    }
+                };
+                let workflow: catalog::Workflow = crate::flows::store::roundtrip(outcome.value)
+                    .map_err(|error| error.to_string())?;
+                Ok(SavePromotedDraftResponse::Ok(
+                    catalog::SavePromotedDraftResult {
+                        workflow,
+                        metadata: serde_json::json!({"logs": outcome.logs}),
+                    },
+                ))
+            })
+            .await;
+        Ok(match response {
+            Ok(response) => response,
+            Err(message) => catalog::SavePromotedDraftResponse::Error(
+                catalog::DraftPromotionFailure {
+                    code: "workflow_save_failed".into(),
+                    message,
+                    details: None,
+                },
+            ),
+        })
+    }
+}
+
 /// A callback registration whose lifetime is bounded by one authoring call.
 pub(crate) struct Registration {
     _registration: module::ServedObjectRegistration,
+    _draft_promotion_registration: module::ServedObjectRegistration,
     pub(crate) authoring: AuthoringHost,
     pub(crate) catalog: catalog::CallbackAddress,
+    pub(crate) draft_promotion: catalog::CallbackAddress,
 }
 
 pub(crate) async fn register(
@@ -200,11 +275,21 @@ pub(crate) async fn register(
     let registration = module::serve_pair(
         path.clone(),
         callbacks.clone(),
-        ApprovalCallbacks(callbacks),
+        ApprovalCallbacks(callbacks.clone()),
+    )
+    .await?;
+    let draft_promotion_path = format!(
+        "/ai/tinyhumans/openhuman/DraftPromotionHost/h{}",
+        uuid::Uuid::new_v4().simple()
+    );
+    let draft_promotion_registration = module::serve_registered(
+        draft_promotion_path.clone(),
+        DraftPromotionCallbacks(callbacks),
     )
     .await?;
     Ok(Registration {
         _registration: registration,
+        _draft_promotion_registration: draft_promotion_registration,
         authoring: AuthoringHost {
             bus_name: module::HOST_BUS_NAME.to_string(),
             object_path: path.clone(),
@@ -212,6 +297,10 @@ pub(crate) async fn register(
         catalog: catalog::CallbackAddress {
             destination: module::HOST_BUS_NAME.to_string(),
             object_path: path,
+        },
+        draft_promotion: catalog::CallbackAddress {
+            destination: module::HOST_BUS_NAME.to_string(),
+            object_path: draft_promotion_path,
         },
     })
 }

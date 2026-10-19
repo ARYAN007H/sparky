@@ -8,10 +8,7 @@
 use crate::core::runtime::DispatchCtx;
 use std::sync::Arc;
 
-use async_trait::async_trait;
 use serde_json::{json, Value};
-use tinyflows::caps::*;
-use tinyflows::error::{EngineError, Result};
 
 use super::*;
 use crate::config::Config;
@@ -55,9 +52,13 @@ pub struct OpenHumanCode {
 
 pub(crate) const CODE_RUN_TIMEOUT_SECS: u64 = 60;
 
-#[async_trait]
-impl CodeRunner for OpenHumanCode {
-    async fn run(&self, language: CodeLanguage, source: &str, input: Value) -> Result<Value> {
+impl OpenHumanCode {
+    pub(crate) async fn run(
+        &self,
+        language: tinyflows_bus::runs::CodeLanguage,
+        source: &str,
+        input: Value,
+    ) -> Result<Value> {
         // Autonomy-tier gate (Phase 2): sandboxed arbitrary-code execution is
         // Write-class. A read-only run `Block`s here and never spawns anything;
         // Supervised/Full fall through to the ApprovalGate below.
@@ -122,8 +123,12 @@ impl CodeRunner for OpenHumanCode {
         // sandbox failures.
         let exec_result = async {
             let (script_name, interpreter, script_body) = match language {
-                CodeLanguage::JavaScript => ("script.js", "node", js_harness(source)),
-                CodeLanguage::Python => ("script.py", "python3", python_harness(source)),
+                tinyflows_bus::runs::CodeLanguage::JavaScript => {
+                    ("script.js", "node", js_harness(source))
+                }
+                tinyflows_bus::runs::CodeLanguage::Python => {
+                    ("script.py", "python3", python_harness(source))
+                }
             };
             let script_path = work_dir.join(script_name);
             let input_path = work_dir.join("input.json");
