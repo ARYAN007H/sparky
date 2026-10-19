@@ -276,7 +276,10 @@ async fn tokenjuice_rpcs_use_their_derived_config_for_module_calls_and_install()
     let methods = calls.methods.lock().unwrap();
     for method in ["Detect", "Compress", "CacheStats", "Retrieve"] {
         assert_eq!(
-            methods.iter().filter(|actual| actual.as_str() == method).count(),
+            methods
+                .iter()
+                .filter(|actual| actual.as_str() == method)
+                .count(),
             2,
             "{method} reached the TinyBus client once per derived context"
         );
