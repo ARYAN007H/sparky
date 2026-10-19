@@ -30,8 +30,9 @@ use tinymemory_api::Error;
 const STATE: &str = "pending_deletions";
 
 /// The workspace's `pending_deletions` state value: a stop mid-write never
-/// loses the queue (the storage write is atomic). An unparsable value is
-/// dropped and logged; an empty queue removes the value.
+/// loses the queue (the storage write is atomic). A read error is returned to
+/// the queue rather than treated as an empty list; an empty queue removes the
+/// value.
 struct FileStore {
     workspace_dir: PathBuf,
 }
