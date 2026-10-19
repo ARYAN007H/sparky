@@ -11,6 +11,7 @@ pub mod state;
 mod sync;
 
 use tinymemory_tools::ops::MemoryOps;
+use tinymemory_integrations::sources::SourceSpec;
 
 use crate::config::schema::{MemorySourceConfig, MemorySourceKind};
 use crate::config::Config;
@@ -54,42 +55,10 @@ pub fn list(config: &Config) -> Vec<SourceView> {
         .collect()
 }
 
-/// Normalises a target for `kind`: GitHub accepts `owner/repo` or a URL;
-/// network kinds must be http(s) URLs.
+/// Normalises a target for `kind` using TinyMemory's source rules.
 pub fn normalize_target(kind: MemorySourceKind, target: &str) -> Result<String> {
-    let target = target.trim();
-    if target.is_empty() {
-        return Err(Error::InvalidRequest("target must not be empty".into()));
-    }
-    match kind {
-        MemorySourceKind::Folder | MemorySourceKind::File => Ok(target.to_string()),
-        MemorySourceKind::Github => {
-            if target.starts_with("http://") || target.starts_with("https://") {
-                return http_url(target);
-            }
-            let mut parts = target.split('/');
-            match (parts.next(), parts.next(), parts.next()) {
-                (Some(owner), Some(repo), None) if !owner.is_empty() && !repo.is_empty() => {
-                    Ok(format!("https://github.com/{owner}/{repo}"))
-                }
-                _ => Err(Error::InvalidRequest(
-                    ("a GitHub target is `owner/repo` or a repository URL").into(),
-                )),
-            }
-        }
-        MemorySourceKind::Link | MemorySourceKind::Rss => http_url(target),
-    }
-}
-
-fn http_url(target: &str) -> Result<String> {
-    let url =
-        url::Url::parse(target).map_err(|_| Error::InvalidRequest("target is not a URL".into()))?;
-    if !matches!(url.scheme(), "http" | "https") || url.host_str().is_none() {
-        return Err(Error::InvalidRequest(
-            ("target must be an http(s) URL").into(),
-        ));
-    }
-    Ok(url.to_string())
+    SourceSpec::normalize_target(kind, target)
+        .map_err(|error| Error::InvalidRequest(error.to_string()))
 }
 
 /// Builds a new source from `memory_sources_add` params and appends it to
@@ -101,38 +70,25 @@ pub fn apply_add(config: &mut Config, params: &SourcesAddParams) -> Result<Memor
             params.kind.trim()
         ))
     })?;
-    let target = normalize_target(kind, &params.target)?;
-    if let Some(mins) = params.schedule_mins {
-        if mins < MIN_SCHEDULE_MINS {
-            return Err(Error::InvalidRequest(format!(
-                "schedule_mins must be at least {MIN_SCHEDULE_MINS}"
-            )));
-        }
-    }
-    if config
-        .memory
-        .sources
-        .iter()
-        .any(|source| source.kind == kind && source.target == target)
-    {
-        return Err(Error::InvalidRequest(
-            ("that source is already added").into(),
-        ));
-    }
+    let spec = SourceSpec {
+        kind,
+        target: params.target.clone(),
+        schedule_mins: params.schedule_mins,
+        namespace: params.namespace.clone(),
+    };
+    let target = spec
+        .validate_new(&config.memory.sources)
+        .map_err(|error| Error::InvalidRequest(error.to_string()))?;
     let label = params
         .label
         .as_deref()
         .map(str::trim)
         .filter(|label| !label.is_empty())
         .map_or_else(|| target.clone(), str::to_string);
-    let namespace = match params.namespace.as_deref().map(str::trim) {
-        None | Some("") => None,
-        Some(raw) => Some(
-            raw.parse::<tinymemory_api::Namespace>()
-                .map_err(|error| Error::InvalidRequest(error.to_string()))?
-                .to_string(),
-        ),
-    };
+    let namespace = spec
+        .namespace()
+        .map_err(|error| Error::InvalidRequest(error.to_string()))?
+        .map(|namespace| namespace.to_string());
     let source = MemorySourceConfig {
         id: format!("src-{}", uuid::Uuid::new_v4().simple()),
         kind,
