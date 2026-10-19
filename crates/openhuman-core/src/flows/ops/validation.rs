@@ -27,7 +27,12 @@ async fn validate_over_bus(
 }
 
 fn is_engine_compatibility_error(code: &str) -> bool {
-    code.starts_with("unsupported_") || code.starts_with("incompatible_referenced_workflow")
+    matches!(
+        code,
+        tinyflows::compat::UNSUPPORTED_NESTED_CONDITIONAL_FAN_IN
+            | tinyflows::compat::UNSUPPORTED_MAIN_PORT_CONDITIONAL_FAN_IN
+            | "incompatible_referenced_workflow"
+    )
 }
 
 /// Validates and migrates a graph through TinyFlows, resolving saved children

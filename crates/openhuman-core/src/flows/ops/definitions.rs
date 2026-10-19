@@ -75,6 +75,7 @@ pub(crate) async fn flows_create_with_context(
     require_approval: bool,
 ) -> Result<Outcome<Flow>, String> {
     let graph = validate_and_migrate_graph(ctx, config, graph_json).await?;
+    ensure_config_aware_engine_compatible(ctx, config, &graph).await?;
 
     // Rule 1: automatic triggers create DISABLED — the user must arm them
     // explicitly.
