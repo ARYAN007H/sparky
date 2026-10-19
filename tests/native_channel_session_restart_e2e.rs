@@ -307,6 +307,7 @@ fn start_core(
         .env("USERPROFILE", home)
         .env("OPENHUMAN_WORKSPACE", workspace)
         .env("OPENHUMAN_CORE_TOKEN", RPC_TOKEN)
+        .env("OPENHUMAN_MODEL", "mock:session-model")
         .env("BACKEND_URL", inference)
         .env("OPENHUMAN_API_URL", inference)
         .env("OPENHUMAN_TELEGRAM_BOT_API_BASE", telegram)
