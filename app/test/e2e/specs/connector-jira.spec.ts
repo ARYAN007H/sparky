@@ -61,7 +61,6 @@ describe('Jira Composio connector flow', () => {
     seedComposioToolkits([TOOLKIT_SLUG]);
     seedComposioConnection(TOOLKIT_SLUG, 'ACTIVE', 'c-jira-1');
     await waitForApp();
-    clearRequestLog();
     await triggerAuthLoopbackBypass(AUTH_TOKEN);
     await waitForWindowVisible(25_000);
     await waitForWebView(15_000);
