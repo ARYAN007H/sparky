@@ -7,6 +7,10 @@ use tinyinference_llm::model::ChatModel;
 
 /// Product recursion ceiling shared by native and MCP delegation.
 pub(crate) const MAX_SPAWN_DEPTH: usize = 3;
+pub use tinyagents_harness::cost::{
+    ControlledDispatchError, DispatchModelOptions, DispatchRefusal, DispatchRefusalReason,
+    PhysicalDispatchAdmission, PhysicalDispatchPermit,
+};
 pub use tinyinference_llm::model::budget::{
     Budget, BudgetExceeded, BudgetSnapshot, CallBudget, Spend, SpendLimits,
 };
@@ -43,6 +47,22 @@ impl ModelBudget {
         tinyagents_harness::cost::ModelBudget::new(self.ledger.clone(), self.call)
             .wrap_model_with_observer(model, observer)
     }
+
+    pub(crate) fn control(
+        model: Arc<dyn ChatModel<()>>,
+        budget: Option<&Self>,
+        admission: Option<Arc<dyn PhysicalDispatchAdmission>>,
+    ) -> Arc<dyn ChatModel<()>> {
+        let monetary_budget = budget.map(|budget| {
+            tinyagents_harness::cost::ModelBudget::new(budget.ledger.clone(), budget.call)
+        });
+        Arc::new(tinyagents_harness::cost::ControlledChatModel::new(
+            model,
+            DispatchModelOptions::new()
+                .monetary_budget(monetary_budget)
+                .admission(admission),
+        ))
+    }
 }
 
 /// Effective host depth ceiling, never wider than product policy.
@@ -65,14 +85,18 @@ pub(super) fn install_depth(
 
 impl crate::inference::turn_models::TurnModels {
     /// Wrap every concrete route and summarizer below harness retries/fallback.
-    pub(crate) fn with_budget(mut self, budget: Option<&ModelBudget>) -> Self {
-        let Some(budget) = budget else {
+    pub(crate) fn with_host_controls(
+        mut self,
+        budget: Option<&ModelBudget>,
+        admission: Option<Arc<dyn PhysicalDispatchAdmission>>,
+    ) -> Self {
+        if budget.is_none() && admission.is_none() {
             return self;
-        };
-        self.primary = budget.wrap(self.primary);
-        self.summarizer = budget.wrap(self.summarizer);
+        }
+        self.primary = ModelBudget::control(self.primary, budget, admission.clone());
+        self.summarizer = ModelBudget::control(self.summarizer, budget, admission.clone());
         for (_, route) in &mut self.routes {
-            *route = budget.wrap(route.clone());
+            *route = ModelBudget::control(route.clone(), budget, admission.clone());
         }
         self
     }

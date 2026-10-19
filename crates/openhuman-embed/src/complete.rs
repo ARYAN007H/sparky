@@ -448,6 +448,7 @@ pub struct Completer {
     observers: Arc<CompleterObservers>,
     cancellation: crate::cancellation::Cancellation,
     budget: Option<crate::budget::ModelBudget>,
+    dispatch_admission: Option<Arc<dyn crate::budget::PhysicalDispatchAdmission>>,
 }
 
 impl std::fmt::Debug for Completer {
@@ -471,6 +472,7 @@ impl Completer {
             observers: Arc::new(CompleterObservers::default()),
             cancellation: Default::default(),
             budget: None,
+            dispatch_admission: None,
         }
     }
 
@@ -499,6 +501,15 @@ impl Completer {
     /// Enforce a shared run or per-turn budget before every provider call.
     pub fn budget(mut self, budget: crate::budget::ModelBudget) -> Self {
         self.budget = Some(budget);
+        self
+    }
+
+    /// Attach a host-owned physical-dispatch policy shared with other calls.
+    pub fn dispatch_admission(
+        mut self,
+        admission: Arc<dyn crate::budget::PhysicalDispatchAdmission>,
+    ) -> Self {
+        self.dispatch_admission = Some(admission);
         self
     }
 
@@ -585,7 +596,17 @@ impl Completer {
         let mut usage = None;
         let mut unknown_cost = false;
         for attempt in 0..=request.structured_retries {
-            let mut response = self.dispatch(request.clone()).await?;
+            let mut response = match self.dispatch(request.clone()).await {
+                Ok(response) => response,
+                Err(CoreError::DispatchAdmission { source, .. }) => {
+                    return Err(CoreError::DispatchAdmission {
+                        method: COMPLETE,
+                        source,
+                        usage,
+                    });
+                }
+                Err(error) => return Err(error),
+            };
             unknown_cost |= response
                 .usage
                 .as_ref()
@@ -620,6 +641,17 @@ impl Completer {
             request.messages.len(),
             request.timeout_ms
         );
+        let wire_request = request.into_wire();
+        if let Err(message) =
+            openhuman_core::inference::host_runtime::ops::validate_complete_once_request(
+                &wire_request,
+            )
+        {
+            return Err(CoreError::Rpc {
+                method: COMPLETE,
+                message,
+            });
+        }
         let budget = self
             .budget
             .as_ref()
@@ -628,14 +660,27 @@ impl Completer {
                 call: budget.call,
             });
         // The spend ledger is an explicit argument of the call, not an ambient scope.
-        let call = openhuman_core::inference::host_runtime::ops::complete_once_observed(
+        let call = openhuman_core::inference::host_runtime::ops::complete_once_controlled(
             &endpoint,
-            request.into_wire(),
+            wire_request,
             budget.as_ref(),
             self.observers.physical_dispatch.clone(),
+            self.dispatch_admission.clone(),
         );
         let started = std::time::Instant::now();
-        let response = call.await.map_err(|message| {
+        let response = call.await.map_err(|error| {
+            let message = match error {
+                tinyagents_harness::cost::ControlledDispatchError::Admission(source) => {
+                    return CoreError::DispatchAdmission {
+                        method: COMPLETE,
+                        source,
+                        usage: None,
+                    };
+                }
+                tinyagents_harness::cost::ControlledDispatchError::Model(source) => {
+                    format!("complete_once: {source}")
+                }
+            };
             if let Some(source) = budget.as_ref().and_then(|budget| budget.ledger.refusal()) {
                 return CoreError::BudgetExceeded {
                     method: COMPLETE,

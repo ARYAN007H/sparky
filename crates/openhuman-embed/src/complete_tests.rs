@@ -476,6 +476,232 @@ async fn physical_observer_reports_each_structured_repair_dispatch() {
     }));
 }
 
+struct OneCallAdmission(std::sync::atomic::AtomicUsize);
+
+struct TestDispatchPermit;
+
+#[async_trait::async_trait]
+impl crate::budget::PhysicalDispatchAdmission for OneCallAdmission {
+    async fn acquire(
+        &self,
+    ) -> Result<Arc<dyn crate::budget::PhysicalDispatchPermit>, crate::budget::DispatchRefusal>
+    {
+        use std::sync::atomic::Ordering;
+
+        if self.0.fetch_add(1, Ordering::SeqCst) != 0 {
+            return Err(crate::budget::DispatchRefusal::new(
+                crate::budget::DispatchRefusalReason::CallLimit,
+            ));
+        }
+        Ok(Arc::new(TestDispatchPermit))
+    }
+}
+
+impl crate::budget::PhysicalDispatchPermit for TestDispatchPermit {
+    fn mark_dispatched(&self) -> Result<(), crate::budget::DispatchRefusal> {
+        Ok(())
+    }
+}
+
+#[tokio::test]
+async fn repair_cannot_exceed_dispatch_limit() {
+    let server = MockServer::start().await;
+    let replies = Arc::new(Mutex::new(0));
+    let replies_for_handler = Arc::clone(&replies);
+    Mock::given(method("POST"))
+        .and(path("/v1/chat/completions"))
+        .respond_with(move |_request: &wiremock::Request| {
+            let mut replies = replies_for_handler.lock().unwrap();
+            let text = if *replies == 0 {
+                "invalid"
+            } else {
+                "{\"ok\":true}"
+            };
+            *replies += 1;
+            ResponseTemplate::new(200).set_body_json(body(text, "stop"))
+        })
+        .mount(&server)
+        .await;
+    let admission = Arc::new(OneCallAdmission(std::sync::atomic::AtomicUsize::new(0)));
+    let request = CompletionRequest::new("repair-model", vec![ChatMessage::user("private")])
+        .response_format(ResponseFormat::JsonObject)
+        .structured_retries(1);
+
+    let result = completer(&server)
+        .dispatch_admission(admission)
+        .complete(request)
+        .await;
+
+    let requests = server.received_requests().await.expect("recording on");
+    assert_eq!(
+        requests.len(),
+        1,
+        "a refused repair must not reach the server"
+    );
+    assert!(result.is_err(), "the refused repair must be terminal");
+}
+
+#[tokio::test]
+async fn admission_only_completion_refuses_before_provider_and_observer() {
+    let server = MockServer::start().await;
+    let observer = Arc::new(PhysicalRecorder::default());
+    let admission = Arc::new(RefuseAdmission);
+
+    let error = completer(&server)
+        .dispatch_admission(admission)
+        .physical_observer(observer.clone())
+        .complete(CompletionRequest::new(
+            "admission-only",
+            vec![ChatMessage::user("private")],
+        ))
+        .await
+        .expect_err("the host policy refuses the first call");
+
+    assert!(matches!(error, CoreError::DispatchAdmission { .. }));
+    assert!(server.received_requests().await.unwrap().is_empty());
+    assert!(observer.0.lock().unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn scoped_monetary_budget_keeps_the_shared_dispatch_admission() {
+    let server = MockServer::start().await;
+    let replies = Arc::new(Mutex::new(0));
+    let replies_for_handler = Arc::clone(&replies);
+    Mock::given(method("POST"))
+        .and(path("/v1/chat/completions"))
+        .respond_with(move |_request: &wiremock::Request| {
+            let mut replies = replies_for_handler.lock().unwrap();
+            let text = if *replies == 0 {
+                "invalid"
+            } else {
+                "{\"ok\":true}"
+            };
+            *replies += 1;
+            ResponseTemplate::new(200).set_body_json(body(text, "stop"))
+        })
+        .mount(&server)
+        .await;
+    let admission = Arc::new(OneCallAdmission(std::sync::atomic::AtomicUsize::new(0)));
+    let budget = crate::budget::ModelBudget {
+        ledger: crate::budget::Budget::new(crate::budget::SpendLimits {
+            tokens: Some(1_000),
+            cost_micros: Some(100_000),
+        }),
+        call: crate::budget::CallBudget {
+            input_tokens: 500,
+            output_tokens: 100,
+            cost_micros: 100_000,
+        },
+    };
+
+    let error = completer(&server)
+        .budget(budget)
+        .dispatch_admission(admission)
+        .complete(
+            CompletionRequest::new("budgeted-admission", vec![ChatMessage::user("private")])
+                .response_format(ResponseFormat::JsonObject)
+                .structured_retries(1),
+        )
+        .await
+        .expect_err("the repair is refused after creating a scoped spend ledger");
+
+    assert!(matches!(error, CoreError::DispatchAdmission { .. }));
+    assert_eq!(server.received_requests().await.unwrap().len(), 1);
+}
+
+#[tokio::test]
+async fn truncation_retry_consumes_a_dispatch_slot() {
+    let server = MockServer::start().await;
+    let replies = Arc::new(Mutex::new(0));
+    let replies_for_handler = Arc::clone(&replies);
+    Mock::given(method("POST"))
+        .and(path("/v1/chat/completions"))
+        .respond_with(move |_request: &wiremock::Request| {
+            let mut replies = replies_for_handler.lock().unwrap();
+            let (text, finish) = if *replies == 0 {
+                ("{", "length")
+            } else {
+                ("{\"ok\":true}", "stop")
+            };
+            *replies += 1;
+            ResponseTemplate::new(200).set_body_json(body(text, finish))
+        })
+        .mount(&server)
+        .await;
+    let admission = Arc::new(OneCallAdmission(std::sync::atomic::AtomicUsize::new(0)));
+    let request = CompletionRequest::new("truncated-model", vec![ChatMessage::user("private")])
+        .response_format(ResponseFormat::JsonObject)
+        .structured_retries(1);
+
+    let error = completer(&server)
+        .dispatch_admission(admission)
+        .complete(request)
+        .await
+        .expect_err("the truncation repair is refused");
+
+    assert!(matches!(error, CoreError::DispatchAdmission { .. }));
+    assert_eq!(server.received_requests().await.unwrap().len(), 1);
+}
+
+#[tokio::test]
+async fn refusal_preserves_paid_usage_without_a_phantom_observer_event() {
+    let server = MockServer::start().await;
+    let replies = Arc::new(Mutex::new(0));
+    let replies_for_handler = Arc::clone(&replies);
+    Mock::given(method("POST"))
+        .and(path("/v1/chat/completions"))
+        .respond_with(move |_request: &wiremock::Request| {
+            let mut replies = replies_for_handler.lock().unwrap();
+            let text = if *replies == 0 {
+                "invalid"
+            } else {
+                "{\"ok\":true}"
+            };
+            *replies += 1;
+            ResponseTemplate::new(200).set_body_json(body(text, "stop"))
+        })
+        .mount(&server)
+        .await;
+    let admission = Arc::new(OneCallAdmission(std::sync::atomic::AtomicUsize::new(0)));
+    let observer = Arc::new(PhysicalRecorder::default());
+    let request = CompletionRequest::new("paid-repair", vec![ChatMessage::user("private")])
+        .response_format(ResponseFormat::JsonObject)
+        .structured_retries(1);
+
+    let error = completer(&server)
+        .dispatch_admission(admission)
+        .physical_observer(observer.clone())
+        .complete(request)
+        .await
+        .expect_err("the second physical call is refused");
+
+    match error {
+        CoreError::DispatchAdmission { usage, .. } => {
+            assert_eq!(
+                usage.expect("first call usage is retained").cost_usd,
+                Some(0.0125)
+            );
+        }
+        other => panic!("expected typed admission refusal, got {other:?}"),
+    }
+    assert_eq!(server.received_requests().await.unwrap().len(), 1);
+    assert_eq!(observer.0.lock().unwrap().len(), 1);
+}
+
+struct RefuseAdmission;
+
+#[async_trait::async_trait]
+impl crate::budget::PhysicalDispatchAdmission for RefuseAdmission {
+    async fn acquire(
+        &self,
+    ) -> Result<Arc<dyn crate::budget::PhysicalDispatchPermit>, crate::budget::DispatchRefusal>
+    {
+        Err(crate::budget::DispatchRefusal::new(
+            crate::budget::DispatchRefusalReason::CallLimit,
+        ))
+    }
+}
+
 #[test]
 fn json_reply_tolerates_one_code_fence() {
     assert_eq!(
@@ -552,6 +778,27 @@ async fn provider_failure_maps_to_an_rpc_error() {
     assert!(
         matches!(err, CoreError::Rpc { method, .. } if method == COMPLETE),
         "{err:?}"
+    );
+}
+
+#[tokio::test]
+async fn provider_failure_keeps_the_complete_once_prefix() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/v1/chat/completions"))
+        .respond_with(ResponseTemplate::new(400).set_body_string("bad request"))
+        .mount(&server)
+        .await;
+
+    let request = CompletionRequest::new("m", vec![ChatMessage::user("x")]);
+    let error = completer(&server)
+        .complete(request)
+        .await
+        .expect_err("a provider failure must preserve the legacy completion context");
+
+    assert!(
+        matches!(&error, CoreError::Rpc { message, .. } if message.starts_with("complete_once: model error:")),
+        "{error:?}"
     );
 }
 
