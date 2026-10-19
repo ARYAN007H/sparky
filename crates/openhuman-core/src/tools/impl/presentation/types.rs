@@ -1,7 +1,9 @@
 //! Typed input / output / error contracts for the `generate_presentation` tool.
 
 use serde::{Deserialize, Serialize};
-use tinydocs_bus::spec::presentation::{PresentationRequestSpec, PresentationSpec, SlideRequestSpec, SlideSpec};
+use tinydocs_bus::spec::presentation::{
+    PresentationRequestSpec, PresentationSpec, SlideRequestSpec, SlideSpec,
+};
 
 use crate::modules::documents::DocumentCallError;
 
@@ -229,13 +231,21 @@ pub(super) fn validate_request(input: &GeneratePresentationInput) -> Result<(), 
         title: input.title.clone(),
         author: input.author.clone(),
         theme: input.theme.clone(),
-        slides: input.slides.iter().map(|slide| SlideRequestSpec {
-            title: slide.title.clone(),
-            body: slide.body.clone(),
-            bullets: slide.bullets.clone(),
-            speaker_notes: slide.speaker_notes.clone(),
-            images: slide.images.iter().map(|image| image.caption.clone()).collect(),
-        }).collect(),
+        slides: input
+            .slides
+            .iter()
+            .map(|slide| SlideRequestSpec {
+                title: slide.title.clone(),
+                body: slide.body.clone(),
+                bullets: slide.bullets.clone(),
+                speaker_notes: slide.speaker_notes.clone(),
+                images: slide
+                    .images
+                    .iter()
+                    .map(|image| image.caption.clone())
+                    .collect(),
+            })
+            .collect(),
     };
     request.validate().map_err(PresentationError::from)
 }

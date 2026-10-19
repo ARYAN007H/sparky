@@ -116,6 +116,77 @@ async fn execute_rejects_too_many_slides() {
     );
 }
 
+#[tokio::test]
+async fn request_preflight_rejects_before_image_resolution_or_artifact_creation() {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    struct CountingResolver(AtomicUsize);
+    #[async_trait]
+    impl ImageResolver for CountingResolver {
+        async fn resolve(
+            &self,
+            _tool: &PresentationTool,
+            input: &GeneratePresentationInput,
+            _ctx: &DispatchCtx,
+        ) -> (Vec<Vec<SlideImage>>, Vec<String>) {
+            self.0.fetch_add(1, Ordering::SeqCst);
+            (vec![Vec::new(); input.slides.len()], Vec::new())
+        }
+    }
+
+    let invalid_text = json!({
+        "title": " ",
+        "slides": [{
+            "title": "Slide",
+            "bullets": ["valid"],
+            "images": [{ "source": { "type": "file", "path": "missing.png" } }]
+        }]
+    });
+    let too_many_slides = json!({
+        "title": "Deck",
+        "slides": (0..=MAX_SLIDES)
+            .map(|i| json!({ "title": format!("Slide {i}"), "bullets": ["valid"] }))
+            .collect::<Vec<_>>()
+    });
+    let too_many_failed_references = json!({
+        "title": "Deck",
+        "slides": [{
+            "title": "Slide",
+            "bullets": ["valid"],
+            "images": (0..9).map(|i| json!({
+                "source": { "type": "file", "path": format!("missing-{i}.png") },
+                "caption": "requested caption"
+            })).collect::<Vec<_>>()
+        }]
+    });
+
+    for (args, expected) in [
+        (invalid_text, "title"),
+        (too_many_slides, "64 slides"),
+        (too_many_failed_references, "8 images total"),
+    ] {
+        let ws = workspace();
+        let tool = make_tool(ws.path());
+        let resolver = CountingResolver(AtomicUsize::new(0));
+        let result = tool
+            .run_with_resolver(args, None, &DispatchCtx::ambient(), &resolver)
+            .await
+            .expect("run returns tool result");
+
+        assert!(
+            result.is_error,
+            "invalid request should fail: {}",
+            result.text()
+        );
+        assert!(result.text().contains(expected), "{}", result.text());
+        assert_eq!(resolver.0.load(Ordering::SeqCst), 0, "image resolution ran");
+        assert!(
+            !ws.path().join("Files").exists(),
+            "invalid request created the artifact output directory"
+        );
+    }
+}
+
 #[test]
 fn resolved_presentation_uses_bus_validation_and_preserves_its_limit_error() {
     let input = GeneratePresentationInput {
