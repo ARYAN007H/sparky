@@ -79,7 +79,8 @@ async fn forgetting_sites_reports_how_many_went() {
     for site in ["shop.test", "books.test"] {
         std::fs::write(sites.join(format!("{site}.json")), b"{}").unwrap();
     }
-    let ctx = CoreContext::for_test_with_config(DomainSet::full(), config.clone());
+    let workspace = config.workspace_dir.clone();
+    let ctx = CoreContext::for_test_with_config(DomainSet::full(), config);
 
     let (one, every, left) = CoreContext::scope(ctx.clone(), async {
         let mut one = Map::new();
@@ -90,25 +91,22 @@ async fn forgetting_sites_reports_how_many_went() {
         let one = super::handle_browser_forget_sites(DispatchCtx::new(ctx.clone()), one).await;
         let every =
             super::handle_browser_forget_sites(DispatchCtx::new(ctx.clone()), Map::new()).await;
-        // Site memory lives in the storage KV since schema v2; the legacy
-        // files are imported once and left in place, so "gone" is read from
-        // the store, not the directory.
-        let left = crate::modules::site_memory_host::forget(&config, None).await;
-        (one, every, left)
+
+        let reopened = crate::modules::site_memory_host::SiteStore::open(&workspace)
+            .expect("reopen active site store");
+        assert!(reopened.load("shop.test").await.unwrap().hints.is_empty());
+        assert!(reopened.load("books.test").await.unwrap().hints.is_empty());
+        assert_eq!(reopened.forget(None).await.unwrap(), 0);
+
+        (one, every)
     })
     .await;
 
     assert_eq!(one.unwrap()["forgotten"], 1);
     assert_eq!(every.unwrap()["forgotten"], 1);
-    assert_eq!(
-        left.unwrap(),
-        0,
-        "nothing may remain after forgetting every site"
-    );
-    assert!(
-        sites.join("books.test.json").exists(),
-        "the imported legacy file is left untouched"
-    );
+
+    assert!(sites.join("shop.test.json").exists());
+    assert!(sites.join("books.test.json").exists());
 }
 
 #[test]
