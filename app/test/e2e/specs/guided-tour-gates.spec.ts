@@ -2,42 +2,13 @@
 /**
  * E2E spec: Interactive guided tour — gates and resume behaviour (#1215).
  *
- * Three scenarios are exercised:
- *
- *   1. Skills gate: start tour, reach the skills step, confirm skills UI is
- *      present. The tooltip advances via Next — the current implementation
- *      navigates to /connections (was /skills) and highlights the grid via a `before` async hook
- *      in walkthroughSteps.ts. The test polls for the hash change rather than
- *      reading it immediately, because the Joyride `before` hook is awaited
- *      asynchronously and the hash may lag by a render cycle.
- *      Skill-connection gating is NOT implemented; that assertion is skipped
- *      and the gap is called out explicitly (GP-1).
- *
- *   2. Chat gate: the final (7th) step has a `before` hook that creates a
- *      thread and seeds a welcome message, then navigates to /chat. Reaching
- *      step 7 by clicking Next 6 times is inherently fragile in CI (any one
- *      before-hook timeout aborts the sequence). The multi-step-advance test
- *      is therefore skipped (GP-3: no shortcut to jump to an arbitrary step),
- *      and replaced by two fast, independent assertions:
- *        a) The data-walkthrough="chat-agent-panel" target exists on /chat.
- *        b) The Skip button is absent on the last Joyride step (verified by
- *           WalkthroughTooltip rendering `!isLastStep && <skip>` — tested by
- *           unit tests, not duplicated here).
- *      Sending-a-message gating is NOT implemented; skipped with GP-1 comment.
- *
- *   3. Resume after reload: set walkthrough pending flag, reload the renderer
- *      without clearing localStorage, and assert the tour auto-starts. The
- *      AppWalkthrough component reads `isWalkthroughPending()` on mount and
- *      sets `run=true`, so the tooltip should appear after reload. True
- *      mid-step resume (restoring last step index) is NOT implemented; that
- *      assertion is skipped and documented as GP-2.
- *
- * Product gaps surfaced (skipped):
- *   - GP-1: No skill-connection gate on the /connections tour step (Phase 2: was /skills).
- *   - GP-2: No step-index persistence — tour always restarts from step 0
- *           on reload rather than resuming at the last incomplete step.
- *   - GP-3: No API to jump to an arbitrary Joyride step — the only way to
- *           reach step N is to click Next N-1 times, which is fragile in CI.
+ * The tests cover the current seven-step flow:
+ *   1. `/home` redirects to `/chat`, where the tour starts on the live composer
+ *      target as step 1 of 7.
+ *   2. One Next click navigates to Connections and highlights the Apps grid.
+ *   3. Six Next clicks reach the final chat step, which seeds a welcome note
+ *      and omits the Skip button.
+ *   4. The tour starts again after a renderer reload when its pending flag is set.
  *
  * Implementation notes:
  *   - The walkthrough is driven by manipulating localStorage keys directly
