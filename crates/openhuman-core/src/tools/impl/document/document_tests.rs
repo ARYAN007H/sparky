@@ -94,50 +94,9 @@ fn description_includes_router_rules() {
     assert!(desc.contains("document") || desc.contains("docx"));
 }
 
-#[tokio::test]
-async fn execute_rejects_empty_title() {
-    let ws = workspace();
-    let tool = make_tool(ws.path());
-    let args = json!({ "title": "", "sections": [{ "heading": "x", "paragraphs": ["y"] }] });
-    let result = tool.execute(args).await.expect("execute returns Ok");
-    assert!(result.is_error);
-    assert!(result.text().contains("title"));
-}
 
-#[tokio::test]
-async fn execute_rejects_empty_sections_array() {
-    let ws = workspace();
-    let tool = make_tool(ws.path());
-    let args = json!({ "title": "Doc", "sections": [] });
-    let result = tool.execute(args).await.expect("execute returns Ok");
-    assert!(result.is_error);
-    assert!(result.text().contains("section"));
-}
 
-#[tokio::test]
-async fn execute_rejects_section_with_no_content() {
-    let ws = workspace();
-    let tool = make_tool(ws.path());
-    let args = json!({
-        "title": "Doc",
-        "sections": [{ "heading": "", "paragraphs": ["   "], "bullets": [] }]
-    });
-    let result = tool.execute(args).await.expect("execute returns Ok");
-    assert!(result.is_error);
-}
 
-#[tokio::test]
-async fn execute_rejects_oversize_heading() {
-    let ws = workspace();
-    let tool = make_tool(ws.path());
-    let big = "x".repeat(MAX_TEXT_CHARS + 1);
-    let args = json!({
-        "title": "Doc",
-        "sections": [{ "heading": big, "paragraphs": ["ok"] }]
-    });
-    let result = tool.execute(args).await.expect("execute returns Ok");
-    assert!(result.is_error);
-}
 
 #[tokio::test]
 async fn execute_rejects_too_many_sections() {

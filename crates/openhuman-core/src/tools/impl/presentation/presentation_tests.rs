@@ -452,8 +452,17 @@ async fn execute_skips_missing_artifact_with_warning() {
 
 #[tokio::test]
 async fn execute_rejects_too_many_images_per_deck() {
+    if crate::util::module_test_process::run(
+        module_path!(),
+        "execute_rejects_too_many_images_per_deck",
+    ) {
+        return;
+    }
     let ws = workspace();
-    let tool = make_tool(ws.path());
+    let mut config = crate::config::Config::default();
+    config.workspace_dir = ws.path().to_path_buf();
+    config.modules.allow_download = false;
+    let tool = make_tool_with_config(ws.path(), config);
     let image_path = ws.path().join("one.png");
     std::fs::write(&image_path, png_1x1()).expect("write valid image");
     // Nine successfully resolved images exceed the bus deck cap of eight.
