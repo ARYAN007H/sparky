@@ -64,7 +64,10 @@ pub(crate) fn handle_voice_set_providers(
             config.local_ai.tts_voice_id = voice.to_string();
         }
 
-        config.save().await.map_err(|e| e.to_string())?;
+        config
+            .save()
+            .await
+            .map_err(crate::config::ops::config_save_error)?;
         log::debug!(
             "[voice-factory] persisted providers stt={} tts={} stt_model={} tts_voice={}",
             config.local_ai.stt_provider,
@@ -202,7 +205,10 @@ pub(crate) fn handle_voice_update_provider_settings(
             }
         }
 
-        config.save().await.map_err(|e| e.to_string())?;
+        config
+            .save()
+            .await
+            .map_err(crate::config::ops::config_save_error)?;
 
         log::debug!(
             "[voice-factory] persisted voice provider settings: {} providers, stt={:?}, tts={:?}",
