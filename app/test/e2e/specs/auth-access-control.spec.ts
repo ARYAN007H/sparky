@@ -418,11 +418,27 @@ describe('Auth & Access Control', () => {
       console.log(`[AuthAccess] Logout: ${loggedOut}`);
     }
 
-    // If a confirmation dialog appears, confirm it
-    await browser.pause(2_000);
-    const hasConfirm =
-      (await textExists('Confirm')) || (await textExists('Yes')) || (await textExists('Log Out'));
-    if (hasConfirm) {
+    // Wait for either the optional confirmation dialog or the authoritative
+    // core logout state. A fixed delay could inspect the core before the
+    // renderer's async clearSession() has reached auth_logout.
+    const logoutProgress = await browser.waitUntil(
+      async () => {
+        const hasConfirm =
+          (await textExists('Confirm')) ||
+          (await textExists('Yes')) ||
+          (await textExists('Log Out'));
+        if (hasConfirm) return 'confirmation';
+        const state = await callOpenhumanRpc<AuthStateResponse>('openhuman.auth_get_state', {});
+        expectRpcOk('auth_get_state', state);
+        return authStateValue(state).isAuthenticated === false ? 'signed-out' : false;
+      },
+      {
+        timeout: 15_000,
+        interval: 250,
+        timeoutMsg: 'logout neither opened confirmation nor cleared core authentication',
+      }
+    );
+    if (logoutProgress === 'confirmation') {
       const confirmed = await browser.execute(() => {
         const candidates = document.querySelectorAll('button, [role="button"], a');
         for (const el of candidates) {
@@ -437,7 +453,6 @@ describe('Auth & Access Control', () => {
       });
       expect(confirmed).toBe(true);
       console.log('[AuthAccess] Confirmation dialog: clicked');
-      await browser.pause(2_000);
     }
 
     // ── Assertion, rewritten ────────────────────────────────────────────
@@ -456,8 +471,18 @@ describe('Auth & Access Control', () => {
     //      security: a UI that routes to Welcome while the core keeps
     //      authenticating is exactly the regression worth catching), and
     //   2. the shell actually renders the logged-out surface.
-    await browser.pause(3_000);
-
+    await browser.waitUntil(
+      async () => {
+        const state = await callOpenhumanRpc<AuthStateResponse>('openhuman.auth_get_state', {});
+        expectRpcOk('auth_get_state', state);
+        return authStateValue(state).isAuthenticated === false;
+      },
+      {
+        timeout: 15_000,
+        interval: 250,
+        timeoutMsg: 'core still reports authenticated after Settings logout completed',
+      }
+    );
     const state = await callOpenhumanRpc<AuthStateResponse>('openhuman.auth_get_state', {});
     expectRpcOk('auth_get_state', state);
     const authState = authStateValue(state);
