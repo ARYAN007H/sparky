@@ -495,7 +495,7 @@ struct FencedBlobs {
 }
 
 /// Two handles to one stream, used only to recover the input when a native
-/// fenced handle rejects streaming before it reads any bytes.
+/// fenced handle rejects streaming before it polls the reader.
 #[derive(Clone)]
 struct SharedBlobReader {
     reader: Arc<Mutex<tinystoragedrivers::BlobReader>>,
