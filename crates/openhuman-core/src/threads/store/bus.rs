@@ -20,11 +20,6 @@
 //! there is exactly one thread-id derivation again rather than a copy and a
 //! promise, and this file's behaviour is untouched by the move — which matters,
 //! because it decides the id under which channel turns are persisted.
-#![allow(
-    deprecated,
-    reason = "the v21 ChannelMessage/SendMessage shims stay in use here until the single inbound path (senamakel/openhuman#136) moves the host to canonical v22 content"
-)]
-
 use crate::core::runtime::DispatchCtx;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, OnceLock, RwLock};
@@ -41,7 +36,7 @@ use tinychannels_bus::ChannelMessage;
 use tinychannels_runtime::context::conversation_history_key;
 
 use super::{
-    append_message, ensure_thread, get_messages, ConversationMessage, CreateConversationThread,
+    ConversationMessage, CreateConversationThread, append_message, ensure_thread, get_messages,
 };
 
 static CONVERSATION_PERSISTENCE_HANDLE: OnceLock<SubscriptionHandle> = OnceLock::new();

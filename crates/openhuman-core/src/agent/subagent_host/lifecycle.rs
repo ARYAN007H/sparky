@@ -31,9 +31,7 @@ use tokio::sync::{Mutex as AsyncMutex, Notify};
 
 use checkpoint::absolute_checkpoint_dir;
 
-use super::{
-    SubagentRunError, SubagentRunOptions, SubagentRunOutcome, SubagentRunStatus, SubagentUsage,
-};
+use super::{SubagentRunError, SubagentRunOptions, SubagentRunOutcome, SubagentRunStatus};
 
 fn root_context_from_options(
     options: &SubagentRunOptions,
@@ -186,7 +184,7 @@ fn observer_cancelled_outcome(task_key: &SubagentTaskKey, agent_id: &str) -> Sub
         mode: super::SubagentMode::Typed,
         status: SubagentRunStatus::Cancelled,
         final_history: Vec::new(),
-        usage: SubagentUsage::default(),
+        usage: tinyagents_harness::progress::SubagentUsage::default(),
         artifact_paths: Vec::new(),
         persistence_disposition:
             tinyagents_orchestration::subagent::SubagentPersistenceDisposition::ObserverCancelled,
@@ -1014,7 +1012,7 @@ impl tinyagents_orchestration::subagent::SubagentPersistence for OpenHumanPersis
             resume_metadata: metadata.clone(),
             output: pause.outcome.output.clone(),
             iterations: pause.outcome.usage.calls as usize,
-            usage: SubagentUsage {
+            usage: tinyagents_harness::progress::SubagentUsage {
                 input_tokens: pause.outcome.usage.usage.input_tokens,
                 output_tokens: pause.outcome.usage.usage.output_tokens,
                 cached_input_tokens: pause.outcome.usage.usage.cache_read_tokens,
@@ -1171,7 +1169,7 @@ fn outcome_to_host(
             .iter()
             .filter_map(tinyagents_runtime::transcript::message_to_native_transcript)
             .collect(),
-        usage: SubagentUsage {
+        usage: tinyagents_harness::progress::SubagentUsage {
             input_tokens: outcome.usage.usage.input_tokens,
             output_tokens: outcome.usage.usage.output_tokens,
             cached_input_tokens: outcome.usage.usage.cache_read_tokens,

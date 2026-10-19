@@ -126,12 +126,12 @@ existing directory with no null byte and refuses anything
 `SecurityPolicy::is_always_forbidden` covers. After the first message the
 folder is fixed: a resumed session keeps its first system prompt and tool list
 verbatim, so moving it would leave the model describing one directory while
-its tools act in another. `web_chat::run_task` reads the binding through
+its tools act in another. `web_chat::turn_host` reads the binding through
 `ops::thread_working_dir`.
 
 ### Turn-state snapshots
 
-`web_chat::progress_bridge` drives a `tinyagents_session::turn_state::TurnStateMirror`
+`web_chat::progress` drives a `tinyagents_session::turn_state::TurnStateMirror`
 for each web turn. `turn_state::mirror::ObserveProgress` (`mirror/observe.rs`)
 is the host projection: it turns each `agent::progress::AgentProgress` event
 into a `TurnState` mutation. Streaming deltas only update memory; the mirror
@@ -191,7 +191,7 @@ label from threads and renames `welcome*` session transcripts to
 - `ConversationThreadSummary`, `ConversationMessageRecord` ([`rpc_models.rs`](./rpc_models.rs)): their wire forms.
 - `ThreadsError` ([`error.rs`](./error.rs)): the error type for handlers that can report a missing thread.
 - `ops::token_usage` ([`ops/usage.rs`](./ops/usage.rs)): also called by `agent/context_breakdown.rs`.
-- `ObserveProgress` ([`turn_state/mirror/observe.rs`](./turn_state/mirror/observe.rs)): the trait `web_chat::progress_bridge` uses to feed the mirror.
+- `ObserveProgress` ([`turn_state/mirror/observe.rs`](./turn_state/mirror/observe.rs)): the trait `web_chat::progress` uses to feed the mirror.
 
 ## RPC surface
 

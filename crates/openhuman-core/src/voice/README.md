@@ -353,7 +353,7 @@ count, rolling recent-transcript buffer) behind a `OnceCell` singleton.
   `voice_providers.rs`); migrations live in `config/migrations/`.
 
 Callers outside this folder include `core/all.rs` (controller and CLI
-registration), `web_chat/run_task.rs` (reply speech, PTT events),
+registration), `web_chat/turn_host.rs` (reply speech, PTT events),
 `channels/host/adapters.rs` (channel STT and reply synthesis),
 `security/credentials/ops/gated_services.rs` (starts and stops the dictation
 server, listener and always-on mode when gating credentials change),

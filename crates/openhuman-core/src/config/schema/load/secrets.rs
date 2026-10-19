@@ -189,14 +189,6 @@ pub(super) fn decrypt_config_secrets(config: &mut Config, openhuman_dir: &Path) 
         decrypt_optional_secret(&store, &mut tok, "mattermost.bot_token")?;
         m.bot_token = tok.unwrap_or_default();
     }
-    if let Some(ref mut w) = ch.webhook {
-        decrypt_optional_secret(&store, &mut w.secret, "webhook.secret")?;
-    }
-    if let Some(ref mut mx) = ch.matrix {
-        let mut tok = Some(mx.access_token.clone());
-        decrypt_optional_secret(&store, &mut tok, "matrix.access_token")?;
-        mx.access_token = tok.unwrap_or_default();
-    }
     if let Some(ref mut wa) = ch.whatsapp {
         decrypt_optional_secret(&store, &mut wa.access_token, "whatsapp.access_token")?;
         decrypt_optional_secret(&store, &mut wa.verify_token, "whatsapp.verify_token")?;
@@ -305,14 +297,6 @@ pub(super) fn encrypt_config_secrets(config: &mut Config) -> Result<()> {
         let mut tok = Some(m.bot_token.clone());
         encrypt_optional_secret(&store, &mut tok, "mattermost.bot_token")?;
         m.bot_token = tok.unwrap_or_default();
-    }
-    if let Some(ref mut w) = ch.webhook {
-        encrypt_optional_secret(&store, &mut w.secret, "webhook.secret")?;
-    }
-    if let Some(ref mut mx) = ch.matrix {
-        let mut tok = Some(mx.access_token.clone());
-        encrypt_optional_secret(&store, &mut tok, "matrix.access_token")?;
-        mx.access_token = tok.unwrap_or_default();
     }
     if let Some(ref mut wa) = ch.whatsapp {
         encrypt_optional_secret(&store, &mut wa.access_token, "whatsapp.access_token")?;

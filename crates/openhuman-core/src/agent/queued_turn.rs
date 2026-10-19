@@ -4,24 +4,99 @@
 //! selects how this payload is consumed. OpenHuman retains the web and
 //! orchestration metadata needed to dispatch a deferred follow-up turn.
 
-/// A queued OpenHuman turn input.
+use tinyagents_harness::turn_runner::{QueueDisposition, RequeuePayload, ScopeKey, TurnRequest};
+
+/// The host metadata one OpenHuman turn carries through TinyAgents' turn
+/// runner and its run queue: which client asked, the per-message model and
+/// locale choices, and the context the turn runs under.
 ///
-/// The payload deliberately does not carry a lane: lane selection is made at
-/// the host boundary when the item is pushed into TinyAgents' `RunQueue`.
-#[derive(Debug, Clone)]
-pub struct QueuedTurn {
-    /// Stable id for this queued item (minted once, at push time). Carried on
-    /// `RunQueue*` domain events (`item_id`) and the `queue_item_*` web-channel
-    /// events so the frontend can key a queued-message row and later target it
-    /// with `channel.web_queue_remove`.
-    pub id: String,
-    pub text: String,
+/// This is the `P` of [`QueuedTurn`]. A turn the runner queues (steer,
+/// follow-up, collect) keeps all of it, so a deferred turn dispatches exactly
+/// as the user asked.
+#[derive(Clone, Default)]
+pub struct QueuedPayload {
+    /// The context the turn runs under. `None` on a placeholder the harness
+    /// rebuilt from a bare id and text; the runner fills it from the running
+    /// turn ([`RequeuePayload::adopt`]).
+    pub ctx: Option<crate::core::runtime::DispatchCtx>,
     pub client_id: String,
-    pub thread_id: String,
-    pub queued_at_ms: u64,
     pub model_override: Option<String>,
     pub temperature: Option<f64>,
     pub locale: Option<String>,
+    pub metadata: tinychannels_bus::web::ChatRequestMetadata,
+    pub queued_at_ms: u64,
+}
+
+impl std::fmt::Debug for QueuedPayload {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("QueuedPayload")
+            .field("client_id", &self.client_id)
+            .field("model_override", &self.model_override)
+            .field("temperature", &self.temperature)
+            .field("locale", &self.locale)
+            .field("queued_at_ms", &self.queued_at_ms)
+            .finish_non_exhaustive()
+    }
+}
+
+impl RequeuePayload for QueuedPayload {
+    fn requeued(_thread_label: &str, queued_at_ms: u64) -> Self {
+        Self {
+            queued_at_ms,
+            ..Self::default()
+        }
+    }
+
+    fn adopt(&mut self, running: &Self) {
+        if self.ctx.is_none() {
+            self.ctx.clone_from(&running.ctx);
+        }
+        if self.client_id.is_empty() {
+            self.client_id.clone_from(&running.client_id);
+            self.model_override.clone_from(&running.model_override);
+            self.temperature = running.temperature;
+            self.locale.clone_from(&running.locale);
+            self.metadata.clone_from(&running.metadata);
+        }
+    }
+}
+
+/// A queued OpenHuman turn input: TinyAgents' [`TurnRequest`] carrying
+/// OpenHuman's [`QueuedPayload`]. The request id doubles as the queued item's
+/// id (what `channel.web_queue_remove` targets); the lane is chosen at the
+/// host boundary when the item is pushed into the runner's `RunQueue`.
+pub type QueuedTurn = TurnRequest<QueuedPayload>;
+
+/// A steering message for a running sub-agent, attributed to `client_id`.
+#[must_use]
+pub fn steer_message(
+    id: impl Into<String>,
+    text: impl Into<String>,
+    client_id: &str,
+    thread_id: &str,
+) -> QueuedTurn {
+    let queued_at_ms = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis() as u64;
+    TurnRequest {
+        scope: ScopeKey {
+            agent_id: String::new(),
+            profile_id: None,
+        },
+        thread_id: thread_id.to_owned(),
+        request_id: id.into(),
+        text: text.into(),
+        payload: QueuedPayload {
+            client_id: client_id.to_owned(),
+            queued_at_ms,
+            ..QueuedPayload::default()
+        },
+        host_authored: false,
+        disposition: QueueDisposition::Steer,
+        deadline: None,
+        idle_timeout: None,
+    }
 }
 
 /// Preview a queued message's caption or attachment names, without exposing

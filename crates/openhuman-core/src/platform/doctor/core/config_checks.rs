@@ -167,12 +167,10 @@ pub(super) fn check_config_semantics(config: &Config, items: &mut Vec<Diagnostic
         || cc.discord.is_some()
         || cc.slack.is_some()
         || cc.imessage.is_some()
-        || cc.matrix.is_some()
         || cc.whatsapp.is_some()
         || cc.email.is_some()
         || cc.irc.is_some()
-        || cc.lark.is_some()
-        || cc.webhook.is_some();
+        || cc.lark.is_some();
 
     if has_channel {
         items.push(DiagnosticItem::ok(cat, "at least one channel configured"));

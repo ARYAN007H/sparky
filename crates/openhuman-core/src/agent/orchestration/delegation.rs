@@ -18,7 +18,6 @@
 use std::sync::Arc;
 
 use crate::agent::harness::host_definition::AgentDefinition;
-use crate::agent::progress::AgentProgress;
 use crate::agent::subagent_host::{
     run_subagent_with_parent, SubagentRunOptions, SubagentRunStatus,
 };
@@ -30,6 +29,7 @@ use tinyagents_graph::delegation::{
     DelegationConfig, DelegationStage, DelegationStageOutput, DelegationState,
 };
 use tinyagents_harness::context::{RunConfig, RunContext};
+use tinyagents_harness::progress::AgentProgress;
 use tinytools::WorkspaceDescriptor;
 
 const LOG_TARGET: &str = "agent_orchestration::delegation";

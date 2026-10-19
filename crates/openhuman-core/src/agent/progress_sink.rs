@@ -17,7 +17,7 @@
 //! `set_on_progress` themselves): where both could apply, the **explicitly-set
 //! sink wins**.
 
-use crate::agent::progress::AgentProgress;
+use tinyagents_harness::progress::AgentProgress;
 
 /// The channel an embedder hands to a turn, and the same type
 /// [`OpenHumanSessionHost::set_on_progress`](crate::agent::OpenHumanSessionHost::set_on_progress)

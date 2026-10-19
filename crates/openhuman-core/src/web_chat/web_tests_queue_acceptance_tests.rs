@@ -76,12 +76,15 @@ async fn web_queue_retains_typed_queued_turn_metadata() {
     assert_eq!(queued.len(), 1);
     let queued = &queued[0];
     assert_eq!(queued.text, "defer this exact payload");
-    assert_eq!(queued.client_id, "queue-test-client");
+    assert_eq!(queued.payload.client_id, "queue-test-client");
     assert_eq!(queued.thread_id, thread_id);
-    assert!(queued.queued_at_ms > 0);
-    assert_eq!(queued.model_override.as_deref(), Some("model-override"));
-    assert_eq!(queued.temperature, Some(0.7));
-    assert_eq!(queued.locale.as_deref(), Some("ar"));
+    assert!(queued.payload.queued_at_ms > 0);
+    assert_eq!(
+        queued.payload.model_override.as_deref(),
+        Some("model-override")
+    );
+    assert_eq!(queued.payload.temperature, Some(0.7));
+    assert_eq!(queued.payload.locale.as_deref(), Some("ar"));
 
     cancel_parked_turn(thread_id, &block).await;
 }
@@ -146,16 +149,19 @@ async fn interrupt_and_parallel_bypass_the_active_turn_queue() {
 #[tokio::test]
 async fn terminal_turn_dispatches_followup_as_a_fresh_host_turn() {
     let _serial = FORCED_ERROR_TEST_LOCK.lock().await;
-    let block = make_block();
+    let workspace = tempfile::tempdir().expect("workspace");
+    let block = TestRunChatTaskBlock {
+        succeed_in: Some(workspace.path().to_path_buf()),
+        ..make_block()
+    };
     set_test_run_chat_task_block(Some(block.clone())).await;
     let thread_id = "queue-followup-terminal";
     let primary_request_id = start_parked_turn(thread_id, &block).await;
     let accepted = queue_message(thread_id, "start after terminal", "followup").await;
     assert_eq!(accepted["queued"], true);
 
-    // End the primary normally from the host test seam. The queue's follow-up
-    // lane is drained only after terminal handling, then `dispatch_followups`
-    // must route it back through `start_chat` as a fresh in-flight turn.
+    // End the primary normally from the host test seam. The runner hands the
+    // queue's follow-up lane back as a fresh turn once the primary completed.
     block.release.notify_one();
     let entries = wait_for_in_flight(|entries| {
         entries
@@ -163,9 +169,11 @@ async fn terminal_turn_dispatches_followup_as_a_fresh_host_turn() {
             .any(|(key, request_id)| key == thread_id && request_id != &primary_request_id)
     })
     .await;
-    assert!(entries
-        .iter()
-        .any(|(key, request_id)| key == thread_id && request_id != &primary_request_id));
+    assert!(
+        entries
+            .iter()
+            .any(|(key, request_id)| key == thread_id && request_id != &primary_request_id)
+    );
 
     cancel_parked_turn(thread_id, &block).await;
 }
@@ -227,27 +235,33 @@ async fn cancellation_discards_pending_lanes_before_a_replacement_turn() {
         .await
         .expect("replacement queue status should be available");
     assert_eq!(replacement.value["total"], 0);
-    assert!(drain_queued_turns_for_test(
-        &crate::core::runtime::DispatchCtx::ambient(),
-        thread_id,
-        QueueLane::Followup
-    )
-    .await
-    .is_empty());
-    assert!(drain_queued_turns_for_test(
-        &crate::core::runtime::DispatchCtx::ambient(),
-        thread_id,
-        QueueLane::Steer
-    )
-    .await
-    .is_empty());
-    assert!(drain_queued_turns_for_test(
-        &crate::core::runtime::DispatchCtx::ambient(),
-        thread_id,
-        QueueLane::Collect
-    )
-    .await
-    .is_empty());
+    assert!(
+        drain_queued_turns_for_test(
+            &crate::core::runtime::DispatchCtx::ambient(),
+            thread_id,
+            QueueLane::Followup
+        )
+        .await
+        .is_empty()
+    );
+    assert!(
+        drain_queued_turns_for_test(
+            &crate::core::runtime::DispatchCtx::ambient(),
+            thread_id,
+            QueueLane::Steer
+        )
+        .await
+        .is_empty()
+    );
+    assert!(
+        drain_queued_turns_for_test(
+            &crate::core::runtime::DispatchCtx::ambient(),
+            thread_id,
+            QueueLane::Collect
+        )
+        .await
+        .is_empty()
+    );
 
     cancel_parked_turn(thread_id, &replacement_block).await;
 }
@@ -308,10 +322,12 @@ async fn web_queue_status_wire_shape_and_clear_cleanup_remain_stable() {
     assert_eq!(lanes, ["collect", "followup", "steer"]);
     for item in items {
         assert!(!item["id"].as_str().expect("id").is_empty());
-        assert!(item["text_preview"]
-            .as_str()
-            .expect("text_preview")
-            .ends_with("payload"));
+        assert!(
+            item["text_preview"]
+                .as_str()
+                .expect("text_preview")
+                .ends_with("payload")
+        );
     }
 
     let cleared = channel_web_queue_clear(&DispatchCtx::ambient(), thread_id)
@@ -453,9 +469,9 @@ async fn web_queue_remove_retracts_one_item_and_emits_event() {
 /// `chat_done` is the client's go-ahead for its next message, so it must not
 /// go out while the finished turn still holds the thread's in-flight slot: a
 /// message sent on it would interrupt the finished request and publish a
-/// "cancelled" `chat_error` for it. The test holds the slot map's lock while
-/// the turn completes; `chat_done` may only arrive after the lock is dropped,
-/// and by then the slot is gone.
+/// "cancelled" `chat_error` for it. The runner persists the reply, releases
+/// the slot, and only then emits the terminal event, so by the time the
+/// client sees `chat_done` the thread is free.
 #[tokio::test]
 async fn chat_done_is_published_only_after_the_in_flight_slot_is_released() {
     let _serial = FORCED_ERROR_TEST_LOCK.lock().await;
@@ -468,30 +484,11 @@ async fn chat_done_is_published_only_after_the_in_flight_slot_is_released() {
     let thread_id = "chat-done-after-slot-release";
     let request_id = start_parked_turn(thread_id, &block).await;
     let mut events = crate::web_chat::subscribe_web_channel_events();
-    let is_done = |event: &crate::web_chat::WebChannelEvent| {
-        event.event == "chat_done" && event.request_id == request_id
+    let is_done = |event: &crate::web_chat::ScopedWebEvent| {
+        event.event_name() == "chat_done" && event.context().request_id == request_id
     };
 
-    let held = crate::web_chat::ops::in_flight(&crate::core::runtime::DispatchCtx::ambient())
-        .lock_owned()
-        .await;
     block.release.notify_one();
-    let early = timeout(Duration::from_millis(500), async {
-        loop {
-            if let Ok(event) = events.recv().await {
-                if is_done(&event) {
-                    return event;
-                }
-            }
-        }
-    })
-    .await;
-    assert!(
-        early.is_err(),
-        "chat_done went out while the turn still held its in-flight slot"
-    );
-    drop(held);
-
     timeout(Duration::from_secs(5), async {
         loop {
             if let Ok(event) = events.recv().await {

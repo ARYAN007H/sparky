@@ -7,8 +7,8 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use common::{
-    chat_completion, chat_requests, runtime_without_master_key, tool_call_completion, tool_names,
-    PointedTransport,
+    PointedTransport, chat_completion, chat_requests, runtime_without_master_key,
+    tool_call_completion, tool_names,
 };
 use openhuman_embed::memory::api::conformance::ReferenceEngine;
 use openhuman_embed::memory::api::{LearningKind, MemoryEngine, MemoryMeta, StoreItem};
@@ -18,7 +18,7 @@ use openhuman_embed::{
     HostTurnTools, PermissionLevel, ProfileRuntime, RelayMessage, SaasConfig, Tool, ToolResult,
     ToolScopeSpec,
 };
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use wiremock::{Mock, Request, Respond, ResponseTemplate};
 
 struct TenantTool {
@@ -330,7 +330,7 @@ async fn scenario() {
         tokio::time::timeout(Duration::from_secs(30), async {
             loop {
                 let event = events.recv().await.unwrap();
-                if event.event == "channel_outbound" {
+                if event.event_name() == "channel_outbound" {
                     break;
                 }
             }
@@ -390,10 +390,12 @@ async fn scenario() {
             .await,
         ToolHookDecision::Proceed
     ));
-    assert!(handles[1]
-        .scope(alice_hook.before_tool_decision(&hook_context))
-        .await
-        .is_deny());
+    assert!(
+        handles[1]
+            .scope(alice_hook.before_tool_decision(&hook_context))
+            .await
+            .is_deny()
+    );
     for name in [
         "hidden",
         "shell",
@@ -433,10 +435,12 @@ async fn scenario() {
         })
         .await;
     let closed_hook = no_callback.hook(handles[0].id(), alice_profile.lease_fence().clone());
-    assert!(handles[0]
-        .scope(closed_hook.before_tool_decision(&hook_context))
-        .await
-        .is_deny());
+    assert!(
+        handles[0]
+            .scope(closed_hook.before_tool_decision(&hook_context))
+            .await
+            .is_deny()
+    );
     // Closing really releases the old lease; reopening must install the same
     // immutable belt and engine on a fresh profile context, without pinning it.
     drop(alice_profile);
@@ -457,12 +461,14 @@ async fn scenario() {
     .await
     .expect("completed turns leave the profile releasable");
     let reopened = runtime.open("alice").await.unwrap();
-    assert!(reopened
-        .threads()
-        .await
-        .unwrap()
-        .iter()
-        .any(|thread| thread.id == "t1"));
+    assert!(
+        reopened
+            .threads()
+            .await
+            .unwrap()
+            .iter()
+            .any(|thread| thread.id == "t1")
+    );
     reopened
         .chat("t1", "alice: call tenant_probe after reopening")
         .await
@@ -482,7 +488,7 @@ async fn scenario() {
             .accepted
     );
     tokio::time::timeout(Duration::from_secs(30), async {
-        while events.recv().await.unwrap().event != "channel_outbound" {}
+        while events.recv().await.unwrap().event_name() != "channel_outbound" {}
     })
     .await
     .unwrap();
@@ -532,9 +538,11 @@ async fn scenario() {
         ToolHookDecision::Proceed
     ));
     let requests = chat_requests(&inference).await;
-    assert!(requests
-        .iter()
-        .any(|request| !tool_names(request).is_empty()));
+    assert!(
+        requests
+            .iter()
+            .any(|request| !tool_names(request).is_empty())
+    );
     for request in requests {
         let mut names = tool_names(&request);
         names.sort();
@@ -667,9 +675,11 @@ async fn scenario() {
             .await,
         "a latched profile must not resolve the shared engine"
     );
-    assert!(handles[0]
-        .scope(alice_hook.before_tool_decision(&hook_context))
-        .await
-        .is_deny());
+    assert!(
+        handles[0]
+            .scope(alice_hook.before_tool_decision(&hook_context))
+            .await
+            .is_deny()
+    );
     runtime.shutdown().await;
 }

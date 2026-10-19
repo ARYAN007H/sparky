@@ -5,8 +5,9 @@ use crate::{
     flows::{
         agents::workflow_builder::builder_prompt::{BuildMode, BuilderRequest},
         ops::{
+            FlowStreamTarget,
             builder::{backend_repair_message, is_backend_or_infrastructure_failure},
-            flows_build_with_extra_hidden_tools, FlowStreamTarget,
+            flows_build_with_extra_hidden_tools,
         },
     },
 };
@@ -76,10 +77,12 @@ fn repair_backend_failure_returns_no_proposal_before_starting_the_builder() {
 
         assert_eq!(outcome.value["proposal"], Value::Null);
         assert_eq!(outcome.value["error"], Value::Null);
-        assert!(outcome.value["assistant_text"]
-            .as_str()
-            .expect("assistant text")
-            .contains("workflow was not changed"));
+        assert!(
+            outcome.value["assistant_text"]
+                .as_str()
+                .expect("assistant text")
+                .contains("workflow was not changed")
+        );
 
         let request_id = format!("backend-repair-{}", uuid::Uuid::new_v4());
         let stream = FlowStreamTarget {
@@ -100,17 +103,18 @@ fn repair_backend_failure_returns_no_proposal_before_starting_the_builder() {
 
         let done = loop {
             match events.try_recv() {
-                Ok(event) if event.request_id == request_id => break event,
+                Ok(event) if event.context().request_id == request_id => break event,
                 Ok(_) | Err(tokio::sync::broadcast::error::TryRecvError::Lagged(_)) => continue,
                 Err(error) => panic!("missing streamed backend-repair event: {error}"),
             }
         };
-        assert_eq!(done.event, "chat_done");
-        assert_eq!(done.thread_id, "backend-repair-thread");
-        assert!(done
-            .full_response
-            .as_deref()
-            .expect("terminal response text")
-            .contains("workflow was not changed"));
+        assert_eq!(done.event_name(), "chat_done");
+        assert_eq!(done.context().thread_id, "backend-repair-thread");
+        assert!(matches!(
+            done.wire_event(),
+            crate::web_chat::WebChannelEvent::ChatDone {
+                full_response, ..
+            } if full_response.as_deref().is_some_and(|text| text.contains("workflow was not changed"))
+        ));
     });
 }

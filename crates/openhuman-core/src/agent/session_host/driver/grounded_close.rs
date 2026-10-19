@@ -105,7 +105,7 @@ pub(super) async fn repair_required_output(
     history: &[tinyinference_llm::message::Message],
     reply: &str,
     reply_already_streamed: bool,
-    progress: Option<&tokio::sync::mpsc::Sender<crate::agent::progress::AgentProgress>>,
+    progress: Option<&tokio::sync::mpsc::Sender<tinyagents_harness::progress::AgentProgress>>,
     iteration: u32,
     usage: &mut RepairUsage,
 ) -> Option<String> {
@@ -152,7 +152,7 @@ pub(super) async fn repair_required_output(
     let continuation = format!("\n\n{correction}");
     if let Some(progress) = progress {
         if let Err(error) = progress
-            .send(crate::agent::progress::AgentProgress::TextDelta {
+            .send(tinyagents_harness::progress::AgentProgress::TextDelta {
                 delta: continuation.clone(),
                 iteration,
             })

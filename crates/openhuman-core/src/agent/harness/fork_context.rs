@@ -13,12 +13,12 @@
 //! Stashed in `Arc`s so cloning into a child costs a refcount bump
 //! rather than a full copy.
 
-use crate::agent::progress::AgentProgress;
 use crate::agent::tinyagents::TurnModelSource;
 use crate::config::AgentConfig;
 use std::collections::HashSet;
 use std::path::PathBuf;
 use std::sync::Arc;
+use tinyagents_harness::progress::AgentProgress;
 use tinyskills::Skill as Workflow;
 use tinytools::WorkspaceDescriptor;
 use tinytools::{Tool, ToolSpec};

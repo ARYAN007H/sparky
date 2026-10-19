@@ -1,8 +1,8 @@
 //! Deterministic, offline measurements of the real viewport and TestBackend renderer.
 use super::{render, state::TranscriptState, ui_state::UiState, viewport::ViewportCache};
-use openhuman_rpc::embed::chat_surface::WebChannelEvent;
-use ratatui::{backend::TestBackend, Terminal};
-use serde_json::{json, Value};
+use openhuman_rpc::embed::chat_surface::{WebChannelEvent, WebEventContext};
+use ratatui::{Terminal, backend::TestBackend};
+use serde_json::{Value, json};
 use std::{hint::black_box, time::Instant};
 
 const SAMPLES: usize = 200;
@@ -49,11 +49,14 @@ pub(crate) fn run() -> anyhow::Result<()> {
                     .unwrap();
             });
             let streaming = measure(|_| {
-                state.apply_event(&WebChannelEvent {
-                    event: "text_delta".into(),
-                    client_id: "benchmark".into(),
+                state.apply_event(&WebChannelEvent::TextDelta {
+                    context: WebEventContext {
+                        client_id: "benchmark".into(),
+                        ..Default::default()
+                    },
                     delta: Some(" streamed token".into()),
-                    ..Default::default()
+                    delta_kind: None,
+                    round: None,
                 });
                 black_box(cache.rows(&state, width - 4, height - 9, 0));
             });
@@ -63,14 +66,23 @@ pub(crate) fn run() -> anyhow::Result<()> {
         }
     }
     let mut tool = TranscriptState::new("benchmark");
-    tool.apply_event(&WebChannelEvent {
-        event: "tool_result".into(),
-        client_id: "benchmark".into(),
+    tool.apply_event(&WebChannelEvent::ToolResult {
+        context: WebEventContext {
+            client_id: "benchmark".into(),
+            ..Default::default()
+        },
         tool_call_id: Some("large-output".into()),
         tool_name: Some("benchmark".into()),
         output: Some("deterministic tool output\n".repeat(40_000)),
         success: Some(true),
-        ..Default::default()
+        skill_id: None,
+        args: None,
+        round: None,
+        failure: None,
+        elapsed_ms: None,
+        tool_display_label: None,
+        tool_display_detail: None,
+        structured: None,
     });
     tool.toggle_entry(0);
     let mut cache = ViewportCache::default();

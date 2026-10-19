@@ -396,7 +396,7 @@ impl SpawnWorkerThreadTool {
                             );
                             if let Some(progress) = progress_sink {
                                 let _ = progress
-                                    .send(crate::agent::progress::AgentProgress::SubagentAwaitingUser {
+                                    .send(tinyagents_harness::progress::AgentProgress::SubagentAwaitingUser {
                                         agent_id: outcome.agent_id.clone(),
                                         task_id: outcome.task_id.clone(),
                                         question: question.clone(),
@@ -449,7 +449,7 @@ impl SpawnWorkerThreadTool {
                             );
                             if let Some(progress) = progress_sink {
                                 let _ = progress
-                                    .send(crate::agent::progress::AgentProgress::SubagentFailed {
+                                    .send(tinyagents_harness::progress::AgentProgress::SubagentFailed {
                                         agent_id: outcome.agent_id.clone(),
                                         task_id: outcome.task_id.clone(),
                                         error: "worker sub-agent was cancelled".into(),

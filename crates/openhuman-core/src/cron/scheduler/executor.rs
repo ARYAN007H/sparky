@@ -16,12 +16,12 @@ use super::failure_classification::{
 };
 use crate::core::bus::BUS;
 use crate::core::events::DomainEvent;
-use crate::cron::bus_host::{kind_refusal, Binding};
-use crate::cron::handlers::{kind_handler, JobRunContext};
+use crate::cron::bus_host::{Binding, kind_refusal};
+use crate::cron::handlers::{JobRunContext, kind_handler};
 use std::collections::HashMap;
 use std::sync::Mutex;
-use tinyflows_bus::schedule::types::{CronJob, JobType, SessionTarget};
 use tinyflows_bus::schedule::Attempt;
+use tinyflows_bus::schedule::types::{CronJob, JobType, SessionTarget};
 
 /// Run states kept before the map is cleared outright (a run whose task was
 /// aborted never reaches `failed`).
@@ -296,12 +296,10 @@ pub(super) fn agent_session_target_tag(target: &SessionTarget) -> &'static str {
 /// metadata-only rule in CLAUDE.md), so no secrets / PII leave the core.
 pub(super) fn publish_cron_user_error(kind: &str) {
     tracing::debug!("[cron] action=surface_user_error kind={kind}");
-    crate::web_chat::publish_web_channel_event(crate::web_chat::WebChannelEvent {
-        event: "user_error".to_string(),
-        client_id: "system".to_string(),
+    crate::web_chat::publish_web_channel_event(crate::web_chat::WebChannelEvent::UserError {
+        context: crate::web_chat::event_context("system", "", ""),
         error_type: Some(kind.to_string()),
         error_source: Some("cron".to_string()),
-        ..Default::default()
     });
 }
 

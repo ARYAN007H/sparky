@@ -37,7 +37,7 @@ use serde_json::Value;
 use socketioxide::extract::{AckSender, Data, SocketRef, TryData};
 use socketioxide::SocketIo;
 
-use crate::core_host::web_chat::{GuardrailPayload, WebChannelEvent};
+use crate::core_host::web_chat::{GuardrailPayload, ScopedWebEvent};
 
 /// Shell-originated companion lifecycle events that still need to reach
 /// Socket.IO-only surfaces such as the native macOS notch WKWebView.
@@ -1129,8 +1129,8 @@ fn join_room_logged(socket: &SocketRef, room: &str, client_id: &str) -> bool {
     }
 }
 
-fn emit_web_channel_event(io: &SocketIo, event: WebChannelEvent) {
-    let name = event.event.clone();
+fn emit_web_channel_event(io: &SocketIo, event: ScopedWebEvent) {
+    let name = event.event_name();
     // Deliver to the initiating client's own room AND the per-thread room. The
     // thread room lets a socket that reconnected with a new client_id (after
     // re-subscribing via `thread:subscribe`) keep receiving an in-flight turn's
@@ -1145,9 +1145,10 @@ fn emit_web_channel_event(io: &SocketIo, event: WebChannelEvent) {
     // `client_id` room, then to the thread room EXCEPT the `client_id` room —
     // each socket is reached exactly once regardless of room overlap.
     // "system" broadcasts and events without a thread_id keep single-room delivery.
-    let primary = event.client_id.clone();
-    let thread_room = (event.client_id != "system" && !event.thread_id.is_empty())
-        .then(|| format!("thread:{}", event.thread_id));
+    let context = event.context();
+    let primary = context.client_id.clone();
+    let thread_room = (context.client_id != "system" && !context.thread_id.is_empty())
+        .then(|| format!("thread:{}", context.thread_id));
     if let Ok(payload) = serde_json::to_value(event) {
         log::debug!(
             "[socketio] send event={} primary={} thread_room={:?} thread_id={} request_id={}",
@@ -1164,8 +1165,8 @@ fn emit_web_channel_event(io: &SocketIo, event: WebChannelEvent) {
                 .unwrap_or_default()
         );
         // Primary: the client_id room.
-        let _ = io.to(primary.clone()).emit(&name, &payload);
-        if let Some(alias) = event_alias(&name) {
+        let _ = io.to(primary.clone()).emit(name, &payload);
+        if let Some(alias) = event_alias(name) {
             let _ = io.to(primary.clone()).emit(alias, &payload);
         }
         // Thread room minus the client_id room (dedup — see note above).
@@ -1173,8 +1174,8 @@ fn emit_web_channel_event(io: &SocketIo, event: WebChannelEvent) {
             let _ = io
                 .to(tr.clone())
                 .except(primary.clone())
-                .emit(&name, &payload);
-            if let Some(alias) = event_alias(&name) {
+                .emit(name, &payload);
+            if let Some(alias) = event_alias(name) {
                 let _ = io
                     .to(tr.clone())
                     .except(primary.clone())
@@ -1255,7 +1256,7 @@ fn replay_parked_approval(socket: &SocketRef, thread_id: &str) {
         // Replay is a fresh emit to a newly-joined socket, not a resend of the
         // original event, so stamp `ts` with "now" (same clock as
         // `publish_web_channel_event`) rather than leaving it unset.
-        event.ts = Some(crate::core_host::web_chat::unix_epoch_ms());
+        stamp_replay_timestamp(&mut event);
         let Ok(payload) = serde_json::to_value(&event) else {
             continue;
         };
@@ -1288,7 +1289,7 @@ fn replay_parked_plan_review(socket: &SocketRef, thread_id: &str) {
         row.tool_call_id.as_deref(),
         row.expires_at.as_deref(),
     );
-    event.ts = Some(crate::core_host::web_chat::unix_epoch_ms());
+    stamp_replay_timestamp(&mut event);
     let Ok(payload) = serde_json::to_value(&event) else {
         return;
     };
@@ -1304,6 +1305,10 @@ fn emit_with_aliases(socket: &SocketRef, name: &str, payload: &serde_json::Value
     if let Some(alias) = event_alias(name) {
         let _ = socket.emit(alias, payload);
     }
+}
+
+fn stamp_replay_timestamp(event: &mut crate::core_host::web_chat::WebChannelEvent) {
+    event.context_mut().ts = Some(crate::core_host::web_chat::unix_epoch_ms());
 }
 
 // Every test here names a gated fn (`channel_connection_update_payload`,

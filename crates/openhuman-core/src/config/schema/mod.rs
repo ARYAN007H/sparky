@@ -84,9 +84,9 @@ pub use capability_providers::{CapabilityProviderConfig, CapabilityProviderTrust
 pub use channel_voice::{ChannelVoiceConfig, ChannelVoiceOverride, VoiceReplyMode};
 pub use channels::{
     AuditConfig, ChannelsConfig, DingTalkConfig, DiscordConfig, EmailConfig, IMessageConfig,
-    IrcConfig, LarkConfig, LarkReceiveMode, LinqConfig, MatrixConfig, MattermostConfig, QQConfig,
+    IrcConfig, LarkConfig, LarkReceiveMode, LinqConfig, MattermostConfig, QQConfig,
     ResourceLimitsConfig, SandboxBackend, SandboxConfig, SecurityConfig, SignalConfig, SlackConfig,
-    StreamMode, TelegramConfig, WebhookConfig, WhatsAppConfig, YuanbaoConfig,
+    StreamMode, TelegramConfig, WhatsAppConfig, YuanbaoConfig,
 };
 pub(crate) use cli_overrides::set_cli_inference_overrides;
 pub use context::{CompactionSettings, CompactionStrategy, ContextConfig};

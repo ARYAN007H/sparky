@@ -208,7 +208,7 @@ what the harness exposes to the child.
   agent-team routing, and parallel map/reduce fanout.
 - `core::bus::BUS`: `DomainEvent::AgentOrchestration*` /
   `Subagent*` publication and subscription.
-- `web_chat::progress_bridge`: the per-turn progress-channel counterpart to
+- `web_chat::progress`: the per-turn progress-channel counterpart to
   `run_ledger_finalize.rs`'s global-bus settlement.
 
 ## Used by

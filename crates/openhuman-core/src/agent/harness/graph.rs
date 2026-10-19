@@ -32,10 +32,10 @@ use std::sync::Arc;
 use anyhow::Result;
 use tokio::sync::mpsc::Sender;
 
-use crate::agent::progress::AgentProgress;
 use crate::agent::tinyagents::TurnModelSource;
 use crate::agent::tinyagents::TurnSpec;
 use crate::config::{MultimodalConfig, MultimodalFileConfig};
+use tinyagents_harness::progress::AgentProgress;
 use tinyagents_session::transcript::TranscriptMessage;
 use tinytools::Tool;
 

@@ -6,7 +6,6 @@ use super::dispatch::{
 };
 pub use super::startup::test_support::resolve_yuanbao_app_secret_for_test;
 use crate::agent::bus::{AgentTurnRequest, AgentTurnResponse, AGENT_RUN_TURN_METHOD};
-use crate::agent::progress::AgentProgress;
 use crate::channels::context::{ChannelRuntimeContext, CHANNEL_MESSAGE_TIMEOUT_SECS};
 use crate::channels::Channel;
 use crate::channels::ChannelSystemPrompt;
@@ -21,6 +20,7 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
+use tinyagents_harness::progress::AgentProgress;
 use tinychannels_bus::{ChannelMessage, SendMessage};
 use tinychannels_runtime::context::ChatMessage;
 use tinyinference_llm::model::{ChatModel, ModelRequest, ModelResponse};

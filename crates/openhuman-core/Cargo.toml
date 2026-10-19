@@ -511,7 +511,7 @@ tokio-tungstenite = { version = "0.29", default-features = false, features = ["c
 [dev-dependencies]
 # Legacy TinyChannels provider/runtime fixtures remain available to tests only;
 # production channel execution uses the TinyBus module contract above.
-tinychannels = { path = "../../vendor/tinychannels", features = ["relay-websocket", "email", "lark", "whatsapp-web"] }
+tinychannels = { path = "../../vendor/tinychannels", features = ["email", "lark", "whatsapp-web"] }
 # The real TinyChannels module, linked into the test binary (never the product)
 # as the fixture behind `channels::module_fixture`.
 tinychannels-module = { path = "../../vendor/tinychannels/crates/tinychannels-module", features = ["static-link"] }

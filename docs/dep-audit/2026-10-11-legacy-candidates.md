@@ -16,7 +16,7 @@ This record selects the defaults for six follow-ups. It changes no runtime behav
 
 ## TinyMemes: keep and move to its owner
 
-[The host adapter](../../crates/openhuman-core/src/tinymemes/mod.rs) runs on the final web-chat reply, leaves the harness transcript original, and falls back to the original reply on failure or timeout. [The web-chat caller](../../crates/openhuman-core/src/web_chat/run_task.rs) holds treatment-arm streaming and invokes the remix after the turn. This is an implemented capability, despite having no dedicated frontend controller.
+[The host adapter](../../crates/openhuman-core/src/tinymemes/mod.rs) runs on the final web-chat reply, leaves the harness transcript original, and falls back to the original reply on failure or timeout. [The web-chat caller](../../crates/openhuman-core/src/web_chat/turn_host.rs) holds treatment-arm streaming and invokes the remix after the turn. This is an implemented capability, despite having no dedicated frontend controller.
 
 [The experiment selector](../../crates/openhuman-core/src/tinymemes/arm.rs) reads `OPENHUMAN_TINYMEMES`, supports stable per-thread A/B assignment, and falls back to `OPENHUMAN_TINYMEMES_DEFAULT` if supplied during compilation; neither flag means off. [Core defaults](../../crates/openhuman-core/Cargo.toml), [the product feature list](../../scripts/ci/product-features.txt), and [the shell manifest](../../crates/openhuman-app/Cargo.toml) still compile it.
 

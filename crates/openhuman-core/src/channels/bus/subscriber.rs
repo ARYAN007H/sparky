@@ -162,34 +162,35 @@ impl EventHandler<DomainEvent> for ChannelInboundSubscriber {
                 }
                 event = event_rx.recv() => {
                     match event {
-                        Ok(ev) if ev.request_id == request_id => {
-                            match ev.event.as_str() {
-                                "text_delta" => {
-                                    if let Some(delta) = ev.delta.as_ref() {
+                        Ok(ev) if ev.context().request_id == request_id => {
+                            match ev.wire_event() {
+                                crate::web_chat::WebChannelEvent::TextDelta { delta, .. } => {
+                                    if let Some(delta) = delta.as_ref() {
                                         pending.push(ProgressiveEvent::TextDelta(delta.clone()));
                                     }
                                 }
-                                "tool_call" => {
-                                    if let Some(ref name) = ev.tool_name {
-                                        pending.push(ProgressiveEvent::ToolCall(name.clone()));
-                                    }
-                                }
-                                "tool_result" => {
-                                    if let Some(ref name) = ev.tool_name {
-                                        pending.push(ProgressiveEvent::ToolResult { tool_name: name.clone(), success: ev.success.unwrap_or(true) });
-                                    }
-                                }
-                                "thinking_delta" => {
-                                    if let Some(delta) = ev.delta.as_ref() {
+                                crate::web_chat::WebChannelEvent::ToolCall {
+                                    tool_name: Some(name), ..
+                                } => pending.push(ProgressiveEvent::ToolCall(name.clone())),
+                                crate::web_chat::WebChannelEvent::ToolCall { .. } => {}
+                                crate::web_chat::WebChannelEvent::ToolResult {
+                                    tool_name: Some(name), success, ..
+                                } => pending.push(ProgressiveEvent::ToolResult {
+                                    tool_name: name.clone(),
+                                    success: success.unwrap_or(true),
+                                }),
+                                crate::web_chat::WebChannelEvent::ToolResult { .. } => {}
+                                crate::web_chat::WebChannelEvent::ThinkingDelta { delta, .. } => {
+                                    if let Some(delta) = delta.as_ref() {
                                         pending.push(ProgressiveEvent::ThinkingDelta(delta.clone()));
                                     }
                                 }
-                                "chat_done" | "chat:done" => {
+                                crate::web_chat::WebChannelEvent::ChatDone { full_response, .. } => {
                                     if let Err(error) = flush_events(&reply, &mut pending).await {
                                         tracing::error!("[channel-inbound] delivery failed: {error}");
                                         return;
                                     }
-                                    let full_response = ev.full_response.unwrap_or_default();
+                                    let full_response = full_response.as_deref().unwrap_or_default();
                                     // Even when the agent produced no visible
                                     // text, we must close out any draft we
                                     // already posted — otherwise the user is
@@ -201,7 +202,7 @@ impl EventHandler<DomainEvent> for ChannelInboundSubscriber {
                                         );
                                         "(No response from agent.)"
                                     } else {
-                                        full_response.as_str()
+                                        full_response
                                     };
                                     tracing::info!(
                                         "[channel-inbound] agent done, replying to channel='{}' len={}",
@@ -214,12 +215,12 @@ impl EventHandler<DomainEvent> for ChannelInboundSubscriber {
                                     if let Err(error) = reply.finalize(reply_text).await { tracing::error!("[channel-inbound] final delivery failed: {error}"); }
                                     return;
                                 }
-                                "chat_error" | "chat:error" => {
+                                crate::web_chat::WebChannelEvent::ChatError { message, .. } => {
                                     if let Err(error) = flush_events(&reply, &mut pending).await {
                                         tracing::error!("[channel-inbound] delivery failed: {error}");
                                         return;
                                     }
-                                    let err_msg = ev.message.unwrap_or_else(|| "unknown error".to_string());
+                                    let err_msg = message.as_deref().unwrap_or("unknown error");
                                     tracing::error!("[channel-inbound] agent error: {}", err_msg);
                                     let _ = reply.finalize(&format!("Sorry, I encountered an error: {err_msg}")).await;
                                     return;
@@ -235,14 +236,14 @@ impl EventHandler<DomainEvent> for ChannelInboundSubscriber {
                                 // that never did — e.g. the parallel-turn
                                 // cooperative-cancel path) and never double-ends
                                 // a turn already finalized by `chat_error`.
-                                "chat_cancelled" => {
+                                crate::web_chat::WebChannelEvent::ChatCancelled { cancel_reason, .. } => {
                                     if let Err(error) = flush_events(&reply, &mut pending).await {
                                         tracing::error!("[channel-inbound] delivery failed: {error}");
                                         return;
                                     }
                                     tracing::info!(
                                         "[channel-inbound] turn cancelled reason={:?}",
-                                        ev.cancel_reason
+                                        cancel_reason
                                     );
                                     let _ = reply.finalize("Cancelled.").await;
                                     return;

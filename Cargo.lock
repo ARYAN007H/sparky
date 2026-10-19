@@ -5649,6 +5649,7 @@ dependencies = [
  "axum",
  "base64 0.22.1",
  "chrono",
+ "engineioxide",
  "futures",
  "hex",
  "keyring",
@@ -8722,7 +8723,7 @@ dependencies = [
  "toml 1.1.6+spec-1.1.0",
  "tracing",
  "ureq",
- "zip 2.4.2",
+ "zip 9.0.5",
 ]
 
 [[package]]
@@ -8823,6 +8824,7 @@ dependencies = [
  "tinybus-module",
  "tinychannels",
  "tinychannels-bus",
+ "tinychannels-runtime",
  "tinystoragedrivers-bus",
  "tinystoragedrivers-busproxy",
  "tinystoragedrivers-client",
@@ -12125,6 +12127,20 @@ dependencies = [
  "memchr",
  "typed-path",
  "zopfli",
+]
+
+[[package]]
+name = "zip"
+version = "9.0.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6e04976da629d3b04204ba8105b396a193af8ad2583b2c79bfb3ab8af580a11e"
+dependencies = [
+ "crc32fast",
+ "flate2",
+ "indexmap",
+ "memchr",
+ "nix 0.31.3",
+ "typed-path",
 ]
 
 [[package]]

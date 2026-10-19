@@ -5,12 +5,12 @@
 use std::time::Duration;
 
 use openhuman_embed::artifacts::{
-    create_artifact, finalize_artifact, resolve_ready_file, ArtifactKind, ArtifactStatus, FileRoots,
+    ArtifactKind, ArtifactStatus, FileRoots, create_artifact, finalize_artifact, resolve_ready_file,
 };
 use openhuman_embed::chat_surface::{
-    publish_web_channel_event, subscribe_web_channel_events, WebChannelEvent,
+    WebChannelEvent, WebEventContext, publish_web_channel_event, subscribe_web_channel_events,
 };
-use openhuman_embed::identity::{peek_credential_user_identity, UserIdentity};
+use openhuman_embed::identity::{UserIdentity, peek_credential_user_identity};
 
 #[tokio::test]
 async fn an_artifact_resolves_only_once_ready_and_only_under_its_roots() {
@@ -74,33 +74,45 @@ async fn an_artifact_resolves_only_once_ready_and_only_under_its_roots() {
 #[tokio::test]
 async fn web_channel_events_reach_a_subscriber_with_a_timestamp() {
     let mut events = subscribe_web_channel_events();
-    publish_web_channel_event(WebChannelEvent {
-        event: "facade_probe".into(),
-        thread_id: "thread-facade".into(),
-        ..WebChannelEvent::default()
+    publish_web_channel_event(WebChannelEvent::UserError {
+        context: WebEventContext {
+            client_id: "facade".into(),
+            thread_id: "thread-facade".into(),
+            request_id: "facade-request".into(),
+            ..WebEventContext::default()
+        },
+        error_type: Some("facade_probe".into()),
+        error_source: None,
     });
     let received = loop {
         let event = tokio::time::timeout(Duration::from_secs(5), events.recv())
             .await
             .expect("an event arrives")
             .expect("bus open");
-        if event.event == "facade_probe" {
+        if matches!(
+            event.wire_event(),
+            WebChannelEvent::UserError {
+                error_type: Some(error_type), ..
+            } if error_type == "facade_probe"
+        ) {
             break event;
         }
     };
-    assert_eq!(received.thread_id, "thread-facade");
-    assert!(received.ts.is_some(), "the publisher stamps ts");
+    assert_eq!(received.context().thread_id, "thread-facade");
+    assert!(received.context().ts.is_some(), "the publisher stamps ts");
 }
 
 #[test]
 fn identity_is_empty_when_nobody_is_signed_in() {
     assert!(peek_credential_user_identity().is_none());
     assert!(UserIdentity::default().is_empty());
-    assert!(!UserIdentity {
-        id: Some("u1".into()),
-        ..UserIdentity::default()
-    }
-    .is_empty());
+    assert!(
+        !UserIdentity {
+            id: Some("u1".into()),
+            ..UserIdentity::default()
+        }
+        .is_empty()
+    );
 }
 
 #[test]

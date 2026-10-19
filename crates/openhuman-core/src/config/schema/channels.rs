@@ -6,9 +6,8 @@ use serde::{Deserialize, Serialize};
 
 pub use tinychannels_bus::config::{
     ChannelsConfig, DingTalkConfig, DiscordConfig, EmailConfig, IMessageConfig, IrcConfig,
-    LarkConfig, LarkReceiveMode, LinqConfig, MatrixConfig, MattermostConfig, QQConfig,
-    SignalConfig, SlackConfig, StreamMode, TelegramConfig, WebhookConfig, WhatsAppConfig,
-    YuanbaoConfig,
+    LarkConfig, LarkReceiveMode, LinqConfig, MattermostConfig, QQConfig, SignalConfig, SlackConfig,
+    StreamMode, TelegramConfig, WhatsAppConfig, YuanbaoConfig,
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default, JsonSchema)]

@@ -1,10 +1,11 @@
 mod common;
 use common::{chat_completion, chat_requests, offline_config, runtime, stub_backend};
 use openhuman_embed::{
-    AgentDefinitionSpec, AgentSpec, HostTools, HostTurnTools, Provider, Runtime, Tool,
+    Agent, AgentDefinitionSpec, AgentSpec, HostTools, HostTurnTools, Provider, Runtime, Tool,
     ToolScopeSpec, Workspace,
 };
 use std::sync::Arc;
+use tinyagents_session::transcript::SessionRef;
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, ResponseTemplate};
 // Runtime is process-wide. Keep the guard on the synchronous test caller;
@@ -30,6 +31,26 @@ impl Tool for Marker {
         Ok(tinytools::ToolResult::success("accepted"))
     }
 }
+
+fn transcript_snapshot(agent: &Agent, session: &SessionRef) -> serde_json::Value {
+    let transcripts =
+        tinyagents_session::port::WorkspaceStores::open(agent.workspace_dir(), agent.id())
+            .expect("the agent's durable workspace store")
+            .transcripts();
+    let handle = transcripts
+        .read_session_transcript(session)
+        .expect("the durable session transcript exists");
+    let transcript = handle
+        .read_session()
+        .expect("the durable session transcript can be read")
+        .expect("the durable session transcript has content");
+    serde_json::json!({
+        "meta": transcript.meta,
+        "messages": transcript.messages,
+        "tools": transcript.tools,
+    })
+}
+
 #[test]
 fn attached_tools_survive_clones_and_session_resume() {
     let _runtime = RUNTIME_LOCK
@@ -124,21 +145,19 @@ fn attached_tools_survive_clones_and_session_resume() {
                 .send()
                 .await
                 .unwrap();
-            let generation_zero = std::fs::read_dir(agent.transcripts_dir())
-                .unwrap()
-                .map(|entry| entry.unwrap().path())
-                .find(|path| {
-                    let has_generation_suffix = path
-                        .file_stem()
-                        .and_then(|stem| stem.to_str())
-                        .and_then(|stem| stem.rsplit_once(".g"))
-                        .is_some_and(|(_, generation)| generation.parse::<u32>().is_ok());
-                    path.extension()
-                        .is_some_and(|extension| extension == "jsonl")
-                        && !has_generation_suffix
-                })
-                .expect("the first committed prefix has generation zero transcript");
-            let frozen_generation_zero = std::fs::read(&generation_zero).unwrap();
+            let continuing_session = SessionRef::scoped("continuing", agent.id());
+            let transcript_store =
+                tinyagents_session::port::WorkspaceStores::open(agent.workspace_dir(), agent.id())
+                    .expect("the agent's durable workspace store");
+            assert_eq!(
+                transcript_store
+                    .transcripts()
+                    .session_chain(&continuing_session)
+                    .len(),
+                1
+            );
+            drop(transcript_store);
+            let frozen_generation_zero = transcript_snapshot(&agent, &continuing_session);
             agent
                 .attach_tools(
                     "second",
@@ -163,35 +182,55 @@ fn attached_tools_survive_clones_and_session_resume() {
                 .await
                 .unwrap();
             assert_eq!(agent.config().action_dir, original_config.action_dir);
-            let paths = std::fs::read_dir(agent.transcripts_dir())
-                .unwrap()
-                .map(|entry| entry.unwrap().path())
-                .collect::<Vec<_>>();
-            assert!(
-                paths.contains(&generation_zero),
-                "the continuing session transcript must remain durable"
-            );
             assert_eq!(
-                std::fs::read(&generation_zero).unwrap(),
+                transcript_snapshot(&agent, &continuing_session),
                 frozen_generation_zero,
-                "the continuing session must leave its transcript byte-for-byte intact"
+                "the continuing session must leave its durable generation unchanged"
             );
-            let successor = paths
+            let after_attach_session = SessionRef::scoped("after-attach", agent.id());
+            let durable = transcript_snapshot(&agent, &after_attach_session);
+            let durable_messages = durable["messages"]
+                .as_array()
+                .expect("the new session's durable messages");
+            let durable_system = durable_messages
                 .iter()
-                .find(|path| {
-                    std::fs::read_to_string(path).is_ok_and(|text| text.contains("hivemind_list"))
-                })
-                .unwrap();
-            let durable = std::fs::read_to_string(successor).unwrap();
+                .filter(|message| message["role"] == "system")
+                .filter_map(|message| message["content"].as_str())
+                .collect::<Vec<_>>();
+            let has_frozen_prompt = durable_system
+                .iter()
+                .any(|content| content.contains("FROZEN_HOST_PROMPT"));
+            let has_permanent_tools_message = durable_system.iter().any(|content| {
+                content.contains("openhuman-permanent-tools")
+                    && content.contains("hivemind_message")
+                    && content.contains("hivemind_list")
+            });
+            if !has_frozen_prompt || !has_permanent_tools_message {
+                eprintln!("durable system messages: {durable_system:#?}");
+            }
             assert!(
-                durable
-                    .lines()
-                    .any(|line| line.contains("openhuman-permanent-tools")
-                        && line.contains("hivemind_message")
-                        && line.contains("hivemind_list")),
-                "successor generation must persist the updated permanent-tool catalogue"
+                has_frozen_prompt,
+                "the new session must persist its frozen prompt"
             );
-            let sealed = String::from_utf8(frozen_generation_zero).unwrap();
+            assert!(
+                has_permanent_tools_message,
+                "the new session must persist its permanent-tools system message"
+            );
+            let declared_tools = durable["tools"]
+                .as_array()
+                .expect("the new session's durable tool catalogue");
+            let tool_names = declared_tools
+                .iter()
+                .filter_map(|tool| tool["name"].as_str())
+                .collect::<Vec<_>>();
+            if !tool_names.contains(&"hivemind_message") || !tool_names.contains(&"hivemind_list") {
+                eprintln!("durable tool declarations: {declared_tools:#?}");
+            }
+            assert!(
+                tool_names.contains(&"hivemind_message") && tool_names.contains(&"hivemind_list"),
+                "the new session must persist the updated permanent-tool catalogue"
+            );
+            let sealed = frozen_generation_zero.to_string();
             assert!(
                 sealed.contains("FROZEN_HOST_PROMPT"),
                 "sealed prefix: {sealed}"
@@ -203,10 +242,6 @@ fn attached_tools_survive_clones_and_session_resume() {
             assert!(
                 !sealed.contains("hivemind_list"),
                 "the original generation cannot contain the later attachment: {sealed}"
-            );
-            assert!(
-                durable.contains("FROZEN_HOST_PROMPT"),
-                "successor prefix: {durable}"
             );
             let requests = chat_requests(&provider).await;
             assert_eq!(requests.len(), 4);

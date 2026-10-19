@@ -1,13 +1,13 @@
 //! Subagent dispatch logic shared by all agent delegation tools.
 
 use crate::agent::harness::host_definition::AgentDefinitionRegistry;
-use crate::agent::progress::AgentProgress;
 use crate::agent::subagent_host::{
     run_subagent_with_parent, SubagentRunOptions, SubagentRunStatus,
 };
 use async_trait::async_trait;
 use std::sync::Arc;
 use tinyagents_harness::context::{RunConfig, RunContext};
+use tinyagents_harness::progress::AgentProgress;
 use tinyagents_harness::tool::{ToolDispatch, ToolExecutionContext};
 use tinytools::ToolRunContext;
 use tinytools::{ToolCallOptions, ToolResult};

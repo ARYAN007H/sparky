@@ -221,7 +221,7 @@ async fn positive_scoped_tool_limit_caps_hosted_runner_inner() {
 fn root_context(
     thread_id: &str,
     workspace: &str,
-    progress: tokio::sync::mpsc::Sender<crate::agent::progress::AgentProgress>,
+    progress: tokio::sync::mpsc::Sender<tinyagents_harness::progress::AgentProgress>,
 ) -> OpenHumanRunContext {
     let mut context = OpenHumanRunContext::new();
     context.origin = Some(crate::agent::turn_origin::AgentTurnOrigin::WebChat {
@@ -421,9 +421,11 @@ async fn a_streamed_delta_reaches_the_progress_channel_exactly_once() {
     let mut completed = 0;
     while let Ok(event) = events.try_recv() {
         match event {
-            crate::agent::progress::AgentProgress::TextDelta { delta, .. } => streamed.push(delta),
-            crate::agent::progress::AgentProgress::TurnStarted => started += 1,
-            crate::agent::progress::AgentProgress::TurnCompleted { .. } => completed += 1,
+            tinyagents_harness::progress::AgentProgress::TextDelta { delta, .. } => {
+                streamed.push(delta)
+            }
+            tinyagents_harness::progress::AgentProgress::TurnStarted => started += 1,
+            tinyagents_harness::progress::AgentProgress::TurnCompleted { .. } => completed += 1,
             _ => {}
         }
     }

@@ -4,11 +4,6 @@
 //! TinyChannels TinyBus module. Serialized configuration, messages, and
 //! schemas come from `tinychannels-bus`; OpenHuman retains host policy and
 //! lifecycle orchestration.
-#![allow(
-    deprecated,
-    reason = "the v21 ChannelMessage/SendMessage shims stay in use here until the single inbound path (senamakel/openhuman#136) moves the host to canonical v22 content"
-)]
-
 // Always-compiled carve-outs (see module docs).
 pub(crate) mod capabilities;
 pub mod contract_schema;

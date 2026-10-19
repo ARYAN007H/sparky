@@ -6,12 +6,15 @@
 //! here so they can be unit-tested without a terminal.
 //!
 //! The single entry point is [`TranscriptState::apply_event`], which folds a
-//! [`WebChannelEvent`] (the same struct the desktop app receives over Socket.IO)
-//! into the transcript. Events for a different `client_id` are ignored, so a
+//! TinyChannels-owned typed [`WebChannelEvent`] (the same wire contract the
+//! desktop app receives over Socket.IO) into the transcript. Events for a
+//! different `client_id` are ignored, so a
 //! process-wide broadcast bus can be drained safely.
 
 use super::activity::{Activity, Status};
 use openhuman_rpc::embed::chat_surface::WebChannelEvent;
+
+use crate::event_view::WebEventView;
 use std::collections::{HashMap, VecDeque};
 use std::sync::atomic::{AtomicU64, Ordering};
 
@@ -240,6 +243,11 @@ impl TranscriptState {
     /// bus is process-wide). Returns nothing; inspect [`Self::entries`] /
     /// [`Self::is_streaming`] afterwards.
     pub fn apply_event(&mut self, ev: &WebChannelEvent) {
+        let ev = WebEventView::from_event(ev);
+        self.apply_event_view(&ev);
+    }
+
+    pub(crate) fn apply_event_view(&mut self, ev: &WebEventView) {
         if ev.client_id != self.client_id
             || (!self.thread_id.is_empty() && ev.thread_id != self.thread_id)
         {
@@ -296,9 +304,10 @@ impl TranscriptState {
                     format!("artifact · {status}{suffix}"),
                 ));
             }
-            "chat_done" => {
+            "chat_done" | "channel_outbound" => {
                 log::debug!(
-                    "[tui] state: chat_done full_response={}",
+                    "[tui] state: {} full_response={}",
+                    ev.event,
                     ev.full_response.is_some()
                 );
                 // `full_response` is authoritative — it replaces whatever the
@@ -401,7 +410,7 @@ impl TranscriptState {
         }
     }
 
-    fn apply_activity(&mut self, ev: &WebChannelEvent, child: bool) {
+    fn apply_activity(&mut self, ev: &WebEventView, child: bool) {
         let identity = if child {
             ev.subagent
                 .as_ref()

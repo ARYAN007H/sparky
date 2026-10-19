@@ -41,6 +41,7 @@ mod controls;
 mod crash_reporting;
 mod demo;
 mod effects;
+mod event_view;
 mod input;
 mod presentation;
 mod render;

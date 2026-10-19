@@ -1,6 +1,6 @@
 use super::super::channel::CHANNEL_OUTBOUND_EVENT;
 use super::*;
-use crate::agent::bus::{mock_agent_run_turn, AgentTurnRequest, AgentTurnResponse};
+use crate::agent::bus::{AgentTurnRequest, AgentTurnResponse, mock_agent_run_turn};
 use crate::agent::turn_origin::AgentTurnOrigin;
 use crate::core::runtime::{ContextOverlay, CoreContext, DomainSet};
 use std::sync::Mutex;
@@ -206,16 +206,30 @@ async fn a_relayed_turn_runs_as_an_external_channel_and_keeps_its_thread() {
 
     let mut outbound = Vec::new();
     while let Ok(event) = events.try_recv() {
-        if event.client_id == "gw-ops-test" {
+        if event.context().client_id == "gw-ops-test" {
             outbound.push(event);
         }
     }
     assert_eq!(outbound.len(), 2, "one channel_outbound per reply");
-    assert!(outbound.iter().all(|e| e.event == CHANNEL_OUTBOUND_EVENT));
-    assert!(outbound.iter().all(|e| e.thread_id == thread));
-    assert_eq!(outbound[0].request_id, "req-m1");
-    assert_eq!(outbound[0].full_response.as_deref(), Some("answer 1"));
-    assert_eq!(outbound[0].structured.as_ref().unwrap()["chat_id"], "-100");
+    assert!(
+        outbound
+            .iter()
+            .all(|event| event.event_name() == CHANNEL_OUTBOUND_EVENT)
+    );
+    assert!(
+        outbound
+            .iter()
+            .all(|event| event.context().thread_id == thread)
+    );
+    assert_eq!(outbound[0].context().request_id, "req-m1");
+    assert!(matches!(
+        outbound[0].wire_event(),
+        crate::web_chat::WebChannelEvent::ChannelOutbound {
+            full_response: Some(text),
+            structured: Some(structured),
+            ..
+        } if text == "answer 1" && structured["chat_id"] == "-100"
+    ));
 }
 
 #[tokio::test]

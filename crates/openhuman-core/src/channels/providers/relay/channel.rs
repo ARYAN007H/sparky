@@ -10,7 +10,7 @@ use std::sync::Mutex;
 use async_trait::async_trait;
 use serde_json::json;
 
-use crate::web_chat::{publish_web_channel_event, WebChannelEvent};
+use crate::web_chat::{WebChannelEvent, publish_web_channel_event};
 use tinychannels_bus::{ChannelMessage, SendMessage};
 use tinychannels_runtime::Channel;
 
@@ -61,11 +61,12 @@ impl RelayChannel {
     /// takes them from the publishing context's tenant, so `/events` hands the
     /// reply only to the caller's own stream.
     pub fn outbound_event(&self, message: &SendMessage) -> WebChannelEvent {
-        WebChannelEvent {
-            event: CHANNEL_OUTBOUND_EVENT.to_string(),
-            client_id: self.client_id.clone(),
-            thread_id: self.thread_id.clone(),
-            request_id: self.request_id.clone(),
+        WebChannelEvent::ChannelOutbound {
+            context: crate::web_chat::event_context(
+                self.client_id.clone(),
+                self.thread_id.clone(),
+                self.request_id.clone(),
+            ),
             full_response: Some(message.content.clone()),
             structured: Some(json!({
                 "kind": CHANNEL_OUTBOUND_EVENT,
@@ -75,7 +76,6 @@ impl RelayChannel {
                 "reply_to_message_id": self.reply_to,
                 "idempotency_key": message.idempotency_key,
             })),
-            ..Default::default()
         }
     }
 }

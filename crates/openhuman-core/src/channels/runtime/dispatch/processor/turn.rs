@@ -3,7 +3,6 @@
 //! delivering the draft/final reply.
 
 use crate::agent::bus::AgentTurnResponse;
-use crate::agent::progress::AgentProgress;
 use crate::channels::context::{
     compact_sender_history, is_context_window_overflow_error, ChannelRuntimeContext,
 };
@@ -16,6 +15,7 @@ use crate::core::events::DomainEvent;
 use crate::util::truncate_with_ellipsis;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
+use tinyagents_harness::progress::AgentProgress;
 use tinyagents_session::transcript::TranscriptMessage;
 use tinychannels_bus as traits;
 use tinychannels_runtime::context::ChatMessage;

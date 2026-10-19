@@ -1,5 +1,10 @@
 use super::*;
+use crate::web_chat::{QueueItemPayload, ScopedWebEvent, WebChannelEvent, WebEventContext};
 use tokio::sync::broadcast;
+
+fn wire(event: &ScopedWebEvent) -> serde_json::Value {
+    serde_json::to_value(event).expect("web event serializes")
+}
 
 /// `fresh_approval_surface_subscription` returns `Some` when the global event bus has
 /// been initialised and `None` otherwise (bus not started).  It must never return `None`
@@ -35,21 +40,15 @@ async fn fresh_approval_surface_subscription_is_not_a_singleton() {
 /// Drain the web-channel receiver until an `external_transfer_pending` event
 /// whose `args.service` matches `marker` arrives (the bus is process-wide).
 async fn find_egress_web_event(
-    rx: &mut broadcast::Receiver<WebChannelEvent>,
+    rx: &mut broadcast::Receiver<ScopedWebEvent>,
     marker: &str,
-) -> WebChannelEvent {
+) -> ScopedWebEvent {
     loop {
         match rx.recv().await {
-            Ok(ev)
-                if ev.event == "external_transfer_pending"
-                    && ev
-                        .args
-                        .as_ref()
-                        .and_then(|a| a.get("service"))
-                        .and_then(|s| s.as_str())
-                        == Some(marker) =>
-            {
-                return ev;
+            Ok(ev) if ev.event_name() == "external_transfer_pending" => {
+                if wire(&ev)["args"]["service"] == marker {
+                    return ev;
+                }
             }
             Ok(_) => continue,
             Err(broadcast::error::RecvError::Lagged(_)) => continue,
@@ -80,10 +79,10 @@ async fn egress_surface_bridges_pending_with_chat_context() {
     });
 
     let ev = find_egress_web_event(&mut web_rx, marker).await;
-    assert_eq!(ev.thread_id, "thread-1");
-    assert_eq!(ev.client_id, "client-1");
-    assert_eq!(ev.request_id, "request-1");
-    let args = ev.args.expect("args present");
+    assert_eq!(ev.context().thread_id, "thread-1");
+    assert_eq!(ev.context().client_id, "client-1");
+    assert_eq!(ev.context().request_id, "request-1");
+    let args = wire(&ev)["args"].clone();
     assert_eq!(args["provider_slug"], "composio");
     assert_eq!(args["reason"], "tool_call");
     assert_eq!(args["is_external"], true);
@@ -118,12 +117,9 @@ async fn egress_surface_drops_pending_without_chat_context() {
 
     loop {
         match web_rx.recv().await {
-            Ok(ev) if ev.event == "external_transfer_pending" => {
-                let svc = ev
-                    .args
-                    .as_ref()
-                    .and_then(|a| a.get("service"))
-                    .and_then(|s| s.as_str());
+            Ok(ev) if ev.event_name() == "external_transfer_pending" => {
+                let value = wire(&ev);
+                let svc = value["args"]["service"].as_str();
                 assert_ne!(
                     svc,
                     Some(dropped_marker),
@@ -145,20 +141,15 @@ async fn egress_surface_drops_pending_without_chat_context() {
 /// Drain the web-channel receiver until an event of the given name whose
 /// `args.artifact_id` matches `marker` arrives.
 async fn find_artifact_web_event(
-    rx: &mut broadcast::Receiver<WebChannelEvent>,
+    rx: &mut broadcast::Receiver<ScopedWebEvent>,
     event_name: &str,
     marker: &str,
-) -> WebChannelEvent {
+) -> ScopedWebEvent {
     loop {
         match rx.recv().await {
             Ok(ev)
-                if ev.event == event_name
-                    && ev
-                        .args
-                        .as_ref()
-                        .and_then(|a| a.get("artifact_id"))
-                        .and_then(|s| s.as_str())
-                        == Some(marker) =>
+                if ev.event_name() == event_name
+                    && wire(&ev)["args"]["artifact_id"].as_str() == Some(marker) =>
             {
                 return ev;
             }
@@ -195,8 +186,8 @@ async fn artifact_surface_bridges_tool_call_id_and_request_id() {
         request_id: Some("req-1".to_string()),
     });
     let ev = find_artifact_web_event(&mut web_rx, "artifact_pending", pending_id).await;
-    assert_eq!(ev.tool_call_id, Some("call-1".to_string()));
-    assert_eq!(ev.turn_request_id, Some("req-1".to_string()));
+    assert_eq!(wire(&ev)["tool_call_id"], "call-1");
+    assert_eq!(wire(&ev)["turn_request_id"], "req-1");
 
     let ready_id = "artifact-corr-ready";
     crate::core::bus::BUS.publish(DomainEvent::ArtifactReady {
@@ -212,8 +203,8 @@ async fn artifact_surface_bridges_tool_call_id_and_request_id() {
         request_id: Some("req-2".to_string()),
     });
     let ev = find_artifact_web_event(&mut web_rx, "artifact_ready", ready_id).await;
-    assert_eq!(ev.tool_call_id, Some("call-2".to_string()));
-    assert_eq!(ev.turn_request_id, Some("req-2".to_string()));
+    assert_eq!(wire(&ev)["tool_call_id"], "call-2");
+    assert_eq!(wire(&ev)["turn_request_id"], "req-2");
 
     let failed_id = "artifact-corr-failed";
     crate::core::bus::BUS.publish(DomainEvent::ArtifactFailed {
@@ -228,8 +219,8 @@ async fn artifact_surface_bridges_tool_call_id_and_request_id() {
         request_id: Some("req-3".to_string()),
     });
     let ev = find_artifact_web_event(&mut web_rx, "artifact_failed", failed_id).await;
-    assert_eq!(ev.tool_call_id, Some("call-3".to_string()));
-    assert_eq!(ev.turn_request_id, Some("req-3".to_string()));
+    assert_eq!(wire(&ev)["tool_call_id"], "call-3");
+    assert_eq!(wire(&ev)["turn_request_id"], "req-3");
 }
 
 /// A producer that ran outside a harness tool-call context (CLI, cron)
@@ -254,21 +245,21 @@ async fn artifact_surface_leaves_tool_call_id_none_when_absent() {
         request_id: None,
     });
     let ev = find_artifact_web_event(&mut web_rx, "artifact_ready", ready_id).await;
-    assert_eq!(ev.tool_call_id, None);
-    assert_eq!(ev.turn_request_id, None);
+    assert!(wire(&ev).get("tool_call_id").is_none());
+    assert!(wire(&ev).get("turn_request_id").is_none());
 }
 
 /// Drain the web-channel receiver until an event with the given `event` name
 /// and `thread_id` arrives (the bus is process-wide, so unrelated events from
 /// other tests may interleave).
 async fn find_agent_web_event(
-    rx: &mut broadcast::Receiver<WebChannelEvent>,
+    rx: &mut broadcast::Receiver<ScopedWebEvent>,
     event: &str,
     thread_id: &str,
-) -> WebChannelEvent {
+) -> ScopedWebEvent {
     loop {
         match rx.recv().await {
-            Ok(ev) if ev.event == event && ev.thread_id == thread_id => return ev,
+            Ok(ev) if ev.event_name() == event && ev.context().thread_id == thread_id => return ev,
             Ok(_) => continue,
             Err(broadcast::error::RecvError::Lagged(_)) => continue,
             Err(broadcast::error::RecvError::Closed) => {
@@ -297,8 +288,8 @@ async fn agent_surface_bridges_thread_goal_updated() {
     });
 
     let ev = find_agent_web_event(&mut web_rx, "thread_goal_updated", thread_id).await;
-    assert_eq!(ev.client_id, "");
-    assert_eq!(ev.goal, Some(goal));
+    assert_eq!(ev.context().client_id, "");
+    assert_eq!(wire(&ev)["goal"], goal);
 }
 
 /// `ThreadGoalCleared` bridges to `thread_goal_cleared`.
@@ -314,7 +305,7 @@ async fn agent_surface_bridges_thread_goal_cleared() {
     });
 
     let ev = find_agent_web_event(&mut web_rx, "thread_goal_cleared", thread_id).await;
-    assert_eq!(ev.client_id, "");
+    assert_eq!(ev.context().client_id, "");
 }
 
 /// `ThreadTodosChanged` bridges to `thread_todos_changed` carrying the todos
@@ -333,7 +324,7 @@ async fn agent_surface_bridges_thread_todos_changed() {
     });
 
     let ev = find_agent_web_event(&mut web_rx, "thread_todos_changed", thread_id).await;
-    assert_eq!(ev.todos, Some(todos));
+    assert_eq!(wire(&ev)["todos"], todos);
 }
 
 /// `RunQueueMessageQueued` bridges to `queue_item_queued` with the item's id
@@ -354,7 +345,8 @@ async fn agent_surface_bridges_queue_item_queued() {
     });
 
     let ev = find_agent_web_event(&mut web_rx, "queue_item_queued", thread_id).await;
-    let item = ev.queue_item.expect("queue_item");
+    let item: QueueItemPayload =
+        serde_json::from_value(wire(&ev)["queue_item"].clone()).expect("queue_item");
     assert_eq!(item.id, "item-1");
     assert_eq!(item.text_preview, Some("hello".to_string()));
 }
@@ -381,7 +373,7 @@ async fn agent_surface_skips_queue_item_queued_without_item_id() {
         thread_id: thread_id.to_string(),
     });
     let ev = find_agent_web_event(&mut web_rx, "thread_goal_cleared", thread_id).await;
-    assert_eq!(ev.thread_id, thread_id);
+    assert_eq!(ev.context().thread_id, thread_id);
 }
 
 /// `RunQueueMessageDelivered` bridges to `queue_item_delivered` carrying the
@@ -402,7 +394,8 @@ async fn agent_surface_bridges_queue_item_delivered_with_lane() {
     });
 
     let ev = find_agent_web_event(&mut web_rx, "queue_item_delivered", thread_id).await;
-    let item = ev.queue_item.expect("queue_item");
+    let item: QueueItemPayload =
+        serde_json::from_value(wire(&ev)["queue_item"].clone()).expect("queue_item");
     assert_eq!(item.id, "item-2");
     assert_eq!(item.lane, Some("collect".to_string()));
 }
@@ -423,8 +416,8 @@ async fn agent_surface_bridges_run_mode_changed() {
     });
 
     let ev = find_agent_web_event(&mut web_rx, "run_mode_changed", thread_id).await;
-    assert_eq!(ev.client_id, "");
-    assert_eq!(ev.message, Some("plan".to_string()));
+    assert_eq!(ev.context().client_id, "");
+    assert_eq!(wire(&ev)["message"], "plan");
 }
 
 /// `ApprovalDecided` with both `thread_id`/`client_id` set bridges to
@@ -448,11 +441,11 @@ async fn approval_surface_bridges_approval_decided_with_resolution() {
     });
 
     let ev = find_agent_web_event(&mut web_rx, "approval_decided", "thread-decided-1").await;
-    assert_eq!(ev.client_id, "client-decided-1");
-    assert_eq!(ev.request_id, "req-decided-1");
-    assert_eq!(ev.tool_call_id, Some("call-decided-1".to_string()));
-    assert_eq!(ev.cancel_reason, Some("expired".to_string()));
-    assert_eq!(ev.message, Some("deny".to_string()));
+    assert_eq!(ev.context().client_id, "client-decided-1");
+    assert_eq!(ev.context().request_id, "req-decided-1");
+    assert_eq!(wire(&ev)["tool_call_id"], "call-decided-1");
+    assert_eq!(wire(&ev)["cancel_reason"], "expired");
+    assert_eq!(wire(&ev)["message"], "deny");
 }
 
 /// `ApprovalDecided` with no thread/client routing (a non-chat origin) is
@@ -485,10 +478,10 @@ async fn approval_surface_drops_approval_decided_without_chat_routing() {
         loop {
             match web_rx.recv().await {
                 Ok(ev)
-                    if ev.event == "approval_decided"
-                        && ev.request_id == "req-decided-no-route" =>
+                    if ev.event_name() == "approval_decided"
+                        && ev.context().request_id == "req-decided-no-route" =>
                 {
-                    return Some(ev)
+                    return Some(ev);
                 }
                 Ok(_) => continue,
                 Err(broadcast::error::RecvError::Lagged(_)) => continue,
@@ -521,10 +514,10 @@ async fn plan_review_surface_bridges_plan_review_decided() {
 
     let ev =
         find_agent_web_event(&mut web_rx, "plan_review_decided", "thread-plan-decided-1").await;
-    assert_eq!(ev.client_id, "client-plan-decided-1");
-    assert_eq!(ev.tool_call_id, Some("call-plan-decided-1".to_string()));
-    assert_eq!(ev.cancel_reason, None);
-    assert_eq!(ev.message, Some("approve".to_string()));
+    assert_eq!(ev.context().client_id, "client-plan-decided-1");
+    assert_eq!(wire(&ev)["tool_call_id"], "call-plan-decided-1");
+    assert!(wire(&ev).get("cancel_reason").is_none());
+    assert_eq!(wire(&ev)["message"], "approve");
 }
 
 /// `publish_web_channel_event` stamps `ts` (epoch ms) when the caller left it
@@ -533,19 +526,20 @@ async fn plan_review_surface_bridges_plan_review_decided() {
 #[tokio::test]
 async fn publish_web_channel_event_stamps_ts_when_unset() {
     let mut web_rx = subscribe_web_channel_events();
-    let before = crate::web_chat::progress_bridge::unix_epoch_ms();
+    let before = crate::web_chat::progress::unix_epoch_ms();
 
-    publish_web_channel_event(WebChannelEvent {
-        event: "ts_stamp_probe".to_string(),
-        thread_id: "thread-ts-stamp-probe".to_string(),
-        ..Default::default()
+    publish_web_channel_event(WebChannelEvent::UserError {
+        context: WebEventContext {
+            thread_id: "thread-ts-stamp-probe".into(),
+            ..WebEventContext::default()
+        },
+        error_type: Some("ts_stamp_probe".into()),
+        error_source: None,
     });
 
-    let ev = find_agent_web_event(&mut web_rx, "ts_stamp_probe", "thread-ts-stamp-probe").await;
-    let after = crate::web_chat::progress_bridge::unix_epoch_ms();
-    let ts = ev
-        .ts
-        .expect("publish_web_channel_event must stamp ts when unset");
+    let ev = find_agent_web_event(&mut web_rx, "user_error", "thread-ts-stamp-probe").await;
+    let after = crate::web_chat::progress::unix_epoch_ms();
+    let ts = ev.context().ts.expect("publisher stamps timestamp");
     assert!(
         ts >= before && ts <= after,
         "stamped ts ({ts}) must fall within [{before}, {after}]"
@@ -560,20 +554,24 @@ async fn publish_web_channel_event_stamps_ts_when_unset() {
 async fn publish_web_channel_event_preserves_an_explicit_ts() {
     let mut web_rx = subscribe_web_channel_events();
 
-    publish_web_channel_event(WebChannelEvent {
-        event: "ts_stamp_probe_explicit".to_string(),
-        thread_id: "thread-ts-stamp-probe-explicit".to_string(),
-        ts: Some(123),
-        ..Default::default()
+    publish_web_channel_event(WebChannelEvent::ChatDone {
+        context: WebEventContext {
+            client_id: "ts-probe".into(),
+            thread_id: "thread-ts-stamp-probe-explicit".into(),
+            request_id: "ts-probe".into(),
+            turn_request_id: None,
+            seq: None,
+            ts: Some(123),
+        },
+        full_response: None,
+        citations: None,
+        usage: None,
+        timing: None,
+        parts: None,
     });
 
-    let ev = find_agent_web_event(
-        &mut web_rx,
-        "ts_stamp_probe_explicit",
-        "thread-ts-stamp-probe-explicit",
-    )
-    .await;
-    assert_eq!(ev.ts, Some(123));
+    let ev = find_agent_web_event(&mut web_rx, "chat_done", "thread-ts-stamp-probe-explicit").await;
+    assert_eq!(ev.context().ts, Some(123));
 }
 
 /// A SaaS user's stream carries only events stamped with that user's agent:
@@ -594,32 +592,54 @@ async fn published_events_carry_the_publishing_agent() {
         .profile("p-alice"),
     );
     CoreContext::scope(ctx, async {
-        publish_web_channel_event(WebChannelEvent {
-            event: "chat_done".into(),
-            thread_id: marker.clone(),
-            ..Default::default()
+        publish_web_channel_event(WebChannelEvent::ChatDone {
+            context: WebEventContext {
+                client_id: String::new(),
+                thread_id: marker.clone(),
+                request_id: "agent-stamp".into(),
+                ..WebEventContext::default()
+            },
+            full_response: None,
+            citations: None,
+            usage: None,
+            timing: None,
+            parts: None,
         });
     })
     .await;
-    publish_web_channel_event(WebChannelEvent {
-        event: "chat_done".into(),
-        thread_id: format!("{marker}-unscoped"),
-        ..Default::default()
+    publish_web_channel_event(WebChannelEvent::ChatDone {
+        context: WebEventContext {
+            client_id: String::new(),
+            thread_id: format!("{marker}-unscoped"),
+            request_id: "agent-stamp-unscoped".into(),
+            ..WebEventContext::default()
+        },
+        full_response: None,
+        citations: None,
+        usage: None,
+        timing: None,
+        parts: None,
     });
 
     let mut seen = Vec::new();
     while seen.len() < 2 {
         let ev = rx.recv().await.unwrap();
-        if ev.thread_id.starts_with(&marker) {
+        if ev.context().thread_id.starts_with(&marker) {
             seen.push(ev);
         }
     }
-    let scoped = seen.iter().find(|e| e.thread_id == marker).unwrap();
+    let scoped = seen
+        .iter()
+        .find(|e| e.context().thread_id == marker)
+        .unwrap();
     assert!(scoped.belongs_to("u-alice"));
     assert!(!scoped.belongs_to("u-bob"));
     assert!(scoped.belongs_to_profile("p-alice"));
     assert!(!scoped.belongs_to_profile("p-bob"));
-    let unscoped = seen.iter().find(|e| e.thread_id != marker).unwrap();
+    let unscoped = seen
+        .iter()
+        .find(|e| e.context().thread_id != marker)
+        .unwrap();
     assert!(
         !unscoped.belongs_to("u-alice") && !unscoped.belongs_to_profile("p-alice"),
         "unstamped events belong to no user"

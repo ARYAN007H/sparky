@@ -6,9 +6,9 @@ use crate::agent::subagent_host::ops::checkpoint;
 use std::collections::HashSet;
 use std::sync::Arc;
 
-use crate::agent::progress::AgentProgress;
 use crate::agent::subagent_host::types::SubagentRunError;
 use crate::agent::tinyagents::{SubagentScope, TurnSpec};
+use tinyagents_harness::progress::AgentProgress;
 use tinyagents_harness::run_queue::RunQueue;
 use tinyagents_session::transcript::TranscriptMessage;
 use tinyjuice_bus::types::AgentTokenjuiceCompression;

@@ -6,7 +6,8 @@
 
 use crate::core::events::DomainEvent;
 use crate::core::runtime::DispatchCtx;
-use crate::web_chat::{publish_web_channel_event_in, WebChannelEvent};
+use crate::web_chat::event_context;
+use crate::web_chat::{WebChannelEvent, publish_web_channel_event_in};
 use async_trait::async_trait;
 use std::sync::Arc;
 use tinybus::EventHandler;
@@ -61,43 +62,13 @@ impl EventHandler<DomainEvent> for WebProactiveSubscriber {
         let thread_id = format!("proactive:{}", job_name.as_deref().unwrap_or("system"));
         publish_web_channel_event_in(
             &ctx,
-            WebChannelEvent {
-                event: "proactive_message".to_string(),
-                client_id: "system".to_string(),
-                thread_id,
-                request_id: uuid::Uuid::new_v4().to_string(),
+            WebChannelEvent::ProactiveMessage {
+                context: event_context("system", thread_id, uuid::Uuid::new_v4().to_string()),
                 full_response: Some(message.clone()),
                 message: None,
-                error_type: None,
-                error_source: None,
-                error_retryable: None,
-                error_retry_after_ms: None,
-                error_provider: None,
-                error_fallback_available: None,
-                copy_key: None,
-                copy_params: None,
-                tool_name: None,
-                skill_id: None,
-                args: None,
-                output: None,
                 success: Some(true),
-                round: None,
-                segment_index: None,
-                segment_total: None,
-                delta: None,
-                delta_kind: None,
-                tool_call_id: None,
-                failure: None,
-                citations: None,
-                subagent: None,
-                tool_display_label: None,
-                tool_display_detail: None,
-                elapsed_ms: None,
-                structured: None,
-                usage: None,
-                // This event is outside the seq-stamping progress bridge.
-                seq: None,
-                ..Default::default()
+                persisted_message_id: None,
+                parts: None,
             },
         );
 

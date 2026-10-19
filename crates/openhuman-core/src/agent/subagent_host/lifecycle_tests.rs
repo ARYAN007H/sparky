@@ -7,7 +7,7 @@ use super::lifecycle::{
     host_in_flight, load_subagent_checkpoint, merged_resume_history, HostInFlight,
     OpenHumanPersistence,
 };
-use super::{SubagentMode, SubagentRunOutcome, SubagentRunStatus, SubagentUsage};
+use super::{SubagentMode, SubagentRunOutcome, SubagentRunStatus};
 
 fn key() -> SubagentTaskKey {
     SubagentTaskKey {
@@ -299,7 +299,7 @@ async fn host_coalescer_keeps_the_leader_winner_and_cancels_only_the_observer() 
         mode: SubagentMode::Typed,
         status: SubagentRunStatus::Completed,
         final_history: Vec::new(),
-        usage: SubagentUsage::default(),
+        usage: tinyagents_harness::progress::SubagentUsage::default(),
         artifact_paths: Vec::new(),
         persistence_disposition:
             tinyagents_orchestration::subagent::SubagentPersistenceDisposition::TerminalInserted,

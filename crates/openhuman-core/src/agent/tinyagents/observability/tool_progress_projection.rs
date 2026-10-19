@@ -1,7 +1,7 @@
 //! Projection of `AgentEvent::ToolProgressDetail` onto
 //! [`AgentProgress::ToolCallProgress`].
 
-use crate::agent::progress::AgentProgress;
+use tinyagents_harness::progress::AgentProgress;
 
 use super::event_bridge::OpenhumanEventBridge;
 

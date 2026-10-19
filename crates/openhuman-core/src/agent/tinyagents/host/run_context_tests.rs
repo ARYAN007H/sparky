@@ -165,7 +165,7 @@ fn child_ledgers_are_isolated_and_parent_keeps_completed_child_totals() {
     left.append_subagent_usage(SubagentUsageEntry {
         task_id: "left-task".into(),
         agent_id: "researcher".into(),
-        usage: crate::agent::subagent_host::SubagentUsage {
+        usage: tinyagents_harness::progress::SubagentUsage {
             input_tokens: 3,
             output_tokens: 2,
             cached_input_tokens: 1,
@@ -178,7 +178,7 @@ fn child_ledgers_are_isolated_and_parent_keeps_completed_child_totals() {
     left.record_completed_subagent_usage(SubagentUsageEntry {
         task_id: "completed-child".into(),
         agent_id: "researcher".into(),
-        usage: crate::agent::subagent_host::SubagentUsage::default(),
+        usage: tinyagents_harness::progress::SubagentUsage::default(),
     });
     assert_eq!(root.subagent_usage_entries().len(), 1);
     assert_eq!(left.subagent_usage_entries().len(), 1);
@@ -191,7 +191,7 @@ fn failed_outer_run_promotes_completed_nested_usage_once() {
     outer.append_subagent_usage(SubagentUsageEntry {
         task_id: "nested".into(),
         agent_id: "researcher".into(),
-        usage: crate::agent::subagent_host::SubagentUsage {
+        usage: tinyagents_harness::progress::SubagentUsage {
             input_tokens: 7,
             ..Default::default()
         },

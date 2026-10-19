@@ -406,7 +406,7 @@ impl OpenHumanSessionHost {
     /// iteration updates to the UI. Pass `None` to disable.
     pub fn set_on_progress(
         &mut self,
-        tx: Option<tokio::sync::mpsc::Sender<crate::agent::progress::AgentProgress>>,
+        tx: Option<tokio::sync::mpsc::Sender<tinyagents_harness::progress::AgentProgress>>,
     ) {
         // A warm runtime retains the last turn's prelude. Release its sender
         // along with the host sender so the finished turn's bridge can drain

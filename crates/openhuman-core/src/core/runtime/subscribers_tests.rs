@@ -1,4 +1,4 @@
-use super::{group_first_time_when_bus_ready, DomainSubscriberPlan};
+use super::{DomainSubscriberPlan, group_first_time_when_bus_ready};
 use crate::config::test_env::EnvVarGuard;
 
 // ---- domain-subscriber gating (#4796 DoD item 3) ----------------------------
@@ -252,21 +252,19 @@ fn proactive_message_reaches_web_on_channelless_core_boot() {
                             .recv()
                             .await
                             .expect("web event stream should remain open");
-                        if event.event == "proactive_message"
-                            && event.full_response.as_deref()
-                                == Some("Your morning briefing is ready.")
-                        {
+                        if matches!(
+                            event.wire_event(),
+                            crate::web_chat::WebChannelEvent::ProactiveMessage {
+                                full_response, ..
+                            } if full_response.as_deref() == Some("Your morning briefing is ready.")
+                        ) {
                             break event;
                         }
                     }
                 })
                 .await
                 .expect("proactive message should reach the web event stream");
-                assert_eq!(event.event, "proactive_message");
-                assert_eq!(
-                    event.full_response.as_deref(),
-                    Some("Your morning briefing is ready.")
-                );
+                assert_eq!(event.event_name(), "proactive_message");
             });
         return;
     }
@@ -287,8 +285,7 @@ fn proactive_message_reaches_web_on_channelless_core_boot() {
 #[test]
 fn proactive_message_is_scoped_to_originating_saas_profile() {
     const CHILD: &str = "OPENHUMAN_PROACTIVE_SUBSCRIBER_TEST_CHILD";
-    const TEST_NAME: &str =
-        "core::runtime::subscribers::tests::proactive_message_is_scoped_to_originating_saas_profile";
+    const TEST_NAME: &str = "core::runtime::subscribers::tests::proactive_message_is_scoped_to_originating_saas_profile";
 
     if std::env::var(CHILD).as_deref() == Ok("1") {
         tokio::runtime::Builder::new_current_thread()
@@ -350,21 +347,19 @@ fn proactive_message_is_scoped_to_originating_saas_profile() {
                             .recv()
                             .await
                             .expect("web event stream should remain open");
-                        if event.event == "proactive_message"
-                            && event.full_response.as_deref()
-                                == Some("Your morning briefing is ready.")
-                        {
+                        if matches!(
+                            event.wire_event(),
+                            crate::web_chat::WebChannelEvent::ProactiveMessage {
+                                full_response, ..
+                            } if full_response.as_deref() == Some("Your morning briefing is ready.")
+                        ) {
                             break event;
                         }
                     }
                 })
                 .await
                 .expect("proactive message should reach the web event stream");
-                assert_eq!(event.event, "proactive_message");
-                assert_eq!(
-                    event.full_response.as_deref(),
-                    Some("Your morning briefing is ready.")
-                );
+                assert_eq!(event.event_name(), "proactive_message");
                 assert!(event.belongs_to_profile("proactive-test"));
                 assert!(!event.belongs_to_profile("another-profile"));
             });

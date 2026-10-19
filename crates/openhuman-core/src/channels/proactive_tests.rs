@@ -111,8 +111,13 @@ async fn web_and_external_proactive_subscribers_deliver_each_destination_once() 
     external.handle(&event).await;
 
     let delivered = web_events.recv().await.expect("web event");
-    assert_eq!(delivered.event, "proactive_message");
-    assert_eq!(delivered.full_response.as_deref(), Some("Hello!"));
+    assert_eq!(delivered.event_name(), "proactive_message");
+    assert!(matches!(
+        delivered.wire_event(),
+        crate::web_chat::WebChannelEvent::ProactiveMessage {
+            full_response: Some(response), ..
+        } if response == "Hello!"
+    ));
     assert!(
         web_events.try_recv().is_err(),
         "web event must not be duplicated"

@@ -8,10 +8,10 @@
 
 use crate::agent::context::ContextManager;
 use crate::agent::hooks::PostTurnHook;
-use crate::agent::progress::AgentProgress;
 use crate::agent::prompts::SystemPromptBuilder;
 use crate::agent::tinyagents::TurnModelSource;
 use std::sync::Arc;
+use tinyagents_harness::progress::AgentProgress;
 use tinytools::ToolPolicySession;
 use tinytools::{Tool, ToolSpec};
 use tinytools_agent::dialect::ToolDialect;
