@@ -69,11 +69,7 @@ async fn ptt_source_turn_completes_without_publishing_a_voice_event() {
     config.components.skills = false;
     config.components.flows = false;
     config.agent.chat_agent_id = Some("ptt_event_regression".to_string());
-    let mut definition =
-        crate::agent_registry::host_definition::AgentDefinitionRegistry::builtins_only()
-            .get("orchestrator")
-            .cloned()
-            .expect("built-in orchestrator definition");
+    let mut definition = crate::agent::harness::test_support::test_main_def();
     definition.id = "ptt_event_regression".to_string();
     definition.tools = tinyagents_definition::ToolScope::Named(Vec::new());
     definition.subagents.clear();
@@ -187,6 +183,10 @@ async fn ptt_source_turn_completes_without_publishing_a_voice_event() {
             )
         });
         assert_eq!(done.full_response.as_deref(), Some("hello from mock"));
+        assert!(
+            !model.requests().is_empty(),
+            "successful turn should invoke the scripted model"
+        );
 
         // Subscriber dispatch is a single FIFO loop (`events/subscriber.rs`), so
         // observing this marker proves it has handled every locally published
