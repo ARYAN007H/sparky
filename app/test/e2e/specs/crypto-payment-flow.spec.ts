@@ -32,33 +32,24 @@ describe('Crypto Payment Flow', () => {
     await performFullLogin('e2e-crypto-payment-token');
   });
 
-  it.skip('6.1 — billing panel shows "moved to web" redirect page', async function () {
+  it('6.1 — account panel shows billing dashboard handoff', async function () {
     this.timeout(60_000);
-    await navigateToBilling();
+    await navigateViaHash('/settings/account');
     await waitForText('Open billing dashboard', 20_000);
-    console.log(`${LOG_PREFIX} 6.1 — billing redirect panel loaded`);
+    console.log(`${LOG_PREFIX} 6.1 — account billing handoff loaded`);
   });
 
-  it.skip('6.2 — "Open billing dashboard" button is present', async () => {
-    await navigateToBilling();
+  it('6.2 — "Open billing dashboard" button is present', async () => {
+    await navigateViaHash('/settings/account');
     const hasButton = await textExists('Open billing dashboard');
     expect(hasButton).toBe(true);
     console.log(`${LOG_PREFIX} 6.2 — "Open billing dashboard" button present`);
   });
 
-  it.skip('6.3 — opening-browser status message is shown on mount', async () => {
-    await navigateToBilling();
-    await waitForText('Billing moved to the web', 10_000);
-    // BillingPanel triggers openUrl on mount; while it is in-flight it shows
-    // t('settings.billing.openingBrowser') = 'Opening your browser...'
-    // After the promise resolves it transitions to 'idle' / 'error'.
-    // Either the opening message or the idle fallback must be visible.
-    const hasOpeningMsg =
-      (await textExists('Opening your browser')) ||
-      (await textExists('If your browser did not open')) ||
-      (await textExists('Open billing dashboard'));
-    expect(hasOpeningMsg).toBe(true);
-    console.log(`${LOG_PREFIX} 6.3 — browser-open status message present`);
+  it('6.3 — the handoff is an explicit user action', async () => {
+    await navigateViaHash('/settings/account');
+    await waitForText('Manage billing', 10_000);
+    expect(await textExists('Open billing dashboard')).toBe(true);
     await navigateToHome();
   });
 });

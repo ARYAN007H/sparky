@@ -169,17 +169,11 @@ test.describe('Settings - Account Preferences', () => {
     }
   });
 
-  test('opens the billing route and settles the redirect status copy', async ({ page }) => {
+  test('shows the billing dashboard handoff on the account panel', async ({ page }) => {
     await gotoSettingsRoute(page, '/settings/account');
 
-    await expect(page.getByRole('heading', { name: 'Billing', exact: true })).toBeVisible();
-    // Billing no longer auto-opens the browser; the panel explains billing
-    // moved to the web and offers an explicit open button.
-    await expect(
-      page.getByText(/Subscription changes, payment methods, credits, and invoices are now managed/)
-    ).toBeVisible();
-
-    await page.getByRole('button', { name: 'Back to settings' }).click();
-    await expect.poll(async () => page.evaluate(() => window.location.hash)).toContain('/settings');
+    await expect(page.getByTestId('account-panel')).toBeVisible();
+    await expect(page.getByTestId('account-open-billing')).toBeVisible();
+    await expect(page.getByText(/Manage your subscription and payment method/)).toBeVisible();
   });
 });
