@@ -294,6 +294,10 @@ fn start_core(
         .env("USERPROFILE", home)
         .env("OPENHUMAN_WORKSPACE", workspace)
         .env("OPENHUMAN_CORE_TOKEN", RPC_TOKEN)
+        .env(
+            "RUST_LOG",
+            "tinychannels=debug,tinychannels_module=debug,openhuman_core::channels=debug",
+        )
         .env("OPENHUMAN_MODEL", "mock:session-model")
         .env("OPENHUMAN_BACKEND_API_KEY", MOCK_API_KEY)
         .env("BACKEND_URL", inference)
