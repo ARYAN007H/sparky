@@ -13,7 +13,10 @@ pub(super) fn handle_web_event(
     {
         return;
     }
-    if matches!(ev.event.as_str(), "chat_done" | "chat_error") {
+    if matches!(
+        ev.event.as_str(),
+        "chat_done" | "channel_outbound" | "chat_error"
+    ) {
         ui.stopping = false;
     }
     match ev.event.as_str() {
