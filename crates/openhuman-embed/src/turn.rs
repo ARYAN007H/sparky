@@ -10,7 +10,7 @@
 //! # Why the params are a struct rather than `json!`
 //!
 //! The controller behind this method deserializes
-//! [`AgentChatParams`](openhuman_core::inference::host_runtime::schemas) — which
+//! the `agent_runs::agent_chat` controller params — which
 //! carries no `#[serde(rename_all)]`, so its wire names are the Rust field names
 //! exactly as spelled. Every embedder that hand-writes that JSON is therefore
 //! depending on an unmarked, unversioned naming coincidence: rename a field
@@ -605,7 +605,7 @@ async fn dispatch(
                 openhuman_core::core::runtime::DispatchCtx::new(std::sync::Arc::clone(&ctx));
             let turn: futures_box::BoxFuture<'_, Result<AgentReply, CoreError>> =
                 Box::pin(async move {
-                    use openhuman_core::inference::host_runtime::ops::{
+                    use openhuman_core::agent_runs::agent_chat::{
                         agent_chat_reply_for, AgentChatTarget,
                     };
                     let mut config = dispatch
@@ -651,7 +651,7 @@ async fn dispatch(
             // allocation per turn is nothing next to the turn itself.
             let turn: futures_box::BoxFuture<'_, Result<AgentReply, CoreError>> =
                 Box::pin(async move {
-                    use openhuman_core::inference::host_runtime::ops::{
+                    use openhuman_core::agent_runs::agent_chat::{
                         agent_chat_for, AgentChatTarget,
                     };
                     let mut config = inner.config.clone();
