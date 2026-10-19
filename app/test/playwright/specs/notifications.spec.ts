@@ -111,10 +111,4 @@ test.describe('Notifications', () => {
     await expect(page.getByText('No alerts yet').first()).toBeVisible();
   });
 
-  test('native notification permission command returns a valid state', async () => {
-    test.skip(
-      true,
-      'web Playwright lane does not expose the Tauri invoke bridge used by the WDIO shell test'
-    );
-  });
 });
