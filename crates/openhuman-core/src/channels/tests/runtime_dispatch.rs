@@ -120,7 +120,7 @@ async fn message_dispatch_processes_messages_in_parallel() {
             relay_thread: None,
             channels_by_name: Arc::new(channels_by_name),
             module_objects: Arc::new(HashMap::new()),
-        turn_model_source: Some(crate::agent::tinyagents::TurnModelSource::from_model(
+            turn_model_source: Some(crate::agent::tinyagents::TurnModelSource::from_model(
                 Arc::new(SlowModel {
                     delay: Duration::from_millis(5),
                 }),
