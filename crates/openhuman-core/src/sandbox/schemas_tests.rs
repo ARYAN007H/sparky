@@ -1,4 +1,5 @@
 use super::*;
+use crate::core::all::assert_schema_controller_parity;
 use crate::core::runtime::context::CoreContext;
 use crate::core::runtime::DispatchCtx;
 use crate::core::runtime::DomainSet;
@@ -8,6 +9,15 @@ use crate::core::runtime::DomainSet;
 /// `~/.openhuman` — which is slow and racy across parallel unit tests (#6081).
 fn scoped_ctx(config: crate::config::Config) -> std::sync::Arc<CoreContext> {
     CoreContext::for_test_with_config(DomainSet::full(), config)
+}
+
+#[test]
+fn sandbox_schema_catalog_matches_registered_controllers() {
+    assert_schema_controller_parity(
+        &all_controller_schemas(),
+        &all_registered_controllers(),
+        "status",
+    );
 }
 
 #[tokio::test]

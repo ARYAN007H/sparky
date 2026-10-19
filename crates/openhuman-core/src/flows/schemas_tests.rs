@@ -1,9 +1,14 @@
 use super::*;
-use crate::core::all::{expect_schema_fields, expect_schema_identity, expect_schema_input_order, expect_schema_output_names, expect_schema_required_inputs};
+use crate::core::all::{assert_schema_controller_parity, expect_schema_fields, expect_schema_identity, expect_schema_input_order, expect_schema_output_names, expect_schema_required_inputs};
 use serde_json::json;
 
 #[test]
 fn flow_schema_wire_contracts_are_preserved() {
+    assert_schema_controller_parity(
+        &all_controller_schemas(),
+        &all_registered_controllers(),
+        "create",
+    );
     let contracts = [
         ("import", &["graph"][..], &["format"][..]),
         ("create", &["name", "graph"][..], &["require_approval"][..]),

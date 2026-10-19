@@ -1,6 +1,9 @@
 use super::*;
 
-use crate::core::all::{expect_schema_fields, expect_schema_identity, expect_schema_output_fields};
+use crate::core::all::{
+    assert_schema_controller_parity, expect_schema_fields, expect_schema_identity,
+    expect_schema_output_fields,
+};
 use crate::tools::schemas::registry::tools_schemas;
 use serde_json::{json, Map};
 const BASE_CONTROLLERS: usize = 5;
@@ -30,6 +33,11 @@ fn apify_linkedin_scrape_controller_is_retired() {
 
 #[test]
 fn tools_schema_wire_contracts_are_preserved() {
+    assert_schema_controller_parity(
+        &all_controller_schemas(),
+        &all_registered_controllers(),
+        "web_search",
+    );
     let contracts: &[(&str, &[(&str, Option<bool>)])] = &[
         ("composio_execute", &[("action", Some(true))]),
         ("web_answer", &[("query", Some(true)), ("depth", None)]),

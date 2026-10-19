@@ -1,5 +1,5 @@
 use super::*;
-use crate::core::all::expect_schema_required_inputs;
+use crate::core::all::{assert_schema_controller_parity, expect_schema_required_inputs};
 use crate::core::runtime::DispatchCtx;
 use serde_json::json;
 
@@ -82,9 +82,10 @@ fn voice_schema_wire_contracts_are_preserved() {
             "voice.{expected} not registered"
         );
     }
-    assert_eq!(
-        all_voice_controller_schemas().len(),
-        all_voice_registered_controllers().len()
+    assert_schema_controller_parity(
+        &all_voice_controller_schemas(),
+        &all_voice_registered_controllers(),
+        "status",
     );
 }
 

@@ -1,12 +1,17 @@
 use super::*;
 use crate::core::all::{
-    expect_schema_fields, expect_schema_identity, expect_schema_input_order,
+    assert_schema_controller_parity, expect_schema_fields, expect_schema_identity, expect_schema_input_order,
     expect_schema_output_fields, expect_schema_output_names,
 };
 use serde_json::json;
 
 #[test]
 fn device_schema_wire_contracts_are_preserved() {
+    assert_schema_controller_parity(
+        &all_controller_schemas(),
+        &all_registered_controllers(),
+        "create_pairing",
+    );
     let contracts = ["create_pairing", "list", "revoke"];
     let names: Vec<_> = all_controller_schemas()
         .into_iter()
