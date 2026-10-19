@@ -509,11 +509,25 @@ pub(crate) fn build_deterministic_final_summary(
     results: &[CheckpointToolResult],
     stop_reason: Option<&str>,
 ) -> String {
+    build_deterministic_final_summary_with_cause(results, stop_reason, None)
+}
+
+/// Build a stopped-turn summary using its typed breaker cause when available.
+/// The note remains a compatibility source for old, untyped stops.
+pub(crate) fn build_deterministic_final_summary_with_cause(
+    results: &[CheckpointToolResult],
+    stop_reason: Option<&str>,
+    failure_cause: Option<&tinyagents_harness::no_progress::ClassifiedStopCause>,
+) -> String {
     if results.is_empty() && stop_reason.is_none() {
         return "I finished this turn but produced no result to report.".to_string();
     }
     if let Some(reason) = stop_reason {
-        return super::stop_summary::render_stop_summary(results, reason);
+        return super::stop_summary::render_stop_summary_with_cause(
+            results,
+            reason,
+            failure_cause,
+        );
     }
     let mut out = String::from(
         "I finished this turn without writing up a result. Here is what each tool call returned:\n",

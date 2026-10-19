@@ -157,6 +157,26 @@ fn classified_halt_summary_uses_typed_class_for_translated_notes() {
     }
 }
 
+#[test]
+fn unrecognized_typed_class_does_not_fall_back_to_english_halt_phrases() {
+    let outcome = classified_halt(
+        "Stopping: the action is blocked by the security policy.",
+        "future_failure_class",
+    );
+    let close = classified_halt_close(&outcome).expect("typed halt");
+
+    assert!(
+        close.output.contains("my tool calls were not getting anywhere"),
+        "unknown typed classes use generic copy instead of parsing halt prose: {}",
+        close.output
+    );
+    assert!(
+        !close.output.contains("security settings"),
+        "English halt wording cannot override a typed class: {}",
+        close.output
+    );
+}
+
 /// The host adapter delegates generation and verification to TinyAgents while
 /// retaining its selected model, temperature, output cap and billing gauge.
 #[tokio::test]
