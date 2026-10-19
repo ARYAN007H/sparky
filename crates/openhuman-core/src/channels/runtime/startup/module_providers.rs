@@ -485,7 +485,7 @@ impl Channel for ModuleChannel {
 }
 
 impl ModuleChannel {
-    async fn send_progressive_typed(
+    pub(super) async fn send_progressive_typed(
         &self,
         message: &tinychannels_bus::channel::ChannelOutboundMessage,
     ) -> anyhow::Result<tinychannels_bus::channel::ChannelSendOutcome> {

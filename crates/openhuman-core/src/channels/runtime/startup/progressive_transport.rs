@@ -46,7 +46,7 @@ impl ProgressiveChannelTransport for ModuleChannel {
                     parts,
                 };
                 let outcome = self
-                    .send_typed_with_receipt(&outbound)
+                    .send_progressive_typed(&outbound)
                     .await
                     .map_err(|_| tinybus::Error::failed("progressive channel send failed"))?;
                 Ok(Result::Outcome(Box::new(outcome)))
@@ -77,7 +77,7 @@ impl ProgressiveChannelTransport for ModuleChannel {
                     outbound.idempotency_key = key;
                 }
                 let outcome = self
-                    .send_typed_with_receipt(&outbound)
+                    .send_progressive_typed(&outbound)
                     .await
                     .map_err(|_| tinybus::Error::failed("progressive channel send failed"))?;
                 Ok(Result::Outcome(Box::new(outcome)))
