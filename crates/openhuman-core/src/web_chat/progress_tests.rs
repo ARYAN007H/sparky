@@ -316,11 +316,10 @@ async fn stops_heartbeat_after_turn_completed() {
 /// `turn_active == false` branch of the heartbeat tick.
 #[tokio::test]
 async fn no_heartbeat_before_turn_started() {
-    let _module = crate::channels::module_fixture::client().await;
     let mut events = crate::web_chat::subscribe_web_channel_events();
     let thread_id = "thread-hb-gate-4270";
     let (tx, task) =
-        spawn_test_bridge_with_interval(thread_id, "req-hb-gate-4270", Duration::from_millis(25));
+        spawn_test_bridge_with_interval(thread_id, "req-hb-gate-4270", Duration::from_millis(25)).await;
 
     // Real time avoids expiring TinyBus' RPC deadline under Tokio's paused
     // clock while still crossing several short heartbeat intervals.
@@ -357,7 +356,7 @@ async fn stamps_monotonic_seq_on_emitted_events() {
     let mut events = crate::web_chat::subscribe_web_channel_events();
     let thread_id = "thread-seq-stamp";
     let request_id = "req-seq-stamp";
-    let tx = spawn_test_bridge(thread_id, request_id);
+    let tx = spawn_test_bridge(thread_id, request_id).await;
 
     // Each of these emits exactly one web-channel event: inference_start,
     // tool_call, tool_result (the fast test never trips the 20s heartbeat).
@@ -545,7 +544,7 @@ mod subagent_tests {
     async fn subagent_spawned_forwards_parent_call_id() {
         let mut events = crate::web_chat::subscribe_web_channel_events();
         let thread_id = "thread-c1-spawned";
-        let tx = spawn_test_bridge(thread_id, "req-c1-spawned");
+        let tx = spawn_test_bridge(thread_id, "req-c1-spawned").await;
 
         tx.send(AgentProgress::SubagentSpawned {
             agent_id: "researcher".into(),
@@ -578,7 +577,7 @@ mod subagent_tests {
     async fn subagent_completed_carries_parent_call_id_and_capped_output() {
         let mut events = crate::web_chat::subscribe_web_channel_events();
         let thread_id = "thread-c1-completed";
-        let tx = spawn_test_bridge(thread_id, "req-c1-completed");
+        let tx = spawn_test_bridge(thread_id, "req-c1-completed").await;
 
         tx.send(AgentProgress::SubagentSpawned {
             agent_id: "researcher".into(),
@@ -629,7 +628,7 @@ mod subagent_tests {
     async fn subagent_failed_carries_parent_call_id() {
         let mut events = crate::web_chat::subscribe_web_channel_events();
         let thread_id = "thread-c1-failed";
-        let tx = spawn_test_bridge(thread_id, "req-c1-failed");
+        let tx = spawn_test_bridge(thread_id, "req-c1-failed").await;
 
         tx.send(AgentProgress::SubagentSpawned {
             agent_id: "researcher".into(),
@@ -677,7 +676,7 @@ mod tool_progress_tests {
     async fn forwards_tool_progress_for_the_running_call() {
         let mut events = crate::web_chat::subscribe_web_channel_events();
         let thread_id = "thread-tool-progress";
-        let tx = spawn_test_bridge(thread_id, "req-tool-progress");
+        let tx = spawn_test_bridge(thread_id, "req-tool-progress").await;
 
         tx.send(AgentProgress::ToolCallProgress {
             call_id: "call-1".into(),
