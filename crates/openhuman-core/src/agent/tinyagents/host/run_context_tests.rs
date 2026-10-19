@@ -429,6 +429,38 @@ fn child_inherits_shared_model_budget_and_narrowed_depth_limit() {
 }
 
 #[test]
+fn child_inherits_the_same_physical_dispatch_admission() {
+    let admission: Arc<dyn super::super::budget::PhysicalDispatchAdmission> =
+        Arc::new(TestAdmission);
+    let env = crate::agent::turn_env::HostTurnEnv {
+        dispatch_admission: Some(admission.clone()),
+        ..Default::default()
+    };
+
+    let parent = OpenHumanRunContext::new().with_host_env(&env);
+    let child = parent.child();
+
+    assert!(Arc::ptr_eq(
+        parent.dispatch_admission.as_ref().unwrap(),
+        child.dispatch_admission.as_ref().unwrap()
+    ));
+}
+
+struct TestAdmission;
+
+#[async_trait::async_trait]
+impl super::super::budget::PhysicalDispatchAdmission for TestAdmission {
+    async fn acquire(
+        &self,
+    ) -> Result<
+        Arc<dyn super::super::budget::PhysicalDispatchPermit>,
+        super::super::budget::DispatchRefusal,
+    > {
+        unreachable!("this context inheritance test never acquires a permit")
+    }
+}
+
+#[test]
 fn task_recency_window_reaches_tools_as_a_host_extension_not_a_task_local() {
     let mut host = OpenHumanRunContext::new();
     host.task_recency_window = Some(Duration::from_secs(86_400));

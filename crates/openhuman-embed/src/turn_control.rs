@@ -366,6 +366,7 @@ impl Turn {
             host: openhuman_core::agent::turn_env::HostTurnEnv {
                 command_environment: self.tool_env.take(),
                 model_budget: budget.clone(),
+                dispatch_admission: self.dispatch_admission.take(),
                 spawn_depth_limit: self.spawn_depth_limit,
                 cancellation: self.native_cancellation.clone(),
                 hooks: std::mem::take(&mut self.hooks),

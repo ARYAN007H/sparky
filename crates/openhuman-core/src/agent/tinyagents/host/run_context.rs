@@ -269,6 +269,9 @@ impl TurnDispatchState {
 pub struct OpenHumanRunContext {
     /// Explicit shared model-call budget inherited by synchronous children.
     pub model_budget: Option<super::super::budget::ModelBudget>,
+    /// Host admission policy shared by this run and its synchronous descendants.
+    pub dispatch_admission:
+        Option<Arc<super::super::budget::PhysicalDispatchAdmission>>,
     /// The response format and output cap this root turn asks of every model
     /// call, and the slot its final call is reported into. Carried explicitly
     /// from the caller (`agent_chat`) through the session; children never
@@ -435,6 +438,7 @@ impl OpenHumanRunContext {
     pub fn new() -> Self {
         Self {
             model_budget: None,
+            dispatch_admission: None,
             response_shape: None,
             max_spawn_depth: None,
             origin: None,
@@ -583,6 +587,7 @@ impl OpenHumanRunContext {
     #[must_use]
     pub(crate) fn with_host_env(mut self, env: &crate::agent::turn_env::HostTurnEnv) -> Self {
         self.model_budget = env.model_budget.clone().or(self.model_budget);
+        self.dispatch_admission = env.dispatch_admission.clone().or(self.dispatch_admission);
         self.max_spawn_depth = env.spawn_depth_limit.or(self.max_spawn_depth);
         if let Some(cancellation) = &env.cancellation {
             self.cancellation = cancellation.clone();

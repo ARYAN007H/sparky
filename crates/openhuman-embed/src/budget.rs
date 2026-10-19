@@ -20,7 +20,8 @@
 //! bounds that include model framing and the maximum price on allowed routes.
 pub use openhuman_core::agent::tinyagents::budget::ModelBudget;
 pub use openhuman_core::agent::tinyagents::budget::{
-    DispatchRefusal, DispatchRefusalReason, PhysicalDispatchAdmission, PhysicalDispatchPermit,
+    ControlledDispatchError, DispatchModelOptions, DispatchRefusal, DispatchRefusalReason,
+    PhysicalDispatchAdmission, PhysicalDispatchPermit,
 };
 pub use tinyinference_llm::model::budget::{
     Budget, BudgetExceeded, BudgetSnapshot, CallBudget, Spend, SpendLimits,
