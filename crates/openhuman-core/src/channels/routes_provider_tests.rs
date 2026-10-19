@@ -57,12 +57,18 @@ async fn handle_runtime_command_routes_configured_provider_slug_and_alias() {
             )
             .await
         );
+        let expected = if requested == "custom-route" {
+            "custom-route"
+        } else {
+            "openhuman"
+        };
+        assert_eq!(get_route_selection(&ctx, key).provider, expected);
     }
 
-    assert_eq!(get_route_selection(&ctx, key).provider, "openhuman");
     let sent = channel_impl.sent.lock().unwrap();
-    assert_eq!(sent.len(), 1, "the configured slug should be accepted");
+    assert_eq!(sent.len(), 2, "both configured routes should be accepted");
     assert!(sent[0]
         .content
         .contains("Provider switched to `custom-route`"));
+    assert!(sent[1].content.contains("Provider switched to `openhuman`"));
 }
